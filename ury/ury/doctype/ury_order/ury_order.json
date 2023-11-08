@@ -1,0 +1,266 @@
+{
+ "actions": [],
+ "creation": "2023-09-13 23:49:03.431246",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "table_tab",
+  "take_away",
+  "table_list",
+  "take_away_list",
+  "restaurant_table",
+  "menu_tab",
+  "item_search",
+  "column_break_10",
+  "all_item",
+  "priority_item",
+  "section_break_13",
+  "item",
+  "customer_tab",
+  "customer_name",
+  "no_of_pax",
+  "favorite_item_section",
+  "favorite_items",
+  "order_tab",
+  "add_item",
+  "cart_items",
+  "grand_total",
+  "last_invoice",
+  "additional_details",
+  "items",
+  "waiter",
+  "pos_profile",
+  "cashier",
+  "comments",
+  "column_break_3",
+  "current_order"
+ ],
+ "fields": [
+  {
+   "fieldname": "table_tab",
+   "fieldtype": "Tab Break",
+   "label": "Table"
+  },
+  {
+   "default": "0",
+   "fieldname": "take_away",
+   "fieldtype": "Check",
+   "hidden": 1,
+   "label": "Take Away"
+  },
+  {
+   "fieldname": "table_list",
+   "fieldtype": "HTML",
+   "label": "Table List"
+  },
+  {
+   "fieldname": "take_away_list",
+   "fieldtype": "HTML",
+   "label": "Take Away List"
+  },
+  {
+   "fieldname": "restaurant_table",
+   "fieldtype": "Link",
+   "hidden": 1,
+   "label": "Restaurant Table",
+   "options": "URY Table"
+  },
+  {
+   "fieldname": "menu_tab",
+   "fieldtype": "Tab Break",
+   "label": "Menu"
+  },
+  {
+   "fieldname": "item_search",
+   "fieldtype": "Data"
+  },
+  {
+   "fieldname": "column_break_10",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "all_item",
+   "fieldtype": "Button",
+   "label": "All"
+  },
+  {
+   "fieldname": "priority_item",
+   "fieldtype": "Button",
+   "label": "Priority"
+  },
+  {
+   "fieldname": "section_break_13",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "item",
+   "fieldtype": "HTML",
+   "label": "Item",
+   "options": "<div class=\"container px-0\">\n<div class=\"row\" id=\"restaurant_menu_items\"></div>\n</div>"
+  },
+  {
+   "fieldname": "customer_tab",
+   "fieldtype": "Tab Break",
+   "label": "Customer"
+  },
+  {
+   "fieldname": "customer_name",
+   "fieldtype": "Link",
+   "in_filter": 1,
+   "in_global_search": 1,
+   "in_standard_filter": 1,
+   "label": "Customer Name",
+   "options": "Customer",
+   "reqd": 1
+  },
+  {
+   "fieldname": "no_of_pax",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Pax",
+   "reqd": 1
+  },
+  {
+   "fieldname": "favorite_item_section",
+   "fieldtype": "Section Break",
+   "label": "Favorite Item",
+   "read_only": 1
+  },
+  {
+   "fieldname": "favorite_items",
+   "fieldtype": "HTML",
+   "label": "Favorite Items",
+   "options": "<div class=\"container px-0\">\n<div class=\"row\" id=\"fav_items\"></div>\n</div>"
+  },
+  {
+   "fieldname": "order_tab",
+   "fieldtype": "Tab Break",
+   "label": "Order"
+  },
+  {
+   "depends_on": "eval:doc.restaurant_table || doc.take_away",
+   "description": "Click Enter To Add",
+   "fieldname": "add_item",
+   "fieldtype": "Link",
+   "hidden": 1,
+   "label": "Add Item",
+   "options": "Item"
+  },
+  {
+   "fieldname": "cart_items",
+   "fieldtype": "HTML",
+   "label": "Cart Items",
+   "options": "<div class=\"container px-0\">\n<div id=\"restaurantCartItems\"></div>\n</div>"
+  },
+  {
+   "fieldname": "grand_total",
+   "fieldtype": "Currency",
+   "label": "Grand Total",
+   "read_only": 1
+  },
+  {
+   "fieldname": "last_invoice",
+   "fieldtype": "Link",
+   "label": "Invoice",
+   "options": "POS Invoice",
+   "read_only": 1
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "additional_details",
+   "fieldtype": "Section Break",
+   "label": "Additional Details"
+  },
+  {
+   "depends_on": "eval:doc.restaurant_table || doc.take_away",
+   "fieldname": "items",
+   "fieldtype": "Table",
+   "label": "Items",
+   "options": "URY Order Item"
+  },
+  {
+   "fieldname": "waiter",
+   "fieldtype": "Link",
+   "label": "Waiter",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "pos_profile",
+   "fieldtype": "Link",
+   "label": "POS Profile",
+   "options": "POS Profile",
+   "read_only": 1
+  },
+  {
+   "fieldname": "cashier",
+   "fieldtype": "Link",
+   "label": "Cashier",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "comments",
+   "fieldtype": "Data",
+   "label": "Comments"
+  },
+  {
+   "fieldname": "column_break_3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval:doc.restaurant_table || doc.take_away",
+   "fieldname": "current_order",
+   "fieldtype": "Section Break",
+   "label": "Current Order"
+  }
+ ],
+ "hide_toolbar": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2023-09-27 23:09:52.290978",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY Order",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "select": 1,
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "URY Manager",
+   "select": 1,
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "URY Captain",
+   "write": 1
+  }
+ ],
+ "quick_entry": 1,
+ "search_fields": "customer_name",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

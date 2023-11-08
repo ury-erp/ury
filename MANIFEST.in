@@ -1,0 +1,18 @@
+include MANIFEST.in
+include requirements.txt
+include *.json
+include *.md
+include *.py
+include *.txt
+recursive-include ury *.css
+recursive-include ury *.csv
+recursive-include ury *.html
+recursive-include ury *.ico
+recursive-include ury *.js
+recursive-include ury *.json
+recursive-include ury *.md
+recursive-include ury *.png
+recursive-include ury *.py
+recursive-include ury *.svg
+recursive-include ury *.txt
+recursive-exclude ury *.pyc

@@ -1,0 +1,150 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "prompt",
+ "creation": "2023-09-13 23:44:01.744181",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "table_info_tab",
+  "no_of_seats",
+  "minimum_seating",
+  "column_break_vub4k",
+  "restaurant",
+  "restaurant_room",
+  "branch",
+  "section_break_mcm3o",
+  "is_take_away",
+  "active_info_tab",
+  "occupied",
+  "column_break_280tb",
+  "latest_invoice_time"
+ ],
+ "fields": [
+  {
+   "fieldname": "table_info_tab",
+   "fieldtype": "Tab Break",
+   "label": "Table Info"
+  },
+  {
+   "fieldname": "no_of_seats",
+   "fieldtype": "Int",
+   "label": "No of Seats"
+  },
+  {
+   "fieldname": "minimum_seating",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Minimum Seating",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_vub4k",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "restaurant",
+   "fieldtype": "Link",
+   "label": "Restaurant",
+   "options": "URY Restaurant",
+   "reqd": 1
+  },
+  {
+   "fieldname": "restaurant_room",
+   "fieldtype": "Link",
+   "label": "Restaurant Room",
+   "options": "URY Room",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "restaurant.branch",
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "label": "Branch",
+   "options": "Branch",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_mcm3o",
+   "fieldtype": "Section Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_take_away",
+   "fieldtype": "Check",
+   "label": "Is Take Away"
+  },
+  {
+   "fieldname": "active_info_tab",
+   "fieldtype": "Tab Break",
+   "label": "Active Info"
+  },
+  {
+   "default": "0",
+   "fieldname": "occupied",
+   "fieldtype": "Check",
+   "label": "Occupied",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_280tb",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Now",
+   "fieldname": "latest_invoice_time",
+   "fieldtype": "Time",
+   "label": "Latest Invoice Time"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2023-09-28 23:36:23.757302",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY Table",
+ "naming_rule": "Set by user",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "select": 1,
+   "share": 1,
+   "write": 1
+  },
+  {
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "URY Captain",
+   "select": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "URY Manager",
+   "select": 1,
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}
