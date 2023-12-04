@@ -1,0 +1,112 @@
+{
+ "charts": [],
+ "content": "[{\"id\":\"PO4EylCUq0\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Quick Access<br></span>\",\"col\":12}},{\"id\":\"Dx0a9ED4s4\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Ury Order\",\"col\":3}},{\"id\":\"VCTWrfn8Od\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"3XhkKI6EJA\",\"type\":\"card\",\"data\":{\"card_name\":\"Setup\",\"col\":4}}]",
+ "creation": "2023-11-30 12:04:38.330350",
+ "custom_blocks": [],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "for_user": "",
+ "hide_custom": 0,
+ "icon": "milestone",
+ "idx": 0,
+ "is_hidden": 0,
+ "label": "URY",
+ "links": [
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Setup",
+   "link_count": 6,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "URY Restaurant",
+   "link_count": 0,
+   "link_to": "URY Restaurant",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Branch",
+   "link_count": 0,
+   "link_to": "Branch",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "URY Menu",
+   "link_count": 0,
+   "link_to": "URY Menu",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "URY Table",
+   "link_count": 0,
+   "link_to": "URY Table",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "URY Room",
+   "link_count": 0,
+   "link_to": "URY Room",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Network Printer Settings",
+   "link_count": 0,
+   "link_to": "Network Printer Settings",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2023-11-30 12:17:16.450472",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY",
+ "number_cards": [],
+ "owner": "Administrator",
+ "parent_page": "",
+ "public": 1,
+ "quick_lists": [],
+ "roles": [
+  {
+   "role": "URY Captain"
+  },
+  {
+   "role": "URY Manager"
+  }
+ ],
+ "sequence_id": 31.0,
+ "shortcuts": [
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "Ury Order",
+   "link_to": "URY Order",
+   "type": "DocType"
+  }
+ ],
+ "title": "URY"
+}
