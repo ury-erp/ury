@@ -122,9 +122,13 @@ Follow these steps to set up URY:
 	```
 - Authorized personnel can upload the files through ERPNext's File Manager.
 - Ensure that both files are uploaded as private files.
-	
 
 **Step 12 :**
+
+- Go to POS Settings
+- Add 'Print' button to Additional Information to take print before settlement
+
+**Step 13 :**
 
 - Go To 'URY Order' and take your first order.
 

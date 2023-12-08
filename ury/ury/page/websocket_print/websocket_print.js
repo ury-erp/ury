@@ -4,12 +4,10 @@ frappe.pages['websocket-print'].on_page_load = function (wrapper) {
 		title: 'Websocket Print',
 		single_column: true
 	});
-	console.log("Heyyyy")
 	frappe.call({
 		method: 'ury.ury_pos.api.getBranch',
 		callback: function (r) {
 			const branch = r.message;
-			console.log(branch, "Heyyyy")
 			const print_channel = `print_${branch}`;
 			frappe.realtime.on(print_channel, (data) => {
 				if (!(data.data.name in localStorage)) {

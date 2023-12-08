@@ -34,6 +34,7 @@
   "pos_profile",
   "cashier",
   "comments",
+  "modified_time",
   "column_break_3",
   "current_order"
  ],
@@ -215,12 +216,17 @@
    "fieldname": "current_order",
    "fieldtype": "Section Break",
    "label": "Current Order"
+  },
+  {
+   "fieldname": "modified_time",
+   "fieldtype": "Datetime",
+   "label": "Modified time"
   }
  ],
  "hide_toolbar": 1,
  "issingle": 1,
  "links": [],
- "modified": "2023-09-27 23:09:52.290978",
+ "modified": "2023-12-04 18:37:00.014157",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Order",

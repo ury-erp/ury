@@ -96,12 +96,13 @@
    "default": "Now",
    "fieldname": "latest_invoice_time",
    "fieldtype": "Time",
-   "label": "Latest Invoice Time"
+   "label": "Latest Invoice Time",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2023-09-28 23:36:23.757302",
+ "modified": "2023-12-08 12:14:40.697920",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Table",

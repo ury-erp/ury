@@ -83,7 +83,7 @@ frappe.pages['point-of-sale'].on_page_load = function (wrapper) {
             cancel_order() {
                 if (!this.$components_wrapper.is(":visible")) return;
 
-                if (this.frm.doc.__unsaved == 1) {
+                if (this.frm.doc.name.startsWith("new-pos")) {
                     frappe.show_alert({
                         message: __("You must save document as draft to cancel."),
                         indicator: 'red'
@@ -91,24 +91,61 @@ frappe.pages['point-of-sale'].on_page_load = function (wrapper) {
                     frappe.utils.play_sound("error");
                     return;
                 }
-                frappe.confirm(
-                    __("Are you sure you want to cancel this document?"),
-                    () => {
-                        frappe.call({
-                            method: 'ury.ury.doctype.ury_order.ury_order.cancel_order',
-                            args: {
-                                invoice_id: this.frm.doc.name
-                            },
-                            callback: function (r) {
-                                frappe.show_alert({ message: __('Cancelled'), indicator: 'red' });
-                                setTimeout(function () {
-                                    window.location.reload();
-                                }, 1000)
-                            }
+                if (this.frm.doc.restaurant_table) {
+                    frappe.throw({
+                        message: __("Not allowed to cancel table orders through PoS")
+                    });
+                }
+                else {
+                    if (this.frm.doc.invoice_printed == 1) {
+                        frappe.throw({
+                            message: __("Not allowed to cancel billed orders")
                         });
+                    }
+                    else {
+                        let cancel_flag = false;
+                        var dialog = new frappe.ui.Dialog({
+                            title: __("Confirm Cancellation"),
+                            fields: [
+                                {
+                                    fieldname: 'reason',
+                                    fieldtype: 'Data',
+                                    label: __('Reason'),
+                                    reqd: 1
+                                }
+                            ],
+                            primary_action: function () {
+                                var reason = dialog.get_value('reason');
+                                if (!cancel_flag) {
+                                    cancel_flag = true;
+                                    this.frm.reason = reason;
+                                    this.frm.cancel_reason = reason;
+                                    this.cancel(this.frm.cancel_reason);
+                                    dialog.hide();
+                                }
+                            }.bind(this),
+                            primary_action_label: __('Yes'),
+                        });
+                        dialog.show();
+                    }
+                }
 
-                    })
+            }
+            cancel() {
 
+                frappe.call({
+                    method: 'ury.ury.doctype.ury_order.ury_order.cancel_order',
+                    args: {
+                        invoice_id: this.frm.doc.name,
+                        reason: this.frm.cancel_reason
+                    },
+                    callback: function (r) {
+                        frappe.show_alert({ message: __('Cancelled'), indicator: 'red' });
+                        setTimeout(function () {
+                            window.location.reload();
+                        }, 1000)
+                    }
+                });
             }
         };
 

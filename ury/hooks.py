@@ -117,6 +117,7 @@ doc_events = {
         "on_trash": "ury.ury.hooks.ury_pos_invoice.on_trash",
     },
     "POS Profile": {"validate": "ury.ury.hooks.ury_pos_profile.validate"},
+    "Sales Invoice": {"before_insert": "ury.ury.hooks.ury_sales_invoice.before_insert"},
 }
 
 # Scheduled Tasks
@@ -235,6 +236,8 @@ fixtures = [
                     "POS Invoice-column_break_gd1mq",
                     "POS Invoice-arrived_time",
                     "POS Invoice-total_spend_time",
+                    "POS Invoice-section_break_hllcp",
+                    "POS Invoice-cancel_reason",
                     "POS Invoice Item-comment",
                     "Sales Invoice-mobile_number",
                     "Sales Invoice-order_info",
@@ -258,6 +261,7 @@ fixtures = [
                     "POS Profile-printer_settings",
                     "POS Profile-qz_print",
                     "POS Profile-qz_host",
+                    "POS Profile-restaurant_prefix",
                     "POS Opening Entry-restaurant_info",
                     "POS Opening Entry-restaurant",
                     "POS Opening Entry-column_break_e3dky",

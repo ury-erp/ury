@@ -15,6 +15,7 @@ def validate(doc, method):
 def before_submit(doc, method):
     calculate_and_set_times(doc, method)
     validate_invoice_print(doc, method)
+    ro_reload_submit(doc, method)
 
 
 def on_trash(doc, method):
@@ -83,3 +84,8 @@ def pos_invoice_naming(doc, method):
         doc.naming_series = frappe.db.get_value(
             "URY Restaurant", restaurant, "invoice_series_prefix"
         )
+
+
+# reload restaurant order page if submitted invoice is open there
+def ro_reload_submit(doc, method):
+    frappe.publish_realtime("reload_ro", {"name": doc.name})

@@ -82,6 +82,7 @@ def sync_order(
     last_invoice,
     waiter,
     pos_profile,
+    last_modified_time=None,
     table=None,
     invoice=None,
     comments=None,
@@ -100,6 +101,48 @@ def sync_order(
         return {"status": "Failure"}
 
     invoice = get_order_invoice(table, invoice)
+
+    if last_invoice and last_modified_time:
+        lastModifiedTime = invoice.modified
+        from datetime import datetime
+
+        if isinstance(last_modified_time, str):
+            try:
+                last_modified_time = datetime.strptime(
+                    last_modified_time, "%Y-%m-%d %H:%M:%S.%f"
+                )
+            except ValueError:
+                last_modified_time = datetime.strptime(
+                    last_modified_time, "%Y-%m-%d %H:%M:%S"
+                )
+        if isinstance(lastModifiedTime, str):
+            try:
+                lastModifiedTime = datetime.strptime(
+                    lastModifiedTime, "%Y-%m-%d %H:%M:%S.%f"
+                )
+            except ValueError:
+                lastModifiedTime = datetime.strptime(
+                    lastModifiedTime, "%Y-%m-%d %H:%M:%S"
+                )
+        if lastModifiedTime != last_modified_time:
+            frappe.msgprint(
+                title="Order has been modified",
+                indicator="red",
+                msg=(
+                    "This order has been modified. Please reload the page to retrieve the latest edits."
+                ),
+            )
+            return {"status": "Failure"}
+    else:
+        if invoice.name:
+            frappe.msgprint(
+                title="Table occupied ",
+                indicator="red",
+                msg=(
+                    "This table ({0}) is already    . Please refresh the page."
+                ).format(table),
+            )
+            return {"status": "Failure"}
 
     invoice.customer = customer
 
@@ -321,7 +364,7 @@ def customer_favourite_item(customer_name):
 
 
 @frappe.whitelist()
-def cancel_order(invoice_id):
+def cancel_order(invoice_id, reason):
     pos_invoice = frappe.get_doc("POS Invoice", invoice_id)
 
     # Update table status
@@ -343,7 +386,11 @@ def cancel_order(invoice_id):
         pass
 
     # Update invoice status
-    frappe.db.update("POS Invoice", invoice_id, {"docstatus": 2, "status": "Cancelled"})
+    frappe.db.update(
+        "POS Invoice",
+        invoice_id,
+        {"docstatus": 2, "status": "Cancelled", "cancel_reason": reason},
+    )
 
 
 # Method for URY POS

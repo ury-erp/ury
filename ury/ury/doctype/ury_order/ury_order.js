@@ -86,6 +86,12 @@ frappe.ui.form.on('URY Order', {
 			$(this).prop('type', 'number');
 		})
 
+		frappe.realtime.on('reload_ro', (data) => {
+			if (frm.doc.last_invoice && data.name === frm.doc.last_invoice) {
+				frappe.dom.freeze(__('Order Completed'));
+				frappe.ui.toolbar.clear_cache();
+			}
+		});
 
 		const handleTableClick = (e) => {
 			const tableId = e.target.id;
@@ -560,8 +566,10 @@ frappe.ui.form.on('URY Order', {
 		frm.doc.add_item = '';
 		frm.doc.grand_total = 0;
 		frm.doc.items = [];
+		frm.doc.modified_time = '';
 		frm.refresh_field("customer_name");
 		frm.refresh_field("no_of_pax");
+		frm.refresh_field("modified_time")
 	},
 
 	restaurant_table: function (frm) {
@@ -627,13 +635,21 @@ frappe.ui.form.on('URY Order', {
 						no_of_pax: frm.doc.no_of_pax,
 						waiter: frappe.session.user,
 						pos_profile: frm.doc.pos_profile,
+						last_modified_time: frm.doc.modified_time,
 						cashier: frm.doc.cashier,
 						last_invoice: last_invoice,
 						comments: frm.doc.comments,
 					},
 					callback: (r) => {
 						let invoice = r.message;
-						if (invoice) {
+						if (invoice.status == "Failure") {
+							frappe.dom.freeze();
+							document.addEventListener('click', function () {
+								window.location.reload()
+							});
+						}
+						else {
+							cur_frm.set_value("modified_time", invoice.modified);
 							frm.events.set_invoice_items(frm, r);
 							frappe.show_alert({ message: __('Order Updated'), indicator: 'green' });
 							frm.trigger('refresh');
@@ -851,6 +867,7 @@ frappe.ui.form.on('URY Order', {
 		frm.set_value('no_of_pax', invoice.no_of_pax);
 		frm.set_value('grand_total', invoice.grand_total);
 		frm.set_value('last_invoice', invoice.name);
+		frm.set_value('modified_time', invoice.modified);
 
 		if (invoice.waiter && invoice.waiter != frappe.session.user) {
 			frappe.db.get_doc('User', invoice.waiter)
@@ -886,127 +903,191 @@ frappe.ui.form.on('URY Order', {
 
 	table_transfer: function (frm) {
 		frm.add_custom_button(__('Table Transfer'), () => {
-			const d = new frappe.ui.Dialog({
-				title: 'Transfer Table',
-				fields: [
-					{
-						label: 'New Table',
-						fieldname: 'table',
-						fieldtype: 'Link',
-						options: 'URY Table',
-						get_query: function () {
-							return { filters: { "occupied": 0 } };
-						}
-					},
-					{
-						label: 'Current Table',
-						fieldname: 'cur_table',
-						fieldtype: 'Data',
-						read_only: true,
-						default: frm.doc.restaurant_table
-					}
-				],
-				primary_action_label: 'Transfer',
-				primary_action(values) {
-					frappe.dom.freeze();
-					frm.call({
-						method: 'ury.ury.doctype.ury_order.ury_order.table_transfer',
-						args: {
-							invoice: frm.doc.last_invoice,
-							table: frm.doc.restaurant_table,
-							newTable: values.table
-						},
-						callback: function (r) {
-							frm.trigger('clear');
-							// Reload the page
-							window.location.reload();
+			frappe.db.get_doc('POS Invoice', invoice).then((pos_invoice) => {
+				if (pos_invoice.invoice_printed === 1) {
+					frappe.throw({
+						title: __("Invoice Already Billed"),
+						message: __("This order has already been billed. Please reload the page."),
+						indicator: 'red'
+					});
+				}
+
+				else {
+					const d = new frappe.ui.Dialog({
+						title: 'Transfer Table',
+						fields: [
+							{
+								label: 'New Table',
+								fieldname: 'table',
+								fieldtype: 'Link',
+								options: 'URY Table',
+								get_query: function () {
+									return { filters: { "occupied": 0 } };
+								}
+							},
+							{
+								label: 'Current Table',
+								fieldname: 'cur_table',
+								fieldtype: 'Data',
+								read_only: true,
+								default: frm.doc.restaurant_table
+							}
+						],
+						primary_action_label: 'Transfer',
+						primary_action(values) {
+							frappe.dom.freeze();
+							frm.call({
+								method: 'ury.ury.doctype.ury_order.ury_order.table_transfer',
+								args: {
+									invoice: frm.doc.last_invoice,
+									table: frm.doc.restaurant_table,
+									newTable: values.table
+								},
+								callback: function (r) {
+									frm.trigger('clear');
+									// Reload the page
+									window.location.reload();
+								}
+							});
+							d.hide();
 						}
 					});
-					d.hide();
+					d.show();
 				}
+
 			});
-			d.show();
-		});
+		})
 	},
 
 	captain_transfer: function (frm) {
 		let invoice = frm.doc.last_invoice
 		frm.add_custom_button(__('Captain Transfer'), () => {
 			frappe.db.get_doc('POS Invoice', invoice).then(pos_invoice => {
+				if (pos_invoice.invoice_printed === 1) {
+					frappe.throw({
+						title: __("Invoice Already Billed"),
+						message: __("This order has already been billed. Please reload the page."),
+						indicator: 'red'
+					});
+				}
+				else {
+					let d = new frappe.ui.Dialog({
+						title: 'Transfer Captain',
+						fields: [
+							{
+								label: 'New Captain',
+								fieldname: 'captain',
+								fieldtype: 'Link',
+								options: 'User',
 
-				let d = new frappe.ui.Dialog({
-					title: 'Transfer Captain',
-					fields: [
-						{
-							label: 'New Captain',
-							fieldname: 'captain',
-							fieldtype: 'Link',
-							options: 'User',
-
-						},
-						{
-							label: 'Current Captain',
-							fieldname: 'cur_captain',
-							fieldtype: 'Data',
-							read_only: true,
-							default: frm.doc.waiter
-						}
-
-					],
-					primary_action_label: 'Transfer',
-					primary_action(values) {
-						frappe.dom.freeze();
-						frm.call({
-							method: 'ury.ury.doctype.ury_order.ury_order.captain_transfer',
-							args: {
-								invoice: frm.doc.last_invoice,
-								currentCaptain: frm.doc.waiter,
-								newCaptain: values.captain
 							},
-							callback: function (r) {
-								frm.trigger('clear');
-								window.location.reload();
-								document.addEventListener('click', function () {
-									window.location.reload();
-								});
-
+							{
+								label: 'Current Captain',
+								fieldname: 'cur_captain',
+								fieldtype: 'Data',
+								read_only: true,
+								default: frm.doc.waiter
 							}
-						});
-						d.hide();
-					}
-				});
-				d.show();
+
+						],
+						primary_action_label: 'Transfer',
+						primary_action(values) {
+							frappe.dom.freeze();
+							frm.call({
+								method: 'ury.ury.doctype.ury_order.ury_order.captain_transfer',
+								args: {
+									invoice: frm.doc.last_invoice,
+									currentCaptain: frm.doc.waiter,
+									newCaptain: values.captain
+								},
+								callback: function (r) {
+									frm.trigger('clear');
+									window.location.reload();
+									document.addEventListener('click', function () {
+										window.location.reload();
+									});
+
+								}
+							});
+							d.hide();
+						}
+					});
+					d.show();
+				}
 			});
 		});
 	},
 
 	cancel_order: function (frm) {
-		frm.add_custom_button(__('Cancel'), () => {
-			if (frm.doc.last_invoice) {
-				frappe.confirm(
-					'Are you sure to Cancel?',
-					function () {
-						frm.call({
-							method: 'ury.ury.doctype.ury_order.ury_order.cancel_order',
-							args: {
-								invoice_id: frm.doc.last_invoice
-							},
-							callback: function (r) {
-								frappe.show_alert({ message: __('Cancelled'), indicator: 'red' });
-								setTimeout(function () {
-									window.location.reload();
-								}, 1000)
+		frappe.call({
+			method: 'ury.ury.api.button_permission.cancel_check',
+			callback: function (r) {
+				if (r.message == true) {
+					frm.add_custom_button(__('Cancel'), () => {
+						frappe.db.get_doc('POS Invoice', frm.doc.last_invoice).then((pos_invoice) => {
+							if (pos_invoice.invoice_printed === 1) {
+								frappe.throw({
+									title: __("Invoice Already Billed"),
+									message: __("This order has already been billed. Please reload the page."),
+									indicator: 'red'
+								});
 							}
+							else {
+								let cancelFlag = false;
+
+								var dialog = new frappe.ui.Dialog({
+									title: __("Confirm Cancellation"),
+									fields: [
+										{
+											fieldname: 'reason',
+											fieldtype: 'Data',
+											label: __('Reason'),
+											reqd: 1
+										}
+									],
+									primary_action: function () {
+										var reason = dialog.get_value('reason');
+										if (!cancelFlag) {
+											cancelFlag = true;
+											frm.reason = reason;
+											frm.cancel_reason = reason;
+											frm.trigger('cancel');
+											dialog.hide();
+										}
+									},
+									primary_action_label: __('Cancel'),
+									// secondary_action_label: __('No'),
+									// secondary_action: function () {
+									// 	dialog.hide();
+									// }
+								});
+
+								dialog.show();
+							}
+
 						});
-					},
-				)
+					}).addClass("cancel-btn");
+				}
+
 			}
-			else {
-				frappe.throw({
-					message: __("No order present to cancel")
-				});
+		})
+
+	},
+
+	cancel: function (frm) {
+		frm.call({
+			method: 'ury.ury.doctype.ury_order.ury_order.cancel_order',
+			args: {
+				invoice_id: frm.doc.last_invoice,
+				reason: frm.cancel_reason
+			},
+			callback: function (r) {
+				frappe.show_alert({ message: __('Cancelled'), indicator: 'red' });
+				setTimeout(function () {
+					window.location.reload();
+				}, 1000)
 			}
-		}).addClass("cancel-btn");
+		});
 
 	}
 
