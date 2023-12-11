@@ -243,14 +243,15 @@ frappe.ui.form.on('URY Order', {
 				array_of_menu = []
 				frappe.db.get_doc('URY Menu', r.message[1]).then(item_list => {
 					item_list.items.forEach(menu_item => {
-						let menu_item_list = []
-						menu_item_list['item_name'] = menu_item.item_name
-						menu_item_list['item_code'] = menu_item.item
-						menu_item_list['rate_of_item'] = menu_item.rate
-						menu_item_list['special_dish_menu'] = menu_item.special_dish
-						array_of_menu = [...array_of_menu, menu_item_list]
-						frm.events.quantity_add(frm, index, menu_item_list);
-
+						if (menu_item.disabled == 0) {
+							let menu_item_list = []
+							menu_item_list['item_name'] = menu_item.item_name
+							menu_item_list['item_code'] = menu_item.item
+							menu_item_list['rate_of_item'] = menu_item.rate
+							menu_item_list['special_dish_menu'] = menu_item.special_dish
+							array_of_menu = [...array_of_menu, menu_item_list]
+							frm.events.quantity_add(frm, index, menu_item_list);
+						}
 					})
 				})
 			}

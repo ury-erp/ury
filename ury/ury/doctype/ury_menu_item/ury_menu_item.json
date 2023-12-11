@@ -10,7 +10,8 @@
   "item",
   "item_name",
   "rate",
-  "special_dish"
+  "special_dish",
+  "disabled"
  ],
  "fields": [
   {
@@ -39,12 +40,19 @@
    "fieldtype": "Check",
    "in_list_view": 1,
    "label": "Special Dish"
+  },
+  {
+   "default": "0",
+   "fieldname": "disabled",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Disabled"
   }
  ],
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2023-09-20 20:34:49.930132",
+ "modified": "2023-12-11 13:43:07.514930",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Menu Item",
