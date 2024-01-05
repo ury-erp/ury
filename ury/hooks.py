@@ -264,6 +264,7 @@ fixtures = [
                     "POS Profile-qz_host",
                     "POS Profile-section_break_tjhrm",
                     "POS Profile-transfer_role_permissions",
+                    "POS Profile-role_allowed_for_billing",
                     "POS Profile-restaurant_prefix",
                     "POS Opening Entry-restaurant_info",
                     "POS Opening Entry-restaurant",

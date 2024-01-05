@@ -143,7 +143,7 @@ frappe.ui.form.on('URY Order', {
 			frm.set_value('restaurant_table', tableId).then(() => {
 				frappe.dom.freeze();
 
-				const tabToClick = frm.doc.last_invoice ? '#ury-order-order_tab-tab' : null;
+				const tabToClick = frm.doc.last_invoice ? '#ury-order-order_tab-tab' : '#ury-order-menu_tab-tab';
 				$(tabToClick).click();
 
 				frappe.dom.unfreeze();
@@ -665,7 +665,7 @@ frappe.ui.form.on('URY Order', {
 					}
 				} else {
 					frappe.throw({
-						message: __('POS Profile Not Found')
+						message: __('POS Profile Not Found or User permission in POS Profile is not given to this user')
 					});
 				}
 			} else {
@@ -926,8 +926,41 @@ frappe.ui.form.on('URY Order', {
 	},
 
 	set_invoice_items: function (frm, r) {
-		frappe.dom.freeze(__('Setting table'));
+
 		let invoice = r.message;
+
+		frappe.call({
+			method: 'frappe.client.get',
+			args: {
+				doctype: 'POS Profile',
+				name: frm.doc.pos_profile
+			},
+			callback: function (response) {
+				if (response.message) {
+					var transfer_roles = response.message.transfer_role_permissions.map(role => role.role);
+					var user_roles = frappe.user_roles;
+					var has_access = transfer_roles.some(role => user_roles.includes(role));
+					if (has_access == false) {
+						if (invoice.waiter && invoice.waiter != frappe.session.user) {
+							frappe.db.get_doc('User', invoice.waiter)
+								.then(docs => {
+									frappe.dom.freeze();
+									document.addEventListener('click', function () {
+										window.location.reload();
+									});
+									frappe.throw({
+										title: __("Table Assignment Error"),
+										message: __("This table is assigned to {0}. Please contact them for assistance.", [docs.full_name])
+
+									})
+								})
+						}
+					}
+				}
+			}
+		})
+
+		frappe.dom.freeze(__('Setting table'));
 
 		if (invoice.name) {
 			frappe.show_alert({
@@ -948,36 +981,7 @@ frappe.ui.form.on('URY Order', {
 		frm.set_value('last_invoice', invoice.name);
 		frm.set_value('modified_time', invoice.modified);
 
-		frappe.call({
-			method: 'frappe.client.get',
-			args: {
-				doctype: 'POS Profile',
-				name: frm.doc.pos_profile
-			},
-			callback: function (response) {
-				if (response.message) {
-					var transfer_roles = response.message.transfer_role_permissions.map(role => role.role);
-					var user_roles = frappe.user_roles;
-					var has_access = transfer_roles.some(role => user_roles.includes(role));
-
-					if (has_access && frm.doc.last_invoice.waiter && frm.doc.last_invoice.waiter !== frappe.session.user) {
-						frappe.db.get_doc('User', frm.doc.last_invoice.waiter).then(user => {
-							frappe.dom.freeze();
-							document.addEventListener('click', function () {
-								window.location.reload();
-							});
-
-							frappe.msgprint({
-								title: __("Table Assignment Error"),
-								message: __("This table is assigned to {0}. Please contact them for assistance.", [user.full_name])
-							});
-						});
-					}
-				}
-			}
-		});
-
-		const tabToClick = frm.doc.last_invoice ? '#ury-order-order_tab-tab' : null;
+		const tabToClick = frm.doc.last_invoice ? '#ury-order-order_tab-tab' : '#ury-order-menu_tab-tab';
 		$(tabToClick).click();
 
 		if (frm.doc.last_invoice) {
