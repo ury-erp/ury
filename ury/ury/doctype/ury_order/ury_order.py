@@ -6,6 +6,7 @@ import frappe
 from frappe import _
 from frappe.model.document import Document
 from erpnext.controllers.queries import item_query
+from ury.ury_pos.api import getBranch
 
 
 class URYOrder(Document):
@@ -22,10 +23,18 @@ def get_order_invoice(table=None, invoiceNo=None, is_payment=None):
                 "POS Invoice", dict(restaurant_table=table, docstatus=0, name=invoiceNo)
             )
         else:
-            invoice_name = frappe.get_value(
-                "POS Invoice",
-                dict(restaurant_table=table, docstatus=0, invoice_printed=0),
-            )
+            if invoiceNo:
+                invoice_name = frappe.get_value(
+                    "POS Invoice",
+                    dict(
+                        restaurant_table=table, docstatus=0, invoice_printed=invoiceNo
+                    ),
+                )
+            else:
+                invoice_name = frappe.get_value(
+                    "POS Invoice",
+                    dict(restaurant_table=table, docstatus=0, invoice_printed=0),
+                )
         # invoice_name = frappe.get_value("POS Invoice", dict(restaurant_table=table, docstatus=0, invoice_printed=0))
         branch, menu_name, restaurant = get_restaurant_and_menu_name(table)
 
@@ -56,9 +65,14 @@ def get_order_invoice(table=None, invoiceNo=None, is_payment=None):
         )
 
     else:
-        invoice_name = frappe.get_value(
-            "POS Invoice", dict(docstatus=0, name=invoiceNo, invoice_printed=0)
-        )
+        if is_payment == "Payments":
+            invoice_name = frappe.get_value(
+                "POS Invoice", dict(restaurant_table=table, docstatus=0, name=invoiceNo)
+            )
+        else:
+            invoice_name = frappe.get_value(
+                "POS Invoice", dict(docstatus=0, name=invoiceNo, invoice_printed=0)
+            )
         if invoice_name:
             invoice = frappe.get_doc("POS Invoice", invoice_name)
 
@@ -92,6 +106,7 @@ def sync_order(
     if (
         last_invoice
         and frappe.db.get_value("POS Invoice", last_invoice, "invoice_printed") == 1
+        and not cashier
     ):
         frappe.msgprint(
             title="Invoice Already Billed",
@@ -134,7 +149,7 @@ def sync_order(
             )
             return {"status": "Failure"}
     else:
-        if invoice.name:
+        if invoice.name and invoice.invoice_printed == 0 and table and not cashier:
             frappe.msgprint(
                 title="Table occupied ",
                 indicator="red",
@@ -218,9 +233,10 @@ def sync_order(
         pass
 
     # table status
-    frappe.db.set_value(
-        "URY Table", table, {"occupied": 1, "latest_invoice_time": invoice.creation}
-    )
+    if invoice.invoice_printed == 0:
+        frappe.db.set_value(
+            "URY Table", table, {"occupied": 1, "latest_invoice_time": invoice.creation}
+        )
 
     invoice.db_set("owner", cashier)
     return invoice.as_dict()
@@ -263,11 +279,11 @@ def get_restaurant_and_menu_name(table):
 
 
 @frappe.whitelist()
-def pos_opening_check(table):
-    pos = frappe.get_doc("URY Table", table)
+def pos_opening_check():
+    branch = getBranch()
     pos_opening_list = frappe.get_all(
         "POS Opening Entry",
-        filters={"restaurant": pos.restaurant, "status": "Open", "docstatus": 1},
+        filters={"branch": branch, "status": "Open", "docstatus": 1},
     )
     result = {
         "opening_exists": len(pos_opening_list) > 0,
@@ -339,26 +355,23 @@ def customer_favourite_item(customer_name):
     pos = frappe.db.get_list(
         "POS Invoice", filters={"customer": customer_name}, fields=["name"]
     )
+
     item_qty = {}
 
     for invoice in pos:
         pos_invoice = frappe.get_doc("POS Invoice", invoice)
         for item in pos_invoice.items:
-            if item.item_name in item_qty:
-                item_qty[item.item_name] += item.qty
-            else:
-                item_qty[item.item_name] = item.qty
+            item_name = item.item_name
+            item_qty[item_name] = item_qty.get(item_name, 0) + item.qty
 
     result = [
         {"item_name": item_name, "qty": qty}
         for item_name, qty in item_qty.items()
         if qty > 1
     ]
-    result = sorted(result, key=lambda x: x["qty"], reverse=True)
+    result = sorted(result, key=lambda x: x["qty"], reverse=True)[:3]
 
-    top_3_items = result[:3]
-
-    return top_3_items
+    return result
 
 
 @frappe.whitelist()

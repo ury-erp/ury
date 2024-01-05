@@ -3,6 +3,7 @@ frappe.require([
     '/assets/ury/js/jsrsasign-all-min.js',
     '/assets/ury/js/sign-message.js'
 ]);
+
 frappe.ui.form.on('POS Invoice', {
 
     before_save: function (frm) {
@@ -164,6 +165,7 @@ frappe.ui.form.on('POS Invoice', {
                         },
                         callback: function (r) {
                             $('.standard-actions').addClass('hidden-xs hidden-md');
+                            frappe.show_alert({ message: __('Invoice Printed'), indicator: 'green' });
                             frappe.ui.toolbar.clear_cache()
                             frappe.dom.unfreeze();
                         }

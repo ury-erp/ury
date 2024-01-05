@@ -118,6 +118,7 @@ doc_events = {
     },
     "POS Profile": {"validate": "ury.ury.hooks.ury_pos_profile.validate"},
     "Sales Invoice": {"before_insert": "ury.ury.hooks.ury_sales_invoice.before_insert"},
+    "Customer": {"before_save": "ury.ury.hooks.ury_customer.before_insert"},
 }
 
 # Scheduled Tasks
@@ -261,6 +262,8 @@ fixtures = [
                     "POS Profile-printer_settings",
                     "POS Profile-qz_print",
                     "POS Profile-qz_host",
+                    "POS Profile-section_break_tjhrm",
+                    "POS Profile-transfer_role_permissions",
                     "POS Profile-restaurant_prefix",
                     "POS Opening Entry-restaurant_info",
                     "POS Opening Entry-restaurant",
@@ -273,4 +276,5 @@ fixtures = [
         ],
     },
     {"dt": "Role", "filters": [["role_name", "like", "URY %"]]},
+    "Client Script",
 ]

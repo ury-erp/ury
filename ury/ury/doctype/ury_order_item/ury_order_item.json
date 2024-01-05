@@ -20,6 +20,7 @@
    "in_list_view": 1,
    "label": "Item",
    "options": "Item",
+   "read_only": 1,
    "reqd": 1
   },
   {
@@ -27,7 +28,8 @@
    "fieldname": "item_name",
    "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "Item Name"
+   "label": "Item Name",
+   "read_only": 1
   },
   {
    "fieldname": "qty",
@@ -38,8 +40,10 @@
   {
    "fieldname": "rate",
    "fieldtype": "Currency",
+   "hidden": 1,
    "in_list_view": 1,
-   "label": "Rate"
+   "label": "Rate",
+   "read_only": 1
   },
   {
    "fieldname": "comments",
@@ -50,7 +54,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2023-09-13 23:48:59.047889",
+ "modified": "2023-12-16 16:16:02.465270",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Order Item",

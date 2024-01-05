@@ -37,8 +37,7 @@
    "fieldname": "minimum_seating",
    "fieldtype": "Int",
    "in_list_view": 1,
-   "label": "Minimum Seating",
-   "reqd": 1
+   "label": "Minimum Seating"
   },
   {
    "fieldname": "column_break_vub4k",
@@ -102,7 +101,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2023-12-08 12:14:40.697920",
+ "modified": "2023-12-19 15:32:33.523732",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Table",
@@ -142,6 +141,12 @@
    "select": 1,
    "share": 1,
    "write": 1
+  },
+  {
+   "print": 1,
+   "read": 1,
+   "role": "URY Cashier",
+   "select": 1
   }
  ],
  "sort_field": "modified",

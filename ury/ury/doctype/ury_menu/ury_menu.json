@@ -63,7 +63,7 @@
   }
  ],
  "links": [],
- "modified": "2023-09-27 23:07:32.807331",
+ "modified": "2023-12-19 14:08:40.859677",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Menu",
@@ -104,6 +104,13 @@
    "report": 1,
    "role": "URY Captain",
    "select": 1
+  },
+  {
+   "print": 1,
+   "read": 1,
+   "role": "URY Cashier",
+   "select": 1,
+   "write": 1
   }
  ],
  "quick_entry": 1,

@@ -31,7 +31,7 @@ frappe.pages['point-of-sale'].on_page_load = function (wrapper) {
                     df: {
                         label: ('Invoice Status'),
                         fieldtype: 'Select',
-                        options: `Draft\nPaid\nConsolidated\nReturn\nUnbilled`,
+                        options: `Draft\nTo Bill`,
                         placeholder: ('Filter by invoice status'),
                         onchange: function () {
                             if (me.$component.is(':visible')) me.refresh_list();
@@ -99,7 +99,9 @@ frappe.pages['point-of-sale'].on_page_load = function (wrapper) {
                 else {
                     if (this.frm.doc.invoice_printed == 1) {
                         frappe.throw({
-                            message: __("Not allowed to cancel billed orders")
+                            title: __("Invoice Already Billed"),
+                            message: __("Not allowed to cancel billed orders."),
+                            indicator: 'red'
                         });
                     }
                     else {
@@ -124,7 +126,7 @@ frappe.pages['point-of-sale'].on_page_load = function (wrapper) {
                                     dialog.hide();
                                 }
                             }.bind(this),
-                            primary_action_label: __('Yes'),
+                            primary_action_label: __('Cancel'),
                         });
                         dialog.show();
                     }

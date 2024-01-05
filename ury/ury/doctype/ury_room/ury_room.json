@@ -16,6 +16,7 @@
   {
    "fieldname": "restaurant",
    "fieldtype": "Link",
+   "hidden": 1,
    "label": "Restaurant",
    "options": "URY Restaurant"
   },
@@ -28,13 +29,14 @@
   {
    "fieldname": "price_list",
    "fieldtype": "Link",
+   "hidden": 1,
    "label": "Price List",
    "options": "Price List"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2023-09-27 23:08:48.984861",
+ "modified": "2023-12-19 14:13:33.301689",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Room",
@@ -74,6 +76,13 @@
    "report": 1,
    "role": "URY Captain",
    "select": 1
+  },
+  {
+   "print": 1,
+   "read": 1,
+   "role": "URY Cashier",
+   "select": 1,
+   "write": 1
   }
  ],
  "quick_entry": 1,

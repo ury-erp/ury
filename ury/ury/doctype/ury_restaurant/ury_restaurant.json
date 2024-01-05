@@ -71,7 +71,7 @@
  ],
  "image_field": "image",
  "links": [],
- "modified": "2023-10-04 12:32:44.363405",
+ "modified": "2023-12-19 14:09:17.821810",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Restaurant",
@@ -112,6 +112,12 @@
    "report": 1,
    "role": "URY Captain",
    "select": 1
+  },
+  {
+   "read": 1,
+   "role": "URY Cashier",
+   "select": 1,
+   "write": 1
   }
  ],
  "quick_entry": 1,

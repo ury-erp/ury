@@ -99,9 +99,9 @@
 
 - Table Orders are listed in the "*Toggle Recent Order*" section. 
 
-- To cancel an invoice, select "*Cancel Order*" from the menu bar.
+- To cancel an invoice, select "*Cancel Order*" from the menu bar. Invoices which is printed cannot be cancelled.
 
-- URY introduces a new status, "*Unbilled*" which filters POS invoices in draft and not printed from the Table Order.
+- URY introduces a new status, "*To Bill*" which filters POS invoices in draft and not printed from the Table Order.
 
 -  In `Additional Information` Section :
 	- Order Type : Select type of order listed 

@@ -50,20 +50,38 @@ frappe.ui.form.on('URY Order', {
 		$("[data-fieldname='qty']").on('click', 'input', function (e) {
 			$(this).prop('type', 'number');
 		})
+
+		frappe.call({
+			method: 'ury.ury.doctype.ury_order.ury_order.pos_opening_check',
+			callback: function (r) {
+				if (!r.message) {
+					frappe.msgprint('Server Error');
+				}
+				else if (!r.message.opening_exists) {
+					frappe.msgprint('POS Opening Entry is not created');
+					document.addEventListener('click', function () {
+						window.location.reload();
+					});
+				}
+				else if (!r.message.cashier || !r.message.pos_profile) {
+					frappe.msgprint('Incomplete data. Check POS Opening Entry.');
+				}
+				else {
+					frappe.dom.unfreeze();
+					if (r.message.opening_exists) {
+						// Set the cashier in URY Order
+						frm.set_value('cashier', r.message.cashier);
+						frm.set_value('waiter', frappe.session.user);
+						frm.set_value('pos_profile', r.message.pos_profile)
+
+					}
+				}
+			}
+		});
 	},
 
 	onload_post_render: function (frm) {
-		if (!frm.item_selector) {
-			frm.item_selector = new erpnext.ItemSelector({
-				frm: frm,
-				item_field: 'item',
-				item_query: 'ury.ury.doctype.ury_order.ury_order.item_query_restaurant',
-				get_filters: () => {
-					return { table: frm.doc.restaurant_table };
-				}
-			});
 
-		}
 		$('.items-container .item-wrapper').click((e) => {
 		})
 
@@ -74,10 +92,11 @@ frappe.ui.form.on('URY Order', {
 	},
 
 	refresh: function (frm) {
+
+		const check = localStorage.getItem('check');
 		frm.disable_save();
-		frm.add_custom_button(__('Update'), () => {
-			frm.trigger('sync');
-		});
+
+		frm.trigger('update_btn');
 
 		$("[data-fieldname='no_of_pax']").on('focus', 'input', function (e) {
 			$(this).prop('type', 'number');
@@ -93,6 +112,30 @@ frappe.ui.form.on('URY Order', {
 			}
 		});
 
+		// disable logo click
+		let logo_nav = document.querySelector('.navbar .navbar-brand')
+		logo_nav.removeAttribute('href');
+
+		//  button update in window for mobile screen
+		if (window.innerWidth <= 768) {
+			setTimeout(() => {
+				const hideButtons = (buttons) => {
+					buttons.forEach((button) => {
+						const element = document.querySelector(`button[data-label="${button}"].btn-default`);
+						if (element) {
+							element.classList.add('d-none');
+						}
+					});
+				};
+
+				const buttonsToHide = ['Table%20Transfer', 'Print', 'Cancel', 'Captain%20Transfer'];
+				hideButtons(buttonsToHide);
+
+				document.querySelector('.custom-actions').classList.remove('hidden-xs', 'hidden-md');
+			}, 1000);
+		}
+
+
 		const handleTableClick = (e) => {
 			const tableId = e.target.id;
 			currentTable = [tableId];
@@ -103,33 +146,7 @@ frappe.ui.form.on('URY Order', {
 				const tabToClick = frm.doc.last_invoice ? '#ury-order-order_tab-tab' : null;
 				$(tabToClick).click();
 
-				frappe.call({
-					method: 'ury.ury.doctype.ury_order.ury_order.pos_opening_check',
-					args: {
-						table: frm.doc.restaurant_table
-					},
-					callback: function (r) {
-						if (r.message.cashier === null) {
-							frappe.msgprint('Please Open POS Entry');
-							document.addEventListener('click', function () {
-								window.location.reload();
-							});
-						} else {
-							frappe.dom.unfreeze();
-							if (r.message.cashier) {
-
-								// Set the cashier in Restaurant Order (RO)
-								frm.set_value('cashier', r.message.cashier);
-								frm.set_value('waiter', frappe.session.user);
-								frm.set_value('pos_profile', r.message.pos_profile)
-
-
-							} else {
-								frappe.msgprint('No cashier/waiter/pos_profile found in POS Opening Entry');
-							}
-						}
-					}
-				});
+				frappe.dom.unfreeze();
 			});
 
 			frm.trigger('menu_listing');
@@ -204,6 +221,10 @@ frappe.ui.form.on('URY Order', {
 
 		});
 
+		$("[data-label='Print']").hide();
+		localStorage.removeItem('check');
+		frm.page.wrapper.find(".comment-box").css({ 'display': 'none' });
+
 		// For adding class to all item in menu tab
 		$("[data-fieldname='all_item']").addClass("float-right all_item").css({
 			'margin-top': '.5%'
@@ -256,6 +277,12 @@ frappe.ui.form.on('URY Order', {
 				})
 			}
 		});
+	},
+
+	calculate_total: function (frm, price, qty) {
+		let total = frm.doc.grand_total
+		let grand_total = total + (price * qty)
+		cur_frm.set_value("grand_total", grand_total);
 	},
 
 	display_menu: function (frm) {
@@ -331,6 +358,7 @@ frappe.ui.form.on('URY Order', {
 				d.hide();
 				(frm.doc.items || []).forEach((d) => {
 					if (d.item === OrderItems) {
+						const oldqty = $(`#${OrderItems}_cartqty`).val()
 						$(`#${index}_input`).val(values.qty)
 						d.qty = values.qty
 						$(`#${OrderItems}_cartqty`).val(`${d.qty}`);
@@ -341,6 +369,9 @@ frappe.ui.form.on('URY Order', {
 							message: __('Item Added Total Qty= ' + d.qty + ''),
 							indicator: 'green'
 						}, 0.85);
+
+						const added_qty = d.qty - parseInt(oldqty)
+						frm.events.calculate_total(frm, menu_item_list.rate_of_item, added_qty);
 					}
 				});
 				return frappe.run_serially([
@@ -352,6 +383,7 @@ frappe.ui.form.on('URY Order', {
 								indicator: 'green'
 							}, 0.85);
 
+							frm.events.calculate_total(frm, menu_item_list.rate_of_item, values.qty);
 							frm.events.createCartItem(frm, OrderItems, names, values.qty, values.comment);
 							return frm.add_child('items', {
 								item: OrderItems,
@@ -384,6 +416,8 @@ frappe.ui.form.on('URY Order', {
 						message: __('Item Added Total Qty= ' + d.qty + ''),
 						indicator: 'green'
 					}, 0.85);
+
+					frm.events.calculate_total(frm, menu_item_list.rate_of_item, 1);
 				}
 			});
 
@@ -395,6 +429,8 @@ frappe.ui.form.on('URY Order', {
 							message: __('Item Added Total Qty= 1'),
 							indicator: 'green'
 						}, 0.85);
+
+						frm.events.calculate_total(frm, menu_item_list.rate_of_item, 1);
 
 						frm.events.createCartItem(frm, OrderItems, names, 1);
 						return frm.add_child('items', {
@@ -417,6 +453,15 @@ frappe.ui.form.on('URY Order', {
 			let OrderItems = menu_item_list.item_code;
 			// Remove the item from frm.doc.items
 			frm.doc.items = (frm.doc.items || []).filter((d) => d.item !== OrderItems);
+
+			const qty = $(`#${OrderItems}_cartqty`).val()
+
+			if (qty) {
+				const negativeQty = qty * -1;
+				frm.events.calculate_total(frm, menu_item_list.rate_of_item, negativeQty);
+
+			}
+
 			frm.refresh_field("items");
 			$(`#${OrderItems}_container`).remove();
 			$(`#${OrderItems}_qtyContainer`).remove();
@@ -441,6 +486,8 @@ frappe.ui.form.on('URY Order', {
 						}, 0.85);
 						$(`#${OrderItems}_cartqty`).val(`${d.qty}`);
 					}
+
+					frm.events.calculate_total(frm, menu_item_list.rate_of_item, -1);
 				}
 			});
 
@@ -592,33 +639,55 @@ frappe.ui.form.on('URY Order', {
 	},
 
 	customer_name: function (frm) {
-		let customer_fav_items = ''
-		$('#fav_items').empty()
-		if (frm.doc.customer_name) {
-			frappe.call({
-				method: `ury.ury.doctype.ury_order.ury_order.customer_favourite_item`,
-				args: {
-					customer_name: frm.doc.customer_name
-				},
-				callback: function (r) {
-					r.message.map((x) => {
-						customer_fav_items = `
-								<div class="col-6 py-3" style="padding:0 15px;width: 250px;">
-										${x["item_name"]}
-								</div>
-								<div class="col-3 py-3">
-										${x["qty"]}
-								</div>
-								`
-						$('#fav_items').append(customer_fav_items);
-					})
 
+		frm.trigger('favourite')
+	},
+
+	update_btn: async function (frm) {
+		const check = localStorage.getItem('check');
+		frm.disable_save();
+
+		const handleUpdate = async () => {
+			if (frm.doc.restaurant_table) {
+				localStorage.setItem('check', 'printed');
+				frm.remove_custom_button('Update');
+				$('.standard-actions').addClass('hidden-xs hidden-md');
+
+				if (frm.doc.pos_profile) {
+					try {
+						frm.trigger('sync');
+						$('.standard-actions').removeClass('hidden-xs hidden-md');
+						frm.doc.comments = '';
+						localStorage.removeItem('check');
+					}
+					catch (error) {
+						console.error(error);
+					}
+				} else {
+					frappe.throw({
+						message: __('POS Profile Not Found')
+					});
 				}
-			});
+			} else {
+				frappe.throw({
+					message: __('Select Table')
+				});
+			}
+		};
+
+		if (frm.doc.last_invoice) {
+			const pos_invoice = await frappe.db.get_doc('POS Invoice', frm.doc.last_invoice);
+			if (pos_invoice.invoice_printed === 0 && !check) {
+				frm.add_custom_button(__('Update'), handleUpdate);
+			}
+		} else {
+			frm.add_custom_button(__('Update'), handleUpdate);
 		}
 	},
 
+
 	sync: function (frm) {
+		$('.custom-actions').addClass('hidden-xs hidden-md');
 		if (frm.doc.customer_name && frm.doc.no_of_pax) {
 			let last_invoice = ''
 			if (frm.doc.last_invoice) {
@@ -653,6 +722,9 @@ frappe.ui.form.on('URY Order', {
 							cur_frm.set_value("modified_time", invoice.modified);
 							frm.events.set_invoice_items(frm, r);
 							frappe.show_alert({ message: __('Order Updated'), indicator: 'green' });
+							localStorage.removeItem('check');
+							frm.trigger('update_btn');
+							$('.standard-actions').removeClass('hidden-xs hidden-md');
 							frm.trigger('refresh');
 
 						}
@@ -660,12 +732,18 @@ frappe.ui.form.on('URY Order', {
 				});
 			}
 			else {
+				frm.trigger('update_btn');
+				$('.standard-actions').removeClass('hidden-xs hidden-md');
+				localStorage.removeItem('check');
 				frappe.throw({
 					message: __("Select Items")
 				});
 			}
 		}
 		else {
+			frm.trigger('update_btn');
+			$('.standard-actions').removeClass('hidden-xs hidden-md');
+			localStorage.removeItem('check');
 			frappe.throw({
 				message: __("Select Customer / No of Pax")
 			});
@@ -870,21 +948,34 @@ frappe.ui.form.on('URY Order', {
 		frm.set_value('last_invoice', invoice.name);
 		frm.set_value('modified_time', invoice.modified);
 
-		if (invoice.waiter && invoice.waiter != frappe.session.user) {
-			frappe.db.get_doc('User', invoice.waiter)
-				.then(docs => {
-					frappe.dom.freeze();
-					document.addEventListener('click', function () {
-						window.location.reload();
-					});
-					frappe.throw({
-						title: __("Table Assignment Error"),
-						message: __("This table is assigned to {0}. Please contact them for assistance.", [docs.full_name])
+		frappe.call({
+			method: 'frappe.client.get',
+			args: {
+				doctype: 'POS Profile',
+				name: frm.doc.pos_profile
+			},
+			callback: function (response) {
+				if (response.message) {
+					var transfer_roles = response.message.transfer_role_permissions.map(role => role.role);
+					var user_roles = frappe.user_roles;
+					var has_access = transfer_roles.some(role => user_roles.includes(role));
 
-					})
-				})
+					if (has_access && frm.doc.last_invoice.waiter && frm.doc.last_invoice.waiter !== frappe.session.user) {
+						frappe.db.get_doc('User', frm.doc.last_invoice.waiter).then(user => {
+							frappe.dom.freeze();
+							document.addEventListener('click', function () {
+								window.location.reload();
+							});
 
-		}
+							frappe.msgprint({
+								title: __("Table Assignment Error"),
+								message: __("This table is assigned to {0}. Please contact them for assistance.", [user.full_name])
+							});
+						});
+					}
+				}
+			}
+		});
 
 		const tabToClick = frm.doc.last_invoice ? '#ury-order-order_tab-tab' : null;
 		$(tabToClick).click();
@@ -904,7 +995,7 @@ frappe.ui.form.on('URY Order', {
 
 	table_transfer: function (frm) {
 		frm.add_custom_button(__('Table Transfer'), () => {
-			frappe.db.get_doc('POS Invoice', invoice).then((pos_invoice) => {
+			frappe.db.get_doc('POS Invoice', frm.doc.last_invoice).then((pos_invoice) => {
 				if (pos_invoice.invoice_printed === 1) {
 					frappe.throw({
 						title: __("Invoice Already Billed"),
@@ -962,61 +1053,78 @@ frappe.ui.form.on('URY Order', {
 
 	captain_transfer: function (frm) {
 		let invoice = frm.doc.last_invoice
-		frm.add_custom_button(__('Captain Transfer'), () => {
-			frappe.db.get_doc('POS Invoice', invoice).then(pos_invoice => {
-				if (pos_invoice.invoice_printed === 1) {
-					frappe.throw({
-						title: __("Invoice Already Billed"),
-						message: __("This order has already been billed. Please reload the page."),
-						indicator: 'red'
-					});
-				}
-				else {
-					let d = new frappe.ui.Dialog({
-						title: 'Transfer Captain',
-						fields: [
-							{
-								label: 'New Captain',
-								fieldname: 'captain',
-								fieldtype: 'Link',
-								options: 'User',
-
-							},
-							{
-								label: 'Current Captain',
-								fieldname: 'cur_captain',
-								fieldtype: 'Data',
-								read_only: true,
-								default: frm.doc.waiter
-							}
-
-						],
-						primary_action_label: 'Transfer',
-						primary_action(values) {
-							frappe.dom.freeze();
-							frm.call({
-								method: 'ury.ury.doctype.ury_order.ury_order.captain_transfer',
-								args: {
-									invoice: frm.doc.last_invoice,
-									currentCaptain: frm.doc.waiter,
-									newCaptain: values.captain
-								},
-								callback: function (r) {
-									frm.trigger('clear');
-									window.location.reload();
-									document.addEventListener('click', function () {
-										window.location.reload();
+		if (invoice) {
+			frappe.call({
+				method: 'frappe.client.get',
+				args: {
+					doctype: 'POS Profile',
+					name: frm.doc.pos_profile
+				},
+				callback: function (response) {
+					var transfer_roles = response.message.transfer_role_permissions.map(role => role.role);
+					var user_roles = frappe.user_roles
+					var has_access = transfer_roles.some(role => user_roles.includes(role));
+					if (has_access) {
+						frm.add_custom_button(__('Captain Transfer'), () => {
+							frappe.db.get_doc('POS Invoice', invoice).then(pos_invoice => {
+								if (pos_invoice.invoice_printed === 1) {
+									frappe.throw({
+										title: __("Invoice Already Billed"),
+										message: __("This order has already been billed. Please reload the page."),
+										indicator: 'red'
 									});
+								}
+								else {
+									let d = new frappe.ui.Dialog({
+										title: 'Transfer Captain',
+										fields: [
+											{
+												label: 'New Captain',
+												fieldname: 'captain',
+												fieldtype: 'Link',
+												options: 'User',
+											},
+											{
+												label: 'Current Captain',
+												fieldname: 'cur_captain',
+												fieldtype: 'Data',
+												read_only: true,
+												default: pos_invoice.waiter
+											}
 
+										],
+										primary_action_label: 'Transfer',
+										primary_action(values) {
+											frappe.dom.freeze();
+											frm.call({
+												method: 'ury.ury.doctype.ury_order.ury_order.captain_transfer',
+												args: {
+													invoice: frm.doc.last_invoice,
+													currentCaptain: frm.doc.waiter,
+													newCaptain: values.captain
+												},
+												callback: function (r) {
+													frm.trigger('clear');
+													window.location.reload();
+													document.addEventListener('click', function () {
+														window.location.reload();
+													});
+
+												}
+											});
+											d.hide();
+										}
+									});
+									d.show();
 								}
 							});
-							d.hide();
-						}
-					});
-					d.show();
+						});
+					}
+
+
 				}
 			});
-		});
+		}
 	},
 
 	cancel_order: function (frm) {
@@ -1029,7 +1137,7 @@ frappe.ui.form.on('URY Order', {
 							if (pos_invoice.invoice_printed === 1) {
 								frappe.throw({
 									title: __("Invoice Already Billed"),
-									message: __("This order has already been billed. Please reload the page."),
+									message: __("Not allowed to cancel billed orders."),
 									indicator: 'red'
 								});
 							}
@@ -1057,10 +1165,6 @@ frappe.ui.form.on('URY Order', {
 										}
 									},
 									primary_action_label: __('Cancel'),
-									// secondary_action_label: __('No'),
-									// secondary_action: function () {
-									// 	dialog.hide();
-									// }
 								});
 
 								dialog.show();
@@ -1090,6 +1194,33 @@ frappe.ui.form.on('URY Order', {
 			}
 		});
 
+	},
+
+	favourite: function (frm) {
+		let customer_fav_items = ''
+		$('#fav_items').empty()
+		if (frm.doc.customer_name) {
+			frappe.call({
+				method: `ury.ury.doctype.ury_order.ury_order.customer_favourite_item`,
+				args: {
+					customer_name: frm.doc.customer_name
+				},
+				callback: function (r) {
+					r.message.map((x) => {
+						customer_fav_items = `
+								<div class="col-6 py-3" style="padding:0 15px;width: 250px;">
+										${x["item_name"]}
+								</div>
+								<div class="col-3 py-3">
+										${x["qty"]}
+								</div>
+								`
+						$('#fav_items').append(customer_fav_items);
+					})
+
+				}
+			});
+		}
 	}
 
 });

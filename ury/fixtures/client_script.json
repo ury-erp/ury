@@ -1,0 +1,24 @@
+[
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "POS Invoice",
+  "enabled": 0,
+  "modified": "2023-12-19 15:34:46.018469",
+  "module": "URY",
+  "name": "Customer mobile number in PoS",
+  "script": "frappe.ui.form.on('POS Invoice', {\n    customer(frm) {\n       \n        $(document).on('shown.bs.modal', '.modal', function() {\n            let modal = $(this);\n\n            // Hide specific fields and sections\n            modal.find('.frappe-control[data-fieldname=\"customer_group\"]').hide();\n            modal.find('.frappe-control[data-fieldname=\"territory\"]').hide();\n            modal.find('.modal-footer .custom-actions button:contains(\"Edit Full Form\")').remove();\n\n            // Copy customer name to mobile number\n            let nameField = modal.find('.frappe-control[data-fieldname=\"customer_name\"] input');\n            let mobileField = modal.find('.frappe-control[data-fieldname=\"mobile_number\"] input');\n            \n            // Copy only if the input is number\n            if (!isNaN(nameField.val())) {\n                mobileField.val(nameField.val());\n                nameField.val('');\n            }\n\n            // Slide down modal body after hiding fields\n            modal.find('.modal-body, .ui-front').slideDown();\n\n            // Set focus to specific fields\n            modal.find('input[data-fieldname=\"customer_name\"]').focus();\n            modal.find('input[data-fieldname=\"comment\"]').focus();\n\n            // Listen for click on the save button\n            modal.find('.modal-footer .standard-actions .btn-modal-primary').click(function(e) {\n                if (isNaN(nameField.val() === '')) {\n                    nameField.val(mobileField.val());\n                }\n            });\n        });\n    }\n});\n",
+  "view": "Form"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "URY Order",
+  "enabled": 0,
+  "modified": "2023-12-19 15:35:10.075949",
+  "module": "URY",
+  "name": "Customer mobile number in ury order",
+  "script": "frappe.ui.form.on('URY Order', {\n\tcustomer_name: function (frm) {\n\t\n\t     $(document).on('shown.bs.modal', '.modal', function() {\n            let modal = $(this);\n\n            // Hide specific fields and sections\n            modal.find('.frappe-control[data-fieldname=\"customer_group\"]').hide();\n            modal.find('.frappe-control[data-fieldname=\"territory\"]').hide();\n            modal.find('.modal-footer .custom-actions button:contains(\"Edit Full Form\")').remove();\n\n            // Copy customer name to mobile number\n            let nameField = modal.find('.frappe-control[data-fieldname=\"customer_name\"] input');\n            let mobileField = modal.find('.frappe-control[data-fieldname=\"mobile_number\"] input');\n            \n            // Copy only if the input is number\n            if (!isNaN(nameField.val())) {\n                mobileField.val(nameField.val());\n                nameField.val('');\n            }\n\n            // Slide down modal body after hiding fields\n            modal.find('.modal-body, .ui-front').slideDown();\n\n            // Set focus to specific fields\n            modal.find('input[data-fieldname=\"customer_name\"]').focus();\n            modal.find('input[data-fieldname=\"comment\"]').focus();\n\n            // Listen for click on the save button\n            modal.find('.modal-footer .standard-actions .btn-modal-primary').click(function(e) {\n                if (isNaN(nameField.val() === '')) {\n                    nameField.val(mobileField.val());\n                }\n            });\n        });\n\t    \n\t}\n});",
+  "view": "Form"
+ }
+]

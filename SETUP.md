@@ -22,6 +22,7 @@ Follow these steps to set up URY:
 - In extra , Use ERP provided roles for permissions related to ERP functionality.
 	- Possible role for restaurant order takers/ captains can be - Item Manager ,Accounts User ,Sales User.
 	- For Restaurant Managers - Item Manager ,Sales Manager ,Accounts Manager ,Stock Manager ,Sales User.
+	
 
 **Step 3 :**
 
@@ -64,10 +65,8 @@ Follow these steps to set up URY:
 
 - Next is to Create Restaurant Room with the following details :
 
-	- **Name** : Specify a unique name to the menu.
+	- **Name** : Specify a unique name to the room.
 	- **Room Type** : Select the type from the list
-	- **Price List** : We can assign a price list a aginst room , mention it here
-
 
 **Step 8 :**
 
@@ -75,7 +74,7 @@ Follow these steps to set up URY:
 
 	- **Name** : Specify the table name that will be listed in URY Order.
 	- **Restaurant** : Select the associated restaurant.
-	- **Restaurant Room** : Specify a room to which the table belong ( if no room is there , create a default room and select it for all)
+	- **Restaurant Room** : Specify a room to which the table belong ( if no room in restaurant , create a default room and select it for all)
 	- **Branch** : This field will be auto-populated when the restaurant is selected.
 	- **No of seat** : Input the number of seats at the table.
 	- **Minimum seating** : Specify minimum seating capacity .
@@ -86,15 +85,13 @@ Follow these steps to set up URY:
 **Step 9 :**
 
 - [Create POS Profile](https://docs.erpnext.com/docs/user/manual/en/pos-profile) in ERPNext
-
 - Addition fields 
-
 	- **Restaurant** : Select Restaurant in which POS Profile belong.
 	- **Branch** :  The branch will be auto-fetched when selecting the restaurant.
 	- **Printer Settings** : Choose a network printer. 
 	- **QZ Print** :  Check this box to enable QZ printing.
 	- **QZ Host** :Enter the Network IP for QZ printing.
-
+	- **Captain Transfer Role Permissions** : Role added to this field have permission for `Captain Transfer`. Also user having this role have access to all table.
 
 **Step 10 :**
 
@@ -105,6 +102,7 @@ Follow these steps to set up URY:
 **Step 11 :**
 
 - To prevent alerts during printing with QZ Tray and address the two promise messages, follow these standardized steps:
+
 - **Signature Promise** 
 	- Add path of your qz certificate in the `site_config.json` under the key "qz_cert".
 	- Eg: If your certificate file is at `/private/files/cert.pem` , then the value follows ,
@@ -129,6 +127,13 @@ Follow these steps to set up URY:
 - Add 'Print' button to Additional Information to take print before settlement
 
 **Step 13 :**
+
+- This step is optional and applicable when the mobile number is automatically fetched from the customer name field.
+- Open the client script and ensure that the script responsible for the provided code is enabled.
+- The purpose is to extract the number from the customer name field and write it to the mobile number field.
+- Give default value to Customer Group and Territories using doctype customisation.
+
+**Step 14 :**
 
 - Go To 'URY Order' and take your first order.
 

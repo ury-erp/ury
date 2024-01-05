@@ -5,6 +5,7 @@ from frappe.utils import now_datetime, get_time
 
 def before_insert(doc, method):
     pos_invoice_naming(doc, method)
+    order_type_update(doc, method)
 
 
 def validate(doc, method):
@@ -84,6 +85,19 @@ def pos_invoice_naming(doc, method):
         doc.naming_series = frappe.db.get_value(
             "URY Restaurant", restaurant, "invoice_series_prefix"
         )
+
+
+def order_type_update(doc, method):
+    if doc.restaurant_table:
+        is_take_away = frappe.db.get_value(
+            "URY Table", doc.restaurant_table, "is_take_away"
+        )
+        if is_take_away == 1:
+            doc.order_type = "Take Away"
+        else:
+            doc.order_type = "Dine In"
+    else:
+        doc.order_type = "Take Away"
 
 
 # reload restaurant order page if submitted invoice is open there
