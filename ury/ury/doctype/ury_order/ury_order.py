@@ -7,6 +7,7 @@ from frappe import _
 from frappe.model.document import Document
 from erpnext.controllers.queries import item_query
 from ury.ury_pos.api import getBranch
+from frappe import cache
 
 
 class URYOrder(Document):
@@ -203,7 +204,17 @@ def sync_order(
                     comment=d.get("comment"),
                 ),
             )
+        for item in invoice.items:
+            item_prices = frappe.db.get_list(
+                "Item Price",
+                filters={"item_code": item.item_code, "price_list": price_list},
+                fields=["price_list_rate"],
+            )
+            for price in item_prices:
+                item.rate = price.price_list_rate
+
         invoice.save()
+
     else:
         invoice.items = []
         for d in items:
@@ -216,6 +227,15 @@ def sync_order(
                     comment=d.get("comment"),
                 ),
             )
+
+        for item in invoice.items:
+            item_prices = frappe.db.get_list(
+                "Item Price",
+                filters={"item_code": item.item_code, "price_list": price_list},
+                fields=["price_list_rate"],
+            )
+            for price in item_prices:
+                item.rate = price.price_list_rate
 
         invoice.save()
 
@@ -266,9 +286,25 @@ def get_restaurant_and_menu_name(table):
     if not table:
         frappe.throw(_("Please select a table"))
 
-    restaurant = frappe.db.get_value("URY Table", table, "restaurant")
-    branch = frappe.db.get_value("URY Table", table, "branch")
-    menu = frappe.db.get_value("URY Restaurant", restaurant, "active_menu")
+    restaurant, branch, room = frappe.get_value(
+        "URY Table",
+        table,
+        ["restaurant", "branch", "restaurant_room"],
+    )
+    room_wise_menu = frappe.db.get_value(
+        "URY Restaurant",
+        restaurant,
+        "room_wise_menu",
+    )
+
+    if not room_wise_menu:
+        menu = frappe.db.get_value("URY Restaurant", restaurant, "active_menu")
+    else:
+        menu = frappe.db.get_value(
+            "Menu for Room",
+            {"parent": restaurant, "room": room},
+            "menu",
+        )
 
     if not menu:
         frappe.throw(

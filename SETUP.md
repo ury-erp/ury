@@ -38,10 +38,12 @@ Follow these steps to set up URY:
 	- **Company**: Specify the company under which the restaurant is being created.
 	- **Default customer** : Set a default customer .
 	- **Invoice Series Prefix**: allows you to define prefix for naming of a Invoice .
-	- **Active Menu** : Select Menu against the restaurant .
-	-  **Branch** : Select the branch associated with the restaurant .
+	- **Branch** : Select the branch associated with the restaurant .
 	- **Default Tax Template** : Mention the [Sales tax](https://docs.erpnext.com/docs/user/manual/en/sales-taxes-and-charges-template) value if applicable .
 	- **Address** : Provide the address of the restaurant.
+	- **Default Menu** : Select Menu against the restaurant .
+	- **Room Wise Menu** : To enable room wise menu .
+	- **Menu For Room** : Add restaurant menu against each room to handle room wise price list. 
 
 
 **Step 5 :**
@@ -66,7 +68,8 @@ Follow these steps to set up URY:
 - Next is to Create Restaurant Room with the following details :
 
 	- **Name** : Specify a unique name to the room.
-	- **Room Type** : Select the type from the list
+	- **Room Type** : Select the type from the list.
+	- **Print Settings** : Choose a network printer.
 
 **Step 8 :**
 

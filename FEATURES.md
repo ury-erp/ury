@@ -36,6 +36,12 @@
 
 - Specified rates in the table automatically creates a 'Price list' using the same menu name.
 
+- Default menu is added in URY Restaurant. 
+
+- Room wise menu is handled by enabling room wise menu and adding values in the child table.
+
+- If room wise menu is enabled , ury take menu as per the room defined against each table on table selection.
+
 - Menu Selection tab contain : 
 	- Search bar to quickly locate specific menu items, enhancing speed and accuracy during busy periods.
 

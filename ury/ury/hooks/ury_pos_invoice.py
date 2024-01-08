@@ -11,6 +11,7 @@ def before_insert(doc, method):
 def validate(doc, method):
     validate_invoice(doc, method)
     validate_customer(doc, method)
+    validate_price_list(doc, method)
 
 
 def before_submit(doc, method):
@@ -103,3 +104,21 @@ def order_type_update(doc, method):
 # reload restaurant order page if submitted invoice is open there
 def ro_reload_submit(doc, method):
     frappe.publish_realtime("reload_ro", {"name": doc.name})
+
+
+def validate_price_list(doc, method):
+    if doc.restaurant:
+        room = frappe.db.get_value("URY Table", doc.restaurant_table, "restaurant_room")
+        menu_name = (
+            frappe.db.get_value("URY Restaurant", doc.restaurant, "active_menu")
+            if not frappe.db.get_value(
+                "URY Restaurant", doc.restaurant, "room_wise_menu"
+            )
+            else frappe.db.get_value(
+                "Menu for Room", {"parent": doc.restaurant, "room": room}, "menu"
+            )
+        )
+
+        doc.selling_price_list = frappe.db.get_value(
+            "Price List", dict(restaurant_menu=menu_name, enabled=1)
+        )

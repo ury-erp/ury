@@ -94,6 +94,7 @@ frappe.ui.form.on('POS Invoice', {
                                                     callback: function (r) {
                                                     }
                                                 });
+                                                cur_frm.set_value('invoice_printed', 1);
                                                 frappe.dom.unfreeze();
                                                 frappe.show_alert({ message: __('Invoice Printed'), indicator: 'green' });
                                             })
@@ -132,10 +133,9 @@ frappe.ui.form.on('POS Invoice', {
                                 if (r.message == "Success") {
                                     $('.standard-actions').addClass('hidden-xs hidden-md');
                                     frappe.show_alert({ message: __('Invoice Printed'), indicator: 'green' });
-                                    setTimeout(function () {
-                                        frappe.dom.unfreeze();
-                                        frappe.ui.toolbar.clear_cache()
-                                    }, 1500)
+                                    cur_frm.set_value('invoice_printed', 1);
+                                    frappe.dom.unfreeze();
+                                    cur_frm.reload_doc();
                                 }
                                 else {
                                     console.error(r.message);
@@ -165,6 +165,7 @@ frappe.ui.form.on('POS Invoice', {
                         },
                         callback: function (r) {
                             $('.standard-actions').addClass('hidden-xs hidden-md');
+                            cur_frm.set_value('invoice_printed', 1);
                             frappe.show_alert({ message: __('Invoice Printed'), indicator: 'green' });
                             frappe.ui.toolbar.clear_cache()
                             frappe.dom.unfreeze();
@@ -176,3 +177,4 @@ frappe.ui.form.on('POS Invoice', {
     }
 
 })
+

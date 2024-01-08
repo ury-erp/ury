@@ -864,43 +864,38 @@ frappe.ui.form.on('URY Order', {
 							}
 
 							else if (profile.printer_settings.some(e => e.bill == 1)) {
-								profile.printer_settings.forEach(printers => {
-									if (printers.bill) {
-										frappe.call({
-											method: `ury.ury.api.ury_print.network_printing`,
-											args: {
-												doctype: "POS Invoice",
-												name: invoice,
-												printer_setting: printers.printer,
-												print_format: profile.print_format
-											},
-											callback: function (r) {
-												if (r.message == "Success") {
-													$('.standard-actions').addClass('hidden-xs hidden-md');
-													frappe.show_alert({ message: __('Invoice Printed'), indicator: 'green' });
-													setTimeout(function () {
-														frappe.dom.unfreeze();
-														frappe.ui.toolbar.clear_cache()
-													}, 1500)
-												}
-												else {
-													console.error(r.message);
-													frappe.dom.unfreeze();
-													frappe.throw({
-														message: __("Printing Failed")
-													});
-												}
-											},
-											error: function (xhr, textStatus, error) {
-												console.error("AJAX Error:", error); // Log the AJAX error
+								frappe.call({
+									method: `ury.ury.api.ury_print.select_network_printer`,
+									args: {
+										pos_profile: pos_invoice.pos_profile,
+										invoice_id: invoice
+									},
+									callback: function (r) {
+										if (r.message == "Success") {
+											$('.standard-actions').addClass('hidden-xs hidden-md');
+											frappe.show_alert({ message: __('Invoice Printed'), indicator: 'green' });
+											setTimeout(function () {
 												frappe.dom.unfreeze();
-												frappe.throw({
-													message: __("An error occurred while printing")
-												});
-											}
+												frappe.ui.toolbar.clear_cache()
+											}, 1500)
+										}
+										else {
+											console.error(r.message);
+											frappe.dom.unfreeze();
+											frappe.throw({
+												message: __("Printing Failed")
+											});
+										}
+									},
+									error: function (xhr, textStatus, error) {
+										console.error("AJAX Error:", error); // Log the AJAX error
+										frappe.dom.unfreeze();
+										frappe.throw({
+											message: __("An error occurred while printing")
 										});
 									}
 								})
+
 							}
 							else {
 								frappe.call({

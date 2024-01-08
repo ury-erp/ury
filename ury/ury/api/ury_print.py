@@ -82,6 +82,33 @@ def network_printing(
 
 
 @frappe.whitelist()
+def select_network_printer(pos_profile, invoice_id):
+    table = frappe.db.get_value("POS Invoice", invoice_id, "restaurant_table")
+    print_format = frappe.db.get_value("POS Profile", pos_profile, "print_format")
+
+    if table:
+        room = frappe.db.get_value("URY Table", table, "restaurant_room")
+        room_bill_printer = frappe.db.get_value(
+            "URY Printer Settings", {"parent": room, "bill": 1}, "printer"
+        )
+        if room_bill_printer:
+            print = network_printing(
+                "POS Invoice", invoice_id, room_bill_printer, print_format
+            )
+            return print
+
+    else:
+        pos_bill_printer = frappe.db.get_value(
+            "URY Printer Settings", {"parent": pos_profile, "bill": 1}, "printer"
+        )
+        if pos_bill_printer:
+            print = network_printing(
+                "POS Invoice", invoice_id, pos_bill_printer, print_format
+            )
+            return print
+
+
+@frappe.whitelist()
 def qz_print_update(invoice):
     table = frappe.db.get_value("POS Invoice", invoice, "restaurant_table")
 

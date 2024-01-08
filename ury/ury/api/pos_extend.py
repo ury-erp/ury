@@ -1,29 +1,39 @@
+from erpnext.accounts.doctype.sales_invoice.sales_invoice import (
+    SalesInvoice,
+    update_multi_mode_option,
+)
 import frappe
 from frappe.utils.nestedset import get_root_of
 from frappe.utils import cint
-from erpnext.accounts.doctype.pos_invoice.pos_invoice import get_stock_availability
+from erpnext.accounts.doctype.pos_invoice.pos_invoice import (
+    add_return_modes,
+    get_stock_availability,
+)
 from erpnext.selling.page.point_of_sale.point_of_sale import (
     search_by_term,
     get_conditions,
     get_item_group_condition,
 )
+from erpnext.accounts.party import get_due_date, get_party_account
 
 
 @frappe.whitelist()
 def overrided_past_order_list(search_term, status, limit=20):
     user = frappe.session.user
-    sql_query = """
-        SELECT b.branch
-        FROM `tabURY User` AS a
-        INNER JOIN `tabBranch` AS b ON a.parent = b.name
-        WHERE a.user = %s
-    """
-    branch_array = frappe.db.sql(sql_query, user, as_dict=True)
 
-    if not branch_array:
-        frappe.throw("User is not Associated with any Branch.Please refresh Page")
+    if user != "Administrator":
+        sql_query = """
+            SELECT b.branch
+            FROM `tabURY User` AS a
+            INNER JOIN `tabBranch` AS b ON a.parent = b.name
+            WHERE a.user = %s
+        """
+        branch_array = frappe.db.sql(sql_query, user, as_dict=True)
 
-    branch_name = branch_array[0].get("branch")
+        if not branch_array:
+            frappe.throw("User is not Associated with any Branch.Please refresh Page")
+
+        branch_name = branch_array[0].get("branch")
 
     fields = [
         "name",
@@ -55,24 +65,46 @@ def overrided_past_order_list(search_term, status, limit=20):
         invoice_list = invoices_by_customer + invoices_by_name
 
     elif status:
-        if status == "To Bill":
-            invoice_list = frappe.db.get_all(
-                "POS Invoice",
-                filters={"status": "Draft", "branch": branch_name},
-                fields=fields,
-            )
-            for invoice in invoice_list:
-                if invoice.restaurant_table and invoice.invoice_printed == 0:
-                    updated_list.append(invoice)
+        if user != "Administrator":
+            if status == "To Bill":
+                invoice_list = frappe.db.get_all(
+                    "POS Invoice",
+                    filters={"status": "Draft", "branch": branch_name},
+                    fields=fields,
+                )
+                for invoice in invoice_list:
+                    if invoice.restaurant_table and invoice.invoice_printed == 0:
+                        updated_list.append(invoice)
+
+            else:
+                invoice_list = frappe.db.get_all(
+                    "POS Invoice",
+                    filters={"status": status, "branch": branch_name},
+                    fields=fields,
+                )
+                for invoice in invoice_list:
+                    if not invoice.restaurant_table or invoice.invoice_printed == 1:
+                        updated_list.append(invoice)
 
         else:
-            invoice_list = frappe.db.get_all(
-                "POS Invoice",
-                filters={"status": status, "branch": branch_name},
-                fields=fields,
-            )
-            for invoice in invoice_list:
-                if not invoice.restaurant_table or invoice.invoice_printed == 1:
-                    updated_list.append(invoice)
+            if status == "To Bill":
+                invoice_list = frappe.db.get_all(
+                    "POS Invoice",
+                    filters={"status": "Draft"},
+                    fields=fields,
+                )
+                for invoice in invoice_list:
+                    if invoice.restaurant_table and invoice.invoice_printed == 0:
+                        updated_list.append(invoice)
+
+            else:
+                invoice_list = frappe.db.get_all(
+                    "POS Invoice",
+                    filters={"status": status},
+                    fields=fields,
+                )
+                for invoice in invoice_list:
+                    if not invoice.restaurant_table or invoice.invoice_printed == 1:
+                        updated_list.append(invoice)
 
     return updated_list

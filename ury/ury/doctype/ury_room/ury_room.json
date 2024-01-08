@@ -8,18 +8,10 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "restaurant",
   "room_type",
-  "price_list"
+  "printer_settings"
  ],
  "fields": [
-  {
-   "fieldname": "restaurant",
-   "fieldtype": "Link",
-   "hidden": 1,
-   "label": "Restaurant",
-   "options": "URY Restaurant"
-  },
   {
    "fieldname": "room_type",
    "fieldtype": "Select",
@@ -27,16 +19,15 @@
    "options": "AC\nNON-AC"
   },
   {
-   "fieldname": "price_list",
-   "fieldtype": "Link",
-   "hidden": 1,
-   "label": "Price List",
-   "options": "Price List"
+   "fieldname": "printer_settings",
+   "fieldtype": "Table",
+   "label": "Printer Settings",
+   "options": "URY Printer Settings"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2023-12-19 14:13:33.301689",
+ "modified": "2024-01-08 13:33:41.540961",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Room",

@@ -8,22 +8,14 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "restaurant",
+  "branch",
   "enabled",
   "column_break_3",
-  "branch",
   "price_list",
   "items_section",
   "items"
  ],
  "fields": [
-  {
-   "fieldname": "restaurant",
-   "fieldtype": "Link",
-   "label": "Restaurant",
-   "options": "URY Restaurant",
-   "reqd": 1
-  },
   {
    "default": "1",
    "fieldname": "enabled",
@@ -34,13 +26,6 @@
   {
    "fieldname": "column_break_3",
    "fieldtype": "Column Break"
-  },
-  {
-   "fetch_from": "restaurant.branch",
-   "fieldname": "branch",
-   "fieldtype": "Link",
-   "label": "Branch",
-   "options": "Branch"
   },
   {
    "fieldname": "price_list",
@@ -60,10 +45,17 @@
    "label": "Items",
    "options": "URY Menu Item",
    "reqd": 1
+  },
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "label": "Branch",
+   "options": "Branch",
+   "reqd": 1
   }
  ],
  "links": [],
- "modified": "2023-12-19 14:08:40.859677",
+ "modified": "2024-01-08 13:31:46.965352",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Menu",

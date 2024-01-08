@@ -1,0 +1,41 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2024-01-07 13:11:04.784852",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "menu",
+  "room"
+ ],
+ "fields": [
+  {
+   "fieldname": "menu",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Menu",
+   "options": "URY Menu"
+  },
+  {
+   "fieldname": "room",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Room",
+   "options": "URY Room"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2024-01-07 13:11:45.463070",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "Menu for Room",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
