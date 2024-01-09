@@ -3,16 +3,69 @@ from frappe import _
 
 
 @frappe.whitelist()
-def getRestaurantMenu():
-    menuItems = []
-    branchName = getBranch()
-    menu = frappe.db.exists("URY Menu", {"branch": branchName})
-    if not menu:
-        frappe.throw(_("Please set an active menu for Branch {0}").format(branchName))
-    restaurantMenuItems = frappe.get_doc("URY Menu", menu)
-    for items in restaurantMenuItems.items:
-        menuItems.append(items)
-    return menuItems
+def getRestaurantMenu(pos_profile, table=None):
+    menu_items = []
+
+    user_role = frappe.get_roles()
+
+    pos_profile = frappe.get_doc("POS Profile", pos_profile)
+
+    cashier = any(
+        role.role in user_role for role in pos_profile.role_allowed_for_billing
+    )
+
+    if cashier:
+        branch_name = getBranch()
+        menu = frappe.db.get_value(
+            "URY Restaurant", {"branch": branch_name}, "active_menu"
+        )
+
+        if menu:
+            menu_items = frappe.get_all(
+                "URY Menu Item",
+                filters={"parent": menu},
+                fields=["item", "item_name", "rate", "special_dish", "disabled"],
+            )
+
+    elif table:
+        if not table:
+            frappe.throw(_("Please select a table"))
+
+        restaurant, branch, room = frappe.get_value(
+            "URY Table",
+            table,
+            ["restaurant", "branch", "restaurant_room"],
+        )
+
+        room_wise_menu = frappe.db.get_value(
+            "URY Restaurant",
+            restaurant,
+            "room_wise_menu",
+        )
+
+        if not room_wise_menu:
+            menu = frappe.db.get_value("URY Restaurant", restaurant, "active_menu")
+
+        else:
+            menu = frappe.db.get_value(
+                "Menu for Room",
+                {"parent": restaurant, "room": room},
+                "menu",
+            )
+
+        if not menu:
+            frappe.throw(
+                _("Please set an active menu for Restaurant {0}").format(restaurant)
+            )
+
+        else:
+            menu_items = frappe.get_all(
+                "URY Menu Item",
+                filters={"parent": menu},
+                fields=["item", "item_name", "rate", "special_dish", "disabled"],
+            )
+
+    return menu_items
 
 
 @frappe.whitelist()
