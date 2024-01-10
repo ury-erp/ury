@@ -638,11 +638,6 @@ frappe.ui.form.on('URY Order', {
 
 	},
 
-	customer_name: function (frm) {
-
-		frm.trigger('favourite')
-	},
-
 	update_btn: async function (frm) {
 		const check = localStorage.getItem('check');
 		frm.disable_save();
@@ -976,6 +971,10 @@ frappe.ui.form.on('URY Order', {
 		frm.set_value('last_invoice', invoice.name);
 		frm.set_value('modified_time', invoice.modified);
 
+		if (frm.doc.customer_name) {
+			frm.trigger('favourite')
+		}
+
 		const tabToClick = frm.doc.last_invoice ? '#ury-order-order_tab-tab' : '#ury-order-menu_tab-tab';
 		$(tabToClick).click();
 
@@ -1196,27 +1195,32 @@ frappe.ui.form.on('URY Order', {
 	},
 
 	favourite: function (frm) {
-		let customer_fav_items = ''
-		$('#fav_items').empty()
+		let customerFavItems = '';
+
+		$('#fav_items').empty();
+
 		if (frm.doc.customer_name) {
 			frappe.call({
-				method: `ury.ury.doctype.ury_order.ury_order.customer_favourite_item`,
+				method: 'ury.ury.doctype.ury_order.ury_order.customer_favourite_item',
 				args: {
 					customer_name: frm.doc.customer_name
 				},
 				callback: function (r) {
 					r.message.map((x) => {
-						customer_fav_items = `
-								<div class="col-6 py-3" style="padding:0 15px;width: 250px;">
-										${x["item_name"]}
-								</div>
-								<div class="col-3 py-3">
-										${x["qty"]}
-								</div>
-								`
-						$('#fav_items').append(customer_fav_items);
-					})
+						customerFavItems = `
+							<div class="col-6 py-3" style="padding: 0 15px; width: 250px;">
+								${x["item_name"]}
+							</div>
+							<div class="col-3 py-3">
+								${x["qty"]}
+							</div>
+						`;
 
+						if (!$('#fav_items').html().includes(customerFavItems)) {
+							// Check if the item is not already in the HTML content
+							$('#fav_items').append(customerFavItems);
+						}
+					});
 				}
 			});
 		}
