@@ -150,12 +150,12 @@ def sync_order(
             )
             return {"status": "Failure"}
     else:
-        if invoice.name and invoice.invoice_printed == 0 and table and not cashier:
+        if invoice.name and invoice.invoice_printed == 0:
             frappe.msgprint(
                 title="Table occupied ",
                 indicator="red",
                 msg=(
-                    "This table ({0}) is already    . Please refresh the page."
+                    "This table ({0}) is already occupied . Please refresh the page."
                 ).format(table),
             )
             return {"status": "Failure"}

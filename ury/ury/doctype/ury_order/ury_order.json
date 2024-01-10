@@ -164,6 +164,7 @@
   {
    "fieldname": "last_invoice",
    "fieldtype": "Link",
+   "hidden": 1,
    "label": "Invoice",
    "options": "POS Invoice",
    "read_only": 1
@@ -226,7 +227,7 @@
  "hide_toolbar": 1,
  "issingle": 1,
  "links": [],
- "modified": "2023-12-04 18:37:00.014157",
+ "modified": "2024-01-10 19:37:37.858495",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Order",
