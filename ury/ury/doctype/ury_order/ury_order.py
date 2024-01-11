@@ -107,7 +107,6 @@ def sync_order(
     if (
         last_invoice
         and frappe.db.get_value("POS Invoice", last_invoice, "invoice_printed") == 1
-        and not cashier
     ):
         frappe.msgprint(
             title="Invoice Already Billed",
@@ -140,7 +139,7 @@ def sync_order(
                 lastModifiedTime = datetime.strptime(
                     lastModifiedTime, "%Y-%m-%d %H:%M:%S"
                 )
-        if lastModifiedTime != last_modified_time:
+        if lastModifiedTime != last_modified_time and not cashier:
             frappe.msgprint(
                 title="Order has been modified",
                 indicator="red",
@@ -150,7 +149,7 @@ def sync_order(
             )
             return {"status": "Failure"}
     else:
-        if invoice.name and invoice.invoice_printed == 0:
+        if invoice.name and invoice.invoice_printed == 0 and table:
             frappe.msgprint(
                 title="Table occupied ",
                 indicator="red",
