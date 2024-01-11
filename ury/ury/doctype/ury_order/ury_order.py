@@ -27,9 +27,7 @@ def get_order_invoice(table=None, invoiceNo=None, is_payment=None):
             if invoiceNo:
                 invoice_name = frappe.get_value(
                     "POS Invoice",
-                    dict(
-                        restaurant_table=table, docstatus=0, invoice_printed=invoiceNo
-                    ),
+                    dict(restaurant_table=table, docstatus=0, name=invoiceNo),
                 )
             else:
                 invoice_name = frappe.get_value(
@@ -72,7 +70,7 @@ def get_order_invoice(table=None, invoiceNo=None, is_payment=None):
             )
         else:
             invoice_name = frappe.get_value(
-                "POS Invoice", dict(docstatus=0, name=invoiceNo, invoice_printed=0)
+                "POS Invoice", dict(docstatus=0, name=invoiceNo)
             )
         if invoice_name:
             invoice = frappe.get_doc("POS Invoice", invoice_name)
@@ -103,10 +101,16 @@ def sync_order(
     comments=None,
 ):
     """Sync the sales order related to the table"""
+    user_role = frappe.get_roles()
+    posprofile = frappe.get_doc("POS Profile", pos_profile)
+    billing_user = any(
+        role.role in user_role for role in posprofile.role_allowed_for_billing
+    )
 
     if (
         last_invoice
         and frappe.db.get_value("POS Invoice", last_invoice, "invoice_printed") == 1
+        and (not billing_user)
     ):
         frappe.msgprint(
             title="Invoice Already Billed",
@@ -149,13 +153,13 @@ def sync_order(
             )
             return {"status": "Failure"}
     else:
-        if invoice.name and invoice.invoice_printed == 0 and table:
+        if invoice.name and invoice.invoice_printed == 0 and not billing_user:
             frappe.msgprint(
                 title="Table occupied ",
                 indicator="red",
-                msg=(
-                    "This table ({0}) is already occupied . Please refresh the page."
-                ).format(table),
+                msg=("{0} is already occupied . Please refresh the page.").format(
+                    table
+                ),
             )
             return {"status": "Failure"}
 
