@@ -82,6 +82,10 @@ def get_order_invoice(table=None, invoiceNo=None, is_payment=None):
             "POS Profile", invoice.pos_profile, "taxes_and_charges"
         )
 
+        invoice.selling_price_list = frappe.db.get_value(
+            "POS Profile", invoice.pos_profile, "selling_price_list"
+        )
+
     return invoice
 
 
