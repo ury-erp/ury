@@ -57,7 +57,7 @@ def network_printing(
             conn.printFile(print_settings.printer_name, file_path, name, {})
 
             restaurant_table, invoice_printed, name = frappe.db.get_value(
-                "POS Invoice", name, ["name", "restaurant_table", "invoice_printed"]
+                "POS Invoice", name, ["restaurant_table", "invoice_printed", "name"]
             )
 
             if restaurant_table and invoice_printed == 0:
@@ -134,7 +134,7 @@ def print_pos_page(doctype, name, print_format):
     data = {"name": name, "doctype": doctype, "print_format": print_format}
 
     restaurant_table, branch, name = frappe.db.get_value(
-        "POS Invoice", name, ["name", "restaurant_table", "branch"]
+        "POS Invoice", name, ["restaurant_table", "branch", "name"]
     )
     print_channel = "{}_{}".format("print", branch)
     frappe.publish_realtime(print_channel, {"data": data})
