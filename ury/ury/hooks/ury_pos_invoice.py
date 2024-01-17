@@ -6,6 +6,7 @@ from frappe.utils import now_datetime, get_time
 def before_insert(doc, method):
     pos_invoice_naming(doc, method)
     order_type_update(doc, method)
+    restrict_existing_order(doc, method)
 
 
 def validate(doc, method):
@@ -122,3 +123,19 @@ def validate_price_list(doc, method):
         doc.selling_price_list = frappe.db.get_value(
             "Price List", dict(restaurant_menu=menu_name, enabled=1)
         )
+
+
+def restrict_existing_order(doc, event):
+    if doc.restaurant_table:
+        invoice_exist = frappe.db.exists(
+            "POS Invoice",
+            {
+                "restaurant_table": doc.restaurant_table,
+                "docstatus": 0,
+                "invoice_printed": 0,
+            },
+        )
+        if invoice_exist:
+            frappe.throw(
+                ("Table {0} has an existing invoice").format(doc.restaurant_table)
+            )

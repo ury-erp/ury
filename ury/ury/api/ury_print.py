@@ -56,20 +56,19 @@ def network_printing(
             output.write(open(file_path, "wb"))
             conn.printFile(print_settings.printer_name, file_path, name, {})
 
-            pos_invoice = frappe.get_doc("POS Invoice", name)
+            restaurant_table, invoice_printed, name = frappe.db.get_value(
+                "POS Invoice", name, ["name", "restaurant_table", "invoice_printed"]
+            )
 
-            if pos_invoice.restaurant_table:
-                if pos_invoice.invoice_printed == 0:
-                    pos_invoice.invoice_printed = 1
-                    pos_invoice.save()
-                    frappe.db.set_value(
-                        "URY Table",
-                        pos_invoice.restaurant_table,
-                        {"occupied": 0, "latest_invoice_time": None},
-                    )
+            if restaurant_table and invoice_printed == 0:
+                frappe.db.set_value("POS Invoice", name, "invoice_printed", 1)
+                frappe.db.set_value(
+                    "URY Table",
+                    restaurant_table,
+                    {"occupied": 0, "latest_invoice_time": None},
+                )
             else:
-                pos_invoice.invoice_printed = 1
-                pos_invoice.save()
+                frappe.db.set_value("POS Invoice", name, "invoice_printed", 1)
 
             return "Success"
         except Exception as e:
@@ -133,16 +132,18 @@ def qz_print_update(invoice):
 @frappe.whitelist()
 def print_pos_page(doctype, name, print_format):
     data = {"name": name, "doctype": doctype, "print_format": print_format}
-    pos_invoice = frappe.get_doc("POS Invoice", name)
-    branch = pos_invoice.branch
+
+    restaurant_table, branch, name = frappe.db.get_value(
+        "POS Invoice", name, ["name", "restaurant_table", "branch"]
+    )
     print_channel = "{}_{}".format("print", branch)
     frappe.publish_realtime(print_channel, {"data": data})
 
     frappe.db.set_value("POS Invoice", name, "invoice_printed", 1)
-    if pos_invoice.restaurant_table:
+    if restaurant_table:
         frappe.db.set_value(
             "URY Table",
-            pos_invoice.restaurant_table,
+            restaurant_table,
             {"occupied": 0, "latest_invoice_time": None},
         )
 
