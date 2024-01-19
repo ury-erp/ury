@@ -25,6 +25,7 @@ def getRestaurantMenu(pos_profile, table=None):
                 "URY Menu Item",
                 filters={"parent": menu},
                 fields=["item", "item_name", "rate", "special_dish", "disabled"],
+                order_by="item_name asc",
             )
 
     elif table:
@@ -63,6 +64,7 @@ def getRestaurantMenu(pos_profile, table=None):
                 "URY Menu Item",
                 filters={"parent": menu},
                 fields=["item", "item_name", "rate", "special_dish", "disabled"],
+                order_by="item_name asc",
             )
 
     return menu_items
