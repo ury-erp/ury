@@ -125,7 +125,6 @@ def getPosInvoice(status):
                 "rounded_total",
             ),
             filters={"branch": branchName, "status": status},
-            limit=100,
             order_by="modified desc",
         )
         for invoice in pos_invoice:
@@ -150,7 +149,6 @@ def getPosInvoice(status):
                 "rounded_total",
             ),
             filters={"branch": branchName},
-            limit=100,
             order_by="modified desc",
         )
         for invoice in pos_invoice:
@@ -180,7 +178,6 @@ def getPosInvoice(status):
                 "rounded_total",
             ),
             filters={"branch": branchName, "status": status},
-            limit=100,
             order_by="modified desc",
         )
         for invoice in pos_invoice:
