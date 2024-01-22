@@ -217,8 +217,10 @@ def sync_order(
                 filters={"item_code": item.item_code, "price_list": price_list},
                 fields=["price_list_rate"],
             )
-            for price in item_prices:
-                item.rate = price.price_list_rate
+            item.rate = item_prices[0].price_list_rate
+            item.cost_center = frappe.db.get_value(
+                "POS Profile", pos_profile, "cost_center"
+            )
 
         invoice.save()
 
@@ -241,8 +243,11 @@ def sync_order(
                 filters={"item_code": item.item_code, "price_list": price_list},
                 fields=["price_list_rate"],
             )
-            for price in item_prices:
-                item.rate = price.price_list_rate
+
+            item.rate = item_prices[0].price_list_rate
+            item.cost_center = frappe.db.get_value(
+                "POS Profile", pos_profile, "cost_center"
+            )
 
         invoice.save()
 

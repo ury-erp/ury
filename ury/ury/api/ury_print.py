@@ -24,7 +24,7 @@ def network_printing(
     file_path=None,
 ):
     try:
-        print_settings = frappe.get_doc("Network Printer Settings", printer_setting)
+        print_settings = frappe("Network Printer Settings", printer_setting)
 
         try:
             import cups
@@ -139,13 +139,17 @@ def print_pos_page(doctype, name, print_format):
     print_channel = "{}_{}".format("print", branch)
     frappe.publish_realtime(print_channel, {"data": data})
 
-    frappe.db.set_value("POS Invoice", name, "invoice_printed", 1)
-    if restaurant_table:
-        frappe.db.set_value(
-            "URY Table",
-            restaurant_table,
-            {"occupied": 0, "latest_invoice_time": None},
-        )
+    invoice_printed = frappe.db.get_value("POS Invoice", name, "invoice_printed")
+
+    if invoice_printed == 0:
+        frappe.db.set_value("POS Invoice", name, "invoice_printed", 1)
+
+        if restaurant_table:
+            frappe.db.set_value(
+                "URY Table",
+                restaurant_table,
+                {"occupied": 0, "latest_invoice_time": None},
+            )
 
 
 @frappe.whitelist()
