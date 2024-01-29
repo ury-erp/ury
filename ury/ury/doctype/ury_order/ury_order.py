@@ -358,7 +358,10 @@ def table_transfer(table, newTable, invoice):
     pos_invoice = frappe.get_doc("POS Invoice", invoice)
     new_table = frappe.get_doc("URY Table", newTable)
 
-    if new_table.occupied == 1:
+    if (
+        current_table.restaurant_room == new_table.restaurant_room
+        and new_table.occupied == 1
+    ):
         frappe.throw(f"Table {new_table.name} is already occupied")
 
     # Update table status
@@ -385,6 +388,9 @@ def table_transfer(table, newTable, invoice):
     except Exception as e:
         # If an exception occurs (e.g., "kot" app not found), it will be caught here without effecting execution
         pass
+
+    else:
+        frappe.throw(_("Table transfer between different rooms is restricted."))
 
 
 @frappe.whitelist()
