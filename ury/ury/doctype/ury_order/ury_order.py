@@ -358,36 +358,38 @@ def table_transfer(table, newTable, invoice):
     pos_invoice = frappe.get_doc("POS Invoice", invoice)
     new_table = frappe.get_doc("URY Table", newTable)
 
-    if (
-        current_table.restaurant_room == new_table.restaurant_room
-        and new_table.occupied == 1
-    ):
-        frappe.throw(f"Table {new_table.name} is already occupied")
+    if current_table.restaurant_room == new_table.restaurant_room:
+        if new_table.occupied == 1:
+            frappe.throw(f"Table {new_table.name} is already occupied")
 
-    # Update table status
-    frappe.db.set_value(
-        "URY Table",
-        new_table.name,
-        {"occupied": 1, "latest_invoice_time": pos_invoice.creation},
-    )
-    frappe.db.set_value(
-        "URY Table", current_table.name, {"occupied": 0, "latest_invoice_time": None}
-    )
+        # Update table status
+        frappe.db.set_value(
+            "URY Table",
+            new_table.name,
+            {"occupied": 1, "latest_invoice_time": pos_invoice.creation},
+        )
+        frappe.db.set_value(
+            "URY Table",
+            current_table.name,
+            {"occupied": 0, "latest_invoice_time": None},
+        )
 
-    # Update POS Invoice
-    pos_invoice.restaurant_table = new_table.name
-    pos_invoice.save()
+        # Update POS Invoice
+        pos_invoice.restaurant_table = new_table.name
+        pos_invoice.save()
 
-    try:
-        apps = frappe.get_single("Installed Applications").installed_applications
-        app_array = [app.app_name for app in apps if app.app_name == "ury_mosaic"]
+        try:
+            apps = frappe.get_single("Installed Applications").installed_applications
+            app_array = [app.app_name for app in apps if app.app_name == "ury_mosaic"]
 
-        if app_array:
-            change_table_in_kot(pos_invoice.name, new_table.name, pos_invoice.branch)
+            if app_array:
+                change_table_in_kot(
+                    pos_invoice.name, new_table.name, pos_invoice.branch
+                )
 
-    except Exception as e:
-        # If an exception occurs (e.g., "kot" app not found), it will be caught here without effecting execution
-        pass
+        except Exception as e:
+            # If an exception occurs (e.g., "kot" app not found), it will be caught here without effecting execution
+            pass
 
     else:
         frappe.throw(_("Table transfer between different rooms is restricted."))
