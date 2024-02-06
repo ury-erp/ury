@@ -919,45 +919,57 @@ frappe.ui.form.on('URY Order', {
 
 		let invoice = r.message;
 
-		frappe.call({
-			method: 'frappe.client.get',
-			args: {
-				doctype: 'POS Profile',
-				name: frm.doc.pos_profile
-			},
-			callback: function (response) {
-				if (response.message) {
-					var transfer_roles = response.message.transfer_role_permissions.map(role => role.role);
-					var user_roles = frappe.user_roles;
-					var has_access = transfer_roles.some(role => user_roles.includes(role));
-					if (has_access == false) {
-						if (invoice.waiter && invoice.waiter != frappe.session.user) {
-							frappe.db.get_doc('User', invoice.waiter)
-								.then(docs => {
-									frappe.dom.freeze();
-									document.addEventListener('click', function () {
-										window.location.reload();
-									});
-									frappe.throw({
-										title: __("Table Assignment Error"),
-										message: __("This table is assigned to {0}. Please contact them for assistance.", [docs.full_name])
+		if (invoice.name) {
+			if (frm.doc.pos_profile) {
+				frappe.call({
+					method: 'frappe.client.get',
+					args: {
+						doctype: 'POS Profile',
+						name: frm.doc.pos_profile
+					},
+					callback: function (response) {
+						if (response.message) {
+							var transfer_roles = response.message.transfer_role_permissions.map(role => role.role);
+							var user_roles = frappe.user_roles;
+							var has_access = transfer_roles.some(role => user_roles.includes(role));
+							if (has_access == false) {
+								if (invoice.waiter && invoice.waiter != frappe.session.user) {
+									frappe.db.get_doc('User', invoice.waiter)
+										.then(docs => {
+											frappe.dom.freeze();
+											document.addEventListener('click', function () {
+												window.location.reload();
+											});
+											frappe.throw({
+												title: __("Table Assignment Error"),
+												message: __("This table is assigned to {0}. Please contact them for assistance.", [docs.full_name])
 
-									})
-								})
+											})
+										})
+								}
+								else {
+									frappe.show_alert({
+										message: __('Past Order Fetched'),
+										indicator: 'green'
+									}, 5);
+								}
+							}
 						}
 					}
-				}
+				})
 			}
-		})
+			else {
+				frappe.throw({
+					title: __("Validation Error"),
+					message: __("POS Profile Failed to Load")
 
-		frappe.dom.freeze(__('Setting table'));
-
-		if (invoice.name) {
-			frappe.show_alert({
-				message: __('Past Order Fetched'),
-				indicator: 'green'
-			}, 5);
+				})
+			}
 		}
+		else {
+			frm.trigger('clear');
+		}
+		frappe.dom.freeze(__('Setting table'));
 
 		frm.doc.items = [];
 		(invoice.items || []).forEach((d) => {
