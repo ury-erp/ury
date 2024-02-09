@@ -5,6 +5,7 @@ from frappe import _
 @frappe.whitelist()
 def getRestaurantMenu(pos_profile, table=None):
     menu_items = []
+    menu_items_with_image = []
 
     user_role = frappe.get_roles()
 
@@ -27,6 +28,18 @@ def getRestaurantMenu(pos_profile, table=None):
                 fields=["item", "item_name", "rate", "special_dish", "disabled"],
                 order_by="item_name asc",
             )
+
+            menu_items_with_image = [
+                {
+                    "item": item.item,
+                    "item_name": item.item_name,
+                    "rate": item.rate,
+                    "special_dish": item.special_dish,
+                    "disabled": item.disabled,
+                    "item_imgae": frappe.db.get_value("Item", item.item, "image"),
+                }
+                for item in menu_items
+            ]
 
     elif table:
         if not table:
@@ -66,8 +79,18 @@ def getRestaurantMenu(pos_profile, table=None):
                 fields=["item", "item_name", "rate", "special_dish", "disabled"],
                 order_by="item_name asc",
             )
-
-    return menu_items
+            menu_items_with_image = [
+                {
+                    "item": item.item,
+                    "item_name": item.item_name,
+                    "rate": item.rate,
+                    "special_dish": item.special_dish,
+                    "disabled": item.disabled,
+                    "item_imgae": frappe.db.get_value("Item", item.item, "image"),
+                }
+                for item in menu_items
+            ]
+    return menu_items_with_image
 
 
 @frappe.whitelist()
@@ -183,6 +206,15 @@ def getPosInvoice(status):
         for invoice in pos_invoice:
             updated_list.append(invoice)
     return updated_list
+
+
+@frappe.whitelist()
+def get_select_field_options():
+    options = frappe.get_meta("POS Invoice").get_field("order_type").options
+    if options:
+        return [{"name": option} for option in options.split("\n")]
+    else:
+        return []
 
 
 @frappe.whitelist()

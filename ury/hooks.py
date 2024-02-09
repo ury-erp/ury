@@ -14,7 +14,11 @@ required_apps = ["erpnext"]
 
 # include js, css files in header of desk.html
 # app_include_css = "/assets/ury/css/ury.css"
-app_include_js = ["/assets/ury/js/quick_entry.js", "/assets/ury/js/pos_print.js"]
+app_include_js = [
+    "/assets/ury/js/quick_entry.js",
+    "/assets/ury/js/pos_print.js",
+    "/assets/ury/js/restrict_qty_edit_pos.js",
+]
 
 # include js, css files in header of web template
 # web_include_css = "/assets/ury/css/ury.css"
@@ -270,6 +274,7 @@ fixtures = [
                     "POS Profile-view_all_status",
                     "POS Profile-remove_items",
                     "POS Profile-restaurant_prefix",
+                    "POS Profile-show_image",
                     "POS Opening Entry-restaurant_info",
                     "POS Opening Entry-restaurant",
                     "POS Opening Entry-column_break_e3dky",

@@ -79,7 +79,7 @@
 
 **Order Printing**
 
-- URY offers two printing methods.
+- URY facilitates room-wise printing and offers three distinct methods for executing printing.
 
 	- QZ printing
 		- You may need first install [QZ Tray](https://qz.io/download/) if is not already on your system

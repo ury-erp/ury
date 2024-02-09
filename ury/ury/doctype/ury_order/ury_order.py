@@ -103,6 +103,7 @@ def sync_order(
     table=None,
     invoice=None,
     comments=None,
+    order_type=None,
 ):
     """Sync the sales order related to the table"""
     user_role = frappe.get_roles()
@@ -168,6 +169,9 @@ def sync_order(
             return {"status": "Failure"}
 
     invoice.customer = customer
+
+    if order_type:
+        invoice.order_type = order_type
 
     customerdoc = frappe.get_doc("Customer", customer)
     invoice.mobile_number = customerdoc.mobile_number
@@ -342,9 +346,7 @@ def pos_opening_check():
     if result["opening_exists"]:
         # If POS opening entry exists, fetch the cashier from the first entry
         opening_entry = frappe.get_doc("POS Opening Entry", pos_opening_list[0].name)
-        result[
-            "cashier"
-        ] = (
+        result["cashier"] = (
             opening_entry.user
         )  # Fetch values from POS Profile linked to POS Opening Entry
         result["pos_profile"] = opening_entry.pos_profile

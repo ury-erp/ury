@@ -44,13 +44,6 @@ frappe.ui.form.on('URY Order', {
 
 	onload: function (frm) {
 		$('.ellipsis.title-text').hide();
-		$("[data-fieldname='no_of_pax']").on('focus', 'input', function (e) {
-			$(this).prop('type', 'number');
-		})
-		$("[data-fieldname='qty']").on('click', 'input', function (e) {
-			$(this).prop('type', 'number');
-		})
-
 		frappe.call({
 			method: 'ury.ury.doctype.ury_order.ury_order.pos_opening_check',
 			callback: function (r) {
@@ -100,7 +93,15 @@ frappe.ui.form.on('URY Order', {
 
 		$("[data-fieldname='no_of_pax']").on('focus', 'input', function (e) {
 			$(this).prop('type', 'number');
+			$(this).on('input', function (event) {
+				let inputValue = e.target.value;
+				if (parseInt(inputValue) < 0) {
+					// If negative, set the input value to an empty string
+					event.target.value = '0';
+				}
+			});
 		})
+
 		$("[data-fieldname='qty']").on('click', 'input', function (e) {
 			$(this).prop('type', 'number');
 		})

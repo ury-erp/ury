@@ -98,8 +98,6 @@ def order_type_update(doc, method):
             doc.order_type = "Take Away"
         else:
             doc.order_type = "Dine In"
-    else:
-        doc.order_type = "Take Away"
 
 
 # reload restaurant order page if submitted invoice is open there

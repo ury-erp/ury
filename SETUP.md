@@ -95,6 +95,7 @@ Follow these steps to set up URY:
 	- **QZ Print** :  Check this box to enable QZ printing.
 	- **QZ Host** :Enter the Network IP for QZ printing.
 	- **Captain Transfer Role Permissions** : Role added to this field have permission for `Captain Transfer`. Also user having this role have access to all table.
+	- **Allow Cashier To Edit And Remove Table Order Items** : To permit cashier to edit and remove table orders. 
 
 **Step 10 :**
 
