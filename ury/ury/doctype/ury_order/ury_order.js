@@ -358,10 +358,16 @@ frappe.ui.form.on('URY Order', {
 			primary_action(values) {
 				d.hide();
 				(frm.doc.items || []).forEach((d) => {
-					if (d.item === OrderItems) {
+					if (
+						d.item === OrderItems &&
+						values.qty !== null &&
+						values.qty !== undefined &&
+						values.qty !== "" &&
+						values.qty > 0
+					) {
+						d.qty = values.qty;
 						const oldqty = $(`#${OrderItems}_cartqty`).val()
 						$(`#${index}_input`).val(values.qty)
-						d.qty = values.qty
 						$(`#${OrderItems}_cartqty`).val(`${d.qty}`);
 						$(`#${OrderItems}_comment`).val(values.comment)
 						d.comment = values.comment
@@ -377,7 +383,13 @@ frappe.ui.form.on('URY Order', {
 				});
 				return frappe.run_serially([
 					() => {
-						if (!added) {
+						if (
+							!added &&
+							values.qty !== null &&
+							values.qty !== undefined &&
+							values.qty !== "" &&
+							values.qty > 0
+						) {
 							$(`#${index}_input`).val(values.qty)
 							frappe.show_alert({
 								message: __('Item Added Total Qty= 1'),
@@ -622,6 +634,18 @@ frappe.ui.form.on('URY Order', {
 	},
 
 	restaurant_table: function (frm) {
+		// to show selected table in the view
+		const activeTable = document.createElement("div");
+		activeTable.innerHTML = `<span style="margin-left:1.2rem;margin-top:3rem;font-size:16px;font-weight:600">${frm.doc.restaurant_table}</span>`;
+		activeTable.style.color = "#1034A6"; // Set color to blue
+
+		const existingSpans = document.querySelectorAll(".page-head-content span");
+		existingSpans.forEach((span) => span.remove());
+
+		const formPageDiv = document.querySelector(".page-head-content");
+		formPageDiv.insertBefore(activeTable, formPageDiv.firstChild);
+
+
 		// select the open sales order items for this table
 		if (!frm.doc.restaurant_table) {
 			return;
