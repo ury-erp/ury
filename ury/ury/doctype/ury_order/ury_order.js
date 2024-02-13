@@ -222,6 +222,27 @@ frappe.ui.form.on('URY Order', {
 
 		});
 
+		function handleTabClick(tabId, message) {
+			$("#" + tabId).on('click', function (e) {
+				if (!frm.doc.restaurant_table) {
+					frappe.msgprint({
+						title: __('Warning'),
+						message: __(message),
+					});
+					// Bind a click event to the body to capture clicks outside the message box
+					$('body').one('click', function (event) {
+						if (!$(event.target).closest('.modal-dialog').length) {
+							$("#ury-order-table_tab-tab").click();
+						}
+					});
+				}
+			});
+		}
+
+		handleTabClick("ury-order-customer_tab-tab", "Select Table.");
+		handleTabClick("ury-order-menu_tab-tab", "Select Table.");
+		handleTabClick("ury-order-order_tab-tab", "Select Table.");
+
 		$("[data-label='Print']").hide();
 		localStorage.removeItem('check');
 		frm.page.wrapper.find(".comment-box").css({ 'display': 'none' });
