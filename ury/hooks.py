@@ -275,6 +275,7 @@ fixtures = [
                     "POS Profile-remove_items",
                     "POS Profile-restaurant_prefix",
                     "POS Profile-show_image",
+                    "POS Profile-table_attention_time",
                     "POS Opening Entry-restaurant_info",
                     "POS Opening Entry-restaurant",
                     "POS Opening Entry-column_break_e3dky",

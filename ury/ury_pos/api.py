@@ -254,6 +254,7 @@ def getPosProfile():
         warehouse = pos_profiles.warehouse
         branch = pos_profiles.branch
         company = pos_profiles.company
+        tableAttention = pos_profiles.table_attention_time
         get_cashier = frappe.get_doc("POS Profile", pos_profile_name)
         print_format = pos_profiles.print_format
         cashier = get_cashier.applicable_for_users[0].user
@@ -288,6 +289,7 @@ def getPosProfile():
         "qz_host": qz_host,
         "printer": printer,
         "print_type": print_type,
+        "tableAttention": tableAttention,
     }
     return invoice_details
 
