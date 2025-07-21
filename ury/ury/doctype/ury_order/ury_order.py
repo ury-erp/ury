@@ -282,8 +282,7 @@ def sync_order(
     try:
         invoice.save()
     except Exception as e:
-        frappe.throw(_("Error while updating order",e))
-           
+        frappe.throw(f"Error while updating order: {e}")      
 
 
     try:
@@ -593,7 +592,11 @@ def make_invoice(customer, payments, cashier, pos_profile,owner, additionalDisco
 
     invoice.owner = owner
     invoice.save()
-    invoice.submit()
+    try:
+        invoice.submit()
+    except Exception as e:
+        frappe.throw(f"Error while settling order: {e}")   
+
 
 
 # Cancel KOT Doc Creation
