@@ -1,8 +1,17 @@
 {
  "charts": [],
- "content": "[{\"id\":\"PO4EylCUq0\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Quick Access<br></span>\",\"col\":12}},{\"id\":\"Dx0a9ED4s4\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Ury Order\",\"col\":3}},{\"id\":\"VCTWrfn8Od\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"3XhkKI6EJA\",\"type\":\"card\",\"data\":{\"card_name\":\"Setup\",\"col\":4}}]",
+ "content": "[{\"id\":\"YXLBzy46Bq\",\"type\":\"custom_block\",\"data\":{\"custom_block_name\":\"URY POS\",\"col\":2}},{\"id\":\"OJsNZQxJi3\",\"type\":\"custom_block\",\"data\":{\"custom_block_name\":\"POS V1\",\"col\":2}},{\"id\":\"3XhkKI6EJA\",\"type\":\"card\",\"data\":{\"card_name\":\"URY Setup\",\"col\":4}}]",
  "creation": "2023-11-30 12:04:38.330350",
- "custom_blocks": [],
+ "custom_blocks": [
+  {
+   "custom_block_name": "URY POS",
+   "label": "URY POS"
+  },
+  {
+   "custom_block_name": "POS V1",
+   "label": "POS V1"
+  }
+ ],
  "docstatus": 0,
  "doctype": "Workspace",
  "for_user": "",
@@ -15,8 +24,8 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Setup",
-   "link_count": 7,
+   "label": "URY Setup",
+   "link_count": 8,
    "link_type": "DocType",
    "onboard": 0,
    "type": "Card Break"
@@ -37,6 +46,16 @@
    "label": "URY Restaurant",
    "link_count": 0,
    "link_to": "URY Restaurant",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "POS Profile",
+   "link_count": 0,
+   "link_to": "POS Profile",
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
@@ -92,7 +111,7 @@
    "type": "Link"
   }
  ],
- "modified": "2024-05-03 11:57:38.296305",
+ "modified": "2025-07-24 17:01:05.586544",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY",
@@ -107,17 +126,12 @@
   },
   {
    "role": "URY Manager"
+  },
+  {
+   "role": "URY Cashier"
   }
  ],
  "sequence_id": 31.0,
- "shortcuts": [
-  {
-   "color": "Grey",
-   "doc_view": "List",
-   "label": "Ury Order",
-   "link_to": "URY Order",
-   "type": "DocType"
-  }
- ],
+ "shortcuts": [],
  "title": "URY"
 }

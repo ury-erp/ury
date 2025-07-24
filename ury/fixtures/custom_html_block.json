@@ -1,0 +1,25 @@
+
+[
+    {
+     "docstatus": 0,
+     "doctype": "Custom HTML Block",
+     "html":"<a href=\"/pos\">\n    <img class=\"uryposlogo\" src=\"/assets/ury/Images/URY-POS.jpg\"/>\n</a>",
+     "modified": "2025-07-24 16:50:40.049812",
+     "name": "URY POS",
+     "private": 0,
+     "roles": [],
+     "script": "",
+     "style": ".uryposlogo {\n    height: 37px;\n}"
+    },
+    {
+     "docstatus": 0,
+     "doctype": "Custom HTML Block",
+     "html": "<a href=\"/urypos\" class=\"container\" ><lable class=\"urypos\">POS V1</lable> </a>",
+     "modified" : "2025-07-24 16:59:46.440258",
+     "name": "POS V1",
+     "private": 0,
+     "roles": [],
+     "script": "",
+     "style": ".container {\n    min-height:40px;\n    display:flex;\n    align-items:center;\n    justify-content:center;\n}\n\n.uryposlogo {\n  font-size:20px;\n}"
+    }
+]
