@@ -310,16 +310,16 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
       <DialogContent 
         ref={dialogRef}
         variant="xlarge"
-        className="bg-white w-full max-w-[90rem] max-h-[90vh] flex flex-col md:flex-row p-0"
+        className="bg-white w-full max-w-[90rem] max-h-[90vh] overflow-y-auto flex flex-col md:flex-row p-0"
         showCloseButton={false}
       >
-        {/* Left Column - Image and Basic Info */}
+        {/* Left Column - Image  */}
         <div className="md:w-1/3 relative">
           {itemDoc?.image ? (
             <img
               src={itemDoc.image}
               alt={itemDoc.name}
-              className="w-full h-96 my-auto object-cover rounded-t-lg md:rounded-l-lg md:rounded-tr-none filter saturate-75 brightness-95"
+              className="w-full min-h-96 h-full object-cover rounded-t-lg md:rounded-l-lg md:rounded-tr-none filter saturate-75 brightness-95"
               style={{ filter: 'saturate(0.7) brightness(0.95)' }}
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
@@ -334,7 +334,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
               }}
             />
           ) : (
-            <div className="w-full h-96 my-auto bg-gray-200 flex items-center justify-center text-[8rem] text-gray-400 font-medium rounded-t-lg md:rounded-l-lg md:rounded-tr-none">
+            <div className="w-full min-h-96 h-full bg-gray-200 flex items-center justify-center text-[8rem] text-gray-400 font-medium rounded-t-lg md:rounded-l-lg md:rounded-tr-none">
               {itemDoc?.name.slice(0, 2).toUpperCase()}
             </div>
           )}
@@ -430,40 +430,43 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
 
 
         {/* Right Column - Add-ons and Order Button */}
-        <div className="md:w-1/3 p-6 border-t md:border-t-0 md:border-l border-gray-200 overflow-y-auto">
-          {isAddonLoading ? (
-            <div className="mb-6 flex items-center justify-center text-gray-500">Loading add-ons...</div>
-          ) : addonError ? (
-            <div className="mb-6 flex items-center justify-center text-red-500">{addonError}</div>
-          ) : addonDetails.length > 0 ? (
-            <div className="mb-6">
-              <h3 className="text-lg font-semibold mb-3">Add-ons</h3>
-              <div className="space-y-2">
-                {addonDetails.map((addon: any) => (
-                  <button
-                    key={addon.id}
-                    onClick={() => handleAddonToggle({ id: addon.id, name: addon.name, price: Number(addon.price) })}
-                    className={cn(
-                      'w-full p-3 rounded-lg border text-left',
-                      selectedAddons.some(item => item.id === addon.id)
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200 hover:border-blue-200'
-                    )}
-                  >
-                    <div className="flex justify-between items-center">
-                      <span>{addon.name}</span>
-                      <span className="text-sm text-gray-500">+{formatCurrency(Number(addon.price))}</span>
-                    </div>
-                  </button>
-                ))}
+        <div className="h-auto md:w-1/3 p-6 border-t md:border-t-0 md:border-l border-gray-200 overflow-y-auto flex flex-col">
+          <div className="overflow-y-auto mb-6">
+            {isAddonLoading ? (
+              <div className="mb-6 flex items-center justify-center text-gray-500">Loading add-ons...</div>
+            ) : addonError ? (
+              <div className="flex items-center justify-center text-red-500">{addonError}</div>
+            ) : addonDetails.length > 0 ? (
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold mb-3">Add-ons</h3>
+                <div className="space-y-2">
+                  {addonDetails.map((addon: any) => (
+                    <button
+                      key={addon.id}
+                      onClick={() => handleAddonToggle({ id: addon.id, name: addon.name, price: Number(addon.price) })}
+                      className={cn(
+                        'w-full p-3 rounded-lg border text-left',
+                        selectedAddons.some(item => item.id === addon.id)
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-gray-200 hover:border-blue-200'
+                      )}
+                    >
+                      <div className="flex justify-between items-center">
+                        <span>{addon.name}</span>
+                        <span className="text-sm text-gray-500">+{formatCurrency(Number(addon.price))}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-          ) : null}
-
+            ) : (
+              <div className="flex items-center justify-center text-gray-400 text-sm">No add ons</div>
+            )}
+          </div>
           {/* Always show total section at the end */}
-          <div className="mt-6">
+          <div className="mt-auto pt-2 border-t border-gray-200">
             <div className="flex justify-between items-center text-lg font-semibold">
-              <span>Total</span>
+              <span>Total&nbsp;</span>
               <span>{formatCurrency(total)}</span>
             </div>
             <Button
