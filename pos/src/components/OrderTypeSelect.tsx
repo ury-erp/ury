@@ -4,7 +4,7 @@ import { useRootStore } from '../store/root-store';
 import { cn } from '../lib/utils';
 import { Button } from './ui';
 import TableSelectionDialog from './TableSelectionDialog';
-import { DINE_IN, ORDER_TYPES , type OrderType} from '../data/order-types';
+import { DEFAULT_ORDER_TYPE, DINE_IN, ORDER_TYPES , type OrderType} from '../data/order-types';
 import { HandPlatter } from 'lucide-react';
 import { isUserRestrictedFromTableOrders } from '../lib/role-utils';
 
@@ -29,6 +29,14 @@ const OrderTypeSelect = ({ disabled }: OrderTypeSelectProps) => {
     setSelectedOrderType(type);
     if (type === DINE_IN) {
       setShowTableDialog(true);
+    }
+  };
+
+  const handleTableDialogClose = () => {
+    setShowTableDialog(false);
+    // If no table is selected, revert to Default
+    if (!selectedTable) {
+      setSelectedOrderType(DEFAULT_ORDER_TYPE);
     }
   };
 
@@ -73,7 +81,7 @@ const OrderTypeSelect = ({ disabled }: OrderTypeSelectProps) => {
       )}
 
       {showTableDialog && (
-        <TableSelectionDialog onClose={() => setShowTableDialog(false)} />
+        <TableSelectionDialog onClose={handleTableDialogClose} />
       )}
     </div>
   );
