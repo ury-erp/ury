@@ -222,7 +222,7 @@ interface CustomerSelectProps {
 }
 
 export function CustomerSelect({ disabled }: CustomerSelectProps) {
-  const { selectedCustomer, setSelectedCustomer, selectedOrderType } = usePOSStore();
+  const { selectedCustomer, setSelectedCustomer, selectedOrderType, isUpdatingOrder } = usePOSStore();
   const [showNewCustomerForm, setShowNewCustomerForm] = useState(false);
   const [isCreatingCustomer, setIsCreatingCustomer] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -308,6 +308,7 @@ export function CustomerSelect({ disabled }: CustomerSelectProps) {
           </div>
           <Button
             onClick={() => setSelectedCustomer(null)}
+            disabled={isUpdatingOrder}
             variant="ghost"
             size="sm"
             className="text-blue-700 hover:text-blue-800"
