@@ -150,7 +150,7 @@
               'text-blue-600': this.tabClick.currentTab === '/Cart',
             },
           ]"
-          >Order</span
+          >Cart</span
         >
       </router-link>
       <router-link
