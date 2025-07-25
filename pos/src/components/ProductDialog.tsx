@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef, ChangeEvent } from 'react';
 import { X, Plus, Minus } from 'lucide-react';
-import { MenuItem, OrderItem, usePOSStore } from '../store/pos-store';
+import { OrderItem, usePOSStore } from '../store/pos-store';
 import { cn, formatCurrency } from '../lib/utils';
-import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, Input } from './ui';
-import { Textarea } from './ui/textarea';
+import { Button, Dialog, DialogContent, Input } from './ui';
 
 interface Variant {
   id: string;
@@ -286,12 +285,11 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
 
           <div className="mt-6">
             <h3 className="text-lg font-semibold mb-3">Special Instructions</h3>
-            <Textarea
+            <Input
               placeholder="Add any special instructions or notes for this item..."
               value={comments}
-              onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setComments(e.target.value)}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setComments(e.target.value)}
               className="resize-none"
-              rows={3}
             />
           </div>
         </div>
