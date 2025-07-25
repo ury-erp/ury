@@ -1,6 +1,6 @@
 {
  "charts": [],
- "content": "[{\"id\":\"YXLBzy46Bq\",\"type\":\"custom_block\",\"data\":{\"custom_block_name\":\"URY POS\",\"col\":2}},{\"id\":\"OJsNZQxJi3\",\"type\":\"custom_block\",\"data\":{\"custom_block_name\":\"POS V1\",\"col\":2}},{\"id\":\"3XhkKI6EJA\",\"type\":\"card\",\"data\":{\"card_name\":\"URY Setup\",\"col\":4}}]",
+ "content": "[{\"id\":\"3XhkKI6EJA\",\"type\":\"card\",\"data\":{\"card_name\":\"URY Setup\",\"col\":3}},{\"id\":\"YXLBzy46Bq\",\"type\":\"custom_block\",\"data\":{\"custom_block_name\":\"URY POS\",\"col\":2}},{\"id\":\"OJsNZQxJi3\",\"type\":\"custom_block\",\"data\":{\"custom_block_name\":\"POS V1\",\"col\":2}}]",
  "creation": "2023-11-30 12:04:38.330350",
  "custom_blocks": [
   {
@@ -111,7 +111,7 @@
    "type": "Link"
   }
  ],
- "modified": "2025-07-24 17:01:05.586544",
+ "modified": "2025-07-25 10:51:43.683224",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY",
