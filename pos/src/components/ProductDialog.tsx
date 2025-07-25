@@ -3,6 +3,7 @@ import { X, Plus, Minus } from 'lucide-react';
 import { OrderItem, usePOSStore } from '../store/pos-store';
 import { cn, formatCurrency } from '../lib/utils';
 import { Button, Dialog, DialogContent, Input } from './ui';
+import { db } from '../lib/frappe-sdk';
 
 interface Variant {
   id: string;
@@ -40,7 +41,8 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
     removeFromOrder, 
     setSelectedItem, 
     getItemQuantityFromCart,
-    activeOrders 
+    activeOrders,
+    menuItems
   } = usePOSStore();
   
   // Find existing item in cart
@@ -54,10 +56,57 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
   ) : null;
 
   const [selectedVariant, setSelectedVariant] = useState<Variant | undefined>(initialVariant || selectedItem?.variants?.[0]);
-  const [selectedAddons, setSelectedAddons] = useState<Array<Omit<Addon, 'category'>>>(initialAddons);
+  const [selectedAddons, setSelectedAddons] = useState<Array<{ id: string; name: string; price: number }>>([]);
   const [quantity, setQuantity] = useState<string>(editMode ? initialQuantity?.toString() || '0' : '0');
   const [comments, setComments] = useState<string>(itemToReplace?.comment || existingCartItem?.comment || '');
   const dialogRef = useRef<HTMLDivElement>(null);
+
+  const [addonItemCodes, setAddonItemCodes] = useState<string[]>([]);
+  const [isAddonLoading, setIsAddonLoading] = useState(false);
+  const [addonError, setAddonError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!selectedItem) {
+      setAddonItemCodes([]);
+      setAddonError(null);
+      setIsAddonLoading(false);
+      return;
+    }
+    setIsAddonLoading(true);
+    setAddonError(null);
+    db.getDoc('Item', selectedItem.item)
+      .then((doc: any) => {
+        if (Array.isArray(doc.custom_pos_add_on_items)) {
+          const codes = doc.custom_pos_add_on_items
+            .map((entry: any) => entry.item)
+            .filter(Boolean);
+          setAddonItemCodes(codes);
+        } else {
+          setAddonItemCodes([]);
+        }
+      })
+      .catch((err: any) => {
+        setAddonError('Failed to fetch add-ons');
+        setAddonItemCodes([]);
+      })
+      .finally(() => {
+        setIsAddonLoading(false);
+      });
+  }, [selectedItem]);
+
+  const [addonDetails, setAddonDetails] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!addonItemCodes.length) {
+      setAddonDetails([]);
+      return;
+    }
+    // For each code, find the item in menuItems where item.item === code
+    const details = addonItemCodes
+      .map(code => menuItems.find(menuItem => menuItem.item === code))
+      .filter(Boolean); // Remove not found
+    setAddonDetails(details);
+  }, [addonItemCodes, menuItems]);
 
   // Initialize quantity and comments from cart if not in edit mode
   useEffect(() => {
@@ -135,26 +184,51 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
   };
 
   const handleAddToOrder = () => {
-    const numericQuantity = parseInt(quantity, 10);
+    const numericQuantity = typeof quantity === 'string' ? parseInt(quantity, 10) : quantity;
     if (isNaN(numericQuantity) || numericQuantity === 0) {
       return; // Don't add to order if quantity is 0 or invalid
     }
 
     if (editMode && itemToReplace?.uniqueId) {
+      // Remove the old item first
       removeFromOrder(itemToReplace.uniqueId);
-    } else if (existingCartItem?.uniqueId) {
-      removeFromOrder(existingCartItem.uniqueId);
     }
 
+    // Add main item as a cart line
     const orderItem: OrderItem = {
       ...selectedItem,
       quantity: numericQuantity,
       selectedVariant,
-      selectedAddons,
-      price: basePrice,
-      comment: comments.trim()
+      price: basePrice
     };
     addToOrder(orderItem);
+
+    // Add each selected add-on as a separate cart line
+    selectedAddons.forEach(addon => {
+      // Find the full menu item details for the add-on
+      const menuAddon = menuItems.find(item => item.item === addon.id);
+      const addonOrderItem: OrderItem = menuAddon
+        ? {
+            ...menuAddon,
+            quantity: numericQuantity,
+            price: addon.price
+          }
+        : {
+            id: addon.id,
+            name: addon.name,
+            price: addon.price,
+            quantity: numericQuantity,
+            image: null,
+            item: addon.id,
+            item_name: addon.name,
+            course: '',
+            description: '',
+            special_dish: 0 as 0 | 1,
+            tax_rate: 0
+          } as OrderItem;
+      addToOrder(addonOrderItem);
+    });
+
     handleClose();
   };
 
@@ -296,41 +370,34 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
 
         {/* Right Column - Add-ons and Order Button */}
         <div className="md:w-1/3 p-6 border-t md:border-t-0 md:border-l border-gray-200 overflow-y-auto">
-          {selectedItem.addons && selectedItem.addons.length > 0 && (
-            <div>
-              <h3 className="text-lg font-semibold mb-3">Add extras</h3>
-              <div className="space-y-4">
-                {(['sides', 'drinks', 'desserts'] as const).map(category => {
-                  const categoryAddons = selectedItem.addons?.filter(addon => addon.category === category);
-                  if (!categoryAddons?.length) return null;
-
-                  return (
-                    <div key={category} className="space-y-2">
-                      <h4 className="font-medium capitalize">{category}</h4>
-                      {categoryAddons.map((addon: Addon) => (
-                        <Button
-                          key={addon.id}
-                          onClick={() => handleAddonToggle(addon)}
-                          variant="outline"
-                          className={cn(
-                            'w-full p-3 text-left justify-start',
-                            selectedAddons.some(item => item.id === addon.id)
-                              ? 'border-blue-500 bg-blue-50'
-                              : 'border-gray-200 hover:border-blue-200'
-                          )}
-                        >
-                          <div className="flex justify-between items-center">
-                            <span className="font-medium">{addon.name}</span>
-                            <span>{formatCurrency(addon.price)}</span>
-                          </div>
-                        </Button>
-                      ))}
+          {isAddonLoading ? (
+            <div className="mb-6 flex items-center justify-center text-gray-500">Loading add-ons...</div>
+          ) : addonError ? (
+            <div className="mb-6 flex items-center justify-center text-red-500">{addonError}</div>
+          ) : addonDetails.length > 0 ? (
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold mb-3">Add-ons</h3>
+              <div className="space-y-2">
+                {addonDetails.map(addon => (
+                  <button
+                    key={addon.item}
+                    onClick={() => handleAddonToggle({ id: addon.item, name: addon.item_name, price: Number(addon.price) })}
+                    className={cn(
+                      'w-full p-3 rounded-lg border text-left',
+                      selectedAddons.some(item => item.id === addon.item)
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-gray-200 hover:border-blue-200'
+                    )}
+                  >
+                    <div className="flex justify-between items-center">
+                      <span>{addon.item_name}</span>
+                      <span>+{formatCurrency(Number(addon.price))}</span>
                     </div>
-                  );
-                })}
+                  </button>
+                ))}
               </div>
             </div>
-          )}
+          ) : null}
 
           <div className="mt-6">
             <div className="flex justify-between items-center text-lg font-semibold">
