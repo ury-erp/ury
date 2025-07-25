@@ -13,7 +13,7 @@ interface OrderTypeSelectProps {
 }
 
 const OrderTypeSelect = ({ disabled }: OrderTypeSelectProps) => {
-  const { selectedOrderType, setSelectedOrderType, selectedTable, posProfile } = usePOSStore();
+  const { selectedOrderType, setSelectedOrderType, selectedTable, posProfile, isUpdatingOrder } = usePOSStore();
   const { user } = useRootStore();
   const [showTableDialog, setShowTableDialog] = useState(false);
 
@@ -45,7 +45,7 @@ const OrderTypeSelect = ({ disabled }: OrderTypeSelectProps) => {
       <div className="flex gap-2 overflow-x-auto pb-2 -mx-2 px-2">
         {ORDER_TYPES.map(({ label, value, icon: Icon }) => {
           const isDineIn = value === DINE_IN;
-          const isDisabled = disabled || (isDineIn && isRestrictedFromTableOrders);
+          const isDisabled = disabled || (isDineIn && isRestrictedFromTableOrders) || isUpdatingOrder;
           
           return (
             <Button
