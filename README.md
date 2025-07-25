@@ -59,7 +59,11 @@ To start using URY, you need to first install URY and then setup your first rest
 1. [URY Installation Guide](INSTALLATION.md).
 
 2. [URY Setup Instructions](SETUP.md).
-	
+
+## Looking for other versions 	
+
+1. Use branch [version-14] to use with frappe version-14
+2. Use branch [v1] to use ury v0.1.0
 
 ## About
 
