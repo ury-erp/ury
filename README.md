@@ -10,22 +10,23 @@ URY is an open source ERP designed to simplify and streamline restaurant operati
 > Our system has been successfully running at scale, serving over 10+ outlets for the past 10 months.
 
 
-## URY is composed of multiple Apps
-This repository houses the core code for the URY base app. While this base app fulfills basic restaurant management needs and enables order taking, a complete URY setup includes multiple integrated apps that implements features relevant to various restaurant operations.
+## What It Includes
+- **POS**: Dine‑in, takeaway, delivery, offline mode, printer management  
+- **Kitchen Display**: Real‑time order queues, KOT printing  
+- **Analytics**: P&L dashboard, consumption reports, item trends  
 
-Given below is the list of apps that add additional features to base URY app. 
+Given below is the list of features of URY app. 
 
 ### URY POS
 
-[URY POS](https://github.com/ury-erp/pos) is a light weight and easy to use web-based application designed for streamlined order management. It serves as an efficient tool for both cashiers and captains, facilitating order processing at the cash counter and tables.It supports various order types, including dine-in, delivery, and takeout. URY POS is compatibile with a wide range of devices, including desktops, tablets, and smartphones. 
+**URY POS** is a light weight and easy to use web-based application designed for streamlined order management. It serves as an efficient tool for both cashiers and captains, facilitating order processing at the cash counter and tables.It supports various order types, including dine-in, delivery, takeout and Aggregator. URY POS is compatibile with a wide range of devices, including desktops, tablets, and smartphones. 
 
-### URY Mosaic
+### URY KOT
 
-[URY Mosaic](https://github.com/ury-erp/mosaic) is an interactive Kitchen Display System (KDS) designed to simplify order management in both single and multi-kitchen restaurants. It integrates with URY POS and URY Serve to display orders with essential details highlighted. Additionally, it offers optional Kitchen Order Ticket (KOT) printing support for added convenience.
+**URY KOT** is an interactive Kitchen Display System (KDS) designed to simplify order management in both single and multi-kitchen restaurants. Additionally, it offers optional Kitchen Order Ticket (KOT) printing support for added convenience.
 
-### URY Pulse
-
-[URY Pulse](https://github.com/ury-erp/pulse) is the App responsible for analytics and reports. It helps restaurants to monitor daily Profit and Loss (P&L), utility consumption, disposables usage, and other key metrics with precision and ease. It provides restaurants with crucial data, enabling timely decision-making by presenting essential information and insights.
+### Daily P & L and Reports
+ URY has daily P & L and various reports. It helps restaurants to monitor daily Profit and Loss (P&L), utility consumption, disposables usage, and other key metrics with precision and ease. It provides restaurants with crucial data, enabling timely decision-making by presenting essential information and insights.
 
 ### URY AI (WIP)
 
@@ -37,7 +38,7 @@ URY Serve is a mobile order-taking Android app designed specifically for restaur
 
 ## Features
 
-Below is the key feature of the URY base app.
+Below is the key feature of the URY app.
 
 - POS Opening and Closing.
 - Table Selection 
@@ -45,6 +46,8 @@ Below is the key feature of the URY base app.
 - Order Taking
 - Order Printing
 - Invoice Settlement
+- KOT and KDS
+- Daily P & L and various reports
 
 For more comprehensive list of features [go here.](FEATURES.md)
 
