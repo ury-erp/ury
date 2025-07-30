@@ -1,7 +1,6 @@
 import { 
-  Cookie,
   Grid3X3,
-  MessageSquare,
+  UtensilsCrossed,
 } from 'lucide-react';
 import { usePOSStore } from '../store/pos-store';
 import { cn } from '../lib/utils';
@@ -97,7 +96,7 @@ const Sidebar = ({ disabled }: SidebarProps) => {
                     <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-blue-600 rounded-r-full" />
                   )}
                   <div className="flex items-center gap-3 ml-1">
-                    <Cookie className="w-4 h-4 text-gray-500" />
+                    <UtensilsCrossed className="w-4 h-4 text-gray-500 flex-shrink-0" />
                     <span className="text-start">{category}</span>
                   </div>
                   <Badge variant="secondary" size="sm" className="text-xs text-gray-500 bg-gray-100 min-w-[24px] text-center">

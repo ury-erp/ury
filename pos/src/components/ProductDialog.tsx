@@ -351,8 +351,8 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
         {/* Middle Column - Variants and Quantity */}
         <div className="md:w-1/3 p-6 overflow-y-auto">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">{itemDoc?.name}</h2>
-            <p className="text-sm text-gray-500 mt-1">{itemDoc?.item}</p>
+            <h2 className="text-2xl font-bold text-gray-900">{selectedItem?.item_name}</h2>
+            <p className="text-sm text-gray-500 mt-1">{selectedItem?.item}</p>
           </div>
 
           <div className="mt-6">
