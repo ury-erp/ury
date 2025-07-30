@@ -34,10 +34,13 @@ const OrderTypeSelect = ({ disabled }: OrderTypeSelectProps) => {
 
   const handleTableDialogClose = () => {
     setShowTableDialog(false);
-    // If no table is selected, revert to Default
-    if (!selectedTable) {
-      setSelectedOrderType(DEFAULT_ORDER_TYPE);
-    }
+    // Use a timeout to allow state to update before checking
+    setTimeout(() => {
+      const currentState = usePOSStore.getState();
+      if (currentState.selectedOrderType === DINE_IN && !currentState.selectedTable) {
+        setSelectedOrderType(DEFAULT_ORDER_TYPE);
+      }
+    }, 100);
   };
 
   return (
