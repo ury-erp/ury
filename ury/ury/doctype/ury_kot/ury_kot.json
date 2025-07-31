@@ -1,0 +1,311 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "naming_series:",
+ "creation": "2023-09-27 12:19:48.275531",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "invoice",
+  "restaurant_table",
+  "customer_name",
+  "original_kot",
+  "column_break_phntx",
+  "date",
+  "time",
+  "type",
+  "section_break_l97s0",
+  "order_status",
+  "production",
+  "section_break_yxcxo",
+  "start_time_prep",
+  "production_time",
+  "column_break_9rksu",
+  "start_time_serv",
+  "section_break_ubzfc",
+  "kot_items",
+  "section_break_zpwun",
+  "naming_series",
+  "pos_profile",
+  "comments",
+  "branch",
+  "verified",
+  "order_no",
+  "aggregator_id",
+  "is_aggregator",
+  "verified_by",
+  "customer_group",
+  "table_takeaway",
+  "user",
+  "amended_from"
+ ],
+ "fields": [
+  {
+   "allow_on_submit": 1,
+   "fieldname": "invoice",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Invoice",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "restaurant_table",
+   "fieldtype": "Link",
+   "label": "Restaurant Table",
+   "options": "URY Table"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "customer_name",
+   "fieldtype": "Link",
+   "label": "Customer Name",
+   "options": "Customer",
+   "read_only": 1
+  },
+  {
+   "fieldname": "original_kot",
+   "fieldtype": "Small Text",
+   "label": "Original KOT",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_phntx",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Today",
+   "fieldname": "date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Date",
+   "reqd": 1
+  },
+  {
+   "default": "Now",
+   "fieldname": "time",
+   "fieldtype": "Time",
+   "label": "Time"
+  },
+  {
+   "allow_on_submit": 1,
+   "default": "New Order",
+   "fieldname": "type",
+   "fieldtype": "Select",
+   "label": "Type",
+   "options": "\nNew Order\nOrder Modified\nCancelled\nPartially cancelled\nDuplicate",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_l97s0",
+   "fieldtype": "Section Break"
+  },
+  {
+   "allow_on_submit": 1,
+   "default": "Ready For Prepare",
+   "fieldname": "order_status",
+   "fieldtype": "Data",
+   "in_standard_filter": 1,
+   "label": "Order Status",
+   "read_only": 1
+  },
+  {
+   "fieldname": "production",
+   "fieldtype": "Link",
+   "label": "Production",
+   "options": "URY Production Unit"
+  },
+  {
+   "fieldname": "section_break_yxcxo",
+   "fieldtype": "Section Break"
+  },
+  {
+   "allow_on_submit": 1,
+   "default": "Now",
+   "fieldname": "start_time_prep",
+   "fieldtype": "Time",
+   "label": "Start Time For Preparation",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_9rksu",
+   "fieldtype": "Column Break"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "start_time_serv",
+   "fieldtype": "Data",
+   "label": "Served Time",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_ubzfc",
+   "fieldtype": "Section Break"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "kot_items",
+   "fieldtype": "Table",
+   "label": "KOT Items",
+   "options": "URY KOT Items"
+  },
+  {
+   "fieldname": "section_break_zpwun",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "naming_series",
+   "read_only": 1
+  },
+  {
+   "fieldname": "pos_profile",
+   "fieldtype": "Link",
+   "hidden": 1,
+   "label": "POS Profile",
+   "options": "POS Profile",
+   "read_only": 1
+  },
+  {
+   "fieldname": "comments",
+   "fieldtype": "Data",
+   "label": "Comments",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "pos_profile.branch",
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "label": "Branch",
+   "options": "Branch",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "default": "0",
+   "fieldname": "verified",
+   "fieldtype": "Check",
+   "label": "Verified",
+   "read_only": 1
+  },
+  {
+   "fieldname": "order_no",
+   "fieldtype": "Data",
+   "label": "Order No",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "verified_by",
+   "fieldtype": "Link",
+   "label": "verified_by",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "customer_name.customer_group",
+   "fieldname": "customer_group",
+   "fieldtype": "Data",
+   "label": "Customer group"
+  },
+  {
+   "default": "0",
+   "fetch_from": "restaurant_table.is_take_away",
+   "fieldname": "table_takeaway",
+   "fieldtype": "Check",
+   "label": "Table Takeaway"
+  },
+  {
+   "fieldname": "user",
+   "fieldtype": "Data",
+   "label": "user"
+  },
+  {
+   "fieldname": "aggregator_id",
+   "fieldtype": "Data",
+   "label": "Aggregator ID",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "is_aggregator",
+   "fieldtype": "Check",
+   "hidden": 1,
+   "label": "Is Aggregator",
+   "read_only": 1
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "URY KOT",
+   "print_hide": 1,
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "production_time",
+   "fieldtype": "Data",
+   "label": "Total Production Time",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2024-08-26 12:28:58.664903",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY KOT",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "URY Captain",
+   "select": 1,
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "URY Manager",
+   "select": 1,
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

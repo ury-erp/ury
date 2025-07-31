@@ -1,0 +1,213 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "SUB-CLO-.YYYY.-.#####",
+ "creation": "2025-03-26 03:40:02.290820",
+ "default_view": "List",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "period_details_section",
+  "period_start_date",
+  "period_end_date",
+  "column_break_nws7",
+  "posting_date",
+  "posting_time",
+  "pos_opening_entry",
+  "status",
+  "user_details_section",
+  "company",
+  "column_break_nahd",
+  "pos_profile",
+  "user",
+  "linked_invoices_section",
+  "pos_transactions",
+  "section_break_xcg0",
+  "payment_reconciliation",
+  "grand_total",
+  "net_total",
+  "total_quantity",
+  "amended_from"
+ ],
+ "fields": [
+  {
+   "fieldname": "period_details_section",
+   "fieldtype": "Section Break",
+   "label": "Period Details"
+  },
+  {
+   "fetch_from": "pos_opening_entry.period_start_date",
+   "fieldname": "period_start_date",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "label": "Period Start Date",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "default": "Today",
+   "fieldname": "period_end_date",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "label": "Period End Date",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_nws7",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Today",
+   "fieldname": "posting_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Posting Date",
+   "reqd": 1
+  },
+  {
+   "default": "Now",
+   "fieldname": "posting_time",
+   "fieldtype": "Time",
+   "label": "Posting Time",
+   "reqd": 1
+  },
+  {
+   "fieldname": "pos_opening_entry",
+   "fieldtype": "Link",
+   "label": "POS Opening Entry",
+   "options": "POS Opening Entry",
+   "reqd": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "default": "Draft",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "hidden": 1,
+   "label": "Status",
+   "options": "Draft\nSubmitted\nQueued\nFailed\nCancelled",
+   "print_hide": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "user_details_section",
+   "fieldtype": "Section Break",
+   "label": "User Details"
+  },
+  {
+   "fetch_from": "pos_opening_entry.company",
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_nahd",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "pos_profile",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "POS Profile ",
+   "options": "POS Profile",
+   "reqd": 1
+  },
+  {
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "label": "Cashier",
+   "options": "User",
+   "reqd": 1
+  },
+  {
+   "fieldname": "linked_invoices_section",
+   "fieldtype": "Section Break",
+   "label": "Linked Invoices"
+  },
+  {
+   "fieldname": "pos_transactions",
+   "fieldtype": "Table",
+   "label": "POS Transactions",
+   "options": "Sub POS Invoices"
+  },
+  {
+   "fieldname": "section_break_xcg0",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "payment_reconciliation",
+   "fieldtype": "Table",
+   "label": "Payment Reconciliation",
+   "options": "Sub POS Closing Payment"
+  },
+  {
+   "fieldname": "grand_total",
+   "fieldtype": "Currency",
+   "label": "Grand Total",
+   "read_only": 1
+  },
+  {
+   "fieldname": "net_total",
+   "fieldtype": "Currency",
+   "label": "Net Total",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_quantity",
+   "fieldtype": "Float",
+   "label": "Total Quantity",
+   "read_only": 1
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Sub POS Closing",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Sub POS Closing",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2025-04-02 18:58:48.902980",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "Sub POS Closing",
+ "naming_rule": "Expression (old style)",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

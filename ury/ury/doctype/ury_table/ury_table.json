@@ -11,6 +11,7 @@
   "table_info_tab",
   "no_of_seats",
   "minimum_seating",
+  "table_shape",
   "column_break_vub4k",
   "restaurant",
   "restaurant_room",
@@ -97,11 +98,17 @@
    "fieldtype": "Time",
    "label": "Latest Invoice Time",
    "read_only": 1
+  },
+  {
+   "fieldname": "table_shape",
+   "fieldtype": "Select",
+   "label": "Table Shape",
+   "options": "\nRectangle\nSquare\nCircle"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2023-12-19 15:32:33.523732",
+ "modified": "2025-07-17 11:29:34.334457",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Table",
@@ -149,6 +156,7 @@
    "select": 1
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [],

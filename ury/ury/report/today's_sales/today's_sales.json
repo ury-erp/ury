@@ -1,0 +1,42 @@
+{
+ "add_total_row": 0,
+ "columns": [],
+ "creation": "2023-09-29 14:44:32.146055",
+ "disable_prepared_report": 0,
+ "disabled": 0,
+ "docstatus": 0,
+ "doctype": "Report",
+ "filters": [
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "label": "Branch",
+   "mandatory": 1,
+   "options": "Branch",
+   "wildcard_filter": 0
+  }
+ ],
+ "idx": 0,
+ "is_standard": "Yes",
+ "modified": "2024-01-07 18:53:11.244041",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "Today's Sales",
+ "owner": "Administrator",
+ "prepared_report": 0,
+ "query": "SELECT\n    DAYNAME(curdate()) AS \"Today\",\n    COUNT(b.`name`) AS \"Total Invoices\",\n    ROUND(SUM(b.`net_total`),2) AS \"Item Total\",\n    ROUND(SUM(b.`total_taxes_and_charges`),2) AS \"Total Taxes and Charges\",\n    ROUND(SUM(b.`grand_total`),2) AS \"Grand Total\",\n    ROUND(SUM(b.`grand_total` - b.`rounded_total`),2) AS \"Round Off\",\n    ROUND(SUM(b.`rounded_total` - b.`paid_amount` + b.`change_amount`), 2)AS \"Cash Discounts\"\nFROM `tabPOS Invoice` b\nLEFT JOIN `tabURY Report Settings` rs ON (\n    rs.`branch` = %(branch)s\n)\nWHERE\n    b.`branch` = %(branch)s\n    AND b.`docstatus` = 1\n    AND b.`status` IN (\"Consolidated\", \"Paid\") \n    AND(\n        ((rs.`hours` IS NULL OR rs.`hours` = 0) AND b.`posting_date` = curdate())\n        OR (rs.`hours` > 0 AND TIMESTAMP(b.`posting_date`, b.`posting_time`) <= TIMESTAMP(DATE_ADD(curdate(), INTERVAL 1 DAY), CONCAT(LPAD(rs.`hours`, 2, '0'), ':00:00')) AND TIMESTAMP(b.`posting_date`, b.`posting_time`) >= TIMESTAMP(curdate(), CONCAT(LPAD(rs.`hours`, 2, '0'), ':00:00')))\n        OR (rs.`branch` IS NULL AND b.`posting_date` = curdate())\n    )",
+ "ref_doctype": "POS Invoice",
+ "report_name": "Today's Sales",
+ "report_type": "Query Report",
+ "roles": [
+  {
+   "role": "Accounts Manager"
+  },
+  {
+   "role": "Accounts User"
+  },
+  {
+   "role": "URY Manager"
+  }
+ ]
+}

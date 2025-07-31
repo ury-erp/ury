@@ -11,6 +11,7 @@
   "image",
   "company",
   "invoice_series_prefix",
+  "aggregator_series_prefix",
   "column_break_4",
   "address",
   "branch",
@@ -18,9 +19,11 @@
   "menu_info_section",
   "active_menu",
   "room_wise_menu",
+  "menu_for_room",
   "column_break_vo5jt",
   "default_room",
-  "menu_for_room"
+  "order_type_wise_menu",
+  "order_type_menu"
  ],
  "fields": [
   {
@@ -101,11 +104,29 @@
    "label": "Default Room",
    "options": "URY Room",
    "reqd": 1
+  },
+  {
+   "fieldname": "aggregator_series_prefix",
+   "fieldtype": "Data",
+   "label": "Aggregator Series Prefix"
+  },
+  {
+   "default": "0",
+   "fieldname": "order_type_wise_menu",
+   "fieldtype": "Check",
+   "label": "Order Type Wise Menu"
+  },
+  {
+   "depends_on": "eval:doc.order_type_wise_menu ",
+   "fieldname": "order_type_menu",
+   "fieldtype": "Table",
+   "label": "Order Type Menu",
+   "options": "Order Type Menu"
   }
  ],
  "image_field": "image",
  "links": [],
- "modified": "2024-05-01 19:55:53.124596",
+ "modified": "2025-03-06 10:39:17.307700",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Restaurant",

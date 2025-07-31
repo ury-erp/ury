@@ -1,0 +1,182 @@
+{
+ "actions": [],
+ "autoname": "field:branch",
+ "creation": "2023-09-29 10:45:19.994545",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "branch",
+  "extended_hours",
+  "hours",
+  "daily_p_and_l",
+  "buying_price_list",
+  "direct_expense_section",
+  "consumables",
+  "direct_fixed_expenses",
+  "indirect_expense_section",
+  "electricity_charges",
+  "indirect_fixed_expenses",
+  "monthly_fixed_expenses",
+  "percentage_expenses",
+  "employee_costs_section",
+  "employee_costs",
+  "section_break_4c2bz",
+  "depreciation"
+ ],
+ "fields": [
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Branch",
+   "options": "Branch",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "default": "0",
+   "description": "Whether the branch is open after 12 AM.",
+   "fieldname": "extended_hours",
+   "fieldtype": "Check",
+   "label": "Extended Hours",
+   "reqd": 1
+  },
+  {
+   "depends_on": "eval:doc.extended_hours==1",
+   "fieldname": "hours",
+   "fieldtype": "Int",
+   "label": "No Of Hours",
+   "mandatory_depends_on": "eval:doc.extended_hours==1",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "daily_p_and_l",
+   "fieldtype": "Tab Break",
+   "label": "Daily P and L Settings"
+  },
+  {
+   "fieldname": "buying_price_list",
+   "fieldtype": "Link",
+   "label": "Buying Price List",
+   "options": "Price List",
+   "reqd": 1
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "direct_expense_section",
+   "fieldtype": "Section Break",
+   "label": "Direct Expenses"
+  },
+  {
+   "description": "Daily Fixed",
+   "fieldname": "direct_fixed_expenses",
+   "fieldtype": "Table",
+   "label": "Direct Fixed Expenses",
+   "options": "URY Fixed Expenses"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "indirect_expense_section",
+   "fieldtype": "Section Break",
+   "label": "Indirect Expenses",
+   "options": "Staff Food Charges"
+  },
+  {
+   "description": "Daily Fixed",
+   "fieldname": "indirect_fixed_expenses",
+   "fieldtype": "Table",
+   "label": "Indirect Fixed Expenses",
+   "options": "URY Fixed Expenses"
+  },
+  {
+   "fieldname": "percentage_expenses",
+   "fieldtype": "Table",
+   "label": "Percentage Expenses",
+   "options": "URY Variable Expenses"
+  },
+  {
+   "description": "Daily Fixed",
+   "fieldname": "depreciation",
+   "fieldtype": "Currency",
+   "label": "Depreciation",
+   "precision": "2"
+  },
+  {
+   "collapsible": 1,
+   "description": "<li>Daily Gross Salary Cost is calculated from employees attendance.</li>\n<br>",
+   "fieldname": "employee_costs_section",
+   "fieldtype": "Section Break",
+   "label": "Employee Costs"
+  },
+  {
+   "fieldname": "section_break_4c2bz",
+   "fieldtype": "Section Break"
+  },
+  {
+   "description": "Per Unit",
+   "fieldname": "electricity_charges",
+   "fieldtype": "Currency",
+   "label": "Electricty Charges"
+  },
+  {
+   "fieldname": "consumables",
+   "fieldtype": "Table",
+   "label": "Burning Materials (Other Consumables)",
+   "options": "URY Materials"
+  },
+  {
+   "description": "Daily Fixed",
+   "fieldname": "employee_costs",
+   "fieldtype": "Table",
+   "label": "Employee Costs",
+   "options": "URY Fixed Expenses"
+  },
+  {
+   "description": "Monthly Fixed",
+   "fieldname": "monthly_fixed_expenses",
+   "fieldtype": "Table",
+   "label": "Monthly Fixed Expenses",
+   "options": "URY Fixed Expenses"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2024-03-22 15:34:04.572515",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY Report Settings",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "URY Manager",
+   "select": 1,
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

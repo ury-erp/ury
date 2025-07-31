@@ -1,0 +1,43 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-03-06 10:26:48.242529",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "order_type",
+  "menu"
+ ],
+ "fields": [
+  {
+   "columns": 5,
+   "fieldname": "order_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Order Type",
+   "options": "\nPhone In\nTake Away\nDelivery"
+  },
+  {
+   "columns": 5,
+   "fieldname": "menu",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Menu",
+   "options": "URY Menu"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2025-03-06 10:26:48.242529",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "Order Type Menu",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

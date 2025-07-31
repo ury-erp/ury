@@ -674,7 +674,7 @@ frappe.ui.form.on('URY Order', {
 		return frappe.call({
 			method: 'ury.ury.doctype.ury_order.ury_order.get_order_invoice',
 			args: {
-				table: frm.doc.restaurant_table
+				table: frm.doc.restaurant_table,
 			},
 			callback: (r) => {
 				frm.events.set_invoice_items(frm, r);
@@ -750,6 +750,7 @@ frappe.ui.form.on('URY Order', {
 						cashier: frm.doc.cashier,
 						last_invoice: last_invoice,
 						comments: frm.doc.comments,
+						order_type: frm.doc.order_type,
 					},
 					callback: (r) => {
 						let invoice = r.message;

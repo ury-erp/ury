@@ -3,7 +3,7 @@ from frappe import _
 
 import os
 
-from PyPDF2 import PdfWriter
+from pypdf import PdfWriter
 
 no_cache = 1
 
@@ -109,24 +109,46 @@ def select_network_printer(pos_profile, invoice_id):
 
 @frappe.whitelist()
 def qz_print_update(invoice):
-    table = frappe.db.get_value("POS Invoice", invoice, "restaurant_table")
-
-    if table == None or table == "":
-        frappe.db.set_value(
-            "POS Invoice", invoice, "invoice_printed", 1, update_modified=False
-        )
-
-    else:
-        invoice_printed = frappe.db.get_value("POS Invoice", invoice, "invoice_printed")
-
-        if invoice_printed == 0:
+    try:
+        table = frappe.db.get_value("POS Invoice", invoice, "restaurant_table")
+        
+        if table == None or table == "":
+            # Update invoice_printed
             frappe.db.set_value(
                 "POS Invoice", invoice, "invoice_printed", 1, update_modified=False
             )
+            
+            # Validate the update
+            new_invoice_printed = frappe.db.get_value("POS Invoice", invoice, "invoice_printed")
+            if new_invoice_printed != 1:
+                return {"status": "Failure"}                
+        else:
+            invoice_printed = frappe.db.get_value("POS Invoice", invoice, "invoice_printed")
 
-            frappe.db.set_value(
-                "URY Table", table, {"occupied": 0, "latest_invoice_time": None}
-            )
+            if invoice_printed == 0:
+                # Update invoice_printed
+                frappe.db.set_value(
+                    "POS Invoice", invoice, "invoice_printed", 1, update_modified=False
+                )
+                
+                # Update table status
+                frappe.db.set_value(
+                    "URY Table", table, {"occupied": 0, "latest_invoice_time": None}
+                )
+                
+                # Validate both updates
+                new_invoice_printed = frappe.db.get_value("POS Invoice", invoice, "invoice_printed")
+                new_table_status = frappe.db.get_value("URY Table", table, "occupied")
+                
+                if new_invoice_printed != 1 or new_table_status != 0:
+                    return {"status": "Failure"}
+        
+        return {"status": "Success"}
+        
+    except Exception as e:
+        frappe.log_error(message=e, title="Print Fail")
+        frappe.throw(_("Error while printing order",e))                   
+        return {"status": "Failure"}
 
 
 @frappe.whitelist()

@@ -1,0 +1,73 @@
+{
+ "actions": [],
+ "allow_import": 1,
+ "allow_rename": 1,
+ "autoname": "field:course",
+ "creation": "2024-05-02 16:11:18.869198",
+ "default_view": "List",
+ "doctype": "DocType",
+ "document_type": "Setup",
+ "engine": "InnoDB",
+ "field_order": [
+  "course"
+ ],
+ "fields": [
+  {
+   "fieldname": "course",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Course",
+   "oldfieldname": "branch",
+   "oldfieldtype": "Data",
+   "reqd": 1,
+   "unique": 1
+  }
+ ],
+ "icon": "fa fa-code-fork",
+ "links": [],
+ "modified": "2024-05-02 16:14:56.862267",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY Menu Course",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "URY Manager",
+   "select": 1,
+   "share": 1,
+   "write": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "URY Captain",
+   "select": 1,
+   "share": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "URY Cashier",
+   "select": 1,
+   "share": 1
+  }
+ ],
+ "quick_entry": 1,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

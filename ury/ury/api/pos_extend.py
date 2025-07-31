@@ -23,7 +23,7 @@ def overrided_past_order_list(search_term, status, limit=20):
 
     if user != "Administrator":
         sql_query = """
-            SELECT b.branch
+            SELECT b.branch,a.room
             FROM `tabURY User` AS a
             INNER JOIN `tabBranch` AS b ON a.parent = b.name
             WHERE a.user = %s
@@ -34,6 +34,7 @@ def overrided_past_order_list(search_term, status, limit=20):
             frappe.throw("User is not Associated with any Branch.Please refresh Page")
 
         branch_name = branch_array[0].get("branch")
+        room_name = branch_array[0].get("room")
 
     fields = [
         "name",
@@ -69,7 +70,7 @@ def overrided_past_order_list(search_term, status, limit=20):
             if status == "To Bill":
                 invoice_list = frappe.db.get_all(
                     "POS Invoice",
-                    filters={"status": "Draft", "branch": branch_name},
+                    filters={"status": "Draft", "branch": branch_name,"custom_restaurant_room": room_name},
                     fields=fields,
                 )
                 for invoice in invoice_list:
@@ -79,7 +80,7 @@ def overrided_past_order_list(search_term, status, limit=20):
             else:
                 invoice_list = frappe.db.get_all(
                     "POS Invoice",
-                    filters={"status": status, "branch": branch_name},
+                    filters={"status": status, "branch": branch_name,"custom_restaurant_room":room_name},
                     fields=fields,
                 )
                 for invoice in invoice_list:

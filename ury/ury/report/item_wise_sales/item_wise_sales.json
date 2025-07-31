@@ -1,0 +1,58 @@
+{
+ "add_total_row": 1,
+ "columns": [],
+ "creation": "2023-09-29 14:51:11.124653",
+ "disable_prepared_report": 0,
+ "disabled": 0,
+ "docstatus": 0,
+ "doctype": "Report",
+ "filters": [
+  {
+   "fieldname": "start_date",
+   "fieldtype": "Date",
+   "label": "From Date",
+   "mandatory": 1,
+   "options": "",
+   "wildcard_filter": 0
+  },
+  {
+   "fieldname": "end_date",
+   "fieldtype": "Date",
+   "label": "To Date",
+   "mandatory": 1,
+   "wildcard_filter": 0
+  },
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "label": "Branch",
+   "mandatory": 1,
+   "options": "Branch",
+   "wildcard_filter": 0
+  }
+ ],
+ "idx": 0,
+ "is_standard": "Yes",
+ "modified": "2023-12-06 10:45:13.122820",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "Item Wise Sales",
+ "owner": "Administrator",
+ "prepared_report": 0,
+ "query": "SELECT \n    c.`item_group` AS \"Item Group\",\n    c.`item_name` AS \"Item Name\",\n    SUM(b.`qty`) AS \"Qty\",\n    SUM(b.`amount`) AS \"Amount\"\nFROM \n    (\n        SELECT %(start_date)s AS `date`\n        UNION\n        SELECT DATE_ADD(%(start_date)s, INTERVAL n DAY) AS `date`\n        FROM (\n            SELECT a.N + b.N * 10 + c.N * 100 + 1 AS n\n            FROM (\n                SELECT 0 AS N UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5 UNION SELECT 6 UNION SELECT 7 UNION SELECT 8 UNION SELECT 9\n            ) AS a\n            CROSS JOIN (\n                SELECT 0 AS N UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5 UNION SELECT 6 UNION SELECT 7 UNION SELECT 8 UNION SELECT 9\n            ) AS b\n            CROSS JOIN (\n                SELECT 0 AS N UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5 UNION SELECT 6 UNION SELECT 7 UNION SELECT 8 UNION SELECT 9\n            ) AS c\n            ORDER BY n\n        ) AS nums\n        WHERE DATE_ADD(%(start_date)s, INTERVAL n DAY) < %(end_date)s\n        UNION\n        SELECT %(end_date)s AS `date`\n    ) AS date_list\nLEFT JOIN `tabPOS Invoice` a ON (\n    a.`branch` = %(branch)s\n    AND a.`status` IN (\"Consolidated\",\"Paid\") \n    AND a.`docstatus` = 1 \n)\nINNER JOIN `tabPOS Invoice Item`b ON a.`name`=b.`parent`\nLEFT JOIN `tabItem` c ON c.`item_code` = b.`item_code`\nLEFT JOIN `tabURY Report Settings` rs ON (\n    rs.`branch` = %(branch)s\n)\nWHERE\n(\n    ((rs.`hours` IS NULL OR rs.`hours` = 0) AND a.`posting_date` = date_list.`date`)\n    OR (rs.`hours` > 0 AND TIMESTAMP(a.`posting_date`, a.`posting_time`) <= TIMESTAMP(DATE_ADD(date_list.`date`, INTERVAL 1 DAY), CONCAT(LPAD(rs.`hours`, 2, '0'), ':00:00')) AND TIMESTAMP(a.`posting_date`, a.`posting_time`) >= TIMESTAMP(date_list.`date`, CONCAT(LPAD(rs.`hours`, 2, '0'), ':00:00')))\n    OR (rs.`branch` IS NULL AND a.`posting_date` = date_list.`date`)\n)\nGROUP BY \n    c.`item_name`\nORDER BY \n    c.`item_group` ASC, b.`item_name` ASC",
+ "ref_doctype": "POS Invoice",
+ "report_name": "Item Wise Sales",
+ "report_script": "",
+ "report_type": "Query Report",
+ "roles": [
+  {
+   "role": "Accounts Manager"
+  },
+  {
+   "role": "Accounts User"
+  },
+  {
+   "role": "URY Manager"
+  }
+ ]
+}

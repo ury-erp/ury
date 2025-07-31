@@ -1,0 +1,129 @@
+<div class="clearfix"></div>
+<div class="box" style="background-color: #f5f5f5; border-radius: 10px; padding: 20px;">
+    <div class="grid-body">
+        <div class="rows text-center">
+            <!-- Sales summary section -->
+            <div style="border: 1px solid #ccc; border-radius: 5px; padding: 20px; background-color: #fff;">
+                <h3 class="ellipsis" style="color: rgb(0, 0, 0);">{{ data.branch }}</h3>
+                <h4 class="ellipsis" style="color: rgb(0, 0, 0);">Date: {{ data.date }}</h4>
+                <div class="tax-break-up" style="overflow-x: auto;">
+                    <style>
+                        table {
+                            border-collapse: separate;
+                            width: 100%;
+                            background-color: #f9f9f9; /* Adjust the background color of the table */
+                        }
+
+                        table td.text-right {
+                            background-color: rgb(218, 227, 243);
+                        }
+
+                        th, td {
+                            padding: 10px;
+                            text-align: right;
+                        }
+
+                        th {
+                            text-align: left;
+                            font-weight: bold;
+                        }
+
+                        .text-left {
+                            text-align: left;
+                        }
+
+                        .font-bold {
+                            font-weight: bold;
+                        }
+
+                        .bg-green {
+                            background-color: rgb(146, 208, 80);
+                        }
+
+                        .bg-gray {
+                            background-color: rgb(201, 201, 201);
+                        }
+                    </style>
+                    <table class="table table-bordered table-hover">
+                        <thead>
+                            <tr>
+                                <th class="text-left font-bold">{{ _("REVENUE") }}</th>
+                                <th class="text-right font-bold">{{ _("AMOUNT") }}</th>
+                                <th class="text-right font-bold">{{ _("PERCENTAGE") }}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="text-left font-bold">{{ _('Gross Sales') }}</td>
+                                <td>{{ frappe.utils.fmt_money(data.gross_sales or '', currency=currency) }}</td>
+                                <td>{{ data.gross_sales_percent }}%</td>
+                            </tr>
+                            <tr>
+                                <td class="text-left font-bold">{{ _('Discounts & Round Offs') }}</td>
+                                <td>{{ frappe.utils.fmt_money(data.cash_discount_round_off or '', currency=currency) }}</td>
+                                <td>{{ data.cash_discount_round_off_percent }}%</td>
+                            </tr>
+                            <tr>
+                                <td class="text-left font-bold">{{ _('Tax') }}</td>
+                                <td>{{ frappe.utils.fmt_money(data.tax or '', currency=currency) }}</td>
+                                <td>{{ data.tax_percent }}%</td>
+                            </tr>
+                            <tr class="bg-green">
+                                <td class="text-left font-bold">{{ _('Net Sales') }}</td>
+                                <td>{{ frappe.utils.fmt_money(data.net_sales or '', currency=currency) }}</td>
+                                <td>{{ data.net_sales_percent }}%</td>
+                            </tr>
+                            <tr class="bg-gray">
+                                <td class="text-left font-bold">{{ _('Cost of Goods Sold') }}</td>
+                                <td>{{ frappe.utils.fmt_money(data.cogs or '', currency=currency) }}</td>
+                                <td>{{ data.cogs_percent }}%</td>
+                            </tr>
+                            <tr>
+                                <td class="text-left font-bold">{{ _('Direct Expenses') }}</td>
+                                <td>{{ frappe.utils.fmt_money(data.total_direct_expenses or '', currency=currency) }}</td>
+                                <td>{{ data.total_direct_expenses_percent }}%</td>
+                            </tr>
+                            <tr class="bg-green">
+                                <td class="text-left font-bold">{{ _('Gross Profit/Loss') }}</td>
+                                <td>{{ frappe.utils.fmt_money(data.gross_profit or '', currency=currency) }}</td>
+                                <td>{{ data.gross_profit_percent }}%</td>
+                            </tr>
+                            <tr>
+                                <td class="text-left font-bold">{{ _('Employee Cost') }}</td>
+                                <td>{{ frappe.utils.fmt_money(data.total_employee_costs or '', currency=currency) }}</td>
+                                <td>{{ data.total_employee_costs_percent }}%</td>
+                            </tr>
+                            {% for expense in data.indirect_expenses_breakup %}
+                            <tr>
+                                <td class="text-left font-bold">{{ expense.breakup }}</td>
+                                <td>{{ expense.amount }}</td>
+                                <td>{{ expense.percent }}%</td>
+                            </tr>
+                            {% endfor %}
+                            <tr>
+                                <td class="text-left font-bold">{{ _('Other Expenses') }}</td>
+                                <td>{{ frappe.utils.fmt_money(data.total_other_expenses or '', currency=currency) }}</td>
+                                <td>{{ data.other_expenses_percent }}%</td>
+                            </tr>
+                            <tr>
+                                <td class="text-left font-bold">{{ _('Depreciation') }}</td>
+                                <td>{{ frappe.utils.fmt_money(data.depreciation or '', currency=currency) }}</td>
+                                <td>{{ data.depreciation_percent }}%</td>
+                            </tr>
+                            <tr class="bg-gray">
+                                <td class="text-left font-bold">{{ _('Total Indirect Expenses') }}</td>
+                                <td>{{ frappe.utils.fmt_money(data.total_indirect_expenses or '', currency=currency) }}</td>
+                                <td>{{ data.total_indirect_expenses_percent }}%</td>
+                            </tr>
+                            <tr class="bg-green">
+                                <td class="text-left font-bold">{{ _('Net Profit/Loss') }}</td>
+                                <td>{{ frappe.utils.fmt_money(data.net_profit or '', currency=currency) }}</td>
+                                <td>{{ data.net_profit_percent }}%</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

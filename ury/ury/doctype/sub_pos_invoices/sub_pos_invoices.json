@@ -1,0 +1,56 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-03-26 03:39:26.809818",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "pos_invoice_section",
+  "pos_invoice",
+  "posting_date",
+  "grand_total"
+ ],
+ "fields": [
+  {
+   "fieldname": "pos_invoice_section",
+   "fieldtype": "Section Break",
+   "label": "POS Invoice"
+  },
+  {
+   "fieldname": "pos_invoice",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "POS Invoice",
+   "options": "POS Invoice",
+   "width": "3"
+  },
+  {
+   "fieldname": "posting_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Date",
+   "width": "3"
+  },
+  {
+   "fieldname": "grand_total",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Amount",
+   "width": "3"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2025-03-26 03:39:26.809818",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "Sub POS Invoices",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

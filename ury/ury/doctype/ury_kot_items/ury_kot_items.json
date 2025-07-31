@@ -1,0 +1,89 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "URYKOTITM.#####",
+ "creation": "2023-09-27 12:18:52.086410",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "item",
+  "item_name",
+  "quantity",
+  "cancelled_qty",
+  "comments",
+  "course",
+  "serve_priority",
+  "indicate_course"
+ ],
+ "fields": [
+  {
+   "fieldname": "item",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Item",
+   "options": "Item"
+  },
+  {
+   "fetch_from": "item.item_name",
+   "fieldname": "item_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Item Name"
+  },
+  {
+   "fieldname": "quantity",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Quantity"
+  },
+  {
+   "fieldname": "cancelled_qty",
+   "fieldtype": "Data",
+   "in_preview": 1,
+   "label": "Cancelled Qty",
+   "read_only": 1
+  },
+  {
+   "fieldname": "comments",
+   "fieldtype": "Data",
+   "label": "Comments"
+  },
+  {
+   "fieldname": "course",
+   "fieldtype": "Link",
+   "label": "Course",
+   "options": "URY Menu Course",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "course.custom_serving_priority",
+   "fieldname": "serve_priority",
+   "fieldtype": "Int",
+   "label": "Serve Priority",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fetch_from": "course.custom_indicate_in_kds",
+   "fieldname": "indicate_course",
+   "fieldtype": "Check",
+   "label": "Indicate Course",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2024-08-28 16:23:35.778511",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY KOT Items",
+ "naming_rule": "Expression (old style)",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

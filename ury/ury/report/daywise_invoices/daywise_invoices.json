@@ -1,0 +1,57 @@
+{
+ "add_total_row": 1,
+ "columns": [],
+ "creation": "2023-09-29 14:47:56.403837",
+ "disable_prepared_report": 0,
+ "disabled": 0,
+ "docstatus": 0,
+ "doctype": "Report",
+ "filters": [
+  {
+   "fieldname": "start_date",
+   "fieldtype": "Date",
+   "label": "From Date",
+   "mandatory": 1,
+   "wildcard_filter": 0
+  },
+  {
+   "fieldname": "end_date",
+   "fieldtype": "Date",
+   "label": "To Date",
+   "mandatory": 1,
+   "wildcard_filter": 0
+  },
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "label": "Branch",
+   "mandatory": 1,
+   "options": "Branch",
+   "wildcard_filter": 0
+  }
+ ],
+ "idx": 0,
+ "is_standard": "Yes",
+ "letterhead": null,
+ "modified": "2024-12-22 12:50:12.080353",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "Daywise Invoices",
+ "owner": "Administrator",
+ "prepared_report": 0,
+ "query": "SELECT \n    b.`posting_date` AS \"Date\",\n    CONCAT(\n    LPAD(IF(HOUR(b.`posting_time`) > 12, HOUR(b.`posting_time`) - 12, HOUR(b.`posting_time`)), 2, '0'),\n    ':',\n    SUBSTRING_INDEX(SUBSTRING_INDEX(b.`posting_time`, ':', 2), ':', -1),\n    CASE WHEN HOUR(b.`posting_time`) >= 12 THEN ' PM' ELSE ' AM' END\n    ) AS \"Time\",\n    b.`name` AS \"Invoice:Link/POS Invoice\",\n    b.`net_total` AS \"Item Total\",\n    b.`total_taxes_and_charges` AS \"Total Taxes and Charges\",\n    b.`grand_total` AS \"Grand Total\",\n    (b.`grand_total` - b.`rounded_total`) AS \"Round Off\",\n    b.`rounded_total` AS \"Rounded Total\",\n    CASE WHEN b.`customer_group` = 'Aggregators' THEN 0 ELSE b.`paid_amount` END AS \"Received Amount\",\n    CASE WHEN b.`customer_group` = 'Aggregators' THEN 0 ELSE b.`change_amount` END AS \"Change Amount\",\n    IFNULL(\n    CASE \n        WHEN b.`rounded_total` > 0 THEN (b.`rounded_total` - b.`paid_amount` + b.`change_amount`)\n        ELSE (b.`grand_total` - b.`paid_amount` + b.`change_amount`)\n    END, \n    0\n    ) AS \"Cash Discounts\",\n    GROUP_CONCAT(\n        CASE WHEN c.`amount` != 0 THEN c.`mode_of_payment` END \n        ORDER BY c.`amount` \n        SEPARATOR ', '\n    ) AS \"Payment Mode\"\nFROM \n    (\n        SELECT %(start_date)s AS `date`\n        UNION\n        SELECT DATE_ADD(%(start_date)s, INTERVAL n DAY) AS `date`\n        FROM (\n            SELECT a.N + b.N * 10 + c.N * 100 + 1 AS n\n            FROM (\n                SELECT 0 AS N UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5 UNION SELECT 6 UNION SELECT 7 UNION SELECT 8 UNION SELECT 9\n            ) AS a\n            CROSS JOIN (\n                SELECT 0 AS N UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5 UNION SELECT 6 UNION SELECT 7 UNION SELECT 8 UNION SELECT 9\n            ) AS b\n            CROSS JOIN (\n                SELECT 0 AS N UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5 UNION SELECT 6 UNION SELECT 7 UNION SELECT 8 UNION SELECT 9\n            ) AS c\n            ORDER BY n\n        ) AS nums\n        WHERE DATE_ADD(%(start_date)s, INTERVAL n DAY) < %(end_date)s\n        UNION\n        SELECT %(end_date)s AS `date`\n    ) AS date_list\nLEFT JOIN `tabPOS Invoice` b ON (\n    b.`branch` = %(branch)s\n    AND b.`status` IN (\"Consolidated\",\"Paid\") \n    AND b.`docstatus` = 1\n)\nLEFT JOIN `tabSales Invoice Payment` c ON (\n    c.`parent`= b.`name`\n)\nLEFT JOIN `tabURY Report Settings` rs ON (\n    rs.`branch` = %(branch)s\n)\nWHERE\n    (\n    ((rs.`hours` IS NULL OR rs.`hours` = 0) AND b.`posting_date` = date_list.`date`)\n    OR (rs.`hours` > 0 AND TIMESTAMP(b.`posting_date`, b.`posting_time`) <= TIMESTAMP(DATE_ADD(date_list.`date`, INTERVAL 1 DAY), CONCAT(LPAD(rs.`hours`, 2, '0'), ':00:00')) AND TIMESTAMP(b.`posting_date`, b.`posting_time`) >= TIMESTAMP(date_list.`date`, CONCAT(LPAD(rs.`hours`, 2, '0'), ':00:00')))\n    OR (rs.`branch` IS NULL AND b.`posting_date` = date_list.`date`)\n    )\nGROUP BY \n    date_list.`date`,b.`name`\nORDER BY \n    date_list.`date` ASC, b.`name` ASC",
+ "ref_doctype": "POS Invoice",
+ "report_name": "Daywise Invoices",
+ "report_type": "Query Report",
+ "roles": [
+  {
+   "role": "Accounts Manager"
+  },
+  {
+   "role": "Accounts User"
+  },
+  {
+   "role": "URY Manager"
+  }
+ ]
+}

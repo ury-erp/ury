@@ -1,0 +1,440 @@
+{
+ "actions": [],
+ "autoname": "Daily-PL-.YYYY.-.#####",
+ "creation": "2023-10-05 16:43:50.108202",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "profit_loss_tab",
+  "proft_loss_details",
+  "p_and_l_section",
+  "gross_sales",
+  "cash_discount_round_off",
+  "tax",
+  "net_sales",
+  "cogs",
+  "total_direct_expenses",
+  "gross_profit",
+  "total_employee_costs",
+  "depreciation",
+  "total_other_expenses",
+  "total_indirect_expenses",
+  "net_profit",
+  "column_break_bqo3d",
+  "gross_sales_percent",
+  "cash_discount_round_off_percent",
+  "tax_percent",
+  "net_sales_percent",
+  "cogs_percent",
+  "total_direct_expenses_percent",
+  "gross_profit_percent",
+  "total_employee_costs_percent",
+  "depreciation_percent",
+  "other_expenses_percent",
+  "total_indirect_expenses_percent",
+  "net_profit_percent",
+  "details_tab",
+  "branch",
+  "column_break_so5qh",
+  "date",
+  "section_break_qpbbd",
+  "electricity_opening",
+  "column_break_mq2bv",
+  "electricity_closing",
+  "section_break_6mqsm",
+  "materials_consumed",
+  "section_break_dv4iu",
+  "other_expenses",
+  "remarks",
+  "expenses_breakup",
+  "direct_expenses_breakup",
+  "section_break_lught",
+  "employee_costs_breakup",
+  "section_break_rhkwy",
+  "indirect_expenses_breakup",
+  "cogs_tab",
+  "cost_of_goods",
+  "amended_from"
+ ],
+ "fields": [
+  {
+   "depends_on": "eval:doc.docstatus==1",
+   "fieldname": "proft_loss_details",
+   "fieldtype": "HTML"
+  },
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Branch",
+   "options": "Branch",
+   "reqd": 1,
+   "set_only_once": 1
+  },
+  {
+   "fieldname": "column_break_so5qh",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Date",
+   "reqd": 1,
+   "set_only_once": 1
+  },
+  {
+   "fieldname": "section_break_qpbbd",
+   "fieldtype": "Section Break"
+  },
+  {
+   "description": "opening reading(Unit)",
+   "fieldname": "electricity_opening",
+   "fieldtype": "Float",
+   "label": "Electricity Opening",
+   "precision": "2",
+   "read_only_depends_on": "eval:doc.docstatus==1",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_mq2bv",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "closing reading(Unit)",
+   "fieldname": "electricity_closing",
+   "fieldtype": "Float",
+   "label": "Electricity Closing",
+   "precision": "2",
+   "read_only_depends_on": "eval:doc.docstatus==1",
+   "reqd": 1
+  },
+  {
+   "fieldname": "other_expenses",
+   "fieldtype": "Table",
+   "label": "Other Expenses",
+   "options": "URY P and L Breakup",
+   "read_only_depends_on": "eval:doc.docstatus==1"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "p_and_l_section",
+   "fieldtype": "Section Break",
+   "label": "Summary"
+  },
+  {
+   "depends_on": "eval:doc.docstatus==1",
+   "fieldname": "gross_sales",
+   "fieldtype": "Currency",
+   "label": "Gross Sales",
+   "precision": "2",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.docstatus==1",
+   "fieldname": "gross_sales_percent",
+   "fieldtype": "Percent",
+   "label": "Gross Sales Percent",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.docstatus==1",
+   "fieldname": "cash_discount_round_off",
+   "fieldtype": "Currency",
+   "label": "Discounts & Round Offs",
+   "precision": "2",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.docstatus==1",
+   "fieldname": "cash_discount_round_off_percent",
+   "fieldtype": "Percent",
+   "label": "Discounts & Round Offs Percent",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.docstatus==1",
+   "fieldname": "tax",
+   "fieldtype": "Currency",
+   "label": "Tax",
+   "precision": "2",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.docstatus==1",
+   "fieldname": "tax_percent",
+   "fieldtype": "Percent",
+   "label": "Tax Percent",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.docstatus==1",
+   "fieldname": "net_sales",
+   "fieldtype": "Currency",
+   "label": "Net Sales",
+   "precision": "2",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.docstatus==1",
+   "fieldname": "net_sales_percent",
+   "fieldtype": "Percent",
+   "label": "Net Sales Percent",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.docstatus==1",
+   "fieldname": "cogs",
+   "fieldtype": "Currency",
+   "label": "Cost of Goods Sold",
+   "precision": "2",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.docstatus==1",
+   "fieldname": "cogs_percent",
+   "fieldtype": "Percent",
+   "label": "Cost of Goods Sold Percent",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.docstatus==1",
+   "fieldname": "total_direct_expenses",
+   "fieldtype": "Currency",
+   "label": "Total Direct Expense",
+   "precision": "2",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.docstatus==1",
+   "fieldname": "total_direct_expenses_percent",
+   "fieldtype": "Percent",
+   "label": "Total Direct Expense Percent",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.docstatus==1",
+   "fieldname": "gross_profit",
+   "fieldtype": "Currency",
+   "label": "Gross Profit/Loss",
+   "precision": "2",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.docstatus==1",
+   "fieldname": "gross_profit_percent",
+   "fieldtype": "Percent",
+   "label": "Gross Profit/Loss Percent",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.docstatus==1",
+   "fieldname": "depreciation",
+   "fieldtype": "Currency",
+   "label": "Depreciation",
+   "precision": "2",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.docstatus==1",
+   "fieldname": "depreciation_percent",
+   "fieldtype": "Percent",
+   "label": "Depreciation Percent",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.docstatus==1",
+   "fieldname": "total_other_expenses",
+   "fieldtype": "Currency",
+   "label": "Other Expenses",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.docstatus==1",
+   "fieldname": "other_expenses_percent",
+   "fieldtype": "Percent",
+   "label": "Other Expenses Percent",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.docstatus==1",
+   "fieldname": "total_indirect_expenses",
+   "fieldtype": "Currency",
+   "label": "Total Indirect Expenses",
+   "precision": "2",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.docstatus==1",
+   "fieldname": "total_indirect_expenses_percent",
+   "fieldtype": "Percent",
+   "label": "Total Indirect Expenses Percent",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.docstatus==1",
+   "fieldname": "net_profit",
+   "fieldtype": "Currency",
+   "label": "Net Profit/Loss",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.docstatus==1",
+   "fieldname": "net_profit_percent",
+   "fieldtype": "Percent",
+   "label": "Net Profit/Loss Percent",
+   "read_only": 1
+  },
+  {
+   "fieldname": "expenses_breakup",
+   "fieldtype": "Tab Break",
+   "label": "Breakup"
+  },
+  {
+   "depends_on": "eval:doc.docstatus==1",
+   "fieldname": "direct_expenses_breakup",
+   "fieldtype": "Table",
+   "label": "Direct Expenses",
+   "options": "URY P and L Breakup",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_lught",
+   "fieldtype": "Section Break"
+  },
+  {
+   "depends_on": "eval:doc.docstatus==1",
+   "description": "Includes in Total Indirect Expense",
+   "fieldname": "employee_costs_breakup",
+   "fieldtype": "Table",
+   "label": "Employee Costs",
+   "options": "URY P and L Breakup",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_rhkwy",
+   "fieldtype": "Section Break"
+  },
+  {
+   "depends_on": "eval:doc.docstatus==1",
+   "fieldname": "indirect_expenses_breakup",
+   "fieldtype": "Table",
+   "label": "Indirect Expenses",
+   "options": "URY P and L Breakup",
+   "read_only": 1
+  },
+  {
+   "fieldname": "cogs_tab",
+   "fieldtype": "Tab Break",
+   "label": "Cost Of Goods"
+  },
+  {
+   "fieldname": "cost_of_goods",
+   "fieldtype": "Table",
+   "label": "Cost Of Goods Sold (Breakup)",
+   "options": "URY Cost Of Goods",
+   "read_only": 1
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "URY Daily P and L",
+   "print_hide": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_6mqsm",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Long Text",
+   "label": "Remarks",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_dv4iu",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "details_tab",
+   "fieldtype": "Tab Break",
+   "label": "Details"
+  },
+  {
+   "depends_on": "eval:doc.docstatus==1",
+   "fieldname": "total_employee_costs",
+   "fieldtype": "Currency",
+   "label": "Employee Cost",
+   "precision": "2",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.docstatus==1",
+   "fieldname": "total_employee_costs_percent",
+   "fieldtype": "Percent",
+   "label": "Employee Cost Percent",
+   "read_only": 1
+  },
+  {
+   "fieldname": "profit_loss_tab",
+   "fieldtype": "Tab Break",
+   "label": "Profit / Loss"
+  },
+  {
+   "fieldname": "column_break_bqo3d",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Enter Units Consumed",
+   "fieldname": "materials_consumed",
+   "fieldtype": "Table",
+   "label": "Materials Consumed",
+   "options": "URY P and L Materials"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2024-01-09 14:15:52.566841",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY Daily P and L",
+ "naming_rule": "Expression (old style)",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "URY Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

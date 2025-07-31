@@ -1,0 +1,16 @@
+{
+  "private": true,
+  "scripts": {
+    "ury-pos-install": "cd urypos && yarn install --check-files",
+    "ury-pos-build": "cd urypos && yarn build",
+    "ury-mosaic-install": "cd URYMosaic && yarn install --check-files",
+    "ury-mosaic-build": "cd URYMosaic && yarn build",
+    "ury-posv2-install": "cd pos && yarn install --check-files",
+    "ury-posv2-build": "cd pos && yarn build",
+    "postinstall": "yarn ury-pos-install && yarn ury-mosaic-install && yarn ury-posv2-install",
+    "build": "yarn ury-pos-build && yarn ury-mosaic-build && yarn ury-posv2-build"
+  },
+  "devDependencies": {
+    "@types/qz-tray": "^2.2.2"
+  }
+}

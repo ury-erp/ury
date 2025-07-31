@@ -1,0 +1,137 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    --primary-50: 226 100% 97%;
+    --primary-100: 224 96% 90%;
+    --primary-200: 223 94% 82%;
+    --primary-300: 222 91% 69%;
+    --primary-400: 221 83% 53%;
+    --primary-500: 221 76% 47%;
+    --primary-600: 221 69% 42%;
+    --primary-700: 221 61% 36%;
+    --primary-800: 221 53% 30%;
+    --primary-900: 221 45% 24%;
+    --primary-950: 221 37% 18%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222.2 84% 4.9%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96%;
+    --accent-foreground: 222.2 84% 4.9%;
+    --accent-50: 355 100% 97%;
+    --accent-100: 353 96% 90%;
+    --accent-200: 352 94% 82%;
+    --accent-300: 351 91% 69%;
+    --accent-400: 350 83% 53%;
+    --accent-500: 350 76% 47%;
+    --accent-600: 350 69% 42%;
+    --accent-700: 350 61% 36%;
+    --accent-800: 350 53% 30%;
+    --accent-900: 350 45% 24%;
+    --accent-950: 350 37% 18%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
+    --radius: 0.5rem;
+    --gray-50: 240 20% 99%;
+    --gray-100: 240 20% 97%;
+    --gray-200: 240 15% 92%;
+    --gray-300: 240 10% 85%;
+    --gray-400: 240 8% 70%;
+    --gray-500: 240 6% 50%;
+    --gray-600: 240 5% 40%;
+    --gray-700: 240 4% 30%;
+    --gray-800: 240 3% 20%;
+    --gray-900: 240 2% 10%;
+    --gray-950: 240 1% 5%;
+    --white: 0 0% 100%;
+    --black: 0 0% 0%;
+    --order-panel-width: 24rem;
+    --badge-min-width: 1.5rem;
+    --dialog-max-width: 90rem;
+    --dialog-max-height: 90vh;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 222.2 84% 4.9%;
+    --primary-50: 226 100% 10%;
+    --primary-100: 224 96% 15%;
+    --primary-200: 223 94% 20%;
+    --primary-300: 222 91% 25%;
+    --primary-400: 221 83% 30%;
+    --primary-500: 221 76% 35%;
+    --primary-600: 221 69% 40%;
+    --primary-700: 221 61% 45%;
+    --primary-800: 221 53% 50%;
+    --primary-900: 221 45% 55%;
+    --primary-950: 221 37% 60%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --accent-50: 355 100% 10%;
+    --accent-100: 353 96% 15%;
+    --accent-200: 352 94% 20%;
+    --accent-300: 351 91% 25%;
+    --accent-400: 350 83% 30%;
+    --accent-500: 350 76% 35%;
+    --accent-600: 350 69% 40%;
+    --accent-700: 350 61% 45%;
+    --accent-800: 350 53% 50%;
+    --accent-900: 350 45% 55%;
+    --accent-950: 350 37% 60%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 224.3 76.3% 94.1%;
+    --gray-50: 240 20% 10%;
+    --gray-100: 240 20% 15%;
+    --gray-200: 240 15% 20%;
+    --gray-300: 240 10% 25%;
+    --gray-400: 240 8% 30%;
+    --gray-500: 240 6% 35%;
+    --gray-600: 240 5% 40%;
+    --gray-700: 240 4% 45%;
+    --gray-800: 240 3% 50%;
+    --gray-900: 240 2% 55%;
+    --gray-950: 240 1% 60%;
+    --white: 0 0% 100%;
+    --black: 0 0% 0%;
+    --order-panel-width: 24rem;
+    --badge-min-width: 1.5rem;
+    --dialog-max-width: 90rem;
+    --dialog-max-height: 90vh;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}

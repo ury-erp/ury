@@ -1,0 +1,51 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2023-10-04 14:54:32.483102",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "expense",
+  "percentage_type",
+  "percent"
+ ],
+ "fields": [
+  {
+   "fieldname": "expense",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Expense",
+   "reqd": 1
+  },
+  {
+   "fieldname": "percentage_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Percentage Type",
+   "options": "Gross Sales\nNet Sales",
+   "reqd": 1
+  },
+  {
+   "description": "% of selected sales",
+   "fieldname": "percent",
+   "fieldtype": "Percent",
+   "in_list_view": 1,
+   "label": "Percent",
+   "reqd": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2023-10-05 17:25:47.313238",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY Variable Expenses",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

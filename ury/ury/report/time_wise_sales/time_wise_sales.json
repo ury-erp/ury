@@ -1,0 +1,49 @@
+{
+ "add_total_row": 0,
+ "columns": [],
+ "creation": "2024-01-05 15:05:51.590275",
+ "disable_prepared_report": 0,
+ "disabled": 0,
+ "docstatus": 0,
+ "doctype": "Report",
+ "filters": [
+  {
+   "fieldname": "date",
+   "fieldtype": "Date",
+   "label": "Date",
+   "mandatory": 1,
+   "wildcard_filter": 0
+  },
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "label": "Branch",
+   "mandatory": 1,
+   "options": "Branch",
+   "wildcard_filter": 0
+  }
+ ],
+ "idx": 0,
+ "is_standard": "Yes",
+ "modified": "2024-01-05 15:14:38.448441",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "Time Wise Sales",
+ "owner": "Administrator",
+ "prepared_report": 0,
+ "query": "SELECT\n    time_intervals.`Time Interval`,\n    COALESCE(SUM(sales_by_interval.`Sales`), 0) AS 'Sales',\n    COUNT(sales_by_interval.`Bill`) AS 'Bills'\nFROM (\n    SELECT '12 AM - 02 AM' AS 'Time Interval', 1 AS 'Order'\n    UNION ALL SELECT '02 AM - 04 AM', 2\n    UNION ALL SELECT '04 AM - 06 AM', 3\n    UNION ALL SELECT '06 AM - 08 AM', 4\n    UNION ALL SELECT '08 AM - 10 AM', 5\n    UNION ALL SELECT '10 AM - 12 PM', 6\n    UNION ALL SELECT '12 PM - 02 PM', 7\n    UNION ALL SELECT '02 PM - 04 PM', 8\n    UNION ALL SELECT '04 PM - 06 PM', 9\n    UNION ALL SELECT '06 PM - 08 PM', 10\n    UNION ALL SELECT '08 PM - 10 PM', 11\n    UNION ALL SELECT '10 PM - 12 AM', 12\n) AS time_intervals\nLEFT JOIN (\n    SELECT\n        CASE\n            WHEN TIME(`posting_time`) BETWEEN '00:00:00' AND '01:59:59' THEN '12 AM - 02 AM'\n            WHEN TIME(`posting_time`) BETWEEN '02:00:00' AND '03:59:59' THEN '02 AM - 04 AM'\n            WHEN TIME(`posting_time`) BETWEEN '04:00:00' AND '05:59:59' THEN '04 AM - 06 AM'\n            WHEN TIME(`posting_time`) BETWEEN '06:00:00' AND '07:59:59' THEN '06 AM - 08 AM'\n            WHEN TIME(`posting_time`) BETWEEN '08:00:00' AND '09:59:59' THEN '08 AM - 10 AM'\n            WHEN TIME(`posting_time`) BETWEEN '10:00:00' AND '11:59:59' THEN '10 AM - 12 PM'\n            WHEN TIME(`posting_time`) BETWEEN '12:00:00' AND '13:59:59' THEN '12 PM - 02 PM'\n            WHEN TIME(`posting_time`) BETWEEN '14:00:00' AND '15:59:59' THEN '02 PM - 04 PM'\n            WHEN TIME(`posting_time`) BETWEEN '16:00:00' AND '17:59:59' THEN '04 PM - 06 PM'\n            WHEN TIME(`posting_time`) BETWEEN '18:00:00' AND '19:59:59' THEN '06 PM - 08 PM'\n            WHEN TIME(`posting_time`) BETWEEN '20:00:00' AND '21:59:59' THEN '08 PM - 10 PM'\n            WHEN TIME(`posting_time`) BETWEEN '22:00:00' AND '23:59:59' THEN '10 PM - 12 AM'\n        END AS 'Time Interval',\n        `name` AS \"Bill\",\n        `grand_total` AS 'Sales'\n    FROM `tabPOS Invoice`\n    WHERE \n        DATE(`posting_date`) = DATE(%(date)s)\n        AND `branch` = %(branch)s\n        AND `docstatus` = 1\n        AND `status` IN (\"Consolidated\", \"Paid\")\n) AS sales_by_interval\nON time_intervals.`Time Interval` = sales_by_interval.`Time Interval`\nGROUP BY time_intervals.`Time Interval`\nORDER BY time_intervals.`Order`;",
+ "ref_doctype": "POS Invoice",
+ "report_name": "Time Wise Sales",
+ "report_type": "Query Report",
+ "roles": [
+  {
+   "role": "Accounts Manager"
+  },
+  {
+   "role": "Accounts User"
+  },
+  {
+   "role": "URY Manager"
+  }
+ ]
+}
