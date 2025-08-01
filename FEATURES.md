@@ -93,6 +93,10 @@
 
 **V2 POS**
 
+> :information_source: **Note**  
+> Version 2 is currently designed for **POS machines/Desktop** to handle **cashiers and fast checkout**.  
+> For **order takers and mobile support**, use **Version 1 POS**, which is available at the path `/pos`.
+
 - **Key Features**
 	- All Major POS Features from Version 1 Retained
 	- Core functionalities from the previous version are preserved for consistency.
