@@ -13,7 +13,8 @@ While URY may work on existing ERPNext instance, it is recommended that you setu
 
 
 
-> :information_source : Minimum Node Version 18.18.*+ required
+> :information_source: Note :
+> Minimum Node Version 18.18.*+ required
 
 
 - Install ERPNext using the [official installation guide](https://github.com/frappe/bench#installation).
