@@ -39,7 +39,7 @@ Given below is the list of features of URY app.
  URY has daily P & L and various reports. It helps restaurants to monitor daily Profit and Loss (P&L), utility consumption, disposables usage, and other key metrics with precision and ease. It provides restaurants with crucial data, enabling timely decision-making by presenting essential information and insights.
  
 :information_source: **Note:**  
-> To access the previous version of the separate URY POS app, [click here](https://github.com/ury-erp/pulse).  
+> To access the previous version of the separate URY PULSE app, [click here](https://github.com/ury-erp/pulse).  
 > **Use the URY branch `v1` to access these separate apps.**
 > **Support for this version will end in December 2025.**
 
