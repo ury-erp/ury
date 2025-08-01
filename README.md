@@ -43,26 +43,61 @@ Given below is the list of features of URY app.
 > **Use the URY branch `v1` to access these separate apps.**
 > **Support for this version will end in December 2025.**
 
-### URY AI (WIP)
-
-URY AI, is an intelligent assistant engineered to deliver insights and data seamlessly through chat. Its purpose is to provide restaurant stakeholders, including managers and owners, with easy access to valuable information. It integrates with popular chat applications WhatsApp, ensuring effortless access to these insights.
-
-### URY Serve (TBD)
-
-URY Serve is a mobile order-taking Android app designed specifically for restaurant servers. Its intuitive interface allows servers to efficiently enter customer orders with ease.
-
 ## Features
 
-Below is the key feature of the URY app.
+### POS & Billing
+* Role-based access with strict operational controls
+* Pre-billing checklists to enforce compliance (e.g., stock check, hygiene checklist)
+* Linked with stock and accounting modules
+* Multi-format support: Table service, QSR, and takeaway
+* Multi-cashier handling and terminal controls
+* Advanced filters for order and bill management
+* Modern, fast UI with guided flow
+* Shift opening, closing, and cash reconciliation built-in
 
-- POS Opening and Closing.
-- Table Selection 
-- Menu Selection
-- Order Taking
-- Order Printing
-- Invoice Settlement
-- KOT and KDS
-- Daily P & L and various reports
+
+###  Menu & Recipe Management
+* Centralized menu with outlet-level control
+* Recipe mapping using Bill of Materials (BOM)
+* Control pricing, availability, and portions per outlet
+* Supports combos, modifiers, and item bundles
+* Integrated with production planning for daily prep
+
+### Table Order Management
+* Mobile-first order taking for waitstaff
+* Live sync with kitchen and cashier
+* Real-time inventory checks before order placement
+* Supports modifiers, course sequencing, and notes
+* Seamless integration with billing and KDS
+
+
+### Kitchen Display & KOT Management
+* Supports multiple kitchens with advanced printer routing
+* Interactive KDS with live status updates (Preparing, Ready, Served)
+* Delay, cancellation, and modification tracking
+* Real-time kitchen analytics
+* Seamless flow from order to service across stations
+
+
+### Operational Red Flags & Alerts
+* Delayed orders and preparation time breaches
+* KOT not started after order placement
+* Unclosed bills and prolonged table occupancy
+* Excessive KOT cancellations and modifications
+* Real-time alerts for operational exceptions
+* Dashboard view for quick issue resolution across outlets
+
+
+
+### Reports & Analytics
+* Daily Profit & Loss
+* Shortage and Excess reporting
+* Course-wise and item-wise performance
+* Captain and staff performance tracking
+* Branch-wise and outlet-wise comparisons
+* Customer-wise sales trends
+* Detailed sales, production, and stock reports
+* Real-time operational insights for better decision-making
 
 For more comprehensive list of features [go here.](FEATURES.md)
 
@@ -77,8 +112,7 @@ To start using URY, you need to first install URY and then setup your first rest
 
 ## Looking for other versions 	
 
-1. Use branch [version-14] to use with frappe version-14
-2. Use branch [v1] to use ury v0.1.0
+1. Use branch `v1` to use ury [v0.1.0]
 
 ## About
 
