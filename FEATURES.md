@@ -29,7 +29,7 @@ A POS Closing Entry must be created at the end of each day to complete the daily
 - **Sidebar Menu Course Navigation**
 	- A left sidebar on the POS page allows quick switching between menu courses (e.g., Starters, Mains, Desserts).
 
-** Version 1 **
+### Version 1
 
 - **Room Selection**
 	
