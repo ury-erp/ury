@@ -4,7 +4,7 @@ It's important to note that if no POS Opening entry is created for the day, URY 
 A POS Closing Entry must be created at the end of each day to complete the daily operations.
 
 > :information_source: **Note**  
-> Version 2 is currently designed for **POS machines/Desktop** to handle **cashiers and fast checkout**.  
+> This version is currently designed for **POS machines/Desktop** to handle **cashiers and fast checkout**.  
 > For **order takers and mobile support**, use **Version 1 POS**, which is available at the path `/urypos/Table`.
 
 - **Key Features**
