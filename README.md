@@ -3,7 +3,7 @@
 
 URY is an open source ERP designed to simplify and streamline restaurant operations. It is built on top of  world's best free and open source ERP, ERPNext.
 
-<div style="width:fit-content;margin-inline:auto;margin-bottom:0.5rem">
+<div align="center">
 	<a href="https://frappecloud.com/dashboard/signup?product=ury" target="_blank">
 		<picture>
 			<source media="(prefers-color-scheme: dark)" srcset="https://frappe.io/files/try-on-fc-white.png">
