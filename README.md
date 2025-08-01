@@ -12,6 +12,7 @@ URY is an open source ERP designed to simplify and streamline restaurant operati
 	</a>
 </div>
 
+
 > :warning: Warning : 
 > URY is currently in active development, and we are continuously making changes, updates, and working on new features and improvements. Please be aware that until a stable release is reached, backward compatibility is not guaranteed. We make every effort to maintain compatibility.
 
