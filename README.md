@@ -57,7 +57,6 @@ Given below is the list of features of URY app.
 
 
 ###  Menu & Recipe Management
-
 * Centralized menu with outlet-level control
 * Recipe mapping using Bill of Materials (BOM)
 * Control pricing, availability, and portions per outlet
@@ -65,8 +64,7 @@ Given below is the list of features of URY app.
 * Integrated with production planning for daily prep
 
 ### Table Order Management
-Mobile-first order taking for waitstaff
-
+* Mobile-first order taking for waitstaff
 * Live sync with kitchen and cashier
 * Real-time inventory checks before order placement
 * Supports modifiers, course sequencing, and notes
@@ -114,8 +112,7 @@ To start using URY, you need to first install URY and then setup your first rest
 
 ## Looking for other versions 	
 
-1. Use branch [version-14] to use with frappe version-14
-2. Use branch [v1] to use ury v0.1.0
+1. Use branch `v1` to use ury [v0.1.0]
 
 ## About
 

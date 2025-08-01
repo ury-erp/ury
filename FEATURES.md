@@ -1,11 +1,35 @@
 # Features of URY App
 
-**POS Opening and Closing**
+It's important to note that if no POS Opening entry is created for the day, URY will not allow table selection, ensuring accurate tracking of operations.
+A POS Closing Entry must be created at the end of each day to complete the daily operations.
 
-- It's important to note that if no POS Opening entry is created for the day, URY will not allow table selection, ensuring accurate tracking of operations.
-- A POS Closing Entry must be created at the end of each day to complete the daily operations.
+> :information_source: **Note**  
+> Version 2 is currently designed for **POS machines/Desktop** to handle **cashiers and fast checkout**.  
+> For **order takers and mobile support**, use **Version 1 POS**, which is available at the path `/urypos/Table`.
 
-**V1 POS**
+- **Key Features**
+	- All Major POS Features from Version 1 Retained
+	- Core functionalities from the previous version are preserved for consistency.
+
+- **Unified Order-Taking Interface**
+	- A single page handles the entire order flow—streamlining operations and reducing clicks.
+
+- **Dynamic Header Search Bar**
+	- In POS Page: Search for menu items.
+	- In Order Page: Search by customer name, invoice ID, etc.
+
+- **Table Selection for Dine-In Orders**
+	- Tables are displayed using shapes and colors.
+	- Shapes are configurable via the URY Table Doctype.
+
+- **Menu Item Interactions**
+	- Double Click: Opens detailed product page for customizations.
+	- Single Click: Instantly adds item to cart.
+
+- **Sidebar Menu Course Navigation**
+	- A left sidebar on the POS page allows quick switching between menu courses (e.g., Starters, Mains, Desserts).
+
+** Version 1 **
 
 - **Room Selection**
 	
@@ -91,37 +115,8 @@
 			- If Either of QZ and Network Printing are not configured , URY will call  websocket printing.
 			- Page can be accessed in `/app/websocket-print` in your browser
 
-**V2 POS**
 
-> :information_source: **Note**  
-> Version 2 is currently designed for **POS machines/Desktop** to handle **cashiers and fast checkout**.  
-> For **order takers and mobile support**, use **Version 1 POS**, which is available at the path `/urypos/Table`.
-
-- **Key Features**
-	- All Major POS Features from Version 1 Retained
-	- Core functionalities from the previous version are preserved for consistency.
-
-- **Unified Order-Taking Interface**
-	- A single page handles the entire order flow—streamlining operations and reducing clicks.
-
-- **Dynamic Header Search Bar**
-	- In POS Page: Search for menu items.
-	- In Order Page: Search by customer name, invoice ID, etc.
-
-- **Table Selection for Dine-In Orders**
-	- Tables are displayed using shapes and colors.
-	- Shapes are configurable via the URY Table Doctype.
-
-- **Menu Item Interactions**
-	- Double Click: Opens detailed product page for customizations.
-	- Single Click: Instantly adds item to cart.
-
-- **Sidebar Menu Course Navigation**
-	- A left sidebar on the POS page allows quick switching between menu courses (e.g., Starters, Mains, Desserts).
-
-
-
-**KOT (Kitchen Order Ticket)**
+**MOSAIC (Kitchen Order Ticket)**
 
 - **KOT Generation:**
 	- KOT are generated when order is placed in the system
