@@ -2,6 +2,19 @@
 
 While URY may work on existing ERPNext instance, it is recommended that you setup URY on a new  frappe site created for URY.
 
+<div align="center">
+	<a href="https://frappecloud.com/dashboard/signup?product=ury" target="_blank">
+		<picture>
+			<source media="(prefers-color-scheme: dark)" srcset="https://frappe.io/files/try-on-fc-white.png">
+			<img src="https://frappe.io/files/try-on-fc-black.png" alt="Try on Frappe Cloud" height="28" />
+		</picture>
+	</a>
+</div>
+
+
+
+> :information_source : Minimum Node Version 18.18.*+ required
+
 
 - Install ERPNext using the [official installation guide](https://github.com/frappe/bench#installation).
 
