@@ -21,12 +21,27 @@ Given below is the list of features of URY app.
 
 **URY POS** is a light weight and easy to use web-based application designed for streamlined order management. It serves as an efficient tool for both cashiers and captains, facilitating order processing at the cash counter and tables.It supports various order types, including dine-in, delivery, takeout and Aggregator. URY POS is compatibile with a wide range of devices, including desktops, tablets, and smartphones. 
 
-### URY KOT
+:information_source: **Note:**  
+> To access the previous version of the separate URY POS app, [click here](https://github.com/ury-erp/pos).  
+> **Use the URY branch `v1` to access these separate apps.**
+> **Support for this version will end in December 2025.**
 
-**URY KOT** is an interactive Kitchen Display System (KDS) designed to simplify order management in both single and multi-kitchen restaurants. Additionally, it offers optional Kitchen Order Ticket (KOT) printing support for added convenience.
+### URY MOSAIC
+
+**URY MOSAIC** is an interactive Kitchen Display System (KDS) designed to simplify order management in both single and multi-kitchen restaurants. Additionally, it offers optional Kitchen Order Ticket (KOT) printing support for added convenience.
+
+:information_source: **Note:**  
+> To access the previous version of the separate URY MOSAIC app, [click here](https://github.com/ury-erp/mosaic).  
+> **Use the URY branch `v1` to access these separate apps.**
+> **Support for this version will end in December 2025.**
 
 ### Daily P & L and Reports
  URY has daily P & L and various reports. It helps restaurants to monitor daily Profit and Loss (P&L), utility consumption, disposables usage, and other key metrics with precision and ease. It provides restaurants with crucial data, enabling timely decision-making by presenting essential information and insights.
+ 
+:information_source: **Note:**  
+> To access the previous version of the separate URY POS app, [click here](https://github.com/ury-erp/pulse).  
+> **Use the URY branch `v1` to access these separate apps.**
+> **Support for this version will end in December 2025.**
 
 ### URY AI (WIP)
 
