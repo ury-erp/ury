@@ -127,3 +127,9 @@ To start using URY, you need to first install URY and then setup your first rest
 ## About
 
 URY is developed by [Tridz Technologies Pvt Ltd](https://tridz.com) and supported by [Frappe](http://frappe.io).
+
+## Terms and Conditions
+
+By using the URY, you agree to use it responsibly and in compliance with applicable laws. URY is built on open-source technology and is provided for your convenience to manage restaurant operations. While we strive to keep the app reliable, it is provided “as is” without any guarantees, and we are not responsible for any misuse or resulting issues.
+
+[Read More](TERMS.md)
