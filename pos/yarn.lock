@@ -1737,10 +1737,10 @@ fraction.js@^4.3.7:
   resolved "https://registry.npmjs.org/fraction.js/-/fraction.js-4.3.7.tgz"
   integrity sha512-ZsDfxO51wGAXREY55a7la9LScWpwv9RxIrYABrlvOFBlH/ShPnrtsXeuUIfXKKOVicNxQ+o8JTbJvjS4M89yew==
 
-frappe-js-sdk@^1.9.0:
-  version "1.9.0"
-  resolved "https://registry.yarnpkg.com/frappe-js-sdk/-/frappe-js-sdk-1.9.0.tgz#535b098718de704a3dad80cbe4f87c490c299f3a"
-  integrity sha512-LFxXaOFH84dcEnESiUe8iPrU6pHP3vgDR8F8v/en9We9YhARbds4RLfPnB/6cks0OGOEbQ8IGhnmf4rMtkpzeA==
+frappe-js-sdk@^1.10.0:
+  version "1.10.0"
+  resolved "https://registry.yarnpkg.com/frappe-js-sdk/-/frappe-js-sdk-1.10.0.tgz#5b07c911b629242efd606a128af1514e52241f7f"
+  integrity sha512-qjeaeoCvkEhhmEZJezSV1On4+rwSU2nUh0bThOqtYalu8glA3k+VlEXE6UMkLMR5vzvVZ5quROVJH0j46Q5MAQ==
   dependencies:
     axios "^1.8.2"
 
