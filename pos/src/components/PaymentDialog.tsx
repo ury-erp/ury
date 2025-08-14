@@ -3,6 +3,8 @@ import { X, Percent, Coins } from 'lucide-react';
 import { usePOSStore } from '../store/pos-store';
 import { cn, formatCurrency } from '../lib/utils';
 import { Button, Input, Dialog, DialogContent } from './ui';
+import { call } from '../lib/frappe-sdk';
+
 
 interface PaymentDialogProps {
   onClose: () => void;
@@ -105,21 +107,16 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
     setIsProcessing(true);
     setError(null);
     try {
-      const res = await fetch('/api/method/ury.ury.doctype.ury_order.ury_order.make_invoice', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          additionalDiscount:discountValue ? parseInt(discountValue): null,
-          cashier,
-          customer,
-          invoice,
-          owner,
-          payments,
-          pos_profile: posProfile,
-          table
-        })
+      await call.post('ury.ury.doctype.ury_order.ury_order.make_invoice', {
+        additionalDiscount: discountValue ? parseInt(discountValue) : null,
+        cashier,
+        customer,
+        invoice,
+        owner,
+        payments,
+        pos_profile: posProfile,
+        table,
       });
-      if (!res.ok) throw new Error('Failed to make payment');
       // Show toast and reload orders (assume showToast and reload available globally)
       if (typeof window !== 'undefined' && (window as any).showToast) {
         (window as any).showToast.success('Payment successful');
