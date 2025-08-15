@@ -12,6 +12,7 @@ import { usePOSStore } from '../store/pos-store';
 import { useNavigate } from 'react-router-dom';
 import PaymentDialog from '../components/PaymentDialog';
 import { printOrder } from '../lib/print';
+import { call } from '../lib/frappe-sdk';
 
 export default function Orders() {
   const { 
@@ -99,12 +100,10 @@ export default function Orders() {
     }
     setCancelLoading(true);
     try {
-      const res = await fetch('/api/method/ury.ury.doctype.ury_order.ury_order.cancel_order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ invoice_id: selectedOrder.name, reason: cancelReason })
-      });
-      if (!res.ok) throw new Error('Failed to cancel order');
+      await call.post('ury.ury.doctype.ury_order.ury_order.cancel_order', {
+        invoice_id: selectedOrder.name,
+        reason: cancelReason
+      })
       showToast.success('Order cancelled successfully');
       setCancelDialogOpen(false);
       setCancelReason('');
