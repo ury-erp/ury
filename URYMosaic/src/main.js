@@ -1,34 +1,30 @@
-import './index.css';
-import { createApp, reactive } from "vue";
-import App from "./App.vue";
+//Import the service with extension (@/services/auth.js).
+//Provide $auth before the router guard runs.
+//Use $auth.isLoggedIn in the guard (not a bare auth).
 
-import router from './router';
+import "./index.css";
+import { createApp } from "vue";
+import App from "./App.vue";
+import router from "./router";
+import $auth from "@/services/auth.js";   // <-- new
 
 const app = createApp(App);
 
-// Plugins
-app.use(router);
+// make $auth available everywhere
+app.config.globalProperties.$auth = $auth; // this.$auth
+app.provide("$auth", $auth);               // inject("$auth")
 
-// Global Properties,
-// components can inject this
-
-// Configure route gaurds
-router.beforeEach(async (to, from, next) => {
-	if (to.matched.some((record) => !record.meta.isLoginPage)) {
-		// this route requires auth, check if logged in
-		// if not, redirect to login page.
-		if (!auth.isLoggedIn) {
-			next({ name: 'Login', query: { route: to.path } });
-		} else {
-			next();
-		}
-	} else {
-		if (auth.isLoggedIn) {
-			next({ name: 'Home' });
-		} else {
-			next();
-		}
-	}
+// route guard
+router.beforeEach((to, from, next) => {
+  const requiresAuth = to.matched.some(r => !r.meta.isLoginPage);
+  if (requiresAuth && !$auth.isLoggedIn) {
+    return next({ name: "Login", query: { route: to.path } });
+  }
+  if (!requiresAuth && $auth.isLoggedIn) {
+    return next({ name: "Home" });
+  }
+  return next();
 });
 
+app.use(router);
 app.mount("#app");
