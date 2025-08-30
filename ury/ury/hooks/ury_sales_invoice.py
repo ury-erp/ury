@@ -8,15 +8,33 @@ def on_update(doc,method):
     aggregator_unpaid(doc,method)
     
 def sales_invoice_naming(doc, method):
-    pos_profile = frappe.db.get_value("POS Profile", doc.pos_profile, ["restaurant_prefix", "restaurant"], as_dict=True)
+    if not doc.is_pos:
+        return
+    
+    if not doc.pos_profile:
+        return
+    
+    pos_profile = frappe.db.get_value(
+        "POS Profile", 
+        doc.pos_profile, 
+        ["restaurant_prefix", "restaurant"], 
+        as_dict=True
+    )
+
+    if not pos_profile:
+        frappe.throw(f"POS Profile '{doc.pos_profile}' does not exist. Please select a valid POS Profile.")
+    
     restaurant = pos_profile.get("restaurant")
 
     if pos_profile.get("restaurant_prefix") == 1 and restaurant:
-        
         if doc.order_type == "Aggregators":
             
             # Get the aggregator series prefix
-            aggregator_series_prefix = frappe.db.get_value("URY Restaurant", restaurant, "aggregator_series_prefix")
+            aggregator_series_prefix = frappe.db.get_value(
+                "URY Restaurant", 
+                restaurant, 
+                "aggregator_series_prefix"
+            )
             
             if aggregator_series_prefix: 
                 doc.naming_series = "SINV-" +  aggregator_series_prefix
