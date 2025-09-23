@@ -21,9 +21,9 @@ frappe.pages['point-of-sale'].on_page_load = function (wrapper) {
                 const me = this;
                 this.search_field = frappe.ui.form.make_control({
                     df: {
-                        label: ('Search'),
+                        label: __('Search'),
                         fieldtype: 'Data',
-                        placeholder: ('Search by invoice id or customer name')
+                        placeholder: __('Search by invoice id or customer name')
                     },
                     parent: this.$component.find('.search-field'),
                     render_input: true,
@@ -31,10 +31,10 @@ frappe.pages['point-of-sale'].on_page_load = function (wrapper) {
 
                 this.status_field = frappe.ui.form.make_control({
                     df: {
-                        label: ('Invoice Status'),
+                        label: __('Invoice Status'),
                         fieldtype: 'Select',
                         options: `Draft\nTo Bill`,
-                        placeholder: ('Filter by invoice status'),
+                        placeholder: __('Filter by invoice status'),
                         onchange: function () {
                             if (me.$component.is(':visible')) me.refresh_list();
                         }
@@ -495,16 +495,16 @@ frappe.pages["point-of-sale"].on_page_load = function (wrapper) {
         );
         commentButton.on("click", () => {
           let d = new frappe.ui.Dialog({
-            title: "Enter Comment",
+            title: __("Enter Comment"),
             fields: [
               {
-                label: "Comment",
+                label: __("Comment"),
                 fieldname: "comment",
                 fieldtype: "Data",
                 default: cur_frm.order_comments,
               },
             ],
-            primary_action_label: "Add",
+            primary_action_label: __("Add"),
             primary_action: (values) => {
               cur_frm.order_comments = values.comment;
               d.hide();

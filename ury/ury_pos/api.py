@@ -113,7 +113,7 @@ def getBranch():
         """
         branch_array = frappe.db.sql(sql_query, user, as_dict=True)
         if not branch_array:
-            frappe.throw("User is not Associated with any Branch.Please refresh Page")
+            frappe.throw(_("User is not Associated with any Branch. Please refresh Page"))
 
         branch_name = branch_array[0].get("branch")
 
@@ -135,10 +135,10 @@ def getBranchRoom():
         room_name = branch_array[0].get("room")
     
         if not branch_name:
-            frappe.throw("Branch information is missing for the user. Please contact your administrator.")
+            frappe.throw(_("Branch information is missing for the user. Please contact your administrator."))
 
         if not room_name:
-            frappe.throw("No room assigned to this user. Please contact your administrator.")
+            frappe.throw(_("No room assigned to this user. Please contact your administrator."))
 
         return [{
             "name":room_name ,
@@ -158,7 +158,7 @@ def getRoom():
         branch_array = frappe.db.sql(sql_query, user, as_dict=True)
         
         if not branch_array:
-            frappe.throw("No branch or room information found for the user. Please contact your administrator.")
+            frappe.throw(_("No branch or room information found for the user. Please contact your administrator."))
         
         room_details = [
             {
@@ -594,7 +594,7 @@ def posOpening():
         if pos_opening.status == "Open" and pos_opening.docstatus == 1:
             flag = 0
     if flag == 1:
-        frappe.msgprint(title="Message", indicator="red", msg=("Please Open POS Entry"))
+        frappe.msgprint(title=_("Message"), indicator="red", msg=_("Please Open POS Entry"))
     return flag
 
 

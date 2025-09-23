@@ -2,6 +2,7 @@
 # For license information, please see license.txt
 
 import frappe
+from frappe import _
 from frappe.model.document import Document
 import json
 import calendar
@@ -274,7 +275,7 @@ class URYDailyPandL(Document):
 	def before_save(self):
 		self.cogs_sold()
 		if self.remarks != "":
-			frappe.msgprint(title='SET BUYING PRICE',msg=("Please review the remarks below for the items. Submitting now will exclude these items from the cost of goods."))
+			frappe.msgprint(title='SET BUYING PRICE',msg=(_("Please review the remarks below for the items. Submitting now will exclude these items from the cost of goods.")))
 	
 	def before_submit(self):
 		self.cogs_sold()
@@ -390,7 +391,7 @@ class URYDailyPandL(Document):
 		attendance_count =  attendance_count[0]
 
 		if attendance_count['Total Attendance'] == 0:
-			frappe.throw(title='No Attendance !',msg=("Attendance not marked"))
+			frappe.throw(title='No Attendance !',msg=(_("Attendance not marked")))
 
 		ns_employee_attendance_list = frappe.db.sql(''' 
 			SELECT
