@@ -195,7 +195,7 @@ def sync_order(
             return {"status": "Failure"}
 
     if not customer:
-        frappe.throw("Please enter valid customer details")
+        frappe.throw(_("Please enter valid customer details"))
     else:
         invoice.customer = customer
 
@@ -434,7 +434,7 @@ def table_transfer(table, newTable, invoice):
 
     if current_table.restaurant_room == new_table.restaurant_room:
         if new_table.occupied == 1:
-            frappe.throw(f"Table {new_table.name} is already occupied")
+            frappe.throw(_("Table {0} is already occupied").format(new_table.name))
 
         # Update table status
         frappe.db.set_value(

@@ -1,4 +1,5 @@
 import frappe
+from frappe import _
 
 
 def before_insert(doc, event):
@@ -7,4 +8,4 @@ def before_insert(doc, event):
 
 def validate_mobile_number(doc, event):
     if not doc.mobile_number:
-        frappe.throw("Mobile Number is Mandatory")
+        frappe.throw(_("Mobile Number is Mandatory"))
