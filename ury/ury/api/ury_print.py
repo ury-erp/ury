@@ -24,7 +24,7 @@ def network_printing(
     file_path=None,
 ):
     try:
-        print_settings = frappe("Network Printer Settings", printer_setting)
+        print_settings = frappe.get_doc("Network Printer Settings", printer_setting)
 
         try:
             import cups
@@ -53,7 +53,8 @@ def network_printing(
                 file_path = os.path.join(
                     "/", "tmp", f"frappe-pdf-{frappe.generate_hash()}.pdf"
                 )
-            output.write(open(file_path, "wb"))
+            with open(file_path, "wb") as f:
+                output.write(f)
             conn.printFile(print_settings.printer_name, file_path, name, {})
 
             restaurant_table, invoice_printed, name = frappe.db.get_value(
