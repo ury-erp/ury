@@ -8,7 +8,7 @@ While URY may work on existing ERPNext instance, it is recommended that you setu
 **To Install ERPNext to your bench:**
 
 ```sh
-	$ bench get-app --branch version-14 erpnext https://github.com/frappe/erpnext.git
+	$ bench get-app --branch version-15 erpnext https://github.com/frappe/erpnext.git
 ```
 
 **Install the URY base app to your bench:**
