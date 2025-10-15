@@ -119,7 +119,6 @@ This guide takes you step-by-step through setting up URY on top of ERPNext
 - Create Restaurant Menu From "URY Menu List" with the following details:
 
 	Menu define the list of items available for order, their prices, and how they’re displayed in the POS.
-
 	<div style="text-align: center;">
 		<img src="https://raw.githubusercontent.com/ury-erp/ury/images/DEMO/URY%20Menu.png" style="margin: 2rem 2rem;" alt="URY Menu">
 	</div>
@@ -133,7 +132,8 @@ This guide takes you step-by-step through setting up URY on top of ERPNext
 	- **Disabled** : You can use this checkbox to remove item from menu as per need.
 	- **Course** : Categorize each item based on the course type (e.g., Starters, Mains, Desserts). In POS, the menu can be categorized and viewed by Course. If the **Indicate in KDS** checkbox is enabled for a course, the Kitchen Display System (KDS) will use the serving priority to determine the preparation and serving order of items.
 
-	<div style="text-align: center; padding:2rem 2rem">
+	Example:
+	<div style="text-align: center;">
 		<img src="https://raw.githubusercontent.com/ury-erp/ury/images/DEMO/URY%20Menu%20Course.png" style="margin: 2rem 2rem;" alt="URY Menu Course">
 	</div>
 
