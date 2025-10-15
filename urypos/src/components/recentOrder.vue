@@ -525,10 +525,7 @@
                 No
               </button>
               <button
-                @click="
-                  this.recentOrders.cancelInvoice();
-                  this.recentOrders.cancelInvoiceFlag = false;
-                "
+                @click="handleConfirmCancellation()"
                 class="mt-6 rounded bg-blue-500 px-3 py-2 text-white hover:bg-blue-600"
               >
                 Yes
@@ -630,16 +627,28 @@ import { usetoggleRecentOrder } from "@/stores/recentOrder.js";
 import { useInvoiceDataStore } from "@/stores/invoiceData.js";
 import { useAuthStore } from "@/stores/Auth.js";
 import { Badge } from "flowbite-vue";
+import { useNotifications } from "@/stores/Notification.js";
 export default {
   name: "RecentOrder",
   components: {
     Badge,
   },
+  methods: {
+    handleConfirmCancellation() {
+      if (!this.recentOrders.cancelReason || this.recentOrders.cancelReason.trim() === '') {
+        this.notification.createNotification('Please enter a reason for cancellation');
+        return;
+      }
+      this.recentOrders.cancelInvoice();
+      this.recentOrders.cancelInvoiceFlag = false;
+    },
+  },
   setup() {
     const recentOrders = usetoggleRecentOrder();
     const invoiceData = useInvoiceDataStore();
     const auth = useAuthStore();
-    return { recentOrders, invoiceData, auth };
+    const notification = useNotifications();
+    return { recentOrders, invoiceData, auth, notification };
   },
   mounted() {
     this.recentOrders.handleStatusChange();
