@@ -207,10 +207,7 @@
             No
           </button>
           <button
-            @click="
-              this.invoiceData.cancelInvoice();
-              this.invoiceData.cancelInvoiceFlag = false;
-            "
+            @click="handleConfirmCancellation()"
             class="mt-6 rounded bg-blue-500 px-3 py-2 text-white hover:bg-blue-600"
           >
             Yes
@@ -377,11 +374,24 @@ import { useTableStore } from "@/stores/Table.js";
 import { useInvoiceDataStore } from "@/stores/invoiceData.js";
 import { useAuthStore } from "@/stores/Auth.js";
 import { usetoggleRecentOrder } from "@/stores/recentOrder.js";
+import { useNotifications } from "@/stores/Notification.js";
 
 export default {
   name: "Cart",
   components: {
     orderInfo,
+  },
+  methods: {
+    handleConfirmCancellation() {
+      console.log(this.invoiceData.cancelReason);
+      console.log(!this.invoiceData.cancelReason || this.invoiceData.cancelReason.trim() === '');
+      if (!this.invoiceData.cancelReason || this.invoiceData.cancelReason.trim() === '') {
+        this.notification.createNotification('Please enter a reason for cancellation');
+        return;
+      }
+      this.invoiceData.cancelInvoice();
+      this.invoiceData.cancelInvoiceFlag = false;
+    },
   },
   setup() {
     const menu = useMenuStore();
@@ -389,7 +399,8 @@ export default {
     const auth = useAuthStore();
     const recentOrders = usetoggleRecentOrder();
     const invoiceData = useInvoiceDataStore();
-    return { menu, table, invoiceData, auth, recentOrders };
+    const notification = useNotifications();
+    return { menu, table, invoiceData, auth, recentOrders, notification };
   },
   mounted() {
     window.scrollTo(0, 0);
