@@ -30,24 +30,7 @@ def getRestaurantMenu(pos_profile, room=None, order_type=None):
     branch_name = getBranch()
     restaurant = frappe.db.get_value("URY Restaurant", {"branch": branch_name}, "name")
     
-    if cashier and order_type:
-        order_type_wise_menu = frappe.db.get_value(
-            "URY Restaurant", restaurant, "order_type_wise_menu"
-        )
-    
-        if order_type_wise_menu:
-            menu = frappe.db.get_value(
-                "Order Type Menu",
-                {"parent": restaurant, "order_type": order_type},
-                "menu"
-            )
-            if not menu:
-                 menu = frappe.db.get_value("URY Restaurant", restaurant, "active_menu")
-    
-        else:
-            menu = frappe.db.get_value("URY Restaurant", restaurant, "active_menu")
-    
-    elif room:
+    if room:
     
         room_wise_menu = frappe.db.get_value(
             "URY Restaurant", restaurant, "room_wise_menu"
@@ -63,7 +46,24 @@ def getRestaurantMenu(pos_profile, room=None, order_type=None):
                  menu = frappe.db.get_value("URY Restaurant", restaurant, "active_menu")
         else:
             menu = frappe.db.get_value("URY Restaurant", restaurant, "active_menu")
+
+    elif cashier and order_type:
+        order_type_wise_menu = frappe.db.get_value(
+            "URY Restaurant", restaurant, "order_type_wise_menu"
+        )
     
+        if order_type_wise_menu:
+            menu = frappe.db.get_value(
+                "Order Type Menu",
+                {"parent": restaurant, "order_type": order_type},
+                "menu"
+            )
+            if not menu:
+                 menu = frappe.db.get_value("URY Restaurant", restaurant, "active_menu")
+    
+        else:
+            menu = frappe.db.get_value("URY Restaurant", restaurant, "active_menu")
+
     # Default menu if nothing is selected
     else:
         menu = frappe.db.get_value("URY Restaurant", restaurant, "active_menu")
