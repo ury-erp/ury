@@ -228,7 +228,7 @@ This guide takes you step-by-step through setting up URY on top of ERPNext
 	
 > **Note:** Update the Price List in Accounting to restaurant menu price list.
 
-### Step 10: URY Prodction Unit
+### Step 10: URY Production Unit
 
 - **URY Production Unit**
  	Create Production Unit From "URY Production Unit" with the following details:
