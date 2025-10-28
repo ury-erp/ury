@@ -1,8 +1,8 @@
-## URY Base App Setup 
+## URY Setup 
 
 This guide takes you step-by-step through setting up URY on top of ERPNext
 
-**Step 1 :**
+### Step 1 : Company
 
 - Login into the site and Follow the installation wizard 
 	- Specify the language.
@@ -11,7 +11,7 @@ This guide takes you step-by-step through setting up URY on top of ERPNext
 	- Enter company name, its description, and select a bank account.
 	- click on 'Complete setup'
 	
-**Step 2 :**
+### Step 2 : Users and Roles
 
 - To manage restaurant operations in URY, you’ll need to set up specific user roles in the ERPNext/Frappe system. Use the [Frappe/ERPNext interface](https://docs.erpnext.com/docs/user/manual/en/adding-users) to create a new user. 
 
@@ -50,14 +50,14 @@ This guide takes you step-by-step through setting up URY on top of ERPNext
 	
 	</details>
 
-**Step 3 :**
+### Step 3 : Branch
 
 - Create [Branch](https://frappehr.com/docs/v14/en/branch) in ERPNext.
 
 	Branch setup manage users, POS access, and aggregator configurations for delivery platforms, ensuring smooth operations.
 
 	<div style="text-align: center;">
-		<img src="https://raw.githubusercontent.com/ury-erp/ury/refs/heads/images/DEMO/Branch.png" style="margin: 2rem 2rem;" alt="Branch">
+		<img src="https://raw.githubusercontent.com/ury-erp/ury/refs/heads/develop/DEMO/Branch.png" style="margin: 2rem 2rem;" alt="Branch">
 	</div>
 
 - Specify branch users in the table; note that only these users can access the  POS of that branch.
@@ -69,14 +69,14 @@ This guide takes you step-by-step through setting up URY on top of ERPNext
 	- **Create Invoice without Tax** : Check this box if you want the aggregator's invoice to be created without tax. This applies to both Sales Invoice and POS Invoice.
 
 
-**Step 4 :**
+### Step 4 : URY Restaurant
 
 - Go to the "URY Restaurant List" and create a new restaurant with the following details:
 
 	The restaurant setup links your company, branch, and menu together, defining details like tax templates, invoice series, and menu configurations for rooms and order types.
 
 	<div style="text-align: center;">
-		<img src="https://raw.githubusercontent.com/ury-erp/ury/images/DEMO/URY%20Restaurant.png" style="margin: 2rem 2rem;" alt="URY Restaurant">
+		<img src="https://raw.githubusercontent.com/ury-erp/ury/develop/DEMO/URY%20Restaurant.png" style="margin: 2rem 2rem;" alt="URY Restaurant">
 	</div>
 
 	- **Name** : Restaurant name
@@ -92,14 +92,14 @@ This guide takes you step-by-step through setting up URY on top of ERPNext
 	- **Order Type Wise Menu** : To enable order type wise menu for cashier.
 	- **Menu For Order Type** : Add restaurant menu against each order type to handle order type wise price list.
 
-**Step 5 :**
+### Step 5 : URY Room
 
 - Next is to Create Restaurant Room with the following details :
 
 	Rooms help organize your restaurant layout—such as indoor, outdoor, or VIP areas and define where orders and print actions (like bills or KOTs) are directed. Each room can have its own printer setup to manage room-wise printing. Make sure to add the room to the corresponding URY Restaurant.
 
 	<div style="text-align: center;">
-		<img src="https://raw.githubusercontent.com/ury-erp/ury/refs/heads/images/DEMO/URY%20Room.png" style="margin: 2rem 2rem;" alt="URY Room">
+		<img src="https://raw.githubusercontent.com/ury-erp/ury/refs/heads/develop/DEMO/URY%20Room.png" style="margin: 2rem 2rem;" alt="URY Room">
 	</div>
 
 	- **Name** : Specify a unique name to the room.
@@ -108,19 +108,19 @@ This guide takes you step-by-step through setting up URY on top of ERPNext
 	- **Bill** : Enable for Invoice Printing .
 	- **KOT Print** : Enable for KOT Printing .
 
-**Step 6 :**
+### Step 6 : Item
 
 - Create [Item](https://docs.erpnext.com/docs/user/manual/en/item) to be included in the URY Menu.
 - If an item is sold in a bundle, consider using the [Product Bundle](https://docs.erpnext.com/docs/user/manual/en/product-bundle) feature.
 
 
-**Step 7 :**
+### Step 7 : URY Menu
 
 - Create Restaurant Menu From "URY Menu List" with the following details:
 
 	Menu define the list of items available for order, their prices, and how they’re displayed in the POS.
 	<div style="text-align: center;">
-		<img src="https://raw.githubusercontent.com/ury-erp/ury/images/DEMO/URY%20Menu.png" style="margin: 2rem 2rem;" alt="URY Menu">
+		<img src="https://raw.githubusercontent.com/ury-erp/ury/develop/DEMO/URY%20Menu.png" style="margin: 2rem 2rem;" alt="URY Menu">
 	</div>
 
 	- **Name** : Specify a unique name to the menu .
@@ -134,17 +134,17 @@ This guide takes you step-by-step through setting up URY on top of ERPNext
 
 	Example:
 	<div style="text-align: center;">
-		<img src="https://raw.githubusercontent.com/ury-erp/ury/images/DEMO/URY%20Menu%20Course.png" style="margin: 2rem 2rem;" alt="URY Menu Course">
+		<img src="https://raw.githubusercontent.com/ury-erp/ury/develop/DEMO/URY%20Menu%20Course.png" style="margin: 2rem 2rem;" alt="URY Menu Course">
 	</div>
 
-**Step 8 :**
+### Step 8 : URY Table
 
 - Create tables for the restaurant in the "URY Table List" with the following details:
 
 	Tables define the seating layout, their availability and are visually displayed on the POS for easy selection.
 
 	<div style="text-align: center;">
-		<img src="https://raw.githubusercontent.com/ury-erp/ury/refs/heads/images/DEMO/URY%20Table.png" style="margin: 2rem 2rem;" alt="URY Table">
+		<img src="https://raw.githubusercontent.com/ury-erp/ury/refs/heads/develop/DEMO/URY%20Table.png" style="margin: 2rem 2rem;" alt="URY Table">
 	</div>
 
 	- **Name** : Specify the table name that will be listed in URY Order.
@@ -158,7 +158,7 @@ This guide takes you step-by-step through setting up URY on top of ERPNext
 	- **Table Shape** : Use this option to add the table shape for display on the POS screen.
 
 
-**Step 9 :**
+### Step 9 : POS Profile
     
 - [Create POS Profile](https://docs.erpnext.com/docs/user/manual/en/pos-profile) in ERPNext with the following additional fields:
         
@@ -168,7 +168,7 @@ This guide takes you step-by-step through setting up URY on top of ERPNext
    
 	 <p>
 		<div style="text-align: center;">
-			<img src="https://raw.githubusercontent.com/ury-erp/ury/images/DEMO/POS%20Profile%20Network%20Printer.png" style="margin: 2rem 2rem;" alt="POS Profile QZ">
+			<img src="https://raw.githubusercontent.com/ury-erp/ury/develop/DEMO/POS%20Profile%20Network%20Printer.png" style="margin: 2rem 2rem;" alt="POS Profile QZ">
 		</div>
 	</p>
 	
@@ -176,7 +176,7 @@ This guide takes you step-by-step through setting up URY on top of ERPNext
 
 	 <p>
 		<div style="text-align: center;">
-			<img src="https://raw.githubusercontent.com/ury-erp/ury/images/DEMO/POS%20Profile%20QZ.png" style="margin: 2rem 2rem;" alt="POS Profile QZ">
+			<img src="https://raw.githubusercontent.com/ury-erp/ury/develop/DEMO/POS%20Profile%20QZ.png" style="margin: 2rem 2rem;" alt="POS Profile QZ">
 		</div>
 	</p>
 	
@@ -189,7 +189,7 @@ This guide takes you step-by-step through setting up URY on top of ERPNext
 
 	<p>
 		<div style="text-align: center;">
-			<img src="https://raw.githubusercontent.com/ury-erp/ury/refs/heads/images/DEMO/POS%20Profile%20Restrictions.png" style="margin: 2rem 2rem;" alt="POS Profile Restrictions">
+			<img src="https://raw.githubusercontent.com/ury-erp/ury/refs/heads/develop/DEMO/POS%20Profile%20Restrictions.png" style="margin: 2rem 2rem;" alt="POS Profile Restrictions">
 		</div>
 	</p>
 
@@ -214,7 +214,7 @@ This guide takes you step-by-step through setting up URY on top of ERPNext
  
 	<p>
 		<div style="text-align: center;">
-			<img src="https://raw.githubusercontent.com/ury-erp/ury/refs/heads/images/DEMO/POS%20Profile%20KOT%20Settings.png" style="margin: 2rem 2rem;" alt="POS Profile KOT Settings">
+			<img src="https://raw.githubusercontent.com/ury-erp/ury/refs/heads/develop/DEMO/POS%20Profile%20KOT%20Settings.png" style="margin: 2rem 2rem;" alt="POS Profile KOT Settings">
 		</div>
 	</p>
 	
@@ -228,7 +228,7 @@ This guide takes you step-by-step through setting up URY on top of ERPNext
 	
 > **Note:** Update the Price List in Accounting to restaurant menu price list.
 
-**Step 10:**
+### Step 10: URY Prodction Unit
 
 - **URY Production Unit**
  	Create Production Unit From "URY Production Unit" with the following details:
@@ -236,7 +236,7 @@ This guide takes you step-by-step through setting up URY on top of ERPNext
 	Production Units manage multiple kitchens, each with its own web-based interface for displaying KOTs in the Kitchen Display System (KDS). Printers can also be configured per unit for physical KOTs if needed.
 
 	<div style="text-align: center;">
-		<img src="https://raw.githubusercontent.com/ury-erp/ury/refs/heads/images/DEMO/URY%20Production%20Unit.png" style="margin: 2rem 2rem;" alt="URY Production Unit">
+		<img src="https://raw.githubusercontent.com/ury-erp/ury/refs/heads/develop/DEMO/URY%20Production%20Unit.png" style="margin: 2rem 2rem;" alt="URY Production Unit">
 	</div>
 
   - **Production** : Enter the name for your Production Unit.
@@ -252,99 +252,95 @@ This guide takes you step-by-step through setting up URY on top of ERPNext
 
 > **Note:** To access KDS follow the site url with `/URYMosaic/Production%20Unit%20Name`. eg: [https://ury.xxxx.com/URYMosaic/Kitchen](https://ury.xxx.com/URYMosaic/Kitchen)
 
-**Step 11 :**
+### Step 11 : User Permissions
 
 - User Permissions control access to specific records in ERPNext. Give [User Permission](https://docs.erpnext.com/docs/user/manual/en/user-permissions) to the user for the documents they need to access, such as:
 	- POS Profile 
 	- Branch
 
-**Step 12 :**
+### Step 12 : Printer Setup
 
-- **Printer Setup** 
-	- QZ Printer
-		-  Add your certificate file is at `ury/public/files/cert.pem`.
-		- Update the `pos/privateKey.js` for v2 and `urypos/privateKey.js` for v1.
-	- Network Printer
-		- Set up CUPS (Common Unix Printing System) for network printing.
-		- In Network Printer Settings, add your printers and note their and enter the corresponding printer in the URY Room for invoice printing from POS.
-    
-	<p>
+- QZ Printer
+	-  Add your certificate file is at `ury/public/files/cert.pem`.
+	- Update the `pos/privateKey.js` for v2 and `urypos/privateKey.js` for v1.
+- Network Printer
+	- Set up CUPS (Common Unix Printing System) for network printing.
+	- In Network Printer Settings, add your printers and note their and enter the corresponding printer in the URY Room for invoice printing from POS.
+
+<p>
+	<div style="text-align: center;">
+		<img src="https://raw.githubusercontent.com/ury-erp/ury/refs/heads/develop/DEMO/Network%20Printer%20Settings.png" style="margin: 2rem 2rem;" alt="Network Printer Settings">
+	</div>
+</p>
+
+### Step 13 : Customer Search
+
+- frappe.utils.global_search is used for customer searching ,you have to run the following commands for building search index
+
+```
+bench --site site-name build-search-index 
+```
+
+and
+
+```
+bench --site site-name rebuild-global-search 
+```
+
+### Step 14: Multiple Cashier Configuration
+	
+- Follow the steps below to set up and manage multiple cashier operations in URY, allowing multiple cashiers to handle billing under one POS profile with individual transaction control.
+- **Create Cashier User** : Create user with the URY Cashier role.
+- **Assign Rooms** : Assign URY Rooms to users. Users can only access POS for the rooms they are assigned to.
+- **Configure POS Profile** : 
+	- In the Applicable for Users table of the POS Profile, add all cashiers for the POS and enable Main Cashier for the head cashier.
+	- Enable Multiple Cashier in the Multiple Cashier Configuration.
+- **Workflow**
+	- POS Opening
+		- The main cashier creates the POS Opening Entry first, followed by sub cashier. The main cashier must always open the POS first.
+	- Order Processing
+		- Proceed with normal order taking and restaurant operations.
+	- Sub POS Closing
+
 		<div style="text-align: center;">
-			<img src="https://raw.githubusercontent.com/ury-erp/ury/refs/heads/images/DEMO/Network%20Printer%20Settings.png" style="margin: 2rem 2rem;" alt="Network Printer Settings">
+			<img src="https://raw.githubusercontent.com/ury-erp/ury/refs/heads/develop/DEMO/Sub%20POS%20Closing.png" style="margin: 2rem 2rem;" alt="Sub POS Closing">
 		</div>
-	</p>
 
-**Step 13 :**
+		- Sub cashier creates a Sub POS Closing Entry.
+		- Sub POS Closing Entry is an URY Doctype to reconcile sub cashier transactions separately.
+	- POS Closing
+		- Main cashier creates a POS Closing Entry
 
-- **Customer Search**
-	- frappe.utils.global_search is used for customer searching ,you have to run the following commands for building search index
-	
-	```
- 	bench --site site-name build-search-index 
-	```
+### Step 15: URY Report Setting
 
-   and
-
-	```
- 	bench --site site-name rebuild-global-search 
-	```
-
-**Step 14:**
-- **Multiple Cashier Configuration**
-	
-	- Follow the steps below to set up and manage multiple cashier operations in URY, allowing multiple cashiers to handle billing under one POS profile with individual transaction control.
-	- **Create Cashier User** : Create user with the URY Cashier role.
-	- **Assign Rooms** : Assign URY Rooms to users. Users can only access POS for the rooms they are assigned to.
-	- **Configure POS Profile** : 
-		- In the Applicable for Users table of the POS Profile, add all cashiers for the POS and enable Main Cashier for the head cashier.
-		- Enable Multiple Cashier in the Multiple Cashier Configuration.
-	- **Workflow**
-		- POS Opening
-			- The main cashier creates the POS Opening Entry first, followed by sub cashier. The main cashier must always open the POS first.
-		- Order Processing
-			- Proceed with normal order taking and restaurant operations.
-		- Sub POS Closing
-
-			<div style="text-align: center;">
-				<img src="https://raw.githubusercontent.com/ury-erp/ury/refs/heads/images/DEMO/Sub%20POS%20Closing.png" style="margin: 2rem 2rem;" alt="Sub POS Closing">
-			</div>
-
-			- Sub cashier creates a Sub POS Closing Entry.
-			- Sub POS Closing Entry is an URY Doctype to reconcile sub cashier transactions separately.
-		- POS Closing
-			- Main cashier creates a POS Closing Entry
-
-**Step 15:**
-
-- **URY Report Setting**
-	- Navigate to **URY Report Settings** in  your site. 
-	- Click on **Add URY Report Settings**.
-	- Under the **Details** tab:
-		- **Extended Hours** : Enable this if the branch operates after 12 AM.
-		- **No of Hours** : Enter the number of hours, if extended hours is enabled. 
-	- Under the **Daily P and L Settings** tab:
-		- **Buying price List** : Select the buying price list for your branch.
-			- Under **Direct Expenses**:
-				- **Burning Materials (Other Consumables)** : Table to list consumables.
-					- **Material** : Enter the Material (e.g., gas, charcoal).
-					- **Cost Per Unit** : Specify the cost per unit for each material.
-				- **Direct Fixed Expenses** : Table to add list of daily fixed direct expenses.
-					- **Expense** : Provide the expense name.
-					- **Amount** : Specify amount for each expense.
-			- Under **Indirect Expenses**:
-				- **Electricity Charges**: Enter the electricity charges per unit.
-				- **Indirect Fixed Expenses** : Table to list daily fixed indirect expenses.
-					- **Expense** : Provide the expense name.
-					- **Amount** : Specify amount for each expense.
-				- **Percentage Expenses** : Table to list of expenses as a percentage of sales.
-					- **Expense** : Provide the expense name.
-					- **Percentage Type** : Choose the percentage type (Net Sales or Gross Sales).
-					- **Percent** : Specify the percentage of the selected type.
-			- Under **Employee Costs**:
-				- **Employee Costs** : Table to list daily fixed expenses as a part of employee costs.
-					- **Expense** : Provide the expense name.
-					- **Amount** : Specify amount for each expense.
-		- **Depreciation** : Add depreciation amount if applicable.
+- Navigate to **URY Report Settings** in  your site. 
+- Click on **Add URY Report Settings**.
+- Under the **Details** tab:
+	- **Extended Hours** : Enable this if the branch operates after 12 AM.
+	- **No of Hours** : Enter the number of hours, if extended hours is enabled. 
+- Under the **Daily P and L Settings** tab:
+	- **Buying price List** : Select the buying price list for your branch.
+		- Under **Direct Expenses**:
+			- **Burning Materials (Other Consumables)** : Table to list consumables.
+				- **Material** : Enter the Material (e.g., gas, charcoal).
+				- **Cost Per Unit** : Specify the cost per unit for each material.
+			- **Direct Fixed Expenses** : Table to add list of daily fixed direct expenses.
+				- **Expense** : Provide the expense name.
+				- **Amount** : Specify amount for each expense.
+		- Under **Indirect Expenses**:
+			- **Electricity Charges**: Enter the electricity charges per unit.
+			- **Indirect Fixed Expenses** : Table to list daily fixed indirect expenses.
+				- **Expense** : Provide the expense name.
+				- **Amount** : Specify amount for each expense.
+			- **Percentage Expenses** : Table to list of expenses as a percentage of sales.
+				- **Expense** : Provide the expense name.
+				- **Percentage Type** : Choose the percentage type (Net Sales or Gross Sales).
+				- **Percent** : Specify the percentage of the selected type.
+		- Under **Employee Costs**:
+			- **Employee Costs** : Table to list daily fixed expenses as a part of employee costs.
+				- **Expense** : Provide the expense name.
+				- **Amount** : Specify amount for each expense.
+	- **Depreciation** : Add depreciation amount if applicable.
 
 
 - **Daily Gross Salary Cost is calculated from employees attendance.**
