@@ -21,34 +21,34 @@ This guide takes you step-by-step through setting up URY on top of ERPNext
 	- URY Cashier - Responsible for managing customer orders, table service, and handling payments and POS operations.
 
 - Below are the recommended DocType permissions for URY roles. These permissions cover only the basic restaurant operations needed for URY (such as table service, billing, and order handling). You can extend or modify them later based on your restaurant’s workflow and access needs.
-<details>
-  <summary>View Role Permissions</summary>
-
-| Role | Doctype | Perm | Select | Read | Write | Create | Delete | Submit | Cancel | Amend | Print | Email | Report | Import | Export | Share |
-| :---- | :---- | :---- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **URY Captian** | Company | 0 | ✓ | ✓ | - | - | - | - | - | - | - | - | - | - | - | - |
-| | Currency | 0 | ✓ | ✓ | - | - | - | - | - | - | - | - | - | - | - | - |
-| | Customer | 0 | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | - | - | - | - | - |
-| | Item Price | 0 | ✓ | ✓ | - | - | - | - | - | - | - | - | - | - | - | - |
-| | POS Invoice | 0 | ✓ | ✓ | ✓ | ✓ | - | - | - | - | ✓ | - | - | - | - | - |
-| | POS Opening | 0 | ✓ | ✓ | - | - | - | - | - | - | - | - | - | - | - | - |
-| | URY KOT | 0 | ✓ | ✓ | ✓ | ✓ | - | ✓ | ✓ | - | - | - | - | - | - | - |
-| | URY KOT Error Log | 0 | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | - | - | - | - | - |
-| **URY Cashier** | Company | 0 | ✓ | ✓ | - | - | - | - | - | - | - | - | - | - | - | - |
-| | Currency | 0 | ✓ | ✓ | - | - | - | - | - | - | - | - | - | - | - | - |
-| | Customer | 0 | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | - | - | - | - | - |
-| | Item Price | 0 | ✓ | ✓ | - | - | - | - | - | - | - | - | - | - | - | - |
-| | POS Profile | 0 | ✓ | ✓ | - | - | - | - | - | - | - | - | - | - | - | - |
-| | POS Invoice | 0 | ✓ | ✓ | ✓ | ✓ | - | ✓ | ✓ | - | - | - | - | - | - | - |
-| | POS Opening | 0 | ✓ | ✓ | ✓ | ✓ | - | ✓ | - | - | - | - | - | - | - | - |
-| | POS Closing | 0 | ✓ | ✓ | ✓ | ✓ | - | ✓ | - | - | - | - | - | - | - | - |
-| | Sales Invoice | 0 | ✓ | ✓ | ✓ | ✓ | - | ✓ | - | - | - | - | - | - | - | - |
-| | User | 0 | ✓ | ✓ | - | - | - | - | - | - | - | - | - | - | - | - |
-| | User | 1 | - | ✓ | ✓ | - | - | - | - | - | - | - | - | - | - | - |
-| | URY KOT | 0 | ✓ | ✓ | ✓ | ✓ | - | ✓ | ✓ | - | - | - | - | - | - | - |
-| | URY KOT Error Log | 0 | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | - | - | - | - | - |
-
-</details>
+	<details>
+	  <summary>View Role Permissions</summary>
+	
+	| Role | Doctype | Perm | Select | Read | Write | Create | Delete | Submit | Cancel | Amend | Print | Email | Report | Import | Export | Share |
+	| :---- | :---- | :---- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+	| **URY Captian** | Company | 0 | ✓ | ✓ | - | - | - | - | - | - | - | - | - | - | - | - |
+	| | Currency | 0 | ✓ | ✓ | - | - | - | - | - | - | - | - | - | - | - | - |
+	| | Customer | 0 | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | - | - | - | - | - |
+	| | Item Price | 0 | ✓ | ✓ | - | - | - | - | - | - | - | - | - | - | - | - |
+	| | POS Invoice | 0 | ✓ | ✓ | ✓ | ✓ | - | - | - | - | ✓ | - | - | - | - | - |
+	| | POS Opening | 0 | ✓ | ✓ | - | - | - | - | - | - | - | - | - | - | - | - |
+	| | URY KOT | 0 | ✓ | ✓ | ✓ | ✓ | - | ✓ | ✓ | - | - | - | - | - | - | - |
+	| | URY KOT Error Log | 0 | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | - | - | - | - | - |
+	| **URY Cashier** | Company | 0 | ✓ | ✓ | - | - | - | - | - | - | - | - | - | - | - | - |
+	| | Currency | 0 | ✓ | ✓ | - | - | - | - | - | - | - | - | - | - | - | - |
+	| | Customer | 0 | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | - | - | - | - | - |
+	| | Item Price | 0 | ✓ | ✓ | - | - | - | - | - | - | - | - | - | - | - | - |
+	| | POS Profile | 0 | ✓ | ✓ | - | - | - | - | - | - | - | - | - | - | - | - |
+	| | POS Invoice | 0 | ✓ | ✓ | ✓ | ✓ | - | ✓ | ✓ | - | - | - | - | - | - | - |
+	| | POS Opening | 0 | ✓ | ✓ | ✓ | ✓ | - | ✓ | - | - | - | - | - | - | - | - |
+	| | POS Closing | 0 | ✓ | ✓ | ✓ | ✓ | - | ✓ | - | - | - | - | - | - | - | - |
+	| | Sales Invoice | 0 | ✓ | ✓ | ✓ | ✓ | - | ✓ | - | - | - | - | - | - | - | - |
+	| | User | 0 | ✓ | ✓ | - | - | - | - | - | - | - | - | - | - | - | - |
+	| | User | 1 | - | ✓ | ✓ | - | - | - | - | - | - | - | - | - | - | - |
+	| | URY KOT | 0 | ✓ | ✓ | ✓ | ✓ | - | ✓ | ✓ | - | - | - | - | - | - | - |
+	| | URY KOT Error Log | 0 | ✓ | ✓ | ✓ | ✓ | - | - | - | - | - | - | - | - | - | - |
+	
+	</details>
 
 **Step 3 :**
 
@@ -165,17 +165,21 @@ This guide takes you step-by-step through setting up URY on top of ERPNext
 - **Printer Info**
 
 	- Configure printing options for invoices and KOTs. For network printers, select the printer in the printer settings table. For QZ printing, enable QZ Print and enter the host IP.
-
-	<div style="text-align: center;">
-		<img src="https://raw.githubusercontent.com/ury-erp/ury/images/DEMO/POS%20Profile%20Network%20Printer.png" style="margin: 2rem 2rem;" alt="POS Profile QZ">
-	</div>
-
+   
+	 <p>
+		<div style="text-align: center;">
+			<img src="https://raw.githubusercontent.com/ury-erp/ury/images/DEMO/POS%20Profile%20Network%20Printer.png" style="margin: 2rem 2rem;" alt="POS Profile QZ">
+		</div>
+	</p>
+	
 	- **Printer Settings** : Select a printer, enable Bill for invoice printing and KOT Print for KOT printing. For multiple rooms with separate printers, configure the printer settings in the corresponding URY Room for room-wise printing.
 
-	<div style="text-align: center;">
-		<img src="https://raw.githubusercontent.com/ury-erp/ury/images/DEMO/POS%20Profile%20QZ.png" style="margin: 2rem 2rem;" alt="POS Profile QZ">
-	</div>
-
+	 <p>
+		<div style="text-align: center;">
+			<img src="https://raw.githubusercontent.com/ury-erp/ury/images/DEMO/POS%20Profile%20QZ.png" style="margin: 2rem 2rem;" alt="POS Profile QZ">
+		</div>
+	</p>
+	
 	- **QZ Print** : Check this box to enable QZ printing.
 	- **QZ Host** : Enter the Network IP for QZ printing.	
 
@@ -183,9 +187,11 @@ This guide takes you step-by-step through setting up URY on top of ERPNext
 
 	- Set role-based permissions, cashier access, table order restrictions, and operational settings such as attention time, discount, daily POS closing, and visibility of paid invoices.
 
-	<div style="text-align: center;">
-		<img src="https://raw.githubusercontent.com/ury-erp/ury/refs/heads/images/DEMO/POS%20Profile%20Restrictions.png" style="margin: 2rem 2rem;" alt="POS Profile Restrictions">
-	</div>
+	<p>
+		<div style="text-align: center;">
+			<img src="https://raw.githubusercontent.com/ury-erp/ury/refs/heads/images/DEMO/POS%20Profile%20Restrictions.png" style="margin: 2rem 2rem;" alt="POS Profile Restrictions">
+		</div>
+	</p>
 
 	- **Captain Transfer Role Permissions** : Roles added to this field will have permission for 'Captain Transfer'. Users with this role will also have access to all tables.
 	- **Role Allowed For Billing** : Users assigned this role will function as cashiers in URY POS, responsible for managing billing transactions.
@@ -205,11 +211,13 @@ This guide takes you step-by-step through setting up URY on top of ERPNext
 - **KOT Settings**
 
 	- Configure how Kitchen Order Tickets (KOTs) are managed and monitored, including naming series, timers, reprint and audio alert options, delay notifications with recipients, and daily order number resets to streamline kitchen operations.
-
-	<div style="text-align: center;">
-		<img src="https://raw.githubusercontent.com/ury-erp/ury/refs/heads/images/DEMO/POS%20Profile%20KOT%20Settings.png" style="margin: 2rem 2rem;" alt="POS Profile KOT Settings">
-	</div>
-
+ 
+	<p>
+		<div style="text-align: center;">
+			<img src="https://raw.githubusercontent.com/ury-erp/ury/refs/heads/images/DEMO/POS%20Profile%20KOT%20Settings.png" style="margin: 2rem 2rem;" alt="POS Profile KOT Settings">
+		</div>
+	</p>
+	
 	- **URY KOT Naming Series** : Add a naming series for KOT. A KOT will be created only if a naming series is set.
 	- **KOT Warning Time** : Timer against KOT are set in this field to trigger a warning when it's exceeded in KDS.
 	- **Enable KOT Reprint** : Use this option if you need the reprint feature for KOT prints. Make sure to add the appropriate printers and print format.
@@ -259,24 +267,26 @@ This guide takes you step-by-step through setting up URY on top of ERPNext
 	- Network Printer
 		- Set up CUPS (Common Unix Printing System) for network printing.
 		- In Network Printer Settings, add your printers and note their and enter the corresponding printer in the URY Room for invoice printing from POS.
+    
+	<p>
+		<div style="text-align: center;">
+			<img src="https://raw.githubusercontent.com/ury-erp/ury/refs/heads/images/DEMO/Network%20Printer%20Settings.png" style="margin: 2rem 2rem;" alt="Network Printer Settings">
+		</div>
+	</p>
 
-	<div style="text-align: center;">
-		<img src="https://raw.githubusercontent.com/ury-erp/ury/refs/heads/images/DEMO/Network%20Printer%20Settings.png" style="margin: 2rem 2rem;" alt="Network Printer Settings">
-	</div>
-
-   and
+**Step 13 :**
 
 - **Customer Search**
 	- frappe.utils.global_search is used for customer searching ,you have to run the following commands for building search index
 	
 	```
-   		$ bench --site site-name build-search-index 
+ 	bench --site site-name build-search-index 
 	```
 
    and
 
 	```
-   	$ bench --site site-name rebuild-global-search 
+ 	bench --site site-name rebuild-global-search 
 	```
 
 **Step 14:**
