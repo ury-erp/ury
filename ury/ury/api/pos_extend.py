@@ -1,26 +1,26 @@
-from erpnext.accounts.doctype.sales_invoice.sales_invoice import (
-    SalesInvoice,
-    update_multi_mode_option,
-)
 import frappe
-from frappe.utils.nestedset import get_root_of
-from frappe.utils import cint
-from erpnext.accounts.doctype.pos_invoice.pos_invoice import (
-    add_return_modes,
-    get_stock_availability,
-)
-from erpnext.selling.page.point_of_sale.point_of_sale import (
-    search_by_term,
-    get_conditions,
-    get_item_group_condition,
-)
-from erpnext.accounts.party import get_due_date, get_party_account
+from frappe import _
 
+def validate_search_input(search_term):
+    """Validate and sanitize search input"""
+    if not search_term:
+        return ""
+
+    # Length validation
+    if len(search_term) > 100:
+        frappe.throw(_("Search term too long (max 100 characters)"))
+
+    # Character whitelist (adjust based on requirements)
+    import re
+    if not re.match(r'^[a-zA-Z0-9\s\-_@.]+$', search_term):
+        frappe.throw(_("Invalid characters in search term"))
+
+    return search_term
 
 @frappe.whitelist()
 def overrided_past_order_list(search_term, status, limit=20):
     user = frappe.session.user
-
+    search_term = validate_search_input(search_term)
     if user != "Administrator":
         sql_query = """
             SELECT b.branch,a.room
@@ -53,18 +53,19 @@ def overrided_past_order_list(search_term, status, limit=20):
         invoices_by_customer = frappe.db.get_all(
             "POS Invoice",
             filters={
-                "customer": ["like", "%{}%".format(search_term)],
+                "customer": ["like", "%{}%".format(frappe.db.escape(search_term))],
                 "status": status,
             },
             fields=fields,
         )
         invoices_by_name = frappe.db.get_all(
             "POS Invoice",
-            filters={"name": ["like", "%{}%".format(search_term)], "status": status},
+            filters={"name": ["like", "%{}%".format(frappe.db.escape(search_term))], "status": status},
             fields=fields,
         )
+        print("invoices by customer",invoices_by_customer)
         invoice_list = invoices_by_customer + invoices_by_name
-
+        updated_list = invoice_list
     elif status:
         if user != "Administrator":
             if status == "To Bill":
