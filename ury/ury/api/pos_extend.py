@@ -20,7 +20,7 @@ def validate_search_input(search_term):
 @frappe.whitelist()
 def overrided_past_order_list(search_term, status, limit=20):
     user = frappe.session.user
-    # search_term = validate_search_input(search_term)
+    search_term = validate_search_input(search_term)
     if user != "Administrator":
         sql_query = """
             SELECT b.branch,a.room
@@ -53,16 +53,17 @@ def overrided_past_order_list(search_term, status, limit=20):
         invoices_by_customer = frappe.db.get_all(
             "POS Invoice",
             filters={
-                "customer": ["like", "%{}%".format(search_term)],
+                "customer": ["like", "%{}%".format(frappe.db.escape(search_term))],
                 "status": status,
             },
             fields=fields,
         )
         invoices_by_name = frappe.db.get_all(
             "POS Invoice",
-            filters={"name": ["like", "%{}%".format(search_term)], "status": status},
+            filters={"name": ["like", "%{}%".format(frappe.db.escape(search_term))], "status": status},
             fields=fields,
         )
+        print("invoices by customer",invoices_by_customer)
         invoice_list = invoices_by_customer + invoices_by_name
         updated_list = invoice_list
     elif status:
