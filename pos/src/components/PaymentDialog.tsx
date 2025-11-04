@@ -104,12 +104,20 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   // Handler for input focus to auto-fill remaining balance
   const handlePaymentInputFocus = (id: string) => {
     setPaymentInputs(inputs => {
-      // Only auto-fill if the field is empty or zero
-      if (!inputs[id] || parseFloat(inputs[id]) === 0) {
-        const remaining = getRemainingBalance(id);
-        return { ...inputs, [id]: remaining > 0 ? String(remaining) : '' };
-      }
-      return inputs;
+      const remaining = getRemainingBalance(id);
+      const newInputs = { ...inputs };
+
+      // Clear all other modes (especially cash) if focusing on a new mode
+      Object.keys(newInputs).forEach(key => {
+        if (key !== id) {
+          newInputs[key] = '';
+        }
+      });
+
+      // Autofill remaining amount in the focused mode
+      newInputs[id] = remaining > 0 ? String(remaining) : '';
+
+      return newInputs;
     });
   };
 
@@ -165,33 +173,15 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
     }
   };
 
-  const handlePaymentChange = (modeId: string, value: string) => {
-  setPaymentInputs((prev) => {
-    const updated = { ...prev, [modeId]: value };
+  const handlePaymentInputSelect = (id: string) => {
+  setPaymentInputs(prev => {
+    const remaining = getRemainingBalance(id);
+    const updated: { [key: string]: string } = {};
 
-    // Find the cash mode
-    const cashMode = paymentModes.find((mode) => {
-      const modeName = typeof mode === 'string' ? mode : mode.name;
-      return modeName?.toLowerCase().includes('cash');
+    // Clear others and fill only the clicked mode
+    Object.keys(prev).forEach(key => {
+      updated[key] = key === id ? String(remaining > 0 ? remaining : '') : '';
     });
-
-    if (cashMode) {
-      const cashId = typeof cashMode === 'string' ? cashMode : cashMode.id;
-
-      // If another mode (non-cash) is entered with >0 value → clear cash field
-      if (modeId !== cashId && parseFloat(value) > 0) {
-        updated[cashId] = '';
-      }
-
-      // Optional: if all other modes are cleared, auto-restore cash again
-      const othersHaveValue = Object.entries(updated)
-        .filter(([id]) => id !== cashId)
-        .some(([_, val]) => parseFloat(val) > 0);
-
-      if (!othersHaveValue && finalTotal > 0) {
-        updated[cashId] = String(finalTotal);
-      }
-    }
 
     return updated;
   });
@@ -252,17 +242,18 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
                   <div key={id} className="flex items-center gap-3">
                     <span className="w-24 font-medium">{typeof mode === 'string' ? mode : mode.name}</span>
                     <Input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={paymentInputs[id] || ''}
-                      onChange={(e) => handlePaymentChange(id, e.target.value)}
-                      onFocus={() => handlePaymentInputFocus(id)}
-                      placeholder="Amount"
-                      className="flex-1"
-                      size="sm"
-                      disabled={isProcessing}
-                    />
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={paymentInputs[id] || ''}
+                        onChange={e => setPaymentInputs(inputs => ({ ...inputs, [id]: e.target.value }))}
+                        onClick={() => handlePaymentInputSelect(id)}
+                        onFocus={() => handlePaymentInputSelect(id)} 
+                        placeholder="Amount"
+                        className="flex-1"
+                        size="sm"
+                        disabled={isProcessing}
+                      />
                   </div>
                 );
               })}
