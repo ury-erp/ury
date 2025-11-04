@@ -248,7 +248,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
                         value={paymentInputs[id] || ''}
                         onChange={e => setPaymentInputs(inputs => ({ ...inputs, [id]: e.target.value }))}
                         onClick={() => handlePaymentInputSelect(id)}
-                        onFocus={() => handlePaymentInputSelect(id)} 
+                        onFocus={() => handlePaymentInputFocus(id)} 
                         placeholder="Amount"
                         className="flex-1"
                         size="sm"
