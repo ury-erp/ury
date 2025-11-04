@@ -113,6 +113,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
     });
   };
 
+  //mode of payment default cash
   useEffect(() => {
   if (paymentModes.length > 0 && finalTotal > 0) {
     const cashMode = paymentModes.find((mode) => {
@@ -163,6 +164,39 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
       setIsProcessing(false);
     }
   };
+
+  const handlePaymentChange = (modeId: string, value: string) => {
+  setPaymentInputs((prev) => {
+    const updated = { ...prev, [modeId]: value };
+
+    // Find the cash mode
+    const cashMode = paymentModes.find((mode) => {
+      const modeName = typeof mode === 'string' ? mode : mode.name;
+      return modeName?.toLowerCase().includes('cash');
+    });
+
+    if (cashMode) {
+      const cashId = typeof cashMode === 'string' ? cashMode : cashMode.id;
+
+      // If another mode (non-cash) is entered with >0 value → clear cash field
+      if (modeId !== cashId && parseFloat(value) > 0) {
+        updated[cashId] = '';
+      }
+
+      // Optional: if all other modes are cleared, auto-restore cash again
+      const othersHaveValue = Object.entries(updated)
+        .filter(([id]) => id !== cashId)
+        .some(([_, val]) => parseFloat(val) > 0);
+
+      if (!othersHaveValue && finalTotal > 0) {
+        updated[cashId] = String(finalTotal);
+      }
+    }
+
+    return updated;
+  });
+};
+
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
@@ -222,7 +256,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
                       min="0"
                       step="0.01"
                       value={paymentInputs[id] || ''}
-                      onChange={e => setPaymentInputs(inputs => ({ ...inputs, [id]: e.target.value }))}
+                      onChange={(e) => handlePaymentChange(id, e.target.value)}
                       onFocus={() => handlePaymentInputFocus(id)}
                       placeholder="Amount"
                       className="flex-1"
