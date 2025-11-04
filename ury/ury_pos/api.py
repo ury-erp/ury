@@ -169,6 +169,35 @@ def getRoom():
         ]
 
         return room_details
+        
+
+@frappe.whitelist()
+def getCustomer(search=None, limit=20):
+    """Fetch customers filtered by search query (name or phone)."""
+    filters = {"disabled": 0}
+    if search:
+        customers = frappe.get_all(
+            "Customer",
+            filters=filters,
+            or_filters=[
+                ["name", "like", f"%{search}%"],
+                ["customer_name", "like", f"%{search}%"],
+                ["mobile_number", "like", f"%{search}%"],
+            ],
+            fields=["name", "customer_name", "mobile_number", "customer_group", "territory"],
+            order_by="customer_name asc",
+            limit_page_length=limit,
+        )
+    else:
+        customers = frappe.get_all(
+            "Customer",
+            filters=filters,
+            fields=["name", "customer_name", "mobile_number", "customer_group", "territory"],
+            order_by="customer_name asc",
+            limit_page_length=limit,
+        )
+    return customers
+    
 
 @frappe.whitelist()
 def getModeOfPayment():

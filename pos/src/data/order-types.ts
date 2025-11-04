@@ -1,12 +1,33 @@
 import { Globe, Phone, ShoppingBag, Truck, Utensils } from "lucide-react";
 
 export type OrderType = "Dine In" | "Take Away" | "Delivery" | "Phone In" | "Aggregators";
+export type paymentMode = "Cash" | "UPI" | "Debit Card";
 
 export type OrderTypes= {
     label: string;
     value: OrderType;
     icon: React.ElementType;
 }
+
+export type paymentModes= {
+    label: string;
+    value: paymentMode;
+}
+
+export const Payment_Mode: paymentModes[] = [
+    {
+        label: "Cash",
+        value: "Cash"
+    },
+    {
+        label: "UPI",
+        value: "UPI"
+    },
+    {
+        label: "Debit Card",
+        value: "Debit Card"
+    }
+]
 
 export const ORDER_TYPES: OrderTypes[] = [
     {
@@ -38,6 +59,7 @@ export const ORDER_TYPES: OrderTypes[] = [
 
 export const DINE_IN="Dine In"
 export const DEFAULT_ORDER_TYPE="Take Away"
+export const DEFAULT_PAYMENT_MODE="Cash"
 
 export type OrderStatusType = "Draft" | "Unbilled" | "Recently Paid" | "Paid" | "Consolidated" | "Return";
 

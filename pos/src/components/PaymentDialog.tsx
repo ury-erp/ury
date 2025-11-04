@@ -5,7 +5,7 @@ import { cn, formatCurrency } from '../lib/utils';
 import { Button, Input, Dialog, DialogContent } from './ui';
 import { call } from '../lib/frappe-sdk';
 import type { PaymentMode } from '../store/pos-store';
-
+import { DEFAULT_PAYMENT_MODE  } from '../data/order-types'
 
 
 interface PaymentDialogProps {
@@ -125,13 +125,13 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
 useEffect(() => {
   if (!paymentModes.length || finalTotal <= 0) return;
 
-  const cashMode = paymentModes.find((mode) => {
-    const modeName = typeof mode === "string" ? mode : mode.name;
-    return modeName?.toLowerCase().includes("cash");
+   const defaultMode = paymentModes.find((mode: any) => {
+    const name = typeof mode === "string" ? mode : mode.name;
+    return name?.toLowerCase() === DEFAULT_PAYMENT_MODE.toLowerCase();
   });
 
-  if (!cashMode) return;
-  const cashId = typeof cashMode === "string" ? cashMode : cashMode.id;
+  if (!defaultMode) return;
+  const cashId = typeof defaultMode === "string" ? defaultMode : defaultMode.id;
 
   setPaymentInputs((prev) => {
     // If user already manually split (multiple non-zero inputs), don't override
