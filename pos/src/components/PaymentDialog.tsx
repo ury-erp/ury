@@ -4,6 +4,8 @@ import { usePOSStore } from '../store/pos-store';
 import { cn, formatCurrency } from '../lib/utils';
 import { Button, Input, Dialog, DialogContent } from './ui';
 import { call } from '../lib/frappe-sdk';
+import type { PaymentMode } from '../store/pos-store';
+
 
 
 interface PaymentDialogProps {
@@ -33,7 +35,12 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   fetchOrders,
   clearSelectedOrder
 }) => {
-  const { paymentModes, fetchPaymentModes, posProfile: storePosProfile } = usePOSStore();
+  const { paymentModes, fetchPaymentModes, posProfile: storePosProfile } = usePOSStore() as {
+  paymentModes: (string | PaymentMode)[];
+  fetchPaymentModes: () => Promise<void>;
+  posProfile: any;
+};
+
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [discountType] = useState<'percentage'>('percentage'); // Only percentage now
@@ -45,6 +52,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
     fetchPaymentModes();
   }, [fetchPaymentModes]);
 
+  
   // Calculate split payment total
   const payments = paymentModes
     .map((mode: any) => {
@@ -91,6 +99,8 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
     return Math.max(0, finalTotal - totalEntered);
   };
 
+  
+
   // Handler for input focus to auto-fill remaining balance
   const handlePaymentInputFocus = (id: string) => {
     setPaymentInputs(inputs => {
@@ -102,6 +112,29 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
       return inputs;
     });
   };
+
+  useEffect(() => {
+  if (paymentModes.length > 0 && finalTotal > 0) {
+    const cashMode = paymentModes.find((mode) => {
+      const modeName = typeof mode === 'string' ? mode : mode.name;
+      return modeName?.toLowerCase().includes('cash');
+    });
+
+    if (cashMode) {
+      const id = typeof cashMode === 'string' ? cashMode : cashMode.id;
+      setPaymentInputs((prev) => {
+        const hasAnyPayment = Object.values(prev).some(
+          (v) => parseFloat(v) > 0
+        );
+        if (!hasAnyPayment) {
+          return { ...prev, [id]: String(finalTotal) };
+        }
+        return prev;
+      });
+    }
+  }
+}, [paymentModes, finalTotal]);
+
 
   const handlePayment = async () => {
     setIsProcessing(true);
