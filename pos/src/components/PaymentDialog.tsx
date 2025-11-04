@@ -121,28 +121,35 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
     });
   };
 
-  //mode of payment default cash
-  useEffect(() => {
-  if (paymentModes.length > 0 && finalTotal > 0) {
-    const cashMode = paymentModes.find((mode) => {
-      const modeName = typeof mode === 'string' ? mode : mode.name;
-      return modeName?.toLowerCase().includes('cash');
+// Auto-update default payment (like Cash) when discount changes
+useEffect(() => {
+  if (!paymentModes.length || finalTotal <= 0) return;
+
+  const cashMode = paymentModes.find((mode) => {
+    const modeName = typeof mode === "string" ? mode : mode.name;
+    return modeName?.toLowerCase().includes("cash");
+  });
+
+  if (!cashMode) return;
+  const cashId = typeof cashMode === "string" ? cashMode : cashMode.id;
+
+  setPaymentInputs((prev) => {
+    // If user already manually split (multiple non-zero inputs), don't override
+    const activeModes = Object.entries(prev).filter(([_, v]) => parseFloat(v) > 0);
+    if (activeModes.length > 1) return prev;
+
+    // If no manual entry or only cash active → auto-fill it with new total
+    const updatedInputs: { [k: string]: string } = {};
+    paymentModes.forEach((mode) => {
+      const id = typeof mode === "string" ? mode : mode.id;
+      updatedInputs[id] = id === cashId ? String(finalTotal) : "";
     });
 
-    if (cashMode) {
-      const id = typeof cashMode === 'string' ? cashMode : cashMode.id;
-      setPaymentInputs((prev) => {
-        const hasAnyPayment = Object.values(prev).some(
-          (v) => parseFloat(v) > 0
-        );
-        if (!hasAnyPayment) {
-          return { ...prev, [id]: String(finalTotal) };
-        }
-        return prev;
-      });
-    }
-  }
-}, [paymentModes, finalTotal]);
+    return updatedInputs;
+  });
+}, [appliedDiscount, finalTotal, paymentModes]);
+
+
 
 
   const handlePayment = async () => {
