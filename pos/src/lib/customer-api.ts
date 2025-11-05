@@ -68,8 +68,12 @@ export async function getCustomerTerritories() {
 
 export async function addCustomer(customerData: CreateCustomerData): Promise<CreateCustomerResponse> {
   try {
-    const response = await db.createDoc(DOCTYPES.CUSTOMER, customerData);
-    return { data: response as Customer };
+    const response = await call.post('ury.ury_pos.api.create_customer',customerData)
+    const customer: Customer = response.message.customer;
+    if(!customer) {
+      throw new Error("Failed to create Customer,API Response error")
+    }
+    return {data:customer}
   } catch (error) {
     console.error('Error creating customer:', error);
     throw error;
