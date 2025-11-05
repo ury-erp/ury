@@ -1,6 +1,7 @@
 import frappe
 from frappe import _
 from datetime import date, datetime, timedelta
+from frappe.utils import validate_phone_number
 
 
 
@@ -657,6 +658,11 @@ def create_customer(customer_name, mobile_number=None, customer_group="Individua
         frappe.throw("Customer name is required")
     if not mobile_number:
         frappe.throw("Mobile Number is required")
+    try:
+        validate_phone_number(mobile_number, throw=True)
+    except Exception:
+        frappe.throw(_("Invalid mobile number format"))
+
     """Create a new customer"""
     try:
         customer = frappe.get_doc({
