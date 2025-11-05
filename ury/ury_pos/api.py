@@ -1,6 +1,7 @@
 import frappe
 from frappe import _
 from datetime import date, datetime, timedelta
+from frappe.utils import validate_phone_number
 
 
 
@@ -650,7 +651,41 @@ def getAggregatorMOP(aggregator):
             {"mode_of_payment": modeOfPayment, "opening_amount": float(0)}
     )
     return modeOfPaymentsList
+@frappe.whitelist()
+def create_customer(customer_name, mobile_number=None, customer_group="Individual", territory="India"):
+    if not customer_name:
+        frappe.throw("Customer name is required")
+    if not mobile_number:
+        frappe.throw("Mobile Number is required")
+    try:
+        validate_phone_number(mobile_number, throw=True)
+    except Exception:
+        frappe.throw("Invalid mobile number format")
 
+    """Create a new customer"""
+    try:
+        customer = frappe.get_doc({
+            "doctype": "Customer",
+            "customer_name": customer_name,
+            "mobile_number": mobile_number,
+            "customer_group": customer_group,
+            "territory": territory
+        })
+        customer.insert(ignore_permissions=True)
+        frappe.db.commit()
+
+        return {
+            "status": "success",
+            "message": "Customer created successfully",
+            "customer": customer.as_dict()
+        }
+
+    except Exception as e:
+        frappe.log_error(message=frappe.get_traceback(), title="Customer Creation Failed")
+        return {
+            "status": "error",
+            "message": str(e)
+        }
 
 @frappe.whitelist()
 def validate_pos_close(pos_profile): 
