@@ -64,6 +64,7 @@ export interface PosProfileFull {
   role_allowed_for_billing: RolePermission[];
   role_restricted_for_table_order?: RolePermission[];
   paid_limit?: number;
+  custom_allow_without_print_on_payment?: boolean
 }
 
 // Combined POS Profile with both limited and full fields
@@ -84,6 +85,7 @@ export interface PosProfileCombined extends PosProfileFull {
   edit_order_type?: number;
   view_all_status?: number;
   custom_daily_pos_close?: number;
+  custom_allow_without_print_on_payment?: boolean;
 }
 
 export interface Currency {
@@ -133,6 +135,7 @@ export async function getCombinedPosProfile(): Promise<PosProfileCombined> {
     enable_discount: limitedProfile.enable_discount,
     multiple_cashier: limitedProfile.multiple_cashier,
     edit_order_type: limitedProfile.edit_order_type,
+    custom_allow_without_print_on_payment: Boolean(fullProfile.custom_allow_without_print_on_payment),
   };
 
   return combinedProfile;
