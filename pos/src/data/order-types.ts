@@ -38,6 +38,7 @@ export const ORDER_TYPES: OrderTypes[] = [
 
 export const DINE_IN="Dine In"
 export const DEFAULT_ORDER_TYPE="Take Away"
+export const DEFAULT_PAYMENT_MODE="Cash"
 
 export type OrderStatusType = "Draft" | "Unbilled" | "Recently Paid" | "Paid" | "Consolidated" | "Return";
 
