@@ -151,10 +151,11 @@ export async function networkPrint(orderId: string, printer: string, printFormat
   });
 }
 
-export async function selectNetworkPrinter(orderId: string, posProfile: string) {
+export async function selectNetworkPrinter(orderId: string, posProfile: string, printFormat?: string | null) {
   await call.post('ury.ury.api.ury_print.select_network_printer', {
     invoice_id: orderId,
     pos_profile: posProfile,
+    print_format: printFormat,
   });
 }
 
