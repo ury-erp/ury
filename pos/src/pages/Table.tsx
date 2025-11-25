@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState, type MouseEvent } from 'react';
+import { useCallback, useEffect, useMemo, useState, type MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, Eye, Printer, Square, Users } from 'lucide-react';
+import { AlertTriangle, Eye, Loader2, Printer, Square, Users } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { usePOSStore } from '../store/pos-store';
 import { getRooms, getTables, type Room, type Table } from '../lib/table-api';
@@ -9,6 +9,9 @@ import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { DINE_IN } from '../data/order-types';
 import { TableShapeIcon } from '../components/TableShapeIcon';
+import { getTableOrder } from '../lib/order-api';
+import { printOrder } from '../lib/print';
+import { showToast } from '../components/ui/toast';
 
 const sortTables = (tables: Table[]) => [...tables].sort((a, b) => a.name.localeCompare(b.name));
 
@@ -24,6 +27,7 @@ const TableView = () => {
   const [loadingRooms, setLoadingRooms] = useState(false);
   const [loadingTables, setLoadingTables] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [printingTable, setPrintingTable] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchRooms() {
@@ -56,23 +60,24 @@ const TableView = () => {
     fetchRooms();
   }, [branch]);
 
-  useEffect(() => {
-    async function fetchTables() {
-      if (!selectedRoom) return;
+  const loadTables = useCallback(
+    async (roomName: string, options?: { useCache?: boolean }) => {
+      if (!roomName) return;
       setError(null);
 
-      if (tablesCache[selectedRoom]) {
-        console.log("herehere")
-        setTables(sortTables(tablesCache[selectedRoom]));
+      const shouldUseCache = options?.useCache !== false;
+      if (shouldUseCache && tablesCache[roomName]) {
+        setTables(sortTables(tablesCache[roomName]));
+        setLoadingTables(false);
         return;
       }
 
       setLoadingTables(true);
       try {
-        const fetchedTables = await getTables(selectedRoom);
+        const fetchedTables = await getTables(roomName);
         const sortedTables = sortTables(fetchedTables);
         setTables(sortedTables);
-        setTablesCache(prev => ({ ...prev, [selectedRoom]: sortedTables }));
+        setTablesCache(prev => ({ ...prev, [roomName]: sortedTables }));
       } catch (e) {
         console.error(e);
         setError('Failed to load tables');
@@ -80,10 +85,14 @@ const TableView = () => {
       } finally {
         setLoadingTables(false);
       }
-    }
+    },
+    [tablesCache]
+  );
 
-    fetchTables();
-  }, [selectedRoom, tablesCache]);
+  useEffect(() => {
+    if (!selectedRoom) return;
+    loadTables(selectedRoom);
+  }, [selectedRoom, loadTables]);
 
   const handleNavigateToPOS = (tableName: string) => {
     if (!selectedRoom) return;
@@ -97,9 +106,32 @@ const TableView = () => {
     handleNavigateToPOS(table.name);
   };
 
-  const handlePrintTable = (table: Table, event: MouseEvent<HTMLButtonElement>) => {
+  const handlePrintTable = async (table: Table, event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
-    console.log('Print bill for table:', table.name);
+
+    if (!posProfile) {
+      showToast.error('POS profile not loaded yet');
+      return;
+    }
+
+    setPrintingTable(table.name);
+    try {
+      const orderResponse = await getTableOrder(table.name);
+      const invoiceId = orderResponse.message?.name;
+
+      if (!invoiceId) {
+        showToast.error('No active order found for this table');
+        return;
+      }
+
+      await printOrder({ orderId: invoiceId, posProfile });
+      showToast.success('Printed successfully');
+      await loadTables(table.restaurant_room, { useCache: false });
+    } catch (error) {
+      showToast.error(error instanceof Error ? error.message : 'Failed to print order');
+    } finally {
+      setPrintingTable(null);
+    }
   };
 
   const formatInvoiceTime = (timestamp: string | null) => {
@@ -115,7 +147,15 @@ const TableView = () => {
       const [, hours, minutes, seconds] = timeOnlyMatch;
       const date = new Date();
       date.setHours(Number(hours), Number(minutes), Number(seconds), 0);
-      return date.toLocaleTimeString(undefined, { hour: 'numeric', minute: 'numeric' });
+      const formatted = date.toLocaleTimeString(undefined, {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      });
+      if (/^\d{1,2}:\d{2}$/.test(formatted)) {
+        return formatted;
+      }
+      return `${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}`;
     }
 
     return timestamp;
@@ -127,6 +167,11 @@ const TableView = () => {
   const showGridSkeleton = loadingTables || !selectedRoom;
 
   const handleRoomChange = (roomName: string) => {
+    if (roomName === selectedRoom) {
+      loadTables(roomName, { useCache: false });
+      return;
+    }
+
     setSelectedRoom(roomName);
 
     if (tablesCache[roomName]) {
@@ -275,10 +320,20 @@ const TableView = () => {
                         </button>
                         <button
                           onClick={(event) => handlePrintTable(table, event)}
-                          className="flex-1 flex items-center justify-center gap-2 py-2 text-xs font-semibold rounded bg-white hover:bg-amber-100 transition"
+                          disabled={printingTable === table.name}
+                          className="flex-1 flex items-center justify-center gap-2 py-2 text-xs font-semibold rounded bg-white hover:bg-amber-100 transition disabled:opacity-60 disabled:cursor-not-allowed"
                         >
-                          <Printer className="w-3 h-3" />
-                          Print
+                          {printingTable === table.name ? (
+                            <>
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                              Printing...
+                            </>
+                          ) : (
+                            <>
+                              <Printer className="w-3 h-3" />
+                              Print
+                            </>
+                          )}
                         </button>
                       </div>
                     ) : (
