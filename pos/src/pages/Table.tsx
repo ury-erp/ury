@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Eye, Loader2, Printer, Square, Users } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { usePOSStore } from '../store/pos-store';
-import { getRooms, getTables, type Room, type Table } from '../lib/table-api';
+import { getRooms, getTables, getTableCount, type Room, type Table } from '../lib/table-api';
 import { Spinner } from '../components/ui/spinner';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
@@ -26,8 +26,15 @@ const TableView = () => {
   const [tablesCache, setTablesCache] = useState<Record<string, Table[]>>({});
   const [loadingRooms, setLoadingRooms] = useState(false);
   const [loadingTables, setLoadingTables] = useState(false);
+  const [roomCounts, setRoomCounts] = useState<Record<string, number>>({});
+  const [loadingRoomCounts, setLoadingRoomCounts] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [printingTable, setPrintingTable] = useState<string | null>(null);
+
+  const persistRoomCounts = useCallback((counts: Record<string, number>) => {
+    if (!branch) return;
+    sessionStorage.setItem(`ury_room_counts_${branch}`, JSON.stringify(counts));
+  }, [branch]);
 
   useEffect(() => {
     async function fetchRooms() {
@@ -60,6 +67,49 @@ const TableView = () => {
     fetchRooms();
   }, [branch]);
 
+  useEffect(() => {
+    if (!branch || rooms.length === 0) return;
+    const cacheKey = `ury_room_counts_${branch}`;
+    const cachedCounts = sessionStorage.getItem(cacheKey);
+    let shouldFetch = true;
+
+    if (cachedCounts) {
+      try {
+        const parsedCounts = JSON.parse(cachedCounts) as Record<string, number>;
+        setRoomCounts(parsedCounts);
+        const hasAllRooms = rooms.every(room => typeof parsedCounts[room.name] === 'number');
+        if (hasAllRooms) {
+          shouldFetch = false;
+        }
+      } catch {
+        sessionStorage.removeItem(cacheKey);
+      }
+    }
+
+    if (!shouldFetch) return;
+
+    async function fetchRoomCounts() {
+      setLoadingRoomCounts(true);
+      try {
+        const counts = await Promise.all(
+          rooms.map(room => getTableCount(room.name, room.branch))
+        );
+        const nextCounts = rooms.reduce((acc, room, index) => {
+          acc[room.name] = counts[index];
+          return acc;
+        }, {} as Record<string, number>);
+        setRoomCounts(nextCounts);
+        persistRoomCounts(nextCounts);
+      } catch (error) {
+        console.error('Failed to load room counts', error);
+      } finally {
+        setLoadingRoomCounts(false);
+      }
+    }
+
+    fetchRoomCounts();
+  }, [branch, rooms, persistRoomCounts]);
+
   const loadTables = useCallback(
     async (roomName: string, options?: { useCache?: boolean }) => {
       if (!roomName) return;
@@ -88,6 +138,23 @@ const TableView = () => {
     },
     [tablesCache]
   );
+
+  const refreshRoomCount = useCallback(async (roomName: string) => {
+    const roomMeta = rooms.find(room => room.name === roomName);
+    const branchName = roomMeta?.branch ?? branch;
+    if (!roomName || !branchName) return;
+
+    try {
+      const count = await getTableCount(roomName, branchName);
+      setRoomCounts(prev => {
+        const next = { ...prev, [roomName]: count };
+        persistRoomCounts(next);
+        return next;
+      });
+    } catch (error) {
+      console.error(`Failed to refresh count for room ${roomName}`, error);
+    }
+  }, [rooms, branch, persistRoomCounts]);
 
   useEffect(() => {
     if (!selectedRoom) return;
@@ -127,6 +194,7 @@ const TableView = () => {
       await printOrder({ orderId: invoiceId, posProfile });
       showToast.success('Printed successfully');
       await loadTables(table.restaurant_room, { useCache: false });
+      await refreshRoomCount(table.restaurant_room);
     } catch (error) {
       showToast.error(error instanceof Error ? error.message : 'Failed to print order');
     } finally {
@@ -211,11 +279,15 @@ const TableView = () => {
                   className="h-fit"
                 >
                   {room.name}
-                  {tablesCache[room.name] && (
+                  {typeof roomCounts[room.name] === 'number' ? (
                     <Badge variant="outline" className="ml-2 bg-white/60">
-                      {tablesCache[room.name].length}
+                      {roomCounts[room.name]}
                     </Badge>
-                  )}
+                  ) : loadingRoomCounts ? (
+                    <Badge variant="outline" className="ml-2 bg-white/60">
+                      --
+                    </Badge>
+                  ) : null}
                 </Button>
               ))}
             </div>
@@ -344,6 +416,22 @@ const TableView = () => {
               })}
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Status Legend */}
+      <div className="fixed bottom-[4.5rem] w-full p-4 bg-white border-t border-gray-200">
+        <div className="max-w-screen-xl mx-auto">
+          <div className="flex items-center justify-center gap-6 text-sm">
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 bg-green-100 border border-green-300 rounded"></div>
+              <span>Available</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 bg-red-100 border border-red-300 rounded"></div>
+              <span>Occupied</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
