@@ -13,6 +13,7 @@ export interface Table {
   is_take_away: number;
   restaurant_room: string;
   table_shape:'Circle' | 'Square' | 'Rectangle';
+  no_of_seats?: number;
 }
 
 export async function getRestaurantMenu(posProfile: string, room?: string | null) {
