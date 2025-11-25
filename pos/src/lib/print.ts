@@ -28,7 +28,7 @@ export async function printOrder({ orderId, posProfile }: PrintOrderParams): Pro
     if (cashier && !multiple_cashier) {
       await networkPrint(orderId, printer as string, print_format as string);
     } else {
-      await selectNetworkPrinter(orderId, name);
+      await selectNetworkPrinter(orderId, name, print_format);
     }
     await updatePrintStatus(orderId);
     return 'network';
