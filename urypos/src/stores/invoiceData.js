@@ -576,21 +576,11 @@ export const useInvoiceDataStore = defineStore("invoiceData", {
             };
           }
         } else {
-          const sendObj = {
-            doctype: "POS Invoice",
-            name: invoiceNo,
-            print_format: this.print_format,
-          };
-          this.call
-            .post("ury.ury.api.ury_print.print_pos_page", sendObj)
-            .then((result) => {
-              this.notification.createNotification("Print Successful");
-              this.isPrinting = false
-              window.location.reload();
-
-              return result.message;
-            })
-            .catch((error) => console.error(error));
+          // Socket printing using printview redirection
+          const url = `/printview?doctype=POS Invoice&name=${invoiceNo}&format=${this.print_format}&no_letterhead=1&settings={}&letterhead=No Letterhead&trigger_print=1&_lang=en`;
+          window.open(url, "_blank", "noopener,noreferrer");
+          this.notification.createNotification("Print triggered");
+          this.isPrinting = false;
         }
       } catch (e) {
         if (e?.custom) {

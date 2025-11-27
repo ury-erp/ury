@@ -133,6 +133,9 @@ export async function getInvoicePrintHtml(invoiceId: string, printFormat: string
         name: invoiceId,
         print_format: printFormat,
         _lang: 'en',
+        no_letterhead: 1,
+        letterhead:"No Letterhead",
+        settings:{}
       }
     );
     return response.message.html;
@@ -159,13 +162,6 @@ export async function selectNetworkPrinter(orderId: string, posProfile: string, 
   });
 }
 
-export async function printPosPage(orderId: string, printFormat: string) {
-  await call.post('ury.ury.api.ury_print.print_pos_page', {
-    doctype: 'POS Invoice',
-    name: orderId,
-    print_format: printFormat,
-  });
-}
 
 export async function updatePrintStatus(orderId: string) {
   await call.post('ury.ury.api.ury_print.qz_print_update', { invoice: orderId });
