@@ -3,7 +3,6 @@ import {
   getInvoicePrintHtml,
   networkPrint,
   selectNetworkPrinter,
-  printPosPage,
   updatePrintStatus
 } from './invoice-api';
 import { PosProfileCombined } from './pos-profile-api';
@@ -33,7 +32,9 @@ export async function printOrder({ orderId, posProfile }: PrintOrderParams): Pro
     await updatePrintStatus(orderId);
     return 'network';
   } else {
-    await printPosPage(orderId, print_format as string);
+    // Redirect to printview page
+    const url=`/printview?doctype=POS Invoice&name=${orderId}&format=${print_format}&no_letterhead=1&settings={}&letterhead=No Letterhead&trigger_print=1&_lang=en`;
+    window.open(url, '_blank', 'noopener,noreferrer');
     return 'socket';
   }
-} 
+}
