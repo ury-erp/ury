@@ -72,6 +72,7 @@ export default function Orders() {
   };
 
   const handleOrderClick = (order: any) => {
+    console.log('Order clicked:', order);
     selectOrder(order);
   };
 
@@ -90,6 +91,14 @@ export default function Orders() {
       default:
         return 'default';
     }
+  };
+
+  // Helper function to get order total with fallback
+  const getOrderTotal = (order: any) => {
+    // Try rounded_total first, then grand_total, then fallback to 0
+    const total = order.rounded_total || order.grand_total || 0;
+    console.log(`Order ${order.name}: rounded_total=${order.rounded_total}, grand_total=${order.grand_total}, using=${total}`);
+    return total;
   };
 
   async function handleCancelOrder() {
@@ -258,7 +267,7 @@ export default function Orders() {
                       {/* Total - pushed to bottom like MenuCard */}
                       <div className="mt-auto pt-2">
                         <span className="text-sm font-semibold text-gray-900 tabular-nums">
-                          {formatCurrency(order.rounded_total)}
+                          {formatCurrency(getOrderTotal(order))}
                         </span>
                       </div>
                     </div>
@@ -480,7 +489,7 @@ export default function Orders() {
                 )}
                 {/* Total */}
                 <span className="ml-auto text-xl font-bold text-gray-900 whitespace-nowrap">
-                  {formatCurrency(selectedOrder.rounded_total)}
+                  {formatCurrency(getOrderTotal(selectedOrder))}
                 </span>
               </div>
             </div>
@@ -491,7 +500,7 @@ export default function Orders() {
         <PaymentDialog
           onClose={() => setShowPaymentDialog(false)}
           grandTotal={selectedOrder.grand_total}
-          roundedTotal={selectedOrder.rounded_total}
+          roundedTotal={selectedOrder.rounded_total || selectedOrder.grand_total}
           invoice={selectedOrder.name}
           customer={selectedOrder.customer}
           posProfile={posStore.posProfile?.name || ''}
