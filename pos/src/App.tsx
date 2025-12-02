@@ -3,6 +3,7 @@ import Footer from './components/Footer';
 import Header from './components/Header';
 import Orders from './pages/Orders';
 import POS from './pages/POS';
+import Table from './pages/Table';
 import AuthGuard from './components/AuthGuard';
 import POSOpeningProvider from './components/POSOpeningProvider';
 import ScreenSizeProvider from './components/ScreenSizeProvider';
@@ -31,6 +32,7 @@ function App() {
                   <Routes>
                     <Route path="/" element={<POS/>} />
                     <Route path="/orders" element={<Orders />} />
+                    <Route path="/table" element={<Table />} />
                   </Routes>
                 </div>
                 <Footer />

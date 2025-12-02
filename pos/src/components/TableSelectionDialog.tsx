@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { X, Circle, Square, RectangleHorizontal, AlertTriangle } from 'lucide-react';
+import { X, Square, AlertTriangle } from 'lucide-react';
 import { usePOSStore } from '../store/pos-store';
 import { Dialog, DialogContent } from './ui/dialog';
 import { Button } from './ui/button';
@@ -7,23 +7,11 @@ import { cn } from '../lib/utils';
 import { getRooms, getTables, Room, Table } from '../lib/table-api';
 import { Badge } from './ui/badge';
 import { Spinner } from './ui/spinner';
+import { TableShapeIcon } from './TableShapeIcon';
 
 interface Props {
   onClose: () => void;
 }
-
-const TableIcon = ({ type, className }: { type: 'Circle' | 'Square' | 'Rectangle' | undefined; className?: string }) => {
-  switch (type) {
-    case 'Circle':
-      return <Circle className={className} />;
-    case 'Square':
-      return <Square className={className} />;
-    case 'Rectangle':
-      return <RectangleHorizontal className={className} />;
-    default:
-      return <Square className={className} />;
-  }
-};
 
 const TableSelectionDialog: React.FC<Props> = ({ onClose }) => {
   const { selectedTable, setSelectedTable, posProfile } = usePOSStore();
@@ -186,12 +174,13 @@ const TableSelectionDialog: React.FC<Props> = ({ onClose }) => {
                     'focus-visible:ring-2 focus-visible:ring-primary-600',
                   )}
                 >
-                  <TableIcon
-                  type={table.table_shape || "Rectangle"}
-                  className={cn(
-                    'w-8 h-8',
-                    table.occupied === 1 ? 'text-amber-500' : 'text-gray-500'
-                  )} />
+                  <TableShapeIcon
+                    shape={table.table_shape}
+                    className={cn(
+                      'w-8 h-8',
+                      table.occupied === 1 ? 'text-amber-500' : 'text-gray-500'
+                    )}
+                  />
                   <div className="text-center">
                     <div className="font-medium">{table.name}</div>
                     <div className="mt-2 h-4"> {/* Height placeholder that matches Badge height */}

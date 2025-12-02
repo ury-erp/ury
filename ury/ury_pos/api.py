@@ -9,7 +9,7 @@ def getTable(room):
     branch_name = getBranch()   
     tables = frappe.get_all(
         "URY Table",
-        fields=["name", "occupied", "latest_invoice_time", "is_take_away", "restaurant_room","table_shape"],
+        fields=["name", "occupied", "latest_invoice_time", "is_take_away", "restaurant_room","table_shape","no_of_seats"],
         filters={"branch": branch_name,"restaurant_room":room,}
     )    
     return tables
