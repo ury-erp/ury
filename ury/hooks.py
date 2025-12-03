@@ -144,7 +144,10 @@ doc_events = {
         },
     "URY Menu Course": {
 		"validate": "ury.ury.api.ury_menu_course_validation.validate_priority",
-	}    
+	},
+    "URY KOT":{
+        "after_insert":"ury.ury.api.ury_print.print_kot_on_create"
+    }
 }
 
 # Scheduled Tasks
