@@ -13,6 +13,167 @@ standard_format = "templates/print_formats/standard.html"
 from frappe.www.printview import validate_print_permission
 
 
+def _print_as_text(conn, printer_name, doc_obj, doctype, name):
+    """Print document as plain text"""
+    try:
+        # ========== KOT-SPECIFIC TEMPLATE ==========
+        if doctype == "URY KOT":
+            text_content = f"""
+{'=' * 50}
+{'KITCHEN ORDER TICKET'.center(50)}
+{'=' * 50}
+KOT #: {doc_obj.name}
+Time: {doc_obj.creation}
+Table: {doc_obj.get('restaurant_table', 'N/A')}
+Order Type: {doc_obj.get('order_type', 'Dine In')}
+Customer: {doc_obj.get('customer_name', 'N/A')}
+{'-' * 50}
+{'ITEMS'.center(50)}
+{'-' * 50}
+"""
+            
+            # KOT items with special instructions
+            if hasattr(doc_obj, 'items'):
+                for item in doc_obj.items:
+                    # Handle both dict and object items
+                    if isinstance(item, dict):
+                        item_name = item.get('item_name', '')
+                        qty = item.get('qty', 0)
+                        notes = item.get('notes')
+                        item_variant = item.get('item_variant')
+                    else:
+                        item_name = getattr(item, 'item_name', '')
+                        qty = getattr(item, 'qty', 0)
+                        notes = getattr(item, 'notes', None)
+                        item_variant = getattr(item, 'item_variant', None)
+                    
+                    # Truncate long item names
+                    display_name = (item_name[:27] + '...') if len(item_name) > 30 else item_name
+                    text_content += f"\n{qty:<5.1f} x {display_name:<30}\n"
+                    
+                    # Add item notes if any
+                    if notes:
+                        text_content += f"  NOTE: {notes[:40]}\n"
+                    
+                    # Add variants if any
+                    if item_variant:
+                        text_content += f"  Variant: {item_variant}\n"
+            
+            text_content += f"""
+{'-' * 50}
+Special Instructions: {doc_obj.get('special_instructions', 'None')}
+{'-' * 50}
+Urgent: {'YES' if doc_obj.get('is_urgent') else 'NO'}
+Course: {doc_obj.get('course', 'Main')}
+{'-' * 50}
+"""
+
+        # ========== INVOICE TEMPLATE ==========
+        else:
+            text_content = f"""
+{'=' * 50}
+{'INVOICE'.center(50)}
+{'=' * 50}
+Invoice: {doc_obj.name}
+Date: {doc_obj.posting_date} {doc_obj.posting_time}
+Customer: {doc_obj.customer_name if hasattr(doc_obj, 'customer_name') else doc_obj.customer}
+Table: {doc_obj.get('restaurant_table', 'Take Away') or 'Take Away'}
+Order Type: {doc_obj.get('order_type', 'N/A')}
+Waiter: {doc_obj.get('waiter', 'N/A')}
+{'-' * 50}
+{'ITEMS'.center(50)}
+{'-' * 50}
+"""
+            # Add items for invoice
+            if hasattr(doc_obj, 'items'):
+                # Header
+                text_content += f"{'Qty':<5} {'Item':<30} {'Rate':>10} {'Amount':>12}\n"
+                text_content += f"{'-' * 57}\n"
+                
+                # Items
+                for item in doc_obj.items:
+                    # Handle both dict and object items
+                    if isinstance(item, dict):
+                        item_name = item.get('item_name', '')
+                        qty = item.get('qty', 0)
+                        rate = item.get('rate', 0)
+                        amount = item.get('amount', 0)
+                    else:
+                        item_name = getattr(item, 'item_name', '')
+                        qty = getattr(item, 'qty', 0)
+                        rate = getattr(item, 'rate', 0)
+                        amount = getattr(item, 'amount', 0)
+                    
+                    # Truncate long item names
+                    display_name = (item_name[:27] + '...') if len(item_name) > 30 else item_name
+                    text_content += f"{qty:<5.1f} {display_name:<30} {float(rate):>10.2f} {float(amount):>12.2f}\n"
+            
+            # Add totals section
+            text_content += f"""
+{'-' * 50}
+{'TOTALS'.center(50)}
+{'-' * 50}
+"""
+            
+            # Check for different total fields
+            if hasattr(doc_obj, 'net_total'):
+                net_total = doc_obj.net_total if not isinstance(doc_obj.net_total, str) else float(doc_obj.net_total)
+                text_content += f"Net Total: {float(net_total):>40.2f}\n"
+            
+            if hasattr(doc_obj, 'total_taxes_and_charges'):
+                tax = doc_obj.total_taxes_and_charges if not isinstance(doc_obj.total_taxes_and_charges, str) else float(doc_obj.total_taxes_and_charges)
+                text_content += f"Tax: {float(tax):>44.2f}\n"
+            
+            if hasattr(doc_obj, 'grand_total'):
+                grand_total = doc_obj.grand_total if not isinstance(doc_obj.grand_total, str) else float(doc_obj.grand_total)
+                text_content += f"{'=' * 50}\n"
+                text_content += f"GRAND TOTAL: {float(grand_total):>37.2f}\n"
+                text_content += f"{'=' * 50}\n"
+            
+            # Footer
+            text_content += f"""
+Thank you for your business!
+"""
+        
+        # Create temp file and print
+        import tempfile
+        import os
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+            f.write(text_content)
+            file_path = f.name
+        
+        # Print the text file
+        conn.printFile(printer_name, file_path, name, {})
+        
+        # Clean up
+        os.unlink(file_path)
+        
+        return "Success"
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return f"Failed to print: {str(e)}"
+
+
+def _update_kot_status(kot_name):
+    """Update KOT printed status"""
+    try:
+        # Try to update printed field if it exists
+        frappe.db.sql("""
+            UPDATE `tabURY KOT` 
+            SET printed = 1 
+            WHERE name = %s
+        """, kot_name)
+    except:
+        # Field doesn't exist, try alternative field names
+        try:
+            frappe.db.set_value("URY KOT", kot_name, "kot_printed", 1)
+        except:
+            # No printed field exists, just skip
+            pass
+
+
 @frappe.whitelist()
 def network_printing(
     doctype,
@@ -22,15 +183,20 @@ def network_printing(
     doc=None,
     no_letterhead=0,
     file_path=None,
+    is_kot=False
 ):
+    """Print document with optional print format"""
     try:
+        # Get printer settings
         print_settings = frappe.get_doc("Network Printer Settings", printer_setting)
 
+        # Import cups
         try:
             import cups
         except ImportError:
             return "Failed to import cups"
 
+        # Connect to CUPS
         try:
             cups.setServer(print_settings.server_ip)
             cups.setPort(print_settings.port)
@@ -38,46 +204,57 @@ def network_printing(
         except Exception as e:
             return f"Failed to connect to the printer: {str(e)}"
 
-        try:
-            output = PdfWriter()
-            output = frappe.get_print(
-                doctype,
-                name,
-                print_format,
-                doc=doc,
-                no_letterhead=no_letterhead,
-                as_pdf=True,
-                output=output,
-            )
-            if not file_path:
-                file_path = os.path.join(
-                    "/", "tmp", f"frappe-pdf-{frappe.generate_hash()}.pdf"
+        # Get the document
+        doc_obj = frappe.get_doc(doctype, name) if not doc else doc
+        
+        # If print_format is specified, use Frappe's print format system
+        if print_format:
+            try:
+                print(f"Using print format: {print_format}")
+                
+                # Get HTML content from print format
+                html = frappe.get_print(
+                    doctype=doctype,
+                    name=name,
+                    print_format=print_format,
+                    doc=doc_obj,
+                    no_letterhead=no_letterhead
                 )
-            with open(file_path, "wb") as f:
-                output.write(f)
-            conn.printFile(print_settings.printer_name, file_path, name, {})
-
-            restaurant_table, invoice_printed, name = frappe.db.get_value(
-                "POS Invoice", name, ["restaurant_table", "invoice_printed", "name"]
-            )
-
-            if restaurant_table and invoice_printed == 0:
-                frappe.db.set_value("POS Invoice", name, "invoice_printed", 1)
-                frappe.db.set_value(
-                    "URY Table",
-                    restaurant_table,
-                    {"occupied": 0, "latest_invoice_time": None},
-                )
-            else:
-                frappe.db.set_value("POS Invoice", name, "invoice_printed", 1)
-
-            return "Success"
-        except Exception as e:
-            return f"Failed to print: {str(e)}"
+                
+                # Convert HTML to PDF
+                from frappe.utils.pdf import get_pdf
+                pdf_content = get_pdf(html)
+                
+                # Create temp PDF file
+                import tempfile
+                with tempfile.NamedTemporaryFile(mode='wb', delete=False, suffix='.pdf') as f:
+                    f.write(pdf_content)
+                    pdf_file_path = f.name
+                
+                # Print the PDF file
+                conn.printFile(print_settings.printer_name, pdf_file_path, f"{name} - {print_format}", {})
+                
+                # Clean up
+                import os
+                os.unlink(pdf_file_path)
+                
+                # Update status for KOT
+                if doctype == "URY KOT":
+                    _update_kot_status(name)
+                
+                return "Success"
+                
+            except Exception as e:
+                print(f"Error with print format {print_format}: {e}")
+                # Fall back to text printing
+                return _print_as_text(conn, print_settings.printer_name, doc_obj, doctype, name)
+        
+        # No print format specified, use text printing
+        return _print_as_text(conn, print_settings.printer_name, doc_obj, doctype, name)
+            
     except Exception as e:
         import traceback
-
-        traceback.print_exc()  # Print the full traceback for debugging
+        traceback.print_exc()
         return f"An error occurred: {str(e)}"
 
 
@@ -154,25 +331,79 @@ def qz_print_update(invoice):
 
 @frappe.whitelist()
 def print_pos_page(doctype, name, print_format):
-    data = {"name": name, "doctype": doctype, "print_format": print_format}
+    """ACTUALLY PRINT instead of just sending realtime events"""
+    print("=" * 60)
+    print("DEBUG: print_pos_page called")
+    print(f"  doctype: {doctype}")
+    print(f"  name: {name}")
+    print(f"  print_format: {print_format}")
+    print("=" * 60)
+    
+    try:
+        # Get default printer setting
+        printer_settings = frappe.get_all('Network Printer Settings', limit=1)
+        
+        print(f"  Found {len(printer_settings)} printer settings")
+        
+        if not printer_settings:
+            print("  ERROR: No printer configured")
+            return {"status": "error", "message": "No printer configured"}
+        
+        printer_setting = printer_settings[0]['name']
+        print(f"  Using printer setting: {printer_setting}")
+        
+        # Call network_printing to actually print
+        print("  Calling network_printing...")
+        result = network_printing(
+            doctype=doctype,
+            name=name,
+            printer_setting=printer_setting,
+            print_format=print_format
+        )
+        
+        print(f"  network_printing result: {result}")
+        
+        # Also send realtime event for UI updates
+        restaurant_table, branch, invoice_name = frappe.db.get_value(
+            "POS Invoice", name, ["restaurant_table", "branch", "name"]
+        )
+        
+        print(f"  Branch: {branch}, Table: {restaurant_table}")
+        
+        if branch:
+            print_channel = "{}_{}".format("print", branch)
+            frappe.publish_realtime(print_channel, {"data": {"name": name, "doctype": doctype, "print_format": print_format}})
+            print(f"  Sent realtime event to channel: {print_channel}")
+        
+        # Update status if not already done by network_printing
+        invoice_printed = frappe.db.get_value("POS Invoice", name, "invoice_printed")
+        print(f"  Current invoice_printed status: {invoice_printed}")
+        
+        if invoice_printed == 0:
+            frappe.db.set_value("POS Invoice", name, "invoice_printed", 1)
+            print(f"  Updated invoice_printed to 1")
 
-    restaurant_table, branch, name = frappe.db.get_value(
-        "POS Invoice", name, ["restaurant_table", "branch", "name"]
-    )
-    print_channel = "{}_{}".format("print", branch)
-    frappe.publish_realtime(print_channel, {"data": data})
-
-    invoice_printed = frappe.db.get_value("POS Invoice", name, "invoice_printed")
-
-    if invoice_printed == 0:
-        frappe.db.set_value("POS Invoice", name, "invoice_printed", 1)
-
-        if restaurant_table:
-            frappe.db.set_value(
-                "URY Table",
-                restaurant_table,
-                {"occupied": 0, "latest_invoice_time": None},
-            )
+            if restaurant_table:
+                frappe.db.set_value(
+                    "URY Table",
+                    restaurant_table,
+                    {"occupied": 0, "latest_invoice_time": None},
+                )
+                print(f"  Updated table {restaurant_table} status")
+        
+        if result == "Success":
+            print("  ✓ Returning success")
+            return {"status": "success", "message": "Printed successfully"}
+        else:
+            print(f"  ✗ Returning error: {result}")
+            return {"status": "error", "message": result}
+            
+    except Exception as e:
+        print(f"  EXCEPTION: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
+        frappe.log_error(f"print_pos_page error: {str(e)}", "Print Error")
+        return {"status": "error", "message": str(e)}
 
 
 @frappe.whitelist()
@@ -189,3 +420,106 @@ def signature_promise():
     key_value = site_config.get("qz_private_key")
 
     return key_value
+
+
+@frappe.whitelist()
+def print_kot_on_create(doc, method=None):
+    """Auto-print KOT when URY KOT doctype is created"""
+    try:
+        # Debug: Print that we're starting
+        print(f"\n=== KOT PRINT HOOK FIRED ===")
+        
+        # If called from hook (doc is a document object)
+        if isinstance(doc, str):
+            # Called via API with string name
+            kot_name = doc
+            kot = frappe.get_doc("URY KOT", kot_name)
+        else:
+            # Called from hook with document object
+            kot = doc
+            kot_name = doc.name
+        
+        print(f"KOT: {kot_name}")
+        print(f"POS Profile: {kot.pos_profile}")
+        
+        # 1. Get the associated POS Profile
+        pos_profile = kot.pos_profile
+        
+        if not pos_profile:
+            print("ERROR: No POS Profile")
+            frappe.log_error(f"No POS Profile found for KOT {kot_name}", "KOT Print Error")
+            return {"status": "error", "message": "No POS Profile configured"}
+        
+        # 2. Get printer settings from the POS Profile
+        printer_settings = frappe.get_all(
+            "URY Printer Settings",
+            filters={"parent": pos_profile, "parentfield": "printer_settings", "custom_kot_print": 1},
+            fields=["name", "printer", "custom_kot_print_format"]
+        )
+        
+        print(f"Found {len(printer_settings)} printer settings with custom_kot_print=1")
+        
+        if not printer_settings:
+            print("ERROR: No KOT printers configured")
+            frappe.log_error(f"No printer with custom_kot_print enabled for POS Profile {pos_profile}", "KOT Print Error")
+            return {"status": "error", "message": "No KOT printer configured"}
+        
+        # 3. Loop through all printers with custom_kot_print enabled
+        results = []
+        for setting in printer_settings:
+            printer = setting.get("printer")
+            print_format = setting.get("custom_kot_print_format")
+            
+            print(f"Printing to: {printer}, format: {print_format}")
+            
+            if not printer:
+                print("Skipping - no printer linked")
+                continue
+            
+            # 4. Print to this printer using existing network_printing function
+            result = network_printing(
+                doctype="URY KOT",
+                name=kot_name,
+                printer_setting=printer,
+                print_format=print_format or None,
+                doc=kot
+            )
+            
+            print(f"Print result: {result}")
+            
+            results.append({
+                "printer": printer,
+                "status": "success" if result == "Success" else "failed",
+                "message": result
+            })
+        
+        # 5. Update KOT status if at least one print was successful
+        successful_prints = [r for r in results if r["status"] == "success"]
+        if successful_prints:
+            _update_kot_status(kot_name)
+            print(f"Updated KOT status to printed")
+        
+        return {
+            "status": "success",
+            "message": f"KOT printed to {len(successful_prints)} printer(s)",
+            "results": results
+        }
+        
+    except Exception as e:
+        error_msg = f"KOT print error: {str(e)}"
+        print(f"EXCEPTION: {error_msg}")
+        import traceback
+        traceback.print_exc()
+        frappe.log_error(error_msg, "KOT Print Error")
+        return {"status": "error", "message": str(e)}
+
+
+@frappe.whitelist()
+def get_kot_printers(pos_profile):
+    """Get all KOT printers for a POS Profile"""
+    printers = frappe.get_all(
+        "URY Printer Settings",
+        filters={"parent": pos_profile, "custom_kot_print": 1},
+        fields=["name", "printer", "custom_kot_print_format"]
+    )
+    return printers
