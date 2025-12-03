@@ -13,6 +13,167 @@ standard_format = "templates/print_formats/standard.html"
 from frappe.www.printview import validate_print_permission
 
 
+def _print_as_text(conn, printer_name, doc_obj, doctype, name):
+    """Print document as plain text"""
+    try:
+        # ========== KOT-SPECIFIC TEMPLATE ==========
+        if doctype == "URY KOT":
+            text_content = f"""
+{'=' * 50}
+{'KITCHEN ORDER TICKET'.center(50)}
+{'=' * 50}
+KOT #: {doc_obj.name}
+Time: {doc_obj.creation}
+Table: {doc_obj.get('restaurant_table', 'N/A')}
+Order Type: {doc_obj.get('order_type', 'Dine In')}
+Customer: {doc_obj.get('customer_name', 'N/A')}
+{'-' * 50}
+{'ITEMS'.center(50)}
+{'-' * 50}
+"""
+            
+            # KOT items with special instructions
+            if hasattr(doc_obj, 'items'):
+                for item in doc_obj.items:
+                    # Handle both dict and object items
+                    if isinstance(item, dict):
+                        item_name = item.get('item_name', '')
+                        qty = item.get('qty', 0)
+                        notes = item.get('notes')
+                        item_variant = item.get('item_variant')
+                    else:
+                        item_name = getattr(item, 'item_name', '')
+                        qty = getattr(item, 'qty', 0)
+                        notes = getattr(item, 'notes', None)
+                        item_variant = getattr(item, 'item_variant', None)
+                    
+                    # Truncate long item names
+                    display_name = (item_name[:27] + '...') if len(item_name) > 30 else item_name
+                    text_content += f"\n{qty:<5.1f} x {display_name:<30}\n"
+                    
+                    # Add item notes if any
+                    if notes:
+                        text_content += f"  NOTE: {notes[:40]}\n"
+                    
+                    # Add variants if any
+                    if item_variant:
+                        text_content += f"  Variant: {item_variant}\n"
+            
+            text_content += f"""
+{'-' * 50}
+Special Instructions: {doc_obj.get('special_instructions', 'None')}
+{'-' * 50}
+Urgent: {'YES' if doc_obj.get('is_urgent') else 'NO'}
+Course: {doc_obj.get('course', 'Main')}
+{'-' * 50}
+"""
+
+        # ========== INVOICE TEMPLATE ==========
+        else:
+            text_content = f"""
+{'=' * 50}
+{'INVOICE'.center(50)}
+{'=' * 50}
+Invoice: {doc_obj.name}
+Date: {doc_obj.posting_date} {doc_obj.posting_time}
+Customer: {doc_obj.customer_name if hasattr(doc_obj, 'customer_name') else doc_obj.customer}
+Table: {doc_obj.get('restaurant_table', 'Take Away') or 'Take Away'}
+Order Type: {doc_obj.get('order_type', 'N/A')}
+Waiter: {doc_obj.get('waiter', 'N/A')}
+{'-' * 50}
+{'ITEMS'.center(50)}
+{'-' * 50}
+"""
+            # Add items for invoice
+            if hasattr(doc_obj, 'items'):
+                # Header
+                text_content += f"{'Qty':<5} {'Item':<30} {'Rate':>10} {'Amount':>12}\n"
+                text_content += f"{'-' * 57}\n"
+                
+                # Items
+                for item in doc_obj.items:
+                    # Handle both dict and object items
+                    if isinstance(item, dict):
+                        item_name = item.get('item_name', '')
+                        qty = item.get('qty', 0)
+                        rate = item.get('rate', 0)
+                        amount = item.get('amount', 0)
+                    else:
+                        item_name = getattr(item, 'item_name', '')
+                        qty = getattr(item, 'qty', 0)
+                        rate = getattr(item, 'rate', 0)
+                        amount = getattr(item, 'amount', 0)
+                    
+                    # Truncate long item names
+                    display_name = (item_name[:27] + '...') if len(item_name) > 30 else item_name
+                    text_content += f"{qty:<5.1f} {display_name:<30} {float(rate):>10.2f} {float(amount):>12.2f}\n"
+            
+            # Add totals section
+            text_content += f"""
+{'-' * 50}
+{'TOTALS'.center(50)}
+{'-' * 50}
+"""
+            
+            # Check for different total fields
+            if hasattr(doc_obj, 'net_total'):
+                net_total = doc_obj.net_total if not isinstance(doc_obj.net_total, str) else float(doc_obj.net_total)
+                text_content += f"Net Total: {float(net_total):>40.2f}\n"
+            
+            if hasattr(doc_obj, 'total_taxes_and_charges'):
+                tax = doc_obj.total_taxes_and_charges if not isinstance(doc_obj.total_taxes_and_charges, str) else float(doc_obj.total_taxes_and_charges)
+                text_content += f"Tax: {float(tax):>44.2f}\n"
+            
+            if hasattr(doc_obj, 'grand_total'):
+                grand_total = doc_obj.grand_total if not isinstance(doc_obj.grand_total, str) else float(doc_obj.grand_total)
+                text_content += f"{'=' * 50}\n"
+                text_content += f"GRAND TOTAL: {float(grand_total):>37.2f}\n"
+                text_content += f"{'=' * 50}\n"
+            
+            # Footer
+            text_content += f"""
+Thank you for your business!
+"""
+        
+        # Create temp file and print
+        import tempfile
+        import os
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+            f.write(text_content)
+            file_path = f.name
+        
+        # Print the text file
+        conn.printFile(printer_name, file_path, name, {})
+        
+        # Clean up
+        os.unlink(file_path)
+        
+        return "Success"
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return f"Failed to print: {str(e)}"
+
+
+def _update_kot_status(kot_name):
+    """Update KOT printed status"""
+    try:
+        # Try to update printed field if it exists
+        frappe.db.sql("""
+            UPDATE `tabURY KOT` 
+            SET printed = 1 
+            WHERE name = %s
+        """, kot_name)
+    except:
+        # Field doesn't exist, try alternative field names
+        try:
+            frappe.db.set_value("URY KOT", kot_name, "kot_printed", 1)
+        except:
+            # No printed field exists, just skip
+            pass
+
+
 @frappe.whitelist()
 def network_printing(
     doctype,
@@ -24,7 +185,7 @@ def network_printing(
     file_path=None,
     is_kot=False
 ):
-    """Print directly as text - faster and more reliable than PDF"""
+    """Print document with optional print format"""
     try:
         # Get printer settings
         print_settings = frappe.get_doc("Network Printer Settings", printer_setting)
@@ -43,168 +204,53 @@ def network_printing(
         except Exception as e:
             return f"Failed to connect to the printer: {str(e)}"
 
-        # TEXT PRINTING LOGIC
-        try:
-            # Get the document
-            doc_obj = frappe.get_doc(doctype, name) if not doc else doc
-            
-            # ========== KOT-SPECIFIC TEMPLATE ==========
-            if doctype == "URY KOT":
-                text_content = f"""
-{'=' * 50}
-{'KITCHEN ORDER TICKET'.center(50)}
-{'=' * 50}
-KOT #: {doc_obj.name}
-Time: {doc_obj.creation}
-Table: {doc_obj.get('restaurant_table', 'N/A')}
-Order Type: {doc_obj.get('order_type', 'Dine In')}
-Customer: {doc_obj.get('customer_name', 'N/A')}
-{'-' * 50}
-{'ITEMS'.center(50)}
-{'-' * 50}
-"""
+        # Get the document
+        doc_obj = frappe.get_doc(doctype, name) if not doc else doc
+        
+        # If print_format is specified, use Frappe's print format system
+        if print_format:
+            try:
+                print(f"Using print format: {print_format}")
                 
-                # KOT items with special instructions
-                if hasattr(doc_obj, 'items'):
-                    for item in doc_obj.items:
-                        # FIX: Handle both dict and object items
-                        if isinstance(item, dict):
-                            item_name = item.get('item_name', '')
-                            qty = item.get('qty', 0)
-                            notes = item.get('notes')
-                            item_variant = item.get('item_variant')
-                        else:
-                            item_name = getattr(item, 'item_name', '')
-                            qty = getattr(item, 'qty', 0)
-                            notes = getattr(item, 'notes', None)
-                            item_variant = getattr(item, 'item_variant', None)
-                        
-                        # Truncate long item names
-                        display_name = (item_name[:27] + '...') if len(item_name) > 30 else item_name
-                        text_content += f"\n{qty:<5.1f} x {display_name:<30}\n"
-                        
-                        # Add item notes if any
-                        if notes:
-                            text_content += f"  NOTE: {notes[:40]}\n"
-                        
-                        # Add variants if any
-                        if item_variant:
-                            text_content += f"  Variant: {item_variant}\n"
+                # Get HTML content from print format
+                html = frappe.get_print(
+                    doctype=doctype,
+                    name=name,
+                    print_format=print_format,
+                    doc=doc_obj,
+                    no_letterhead=no_letterhead
+                )
                 
-                text_content += f"""
-{'-' * 50}
-Special Instructions: {doc_obj.get('special_instructions', 'None')}
-{'-' * 50}
-Urgent: {'YES' if doc_obj.get('is_urgent') else 'NO'}
-Course: {doc_obj.get('course', 'Main')}
-{'-' * 50}
-"""
-
-            # ========== INVOICE TEMPLATE (existing code) ==========
-            else:
-                text_content = f"""
-{'=' * 50}
-{'INVOICE'.center(50)}
-{'=' * 50}
-Invoice: {doc_obj.name}
-Date: {doc_obj.posting_date} {doc_obj.posting_time}
-Customer: {doc_obj.customer_name if hasattr(doc_obj, 'customer_name') else doc_obj.customer}
-Table: {doc_obj.get('restaurant_table', 'Take Away') or 'Take Away'}
-Order Type: {doc_obj.get('order_type', 'N/A')}
-Waiter: {doc_obj.get('waiter', 'N/A')}
-{'-' * 50}
-{'ITEMS'.center(50)}
-{'-' * 50}
-"""
-                # Add items for invoice (existing code)
-                if hasattr(doc_obj, 'items'):
-                    # Header
-                    text_content += f"{'Qty':<5} {'Item':<30} {'Rate':>10} {'Amount':>12}\n"
-                    text_content += f"{'-' * 57}\n"
-                    
-                    # Items
-                    for item in doc_obj.items:
-                        # Handle both dict and object items
-                        if isinstance(item, dict):
-                            item_name = item.get('item_name', '')
-                            qty = item.get('qty', 0)
-                            rate = item.get('rate', 0)
-                            amount = item.get('amount', 0)
-                        else:
-                            item_name = getattr(item, 'item_name', '')
-                            qty = getattr(item, 'qty', 0)
-                            rate = getattr(item, 'rate', 0)
-                            amount = getattr(item, 'amount', 0)
-                        
-                        # Truncate long item names
-                        display_name = (item_name[:27] + '...') if len(item_name) > 30 else item_name
-                        text_content += f"{qty:<5.1f} {display_name:<30} {float(rate):>10.2f} {float(amount):>12.2f}\n"
+                # Convert HTML to PDF
+                from frappe.utils.pdf import get_pdf
+                pdf_content = get_pdf(html)
                 
-                # Add totals section
-                text_content += f"""
-{'-' * 50}
-{'TOTALS'.center(50)}
-{'-' * 50}
-"""
+                # Create temp PDF file
+                import tempfile
+                with tempfile.NamedTemporaryFile(mode='wb', delete=False, suffix='.pdf') as f:
+                    f.write(pdf_content)
+                    pdf_file_path = f.name
                 
-                # Check for different total fields
-                if hasattr(doc_obj, 'net_total'):
-                    net_total = doc_obj.net_total if not isinstance(doc_obj.net_total, str) else float(doc_obj.net_total)
-                    text_content += f"Net Total: {float(net_total):>40.2f}\n"
+                # Print the PDF file
+                conn.printFile(print_settings.printer_name, pdf_file_path, f"{name} - {print_format}", {})
                 
-                if hasattr(doc_obj, 'total_taxes_and_charges'):
-                    tax = doc_obj.total_taxes_and_charges if not isinstance(doc_obj.total_taxes_and_charges, str) else float(doc_obj.total_taxes_and_charges)
-                    text_content += f"Tax: {float(tax):>44.2f}\n"
+                # Clean up
+                import os
+                os.unlink(pdf_file_path)
                 
-                if hasattr(doc_obj, 'grand_total'):
-                    grand_total = doc_obj.grand_total if not isinstance(doc_obj.grand_total, str) else float(doc_obj.grand_total)
-                    text_content += f"{'=' * 50}\n"
-                    text_content += f"GRAND TOTAL: {float(grand_total):>37.2f}\n"
-                    text_content += f"{'=' * 50}\n"
+                # Update status for KOT
+                if doctype == "URY KOT":
+                    _update_kot_status(name)
                 
-                # Footer
-                text_content += f"""
-Thank you for your business!
-"""
-            
-            # ========== END TEMPLATE ==========
-            
-            # Create temp file and print
-            import tempfile
-            import os
-            with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
-                f.write(text_content)
-                file_path = f.name
-            
-            # Print the text file
-            conn.printFile(print_settings.printer_name, file_path, name, {})
-            
-            # Clean up
-            os.unlink(file_path)
-            
-            # Update status - handle case where field might not exist
-            if doctype == "URY KOT":
-                try:
-                    # Try to update printed field if it exists
-                    frappe.db.sql("""
-                        UPDATE `tabURY KOT` 
-                        SET printed = 1 
-                        WHERE name = %s
-                    """, name)
-                except:
-                    # Field doesn't exist, try alternative field names
-                    try:
-                        frappe.db.set_value("URY KOT", name, "kot_printed", 1)
-                    except:
-                        # No printed field exists, just skip
-                        pass
-            
-            return "Success"
-            
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-            return f"Failed to print: {str(e)}"
+                return "Success"
+                
+            except Exception as e:
+                print(f"Error with print format {print_format}: {e}")
+                # Fall back to text printing
+                return _print_as_text(conn, print_settings.printer_name, doc_obj, doctype, name)
+        
+        # No print format specified, use text printing
+        return _print_as_text(conn, print_settings.printer_name, doc_obj, doctype, name)
             
     except Exception as e:
         import traceback
@@ -405,7 +451,6 @@ def print_kot_on_create(doc, method=None):
             return {"status": "error", "message": "No POS Profile configured"}
         
         # 2. Get printer settings from the POS Profile
-        # IMPORTANT: The field name is "printer_settings" (from your output)
         printer_settings = frappe.get_all(
             "URY Printer Settings",
             filters={"parent": pos_profile, "parentfield": "printer_settings", "custom_kot_print": 1},
@@ -451,21 +496,8 @@ def print_kot_on_create(doc, method=None):
         # 5. Update KOT status if at least one print was successful
         successful_prints = [r for r in results if r["status"] == "success"]
         if successful_prints:
-            try:
-                frappe.db.set_value("URY KOT", kot_name, "kot_printed", 1)
-                frappe.db.commit()
-                print(f"Updated KOT status to printed")
-            except:
-                try:
-                    frappe.db.sql("""
-                        UPDATE `tabURY KOT` 
-                        SET printed = 1 
-                        WHERE name = %s
-                    """, kot_name)
-                    frappe.db.commit()
-                    print(f"Updated KOT printed field")
-                except:
-                    print(f"Could not update KOT printed status - field doesn't exist")
+            _update_kot_status(kot_name)
+            print(f"Updated KOT status to printed")
         
         return {
             "status": "success",
