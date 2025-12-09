@@ -18,3 +18,4 @@ ury/www/URYMosaic.html
 build
 
 *.lock
+ury/public/pos/assets/ury/files/cert.pem
