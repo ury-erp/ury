@@ -1,21 +1,34 @@
 import frappe
 from frappe import _
-
 import os
+import tempfile
+import traceback
 
-from pypdf import PdfWriter
-
-no_cache = 1
-
-base_template_path = "www/printview.html"
-standard_format = "templates/print_formats/standard.html"
+# Safe import for cups
+try:
+    import cups
+except ImportError:
+    cups = None
 
 from frappe.www.printview import validate_print_permission
 
+logger = frappe.logger("pos_printing")
+
+def _get_qz_status(pos_profile):
+    """
+    Helper to check if QZ Print is enabled for the given POS Profile.
+    Returns True if QZ is enabled, False otherwise.
+    """
+    if not pos_profile:
+        return False
+    
+    return frappe.db.get_value("POS Profile", pos_profile, "qz_print") == 1
 
 def _print_as_text(conn, printer_name, doc_obj, doctype, name):
-    """Print document as plain text"""
+    """Print document as plain text template (CUPS Only)"""
     try:
+        text_content = ""
+        
         # ========== KOT-SPECIFIC TEMPLATE ==========
         if doctype == "URY KOT":
             text_content = f"""
@@ -31,11 +44,9 @@ Customer: {doc_obj.get('customer_name', 'N/A')}
 {'ITEMS'.center(50)}
 {'-' * 50}
 """
-            
-            # KOT items with special instructions
+            # KOT items
             if hasattr(doc_obj, 'items'):
                 for item in doc_obj.items:
-                    # Handle both dict and object items
                     if isinstance(item, dict):
                         item_name = item.get('item_name', '')
                         qty = item.get('qty', 0)
@@ -47,15 +58,11 @@ Customer: {doc_obj.get('customer_name', 'N/A')}
                         notes = getattr(item, 'notes', None)
                         item_variant = getattr(item, 'item_variant', None)
                     
-                    # Truncate long item names
                     display_name = (item_name[:27] + '...') if len(item_name) > 30 else item_name
                     text_content += f"\n{qty:<5.1f} x {display_name:<30}\n"
                     
-                    # Add item notes if any
                     if notes:
                         text_content += f"  NOTE: {notes[:40]}\n"
-                    
-                    # Add variants if any
                     if item_variant:
                         text_content += f"  Variant: {item_variant}\n"
             
@@ -84,15 +91,11 @@ Waiter: {doc_obj.get('waiter', 'N/A')}
 {'ITEMS'.center(50)}
 {'-' * 50}
 """
-            # Add items for invoice
             if hasattr(doc_obj, 'items'):
-                # Header
                 text_content += f"{'Qty':<5} {'Item':<30} {'Rate':>10} {'Amount':>12}\n"
                 text_content += f"{'-' * 57}\n"
                 
-                # Items
                 for item in doc_obj.items:
-                    # Handle both dict and object items
                     if isinstance(item, dict):
                         item_name = item.get('item_name', '')
                         qty = item.get('qty', 0)
@@ -104,115 +107,91 @@ Waiter: {doc_obj.get('waiter', 'N/A')}
                         rate = getattr(item, 'rate', 0)
                         amount = getattr(item, 'amount', 0)
                     
-                    # Truncate long item names
                     display_name = (item_name[:27] + '...') if len(item_name) > 30 else item_name
                     text_content += f"{qty:<5.1f} {display_name:<30} {float(rate):>10.2f} {float(amount):>12.2f}\n"
             
-            # Add totals section
             text_content += f"""
 {'-' * 50}
 {'TOTALS'.center(50)}
 {'-' * 50}
 """
-            
-            # Check for different total fields
             if hasattr(doc_obj, 'net_total'):
-                net_total = doc_obj.net_total if not isinstance(doc_obj.net_total, str) else float(doc_obj.net_total)
-                text_content += f"Net Total: {float(net_total):>40.2f}\n"
+                val = doc_obj.net_total
+                net_total = float(val) if val else 0.0
+                text_content += f"Net Total: {net_total:>40.2f}\n"
             
             if hasattr(doc_obj, 'total_taxes_and_charges'):
-                tax = doc_obj.total_taxes_and_charges if not isinstance(doc_obj.total_taxes_and_charges, str) else float(doc_obj.total_taxes_and_charges)
-                text_content += f"Tax: {float(tax):>44.2f}\n"
+                val = doc_obj.total_taxes_and_charges
+                tax = float(val) if val else 0.0
+                text_content += f"Tax: {tax:>44.2f}\n"
             
             if hasattr(doc_obj, 'grand_total'):
-                grand_total = doc_obj.grand_total if not isinstance(doc_obj.grand_total, str) else float(doc_obj.grand_total)
+                val = doc_obj.grand_total
+                grand_total = float(val) if val else 0.0
                 text_content += f"{'=' * 50}\n"
-                text_content += f"GRAND TOTAL: {float(grand_total):>37.2f}\n"
+                text_content += f"GRAND TOTAL: {grand_total:>37.2f}\n"
                 text_content += f"{'=' * 50}\n"
             
-            # Footer
-            text_content += f"""
-Thank you for your business!
-"""
+            text_content += "\nThank you for your business!\n"
         
-        # Create temp file and print
-        import tempfile
-        import os
         with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
             f.write(text_content)
             file_path = f.name
         
-        # Print the text file
-        conn.printFile(printer_name, file_path, name, {})
-        
-        # Clean up
-        os.unlink(file_path)
-        
-        return "Success"
+        try:
+            conn.printFile(printer_name, file_path, name, {})
+            return {"status": "success", "message": "Printed text successfully"}
+        finally:
+            if os.path.exists(file_path):
+                os.unlink(file_path)
         
     except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return f"Failed to print: {str(e)}"
+        logger.error(f"Text Print Error: {traceback.format_exc()}")
+        return {"status": "error", "message": f"Failed to print text: {str(e)}"}
 
 
 def _update_kot_status(kot_name):
-    """Update KOT printed status"""
+    """Update KOT printed status safely"""
     try:
-        # Try to update printed field if it exists
-        frappe.db.sql("""
-            UPDATE `tabURY KOT` 
-            SET printed = 1 
-            WHERE name = %s
-        """, kot_name)
-    except:
-        # Field doesn't exist, try alternative field names
-        try:
-            frappe.db.set_value("URY KOT", kot_name, "kot_printed", 1)
-        except:
-            # No printed field exists, just skip
-            pass
+        if not frappe.db.exists("URY KOT", kot_name):
+            return
+
+        meta = frappe.get_meta("URY KOT")
+        if meta.has_field("kot_printed"):
+            frappe.db.set_value("URY KOT", kot_name, "kot_printed", 1, update_modified=False)
+        elif meta.has_field("printed"):
+            frappe.db.set_value("URY KOT", kot_name, "printed", 1, update_modified=False)
+    except Exception:
+        logger.error(f"Failed to update KOT status for {kot_name}")
 
 
 @frappe.whitelist()
-def network_printing(
-    doctype,
-    name,
-    printer_setting,
-    print_format=None,
-    doc=None,
-    no_letterhead=0,
-    file_path=None,
-    is_kot=False
-):
-    """Print document with optional print format"""
+def network_printing(doctype, name, printer_setting, print_format=None, doc=None, no_letterhead=0, file_path=None, is_kot=False):
+    """
+    Standard Server-Side CUPS Printing.
+    NOTE: This does NOT handle QZ Tray logic. That is handled in the wrappers.
+    """
     try:
-        # Get printer settings
+        if not cups:
+            return {"status": "error", "message": "CUPS module not installed on server"}
+
+        if not frappe.db.exists("Network Printer Settings", printer_setting):
+            return {"status": "error", "message": f"Printer setting '{printer_setting}' not found"}
+
         print_settings = frappe.get_doc("Network Printer Settings", printer_setting)
 
-        # Import cups
-        try:
-            import cups
-        except ImportError:
-            return "Failed to import cups"
-
-        # Connect to CUPS
         try:
             cups.setServer(print_settings.server_ip)
             cups.setPort(print_settings.port)
             conn = cups.Connection()
         except Exception as e:
-            return f"Failed to connect to the printer: {str(e)}"
+            return {"status": "error", "message": f"Connection to printer failed: {str(e)}"}
 
-        # Get the document
         doc_obj = frappe.get_doc(doctype, name) if not doc else doc
         
-        # If print_format is specified, use Frappe's print format system
+        # 1. HTML/PDF Printing
         if print_format:
             try:
-                print(f"Using print format: {print_format}")
-                
-                # Get HTML content from print format
                 html = frappe.get_print(
                     doctype=doctype,
                     name=name,
@@ -220,140 +199,134 @@ def network_printing(
                     doc=doc_obj,
                     no_letterhead=no_letterhead
                 )
-                
-                # Convert HTML to PDF
                 from frappe.utils.pdf import get_pdf
                 pdf_content = get_pdf(html)
                 
-                # Create temp PDF file
-                import tempfile
                 with tempfile.NamedTemporaryFile(mode='wb', delete=False, suffix='.pdf') as f:
                     f.write(pdf_content)
                     pdf_file_path = f.name
                 
-                # Print the PDF file
-                conn.printFile(print_settings.printer_name, pdf_file_path, f"{name} - {print_format}", {})
-                
-                # Clean up
-                import os
-                os.unlink(pdf_file_path)
-                
-                # Update status for KOT
-                if doctype == "URY KOT":
-                    _update_kot_status(name)
-                
-                return "Success"
-                
+                try:
+                    conn.printFile(print_settings.printer_name, pdf_file_path, f"{name} - {print_format}", {})
+                    if os.path.exists(pdf_file_path):
+                        os.unlink(pdf_file_path)
+                    
+                    if doctype == "URY KOT":
+                        _update_kot_status(name)
+                        
+                    return {"status": "success", "message": "Printed PDF successfully"}
+                except Exception as e:
+                    if os.path.exists(pdf_file_path):
+                        os.unlink(pdf_file_path)
+                    raise e 
             except Exception as e:
-                print(f"Error with print format {print_format}: {e}")
-                # Fall back to text printing
-                return _print_as_text(conn, print_settings.printer_name, doc_obj, doctype, name)
+                logger.error(f"PDF Print failed for {print_format}, falling back to text. Error: {e}")
         
-        # No print format specified, use text printing
+        # 2. Fallback Text Printing
         return _print_as_text(conn, print_settings.printer_name, doc_obj, doctype, name)
             
     except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return f"An error occurred: {str(e)}"
+        logger.error(f"Network Printing Error: {traceback.format_exc()}")
+        return {"status": "error", "message": str(e)}
 
 
 @frappe.whitelist()
 def select_network_printer(pos_profile, invoice_id):
+    """
+    Called by JS to decide how to print an invoice.
+    """
+    # 1. CHECK QZ STATUS FIRST
+    if _get_qz_status(pos_profile):
+        # If QZ is enabled, we DO NOT print here. 
+        # We return a specific status so the JS knows to run the QZ logic.
+        return {"status": "qz_enabled", "message": "Client will handle printing"}
+
+    # 2. Proceed with CUPS Logic
     table = frappe.db.get_value("POS Invoice", invoice_id, "restaurant_table")
     print_format = frappe.db.get_value("POS Profile", pos_profile, "print_format")
+    
+    printer_setting_name = None
 
     if table:
         room = frappe.db.get_value("URY Table", table, "restaurant_room")
-        room_bill_printer = frappe.db.get_value(
-            "URY Printer Settings", {"parent": room, "bill": 1}, "printer"
+        printer_setting_name = frappe.db.get_value(
+            "URY Printer Settings", 
+            {"parent": room, "bill": 1}, 
+            "printer"
         )
-        if room_bill_printer:
-            print = network_printing(
-                "POS Invoice", invoice_id, room_bill_printer, print_format
-            )
-            return print
 
-    else:
-        pos_bill_printer = frappe.db.get_value(
-            "URY Printer Settings", {"parent": pos_profile, "bill": 1}, "printer"
+    if not printer_setting_name:
+        printer_setting_name = frappe.db.get_value(
+            "URY Printer Settings", 
+            {"parent": pos_profile, "bill": 1}, 
+            "printer"
         )
-        if pos_bill_printer:
-            print = network_printing(
-                "POS Invoice", invoice_id, pos_bill_printer, print_format
-            )
-            return print
+
+    if printer_setting_name:
+        return network_printing(
+            "POS Invoice", invoice_id, printer_setting_name, print_format
+        )
+    
+    return {"status": "error", "message": "No suitable printer found configuration"}
 
 
 @frappe.whitelist()
 def qz_print_update(invoice):
+    """
+    Called by JS AFTER QZ Tray successfully prints, or to update status.
+    """
     try:
         table = frappe.db.get_value("POS Invoice", invoice, "restaurant_table")
         
-        if table == None or table == "":
-            # Update invoice_printed
-            frappe.db.set_value(
-                "POS Invoice", invoice, "invoice_printed", 1, update_modified=False
-            )
-            
-            # Validate the update
-            new_invoice_printed = frappe.db.get_value("POS Invoice", invoice, "invoice_printed")
-            if new_invoice_printed != 1:
-                return {"status": "Failure"}                
-        else:
-            invoice_printed = frappe.db.get_value("POS Invoice", invoice, "invoice_printed")
+        frappe.db.set_value("POS Invoice", invoice, "invoice_printed", 1, update_modified=False)
+        
+        if frappe.db.get_value("POS Invoice", invoice, "invoice_printed") != 1:
+             return {"status": "Failure"}
 
-            if invoice_printed == 0:
-                # Update invoice_printed
-                frappe.db.set_value(
-                    "POS Invoice", invoice, "invoice_printed", 1, update_modified=False
-                )
-                
-                # Update table status
-                frappe.db.set_value(
-                    "URY Table", table, {"occupied": 0, "latest_invoice_time": None}
-                )
-                
-                # Validate both updates
-                new_invoice_printed = frappe.db.get_value("POS Invoice", invoice, "invoice_printed")
-                new_table_status = frappe.db.get_value("URY Table", table, "occupied")
-                
-                if new_invoice_printed != 1 or new_table_status != 0:
-                    return {"status": "Failure"}
+        if table:
+             frappe.db.set_value(
+                "URY Table", 
+                table, 
+                {"occupied": 0, "latest_invoice_time": None},
+                update_modified=True
+            )
+             
+             if frappe.db.get_value("URY Table", table, "occupied") != 0:
+                 return {"status": "Failure"}
         
         return {"status": "Success"}
         
     except Exception as e:
-        frappe.log_error(message=e, title="Print Fail")
-        frappe.throw(_("Error while printing order",e))                   
+        frappe.log_error(title="Print Update Fail", message=traceback.format_exc())
         return {"status": "Failure"}
 
 
 @frappe.whitelist()
 def print_pos_page(doctype, name, print_format):
-    """ACTUALLY PRINT instead of just sending realtime events"""
-    print("=" * 60)
-    print("DEBUG: print_pos_page called")
-    print(f"  doctype: {doctype}")
-    print(f"  name: {name}")
-    print(f"  print_format: {print_format}")
-    print("=" * 60)
+    """
+    Endpoint to trigger printing. 
+    If QZ is enabled, it returns 'qz_enabled' so JS takes over.
+    If QZ is disabled, it prints via CUPS.
+    """
+    logger.debug(f"print_pos_page called for {name}")
     
     try:
-        # Get default printer setting
+        # Fetch POS Profile from the Invoice
+        pos_profile = frappe.db.get_value(doctype, name, "pos_profile")
+        
+        # 1. CHECK QZ STATUS
+        if _get_qz_status(pos_profile):
+            # QZ is ON. We do NOT print from server.
+            # We return success/qz status so the JS knows to proceed with client-side print.
+            return {"status": "qz_enabled", "message": "QZ Enabled, Handled by Client"}
+
+        # 2. CUPS PRINTING (Legacy/Server-side)
         printer_settings = frappe.get_all('Network Printer Settings', limit=1)
-        
-        print(f"  Found {len(printer_settings)} printer settings")
-        
         if not printer_settings:
-            print("  ERROR: No printer configured")
             return {"status": "error", "message": "No printer configured"}
         
         printer_setting = printer_settings[0]['name']
-        print(f"  Using printer setting: {printer_setting}")
         
-        # Call network_printing to actually print
-        print("  Calling network_printing...")
         result = network_printing(
             doctype=doctype,
             name=name,
@@ -361,27 +334,20 @@ def print_pos_page(doctype, name, print_format):
             print_format=print_format
         )
         
-        print(f"  network_printing result: {result}")
-        
-        # Also send realtime event for UI updates
-        restaurant_table, branch, invoice_name = frappe.db.get_value(
-            "POS Invoice", name, ["restaurant_table", "branch", "name"]
+        # UI Realtime updates (Only needed for Server side print usually)
+        restaurant_table, branch = frappe.db.get_value(
+            "POS Invoice", name, ["restaurant_table", "branch"]
         )
         
-        print(f"  Branch: {branch}, Table: {restaurant_table}")
-        
         if branch:
-            print_channel = "{}_{}".format("print", branch)
-            frappe.publish_realtime(print_channel, {"data": {"name": name, "doctype": doctype, "print_format": print_format}})
-            print(f"  Sent realtime event to channel: {print_channel}")
+            print_channel = f"print_{branch}"
+            frappe.publish_realtime(print_channel, {
+                "data": {"name": name, "doctype": doctype, "print_format": print_format}
+            })
         
-        # Update status if not already done by network_printing
-        invoice_printed = frappe.db.get_value("POS Invoice", name, "invoice_printed")
-        print(f"  Current invoice_printed status: {invoice_printed}")
-        
-        if invoice_printed == 0:
+        # Update Status (Since server handled the print)
+        if frappe.db.get_value("POS Invoice", name, "invoice_printed") == 0:
             frappe.db.set_value("POS Invoice", name, "invoice_printed", 1)
-            print(f"  Updated invoice_printed to 1")
 
             if restaurant_table:
                 frappe.db.set_value(
@@ -389,137 +355,133 @@ def print_pos_page(doctype, name, print_format):
                     restaurant_table,
                     {"occupied": 0, "latest_invoice_time": None},
                 )
-                print(f"  Updated table {restaurant_table} status")
         
-        if result == "Success":
-            print("  ✓ Returning success")
-            return {"status": "success", "message": "Printed successfully"}
-        else:
-            print(f"  ✗ Returning error: {result}")
-            return {"status": "error", "message": result}
+        return result
             
     except Exception as e:
-        print(f"  EXCEPTION: {type(e).__name__}: {e}")
-        import traceback
-        traceback.print_exc()
         frappe.log_error(f"print_pos_page error: {str(e)}", "Print Error")
         return {"status": "error", "message": str(e)}
 
 
 @frappe.whitelist()
 def qz_certificate():
-    site_config = frappe.get_site_config()
-    qz_key_value = site_config.get("qz_cert")
-
-    return qz_key_value
+    return frappe.get_site_config().get("qz_cert")
 
 
 @frappe.whitelist()
 def signature_promise():
-    site_config = frappe.get_site_config()
-    key_value = site_config.get("qz_private_key")
-
-    return key_value
+    return frappe.get_site_config().get("qz_private_key")
 
 
 @frappe.whitelist()
 def print_kot_on_create(doc, method=None):
-    """Auto-print KOT when URY KOT doctype is created"""
+    """
+    Auto-print KOT. 
+    If QZ is enabled, publish realtime event for client-side printing.
+    Otherwise use CUPS server-side printing.
+    """
     try:
-        # Debug: Print that we're starting
-        print(f"\n=== KOT PRINT HOOK FIRED ===")
-        
-        # If called from hook (doc is a document object)
         if isinstance(doc, str):
-            # Called via API with string name
             kot_name = doc
             kot = frappe.get_doc("URY KOT", kot_name)
         else:
-            # Called from hook with document object
             kot = doc
             kot_name = doc.name
         
-        print(f"KOT: {kot_name}")
-        print(f"POS Profile: {kot.pos_profile}")
-        
-        # 1. Get the associated POS Profile
         pos_profile = kot.pos_profile
         
+        # 1. CHECK QZ STATUS
+        if _get_qz_status(pos_profile):
+            # Get printer settings for this POS Profile
+            printer_settings = frappe.get_all(
+                "URY Printer Settings",
+                filters={
+                    "parent": pos_profile, 
+                    "parentfield": "printer_settings", 
+                    "custom_kot_print": 1
+                },
+                fields=["name", "printer", "custom_kot_print_format", "item_group"]
+            )
+            
+            if not printer_settings:
+                return {"status": "error", "message": "No KOT printer configured"}
+            
+            # Publish realtime event with printer details
+            frappe.publish_realtime(
+                event="ury_kot_created",
+                message={
+                    "kot_name": kot_name,
+                    "pos_profile": pos_profile,
+                    "printers": printer_settings
+                },
+                user=frappe.session.user
+            )
+            
+            logger.info(f"Published KOT event for {kot_name} to {len(printer_settings)} printer(s)")
+            return {"status": "qz_enabled", "message": f"KOT event published for {len(printer_settings)} printer(s)"}
+
+        # 2. CUPS PRINTING (unchanged)
         if not pos_profile:
-            print("ERROR: No POS Profile")
-            frappe.log_error(f"No POS Profile found for KOT {kot_name}", "KOT Print Error")
             return {"status": "error", "message": "No POS Profile configured"}
         
-        # 2. Get printer settings from the POS Profile
         printer_settings = frappe.get_all(
             "URY Printer Settings",
-            filters={"parent": pos_profile, "parentfield": "printer_settings", "custom_kot_print": 1},
+            filters={
+                "parent": pos_profile, 
+                "parentfield": "printer_settings", 
+                "custom_kot_print": 1
+            },
             fields=["name", "printer", "custom_kot_print_format"]
         )
         
-        print(f"Found {len(printer_settings)} printer settings with custom_kot_print=1")
-        
         if not printer_settings:
-            print("ERROR: No KOT printers configured")
-            frappe.log_error(f"No printer with custom_kot_print enabled for POS Profile {pos_profile}", "KOT Print Error")
             return {"status": "error", "message": "No KOT printer configured"}
         
-        # 3. Loop through all printers with custom_kot_print enabled
         results = []
+        success_count = 0
+
         for setting in printer_settings:
             printer = setting.get("printer")
-            print_format = setting.get("custom_kot_print_format")
+            fmt = setting.get("custom_kot_print_format")
             
-            print(f"Printing to: {printer}, format: {print_format}")
+            if not printer: continue
             
-            if not printer:
-                print("Skipping - no printer linked")
-                continue
-            
-            # 4. Print to this printer using existing network_printing function
-            result = network_printing(
+            res = network_printing(
                 doctype="URY KOT",
                 name=kot_name,
                 printer_setting=printer,
-                print_format=print_format or None,
+                print_format=fmt,
                 doc=kot
             )
             
-            print(f"Print result: {result}")
-            
+            status = res.get("status") if isinstance(res, dict) else "unknown"
+            if status == "success":
+                success_count += 1
+
             results.append({
                 "printer": printer,
-                "status": "success" if result == "Success" else "failed",
-                "message": result
+                "status": status,
+                "message": res.get("message") if isinstance(res, dict) else str(res)
             })
         
-        # 5. Update KOT status if at least one print was successful
-        successful_prints = [r for r in results if r["status"] == "success"]
-        if successful_prints:
+        if success_count > 0:
             _update_kot_status(kot_name)
-            print(f"Updated KOT status to printed")
         
         return {
             "status": "success",
-            "message": f"KOT printed to {len(successful_prints)} printer(s)",
+            "message": f"KOT printed to {success_count} printer(s)",
             "results": results
         }
         
     except Exception as e:
-        error_msg = f"KOT print error: {str(e)}"
-        print(f"EXCEPTION: {error_msg}")
-        import traceback
-        traceback.print_exc()
-        frappe.log_error(error_msg, "KOT Print Error")
+        frappe.log_error(f"KOT Print Error: {str(e)}", "KOT Print Error")
         return {"status": "error", "message": str(e)}
 
 
 @frappe.whitelist()
 def get_kot_printers(pos_profile):
-    """Get all KOT printers for a POS Profile"""
-    printers = frappe.get_all(
+    return frappe.get_all(
         "URY Printer Settings",
         filters={"parent": pos_profile, "custom_kot_print": 1},
         fields=["name", "printer", "custom_kot_print_format"]
     )
-    return printers

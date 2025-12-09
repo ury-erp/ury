@@ -13,10 +13,9 @@ interface PrintOrderParams {
 }
 
 export async function printOrder({ orderId, posProfile }: PrintOrderParams): Promise<'qz' | 'network' | 'socket'> {
-  const { qz_print, qz_host, print_format, printer, name, cashier, multiple_cashier } = posProfile;
+  const { print_type, qz_host, print_format, printer, name, cashier, multiple_cashier } = posProfile;
 
-  // Use qz_print field instead of print_type
-  if (qz_print === 1) {
+  if (print_type === 'qz') {
     if (!qz_host) {
       throw new Error('QZ host is not set');
     }
@@ -24,8 +23,7 @@ export async function printOrder({ orderId, posProfile }: PrintOrderParams): Pro
     await printWithQz(qz_host, html);
     await updatePrintStatus(orderId);
     return 'qz';
-  } else if (printer) {
-    // Network printing
+  } else if (print_type === 'network') {
     if (cashier && !multiple_cashier) {
       await networkPrint(orderId, printer as string, print_format as string);
     } else {

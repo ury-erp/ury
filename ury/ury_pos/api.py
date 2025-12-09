@@ -683,3 +683,118 @@ def validate_pos_close(pos_profile):
     
     return "Success"
 
+@frappe.whitelist()
+def get_latest_kot():
+    """Get the latest unprinted KOT for the current user's POS Profile"""
+    try:
+        current_user = frappe.session.user
+        
+        # Get user's active POS Profile
+        pos_opening = frappe.get_all(
+            "POS Opening Entry",
+            filters={
+                "user": current_user,
+                "docstatus": 1,
+                "status": "Open"
+            },
+            fields=["pos_profile"],
+            limit=1
+        )
+        
+        if not pos_opening:
+            return {"debug": "no_pos_opening", "user": current_user}
+        
+        pos_profile = pos_opening[0].pos_profile
+        
+        # Check if QZ is enabled
+        qz_print = frappe.db.get_value("POS Profile", pos_profile, "qz_print")
+        
+        if qz_print != 1:
+            return {"debug": "qz_not_enabled", "qz_print": qz_print, "pos_profile": pos_profile}
+        
+        # Get latest unprinted KOT
+        kot = frappe.get_all(
+            "URY KOT",
+            filters={
+                "pos_profile": pos_profile,
+                "kot_printed": 0,
+                "docstatus": ["!=", 2]
+            },
+            fields=["name", "kot_printed", "creation"],
+            order_by="creation desc",
+            limit=1
+        )
+        
+        if not kot:
+            return {"debug": "no_unprinted_kots", "pos_profile": pos_profile}
+        
+        kot_doc = kot[0]
+        
+        # Get printer settings
+        printer_settings = frappe.get_all(
+            "URY Printer Settings",
+            filters={
+                "parent": pos_profile,
+                "parentfield": "printer_settings",
+                "custom_kot_print": 1
+            },
+            fields=["name", "printer", "custom_kot_print_format"]
+        )
+        
+        if not printer_settings:
+            return {"debug": "no_printers", "pos_profile": pos_profile, "kot": kot_doc.name}
+        
+        return {
+            "kot_name": kot_doc.name,
+            "pos_profile": pos_profile,
+            "kot_printed": kot_doc.kot_printed,
+            "printers": printer_settings
+        }
+        
+    except Exception as e:
+        import traceback
+        return {
+            "debug": "exception",
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }
+
+
+@frappe.whitelist(methods=['GET'])
+def mark_kot_printed(kot_name):
+    """Mark a KOT as printed"""
+    try:
+        if not frappe.db.exists("URY KOT", kot_name):
+            return {"status": "error", "message": "KOT not found"}
+        
+        frappe.db.set_value("URY KOT", kot_name, "kot_printed", 1, update_modified=False)
+        frappe.db.commit()
+        
+        return {"status": "success"}
+    except Exception as e:
+        frappe.log_error(f"mark_kot_printed error: {str(e)}")
+        return {"status": "error", "message": str(e)}
+
+
+@frappe.whitelist()
+def test_get_kots():
+    """Test function to see all unprinted KOTs"""
+    try:
+        kots = frappe.get_all(
+            "URY KOT",
+            filters={
+                "kot_printed": 0,
+                "docstatus": ["!=", 2]
+            },
+            fields=["name", "kot_printed", "pos_profile", "creation"],
+            order_by="creation desc",
+            limit=3
+        )
+        
+        return {
+            "user": frappe.session.user,
+            "kots_count": len(kots),
+            "kots": kots
+        }
+    except Exception as e:
+        return {"error": str(e)}

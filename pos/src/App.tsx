@@ -10,6 +10,7 @@ import ScreenSizeProvider from './components/ScreenSizeProvider';
 import { ToastProvider } from './components/ui/toast';
 import { usePOSStore } from './store/pos-store';
 import { useEffect } from 'react';
+import { setupKotListener } from './lib/kot-listener';
 
 function App() {
   const {
@@ -18,7 +19,10 @@ function App() {
   
   useEffect(() => {
     initializeApp();
+    // Initialize KOT listener after app is ready
+    setupKotListener();
   }, [initializeApp]);
+  
   return (
     <>
       <ToastProvider />
