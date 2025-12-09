@@ -19,6 +19,7 @@ app_include_js = [
     "/assets/ury/js/pos_print.js",
     "/assets/ury/js/restrict_qty_edit_pos.js",
     "/assets/ury/js/ury_pos_kot.js"
+    
 ]
 
 # include js, css files in header of web template
