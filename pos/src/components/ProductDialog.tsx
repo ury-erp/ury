@@ -247,11 +247,12 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
       removeFromOrder(itemToReplace.uniqueId);
     }
 
-    // Add main item as a cart line
+    // Add main item as a cart line with comments
     const orderItem: OrderItem = {
       ...selectedItem,
       quantity: numericQuantity,
-      price: basePrice
+      price: basePrice,
+      comment: comments.trim() || undefined
     };
     addToOrder(orderItem);
 
@@ -484,4 +485,4 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
   );
 };
 
-export default ProductDialog; 
+export default ProductDialog;
