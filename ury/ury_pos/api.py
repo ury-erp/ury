@@ -683,7 +683,7 @@ def validate_pos_close(pos_profile):
     
     return "Success"
 
-@frappe.whitelist()
+@frappe.whitelist(allow_guest=True)
 def get_latest_kot():
     """Get the latest unprinted KOT for the current user's POS Profile"""
     try:
@@ -730,7 +730,7 @@ def get_latest_kot():
         
         kot_doc = kot[0]
         
-        # Get printer settings
+        # Get printer settings - FIXED: Removed item_group which doesn't exist
         printer_settings = frappe.get_all(
             "URY Printer Settings",
             filters={
@@ -738,12 +738,17 @@ def get_latest_kot():
                 "parentfield": "printer_settings",
                 "custom_kot_print": 1
             },
-            fields=["name", "printer", "custom_kot_print_format"]
+            fields=["printer", "custom_kot_print_format"]
         )
         
         if not printer_settings:
-            return {"debug": "no_printers", "pos_profile": pos_profile, "kot": kot_doc.name}
+            return {
+                "debug": "no_printers", 
+                "pos_profile": pos_profile, 
+                "kot_name": kot_doc.name  # FIXED: Include kot_name in debug response
+            }
         
+        # FIXED: Return proper structure
         return {
             "kot_name": kot_doc.name,
             "pos_profile": pos_profile,
@@ -758,7 +763,6 @@ def get_latest_kot():
             "error": str(e),
             "traceback": traceback.format_exc()
         }
-
 
 @frappe.whitelist(methods=['GET'])
 def mark_kot_printed(kot_name):
