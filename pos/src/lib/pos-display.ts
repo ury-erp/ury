@@ -1,13 +1,47 @@
-// pos-display.ts
-// Ury POS Display - Sends total to dual screen display
+// src/lib/pos-display.ts
 
 const BRIDGE_URL = "http://localhost:8000";
 const DEBUG = true;
 
-const log = (...args: any[]) => DEBUG && console.log("[pos_display]", ...args);
+const log = (...args: unknown[]) => DEBUG && console.log("[ury_display]", ...args);
 
 let lastTotal: number | null = null;
 let isDialogOpen = false;
+let enabled = false;
+let posType = "";
+let observer: MutationObserver | null = null;
+let initialized = false;
+
+async function fetchSettings(): Promise<boolean> {
+  try {
+    const [enabledRes, posTypeRes] = await Promise.all([
+      fetch("/api/method/frappe.client.get_single_value?" + new URLSearchParams({
+        doctype: "POS Dual Screen Settings",
+        field: "enabled"
+      })),
+      fetch("/api/method/frappe.client.get_single_value?" + new URLSearchParams({
+        doctype: "POS Dual Screen Settings",
+        field: "pos_type"
+      }))
+    ]);
+
+    const [enabledData, posTypeData] = await Promise.all([
+      enabledRes.json(),
+      posTypeRes.json()
+    ]);
+
+    enabled = enabledData.message === 1 || enabledData.message === "1";
+    posType = (posTypeData.message || "").toLowerCase().trim();
+
+    log("Settings loaded:", { enabled, posType });
+    return true;
+  } catch (e) {
+    log("Settings fetch error:", e);
+    enabled = true;
+    posType = "ury";
+    return false;
+  }
+}
 
 async function sendTotal(value: number): Promise<boolean> {
   try {
@@ -38,16 +72,10 @@ function isPaymentDialogVisible(): boolean {
   let hasOrderSummary = false;
 
   for (const h2 of h2s) {
-    if (h2.textContent?.trim() === "Payment") {
-      hasPayment = true;
-      break;
-    }
+    if (h2.textContent?.trim() === "Payment") { hasPayment = true; break; }
   }
   for (const h3 of h3s) {
-    if (h3.textContent?.trim() === "Order Summary") {
-      hasOrderSummary = true;
-      break;
-    }
+    if (h3.textContent?.trim() === "Order Summary") { hasOrderSummary = true; break; }
   }
 
   return hasPayment && hasOrderSummary;
@@ -78,6 +106,8 @@ function extractFinalTotal(): number | null {
 }
 
 async function checkAndUpdate(): Promise<void> {
+  if (!enabled || posType !== "ury") return;
+
   const dialogVisible = isPaymentDialogVisible();
 
   if (dialogVisible && !isDialogOpen) {
@@ -103,23 +133,42 @@ async function checkAndUpdate(): Promise<void> {
   }
 }
 
-// Initialize
-function init(): void {
-  const observer = new MutationObserver(() => {
+export async function initPosDisplay(): Promise<void> {
+  if (initialized) {
+    log("Already initialized, skipping");
+    return;
+  }
+
+  log("🚀 Initializing POS Display...");
+  
+  await fetchSettings();
+
+  if (!enabled) {
+    log("⛔ POS Display is disabled");
+    return;
+  }
+
+  if (posType !== "ury") {
+    log("⛔ POS type is not Ury:", posType);
+    return;
+  }
+
+  observer = new MutationObserver(() => {
     setTimeout(checkAndUpdate, 50);
   });
 
   observer.observe(document.body, { childList: true, subtree: true });
   checkAndUpdate();
 
-  log("✅ POS Display initialized");
+  initialized = true;
+  log("✅ Ury POS Display active");
 }
 
-// Start when DOM is ready
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", init);
-} else {
-  init();
+export function destroyPosDisplay(): void {
+  if (observer) {
+    observer.disconnect();
+    observer = null;
+  }
+  initialized = false;
+  log("POS Display destroyed");
 }
-
-export {};

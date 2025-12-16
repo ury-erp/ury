@@ -11,6 +11,7 @@ import { ToastProvider } from './components/ui/toast';
 import { usePOSStore } from './store/pos-store';
 import { useEffect } from 'react';
 import { setupKotListener } from './lib/kot-listener';
+import { initPosDisplay, destroyPosDisplay } from './lib/pos-display';
 
 function App() {
   const {
@@ -21,6 +22,12 @@ function App() {
     initializeApp();
     // Initialize KOT listener after app is ready
     setupKotListener();
+    // Initialize POS display for dual screen
+    initPosDisplay();
+    
+    return () => {
+      destroyPosDisplay();
+    };
   }, [initializeApp]);
   
   return (
