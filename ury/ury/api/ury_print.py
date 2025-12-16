@@ -400,7 +400,7 @@ def print_kot_on_create(doc, method=None):
                     "parentfield": "printer_settings", 
                     "custom_kot_print": 1
                 },
-                fields=["name", "printer", "custom_kot_print_format", "item_group"]
+                fields=["name", "printer", "custom_kot_print_format"]
             )
             
             if not printer_settings:
