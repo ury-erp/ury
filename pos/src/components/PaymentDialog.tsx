@@ -10,7 +10,6 @@ import { DEFAULT_PAYMENT_MODE } from '../data/order-types';
 interface PaymentDialogProps {
   onClose: () => void;
   grandTotal: number;
-  roundedTotal: number;
   invoice: string;
   customer: string;
   posProfile: string;
@@ -24,7 +23,6 @@ interface PaymentDialogProps {
 const PaymentDialog: React.FC<PaymentDialogProps> = ({
   onClose,
   grandTotal,
-  roundedTotal,
   invoice,
   customer,
   posProfile,
@@ -73,16 +71,8 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
 
   // Order summary logic
   const subtotal = grandTotal;
-  const adjustment = roundedTotal - grandTotal;
-  const roundedAdjustment = Math.round(adjustment * 100) / 100;
-  const showAdjustment = Math.abs(roundedAdjustment) > 0.001;
   const totalDiscount = appliedDiscount;
-  const discountedTotal = Math.max(0, subtotal - totalDiscount);
-  // If discount is applied, round up; else, round normally
-  const finalTotal = appliedDiscount > 0 ? Math.ceil(discountedTotal) : Math.round(discountedTotal);
-  const finalAdjustment = finalTotal - discountedTotal;
-  const roundedFinalAdjustment = Math.round(finalAdjustment * 100) / 100;
-  const showFinalAdjustment = Math.abs(roundedFinalAdjustment) > 0.001;
+  const finalTotal = Math.max(0, subtotal - totalDiscount);
 
   useEffect(()=>{
     const defaultPaymentModePresent=paymentModes.find((mode)=>mode===DEFAULT_PAYMENT_MODE)
@@ -254,13 +244,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
                   <span>-{formatCurrency(appliedDiscount)}</span>
                 </div>
               )}
-              {/* Adjustment (if any) */}
-              {showFinalAdjustment && (
-                <div className="flex justify-between text-blue-600">
-                  <span>Adjustment</span>
-                  <span>{roundedFinalAdjustment > 0 ? '+' : ''}{formatCurrency(roundedFinalAdjustment)}</span>
-                </div>
-              )}
+
               {/* Final Total (Rounded) */}
               <div className="border-t pt-2">
                 <div className="flex justify-between font-semibold text-lg">

@@ -201,35 +201,39 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   orderComment: '',
 
   initializeApp: async () => {
-    try {
-      set({ isInitializing: true, error: null });
-      
-      const [profileResult, menuResult, categoriesResult, paymentModesResult] = await Promise.allSettled([
-        get().fetchPosProfile(),
-        get().fetchMenuItems(),
-        get().fetchCategories(),
-        get().fetchPaymentModes()
-      ]);
+  try {
+    set({ isInitializing: true, error: null });
+    
+    const [profileResult, menuResult, categoriesResult, paymentModesResult] = await Promise.allSettled([
+      get().fetchPosProfile(),
+      get().fetchMenuItems(),
+      get().fetchCategories(),
+      get().fetchPaymentModes()
+    ]);
 
-      if (profileResult.status === 'rejected' || 
-          menuResult.status === 'rejected' || 
-          categoriesResult.status === 'rejected' ||
-          paymentModesResult.status === 'rejected') {
-        set({ 
-          error: 'Failed to initialize app. Please refresh the page.',
-          isInitializing: false 
-        });
-        return;
-      }
-
-      set({ isInitializing: false });
-    } catch (error) {
+    if (profileResult.status === 'rejected' || 
+        menuResult.status === 'rejected' || 
+        categoriesResult.status === 'rejected' ||
+        paymentModesResult.status === 'rejected') {
       set({ 
         error: 'Failed to initialize app. Please refresh the page.',
         isInitializing: false 
       });
+      return;
     }
-  },
+
+    // Set default customer after successful initialization
+    set({ 
+      isInitializing: false,
+      selectedCustomer: { id: 'Cash Customer', name: 'Cash Customer', phone: '' }
+    });
+  } catch (error) {
+    set({ 
+      error: 'Failed to initialize app. Please refresh the page.',
+      isInitializing: false 
+    });
+  }
+},
 
   fetchPosProfile: async () => {
     try {
@@ -662,26 +666,26 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   },
 
   resetOrderState: () => {
-    const { fetchMenuItems } = get();
-    
-    set({
-      selectedCustomer: null,
-      selectedTable: null,
-      selectedRoom: null,
-      selectedAggregator: null,
-      isUpdatingOrder: false,
-      orderId: null,
-      activeOrders: [],
-      selectedItem: null,
-      orderLoading: false,
-      menuItems: [],
-      error: null,
-      selectedOrderType: DEFAULT_ORDER_TYPE,
-      orderComment: '',
-    });
+  const { fetchMenuItems } = get();
+  
+  set({
+    selectedCustomer: { id: 'Cash Customer', name: 'Cash Customer', phone: '' }, // Changed from null
+    selectedTable: null,
+    selectedRoom: null,
+    selectedAggregator: null,
+    isUpdatingOrder: false,
+    orderId: null,
+    activeOrders: [],
+    selectedItem: null,
+    orderLoading: false,
+    menuItems: [],
+    error: null,
+    selectedOrderType: DEFAULT_ORDER_TYPE,
+    orderComment: '',
+  });
 
-    fetchMenuItems();
-  },
+  fetchMenuItems();
+},
 
   isMenuInteractionDisabled: () => {
     const state = get();
