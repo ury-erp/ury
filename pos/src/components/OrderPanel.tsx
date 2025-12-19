@@ -96,28 +96,28 @@ const OrderPanel = () => {
       setIsSubmitting(true);
       
       const orderData = {
-        items: activeOrders.map(item => ({
-          item: item.id,
-          item_name: item.name,
-          rate: item.selectedVariant?.price || item.price,
-          qty: item.quantity,
-          comment: item.comment || undefined
-        })),
-        no_of_pax: 1,
-        pos_profile: posProfile.name,
-        order_type: selectedOrderType,
-        table: selectedTable || undefined,
-        room: selectedRoom || undefined,
-        customer: selectedOrderType === 'Aggregators' ? selectedAggregator?.customer : selectedCustomer?.name,
-        aggregator_id: selectedOrderType === 'Aggregators' ? selectedAggregator?.customer : undefined,
-        cashier: posProfile.cashier,
-        owner: user.name,
-        mode_of_payment: paymentModes[0],
-        last_invoice: isUpdatingOrder ? orderId : null,
-        invoice: isUpdatingOrder ? orderId : null,
-        waiter: user.name,
-        comments: orderComment || undefined
-      };
+      items: activeOrders.map(item => ({
+        item: item.id,
+        item_name: item.name,
+        rate: item.selectedVariant?.price || item.price,
+        qty: item.quantity,
+        comment: item.comment || undefined
+      })),
+      no_of_pax: 1,
+      pos_profile: posProfile.name,
+      order_type: selectedOrderType,
+      table: selectedTable || undefined,
+      room: selectedRoom || undefined,
+      customer: selectedOrderType === 'Aggregators' ? selectedAggregator?.customer : selectedCustomer?.name,
+      aggregator_id: selectedOrderType === 'Aggregators' ? selectedAggregator?.customer : undefined,
+      cashier: posProfile.cashier,
+      owner: isUpdatingOrder ? undefined : user.name,  // Only set owner for new orders
+      mode_of_payment: paymentModes[0],
+      last_invoice: isUpdatingOrder ? orderId : null,
+      invoice: isUpdatingOrder ? orderId : null,
+      waiter: user.name,
+      comments: orderComment || undefined
+    };
 
       await syncOrder(orderData);
       
