@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, Eye, Loader2, Printer, Square, Users } from 'lucide-react';
-import { cn } from '../lib/utils';
+import { AlertTriangle, Eye, Layout, Loader2, Printer, Square, Users } from 'lucide-react';
+import { cn, formatInvoiceTime } from '../lib/utils';
 import { usePOSStore } from '../store/pos-store';
 import { getRooms, getTables, getTableCount, type Room, type Table } from '../lib/table-api';
 import { Spinner } from '../components/ui/spinner';
@@ -12,6 +12,8 @@ import { TableShapeIcon } from '../components/TableShapeIcon';
 import { getTableOrder } from '../lib/order-api';
 import { printOrder } from '../lib/print';
 import { showToast } from '../components/ui/toast';
+
+import LayoutView from '../components/LayoutView';
 
 const sortTables = (tables: Table[]) => [...tables].sort((a, b) => a.name.localeCompare(b.name));
 
@@ -202,33 +204,6 @@ const TableView = () => {
     }
   };
 
-  const formatInvoiceTime = (timestamp: string | null) => {
-    if (!timestamp) return 'No bill activity yet';
-
-    const parsedDate = new Date(timestamp);
-    if (!Number.isNaN(parsedDate.getTime())) {
-      return parsedDate.toLocaleTimeString(undefined, { hour: 'numeric', minute: 'numeric' });
-    }
-
-    const timeOnlyMatch = timestamp.match(/^(\d{1,2}):(\d{2}):(\d{2})(?:\.(\d+))?$/);
-    if (timeOnlyMatch) {
-      const [, hours, minutes, seconds] = timeOnlyMatch;
-      const date = new Date();
-      date.setHours(Number(hours), Number(minutes), Number(seconds), 0);
-      const formatted = date.toLocaleTimeString(undefined, {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-      });
-      if (/^\d{1,2}:\d{2}$/.test(formatted)) {
-        return formatted;
-      }
-      return `${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}`;
-    }
-
-    return timestamp;
-  };
-
   const tablesToDisplay = useMemo(() => sortTables(tables), [tables]);
 
   const hasRooms = rooms.length > 0;
@@ -251,57 +226,78 @@ const TableView = () => {
     }
   };
 
+  const [isLayoutView, setIsLayoutView] = useState(false);
+
+  const handleLayoutView = () => {
+    if (selectedRoom) {
+      loadTables(selectedRoom, { useCache: false });
+    }
+    setIsLayoutView(true);
+  };
+
+  if (isLayoutView && selectedRoom) {
+    return (
+      <LayoutView
+        selectedRoom={selectedRoom}
+        tables={tablesToDisplay}
+        onBackToGrid={() => setIsLayoutView(false)}
+      />
+    );
+  }
+
   return (
     <div className="flex flex-col h-full">
       <div className="p-4 bg-white border-b border-gray-200">
         <div className="max-w-screen-xl mx-auto">
           <div className="flex flex-col gap-3">
-            <div className="flex flex-wrap gap-2">
-              {loadingRooms && (
-                <div className="flex-1 min-w-[160px]">
-                  <Spinner message="Loading rooms..." />
-                </div>
-              )}
+            <div className="flex justify-between items-start gap-4">
+              <div className="flex flex-wrap gap-2">
+                {loadingRooms && (
+                  <div className="flex-1 min-w-[160px]">
+                    <Spinner message="Loading rooms..." />
+                  </div>
+                )}
 
-              {!loadingRooms && !hasRooms && (
-                <div className="flex items-center gap-2 text-gray-500 text-sm">
-                  <AlertTriangle className="w-4 h-4" />
-                  No rooms found for this branch
-                </div>
-              )}
+                {!loadingRooms && !hasRooms && (
+                  <div className="flex items-center gap-2 text-gray-500 text-sm">
+                    <AlertTriangle className="w-4 h-4" />
+                    No rooms found for this branch
+                  </div>
+                )}
 
-              {rooms.map(room => (
+                {rooms.map(room => (
+                  <Button
+                    key={room.name}
+                    variant="tab"
+                    data-selected={selectedRoom === room.name}
+                    onClick={() => handleRoomChange(room.name)}
+                    className="h-fit"
+                  >
+                    {room.name}
+                    {typeof roomCounts[room.name] === 'number' ? (
+                      <Badge variant="outline" className="ml-2 bg-white/60">
+                        {roomCounts[room.name]}
+                      </Badge>
+                    ) : loadingRoomCounts ? (
+                      <Badge variant="outline" className="ml-2 bg-white/60">
+                        --
+                      </Badge>
+                    ) : null}
+                  </Button>
+                ))}
+              </div>
+
+              <div className="flex-shrink-0">
                 <Button
-                  key={room.name}
                   variant="tab"
-                  data-selected={selectedRoom === room.name}
-                  onClick={() => handleRoomChange(room.name)}
-                  className="h-fit"
+                  className="flex items-center gap-2 text-sm"
+                  onClick={() => handleLayoutView()}
                 >
-                  {room.name}
-                  {typeof roomCounts[room.name] === 'number' ? (
-                    <Badge variant="outline" className="ml-2 bg-white/60">
-                      {roomCounts[room.name]}
-                    </Badge>
-                  ) : loadingRoomCounts ? (
-                    <Badge variant="outline" className="ml-2 bg-white/60">
-                      --
-                    </Badge>
-                  ) : null}
+                  <Layout className="w-4 h-4" />
+                  Layout view
                 </Button>
-              ))}
+              </div>
             </div>
-
-            {/* <div className="flex justify-end">
-              <Button
-                variant="ghost"
-                className="flex items-center gap-2 text-sm"
-                onClick={() => console.log('Layout view coming soon')}
-              >
-                <Layout className="w-4 h-4" />
-                Layout view
-              </Button>
-            </div> */}
           </div>
         </div>
       </div>
@@ -343,42 +339,42 @@ const TableView = () => {
                     )}
                   >
                     <div>
-                        <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
-                            <TableShapeIcon shape={table.table_shape || 'Rectangle'} />
-                            <span className="font-semibold text-lg text-gray-900">{table.name}</span>
+                          <TableShapeIcon shape={table.table_shape || 'Rectangle'} />
+                          <span className="font-semibold text-lg text-gray-900">{table.name}</span>
                         </div>
                         <Badge variant={isOccupied ? 'warning' : 'success'}>
-                            {isOccupied ? 'Occupied' : 'Available'}
+                          {isOccupied ? 'Occupied' : 'Available'}
                         </Badge>
-                        </div>
+                      </div>
 
-                        <div className="space-y-2 text-sm text-gray-700">
+                      <div className="space-y-2 text-sm text-gray-700">
                         <div className="flex items-center justify-between">
-                            <span className="font-medium">Room</span>
-                            <span>{table.restaurant_room}</span>
+                          <span className="font-medium">Room</span>
+                          <span>{table.restaurant_room}</span>
                         </div>
                         {isOccupied && (
-                            <div className="flex items-center justify-between">
+                          <div className="flex items-center justify-between">
                             <span className="font-medium">Started at</span>
                             <span>{formatInvoiceTime(table.latest_invoice_time)}</span>
-                            </div>
+                          </div>
                         )}
                         {typeof table.no_of_seats === 'number' && (
-                            <div className="flex items-center justify-between">
+                          <div className="flex items-center justify-between">
                             <span className="font-medium">Seats</span>
                             <span className="flex items-center gap-1">
-                                <Users className="w-3 h-3" />
-                                {table.no_of_seats}
+                              <Users className="w-3 h-3" />
+                              {table.no_of_seats}
                             </span>
-                            </div>
+                          </div>
                         )}
                         {table.is_take_away === 1 && (
-                            <Badge variant="pending" className="mt-2">
+                          <Badge variant="pending" className="mt-2">
                             Take away
-                            </Badge>
+                          </Badge>
                         )}
-                        </div>
+                      </div>
                     </div>
 
                     {isOccupied ? (

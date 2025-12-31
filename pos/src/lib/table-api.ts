@@ -12,8 +12,11 @@ export interface Table {
   latest_invoice_time: string | null;
   is_take_away: number;
   restaurant_room: string;
-  table_shape:'Circle' | 'Square' | 'Rectangle';
+  table_shape: 'Circle' | 'Square' | 'Rectangle';
   no_of_seats?: number;
+  layout_x?: number;
+  layout_y?: number;
+  minimum_seating?: number;
 }
 
 export async function getRestaurantMenu(posProfile: string, room?: string | null) {
@@ -38,9 +41,35 @@ export async function getRooms(branch: string): Promise<Room[]> {
 
 export async function getTables(room: string): Promise<Table[]> {
   const { call } = await import('./frappe-sdk');
-  const res = await call.get('ury.ury_pos.api.getTable', { room });
-  return res.message as Table[];
-} 
+
+  const [apiRes, dbRes] = await Promise.all([
+    call.get('ury.ury_pos.api.getTable', { room }),
+    db.getDocList(DOCTYPES.URY_TABLE, {
+      fields: ['name', 'layout_x', 'layout_y', 'minimum_seating', 'table_shape', 'no_of_seats'],
+      filters: [['restaurant_room', '=', room]],
+      limit: 1000,
+      asDict: true
+    })
+  ]);
+
+  const apiTables = (apiRes.message || []) as Table[];
+  const dbTables = (dbRes || []) as any[];
+  const dbMap = new Map(dbTables.map(t => [t.name, t]));
+
+  return apiTables.map(t => {
+    const dbT = dbMap.get(t.name);
+    return {
+      ...t,
+      // Prioritize DB values for configuration fields as standard API might not return custom fields
+      layout_x: dbT?.layout_x,
+      layout_y: dbT?.layout_y,
+      minimum_seating: dbT?.minimum_seating,
+      // Ensure we have the latest shape/seats from DB as well
+      table_shape: dbT?.table_shape || t.table_shape,
+      no_of_seats: dbT?.no_of_seats || t.no_of_seats
+    };
+  });
+}
 
 export async function getTableCount(room: string, branch?: string): Promise<number> {
   const filters = [
@@ -55,4 +84,16 @@ export async function getTableCount(room: string, branch?: string): Promise<numb
   }) as Array<{ count?: number | string }>;
   const countValue = rows[0]?.count ?? 0;
   return typeof countValue === 'number' ? countValue : Number(countValue) || 0;
+}
+
+export async function updateTableLayout(name: string, data: Partial<Table>) {
+  return db.updateDoc(DOCTYPES.URY_TABLE, name, data);
+}
+
+export async function createTable(data: any) {
+  return db.createDoc(DOCTYPES.URY_TABLE, data);
+}
+
+export async function deleteTable(name: string) {
+  return db.deleteDoc(DOCTYPES.URY_TABLE, name);
 }
