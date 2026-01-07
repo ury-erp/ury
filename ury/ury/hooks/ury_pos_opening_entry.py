@@ -89,4 +89,8 @@ def validate_pos_opening_quality_review(doc, method):
         }
     )
 
-    
+    if not exists:
+        frappe.throw(
+            "Please complete today's Quality Review for Cashier POS Opening",
+            title="Quality Review Required"
+        )
