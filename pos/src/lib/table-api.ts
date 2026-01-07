@@ -51,10 +51,3 @@ export async function updateTableLayout(name: string, data: Partial<Table>) {
   return db.updateDoc(DOCTYPES.URY_TABLE, name, data);
 }
 
-export async function createTable(data: any) {
-  return db.createDoc(DOCTYPES.URY_TABLE, data);
-}
-
-export async function deleteTable(name: string) {
-  return db.deleteDoc(DOCTYPES.URY_TABLE, name);
-}

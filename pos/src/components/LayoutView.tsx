@@ -349,7 +349,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
               setIsEditMode(!isEditMode);
             }}
             className={cn(
-              'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium shadow-lg border transition-all',
+              'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border transition-all',
               isEditMode
                 ? 'bg-blue-600 hover:bg-blue-700 text-white border-green-700'
                 : 'bg-white hover:bg-gray-50 text-gray-700 border-gray-200'
@@ -364,7 +364,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
       </div>
 
       {/* Canvas Area */}
-      <div className="flex-1 relative overflow-hidden">
+      <div className="flex-1 relative ">
         {/* Zoom Controls */}
         <div className="absolute top-4 left-4 z-30 flex flex-col gap-2">
           <button
