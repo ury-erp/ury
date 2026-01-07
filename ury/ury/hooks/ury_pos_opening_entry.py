@@ -75,11 +75,18 @@ def validate_pos_opening_quality_review(doc, method):
         "name"
     )
 
-    # Safety check (misconfiguration)
     if not quality_goal_name:
         frappe.throw(
             "Quality Goal 'Cashier POS Opening' is not configured.",
             title="Configuration Error"
         )
 
-  
+    exists = frappe.db.exists(
+        "Quality Review",
+        {
+            "date": today(),
+            "goal": quality_goal_name
+        }
+    )
+
+    
