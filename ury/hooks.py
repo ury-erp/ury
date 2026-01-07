@@ -137,7 +137,11 @@ doc_events = {
         "validate":"ury.ury.hooks.ury_pos_opening_entry.set_cashier_room",
         "before_save": "ury.ury.hooks.ury_pos_opening_entry.before_save",
         "before_insert":"ury.ury.api.ury_kot_order_number.set_last_invoice_in_pos_open",
-        },
+        "validate": [
+            "ury.ury.hooks.ury_pos_opening_entry.validate_pos_opening_quality_review"
+        ]
+    },
+
     "POS Closing Entry": {
         "before_save": "ury.ury.hooks.ury_pos_closing_entry.before_save",
         "validate":"ury.ury.hooks.ury_pos_closing_entry.validate"

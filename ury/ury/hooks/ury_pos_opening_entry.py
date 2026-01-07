@@ -61,3 +61,19 @@ def main_pos_open_check(doc,method):
             return flag
     else:
         pass
+
+def validate_pos_opening_quality_review(doc, method):
+   
+    exists = frappe.db.exists(
+        "Quality Review",
+        {
+            "date": today(),
+            "goal": "Cashier POS Opening"
+        }
+    )
+
+    if exists:
+        frappe.throw(
+           ( "Please complete today's Quality Review"),
+            title=("Quality Review Required")
+        )
