@@ -28,6 +28,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+  const [capacityInput, setCapacityInput] = useState<string>('');
 
   // Save to local storage effect removed
 
@@ -50,6 +51,14 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
       };
     });
   }, [tables, localLayouts]);
+
+  // Sync capacity input when selected table changes
+  useEffect(() => {
+    if (selectedTable) {
+      const table = tablesWithPosition.find(t => t.name === selectedTable);
+      setCapacityInput(table?.no_of_seats?.toString() ?? '');
+    }
+  }, [selectedTable, tablesWithPosition]);
 
   // Calculate table dimensions based on capacity and shape
   const getTableDimensions = (shape: string, capacity: number = 4) => {
@@ -302,6 +311,10 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
   // Helper to format invoice time (consistent with Table.tsx) removed - imported from utils
   const handleCapacityChange = (capacityStr: string) => {
     if (!selectedTable) return;
+
+    // Always update the input field value to allow free typing
+    setCapacityInput(capacityStr);
+
     const capacity = parseInt(capacityStr);
     if (isNaN(capacity) || capacity < 1 || capacity > 20) return;
 
@@ -487,9 +500,9 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
               <label className="block text-sm font-medium mb-1">Capacity</label>
               <input
                 type="number"
-                min="1"
+                min="0"
                 max="20"
-                value={selectedTableData.no_of_seats || 4}
+                value={capacityInput}
                 onChange={(e) => handleCapacityChange(e.target.value)}
                 disabled={!isEditMode}
                 className={cn(
