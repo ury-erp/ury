@@ -339,7 +339,26 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
             <h2 className="text-lg font-semibold">{selectedRoom} <span className="text-gray-400 mx-2">|</span> Layout</h2>
           </div>
           <div className="flex items-center gap-2">
-            {/* Add Table button removed */}
+            {/* Edit Mode Toggle */}
+        <div className="">
+          <button
+            onClick={() => {
+              if (isEditMode) {
+                onRefresh?.();
+              }
+              setIsEditMode(!isEditMode);
+            }}
+            className={cn(
+              'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium shadow-lg border transition-all',
+              isEditMode
+                ? 'bg-blue-600 hover:bg-blue-700 text-white border-green-700'
+                : 'bg-white hover:bg-gray-50 text-gray-700 border-gray-200'
+            )}
+          >
+            {isEditMode ? <Save className="w-4 h-4" /> : <Edit3 className="w-4 h-4" />}
+            {isEditMode ? 'Finish Editing' : 'Edit Layout'}
+          </button>
+        </div>
           </div>
         </div>
       </div>
@@ -372,27 +391,6 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
           <div className="px-2 py-1 bg-white rounded-lg shadow-lg border border-gray-200 text-xs font-medium text-gray-600">
             {Math.round(zoom * 100)}%
           </div>
-        </div>
-
-        {/* Edit Mode Toggle */}
-        <div className="absolute top-4 right-4 z-30">
-          <button
-            onClick={() => {
-              if (isEditMode) {
-                onRefresh?.();
-              }
-              setIsEditMode(!isEditMode);
-            }}
-            className={cn(
-              'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium shadow-lg border transition-all',
-              isEditMode
-                ? 'bg-green-600 hover:bg-green-700 text-white border-green-700'
-                : 'bg-white hover:bg-gray-50 text-gray-700 border-gray-200'
-            )}
-          >
-            {isEditMode ? <Save className="w-4 h-4" /> : <Edit3 className="w-4 h-4" />}
-            {isEditMode ? 'Finish Editing' : 'Edit Layout'}
-          </button>
         </div>
 
         {/* Instructions */}
@@ -446,7 +444,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
 
       {/* Table Properties Panel */}
       {selectedTable && selectedTableData && (
-        <div className="absolute right-4 top-20 bg-white rounded-lg shadow-lg border p-4 w-64 z-40 max-h-[calc(100vh-200px)] overflow-y-auto">
+        <div className="absolute right-0 bottom-0 top-36 bg-white rounded-t-lg shadow-xl border-t border-l border-gray-200 p-4 w-full max-w-xs z-40 max-h-[72vh] overflow-y-auto">
           <div className="flex justify-between items-center mb-3">
             <h4 className="font-semibold">
               {isEditMode ? 'Edit Table Settings' : 'Table Info'}

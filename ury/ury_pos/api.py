@@ -9,11 +9,10 @@ def getTable(room):
     branch_name = getBranch()   
     tables = frappe.get_all(
         "URY Table",
-        fields=["name", "occupied", "latest_invoice_time", "is_take_away", "restaurant_room","table_shape","no_of_seats"],
+        fields=["name", "occupied", "latest_invoice_time", "is_take_away", "restaurant_room","table_shape","no_of_seats","layout_x","layout_y"],
         filters={"branch": branch_name,"restaurant_room":room,}
     )    
     return tables
-
 
 @frappe.whitelist()
 def getRestaurantMenu(pos_profile, room=None, order_type=None):
