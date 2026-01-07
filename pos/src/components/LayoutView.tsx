@@ -78,8 +78,6 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
     }
   };
 
-
-
   // Zoom functionality (simple scale)
   const handleZoomIn = () => setZoom(prev => Math.min(prev + 0.1, 3));
   const handleZoomOut = () => setZoom(prev => Math.max(prev - 0.1, 0.3));
