@@ -69,61 +69,23 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
     }
   };
 
-  // Helper to zoom around a specific point (screen coordinates)
-  const zoomToPoint = useCallback((newZoom: number, pivotX: number, pivotY: number) => {
-    // 1. Calculate the point in World coordinates before zoom
-    // worldX = (screenX - panX) / oldZoom
-    const worldPointX = (pivotX - panOffset.x) / zoom;
-    const worldPointY = (pivotY - panOffset.y) / zoom;
 
-    // 2. Update Zoom
-    const clampedZoom = Math.max(0.3, Math.min(3, newZoom));
-    setZoom(clampedZoom);
 
-    // 3. Calculate new Pan to keep the World point at the same Screen position
-    // screenX = newPanX + worldX * newZoom
-    // => newPanX = screenX - worldX * newZoom
-    setPanOffset({
-      x: pivotX - worldPointX * clampedZoom,
-      y: pivotY - worldPointY * clampedZoom
-    });
-  }, [zoom, panOffset]);
-
-  // Zoom functionality (buttons zoom to center)
-  const handleZoomIn = () => {
-    if (!canvasRef.current) return;
-    const rect = canvasRef.current.getBoundingClientRect();
-    const centerX = rect.width / 2;
-    const centerY = rect.height / 2;
-    zoomToPoint(zoom + 0.2, centerX, centerY);
-  };
-
-  const handleZoomOut = () => {
-    if (!canvasRef.current) return;
-    const rect = canvasRef.current.getBoundingClientRect();
-    const centerX = rect.width / 2;
-    const centerY = rect.height / 2;
-    zoomToPoint(zoom - 0.2, centerX, centerY);
-  };
-
+  // Zoom functionality (simple scale)
+  const handleZoomIn = () => setZoom(prev => Math.min(prev + 0.1, 3));
+  const handleZoomOut = () => setZoom(prev => Math.max(prev - 0.1, 0.3));
   const handleResetZoom = () => {
     setZoom(1);
     setPanOffset({ x: 0, y: 0 });
   };
 
-  // Mouse wheel zoom (zooms to cursor)
+  // Mouse wheel zoom (simple scale)
   const handleWheel = useCallback((e: WheelEvent) => {
     e.preventDefault();
     e.stopPropagation();
-
-    if (!canvasRef.current) return;
-    const rect = canvasRef.current.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-
     const delta = e.deltaY > 0 ? -0.1 : 0.1;
-    zoomToPoint(zoom + delta, mouseX, mouseY);
-  }, [zoom, zoomToPoint]);
+    setZoom(prev => Math.max(0.3, Math.min(3, prev + delta)));
+  }, []);
 
   // Use ref to attach non-passive listener for proper preventDefault
   useEffect(() => {
@@ -160,12 +122,9 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
 
     const canvasRect = canvasRef.current.getBoundingClientRect();
 
-    // We subtract panOffset and divide by zoom to get back to "world" coordinates
-    const mouseX = (e.clientX - canvasRect.left - panOffset.x) / zoom;
-    const mouseY = (e.clientY - canvasRect.top - panOffset.y) / zoom;
-
-    const newX = mouseX - dragOffset.x;
-    const newY = mouseY - dragOffset.y;
+    // Classic drag math
+    const newX = (e.clientX - canvasRect.left) / zoom - dragOffset.x - panOffset.x / zoom;
+    const newY = (e.clientY - canvasRect.top) / zoom - dragOffset.y - panOffset.y / zoom;
 
     // Update local state for immediate feedback
     setLocalLayouts(prev => ({
@@ -234,13 +193,28 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
     const canvasRect = canvasRef.current?.getBoundingClientRect();
     if (!canvasRect) return;
 
-    const mouseXWorld = (e.clientX - canvasRect.left - panOffset.x) / zoom;
-    const mouseYWorld = (e.clientY - canvasRect.top - panOffset.y) / zoom;
+    // Calculate offset for drag start
+    // We need to match the drag math: 
+    // newX = (mouseX - rect.left)/zoom - dragOffset - pan/zoom
+    // So dragOffset = (mouseX - rect)/zoom - startX - pan/zoom
+
+    // Actually, just use standard offset from top-left of element?
+    // Wait, the newX formula sets the new TopLeft.
+    // So dragOffset should be the difference between Mouse and TableTopLeft (in scaled/world units?)
+
+    // User formula: newX = (mouseX - canvasRect.left) / zoom - dragOffset.x - panOffset.x / zoom
+
+    // So when we start drag:
+    // table.x = (mouseX - rect.left)/zoom - dragOffset.x - panOffset.x/zoom
+    // dragOffset.x = (mouseX - rect.left)/zoom - table.x - panOffset.x/zoom
+
+    const mouseX = e.clientX;
+    const mouseY = e.clientY;
 
     setDraggedTable(table.name);
     setDragOffset({
-      x: mouseXWorld - table.x,
-      y: mouseYWorld - table.y
+      x: (mouseX - canvasRect.left) / zoom - table.x - panOffset.x / zoom,
+      y: (mouseY - canvasRect.top) / zoom - table.y - panOffset.y / zoom
     });
   };
 
@@ -281,6 +255,8 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
       top: table.y,
       width: dimensions.width,
       height: dimensions.height,
+      transform: `scale(${zoom})`,
+      transformOrigin: 'top left',
     };
 
     const shapeLower = table.table_shape?.toLowerCase();
@@ -343,45 +319,6 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
     updateTableLayout(selectedTable, { no_of_seats: capacity })
       .catch(console.error);
   }
-
-  // const handleAddTable = async () => {
-  //   const tableName = prompt("Enter table name:");
-  //   if (!tableName) return;
-
-  //   try {
-  //     await createTable({
-  //       restaurant_room: selectedRoom,
-  //       table_shape: 'Rectangle',
-  //       no_of_seats: 4,
-  //       custom_layout_x: 100 + Math.abs(panOffset.x), // Place near current view
-  //       custom_layout_y: 100 + Math.abs(panOffset.y),
-  //       is_take_away: 0,
-  //       occupied: 0,
-  //       name: tableName
-  //     });
-  //     showToast.success('Table created');
-  //     onRefresh?.();
-  //   } catch (error) {
-  //     console.error(error);
-  //     showToast.error('Failed to create table');
-  //   }
-  // };
-
-  // const handleDeleteTable = async () => {
-  //   if (!selectedTable) return;
-  //   if (!confirm(`Are you sure you want to delete ${selectedTable}?`)) return;
-
-  //   try {
-  //     await deleteTable(selectedTable);
-  //     showToast.success('Table deleted');
-  //     setSelectedTable(null);
-  //     onRefresh?.();
-  //   } catch (error) {
-  //     console.error(error);
-  //     showToast.error('Failed to delete table');
-  //   }
-  // };
-
 
   const handleDropdownShapeChange = (shape: string) => {
     if (!selectedTable) return;
@@ -497,18 +434,17 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
             cursor: isPanning ? 'grabbing' : isEditMode ? 'default' : 'grab'
           }}
         >
-          {/* World Container - applies Zoom and Pan to everything inside */}
+          {/* World Container - applies Pan Only */}
           <div
             style={{
-              transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoom})`,
-              transformOrigin: '0 0',
+              transform: `translate(${panOffset.x}px, ${panOffset.y}px)`,
               width: '100%',
               height: '100%',
               backgroundImage: `
                 linear-gradient(to right, #e5e7eb 1px, transparent 1px),
                 linear-gradient(to bottom, #e5e7eb 1px, transparent 1px)
               `,
-              backgroundSize: '20px 20px', // Fixed size, scale transform handles the zooming
+              backgroundSize: `${20 * zoom}px ${20 * zoom}px`, // Grid scales with zoom
               backgroundPosition: '0 0'
             }}
             className="w-full h-full"
