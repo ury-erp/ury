@@ -41,10 +41,25 @@ export async function getRooms(branch: string): Promise<Room[]> {
 }
 
 export async function getTables(room: string): Promise<Table[]> {
-  const { call } = await import('./frappe-sdk');
-  const res = await call.get('ury.ury_pos.api.getTable', { room });
-  return res.message as Table[];
-} 
+  const tables = await db.getDocList(DOCTYPES.URY_TABLE, {
+    fields: [
+      'name',
+      'occupied',
+      'latest_invoice_time',
+      'is_take_away',
+      'restaurant_room',
+      'table_shape',
+      'no_of_seats',
+      'layout_x',
+      'layout_y',
+      'minimum_seating'
+    ],
+    filters: [['restaurant_room', '=', room]],
+    asDict: true,
+  });
+
+  return tables as Table[];
+}
 
 
 export async function updateTableLayout(name: string, data: Partial<Table>) {
