@@ -227,27 +227,6 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
     });
   };
 
-  const handleShapeChange = (e: React.MouseEvent, table: typeof tablesWithPosition[0]) => {
-    e.stopPropagation();
-    const shapes: ('Circle' | 'Square' | 'Rectangle')[] = ['Circle', 'Square', 'Rectangle'];
-    const currentShape = table.table_shape || 'Rectangle';
-    // Find current shape case-insensitively
-    const currentIndex = shapes.findIndex(s => s.toLowerCase() === currentShape.toLowerCase());
-    const nextShape = shapes[(currentIndex + 1) % shapes.length];
-
-    setLocalLayouts(prev => ({
-      ...prev,
-      [table.name]: {
-        ...(prev[table.name] || {}),
-        table_shape: nextShape
-      }
-    }));
-
-    updateTableLayout(table.name, { table_shape: nextShape })
-      .catch(console.error);
-  };
-
-
   const TableShape = ({ table }: { table: typeof tablesWithPosition[0] }) => {
     const dimensions = getTableDimensions(table.table_shape, table.no_of_seats);
 
@@ -294,13 +273,6 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
           <>
             <div className="absolute -top-1 -right-1 bg-blue-500 text-white rounded-full p-0.5 shadow-sm">
               <Move className="w-2 h-2" />
-            </div>
-            <div
-              onMouseDown={(e) => handleShapeChange(e, table)}
-              className="absolute -bottom-1 -right-1 bg-white border border-gray-200 text-gray-600 hover:text-blue-600 rounded-full p-0.5 shadow-sm cursor-pointer z-30 pointer-events-auto"
-              title="Change Shape"
-            >
-              <RotateCcw className="w-2 h-2" />
             </div>
           </>
         )}
