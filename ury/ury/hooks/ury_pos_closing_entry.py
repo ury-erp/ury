@@ -70,4 +70,3 @@ def validate_cashier(doc, method):
             frappe.throw("Sub Cashiers are not allowed to make POS Closing Entries.")
     else:
         pass
-    

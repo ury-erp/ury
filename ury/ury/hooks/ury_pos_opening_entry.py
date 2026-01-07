@@ -63,17 +63,23 @@ def main_pos_open_check(doc,method):
         pass
 
 def validate_pos_opening_quality_review(doc, method):
-   
-    exists = frappe.db.exists(
-        "Quality Review",
-        {
-            "date": today(),
-            "goal": "Cashier POS Opening"
-        }
+    """
+    Block POS Opening Entry unless
+    a Quality Review exists today
+    for Quality Goal titled 'Cashier POS Opening'
+    """
+
+    quality_goal_name = frappe.db.get_value(
+        "Quality Goal",
+        {"goal": "Cashier POS Opening"},
+        "name"
     )
 
-    if exists:
+    # Safety check (misconfiguration)
+    if not quality_goal_name:
         frappe.throw(
-           ( "Please complete today's Quality Review"),
-            title=("Quality Review Required")
+            "Quality Goal 'Cashier POS Opening' is not configured.",
+            title="Configuration Error"
         )
+
+  
