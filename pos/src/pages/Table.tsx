@@ -241,6 +241,7 @@ const TableView = () => {
         selectedRoom={selectedRoom}
         tables={tablesToDisplay}
         onBackToGrid={() => setIsLayoutView(false)}
+        onRefresh={() => loadTables(selectedRoom, { useCache: false })}
       />
     );
   }

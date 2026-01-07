@@ -407,7 +407,12 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
         {/* Edit Mode Toggle */}
         <div className="absolute top-4 right-4 z-30">
           <button
-            onClick={() => setIsEditMode(!isEditMode)}
+            onClick={() => {
+              if (isEditMode) {
+                onRefresh?.();
+              }
+              setIsEditMode(!isEditMode);
+            }}
             className={cn(
               'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium shadow-lg border transition-all',
               isEditMode
