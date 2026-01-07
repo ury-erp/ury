@@ -1,10 +1,10 @@
 import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
-import { CreditCard as Edit3, Save, Grid3x3 as Grid3X3, ZoomIn, ZoomOut, RotateCcw, X, Users, Move} from 'lucide-react';
+import { CreditCard as Edit3, Save, Square, Circle, RectangleHorizontal, Users, Move, X, Grid3x3 as Grid3X3, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 import { cn, formatInvoiceTime } from '../lib/utils';
 import { Table, updateTableLayout } from '../lib/table-api';
 import { getTableOrder, POSInvoice } from '../lib/order-api';
 import { Button } from './ui';
-// import { showToast } from './ui/toast';
+import { showToast } from './ui/toast';
 
 
 
@@ -383,6 +383,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
   //   }
   // };
 
+
   const handleDropdownShapeChange = (shape: string) => {
     if (!selectedTable) return;
     const currentTable = tablesWithPosition.find(t => t.name === selectedTable);
@@ -418,12 +419,9 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
             </Button>
             <h2 className="text-lg font-semibold">{selectedRoom} <span className="text-gray-400 mx-2">|</span> Layout</h2>
           </div>
-          {/* {isEditMode && (
-            <Button onClick={handleAddTable} className="flex items-center gap-2">
-              <Plus className="w-4 h-4" />
-              Add Table
-            </Button>
-          )} */}
+          <div className="flex items-center gap-2">
+            {/* Add Table button removed */}
+          </div>
         </div>
       </div>
 
@@ -464,7 +462,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
             className={cn(
               'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium shadow-lg border transition-all',
               isEditMode
-                ? 'bg-blue-600 hover:bg-blue-700 text-white border-blue-700'
+                ? 'bg-green-600 hover:bg-green-700 text-white border-green-700'
                 : 'bg-white hover:bg-gray-50 text-gray-700 border-gray-200'
             )}
           >
@@ -647,18 +645,6 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
               </div>
             )}
 
-            {/* {isEditMode && (
-              <div className="pt-4 mt-2 border-t border-gray-200">
-                <Button
-                  onClick={handleDeleteTable}
-                  variant="destructive"
-                  className="w-full flex items-center justify-center gap-2"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  Delete Table
-                </Button>
-              </div>
-            )} */}
           </div>
         </div>
       )}
