@@ -1,4 +1,6 @@
 import frappe
+from frappe.utils import today
+
 
 def before_save(doc, method):
     sub_pos_close_check(doc, method)
@@ -70,3 +72,16 @@ def validate_cashier(doc, method):
             frappe.throw("Sub Cashiers are not allowed to make POS Closing Entries.")
     else:
         pass
+def validate_pos_closing_quality_review(doc, method):
+  
+    quality_goal_name = frappe.db.get_value(
+        "Quality Goal",
+        {"goal": "Cashier POS Closing"},
+        "name"
+    )
+
+    if not quality_goal_name:
+        frappe.throw(
+            "Quality Goal 'Cashier POS Closing' is not configured.",
+            title="Configuration Error"
+        )
