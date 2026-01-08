@@ -65,7 +65,6 @@ def main_pos_open_check(doc,method):
 
 def validate_pos_opening_quality_review(doc, method):
 
-    # 1️⃣ Resolve Quality Goal NAME
     quality_goal_name = frappe.db.get_value(
         "Quality Goal",
         {"goal": "Cashier POS Opening"},
@@ -78,7 +77,6 @@ def validate_pos_opening_quality_review(doc, method):
             title="Configuration Error"
         )
 
-    # 2️⃣ Load full Quality Review document
     review_name = frappe.db.get_value(
         "Quality Review",
         {
@@ -88,7 +86,6 @@ def validate_pos_opening_quality_review(doc, method):
         "name"
     )
 
-    # 3️⃣ HARD BLOCK if review does not exist
     if not review_name:
         frappe.throw(
             "Please complete today's Quality Review for Cashier POS Opening",
@@ -97,13 +94,11 @@ def validate_pos_opening_quality_review(doc, method):
 
     review_doc = frappe.get_doc("Quality Review", review_name)
 
-    # 4️⃣ CHECK CHILD TABLE FOR FAILED OBJECTIVES
     has_failed_objective = any(
         row.status == "Failed"
         for row in review_doc.reviews
     )
 
-    # 5️⃣ WARNING ONLY (DO NOT BLOCK)
     if has_failed_objective:
         frappe.msgprint(
             "Please complete the Failed objective",
