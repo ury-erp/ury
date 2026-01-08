@@ -40,6 +40,20 @@ export async function getRooms(branch: string): Promise<Room[]> {
   return rooms as Room[];
 }
 
+export async function getTableCount(room: string, branch?: string): Promise<number> {
+  const filters = [
+    ['restaurant_room', '=', room],
+    ...(branch ? [['branch', '=', branch]] : []),
+  ];
+  const rows = await db.getDocList(DOCTYPES.URY_TABLE, {
+    fields: ['count(name) as count'],
+    filters: filters as any,
+    limit: 1,
+    asDict: true,
+  }) as Array<{ count?: number | string }>;
+  const countValue = rows[0]?.count ?? 0;
+  return typeof countValue === 'number' ? countValue : Number(countValue) || 0;
+}
 export async function getTables(room: string): Promise<Table[]> {
   const tables = await db.getDocList(DOCTYPES.URY_TABLE, {
     fields: [

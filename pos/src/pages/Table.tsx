@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Eye, Layout, Loader2, Printer, Square, Users } from 'lucide-react';
 import { cn, formatInvoiceTime } from '../lib/utils';
 import { usePOSStore } from '../store/pos-store';
-import { getRooms, getTables, type Room, type Table } from '../lib/table-api';
+import { getRooms, getTables, getTableCount ,type Room, type Table } from '../lib/table-api';
 import { Spinner } from '../components/ui/spinner';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
@@ -29,6 +29,7 @@ const TableView = () => {
   const [loadingRooms, setLoadingRooms] = useState(false);
   const [loadingTables, setLoadingTables] = useState(false);
   const [roomCounts, setRoomCounts] = useState<Record<string, number>>({});
+  const [loadingRoomCounts, setLoadingRoomCounts] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [printingTable, setPrintingTable] = useState<string | null>(null);
 
@@ -88,6 +89,27 @@ const TableView = () => {
     }
 
     if (!shouldFetch) return;
+
+  async function fetchRoomCounts() {
+      setLoadingRoomCounts(true);
+      try {
+        const counts = await Promise.all(
+          rooms.map(room => getTableCount(room.name, room.branch))
+        );
+        const nextCounts = rooms.reduce((acc, room, index) => {
+          acc[room.name] = counts[index];
+          return acc;
+        }, {} as Record<string, number>);
+        setRoomCounts(nextCounts);
+        persistRoomCounts(nextCounts);
+      } catch (error) {
+        console.error('Failed to load room counts', error);
+      } finally {
+        setLoadingRoomCounts(false);
+      }
+    }
+
+    fetchRoomCounts();
   }, [branch, rooms, persistRoomCounts]);
 
   const loadTables = useCallback(
