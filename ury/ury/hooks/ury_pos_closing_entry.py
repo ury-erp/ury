@@ -85,3 +85,17 @@ def validate_pos_closing_quality_review(doc, method):
             "Quality Goal 'Cashier POS Closing' is not configured.",
             title="Configuration Error"
         )
+
+    exists = frappe.db.exists(
+        "Quality Review",
+        {
+            "date": today(),
+            "goal": quality_goal_name
+        }
+    )
+
+    if not exists:
+        frappe.throw(
+            "Please complete today's Quality Review for Cashier POS Closing ",
+            title="Quality Review Required"
+        )
