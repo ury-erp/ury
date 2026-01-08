@@ -7,8 +7,6 @@ from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 
 def after_install():
     create_custom_fields(get_custom_fields())
-def before_uninstall():
-    delete_custom_fields(get_custom_fields())
  
 def get_custom_fields():
 	"""URY specific custom fields that need to be added to the masters in ERPNext"""
@@ -365,30 +363,6 @@ def get_custom_fields():
      
     }
  
-def delete_custom_fields(custom_fields):
-    for doctype, fields in custom_fields.items():
-        fieldnames = [field["fieldname"] for field in fields]
-        frappe.db.delete(
-            "Custom Field",
-            {"dt": doctype, "fieldname": ("in", fieldnames)}
-        )
-        
-    frappe.db.delete("Custom Field", {"dt": ("like", "%URY%")})
-    frappe.db.delete("Custom Field", {"options": ("like", "%URY%")})
-    frappe.db.commit()
-    print("Deleted URY custom fields")
-
-    roles = frappe.get_all("Role", filters={"name": ("like", "URY%")})
-    for r in roles:
-        frappe.delete_doc("Role", r.name, force=1, ignore_permissions=True)
-    frappe.db.commit()
-
-    frappe.db.delete("Has Role", {"role": ("like", "URY%")})
-    frappe.db.delete("User Permission", {"allow": ("like", "URY%")})
-    frappe.db.commit()
-
-    for doctype in custom_fields.keys():
-        frappe.clear_cache(doctype=doctype)
 
 
         
