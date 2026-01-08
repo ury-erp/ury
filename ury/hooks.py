@@ -84,8 +84,8 @@ website_route_rules = [
 # Uninstallation
 # ------------
 
-# before_uninstall = "ury.uninstall.before_uninstall"
-# after_uninstall = "ury.uninstall.before_uninstall"
+before_uninstall = "ury.uninstall.before_uninstall"
+after_uninstall = "ury.uninstall.after_uninstall"
 
 # Desk Notifications
 # ------------------
