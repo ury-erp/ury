@@ -72,8 +72,10 @@ def validate_cashier(doc, method):
             frappe.throw("Sub Cashiers are not allowed to make POS Closing Entries.")
     else:
         pass
+
 def validate_pos_closing_quality_review(doc, method):
-  
+    
+
     quality_goal_name = frappe.db.get_value(
         "Quality Goal",
         {"goal": "Cashier POS Closing"},
@@ -86,16 +88,30 @@ def validate_pos_closing_quality_review(doc, method):
             title="Configuration Error"
         )
 
-    exists = frappe.db.exists(
+    review_name = frappe.db.get_value(
         "Quality Review",
         {
             "date": today(),
             "goal": quality_goal_name
-        }
+        },
+        "name"
     )
 
-    if not exists:
+    if not review_name:
         frappe.throw(
-            "Please complete today's Quality Review for Cashier POS Closing ",
+            "Please complete today's Quality Review for Cashier POS Closing",
             title="Quality Review Required"
+        )
+
+    review_doc = frappe.get_doc("Quality Review", review_name)
+
+    has_failed_objective = any(
+        row.status == "Failed"
+        for row in review_doc.reviews
+    )
+
+    if has_failed_objective:
+        frappe.msgprint(
+            "Please complete the Failed objective",
+            indicator="orange"
         )
