@@ -5,12 +5,10 @@ def before_uninstall():
 
     ury_doctypes = [
         "POS Invoice", "Sales Invoice", "POS Profile", "Address", "item", "item_barcode",
-        "POS Opening Entry", "Price List", "Branch", "POS Closing Entry", "Employee",
+        "POS Opening Entry", "Price List", "Branch", "POS Closing Entry", "Employee", "ury_menu_course"
         "Customer", "POS Invoice Item", "Contact", "POS Closing Entry Detail", "POS Profile User"
     ]
     
-    frappe.db.delete("Custom Field", {"name": ("like", "%URY%")})
-    frappe.db.delete("Custom Field", {"fieldname": ("like", "%URY%")})
     frappe.db.delete("Custom Field", {"dt": ("in", ury_doctypes)})
     frappe.db.delete("Property Setter", {"doc_type": ("in", ury_doctypes)})
 
