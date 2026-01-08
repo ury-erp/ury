@@ -62,12 +62,12 @@ def main_pos_open_check(doc,method):
     else:
         pass
 
+
+import frappe
+from frappe.utils import today
+
+
 def validate_pos_opening_quality_review(doc, method):
-    """
-    Block POS Opening Entry unless
-    a Quality Review exists today
-    for Quality Goal titled 'Cashier POS Opening'
-    """
 
     quality_goal_name = frappe.db.get_value(
         "Quality Goal",
@@ -81,16 +81,30 @@ def validate_pos_opening_quality_review(doc, method):
             title="Configuration Error"
         )
 
-    exists = frappe.db.exists(
+    review_name = frappe.db.get_value(
         "Quality Review",
         {
             "date": today(),
             "goal": quality_goal_name
-        }
+        },
+        "name"
     )
 
-    if not exists:
+    if not review_name:
         frappe.throw(
             "Please complete today's Quality Review for Cashier POS Opening",
             title="Quality Review Required"
+        )
+
+    review_doc = frappe.get_doc("Quality Review", review_name)
+
+    has_failed_objective = any(
+        row.status == "Failed"
+        for row in review_doc.reviews
+    )
+
+    if has_failed_objective:
+        frappe.msgprint(
+            "Please complete the Failed objective",
+            indicator="orange"
         )
