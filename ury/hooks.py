@@ -35,17 +35,12 @@ app_include_js = [
 # include js in page
 page_js = {"point-of-sale": ["public/js/pos_extend.js"]}
 
-doctype_js = {
-    "Quality Review": "public/js/quality_review.js"
-}
-
 
 # include js in doctype views
 # doctype_js = {"POS Invoive" : "public/js/pos_print.js"}
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
-
 # Splash Image in Website Settings
 website_context = {"splash_image": "/assets/ury/Images/ury-logo.jpg"}
 
@@ -386,3 +381,7 @@ fixtures = [
     {"dt": "Role", "filters": [["role_name", "like", "URY %"]]},
     "Client Script",
 ]
+
+doctype_js = {
+    "Quality Review": "public/js/quality_review.js"
+}
