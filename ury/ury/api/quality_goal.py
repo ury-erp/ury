@@ -19,3 +19,14 @@ def quality_goal_for_current_user(
     if not roles:
         return []
 
+    placeholders = ", ".join(["%s"] * len(roles))
+
+    return frappe.db.sql(f"""
+        SELECT name
+        FROM `tabQuality Goal`
+        WHERE
+            name LIKE %s
+            AND custom_assigned_role IN ({placeholders})
+        ORDER BY modified DESC
+        LIMIT %s, %s
+    """, tuple([f"%{txt}%"] + roles + [start, page_len]))
