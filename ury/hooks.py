@@ -35,6 +35,8 @@ app_include_js = [
 # include js in page
 page_js = {"point-of-sale": ["public/js/pos_extend.js"]}
 
+
+
 # include js in doctype views
 # doctype_js = {"POS Invoive" : "public/js/pos_print.js"}
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
