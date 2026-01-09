@@ -84,8 +84,8 @@ website_route_rules = [
 # Uninstallation
 # ------------
 
-# before_uninstall = "ury.uninstall.before_uninstall"
-# after_uninstall = "ury.uninstall.before_uninstall"
+before_uninstall = "ury.uninstall.before_uninstall"
+after_uninstall = "ury.uninstall.before_uninstall"
 
 # Desk Notifications
 # ------------------
@@ -243,134 +243,6 @@ scheduler_events = {
 # ]
 
 fixtures = [
-    {
-        "doctype": "Custom Field",
-        "filters": [
-            [
-                "name",
-                "in",
-                {
-                    "Customer-mobile_number",
-                    "POS Invoice-mobile_number",
-                    "POS Invoice-order_info",
-                    "POS Invoice-order_type",
-                    "POS Invoice-waiter",
-                    "POS Invoice-column_break_rwbwf",
-                    "POS Invoice-no_of_pax",
-                    "POS Invoice-cashier",
-                    "POS Invoice-invoice_printed",
-                    "POS Invoice-invoice_created",
-                    "POS Invoice-custom_aggregator_id",
-                    "POS Invoice-restaurant_info",
-                    "POS Invoice-restaurant",
-                    "POS Invoice-branch",
-                    "POS Invoice-print",
-                    "POS Invoice-restaurant_table",
-                    "POS Invoice-custom_restaurant_room",
-                    "POS Invoice-column_break_gd1mq",
-                    "POS Invoice-arrived_time",
-                    "POS Invoice-total_spend_time",
-                    "POS Invoice-section_break_hllcp",
-                    "POS Invoice-cancel_reason",
-                    "POS Invoice Item-comment",
-                    "POS Invoice Item-custom_course",
-                    "Sales Invoice-mobile_number",
-                    "Sales Invoice-order_info",
-                    "Sales Invoice-order_type",
-                    "Sales Invoice-waiter",
-                    "Sales Invoice-column_break_bc56k",
-                    "Sales Invoice-no_of_pax",
-                    "Sales Invoice-cashier",
-                    "Sales Invoice-restaurant_info",
-                    "Sales Invoice-restaurant",
-                    "Sales Invoice-branch",
-                    "Sales Invoice-restaurant_table",
-                    "Sales Invoice-custom_restaurant_room",
-                    "Sales Invoice-column_break_hnrk9",
-                    "Sales Invoice-arrived_time",
-                    "Sales Invoice-total_spend_time",
-                    "Sales Invoice-custom_aggregator_id",
-                    "Sales Invoice Item-custom_course",
-                    "POS Profile-restaurant_info",
-                    "POS Profile-restaurant",
-                    "POS Profile-column_break_c10ag",
-                    "POS Profile-branch",
-                    "POS Profile-printer_info",
-                    "POS Profile-printer_settings",
-                    "POS Profile-qz_print",
-                    "POS Profile-qz_host",
-                    "POS Profile-section_break_tjhrm",
-                    "POS Profile-transfer_role_permissions",
-                    "POS Profile-role_allowed_for_billing",
-                    "POS Profile-column_break_bvzw2",
-                    "POS Profile-role_restricted_for_table_order",
-                    "POS Profile-view_all_status",
-                    "POS Profile-remove_items",
-                    "POS Profile-restaurant_prefix",
-                    "POS Profile-show_image",
-                    "POS Profile-custom_daily_pos_close",
-                    "POS Profile-paid_limit",
-                    "POS Profile-table_attention_time",
-                    "POS Opening Entry-restaurant_info",
-                    "POS Opening Entry-restaurant",
-                    "POS Opening Entry-column_break_e3dky",
-                    "POS Opening Entry-branch",
-                    "POS Opening Entry-custom_room",
-                    "Branch-user",
-                    "Branch-custom_aggregator_settings",
-                    "Branch-custom_aggregators",
-                    "Branch-custom_make_unpaid",
-                    "Branch-custom_no_taxes",
-                    "Price List-restaurant_menu",
-                    "POS Profile-custom_enable_discount",
-                    "POS Invoice-custom_comments",
-                    "POS Profile-custom_multiple_cashier_configuration",
-                    "POS Profile-custom_enable_multiple_cashier",
-                    "POS Profile User-custom_main_cashier",
-                    "POS Opening Entry-custom_rooms",
-                    "POS Opening Entry-custom_sub_pos_close_entry",
-                    "POS Closing Entry Detail-custom_closing_amount",
-                    "POS Profile-custom_edit_order_type",
-                    "Printer Settings-kot_print_format_",
-                    "Printer Settings-kot",
-                    "POS Profile-kot_naming_series",
-                    "POS Profile-custom_kot_settings",
-                    "POS Profile-custom_kot_alert",
-                    "POS Profile-custom_kot_alert_sound",
-                    "POS Profile-custom_kot_warning_time",
-                    "POS Profile-custom_cl",
-                    "POS Profile-custom_notify_kot_delay",
-                    "POS Profile-custom_recipients",
-                    "URY Printer Settings-custom_block_takeaway_kot",
-                    "POS Opening Entry-custom_ury_last_invoice",
-                    "POS Opening Entry-custom_ury_last_aggregator_invoice",
-                    "POS Profile-custom_reset_order_number_daily",
-                    "POS Invoice-custom_ury_order_number",
-                    "URY Menu Course-custom_serving_priority",
-                    "URY Menu Course-custom_indicate_in_kds",
-                    "POS Profile-custom_enable_kot_reprint",
-                    "POS Profile-custom_parcel_order_printer",
-                    "POS Profile-custom_column_break_wwq3q",
-                    "POS Profile-custom_table_order_printer",
-                    "POS Profile-custom_reprint_kot_format",
-                    "Employee-payment_amount",
-                    "Employee-payment_type"
-                },
-            ]
-        ],
-    },
-    {
-        "dt": "Property Setter",
-        "filters": [
-            [
-                "name",
-                "in",
-                {
-                    "POS Closing Entry Detail-closing_amount-label"
-                }
-            ]
-        ],
-    },
     {"dt": "Role", "filters": [["role_name", "like", "URY %"]]},
     "Client Script",
 ]
