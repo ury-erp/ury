@@ -61,7 +61,6 @@ def main_pos_open_check(doc,method):
             return flag
     else:
         pass
-
 def validate_pos_opening_quality_review(doc, method):
     if not frappe.db.get_value(
         "POS Profile",
@@ -69,43 +68,42 @@ def validate_pos_opening_quality_review(doc, method):
         "custom_daily_quality_check"
     ):
         return
-    quality_goal_name = frappe.db.get_value(
+
+    user = frappe.session.user
+    user_roles = frappe.get_roles(user)
+
+    assigned_goals = frappe.get_all(
         "Quality Goal",
-        {"goal": "Cashier POS Opening"},
-        "name"
+        filters={"custom_assigned_role": ["in", user_roles]},
+        pluck="name"
     )
 
-    if not quality_goal_name:
+    if not assigned_goals:
         frappe.throw(
-            "Quality Goal 'Cashier POS Opening' is not configured.",
-            title="Configuration Error"
+            "No Quality Goals are assigned to your role.",
+            title="Quality Review Required"
         )
 
     review_name = frappe.db.get_value(
         "Quality Review",
         {
+            "owner": user,
             "date": today(),
-            "goal": quality_goal_name
+            "goal": ["in", assigned_goals]
         },
         "name"
     )
 
     if not review_name:
         frappe.throw(
-            "Please complete today's Quality Review for Cashier POS Opening",
+            "Please complete today's Quality Review for your assigned goals.",
             title="Quality Review Required"
         )
 
     review_doc = frappe.get_doc("Quality Review", review_name)
 
-    has_failed_objective = any(
-        row.status == "Failed"
-        for row in review_doc.reviews
-    )
-
-    if has_failed_objective:
-        frappe.msgprint(
-            "Please complete the Failed objective",
-            indicator="orange"
+    if any(row.status == "Failed" for row in review_doc.reviews):
+        frappe.throw(
+            "Please resolve failed objectives in your Quality Review.",
+            title="Quality Review Failed"
         )
-
