@@ -340,25 +340,25 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
           </div>
           <div className="flex items-center gap-2">
             {/* Edit Mode Toggle */}
-        <div className="">
-          <button
-            onClick={() => {
-              if (isEditMode) {
-                onRefresh?.();
-              }
-              setIsEditMode(!isEditMode);
-            }}
-            className={cn(
-              'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border transition-all',
-              isEditMode
-                ? 'bg-blue-600 hover:bg-blue-700 text-white border-green-700'
-                : 'bg-white hover:bg-gray-50 text-gray-700 border-gray-200'
-            )}
-          >
-            {isEditMode ? <Save className="w-4 h-4" /> : <Edit3 className="w-4 h-4" />}
-            {isEditMode ? 'Finish Editing' : 'Edit Layout'}
-          </button>
-        </div>
+            <div className="">
+              <button
+                onClick={() => {
+                  if (isEditMode) {
+                    onRefresh?.();
+                  }
+                  setIsEditMode(!isEditMode);
+                }}
+                className={cn(
+                  'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border transition-all',
+                  isEditMode
+                    ? 'bg-blue-600 hover:bg-blue-700 text-white border-green-700'
+                    : 'bg-white hover:bg-gray-50 text-gray-700 border-gray-200'
+                )}
+              >
+                {isEditMode ? <Save className="w-4 h-4" /> : <Edit3 className="w-4 h-4" />}
+                {isEditMode ? 'Finish Editing' : 'Edit Layout'}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -410,30 +410,26 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
 
         <div
           ref={canvasRef}
-          className="w-full h-full relative bg-gray-100 overflow-hidden"
-          // Wheel listener attached via ref in useEffect for passive: false support
+          className="w-full h-full relative bg-white overflow-hidden cursor-grab active:cursor-grabbing"
+          style={{
+            backgroundImage: `
+              linear-gradient(to right, #e5e7eb 1px, transparent 1px),
+              linear-gradient(to bottom, #e5e7eb 1px, transparent 1px)
+            `,
+            backgroundSize: `${20 * zoom}px ${20 * zoom}px`,
+            backgroundPosition: `${panOffset.x}px ${panOffset.y}px`
+          }}
           onMouseDown={handleCanvasMouseDown}
           onMouseMove={handleCanvasMouseMove}
           onMouseUp={handleCanvasMouseUp}
           onMouseLeave={handleCanvasMouseUp}
-          style={{
-            cursor: isPanning ? 'grabbing' : isEditMode ? 'default' : 'grab'
-          }}
         >
-          {/* World Container - applies Pan Only */}
+          {/* Tables Container with Transform */}
           <div
             style={{
               transform: `translate(${panOffset.x}px, ${panOffset.y}px)`,
-              width: '100%',
-              height: '100%',
-              backgroundImage: `
-                linear-gradient(to right, #e5e7eb 1px, transparent 1px),
-                linear-gradient(to bottom, #e5e7eb 1px, transparent 1px)
-              `,
-              backgroundSize: `${20 * zoom}px ${20 * zoom}px`, // Grid scales with zoom
-              backgroundPosition: '0 0'
+              transformOrigin: 'top left'
             }}
-            className="w-full h-full"
           >
             {tablesWithPosition.map(table => (
               <TableShape key={table.name} table={table} />
