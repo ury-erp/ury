@@ -121,37 +121,47 @@ doc_events = {
     "POS Invoice": {
         "before_insert": "ury.ury.hooks.ury_pos_invoice.before_insert",
         "validate": "ury.ury.hooks.ury_pos_invoice.validate",
-        "after_insert":"ury.ury.api.ury_kot_order_number.set_order_number",
+        "after_insert": "ury.ury.api.ury_kot_order_number.set_order_number",
         "before_submit": "ury.ury.hooks.ury_pos_invoice.before_submit",
         "on_cancel": "ury.ury.hooks.ury_pos_invoice.on_trash",
         "on_trash": "ury.ury.hooks.ury_pos_invoice.on_trash",
     },
-    "POS Profile": {"validate": "ury.ury.hooks.ury_pos_profile.validate"},
-    "Sales Invoice": {
-        "before_insert": "ury.ury.hooks.ury_sales_invoice.before_insert",
-        "on_update":"ury.ury.hooks.ury_sales_invoice.on_update",
-        },
-    "Customer": {"before_save": "ury.ury.hooks.ury_customer.before_insert"},
-    "Item": {"validate": "ury.ury.hooks.ury_item.validate"},
-    "POS Opening Entry": {
-        "validate":"ury.ury.hooks.ury_pos_opening_entry.set_cashier_room",
-        "before_save": "ury.ury.hooks.ury_pos_opening_entry.before_save",
-        "before_insert":"ury.ury.api.ury_kot_order_number.set_last_invoice_in_pos_open",
-        "validate": [
-            "ury.ury.hooks.ury_pos_opening_entry.validate_pos_opening_quality_review"
-        ]
+
+    "POS Profile": {
+        "validate": "ury.ury.hooks.ury_pos_profile.validate"
     },
 
+    "Sales Invoice": {
+        "before_insert": "ury.ury.hooks.ury_sales_invoice.before_insert",
+        "on_update": "ury.ury.hooks.ury_sales_invoice.on_update",
+    },
+
+    "Customer": {
+        "before_save": "ury.ury.hooks.ury_customer.before_insert"
+    },
+
+    "Item": {
+        "validate": "ury.ury.hooks.ury_item.validate"
+    },
+
+    # ✅ POS OPENING ENTRY (QUALITY REVIEW MOVED TO before_submit)
+    "POS Opening Entry": {
+        "validate": "ury.ury.hooks.ury_pos_opening_entry.set_cashier_room",
+        "before_save": "ury.ury.hooks.ury_pos_opening_entry.before_save",
+        "before_insert": "ury.ury.api.ury_kot_order_number.set_last_invoice_in_pos_open",
+        "before_submit": "ury.ury.hooks.ury_pos_opening_entry.validate_pos_opening_quality_review",
+    },
+
+    # ✅ POS CLOSING ENTRY (QUALITY REVIEW MOVED TO before_submit)
     "POS Closing Entry": {
         "before_save": "ury.ury.hooks.ury_pos_closing_entry.before_save",
-        "validate":"ury.ury.hooks.ury_pos_closing_entry.validate",
-        "validate": [
-            "ury.ury.hooks.ury_pos_closing_entry.validate_pos_closing_quality_review"
-        ]
+        "validate": "ury.ury.hooks.ury_pos_closing_entry.validate",
+        "before_submit": "ury.ury.hooks.ury_pos_closing_entry.validate_pos_closing_quality_review",
     },
+
     "URY Menu Course": {
-		"validate": "ury.ury.api.ury_menu_course_validation.validate_priority",
-	}    
+        "validate": "ury.ury.api.ury_menu_course_validation.validate_priority",
+    }
 }
 
 # Scheduled Tasks

@@ -73,9 +73,18 @@ def validate_cashier(doc, method):
     else:
         pass
 
-def validate_pos_closing_quality_review(doc, method):
-    
 
+def validate_pos_closing_quality_review(doc, method):
+    if not frappe.db.get_value(
+        "POS Profile",
+        doc.pos_profile,
+        "custom_daily_quality_check"
+    ):
+        return
+
+    # existing logic continues...
+
+    # ⬇️ EXISTING QUALITY REVIEW LOGIC (UNCHANGED)
     quality_goal_name = frappe.db.get_value(
         "Quality Goal",
         {"goal": "Cashier POS Closing"},

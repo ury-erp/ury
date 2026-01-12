@@ -62,9 +62,13 @@ def main_pos_open_check(doc,method):
     else:
         pass
 
-
 def validate_pos_opening_quality_review(doc, method):
-
+    if not frappe.db.get_value(
+        "POS Profile",
+        doc.pos_profile,
+        "custom_daily_quality_check"
+    ):
+        return
     quality_goal_name = frappe.db.get_value(
         "Quality Goal",
         {"goal": "Cashier POS Opening"},
@@ -104,3 +108,4 @@ def validate_pos_opening_quality_review(doc, method):
             "Please complete the Failed objective",
             indicator="orange"
         )
+
