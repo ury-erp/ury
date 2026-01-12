@@ -7,6 +7,7 @@ interface AggregatorSelectProps {
   disabled?: boolean;
 }
 
+
 export function AggregatorSelect({ disabled }: AggregatorSelectProps) {
   const { selectedAggregator, setSelectedAggregator, fetchAggregatorMenu } = usePOSStore();
   const [aggregators, setAggregators] = useState<Aggregator[]>([]);
