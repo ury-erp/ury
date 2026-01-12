@@ -144,7 +144,6 @@ doc_events = {
         "validate": "ury.ury.hooks.ury_item.validate"
     },
 
-    # ✅ POS OPENING ENTRY (QUALITY REVIEW MOVED TO before_submit)
     "POS Opening Entry": {
         "validate": "ury.ury.hooks.ury_pos_opening_entry.set_cashier_room",
         "before_save": "ury.ury.hooks.ury_pos_opening_entry.before_save",
@@ -152,7 +151,6 @@ doc_events = {
         "before_submit": "ury.ury.hooks.ury_pos_opening_entry.validate_pos_opening_quality_review",
     },
 
-    # ✅ POS CLOSING ENTRY (QUALITY REVIEW MOVED TO before_submit)
     "POS Closing Entry": {
         "before_save": "ury.ury.hooks.ury_pos_closing_entry.before_save",
         "validate": "ury.ury.hooks.ury_pos_closing_entry.validate",
