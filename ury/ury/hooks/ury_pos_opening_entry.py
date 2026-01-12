@@ -96,7 +96,7 @@ def validate_pos_opening_quality_review(doc, method):
 
     if not review_name:
         frappe.throw(
-            "Please complete today's Quality Review for your assigned goals.",
+            "Please complete today's Quality Review",
             title="Quality Review Required"
         )
 
