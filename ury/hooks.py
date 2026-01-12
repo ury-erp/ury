@@ -242,7 +242,3 @@ scheduler_events = {
 # 	"ury.auth.validate"
 # ]
 
-fixtures = [
-    {"dt": "Role", "filters": [["role_name", "like", "URY %"]]},
-    "Client Script",
-]

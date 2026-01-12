@@ -7,9 +7,67 @@ from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 
 def after_install():
     create_custom_fields(get_custom_fields())
+    create_roles()
+    # create_client_scripts()
     
 def before_uninstall():
 	delete_custom_fields(get_custom_fields())
+
+def create_roles():
+	for role in get_roles():
+		if not frappe.db.exists("Role", role.get("role_name")):
+			role_doc = frappe.new_doc("Role")
+			role_doc.update(role)
+			role_doc.insert(ignore_permissions=True)
+   
+   
+# def create_client_scripts():
+# 	scripts_path = os.path.join(
+# 		os.path.dirname(__file__), "client_scripts"
+# 	)
+# 	for filename in os.listdir(scripts_path):
+# 		if filename.endswith(".json"):
+# 			file_path = os.path.join(scripts_path, filename)
+# 			with open(file_path, "r") as f:
+# 				script_data = frappe.get_doc(frappe.parse_json(f.read()))
+# 				if not frappe.db.exists("Client Script", script_data.name):
+# 					script_data.insert(ignore_permissions=True)
+     
+# def get_client_scripts():
+# 	scripts = []
+# 	scripts_path = os.path.join(
+# 		os.path.dirname(__file__), "client_scripts"
+# 	)
+# 	for filename in os.listdir(scripts_path):
+# 		if filename.endswith(".json"):
+# 			file_path = os.path.join(scripts_path, filename)
+# 			with open(file_path, "r") as f:
+# 				script_data = frappe.get_doc(frappe.parse_json(f.read()))
+# 				scripts.append(script_data)
+# 	return scripts
+
+def get_roles():
+	return [
+		{
+			"role_name": "URY Manager",
+			"desk_access": 1,
+			"disabled": 0,
+			"two_factor_auth": 0,
+		},
+		{
+			"role_name": "URY Captain",
+			"desk_access": 1,
+			"disabled": 0,
+			"two_factor_auth": 0,
+		},
+		{
+			"role_name": "URY Cashier",
+			"desk_access": 1,
+			"disabled": 0,
+			"two_factor_auth": 0,
+		}
+	]
+
  
 def get_custom_fields():
 	"""URY specific custom fields that need to be added to the masters in ERPNext"""
