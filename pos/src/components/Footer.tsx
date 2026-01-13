@@ -1,17 +1,19 @@
 import { NavLink } from 'react-router-dom';
-import { 
-  LayoutGrid, 
-  ClipboardList, 
+import {
+  LayoutGrid,
+  ClipboardList,
   Table,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '../lib/utils';
 
 const Footer = () => {
+  const { t } = useTranslation();
 
   const navItems = [
-    { icon: LayoutGrid, label: 'POS', path: '/' },
-    {icon: Table, label: 'Table', path: '/table'},
-    { icon: ClipboardList, label: 'Orders', path: '/orders' },
+    { icon: LayoutGrid, label: t('nav.pos', 'POS'), path: '/' },
+    { icon: Table, label: t('nav.table', 'Table'), path: '/table' },
+    { icon: ClipboardList, label: t('nav.orders', 'Orders'), path: '/orders' },
   ];
 
   return (

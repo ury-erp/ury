@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Trash2, Edit, FrownIcon, Plus, Loader2, MessageSquare } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { usePOSStore } from '../store/pos-store';
 import { formatCurrency, cn } from '../lib/utils';
 import { CustomerSelect } from './CustomerSelect';
@@ -15,11 +16,12 @@ import { showToast } from './ui/toast';
 import { DINE_IN } from '../data/order-types';
 
 const OrderPanel = () => {
-  const { 
-    activeOrders, 
-    removeFromOrder, 
-    updateQuantity, 
-    clearOrder, 
+  const { t } = useTranslation();
+  const {
+    activeOrders,
+    removeFromOrder,
+    updateQuantity,
+    clearOrder,
     setSelectedItem,
     orderLoading,
     isOrderInteractionDisabled,
@@ -69,32 +71,32 @@ const OrderPanel = () => {
   const handleSubmit = async () => {
     try {
       if (!posProfile) {
-        throw new Error('POS Profile not found');
+        throw new Error(t('messages.error.posProfileNotFound'));
       }
 
       if (!user?.name) {
-        throw new Error('User not logged in');
+        throw new Error(t('messages.error.userNotLoggedIn'));
       }
 
       // Validate customer/aggregator details
       if (selectedOrderType === 'Aggregators') {
         if (!selectedAggregator?.customer) {
-          showToast.error('Please select an aggregator before proceeding');
+          showToast.error(t('messages.error.selectAggregator'));
           return;
         }
       } else if (!selectedCustomer?.name) {
-        showToast.error('Please select a customer before proceeding');
+        showToast.error(t('messages.error.selectCustomerBeforeProceeding'));
         return;
       }
 
       // Validate table selection for dine-in orders
       if (selectedOrderType === DINE_IN && !selectedTable) {
-        showToast.error(`Please select a table for ${DINE_IN} orders`);
+        showToast.error(t('messages.error.selectTableForDineIn', { orderType: DINE_IN }));
         return;
       }
 
       setIsSubmitting(true);
-      
+
       const orderData = {
         items: activeOrders.map(item => ({
           item: item.id,
@@ -120,10 +122,10 @@ const OrderPanel = () => {
       };
 
       await syncOrder(orderData);
-      
+
       // Reset all states after successful order submission
       resetOrderState();
-      showToast.success(isUpdatingOrder ? 'Order updated successfully' : 'Order created successfully');
+      showToast.success(isUpdatingOrder ? t('messages.success.orderUpdated') : t('messages.success.orderCreated'));
     } catch (error) {
       console.error('Failed to sync order:', error);
       // Frappe API error handling
@@ -131,14 +133,14 @@ const OrderPanel = () => {
         try {
           const messages = JSON.parse((error as any)._server_messages);
           const messageObj = JSON.parse(messages[0]);
-          showToast.error(messageObj.message || 'API error');
+          showToast.error(messageObj.message || t('messages.error.apiError'));
         } catch {
-          showToast.error('API error');
+          showToast.error(t('messages.error.apiError'));
         }
       } else if (error instanceof Error) {
         showToast.error(error.message);
       } else {
-        showToast.error('Failed to process order');
+        showToast.error(t('messages.error.failedToProcessOrder'));
       }
     } finally {
       setIsSubmitting(false);
@@ -150,29 +152,29 @@ const OrderPanel = () => {
       <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-6">
         <FrownIcon className="w-12 h-12 text-gray-400" />
       </div>
-      
+
       <h3 className="text-lg font-semibold text-gray-900 mb-2">
-        Your cart is empty
+        {t('order.cartEmpty')}
       </h3>
-      
+
       <p className="text-gray-500 text-sm mb-6 max-w-xs leading-relaxed">
-        Add items to get started with your order
+        {t('order.addItemsToStart')}
       </p>
-      
+
       <div className="flex items-center gap-2 text-blue-600 bg-blue-50 px-4 py-2 rounded-lg">
         <Plus className="w-4 h-4" />
-        <span className="text-sm font-medium">Click items to add them</span>
+        <span className="text-sm font-medium">{t('order.clickToAdd')}</span>
       </div>
-      
+
       <div className="mt-4 text-xs text-gray-400">
-        Double-click for customization options
+        {t('order.doubleClickCustomize')}
       </div>
     </div>
   );
 
   const LoadingOrderUI = () => (
     <div className="h-96">
-      <Spinner message="Loading order details..." />
+      <Spinner message={t('order.loadingOrderDetails')} />
     </div>
   );
 
@@ -222,7 +224,7 @@ const OrderPanel = () => {
                       variant="ghost"
                       size="icon"
                       className="text-blue-600 hover:text-blue-700"
-                      title="Edit item"
+                      title={t('order.editItem')}
                       disabled={isInteractionDisabled}
                     >
                       <Edit className="w-4 h-4" />
@@ -277,7 +279,7 @@ const OrderPanel = () => {
                 className="w-full text-gray-600 hover:text-gray-800 mt-4"
                 disabled={isInteractionDisabled}
               >
-                Clear cart
+                {t('order.clearCart')}
               </Button>
             )}
           </div>
@@ -294,11 +296,11 @@ const OrderPanel = () => {
                     orderComment ? "text-blue-600" : "text-gray-500 hover:text-gray-700"
                   )}
                   disabled={isInteractionDisabled}
-                  title={orderComment ? "Edit comment" : "Add comment"}
+                  title={orderComment ? t('order.editComment') : t('order.addComment')}
                 >
                   <MessageSquare className="w-4 h-4" />
                 </Button>
-                <span className="text-lg font-semibold">Total</span>
+                <span className="text-lg font-semibold">{t('common.total')}</span>
               </div>
               <span className="text-lg font-semibold">{formatCurrency(total)}</span>
             </div>
@@ -312,12 +314,12 @@ const OrderPanel = () => {
               {isSubmitting ? (
                 <div className="flex items-center">
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  {isUpdatingOrder ? 'Updating Order...' : 'Processing Order...'}
+                  {isUpdatingOrder ? t('order.updatingOrder') : t('order.processingOrder')}
                 </div>
               ) : isUpdatingOrder ? (
-                'Update Order'
+                t('order.updateOrder')
               ) : (
-                'Add New Order'
+                t('order.addNewOrder')
               )}
             </Button>
           </div>

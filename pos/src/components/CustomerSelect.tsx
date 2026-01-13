@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { UserPlus, Mail, Phone, Loader } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { usePOSStore, type Customer } from '../store/pos-store';
 import { Button, Dialog, DialogContent, Input } from './ui';
 import { Select, SelectItem } from './ui';
@@ -9,21 +10,22 @@ import { addCustomer, type CreateCustomerData, searchCustomers } from '../lib/cu
 import { AggregatorSelect } from './AggregatorSelect';
 
 // NewCustomerForm component
-function NewCustomerForm({ 
-  onClose, 
-  onSuccess, 
-  isCreatingCustomer: parentIsCreatingCustomer, 
-  setIsCreatingCustomer: setParentIsCreatingCustomer, 
+function NewCustomerForm({
+  onClose,
+  onSuccess,
+  isCreatingCustomer: parentIsCreatingCustomer,
+  setIsCreatingCustomer: setParentIsCreatingCustomer,
   prefillName = '',
   prefillPhone = ''
-}: { 
-  onClose: () => void; 
+}: {
+  onClose: () => void;
   onSuccess?: () => void;
   isCreatingCustomer?: boolean;
   setIsCreatingCustomer?: React.Dispatch<React.SetStateAction<boolean>>;
   prefillName?: string;
   prefillPhone?: string;
 }) {
+  const { t } = useTranslation();
   const { customerGroups, territories, fetchCustomerGroups, fetchTerritories, setSelectedCustomer } = usePOSStore();
   const [newCustomerName, setNewCustomerName] = React.useState('');
   const [newCustomerPhone, setNewCustomerPhone] = React.useState('');
@@ -119,7 +121,7 @@ function NewCustomerForm({
         </div>
       )}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="new-customer-name">Name <span className="text-red-500">*</span></label>
+        <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="new-customer-name">{t('customer.name')} <span className="text-red-500">*</span></label>
         <Input
           id="new-customer-name"
           type="text"
@@ -130,11 +132,11 @@ function NewCustomerForm({
           aria-invalid={!!formError && !newCustomerName}
         />
         {formError && !newCustomerName && (
-          <div className="text-xs text-red-500 mt-1">Name is required</div>
+          <div className="text-xs text-red-500 mt-1">{t('validation.nameRequired')}</div>
         )}
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="new-customer-phone">Phone <span className="text-red-500">*</span></label>
+        <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="new-customer-phone">{t('customer.phone')} <span className="text-red-500">*</span></label>
         <div className="relative">
           <Input
             id="new-customer-phone"
@@ -149,13 +151,13 @@ function NewCustomerForm({
           <Phone className="absolute left-3 top-2.5 text-gray-400 w-5 h-5" />
         </div>
         {formError && !newCustomerPhone && (
-          <div className="text-xs text-red-500 mt-1">Phone is required</div>
+          <div className="text-xs text-red-500 mt-1">{t('validation.phoneRequired')}</div>
         )}
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Customer Group</label>
+        <label className="block text-sm font-medium text-gray-700 mb-1">{t('customer.customerGroup')}</label>
         <Select
-          placeholder={loadingGroups ? 'Loading...' : 'Select group'}
+          placeholder={loadingGroups ? t('common.loading') + '...' : t('customer.selectGroup')}
           value={newCustomerGroup}
           onValueChange={setNewCustomerGroup}
           disabled={isCreatingCustomer || loadingGroups || !customerGroups.length}
@@ -167,13 +169,13 @@ function NewCustomerForm({
           ))}
         </Select>
         {!loadingGroups && !customerGroups.length && (
-          <div className="text-xs text-gray-400 mt-1">No options</div>
+          <div className="text-xs text-gray-400 mt-1">{t('customer.noOptions')}</div>
         )}
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Territory</label>
+        <label className="block text-sm font-medium text-gray-700 mb-1">{t('customer.territory')}</label>
         <Select
-          placeholder={loadingTerritories ? 'Loading...' : 'Select territory'}
+          placeholder={loadingTerritories ? t('common.loading') + '...' : t('customer.selectTerritory')}
           value={newCustomerTerritory}
           onValueChange={setNewCustomerTerritory}
           disabled={isCreatingCustomer || loadingTerritories || !territories.length}
@@ -185,7 +187,7 @@ function NewCustomerForm({
           ))}
         </Select>
         {!loadingTerritories && !territories.length && (
-          <div className="text-xs text-gray-400 mt-1">No options</div>
+          <div className="text-xs text-gray-400 mt-1">{t('customer.noOptions')}</div>
         )}
       </div>
       <div className="flex gap-3 mt-6">
@@ -198,10 +200,10 @@ function NewCustomerForm({
           {isCreatingCustomer ? (
             <>
               <Loader className="w-4 h-4 mr-2 animate-spin" />
-              Adding Customer...
+              {t('customer.addingCustomer')}
             </>
           ) : (
-            'Add Customer'
+            t('order.addCustomer')
           )}
         </Button>
         <Button
@@ -210,7 +212,7 @@ function NewCustomerForm({
           onClick={onClose}
           disabled={isCreatingCustomer}
         >
-          Cancel
+          {t('common.cancel')}
         </Button>
       </div>
     </form>
@@ -222,6 +224,7 @@ interface CustomerSelectProps {
 }
 
 export function CustomerSelect({ disabled }: CustomerSelectProps) {
+  const { t } = useTranslation();
   const { selectedCustomer, setSelectedCustomer, selectedOrderType, isUpdatingOrder } = usePOSStore();
   const [showNewCustomerForm, setShowNewCustomerForm] = useState(false);
   const [isCreatingCustomer, setIsCreatingCustomer] = useState(false);
@@ -313,7 +316,7 @@ export function CustomerSelect({ disabled }: CustomerSelectProps) {
             size="sm"
             className="text-blue-700 hover:text-blue-800"
           >
-            Change
+            {t('customer.change')}
           </Button>
         </div>
       ) : (
@@ -333,9 +336,9 @@ export function CustomerSelect({ disabled }: CustomerSelectProps) {
                 setTimeout(() => setIsOpen(false), 100);
               }}
               onKeyDown={handleKeyDown}
-              placeholder="Search customer..."
+              placeholder={t('customer.searchPlaceholder')}
               className="w-full h-10 border border-gray-200 rounded-lg px-4 py-2 text-sm font-medium text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 transition-colors"
-              aria-label="Search customer"
+              aria-label={t('customer.searchPlaceholder')}
               autoComplete="off"
             />
             <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
@@ -343,11 +346,11 @@ export function CustomerSelect({ disabled }: CustomerSelectProps) {
           {isOpen && (
             <div className="absolute w-full mt-2 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-80 overflow-y-auto">
               {searchTerm.trim() === '' && !isSearching && !searchError && (
-                <div className="p-4 text-center text-gray-400 text-sm select-none">Please type to search...</div>
+                <div className="p-4 text-center text-gray-400 text-sm select-none">{t('customer.pleaseTypeToSearch')}</div>
               )}
               {isSearching && (
                 <div className="flex items-center justify-center p-4 text-gray-500 text-sm select-none">
-                  <Loader className="w-4 h-4 mr-2 animate-spin" /> Searching...
+                  <Loader className="w-4 h-4 mr-2 animate-spin" /> {t('customer.searching')}
                 </div>
               )}
               {searchError && (
@@ -376,7 +379,7 @@ export function CustomerSelect({ disabled }: CustomerSelectProps) {
                 );
               })}
               {!isSearching && !searchError && searchResults.length === 0 && searchTerm.trim() && (
-                <div className="p-4 text-center text-gray-400 text-sm select-none">No customers found</div>
+                <div className="p-4 text-center text-gray-400 text-sm select-none">{t('customer.noCustomersFound')}</div>
               )}
               <div className="my-1 h-px bg-gray-100" />
               <button
@@ -398,15 +401,15 @@ export function CustomerSelect({ disabled }: CustomerSelectProps) {
                 }}
                 onMouseEnter={() => setHighlightedIndex(searchResults.length)}
               >
-                <UserPlus className="w-4 h-4" /> {searchTerm.trim() ? `Add "${searchTerm.trim()}"...` : 'Add New Customer'}
+                <UserPlus className="w-4 h-4" /> {searchTerm.trim() ? t('customer.addCustomerWithName', { name: searchTerm.trim() }) : t('customer.addNewCustomer')}
               </button>
             </div>
           )}
         </div>
       )}
       {showNewCustomerForm && (
-        <Dialog 
-          open={showNewCustomerForm} 
+        <Dialog
+          open={showNewCustomerForm}
           onOpenChange={(open) => {
             // Prevent closing the dialog when creating customer
             if (!isCreatingCustomer) {
@@ -415,9 +418,9 @@ export function CustomerSelect({ disabled }: CustomerSelectProps) {
           }}
         >
           <DialogContent className="w-full max-w-md p-4 max-h-[80vh] overflow-y-auto">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Add New Customer</h3>
-            <NewCustomerForm 
-              onClose={() => setShowNewCustomerForm(false)} 
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('customer.addNewCustomer')}</h3>
+            <NewCustomerForm
+              onClose={() => setShowNewCustomerForm(false)}
               isCreatingCustomer={isCreatingCustomer}
               setIsCreatingCustomer={setIsCreatingCustomer}
               prefillName={prefillName}

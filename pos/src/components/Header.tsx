@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { 
+import {
   Command,
   User,
   ChevronDown,
@@ -8,14 +8,17 @@ import {
   LogOut,
   RefreshCw,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Button, Input } from './ui';
 import { useRootStore } from '../store/root-store';
 import { usePOSStore } from '../store/pos-store';
 import type { RootState } from '../store/root-store';
 import { logout } from '../lib/auth-api';
 import { showToast } from './ui/toast';
+import LanguageSwitcher from './LanguageSwitcher';
 
 const Header = () => {
+  const { t } = useTranslation();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const user = useRootStore((state: RootState) => state.user);
@@ -26,15 +29,15 @@ const Header = () => {
   const [orderSearchInput, setOrderSearchInput] = useState(orderSearchQuery);
 
   // Determine placeholder and handlers based on route
-  let searchPlaceholder = 'Search orders, menu items, or customers...';
+  let searchPlaceholder = t('header.searchPlaceholder');
   let searchValue: string | undefined = undefined;
   let searchOnChange: ((e: React.ChangeEvent<HTMLInputElement>) => void) | undefined = undefined;
   if (location.pathname === '/orders') {
-    searchPlaceholder = 'Search Orders';
+    searchPlaceholder = t('header.searchOrders');
     searchValue = orderSearchInput;
     searchOnChange = (e) => setOrderSearchInput(e.target.value);
   } else if (location.pathname === '/') {
-    searchPlaceholder = 'Search Menu';
+    searchPlaceholder = t('header.searchMenu');
     searchValue = searchQuery;
     searchOnChange = (e) => setSearchQuery(e.target.value);
   }
@@ -89,7 +92,7 @@ const Header = () => {
       await logout();
       window.location.href = '/login?redirect-to=%2Fpos';
     } catch (error) {
-      showToast.error('Failed to logout. Please try again.');
+      showToast.error(t('messages.error.failedToLogout'));
     }
   };
 
@@ -133,6 +136,9 @@ const Header = () => {
 
         {/* Right side actions */}
         <div className="flex items-center space-x-4">
+          {/* Language Switcher */}
+          <LanguageSwitcher />
+
           {/* User menu */}
           <div className="relative" ref={userMenuRef}>
             <Button
@@ -161,7 +167,7 @@ const Header = () => {
                     onClick={() => window.location.href = '/app'}
                   >
                     <Monitor className="w-4 h-4 mr-3" />
-                    Switch To Desk
+                    {t('header.switchToDesk')}
                   </Button>
                   <Button
                     variant="ghost"
@@ -169,7 +175,7 @@ const Header = () => {
                     onClick={handleClearCache}
                   >
                     <RefreshCw className="w-4 h-4 mr-3" />
-                    Clear Cache
+                    {t('header.clearCache')}
                   </Button>
                   <Button
                     variant="ghost"
@@ -177,7 +183,7 @@ const Header = () => {
                     onClick={handleLogout}
                   >
                     <LogOut className="w-4 h-4 mr-3" />
-                    Logout
+                    {t('header.logout')}
                   </Button>
                 </div>
               </div>

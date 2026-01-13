@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Star, TrendingUp } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import Sidebar from '../components/Sidebar';
 import OrderPanel from '../components/OrderPanel';
 import ProductDialog from '../components/ProductDialog';
@@ -11,6 +12,7 @@ import { Spinner } from '../components/ui/spinner';
 import InitialLoader from '../components/InitialLoader';
 
 export default function POS() {
+  const { t } = useTranslation();
   const {
     searchQuery,
     setSearchQuery,
@@ -134,8 +136,8 @@ export default function POS() {
                 disabled={isMenuInteractionDisabled()}
               /> */}
               
-              <QuickFilterButton filter="all" icon={Star} label="All" />
-              <QuickFilterButton filter="special" icon={TrendingUp} label="Special Items" />
+              <QuickFilterButton filter="all" icon={Star} label={t('menu.all')} />
+              <QuickFilterButton filter="special" icon={TrendingUp} label={t('menu.specialItems', 'Special Items')} />
             </div>
           </div>
         </div>

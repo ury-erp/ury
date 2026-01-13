@@ -1,7 +1,8 @@
-import { 
+import {
   Grid3X3,
   UtensilsCrossed,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { usePOSStore } from '../store/pos-store';
 import { cn } from '../lib/utils';
 import { Button, Badge } from './ui';
@@ -13,6 +14,7 @@ interface SidebarProps {
 }
 
 const Sidebar = ({ disabled }: SidebarProps) => {
+  const { t } = useTranslation();
   const { selectedCategory, setSelectedCategory, menuItems, categories, orderComment, setOrderComment } = usePOSStore();
   const [showCommentDialog, setShowCommentDialog] = useState(false);
 
@@ -41,7 +43,7 @@ const Sidebar = ({ disabled }: SidebarProps) => {
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
           {/* Section Title */}
           <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3 px-1">
-            categories
+            {t('menu.categories', 'CATEGORIES')}
           </h2>
           
           {/* All Items */}
@@ -63,7 +65,7 @@ const Sidebar = ({ disabled }: SidebarProps) => {
             
             <div className="flex items-center gap-3 ml-1">
               <Grid3X3 className="w-4 h-4 text-gray-500" />
-              <span>All Items</span>
+              <span>{t('menu.allItems', 'All Items')}</span>
             </div>
             
             <Badge variant="secondary" size="sm" className="text-xs text-gray-500 bg-gray-100 min-w-[24px] text-center">
