@@ -74,48 +74,40 @@ def validate_cashier(doc, method):
         pass
 
 def validate_pos_closing_quality_review(doc, method):
-    if not frappe.db.get_value(
-        "POS Profile",
-        doc.pos_profile,
-        "custom_daily_quality_check"
-    ):
-        return
-
-    user = frappe.session.user
-    user_roles = frappe.get_roles(user)
-
-    assigned_goals = frappe.get_all(
-        "Quality Goal",
-        filters={"custom_assigned_role": ["in", user_roles]},
-        pluck="name"
+    required_goals = frappe.get_all(
+        "Daily Quality Check",
+        filters={
+            "parent": doc.pos_profile,
+            "parenttype": "POS Profile",
+            "options": "POS Closing Entry"
+        },
+        pluck="checklist"
     )
 
-    if not assigned_goals:
-        frappe.throw(
-            "No Quality Goals are assigned to your role.",
-            title="Quality Review Required"
-        )
+    if not required_goals:
+        return
 
     review_name = frappe.db.get_value(
         "Quality Review",
         {
-            "owner": user,
             "date": today(),
-            "goal": ["in", assigned_goals]
+            "goal": ["in", required_goals]
         },
         "name"
     )
 
     if not review_name:
         frappe.throw(
-            "Please complete today's Quality Review",
+            "Please complete today's Quality Review for POS Closing.",
             title="Quality Review Required"
         )
 
     review_doc = frappe.get_doc("Quality Review", review_name)
 
     if any(row.status == "Failed" for row in review_doc.reviews):
-        frappe.throw(
-            "Please resolve failed objectives in your Quality Review.",
-            title="Quality Review Failed"
+        frappe.msgprint(
+            "Some objectives in today's Quality Review are marked as Failed. "
+            "Please review them.",
+            indicator="red",
+            alert=True
         )
