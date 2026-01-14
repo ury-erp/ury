@@ -7,7 +7,7 @@ import { getMenuCourses } from '../lib/menu-course-api';
 import { getCustomerGroups, getCustomerTerritories, getCustomerById } from '../lib/customer-api';
 import { DEFAULT_ORDER_TYPE, OrderType } from '../data/order-types';
 import { getTableOrder, TableOrder } from '../lib/order-api';
-
+import { getPaymentModes } from '../lib/payment-api';
 // Constants
 const MAX_QUANTITY = 99;
 const MIN_QUANTITY = 0;
@@ -269,10 +269,17 @@ export const usePOSStore = create<POSStore>((set, get) => ({
 
             // Set default customer if none selected
             if (!get().selectedCustomer && mappings.length > 0) {
-              const firstMapping = mappings[0];
-              const defaultCustomer = customerMap[firstMapping.order_type];
-              if (defaultCustomer) {
-                set({ selectedCustomer: defaultCustomer });
+              const currentOrderType = get().selectedOrderType;
+              const mappedCustomer = customerMap[currentOrderType];
+
+              if (mappedCustomer) {
+                set({ selectedCustomer: mappedCustomer });
+              } else {
+                const firstMapping = mappings[0];
+                const defaultCustomer = customerMap[firstMapping.order_type];
+                if (defaultCustomer) {
+                  set({ selectedCustomer: defaultCustomer });
+                }
               }
             }
           } catch (err) {
@@ -321,10 +328,17 @@ export const usePOSStore = create<POSStore>((set, get) => ({
 
           // Set default customer if none selected
           if (!get().selectedCustomer && mappings.length > 0) {
-            const firstMapping = mappings[0];
-            const defaultCustomer = customerMap[firstMapping.order_type];
-            if (defaultCustomer) {
-              set({ selectedCustomer: defaultCustomer });
+            const currentOrderType = get().selectedOrderType;
+            const mappedCustomer = customerMap[currentOrderType];
+
+            if (mappedCustomer) {
+              set({ selectedCustomer: mappedCustomer });
+            } else {
+              const firstMapping = mappings[0];
+              const defaultCustomer = customerMap[firstMapping.order_type];
+              if (defaultCustomer) {
+                set({ selectedCustomer: defaultCustomer });
+              }
             }
           }
         } catch (err) {
