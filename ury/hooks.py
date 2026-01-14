@@ -18,7 +18,8 @@ app_include_js = [
     "/assets/ury/js/quick_entry.js",
     "/assets/ury/js/pos_print.js",
     "/assets/ury/js/restrict_qty_edit_pos.js",
-    "/assets/ury/js/ury_pos_kot.js"
+    "/assets/ury/js/ury_pos_kot.js",
+    "/assets/ury/js/quality_review.js"
 ]
 
 # include js, css files in header of web template
@@ -389,7 +390,3 @@ fixtures = [
     {"dt": "Role", "filters": [["role_name", "like", "URY %"]]},
     "Client Script",
 ]
-
-doctype_js = {
-    "Quality Review": "public/js/quality_review.js"
-}
