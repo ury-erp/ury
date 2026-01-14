@@ -231,130 +231,77 @@ export const usePOSStore = create<POSStore>((set, get) => ({
       });
     }
   },
-
   fetchPosProfile: async () => {
     try {
       const cached = sessionStorage.getItem('posProfile');
+      let profile: PosProfileCombined;
+
       if (cached) {
-        const profile = JSON.parse(cached);
-        set({
-          posProfile: profile,
-          profileLoading: false,
-          currency: profile.currency || 'INR',
-          orderTypeCustomers: {} // Reset or load logic if needed, but for now empty or could be cached too if enhanced later
-        });
-
-        // Actually, let's process the mapping even if cached to ensure we have customer objects
-        if (profile.custom_pos_order_type_customer?.length) {
-          const mappings = profile.custom_pos_order_type_customer;
-          const uniqueCustomerIds = [...new Set(mappings.map((m: any) => m.customer))];
-
-          try {
-            const customerPromises = uniqueCustomerIds.map((id: string) => getCustomerById(id));
-            const customers = await Promise.all(customerPromises);
-
-            const customerMap: Record<string, Customer> = {};
-            mappings.forEach((mapping: any) => {
-              const customer = customers.find((c: any) => c.name === mapping.customer);
-              if (customer) {
-                customerMap[mapping.order_type] = {
-                  id: customer.name,
-                  name: customer.customer_name,
-                  phone: customer.mobile_number
-                };
-              }
-            });
-
-            set({ orderTypeCustomers: customerMap });
-
-            // Set default customer if none selected
-            if (!get().selectedCustomer && mappings.length > 0) {
-              const currentOrderType = get().selectedOrderType;
-              const mappedCustomer = customerMap[currentOrderType];
-
-              if (mappedCustomer) {
-                set({ selectedCustomer: mappedCustomer });
-              } else {
-                const firstMapping = mappings[0];
-                const defaultCustomer = customerMap[firstMapping.order_type];
-                if (defaultCustomer) {
-                  set({ selectedCustomer: defaultCustomer });
-                }
-              }
-            }
-          } catch (err) {
-            console.error("Failed to load mapped customers", err);
-          }
-        }
-
-        if (!storage.getItem('currencySymbol')) {
-          await get().fetchCurrencySymbol();
-        }
-        return;
+        profile = JSON.parse(cached);
+      } else {
+        set({ profileLoading: true });
+        profile = await getCombinedPosProfile();
+        sessionStorage.setItem('posProfile', JSON.stringify(profile));
       }
 
-      set({ profileLoading: true, error: null });
-      const combinedProfile = await getCombinedPosProfile();
-
-      sessionStorage.setItem('posProfile', JSON.stringify(combinedProfile));
+      // Set profile + currency immediately
       set({
-        posProfile: combinedProfile,
+        posProfile: profile,
         profileLoading: false,
-        currency: combinedProfile.currency || 'INR'
+        currency: profile.currency || 'INR'
       });
 
-      // Process Customer Mappings
-      if (combinedProfile.custom_pos_order_type_customer?.length) {
-        const mappings = combinedProfile.custom_pos_order_type_customer;
+      if (profile.custom_pos_order_type_customer?.length) {
+        const mappings = profile.custom_pos_order_type_customer;
         const uniqueCustomerIds = [...new Set(mappings.map((m: any) => m.customer))];
 
         try {
-          const customerPromises = uniqueCustomerIds.map((id: unknown) => getCustomerById(id as string));
-          const customers = await Promise.all(customerPromises);
+          // Fetch customers once
+          const customers = await Promise.all(
+            uniqueCustomerIds.map((id: string) => getCustomerById(id))
+          );
 
           const customerMap: Record<string, Customer> = {};
+
           mappings.forEach((mapping: any) => {
-            const customer = customers.find((c: any) => c.name === mapping.customer);
-            if (customer) {
+            const found = customers.find(c => c.name === mapping.customer);
+            if (found) {
               customerMap[mapping.order_type] = {
-                id: customer.name,
-                name: customer.customer_name,
-                phone: customer.mobile_number
+                id: found.name,
+                name: found.customer_name,
+                phone: found.mobile_number
               };
             }
           });
 
           set({ orderTypeCustomers: customerMap });
 
-          // Set default customer if none selected
-          if (!get().selectedCustomer && mappings.length > 0) {
-            const currentOrderType = get().selectedOrderType;
-            const mappedCustomer = customerMap[currentOrderType];
+          // Auto-assign mapped customer
+          const currentType = get().selectedOrderType;
+          const mapped = customerMap[currentType];
 
-            if (mappedCustomer) {
-              set({ selectedCustomer: mappedCustomer });
-            } else {
-              const firstMapping = mappings[0];
-              const defaultCustomer = customerMap[firstMapping.order_type];
-              if (defaultCustomer) {
-                set({ selectedCustomer: defaultCustomer });
-              }
+          if (mapped) {
+            set({ selectedCustomer: mapped });
+          } else {
+            const first = mappings[0]?.order_type;
+            if (first && customerMap[first]) {
+              set({ selectedCustomer: customerMap[first] });
             }
           }
+
         } catch (err) {
-          console.error("Failed to load mapped customers", err);
+          console.error("Failed customer mapping", err);
         }
       }
 
+      // Ensure currency symbol exists
       if (!storage.getItem('currencySymbol')) {
         await get().fetchCurrencySymbol();
       }
+
     } catch (error) {
       console.error('Error fetching POS profile:', error);
-      set({
-        error: 'Failed to fetch POS profile',
-        profileLoading: false
-      });
+      set({ error: 'Failed to fetch POS profile', profileLoading: false });
     }
   },
 
@@ -771,10 +718,24 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   },
 
   resetOrderState: () => {
-    const { fetchMenuItems } = get();
+    const { fetchMenuItems, orderTypeCustomers, posProfile } = get();
+    // Calculate default customer logic
+    let defaultCustomer = null;
+    const mappings = posProfile?.custom_pos_order_type_customer;
+    const mappedCustomer = orderTypeCustomers[DEFAULT_ORDER_TYPE];
+
+    if (mappedCustomer) {
+      defaultCustomer = mappedCustomer;
+    } else if (mappings && mappings.length > 0) {
+      const firstMapping = mappings[0];
+      const fallback = orderTypeCustomers[firstMapping.order_type];
+      if (fallback) {
+        defaultCustomer = fallback;
+      }
+    }
 
     set({
-      selectedCustomer: null,
+      selectedCustomer: defaultCustomer,
       selectedTable: null,
       selectedRoom: null,
       selectedAggregator: null,
