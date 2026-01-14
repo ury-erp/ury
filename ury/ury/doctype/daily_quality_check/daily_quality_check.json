@@ -1,0 +1,43 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-01-14 11:38:19.730898",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "checklist",
+  "options"
+ ],
+ "fields": [
+  {
+   "fieldname": "checklist",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Checklist",
+   "options": "Quality Goal"
+  },
+  {
+   "fieldname": "options",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Options",
+   "options": "Pos Opening Entry\nPos Closing Entry"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-01-14 12:14:20.709494",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "Daily Quality Check",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
