@@ -93,7 +93,9 @@ def validate_pos_opening_quality_review(doc, method):
     review_doc = frappe.get_doc("Quality Review", review_name)
 
     if any(row.status == "Failed" for row in review_doc.reviews):
-        frappe.throw(
-            "Please resolve failed objectives in your Quality Review.",
-            title="Quality Review Failed"
+        frappe.msgprint(
+            "Some objectives in today's Quality Review are marked as Failed. "
+            "Please review them.",
+            indicator="red",
+            alert=True
         )
