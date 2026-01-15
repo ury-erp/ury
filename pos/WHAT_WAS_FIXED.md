@@ -5,7 +5,54 @@ The Arabic language support was initially implemented, but only the Header compo
 
 ## What Was Fixed (January 13, 2026)
 
-### ✅ Latest Fix - RTL Layout (Just Now)
+### ✅ Latest Fix - Orders Page Translation (Just Now)
+
+**Components**: Orders.tsx & OrderStatusSidebar.tsx - Complete translation of the Orders management page
+**What was translated**:
+- **Order Status Sidebar**:
+  - Section title: "Order Status" → "حالة الطلب"
+  - All status labels: "Draft" → "مسودة", "Unbilled" → "غير مفوتر", "Paid" → "مدفوع", "Recently Paid" → "مدفوع حديثاً", "Consolidated" → "موحد", "Return" → "مرتجع"
+- **Order Cards**:
+  - Status badges now display in Arabic
+  - Empty state: "No orders found" → "لم يتم العثور على طلبات"
+  - Error messages: "Failed to load orders" → "فشل تحميل الطلبات"
+- **Order Details Panel**:
+  - Empty state: "Select an order to view details" → "اختر طلباً لعرض التفاصيل"
+  - "Order Items" → "عناصر الطلب"
+  - "Qty" → "الكمية"
+  - "Taxes & Charges" → "الضرائب والرسوم"
+  - "Payment" button → "الدفع"
+- **Pagination**:
+  - "Previous" → "السابق", "Next" → "التالي", "Page" → "الصفحة"
+- **Cancel Order Dialog**:
+  - Title: "Cancel Order" → "إلغاء الطلب"
+  - Description and buttons all translated
+  - "Cancelling..." → "جاري الإلغاء...", "Confirm Cancel" → "تأكيد الإلغاء"
+- **Toast Messages**:
+  - "Order cancelled successfully" → "تم إلغاء الطلب بنجاح"
+  - "Printed Successfully" → "تمت الطباعة بنجاح"
+  - "Order moved to Draft after printing." → "تم نقل الطلب إلى المسودة بعد الطباعة."
+  - All error messages translated
+
+**Result**: The entire Orders page now displays in Arabic when the language is switched!
+
+### ✅ Previous Fix - Table Page Translation
+
+**Component**: Table.tsx - Complete translation of the Table management page
+**What was translated**:
+- Room tabs and loading states ("Loading rooms..." → "جاري تحميل القاعات...")
+- Table cards with all status information:
+  - Status badges: "Occupied" / "Available" → "محجوزة" / "متاحة"
+  - Labels: "Room" → "القاعة", "Seats" → "المقاعد", "Started at" → "بدأت في"
+  - "Take away" badge → "طلبات خارجية"
+- Action buttons: "Preview" → "معاينة", "Print" → "طباعة", "Printing..." → "جاري الطباعة..."
+- Empty states: "No tables found" → "لا توجد طاولات في هذه القاعة"
+- Toast messages: "Printed successfully" → "تمت الطباعة بنجاح"
+- Status legend at bottom
+
+**Result**: The entire Table page now displays in Arabic when the language is switched!
+
+### ✅ Previous Fix - RTL Layout
 
 **Issue**: Sidebar with "CATEGORIES" was not visible in Arabic mode
 **Root Cause**: Fixed positioning and padding classes weren't flipping properly in RTL mode
@@ -86,54 +133,68 @@ Added the following keys to both `en.json` and `ar.json`:
 ### Recently Translated (Latest Update):
 - ✅ **OrderPanel** - Empty cart messages, cart actions, submit buttons, loading states
 - ✅ **CustomerSelect** - Search placeholder, customer form, dropdown messages, all UI text
+- ✅ **Table Page** - ✨ COMPLETED - All table UI translated (rooms, status badges, buttons, messages)
+- ✅ **Orders Page** - ✨ COMPLETED - Order list, order details, status sidebar, pagination, all actions and messages
 
 ### Still Need Translation:
 The following components still have hardcoded English text:
 
-- ⚠️ **Table Page** - Table cards, room selection, status labels
-- ⚠️ **Orders Page** - Order list, filters, status labels
 - ⚠️ **ProductDialog** - Product details, add-ons
 - ⚠️ **PaymentDialog** - Payment form
 - ⚠️ **TableSelectionDialog** - Table selection modal
 - ⚠️ **CommentDialog** - Comments input
 - ⚠️ **POSOpeningDialog** - POS opening form
 - ⚠️ **MenuList** - Menu item cards
-- ⚠️ **Toast Messages** - Various notifications (some already translated in OrderPanel)
 
 ## How to Test
 
 1. Access your URY POS at `http://localhost:8000/pos` (or your server URL)
 2. Click the language button (عربي/EN) in the header
-3. You should now see:
+3. **On POS Page** you should see:
    - **FIXED**: Sidebar now visible in Arabic with "التصنيفات" (CATEGORIES) label
-   - Bottom navigation in Arabic
+   - Bottom navigation in Arabic ("نقطة البيع", "الطاولات", "الطلبات")
    - Order type buttons in Arabic
    - "All" and "Special Items" buttons in Arabic
-   - **NEW**: Empty cart messages in Arabic ("سلة المشتريات فارغة")
-   - **NEW**: Customer search placeholder in Arabic ("البحث عن عميل...")
-   - **NEW**: Order submit buttons in Arabic ("إضافة طلب جديد", "تحديث الطلب")
-   - **NEW**: Customer form labels in Arabic (when adding new customer)
-   - **NEW**: All cart actions and totals in Arabic
+   - Empty cart messages in Arabic ("سلة المشتريات فارغة")
+   - Customer search placeholder in Arabic ("البحث عن عميل...")
+   - Order submit buttons in Arabic ("إضافة طلب جديد", "تحديث الطلب")
+   - Customer form labels in Arabic (when adding new customer)
+   - All cart actions and totals in Arabic
    - **FIXED**: Proper RTL layout - Order panel on left, sidebar on right, correct spacing
+
+4. **On Table Page** (click "الطاولات" in bottom nav) you should see:
+   - Room tabs with Arabic loading state ("جاري تحميل القاعات...")
+   - Table cards with Arabic status: "محجوزة" (Occupied) or "متاحة" (Available)
+   - Table information in Arabic: "القاعة" (Room), "المقاعد" (Seats), "بدأت في" (Started at)
+   - Action buttons in Arabic: "معاينة" (Preview), "طباعة" (Print)
+   - Status legend at bottom in Arabic
+   - All messages and notifications in Arabic
+
+5. **On Orders Page** (click "الطلبات" in bottom nav) you should see:
+   - Order status sidebar in Arabic: "حالة الطلب" (Order Status)
+   - All status labels in Arabic: "مسودة" (Draft), "غير مفوتر" (Unbilled), "مدفوع حديثاً" (Recently Paid), etc.
+   - Order cards with Arabic status badges
+   - Order details panel with Arabic labels: "عناصر الطلب" (Order Items), "الضرائب والرسوم" (Taxes & Charges)
+   - Pagination in Arabic: "السابق" (Previous), "التالي" (Next), "الصفحة" (Page)
+   - Action buttons in Arabic: "الدفع" (Payment), "معاينة" (Preview), "إلغاء الطلب" (Cancel Order)
+   - All dialogs and messages in Arabic
 
 ## Next Steps
 
 To complete the full Arabic translation:
 
 1. **High Priority** (most visible):
-   - OrderPanel - The order cart/summary panel
-   - Table Page - Table selection screen
    - MenuList - Menu item display
+   - ProductDialog - Product customization
 
 2. **Medium Priority**:
-   - Orders Page - Order management
-   - ProductDialog - Product customization
-   - CustomerSelect - Customer selection
+   - PaymentDialog - Payment form
+   - TableSelectionDialog - Table selection modal
+   - CommentDialog - Comments input
 
 3. **Lower Priority**:
-   - Various dialogs and modals
-   - Toast notifications
-   - Error messages
+   - POSOpeningDialog - POS opening form
+   - Various other dialogs and modals
 
 ## Quick Reference
 
@@ -160,18 +221,21 @@ pos/src/components/
 ├── Sidebar.tsx          [UPDATED - Jan 13]
 ├── Footer.tsx           [UPDATED - Jan 13]
 ├── OrderTypeSelect.tsx  [UPDATED - Jan 13]
-├── OrderPanel.tsx       [UPDATED - LATEST - Cart UI, buttons, messages]
-└── CustomerSelect.tsx   [UPDATED - LATEST - Search, form, all customer UI]
+├── OrderPanel.tsx       [UPDATED - Cart UI, buttons, messages]
+├── CustomerSelect.tsx   [UPDATED - Search, form, all customer UI]
+└── OrderStatusSidebar.tsx [UPDATED - LATEST - Status labels, heading]
 
 pos/src/pages/
-└── POS.tsx              [UPDATED - Jan 13]
+├── POS.tsx              [UPDATED - Jan 13]
+├── Table.tsx            [UPDATED - Complete table page translation]
+└── Orders.tsx           [UPDATED - LATEST - Complete orders page translation]
 
 pos/src/i18n/locales/
-├── en.json              [UPDATED - LATEST - Added order panel and customer keys]
-└── ar.json              [UPDATED - LATEST - Added Arabic translations for all new keys]
+├── en.json              [UPDATED - LATEST - Added orders page keys]
+└── ar.json              [UPDATED - LATEST - Added Arabic orders translations]
 
 pos/src/
-└── index.css            [UPDATED - LATEST - Added RTL layout fixes for positioning]
+└── index.css            [UPDATED - RTL layout fixes for positioning]
 ```
 
 ## Summary
@@ -180,13 +244,34 @@ The Arabic language support is now working significantly better with most of the
 - Arabic navigation menu
 - Arabic category labels
 - Arabic order type buttons
-- **NEW**: Arabic cart panel (empty state, actions, totals)
-- **NEW**: Arabic customer search and selection
-- **NEW**: Arabic customer form (add new customer)
-- **NEW**: Arabic order submission buttons and loading states
+- Arabic cart panel (empty state, actions, totals)
+- Arabic customer search and selection
+- Arabic customer form (add new customer)
+- Arabic order submission buttons and loading states
+- Arabic table page (rooms, table cards, status badges, action buttons)
+- **NEW**: Arabic orders page (order list, status sidebar, order details, all actions)
 - Proper RTL layout
 
 ### Latest Progress (Current Session):
+
+**Orders Page**: ✨ Fully translated including:
+- Order status sidebar (Order Status → حالة الطلب)
+- All status labels (Draft → مسودة, Unbilled → غير مفوتر, Paid → مدفوع, Recently Paid → مدفوع حديثاً, etc.)
+- Order cards with translated status badges
+- Order details panel (Order Items → عناصر الطلب, Taxes & Charges → الضرائب والرسوم)
+- Pagination controls (Previous → السابق, Next → التالي, Page → الصفحة)
+- Cancel order dialog with all text translated
+- Action buttons (Payment → الدفع)
+- All toast messages and error messages
+
+**Table Page**: Fully translated including:
+- Room tabs and loading states
+- Table status badges (Occupied/Available → محجوزة/متاحة)
+- All table card information (Room, Seats, Started at)
+- Action buttons (Preview, Print)
+- Loading and error messages
+- Status legend at bottom
+
 **OrderPanel Component**: Fully translated including:
 - Empty cart UI ("Your cart is empty" → "سلة المشتريات فارغة")
 - Cart instructions ("Click items to add them" → "انقر على العناصر لإضافتها")

@@ -3,6 +3,7 @@ import { cn } from '../lib/utils';
 import { Button } from './ui';
 import { getOrderStatusTypes, OrderStatusType } from '../data/order-types';
 import { usePOSStore } from '../store/pos-store';
+import { useTranslation } from 'react-i18next';
 
 interface OrderStatusSidebarProps {
   disabled?: boolean;
@@ -11,15 +12,40 @@ interface OrderStatusSidebarProps {
   getStatusCount?: (status: OrderStatusType) => number;
 }
 
-const OrderStatusSidebar = ({ 
+const OrderStatusSidebar = ({
   disabled,
   selectedStatus,
   setSelectedStatus,
 }: OrderStatusSidebarProps) => {
+  const { t } = useTranslation();
   const { posProfile } = usePOSStore();
-  
+
   // Get the appropriate status types based on POS profile settings
   const statusTypes = getOrderStatusTypes(posProfile?.view_all_status, posProfile?.paid_limit);
+
+  // Helper function to translate order status
+  const translateStatus = (status: string) => {
+    switch (status) {
+      case 'Draft':
+        return t('order.draft');
+      case 'Unbilled':
+        return t('order.unbilled');
+      case 'Paid':
+        return t('order.paid');
+      case 'Unpaid':
+        return t('order.unpaid');
+      case 'Recently Paid':
+        return t('order.recentlyPaid');
+      case 'Consolidated':
+        return t('order.consolidated');
+      case 'Return':
+        return t('order.return');
+      case 'Cancelled':
+        return t('order.cancelled');
+      default:
+        return status;
+    }
+  };
 
   return (
     <div className={cn(
@@ -30,7 +56,7 @@ const OrderStatusSidebar = ({
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
           {/* Section Title */}
           <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3 px-1">
-            Order Status
+            {t('order.orderStatus')}
           </h2>
 
           {/* Status Items */}
@@ -54,7 +80,7 @@ const OrderStatusSidebar = ({
                 )}
                 <div className="flex items-center gap-3 ml-1">
                   <FileText className="w-4 h-4 text-gray-500" />
-                  <span>{status.label}</span>
+                  <span>{translateStatus(status.label)}</span>
                 </div>
               </Button>
             ))}
