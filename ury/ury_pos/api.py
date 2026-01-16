@@ -677,7 +677,10 @@ def create_customer(customer_name, mobile_number=None, customer_group="Individua
         return {
             "status": "success",
             "message": "Customer created successfully",
-            "customer": customer.as_dict()
+            "customer_name": customer_name,
+            "mobile_number": mobile_number,
+            "customer_group": customer_group,
+            "territory": territory
         }
 
     except Exception as e:
