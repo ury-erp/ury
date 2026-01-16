@@ -38,9 +38,10 @@ export interface CreateCustomerData {
 }
 
 export interface CreateCustomerResponse {
-  data: Customer;
+  data: CreateCustomerData;
   _server_messages?: string;
 }
+
 
 export async function getCustomerGroups() {
   const groups = await db.getDocList(DOCTYPES.CUSTOMER_GROUP, {
@@ -66,15 +67,30 @@ export async function getCustomerTerritories() {
   return territories;
 }
 
-export async function addCustomer(customerData: CreateCustomerData): Promise<CreateCustomerResponse> {
+export async function addCustomer(
+  customerData: CreateCustomerData
+): Promise<CreateCustomerResponse> {
   try {
-    const response = await db.createDoc(DOCTYPES.CUSTOMER, customerData);
-    return { data: response as Customer };
+    const response = await call.post('ury.ury_pos.api.create_customer', customerData);
+    const msg = response.message;
+    if (!msg || msg.status !== "success") {
+      throw new Error("Failed to create Customer,API Response error");
+    }
+    return {
+      data: {
+        customer_name: msg.customer_name,
+        mobile_number: msg.mobile_number,
+        customer_group: msg.customer_group,
+        territory: msg.territory
+      }
+    };
+
   } catch (error) {
     console.error('Error creating customer:', error);
     throw error;
   }
 }
+
 
 export async function searchCustomers(search: string, limit = 5) {
   if (!search.trim()) return [];
