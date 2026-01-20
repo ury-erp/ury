@@ -28,25 +28,25 @@ export default defineConfig({
         scope: '/',
         icons: [
           {
-            src: '/pwa-192x192.png',
+            src: '/assets/ury/pos/pwa-192x192.png',
             sizes: '192x192',
             type: 'image/png'
           },
           {
-            src: '/pwa-512x512.png',
+            src: '/assets/ury/pos/pwa-512x512.png',
             sizes: '512x512',
             type: 'image/png'
           }
         ]
       },
       workbox: {
-        navigateFallback: '/pos/index.html',
+        navigateFallback: '/pos',
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
         modifyURLPrefix: {
-          '': '/pos/'
+          '': '/assets/ury/pos/'
         }
       },
-      outDir: '../ury/pos/public',
+      outDir: '../ury/public/pos',
     })
   ],
   resolve: {

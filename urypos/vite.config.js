@@ -36,13 +36,13 @@ export default defineConfig({
 				]
 			},
 			workbox: {
-				navigateFallback: '/urypos/index.html',
+				navigateFallback: '/assets/ury/urypos/index.html',
 				globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
 				modifyURLPrefix: {
-					'': '/urypos/'
+					'': '/assets/ury/urypos/'
 				}
 			},
-			outDir: '../ury/urypos/public',
+			outDir: '../ury/public/urypos',
 		})
 	],
 	server: {
@@ -55,7 +55,7 @@ export default defineConfig({
 		}
 	},
 	build: {
-		outDir: '../ury/urypos/public',
+		outDir: '../ury/public/urypos',
 		emptyOutDir: true,
 		target: 'es2015',
 	},
