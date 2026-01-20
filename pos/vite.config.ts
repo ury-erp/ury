@@ -40,13 +40,13 @@ export default defineConfig({
         ]
       },
       workbox: {
-        navigateFallback: '/assets/ury/pos/index.html',
+        navigateFallback: '/pos/index.html',
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
         modifyURLPrefix: {
-          '': '/assets/ury/pos/'
+          '': '/pos/'
         }
       },
-      outDir: '../ury/public/pos',
+      outDir: '../ury/pos/public',
     })
   ],
   resolve: {
