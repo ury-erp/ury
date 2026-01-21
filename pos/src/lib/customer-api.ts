@@ -95,9 +95,8 @@ export async function addCustomer(
 export async function searchCustomers(search: string, limit = 5) {
   if (!search.trim()) return [];
   try {
-    const res = await call.get('frappe.utils.global_search.search', {
-      text: search,
-      doctype: DOCTYPES.CUSTOMER,
+    const res = await call.get('ury.ury.api.customer.get', {
+      search: search,
       limit,
     });
     return res.message || [];

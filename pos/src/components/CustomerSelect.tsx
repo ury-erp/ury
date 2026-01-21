@@ -9,15 +9,15 @@ import { addCustomer, type CreateCustomerData, searchCustomers } from '../lib/cu
 import { AggregatorSelect } from './AggregatorSelect';
 
 // NewCustomerForm component
-function NewCustomerForm({ 
-  onClose, 
-  onSuccess, 
-  isCreatingCustomer: parentIsCreatingCustomer, 
-  setIsCreatingCustomer: setParentIsCreatingCustomer, 
+function NewCustomerForm({
+  onClose,
+  onSuccess,
+  isCreatingCustomer: parentIsCreatingCustomer,
+  setIsCreatingCustomer: setParentIsCreatingCustomer,
   prefillName = '',
   prefillPhone = ''
-}: { 
-  onClose: () => void; 
+}: {
+  onClose: () => void;
   onSuccess?: () => void;
   isCreatingCustomer?: boolean;
   setIsCreatingCustomer?: React.Dispatch<React.SetStateAction<boolean>>;
@@ -33,7 +33,7 @@ function NewCustomerForm({
   const [apiError, setApiError] = React.useState<string>("");
   const [loadingGroups, setLoadingGroups] = React.useState(false);
   const [loadingTerritories, setLoadingTerritories] = React.useState(false);
-  
+
   // Use parent loading state if available, otherwise fallback to local state
   const [localIsCreatingCustomer, setLocalIsCreatingCustomer] = React.useState(false);
   const isCreatingCustomer = parentIsCreatingCustomer ?? localIsCreatingCustomer;
@@ -278,12 +278,11 @@ export function CustomerSelect({ disabled }: CustomerSelectProps) {
           setShowNewCustomerForm(true);
           setIsOpen(false);
         } else if (searchResults[highlightedIndex]) {
-          // The API returns { name, content, ... }
           const customer = searchResults[highlightedIndex];
           setSelectedCustomer({
             id: customer.name,
-            name: customer.content?.match(/Customer Name : ([^|]+)/)?.[1]?.trim() || customer.name,
-            phone: customer.content?.match(/Mobile Number : ([^|]+)/)?.[1]?.trim() || '',
+            name: customer.customer_name || customer.name,
+            phone: customer.mobile_number || '',
           });
           setSearchTerm('');
           setIsOpen(false);
@@ -354,15 +353,14 @@ export function CustomerSelect({ disabled }: CustomerSelectProps) {
                 <div className="p-4 text-center text-red-500 text-sm select-none">{searchError}</div>
               )}
               {!isSearching && !searchError && searchResults.length > 0 && searchResults.map((customer, idx) => {
-                const name = customer.content?.match(/Customer Name : ([^|]+)/)?.[1]?.trim() || customer.name;
-                const phone = customer.content?.match(/Mobile Number : ([^|]+)/)?.[1]?.trim() || '';
+                const name = customer.customer_name || customer.name;
+                const phone = customer.mobile_number || '';
                 return (
                   <button
                     key={customer.name}
                     type="button"
-                    className={`w-full gap-2 px-4 py-2 text-left rounded-md text-gray-800 text-sm select-none transition-colors ${
-                      idx === highlightedIndex ? 'bg-primary-50 text-primary-700' : 'hover:bg-gray-50'
-                    }`}
+                    className={`w-full px-4 py-2 text-left rounded-md text-gray-800 text-sm select-none transition-colors ${idx === highlightedIndex ? 'bg-primary-50 text-primary-700' : 'hover:bg-gray-50'
+                      }`}
                     onMouseDown={() => {
                       setSelectedCustomer({ id: customer.name, name, phone });
                       setSearchTerm('');
@@ -371,7 +369,7 @@ export function CustomerSelect({ disabled }: CustomerSelectProps) {
                     onMouseEnter={() => setHighlightedIndex(idx)}
                   >
                     <div className="font-medium">{name}</div>
-                    <div className="ml-auto text-xs text-gray-500">{phone}</div>
+                    {phone && <div className="text-xs text-gray-500">{phone}</div>}
                   </button>
                 );
               })}
@@ -381,9 +379,8 @@ export function CustomerSelect({ disabled }: CustomerSelectProps) {
               <div className="my-1 h-px bg-gray-100" />
               <button
                 type="button"
-                className={`flex items-center gap-2 w-full px-4 py-2 text-primary-600 hover:text-primary-700 hover:bg-gray-50 font-medium rounded-md text-sm select-none transition-colors ${
-                  highlightedIndex === searchResults.length ? 'bg-primary-50' : ''
-                }`}
+                className={`flex items-center gap-2 w-full px-4 py-2 text-primary-600 hover:text-primary-700 hover:bg-gray-50 font-medium rounded-md text-sm select-none transition-colors ${highlightedIndex === searchResults.length ? 'bg-primary-50' : ''
+                  }`}
                 onMouseDown={() => {
                   // Prefill logic
                   if (/^\d+$/.test(searchTerm.trim())) {
@@ -405,8 +402,8 @@ export function CustomerSelect({ disabled }: CustomerSelectProps) {
         </div>
       )}
       {showNewCustomerForm && (
-        <Dialog 
-          open={showNewCustomerForm} 
+        <Dialog
+          open={showNewCustomerForm}
           onOpenChange={(open) => {
             // Prevent closing the dialog when creating customer
             if (!isCreatingCustomer) {
@@ -416,8 +413,8 @@ export function CustomerSelect({ disabled }: CustomerSelectProps) {
         >
           <DialogContent className="w-full max-w-md p-4 max-h-[80vh] overflow-y-auto">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Add New Customer</h3>
-            <NewCustomerForm 
-              onClose={() => setShowNewCustomerForm(false)} 
+            <NewCustomerForm
+              onClose={() => setShowNewCustomerForm(false)}
               isCreatingCustomer={isCreatingCustomer}
               setIsCreatingCustomer={setIsCreatingCustomer}
               prefillName={prefillName}
