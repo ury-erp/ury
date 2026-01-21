@@ -95,7 +95,7 @@ export async function addCustomer(
 export async function searchCustomers(search: string, limit = 5) {
   if (!search.trim()) return [];
   try {
-    const res = await call.get('ury.ury.api.customer.get', {
+    const res = await call.get('ury.ury.api.customer.get_customer_search', {
       search: search,
       limit,
     });

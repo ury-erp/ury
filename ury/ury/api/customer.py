@@ -15,7 +15,7 @@ def validate_search_input(search_term):
 
 
 @frappe.whitelist()
-def get(search, limit=20):
+def get_customer_search(search, limit=20):
     """    
     Searches across multiple customer fields using LIKE pattern matching.
     Respects user permissions automatically via frappe.db.get_all.
