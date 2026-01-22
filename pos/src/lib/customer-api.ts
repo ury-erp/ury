@@ -1,5 +1,6 @@
 import { DOCTYPES } from '../data/doctypes';
 import { db, call } from './frappe-sdk';
+import { handleApiError } from './error-handler';
 
 export interface Customer {
   name: string;
@@ -103,6 +104,7 @@ export async function searchCustomers(search: string, limit = 5) {
     return res.message || [];
   } catch (error) {
     console.error('Customer search error:', error);
-    throw error;
+    const errorMessage = handleApiError(error);
+    throw new Error(errorMessage);
   }
 }

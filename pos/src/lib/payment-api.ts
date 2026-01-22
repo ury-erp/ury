@@ -1,4 +1,5 @@
 import { call } from './frappe-sdk';
+import { handleApiError } from './error-handler';
 
 interface PaymentMode {
   mode_of_payment: string;
@@ -19,14 +20,13 @@ export const getPaymentModes = async (): Promise<string[]> => {
   try {
     const response = await call.get<PaymentModeResponse>("ury.ury_pos.api.getModeOfPayment");
 
-    const paymentModes = response.message.map((mode:PaymentMode) => mode.mode_of_payment);
-    
-    // Cache in session storage
+    const paymentModes = response.message.map((mode: PaymentMode) => mode.mode_of_payment);
     sessionStorage.setItem('payment_modes', JSON.stringify(paymentModes));
-    
+
     return paymentModes;
   } catch (error) {
     console.error('Failed to fetch payment modes:', error);
-    throw error;
+    const errorMessage = handleApiError(error);
+    throw new Error(errorMessage);
   }
 }; 
