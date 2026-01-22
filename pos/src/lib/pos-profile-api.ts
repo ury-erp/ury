@@ -64,13 +64,6 @@ export interface PosProfileFull {
   role_allowed_for_billing: RolePermission[];
   role_restricted_for_table_order?: RolePermission[];
   paid_limit?: number;
-  custom_pos_order_type_customer?: PosOrderTypeCustomer[];
-}
-
-export interface PosOrderTypeCustomer {
-  order_type: string;
-  customer: string;
-  name: string;
 }
 
 // Combined POS Profile with both limited and full fields
@@ -91,7 +84,6 @@ export interface PosProfileCombined extends PosProfileFull {
   edit_order_type?: number;
   view_all_status?: number;
   custom_daily_pos_close?: number;
-  custom_pos_order_type_customer?: PosOrderTypeCustomer[];
 }
 
 export interface Currency {
@@ -121,10 +113,10 @@ export async function getCombinedPosProfile(): Promise<PosProfileCombined> {
   // Get limited fields first
   const limitedProfile = await getPosProfileLimitedFields();
   console.log('limitedProfile', limitedProfile);
-
+  
   // Get full profile using the pos_profile name from limited profile
   const fullProfile = await getPosProfileFull(limitedProfile.pos_profile);
-
+  
   // Merge both profiles
   const combinedProfile: PosProfileCombined = {
     ...fullProfile,

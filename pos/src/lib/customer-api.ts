@@ -106,8 +106,3 @@ export async function searchCustomers(search: string, limit = 5) {
     throw error;
   }
 }
-
-export async function getCustomerById(id: string): Promise<Customer> {
-  const doc = await db.getDoc(DOCTYPES.CUSTOMER, id);
-  return doc;
-}
