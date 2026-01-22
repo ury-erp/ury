@@ -576,7 +576,7 @@ def make_invoice(customer, payments, cashier, pos_profile,owner, additionalDisco
             "payments", dict(mode_of_payment=d["mode_of_payment"], amount=d["amount"])
         )
 
-    invoice.owner = owner
+    # invoice.owner = owner
     invoice.save()
     try:
         invoice.submit()
