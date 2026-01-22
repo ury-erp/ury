@@ -11,7 +11,15 @@ app_icon_title = "URY"
 required_apps = ["erpnext"]
 # Includes in <head>
 # ------------------
-
+add_to_apps_screen = [
+  {
+    "name": "ury",
+    "logo": "/assets/ury/Images/ury.png",
+    "title": "ury",
+    "route": "/app/ury",
+    "has_permission": "ury.permission.check_app_permission"
+  }
+]
 # include js, css files in header of desk.html
 # app_include_css = "/assets/ury/css/ury.css"
 app_include_js = [
