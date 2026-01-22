@@ -4,11 +4,10 @@ import { storage } from '../lib/storage';
 import { getRestaurantMenu, getAggregatorMenu, MenuItem as APIMenuItem } from '../lib/menu-api';
 import { getCurrencyInfo, PosProfileCombined, getCombinedPosProfile } from '../lib/pos-profile-api';
 import { getMenuCourses } from '../lib/menu-course-api';
-import { getCustomerGroups, getCustomerTerritories } from '../lib/customer-api';
+import { getCustomerGroups, getCustomerTerritories, getCustomerById } from '../lib/customer-api';
 import { DEFAULT_ORDER_TYPE, OrderType } from '../data/order-types';
 import { getTableOrder, TableOrder } from '../lib/order-api';
 import { getPaymentModes } from '../lib/payment-api';
-
 // Constants
 const MAX_QUANTITY = 99;
 const MIN_QUANTITY = 0;
@@ -115,6 +114,7 @@ interface POSState {
   tableOrder: TableOrder | null;
   isInitializing: boolean;
   orderComment: string;
+  orderTypeCustomers: Record<string, Customer>;
 }
 
 interface POSStore extends POSState {
@@ -199,11 +199,12 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   isUpdatingOrder: false,
   orderId: null,
   orderComment: '',
+  orderTypeCustomers: {},
 
   initializeApp: async () => {
     try {
       set({ isInitializing: true, error: null });
-      
+
       const [profileResult, menuResult, categoriesResult, paymentModesResult] = await Promise.allSettled([
         get().fetchPosProfile(),
         get().fetchMenuItems(),
@@ -211,61 +212,96 @@ export const usePOSStore = create<POSStore>((set, get) => ({
         get().fetchPaymentModes()
       ]);
 
-      if (profileResult.status === 'rejected' || 
-          menuResult.status === 'rejected' || 
-          categoriesResult.status === 'rejected' ||
-          paymentModesResult.status === 'rejected') {
-        set({ 
+      if (profileResult.status === 'rejected' ||
+        menuResult.status === 'rejected' ||
+        categoriesResult.status === 'rejected' ||
+        paymentModesResult.status === 'rejected') {
+        set({
           error: 'Failed to initialize app. Please refresh the page.',
-          isInitializing: false 
+          isInitializing: false
         });
         return;
       }
 
       set({ isInitializing: false });
     } catch (error) {
-      set({ 
+      set({
         error: 'Failed to initialize app. Please refresh the page.',
-        isInitializing: false 
+        isInitializing: false
       });
     }
   },
-
   fetchPosProfile: async () => {
     try {
       const cached = sessionStorage.getItem('posProfile');
+      let profile: PosProfileCombined;
+
       if (cached) {
-        const profile = JSON.parse(cached);
-        set({ 
-          posProfile: profile, 
-          profileLoading: false,
-          currency: profile.currency || 'INR'
-        });
-        if (!storage.getItem('currencySymbol')) {
-          await get().fetchCurrencySymbol();
-        }
-        return;
+        profile = JSON.parse(cached);
+      } else {
+        set({ profileLoading: true });
+        profile = await getCombinedPosProfile();
+        sessionStorage.setItem('posProfile', JSON.stringify(profile));
       }
 
-      set({ profileLoading: true, error: null });
-      const combinedProfile = await getCombinedPosProfile();
-      
-      sessionStorage.setItem('posProfile', JSON.stringify(combinedProfile));
-      set({ 
-        posProfile: combinedProfile, 
+      // Set profile + currency immediately
+      set({
+        posProfile: profile,
         profileLoading: false,
-        currency: combinedProfile.currency || 'INR'
+        currency: profile.currency || 'INR'
       });
-      
+
+      if (profile.custom_pos_order_type_customer?.length) {
+        const mappings = profile.custom_pos_order_type_customer;
+        const uniqueCustomerIds = [...new Set(mappings.map((m: any) => m.customer))];
+
+        try {
+          // Fetch customers once
+          const customers = await Promise.all(
+            uniqueCustomerIds.map((id: string) => getCustomerById(id))
+          );
+
+          const customerMap: Record<string, Customer> = {};
+
+          mappings.forEach((mapping: any) => {
+            const found = customers.find(c => c.name === mapping.customer);
+            if (found) {
+              customerMap[mapping.order_type] = {
+                id: found.name,
+                name: found.customer_name,
+                phone: found.mobile_number
+              };
+            }
+          });
+
+          set({ orderTypeCustomers: customerMap });
+
+          // Auto-assign mapped customer
+          const currentType = get().selectedOrderType;
+          const mapped = customerMap[currentType];
+
+          if (mapped) {
+            set({ selectedCustomer: mapped });
+          } else {
+            const first = mappings[0]?.order_type;
+            if (first && customerMap[first]) {
+              set({ selectedCustomer: customerMap[first] });
+            }
+          }
+
+        } catch (err) {
+          console.error("Failed customer mapping", err);
+        }
+      }
+
+      // Ensure currency symbol exists
       if (!storage.getItem('currencySymbol')) {
         await get().fetchCurrencySymbol();
       }
+
     } catch (error) {
       console.error('Error fetching POS profile:', error);
-      set({ 
-        error: 'Failed to fetch POS profile',
-        profileLoading: false 
-      });
+      set({ error: 'Failed to fetch POS profile', profileLoading: false });
     }
   },
 
@@ -274,7 +310,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
       const currency = get().currency;
       const response = await getCurrencyInfo(currency);
       const { symbol } = response;
-      
+
       set({ currencySymbol: symbol });
       storage.setItem('currencySymbol', symbol);
     } catch (error) {
@@ -291,7 +327,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
     try {
       set({ menuLoading: true, error: null });
       const items = await getRestaurantMenu(posProfile.name, selectedRoom, selectedOrderType);
-      
+
       const menuItems: MenuItem[] = items.map(item => ({
         id: item.item,
         name: item.item_name,
@@ -319,7 +355,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
     try {
       set({ menuLoading: true, error: null });
       const items = await getAggregatorMenu(aggregator);
-      
+
       const menuItems: MenuItem[] = items.map(item => ({
         ...item,
         id: item.item,
@@ -392,7 +428,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
           quantity: newQuantity,
           comment: newComment
         };
-        
+
         set({ activeOrders: newOrders });
       } else {
         const newOrders = [...get().activeOrders, { ...item, uniqueId }];
@@ -448,8 +484,8 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   setSelectedCustomer: (customer) => set({ selectedCustomer: customer }),
   setSelectedTable: (table: string | null, room: string | null, doNotLoadOrder: boolean = false) => {
     set({ selectedTable: table, selectedRoom: room });
-    if (table ) {
-      if (!doNotLoadOrder) 
+    if (table) {
+      if (!doNotLoadOrder)
         get().loadTableOrder(table);
     } else {
       get().clearTableOrder();
@@ -460,16 +496,36 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   },
   setSelectedOrderType: (type) => {
     const { fetchMenuItems } = get();
-    
-    set({ 
+
+    set({
       activeOrders: [],
       selectedOrderType: type,
       isUpdatingOrder: false,
       orderId: null
     });
-    
+
     if (type !== 'Aggregators') {
       fetchMenuItems();
+    }
+
+    // Auto-switch customer based on order type
+    const { orderTypeCustomers, posProfile } = get();
+    const mappings = posProfile?.custom_pos_order_type_customer;
+    const mappedCustomer = orderTypeCustomers[type];
+
+    // Requirement 2:
+    // If selected order type exists in table: Auto-assign mapped customer
+    // Else: Set fallback to first row’s customer
+
+    if (mappedCustomer) {
+      set({ selectedCustomer: mappedCustomer });
+    } else if (mappings && mappings.length > 0) {
+      // Fallback to first row's customer
+      const firstMapping = mappings[0];
+      const defaultCustomer = orderTypeCustomers[firstMapping.order_type];
+      if (defaultCustomer) {
+        set({ selectedCustomer: defaultCustomer });
+      }
     }
   },
   setQuickFilter: (filter) => set({ quickFilter: filter }),
@@ -480,7 +536,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   processPayment: async (paymentMode: string, amount: number) => {
     try {
       const { activeOrders, cartId, selectedCustomer, selectedOrderType } = get();
-      
+
       const order: Order = {
         id: uuidv4(),
         cartId: cartId!,
@@ -497,7 +553,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
 
       const newOrders = [...get().orders, order];
       set({ orders: newOrders });
-      
+
       await get().clearOrder();
     } catch (error) {
       set({ error: (error as Error).message });
@@ -506,8 +562,8 @@ export const usePOSStore = create<POSStore>((set, get) => ({
 
   updateOrderStatus: async (orderId: string, status: Order['status']) => {
     try {
-      const newOrders = get().orders.map(order => 
-        order.id === orderId 
+      const newOrders = get().orders.map(order =>
+        order.id === orderId
           ? { ...order, status, updatedAt: new Date().toISOString() }
           : order
       );
@@ -544,7 +600,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   getCartTotals: (): CartTotals => {
     const items = get().activeOrders;
     const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
-    
+
     const subtotal = items.reduce((sum, item) => {
       const itemPrice = calculateItemPrice(item);
       return sum + (itemPrice * item.quantity);
@@ -610,7 +666,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
           } as OrderItem;
         });
 
-        set({ 
+        set({
           tableOrder: response,
           activeOrders: orderItems,
           selectedCustomer: order.customer ? {
@@ -622,7 +678,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
           orderId: order.name,
         });
       } else {
-        set({ 
+        set({
           tableOrder: null,
           activeOrders: [],
           selectedCustomer: null,
@@ -631,7 +687,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
         });
       }
     } catch (error) {
-      set({ 
+      set({
         error: 'Failed to load table order',
         tableOrder: null,
         activeOrders: [],
@@ -645,7 +701,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   },
 
   clearTableOrder: () => {
-    set({ 
+    set({
       tableOrder: null,
       activeOrders: [],
       selectedCustomer: null,
@@ -655,17 +711,31 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   },
 
   setOrderForUpdate: (orderId: string | null) => {
-    set({ 
+    set({
       isUpdatingOrder: orderId !== null,
       orderId,
     });
   },
 
   resetOrderState: () => {
-    const { fetchMenuItems } = get();
-    
+    const { fetchMenuItems, orderTypeCustomers, posProfile } = get();
+    // Calculate default customer logic
+    let defaultCustomer = null;
+    const mappings = posProfile?.custom_pos_order_type_customer;
+    const mappedCustomer = orderTypeCustomers[DEFAULT_ORDER_TYPE];
+
+    if (mappedCustomer) {
+      defaultCustomer = mappedCustomer;
+    } else if (mappings && mappings.length > 0) {
+      const firstMapping = mappings[0];
+      const fallback = orderTypeCustomers[firstMapping.order_type];
+      if (fallback) {
+        defaultCustomer = fallback;
+      }
+    }
+
     set({
-      selectedCustomer: null,
+      selectedCustomer: defaultCustomer,
       selectedTable: null,
       selectedRoom: null,
       selectedAggregator: null,
