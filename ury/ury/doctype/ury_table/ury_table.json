@@ -16,6 +16,12 @@
   "restaurant",
   "restaurant_room",
   "branch",
+  "layout_position_section",
+  "layout_x",
+  "layout_width",
+  "column_break_olsi",
+  "layout_y",
+  "layout_height",
   "section_break_mcm3o",
   "is_take_away",
   "active_info_tab",
@@ -104,11 +110,40 @@
    "fieldtype": "Select",
    "label": "Table Shape",
    "options": "\nRectangle\nSquare\nCircle"
+  },
+  {
+   "fieldname": "layout_position_section",
+   "fieldtype": "Section Break",
+   "label": "Layout Position"
+  },
+  {
+   "fieldname": "layout_x",
+   "fieldtype": "Float",
+   "label": "Layout X"
+  },
+  {
+   "fieldname": "layout_width",
+   "fieldtype": "Float",
+   "label": "Layout Width"
+  },
+  {
+   "fieldname": "column_break_olsi",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "layout_y",
+   "fieldtype": "Float",
+   "label": "Layout Y"
+  },
+  {
+   "fieldname": "layout_height",
+   "fieldtype": "Float",
+   "label": "Layout Height"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-07-17 11:29:34.334457",
+ "modified": "2025-12-31 15:45:13.235634",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Table",
@@ -157,6 +192,7 @@
   }
  ],
  "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [],
