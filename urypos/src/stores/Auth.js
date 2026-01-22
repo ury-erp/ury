@@ -182,28 +182,58 @@ export const useAuthStore = defineStore("auth", {
             });
 
           });
-      } 
+      }
       else {
         this.call
-          .get("ury.ury_pos.api.posOpening")
-          .then((result) => {
-            const serverMessages = JSON.parse(result._server_messages);
-            const innerMessageString = serverMessages[0];
-            const innerMessage = JSON.parse(innerMessageString);
-            const message = innerMessage.message;
-            // if (this.cashier) {
-            //   this.alert.createAlert("Message", message, "OK").then(() => {
-            //     router.push("/posOpen");
-            //   });
-            // } else {
-            var currentDomain = window.location.origin;
-            this.alert.createAlert("Message", message, "OK").then(() => {
-              window.location.href = currentDomain + "/app/";
-            });
-            // }
+          .get("ury.ury.api.pos_checklist.checklist")
+          .then((checklistRes) => {
+            if (checklistRes.checklist === 0) {
+              var currentDomain = window.location.origin;
+              this.alert.createAlert("Message", checklistRes.message || "Complete the checklist quality review", "OK").then(() => {
+                router.push("/PosOpen");
+              });
+              return;
+            }
+
+            this.call
+              .get("ury.ury_pos.api.posOpening")
+              .then((result) => {
+                const serverMessages = JSON.parse(result._server_messages);
+                const innerMessageString = serverMessages[0];
+                const innerMessage = JSON.parse(innerMessageString);
+                const message = innerMessage.message;
+                // if (this.cashier) {
+                //   this.alert.createAlert("Message", message, "OK").then(() => {
+                //     router.push("/posOpen");
+                //   });
+                // } else {
+                var currentDomain = window.location.origin;
+                this.alert.createAlert("Message", message, "OK").then(() => {
+                  window.location.href = currentDomain + "/app/";
+                });
+                // }
+              })
+              .catch((error) => {
+                // console.error(error)
+              });
           })
           .catch((error) => {
-            // console.error(error)
+            console.error("Checklist check failed", error);
+            // Fallback to normal POS opening check if checklist check fails? 
+            // Or fail safe? Proceeding might be safer to avoid blocking if API issue.
+            this.call
+              .get("ury.ury_pos.api.posOpening")
+              .then((result) => {
+                // ... (same existing logic)
+                const serverMessages = JSON.parse(result._server_messages);
+                const innerMessageString = serverMessages[0];
+                const innerMessage = JSON.parse(innerMessageString);
+                const message = innerMessage.message;
+                var currentDomain = window.location.origin;
+                this.alert.createAlert("Message", message, "OK").then(() => {
+                  window.location.href = currentDomain + "/app/";
+                });
+              })
           });
       }
     },
@@ -215,11 +245,33 @@ export const useAuthStore = defineStore("auth", {
         .get("ury.ury_pos.api.validate_pos_close", getPosProfile)
         .then((result) => {
           if (result.message === "Failed") {
-            var currentDomain = window.location.origin;
-            this.alert
-              .createAlert("Message", "Please close previous POS Entry", "OK")
-              .then(() => {
-                window.location.href = currentDomain + "/app/";
+            this.call
+              .get("ury.ury.api.pos_checklist.checklist")
+              .then((checklistRes) => {
+                if (checklistRes.checklist === 0) {
+                  var currentDomain = window.location.origin;
+                  this.alert.createAlert("Message", checklistRes.message || "Complete the checklist quality review", "OK").then(() => {
+                    router.push("/PosClose");
+                  });
+                  return;
+                } else {
+                  var currentDomain = window.location.origin;
+                  this.alert
+                    .createAlert("Message", "Please close previous POS Entry", "OK")
+                    .then(() => {
+                      router.push("/PosClose");
+                    });
+                }
+              })
+              .catch((error) => {
+                console.error(error)
+                // Fallback if checklist API fails
+                var currentDomain = window.location.origin;
+                this.alert
+                  .createAlert("Message", "Please close previous POS Entry", "OK")
+                  .then(() => {
+                    router.push("/app");
+                  });
               });
           }
         })
