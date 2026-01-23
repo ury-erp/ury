@@ -195,47 +195,35 @@ export const useAuthStore = defineStore("auth", {
               return;
             }
 
-            this.call
-              .get("ury.ury_pos.api.posOpening")
-              .then((result) => {
-                const serverMessages = JSON.parse(result._server_messages);
-                const innerMessageString = serverMessages[0];
-                const innerMessage = JSON.parse(innerMessageString);
-                const message = innerMessage.message;
-                // if (this.cashier) {
-                //   this.alert.createAlert("Message", message, "OK").then(() => {
-                //     router.push("/posOpen");
-                //   });
-                // } else {
-                var currentDomain = window.location.origin;
-                this.alert.createAlert("Message", message, "OK").then(() => {
-                  window.location.href = currentDomain + "/app/";
-                });
-                // }
-              })
-              .catch((error) => {
-                // console.error(error)
-              });
+            if (checklistRes.pos_open === 0) {
+              this.checkPosOpeningEntry();
+              return;
+            }
+
+            this.checkPosOpeningEntry();
           })
           .catch((error) => {
             console.error("Checklist check failed", error);
-            // Fallback to normal POS opening check if checklist check fails? 
-            // Or fail safe? Proceeding might be safer to avoid blocking if API issue.
-            this.call
-              .get("ury.ury_pos.api.posOpening")
-              .then((result) => {
-                // ... (same existing logic)
-                const serverMessages = JSON.parse(result._server_messages);
-                const innerMessageString = serverMessages[0];
-                const innerMessage = JSON.parse(innerMessageString);
-                const message = innerMessage.message;
-                var currentDomain = window.location.origin;
-                this.alert.createAlert("Message", message, "OK").then(() => {
-                  window.location.href = currentDomain + "/app/";
-                });
-              })
+            this.checkPosOpeningEntry();
           });
       }
+    },
+    checkPosOpeningEntry() {
+      this.call
+        .get("ury.ury_pos.api.posOpening")
+        .then((result) => {
+          const serverMessages = JSON.parse(result._server_messages);
+          const innerMessageString = serverMessages[0];
+          const innerMessage = JSON.parse(innerMessageString);
+          const message = innerMessage.message;
+          var currentDomain = window.location.origin;
+          this.alert.createAlert("Message", message, "OK").then(() => {
+            window.location.href = currentDomain + "/app/";
+          });
+        })
+        .catch((error) => {
+          // console.error(error)
+        });
     },
     isPosCloseCheck() {
       const getPosProfile = {
