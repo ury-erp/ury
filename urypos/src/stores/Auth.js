@@ -166,12 +166,7 @@ export const useAuthStore = defineStore("auth", {
         if (checklistRes.message.checklist === 0) {
           const currentDomain = window.location.origin;
           await this.alert.createAlert("Message", checklistRes.message.message || "Complete the checklist quality review", "OK");
-
-          if (redirectPath.startsWith("http")) {
-            window.location.href = redirectPath;
-          } else {
-            router.push(redirectPath);
-          }
+          window.location.href = window.location.origin + "/app";
           return false;
         }
         return true;

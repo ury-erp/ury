@@ -4,7 +4,7 @@ from ury.ury_pos.api import getBranch
 
 
 @frappe.whitelist()
-def checklist():
+def checklist(**kwargs):
     today_date = today()
     employee = frappe.session.user
     branchName = getBranch()
@@ -19,13 +19,12 @@ def checklist():
         fields=["posting_date"]
     )
 
-    if not pos_opening_list:
-        return {
-            "pos_open": 0
-        }
-
-    pos_open = 1
-    pos_posting_date = pos_opening_list[0].posting_date
+    if pos_opening_list:
+        pos_open = 1
+        pos_posting_date = pos_opening_list[0].posting_date
+    else:
+        pos_open = 0
+        pos_posting_date = today_date
 
     user = frappe.get_doc("User", employee)
     user_roles = user.roles
@@ -35,6 +34,12 @@ def checklist():
         {"branch": branchName},
         "name"
     )
+    
+    if not pos_profile_name:
+         return {
+            "pos_open": pos_open,
+            "checklist": 1
+        }
 
     pos_profile = frappe.get_doc("POS Profile", pos_profile_name)
     daily_quality_checklist = pos_profile.custom_daily_quality_checking
@@ -67,6 +72,6 @@ def checklist():
     return {
         "pos_open": pos_open,
         "checklist": 1 if is_checklist_submitted else 0,
-        "checklist_doc": to_submit_checklists,
+        "checklist_name": [check.checklist for check in to_submit_checklists],
         "pos_posting_date": pos_posting_date
     }
