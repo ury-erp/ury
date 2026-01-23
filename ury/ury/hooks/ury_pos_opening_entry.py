@@ -4,6 +4,7 @@ from frappe.utils import  get_datetime,today,now
 
 def validate(doc,method):
     set_cashier_room(doc,method)
+    validate_pos_opening_quality_review(doc, method)
     
 def before_save(doc, method):
     main_pos_open_check(doc, method)

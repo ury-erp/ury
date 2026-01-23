@@ -4,7 +4,6 @@ from ury.ury_pos.api import getBranch
 
 
 @frappe.whitelist()
-@frappe.whitelist()
 def checklist(checklist_type="Pos Opening Entry"):
     today_date = today()
     employee = frappe.session.user

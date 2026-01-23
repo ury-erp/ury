@@ -8,6 +8,7 @@ def before_save(doc, method):
 def validate(doc, method):
     calculate_closing_amount(doc, method)
     validate_cashier(doc, method)
+    validate_pos_closing_quality_review(doc, method)
 
 
 def sub_pos_close_check(doc,method):
