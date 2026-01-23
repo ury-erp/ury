@@ -158,7 +158,30 @@ export const useAuthStore = defineStore("auth", {
       window.location.href = currentDomain + "/app/";
     },
 
-    isPosOpenChecking() {
+    async validateChecklist(redirectPath, checklistType = "Pos Opening Entry") {
+      try {
+        const checklistRes = await this.call.get("ury.ury.api.pos_checklist.checklist", {
+          checklist_type: checklistType
+        });
+        if (checklistRes.message.checklist === 0) {
+          const currentDomain = window.location.origin;
+          await this.alert.createAlert("Message", checklistRes.message.message || "Complete the checklist quality review", "OK");
+
+          if (redirectPath.startsWith("http")) {
+            window.location.href = redirectPath;
+          } else {
+            router.push(redirectPath);
+          }
+          return false;
+        }
+        return true;
+      } catch (error) {
+        console.error("Checklist check failed", error);
+        return true;
+      }
+    },
+
+    async isPosOpenChecking() {
       if (this.invoiceData.multipleCashier) {
         this.call
           .get("ury.ury.doctype.ury_order.ury_order.pos_opening_check")
@@ -184,28 +207,11 @@ export const useAuthStore = defineStore("auth", {
           });
       }
       else {
-        this.call
-          .get("ury.ury.api.pos_checklist.checklist")
-          .then((checklistRes) => {
-            if (checklistRes.checklist === 0) {
-              var currentDomain = window.location.origin;
-              this.alert.createAlert("Message", checklistRes.message || "Complete the checklist quality review", "OK").then(() => {
-                router.push("/PosOpen");
-              });
-              return;
-            }
+        // Updated flow as per requirements
+        const isValid = await this.validateChecklist("/PosOpen", "Pos Opening Entry");
+        if (!isValid) return;
 
-            if (checklistRes.pos_open === 0) {
-              this.checkPosOpeningEntry();
-              return;
-            }
-
-            this.checkPosOpeningEntry();
-          })
-          .catch((error) => {
-            console.error("Checklist check failed", error);
-            this.checkPosOpeningEntry();
-          });
+        this.checkPosOpeningEntry();
       }
     },
     checkPosOpeningEntry() {
@@ -231,35 +237,17 @@ export const useAuthStore = defineStore("auth", {
       };
       this.call
         .get("ury.ury_pos.api.validate_pos_close", getPosProfile)
-        .then((result) => {
+        .then(async (result) => {
           if (result.message === "Failed") {
-            this.call
-              .get("ury.ury.api.pos_checklist.checklist")
-              .then((checklistRes) => {
-                if (checklistRes.checklist === 0) {
-                  var currentDomain = window.location.origin;
-                  this.alert.createAlert("Message", checklistRes.message || "Complete the checklist quality review", "OK").then(() => {
-                    router.push("/PosClose");
-                  });
-                  return;
-                } else {
-                  var currentDomain = window.location.origin;
-                  this.alert
-                    .createAlert("Message", "Please close previous POS Entry", "OK")
-                    .then(() => {
-                      router.push("/PosClose");
-                    });
-                }
-              })
-              .catch((error) => {
-                console.error(error)
-                // Fallback if checklist API fails
-                var currentDomain = window.location.origin;
-                this.alert
-                  .createAlert("Message", "Please close previous POS Entry", "OK")
-                  .then(() => {
-                    router.push("/app");
-                  });
+            const isValid = await this.validateChecklist("/PosClose", "Pos Closing Entry");
+            if (!isValid) return;
+
+            // Checklist valid, but POS still needs closing
+            var currentDomain = window.location.origin;
+            this.alert
+              .createAlert("Message", "Please close previous POS Entry", "OK")
+              .then(() => {
+                router.push("/PosClose");
               });
           }
         })
