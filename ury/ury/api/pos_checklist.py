@@ -26,8 +26,7 @@ def checklist(**kwargs):
         pos_open = 0
         pos_posting_date = today_date
 
-    user = frappe.get_doc("User", employee)
-    user_roles = user.roles
+    user_roles = frappe.get_roles(employee)
 
     pos_profile_name = frappe.get_value(
         "POS Profile",
@@ -53,7 +52,7 @@ def checklist(**kwargs):
     to_submit_checklists = []
     for checklist in daily_quality_checklist:
         for user_role in user_roles:
-            if checklist.role == user_role.role:
+            if checklist.role == user_role:
                 to_submit_checklists.append(checklist)
 
     if not to_submit_checklists:
