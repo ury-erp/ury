@@ -7,7 +7,8 @@
  "engine": "InnoDB",
  "field_order": [
   "checklist",
-  "options"
+  "options",
+  "role"
  ],
  "fields": [
   {
@@ -22,14 +23,20 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Options",
-   "options": "Pos Opening Entry\nPos Closing Entry"
+   "options": "POS Opening Entry\nPOS Closing Entry\nOrder Taking\nRM Checklist"
+  },
+  {
+   "fieldname": "role",
+   "fieldtype": "Link",
+   "label": "Role",
+   "options": "Role"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-01-14 12:14:20.709494",
+ "modified": "2026-01-23 12:29:11.027868",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "Daily Quality Check",
