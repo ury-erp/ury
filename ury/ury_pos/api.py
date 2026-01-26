@@ -558,14 +558,18 @@ def getPosInvoiceItems(invoice):
     orderdItems = frappe.get_doc("POS Invoice", invoice)
     posItems = orderdItems.items
     for items in posItems:
+        item_code = items.item_code
         item_name = items.item_name
         qty = items.qty
         amount = items.rate
+        uom = items.uom
         itemDetails.append(
             {
+                "item_code": item_code,
                 "item_name": item_name,
                 "qty": qty,
                 "amount": amount,
+                "uom": uom,
             }
         )
     taxDetail = orderdItems.taxes

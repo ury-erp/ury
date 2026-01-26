@@ -64,6 +64,7 @@ export interface PosProfileFull {
   role_allowed_for_billing: RolePermission[];
   role_restricted_for_table_order?: RolePermission[];
   paid_limit?: number;
+  cost_center?: string | null;
 }
 
 // Combined POS Profile with both limited and full fields

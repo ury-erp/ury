@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Clock, User, UserCheck, Receipt, Printer, Pencil, X } from 'lucide-react';
+import { Clock, User, UserCheck, Receipt, Printer, Pencil, X, AlertTriangle } from 'lucide-react';
 import { Badge, Button, Card, CardContent } from '../components/ui';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../components/ui/dialog';
 import { showToast } from '../components/ui/toast';
@@ -11,6 +11,7 @@ import { Textarea } from '../components/ui/textarea';
 import { usePOSStore } from '../store/pos-store';
 import { useNavigate } from 'react-router-dom';
 import PaymentDialog from '../components/PaymentDialog';
+import WastageDialog from '../components/WastageDialog';
 import { printOrder } from '../lib/print';
 import { call } from '../lib/frappe-sdk';
 import { useTranslation } from 'react-i18next';
@@ -46,6 +47,7 @@ export default function Orders() {
   const [editLoading, setEditLoading] = React.useState(false);
   const [showPaymentDialog, setShowPaymentDialog] = React.useState(false);
   const [isPrinting, setIsPrinting] = React.useState(false);
+  const [showWastageDialog, setShowWastageDialog] = React.useState(false);
 
   useEffect(() => {
     fetchOrders();
@@ -475,7 +477,7 @@ export default function Orders() {
               )}
             </div>
 
-            {/* Sticky Bottom Section - Single Row: Print | Payment | Total */}
+            {/* Sticky Bottom Section - Single Row: Print | Waste | Payment | Total */}
             <div className="border-t border-gray-200 p-6 bg-gray-50 sticky bottom-0 left-0 right-0 z-10">
               <div className="flex items-center gap-3 w-full">
                 {/* Print Icon Button */}
@@ -489,6 +491,19 @@ export default function Orders() {
                 >
                   {isPrinting ? <Spinner className="w-5 h-5" hideMessage /> : <Printer className="w-5 h-5" />}
                 </Button>
+                {/* Mark as Waste Button - Only show for Draft, Unbilled orders */}
+                {(selectedOrder.status === 'Draft' || selectedOrder.status === 'Unbilled') && (
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="flex-shrink-0 text-orange-500 hover:text-orange-600 hover:bg-orange-50"
+                    onClick={() => setShowWastageDialog(true)}
+                    aria-label={t('wastage.markAsWaste')}
+                    title={t('wastage.markInvoiceWaste')}
+                  >
+                    <AlertTriangle className="w-5 h-5" />
+                  </Button>
+                )}
                 {/* Payment Button - Only show for Draft, Unbilled, and Recently Paid orders */}
                 {(selectedOrder.status === 'Draft' || selectedOrder.status === 'Unbilled' || selectedOrder.status === 'Recently Paid') && (
                   <Button
@@ -526,6 +541,23 @@ export default function Orders() {
           owner={posStore.posProfile?.cashier || ''}
           fetchOrders={fetchOrders}
           clearSelectedOrder={clearSelectedOrder}
+        />
+      )}
+      {showWastageDialog && selectedOrder && (
+        <WastageDialog
+          isOpen={showWastageDialog}
+          onClose={() => setShowWastageDialog(false)}
+          invoiceId={selectedOrder.name}
+          invoiceItems={selectedOrderItems.map(item => ({
+            item_code: item.item_code,
+            item_name: item.item_name,
+            qty: item.qty,
+            uom: item.uom
+          }))}
+          onSuccess={() => {
+            setShowWastageDialog(false);
+            fetchOrders();
+          }}
         />
       )}
     </div>

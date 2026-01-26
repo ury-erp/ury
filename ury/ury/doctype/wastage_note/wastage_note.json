@@ -1,0 +1,217 @@
+{
+  "actions": [],
+  "autoname": "naming_series:",
+  "creation": "2024-01-15 00:00:00.000000",
+  "doctype": "DocType",
+  "editable_grid": 1,
+  "engine": "InnoDB",
+  "field_order": [
+    "naming_series",
+    "company",
+    "posting_date",
+    "posting_time",
+    "column_break_1",
+    "pos_invoice",
+    "status",
+    "amended_from",
+    "section_break_warehouse",
+    "source_warehouse",
+    "waste_warehouse",
+    "column_break_accounts",
+    "expense_account",
+    "cost_center",
+    "section_break_items",
+    "items",
+    "section_break_reference",
+    "stock_entry",
+    "remarks"
+  ],
+  "fields": [
+    {
+      "fieldname": "naming_series",
+      "fieldtype": "Select",
+      "label": "Series",
+      "options": "WN-.YYYY.-",
+      "reqd": 1
+    },
+    {
+      "fieldname": "company",
+      "fieldtype": "Link",
+      "in_list_view": 1,
+      "in_standard_filter": 1,
+      "label": "Company",
+      "options": "Company",
+      "reqd": 1
+    },
+    {
+      "fieldname": "posting_date",
+      "fieldtype": "Date",
+      "default": "Today",
+      "in_list_view": 1,
+      "label": "Posting Date",
+      "reqd": 1
+    },
+    {
+      "fieldname": "posting_time",
+      "fieldtype": "Time",
+      "label": "Posting Time"
+    },
+    {
+      "fieldname": "column_break_1",
+      "fieldtype": "Column Break"
+    },
+    {
+      "fieldname": "pos_invoice",
+      "fieldtype": "Link",
+      "in_list_view": 1,
+      "label": "POS Invoice",
+      "options": "POS Invoice"
+    },
+    {
+      "fieldname": "status",
+      "fieldtype": "Select",
+      "default": "Draft",
+      "in_list_view": 1,
+      "in_standard_filter": 1,
+      "label": "Status",
+      "options": "Draft\nPending\nCompleted\nCancelled",
+      "read_only": 1
+    },
+    {
+      "fieldname": "amended_from",
+      "fieldtype": "Link",
+      "label": "Amended From",
+      "no_copy": 1,
+      "options": "Wastage Note",
+      "print_hide": 1,
+      "read_only": 1
+    },
+    {
+      "fieldname": "section_break_warehouse",
+      "fieldtype": "Section Break",
+      "label": "Warehouse Details"
+    },
+    {
+      "fieldname": "source_warehouse",
+      "fieldtype": "Link",
+      "label": "Source Warehouse",
+      "options": "Warehouse",
+      "reqd": 1
+    },
+    {
+      "fieldname": "waste_warehouse",
+      "fieldtype": "Link",
+      "label": "Waste Warehouse",
+      "options": "Warehouse",
+      "description": "Leave empty for Material Issue (stock consumption). Set for Material Transfer to waste warehouse."
+    },
+    {
+      "fieldname": "column_break_accounts",
+      "fieldtype": "Column Break"
+    },
+    {
+      "fieldname": "expense_account",
+      "fieldtype": "Link",
+      "label": "Expense Account",
+      "options": "Account",
+      "reqd": 1
+    },
+    {
+      "fieldname": "cost_center",
+      "fieldtype": "Link",
+      "label": "Cost Center",
+      "options": "Cost Center",
+      "reqd": 1
+    },
+    {
+      "fieldname": "section_break_items",
+      "fieldtype": "Section Break",
+      "label": "Wastage Items"
+    },
+    {
+      "fieldname": "items",
+      "fieldtype": "Table",
+      "label": "Items",
+      "options": "Wastage Note Item",
+      "reqd": 1
+    },
+    {
+      "fieldname": "section_break_reference",
+      "fieldtype": "Section Break",
+      "label": "References"
+    },
+    {
+      "fieldname": "stock_entry",
+      "fieldtype": "Link",
+      "label": "Stock Entry",
+      "options": "Stock Entry",
+      "read_only": 1
+    },
+    {
+      "fieldname": "remarks",
+      "fieldtype": "Text",
+      "label": "Remarks"
+    }
+  ],
+  "index_web_pages_for_search": 1,
+  "is_submittable": 1,
+  "links": [],
+  "modified": "2024-01-15 00:00:00.000000",
+  "modified_by": "Administrator",
+  "module": "URY",
+  "name": "Wastage Note",
+  "naming_rule": "By \"Naming Series\" field",
+  "owner": "Administrator",
+  "permissions": [
+    {
+      "create": 1,
+      "delete": 1,
+      "email": 1,
+      "export": 1,
+      "print": 1,
+      "read": 1,
+      "report": 1,
+      "role": "System Manager",
+      "share": 1,
+      "submit": 1,
+      "write": 1
+    },
+    {
+      "create": 1,
+      "email": 1,
+      "export": 1,
+      "print": 1,
+      "read": 1,
+      "report": 1,
+      "role": "Stock Manager",
+      "share": 1,
+      "submit": 1,
+      "write": 1
+    },
+    {
+      "create": 1,
+      "email": 1,
+      "export": 1,
+      "print": 1,
+      "read": 1,
+      "report": 1,
+      "role": "Stock User",
+      "share": 1,
+      "write": 1
+    },
+    {
+      "create": 1,
+      "email": 1,
+      "export": 1,
+      "print": 1,
+      "read": 1,
+      "report": 1,
+      "role": "Accounts User",
+      "share": 1,
+      "write": 1
+    }
+  ],
+  "sort_field": "modified",
+  "sort_order": "DESC",
+  "track_changes": 1
+}

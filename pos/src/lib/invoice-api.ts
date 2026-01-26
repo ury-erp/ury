@@ -20,9 +20,11 @@ export interface POSInvoice {
 }
 
 export interface POSInvoiceItem {
+  item_code: string;
   item_name: string;
   qty: number;
   amount: number;
+  uom?: string;
 }
 
 export interface POSInvoiceTax {
