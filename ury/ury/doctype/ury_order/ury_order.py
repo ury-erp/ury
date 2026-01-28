@@ -127,7 +127,9 @@ def sync_order(
     comments=None,
     order_type=None,
     aggregator_id=None,
-    room=None
+    room=None,
+    is_employee_meal=None,
+    employee=None
 ):
     
     user_role = frappe.get_roles()
@@ -194,16 +196,36 @@ def sync_order(
             )
             return {"status": "Failure"}
 
-    if not customer:
-        frappe.throw("Please enter valid customer details")
-    else:
-        invoice.customer = customer
-
     if order_type:
         invoice.order_type = order_type
 
-    customerdoc = frappe.get_doc("Customer", customer)
-    invoice.mobile_number = customerdoc.mobile_number
+    # Employee meal handling
+    if is_employee_meal and int(is_employee_meal):
+        emp_doc = frappe.get_doc("Employee", employee)
+        existing_customer = frappe.db.get_value("Customer", {"customer_name": emp_doc.employee_name})
+        if not existing_customer:
+            emp_phone = emp_doc.get("cell_phone") or emp_doc.get("personal_phone") or emp_doc.get("company_phone") or "0000000000"
+            new_cust = frappe.get_doc({
+                "doctype": "Customer",
+                "customer_name": emp_doc.employee_name,
+                "customer_type": "Individual",
+                "mobile_number": emp_phone,
+            })
+            new_cust.insert(ignore_permissions=True)
+            frappe.db.commit()
+            customer = new_cust.name
+        else:
+            customer = existing_customer
+        invoice.customer = customer
+        invoice.is_employee_meal = 1
+        invoice.employee = employee
+        invoice.mobile_number = frappe.db.get_value("Customer", customer, "mobile_number") or ""
+    else:
+        if not customer:
+            frappe.throw("Please enter valid customer details")
+        invoice.customer = customer
+        customerdoc = frappe.get_doc("Customer", customer)
+        invoice.mobile_number = customerdoc.mobile_number
     if comments:
         invoice.custom_comments = comments
     invoice.no_of_pax = no_of_pax
@@ -281,11 +303,56 @@ def sync_order(
                 ),
             )
 
+    # Employee meal validations
+    _current_day = None
+    if is_employee_meal and int(is_employee_meal) and employee:
+        import calendar as _calendar
+        from frappe.utils import today as _today, getdate as _getdate
+        _current_day = _calendar.day_name[_getdate(_today()).weekday()]
+
+        # Check if meal already taken today
+        already_taken = frappe.db.get_value(
+            "Employee Meal Eligibility",
+            {"parent": employee, "parenttype": "Employee", "day": _current_day},
+            "meal_taken"
+        )
+        if already_taken:
+            frappe.throw(
+                _("Employee {0} has already taken their meal for today ({1})").format(
+                    employee, _current_day
+                )
+            )
+
+        # Validate max price
+        max_price = frappe.db.get_value(
+            "Employee Meal Eligibility",
+            {"parent": employee, "parenttype": "Employee", "day": _current_day},
+            "max_price"
+        )
+        if max_price:
+            item_total = sum(
+                (item.rate or 0) * (item.qty or 0) for item in invoice.items
+            )
+            if item_total > float(max_price):
+                frappe.throw(
+                    _("Order total {0} exceeds employee's max meal price {1} for {2}").format(
+                        item_total, max_price, _current_day
+                    )
+                )
+
     try:
         invoice.save()
     except Exception as e:
-        frappe.throw(f"Error while updating order: {e}")   
+        frappe.throw(f"Error while updating order: {e}")
 
+    # Mark employee meal as taken for today
+    if is_employee_meal and int(is_employee_meal) and employee and _current_day:
+        frappe.db.set_value(
+            "Employee Meal Eligibility",
+            {"parent": employee, "parenttype": "Employee", "day": _current_day},
+            "meal_taken",
+            1
+        )
 
     try:
         kot_execute(invoice.name, customer, table, items, past_item, comments)
@@ -553,6 +620,21 @@ def cancel_order(invoice_id, reason):
     frappe.db.set_value("POS Invoice", invoice_id, "status", "Cancelled")
     frappe.db.set_value("POS Invoice", invoice_id, "cancel_reason", reason)
 
+    # Reset meal_taken flag if this was an employee meal cancelled on the same day
+    if pos_invoice.get("is_employee_meal") and pos_invoice.get("employee"):
+        import calendar as _calendar
+        from frappe.utils import today as _today, getdate as _getdate
+        today_date = _getdate(_today())
+        posting_date = _getdate(pos_invoice.posting_date)
+        if today_date == posting_date:
+            current_day = _calendar.day_name[today_date.weekday()]
+            frappe.db.set_value(
+                "Employee Meal Eligibility",
+                {"parent": pos_invoice.employee, "parenttype": "Employee", "day": current_day},
+                "meal_taken",
+                0
+            )
+
 # Method for URY POS
 @frappe.whitelist()
 def make_invoice(customer, payments, cashier, pos_profile,owner, additionalDiscount=None, table=None, invoice=None):
@@ -566,6 +648,11 @@ def make_invoice(customer, payments, cashier, pos_profile,owner, additionalDisco
     invoice.customer = customer
     invoice.pos_profile = pos_profile
     invoice.additional_discount_percentage=additionalDiscount
+
+    # Force 100% discount for employee meals
+    if invoice.is_employee_meal:
+        invoice.additional_discount_percentage = 100
+
     invoice.calculate_taxes_and_totals()
 
     for pay in invoice.payments:

@@ -166,6 +166,19 @@
     "noCustomersFound": "لم يتم العثور على عملاء",
     "addCustomerWithName": "إضافة \"{name}\"..."
   },
+  "employee": {
+    "employeeMeal": "وجبة موظف",
+    "searchPlaceholder": "البحث عن موظف بالاسم أو الرقم...",
+    "searching": "جاري البحث...",
+    "searchFailed": "فشل البحث عن الموظفين",
+    "noEmployeesFound": "لم يتم العثور على موظفين مؤهلين",
+    "pleaseTypeToSearch": "يرجى الكتابة للبحث...",
+    "change": "تغيير",
+    "maxPrice": "الحد الأقصى للسعر",
+    "employeeMealDiscount": "خصم وجبة الموظف",
+    "fullDiscountApplied": "تم تطبيق خصم 100% لوجبة الموظف",
+    "employeeId": "رقم الموظف"
+  },
   "payment": {
     "paymentMethod": "طريقة الدفع",
     "cash": "نقدي",
@@ -226,6 +239,7 @@
       "requiredField": "هذا الحقل مطلوب",
       "selectCustomer": "يرجى اختيار عميل",
       "selectCustomerBeforeProceeding": "يرجى اختيار عميل قبل المتابعة",
+      "selectEmployeeBeforeProceeding": "يرجى اختيار موظف قبل المتابعة",
       "selectAggregator": "يرجى اختيار منصة توصيل قبل المتابعة",
       "selectTable": "يرجى اختيار طاولة",
       "selectTableForDineIn": "يرجى اختيار طاولة لطلبات {orderType}",

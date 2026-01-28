@@ -192,12 +192,13 @@ def getInvoiceForCashier(status, cashier, limit, limit_start):
     if status == "Draft":
         invoices = frappe.db.sql(
             """
-            SELECT 
-                name, invoice_printed, grand_total, restaurant_table, 
-                cashier, waiter, net_total, posting_time, 
-                total_taxes_and_charges, customer, status, mobile_number, 
-                posting_date, rounded_total, order_type 
-            FROM `tabPOS Invoice` 
+            SELECT
+                name, invoice_printed, grand_total, restaurant_table,
+                cashier, waiter, net_total, posting_time,
+                total_taxes_and_charges, customer, status, mobile_number,
+                posting_date, rounded_total, order_type,
+                is_employee_meal, employee, employee_name
+            FROM `tabPOS Invoice`
             WHERE branch = %s AND status = %s AND cashier = %s
             AND (invoice_printed = 1 OR (invoice_printed = 0 AND COALESCE(restaurant_table, '') = ''))
             ORDER BY modified desc
@@ -208,16 +209,17 @@ def getInvoiceForCashier(status, cashier, limit, limit_start):
         )
         updatedlist.extend(invoices)
     elif status == "Unbilled":
-        
+
         docstatus = "Draft"
         invoices = frappe.db.sql(
             """
-            SELECT 
-                name, invoice_printed, grand_total, restaurant_table, 
-                cashier, waiter, net_total, posting_time, 
-                total_taxes_and_charges, customer, status, mobile_number, 
-                posting_date, rounded_total, order_type 
-            FROM `tabPOS Invoice` 
+            SELECT
+                name, invoice_printed, grand_total, restaurant_table,
+                cashier, waiter, net_total, posting_time,
+                total_taxes_and_charges, customer, status, mobile_number,
+                posting_date, rounded_total, order_type,
+                is_employee_meal, employee, employee_name
+            FROM `tabPOS Invoice`
             WHERE branch = %s AND status = %s AND cashier = %s
             AND (invoice_printed = 0 AND restaurant_table IS NOT NULL)
             ORDER BY modified desc
@@ -231,12 +233,13 @@ def getInvoiceForCashier(status, cashier, limit, limit_start):
         docstatus = "Paid"
         invoices = frappe.db.sql(
             """
-            SELECT 
-                name, invoice_printed, grand_total, restaurant_table, 
-                cashier, waiter, net_total, posting_time, 
+            SELECT
+                name, invoice_printed, grand_total, restaurant_table,
+                cashier, waiter, net_total, posting_time,
                 total_taxes_and_charges, customer, status, mobile_number,
-                posting_date, rounded_total, order_type,additional_discount_percentage,discount_amount 
-            FROM `tabPOS Invoice` 
+                posting_date, rounded_total, order_type, additional_discount_percentage, discount_amount,
+                is_employee_meal, employee, employee_name
+            FROM `tabPOS Invoice`
             WHERE branch = %s AND status = %s AND cashier = %s
             ORDER BY modified desc
             LIMIT %s OFFSET %s
@@ -244,17 +247,18 @@ def getInvoiceForCashier(status, cashier, limit, limit_start):
             (branch, docstatus, cashier, limit, limit_start),
             as_dict=True,
         )
-        updatedlist.extend(invoices)    
+        updatedlist.extend(invoices)
     else:
-        
+
         invoices = frappe.db.sql(
             """
-            SELECT 
-                name, invoice_printed, grand_total, restaurant_table, 
-                cashier, waiter, net_total, posting_time, 
+            SELECT
+                name, invoice_printed, grand_total, restaurant_table,
+                cashier, waiter, net_total, posting_time,
                 total_taxes_and_charges, customer, status, mobile_number,
-                posting_date, rounded_total, order_type,additional_discount_percentage,discount_amount
-            FROM `tabPOS Invoice` 
+                posting_date, rounded_total, order_type, additional_discount_percentage, discount_amount,
+                is_employee_meal, employee, employee_name
+            FROM `tabPOS Invoice`
             WHERE branch = %s AND status = %s AND cashier = %s
             ORDER BY modified desc
             LIMIT %s OFFSET %s
@@ -268,7 +272,7 @@ def getInvoiceForCashier(status, cashier, limit, limit_start):
             next = True
             updatedlist.pop()
     else:
-            next = False   
+            next = False
     return  { "data":updatedlist,"next":next}
 
 
@@ -282,13 +286,14 @@ def getPosInvoice(status, limit, limit_start):
     if status == "Draft":
         invoices = frappe.db.sql(
             """
-            SELECT 
-                name, invoice_printed, grand_total, restaurant_table, 
-                cashier, waiter, net_total, posting_time, 
-                total_taxes_and_charges, customer, status, mobile_number, 
-                posting_date, rounded_total, order_type 
-            FROM `tabPOS Invoice` 
-            WHERE branch = %s AND status = %s 
+            SELECT
+                name, invoice_printed, grand_total, restaurant_table,
+                cashier, waiter, net_total, posting_time,
+                total_taxes_and_charges, customer, status, mobile_number,
+                posting_date, rounded_total, order_type,
+                is_employee_meal, employee, employee_name
+            FROM `tabPOS Invoice`
+            WHERE branch = %s AND status = %s
             AND (invoice_printed = 1 OR (invoice_printed = 0 AND COALESCE(restaurant_table, '') = ''))
             ORDER BY modified desc
             LIMIT %s OFFSET %s
@@ -298,17 +303,18 @@ def getPosInvoice(status, limit, limit_start):
         )
         updatedlist.extend(invoices)
     elif status == "Unbilled":
-        
+
         docstatus = "Draft"
         invoices = frappe.db.sql(
             """
-            SELECT 
-                name, invoice_printed, grand_total, restaurant_table, 
-                cashier, waiter, net_total, posting_time, 
-                total_taxes_and_charges, customer, status, mobile_number, 
-                posting_date, rounded_total, order_type 
-            FROM `tabPOS Invoice` 
-            WHERE branch = %s AND status = %s 
+            SELECT
+                name, invoice_printed, grand_total, restaurant_table,
+                cashier, waiter, net_total, posting_time,
+                total_taxes_and_charges, customer, status, mobile_number,
+                posting_date, rounded_total, order_type,
+                is_employee_meal, employee, employee_name
+            FROM `tabPOS Invoice`
+            WHERE branch = %s AND status = %s
             AND (invoice_printed = 0 AND restaurant_table IS NOT NULL)
             ORDER BY modified desc
             LIMIT %s OFFSET %s
@@ -321,31 +327,33 @@ def getPosInvoice(status, limit, limit_start):
         docstatus = "Paid"
         invoices = frappe.db.sql(
             """
-            SELECT 
-                name, invoice_printed, grand_total, restaurant_table, 
-                cashier, waiter, net_total, posting_time, 
+            SELECT
+                name, invoice_printed, grand_total, restaurant_table,
+                cashier, waiter, net_total, posting_time,
                 total_taxes_and_charges, customer, status, mobile_number,
-                posting_date, rounded_total, order_type,additional_discount_percentage,discount_amount 
-            FROM `tabPOS Invoice` 
-            WHERE branch = %s AND status = %s 
+                posting_date, rounded_total, order_type, additional_discount_percentage, discount_amount,
+                is_employee_meal, employee, employee_name
+            FROM `tabPOS Invoice`
+            WHERE branch = %s AND status = %s
             ORDER BY modified desc
             LIMIT %s OFFSET %s
             """,
             (branch, docstatus, limit, limit_start),
             as_dict=True,
         )
-        updatedlist.extend(invoices)    
+        updatedlist.extend(invoices)
     else:
-        
+
         invoices = frappe.db.sql(
             """
-            SELECT 
-                name, invoice_printed, grand_total, restaurant_table, 
-                cashier, waiter, net_total, posting_time, 
+            SELECT
+                name, invoice_printed, grand_total, restaurant_table,
+                cashier, waiter, net_total, posting_time,
                 total_taxes_and_charges, customer, status, mobile_number,
-                posting_date, rounded_total, order_type,additional_discount_percentage,discount_amount
-            FROM `tabPOS Invoice` 
-            WHERE branch = %s AND status = %s 
+                posting_date, rounded_total, order_type, additional_discount_percentage, discount_amount,
+                is_employee_meal, employee, employee_name
+            FROM `tabPOS Invoice`
+            WHERE branch = %s AND status = %s
             ORDER BY modified desc
             LIMIT %s OFFSET %s
             """,
@@ -358,7 +366,7 @@ def getPosInvoice(status, limit, limit_start):
             next = True
             updatedlist.pop()
     else:
-            next = False   
+            next = False
     return  { "data":updatedlist,"next":next}
 
 
@@ -684,6 +692,44 @@ def validate_pos_close(pos_profile):
             return "Failed"
         
         return "Success"
-    
+
     return "Success"
+
+
+@frappe.whitelist()
+def searchEmployees(search="", limit=10):
+    """Search employees eligible for employee meal at the current branch on the current day."""
+    import calendar as _calendar
+    from frappe.utils import today as _today, getdate as _getdate
+
+    branch = getBranch()
+    current_day = _calendar.day_name[_getdate(_today()).weekday()]
+
+    search_condition = ""
+    if search:
+        search = "%{}%".format(search)
+        search_condition = "AND (e.name LIKE %(search)s OR e.employee_name LIKE %(search)s)"
+
+    employees = frappe.db.sql("""
+        SELECT DISTINCT e.name, e.employee_name, eme.max_price
+        FROM `tabEmployee` e
+        INNER JOIN `tabEmployee Branch Eligibility` ebe
+            ON ebe.parent = e.name AND ebe.parenttype = 'Employee'
+        INNER JOIN `tabEmployee Meal Eligibility` eme
+            ON eme.parent = e.name AND eme.parenttype = 'Employee'
+        WHERE e.status = 'Active'
+            AND ebe.branch = %(branch)s
+            AND eme.day = %(current_day)s
+            AND IFNULL(eme.meal_taken, 0) = 0
+            {search_condition}
+        ORDER BY e.employee_name ASC
+        LIMIT %(limit)s
+    """.format(search_condition=search_condition), {
+        "branch": branch,
+        "current_day": current_day,
+        "search": search if search else None,
+        "limit": int(limit),
+    }, as_dict=True)
+
+    return employees
 

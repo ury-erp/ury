@@ -19,6 +19,7 @@ interface PaymentDialogProps {
   owner: string;
   fetchOrders: () => Promise<void>;
   clearSelectedOrder: () => void;
+  isEmployeeMeal?: boolean;
 }
 
 const PaymentDialog: React.FC<PaymentDialogProps> = ({
@@ -32,7 +33,8 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   cashier,
   owner,
   fetchOrders,
-  clearSelectedOrder
+  clearSelectedOrder,
+  isEmployeeMeal = false
 }) => {
   const { paymentModes, fetchPaymentModes, posProfile: storePosProfile } = usePOSStore();
   const [isProcessing, setIsProcessing] = useState(false);
@@ -46,11 +48,22 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
     fetchPaymentModes();
   }, [fetchPaymentModes]);
 
+  // Auto-apply 100% discount for employee meals
+  useEffect(() => {
+    if (isEmployeeMeal) {
+      setDiscountValue('100');
+      setAppliedDiscount(grandTotal);
+    }
+  }, [isEmployeeMeal, grandTotal]);
+
   // Calculate split payment total
   const payments = paymentModes
     .map((mode: any) => {
       const id = typeof mode === 'string' ? mode : mode.id;
       const amount = parseFloat(paymentInputs[id] || '');
+      if (isEmployeeMeal && !isNaN(amount)) {
+        return { mode_of_payment: id, amount };
+      }
       return amount > 0 ? { mode_of_payment: id, amount } : null;
     })
     .filter(Boolean);
@@ -163,29 +176,35 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
           </div>
 
           {/* Discount Section (conditional) */}
-          {storePosProfile?.enable_discount === 1 && (
+          {(storePosProfile?.enable_discount === 1 || isEmployeeMeal) && (
             <div className="space-y-4 mb-6">
               <h3 className="text-lg font-semibold flex items-center gap-2">
                 <Percent className="w-5 h-5" />
-                Apply Discount
+                {isEmployeeMeal ? 'Employee Meal Discount' : 'Apply Discount'}
               </h3>
-              <div className="flex gap-2">
-                <Input
-                  type="number"
-                  value={discountValue}
-                  onChange={(e) => setDiscountValue(e.target.value)}
-                  placeholder={'Enter %'}
-                  size="sm"
-                  className="flex-1"
-                />
-                <Button
-                  onClick={handleApplyDiscount}
-                  variant="default"
-                  size="sm"
-                >
-                  Apply
-                </Button>
-              </div>
+              {isEmployeeMeal ? (
+                <p className="text-sm text-green-600 font-medium">
+                  100% discount applied for employee meal
+                </p>
+              ) : (
+                <div className="flex gap-2">
+                  <Input
+                    type="number"
+                    value={discountValue}
+                    onChange={(e) => setDiscountValue(e.target.value)}
+                    placeholder={'Enter %'}
+                    size="sm"
+                    className="flex-1"
+                  />
+                  <Button
+                    onClick={handleApplyDiscount}
+                    variant="default"
+                    size="sm"
+                  >
+                    Apply
+                  </Button>
+                </div>
+              )}
             </div>
           )}
 
@@ -274,8 +293,8 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
           {/* Payment Button */}
           <Button
             onClick={handlePayment}
-            disabled={isProcessing || payments.length === 0}
-            variant={isProcessing || payments.length === 0 ? "secondary" : "default"}
+            disabled={isProcessing || (!isEmployeeMeal && payments.length === 0)}
+            variant={isProcessing || (!isEmployeeMeal && payments.length === 0) ? "secondary" : "default"}
             className="w-full"
           >
             {isProcessing ? 'Processing...' : `Pay ${formatCurrency(paymentsTotal>0?paymentsTotal:finalTotal)}`}

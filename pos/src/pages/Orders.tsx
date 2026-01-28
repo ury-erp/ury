@@ -159,7 +159,17 @@ export default function Orders() {
       if (order.restaurant_table) {
         posStore.setSelectedTable(order.restaurant_table, order.custom_restaurant_room || null,true);
       }
-      posStore.setSelectedCustomer({ id: order.customer, name: order.customer_name, phone: order.mobile_number });
+      // Restore employee meal or customer state
+      if (order.is_employee_meal === 1 && order.employee) {
+        posStore.setIsEmployeeMeal(true);
+        posStore.setSelectedEmployee({
+          id: order.employee,
+          name: order.employee_name || order.employee,
+        });
+      } else {
+        posStore.setIsEmployeeMeal(false);
+        posStore.setSelectedCustomer({ id: order.customer, name: order.customer_name, phone: order.mobile_number });
+      }
       // Fill cart
       const items = (order.items || []).map((item: any) => ({
         id: item.item_code,
@@ -541,6 +551,7 @@ export default function Orders() {
           owner={posStore.posProfile?.cashier || ''}
           fetchOrders={fetchOrders}
           clearSelectedOrder={clearSelectedOrder}
+          isEmployeeMeal={selectedOrder.is_employee_meal === 1}
         />
       )}
       {showWastageDialog && selectedOrder && (

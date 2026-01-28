@@ -45,6 +45,12 @@ export interface Customer {
   phone: string;
 }
 
+export interface Employee {
+  id: string;        // Employee doctype name (e.g. HR-EMP-00001)
+  name: string;      // employee_name (display name)
+  maxPrice?: number; // max meal price for today
+}
+
 export interface OrderItem extends MenuItem {
   quantity: number;
   selectedVariant?: { id: string; name: string; price: number };
@@ -115,6 +121,8 @@ interface POSState {
   tableOrder: TableOrder | null;
   isInitializing: boolean;
   orderComment: string;
+  isEmployeeMeal: boolean;
+  selectedEmployee: Employee | null;
 }
 
 interface POSStore extends POSState {
@@ -154,6 +162,8 @@ interface POSStore extends POSState {
   resetOrderState: () => void;
   setSelectedAggregator: (aggregator: Aggregator | null) => void;
   setOrderComment: (comment: string) => void;
+  setIsEmployeeMeal: (value: boolean) => void;
+  setSelectedEmployee: (employee: Employee | null) => void;
 }
 
 const generateUniqueId = (item: OrderItem): string => {
@@ -199,6 +209,8 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   isUpdatingOrder: false,
   orderId: null,
   orderComment: '',
+  isEmployeeMeal: false,
+  selectedEmployee: null,
 
   initializeApp: async () => {
     try {
@@ -460,12 +472,14 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   },
   setSelectedOrderType: (type) => {
     const { fetchMenuItems } = get();
-    
-    set({ 
+
+    set({
       activeOrders: [],
       selectedOrderType: type,
       isUpdatingOrder: false,
-      orderId: null
+      orderId: null,
+      isEmployeeMeal: false,
+      selectedEmployee: null,
     });
     
     if (type !== 'Aggregators') {
@@ -476,6 +490,14 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   setSelectedItem: (item) => set({ selectedItem: item }),
   setSelectedAggregator: (aggregator) => set({ selectedAggregator: aggregator }),
   setOrderComment: (comment: string) => set({ orderComment: comment }),
+  setIsEmployeeMeal: (value: boolean) => {
+    if (!value) {
+      set({ isEmployeeMeal: false, selectedEmployee: null });
+    } else {
+      set({ isEmployeeMeal: true, selectedCustomer: null });
+    }
+  },
+  setSelectedEmployee: (employee) => set({ selectedEmployee: employee }),
 
   processPayment: async (paymentMode: string, amount: number) => {
     try {
@@ -610,7 +632,8 @@ export const usePOSStore = create<POSStore>((set, get) => ({
           } as OrderItem;
         });
 
-        set({ 
+        const isEmpMeal = (order as any).is_employee_meal === 1;
+        set({
           tableOrder: response,
           activeOrders: orderItems,
           selectedCustomer: order.customer ? {
@@ -620,24 +643,33 @@ export const usePOSStore = create<POSStore>((set, get) => ({
           } : null,
           isUpdatingOrder: true,
           orderId: order.name,
+          isEmployeeMeal: isEmpMeal,
+          selectedEmployee: isEmpMeal && (order as any).employee ? {
+            id: (order as any).employee,
+            name: (order as any).employee_name || (order as any).employee,
+          } : null,
         });
       } else {
-        set({ 
+        set({
           tableOrder: null,
           activeOrders: [],
           selectedCustomer: null,
           isUpdatingOrder: false,
           orderId: null,
+          isEmployeeMeal: false,
+          selectedEmployee: null,
         });
       }
     } catch (error) {
-      set({ 
+      set({
         error: 'Failed to load table order',
         tableOrder: null,
         activeOrders: [],
         selectedCustomer: null,
         isUpdatingOrder: false,
         orderId: null,
+        isEmployeeMeal: false,
+        selectedEmployee: null,
       });
     } finally {
       set({ orderLoading: false });
@@ -645,12 +677,14 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   },
 
   clearTableOrder: () => {
-    set({ 
+    set({
       tableOrder: null,
       activeOrders: [],
       selectedCustomer: null,
       isUpdatingOrder: false,
       orderId: null,
+      isEmployeeMeal: false,
+      selectedEmployee: null,
     });
   },
 
@@ -663,7 +697,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
 
   resetOrderState: () => {
     const { fetchMenuItems } = get();
-    
+
     set({
       selectedCustomer: null,
       selectedTable: null,
@@ -678,6 +712,8 @@ export const usePOSStore = create<POSStore>((set, get) => ({
       error: null,
       selectedOrderType: DEFAULT_ORDER_TYPE,
       orderComment: '',
+      isEmployeeMeal: false,
+      selectedEmployee: null,
     });
 
     fetchMenuItems();

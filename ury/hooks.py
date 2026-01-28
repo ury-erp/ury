@@ -354,7 +354,15 @@ fixtures = [
                     "POS Profile-custom_table_order_printer",
                     "POS Profile-custom_reprint_kot_format",
                     "Employee-payment_amount",
-                    "Employee-payment_type"
+                    "Employee-payment_type",
+                    "POS Invoice-employee_meal_info",
+                    "POS Invoice-is_employee_meal",
+                    "POS Invoice-employee",
+                    "POS Invoice-employee_name",
+                    "Employee-employee_meal_section",
+                    "Employee-employee_meal_eligibility",
+                    "Employee-column_break_emp_meal",
+                    "Employee-employee_branch_eligibility",
                 },
             ]
         ],

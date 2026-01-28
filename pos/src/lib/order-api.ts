@@ -32,6 +32,9 @@ export interface POSInvoice {
   total: number;
   grand_total: number;
   items: POSInvoiceItem[];
+  is_employee_meal?: number;
+  employee?: string;
+  employee_name?: string;
 }
 
 export interface TableOrder {
@@ -77,6 +80,8 @@ export interface SyncOrderRequest {
   last_invoice: string | null;
   comments?: string | null;
   room?: string;
+  is_employee_meal?: number;
+  employee?: string;
 }
 
 export const syncOrder = async (data: SyncOrderRequest) => {

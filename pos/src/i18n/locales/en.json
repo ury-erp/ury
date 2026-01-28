@@ -171,6 +171,19 @@
     "noCustomersFound": "No customers found",
     "addCustomerWithName": "Add \"{name}\"..."
   },
+  "employee": {
+    "employeeMeal": "Employee Meal",
+    "searchPlaceholder": "Search employee by name or ID...",
+    "searching": "Searching...",
+    "searchFailed": "Failed to search employees",
+    "noEmployeesFound": "No eligible employees found",
+    "pleaseTypeToSearch": "Please type to search...",
+    "change": "Change",
+    "maxPrice": "Max Price",
+    "employeeMealDiscount": "Employee Meal Discount",
+    "fullDiscountApplied": "100% discount applied for employee meal",
+    "employeeId": "Employee ID"
+  },
   "payment": {
     "paymentMethod": "Payment Method",
     "cash": "Cash",
@@ -231,6 +244,7 @@
       "requiredField": "This field is required",
       "selectCustomer": "Please select a customer",
       "selectCustomerBeforeProceeding": "Please select a customer before proceeding",
+      "selectEmployeeBeforeProceeding": "Please select an employee before proceeding",
       "selectAggregator": "Please select an aggregator before proceeding",
       "selectTable": "Please select a table",
       "selectTableForDineIn": "Please select a table for {orderType} orders",
