@@ -154,6 +154,9 @@ scheduler_events = {
     "cron":{
 		"* * * * *":[
 			"ury.ury.api.ury_kot_validation.kotValidationThread"
+		],
+		"0 0 * * *":[
+			"ury.ury.api.employee_meal_reset.reset_employee_meal_taken"
 		]
 	}
 # 	"all": [
