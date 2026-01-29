@@ -573,6 +573,7 @@ def getPosInvoiceItems(invoice):
         uom = items.uom
         itemDetails.append(
             {
+                "name": items.name,
                 "item_code": item_code,
                 "item_name": item_name,
                 "qty": qty,

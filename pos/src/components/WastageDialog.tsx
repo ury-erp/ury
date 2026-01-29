@@ -1,5 +1,9 @@
 /**
  * WastageDialog - Modal for marking items or invoices as waste
+ *
+ * Two modes accessible via tabs:
+ *   "Waste Single Item" – pick one invoice line, enter partial qty
+ *   "Waste Entire Invoice" – confirm waste of all items (full cancellation)
  */
 
 import React, { useState, useEffect } from 'react';
@@ -21,32 +25,25 @@ import {
   ItemStockInfo
 } from '../lib/wastage-api';
 import { usePOSStore } from '../store/pos-store';
+import { cn } from '../lib/utils';
 
 interface WastageDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  // For single item wastage
-  item?: {
-    item_code: string;
-    item_name: string;
-    qty: number;
-    uom?: string;
-  };
-  // For full invoice wastage
-  invoiceId?: string;
-  invoiceItems?: Array<{
+  invoiceId: string;
+  invoiceItems: Array<{
+    name: string;
     item_code: string;
     item_name: string;
     qty: number;
     uom?: string;
   }>;
-  onSuccess?: (result: { wastage_note: string; stock_entry?: string }) => void;
+  onSuccess?: (result: { wastage_note: string; stock_entry?: string; invoice_action?: string }) => void;
 }
 
 const WastageDialog: React.FC<WastageDialogProps> = ({
   isOpen,
   onClose,
-  item,
   invoiceId,
   invoiceItems,
   onSuccess
@@ -60,28 +57,34 @@ const WastageDialog: React.FC<WastageDialogProps> = ({
   const [defaults, setDefaults] = useState<WastageDefaults>({});
   const [stockInfo, setStockInfo] = useState<ItemStockInfo | null>(null);
 
-  // Form state for single item
-  const [qty, setQty] = useState<string>('1');
-  const [reason, setReason] = useState<string>('');
+  // Mode tabs
+  const [wastageMode, setWastageMode] = useState<'item' | 'invoice'>('item');
+
+  // Form state for single item mode
+  const [selectedRowName, setSelectedRowName] = useState<string>('');
+  const [wasteQty, setWasteQty] = useState<string>('1');
+  const [itemReason, setItemReason] = useState<string>('');
   const [selectedBatch, setSelectedBatch] = useState<string>('');
 
   // Form state for invoice/bulk wastage
   const [bulkReason, setBulkReason] = useState<string>('');
 
-  // Determine mode
-  const isInvoiceMode = !item && (invoiceId || (invoiceItems && invoiceItems.length > 0));
-  const isSingleItemMode = !!item;
+  // Get the currently selected item from invoiceItems
+  const selectedItem = invoiceItems.find(i => i.name === selectedRowName);
 
-  // Load defaults and stock info
+  // Load defaults on open
   useEffect(() => {
     if (isOpen) {
       loadDefaults();
-      if (item) {
-        setQty(item.qty.toString());
-        loadStockInfo(item.item_code);
-      }
     }
-  }, [isOpen, item]);
+  }, [isOpen]);
+
+  // Load stock info when item selection changes
+  useEffect(() => {
+    if (isOpen && selectedItem) {
+      loadStockInfo(selectedItem.item_code);
+    }
+  }, [isOpen, selectedRowName]);
 
   const loadDefaults = async () => {
     try {
@@ -105,6 +108,8 @@ const WastageDialog: React.FC<WastageDialogProps> = ({
       // Auto-select first batch if available
       if (info.batches.length > 0) {
         setSelectedBatch(info.batches[0].batch_no);
+      } else {
+        setSelectedBatch('');
       }
     } catch (err) {
       console.error('Failed to load stock info:', err);
@@ -113,8 +118,10 @@ const WastageDialog: React.FC<WastageDialogProps> = ({
 
   const handleClose = () => {
     setError(null);
-    setQty('1');
-    setReason('');
+    setWastageMode('item');
+    setSelectedRowName('');
+    setWasteQty('1');
+    setItemReason('');
     setBulkReason('');
     setSelectedBatch('');
     setStockInfo(null);
@@ -140,13 +147,17 @@ const WastageDialog: React.FC<WastageDialogProps> = ({
       return false;
     }
 
-    if (isSingleItemMode) {
-      const qtyNum = parseFloat(qty);
+    if (wastageMode === 'item') {
+      if (!selectedRowName) {
+        setError(t('wastage.selectItemFirst'));
+        return false;
+      }
+      const qtyNum = parseFloat(wasteQty);
       if (isNaN(qtyNum) || qtyNum <= 0) {
         setError(t('wastage.invalidQty'));
         return false;
       }
-      if (item && qtyNum > item.qty) {
+      if (selectedItem && qtyNum > selectedItem.qty) {
         setError(t('wastage.qtyExceedsAvailable'));
         return false;
       }
@@ -163,22 +174,25 @@ const WastageDialog: React.FC<WastageDialogProps> = ({
 
     let items: WastageItem[] = [];
 
-    if (isSingleItemMode && item) {
+    if (wastageMode === 'item' && selectedItem) {
       items = [{
-        item_code: item.item_code,
-        item_name: item.item_name,
-        qty: parseFloat(qty),
-        uom: item.uom,
+        item_code: selectedItem.item_code,
+        item_name: selectedItem.item_name,
+        qty: parseFloat(wasteQty),
+        uom: selectedItem.uom,
         batch_no: selectedBatch || undefined,
-        reason: reason || undefined
+        reason: itemReason || undefined,
+        row_name: selectedItem.name,
       }];
-    } else if (isInvoiceMode && invoiceItems) {
+    } else {
+      // Invoice mode: all items
       items = invoiceItems.map(i => ({
         item_code: i.item_code,
         item_name: i.item_name,
         qty: i.qty,
         uom: i.uom,
-        reason: bulkReason || 'Marked as waste from invoice'
+        reason: bulkReason || 'Marked as waste from invoice',
+        row_name: i.name,
       }));
     }
 
@@ -190,7 +204,8 @@ const WastageDialog: React.FC<WastageDialogProps> = ({
       expense_account: expenseAccount,
       cost_center: costCenter,
       auto_submit: true,
-      remarks: isInvoiceMode ? bulkReason : reason
+      remarks: wastageMode === 'invoice' ? bulkReason : itemReason,
+      wastage_mode: wastageMode === 'item' ? 'partial' : 'full',
     };
   };
 
@@ -207,7 +222,11 @@ const WastageDialog: React.FC<WastageDialogProps> = ({
       if (navigator.onLine) {
         const result = await markItemsWaste(payload);
         showToast.success(t('wastage.successMessage', { note: result.wastage_note }));
-        onSuccess?.({ wastage_note: result.wastage_note, stock_entry: result.stock_entry });
+        onSuccess?.({
+          wastage_note: result.wastage_note,
+          stock_entry: result.stock_entry,
+          invoice_action: result.invoice_action,
+        });
         handleClose();
       } else {
         // Queue for offline processing
@@ -229,7 +248,7 @@ const WastageDialog: React.FC<WastageDialogProps> = ({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Trash2 className="w-5 h-5 text-red-500" />
-            {isInvoiceMode ? t('wastage.markInvoiceWaste') : t('wastage.markItemWaste')}
+            {t('wastage.markAsWaste')}
           </DialogTitle>
         </DialogHeader>
 
@@ -242,109 +261,167 @@ const WastageDialog: React.FC<WastageDialogProps> = ({
             </div>
           )}
 
-          {/* Single Item Mode */}
-          {isSingleItemMode && item && (
-            <>
-              {/* Item Info */}
-              <div className="p-3 bg-gray-50 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <Package className="w-8 h-8 text-gray-400" />
-                  <div>
-                    <p className="font-medium text-gray-900">{item.item_name}</p>
-                    <p className="text-sm text-gray-500">{item.item_code}</p>
-                    <p className="text-sm text-gray-500">
-                      {t('wastage.availableQty')}: {item.qty} {item.uom}
-                    </p>
-                  </div>
-                </div>
-              </div>
+          {/* Invoice Info Header */}
+          <div className="p-3 bg-gray-50 rounded-lg">
+            <p className="font-medium text-gray-900">
+              {t('wastage.invoice')}: {invoiceId}
+            </p>
+          </div>
 
-              {/* Stock Info & Batches */}
-              {stockInfo && stockInfo.batches.length > 0 && (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">
-                    {t('wastage.selectBatch')}
-                  </label>
-                  <select
-                    value={selectedBatch}
-                    onChange={(e) => setSelectedBatch(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">{t('wastage.noBatch')}</option>
-                    {stockInfo.batches.map((batch) => (
-                      <option key={batch.batch_no} value={batch.batch_no}>
-                        {batch.batch_no} - {t('wastage.qty')}: {batch.qty}
-                        {batch.expiry_date && ` - ${t('wastage.expiry')}: ${batch.expiry_date}`}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+          {/* Mode Tabs */}
+          <div className="flex border-b border-gray-200">
+            <button
+              type="button"
+              className={cn(
+                "flex-1 py-2 text-sm font-medium text-center border-b-2 transition-colors",
+                wastageMode === 'item'
+                  ? "border-orange-500 text-orange-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700"
               )}
+              onClick={() => setWastageMode('item')}
+            >
+              {t('wastage.wasteSingleItem')}
+            </button>
+            <button
+              type="button"
+              className={cn(
+                "flex-1 py-2 text-sm font-medium text-center border-b-2 transition-colors",
+                wastageMode === 'invoice'
+                  ? "border-red-500 text-red-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700"
+              )}
+              onClick={() => setWastageMode('invoice')}
+            >
+              {t('wastage.wasteEntireInvoice')}
+            </button>
+          </div>
 
-              {/* Quantity Input */}
+          {/* Mode: Waste Single Item */}
+          {wastageMode === 'item' && (
+            <>
+              {/* Item Selector - radio list */}
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-700">
-                  {t('wastage.wasteQty')}
+                  {t('wastage.selectItem')}
                 </label>
-                <input
-                  type="number"
-                  value={qty}
-                  onChange={(e) => setQty(e.target.value)}
-                  min="0.01"
-                  max={item.qty}
-                  step="0.01"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+                <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-lg">
+                  {invoiceItems.map((item) => (
+                    <label
+                      key={item.name}
+                      className={cn(
+                        "flex items-center p-3 border-b border-gray-100 last:border-b-0 cursor-pointer hover:bg-gray-50",
+                        selectedRowName === item.name && "bg-orange-50"
+                      )}
+                    >
+                      <input
+                        type="radio"
+                        name="waste-item"
+                        value={item.name}
+                        checked={selectedRowName === item.name}
+                        onChange={() => {
+                          setSelectedRowName(item.name);
+                          setWasteQty(item.qty.toString());
+                          setError(null);
+                        }}
+                        className="mr-3"
+                      />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">{item.item_name}</p>
+                        <p className="text-xs text-gray-500">
+                          {t('wastage.qty')}: {item.qty} {item.uom}
+                        </p>
+                      </div>
+                    </label>
+                  ))}
+                </div>
               </div>
 
-              {/* Reason Input */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">
-                  {t('wastage.reason')}
-                </label>
-                <Textarea
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  placeholder={t('wastage.reasonPlaceholder')}
-                  rows={3}
-                />
-              </div>
+              {/* Quantity to waste */}
+              {selectedItem && (
+                <>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">
+                      {t('wastage.wasteQty')}
+                    </label>
+                    <input
+                      type="number"
+                      value={wasteQty}
+                      onChange={(e) => setWasteQty(e.target.value)}
+                      min="0.01"
+                      max={selectedItem.qty}
+                      step="0.01"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    />
+                  </div>
+
+                  {/* Batch selector */}
+                  {stockInfo && stockInfo.batches.length > 0 && (
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700">
+                        {t('wastage.selectBatch')}
+                      </label>
+                      <select
+                        value={selectedBatch}
+                        onChange={(e) => setSelectedBatch(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                      >
+                        <option value="">{t('wastage.noBatch')}</option>
+                        {stockInfo.batches.map((batch) => (
+                          <option key={batch.batch_no} value={batch.batch_no}>
+                            {batch.batch_no} - {t('wastage.qty')}: {batch.qty}
+                            {batch.expiry_date && ` - ${t('wastage.expiry')}: ${batch.expiry_date}`}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Reason Input */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">
+                      {t('wastage.reason')}
+                    </label>
+                    <Textarea
+                      value={itemReason}
+                      onChange={(e) => setItemReason(e.target.value)}
+                      placeholder={t('wastage.reasonPlaceholder')}
+                      rows={2}
+                    />
+                  </div>
+                </>
+              )}
             </>
           )}
 
-          {/* Invoice/Bulk Mode */}
-          {isInvoiceMode && (
+          {/* Mode: Waste Entire Invoice */}
+          {wastageMode === 'invoice' && (
             <>
-              {/* Invoice Info */}
-              {invoiceId && (
-                <div className="p-3 bg-gray-50 rounded-lg">
-                  <p className="font-medium text-gray-900">
-                    {t('wastage.invoice')}: {invoiceId}
-                  </p>
-                </div>
-              )}
+              {/* Warning banner */}
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-red-700 text-sm font-medium">
+                  {t('wastage.entireInvoiceWarning')}
+                </p>
+              </div>
 
-              {/* Items Summary */}
-              {invoiceItems && invoiceItems.length > 0 && (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">
-                    {t('wastage.itemsToWaste')} ({invoiceItems.length})
-                  </label>
-                  <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg">
-                    {invoiceItems.map((i, idx) => (
-                      <div
-                        key={`${i.item_code}-${idx}`}
-                        className="p-2 border-b border-gray-100 last:border-b-0"
-                      >
-                        <p className="text-sm font-medium">{i.item_name}</p>
-                        <p className="text-xs text-gray-500">
-                          {i.qty} {i.uom}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
+              {/* All items summary (read-only) */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">
+                  {t('wastage.itemsToWaste')} ({invoiceItems.length})
+                </label>
+                <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg">
+                  {invoiceItems.map((i) => (
+                    <div
+                      key={i.name}
+                      className="p-2 border-b border-gray-100 last:border-b-0"
+                    >
+                      <p className="text-sm font-medium">{i.item_name}</p>
+                      <p className="text-xs text-gray-500">
+                        {i.qty} {i.uom}
+                      </p>
+                    </div>
+                  ))}
                 </div>
-              )}
+              </div>
 
               {/* Bulk Reason Input */}
               <div className="space-y-2">
@@ -393,7 +470,9 @@ const WastageDialog: React.FC<WastageDialogProps> = ({
             ) : (
               <span className="flex items-center gap-2">
                 <Trash2 className="w-4 h-4" />
-                {t('wastage.confirmWaste')}
+                {wastageMode === 'item'
+                  ? t('wastage.confirmWasteItem')
+                  : t('wastage.confirmWasteInvoice')}
               </span>
             )}
           </Button>

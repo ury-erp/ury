@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Trash2, Edit, FrownIcon, Plus, Loader2, MessageSquare, AlertTriangle } from 'lucide-react';
+import { Trash2, Edit, FrownIcon, Plus, Loader2, MessageSquare } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { usePOSStore } from '../store/pos-store';
 import { formatCurrency, cn } from '../lib/utils';
@@ -8,7 +8,6 @@ import { EmployeeSelect } from './EmployeeSelect';
 import ProductDialog from './ProductDialog';
 import OrderTypeSelect from './OrderTypeSelect';
 import CommentDialog from './CommentDialog';
-import WastageDialog from './WastageDialog';
 import { Button } from './ui/button';
 import { Spinner } from './ui/spinner';
 import { syncOrder } from '../lib/order-api';
@@ -47,14 +46,6 @@ const OrderPanel = () => {
   const [editingItem, setEditingItem] = useState<typeof activeOrders[0] | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCommentDialog, setShowCommentDialog] = useState(false);
-  const [showWastageDialog, setShowWastageDialog] = useState(false);
-  const [wastageItem, setWastageItem] = useState<{
-    item_code: string;
-    item_name: string;
-    qty: number;
-    uom?: string;
-  } | null>(null);
-
   const calculateItemTotal = (item: typeof activeOrders[0]) => {
     const basePrice = item.selectedVariant?.price || item.price;
     const addonsTotal = item.selectedAddons?.reduce((sum, addon) => sum + addon.price, 0) || 0;
@@ -78,27 +69,6 @@ const OrderPanel = () => {
 
   const handleCommentSave = (comment: string) => {
     setOrderComment(comment);
-  };
-
-  const handleMarkAsWaste = (item: typeof activeOrders[0]) => {
-    setWastageItem({
-      item_code: item.id,
-      item_name: item.name,
-      qty: item.quantity,
-      uom: undefined // Will be fetched from backend
-    });
-    setShowWastageDialog(true);
-  };
-
-  const handleWastageSuccess = (result: { wastage_note: string; stock_entry?: string }) => {
-    // Optionally remove the item from cart after marking as waste
-    if (wastageItem) {
-      const itemInCart = activeOrders.find(o => o.id === wastageItem.item_code);
-      if (itemInCart) {
-        removeFromOrder(itemInCart.uniqueId!);
-      }
-    }
-    setWastageItem(null);
   };
 
   const handleSubmit = async () => {
@@ -329,16 +299,6 @@ const OrderPanel = () => {
                     </div>
                     
                     <Button
-                      onClick={() => handleMarkAsWaste(item)}
-                      variant="ghost"
-                      size="icon"
-                      className="text-orange-500 hover:text-orange-600"
-                      title={t('wastage.markAsWaste')}
-                      disabled={isInteractionDisabled}
-                    >
-                      <AlertTriangle className="w-4 h-4" />
-                    </Button>
-                    <Button
                       onClick={() => removeFromOrder(item.uniqueId!)}
                       variant="ghost"
                       size="icon"
@@ -427,15 +387,6 @@ const OrderPanel = () => {
         initialComment={orderComment}
       />
 
-      <WastageDialog
-        isOpen={showWastageDialog}
-        onClose={() => {
-          setShowWastageDialog(false);
-          setWastageItem(null);
-        }}
-        item={wastageItem || undefined}
-        onSuccess={handleWastageSuccess}
-      />
     </div>
   );
 };

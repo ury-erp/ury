@@ -373,6 +373,17 @@ export default function Orders() {
                       <Pencil className="w-4 h-4" />
                       {editLoading && <span className="ml-2 text-xs">Loading...</span>}
                     </button>
+                    {(selectedOrder.status === 'Draft' || selectedOrder.status === 'Unbilled') && (
+                      <button
+                        type="button"
+                        className="inline-flex items-center justify-center rounded-md p-2 bg-orange-50 hover:bg-orange-100 text-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        aria-label={t('wastage.markAsWaste')}
+                        title={t('wastage.markAsWaste')}
+                        onClick={() => setShowWastageDialog(true)}
+                      >
+                        <AlertTriangle className="w-4 h-4" />
+                      </button>
+                    )}
                     <button
                       type="button"
                       className="inline-flex items-center justify-center rounded-md p-2 bg-gray-100 hover:bg-gray-200 text-red-600 focus:outline-none focus:ring-2 focus:ring-red-500"
@@ -487,7 +498,7 @@ export default function Orders() {
               )}
             </div>
 
-            {/* Sticky Bottom Section - Single Row: Print | Waste | Payment | Total */}
+            {/* Sticky Bottom Section - Single Row: Print | Payment | Total */}
             <div className="border-t border-gray-200 p-6 bg-gray-50 sticky bottom-0 left-0 right-0 z-10">
               <div className="flex items-center gap-3 w-full">
                 {/* Print Icon Button */}
@@ -501,19 +512,6 @@ export default function Orders() {
                 >
                   {isPrinting ? <Spinner className="w-5 h-5" hideMessage /> : <Printer className="w-5 h-5" />}
                 </Button>
-                {/* Mark as Waste Button - Only show for Draft, Unbilled orders */}
-                {(selectedOrder.status === 'Draft' || selectedOrder.status === 'Unbilled') && (
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="flex-shrink-0 text-orange-500 hover:text-orange-600 hover:bg-orange-50"
-                    onClick={() => setShowWastageDialog(true)}
-                    aria-label={t('wastage.markAsWaste')}
-                    title={t('wastage.markInvoiceWaste')}
-                  >
-                    <AlertTriangle className="w-5 h-5" />
-                  </Button>
-                )}
                 {/* Payment Button - Only show for Draft, Unbilled, and Recently Paid orders */}
                 {(selectedOrder.status === 'Draft' || selectedOrder.status === 'Unbilled' || selectedOrder.status === 'Recently Paid') && (
                   <Button
@@ -560,13 +558,19 @@ export default function Orders() {
           onClose={() => setShowWastageDialog(false)}
           invoiceId={selectedOrder.name}
           invoiceItems={selectedOrderItems.map(item => ({
+            name: item.name,
             item_code: item.item_code,
             item_name: item.item_name,
             qty: item.qty,
             uom: item.uom
           }))}
-          onSuccess={() => {
+          onSuccess={(result) => {
             setShowWastageDialog(false);
+            if (result.invoice_action === 'cancelled') {
+              clearSelectedOrder();
+            } else if (selectedOrder) {
+              selectOrder(selectedOrder);
+            }
             fetchOrders();
           }}
         />

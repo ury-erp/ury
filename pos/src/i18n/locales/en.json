@@ -297,6 +297,13 @@
     "syncNow": "Sync Now",
     "syncing": "Syncing...",
     "syncComplete": "Sync complete",
-    "syncFailed": "Some jobs failed to sync"
+    "syncFailed": "Some jobs failed to sync",
+    "wasteSingleItem": "Waste Single Item",
+    "wasteEntireInvoice": "Waste Entire Invoice",
+    "selectItem": "Select Item",
+    "selectItemFirst": "Please select an item first",
+    "entireInvoiceWarning": "This will cancel the entire invoice and mark all items as waste. This action cannot be undone.",
+    "confirmWasteItem": "Waste Item",
+    "confirmWasteInvoice": "Waste Entire Invoice"
   }
 }

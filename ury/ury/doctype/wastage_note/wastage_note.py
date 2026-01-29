@@ -208,14 +208,35 @@ def mark_items_waste(payload):
     if auto_submit:
         wastage_note.submit()
 
-    # Cancel the POS Invoice and KOT after creating wastage note
+    # Handle POS Invoice based on wastage mode
+    wastage_mode = payload.get("wastage_mode", "full")
+
     if pos_invoice:
-        cancel_order_for_wastage(pos_invoice, payload.get("remarks") or "Marked as wastage")
+        if wastage_mode == "partial":
+            result = partial_invoice_wastage(
+                pos_invoice,
+                items,
+                payload.get("remarks") or "Partial wastage",
+            )
+            return {
+                "wastage_note": wastage_note.name,
+                "stock_entry": wastage_note.stock_entry,
+                "status": wastage_note.status,
+                "invoice_action": result.get("action"),
+            }
+        else:
+            # Guard: only allow full wastage on draft invoices with allowed status
+            inv = frappe.get_doc("POS Invoice", pos_invoice)
+            if inv.docstatus != 0:
+                frappe.throw(_("Full wastage cancellation is only allowed on draft invoices"))
+            if inv.status not in ("Draft", "Unbilled"):
+                frappe.throw(_("Full wastage is only allowed on Draft or Unbilled invoices"))
+            cancel_order_for_wastage(pos_invoice, payload.get("remarks") or "Marked as wastage")
 
     return {
         "wastage_note": wastage_note.name,
         "stock_entry": wastage_note.stock_entry,
-        "status": wastage_note.status
+        "status": wastage_note.status,
     }
 
 
@@ -256,6 +277,139 @@ def cancel_order_for_wastage(invoice_id, reason):
     frappe.db.set_value("POS Invoice", invoice_id, "docstatus", 2)
     frappe.db.set_value("POS Invoice", invoice_id, "status", "Cancelled")
     frappe.db.set_value("POS Invoice", invoice_id, "cancel_reason", f"Wastage: {reason}")
+
+
+def partial_invoice_wastage(invoice_id, wasted_items, reason):
+    """
+    Modify a POS Invoice after partial wastage.
+    Reduces item quantities using normal doc operations and recalculates totals.
+    If all items reach qty 0, cancels the invoice entirely.
+
+    Args:
+        invoice_id (str): POS Invoice name
+        wasted_items (list): List of dicts with keys:
+            - item_code (str)
+            - qty (float): quantity being wasted (NOT the new qty)
+            - row_name (str, optional): child row name for precise matching
+            - item_name (str, optional): for KOT
+        reason (str): Wastage reason
+
+    Returns:
+        dict: {"action": "modified"} or {"action": "cancelled"}
+    """
+    pos_invoice = frappe.get_doc("POS Invoice", invoice_id)
+
+    # Guard: only allow partial wastage on draft invoices with allowed status
+    if pos_invoice.docstatus != 0:
+        frappe.throw(_("Partial wastage is only allowed on draft invoices"))
+    if pos_invoice.status not in ("Draft", "Unbilled"):
+        frappe.throw(_("Partial wastage is only allowed on Draft or Unbilled invoices"))
+
+    # Collect items to remove (can't mutate child table while iterating)
+    items_to_remove = []
+
+    for wasted in wasted_items:
+        row_name = wasted.get("row_name")
+        waste_qty = flt(wasted.get("qty"))
+        matched = False
+
+        for inv_item in pos_invoice.items:
+            if row_name and inv_item.name == row_name:
+                matched = True
+            elif not row_name and inv_item.item_code == wasted.get("item_code"):
+                matched = True
+
+            if matched:
+                new_qty = flt(inv_item.qty) - waste_qty
+                if new_qty < 0:
+                    frappe.throw(
+                        _("Cannot waste {0} qty of {1}. Only {2} available on invoice.").format(
+                            waste_qty, inv_item.item_code, inv_item.qty
+                        )
+                    )
+                elif new_qty == 0:
+                    items_to_remove.append(inv_item)
+                else:
+                    inv_item.qty = new_qty
+                    inv_item.amount = flt(new_qty * inv_item.rate)
+                break
+
+        if not matched:
+            frappe.throw(
+                _("Item {0} not found in invoice {1}").format(
+                    wasted.get("item_code"), invoice_id
+                )
+            )
+
+    for item in items_to_remove:
+        pos_invoice.remove(item)
+
+    if not pos_invoice.items:
+        # All items wasted → full cancellation
+        cancel_order_for_wastage(invoice_id, reason)
+        return {"action": "cancelled"}
+
+    # Recalculate totals using Frappe's built-in method
+    pos_invoice.calculate_taxes_and_totals()
+    pos_invoice.save(ignore_permissions=True)
+
+    # Partial KOT cancel for kitchen consistency
+    partial_cancel_kot(invoice_id, wasted_items)
+
+    return {"action": "modified"}
+
+
+def partial_cancel_kot(invoice_id, wasted_items):
+    """
+    Create partial cancel KOTs for wasted items only.
+    Unlike cancel_kot(), this does NOT mark all existing KOTs as cancelled.
+    """
+    try:
+        from ury.ury.api.ury_kot_generate import process_items_for_cancel_kot
+
+        pos_invoice = frappe.get_doc("POS Invoice", invoice_id)
+        pos_profile = frappe.get_doc("POS Profile", pos_invoice.pos_profile)
+        kot_naming_series = pos_profile.custom_kot_naming_series
+        cancel_kot_naming_series = "CNCL-" + kot_naming_series
+
+        # Cancel items: only the wasted ones
+        cancel_items = [
+            {
+                "item_code": w.get("item_code"),
+                "qty": flt(w.get("qty")),
+                "item_name": w.get("item_name"),
+            }
+            for w in wasted_items
+        ]
+
+        # Full invoice items: needed by create_cancel_kot_doc to look up original qty
+        invoice_items = [
+            {
+                "item_code": item.get("item", item.get("item_code")),
+                "qty": item.qty,
+                "item_name": item.item_name,
+            }
+            for item in pos_invoice.items
+        ]
+
+        restaurant_table = pos_invoice.restaurant_table or None
+
+        process_items_for_cancel_kot(
+            invoice_id,
+            pos_invoice.customer,
+            restaurant_table,
+            cancel_items,
+            "Partial wastage",
+            pos_invoice.pos_profile,
+            cancel_kot_naming_series,
+            "Partially cancelled",
+            invoice_items,
+        )
+    except Exception as e:
+        frappe.log_error(
+            title=f"Partial KOT cancellation failed for wastage: {invoice_id}",
+            message=str(e),
+        )
 
 
 @frappe.whitelist()

@@ -12,6 +12,7 @@ export interface WastageItem {
   batch_no?: string;
   serial_no?: string;
   reason?: string;
+  row_name?: string;
 }
 
 export interface MarkWastePayload {
@@ -26,12 +27,14 @@ export interface MarkWastePayload {
   remarks?: string;
   posting_date?: string;
   posting_time?: string;
+  wastage_mode?: 'full' | 'partial';
 }
 
 export interface MarkWasteResponse {
   wastage_note: string;
   stock_entry: string;
   status: string;
+  invoice_action?: 'modified' | 'cancelled';
 }
 
 export interface WastageDefaults {

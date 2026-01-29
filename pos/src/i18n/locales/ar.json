@@ -297,6 +297,13 @@
     "syncNow": "مزامنة الآن",
     "syncing": "جاري المزامنة...",
     "syncComplete": "اكتملت المزامنة",
-    "syncFailed": "فشلت بعض المهام في المزامنة"
+    "syncFailed": "فشلت بعض المهام في المزامنة",
+    "wasteSingleItem": "هدر عنصر واحد",
+    "wasteEntireInvoice": "هدر الفاتورة كاملة",
+    "selectItem": "اختر العنصر",
+    "selectItemFirst": "يرجى اختيار عنصر أولاً",
+    "entireInvoiceWarning": "سيتم إلغاء الفاتورة بالكامل وتسجيل جميع العناصر كهدر. لا يمكن التراجع عن هذا الإجراء.",
+    "confirmWasteItem": "هدر العنصر",
+    "confirmWasteInvoice": "هدر الفاتورة كاملة"
   }
 }
