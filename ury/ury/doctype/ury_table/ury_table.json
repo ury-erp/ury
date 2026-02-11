@@ -188,7 +188,8 @@
    "print": 1,
    "read": 1,
    "role": "URY Cashier",
-   "select": 1
+   "select": 1,
+   "write": 1
   }
  ],
  "row_format": "Dynamic",
