@@ -16,7 +16,7 @@ export const useTableStore = defineStore("table", {
     selectedTable: null,
     previousOrderdItem: [],
     invoiceNo: "",
-    takeAwayTable: 0,  
+    takeAwayTable: 0,
     alert: useAlert(),
     previousOrder: [],
     previousOrderdCustomer: "",
@@ -25,7 +25,7 @@ export const useTableStore = defineStore("table", {
     notification: useNotifications(),
     selectedOption: "",
     isTakeAway: "",
-    mobileNumber:"",
+    mobileNumber: "",
     showModal: false,
     isTakeaeay: false,
     newTable: "",
@@ -38,7 +38,7 @@ export const useTableStore = defineStore("table", {
     tableName: "",
     showModalCaptainTransfer: false,
     showCaptain: false,
-    cashier:null,
+    cashier: null,
     captain: [],
     previousWaiter: null,
     newCaptain: "",
@@ -51,8 +51,8 @@ export const useTableStore = defineStore("table", {
     invoiceNumber: null,
     modifiedTime: null,
     selectedRoom: null,
-    orderModified:null,
-    menuName:null,
+    orderModified: null,
+    menuName: null,
     rooms: [],
     recentOrders: usetoggleRecentOrder()
   }),
@@ -145,26 +145,40 @@ export const useTableStore = defineStore("table", {
         this.getCashier()
       }
     },
-    getCashier(){
+    getCashier() {
       const getCashier = {
         room: this.selectedRoom,
       };
       this.call.get("ury.ury_pos.api.getCashier", getCashier).then((result) => {
-        this.cashier=result.message
+        this.cashier = result.message
       });
     },
     fetchTable() {
-      const getTables = {
-        room: this.selectedRoom,
-      };
-      this.call.get("ury.ury_pos.api.getTable", getTables).then((result) => {
-        this.tables = result.message.sort((a, b) => {
-          return a.name.localeCompare(b.name, undefined, {
-            numeric: true,
-            sensitivity: "base",
+      this.db
+        .getDocList("URY Table", {
+          fields: [
+            "name",
+            "occupied",
+            "latest_invoice_time",
+            "is_take_away",
+            "restaurant_room",
+            "table_shape",
+            "no_of_seats",
+            "layout_x",
+            "layout_y",
+            "minimum_seating",
+          ],
+          filters: [["restaurant_room", "=", this.selectedRoom]],
+          limit: "*",
+        })
+        .then((tables) => {
+          this.tables = tables.sort((a, b) => {
+            return a.name.localeCompare(b.name, undefined, {
+              numeric: true,
+              sensitivity: "base",
+            });
           });
         });
-      });
     },
     async getMenu() {
       const getMenuIem = {
@@ -254,9 +268,8 @@ export const useTableStore = defineStore("table", {
       const secondsDifference = Math.floor(timeDifferenceInMs / 1000);
       const minutesDifference = Math.floor(secondsDifference / 60);
       const hoursDifference = Math.floor(minutesDifference / 60);
-      const formattedTimeDifference = `${hoursDifference}:${
-        minutesDifference % 60
-      }`;
+      const formattedTimeDifference = `${hoursDifference}:${minutesDifference % 60
+        }`;
       return formattedTimeDifference;
     },
     getBadgeType(table) {
@@ -301,8 +314,8 @@ export const useTableStore = defineStore("table", {
       }
       let previousOrderdNumberOfPax = "";
       this.previousOrderdItem = [];
-      this.recentOrders.modifiedTime =""     
-      this.recentOrders.pastOrderdItem=[]
+      this.recentOrders.modifiedTime = ""
+      this.recentOrders.pastOrderdItem = []
       this.invoiceNo = "";
       let items = this.tableMenu;
       items.forEach((item) => {
@@ -321,7 +334,7 @@ export const useTableStore = defineStore("table", {
         .then((result) => {
           this.previousOrder = result.message;
           this.invoicePrinted = this.previousOrder.invoice_printed;
-          this.menu.comments= this.previousOrder.custom_comments;
+          this.menu.comments = this.previousOrder.custom_comments;
           this.modifiedTime = this.previousOrder.modified;
           this.grandTotal = this.previousOrder.grand_total;
           this.mobileNumber = this.previousOrder.mobile_number;
@@ -361,7 +374,7 @@ export const useTableStore = defineStore("table", {
             this.customers.search = "";
             this.customers.numberOfPax = "";
             this.customers.customerFavouriteItems = "";
-            this.customers.newCustomerMobileNo=""
+            this.customers.newCustomerMobileNo = ""
           }
 
           items.forEach((item) => {
@@ -384,7 +397,7 @@ export const useTableStore = defineStore("table", {
             this.previousOrderdItem.forEach((previousItem) => {
               const existsInMenu = items.some(item => item.item === previousItem.item_code);
               const existsInCart = cart.some(item => item.item === previousItem.item_code);
-              
+
               if (!existsInMenu && !existsInCart) {
                 // Item no longer in menu but was in previous order - add it to cart
                 cart.push({
