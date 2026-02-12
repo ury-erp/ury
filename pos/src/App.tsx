@@ -4,6 +4,7 @@ import Header from './components/Header';
 import Orders from './pages/Orders';
 import POS from './pages/POS';
 import Table from './pages/Table';
+import Dashboard from './pages/Dashboard';
 import AuthGuard from './components/AuthGuard';
 import POSOpeningProvider from './components/POSOpeningProvider';
 import ScreenSizeProvider from './components/ScreenSizeProvider';
@@ -15,7 +16,7 @@ function App() {
   const {
     initializeApp
   } = usePOSStore();
-  
+
   useEffect(() => {
     initializeApp();
   }, [initializeApp]);
@@ -30,9 +31,10 @@ function App() {
                 <Header />
                 <div className="flex-1 overflow-hidden">
                   <Routes>
-                    <Route path="/" element={<POS/>} />
+                    <Route path="/" element={<POS />} />
                     <Route path="/orders" element={<Orders />} />
                     <Route path="/table" element={<Table />} />
+                    <Route path="/dashboard" element={<Dashboard />} />
                   </Routes>
                 </div>
                 <Footer />

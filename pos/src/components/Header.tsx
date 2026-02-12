@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { 
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import {
   Command,
   User,
   ChevronDown,
   Monitor,
   LogOut,
   RefreshCw,
+  LayoutDashboard,
 } from 'lucide-react';
 import { Button, Input } from './ui';
 import { useRootStore } from '../store/root-store';
@@ -21,6 +22,7 @@ const Header = () => {
   const user = useRootStore((state: RootState) => state.user);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const location = useLocation();
+  const navigate = useNavigate();
   const { searchQuery, setSearchQuery } = usePOSStore();
   const { orderSearchQuery, setOrderSearchQuery } = useRootStore();
   const [orderSearchInput, setOrderSearchInput] = useState(orderSearchQuery);
@@ -107,10 +109,10 @@ const Header = () => {
       <div className="flex items-center justify-between h-16 px-6">
         {/* Logo */}
         <div className="flex items-center">
-        <Link to="/" className="flex items-center space-x-3">
-            <img 
-              src="/assets/ury/pos/ury_pos.png" 
-              alt="URY POS" 
+          <Link to="/" className="flex items-center space-x-3">
+            <img
+              src="/assets/ury/pos/ury_pos.png"
+              alt="URY POS"
               className="h-10 w-auto"
             />
           </Link>
@@ -118,17 +120,17 @@ const Header = () => {
 
         {/* Search Bar */}
         <div className="px-4 py-2 flex-1 flex items-center max-w-2xl mx-8  bg-gray-50 hover:bg-gray-100 border border-input rounded-md">
-            <Input
-              ref={searchInputRef}
-              placeholder={searchPlaceholder}
-              className="h-fit p-0 w-full bg-transparent border-0 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
-              value={searchValue}
-              onChange={searchOnChange}
-            />
-            <div className="flex items-center gap-2 text-gray-400">
-              <Command className="w-4 h-4" />
-              <span>K</span>
-            </div>
+          <Input
+            ref={searchInputRef}
+            placeholder={searchPlaceholder}
+            className="h-fit p-0 w-full bg-transparent border-0 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
+            value={searchValue}
+            onChange={searchOnChange}
+          />
+          <div className="flex items-center gap-2 text-gray-400">
+            <Command className="w-4 h-4" />
+            <span>K</span>
+          </div>
         </div>
 
         {/* Right side actions */}
@@ -162,6 +164,17 @@ const Header = () => {
                   >
                     <Monitor className="w-4 h-4 mr-3" />
                     Switch To Desk
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="flex justify-start items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                    onClick={() => {
+                      navigate('/dashboard');
+                      setShowUserMenu(false);
+                    }}
+                  >
+                    <LayoutDashboard className="w-4 h-4 mr-3" />
+                    Dashboard
                   </Button>
                   <Button
                     variant="ghost"
