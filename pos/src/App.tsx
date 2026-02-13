@@ -15,7 +15,7 @@ function App() {
   const {
     initializeApp
   } = usePOSStore();
-  
+
   useEffect(() => {
     initializeApp();
   }, [initializeApp]);
@@ -30,7 +30,7 @@ function App() {
                 <Header />
                 <div className="flex-1 overflow-hidden">
                   <Routes>
-                    <Route path="/" element={<POS/>} />
+                    <Route path="/" element={<POS />} />
                     <Route path="/orders" element={<Orders />} />
                     <Route path="/table" element={<Table />} />
                   </Routes>

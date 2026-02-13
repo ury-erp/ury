@@ -48,16 +48,16 @@ interface GetPOSInvoiceItemsResponse {
   message: [POSInvoiceItem[], POSInvoiceTax[]];
 }
 
-export async function getPOSInvoices({ 
-  status, 
-  limit, 
+export async function getPOSInvoices({
+  status,
+  limit,
   limit_start,
   paid_limit
 }: GetPOSInvoicesParams) {
   try {
     // Use paid_limit as the limit for Recently Paid status
     const actualLimit = status === 'Recently Paid' && paid_limit ? paid_limit : limit;
-    
+
     const response = await call.get<GetPOSInvoicesResponse>(
       'ury.ury_pos.api.getPosInvoice',
       {
@@ -109,7 +109,7 @@ export async function updateInvoiceStatus(
     console.error('Error updating invoice status:', error);
     throw new Error('Failed to update invoice status');
   }
-} 
+}
 
 export async function searchPosInvoice(query: string, status: string) {
   try {
@@ -122,7 +122,7 @@ export async function searchPosInvoice(query: string, status: string) {
     console.error('Error searching POS invoices:', error);
     throw error;
   }
-} 
+}
 
 export async function getInvoicePrintHtml(invoiceId: string, printFormat: string) {
   try {
@@ -134,8 +134,8 @@ export async function getInvoicePrintHtml(invoiceId: string, printFormat: string
         print_format: printFormat,
         _lang: 'en',
         no_letterhead: 1,
-        letterhead:"No Letterhead",
-        settings:{}
+        letterhead: "No Letterhead",
+        settings: {}
       }
     );
     return response.message.html;
@@ -143,7 +143,7 @@ export async function getInvoicePrintHtml(invoiceId: string, printFormat: string
     console.error('Error fetching invoice print HTML:', error);
     throw new Error('Failed to fetch invoice print HTML');
   }
-} 
+}
 
 export async function networkPrint(orderId: string, printer: string, printFormat: string) {
   await call.post('ury.ury.api.ury_print.network_printing', {
