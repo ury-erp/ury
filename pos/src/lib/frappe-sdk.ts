@@ -10,6 +10,13 @@ export const auth = frappe.auth();
 // Access the underlying axios instance from Frappe SDK
 const axiosInstance = (frappe as any).axios;
 
+// Helper function to strip HTML tags from error messages
+function stripHtmlTags(html: string): string {
+    if (!html) return html;
+    // Remove HTML tags
+    return html.replace(/<[^>]*>/g, '').trim();
+}
+
 // Track last error message to prevent duplicates
 let lastErrorMessage = '';
 let lastErrorTime = 0;
@@ -55,6 +62,9 @@ if (axiosInstance) {
                     errorMessage = errorData.message || errorData.error || errorMessage;
                 }
             }
+
+            // Strip HTML tags from error message
+            errorMessage = stripHtmlTags(errorMessage);
 
             // Prevent duplicate toasts
             const now = Date.now();
