@@ -2,16 +2,28 @@ import { call } from './frappe-sdk';
 import { DashboardFilters } from '../pages/Dashboard';
 
 export interface DashboardData {
-    name: string;
-    posting_date: string;
-    grand_total: number;
-    mode_of_payment: string;
-    docstatus: number;
-    currency: string;
+    posRegister: any[];
 }
 
-export const getDashboardData = async (filters: DashboardFilters): Promise<DashboardData[]> => {
-    const frappeFilters: any = {};
+export const getReportData = async (reportName: string, filters: any) => {
+    try {
+        const response = await (call as any).post('frappe.desk.query_report.run', {
+            report_name: reportName,
+            filters: filters,
+            ignore_prepared_report: true
+        });
+        return response.message?.result || [];
+    } catch (error) {
+        console.error(`Error fetching report ${reportName}:`, error);
+        return [];
+    }
+};
+
+export const getDashboardData = async (filters: DashboardFilters, company: string): Promise<DashboardData> => {
+    const frappeFilters: any = {
+        company: company,
+        branch: filters.branch || ''
+    };
 
     const today = new Date().toISOString().split('T')[0];
     const now = new Date();
@@ -32,18 +44,12 @@ export const getDashboardData = async (filters: DashboardFilters): Promise<Dashb
         frappeFilters.to_date = filters.customEndDate;
     }
 
-    if (filters.branch) {
-        frappeFilters.branch = filters.branch;
-    }
 
-    // Use standard Report API
-    const response = await (call as any).post('frappe.desk.query_report.run', {
-        report_name: 'POS Register',
-        filters: frappeFilters
-    });
 
-    if (response && response.message) {
-        return response.message.result || [];
-    }
-    return [];
+    // Fetch ONLY POS Register as per requirement
+    const posRegisterData = await getReportData('POS Register', frappeFilters);
+
+    return {
+        posRegister: posRegisterData
+    };
 };

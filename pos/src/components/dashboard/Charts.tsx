@@ -1,160 +1,197 @@
-import React, { useMemo } from 'react';
-import {
-    BarChart, Bar,
-    PieChart, Pie,
-    XAxis, YAxis,
-    CartesianGrid,
-    Tooltip,
-    Legend,
-    ResponsiveContainer,
-    Cell
-} from 'recharts';
+import React, { useMemo, useState, useEffect } from 'react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/card';
 import { DashboardFilters } from '../../pages/Dashboard';
+import { DashboardData, getReportData } from '../../lib/dashboard-api';
+import { usePOSStore } from '../../store/pos-store';
+import { Select, SelectItem } from '../ui/select';
 
 interface Props {
-    data: any[];
+    data: DashboardData | null;
     filters: DashboardFilters;
 }
 
-const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
-const Charts: React.FC<Props> = ({ data, filters }) => {
-    const getVal = (row: any, key: string, index: number) => {
-        if (typeof row === 'object' && !Array.isArray(row)) return row[key];
-        return row[index];
+type DateRange = 'today' | 'this_week' | 'this_month' | 'custom';
+
+const ChartFilter: React.FC<{ value: DateRange; onChange: (val: DateRange) => void }> = ({ value, onChange }) => (
+    <div className="w-[140px]">
+        <Select value={value} onValueChange={(val) => onChange(val as DateRange)} placeholder="Select range">
+            <SelectItem value="today">Today</SelectItem>
+            <SelectItem value="this_week">Weekly</SelectItem>
+            <SelectItem value="this_month">Monthly</SelectItem>
+            <SelectItem value="custom">Custom Range</SelectItem>
+        </Select>
+    </div>
+);
+
+const Charts: React.FC<Props> = ({ data: initialData, filters: globalFilters }) => {
+    const { posProfile } = usePOSStore();
+    const company = posProfile?.company || '';
+
+    // Independent State for each chart
+    const [salesTrendRange, setSalesTrendRange] = useState<DateRange>(globalFilters.dateRange as DateRange || 'today');
+    const [salesTrendData, setSalesTrendData] = useState<any[] | null>(null);
+
+    const [paymentModeRange, setPaymentModeRange] = useState<DateRange>(globalFilters.dateRange as DateRange || 'today');
+    const [paymentModeData, setPaymentModeData] = useState<any[] | null>(null);
+
+    const [topItemsRange, setTopItemsRange] = useState<DateRange>(globalFilters.dateRange as DateRange || 'today');
+    const [topItemsData, setTopItemsData] = useState<any[] | null>(null);
+
+    // Sync with global filters
+    useEffect(() => {
+        setSalesTrendRange(globalFilters.dateRange as DateRange);
+        setPaymentModeRange(globalFilters.dateRange as DateRange);
+        setTopItemsRange(globalFilters.dateRange as DateRange);
+    }, [globalFilters.dateRange]);
+
+    const fetchChartData = async (range: DateRange) => {
+        const today = new Date().toISOString().split('T')[0];
+        const now = new Date();
+        const frappeFilters: any = {
+            company: company,
+            branch: globalFilters.branch || ''
+        };
+
+        if (range === 'today') {
+            frappeFilters.from_date = today;
+            frappeFilters.to_date = today;
+        } else if (range === 'this_week') {
+            const day = now.getDay();
+            const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+            const firstDay = new Date(now.setDate(diff)).toISOString().split('T')[0];
+            frappeFilters.from_date = firstDay;
+            frappeFilters.to_date = today;
+        } else if (range === 'this_month') {
+            const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+            frappeFilters.from_date = firstDay;
+            frappeFilters.to_date = today;
+        } else {
+            return null;
+        }
+
+        return await getReportData('POS Register', frappeFilters);
     };
 
-    const revenueTrendData = useMemo(() => {
-        const trend: Record<string, number> = {};
+    // Effects to handle data source
+    const updateChartData = (range: DateRange, setData: (data: any[]) => void) => {
+        if ((range === 'custom' || range === globalFilters.dateRange) && initialData?.posRegister) {
+            setData(initialData.posRegister);
+        } else {
+            fetchChartData(range).then(data => {
+                if (data) setData(data);
+            });
+        }
+    };
 
-        data.forEach(row => {
-            if (parseInt(getVal(row, 'docstatus', 4)) !== 1) return;
+    // Sales Trend Effect
+    useEffect(() => {
+        updateChartData(salesTrendRange, setSalesTrendData);
+    }, [salesTrendRange, globalFilters.dateRange, initialData, company]);
 
-            const dateStr = getVal(row, 'posting_date', 1);
-            if (!dateStr) return;
+    // Payment Mode Effect
+    useEffect(() => {
+        updateChartData(paymentModeRange, setPaymentModeData);
+    }, [paymentModeRange, globalFilters.dateRange, initialData, company]);
 
-            const date = new Date(dateStr);
-            let groupKey = dateStr;
+    // Top Items Effect
+    useEffect(() => {
+        updateChartData(topItemsRange, setTopItemsData);
+    }, [topItemsRange, globalFilters.dateRange, initialData, company]);
 
-            if (filters.groupBy === 'monthly') {
-                groupKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-            } else if (filters.groupBy === 'weekly') {
-                // Simple start of week (Sunday)
-                const d = new Date(date);
-                const day = d.getDay();
-                const diff = d.getDate() - day;
-                const startOfWeek = new Date(d.setDate(diff));
-                groupKey = startOfWeek.toISOString().split('T')[0];
+
+    // Data Processing Helper
+    const processData = (rawData: any[] | null, type: 'trend' | 'payment' | 'items', range: DateRange) => {
+        if (!rawData) return [];
+
+        const map = new Map<string, number>();
+
+        rawData.forEach((row: any) => {
+            if (row.status === 'Cancelled' || row.docstatus === 2) return;
+
+            if (type === 'trend') {
+                const date = row.posting_date || row.date;
+                if (!date) return;
+
+                let groupKey = date;
+
+                // If Today, try to group by Hour if time exists
+                if (range === 'today' && row.posting_time) {
+                    groupKey = row.posting_time.split(':')[0] + ':00';
+                }
+
+                const total = parseFloat(row.grand_total || 0);
+                map.set(groupKey, (map.get(groupKey) || 0) + total);
             }
-
-            const total = parseFloat(getVal(row, 'grand_total', 2)) || 0;
-            trend[groupKey] = (trend[groupKey] || 0) + total;
-        });
-
-        return Object.entries(trend)
-            .map(([name, value]) => ({ name, value }))
-            .sort((a, b) => a.name.localeCompare(b.name));
-    }, [data, filters.groupBy]);
-
-    const paymentModeData = useMemo(() => {
-        const modes: Record<string, number> = {};
-
-        data.forEach(row => {
-            if (parseInt(getVal(row, 'docstatus', 4)) !== 1) return;
-
-            const mode = getVal(row, 'mode_of_payment', 3) || 'Unspecified';
-            const total = parseFloat(getVal(row, 'grand_total', 2)) || 0;
-            modes[mode] = (modes[mode] || 0) + total;
-        });
-
-        return Object.entries(modes).map(([name, value]) => ({ name, value }));
-    }, [data]);
-
-    const topItemsData = useMemo(() => {
-        const itemSales: Record<string, number> = {};
-
-        data.forEach(row => {
-            if (parseInt(getVal(row, 'docstatus', 4)) !== 1) return;
-
-            const item = getVal(row, 'item_code', 5);
-            const qty = parseFloat(getVal(row, 'qty', 6)) || 0;
-            if (item && qty > 0) {
-                itemSales[item] = (itemSales[item] || 0) + qty;
+            else if (type === 'payment') {
+                const mode = row.mode_of_payment || 'Unknown';
+                const total = parseFloat(row.grand_total || 0);
+                map.set(mode, (map.get(mode) || 0) + total);
+            }
+            else if (type === 'items') {
+                const item = row.item_code || row.item_name;
+                const qty = parseFloat(row.qty || row.stock_qty || 0);
+                if (item && qty) {
+                    map.set(item, (map.get(item) || 0) + qty);
+                }
             }
         });
 
-        return Object.entries(itemSales)
+        return Array.from(map.entries())
             .map(([name, value]) => ({ name, value }))
-            .sort((a, b) => b.value - a.value)
-            .slice(0, 10);
-    }, [data]);
+            .sort((a, b) => type === 'items' ? b.value - a.value : a.name.localeCompare(b.name)) // Sort items desc, others asc
+            .slice(0, type === 'items' ? 10 : undefined);
+    };
+
+    const revenueTrendProcessed = useMemo(() => processData(salesTrendData, 'trend', salesTrendRange), [salesTrendData, salesTrendRange]);
+    const paymentModeProcessed = useMemo(() => processData(paymentModeData, 'payment', paymentModeRange), [paymentModeData, paymentModeRange]);
+    const topItemsProcessed = useMemo(() => processData(topItemsData, 'items', topItemsRange), [topItemsData, topItemsRange]);
 
     return (
-        <>
-            <Card className="flex flex-col">
-                <CardHeader>
-                    <CardTitle className="text-lg font-semibold flex items-center justify-between">
-                        Revenue Trend
-                        <span className="text-xs font-normal text-gray-500 capitalize">Grouped by {filters.groupBy}</span>
-                    </CardTitle>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+            <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                    <CardTitle>Sales Trend</CardTitle>
+                    <ChartFilter value={salesTrendRange} onChange={setSalesTrendRange} />
                 </CardHeader>
-                <CardContent className="h-[350px] mt-4">
+                <CardContent className="h-[300px]">
                     <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={revenueTrendData}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                            <XAxis
-                                dataKey="name"
-                                fontSize={12}
-                                tickLine={false}
-                                axisLine={false}
-                                tick={{ fill: '#64748b' }}
-                            />
-                            <YAxis
-                                fontSize={12}
-                                tickLine={false}
-                                axisLine={false}
-                                tick={{ fill: '#64748b' }}
-                                tickFormatter={(val) => `₹${val}`}
-                            />
-                            <Tooltip
-                                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                                formatter={(val: any) => [`₹${val.toLocaleString()}`, 'Revenue']}
-                            />
-                            <Bar
-                                dataKey="value"
-                                fill="#3b82f6"
-                                radius={[4, 4, 0, 0]}
-                                animationDuration={1500}
-                            />
+                        <BarChart data={revenueTrendProcessed}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="name" />
+                            <YAxis />
+                            <Tooltip />
+                            <Bar dataKey="value" fill="#8884d8" name="Revenue" />
                         </BarChart>
                     </ResponsiveContainer>
                 </CardContent>
             </Card>
 
-            <Card className="flex flex-col">
-                <CardHeader>
-                    <CardTitle className="text-lg font-semibold">Payment Mode Distribution</CardTitle>
+            <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                    <CardTitle>Payment Mode Distribution</CardTitle>
+                    <ChartFilter value={paymentModeRange} onChange={setPaymentModeRange} />
                 </CardHeader>
-                <CardContent className="h-[350px] mt-4">
+                <CardContent className="h-[300px]">
                     <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                             <Pie
-                                data={paymentModeData}
-                                innerRadius={60}
-                                outerRadius={100}
-                                paddingAngle={5}
+                                data={paymentModeProcessed}
+                                cx="50%"
+                                cy="50%"
+                                labelLine={false}
+                                label={({ name, percent }: { name?: string | number, percent?: number }) => `${name || ''} ${((percent || 0) * 100).toFixed(0)}%`}
+                                outerRadius={80}
+                                fill="#8884d8"
                                 dataKey="value"
-                                animationDuration={1500}
                             >
-                                {paymentModeData.map((_, index) => (
+                                {paymentModeProcessed.map((_, index) => (
                                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                 ))}
                             </Pie>
-                            <Tooltip
-                                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                                formatter={(val: any) => [`₹${val.toLocaleString()}`, 'Amount']}
-                            />
+                            <Tooltip />
                             <Legend verticalAlign="bottom" height={36} />
                         </PieChart>
                     </ResponsiveContainer>
@@ -162,13 +199,14 @@ const Charts: React.FC<Props> = ({ data, filters }) => {
             </Card>
 
             <Card className="lg:col-span-2">
-                <CardHeader>
-                    <CardTitle className="text-lg font-semibold">Top 10 Selling Items</CardTitle>
+                <CardHeader className="flex flex-row items-center justify-between">
+                    <CardTitle>Top 10 Selling Items</CardTitle>
+                    <ChartFilter value={topItemsRange} onChange={setTopItemsRange} />
                 </CardHeader>
-                <CardContent className="h-[400px] mt-4">
+                <CardContent className="h-[300px] mt-4">
                     <ResponsiveContainer width="100%" height="100%">
                         <BarChart
-                            data={topItemsData}
+                            data={topItemsProcessed}
                             layout="vertical"
                             margin={{ left: 40, right: 20 }}
                         >
@@ -186,20 +224,19 @@ const Charts: React.FC<Props> = ({ data, filters }) => {
                             <Tooltip
                                 cursor={{ fill: '#f8fafc' }}
                                 contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                                formatter={(val: any) => [val, 'Qty Sold']}
                             />
                             <Bar
                                 dataKey="value"
                                 fill="#10b981"
                                 radius={[0, 4, 4, 0]}
-                                barSize={24}
+                                barSize={20}
                                 animationDuration={1500}
                             />
                         </BarChart>
                     </ResponsiveContainer>
                 </CardContent>
             </Card>
-        </>
+        </div>
     );
 };
 
