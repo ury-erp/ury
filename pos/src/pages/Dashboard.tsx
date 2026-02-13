@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import { call } from '../lib/frappe-sdk';
 import FilterBar from '../components/dashboard/FilterBar';
 import KpiCards from '../components/dashboard/KpiCards';
 import Charts from '../components/dashboard/Charts';
 import { Spinner } from '../components/ui/spinner';
 import { showToast } from '../components/ui/toast';
+import { getDashboardData } from '../lib/dashboard-api';
 
 export interface DashboardFilters {
     dateRange: 'today' | 'this_week' | 'this_month' | 'custom';
@@ -27,40 +27,8 @@ const Dashboard = () => {
     const fetchReportData = async () => {
         setLoading(true);
         try {
-            // Prepare filters as Frappe expects
-            const frappeFilters: any = {};
-
-            const today = new Date().toISOString().split('T')[0];
-            const now = new Date();
-
-            if (filters.dateRange === 'today') {
-                frappeFilters.from_date = today;
-                frappeFilters.to_date = today;
-            } else if (filters.dateRange === 'this_week') {
-                const firstDay = new Date(now.setDate(now.getDate() - now.getDay())).toISOString().split('T')[0];
-                frappeFilters.from_date = firstDay;
-                frappeFilters.to_date = today;
-            } else if (filters.dateRange === 'this_month') {
-                const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-                frappeFilters.from_date = firstDay;
-                frappeFilters.to_date = today;
-            } else if (filters.dateRange === 'custom') {
-                frappeFilters.from_date = filters.customStartDate;
-                frappeFilters.to_date = filters.customEndDate;
-            }
-
-            if (filters.branch) {
-                frappeFilters.branch = filters.branch;
-            }
-
-            const response = await (call as any).post('frappe.desk.query_report.run', {
-                report_name: 'POS Invoice', // Likely report name, will adjust if needed
-                filters: frappeFilters
-            });
-
-            if (response && response.message) {
-                setReportData(response.message.result || []);
-            }
+            const data = await getDashboardData(filters);
+            setReportData(data);
         } catch (error) {
             console.error('Failed to fetch dashboard data:', error);
             showToast.error('Failed to load dashboard data');
