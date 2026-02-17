@@ -1,0 +1,31 @@
+{
+    "add_total_row": 0,
+    "columns": [],
+    "creation": "2024-05-22 10:00:00.000000",
+    "disabled": 0,
+    "docstatus": 0,
+    "doctype": "Report",
+    "filters": [],
+    "idx": 0,
+    "is_standard": "Yes",
+    "modified": "2024-05-22 10:00:00.000000",
+    "modified_by": "Administrator",
+    "module": "URY",
+    "name": "Best-Selling Items",
+    "owner": "Administrator",
+    "prepared_report": 0,
+    "ref_doctype": "POS Invoice",
+    "report_name": "Best-Selling Items",
+    "report_type": "Script Report",
+    "roles": [
+        {
+            "role": "Accounts Manager"
+        },
+        {
+            "role": "Accounts User"
+        },
+        {
+            "role": "URY Manager"
+        }
+    ]
+}

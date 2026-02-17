@@ -15,9 +15,9 @@ const FilterBar: React.FC<Props> = ({ filters, onFilterChange, branches }) => {
         onFilterChange({ ...filters, dateRange: value as any });
     };
 
-    const handleGroupByChange = (value: string) => {
-        onFilterChange({ ...filters, groupBy: value as any });
-    };
+    // const handleGroupByChange = (value: string) => {
+    //     onFilterChange({ ...filters, groupBy: value as any });
+    // };
 
     // const handlePaymentModeChange = (value: string) => {
     //     onFilterChange({ ...filters, modeOfPayment: value as any });
@@ -40,7 +40,7 @@ const FilterBar: React.FC<Props> = ({ filters, onFilterChange, branches }) => {
                 </div>
 
                 {filters.dateRange === 'custom' && (
-                    <div className="grid grid-cols-2 gap-2 col-span-1 md:col-span-2 lg:col-span-1">
+                    <div className="grid grid-cols-2 gap-4 col-span-1 md:col-span-2 lg:col-span-2">
                         <div className="space-y-1">
                             <label className="text-xs font-medium text-gray-500 uppercase">From</label>
                             <Input
@@ -59,7 +59,7 @@ const FilterBar: React.FC<Props> = ({ filters, onFilterChange, branches }) => {
                         </div>
                     </div>
                 )}
-
+                {/* 
                 <div className="space-y-1">
                     <label className="text-xs font-medium text-gray-500 uppercase">Group By</label>
                     <Select
@@ -70,7 +70,7 @@ const FilterBar: React.FC<Props> = ({ filters, onFilterChange, branches }) => {
                         <SelectItem value="weekly">Weekly</SelectItem>
                         <SelectItem value="monthly">Monthly</SelectItem>
                     </Select>
-                </div>
+                </div> */}
                 {/* 
                 <div className="space-y-1">
                     <label className="text-xs font-medium text-gray-500 uppercase">Payment Mode</label>

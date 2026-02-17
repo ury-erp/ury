@@ -1,10 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Card, CardContent } from '../../ui/card';
+import React from 'react';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { DashboardFilters } from '../../../pages/Dashboard';
-import { getDashboardData } from '../../../lib/dashboard-api';
-import ChartCardHeader from './ChartCardHeader';
-import { usePOSStore } from '../../../store/pos-store';
+import GenericChart from './GenericChart';
 
 interface Props {
     initialData: any[];
@@ -12,98 +9,41 @@ interface Props {
 }
 
 const PeakHoursChart: React.FC<Props> = ({ initialData, globalFilters }) => {
-    const { posProfile } = usePOSStore();
-    const [filter, setFilter] = useState<string>(globalFilters.dateRange === 'custom' ? 'today' : globalFilters.dateRange);
-    const [customDates, setCustomDates] = useState<{ start: string, end: string }>({
-        start: globalFilters.customStartDate || '',
-        end: globalFilters.customEndDate || ''
-    });
-    const [data, setData] = useState<any[]>(initialData);
-    const [loading, setLoading] = useState(false);
-
-    useEffect(() => {
-        setData(initialData);
-        setFilter(globalFilters.dateRange === 'custom' ? 'custom' : globalFilters.dateRange);
-        if (globalFilters.dateRange === 'custom') {
-            setCustomDates({
-                start: globalFilters.customStartDate || '',
-                end: globalFilters.customEndDate || ''
-            });
-        }
-    }, [initialData, globalFilters]);
-
-    const fetchData = async (currentFilter: string, startDate?: string, endDate?: string) => {
-        setLoading(true);
-        try {
-            const tempFilters = {
-                ...globalFilters,
-                dateRange: currentFilter as any,
-                customStartDate: startDate,
-                customEndDate: endDate
-            };
-
-            if (posProfile?.company) {
-                const result = await getDashboardData(tempFilters, posProfile.company, 'peak_hours');
-                setData(result.peak_hours);
-            }
-        } catch (err) {
-            console.error(err);
-        } finally {
-            setLoading(false);
-        }
-    }
-
-    const handleFilterChange = async (newFilter: string) => {
-        setFilter(newFilter);
-        if (newFilter !== 'custom') {
-            setCustomDates({ start: '', end: '' });
-            fetchData(newFilter);
-        }
-    };
-
-    const handleCustomDateChange = (type: 'start' | 'end', value: string) => {
-        const newDates = { ...customDates, [type]: value };
-        setCustomDates(newDates);
-
-        if (newDates.start && newDates.end) {
-            fetchData('custom', newDates.start, newDates.end);
-        }
-    };
-
     return (
-        <Card className="p-6 rounded-xl border border-gray-200 shadow-sm transition-all hover:shadow-md">
-            <ChartCardHeader
-                title="Peak Hours (Transactions)"
-                currentFilter={filter}
-                onFilterChange={handleFilterChange}
-                customStartDate={customDates.start}
-                customEndDate={customDates.end}
-                onCustomDateChange={handleCustomDateChange}
-            />
-            <CardContent className="h-[300px] p-0 relative">
-                {loading && <div className="absolute inset-0 bg-white/50 flex items-center justify-center z-10">Loading...</div>}
-                <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={data}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                        <XAxis
-                            dataKey="hour"
-                            tickFormatter={(tick) => `${tick}:00`}
-                            axisLine={false}
-                            tickLine={false}
-                            tick={{ fill: '#94a3b8', fontSize: 12 }}
-                            dy={10}
-                        />
-                        <YAxis
-                            axisLine={false}
-                            tickLine={false}
-                            tick={{ fill: '#94a3b8', fontSize: 12 }}
-                        />
-                        <Tooltip labelFormatter={(label) => `${label}:00 - ${label + 1}:00`} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
-                        <Bar dataKey="invoice_count" fill="#f97316" name="Invoices" radius={[4, 4, 0, 0]} barSize={24} />
-                    </BarChart>
-                </ResponsiveContainer>
-            </CardContent>
-        </Card>
+        <GenericChart
+            title="Peak Hours (Transactions)"
+            initialData={initialData}
+            globalFilters={globalFilters}
+            apiSection="peak_hours"
+            mapData={(data) => data?.map((item: any) => ({
+                name: item.hour,
+                value: item.invoice_count
+            })) || []}
+            renderChart={(chartData) => (
+                <AreaChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                    <XAxis
+                        dataKey="name"
+                        tickFormatter={(val) => `${val}:00`}
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fill: '#94a3b8', fontSize: 12 }}
+                        dy={10}
+                    />
+                    <YAxis
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fill: '#94a3b8', fontSize: 12 }}
+                    />
+                    <Tooltip
+                        cursor={{ stroke: '#cbd5e1', strokeWidth: 1 }}
+                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                        labelFormatter={(label) => `${label}:00 - ${label + 1}:00`}
+                    />
+                    <Area type="monotone" dataKey="value" stroke="#3b82f6" fill="#bfdbfe" strokeWidth={3} name="Invoices" />
+                </AreaChart>
+            )}
+        />
     );
 };
 

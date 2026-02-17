@@ -1,10 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent } from '../ui/card';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { DashboardData, getDashboardData } from '../../lib/dashboard-api';
+import React from 'react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
+import { DashboardData } from '../../lib/dashboard-api';
 import { DashboardFilters } from '../../pages/Dashboard';
-import ChartCardHeader from './charts/ChartCardHeader';
-import { usePOSStore } from '../../store/pos-store';
+import GenericChart from './charts/GenericChart';
 
 interface Props {
     data: DashboardData | null;
@@ -12,118 +10,58 @@ interface Props {
     filters: DashboardFilters;
 }
 
-const BestSellingItems: React.FC<Props> = ({ data: initialData, loading: initialLoading, filters: globalFilters }) => {
-    const { posProfile } = usePOSStore();
-    const [filter, setFilter] = useState<string>(globalFilters.dateRange === 'custom' ? 'today' : globalFilters.dateRange);
-    const [customDates, setCustomDates] = useState<{ start: string, end: string }>({
-        start: globalFilters.customStartDate || '',
-        end: globalFilters.customEndDate || ''
-    });
-    const [data, setData] = useState<DashboardData | null>(initialData);
-    const [loading, setLoading] = useState(initialLoading);
+const BestSellingItems: React.FC<Props> = ({ data: initialData, filters: globalFilters }) => {
+    // BestSellingItems expects DashboardData object in data prop but uses data.bestSellingItems
+    // GenericChart will handle fetching based on 'best_selling_items' key.
 
-    useEffect(() => {
-        setData(initialData);
-        setLoading(initialLoading);
-        setFilter(globalFilters.dateRange === 'custom' ? 'custom' : globalFilters.dateRange);
-        if (globalFilters.dateRange === 'custom') {
-            setCustomDates({
-                start: globalFilters.customStartDate || '',
-                end: globalFilters.customEndDate || ''
-            });
-        }
-    }, [initialData, initialLoading, globalFilters]);
-
-    const fetchData = async (currentFilter: string, startDate?: string, endDate?: string) => {
-        setLoading(true);
-        try {
-            const tempFilters = {
-                ...globalFilters,
-                dateRange: currentFilter as any,
-                customStartDate: startDate,
-                customEndDate: endDate
-            };
-
-            if (posProfile?.company) {
-                const result = await getDashboardData(tempFilters, posProfile.company, 'best_selling_items');
-                setData(result);
-            }
-        } catch (err) {
-            console.error(err);
-        } finally {
-            setLoading(false);
-        }
-    }
-
-    const handleFilterChange = async (newFilter: string) => {
-        setFilter(newFilter);
-        if (newFilter !== 'custom') {
-            setCustomDates({ start: '', end: '' });
-            fetchData(newFilter);
-        }
-    };
-
-    const handleCustomDateChange = (type: 'start' | 'end', value: string) => {
-        const newDates = { ...customDates, [type]: value };
-        setCustomDates(newDates);
-
-        if (newDates.start && newDates.end) {
-            fetchData('custom', newDates.start, newDates.end);
-        }
-    };
-
-    const items = (data?.bestSellingItems || [])
-        .slice(0, 10)
-        .map((item: any) => ({
-            name: item.item_name,
-            value: item.total_revenue
-        }));
+    // Initial data passed in might be null or DashboardData.
+    const initialItems = initialData?.bestSellingItems || [];
 
     return (
-        <Card className="p-6 rounded-xl border border-gray-200 shadow-sm transition-all hover:shadow-md">
-            <ChartCardHeader
-                title="Top 10 Best Selling Items"
-                currentFilter={filter}
-                onFilterChange={handleFilterChange}
-                customStartDate={customDates.start}
-                customEndDate={customDates.end}
-                onCustomDateChange={handleCustomDateChange}
-            />
-            <CardContent className="h-[300px] p-0 relative">
-                {loading && <div className="absolute inset-0 bg-white/50 flex items-center justify-center z-10">Loading...</div>}
-                <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                        data={items}
-                        layout="vertical"
-                        margin={{ left: 0, right: 20, bottom: 20 }}
-                    >
-                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
-                        <XAxis type="number" hide />
-                        <YAxis
-                            type="category"
-                            dataKey="name"
-                            fontSize={12}
-                            tickLine={false}
-                            axisLine={false}
-                            tick={{ fill: '#64748b' }}
-                            width={150}
-                        />
-                        <Tooltip
-                            cursor={{ fill: '#f8fafc' }}
-                            contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                            formatter={(value: any) => `₹${value.toLocaleString()}`}
-                        />
-                        <Bar
-                            dataKey="value"
-                            fill="#f59e0b"
-                            radius={[0, 4, 4, 0]}
-                            barSize={32}
-                            name="Revenue"
-                        />
-                    </BarChart>
-                </ResponsiveContainer>
-            </CardContent>
-        </Card>
+        <GenericChart
+            title="Top 10 Best Selling Items"
+            initialData={initialItems}
+            globalFilters={globalFilters}
+            apiSection="best_selling_items"
+            mapData={(data) => (data || [])
+                .slice(0, 10)
+                .map((item: any) => ({
+                    name: item.item_name,
+                    value: item.total_revenue
+                }))
+            }
+            renderChart={(chartData) => (
+                <BarChart
+                    data={chartData}
+                    layout="vertical"
+                    margin={{ left: 0, right: 20, bottom: 20 }}
+                >
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
+                    <XAxis type="number" hide />
+                    <YAxis
+                        type="category"
+                        dataKey="name"
+                        fontSize={12}
+                        tickLine={false}
+                        axisLine={false}
+                        tick={{ fill: '#64748b' }}
+                        width={150}
+                    />
+                    <Tooltip
+                        cursor={{ fill: '#f8fafc' }}
+                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                        formatter={(value: any) => `₹${(value || 0).toLocaleString()}`}
+                    />
+                    <Bar
+                        dataKey="value"
+                        fill="#f59e0b"
+                        radius={[0, 4, 4, 0]}
+                        barSize={32}
+                        name="Revenue"
+                    />
+                </BarChart>
+            )}
+        />
     );
 };
 
