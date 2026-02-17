@@ -28,7 +28,6 @@ const Dashboard = () => {
         modeOfPayment: 'All',
         posProfile: posProfile?.name // Auto-detect current POS Profile
     });
-
     const [reportData, setReportData] = useState<DashboardData | null>(null);
     const [loading, setLoading] = useState(true);
 
@@ -69,11 +68,11 @@ const Dashboard = () => {
     }
 
     return (
-        <div className="flex-1 bg-[#f8f9fb] h-[calc(100vh-64px)] overflow-y-auto w-full">
-            <div className="max-w-[1600px] mx-auto p-6 md:p-8 space-y-8">
+        <div className="flex-1 bg-white h-[calc(100vh-64px)] overflow-y-auto w-full">
+            <div className="max-w-7xl mx-auto p-6 md:p-8 space-y-8">
                 {/* Header Section */}
                 <div className="flex justify-between items-center mb-6">
-                    <h1 className="text-2xl font-bold text-gray-900">POS Dashboard</h1>
+                    <h1 className="text-2xl font-bold text-gray-900">Cashier Dashboard</h1>
                 </div>
 
                 {/* Filter Section */}
@@ -97,7 +96,7 @@ const Dashboard = () => {
 
                 {/* Reports/Top Items Section */}
                 <div className="mb-8">
-                    <BestSellingItems data={reportData} loading={loading} />
+                    <BestSellingItems data={reportData} loading={loading} filters={filters} />
                 </div>
             </div>
         </div>

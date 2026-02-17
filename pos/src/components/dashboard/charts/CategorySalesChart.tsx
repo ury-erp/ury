@@ -1,30 +1,30 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent } from '../ui/card';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { DashboardData, getDashboardData } from '../../lib/dashboard-api';
-import { DashboardFilters } from '../../pages/Dashboard';
-import ChartCardHeader from './charts/ChartCardHeader';
-import { usePOSStore } from '../../store/pos-store';
+import { PieChart, Pie, Cell, Legend, Tooltip, ResponsiveContainer } from 'recharts';
+import { Card, CardContent } from '../../ui/card';
+import { DashboardFilters } from '../../../pages/Dashboard';
+import { getDashboardData } from '../../../lib/dashboard-api';
+import ChartCardHeader from './ChartCardHeader';
+import { usePOSStore } from '../../../store/pos-store';
 
 interface Props {
-    data: DashboardData | null;
-    loading: boolean;
-    filters: DashboardFilters;
+    initialData: any[];
+    globalFilters: DashboardFilters;
 }
 
-const BestSellingItems: React.FC<Props> = ({ data: initialData, loading: initialLoading, filters: globalFilters }) => {
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
+
+const CategorySalesChart: React.FC<Props> = ({ initialData, globalFilters }) => {
     const { posProfile } = usePOSStore();
     const [filter, setFilter] = useState<string>(globalFilters.dateRange === 'custom' ? 'today' : globalFilters.dateRange);
     const [customDates, setCustomDates] = useState<{ start: string, end: string }>({
         start: globalFilters.customStartDate || '',
         end: globalFilters.customEndDate || ''
     });
-    const [data, setData] = useState<DashboardData | null>(initialData);
-    const [loading, setLoading] = useState(initialLoading);
+    const [data, setData] = useState<any[]>(initialData);
+    const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         setData(initialData);
-        setLoading(initialLoading);
         setFilter(globalFilters.dateRange === 'custom' ? 'custom' : globalFilters.dateRange);
         if (globalFilters.dateRange === 'custom') {
             setCustomDates({
@@ -32,7 +32,7 @@ const BestSellingItems: React.FC<Props> = ({ data: initialData, loading: initial
                 end: globalFilters.customEndDate || ''
             });
         }
-    }, [initialData, initialLoading, globalFilters]);
+    }, [initialData, globalFilters]);
 
     const fetchData = async (currentFilter: string, startDate?: string, endDate?: string) => {
         setLoading(true);
@@ -45,8 +45,8 @@ const BestSellingItems: React.FC<Props> = ({ data: initialData, loading: initial
             };
 
             if (posProfile?.company) {
-                const result = await getDashboardData(tempFilters, posProfile.company, 'best_selling_items');
-                setData(result);
+                const result = await getDashboardData(tempFilters, posProfile.company, 'sales_by_category');
+                setData(result.sales_by_category);
             }
         } catch (err) {
             console.error(err);
@@ -72,17 +72,10 @@ const BestSellingItems: React.FC<Props> = ({ data: initialData, loading: initial
         }
     };
 
-    const items = (data?.bestSellingItems || [])
-        .slice(0, 10)
-        .map((item: any) => ({
-            name: item.item_name,
-            value: item.total_revenue
-        }));
-
     return (
         <Card className="p-6 rounded-xl border border-gray-200 shadow-sm transition-all hover:shadow-md">
             <ChartCardHeader
-                title="Top 10 Best Selling Items"
+                title="Sales by Category"
                 currentFilter={filter}
                 onFilterChange={handleFilterChange}
                 customStartDate={customDates.start}
@@ -92,39 +85,29 @@ const BestSellingItems: React.FC<Props> = ({ data: initialData, loading: initial
             <CardContent className="h-[300px] p-0 relative">
                 {loading && <div className="absolute inset-0 bg-white/50 flex items-center justify-center z-10">Loading...</div>}
                 <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                        data={items}
-                        layout="vertical"
-                        margin={{ left: 0, right: 20, bottom: 20 }}
-                    >
-                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
-                        <XAxis type="number" hide />
-                        <YAxis
-                            type="category"
-                            dataKey="name"
-                            fontSize={12}
-                            tickLine={false}
-                            axisLine={false}
-                            tick={{ fill: '#64748b' }}
-                            width={150}
-                        />
-                        <Tooltip
-                            cursor={{ fill: '#f8fafc' }}
-                            contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                            formatter={(value: any) => `₹${value.toLocaleString()}`}
-                        />
-                        <Bar
-                            dataKey="value"
-                            fill="#f59e0b"
-                            radius={[0, 4, 4, 0]}
-                            barSize={32}
-                            name="Revenue"
-                        />
-                    </BarChart>
+                    <PieChart>
+                        <Pie
+                            data={data}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={40}
+                            outerRadius={80}
+                            paddingAngle={2}
+                            dataKey="amount"
+                            nameKey="item_group"
+                            label={({ item_group, percent }: { item_group?: string, percent?: number }) => `${item_group} ${(percent! * 100).toFixed(0)}%`}
+                        >
+                            {data.map((_, index) => (
+                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} strokeWidth={0} />
+                            ))}
+                        </Pie>
+                        <Tooltip formatter={(value: any) => `₹${(value || 0).toLocaleString()}`} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
+                        <Legend verticalAlign="bottom" iconType="circle" />
+                    </PieChart>
                 </ResponsiveContainer>
             </CardContent>
         </Card>
     );
 };
 
-export default BestSellingItems;
+export default CategorySalesChart;
