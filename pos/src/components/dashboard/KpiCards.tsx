@@ -74,16 +74,20 @@ const KpiCards: React.FC<Props> = ({ data, loading }) => {
 
     return (
         <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
                 {cards.map((card) => (
-                    <Card key={card.title} className="p-5 flex items-start space-x-4 hover:shadow-md transition-shadow">
-                        <div className={`p-3 rounded-lg ${colorMap[card.color]?.bg || 'bg-gray-50'} ${colorMap[card.color]?.text || 'text-gray-600'}`}>
-                            <card.icon className="w-6 h-6" />
+                    <Card key={card.title} className="p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow h-full">
+                        <div className="flex justify-between items-start mb-4">
+                            <p className="text-sm font-medium text-gray-500 truncate">{card.title}</p>
+                            <div className={`p-2 rounded-lg ${colorMap[card.color]?.bg || 'bg-gray-50'} ${colorMap[card.color]?.text || 'text-gray-600'}`}>
+                                <card.icon className="w-5 h-5" />
+                            </div>
                         </div>
                         <div>
-                            <p className="text-sm font-medium text-gray-500">{card.title}</p>
-                            <h3 className="text-2xl font-bold text-gray-900">{loading ? '...' : card.value}</h3>
-                            <p className="text-xs text-gray-400 mt-1">{card.description}</p>
+                            <h3 className="text-3xl font-bold text-gray-900 tracking-tight">
+                                {loading ? '...' : card.value}
+                            </h3>
+                            <p className="text-xs text-gray-400 mt-2 font-medium">{card.description}</p>
                         </div>
                     </Card>
                 ))}

@@ -19,9 +19,9 @@ const FilterBar: React.FC<Props> = ({ filters, onFilterChange, branches }) => {
         onFilterChange({ ...filters, groupBy: value as any });
     };
 
-    const handlePaymentModeChange = (value: string) => {
-        onFilterChange({ ...filters, modeOfPayment: value as any });
-    };
+    // const handlePaymentModeChange = (value: string) => {
+    //     onFilterChange({ ...filters, modeOfPayment: value as any });
+    // };
 
     return (
         <Card className="p-4 bg-white border-gray-200">
@@ -71,7 +71,7 @@ const FilterBar: React.FC<Props> = ({ filters, onFilterChange, branches }) => {
                         <SelectItem value="monthly">Monthly</SelectItem>
                     </Select>
                 </div>
-
+                {/* 
                 <div className="space-y-1">
                     <label className="text-xs font-medium text-gray-500 uppercase">Payment Mode</label>
                     <Select
@@ -82,7 +82,7 @@ const FilterBar: React.FC<Props> = ({ filters, onFilterChange, branches }) => {
                         <SelectItem value="Cash">Cash Only</SelectItem>
                         <SelectItem value="Others">Others</SelectItem>
                     </Select>
-                </div>
+                </div> */}
 
                 {branches.length > 0 && (
                     <div className="space-y-1">

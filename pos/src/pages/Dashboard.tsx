@@ -69,23 +69,34 @@ const Dashboard = () => {
     }
 
     return (
-        <div className="flex-1 bg-gray-50 h-[calc(100vh-64px)] overflow-y-auto">
-            <div className="w-full p-6 space-y-6">
-                <div className="flex justify-between items-center">
+        <div className="flex-1 bg-[#f8f9fb] h-[calc(100vh-64px)] overflow-y-auto w-full">
+            <div className="max-w-[1600px] mx-auto p-6 md:p-8 space-y-8">
+                {/* Header Section */}
+                <div className="flex justify-between items-center mb-6">
                     <h1 className="text-2xl font-bold text-gray-900">POS Dashboard</h1>
                 </div>
 
-                <div className="max-w-[1600px] mx-auto space-y-6">
+                {/* Filter Section */}
+                <div className="mb-8">
                     <FilterBar
                         filters={filters}
                         onFilterChange={setFilters}
-                        branches={[]} // To be populated if needed
+                        branches={[]}
                     />
+                </div>
 
+                {/* KPI Section */}
+                <div className="mb-8">
                     <KpiCards data={reportData} loading={loading} />
+                </div>
 
+                {/* Charts Section */}
+                <div className="mb-8">
                     <Charts data={reportData} filters={filters} />
+                </div>
 
+                {/* Reports/Top Items Section */}
+                <div className="mb-8">
                     <BestSellingItems data={reportData} loading={loading} />
                 </div>
             </div>

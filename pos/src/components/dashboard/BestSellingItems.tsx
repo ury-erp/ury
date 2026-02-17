@@ -19,16 +19,16 @@ const BestSellingItems: React.FC<Props> = ({ data, loading }) => {
         }));
 
     return (
-        <Card className="mt-6">
-            <CardHeader>
-                <CardTitle>Top 10 Best Selling Items (Revenue)</CardTitle>
+        <Card className="p-6 rounded-xl border border-gray-200 shadow-sm">
+            <CardHeader className="p-0 mb-6">
+                <CardTitle className="text-base font-semibold text-gray-900">Top 10 Best Selling Items (Revenue)</CardTitle>
             </CardHeader>
-            <CardContent className="h-[300px]">
+            <CardContent className="h-[300px] p-0">
                 <ResponsiveContainer width="100%" height="100%">
                     <BarChart
                         data={items}
                         layout="vertical"
-                        margin={{ left: 20, right: 20, bottom: 20 }}
+                        margin={{ left: 0, right: 20, bottom: 20 }}
                     >
                         <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
                         <XAxis type="number" hide />
@@ -50,7 +50,7 @@ const BestSellingItems: React.FC<Props> = ({ data, loading }) => {
                             dataKey="value"
                             fill="#f59e0b"
                             radius={[0, 4, 4, 0]}
-                            barSize={20}
+                            barSize={32}
                             name="Revenue"
                         />
                     </BarChart>
