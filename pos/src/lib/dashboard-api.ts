@@ -2,27 +2,31 @@ import { call } from './frappe-sdk';
 import { DashboardFilters } from '../pages/Dashboard';
 
 export interface DashboardData {
-    posRegister: any[];
+    kpis: {
+        total_invoices: number;
+        total_sales: number;
+        total_outstanding: number;
+        total_cash: number;
+        total_card: number;
+        total_upi: number;
+        total_other: number;
+    };
+    payment_modes: {
+        mode_of_payment: string;
+        amount: number;
+    }[];
+    daywise_sales: {
+        posting_date: string;
+        total_sales: number;
+    }[];
+    bestSellingItems: any[];
 }
-
-export const getReportData = async (reportName: string, filters: any) => {
-    try {
-        const response = await (call as any).post('frappe.desk.query_report.run', {
-            report_name: reportName,
-            filters: filters,
-            ignore_prepared_report: true
-        });
-        return response.message?.result || [];
-    } catch (error) {
-        console.error(`Error fetching report ${reportName}:`, error);
-        return [];
-    }
-};
 
 export const getDashboardData = async (filters: DashboardFilters, company: string): Promise<DashboardData> => {
     const frappeFilters: any = {
         company: company,
-        branch: filters.branch || ''
+        branch: filters.branch || '',
+        pos_profile: filters.posProfile || ''
     };
 
     const today = new Date().toISOString().split('T')[0];
@@ -32,8 +36,11 @@ export const getDashboardData = async (filters: DashboardFilters, company: strin
         frappeFilters.from_date = today;
         frappeFilters.to_date = today;
     } else if (filters.dateRange === 'this_week') {
-        const firstDay = new Date(now.setDate(now.getDate() - now.getDay())).toISOString().split('T')[0];
-        frappeFilters.from_date = firstDay;
+        const tempNow = new Date(now);
+        const day = tempNow.getDay();
+        const diff = tempNow.getDate() - day + (day == 0 ? -6 : 1);
+        const monday = new Date(tempNow.setDate(diff));
+        frappeFilters.from_date = monday.toISOString().split('T')[0];
         frappeFilters.to_date = today;
     } else if (filters.dateRange === 'this_month') {
         const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
@@ -44,12 +51,36 @@ export const getDashboardData = async (filters: DashboardFilters, company: strin
         frappeFilters.to_date = filters.customEndDate;
     }
 
+    try {
+        // 1. Fetch KPIs and Charts data
+        const kpiResponse = await (call as any).get('ury.ury.api.cashier_dashboard.get_cashier_kpis', {
+            filters: frappeFilters
+        });
+        const kpiData = kpiResponse.message || {};
 
+        return {
+            kpis: kpiData?.kpis || {},
+            payment_modes: kpiData?.payment_modes || [],
+            daywise_sales: kpiData?.daywise_sales || [],
+            bestSellingItems: kpiData?.best_selling_items || []
+        };
 
-    // Fetch ONLY POS Register as per requirement
-    const posRegisterData = await getReportData('POS Register', frappeFilters);
-
-    return {
-        posRegister: posRegisterData
-    };
+    } catch (error) {
+        console.error("Failed to fetch dashboard data", error);
+        // Use type assertion to match expected return type even on error for safer handling in component
+        return {
+            kpis: {
+                total_invoices: 0,
+                total_sales: 0,
+                total_outstanding: 0,
+                total_cash: 0,
+                total_card: 0,
+                total_upi: 0,
+                total_other: 0
+            },
+            payment_modes: [],
+            daywise_sales: [],
+            bestSellingItems: []
+        };
+    }
 };

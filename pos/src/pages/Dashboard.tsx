@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import FilterBar from '../components/dashboard/FilterBar';
 import KpiCards from '../components/dashboard/KpiCards';
 import Charts from '../components/dashboard/Charts';
+import BestSellingItems from '../components/dashboard/BestSellingItems'; // Updated import
 import { Spinner } from '../components/ui/spinner';
 import { showToast } from '../components/ui/toast';
 import { getDashboardData, DashboardData } from '../lib/dashboard-api';
@@ -13,25 +14,37 @@ export interface DashboardFilters {
     customEndDate?: string;
     groupBy: 'daily' | 'weekly' | 'monthly';
     branch?: string;
+    posProfile?: string;
     modeOfPayment: 'All' | 'Cash' | 'Others';
 }
 
 const Dashboard = () => {
+    const { posProfile } = usePOSStore();
+
+    // Initialize filters, defaulting to current POS Profile if available
     const [filters, setFilters] = useState<DashboardFilters>({
-        dateRange: 'this_month',
+        dateRange: 'today',
         groupBy: 'daily',
         modeOfPayment: 'All',
+        posProfile: posProfile?.name // Auto-detect current POS Profile
     });
+
     const [reportData, setReportData] = useState<DashboardData | null>(null);
     const [loading, setLoading] = useState(true);
-    const { posProfile } = usePOSStore();
+
 
     const fetchReportData = async () => {
         if (!posProfile?.company) return;
 
         setLoading(true);
         try {
-            const data = await getDashboardData(filters, posProfile.company);
+            // Ensure posProfile filter is set if it was missing initially
+            const currentFilters = {
+                ...filters,
+                posProfile: filters.posProfile || posProfile.name
+            };
+
+            const data = await getDashboardData(currentFilters, posProfile.company);
             setReportData(data);
         } catch (error) {
             console.error('Failed to fetch dashboard data:', error);
@@ -66,12 +79,14 @@ const Dashboard = () => {
                     <FilterBar
                         filters={filters}
                         onFilterChange={setFilters}
-                        branches={[]} // To be populated if available
+                        branches={[]} // To be populated if needed
                     />
 
                     <KpiCards data={reportData} loading={loading} />
 
                     <Charts data={reportData} filters={filters} />
+
+                    <BestSellingItems data={reportData} loading={loading} />
                 </div>
             </div>
         </div>
