@@ -80,6 +80,58 @@ const Charts: React.FC<Props> = ({ data }) => {
                 </CardContent>
             </Card>
 
+            {/* Top Selling Items */}
+
+            {/* Sales by Category */}
+            <Card>
+                <CardHeader>
+                    <CardTitle>Sales by Category</CardTitle>
+                </CardHeader>
+                <CardContent className="h-[300px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                            <Pie
+                                data={data?.sales_by_category || []}
+                                cx="50%"
+                                cy="50%"
+                                labelLine={false}
+                                label={({ item_group, percent }: { item_group?: string, percent?: number }) => `${item_group} ${(percent! * 100).toFixed(0)}%`}
+                                outerRadius={80}
+                                fill="#8884d8"
+                                dataKey="amount"
+                                nameKey="item_group"
+                            >
+                                {(data?.sales_by_category || []).map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                ))}
+                            </Pie>
+                            <Tooltip formatter={(value: number) => `₹${value.toLocaleString()}`} />
+                            <Legend />
+                        </PieChart>
+                    </ResponsiveContainer>
+                </CardContent>
+            </Card>
+
+            {/* Peak Hours */}
+            <Card>
+                <CardHeader>
+                    <CardTitle>Peak Hours (Transactions)</CardTitle>
+                </CardHeader>
+                <CardContent className="h-[300px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={data?.peak_hours || []}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis
+                                dataKey="hour"
+                                tickFormatter={(tick) => `${tick}:00`}
+                            />
+                            <YAxis />
+                            <Tooltip labelFormatter={(label) => `${label}:00 - ${label + 1}:00`} />
+                            <Bar dataKey="invoice_count" fill="#f97316" name="Invoices" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                    </ResponsiveContainer>
+                </CardContent>
+            </Card>
         </div>
     );
 };

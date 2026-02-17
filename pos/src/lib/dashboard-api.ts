@@ -20,6 +20,15 @@ export interface DashboardData {
         total_sales: number;
     }[];
     bestSellingItems: any[];
+    sales_by_category: {
+        item_group: string;
+        amount: number;
+    }[];
+    peak_hours: {
+        hour: number;
+        invoice_count: number;
+        total_sales: number;
+    }[];
 }
 
 export const getDashboardData = async (filters: DashboardFilters, company: string): Promise<DashboardData> => {
@@ -62,7 +71,9 @@ export const getDashboardData = async (filters: DashboardFilters, company: strin
             kpis: kpiData?.kpis || {},
             payment_modes: kpiData?.payment_modes || [],
             daywise_sales: kpiData?.daywise_sales || [],
-            bestSellingItems: kpiData?.best_selling_items || []
+            bestSellingItems: kpiData?.best_selling_items || [],
+            sales_by_category: kpiData?.sales_by_category || [],
+            peak_hours: kpiData?.peak_hours || []
         };
 
     } catch (error) {
@@ -80,7 +91,9 @@ export const getDashboardData = async (filters: DashboardFilters, company: strin
             },
             payment_modes: [],
             daywise_sales: [],
-            bestSellingItems: []
+            bestSellingItems: [],
+            sales_by_category: [],
+            peak_hours: []
         };
     }
 };
