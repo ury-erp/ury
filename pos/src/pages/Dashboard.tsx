@@ -75,17 +75,15 @@ const Dashboard = () => {
                     <h1 className="text-2xl font-bold text-gray-900">Cashier Dashboard</h1>
                 </div>
 
-                {/* Filter Section */}
-                <div className="mb-8">
+                {/* KPI & Filter Section Container */}
+                <div className="mb-8 bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-6">
                     <FilterBar
                         filters={filters}
                         onFilterChange={setFilters}
                         branches={[]}
+                        variant="clean"
                     />
-                </div>
-
-                {/* KPI Section */}
-                <div className="mb-8">
+                    <div className="border-t border-gray-100 pt-6"></div>
                     <KpiCards data={reportData} loading={loading} />
                 </div>
 

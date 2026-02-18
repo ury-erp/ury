@@ -25,17 +25,17 @@ const ChartCardHeader: React.FC<Props> = ({
         <CardHeader className="p-0 mb-6 flex flex-col space-y-4">
             <div className="flex flex-row items-center justify-between w-full">
                 <CardTitle className="text-base font-semibold text-gray-900">{title}</CardTitle>
-                {/* <div className="w-36">
+                <div className="w-36">
                     <Select value={currentFilter} onValueChange={onFilterChange}>
                         <SelectItem value="today">Today</SelectItem>
                         <SelectItem value="this_week">This Week</SelectItem>
                         <SelectItem value="this_month">This Month</SelectItem>
                         <SelectItem value="custom">Custom Range</SelectItem>
                     </Select>
-                </div> */}
+                </div>
             </div>
 
-            {/* {currentFilter === 'custom' && onCustomDateChange && (
+            {currentFilter === 'custom' && onCustomDateChange && (
                 <div className="flex flex-row items-center gap-2 w-full animate-in fade-in slide-in-from-top-2 duration-200">
                     <div className="flex-1">
                         <Input
@@ -55,7 +55,7 @@ const ChartCardHeader: React.FC<Props> = ({
                         />
                     </div>
                 </div>
-            )} */}
+            )}
         </CardHeader>
     );
 };
