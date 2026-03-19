@@ -1,0 +1,127 @@
+{
+  "common": {
+    "loading": "Chargement...",
+    "cancel": "Annuler",
+    "save": "Enregistrer",
+    "apply": "Appliquer",
+    "change": "Modifier",
+    "all": "Tout",
+    "no_options": "Aucune option",
+    "searching": "Recherche..."
+  },
+  "header": {
+    "search_placeholder_default": "Rechercher commandes, articles ou clients...",
+    "search_placeholder_orders": "Rechercher des commandes",
+    "search_placeholder_menu": "Rechercher dans le menu",
+    "switch_to_desk": "Accéder au bureau",
+    "clear_cache": "Vider le cache",
+    "logout": "Déconnexion"
+  },
+  "menu": {
+    "special_items": "Plats spéciaux"
+  },
+  "cart": {
+    "empty_title": "Votre panier est vide",
+    "empty_subtitle": "Ajoutez des articles pour commencer votre commande",
+    "click_to_add": "Cliquez sur les articles pour les ajouter",
+    "double_click_hint": "Double-cliquez pour les options de personnalisation",
+    "clear_cart": "Vider le panier",
+    "total": "Total",
+    "add_new_order": "Nouvelle commande",
+    "update_order": "Mettre à jour la commande",
+    "updating_order": "Mise à jour...",
+    "processing_order": "Traitement en cours...",
+    "loading_order": "Chargement des détails de la commande...",
+    "edit_item": "Modifier l'article",
+    "add_comment": "Ajouter un commentaire",
+    "edit_comment": "Modifier le commentaire"
+  },
+  "order": {
+    "select_to_view": "Sélectionnez une commande pour voir les détails",
+    "items_title": "Articles de la commande",
+    "taxes_charges": "Taxes et frais",
+    "cancel_order": "Annuler la commande",
+    "enter_cancel_reason": "Saisir le motif d'annulation",
+    "print": "Imprimer",
+    "payment": "Paiement"
+  },
+  "payment": {
+    "title": "Paiement",
+    "apply_discount": "Appliquer une remise",
+    "discount_placeholder": "Entrer %",
+    "payment_methods": "Modes de paiement",
+    "amount_placeholder": "Montant",
+    "total_entered": "Total saisi",
+    "order_summary": "Résumé de la commande",
+    "subtotal": "Sous-total",
+    "discount": "Remise",
+    "adjustment": "Ajustement",
+    "total": "Total",
+    "pay_button": "Payer {{amount}}",
+    "processing": "Traitement..."
+  },
+  "pos": {
+    "not_opened_title": "PDV non ouvert",
+    "not_opened_message": "Veuillez ouvrir une entrée PDV pour continuer.",
+    "not_closed_title": "PDV précédent non fermé",
+    "not_closed_message": "Veuillez fermer l'entrée PDV précédente pour continuer.",
+    "reload_page": "Recharger la page",
+    "switch_to_desk": "Accéder au bureau"
+  },
+  "customer": {
+    "search_placeholder": "Rechercher un client...",
+    "type_to_search": "Tapez pour rechercher...",
+    "no_customers_found": "Aucun client trouvé",
+    "add_new": "Ajouter un nouveau client",
+    "add_with_name": "Ajouter \"{{name}}\"...",
+    "failed_search": "Échec de la recherche de clients",
+    "add_customer_title": "Ajouter un nouveau client",
+    "name_label": "Nom",
+    "name_required": "Le nom est obligatoire",
+    "phone_label": "Téléphone",
+    "phone_required": "Le téléphone est obligatoire",
+    "customer_group_label": "Groupe client",
+    "territory_label": "Territoire",
+    "select_group": "Sélectionner un groupe",
+    "select_territory": "Sélectionner un territoire",
+    "adding": "Ajout du client...",
+    "add_button": "Ajouter le client",
+    "failed_create": "Échec de la création du client. Veuillez réessayer."
+  },
+  "comment": {
+    "title": "Commentaires de la commande",
+    "label": "Ajouter des commentaires pour cette commande",
+    "placeholder": "Entrez des instructions spéciales ou des commentaires...",
+    "save_button": "Enregistrer le commentaire"
+  },
+  "errors": {
+    "pos_profile_not_found": "Profil PDV introuvable",
+    "pos_profile_not_loaded": "Le profil PDV n'est pas encore chargé",
+    "user_not_logged_in": "Utilisateur non connecté",
+    "select_aggregator": "Veuillez sélectionner un agrégateur avant de continuer",
+    "select_customer": "Veuillez sélectionner un client avant de continuer",
+    "select_table": "Veuillez sélectionner une table pour les commandes {{order_type}}",
+    "failed_logout": "Échec de la déconnexion. Veuillez réessayer.",
+    "failed_cancel_order": "Échec de l'annulation de la commande",
+    "failed_edit_order": "Échec de la modification de la commande",
+    "failed_fetch_invoices": "Échec du chargement des factures PDV",
+    "failed_fetch_order": "Échec du chargement des détails de la commande",
+    "failed_print": "Échec de l'impression de la commande",
+    "failed_process_order": "Échec du traitement de la commande",
+    "no_active_order": "Aucune commande active trouvée pour cette table",
+    "qz_host_not_set": "L'hôte QZ n'est pas configuré",
+    "print_failed": "Échec d'impression : {{reason}}",
+    "invalid_discount": "Veuillez entrer une valeur de remise valide",
+    "discount_exceeds_max": "La remise en pourcentage ne peut pas dépasser 100 %",
+    "please_print_first": "Veuillez imprimer la facture avant d'effectuer le paiement",
+    "enter_cancel_reason": "Veuillez entrer un motif d'annulation."
+  },
+  "success": {
+    "order_cancelled": "Commande annulée avec succès",
+    "order_created": "Commande créée avec succès",
+    "order_updated": "Commande mise à jour avec succès",
+    "printed": "Imprimé avec succès",
+    "payment_successful": "Paiement réussi",
+    "order_moved_to_draft": "Commande déplacée en brouillon après impression."
+  }
+}
