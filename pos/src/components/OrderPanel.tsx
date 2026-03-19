@@ -13,6 +13,7 @@ import { useRootStore } from '../store/root-store';
 import type { RootState } from '../store/root-store';
 import { showToast } from './ui/toast';
 import { DINE_IN } from '../data/order-types';
+import { t } from '../i18n';
 
 const OrderPanel = () => {
   const { 
@@ -69,27 +70,27 @@ const OrderPanel = () => {
   const handleSubmit = async () => {
     try {
       if (!posProfile) {
-        throw new Error('POS Profile not found');
+        throw new Error(t('errors.pos_profile_not_found'));
       }
 
       if (!user?.name) {
-        throw new Error('User not logged in');
+        throw new Error(t('errors.user_not_logged_in'));
       }
 
       // Validate customer/aggregator details
       if (selectedOrderType === 'Aggregators') {
         if (!selectedAggregator?.customer) {
-          showToast.error('Please select an aggregator before proceeding');
+          showToast.error(t('errors.select_aggregator'));
           return;
         }
       } else if (!selectedCustomer?.name) {
-        showToast.error('Please select a customer before proceeding');
+        showToast.error(t('errors.select_customer'));
         return;
       }
 
       // Validate table selection for dine-in orders
       if (selectedOrderType === DINE_IN && !selectedTable) {
-        showToast.error(`Please select a table for ${DINE_IN} orders`);
+        showToast.error(t('errors.select_table', { order_type: DINE_IN }));
         return;
       }
 
@@ -123,7 +124,7 @@ const OrderPanel = () => {
       
       // Reset all states after successful order submission
       resetOrderState();
-      showToast.success(isUpdatingOrder ? 'Order updated successfully' : 'Order created successfully');
+      showToast.success(isUpdatingOrder ? t('success.order_updated') : t('success.order_created'));
     } catch (error) {
       console.error('Failed to sync order:', error);
       // Frappe API error handling
@@ -138,7 +139,7 @@ const OrderPanel = () => {
       } else if (error instanceof Error) {
         showToast.error(error.message);
       } else {
-        showToast.error('Failed to process order');
+        showToast.error(t('errors.failed_process_order'));
       }
     } finally {
       setIsSubmitting(false);
@@ -152,27 +153,27 @@ const OrderPanel = () => {
       </div>
       
       <h3 className="text-lg font-semibold text-gray-900 mb-2">
-        Your cart is empty
+        {t('cart.empty_title')}
       </h3>
-      
+
       <p className="text-gray-500 text-sm mb-6 max-w-xs leading-relaxed">
-        Add items to get started with your order
+        {t('cart.empty_subtitle')}
       </p>
-      
+
       <div className="flex items-center gap-2 text-blue-600 bg-blue-50 px-4 py-2 rounded-lg">
         <Plus className="w-4 h-4" />
-        <span className="text-sm font-medium">Click items to add them</span>
+        <span className="text-sm font-medium">{t('cart.click_to_add')}</span>
       </div>
-      
+
       <div className="mt-4 text-xs text-gray-400">
-        Double-click for customization options
+        {t('cart.double_click_hint')}
       </div>
     </div>
   );
 
   const LoadingOrderUI = () => (
     <div className="h-96">
-      <Spinner message="Loading order details..." />
+      <Spinner message={t('cart.loading_order')} />
     </div>
   );
 
@@ -222,7 +223,7 @@ const OrderPanel = () => {
                       variant="ghost"
                       size="icon"
                       className="text-blue-600 hover:text-blue-700"
-                      title="Edit item"
+                      title={t('cart.edit_item')}
                       disabled={isInteractionDisabled}
                     >
                       <Edit className="w-4 h-4" />
@@ -277,7 +278,7 @@ const OrderPanel = () => {
                 className="w-full text-gray-600 hover:text-gray-800 mt-4"
                 disabled={isInteractionDisabled}
               >
-                Clear cart
+                {t('cart.clear_cart')}
               </Button>
             )}
           </div>
@@ -294,11 +295,11 @@ const OrderPanel = () => {
                     orderComment ? "text-blue-600" : "text-gray-500 hover:text-gray-700"
                   )}
                   disabled={isInteractionDisabled}
-                  title={orderComment ? "Edit comment" : "Add comment"}
+                  title={orderComment ? t('cart.edit_comment') : t('cart.add_comment')}
                 >
                   <MessageSquare className="w-4 h-4" />
                 </Button>
-                <span className="text-lg font-semibold">Total</span>
+                <span className="text-lg font-semibold">{t('cart.total')}</span>
               </div>
               <span className="text-lg font-semibold">{formatCurrency(total)}</span>
             </div>
@@ -312,12 +313,12 @@ const OrderPanel = () => {
               {isSubmitting ? (
                 <div className="flex items-center">
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  {isUpdatingOrder ? 'Updating Order...' : 'Processing Order...'}
+                  {isUpdatingOrder ? t('cart.updating_order') : t('cart.processing_order')}
                 </div>
               ) : isUpdatingOrder ? (
-                'Update Order'
+                t('cart.update_order')
               ) : (
-                'Add New Order'
+                t('cart.add_new_order')
               )}
             </Button>
           </div>

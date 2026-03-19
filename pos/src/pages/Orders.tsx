@@ -13,6 +13,7 @@ import { useNavigate } from 'react-router-dom';
 import PaymentDialog from '../components/PaymentDialog';
 import { printOrder } from '../lib/print';
 import { call } from '../lib/frappe-sdk';
+import { t } from '../i18n';
 
 export default function Orders() {
   const { 
@@ -95,7 +96,7 @@ export default function Orders() {
   async function handleCancelOrder() {
     if (!selectedOrder) return;
     if (!cancelReason.trim()) {
-      showToast.error('Please enter a reason for cancellation.');
+      showToast.error(t('errors.enter_cancel_reason'));
       return;
     }
     setCancelLoading(true);
@@ -104,13 +105,13 @@ export default function Orders() {
         invoice_id: selectedOrder.name,
         reason: cancelReason
       })
-      showToast.success('Order cancelled successfully');
+      showToast.success(t('success.order_cancelled'));
       setCancelDialogOpen(false);
       setCancelReason('');
       clearSelectedOrder();
       fetchOrders();
     } catch (err) {
-      showToast.error(err instanceof Error ? err.message : 'Failed to cancel order');
+      showToast.error(err instanceof Error ? err.message : t('errors.failed_cancel_order'));
     } finally {
       setCancelLoading(false);
     }
@@ -155,7 +156,7 @@ export default function Orders() {
       // Redirect to POS page
       navigate('/');
     } catch (err) {
-      showToast.error(err instanceof Error ? err.message : 'Failed to edit order');
+      showToast.error(err instanceof Error ? err.message : t('errors.failed_edit_order'));
     } finally {
       setEditLoading(false);
     }
@@ -169,19 +170,19 @@ export default function Orders() {
         orderId: selectedOrder.name,
         posProfile: posStore.posProfile
       });
-      showToast.success(`Printed Successfully`);
+      showToast.success(t('success.printed'));
       // Locally update selectedOrder.invoice_printed to 1
       if (selectedOrder && typeof selectedOrder === 'object') {
         selectOrder({ ...selectedOrder, invoice_printed: 1 });
       }
       // If order was Unbilled, set to Draft and reload draft orders
       if (selectedStatus === 'Unbilled') {
-        showToast.info('Order moved to Draft after printing.');
+        showToast.info(t('success.order_moved_to_draft'));
         setSelectedStatus('Draft');
         fetchOrders();
       }
     } catch (err: any) {
-      showToast.error('Print failed: ' + (err?.message || err));
+      showToast.error(t('errors.print_failed', { reason: err?.message || String(err) }));
     } finally {
       setIsPrinting(false);
     }
@@ -304,7 +305,7 @@ export default function Orders() {
       <div className="w-96 bg-white border-l border-gray-200 flex flex-col h-[calc(100vh-4rem)] fixed right-0 z-10">
         {!selectedOrder ? (
           <div className="text-center h-full flex flex-col items-center justify-center text-gray-500 p-6">
-            <p className="text-lg font-medium mb-2">Select an order to view details</p>
+            <p className="text-lg font-medium mb-2">{t('order.select_to_view')}</p>
             <p className="text-sm">Click on any order card to view its details</p>
           </div>
         ) : selectedOrderLoading ? (
@@ -354,14 +355,14 @@ export default function Orders() {
             <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Cancel Order</DialogTitle>
+                  <DialogTitle>{t('order.cancel_order')}</DialogTitle>
                   <DialogDescription>
-                    Please provide a reason for cancelling this order.
+                    {t('errors.enter_cancel_reason')}
                   </DialogDescription>
                 </DialogHeader>
                 <div className="px-6 mb-3">
                 <Textarea
-                  placeholder="Enter cancel reason"
+                  placeholder={t('order.enter_cancel_reason')}
                   value={cancelReason}
                   onChange={e => setCancelReason(e.target.value)}
                   disabled={cancelLoading}
@@ -413,7 +414,7 @@ export default function Orders() {
 
               {/* Order Items */}
               <div className="mb-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Order Items</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('order.items_title')}</h3>
                 <div className="space-y-3">
                   {selectedOrderItems.map((item, index) => (
                     <div key={index} className="flex justify-between items-start py-2 border-b border-gray-100">
@@ -434,7 +435,7 @@ export default function Orders() {
               {/* Taxes */}
               {selectedOrderTaxes.length > 0 && (
                 <div className="mb-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Taxes & Charges</h3>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('order.taxes_charges')}</h3>
                   <div className="space-y-2">
                     {selectedOrderTaxes.map((tax, index) => (
                       <div key={index} className="flex justify-between items-center py-1">
@@ -469,13 +470,13 @@ export default function Orders() {
                     className="flex-1"
                     onClick={() => {
                       if (String(selectedOrder.invoice_printed) === '0') {
-                        showToast.error('Please print invoice before making payment');
+                        showToast.error(t('errors.please_print_first'));
                         return;
                       }
                       setShowPaymentDialog(true);
                     }}
                   >
-                    Payment
+                    {t('order.payment')}
                   </Button>
                 )}
                 {/* Total */}
