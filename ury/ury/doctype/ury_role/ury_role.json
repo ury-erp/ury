@@ -1,0 +1,103 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "field:role_name",
+ "creation": "2026-03-23 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "role_name",
+  "description",
+  "column_break_1",
+  "is_system_role",
+  "desk_access",
+  "frappe_role",
+  "section_break_permissions",
+  "permissions"
+ ],
+ "fields": [
+  {
+   "fieldname": "role_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Role Name",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "Description"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_system_role",
+   "fieldtype": "Check",
+   "label": "Is System Role",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "desk_access",
+   "fieldtype": "Check",
+   "label": "Desk Access",
+   "read_only": 1
+  },
+  {
+   "fieldname": "frappe_role",
+   "fieldtype": "Link",
+   "label": "Frappe Role",
+   "options": "Role",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_permissions",
+   "fieldtype": "Section Break",
+   "label": "Capabilities"
+  },
+  {
+   "fieldname": "permissions",
+   "fieldtype": "Table",
+   "label": "Permissions",
+   "options": "URY Role Permission"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-03-23 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY Role",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "export": 1,
+   "read": 1,
+   "report": 1,
+   "role": "URY Manager",
+   "share": 0
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}
