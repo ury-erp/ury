@@ -1,0 +1,38 @@
+{
+  "name": "@ury/table-order",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build --base=/assets/ury/table-order/ && yarn copy-html-entry",
+    "copy-html-entry": "cp ../../ury/public/table-order/index.html ../../ury/www/table-order.html",
+    "lint": "eslint .",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@ury/api-client": "workspace:*",
+    "@ury/cart": "workspace:*",
+    "@ury/config": "workspace:*",
+    "@ury/menu": "workspace:*",
+    "@ury/order": "workspace:*",
+    "@ury/ui": "workspace:*",
+    "frappe-js-sdk": "^1.10.0",
+    "lucide-react": "^0.525.0",
+    "qrcode.react": "^4.2.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-router-dom": "^6.30.1",
+    "zustand": "^5.0.6"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.10",
+    "@types/react-dom": "^19.0.4",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.21",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.17",
+    "typescript": "~5.7.2",
+    "vite": "^6.2.0"
+  }
+}

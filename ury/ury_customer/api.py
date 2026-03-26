@@ -181,6 +181,67 @@ def get_order_status(order_token):
         frappe.throw(_("Failed to load order status"), frappe.ValidationError)
 
 
+@frappe.whitelist()
+def generate_table_qr(table, expiry_hours=24):
+    """
+    Generate a signed QR code token for table ordering.
+    
+    This endpoint is for staff to generate QR codes for tables.
+    
+    Args:
+        table: Table name (URY Table)
+        expiry_hours: Token validity in hours (default 24)
+        
+    Returns:
+        dict: QR token data and URL
+    """
+    try:
+        import jwt
+        import time
+        
+        # Get table details
+        table_doc = frappe.get_doc("URY Table", table)
+        if not table_doc:
+            frappe.throw(_("Table not found"), frappe.DoesNotExistError)
+        
+        restaurant = table_doc.restaurant
+        
+        # Generate JWT token
+        secret = frappe.local.conf.get("encryption_key", "URY_Secret_Key")
+        payload = {
+            "r": restaurant,           # restaurant
+            "t": table,                # table
+            "room": table_doc.room,    # room
+            "exp": time.time() + (expiry_hours * 3600)  # expiry
+        }
+        
+        token = jwt.encode(payload, secret, algorithm="HS256")
+        
+        # Update table with token
+        frappe.db.set_value("URY Table", table, {
+            "qr_token": token,
+            "qr_generated_at": frappe.utils.now()
+        })
+        
+        # Generate QR URL
+        base_url = frappe.utils.get_url()
+        qr_url = f"{base_url}/order/t/{token}"
+        
+        return {
+            "token": token,
+            "qr_url": qr_url,
+            "table": table,
+            "restaurant": restaurant,
+            "expires_at": frappe.utils.format_datetime(
+                frappe.utils.add_to_date(None, hours=expiry_hours)
+            )
+        }
+        
+    except Exception as e:
+        frappe.log_error(f"Error generating QR token: {str(e)}", "URY Customer API")
+        frappe.throw(_("Failed to generate QR code"), frappe.ValidationError)
+
+
 @frappe.whitelist(allow_guest=True)
 def validate_table_token(token):
     """
