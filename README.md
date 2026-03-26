@@ -139,6 +139,16 @@ packages/               # Shared npm packages
 
 See [AGENTS.md](AGENTS.md) for detailed developer documentation.
 
+## Skills
+
+URY includes a modular skills directory (`skills/`) that documents specific codebase areas for AI agents and developers:
+
+- **Frontend Skills**: UI components, API client, cart state, menu/order hooks
+- **Backend Skills**: Frappe patterns, DocTypes, customer/staff APIs, KOT generation
+- **Integration Skills**: Payment gateway, realtime updates
+
+See `skills/_index.json` for the complete skill catalog or browse individual skills in the `skills/` directory.
+
 ## Getting Started
 
 To start using URY, you need to first install URY and then setup your first restaurant.

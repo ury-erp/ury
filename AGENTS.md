@@ -303,8 +303,58 @@ Ensure new modules are added to `ury/modules.txt` and run `bench migrate`.
 
 ---
 
+## Skills Directory
+
+URY includes a modular skills system in `skills/` that provides AI agents with contextual knowledge about specific codebase areas.
+
+### Using the Skills Directory
+
+The `skills/_index.json` file contains a machine-readable index of all 18 available skills with metadata including:
+- **name**: Skill identifier
+- **description**: What the skill covers
+- **category**: backend, frontend, features, quality, ui
+- **path**: Location of the skill documentation
+- **key_files**: Important files referenced by this skill
+- **depends_on**: Other skills this one depends on
+- **tags**: Searchable keywords
+
+### Available Skills
+
+| Skill | Category | Description |
+|-------|----------|-------------|
+| `api-client` | frontend | Frappe SDK wrapper for frontend apps |
+| `cart-state` | frontend | Zustand cart state management |
+| `custom-fields` | backend | ERPNext custom field extensions |
+| `customer-api` | backend | Guest-facing ordering APIs |
+| `doctypes` | backend | Core URY data models |
+| `frappe-patterns` | backend | Frappe framework patterns |
+| `kot-generation` | backend | Kitchen Order Ticket system |
+| `menu-hooks` | frontend | React hooks for menu/QR data |
+| `monorepo` | frontend | NPM workspaces structure |
+| `order-hooks` | frontend | Order lifecycle React hooks |
+| `payment-gateway` | backend | Multi-provider payment processing |
+| `realtime` | backend | WebSocket/realtime patterns |
+| `staff-pos-api` | backend | Staff POS operations APIs |
+| `testing` | quality | Testing patterns and workflows |
+| `ui-components` | ui | React UI component library |
+| `table-order-app` | features | QR Table Ordering application |
+| `customer-order-app` | features | Online pickup/delivery ordering |
+| `kiosk-app` | features | Self-service kiosk ordering |
+
+### Skill File Format
+
+Each skill is documented in `skills/<skill-name>/SKILL.md` with:
+- **Key Files**: Important source files
+- **How It Works**: Core patterns and flow
+- **Extension Points**: Where to add new functionality
+- **Dependencies**: Required packages/modules
+- **Gotchas**: Common pitfalls and solutions
+
+---
+
 ## Contact & Support
 
 - **Repository**: https://github.com/ury-erp/ury
 - **Issues**: Create GitHub issue
 - **Documentation**: See `planning/` directory
+- **Skills Index**: See `skills/_index.json` for the complete catalog of 18 skills

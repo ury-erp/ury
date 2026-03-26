@@ -1,11 +1,92 @@
 # Features of URY App
 
-It's important to note that if no POS Opening entry is created for the day, URY will not allow table selection, ensuring accurate tracking of operations.
-A POS Closing Entry must be created at the end of each day to complete the daily operations.
+URY is a comprehensive restaurant management system with multi-channel ordering capabilities.
+
+## Multi-App Architecture
+
+URY now supports multiple customer-facing applications in addition to the staff POS:
+
+### Staff Applications
+- **POS v2** (`/pos/`) - Desktop/tablet cashier interface
+- **POS v1** (`/urypos/`) - Mobile order-taker interface (legacy)
+- **Mosaic KDS** (`/URYMosaic/`) - Kitchen Display System
+
+### Customer Applications
+- **QR Table Ordering** (`/order/t/<token>`) - Customers scan QR codes to order from tables
+- **Online Ordering** (`/menu/<slug>`) - Remote pickup/delivery ordering
+- **Kiosk Mode** (`/kiosk/<device>`) - Self-service ordering on touch screens
+
+### Key Features Across All Apps
+- Unified menu management
+- Real-time order status updates
+- Automatic KOT generation
+- Integrated payment processing
+
+---
 
 > :information_source: **Note**  
-> This version is currently designed for **POS machines/Desktop** to handle **cashiers and fast checkout**.  
+> It's important to note that if no POS Opening entry is created for the day, URY will not allow table selection, ensuring accurate tracking of operations.
+> A POS Closing Entry must be created at the end of each day to complete the daily operations.
+
+> :information_source: **Note**  
+> The POS v2 is currently designed for **POS machines/Desktop** to handle **cashiers and fast checkout**.  
 > For **order takers and mobile support**, use **Version 1 POS**, which is available at the path `/urypos/Table`.
+
+---
+
+## QR Table Ordering
+
+Customers scan QR codes at their tables to place orders directly.
+
+- **QR Code Generation**: Staff generate QR codes for each table with configurable expiry
+- **Token-Based Access**: Secure JWT tokens encode restaurant and table context
+- **Mobile-Optimized Menu**: Browse menu by categories, view item images and descriptions
+- **Cart Management**: Add/remove items, adjust quantities
+- **Guest Checkout**: No account required - just name and optional phone
+- **Real-Time Status**: Track order status from Placed → Confirmed → Preparing → Ready → Served
+- **Call Waiter**: Button to notify staff for assistance
+- **Pay at Counter**: Payment handled traditionally after meal
+
+## Online Customer Ordering
+
+Remote ordering for pickup, delivery, or curbside.
+
+- **Restaurant Discovery**: Access via unique slug (`/menu/restaurant-name`)
+- **Order Types**: Pickup, Delivery, or Curbside
+- **Scheduled Orders**: Order now for pickup later (up to 7 days)
+- **Time Slot Selection**: 15-minute interval slots based on restaurant hours
+- **Guest Checkout**: Phone-based order tracking, no account needed
+- **Order History**: View past orders by phone number
+- **Real-Time Tracking**: Live order status updates
+- **Payment Integration**: Stripe and Razorpay support
+
+## Kiosk Self-Service
+
+In-store ordering on large touch screens.
+
+- **Attract Screen**: Eye-catching welcome with animations, auto-reset after timeout
+- **Large Touch Targets**: Minimum 64px buttons for easy interaction
+- **Category Ribbon**: Quick navigation between menu categories
+- **Full-Screen Item View**: Large images and descriptions
+- **Always-Visible Cart**: Side panel showing current order
+- **Dine-In / Takeaway**: Simple selection with large buttons
+- **Inactivity Timeout**: 90-second auto-reset to attract screen
+- **Order Confirmation**: Large order number display with QR for tracking
+- **Device Authentication**: One-time setup with device token
+
+## Payment Gateway
+
+Integrated payment processing for online orders.
+
+- **Multiple Providers**: Stripe and Razorpay supported
+- **Payment Methods**: Cards, UPI, wallets (provider-dependent)
+- **Webhook Handling**: Automatic payment confirmation
+- **Secure**: PCI-compliant hosted checkout
+- **Test Mode**: Sandbox support for development
+
+---
+
+## Staff POS v2 Features
 
 - **Key Features**
 	- All Major POS Features from Version 1 Retained
