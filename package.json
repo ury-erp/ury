@@ -11,8 +11,12 @@
     "ury-mosaic-build": "cd URYMosaic && yarn build",
     "ury-posv2-install": "cd apps/pos && yarn install --check-files",
     "ury-posv2-build": "cd apps/pos && yarn build",
-    "postinstall": "yarn ury-pos-install && yarn ury-mosaic-install && yarn ury-posv2-install",
-    "build": "yarn ury-pos-build && yarn ury-mosaic-build && yarn ury-posv2-build",
+    "ury-table-order-install": "cd apps/table-order && yarn install --check-files",
+    "ury-table-order-build": "cd apps/table-order && yarn build",
+    "ury-customer-order-install": "cd apps/customer-order && yarn install --check-files",
+    "ury-customer-order-build": "cd apps/customer-order && yarn build",
+    "postinstall": "yarn ury-pos-install && yarn ury-mosaic-install && yarn ury-posv2-install && yarn ury-table-order-install && yarn ury-customer-order-install",
+    "build": "yarn ury-pos-build && yarn ury-mosaic-build && yarn ury-posv2-build && yarn ury-table-order-build && yarn ury-customer-order-build",
     "build:packages": "npm run build --workspaces --if-present"
   },
   "devDependencies": {
