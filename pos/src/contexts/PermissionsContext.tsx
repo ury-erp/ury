@@ -49,7 +49,7 @@ export const PermissionsProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
   const hasCapability = useCallback(
     (capability: string): boolean => {
-      if (!data) return false;
+      if (!data?.capabilities) return false;
       return data.capabilities.includes(capability);
     },
     [data]
