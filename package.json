@@ -15,8 +15,10 @@
     "ury-table-order-build": "cd apps/table-order && yarn build",
     "ury-customer-order-install": "cd apps/customer-order && yarn install --check-files",
     "ury-customer-order-build": "cd apps/customer-order && yarn build",
-    "postinstall": "yarn ury-pos-install && yarn ury-mosaic-install && yarn ury-posv2-install && yarn ury-table-order-install && yarn ury-customer-order-install",
-    "build": "yarn ury-pos-build && yarn ury-mosaic-build && yarn ury-posv2-build && yarn ury-table-order-build && yarn ury-customer-order-build",
+    "ury-kiosk-install": "cd apps/kiosk && yarn install --check-files",
+    "ury-kiosk-build": "cd apps/kiosk && yarn build",
+    "postinstall": "yarn ury-pos-install && yarn ury-mosaic-install && yarn ury-posv2-install && yarn ury-table-order-install && yarn ury-customer-order-install && yarn ury-kiosk-install",
+    "build": "yarn ury-pos-build && yarn ury-mosaic-build && yarn ury-posv2-build && yarn ury-table-order-build && yarn ury-customer-order-build && yarn ury-kiosk-build",
     "build:packages": "npm run build --workspaces --if-present"
   },
   "devDependencies": {
