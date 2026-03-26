@@ -10,7 +10,7 @@
 
 | Phase | Description | Status | Duration |
 |-------|-------------|--------|----------|
-| Phase 0 | Foundation & Extraction | 🚧 IN PROGRESS | 2-3 weeks |
+| Phase 0 | Foundation & Extraction | ✅ COMPLETE | 2-3 weeks |
 | Phase 1 | Shared Ordering Core | ⏳ PENDING | 2-3 weeks |
 | Phase 2 | QR Table Ordering MVP | ⏳ PENDING | 3-4 weeks |
 | Phase 2.5 | Payment Gateway Integration | ⏳ PENDING | 2-3 weeks |
@@ -21,9 +21,40 @@
 
 ---
 
-## Phase 0: Foundation & Extraction
+## Phase 0: Foundation & Extraction ✅ COMPLETE
 
 **Goal**: Set up shared infrastructure without breaking existing apps.
+
+**Completed**: 2026-03-26
+
+### Summary
+
+Phase 0 has been successfully completed. The foundation for the multi-app architecture is now in place:
+
+**Backend:**
+- ✅ New `ury_customer` module created with customer-facing APIs
+- ✅ URY Restaurant DocType extended with slug, accepts_online_orders, logo, opening_hours
+- ✅ URY Table DocType extended with qr_token, qr_generated_at
+- ✅ URY Menu DocType extended with is_public
+- ✅ New website routes added for customer ordering (/order/t/<token>, /menu/<slug>)
+
+**Frontend Infrastructure:**
+- ✅ npm workspaces configured with packages/* and apps/*
+- ✅ POS app moved to apps/pos with updated build paths
+- ✅ @ury/config package - DocType constants and order types
+- ✅ @ury/ui package - 10 React UI components
+- ✅ @ury/api-client package - Frappe SDK wrapper with typed APIs
+- ✅ @ury/cart package - Zustand-based cart state management
+
+**Documentation:**
+- ✅ AGENTS.md created for developer guidance
+- ✅ README.md updated with architecture overview
+- ✅ Package READMEs added for all 4 packages
+
+**Commits:**
+- `1d65a61` feat(ury): Phase 0 - Foundation & Extraction
+- `aaaa4d3` docs: update README and add AGENTS.md
+- `6bc4978` docs: add README files for all packages and apps
 
 ### Phase 0A: Frontend Shared Packages
 
