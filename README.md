@@ -24,6 +24,9 @@ URY is an open source ERP designed to simplify and streamline restaurant operati
 - **POS**: Dine‑in, takeaway, delivery, offline mode, printer management  
 - **Kitchen Display**: Real‑time order queues, KOT printing  
 - **Analytics**: P&L dashboard, consumption reports, item trends  
+- **QR Table Ordering**: Customer self-order via QR codes *(coming soon)*  
+- **Online Ordering**: Remote pickup/delivery ordering *(coming soon)*  
+- **Kiosk**: Self-service kiosk interface *(coming soon)*  
 
 Given below is the list of features of URY app. 
 
@@ -112,6 +115,30 @@ Given below is the list of features of URY app.
 For more comprehensive list of features [go here.](FEATURES.md)
 
 
+## Architecture
+
+URY uses a **multi-app architecture** with shared packages:
+
+```
+ury/                    # Frappe Python backend
+├── ury/                # Core doctypes and APIs
+├── ury_pos/            # Staff POS APIs
+└── ury_customer/       # Customer-facing APIs (NEW)
+
+apps/                   # Frontend applications
+├── pos/                # Staff POS (React + TypeScript)
+├── urypos/             # Staff POS v1 (Vue.js - legacy)
+└── mosaic/             # Kitchen Display System
+
+packages/               # Shared npm packages
+├── @ury/config         # Constants and types
+├── @ury/ui             # React UI components
+├── @ury/api-client     # Frappe SDK wrapper
+└── @ury/cart           # Cart state management
+```
+
+See [AGENTS.md](AGENTS.md) for detailed developer documentation.
+
 ## Getting Started
 
 To start using URY, you need to first install URY and then setup your first restaurant.
@@ -119,6 +146,23 @@ To start using URY, you need to first install URY and then setup your first rest
 1. [URY Installation Guide](INSTALLATION.md).
 
 2. [URY Setup Instructions](SETUP.md).
+
+### Development Setup
+
+```bash
+# Clone the repository
+git clone https://github.com/ury-erp/ury.git
+cd ury
+
+# Install dependencies (uses npm workspaces)
+yarn install
+
+# Build packages
+yarn build:packages
+
+# Build frontend apps
+yarn build
+```
 
 ## Looking for other versions 	
 

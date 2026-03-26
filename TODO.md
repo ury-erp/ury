@@ -39,6 +39,12 @@
 | 8. POS v2 refactor imports | ⏳ PENDING | `apps/pos/src/` | Update to use packages |
 | 9. Update vite.config.ts paths | ✅ DONE | `apps/pos/vite.config.ts` | Updated outDir path |
 | 10. Update package.json scripts | ✅ DONE | `apps/pos/package.json` | Updated copy-html-entry path |
+| 11. Create `ury_customer` module | ✅ DONE | `ury/ury_customer/` | Backend module for customer APIs |
+| 12. Add to modules.txt | ✅ DONE | `ury/modules.txt` | Added "URY Customer" |
+| 13. Update URY Restaurant DocType | ✅ DONE | `ury/ury/doctype/ury_restaurant/` | Added slug, accepts_online_orders, logo, opening_hours |
+| 14. Update URY Table DocType | ✅ DONE | `ury/ury/doctype/ury_table/` | Added qr_token, qr_generated_at |
+| 15. Update URY Menu DocType | ✅ DONE | `ury/ury/doctype/ury_menu/` | Added is_public |
+| 16. Update hooks.py routes | ✅ DONE | `ury/hooks.py` | Added customer ordering routes |
 
 ### Phase 0B: Backend API Refactoring
 
