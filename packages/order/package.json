@@ -1,0 +1,30 @@
+{
+  "name": "@ury/order",
+  "version": "0.0.1",
+  "description": "URY Order - Order lifecycle management and status tracking for URY applications",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "@ury/api-client": "workspace:*",
+    "@ury/config": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.10",
+    "react": "^19.0.0",
+    "typescript": "~5.7.2"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  }
+}
