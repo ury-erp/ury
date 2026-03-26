@@ -380,5 +380,7 @@ fixtures = [
         ],
     },
     {"dt": "Role", "filters": [["role_name", "like", "URY %"]]},
+    {"dt": "URY Role"},
+    {"dt": "URY User Role"},
     "Client Script",
 ]
