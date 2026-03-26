@@ -1,0 +1,278 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    --primary-50: 226 100% 97%;
+    --primary-100: 224 96% 90%;
+    --primary-200: 223 94% 82%;
+    --primary-300: 222 91% 69%;
+    --primary-400: 221 83% 53%;
+    --primary-500: 221 76% 47%;
+    --primary-600: 221 69% 42%;
+    --primary-700: 221 61% 36%;
+    --primary-800: 221 53% 30%;
+    --primary-900: 221 45% 24%;
+    --primary-950: 221 37% 18%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222.2 84% 4.9%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96%;
+    --accent-foreground: 222.2 84% 4.9%;
+    --accent-50: 355 100% 97%;
+    --accent-100: 353 96% 90%;
+    --accent-200: 352 94% 82%;
+    --accent-300: 351 91% 69%;
+    --accent-400: 350 83% 53%;
+    --accent-500: 350 76% 47%;
+    --accent-600: 350 69% 42%;
+    --accent-700: 350 61% 36%;
+    --accent-800: 350 53% 30%;
+    --accent-900: 350 45% 24%;
+    --accent-950: 350 37% 18%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
+    --radius: 0.75rem;
+    --gray-50: 240 20% 99%;
+    --gray-100: 240 20% 97%;
+    --gray-200: 240 15% 92%;
+    --gray-300: 240 10% 85%;
+    --gray-400: 240 8% 70%;
+    --gray-500: 240 6% 50%;
+    --gray-600: 240 5% 40%;
+    --gray-700: 240 4% 30%;
+    --gray-800: 240 3% 20%;
+    --gray-900: 240 2% 10%;
+    --gray-950: 240 1% 5%;
+    --white: 0 0% 100%;
+    --black: 0 0% 0%;
+    
+    /* Kiosk specific */
+    --kiosk-touch-target: 64px;
+    --kiosk-card-height: 280px;
+    --kiosk-sidebar-width: 400px;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  html {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  body {
+    @apply bg-background text-foreground font-inter antialiased;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  
+  /* Hide scrollbars but keep functionality */
+  ::-webkit-scrollbar {
+    display: none;
+  }
+  
+  * {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+@layer components {
+  /* Large touch-friendly button variants */
+  .kiosk-btn {
+    @apply inline-flex items-center justify-center rounded-2xl font-semibold transition-all duration-150 
+           active:scale-95 active:shadow-inner
+           disabled:opacity-50 disabled:pointer-events-none
+           min-h-[64px] px-8 text-lg;
+  }
+  
+  .kiosk-btn-primary {
+    @apply kiosk-btn bg-primary text-white shadow-lg shadow-primary/30 
+           hover:bg-primary-600 hover:shadow-xl hover:shadow-primary/40;
+  }
+  
+  .kiosk-btn-secondary {
+    @apply kiosk-btn bg-secondary text-secondary-foreground 
+           hover:bg-gray-200;
+  }
+  
+  .kiosk-btn-accent {
+    @apply kiosk-btn bg-accent text-accent-foreground 
+           hover:bg-accent-100;
+  }
+  
+  .kiosk-btn-outline {
+    @apply kiosk-btn border-2 border-primary text-primary bg-transparent
+           hover:bg-primary-50;
+  }
+  
+  .kiosk-btn-ghost {
+    @apply kiosk-btn bg-transparent text-foreground
+           hover:bg-gray-100;
+  }
+  
+  /* Large touch targets for +/- buttons */
+  .kiosk-stepper {
+    @apply flex items-center gap-2;
+  }
+  
+  .kiosk-stepper-btn {
+    @apply flex items-center justify-center w-16 h-16 rounded-xl
+           bg-primary text-white text-2xl font-bold
+           active:scale-90 active:bg-primary-600
+           transition-all duration-100
+           shadow-lg shadow-primary/30;
+  }
+  
+  .kiosk-stepper-btn-minus {
+    @apply kiosk-stepper-btn bg-gray-200 text-gray-700 shadow-none
+           active:bg-gray-300;
+  }
+  
+  .kiosk-stepper-value {
+    @apply w-20 text-center text-3xl font-bold text-foreground;
+  }
+  
+  /* Card styles for menu items */
+  .kiosk-card {
+    @apply relative bg-white rounded-3xl shadow-lg overflow-hidden
+           active:scale-[0.98] active:shadow-md
+           transition-all duration-150 cursor-pointer
+           border border-gray-100;
+  }
+  
+  .kiosk-card-image {
+    @apply w-full h-40 object-cover;
+  }
+  
+  .kiosk-card-content {
+    @apply p-5;
+  }
+  
+  .kiosk-card-title {
+    @apply text-xl font-bold text-foreground line-clamp-2;
+  }
+  
+  .kiosk-card-price {
+    @apply text-2xl font-bold text-primary;
+  }
+  
+  /* Category ribbon */
+  .kiosk-category {
+    @apply flex items-center gap-3 px-6 py-4 rounded-full
+           bg-white text-gray-700 font-semibold text-lg
+           border-2 border-transparent
+           active:scale-95 transition-all duration-150
+           shadow-sm whitespace-nowrap;
+  }
+  
+  .kiosk-category-active {
+    @apply kiosk-category bg-primary text-white border-primary shadow-lg shadow-primary/30;
+  }
+  
+  /* Cart sidebar item */
+  .kiosk-cart-item {
+    @apply flex items-center gap-4 p-4 bg-white rounded-2xl
+           border border-gray-100 shadow-sm;
+  }
+  
+  /* Visual feedback for touch */
+  .touch-feedback {
+    @apply relative overflow-hidden;
+  }
+  
+  .touch-feedback::after {
+    content: '';
+    @apply absolute inset-0 bg-white/30 opacity-0
+           transition-opacity duration-150;
+  }
+  
+  .touch-feedback:active::after {
+    @apply opacity-100;
+  }
+  
+  /* Haptic visual feedback */
+  .haptic {
+    @apply transition-transform duration-75;
+  }
+  
+  .haptic:active {
+    @apply scale-[0.96];
+  }
+  
+  /* Order type selection */
+  .kiosk-order-type {
+    @apply flex flex-col items-center justify-center gap-4
+           p-8 rounded-3xl border-2 border-gray-200 bg-white
+           transition-all duration-200 cursor-pointer
+           min-h-[200px];
+  }
+  
+  .kiosk-order-type:hover {
+    @apply border-primary-300 bg-primary-50;
+  }
+  
+  .kiosk-order-type-selected {
+    @apply kiosk-order-type border-primary bg-primary-50 shadow-xl shadow-primary/20;
+  }
+  
+  /* Large input */
+  .kiosk-input {
+    @apply w-full px-6 py-5 rounded-2xl border-2 border-gray-200
+           text-2xl font-semibold text-foreground
+           placeholder:text-gray-400
+           focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/20
+           transition-all duration-150;
+  }
+  
+  /* Attract screen animations */
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-20px); }
+  }
+  
+  .animate-float {
+    animation: float 3s ease-in-out infinite;
+  }
+  
+  @keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.5); }
+    50% { box-shadow: 0 0 40px rgba(59, 130, 246, 0.8); }
+  }
+  
+  .animate-pulse-glow {
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+}
+
+/* Toast notifications for kiosk */
+.kiosk-toast {
+  @apply fixed bottom-8 left-1/2 -translate-x-1/2 
+         px-8 py-4 rounded-2xl text-xl font-semibold
+         bg-gray-900 text-white shadow-2xl
+         animate-slide-up z-50;
+}
+
+/* Loading spinner */
+.kiosk-spinner {
+  @apply w-12 h-12 border-4 border-primary-200 border-t-primary 
+         rounded-full animate-spin;
+}
