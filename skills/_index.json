@@ -1,0 +1,253 @@
+{
+  "version": "1.0.0",
+  "last_updated": "2026-03-26",
+  "description": "URY Skills Directory - Modular knowledge for AI agents working with the URY restaurant ERP codebase",
+  "skills": [
+    {
+      "name": "api-client",
+      "description": "Frappe SDK wrapper (@ury/api-client) providing typed API access to Frappe backend for frontend applications",
+      "category": "frontend",
+      "path": "skills/api-client",
+      "key_files": [
+        "packages/api-client/src/client.ts",
+        "packages/api-client/src/index.ts",
+        "packages/api-client/package.json"
+      ],
+      "depends_on": [],
+      "tags": ["api", "frappe", "sdk", "typescript", "http"]
+    },
+    {
+      "name": "cart-state",
+      "description": "Cart state management using Zustand (@ury/cart) for managing shopping cart across URY applications",
+      "category": "frontend",
+      "path": "skills/cart-state",
+      "key_files": [
+        "packages/cart/src/store.ts",
+        "packages/cart/src/types.ts",
+        "packages/cart/package.json"
+      ],
+      "depends_on": ["api-client"],
+      "tags": ["state-management", "zustand", "cart", "react"]
+    },
+    {
+      "name": "custom-fields",
+      "description": "ERPNext Custom Fields for URY - extending POS Invoice with fulfillment_status, order_source, customer_order_token",
+      "category": "backend",
+      "path": "skills/custom-fields",
+      "key_files": [
+        "ury/patches/v2_0/add_customer_ordering_fields.py",
+        "ury/hooks.py",
+        "ury/fixtures/custom_fields.json"
+      ],
+      "depends_on": ["frappe-patterns"],
+      "tags": ["erpnext", "custom-fields", "patches", "pos-invoice"]
+    },
+    {
+      "name": "customer-api",
+      "description": "Guest-facing customer ordering APIs for QR table ordering, online ordering, and kiosk applications",
+      "category": "backend",
+      "path": "skills/customer-api",
+      "key_files": [
+        "ury/ury_customer/api.py",
+        "ury/ury_customer/__init__.py",
+        "ury/modules.txt"
+      ],
+      "depends_on": ["frappe-patterns", "doctypes", "kot-generation"],
+      "tags": ["api", "guest-access", "qr-ordering", "online-ordering", "jwt"]
+    },
+    {
+      "name": "doctypes",
+      "description": "Core URY DocType structure - Restaurant, Table, Menu, KOT, Order entities and their relationships",
+      "category": "backend",
+      "path": "skills/doctypes",
+      "key_files": [
+        "ury/ury/doctype/ury_restaurant/ury_restaurant.json",
+        "ury/ury/doctype/ury_table/ury_table.json",
+        "ury/ury/doctype/ury_menu/ury_menu.json",
+        "ury/ury/doctype/ury_kot/ury_kot.json",
+        "ury/ury/doctype/ury_order/ury_order.json"
+      ],
+      "depends_on": ["frappe-patterns"],
+      "tags": ["doctype", "data-model", "restaurant", "table", "menu", "kot"]
+    },
+    {
+      "name": "frappe-patterns",
+      "description": "Frappe Framework patterns used in URY - DocTypes, API endpoints, document hooks, fixtures",
+      "category": "backend",
+      "path": "skills/frappe-patterns",
+      "key_files": [
+        "ury/hooks.py",
+        "ury/modules.txt",
+        "ury/ury/doctype/"
+      ],
+      "depends_on": [],
+      "tags": ["frappe", "patterns", "hooks", "fixtures", "api"]
+    },
+    {
+      "name": "kot-generation",
+      "description": "Kitchen Order Ticket generation system for routing orders to production units and managing kitchen workflows",
+      "category": "backend",
+      "path": "skills/kot-generation",
+      "key_files": [
+        "ury/ury/api/ury_kot_generate.py",
+        "ury/ury/doctype/ury_kot/",
+        "ury/ury/doctype/ury_production_unit/"
+      ],
+      "depends_on": ["frappe-patterns", "doctypes"],
+      "tags": ["kot", "kitchen", "production", "order-routing"]
+    },
+    {
+      "name": "menu-hooks",
+      "description": "React hooks for fetching menu data, restaurant information, and validating table tokens (@ury/menu)",
+      "category": "frontend",
+      "path": "skills/menu-hooks",
+      "key_files": [
+        "packages/menu/src/hooks.ts",
+        "packages/menu/src/menu-api.ts",
+        "packages/menu/src/types.ts"
+      ],
+      "depends_on": ["api-client"],
+      "tags": ["react", "hooks", "menu", "restaurant", "qr-token"]
+    },
+    {
+      "name": "monorepo",
+      "description": "NPM workspaces and monorepo structure for URY frontend applications and shared packages",
+      "category": "frontend",
+      "path": "skills/monorepo",
+      "key_files": [
+        "package.json",
+        "packages/config/",
+        "packages/ui/",
+        "packages/api-client/",
+        "packages/cart/"
+      ],
+      "depends_on": [],
+      "tags": ["monorepo", "npm-workspaces", "typescript", "build"]
+    },
+    {
+      "name": "order-hooks",
+      "description": "Order lifecycle React hooks for creation, status tracking, and real-time updates (@ury/order)",
+      "category": "frontend",
+      "path": "skills/order-hooks",
+      "key_files": [
+        "packages/order/src/hooks.ts",
+        "packages/order/src/order-api.ts",
+        "packages/order/src/types.ts"
+      ],
+      "depends_on": ["api-client", "realtime"],
+      "tags": ["react", "hooks", "order", "lifecycle", "status-tracking"]
+    },
+    {
+      "name": "payment-gateway",
+      "description": "Payment processing API supporting multiple providers (Stripe, Razorpay, PayPal, Square) for customer orders",
+      "category": "backend",
+      "path": "skills/payment-gateway",
+      "key_files": [
+        "ury/ury_payment/api.py",
+        "ury/ury_payment/doctype/ury_payment/",
+        "ury/ury_payment/doctype/ury_payment_gateway/"
+      ],
+      "depends_on": ["frappe-patterns", "customer-api"],
+      "tags": ["payment", "stripe", "razorpay", "webhook", "gateway"]
+    },
+    {
+      "name": "realtime",
+      "description": "Frappe realtime/WebSocket patterns for live updates - order status, KOT notifications, payment updates",
+      "category": "backend",
+      "path": "skills/realtime",
+      "key_files": [
+        "ury/ury_customer/api.py",
+        "ury/ury/doctype/ury_kot/ury_kot.py",
+        "ury/ury_payment/api.py"
+      ],
+      "depends_on": ["frappe-patterns"],
+      "tags": ["websocket", "realtime", "notifications", "events"]
+    },
+    {
+      "name": "staff-pos-api",
+      "description": "Internal staff POS APIs for restaurant operations including menu, invoices, cashier management",
+      "category": "backend",
+      "path": "skills/staff-pos-api",
+      "key_files": [
+        "ury/ury_pos/api.py",
+        "ury/ury_pos/__init__.py"
+      ],
+      "depends_on": ["frappe-patterns", "doctypes"],
+      "tags": ["api", "pos", "staff", "cashier", "menu", "invoices"]
+    },
+    {
+      "name": "testing",
+      "description": "Testing patterns for URY including backend API testing, frontend E2E workflows, and test environment setup",
+      "category": "quality",
+      "path": "skills/testing",
+      "key_files": [
+        "TESTING.md"
+      ],
+      "depends_on": ["customer-api", "staff-pos-api"],
+      "tags": ["testing", "api-testing", "e2e", "curl", "performance"]
+    },
+    {
+      "name": "ui-components",
+      "description": "React UI component system with CVA variants (@ury/ui) - Button, Card, Dialog, Input components",
+      "category": "frontend",
+      "path": "skills/ui-components",
+      "key_files": [
+        "packages/ui/src/components/button.tsx",
+        "packages/ui/src/components/card.tsx",
+        "packages/ui/src/components/dialog.tsx",
+        "packages/ui/src/lib/utils.ts"
+      ],
+      "depends_on": ["monorepo"],
+      "tags": ["ui", "react", "cva", "tailwind", "components"]
+    },
+    {
+      "name": "table-order-app",
+      "description": "QR Table Ordering application for customers to scan and order from their table",
+      "category": "features",
+      "path": "skills/table-order-app",
+      "key_files": [
+        "apps/table-order/src/pages/TokenResolver.tsx",
+        "apps/table-order/src/pages/Menu.tsx",
+        "apps/table-order/src/pages/OrderStatus.tsx",
+        "apps/table-order/src/App.tsx"
+      ],
+      "depends_on": ["menu-hooks", "cart-state", "order-hooks"],
+      "tags": ["ordering", "qr", "customer", "table", "dine-in"]
+    },
+    {
+      "name": "customer-order-app",
+      "description": "Online Customer Ordering application for pickup and delivery orders",
+      "category": "features",
+      "path": "skills/customer-order-app",
+      "key_files": [
+        "apps/customer-order/src/pages/RestaurantLanding.tsx",
+        "apps/customer-order/src/pages/Menu.tsx",
+        "apps/customer-order/src/pages/Checkout.tsx",
+        "apps/customer-order/src/App.tsx"
+      ],
+      "depends_on": ["menu-hooks", "cart-state", "order-hooks", "payment-gateway"],
+      "tags": ["ordering", "online", "customer", "pickup", "delivery"]
+    },
+    {
+      "name": "kiosk-app",
+      "description": "Self-service kiosk ordering application for in-store ordering",
+      "category": "features",
+      "path": "skills/kiosk-app",
+      "key_files": [
+        "apps/kiosk/src/pages/AttractScreen.tsx",
+        "apps/kiosk/src/pages/Menu.tsx",
+        "apps/kiosk/src/pages/Checkout.tsx",
+        "apps/kiosk/src/hooks/useKiosk.tsx"
+      ],
+      "depends_on": ["menu-hooks", "cart-state", "order-hooks", "ui-components"],
+      "tags": ["ordering", "kiosk", "self-service", "in-store", "touch"]
+    }
+  ],
+  "categories": {
+    "backend": "Server-side Frappe/ERPNext patterns, APIs, DocTypes",
+    "frontend": "Client-side React/TypeScript packages and hooks",
+    "features": "End-to-end feature implementations",
+    "quality": "Testing, validation, and quality assurance",
+    "ui": "User interface components and design system"
+  }
+}
