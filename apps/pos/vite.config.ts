@@ -15,7 +15,7 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: "../ury/public/pos",
+    outDir: "../../ury/public/pos",
     emptyOutDir: true,
   },
 })

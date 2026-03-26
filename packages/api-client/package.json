@@ -1,0 +1,25 @@
+{
+  "name": "@ury/api-client",
+  "version": "0.0.1",
+  "description": "URY API Client - Frappe SDK wrapper and typed API functions for URY",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "frappe-js-sdk": "^1.10.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.10",
+    "typescript": "~5.7.2"
+  }
+}

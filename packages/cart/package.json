@@ -1,0 +1,29 @@
+{
+  "name": "@ury/cart",
+  "version": "0.0.1",
+  "description": "URY Cart state management - Shared cart functionality for URY applications",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "zustand": "^5.0.6"
+  },
+  "devDependencies": {
+    "@types/uuid": "^10.0.0",
+    "typescript": "~5.7.2",
+    "uuid": "^11.1.0"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  }
+}

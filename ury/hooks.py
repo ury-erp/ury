@@ -56,6 +56,9 @@ website_route_rules = [
     {"from_route": "/pos/<path:app_path>", "to_route": "pos"},
     {"from_route": "/urypos/<path:app_path>", "to_route": "urypos"},
     {"from_route": "/URYMosaic/<path:app_path>", "to_route": "URYMosaic"},
+    # Customer-facing routes
+    {"from_route": "/order/t/<token>", "to_route": "table-order"},
+    {"from_route": "/menu/<path:slug>", "to_route": "customer-order"},
 ]
 # Home Pages
 # ----------
@@ -361,7 +364,14 @@ fixtures = [
                     "POS Profile-custom_table_order_printer",
                     "POS Profile-custom_reprint_kot_format",
                     "Employee-payment_amount",
-                    "Employee-payment_type"
+                    "Employee-payment_type",
+                    # Customer ordering fields (on ERPNext DocTypes)
+                    "POS Invoice-fulfillment_status",
+                    "POS Invoice-customer_order_token",
+                    "POS Invoice-order_source",
+                    "POS Invoice-scheduled_pickup_time",
+                    "POS Invoice-payment_gateway",
+                    "POS Invoice-payment_gateway_ref"
                 },
             ]
         ],

@@ -1,0 +1,22 @@
+{
+  "name": "@ury/config",
+  "version": "0.0.1",
+  "description": "URY shared configuration and constants",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "~5.7.2"
+  }
+}

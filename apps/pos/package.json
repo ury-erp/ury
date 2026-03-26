@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build --base=/assets/ury/pos/ && yarn copy-html-entry",
-    "copy-html-entry": "cp ../ury/public/pos/index.html ../ury/www/pos.html",
+    "copy-html-entry": "cp ../../ury/public/pos/index.html ../../ury/www/pos.html",
     "lint": "eslint .",
     "preview": "vite preview"
   },

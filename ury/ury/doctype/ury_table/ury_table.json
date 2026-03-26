@@ -27,7 +27,11 @@
   "active_info_tab",
   "occupied",
   "column_break_280tb",
-  "latest_invoice_time"
+  "latest_invoice_time",
+  "qr_code_section",
+  "qr_token",
+  "column_break_qr",
+  "qr_generated_at"
  ],
  "fields": [
   {
@@ -139,6 +143,28 @@
    "fieldname": "layout_height",
    "fieldtype": "Float",
    "label": "Layout Height"
+  },
+  {
+   "fieldname": "qr_code_section",
+   "fieldtype": "Section Break",
+   "label": "QR Code"
+  },
+  {
+   "fieldname": "qr_token",
+   "fieldtype": "Data",
+   "label": "QR Token",
+   "read_only": 1,
+   "description": "Signed token for QR table ordering"
+  },
+  {
+   "fieldname": "column_break_qr",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "qr_generated_at",
+   "fieldtype": "Datetime",
+   "label": "QR Generated At",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,

@@ -10,6 +10,7 @@
  "field_order": [
   "branch",
   "enabled",
+  "is_public",
   "column_break_3",
   "price_list",
   "items_section",
@@ -53,6 +54,14 @@
    "label": "Branch",
    "options": "Branch",
    "reqd": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "is_public",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Is Public",
+   "description": "Make this menu visible to customers in online ordering"
   }
  ],
  "links": [],

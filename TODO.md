@@ -1,0 +1,138 @@
+# URY Multi-App Architecture Implementation - TODO Tracker
+
+> **Current Phase**: Phase 0 - Foundation & Extraction  
+> **Last Updated**: 2026-03-26  
+> **Branch**: planning/multi-app-architecture
+
+---
+
+## Phase Overview
+
+| Phase | Description | Status | Duration |
+|-------|-------------|--------|----------|
+| Phase 0 | Foundation & Extraction | 🚧 IN PROGRESS | 2-3 weeks |
+| Phase 1 | Shared Ordering Core | ⏳ PENDING | 2-3 weeks |
+| Phase 2 | QR Table Ordering MVP | ⏳ PENDING | 3-4 weeks |
+| Phase 2.5 | Payment Gateway Integration | ⏳ PENDING | 2-3 weeks |
+| Phase 3 | Online Customer Ordering | ⏳ PENDING | 3-4 weeks |
+| Phase 4 | Curbside Extension | ⏳ PENDING | 1-2 weeks |
+| Phase 5 | Kiosk Mode | ⏳ PENDING | 2-3 weeks |
+| Phase 6 | Hardening & Analytics | ⏳ PENDING | 2-3 weeks |
+
+---
+
+## Phase 0: Foundation & Extraction
+
+**Goal**: Set up shared infrastructure without breaking existing apps.
+
+### Phase 0A: Frontend Shared Packages
+
+| Task | Status | Files Changed | Notes |
+|------|--------|---------------|-------|
+| 1. Add npm workspaces | ✅ DONE | `package.json` | Added `"workspaces": ["packages/*", "apps/*"]` |
+| 2. Create `apps/` directory structure | ✅ DONE | `apps/pos/` (moved from `/pos`) | Moved existing pos to apps/ |
+| 3. Create `packages/` directory | ✅ DONE | `packages/` | Shared npm packages root created |
+| 4. Extract `@ury/config` | ✅ DONE | `packages/config/` | doctypes.ts, order-types.ts extracted |
+| 5. Extract `@ury/ui` | ✅ DONE | `packages/ui/` | button, card, dialog, input, select, badge, toast, spinner, loader |
+| 6. Extract `@ury/api-client` | ✅ DONE | `packages/api-client/` | frappe-sdk.ts wrapper, menu-api, auth-api |
+| 7. Extract `@ury/cart` | ✅ DONE | `packages/cart/` | Cart state from pos-store.ts with Zustand |
+| 8. POS v2 refactor imports | ⏳ PENDING | `apps/pos/src/` | Update to use packages |
+| 9. Update vite.config.ts paths | ✅ DONE | `apps/pos/vite.config.ts` | Updated outDir path |
+| 10. Update package.json scripts | ✅ DONE | `apps/pos/package.json` | Updated copy-html-entry path |
+
+### Phase 0B: Backend API Refactoring
+
+| Task | Status | Files Changed | Notes |
+|------|--------|---------------|-------|
+| 1. Create `ury_customer` module | ⏳ PENDING | `ury/ury_customer/` | New Frappe module |
+| 2. Add to modules.txt | ⏳ PENDING | `ury/modules.txt` | Add "URY Customer" |
+| 3. Create `get_public_menu()` | ⏳ PENDING | `ury/ury_customer/api.py` | Public menu endpoint |
+| 4. Backend DRY pass | ⏳ PENDING | `ury/ury_pos/api.py` | Unify invoice queries |
+
+---
+
+## Files Changed Log
+
+### Phase 0 Changes
+
+```
+# New Directories
+packages/
+├── config/
+├── ui/
+├── api-client/
+└── cart/
+apps/
+└── pos/              # Moved from /pos
+
+# Modified Files
+package.json          # Added workspaces
+ury/modules.txt       # Added "URY Customer"
+
+# New Backend Files
+ury/ury_customer/
+├── __init__.py
+└── api.py
+```
+
+---
+
+## Blockers & Risks
+
+| Risk | Mitigation | Status |
+|------|------------|--------|
+| Import path breakage in POS v2 | Extract incrementally, test after each package | 🟡 MONITORING |
+| Frappe guest permission model | Use `allow_guest=True` + signed tokens | ⏳ FUTURE |
+| Bundle size for mobile | Tree-shake aggressively | ⏳ FUTURE |
+
+---
+
+## Git Commit Log
+
+| Commit | Message | Phase |
+|--------|---------|-------|
+| - | Initial TODO.md creation | Phase 0 |
+
+---
+
+## Implementation Notes
+
+### From Planning Documents
+
+**Key Principles:**
+1. URY is a **single Frappe app** - all new modules go inside `ury/`
+2. New Python modules (e.g., `ury_customer`) go inside `ury/` following `ury_pos/` pattern
+3. New frontend SPAs go in `apps/` at repo root
+4. Every new module must be added to `ury/modules.txt`
+5. Every `@frappe.whitelist()` endpoint is callable from frontend
+6. For guest APIs use `@frappe.whitelist(allow_guest=True)`
+
+**Phase 0 Success Criteria:**
+- [ ] npm workspaces configured
+- [ ] POS v2 builds successfully using shared packages
+- [ ] `ury_customer` module created with `get_public_menu()` API
+- [ ] No regression in existing POS functionality
+- [ ] All tests pass
+
+---
+
+## Quick Reference
+
+**Skill Package Location**: `/tmp/frappe-skill/`
+
+**Phase 0 Skills Used:**
+- `frappe-impl-customapp` - Module creation
+- `frappe-syntax-customapp` - Structure
+- `frappe-ops-frontend-build` - Build system
+
+**Frappe Commands:**
+```bash
+# After doctype/custom field changes
+bench migrate
+
+# After API changes not reflecting
+bench clear-cache
+
+# Build frontend
+bench build --app ury
+```

@@ -16,6 +16,12 @@
   "address",
   "branch",
   "default_tax_template",
+  "customer_ordering_section",
+  "slug",
+  "accepts_online_orders",
+  "logo",
+  "column_break_customer",
+  "opening_hours",
   "menu_info_section",
   "active_menu",
   "room_wise_menu",
@@ -122,6 +128,40 @@
    "fieldtype": "Table",
    "label": "Order Type Menu",
    "options": "Order Type Menu"
+  },
+  {
+   "fieldname": "customer_ordering_section",
+   "fieldtype": "Section Break",
+   "label": "Customer Ordering"
+  },
+  {
+   "fieldname": "slug",
+   "fieldtype": "Data",
+   "label": "Slug",
+   "unique": 1,
+   "description": "URL-friendly identifier for public access (e.g., 'my-restaurant')"
+  },
+  {
+   "default": "0",
+   "fieldname": "accepts_online_orders",
+   "fieldtype": "Check",
+   "label": "Accepts Online Orders"
+  },
+  {
+   "fieldname": "logo",
+   "fieldtype": "Attach Image",
+   "label": "Logo",
+   "description": "Logo displayed on customer-facing apps"
+  },
+  {
+   "fieldname": "column_break_customer",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "opening_hours",
+   "fieldtype": "JSON",
+   "label": "Opening Hours",
+   "description": "JSON format: {\"mon\": {\"open\": \"09:00\", \"close\": \"22:00\"}}"
   }
  ],
  "image_field": "image",
