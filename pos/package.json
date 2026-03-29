@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build --base=/assets/ury/pos/ && yarn copy-html-entry",
+    "build": "vite build --base=/assets/ury/pos/ && yarn copy-html-entry && yarn copy-pwa-assets",
     "copy-html-entry": "cp ../ury/public/pos/index.html ../ury/www/pos.html",
+    "copy-pwa-assets": "cp ../ury/public/pos/sw.js ../ury/www/sw.js && cp ../ury/public/pos/workbox-*.js ../ury/www/ 2>/dev/null || : && cp ../ury/public/pos/manifest.webmanifest ../ury/www/manifest.webmanifest",
     "lint": "eslint .",
     "preview": "vite preview"
   },
@@ -43,6 +44,11 @@
     "globals": "^15.15.0",
     "typescript": "~5.7.2",
     "typescript-eslint": "^8.24.1",
-    "vite": "^6.2.0"
+    "vite": "^6.2.0",
+    "vite-plugin-pwa": "^1.2.0"
+  },
+  "resolutions": {
+    "workbox-build": "7.1.0",
+    "workbox-window": "7.1.0"
   }
 }

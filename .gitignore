@@ -17,4 +17,12 @@ ury/www/urypos.html
 ury/www/URYMosaic.html
 build
 
+
+ury/www/sw.js
+ury/www/manifest.webmanifest
+ury/www/workbox-*.js
+ury/www/urypos-manifest.webmanifest
+ury/www/urypos-sw.js
+
 *.lock
+

@@ -32,3 +32,16 @@ router.beforeEach((to, from, next) => {
 app.mount("#app");
 app.component('NotificationModal', NotificationModal);
 
+if ('serviceWorker' in navigator) {
+	window.addEventListener('load', () => {
+		navigator.serviceWorker.register('/urypos-sw.js', { scope: '/urypos' }).then(
+			(registration) => {
+				console.log('SW registered: ', registration);
+			},
+			(registrationError) => {
+				console.log('SW registration failed: ', registrationError);
+			}
+		);
+	});
+}
+

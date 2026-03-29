@@ -5,14 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build --base=/assets/ury/urypos/ && yarn copy-html-entry",
+    "build": "vite build --base=/assets/ury/urypos/ && yarn copy-html-entry && yarn copy-pwa-assets",
     "preview": "vite preview",
-    "copy-html-entry": "cp ../ury/public/urypos/index.html ../ury/www/urypos.html"
+    "copy-html-entry": "cp ../ury/public/urypos/index.html ../ury/www/urypos.html",
+    "copy-pwa-assets": "cp ../ury/public/urypos/urypos-sw.js ../ury/www/urypos-sw.js && cp ../ury/public/urypos/workbox-*.js ../ury/www/ 2>/dev/null || : && cp ../ury/public/urypos/manifest.webmanifest ../ury/www/urypos-manifest.webmanifest"
   },
   "dependencies": {
-    "socket.io-client": "^4.5.1",
-    "vue": "^3.3.4",
-    "vue-router": "^4",
     "@syncfusion/ej2-vue-calendars": "^22.2.10",
     "axios": "^1.3.4",
     "flowbite": "^1.6.5",
@@ -23,8 +21,11 @@
     "pinia": "^2.0.35",
     "pnpm": "^7.33.6",
     "qz-tray": "^2.2.2",
+    "socket.io-client": "^4.5.1",
+    "vue": "^3.3.4",
     "vue-datepicker": "^1.3.0",
-    "vue-datepicker-next": "^1.0.3"
+    "vue-datepicker-next": "^1.0.3",
+    "vue-router": "^4"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^4.2.3",
@@ -36,6 +37,11 @@
     "prettier": "2.8.4",
     "prettier-plugin-tailwindcss": "^0.2.3",
     "tailwindcss": "^3.3.3",
-    "vite": "^4.5.2"
+    "vite": "^4.5.2",
+    "vite-plugin-pwa": "^1.2.0"
+  },
+  "resolutions": {
+    "workbox-build": "7.1.0",
+    "workbox-window": "7.1.0"
   }
 }
