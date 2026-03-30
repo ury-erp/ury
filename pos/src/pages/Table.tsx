@@ -258,7 +258,7 @@ const TableView = () => {
                   >
                     {room.name}
                     {typeof roomCounts[room.name] === 'number' ? (
-                      <Badge variant="outline" className="ms-2 bg-white/60">
+                      <Badge variant="outline" className="ml-2 bg-white/60">
                         {roomCounts[room.name]}
                       </Badge>
                     ) : null}
