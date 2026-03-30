@@ -17,6 +17,28 @@ export async function initI18n(lang?: string): Promise<void> {
 }
 
 /**
+ * Get the text direction for the active locale.
+ * Reads `_meta.direction` from the locale JSON; defaults to 'ltr'.
+ */
+export function getActiveDirection(): 'ltr' | 'rtl' {
+  const meta = (activeLocale as Record<string, unknown>)._meta;
+  if (meta && typeof meta === 'object' && (meta as Record<string, unknown>).direction === 'rtl') {
+    return 'rtl';
+  }
+  return 'ltr';
+}
+
+/**
+ * Apply lang and dir to <html> after i18n is resolved.
+ * Call this once in main.tsx before rendering the React tree.
+ */
+export function applyDocumentLocale(): void {
+  const root = document.documentElement;
+  root.lang = activeLanguage;
+  root.dir = getActiveDirection();
+}
+
+/**
  * Get the currently active language code.
  */
 export function getActiveLanguage(): string {
