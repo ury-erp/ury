@@ -7,7 +7,7 @@
 }
 
 .Toastify__toast-icon {
-  margin-right: 12px !important;
+  margin-inline-end: 12px !important;
   width: 20px !important;
 }
 
@@ -75,7 +75,7 @@
 .Toastify__close-button {
   opacity: 0.8 !important;
   padding: 0 !important;
-  margin-left: 12px !important;
+  margin-inline-start: 12px !important;
 }
 
 .Toastify__close-button:hover {
