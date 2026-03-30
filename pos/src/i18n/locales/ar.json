@@ -22,10 +22,15 @@
         "search_placeholder_menu": "ابحث في القائمة",
         "switch_to_desk": "التبديل إلى المكتب",
         "clear_cache": "مسح ذاكرة التخزين المؤقت",
-        "logout": "تسجيل الخروج"
+        "logout": "تسجيل الخروج",
+        "search_shortcut_key": "K"
     },
     "menu": {
         "special_items": "أصناف مميزة"
+    },
+    "pos_sidebar": {
+        "categories": "فئات",
+        "all_items": "جميع الأصناف"
     },
     "cart": {
         "empty_title": "عربة التسوق فارغة",
@@ -130,5 +135,33 @@
         "printed": "تمت الطباعة بنجاح",
         "payment_successful": "تمت عملية الدفع بنجاح",
         "order_moved_to_draft": "تم نقل الطلب إلى المسودات بعد الطباعة."
+    },
+    "orders": {
+        "no_orders_found": "لم يتم العثور على طلبات",
+        "click_to_view": "انقر على أي بطاقة طلب لعرض تفاصيلها",
+        "status_title": "حالة الطلب",
+        "pagination": {
+            "previous": "السابق",
+            "next": "التالي",
+            "page": "صفحة {{number}}"
+        }
+    },
+    "tables": {
+        "layout_view": "عرض المخطط",
+        "grid_view": "عرض الشبكة",
+        "edit_layout": "تعديل المخطط",
+        "finish_editing": "إنهاء التعديل",
+        "layout": "مخطط",
+        "available": "متاح",
+        "occupied": "مشغول",
+        "room": "غرفة",
+        "seats": "مقاعد",
+        "tap_to_start": "انقر لبدء طلب محلي جديد",
+        "no_tables_found": "لم يتم العثور على طاولات لهذه الغرفة"
+    },
+    "footer": {
+        "pos": "نقطة البيع",
+        "table": "طاولة",
+        "orders": "الطلبات"
     }
 }

@@ -15,10 +15,15 @@
     "search_placeholder_menu": "Rechercher dans le menu",
     "switch_to_desk": "Accéder au bureau",
     "clear_cache": "Vider le cache",
-    "logout": "Déconnexion"
+    "logout": "Déconnexion",
+    "search_shortcut_key": "K"
   },
   "menu": {
     "special_items": "Plats spéciaux"
+  },
+  "pos_sidebar": {
+    "categories": "Catégories",
+    "all_items": "Tous les articles"
   },
   "cart": {
     "empty_title": "Votre panier est vide",
@@ -123,5 +128,33 @@
     "printed": "Imprimé avec succès",
     "payment_successful": "Paiement réussi",
     "order_moved_to_draft": "Commande déplacée en brouillon après impression."
+  },
+  "orders": {
+    "no_orders_found": "Aucune commande trouvée",
+    "click_to_view": "Cliquez sur n'importe quel badge de commande pour voir ses détails",
+    "status_title": "Statut de la commande",
+    "pagination": {
+      "previous": "Précédent",
+      "next": "Suivant",
+      "page": "Page {{number}}"
+    }
+  },
+  "tables": {
+    "layout_view": "Vue de mise en page",
+    "grid_view": "Vue en grille",
+    "edit_layout": "Modifier le plan",
+    "finish_editing": "Terminer la modification",
+    "layout": "Plan",
+    "available": "Disponible",
+    "occupied": "Occupé",
+    "room": "Salle",
+    "seats": "Sièges",
+    "tap_to_start": "Appuyez pour commencer une nouvelle commande sur place",
+    "no_tables_found": "Aucune table trouvée pour cette salle"
+  },
+  "footer": {
+    "pos": "PDV",
+    "table": "Table",
+    "orders": "Commandes"
   }
 }
