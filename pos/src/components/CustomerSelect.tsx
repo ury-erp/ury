@@ -146,7 +146,7 @@ function NewCustomerForm({
             className="pl-10"
             aria-invalid={!!formError && !newCustomerPhone}
           />
-          <Phone className="absolute left-3 top-2.5 text-gray-400 w-5 h-5" />
+          <Phone className="absolute start-3 top-2.5 text-gray-400 w-5 h-5" />
         </div>
         {formError && !newCustomerPhone && (
           <div className="text-xs text-red-500 mt-1">Phone is required</div>
@@ -197,7 +197,7 @@ function NewCustomerForm({
         >
           {isCreatingCustomer ? (
             <>
-              <Loader className="w-4 h-4 mr-2 animate-spin" />
+              <Loader className="w-4 h-4 me-2 animate-spin" />
               Adding Customer...
             </>
           ) : (
@@ -338,7 +338,7 @@ export function CustomerSelect({ disabled }: CustomerSelectProps) {
               aria-label="Search customer"
               autoComplete="off"
             />
-            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            <ChevronDown className="absolute end-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
           </div>
           {isOpen && (
             <div className="absolute w-full mt-2 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-80 overflow-y-auto">
@@ -347,7 +347,7 @@ export function CustomerSelect({ disabled }: CustomerSelectProps) {
               )}
               {isSearching && (
                 <div className="flex items-center justify-center p-4 text-gray-500 text-sm select-none">
-                  <Loader className="w-4 h-4 mr-2 animate-spin" /> Searching...
+                  <Loader className="w-4 h-4 me-2 animate-spin" /> Searching...
                 </div>
               )}
               {searchError && (
@@ -360,7 +360,7 @@ export function CustomerSelect({ disabled }: CustomerSelectProps) {
                   <button
                     key={customer.name}
                     type="button"
-                    className={`w-full gap-2 px-4 py-2 text-left rounded-md text-gray-800 text-sm select-none transition-colors ${
+                    className={`w-full gap-2 px-4 py-2 text-start rounded-md text-gray-800 text-sm select-none transition-colors ${
                       idx === highlightedIndex ? 'bg-primary-50 text-primary-700' : 'hover:bg-gray-50'
                     }`}
                     onMouseDown={() => {
@@ -371,7 +371,7 @@ export function CustomerSelect({ disabled }: CustomerSelectProps) {
                     onMouseEnter={() => setHighlightedIndex(idx)}
                   >
                     <div className="font-medium">{name}</div>
-                    <div className="ml-auto text-xs text-gray-500">{phone}</div>
+                    <div className="ms-auto text-xs text-gray-500">{phone}</div>
                   </button>
                 );
               })}

@@ -107,7 +107,7 @@ const Header = () => {
       <div className="flex items-center justify-between h-16 px-6">
         {/* Logo */}
         <div className="flex items-center">
-        <Link to="/" className="flex items-center space-x-3">
+        <Link to="/" className="flex items-center gap-3">
             <img 
               src="/assets/ury/pos/ury_pos.png" 
               alt="URY POS" 
@@ -132,13 +132,13 @@ const Header = () => {
         </div>
 
         {/* Right side actions */}
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center gap-4">
           {/* User menu */}
           <div className="relative" ref={userMenuRef}>
             <Button
               onClick={handleUserMenuToggle}
               variant="ghost"
-              className="flex items-center space-x-2 text-gray-600 hover:text-gray-900"
+              className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
             >
               <div className="w-8 h-8 bg-primary-500 rounded-full flex items-center justify-center">
                 <User className="w-4 h-4 text-white" />
@@ -149,7 +149,7 @@ const Header = () => {
 
             {/* User dropdown */}
             {showUserMenu && (
-              <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+              <div className="absolute end-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
                 <div className="p-4 border-b border-gray-200">
                   <p className="text-sm font-medium text-gray-900">{user?.full_name || 'User'}</p>
                   <p className="text-sm text-gray-500">{user?.name || ''}</p>
@@ -160,7 +160,7 @@ const Header = () => {
                     className="flex justify-start items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
                     onClick={() => window.location.href = '/app'}
                   >
-                    <Monitor className="w-4 h-4 mr-3" />
+                    <Monitor className="w-4 h-4 me-3" />
                     Switch To Desk
                   </Button>
                   <Button
@@ -168,7 +168,7 @@ const Header = () => {
                     className="flex justify-start items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
                     onClick={handleClearCache}
                   >
-                    <RefreshCw className="w-4 h-4 mr-3" />
+                    <RefreshCw className="w-4 h-4 me-3" />
                     Clear Cache
                   </Button>
                   <Button
@@ -176,7 +176,7 @@ const Header = () => {
                     className="flex justify-start items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 hover:text-red-700 transition-colors"
                     onClick={handleLogout}
                   >
-                    <LogOut className="w-4 h-4 mr-3" />
+                    <LogOut className="w-4 h-4 me-3" />
                     Logout
                   </Button>
                 </div>

@@ -179,7 +179,7 @@ const OrderPanel = () => {
   const isInteractionDisabled = isOrderInteractionDisabled() || isSubmitting;
 
   return (
-    <div className="w-96 bg-white border-l border-gray-200 flex flex-col h-[calc(100vh-4rem)] fixed right-0 z-10">
+    <div className="w-96 bg-white border-s border-gray-200 flex flex-col h-[calc(100vh-4rem)] fixed end-0 z-10">
       <div className="p-4 border-b border-gray-200 flex-shrink-0">
         <OrderTypeSelect disabled={isInteractionDisabled} />
         <div className="mt-3"><CustomerSelect disabled={isInteractionDisabled} /></div>
@@ -216,7 +216,7 @@ const OrderPanel = () => {
                     <p className="text-gray-600 text-sm">{formatCurrency(calculateItemTotal(item))}</p>
                   </div>
                   
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center gap-2">
                     <Button
                       onClick={() => handleEdit(item)}
                       variant="ghost"
@@ -227,7 +227,7 @@ const OrderPanel = () => {
                     >
                       <Edit className="w-4 h-4" />
                     </Button>
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center gap-2">
                       <Button
                         onClick={() => {
                           const newQuantity = Math.max(0, item.quantity - 1);
@@ -311,7 +311,7 @@ const OrderPanel = () => {
             >
               {isSubmitting ? (
                 <div className="flex items-center">
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <Loader2 className="w-4 h-4 me-2 animate-spin" />
                   {isUpdatingOrder ? 'Updating Order...' : 'Processing Order...'}
                 </div>
               ) : isUpdatingOrder ? (
