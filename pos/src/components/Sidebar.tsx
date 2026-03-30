@@ -7,6 +7,7 @@ import { cn } from '../lib/utils';
 import { Button, Badge } from './ui';
 import CommentDialog from './CommentDialog';
 import { useState } from 'react';
+import { t } from '../i18n';
 
 interface SidebarProps {
   disabled?: boolean;
@@ -33,7 +34,7 @@ const Sidebar = ({ disabled }: SidebarProps) => {
 
   return (
     <div className={cn(
-      "w-64 bg-white border-r border-gray-200 h-screen flex flex-col",
+      "w-64 bg-white border-e border-gray-200 h-screen flex flex-col",
       disabled && "opacity-50 pointer-events-none"
     )}>
       {/* Categories List */}
@@ -41,7 +42,7 @@ const Sidebar = ({ disabled }: SidebarProps) => {
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
           {/* Section Title */}
           <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3 px-1">
-            categories
+            {t('pos_sidebar.categories')}
           </h2>
           
           {/* All Items */}
@@ -58,12 +59,12 @@ const Sidebar = ({ disabled }: SidebarProps) => {
           >
             {/* Active indicator bar */}
             {selectedCategory === '' && (
-              <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-blue-600 rounded-r-full" />
+              <div className="absolute start-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-blue-600 rounded-e-full" />
             )}
             
-            <div className="flex items-center gap-3 ml-1">
+            <div className="flex items-center gap-3 ms-1">
               <Grid3X3 className="w-4 h-4 text-gray-500" />
-              <span>All Items</span>
+              <span>{t('pos_sidebar.all_items')}</span>
             </div>
             
             <Badge variant="secondary" size="sm" className="text-xs text-gray-500 bg-gray-100 min-w-[24px] text-center">
@@ -93,9 +94,9 @@ const Sidebar = ({ disabled }: SidebarProps) => {
                 >
                   {/* Active indicator bar */}
                   {selectedCategory === category && (
-                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-blue-600 rounded-r-full" />
+                    <div className="absolute start-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-blue-600 rounded-e-full" />
                   )}
-                  <div className="flex items-center gap-3 ml-1">
+                  <div className="flex items-center gap-3 ms-1">
                     <UtensilsCrossed className="w-4 h-4 text-gray-500 flex-shrink-0" />
                     <span className="text-start">{category}</span>
                   </div>

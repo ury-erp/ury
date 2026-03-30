@@ -208,7 +208,7 @@ export default function Orders() {
       />
 
       {/* Middle Section - Order Cards */}
-      <div className="flex-1 flex flex-col h-screen overflow-hidden pr-96">
+      <div className="flex-1 flex flex-col h-screen overflow-hidden pe-96">
         <div className="flex-1 overflow-y-auto bg-gray-50 p-4 pb-40">
           {orderLoading ? (
             <div className="flex items-center justify-center h-full">
@@ -216,7 +216,7 @@ export default function Orders() {
             </div>
           ) : orders.length === 0 ? (
             <div className="text-center mt-10">
-              <p className="text-gray-500">No orders found</p>
+              <p className="text-gray-500">{t('orders.no_orders_found')}</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-screen-xl mx-auto">
@@ -239,7 +239,7 @@ export default function Orders() {
                           {order.restaurant_table ? `Table ${order.restaurant_table} • ` : ''}{order.order_type}
                         </p>
                       </div>
-                      <Badge variant={getBadgeVariant(order.status)} className="ml-2">
+                      <Badge variant={getBadgeVariant(order.status)} className="ms-2">
                         {order.status}
                       </Badge>
                     </div>
@@ -279,11 +279,11 @@ export default function Orders() {
                   className='w-20'
                   size="xs"
                 >
-                  Previous
+                  {t('orders.pagination.previous')}
                 </Button>
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-muted-foreground">
-                    Page {pagination.currentPage}
+                    {t('orders.pagination.page', { number: pagination.currentPage })}
                   </span>
                 </div>
                 <Button
@@ -293,7 +293,7 @@ export default function Orders() {
                   className='w-20'
                   size="xs"
                 >
-                  Next
+                  {t('orders.pagination.next')}
                 </Button>
               </div>
             </div>
@@ -302,11 +302,11 @@ export default function Orders() {
       </div>
 
       {/* Right Section - Order Details */}
-      <div className="w-96 bg-white border-l border-gray-200 flex flex-col h-[calc(100vh-4rem)] fixed right-0 z-10">
+      <div className="w-96 bg-white border-s border-gray-200 flex flex-col h-[calc(100vh-4rem)] fixed end-0 z-10">
         {!selectedOrder ? (
           <div className="text-center h-full flex flex-col items-center justify-center text-gray-500 p-6">
             <p className="text-lg font-medium mb-2">{t('order.select_to_view')}</p>
-            <p className="text-sm">Click on any order card to view its details</p>
+            <p className="text-sm">{t('orders.click_to_view')}</p>
           </div>
         ) : selectedOrderLoading ? (
           <div className="flex items-center justify-center h-full">
@@ -320,7 +320,7 @@ export default function Orders() {
         ) : (
           <>
             {/* Fixed Header */}
-            <div className="sticky top-0 left-0 right-0 z-20 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between min-h-[64px]">
+            <div className="sticky top-0 start-0 end-0 z-20 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between min-h-[64px]">
               <h2 className="text-xl font-semibold text-gray-900 truncate max-w-[10rem]">{selectedOrder.name}</h2>
               <div className="flex items-center gap-2">
                 {/* Only show edit and cancel buttons for Draft, Unbilled, and Recently Paid orders */}
@@ -334,7 +334,7 @@ export default function Orders() {
                       disabled={editLoading}
                     >
                       <Pencil className="w-4 h-4" />
-                      {editLoading && <span className="ml-2 text-xs">Loading...</span>}
+                      {editLoading && <span className="ms-2 text-xs">Loading...</span>}
                     </button>
                     <button
                       type="button"
@@ -451,7 +451,7 @@ export default function Orders() {
             </div>
 
             {/* Sticky Bottom Section - Single Row: Print | Payment | Total */}
-            <div className="border-t border-gray-200 p-6 bg-gray-50 sticky bottom-0 left-0 right-0 z-10">
+            <div className="border-t border-gray-200 p-6 bg-gray-50 sticky bottom-0 start-0 end-0 z-10">
               <div className="flex items-center gap-3 w-full">
                 {/* Print Icon Button */}
                 <Button
@@ -480,7 +480,7 @@ export default function Orders() {
                   </Button>
                 )}
                 {/* Total */}
-                <span className="ml-auto text-xl font-bold text-gray-900 whitespace-nowrap">
+                <span className="ms-auto text-xl font-bold text-gray-900 whitespace-nowrap">
                   {formatCurrency(selectedOrder.rounded_total)}
                 </span>
               </div>

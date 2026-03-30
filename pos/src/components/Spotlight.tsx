@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Search, Command, X } from 'lucide-react';
 import { usePOSStore } from '../store/pos-store';
-import { cn } from '../lib/utils';
+import { cn, formatCurrency } from '../lib/utils';
 import { Button, Input } from './ui';
 import { Dialog, DialogContent } from './ui/dialog';
 
@@ -63,7 +63,7 @@ const Spotlight = () => {
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogContent className="bg-white rounded-lg shadow-xl w-full max-w-2xl p-0">
         <div className="flex items-center border-b border-gray-200 p-4">
-          <Search className="w-5 h-5 text-gray-400 mr-3" />
+          <Search className="w-5 h-5 text-gray-400 me-3" />
           <Input
             ref={inputRef}
             type="text"
@@ -77,7 +77,7 @@ const Spotlight = () => {
             onClick={() => setIsOpen(false)}
             variant="ghost"
             size="icon"
-            className="ml-3"
+            className="ms-3"
           >
             <X className="w-5 h-5" />
           </Button>
@@ -98,14 +98,14 @@ const Spotlight = () => {
                 <img
                   src={item.image}
                   alt={item.name}
-                  className="w-12 h-12 object-cover rounded mr-4"
+                  className="w-12 h-12 object-cover rounded me-4"
                 />
-                <div className="flex-1 text-left">
+                <div className="flex-1 text-start">
                   <div className="font-medium">{item.name}</div>
                   <div className="text-sm text-gray-500">{item.category}</div>
                 </div>
-                <div className="text-right">
-                  <div className="font-medium">₹{item.price}</div>
+                <div className="text-end">
+                  <div className="font-medium">{formatCurrency(item.price)}</div>
                 </div>
               </Button>
             ))
