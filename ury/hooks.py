@@ -361,7 +361,8 @@ fixtures = [
                     "POS Profile-custom_table_order_printer",
                     "POS Profile-custom_reprint_kot_format",
                     "Employee-payment_amount",
-                    "Employee-payment_type"
+                    "Employee-payment_type",
+                    "POS Profile-custom_allow_without_print_on_payment",
                 },
             ]
         ],

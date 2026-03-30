@@ -471,6 +471,7 @@ def getPosProfile():
         multiple_cashier = pos_profiles.custom_enable_multiple_cashier
         edit_order_type = pos_profiles.custom_edit_order_type
         enable_kot_reprint = pos_profiles.custom_enable_kot_reprint
+        custom_allow_without_print_on_payment = pos_profiles.custom_allow_without_print_on_payment
         if multiple_cashier:
             details = getBranchRoom()
             room = details[0].get('name') 

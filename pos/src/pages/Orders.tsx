@@ -464,20 +464,23 @@ export default function Orders() {
                   {isPrinting ? <Spinner className="w-5 h-5" hideMessage /> : <Printer className="w-5 h-5" />}
                 </Button>
                 {/* Payment Button - Only show for Draft, Unbilled, and Recently Paid orders */}
-                {(selectedOrder.status === 'Draft' || selectedOrder.status === 'Unbilled' || selectedOrder.status === 'Recently Paid') && (
-                  <Button
-                    className="flex-1"
-                    onClick={() => {
-                      if (String(selectedOrder.invoice_printed) === '0') {
-                        showToast.error('Please print invoice before making payment');
-                        return;
-                      }
-                      setShowPaymentDialog(true);
-                    }}
-                  >
-                    Payment
-                  </Button>
-                )}
+                 {(selectedOrder.status === 'Draft' || selectedOrder.status === 'Unbilled' || selectedOrder.status === 'Recently Paid') && (
+                    <Button
+                      className="flex-1"
+                      onClick={() => {
+                        const allowWithoutPrint = Boolean(
+                          posStore.posProfile?.custom_allow_without_print_on_payment
+                        );
+                        if (!allowWithoutPrint && selectedOrder.invoice_printed === 0) {
+                          showToast.error('Please print invoice before making payment');
+                          return;
+                        }
+                        setShowPaymentDialog(true);
+                      }}
+                    >
+                      Payment
+                    </Button>
+                  )}
                 {/* Total */}
                 <span className="ml-auto text-xl font-bold text-gray-900 whitespace-nowrap">
                   {formatCurrency(selectedOrder.rounded_total)}
