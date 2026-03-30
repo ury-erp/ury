@@ -1,5 +1,5 @@
 <!doctype html>
-{% set user_lang = frappe.local.lang or 'en' %}
+{% set user_lang = frappe.lang or 'en' %}
 {% set is_rtl = user_lang in ['ar', 'he', 'fa', 'ur', 'ku'] %}
 <html lang="{{ user_lang }}" dir="{{ 'rtl' if is_rtl else 'ltr' }}">
   <head>
