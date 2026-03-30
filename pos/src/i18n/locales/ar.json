@@ -1,0 +1,134 @@
+{
+    "_meta": {
+        "language_code": "ar",
+        "translation_method": "machine_translated",
+        "human_verified": false,
+        "last_updated": "2026-03-30",
+        "direction": "rtl"
+    },
+    "common": {
+        "loading": "جاري التحميل...",
+        "cancel": "إلغاء",
+        "save": "حفظ",
+        "apply": "تطبيق",
+        "change": "تغيير",
+        "all": "الكل",
+        "no_options": "لا توجد خيارات",
+        "searching": "جاري البحث..."
+    },
+    "header": {
+        "search_placeholder_default": "ابحث عن الطلبات، عناصر القائمة، أو العملاء...",
+        "search_placeholder_orders": "ابحث عن الطلبات",
+        "search_placeholder_menu": "ابحث في القائمة",
+        "switch_to_desk": "التبديل إلى المكتب",
+        "clear_cache": "مسح ذاكرة التخزين المؤقت",
+        "logout": "تسجيل الخروج"
+    },
+    "menu": {
+        "special_items": "أصناف مميزة"
+    },
+    "cart": {
+        "empty_title": "عربة التسوق فارغة",
+        "empty_subtitle": "أضف عناصر للبدء في طلبك",
+        "click_to_add": "انقر على العناصر لإضافتها",
+        "double_click_hint": "انقر مرتين لخيارات التخصيص",
+        "clear_cart": "إفراغ العربة",
+        "total": "الإجمالي",
+        "add_new_order": "إضافة طلب جديد",
+        "update_order": "تحديث الطلب",
+        "updating_order": "جاري تحديث الطلب...",
+        "processing_order": "جاري معالجة الطلب...",
+        "loading_order": "جاري تحميل تفاصيل الطلب...",
+        "edit_item": "تعديل العنصر",
+        "add_comment": "إضافة تعليق",
+        "edit_comment": "تعديل التعليق"
+    },
+    "order": {
+        "select_to_view": "حدد طلبًا لعرض التفاصيل",
+        "items_title": "عناصر الطلب",
+        "taxes_charges": "الضرائب والرسوم",
+        "cancel_order": "إلغاء الطلب",
+        "enter_cancel_reason": "أدخل سبب الإلغاء",
+        "print": "طباعة",
+        "payment": "الدفع"
+    },
+    "payment": {
+        "title": "الدفع",
+        "apply_discount": "تطبيق الخصم",
+        "discount_placeholder": "أدخل نسبة %",
+        "payment_methods": "طرق الدفع",
+        "amount_placeholder": "المبلغ",
+        "total_entered": "الإجمالي المدخل",
+        "order_summary": "ملخص الطلب",
+        "subtotal": "المجموع الفرعي",
+        "discount": "الخصم",
+        "adjustment": "التسوية",
+        "total": "الإجمالي",
+        "pay_button": "دفع {{amount}}",
+        "processing": "جاري المعالجة..."
+    },
+    "pos": {
+        "not_opened_title": "نقطة البيع غير مفتوحة",
+        "not_opened_message": "يرجى فتح جلسة نقطة البيع للمتابعة في استخدام النظام.",
+        "not_closed_title": "جلسة نقطة البيع السابقة غير مغلقة",
+        "not_closed_message": "يرجى إغلاق جلسة نقطة البيع السابقة للمتابعة.",
+        "reload_page": "إعادة تحميل الصفحة",
+        "switch_to_desk": "التبديل إلى المكتب"
+    },
+    "customer": {
+        "search_placeholder": "ابحث عن عميل...",
+        "type_to_search": "يرجى الكتابة للبحث...",
+        "no_customers_found": "لم يتم العثور على عملاء",
+        "add_new": "إضافة عميل جديد",
+        "add_with_name": "إضافة \"{{name}}\"...",
+        "failed_search": "فشل البحث عن عملاء",
+        "add_customer_title": "إضافة عميل جديد",
+        "name_label": "الاسم",
+        "name_required": "الاسم مطلوب",
+        "phone_label": "رقم الهاتف",
+        "phone_required": "رقم الهاتف مطلوب",
+        "customer_group_label": "مجموعة العملاء",
+        "territory_label": "المنطقة",
+        "select_group": "حدد المجموعة",
+        "select_territory": "حدد المنطقة",
+        "adding": "جاري إضافة العميل...",
+        "add_button": "إضافة العميل",
+        "failed_create": "فشل في إنشاء العميل. يرجى المحاولة مرة أخرى."
+    },
+    "comment": {
+        "title": "تعليقات الطلب",
+        "label": "أضف تعليقات لهذا الطلب",
+        "placeholder": "أدخل أي تعليمات خاصة أو تعليقات...",
+        "save_button": "حفظ التعليق"
+    },
+    "errors": {
+        "pos_profile_not_found": "لم يتم العثور على ملف تعريف نقطة البيع",
+        "pos_profile_not_loaded": "لم يتم تحميل ملف تعريف نقطة البيع بعد",
+        "user_not_logged_in": "المستخدم غير مسجل الدخول",
+        "select_aggregator": "يرجى تحديد منصة التجميع (aggregator) قبل المتابعة",
+        "select_customer": "يرجى تحديد عميل قبل المتابعة",
+        "select_table": "يرجى تحديد طاولة للطلبات من نوع {{order_type}}",
+        "failed_logout": "فشل في تسجيل الخروج. يرجى المحاولة مرة أخرى.",
+        "failed_cancel_order": "فشل في إلغاء الطلب",
+        "failed_edit_order": "فشل في تعديل الطلب",
+        "failed_fetch_invoices": "فشل في جلب فواتير نقطة البيع",
+        "failed_fetch_order": "فشل في جلب تفاصيل الطلب",
+        "failed_print": "فشل في طباعة الطلب",
+        "failed_process_order": "فشل في معالجة الطلب",
+        "no_active_order": "لم يتم العثور على طلب نشط لهذه الطاولة",
+        "qz_host_not_set": "مضيف QZ غير محدد",
+        "print_failed": "فشلت الطباعة: {{reason}}",
+        "invalid_discount": "يرجى إدخال قيمة خصم صحيحة",
+        "discount_exceeds_max": "لا يمكن أن تتجاوز نسبة الخصم 100٪",
+        "please_print_first": "يرجى طباعة الفاتورة قبل إتمام عملية الدفع",
+        "enter_cancel_reason": "يرجى إدخال سبب للإلغاء."
+    },
+    "success": {
+        "order_cancelled": "تم إلغاء الطلب بنجاح",
+        "order_created": "تم إنشاء الطلب بنجاح",
+        "order_updated": "تم تحديث الطلب بنجاح",
+        "printed": "تمت الطباعة بنجاح",
+        "payment_successful": "تمت عملية الدفع بنجاح",
+        "order_moved_to_draft": "تم نقل الطلب إلى المسودات بعد الطباعة."
+    }
+}
