@@ -15,10 +15,15 @@
     "search_placeholder_menu": "Search Menu",
     "switch_to_desk": "Switch To Desk",
     "clear_cache": "Clear Cache",
-    "logout": "Logout"
+    "logout": "Logout",
+    "search_shortcut_key": "K"
   },
   "menu": {
     "special_items": "Special Items"
+  },
+  "pos_sidebar": {
+    "categories": "Categories",
+    "all_items": "All Items"
   },
   "cart": {
     "empty_title": "Your cart is empty",
@@ -123,5 +128,33 @@
     "printed": "Printed successfully",
     "payment_successful": "Payment successful",
     "order_moved_to_draft": "Order moved to Draft after printing."
+  },
+  "orders": {
+    "no_orders_found": "No orders found",
+    "click_to_view": "Click on any order card to view its details",
+    "status_title": "Order Status",
+    "pagination": {
+      "previous": "Previous",
+      "next": "Next",
+      "page": "Page {{number}}"
+    }
+  },
+  "tables": {
+    "layout_view": "Layout View",
+    "grid_view": "Grid View",
+    "edit_layout": "Edit Layout",
+    "finish_editing": "Finish Editing",
+    "layout": "Layout",
+    "available": "Available",
+    "occupied": "Occupied",
+    "room": "Room",
+    "seats": "Seats",
+    "tap_to_start": "Tap to start a new dine-in order",
+    "no_tables_found": "No tables found for this room"
+  },
+  "footer": {
+    "pos": "POS",
+    "table": "Table",
+    "orders": "Orders"
   }
 }
