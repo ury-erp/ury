@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { t } from '../i18n';
 import { Star, TrendingUp } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import OrderPanel from '../components/OrderPanel';
@@ -134,8 +135,8 @@ export default function POS() {
                 disabled={isMenuInteractionDisabled()}
               /> */}
               
-              <QuickFilterButton filter="all" icon={Star} label="All" />
-              <QuickFilterButton filter="special" icon={TrendingUp} label="Special Items" />
+              <QuickFilterButton filter="all" icon={Star} label={t('common.all')} />
+              <QuickFilterButton filter="special" icon={TrendingUp} label={t('menu.special_items')} />
             </div>
           </div>
         </div>

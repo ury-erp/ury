@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { t } from '../i18n';
 import { Link, useLocation } from 'react-router-dom';
 import { 
   Command,
@@ -26,15 +27,15 @@ const Header = () => {
   const [orderSearchInput, setOrderSearchInput] = useState(orderSearchQuery);
 
   // Determine placeholder and handlers based on route
-  let searchPlaceholder = 'Search orders, menu items, or customers...';
+  let searchPlaceholder = t('header.search_placeholder_default');
   let searchValue: string | undefined = undefined;
   let searchOnChange: ((e: React.ChangeEvent<HTMLInputElement>) => void) | undefined = undefined;
   if (location.pathname === '/orders') {
-    searchPlaceholder = 'Search Orders';
+    searchPlaceholder = t('header.search_placeholder_orders');
     searchValue = orderSearchInput;
     searchOnChange = (e) => setOrderSearchInput(e.target.value);
   } else if (location.pathname === '/') {
-    searchPlaceholder = 'Search Menu';
+    searchPlaceholder = t('header.search_placeholder_menu');
     searchValue = searchQuery;
     searchOnChange = (e) => setSearchQuery(e.target.value);
   }
@@ -89,7 +90,7 @@ const Header = () => {
       await logout();
       window.location.href = '/login?redirect-to=%2Fpos';
     } catch (error) {
-      showToast.error('Failed to logout. Please try again.');
+      showToast.error(t('errors.failed_logout'));
     }
   };
 
@@ -160,24 +161,24 @@ const Header = () => {
                     className="flex justify-start items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
                     onClick={() => window.location.href = '/app'}
                   >
-                    <Monitor className="w-4 h-4 me-3" />
-                    Switch To Desk
+                    <Monitor className="w-4 h-4 mr-3" />
+                    {t('header.switch_to_desk')}
                   </Button>
                   <Button
                     variant="ghost"
                     className="flex justify-start items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
                     onClick={handleClearCache}
                   >
-                    <RefreshCw className="w-4 h-4 me-3" />
-                    Clear Cache
+                    <RefreshCw className="w-4 h-4 mr-3" />
+                    {t('header.clear_cache')}
                   </Button>
                   <Button
                     variant="ghost"
                     className="flex justify-start items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 hover:text-red-700 transition-colors"
                     onClick={handleLogout}
                   >
-                    <LogOut className="w-4 h-4 me-3" />
-                    Logout
+                    <LogOut className="w-4 h-4 mr-3" />
+                    {t('header.logout')}
                   </Button>
                 </div>
               </div>
