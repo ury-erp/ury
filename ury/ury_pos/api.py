@@ -83,12 +83,12 @@ def getRestaurantMenu(pos_profile, room=None, order_type=None):
     menu_items_with_image = [
         {
             "item": item.item,
-            "item_name": item.item_name,
+            "item_name": _(item.item_name) if item.item_name else item.item_name,
             "rate": item.rate,
             "special_dish": item.special_dish,
             "disabled": item.disabled,
             "item_image": frappe.db.get_value("Item", item.item, "image"),
-            "course": item.course,
+            "course": _(item.course) if item.course else item.course,
         }
         for item in menu_items
     ]

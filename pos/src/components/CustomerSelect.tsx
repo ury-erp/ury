@@ -7,6 +7,7 @@ import { ChevronDown } from 'lucide-react';
 import React from 'react';
 import { addCustomer, type CreateCustomerData, searchCustomers } from '../lib/customer-api';
 import { AggregatorSelect } from './AggregatorSelect';
+import { t } from '../i18n';
 
 // NewCustomerForm component
 function NewCustomerForm({ 
@@ -105,7 +106,7 @@ function NewCustomerForm({
       onClose();
     } catch (error: any) {
       console.error('Failed to create customer:', error);
-      setApiError(error?.message || 'Failed to create customer. Please try again.');
+      setApiError(error?.message || t('customer.failed_create'));
     } finally {
       setIsCreatingCustomer(false);
     }
@@ -119,7 +120,7 @@ function NewCustomerForm({
         </div>
       )}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="new-customer-name">Name <span className="text-red-500">*</span></label>
+        <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="new-customer-name">{t('customer.name_label')} <span className="text-red-500">*</span></label>
         <Input
           id="new-customer-name"
           type="text"
@@ -130,11 +131,11 @@ function NewCustomerForm({
           aria-invalid={!!formError && !newCustomerName}
         />
         {formError && !newCustomerName && (
-          <div className="text-xs text-red-500 mt-1">Name is required</div>
+          <div className="text-xs text-red-500 mt-1">{t('customer.name_required')}</div>
         )}
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="new-customer-phone">Phone <span className="text-red-500">*</span></label>
+        <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="new-customer-phone">{t('customer.phone_label')} <span className="text-red-500">*</span></label>
         <div className="relative">
           <Input
             id="new-customer-phone"
@@ -149,13 +150,13 @@ function NewCustomerForm({
           <Phone className="absolute start-3 top-2.5 text-gray-400 w-5 h-5" />
         </div>
         {formError && !newCustomerPhone && (
-          <div className="text-xs text-red-500 mt-1">Phone is required</div>
+          <div className="text-xs text-red-500 mt-1">{t('customer.phone_required')}</div>
         )}
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Customer Group</label>
+        <label className="block text-sm font-medium text-gray-700 mb-1">{t('customer.customer_group_label')}</label>
         <Select
-          placeholder={loadingGroups ? 'Loading...' : 'Select group'}
+          placeholder={loadingGroups ? t('common.loading') : t('customer.select_group')}
           value={newCustomerGroup}
           onValueChange={setNewCustomerGroup}
           disabled={isCreatingCustomer || loadingGroups || !customerGroups.length}
@@ -167,13 +168,13 @@ function NewCustomerForm({
           ))}
         </Select>
         {!loadingGroups && !customerGroups.length && (
-          <div className="text-xs text-gray-400 mt-1">No options</div>
+          <div className="text-xs text-gray-400 mt-1">{t('common.no_options')}</div>
         )}
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Territory</label>
+        <label className="block text-sm font-medium text-gray-700 mb-1">{t('customer.territory_label')}</label>
         <Select
-          placeholder={loadingTerritories ? 'Loading...' : 'Select territory'}
+          placeholder={loadingTerritories ? t('common.loading') : t('customer.select_territory')}
           value={newCustomerTerritory}
           onValueChange={setNewCustomerTerritory}
           disabled={isCreatingCustomer || loadingTerritories || !territories.length}
@@ -185,7 +186,7 @@ function NewCustomerForm({
           ))}
         </Select>
         {!loadingTerritories && !territories.length && (
-          <div className="text-xs text-gray-400 mt-1">No options</div>
+          <div className="text-xs text-gray-400 mt-1">{t('common.no_options')}</div>
         )}
       </div>
       <div className="flex gap-3 mt-6">
@@ -197,11 +198,11 @@ function NewCustomerForm({
         >
           {isCreatingCustomer ? (
             <>
-              <Loader className="w-4 h-4 me-2 animate-spin" />
-              Adding Customer...
+              <Loader className="w-4 h-4 mr-2 animate-spin" />
+              {t('customer.adding')}
             </>
           ) : (
-            'Add Customer'
+            t('customer.add_button')
           )}
         </Button>
         <Button
@@ -210,7 +211,7 @@ function NewCustomerForm({
           onClick={onClose}
           disabled={isCreatingCustomer}
         >
-          Cancel
+          {t('common.cancel')}
         </Button>
       </div>
     </form>
@@ -252,7 +253,7 @@ export function CustomerSelect({ disabled }: CustomerSelectProps) {
           setIsSearching(false);
         })
         .catch(err => {
-          setSearchError('Failed to search customers');
+          setSearchError(t('customer.failed_search'));
           setIsSearching(false);
         });
     }, 300);
@@ -313,7 +314,7 @@ export function CustomerSelect({ disabled }: CustomerSelectProps) {
             size="sm"
             className="text-blue-700 hover:text-blue-800"
           >
-            Change
+            {t('common.change')}
           </Button>
         </div>
       ) : (
@@ -333,9 +334,9 @@ export function CustomerSelect({ disabled }: CustomerSelectProps) {
                 setTimeout(() => setIsOpen(false), 100);
               }}
               onKeyDown={handleKeyDown}
-              placeholder="Search customer..."
+              placeholder={t('customer.search_placeholder')}
               className="w-full h-10 border border-gray-200 rounded-lg px-4 py-2 text-sm font-medium text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 transition-colors"
-              aria-label="Search customer"
+              aria-label={t('customer.search_placeholder')}
               autoComplete="off"
             />
             <ChevronDown className="absolute end-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
@@ -343,11 +344,11 @@ export function CustomerSelect({ disabled }: CustomerSelectProps) {
           {isOpen && (
             <div className="absolute w-full mt-2 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-80 overflow-y-auto">
               {searchTerm.trim() === '' && !isSearching && !searchError && (
-                <div className="p-4 text-center text-gray-400 text-sm select-none">Please type to search...</div>
+                <div className="p-4 text-center text-gray-400 text-sm select-none">{t('customer.type_to_search')}</div>
               )}
               {isSearching && (
                 <div className="flex items-center justify-center p-4 text-gray-500 text-sm select-none">
-                  <Loader className="w-4 h-4 me-2 animate-spin" /> Searching...
+                  <Loader className="w-4 h-4 mr-2 animate-spin" /> {t('common.searching')}
                 </div>
               )}
               {searchError && (
@@ -376,7 +377,7 @@ export function CustomerSelect({ disabled }: CustomerSelectProps) {
                 );
               })}
               {!isSearching && !searchError && searchResults.length === 0 && searchTerm.trim() && (
-                <div className="p-4 text-center text-gray-400 text-sm select-none">No customers found</div>
+                <div className="p-4 text-center text-gray-400 text-sm select-none">{t('customer.no_customers_found')}</div>
               )}
               <div className="my-1 h-px bg-gray-100" />
               <button
@@ -398,7 +399,7 @@ export function CustomerSelect({ disabled }: CustomerSelectProps) {
                 }}
                 onMouseEnter={() => setHighlightedIndex(searchResults.length)}
               >
-                <UserPlus className="w-4 h-4" /> {searchTerm.trim() ? `Add "${searchTerm.trim()}"...` : 'Add New Customer'}
+                <UserPlus className="w-4 h-4" /> {searchTerm.trim() ? t('customer.add_with_name', { name: searchTerm.trim() }) : t('customer.add_new')}
               </button>
             </div>
           )}
@@ -415,7 +416,7 @@ export function CustomerSelect({ disabled }: CustomerSelectProps) {
           }}
         >
           <DialogContent className="w-full max-w-md p-4 max-h-[80vh] overflow-y-auto">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Add New Customer</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('customer.add_customer_title')}</h3>
             <NewCustomerForm 
               onClose={() => setShowNewCustomerForm(false)} 
               isCreatingCustomer={isCreatingCustomer}

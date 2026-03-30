@@ -1,5 +1,6 @@
 import { RefreshCw, AlertTriangle, Monitor } from 'lucide-react';
 import { Button } from './ui';
+import { t } from '../i18n';
 
 interface POSOpeningDialogProps {
   onReload: () => void;
@@ -32,34 +33,31 @@ const POSOpeningDialog = ({ onReload, type }: POSOpeningDialogProps) => {
           
           {/* Title */}
           <h2 className="text-2xl font-bold text-gray-900 mb-4">
-            {isOpeningIssue ? 'POS Not Opened' : 'Previous POS Not Closed'}
+            {isOpeningIssue ? t('pos.not_opened_title') : t('pos.not_closed_title')}
           </h2>
-          
+
           {/* Message */}
           <p className="text-gray-600 mb-8 text-lg">
-            {isOpeningIssue 
-              ? 'Please open POS Entry to continue using the system.'
-              : 'Please close the previous POS Entry to continue.'
-            }
+            {isOpeningIssue ? t('pos.not_opened_message') : t('pos.not_closed_message')}
           </p>
-          
+
           {/* Buttons */}
           <div className="space-y-3">
             <Button
               onClick={onReload}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-lg transition-colors duration-200"
             >
-              <RefreshCw className="w-5 h-5 me-2" />
-              Reload Page
+              <RefreshCw className="w-5 h-5 mr-2" />
+              {t('pos.reload_page')}
             </Button>
-            
+
             <Button
               onClick={handleSwitchToDesk}
               variant="outline"
               className="w-full border-gray-300 text-gray-700 hover:bg-gray-50 font-medium py-3 px-6 rounded-lg transition-colors duration-200"
             >
-              <Monitor className="w-5 h-5 me-2" />
-              Switch to Desk
+              <Monitor className="w-5 h-5 mr-2" />
+              {t('pos.switch_to_desk')}
             </Button>
           </div>
         </div>

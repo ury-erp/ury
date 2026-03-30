@@ -1,0 +1,127 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "cancel": "Cancel",
+    "save": "Save",
+    "apply": "Apply",
+    "change": "Change",
+    "all": "All",
+    "no_options": "No options",
+    "searching": "Searching..."
+  },
+  "header": {
+    "search_placeholder_default": "Search orders, menu items, or customers...",
+    "search_placeholder_orders": "Search Orders",
+    "search_placeholder_menu": "Search Menu",
+    "switch_to_desk": "Switch To Desk",
+    "clear_cache": "Clear Cache",
+    "logout": "Logout"
+  },
+  "menu": {
+    "special_items": "Special Items"
+  },
+  "cart": {
+    "empty_title": "Your cart is empty",
+    "empty_subtitle": "Add items to get started with your order",
+    "click_to_add": "Click items to add them",
+    "double_click_hint": "Double-click for customization options",
+    "clear_cart": "Clear cart",
+    "total": "Total",
+    "add_new_order": "Add New Order",
+    "update_order": "Update Order",
+    "updating_order": "Updating Order...",
+    "processing_order": "Processing Order...",
+    "loading_order": "Loading order details...",
+    "edit_item": "Edit item",
+    "add_comment": "Add comment",
+    "edit_comment": "Edit comment"
+  },
+  "order": {
+    "select_to_view": "Select an order to view details",
+    "items_title": "Order Items",
+    "taxes_charges": "Taxes & Charges",
+    "cancel_order": "Cancel order",
+    "enter_cancel_reason": "Enter cancel reason",
+    "print": "Print",
+    "payment": "Payment"
+  },
+  "payment": {
+    "title": "Payment",
+    "apply_discount": "Apply Discount",
+    "discount_placeholder": "Enter %",
+    "payment_methods": "Payment Methods",
+    "amount_placeholder": "Amount",
+    "total_entered": "Total Entered",
+    "order_summary": "Order Summary",
+    "subtotal": "Subtotal",
+    "discount": "Discount",
+    "adjustment": "Adjustment",
+    "total": "Total",
+    "pay_button": "Pay {{amount}}",
+    "processing": "Processing..."
+  },
+  "pos": {
+    "not_opened_title": "POS Not Opened",
+    "not_opened_message": "Please open POS Entry to continue using the system.",
+    "not_closed_title": "Previous POS Not Closed",
+    "not_closed_message": "Please close the previous POS Entry to continue.",
+    "reload_page": "Reload Page",
+    "switch_to_desk": "Switch to Desk"
+  },
+  "customer": {
+    "search_placeholder": "Search customer...",
+    "type_to_search": "Please type to search...",
+    "no_customers_found": "No customers found",
+    "add_new": "Add New Customer",
+    "add_with_name": "Add \"{{name}}\"...",
+    "failed_search": "Failed to search customers",
+    "add_customer_title": "Add New Customer",
+    "name_label": "Name",
+    "name_required": "Name is required",
+    "phone_label": "Phone",
+    "phone_required": "Phone is required",
+    "customer_group_label": "Customer Group",
+    "territory_label": "Territory",
+    "select_group": "Select group",
+    "select_territory": "Select territory",
+    "adding": "Adding Customer...",
+    "add_button": "Add Customer",
+    "failed_create": "Failed to create customer. Please try again."
+  },
+  "comment": {
+    "title": "Order Comments",
+    "label": "Add comments for this order",
+    "placeholder": "Enter any special instructions or comments...",
+    "save_button": "Save Comment"
+  },
+  "errors": {
+    "pos_profile_not_found": "POS Profile not found",
+    "pos_profile_not_loaded": "POS profile not loaded yet",
+    "user_not_logged_in": "User not logged in",
+    "select_aggregator": "Please select an aggregator before proceeding",
+    "select_customer": "Please select a customer before proceeding",
+    "select_table": "Please select a table for {{order_type}} orders",
+    "failed_logout": "Failed to logout. Please try again.",
+    "failed_cancel_order": "Failed to cancel order",
+    "failed_edit_order": "Failed to edit order",
+    "failed_fetch_invoices": "Failed to fetch POS invoices",
+    "failed_fetch_order": "Failed to fetch order details",
+    "failed_print": "Failed to print order",
+    "failed_process_order": "Failed to process order",
+    "no_active_order": "No active order found for this table",
+    "qz_host_not_set": "QZ host is not set",
+    "print_failed": "Print failed: {{reason}}",
+    "invalid_discount": "Please enter a valid discount value",
+    "discount_exceeds_max": "Percentage discount cannot exceed 100%",
+    "please_print_first": "Please print invoice before making payment",
+    "enter_cancel_reason": "Please enter a reason for cancellation."
+  },
+  "success": {
+    "order_cancelled": "Order cancelled successfully",
+    "order_created": "Order created successfully",
+    "order_updated": "Order updated successfully",
+    "printed": "Printed successfully",
+    "payment_successful": "Payment successful",
+    "order_moved_to_draft": "Order moved to Draft after printing."
+  }
+}
