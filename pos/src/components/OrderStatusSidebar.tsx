@@ -3,6 +3,7 @@ import { cn } from '../lib/utils';
 import { Button } from './ui';
 import { getOrderStatusTypes, OrderStatusType } from '../data/order-types';
 import { usePOSStore } from '../store/pos-store';
+import { t } from '../i18n';
 
 interface OrderStatusSidebarProps {
   disabled?: boolean;
@@ -23,14 +24,14 @@ const OrderStatusSidebar = ({
 
   return (
     <div className={cn(
-      "w-64 bg-white border-r border-gray-200 h-full flex flex-col",
+      "w-64 bg-white border-e border-gray-200 h-full flex flex-col",
       disabled && "opacity-50 pointer-events-none"
     )}>
       <nav className="flex-1 p-6 overflow-y-auto">
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
           {/* Section Title */}
           <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3 px-1">
-            Order Status
+            {t('orders.status_title')}
           </h2>
 
           {/* Status Items */}
@@ -50,9 +51,9 @@ const OrderStatusSidebar = ({
               >
                 {/* Active indicator bar */}
                 {selectedStatus === status.value && (
-                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-blue-600 rounded-r-full" />
+                  <div className="absolute start-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-blue-600 rounded-e-full" />
                 )}
-                <div className="flex items-center gap-3 ml-1">
+                <div className="flex items-center gap-3 ms-1">
                   <FileText className="w-4 h-4 text-gray-500" />
                   <span>{status.label}</span>
                 </div>
