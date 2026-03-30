@@ -12,6 +12,7 @@ import { TableShapeIcon } from '../components/TableShapeIcon';
 import { getTableOrder } from '../lib/order-api';
 import { printOrder } from '../lib/print';
 import { showToast } from '../components/ui/toast';
+import { t } from '../i18n';
 
 import LayoutView from '../components/LayoutView';
 
@@ -273,7 +274,7 @@ const TableView = () => {
                   onClick={() => handleLayoutView()}
                 >
                   <Layout className="w-4 h-4" />
-                  Layout view
+                  {t('tables.layout_view')}
                 </Button>
               </div>
             </div>
@@ -293,7 +294,7 @@ const TableView = () => {
           ) : tablesToDisplay.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center gap-3 text-gray-500">
               <Square className="w-10 h-10" />
-              <p>No tables found for this room</p>
+              <p>{t('tables.no_tables_found')}</p>
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
@@ -324,13 +325,13 @@ const TableView = () => {
                           <span className="font-semibold text-lg text-gray-900">{table.name}</span>
                         </div>
                         <Badge variant={isOccupied ? 'warning' : 'success'}>
-                          {isOccupied ? 'Occupied' : 'Available'}
+                          {isOccupied ? t('tables.occupied') : t('tables.available')}
                         </Badge>
                       </div>
 
                       <div className="space-y-2 text-sm text-gray-700">
                         <div className="flex items-center justify-between">
-                          <span className="font-medium">Room</span>
+                          <span className="font-medium">{t('tables.room')}</span>
                           <span>{table.restaurant_room}</span>
                         </div>
                         {isOccupied && (
@@ -341,7 +342,7 @@ const TableView = () => {
                         )}
                         {typeof table.no_of_seats === 'number' && (
                           <div className="flex items-center justify-between">
-                            <span className="font-medium">Seats</span>
+                            <span className="font-medium">{t('tables.seats')}</span>
                             <span className="flex items-center gap-1">
                               <Users className="w-3 h-3" />
                               {table.no_of_seats}
@@ -384,7 +385,7 @@ const TableView = () => {
                         </button>
                       </div>
                     ) : (
-                      <p className="text-sm text-gray-500">Tap to start a new dine-in order</p>
+                      <p className="text-sm text-gray-500">{t('tables.tap_to_start')}</p>
                     )}
                   </div>
                 );
@@ -400,11 +401,11 @@ const TableView = () => {
           <div className="flex items-center justify-center gap-6 text-sm">
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 bg-green-100 border border-green-300 rounded"></div>
-              <span>Available</span>
+              <span>{t('tables.available')}</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 bg-red-100 border border-red-300 rounded"></div>
-              <span>Occupied</span>
+              <span>{t('tables.occupied')}</span>
             </div>
           </div>
         </div>

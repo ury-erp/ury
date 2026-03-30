@@ -4,6 +4,7 @@ import { cn, formatInvoiceTime } from '../lib/utils';
 import { Table, updateTableLayout } from '../lib/table-api';
 import { getTableOrder, POSInvoice } from '../lib/order-api';
 import { Button } from './ui';
+import { t } from '../i18n';
 
 
 
@@ -334,9 +335,9 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
               className="flex items-center gap-2"
             >
               <Grid3X3 className="w-4 h-4" />
-              Grid View
+              {t('tables.grid_view')}
             </Button>
-            <h2 className="text-lg font-semibold">{selectedRoom} <span className="text-gray-400 mx-2">|</span> Layout</h2>
+            <h2 className="text-lg font-semibold">{selectedRoom} <span className="text-gray-400 mx-2">|</span> {t('tables.layout')}</h2>
           </div>
           <div className="flex items-center gap-2">
             {/* Edit Mode Toggle */}
@@ -356,7 +357,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
                 )}
               >
                 {isEditMode ? <Save className="w-4 h-4" /> : <Edit3 className="w-4 h-4" />}
-                {isEditMode ? 'Finish Editing' : 'Edit Layout'}
+                {isEditMode ? t('tables.finish_editing') : t('tables.edit_layout')}
               </button>
             </div>
           </div>
