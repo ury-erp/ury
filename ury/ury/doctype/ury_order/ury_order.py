@@ -672,3 +672,11 @@ def change_table_in_kot(invoice, new_table, branch):
         production = frappe.db.get_value("URY KOT", kot.name, "production")
         kot_channel = "{}_{}_{}".format("kot_update", branch, production)
         frappe.publish_realtime(kot_channel)
+
+@frappe.whitelist()
+def get_customer_defaults():
+    return {
+        "customer_group": frappe.db.get_single_value("Selling Settings", "customer_group"),
+        "territory": frappe.db.get_single_value("Selling Settings", "territory")
+    }
+
