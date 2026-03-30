@@ -23,7 +23,7 @@ const OrderStatusSidebar = ({
 
   return (
     <div className={cn(
-      "w-64 bg-white border-r border-gray-200 h-full flex flex-col",
+      "w-64 bg-white border-e border-gray-200 h-full flex flex-col",
       disabled && "opacity-50 pointer-events-none"
     )}>
       <nav className="flex-1 p-6 overflow-y-auto">
@@ -50,9 +50,9 @@ const OrderStatusSidebar = ({
               >
                 {/* Active indicator bar */}
                 {selectedStatus === status.value && (
-                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-blue-600 rounded-r-full" />
+                  <div className="absolute start-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-blue-600 rounded-e-full" />
                 )}
-                <div className="flex items-center gap-3 ml-1">
+                <div className="flex items-center gap-3 ms-1">
                   <FileText className="w-4 h-4 text-gray-500" />
                   <span>{status.label}</span>
                 </div>

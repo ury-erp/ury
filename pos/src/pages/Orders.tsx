@@ -208,7 +208,7 @@ export default function Orders() {
       />
 
       {/* Middle Section - Order Cards */}
-      <div className="flex-1 flex flex-col h-screen overflow-hidden pr-96">
+      <div className="flex-1 flex flex-col h-screen overflow-hidden pe-96">
         <div className="flex-1 overflow-y-auto bg-gray-50 p-4 pb-40">
           {orderLoading ? (
             <div className="flex items-center justify-center h-full">
@@ -239,7 +239,7 @@ export default function Orders() {
                           {order.restaurant_table ? `Table ${order.restaurant_table} • ` : ''}{order.order_type}
                         </p>
                       </div>
-                      <Badge variant={getBadgeVariant(order.status)} className="ml-2">
+                      <Badge variant={getBadgeVariant(order.status)} className="ms-2">
                         {order.status}
                       </Badge>
                     </div>
@@ -302,7 +302,7 @@ export default function Orders() {
       </div>
 
       {/* Right Section - Order Details */}
-      <div className="w-96 bg-white border-l border-gray-200 flex flex-col h-[calc(100vh-4rem)] fixed right-0 z-10">
+      <div className="w-96 bg-white border-s border-gray-200 flex flex-col h-[calc(100vh-4rem)] fixed end-0 z-10">
         {!selectedOrder ? (
           <div className="text-center h-full flex flex-col items-center justify-center text-gray-500 p-6">
             <p className="text-lg font-medium mb-2">{t('order.select_to_view')}</p>
@@ -334,7 +334,7 @@ export default function Orders() {
                       disabled={editLoading}
                     >
                       <Pencil className="w-4 h-4" />
-                      {editLoading && <span className="ml-2 text-xs">Loading...</span>}
+                      {editLoading && <span className="ms-2 text-xs">Loading...</span>}
                     </button>
                     <button
                       type="button"
@@ -422,7 +422,7 @@ export default function Orders() {
                         <p className="text-sm font-medium text-gray-900">{item.item_name}</p>
                         <p className="text-xs text-gray-500">Qty: {item.qty}</p>
                       </div>
-                      <div className="text-right">
+                      <div className="text-end">
                         <p className="text-sm font-semibold text-gray-900">
                           {formatCurrency(item.amount)}
                         </p>
@@ -480,7 +480,7 @@ export default function Orders() {
                   </Button>
                 )}
                 {/* Total */}
-                <span className="ml-auto text-xl font-bold text-gray-900 whitespace-nowrap">
+                <span className="ms-auto text-xl font-bold text-gray-900 whitespace-nowrap">
                   {formatCurrency(selectedOrder.rounded_total)}
                 </span>
               </div>
