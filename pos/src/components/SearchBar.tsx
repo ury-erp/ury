@@ -70,7 +70,7 @@ export default function SearchBar({
               onChange('');
             }}
             className={cn(
-              "absolute end-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-all duration-200 hover:scale-110 active:scale-90",
+              "absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-all duration-200 hover:scale-110 active:scale-90",
               disabled && "opacity-50 cursor-not-allowed pointer-events-none"
             )}
             disabled={disabled}
