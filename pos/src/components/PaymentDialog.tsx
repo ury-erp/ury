@@ -150,7 +150,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent variant="xlarge" className="bg-white w-full max-w-4xl max-h-[90vh] flex flex-col md:flex-row p-0" showCloseButton={false}>
         {/* Left Column - Discount and Payment Mode */}
-        <div className="md:w-1/2 p-6 border-b md:border-b-0 md:border-e border-gray-200 overflow-y-auto">
+        <div className="md:w-1/2 p-6 border-b md:border-b-0 md:border-r border-gray-200 overflow-y-auto">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-bold text-gray-900">{t('payment.title')}</h2>
             <Button
@@ -221,8 +221,8 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
                 {formatCurrency(paymentsTotal)} / {formatCurrency(finalTotal)}
                 {paymentsTotal > finalTotal && (
                   <span className="text-yellow-700 font-semibold">
-                    <Coins className="inline w-4 h-4 ms-1 text-yellow-500" />
-                    <span className="text-yellow-500 font-bold ms-1">{formatCurrency(paymentsTotal - finalTotal)}</span>
+                    <Coins className="inline w-4 h-4 ml-1 text-yellow-500" />
+                    <span className="text-yellow-500 font-bold ml-1">{formatCurrency(paymentsTotal - finalTotal)}</span>
                   </span>
                 )}
               </span>
