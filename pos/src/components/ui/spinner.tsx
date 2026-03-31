@@ -1,4 +1,5 @@
 import { cn } from '../../lib/utils';
+import { t } from '../../i18n';
 
 interface SpinnerProps {
   className?: string;
@@ -6,7 +7,8 @@ interface SpinnerProps {
   hideMessage?: boolean;
 }
 
-export function Spinner({ className, message = "Loading..." , hideMessage = false}: SpinnerProps) {
+export function Spinner({ className, message, hideMessage = false}: SpinnerProps) {
+  const displayMessage = message ?? t('common.loading');
   return (
     <div className="flex items-center justify-center min-h-[inherit]">
       <div className="text-center">
@@ -14,8 +16,8 @@ export function Spinner({ className, message = "Loading..." , hideMessage = fals
           "animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600 mx-auto",
           className
         )} />
-        {!hideMessage && message && <p className="mt-4 text-gray-600">{message}</p>}
+        {!hideMessage && displayMessage && <p className="mt-4 text-gray-600">{displayMessage}</p>}
       </div>
     </div>
   );
-} 
+}
