@@ -3,6 +3,7 @@ import { usePOSStore } from '../store/pos-store';
 import MenuCard from './MenuCard';
 import { Spinner } from './ui/spinner';
 import { cn } from '../lib/utils';
+import { t } from '../i18n';
 
 interface MenuListProps {
   onItemClick: (item: any) => void;
@@ -46,20 +47,20 @@ const MenuList: React.FC<MenuListProps> = ({ onItemClick }) => {
       <div className="max-w-screen-xl mx-auto p-4 pb-40">
         {menuLoading ? (
           <div className="h-96">
-            <Spinner message="Loading menu items..." />
+            <Spinner message={t('common.loading_menu_items')} />
           </div>
         ) : error ? (
           <div className="flex items-center justify-center h-96">
             <div className="text-red-600 text-center">
-              <p className="text-lg font-medium">Error loading menu items</p>
+              <p className="text-lg font-medium">{t('common.error_loading_menu_items')}</p>
               <p className="text-sm mt-2">{error}</p>
             </div>
           </div>
         ) : filteredItems.length === 0 ? (
           <div className="flex items-center justify-center h-96">
             <div className="text-gray-500 text-center">
-              <p className="text-lg font-medium">No items found</p>
-              <p className="text-sm mt-2">Try adjusting your filters or search term</p>
+              <p className="text-lg font-medium">{t('common.no_items_found')}</p>
+              <p className="text-sm mt-2">{t('common.try_adjusting_filters')}</p>
             </div>
           </div>
         ) : (

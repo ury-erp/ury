@@ -104,7 +104,7 @@ export default function POS() {
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <Spinner message="Loading menu items..." />
+        <Spinner message={t('common.loading_menu_items')} />
       </div>
     );
   }
@@ -113,7 +113,7 @@ export default function POS() {
     return (
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center">
-          <p className="text-lg font-medium text-red-600">Error loading menu</p>
+          <p className="text-lg font-medium text-red-600">{t('common.error_loading_menu_items')}</p>
           <p className="text-sm text-gray-500 mt-2">{error}</p>
         </div>
       </div>
