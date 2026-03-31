@@ -78,27 +78,27 @@ const Sidebar = ({ disabled }: SidebarProps) => {
           {/* Category Items */}
           <div className="space-y-1">
             {categories.map((category) => {
-              const count = getCategoryCount(category);
+              const count = getCategoryCount(category.name);
               return (
                 <Button
-                  key={category}
-                  onClick={() => setSelectedCategory(category)}
+                  key={category.name}
+                  onClick={() => setSelectedCategory(category.name)}
                   variant="ghost"
                   className={cn(
                     'w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium transition-all duration-200 group relative',
-                    selectedCategory === category
+                    selectedCategory === category.name
                       ? 'bg-white text-gray-900 shadow-sm font-semibold'
                       : 'text-gray-700 hover:bg-white/60 hover:text-gray-900'
                   )}
                   disabled={disabled}
                 >
                   {/* Active indicator bar */}
-                  {selectedCategory === category && (
+                  {selectedCategory === category.name && (
                     <div className="absolute start-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-blue-600 rounded-e-full" />
                   )}
                   <div className="flex items-center gap-3 ms-1">
                     <UtensilsCrossed className="w-4 h-4 text-gray-500 flex-shrink-0" />
-                    <span className="text-start">{category}</span>
+                    <span className="text-start">{category.label}</span>
                   </div>
                   <Badge variant="secondary" size="sm" className="text-xs text-gray-500 bg-gray-100 min-w-[24px] text-center">
                     {count}

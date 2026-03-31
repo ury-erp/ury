@@ -353,7 +353,15 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
         <div className="md:w-1/3 p-6 overflow-y-auto">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">{selectedItem?.item_name}</h2>
-            <p className="text-sm text-gray-500 mt-1">{selectedItem?.item}</p>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-sm text-gray-500">{selectedItem?.item}</span>
+              {(selectedItem?.course_label || selectedItem?.course) && (
+                <>
+                  <span className="text-gray-300">•</span>
+                  <span className="text-sm font-medium text-blue-600">{selectedItem?.course_label || selectedItem?.course}</span>
+                </>
+              )}
+            </div>
           </div>
 
           <div className="mt-6">
