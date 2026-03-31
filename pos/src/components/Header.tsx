@@ -128,7 +128,7 @@ const Header = () => {
             />
             <div className="flex items-center gap-2 text-gray-400">
               <Command className="w-4 h-4" />
-              <span>{t('header.search_shortcut_key')}</span>
+              <span>K</span>
             </div>
         </div>
 
