@@ -16,6 +16,7 @@ interface Props {
 }
 
 const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRefresh }) => {
+  const isRTL = document.dir === 'rtl';
   const [isEditMode, setIsEditMode] = useState(false);
 
   // Local state for optimistic updates
@@ -398,13 +399,13 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
         <div className="absolute bottom-4 right-4 z-30 pointer-events-none">
           {isEditMode ? (
             <div className="bg-blue-50/90 backdrop-blur border border-blue-200 rounded-lg p-3 text-sm text-blue-800 shadow-lg">
-              <div className="font-medium mb-1">Editing Layout</div>
-              <div>• Drag tables to reposition</div>
-              <div>• Changes autosave</div>
+              <div className="font-medium mb-1">{t('tables.editing_layout_hint_title')}</div>
+              <div>{t('tables.drag_tables_hint')}</div>
+              <div>{t('tables.autosave_hint')}</div>
             </div>
           ) : (
             <div className="bg-white/80 backdrop-blur border border-gray-200 rounded-lg p-2 text-xs text-gray-500 shadow-sm">
-              Use Scroll to zoom • Drag background to pan
+              {t('tables.zoom_pan_hint')}
             </div>
           )}
         </div>
@@ -441,10 +442,10 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
 
       {/* Table Properties Panel */}
       {selectedTable && selectedTableData && (
-        <div className="absolute right-0 bottom-0 top-36 bg-white rounded-t-lg shadow-xl border-t border-l border-gray-200 p-4 w-full max-w-xs z-40 max-h-[72vh] overflow-y-auto">
+        <div className={cn("absolute bottom-0 top-36 bg-white rounded-t-lg shadow-xl border-t border-l border-gray-200 p-4 w-full max-w-xs z-40 max-h-[72vh] overflow-y-auto", isRTL ? "left-0 border-r" : "right-0")}>
           <div className="flex justify-between items-center mb-3">
-            <h4 className="font-semibold">
-              {isEditMode ? 'Edit Table Settings' : 'Table Info'}
+            <h4 className="font-semibold text-gray-900">
+              {isEditMode ? t('tables.edit_settings') : t('tables.table_info')}
             </h4>
             <button
               onClick={() => setSelectedTable(null)}
@@ -456,18 +457,18 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
 
           <div className="space-y-3">
             <div>
-              <label className="block text-sm font-medium mb-1">Table Name</label>
+              <label className="block text-sm font-medium mb-1">{t('tables.table_name')}</label>
               <input
                 type="text"
                 value={selectedTableData.name}
                 disabled={true}
                 className="w-full px-3 py-2 border rounded-md text-sm border-gray-200 bg-gray-50 cursor-not-allowed"
-                title="Table names are managed in backend"
+                title={t('tables.table_name_title')}
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">Capacity</label>
+              <label className="block text-sm font-medium mb-1">{t('tables.capacity')}</label>
               <input
                 type="number"
                 min="0"
@@ -481,13 +482,13 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
                     ? "border-gray-300 bg-white"
                     : "border-gray-200 bg-gray-50 cursor-not-allowed"
                 )}
-                placeholder="Enter 1-20"
+                placeholder={t('tables.capacity_placeholder')}
               />
-              <p className="text-xs text-gray-500 mt-1">Valid range: 1-20 pax</p>
+              <p className="text-xs text-gray-500 mt-1">{t('tables.capacity_range_hint')}</p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">Shape</label>
+              <label className="block text-sm font-medium mb-1">{t('tables.shape')}</label>
               <select
                 value={selectedTableData.table_shape || 'Rectangle'}
                 onChange={(e) => handleDropdownShapeChange(e.target.value)}
@@ -499,23 +500,23 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
                     : "border-gray-200 bg-gray-50 cursor-not-allowed"
                 )}
               >
-                <option value="Circle">Circle</option>
-                <option value="Square">Square</option>
-                <option value="Rectangle">Rectangle</option>
+                <option value="Circle">{t('tables.circle')}</option>
+                <option value="Square">{t('tables.square')}</option>
+                <option value="Rectangle">{t('tables.rectangle')}</option>
               </select>
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">Status</label>
+              <label className="block text-sm font-medium mb-1">{t('tables.status')}</label>
               <div className="w-full px-3 py-2 border border-gray-200 bg-gray-50 rounded-md text-sm cursor-not-allowed capitalize">
-                {selectedTableData.occupied ? 'Occupied' : 'Available'}
+                {selectedTableData.occupied ? t('tables.occupied') : t('tables.available')}
               </div>
             </div>
 
             {/* Position Information */}
             <div className="pt-3 border-t border-gray-200">
-              <label className="block text-sm font-medium mb-2">Position</label>
-              <div className="grid grid-cols-2 gap-2 text-sm">
+              <label className="block text-sm font-medium mb-2">{t('tables.position')}</label>
+              <div className={cn("grid grid-cols-2 gap-2 text-sm", isRTL && "flex-row-reverse")}>
                 <div>
                   <span className="text-gray-500">X:</span>
                   <span className="ml-1">{Math.round(selectedTableData.x)}px</span>
@@ -529,8 +530,8 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
 
             {/* Size Information */}
             <div>
-              <label className="block text-sm font-medium mb-2">Size</label>
-              <div className="grid grid-cols-2 gap-2 text-sm">
+              <label className="block text-sm font-medium mb-2">{t('tables.size')}</label>
+              <div className={cn("grid grid-cols-2 gap-2 text-sm", isRTL && "flex-row-reverse")}>
                 <div>
                   <span className="text-gray-500">W:</span>
                   <span className="ml-1">{getTableDimensions(selectedTableData.table_shape || 'Rectangle').width}px</span>
@@ -545,15 +546,15 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
             {/* Show current bill info if table is occupied */}
             {selectedTableData.latest_invoice_time && (
               <div className="pt-3 border-t border-gray-200">
-                <label className="block text-sm font-medium mb-2">Current Bill</label>
+                <label className="block text-sm font-medium mb-2">{t('tables.current_bill')}</label>
                 <div className="bg-blue-50 p-3 rounded-md text-sm">
                   <div className="flex justify-between mb-1">
-                    <span>Started at:</span>
+                    <span>{t('tables.started_at')}</span>
                     <span>{formatInvoiceTime(selectedTableData.latest_invoice_time)}</span>
                   </div>
                   {selectedTableOrder && (
                     <div className="flex justify-between items-center pt-2 mt-2 border-t border-blue-200">
-                      <span>Total Amount:</span>
+                      <span>{t('tables.total_amount')}</span>
                       <span className="font-bold text-lg text-blue-800">
                         {selectedTableOrder.grand_total.toFixed(2)}
                       </span>
