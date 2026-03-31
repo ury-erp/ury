@@ -59,6 +59,11 @@ export interface PaymentMode {
   enabled: boolean;
 }
 
+export interface Category {
+  name: string;
+  label: string;
+}
+
 export interface Order {
   id: string;
   cartId: string;
@@ -86,7 +91,7 @@ interface Aggregator {
 
 interface POSState {
   menuItems: MenuItem[];
-  categories: string[];
+  categories: Category[];
   activeOrders: OrderItem[];
   selectedCategory: string;
   selectedTable: string | null;
@@ -301,6 +306,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
         item_name: item.item_name,
         item_image: item.item_image,
         course: item.course,
+        course_label: item.course_label || item.course,
         description: item.description || '',
         special_dish: item.special_dish || 0,
         tax_rate: 0,
@@ -346,9 +352,8 @@ export const usePOSStore = create<POSStore>((set, get) => ({
       }
 
       const courses = await getMenuCourses();
-      const categoryNames = courses.map(course => course.name);
-      sessionStorage.setItem('menuCategories', JSON.stringify(categoryNames));
-      set({ categories: categoryNames });
+      sessionStorage.setItem('menuCategories', JSON.stringify(courses));
+      set({ categories: courses });
     } catch (error) {
       set({ error: 'Failed to load menu categories' });
       throw error;
