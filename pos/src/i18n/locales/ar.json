@@ -14,7 +14,21 @@
         "change": "تغيير",
         "all": "الكل",
         "no_options": "لا توجد خيارات",
-        "searching": "جاري البحث..."
+        "searching": "جاري البحث...",
+        "no_items_found": "لم يتم العثور على عناصر",
+        "try_adjusting_filters": "حاول تعديل خيارات التصفية أو البحث",
+        "loading_tables": "جاري تحميل الطاولات...",
+        "loading_menu_items": "جاري تحميل قائمة الطعام...",
+        "error_loading_menu_items": "فشل في تحميل قائمة الطعام",
+        "loading_rooms": "جاري تحميل القاعات...",
+        "no_rooms_found": "لم يتم العثور على قاعات",
+        "no_tables_found": "لم يتم العثور على طاولات",
+        "select_table_title": "اختر طاولة",
+        "checking_pos_status": "جاري التحقق من حالة نقطة البيع...",
+        "cancelling": "جاري الإلغاء...",
+        "confirm_cancel": "تأكيد الإلغاء",
+        "loading_ury_pos": "جاري تحميل URY POS...",
+        "please_wait_setup": "يرجى الانتظار بينما نقوم بضبط الأشياء..."
     },
     "header": {
         "search_placeholder_default": "ابحث عن الطلبات، عناصر القائمة، أو العملاء...",
@@ -22,8 +36,7 @@
         "search_placeholder_menu": "ابحث في القائمة",
         "switch_to_desk": "التبديل إلى المكتب",
         "clear_cache": "مسح ذاكرة التخزين المؤقت",
-        "logout": "تسجيل الخروج",
-        "search_shortcut_key": "K"
+        "logout": "تسجيل الخروج"
     },
     "menu": {
         "special_items": "أصناف مميزة"
@@ -74,11 +87,11 @@
     },
     "pos": {
         "not_opened_title": "نقطة البيع غير مفتوحة",
-        "not_opened_message": "يرجى فتح جلسة نقطة البيع للمتابعة في استخدام النظام.",
-        "not_closed_title": "جلسة نقطة البيع السابقة غير مغلقة",
-        "not_closed_message": "يرجى إغلاق جلسة نقطة البيع السابقة للمتابعة.",
+        "not_closed_title": "وردية نقطة البيع السابقة غير مغلقة",
+        "not_opened_message": "يجب فتح وردية نقطة بيع جديدة للبدء.",
+        "not_closed_message": "يجب إغلاق وردية نقطة البيع السابقة قبل البدء بوردية جديدة. يرجى إغلاقها للمتابعة.",
         "reload_page": "إعادة تحميل الصفحة",
-        "switch_to_desk": "التبديل إلى المكتب"
+        "switch_to_desk": "التبديل إلى لوحة التحكم (Desk)"
     },
     "customer": {
         "search_placeholder": "ابحث عن عميل...",
@@ -110,6 +123,8 @@
         "pos_profile_not_found": "لم يتم العثور على ملف تعريف نقطة البيع",
         "pos_profile_not_loaded": "لم يتم تحميل ملف تعريف نقطة البيع بعد",
         "user_not_logged_in": "المستخدم غير مسجل الدخول",
+        "failed_load_rooms": "فشل في تحميل القاعات",
+        "failed_load_tables": "فشل في تحميل الطاولات",
         "select_aggregator": "يرجى تحديد منصة التجميع (aggregator) قبل المتابعة",
         "select_customer": "يرجى تحديد عميل قبل المتابعة",
         "select_table": "يرجى تحديد طاولة للطلبات من نوع {{order_type}}",
@@ -126,7 +141,8 @@
         "invalid_discount": "يرجى إدخال قيمة خصم صحيحة",
         "discount_exceeds_max": "لا يمكن أن تتجاوز نسبة الخصم 100٪",
         "please_print_first": "يرجى طباعة الفاتورة قبل إتمام عملية الدفع",
-        "enter_cancel_reason": "يرجى إدخال سبب للإلغاء."
+        "enter_cancel_reason": "يرجى إدخال سبب للإلغاء.",
+        "dine_in_restricted": "الطلبات المحلية غير متاحة للدور الخاص بك"
     },
     "success": {
         "order_cancelled": "تم إلغاء الطلب بنجاح",
@@ -157,11 +173,65 @@
         "room": "غرفة",
         "seats": "مقاعد",
         "tap_to_start": "انقر لبدء طلب محلي جديد",
-        "no_tables_found": "لم يتم العثور على طاولات لهذه الغرفة"
+        "no_tables_found": "لم يتم العثور على طاولات لهذه الغرفة",
+        "edit_settings": "تعديل إعدادات الطاولة",
+        "table_info": "معلومات الطاولة",
+        "table_name": "اسم الطاولة",
+        "capacity": "السعة",
+        "shape": "الشكل",
+        "rectangle": "مستطيل",
+        "circle": "دائري",
+        "square": "مربع",
+        "status": "الحالة",
+        "position": "الموقع",
+        "size": "الحجم",
+        "width": "العرض",
+        "height": "الطول",
+        "current_bill": "الفاتورة الحالية",
+        "total_amount": "المبلغ الإجمالي",
+        "last_updated": "آخر تحديث",
+        "order_items": "عناصر الطلب",
+        "started_at": "بدأ في",
+        "no_active_order": "لم يتم العثور على طلب نشط",
+        "loading_table_order": "جاري تحميل طلب الطاولة...",
+        "table_name_title": "يتم إدارة أسماء الطاولات من لوحة التحكم",
+        "capacity_placeholder": "أدخل 1-20",
+        "capacity_range_hint": "النطاق الصالح: 1-20 شخص",
+        "editing_layout_hint_title": "تعديل المخطط",
+        "drag_tables_hint": "• اسحب الطاولات لتغيير موضعها",
+        "autosave_hint": "• يتم حفظ التغييرات تلقائيًا",
+        "zoom_pan_hint": "استخدم التمرير للتكبير • اسحب الخلفية للتحريك"
     },
     "footer": {
         "pos": "نقطة البيع",
         "table": "طاولة",
         "orders": "الطلبات"
+    },
+    "product_dialog": {
+        "special_instructions": "تعليمات خاصة",
+        "special_instructions_placeholder": "أضف أي تعليمات خاصة أو ملاحظات لهذا العنصر...",
+        "quantity": "الكمية",
+        "variants": "الخيارات",
+        "addons": "الإضافات",
+        "loading_addons": "جاري تحميل الإضافات...",
+        "no_addons": "لا توجد إضافات",
+        "total": "الإجمالي",
+        "update_order": "تحديث الطلب",
+        "add_to_order": "إضافة إلى الطلب"
+    },
+    "order_types": {
+        "dine_in": "طلب محلي",
+        "take_away": "سفري",
+        "delivery": "توصيل",
+        "phone_in": "طلب هاتفي",
+        "aggregators": "منصات تجميع"
+    },
+    "order_status_types": {
+        "draft": "مسودة",
+        "unbilled": "غير مفوتر",
+        "recently_paid": "مدفوع مؤخراً",
+        "paid": "مدفوع",
+        "consolidated": "مجمع",
+        "return": "مرتجع"
     }
 }

@@ -7,7 +7,21 @@
     "change": "Modifier",
     "all": "Tout",
     "no_options": "Aucune option",
-    "searching": "Recherche..."
+    "searching": "Recherche...",
+    "no_items_found": "Aucun article trouvé",
+    "try_adjusting_filters": "Essayez de modifier vos filtres ou terme de recherche",
+    "loading_tables": "Chargement des tables...",
+    "loading_menu_items": "Chargement des articles du menu...",
+    "error_loading_menu_items": "Erreur lors du chargement des articles du menu",
+    "loading_rooms": "Chargement des salles...",
+    "no_rooms_found": "Aucune salle trouvée",
+    "no_tables_found": "Aucune table trouvée",
+    "select_table_title": "Sélectionner une table",
+    "checking_pos_status": "Vérification de l'état de la POS...",
+    "cancelling": "Annulation en cours...",
+    "confirm_cancel": "Confirmer l'annulation",
+    "loading_ury_pos": "Chargement de URY POS...",
+    "please_wait_setup": "Veuillez patienter pendant que nous préparons tout"
   },
   "header": {
     "search_placeholder_default": "Rechercher commandes, articles ou clients...",
@@ -15,8 +29,7 @@
     "search_placeholder_menu": "Rechercher dans le menu",
     "switch_to_desk": "Accéder au bureau",
     "clear_cache": "Vider le cache",
-    "logout": "Déconnexion",
-    "search_shortcut_key": "K"
+    "logout": "Déconnexion"
   },
   "menu": {
     "special_items": "Plats spéciaux"
@@ -103,6 +116,8 @@
     "pos_profile_not_found": "Profil PDV introuvable",
     "pos_profile_not_loaded": "Le profil PDV n'est pas encore chargé",
     "user_not_logged_in": "Utilisateur non connecté",
+    "failed_load_rooms": "Échec du chargement des salles",
+    "failed_load_tables": "Échec du chargement des tables",
     "select_aggregator": "Veuillez sélectionner un agrégateur avant de continuer",
     "select_customer": "Veuillez sélectionner un client avant de continuer",
     "select_table": "Veuillez sélectionner une table pour les commandes {{order_type}}",
@@ -119,7 +134,8 @@
     "invalid_discount": "Veuillez entrer une valeur de remise valide",
     "discount_exceeds_max": "La remise en pourcentage ne peut pas dépasser 100 %",
     "please_print_first": "Veuillez imprimer la facture avant d'effectuer le paiement",
-    "enter_cancel_reason": "Veuillez entrer un motif d'annulation."
+    "enter_cancel_reason": "Veuillez entrer un motif d'annulation.",
+    "dine_in_restricted": "La consommation sur place n'est pas disponible pour votre rôle"
   },
   "success": {
     "order_cancelled": "Commande annulée avec succès",
@@ -150,11 +166,65 @@
     "room": "Salle",
     "seats": "Sièges",
     "tap_to_start": "Appuyez pour commencer une nouvelle commande sur place",
-    "no_tables_found": "Aucune table trouvée pour cette salle"
+    "no_tables_found": "Aucune table trouvée pour cette salle",
+    "edit_settings": "Modifier les paramètres de la table",
+    "table_info": "Informations sur la table",
+    "table_name": "Nom de la table",
+    "capacity": "Capacité",
+    "shape": "Forme",
+    "rectangle": "Rectangle",
+    "circle": "Cercle",
+    "square": "Carré",
+    "status": "Statut",
+    "position": "Position",
+    "size": "Taille",
+    "width": "Largeur",
+    "height": "Hauteur",
+    "current_bill": "Facture actuelle",
+    "total_amount": "Montant total",
+    "last_updated": "Dernière mise à jour",
+    "order_items": "Articles de la commande",
+    "started_at": "Démarré à :",
+    "no_active_order": "Aucune commande active trouvée",
+    "loading_table_order": "Chargement de la commande de la table...",
+    "table_name_title": "Les noms des tables sont gérés dans le backend",
+    "capacity_placeholder": "Entrez 1-20",
+    "capacity_range_hint": "Plage valide : 1-20 pax",
+    "editing_layout_hint_title": "Modification du plan",
+    "drag_tables_hint": "• Faites glisser les tables pour les repositionner",
+    "autosave_hint": "• Les modifications sont enregistrées automatiquement",
+    "zoom_pan_hint": "Utilisez le défilement pour zoomer • Faites glisser l'arrière-plan pour déplacer"
   },
   "footer": {
     "pos": "PDV",
     "table": "Table",
     "orders": "Commandes"
+  },
+  "product_dialog": {
+    "special_instructions": "Instructions spéciales",
+    "special_instructions_placeholder": "Ajoutez des instructions spéciales ou des notes pour cet article...",
+    "quantity": "Quantité",
+    "variants": "Variantes",
+    "addons": "Suppléments",
+    "loading_addons": "Chargement des suppléments...",
+    "no_addons": "Aucun supplément",
+    "total": "Total",
+    "update_order": "Mettre à jour la commande",
+    "add_to_order": "Ajouter à la commande"
+  },
+  "order_types": {
+    "dine_in": "Sur place",
+    "take_away": "À emporter",
+    "delivery": "Livraison",
+    "phone_in": "Commande par téléphone",
+    "aggregators": "Agrégateurs"
+  },
+  "order_status_types": {
+    "draft": "Brouillon",
+    "unbilled": "Non facturé",
+    "recently_paid": "Payé récemment",
+    "paid": "Payé",
+    "consolidated": "Consolidé",
+    "return": "Retour"
   }
 }

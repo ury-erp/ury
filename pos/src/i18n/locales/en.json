@@ -7,7 +7,21 @@
     "change": "Change",
     "all": "All",
     "no_options": "No options",
-    "searching": "Searching..."
+    "searching": "Searching...",
+    "no_items_found": "No items found",
+    "try_adjusting_filters": "Try adjusting your filters or search term",
+    "loading_tables": "Loading tables...",
+    "loading_menu_items": "Loading menu items...",
+    "error_loading_menu_items": "Error loading menu items",
+    "loading_rooms": "Loading rooms...",
+    "no_rooms_found": "No rooms found",
+    "no_tables_found": "No tables found",
+    "select_table_title": "Select Table",
+    "checking_pos_status": "Checking POS status...",
+    "cancelling": "Cancelling...",
+    "confirm_cancel": "Confirm Cancel",
+    "loading_ury_pos": "Loading URY POS...",
+    "please_wait_setup": "Please wait while we set things up"
   },
   "header": {
     "search_placeholder_default": "Search orders, menu items, or customers...",
@@ -15,8 +29,7 @@
     "search_placeholder_menu": "Search Menu",
     "switch_to_desk": "Switch To Desk",
     "clear_cache": "Clear Cache",
-    "logout": "Logout",
-    "search_shortcut_key": "K"
+    "logout": "Logout"
   },
   "menu": {
     "special_items": "Special Items"
@@ -103,6 +116,8 @@
     "pos_profile_not_found": "POS Profile not found",
     "pos_profile_not_loaded": "POS profile not loaded yet",
     "user_not_logged_in": "User not logged in",
+    "failed_load_rooms": "Failed to load rooms",
+    "failed_load_tables": "Failed to load tables",
     "select_aggregator": "Please select an aggregator before proceeding",
     "select_customer": "Please select a customer before proceeding",
     "select_table": "Please select a table for {{order_type}} orders",
@@ -119,7 +134,8 @@
     "invalid_discount": "Please enter a valid discount value",
     "discount_exceeds_max": "Percentage discount cannot exceed 100%",
     "please_print_first": "Please print invoice before making payment",
-    "enter_cancel_reason": "Please enter a reason for cancellation."
+    "enter_cancel_reason": "Please enter a reason for cancellation.",
+    "dine_in_restricted": "Dine In is not available for your role"
   },
   "success": {
     "order_cancelled": "Order cancelled successfully",
@@ -150,11 +166,65 @@
     "room": "Room",
     "seats": "Seats",
     "tap_to_start": "Tap to start a new dine-in order",
-    "no_tables_found": "No tables found for this room"
+    "no_tables_found": "No tables found for this room",
+    "edit_settings": "Edit Table Settings",
+    "table_info": "Table Info",
+    "table_name": "Table Name",
+    "capacity": "Capacity",
+    "shape": "Shape",
+    "rectangle": "Rectangle",
+    "circle": "Circle",
+    "square": "Square",
+    "status": "Status",
+    "position": "Position",
+    "size": "Size",
+    "width": "Width",
+    "height": "Height",
+    "current_bill": "Current Bill",
+    "total_amount": "Total Amount",
+    "last_updated": "Last Updated",
+    "order_items": "Order Items",
+    "started_at": "Started at:",
+    "no_active_order": "No active order found",
+    "loading_table_order": "Loading table order...",
+    "table_name_title": "Table names are managed in backend",
+    "capacity_placeholder": "Enter 1-20",
+    "capacity_range_hint": "Valid range: 1-20 pax",
+    "editing_layout_hint_title": "Editing Layout",
+    "drag_tables_hint": "• Drag tables to reposition",
+    "autosave_hint": "• Changes autosave",
+    "zoom_pan_hint": "Use Scroll to zoom • Drag background to pan"
   },
   "footer": {
     "pos": "POS",
     "table": "Table",
     "orders": "Orders"
+  },
+  "product_dialog": {
+    "special_instructions": "Special Instructions",
+    "special_instructions_placeholder": "Add any special instructions or notes for this item...",
+    "quantity": "Quantity",
+    "variants": "Variants",
+    "addons": "Add-ons",
+    "loading_addons": "Loading add-ons...",
+    "no_addons": "No add ons",
+    "total": "Total",
+    "update_order": "Update Order",
+    "add_to_order": "Add to Order"
+  },
+  "order_types": {
+    "dine_in": "Dine In",
+    "take_away": "Take Away",
+    "delivery": "Delivery",
+    "phone_in": "Phone In",
+    "aggregators": "Aggregators"
+  },
+  "order_status_types": {
+    "draft": "Draft",
+    "unbilled": "Unbilled",
+    "recently_paid": "Recently Paid",
+    "paid": "Paid",
+    "consolidated": "Consolidated",
+    "return": "Return"
   }
 }
