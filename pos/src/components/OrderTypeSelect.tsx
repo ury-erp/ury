@@ -7,6 +7,7 @@ import TableSelectionDialog from './TableSelectionDialog';
 import { DEFAULT_ORDER_TYPE, DINE_IN, ORDER_TYPES , type OrderType} from '../data/order-types';
 import { HandPlatter } from 'lucide-react';
 import { isUserRestrictedFromTableOrders } from '../lib/role-utils';
+import { t } from '../i18n';
 
 interface OrderTypeSelectProps {
   disabled?: boolean;
@@ -46,7 +47,7 @@ const OrderTypeSelect = ({ disabled }: OrderTypeSelectProps) => {
   return (
     <div>
       <div className="flex gap-2 overflow-x-auto pb-2 -mx-2 px-2">
-        {ORDER_TYPES.map(({ label, value, icon: Icon }) => {
+        {ORDER_TYPES.map(({ value, icon: Icon }) => {
           const isDineIn = value === DINE_IN;
           const isDisabled = disabled || (isDineIn && isRestrictedFromTableOrders) || isUpdatingOrder;
           
@@ -63,10 +64,10 @@ const OrderTypeSelect = ({ disabled }: OrderTypeSelectProps) => {
                 isDisabled && 'opacity-50 cursor-not-allowed'
               )}
               disabled={isDisabled}
-              title={isDineIn && isRestrictedFromTableOrders ? 'Dine In is not available for your role' : undefined}
+              title={isDineIn && isRestrictedFromTableOrders ? t('errors.dine_in_restricted') || 'Dine In is not available for your role' : undefined}
             >
               <Icon className="w-4 h-4" />
-              {label}
+              {t(`order_types.${value.toLowerCase().replace(/ /g, '_')}`)}
             </Button>
           );
         })}
