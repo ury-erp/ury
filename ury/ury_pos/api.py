@@ -88,7 +88,8 @@ def getRestaurantMenu(pos_profile, room=None, order_type=None):
             "special_dish": item.special_dish,
             "disabled": item.disabled,
             "item_image": frappe.db.get_value("Item", item.item, "image"),
-            "course": _(item.course) if item.course else item.course,
+            "course": item.course,
+            "course_label": _(item.course) if item.course else item.course,
         }
         for item in menu_items
     ]
@@ -100,6 +101,11 @@ def getRestaurantMenu(pos_profile, room=None, order_type=None):
         "modified_time": modified,
         "name": menu
     }
+
+@frappe.whitelist()
+def getMenuCourses():
+    courses = frappe.get_all("URY Menu Course", fields=["name"])
+    return [{"name": d.name, "label": _(d.name)} for d in courses]
 
 @frappe.whitelist()
 def getBranch():
