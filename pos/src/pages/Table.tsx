@@ -290,7 +290,7 @@ const TableView = () => {
               <p>{error}</p>
             </div>
           ) : showGridSkeleton ? (
-            <Spinner message="Loading tables..." />
+            <Spinner message={t('common.loading_tables')} />
           ) : tablesToDisplay.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center gap-3 text-gray-500">
               <Square className="w-10 h-10" />
