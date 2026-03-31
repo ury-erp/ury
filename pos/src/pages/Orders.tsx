@@ -236,11 +236,11 @@ export default function Orders() {
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-xs text-gray-500">
-                          {order.restaurant_table ? `Table ${order.restaurant_table} • ` : ''}{order.order_type}
+                          {order.restaurant_table ? `Table ${order.restaurant_table} • ` : ''}{t(`order_types.${order.order_type.toLowerCase().replace(/ /g, '_')}`)}
                         </p>
                       </div>
                       <Badge variant={getBadgeVariant(order.status)} className="ms-2">
-                        {order.status}
+                        {t(`order_status_types.${order.status.toLowerCase().replace(/ /g, '_')}`)}
                       </Badge>
                     </div>
                     </div>
@@ -283,7 +283,7 @@ export default function Orders() {
                 </Button>
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-muted-foreground">
-                    {t('orders.pagination.page', { number: pagination.currentPage })}
+                    {t('orders.pagination.page', { number: pagination.currentPage.toString() })}
                   </span>
                 </div>
                 <Button
@@ -334,7 +334,7 @@ export default function Orders() {
                       disabled={editLoading}
                     >
                       <Pencil className="w-4 h-4" />
-                      {editLoading && <span className="ms-2 text-xs">Loading...</span>}
+                      {editLoading && <span className="ms-2 text-xs">{t('common.loading')}</span>}
                     </button>
                     <button
                       type="button"
@@ -347,7 +347,7 @@ export default function Orders() {
                   </>
                 )}
                 <Badge variant={getBadgeVariant(selectedOrder.status)}>
-                  {selectedOrder.status}
+                  {t(`order_status_types.${selectedOrder.status.toLowerCase().replace(/ /g, '_')}`)}
                 </Badge>
               </div>
             </div>
@@ -371,10 +371,10 @@ export default function Orders() {
                 </div>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setCancelDialogOpen(false)} disabled={cancelLoading}>
-                    Close
+                    {t('common.cancel')}
                   </Button>
                   <Button variant="danger" onClick={handleCancelOrder} disabled={cancelLoading}>
-                    {cancelLoading ? 'Cancelling...' : 'Confirm Cancel'}
+                    {cancelLoading ? t('common.cancelling') : t('common.confirm_cancel')}
                   </Button>
                 </DialogFooter>
               </DialogContent>

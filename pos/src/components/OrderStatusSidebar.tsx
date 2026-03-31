@@ -55,7 +55,7 @@ const OrderStatusSidebar = ({
                 )}
                 <div className="flex items-center gap-3 ms-1">
                   <FileText className="w-4 h-4 text-gray-500" />
-                  <span>{status.label}</span>
+                  <span>{t(`order_status_types.${status.value.toLowerCase().replace(/ /g, '_')}`)}</span>
                 </div>
               </Button>
             ))}
