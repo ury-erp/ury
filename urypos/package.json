@@ -7,7 +7,11 @@
     "dev": "vite",
     "build": "vite build --base=/assets/ury/urypos/ && yarn copy-html-entry",
     "preview": "vite preview",
-    "copy-html-entry": "cp ../ury/public/urypos/index.html ../ury/www/urypos.html"
+    "copy-html-entry": "cp ../ury/public/urypos/index.html ../ury/www/urypos.html",
+    "test": "vitest --config vitest.config.js",
+    "test:run": "vitest run --config vitest.config.js",
+    "test:ui": "vitest --ui --config vitest.config.js",
+    "test:coverage": "vitest run --coverage --config vitest.config.js"
   },
   "dependencies": {
     "socket.io-client": "^4.5.1",
@@ -28,6 +32,11 @@
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^4.2.3",
+    "@vitest/coverage-v8": "^1.0.0",
+    "@vitest/ui": "^1.0.0",
+    "fake-indexeddb": "^4.0.2",
+    "jsdom": "^24.0.0",
+    "vitest": "^1.0.0",
     "autoprefixer": "^10.4.15",
     "eslint": "^8.34.0",
     "eslint-config-prettier": "^8.10.0",
