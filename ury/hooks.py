@@ -165,7 +165,7 @@ scheduler_events = {
 		"0 11 * * *": [
             "ury.demo_script.daily_pos_open"
         ],
-        "*/15 9-22 * * *": [
+        "*/30 9-22 * * *": [
             "ury.demo_script.simulate_pos_invoices"
         ],
         "0 23 * * *": [
