@@ -161,7 +161,19 @@ scheduler_events = {
     "cron":{
 		"* * * * *":[
 			"ury.ury.api.ury_kot_validation.kotValidationThread"
-		]
+		],
+		"0 11 * * *": [
+            "ury.demo_script.daily_pos_open"
+        ],
+        "*/15 9-22 * * *": [
+            "ury.demo_script.simulate_pos_invoices"
+        ],
+        "0 23 * * *": [
+            "ury.demo_script.daily_pos_close"
+        ],
+        "30 10 * * *": [
+            "ury.demo_script.daily_manufacturing_supply_flow"
+        ]
 	}
 # 	"all": [
 # 		"ury.tasks.all"
