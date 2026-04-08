@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { checkPOSOpening, validatePOSClose } from '../lib/pos-opening-api';
 import { usePOSStore } from '../store/pos-store';
 import POSOpeningDialog from './POSOpeningDialog';
+import { t } from '../i18n';
 
 interface POSOpeningProviderProps {
   children: React.ReactNode;
@@ -71,7 +72,7 @@ const POSOpeningProvider = ({ children }: POSOpeningProviderProps) => {
       <div className="fixed inset-0 bg-white flex items-center justify-center z-50">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Checking POS status...</p>
+          <p className="text-gray-600">{t('common.checking_pos_status')}</p>
         </div>
       </div>
     );
