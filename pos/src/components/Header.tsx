@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   Command,
   User,
@@ -7,6 +7,7 @@ import {
   Monitor,
   LogOut,
   RefreshCw,
+  Settings,
 } from 'lucide-react';
 import { Button, Input } from './ui';
 import { useRootStore } from '../store/root-store';
@@ -14,6 +15,7 @@ import { usePOSStore } from '../store/pos-store';
 import type { RootState } from '../store/root-store';
 import { logout } from '../lib/auth-api';
 import { showToast } from './ui/toast';
+import { usePermissions } from '../contexts/PermissionsContext';
 
 const Header = () => {
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -21,9 +23,14 @@ const Header = () => {
   const user = useRootStore((state: RootState) => state.user);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const location = useLocation();
+  const navigate = useNavigate();
   const { searchQuery, setSearchQuery } = usePOSStore();
   const { orderSearchQuery, setOrderSearchQuery } = useRootStore();
   const [orderSearchInput, setOrderSearchInput] = useState(orderSearchQuery);
+  const { hasCapability } = usePermissions();
+  
+  // Check if user has any settings-related capability
+  const canAccessSettings = hasCapability('users.manage') || hasCapability('roles.manage');
 
   // Determine placeholder and handlers based on route
   let searchPlaceholder = 'Search orders, menu items, or customers...';
@@ -155,6 +162,19 @@ const Header = () => {
                   <p className="text-sm text-gray-500">{user?.name || ''}</p>
                 </div>
                 <div className="py-2">
+                  {canAccessSettings && (
+                    <Button
+                      variant="ghost"
+                      className="flex justify-start items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                      onClick={() => {
+                        setShowUserMenu(false);
+                        navigate('/settings');
+                      }}
+                    >
+                      <Settings className="w-4 h-4 mr-3" />
+                      Settings
+                    </Button>
+                  )}
                   <Button
                     variant="ghost"
                     className="flex justify-start items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
