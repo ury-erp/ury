@@ -258,7 +258,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2024-08-26 12:28:58.664903",
+ "modified": "2026-04-08 18:03:36.843258",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY KOT",
@@ -318,8 +318,48 @@
    "share": 1,
    "submit": 1,
    "write": 1
+  },
+  {
+   "cancel": 1,
+   "export": 1,
+   "read": 1,
+   "report": 1,
+   "role": "URY Store Admin",
+   "select": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "cancel": 1,
+   "export": 1,
+   "read": 1,
+   "report": 1,
+   "role": "URY Sales Manager",
+   "select": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "cancel": 1,
+   "delete": 1,
+   "export": 1,
+   "read": 1,
+   "report": 1,
+   "role": "URY Ops Admin",
+   "select": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "export": 1,
+   "read": 1,
+   "report": 1,
+   "role": "URY Chef",
+   "select": 1,
+   "write": 1
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": []
