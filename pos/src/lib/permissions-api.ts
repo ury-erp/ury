@@ -67,7 +67,7 @@ function handleFrappeError(error: unknown): never {
 export async function getMe(): Promise<MeResponse> {
   try {
     const res = await call.get('ury.ury.permissions.get_me');
-    return res as unknown as MeResponse;
+    return (res as any).message;
   } catch (error) {
     handleFrappeError(error);
   }
@@ -80,7 +80,7 @@ export async function getMe(): Promise<MeResponse> {
 export async function getUsers(): Promise<URYUser[]> {
   try {
     const res = await call.get('ury.ury.api.permissions_api.get_users');
-    return res as unknown as URYUser[];
+    return (res as any).message;
   } catch (error) {
     handleFrappeError(error);
   }
@@ -97,7 +97,7 @@ export async function inviteUser(
       full_name,
       ury_role,
     });
-    return res as unknown as { message: string };
+    return (res as any).message;
   } catch (error) {
     handleFrappeError(error);
   }
@@ -112,7 +112,7 @@ export async function updateUserRole(
       user,
       ury_role,
     });
-    return res as unknown as { message: string };
+    return (res as any).message;
   } catch (error) {
     handleFrappeError(error);
   }
@@ -127,7 +127,7 @@ export async function setUserEnabled(
       user,
       enabled,
     });
-    return res as unknown as { message: string };
+    return (res as any).message;
   } catch (error) {
     handleFrappeError(error);
   }
@@ -140,7 +140,7 @@ export async function setUserEnabled(
 export async function getURYRoles(): Promise<URYRole[]> {
   try {
     const res = await call.get('ury.ury.api.permissions_api.get_ury_roles');
-    return res as unknown as URYRole[];
+    return (res as any).message;
   } catch (error) {
     handleFrappeError(error);
   }
@@ -149,7 +149,7 @@ export async function getURYRoles(): Promise<URYRole[]> {
 export async function getCapabilitiesCatalogue(): Promise<Record<string, string>> {
   try {
     const res = await call.get('ury.ury.api.permissions_api.get_capabilities_catalogue');
-    return res as unknown as Record<string, string>;
+    return (res as any).message;
   } catch (error) {
     handleFrappeError(error);
   }
@@ -168,7 +168,7 @@ export async function createURYRole(
       capabilities: JSON.stringify(capabilities),
       desk_access,
     });
-    return res as unknown as { message: string };
+    return (res as any).message;
   } catch (error) {
     handleFrappeError(error);
   }
@@ -185,7 +185,7 @@ export async function updateURYRole(
       capabilities: JSON.stringify(capabilities),
       description,
     });
-    return res as unknown as { message: string };
+    return (res as any).message;
   } catch (error) {
     handleFrappeError(error);
   }
@@ -198,7 +198,7 @@ export async function deleteURYRole(
     const res = await call.post('ury.ury.api.permissions_api.delete_ury_role', {
       role_name,
     });
-    return res as unknown as { message: string };
+    return (res as any).message;
   } catch (error) {
     handleFrappeError(error);
   }
