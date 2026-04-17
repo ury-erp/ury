@@ -214,10 +214,10 @@ export const useInvoiceDataStore = defineStore("invoiceData", {
       this.invoiceUpdating = true;
       let selectedTables = "";
       let cart = this.menu.cart;
-      const customerName = this.customers.search;
+      const customerName = this.customers.search || "Walk-in Customer";
       const ordeType =
         this.menu.selectedOrderType || this.recentOrders.pastOrderType;
-      const numberOfPax = this.customers.numberOfPax;
+      const numberOfPax = this.customers.numberOfPax || 1;
       let invoice =
         this.recentOrders.draftInvoice ||
         this.table.invoiceNo ||
