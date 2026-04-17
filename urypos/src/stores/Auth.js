@@ -154,7 +154,7 @@ export const useAuthStore = defineStore("auth", {
         });
     },
     routeToHome() {
-      var currentDomain = window.location.protocol + "//" + window.location.hostname;
+      var currentDomain = window.location.protocol + "//" + window.location.host;
       window.location.href = currentDomain + "/app/";
     },
 
