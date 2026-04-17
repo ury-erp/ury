@@ -104,20 +104,19 @@ def getRestaurantMenu(pos_profile, room=None, order_type=None):
 @frappe.whitelist()
 def getBranch():
     user = frappe.session.user
-    if user != "Administrator":
-        sql_query = """
-            SELECT b.branch
-            FROM `tabURY User` AS a
-            INNER JOIN `tabBranch` AS b ON a.parent = b.name
-            WHERE a.user = %s
-        """
-        branch_array = frappe.db.sql(sql_query, user, as_dict=True)
-        if not branch_array:
-            frappe.throw("User is not Associated with any Branch.Please refresh Page")
+    sql_query = """
+        SELECT b.branch
+        FROM `tabURY User` AS a
+        INNER JOIN `tabBranch` AS b ON a.parent = b.name
+        WHERE a.user = %s
+    """
+    branch_array = frappe.db.sql(sql_query, user, as_dict=True)
+    if not branch_array:
+        frappe.throw("User is not Associated with any Branch.Please refresh Page")
 
-        branch_name = branch_array[0].get("branch")
+    branch_name = branch_array[0].get("branch")
 
-        return branch_name
+    return branch_name
 
 @frappe.whitelist()
 def getBranchRoom():
