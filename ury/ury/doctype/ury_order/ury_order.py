@@ -247,6 +247,7 @@ def sync_order(
     invoice.items = []
     
     menu = frappe.db.get_value("URY Menu", {"branch": invoice.branch}, "name")
+    has_special_dish_field = frappe.get_meta("POS Invoice Item").has_field("custom_special_dish")
    
     for d in items:
         
@@ -270,6 +271,7 @@ def sync_order(
                     qty=d.get("qty"),
                     **({"custom_course": course} if course else {}),
                     comment=d.get("comment"),
+                    **({"custom_special_dish": d.get("special_dish")} if has_special_dish_field and "special_dish" in d else {}),
                     rate = item_prices[0].price_list_rate,
                     price_list_rate = item_prices[0].price_list_rate,
                     base_price_list_rate = item_prices[0].price_list_rate,

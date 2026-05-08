@@ -75,11 +75,9 @@ def validate_invoice(doc, method):
 
 
 def validate_customer(doc, method):
-    if doc.customer_name == None or doc.customer_name == "":
+    if not doc.customer:
         frappe.throw(
-            (" Failed to load data , Please Refresh the page ").format(
-                doc.customer_name
-            )
+            (" Failed to load data , Please enter valid customer details. ")
         )
 
 
