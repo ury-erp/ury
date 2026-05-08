@@ -526,6 +526,7 @@ def getPosProfile():
 
     invoice_details = {
         "pos_profile": pos_profile_name,
+        "customer": pos_profiles.customer,
         "branch": branch,
         "company": company,
         "waiter": waiter,
