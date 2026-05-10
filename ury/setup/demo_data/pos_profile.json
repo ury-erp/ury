@@ -1,0 +1,57 @@
+[
+    {
+        "doctype": "POS Profile",
+        "__newname": "Demo Profile",
+        "company": "__COMPANY__",
+        "restaurant": "Demo Restaurant",
+        "branch": "Demo Branch",
+        "show_image": "1",
+        "custom_kot_naming_series": "KOT-UD-",
+        "custom_kot_warning_time": "15",
+        "custom_reset_order_number_daily": "1",
+        "submit_stock_reconciliation": "1",
+        "custom_current_time": "1",
+        "warehouse": "__WAREHOUSE__",
+        "write_off_account": "__WRITE_OFF_ACCOUNT__",
+        "write_off_cost_center": "__COST_CENTER__",
+        "cost_center": "__COST_CENTER__",
+        "role_allowed_for_billing": [
+            {
+                "role": "Ury Cashier",
+                "parentfield": "role_allowed_for_billing"
+            }
+        ],
+        "payments": [
+            {
+                "doctype": "POS Payment Method",
+                "mode_of_payment": "Cash",
+                "default": "1",
+                "parentfield": "payments"
+            }
+        ],
+        "applicable_for_users": [
+            {
+                "doctype": "POS Profile User",
+                "user": "captain@ury.com",
+                "parentfield": "applicable_for_users"
+            },
+            {
+                "doctype": "POS Profile User",
+                "user": "manager@ury.com",
+                "parentfield": "applicable_for_users"
+            },
+            {
+                "doctype": "POS Profile User",
+                "user": "cashier@ury.com",
+                "default": "1",
+                "parentfield": "applicable_for_users"
+            },
+            {
+                "doctype": "POS Profile User",
+                "user": "Administrator",
+                "default": "1",
+                "parentfield": "applicable_for_users"
+            }
+        ]
+    }
+]

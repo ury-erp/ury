@@ -57,6 +57,46 @@ website_route_rules = [
     {"from_route": "/urypos/<path:app_path>", "to_route": "urypos"},
     {"from_route": "/URYMosaic/<path:app_path>", "to_route": "URYMosaic"},
 ]
+
+setup_wizard_requires = [
+    "assets/erpnext/js/setup_wizard.js",
+    "assets/ury/js/setup_wizard.js",
+]
+
+setup_wizard_complete = "ury.setup.setup_wizard.setup_ury_or_erpnext_demo"
+
+ury_demo_master_doctypes = [
+    "Item Group",
+    "Item",
+    "Item Price",
+    "Customer Group",
+    "Customer",
+    "Gender",
+    "User",
+    "Employee",
+    "BOM",
+    "Supplier Group",
+    "Supplier",
+    "Branch",
+    "URY Menu Course",
+    "URY Menu",
+    "URY Room",
+    "URY Restaurant",
+    "URY Table",
+    "Product Bundle",
+    "URY Production Unit",
+    "URY Report Settings",
+    "POS Profile"
+]
+
+ury_demo_transaction_doctypes = [
+    "Production Plan",
+    "Material Request",
+    "Purchase Order",
+    "Sales Order",
+    "Journal Entry",
+    "Payment Entry"
+]
 # Home Pages
 # ----------
 
