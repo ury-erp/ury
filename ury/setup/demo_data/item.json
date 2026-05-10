@@ -1,0 +1,115 @@
+[
+    {
+        "doctype": "Item",
+        "item_group": "STARTERS",
+        "item_code": "MOM",
+        "item_name": "Momo",
+        "valuation_rate": 40.0,
+        "is_stock_item": "1",
+        "opening_stock": 10,
+        "gst_hsn_code": "999512",
+        "image": "https://www.mygingergarlickitchen.com/wp-content/rich-markup-images/1x1/1x1-steamed-veg-momos-spicy-chili-chutney-vegetable-momos-recipe-video.jpg"
+    },
+    {
+        "doctype": "Item",
+        "item_group": "STARTERS",
+        "item_code": "WNG",
+        "item_name": "Wings",
+        "valuation_rate": 99.0,
+        "is_stock_item": "1",
+        "opening_stock": 10,
+        "gst_hsn_code": "999513",
+        "image": "https://easychickenrecipes.com/wp-content/uploads/2023/08/featured-buffalo-wings-recipe.jpg"
+    },
+    {
+        "doctype": "Item",
+        "item_group": "RICE",
+        "item_code": "GR",
+        "item_name": "Ghee Rice",
+        "is_stock_item": "1",
+        "opening_stock": 10,
+        "stock_uom": "Kg",
+        "valuation_rate": 300.0,
+        "gst_hsn_code": "999517",
+        "image": "https://www.whiskaffair.com/wp-content/uploads/2020/09/Ghee-Rice-2-3.jpg"
+    },
+    {
+        "doctype": "Item",
+        "item_group": "RICE",
+        "item_code": "MR",
+        "item_name": "Mandhi",
+        "is_stock_item": "1",
+        "opening_stock": 10,
+        "stock_uom": "Kg",
+        "valuation_rate": 500.0,
+        "gst_hsn_code": "999519",
+        "image": "https://media-assets.swiggy.com/swiggy/image/upload/f_auto,q_auto,fl_lossy/wydpzezlbyahq1ao78cj"
+    },
+    {
+        "doctype": "Item",
+        "item_group": "RICE",
+        "item_code": "BR",
+        "item_name": "Biriyani",
+        "is_stock_item": "1",
+        "opening_stock": 10,
+        "stock_uom": "Kg",
+        "valuation_rate": 300.0,
+        "gst_hsn_code": "999514",
+        "image": "https://www.pachakam.com/wp-content/uploads/2002/08/kozhikode-chicken-biriyani-500x500.jpg"
+    },
+    {
+        "doctype": "Item",
+        "item_group": "GRAVIES",
+        "item_code": "CG",
+        "item_name": "Chicken Gravy",
+        "stock_uom": "Kg",
+        "valuation_rate": 190.0,
+        "is_stock_item": "1",
+        "opening_stock": 10,
+        "gst_hsn_code": "999520",
+        "image": "https://spiceeats.com/wp-content/uploads/2020/07/Chicken-Hyderabadi.jpg"
+    },
+    {
+        "doctype": "Item",
+        "item_group": "GRAVIES",
+        "item_code": "BG",
+        "item_name": "Beef Gravy",
+        "stock_uom": "Kg",
+        "is_stock_item": "1",
+        "opening_stock": 10,
+        "valuation_rate": 400.0,
+        "gst_hsn_code": "999521",
+        "image": "https://img.taste.com.au/g2N1sXxo/w1200-h1200-cfill-q80/taste/2021/05/slow-cooker-gravy-beef-and-mushroom-stew-171034-3.jpg"
+    },
+    {
+        "doctype": "Item",
+        "item_group": "VEGETABLES",
+        "item_code": "ONN",
+        "item_name": "Onion",
+        "is_stock_item": "1",
+        "opening_stock": 30,
+        "stock_uom": "Kg",
+        "valuation_rate": 130.0,
+        "gst_hsn_code": "999530",
+        "image": "https://5.imimg.com/data5/SELLER/Default/2020/12/HO/WJ/YZ/69123212/121-500x500.jpg"
+    },
+    {
+        "doctype": "Item",
+        "item_group": "COMBOS",
+        "item_code": "TDC",
+        "item_name": "Takeaway And Delivery Combo",
+        "is_stock_item": "0",
+        "image": "https://placehold.co/600x400/A7C7E7/000000.png?text=Combo"
+    },
+    {
+        "doctype": "Item",
+        "item_group": "MEAT",
+        "item_code": "CKN",
+        "item_name": "Chicken",
+        "is_stock_item": "1",
+        "opening_stock": 20,
+        "stock_uom": "Kg",
+        "valuation_rate": 300.0,
+        "image": "https://journal.swaledale.co.uk/wp-content/uploads/2024/02/Chicken-Whole.jpg"
+    }
+]
