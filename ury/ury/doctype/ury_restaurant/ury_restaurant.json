@@ -2,6 +2,7 @@
  "actions": [],
  "autoname": "prompt",
  "creation": "2023-09-13 23:41:41.934914",
+ "description": "DEPRECATED: All fields moved to Branch.",
  "default_view": "List",
  "doctype": "DocType",
  "document_type": "Setup",

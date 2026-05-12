@@ -61,11 +61,10 @@ def create_kot_doc(
     branch = getBranch()
     if restaurant_table:
         room = frappe.db.get_value("URY Table", restaurant_table, "restaurant_room")
-        restaurant = frappe.db.get_value("URY Table", restaurant_table, "restaurant")
-        menu = frappe.db.get_value("Menu for Room", {"room": room,"parent":restaurant}, "menu")
+        menu = frappe.db.get_value("Menu for Room", {"room": room,"parent":branch}, "menu")
         
     else:
-        menu = frappe.db.get_value("URY Restaurant", {"branch": branch}, "active_menu")
+        menu = frappe.db.get_value("Branch", branch, "active_menu")
 
     for item in items:
         course = frappe.db.get_value("URY Menu Item", {"item": item["item_code"],"parent":menu}, "course")
@@ -293,11 +292,10 @@ def create_cancel_kot_doc(
     branch = getBranch()
     if restaurant_table:
         room = frappe.db.get_value("URY Table", restaurant_table, "restaurant_room")
-        restaurant = frappe.db.get_value("URY Table", restaurant_table, "restaurant")
-        menu = frappe.db.get_value("Menu for Room", {"room": room,"parent":restaurant}, "menu")
+        menu = frappe.db.get_value("Menu for Room", {"room": room,"parent":branch}, "menu")
         
     else:
-        menu = frappe.db.get_value("URY Restaurant", {"branch": branch}, "active_menu")
+        menu = frappe.db.get_value("Branch", branch, "active_menu")
     for cancelItem in cancel_items:
         course = frappe.db.get_value("URY Menu Item", {"item": cancelItem["item_code"],"parent":menu}, "course")
         for item in invoiceItems:

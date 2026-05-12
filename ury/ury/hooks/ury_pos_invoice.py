@@ -122,16 +122,16 @@ def table_status_delete(doc, method):
 
 def pos_invoice_naming(doc, method):
     pos_profile = frappe.get_doc("POS Profile", doc.pos_profile)
-    restaurant = pos_profile.restaurant
+    branch = pos_profile.branch
 
     if not doc.restaurant_table:
         doc.naming_series = frappe.db.get_value(
-            "URY Restaurant", restaurant, "invoice_series_prefix"
+            "Branch", branch, "invoice_series_prefix"
         )
         
         if doc.order_type == "Aggregators":
             doc.naming_series = frappe.db.get_value(
-                "URY Restaurant", restaurant, "aggregator_series_prefix"
+                "Branch", branch, "aggregator_series_prefix"
             )
     
 
@@ -156,17 +156,17 @@ def ro_reload_submit(doc, method):
 
 def validate_price_list(doc, method):
         
-    if doc.restaurant:
+    if doc.branch:
         
         if doc.restaurant_table:
             room = frappe.db.get_value("URY Table", doc.restaurant_table, "restaurant_room")
             menu_name = (
-                frappe.db.get_value("URY Restaurant", doc.restaurant, "active_menu")
+                frappe.db.get_value("Branch", doc.branch, "active_menu")
                 if not frappe.db.get_value(
-                    "URY Restaurant", doc.restaurant, "room_wise_menu"
+                    "Branch", doc.branch, "room_wise_menu"
                 )
                 else frappe.db.get_value(
-                    "Menu for Room", {"parent": doc.restaurant, "room": room}, "menu"
+                    "Menu for Room", {"parent": doc.branch, "room": room}, "menu"
                 )
             )
 
@@ -186,7 +186,7 @@ def validate_price_list(doc, method):
             doc.selling_price_list = price_list
             
         else:
-            menu_name = frappe.db.get_value("URY Restaurant", doc.restaurant, "active_menu") 
+            menu_name = frappe.db.get_value("Branch", doc.branch, "active_menu")
 
             doc.selling_price_list = frappe.db.get_value(
                 "Price List", dict(restaurant_menu=menu_name, enabled=1)
