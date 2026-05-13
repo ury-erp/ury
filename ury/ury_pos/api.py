@@ -110,71 +110,68 @@ def getMenuCourses():
 @frappe.whitelist()
 def getBranch():
     user = frappe.session.user
-    if user != "Administrator":
-        sql_query = """
-            SELECT b.branch
-            FROM `tabURY User` AS a
-            INNER JOIN `tabBranch` AS b ON a.parent = b.name
-            WHERE a.user = %s
-        """
-        branch_array = frappe.db.sql(sql_query, user, as_dict=True)
-        if not branch_array:
-            frappe.throw("User is not Associated with any Branch.Please refresh Page")
+    sql_query = """
+        SELECT b.branch
+        FROM `tabURY User` AS a
+        INNER JOIN `tabBranch` AS b ON a.parent = b.name
+        WHERE a.user = %s
+    """
+    branch_array = frappe.db.sql(sql_query, user, as_dict=True)
+    if not branch_array:
+        frappe.throw("User is not Associated with any Branch.Please refresh Page")
 
-        branch_name = branch_array[0].get("branch")
+    branch_name = branch_array[0].get("branch")
 
-        return branch_name
+    return branch_name
 
 @frappe.whitelist()
 def getBranchRoom():
     user = frappe.session.user
-    if user != "Administrator":
-        sql_query = """
-            SELECT b.branch , a.room
-            FROM `tabURY User` AS a
-            INNER JOIN `tabBranch` AS b ON a.parent = b.name
-            WHERE a.user = %s
-        """
-        branch_array = frappe.db.sql(sql_query, user, as_dict=True)
-        
-        branch_name = branch_array[0].get("branch")
-        room_name = branch_array[0].get("room")
+    sql_query = """
+        SELECT b.branch , a.room
+        FROM `tabURY User` AS a
+        INNER JOIN `tabBranch` AS b ON a.parent = b.name
+        WHERE a.user = %s
+    """
+    branch_array = frappe.db.sql(sql_query, user, as_dict=True)
     
-        if not branch_name:
-            frappe.throw("Branch information is missing for the user. Please contact your administrator.")
+    branch_name = branch_array[0].get("branch")
+    room_name = branch_array[0].get("room")
 
-        if not room_name:
-            frappe.throw("No room assigned to this user. Please contact your administrator.")
+    if not branch_name:
+        frappe.throw("Branch information is missing for the user. Please contact your administrator.")
 
-        return [{
-            "name":room_name ,
-            "branch": branch_name,
-        }]
+    if not room_name:
+        frappe.throw("No room assigned to this user. Please contact your administrator.")
+
+    return [{
+        "name":room_name ,
+        "branch": branch_name,
+    }]
 
 @frappe.whitelist()
 def getRoom():
     user = frappe.session.user
-    if user != "Administrator":
-        sql_query = """
-            SELECT b.branch, a.room
-            FROM `tabURY User` AS a
-            INNER JOIN `tabBranch` AS b ON a.parent = b.name
-            WHERE a.user = %s
-        """
-        branch_array = frappe.db.sql(sql_query, user, as_dict=True)
-        
-        if not branch_array:
-            frappe.throw("No branch or room information found for the user. Please contact your administrator.")
-        
-        room_details = [
-            {
-                "name": row.get("room"),
-                "branch": row.get("branch")
-            } 
-            for row in branch_array
-        ]
+    sql_query = """
+        SELECT b.branch, a.room
+        FROM `tabURY User` AS a
+        INNER JOIN `tabBranch` AS b ON a.parent = b.name
+        WHERE a.user = %s
+    """
+    branch_array = frappe.db.sql(sql_query, user, as_dict=True)
+    
+    if not branch_array:
+        frappe.throw("No branch or room information found for the user. Please contact your administrator.")
+    
+    room_details = [
+        {
+            "name": row.get("room"),
+            "branch": row.get("branch")
+        } 
+        for row in branch_array
+    ]
 
-        return room_details
+    return room_details
 
 @frappe.whitelist()
 def getModeOfPayment():
