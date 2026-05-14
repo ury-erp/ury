@@ -151,7 +151,10 @@ doc_events = {
         },
     "URY Menu Course": {
 		"validate": "ury.ury.api.ury_menu_course_validation.validate_priority",
-	}    
+	},
+    "Branch": {
+        "on_update": "ury.ury.hooks.branch.on_update",
+    }
 }
 
 # Scheduled Tasks
@@ -273,6 +276,9 @@ fixtures = [
                     "Branch-order_type_menu",
                     "Branch-order_type_wise_menu",
                     "Branch-room_wise_menu",
+                    "Branch-column_break_company",
+                    "Branch-column_break_order_type",
+                    "Branch-user_infor_section",
                     "Branch-user",
                     "Customer-mobile_number",
                     "Employee-payment_amount",

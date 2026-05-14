@@ -299,27 +299,16 @@ def get_custom_fields():
 		],
   
 		"Branch": [
-			{
-				"fieldname": "user",
-				"fieldtype": "Table",
-				"options": "URY User",
-				"label": "User",
-				"insert_after": "branch",
-				"reqd": 1
-			},
-			{
-				"fieldname": "company_and_menu_section",
-				"fieldtype": "Section Break",
-				"insert_after": "user"
-			},
+
 			{
 				"fieldname": "company",
 				"fieldtype": "Link",
 				"label": "Company",
 				"options": "Company",
-				"insert_after": "company_and_menu_section",
+				"insert_after": "branch",
 				"reqd": 1
 			},
+
 			{
 				"fieldname": "invoice_series_prefix",
 				"fieldtype": "Data",
@@ -327,16 +316,18 @@ def get_custom_fields():
 				"insert_after": "company",
 				"reqd": 1
 			},
+
 			{
-				"fieldname": "column_break_4",
+				"fieldname": "column_break_company",
 				"fieldtype": "Column Break",
 				"insert_after": "invoice_series_prefix"
 			},
+
 			{
 				"fieldname": "aggregator_series_prefix",
 				"fieldtype": "Data",
 				"label": "Aggregator Series Prefix",
-				"insert_after": "column_break_4"
+				"insert_after": "column_break_company"
 			},
 			{
 				"fieldname": "address",
@@ -356,9 +347,10 @@ def get_custom_fields():
 			{
 				"fieldname": "menu_info_section",
 				"fieldtype": "Section Break",
-				"label": "Menu Info",
+				"label": "Menu Config",
 				"insert_after": "default_tax_template"
 			},
+
 			{
 				"fieldname": "active_menu",
 				"fieldtype": "Link",
@@ -366,6 +358,7 @@ def get_custom_fields():
 				"options": "URY Menu",
 				"insert_after": "menu_info_section"
 			},
+
 			{
 				"fieldname": "room_wise_menu",
 				"fieldtype": "Check",
@@ -383,7 +376,7 @@ def get_custom_fields():
 			},
 
 			{
-				"fieldname": "column_break_vo5jt",
+				"fieldname": "column_break_order_type",
 				"fieldtype": "Column Break",
 				"insert_after": "menu_for_room"
 			},
@@ -393,8 +386,7 @@ def get_custom_fields():
 				"fieldtype": "Link",
 				"label": "Default Room",
 				"options": "URY Room",
-				"insert_after": "column_break_vo5jt",
-				"reqd": 1
+				"insert_after": "column_break_order_type"
 			},
 
 			{
@@ -404,7 +396,6 @@ def get_custom_fields():
 				"default": "0",
 				"insert_after": "default_room"
 			},
-
 			{
 				"fieldname": "order_type_menu",
 				"fieldtype": "Table",
@@ -412,6 +403,21 @@ def get_custom_fields():
 				"options": "Order Type Menu",
 				"depends_on": "eval:doc.order_type_wise_menu",
 				"insert_after": "order_type_wise_menu"
+			},
+
+			{
+				"fieldname": "user_infor_section",
+				"fieldtype": "Section Break",
+				"insert_after": "order_type_menu"
+			},
+
+			{
+				"fieldname": "user",
+				"fieldtype": "Table",
+				"options": "URY User",
+				"label": "User",
+				"insert_after": "user_infor_section",
+				"reqd": 1
 			}
 		],
 
