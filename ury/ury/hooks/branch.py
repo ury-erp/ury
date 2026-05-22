@@ -12,7 +12,7 @@ def on_update(doc, method=None):
         
     fields_to_sync = [
         "company", "invoice_series_prefix", "aggregator_series_prefix",
-        "address", "default_tax_template", "active_menu", "room_wise_menu",
+        "default_tax_template", "active_menu", "room_wise_menu",
         "default_room", "order_type_wise_menu"
     ]
     

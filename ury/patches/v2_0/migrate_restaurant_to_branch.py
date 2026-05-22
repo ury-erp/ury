@@ -23,7 +23,7 @@ def execute():
         # Simple fields
         fields_to_map = [
             "company", "invoice_series_prefix", "aggregator_series_prefix", 
-            "address", "default_tax_template", "active_menu", 
+            "default_tax_template", "active_menu", 
             "room_wise_menu", "default_room", "order_type_wise_menu"
         ]
         

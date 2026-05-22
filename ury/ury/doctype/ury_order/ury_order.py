@@ -38,10 +38,8 @@ def get_order_invoice(table=None, invoiceNo=None, order_type=None, is_payment=No
                 invoice_name = frappe.get_value(
                     "POS Invoice",
                     dict(restaurant_table=table, docstatus=0, invoice_printed=0),
-                )
-                
         # invoice_name = frappe.get_value("POS Invoice", dict(restaurant_table=table, docstatus=0, invoice_printed=0))
-        branch, menu_name, restaurant = get_restaurant_and_menu_name(table)
+        branch, menu_name = get_branch_and_menu_name(table)
 
         if invoice_name:
             invoice = frappe.get_doc("POS Invoice", invoice_name)
@@ -314,7 +312,7 @@ def item_query_restaurant(
     as_dict=False,
 ):
     """Return items that are selected in active menu of the restaurant"""
-    restaurant, menu = get_restaurant_and_menu_name(filters["table"])
+    branch, menu = get_branch_and_menu_name(filters["table"])
     items = frappe.db.get_all("URY Menu Item", ["item"], dict(parent=menu, disabled=0))
     del filters["table"]
     filters["name"] = ("in", [d.item for d in items])
@@ -323,14 +321,14 @@ def item_query_restaurant(
 
 
 @frappe.whitelist()
-def get_restaurant_and_menu_name(table):
+def get_branch_and_menu_name(table):
     if not table:
         frappe.throw(_("Please select a table"))
 
-    restaurant, branch, room = frappe.get_value(
+    branch, room = frappe.get_value(
         "URY Table",
         table,
-        ["restaurant", "branch", "restaurant_room"],
+        ["branch", "restaurant_room"],
     )
     room_wise_menu = frappe.db.get_value(
         "Branch",
@@ -352,7 +350,7 @@ def get_restaurant_and_menu_name(table):
             _("Please set an active menu for Branch {0}").format(branch)
         )
 
-    return branch, menu, restaurant
+    return branch, menu
 
 @frappe.whitelist()
 def get_menu_name(order_type):
@@ -551,10 +549,6 @@ def cancel_order(invoice_id, reason):
 def make_invoice(customer, payments, cashier, pos_profile,owner, additionalDiscount=None, table=None, invoice=None):
     order_type =  invoice_name = frappe.get_value("POS Invoice",invoice , "order_type")
     invoice = get_order_invoice(table, invoice, order_type, "Payments")
-
-    if table:
-        restaurant = get_restaurant_and_menu_name(table)
-        invoice.restaurant = restaurant
 
     invoice.customer = customer
     invoice.pos_profile = pos_profile

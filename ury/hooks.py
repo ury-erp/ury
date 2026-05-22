@@ -261,7 +261,6 @@ fixtures = [
                 "in",
                 {
                     "Branch-active_menu",
-                    "Branch-address",
                     "Branch-aggregator_series_prefix",
                     "Branch-company",
                     "Branch-custom_aggregator_settings",

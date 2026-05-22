@@ -310,45 +310,38 @@ def get_custom_fields():
 			},
 
 			{
-				"fieldname": "invoice_series_prefix",
-				"fieldtype": "Data",
-				"label": "Invoice Series Prefix",
-				"insert_after": "company",
-				"reqd": 1
+				"fieldname": "default_tax_template",
+				"fieldtype": "Link",
+				"label": "Default Tax Template",
+				"options": "Sales Taxes and Charges Template",
+				"insert_after": "company"
 			},
 
 			{
 				"fieldname": "column_break_company",
 				"fieldtype": "Column Break",
-				"insert_after": "invoice_series_prefix"
+				"insert_after": "default_tax_template"
 			},
 
+			{
+				"fieldname": "invoice_series_prefix",
+				"fieldtype": "Data",
+				"label": "Invoice Series Prefix",
+				"insert_after": "column_break_company",
+				"reqd": 1
+			},
 			{
 				"fieldname": "aggregator_series_prefix",
 				"fieldtype": "Data",
 				"label": "Aggregator Series Prefix",
-				"insert_after": "column_break_company"
-			},
-			{
-				"fieldname": "address",
-				"fieldtype": "Link",
-				"label": "Address",
-				"options": "Address",
-				"insert_after": "aggregator_series_prefix"
-			},
-			{
-				"fieldname": "default_tax_template",
-				"fieldtype": "Link",
-				"label": "Default Tax Template",
-				"options": "Sales Taxes and Charges Template",
-				"insert_after": "address"
+				"insert_after": "invoice_series_prefix"
 			},
 
 			{
 				"fieldname": "menu_info_section",
 				"fieldtype": "Section Break",
 				"label": "Menu Config",
-				"insert_after": "default_tax_template"
+				"insert_after": "aggregator_series_prefix"
 			},
 
 			{
@@ -386,7 +379,8 @@ def get_custom_fields():
 				"fieldtype": "Link",
 				"label": "Default Room",
 				"options": "URY Room",
-				"insert_after": "column_break_order_type"
+				"insert_after": "column_break_order_type",
+				"reqd": 1
 			},
 
 			{

@@ -4,7 +4,8 @@ def execute():
     fields_to_delete = [
         'Branch-company_and_menu_section',
         'Branch-column_break_4',
-        'Branch-column_break_vo5jt'
+        'Branch-column_break_vo5jt',
+        'Branch-address'
     ]
     
     for fieldname in fields_to_delete:
