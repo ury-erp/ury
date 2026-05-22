@@ -510,7 +510,7 @@ export default {
     redirectToLogin() {
       var currentDomain = window.location.origin;
       window.location.href =
-        currentDomain + "/login?redirect-to=URYMosaic/" + this.production;
+        currentDomain + "/login?redirect-to=Mosaic/" + this.production;
     },
     masonryLoading() {
       this.$nextTick(() => {

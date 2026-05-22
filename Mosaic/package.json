@@ -5,9 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build --base=/assets/ury/URYMosaic/ && yarn copy-html-entry",
+    "build": "vite build --base=/assets/ury/Mosaic/ && yarn copy-html-entry",
     "preview": "vite preview",
-    "copy-html-entry": "cp ../ury/public/URYMosaic/index.html ../ury/www/URYMosaic.html"
+    "copy-html-entry": "cp ../ury/public/Mosaic/index.html ../ury/www/Mosaic.html"
   },
   "dependencies": {
     "socket.io-client": "^4.5.1",
