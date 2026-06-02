@@ -250,7 +250,7 @@ This guide takes you step-by-step through setting up URY on top of ERPNext
     - **KOT Print Format** : Select print format for KOT .
     - **Block Takeaway KOT** : Enable for block Takeaway KOT printing .
 
-> **Note:** To access KDS follow the site url with `/Mosaic/Production%20Unit%20Name`. eg: [https://ury.xxxx.com/Mosaic/Kitchen](https://ury.xxx.com/Mosaic/Kitchen)
+> **Note:** To access KDS follow the site url with `/mosaic/Production%20Unit%20Name`. eg: [https://ury.xxxx.com/mosaic/Kitchen](https://ury.xxx.com/mosaic/Kitchen)
 
 ### Step 11 : User Permissions
 

@@ -13,7 +13,7 @@ const routes = [
 ];
 
 const router = createRouter({
-  base: "/Mosaic/",
+  base: "/mosaic/",
   history: createWebHistory(),
   routes,
 });

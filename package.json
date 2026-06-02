@@ -3,8 +3,8 @@
   "scripts": {
     "ury-pos-install": "cd urypos && yarn install --check-files",
     "ury-pos-build": "cd urypos && yarn build",
-    "ury-mosaic-install": "cd Mosaic && yarn install --check-files",
-    "ury-mosaic-build": "cd Mosaic && yarn build",
+    "ury-mosaic-install": "cd mosaic && yarn install --check-files",
+    "ury-mosaic-build": "cd mosaic && yarn build",
     "ury-posv2-install": "cd pos && yarn install --check-files",
     "ury-posv2-build": "cd pos && yarn build",
     "postinstall": "yarn ury-pos-install && yarn ury-mosaic-install && yarn ury-posv2-install",
