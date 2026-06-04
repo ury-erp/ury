@@ -8,6 +8,8 @@
     "ury-posv2-install": "cd pos && yarn install --check-files",
     "ury-posv2-build": "cd pos && yarn build",
     "postinstall": "yarn ury-pos-install && yarn ury-mosaic-install && yarn ury-posv2-install",
+    "preinstall": "rm -rf URYMosaic ury/public/URYMosaic ury/www/URYMosaic.html",
+    "prebuild": "rm -rf URYMosaic ury/public/URYMosaic ury/www/URYMosaic.html",
     "build": "yarn ury-pos-build && yarn ury-mosaic-build && yarn ury-posv2-build"
   },
   "devDependencies": {
