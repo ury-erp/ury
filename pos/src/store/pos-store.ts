@@ -608,6 +608,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
             description: item.description || '',
             special_dish: 0 as 0 | 1,
             tax_rate: 0,
+            comment: item.comment || '',
           };
           return {
             ...orderItem,
