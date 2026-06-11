@@ -65,9 +65,25 @@ def kot_list():
         },
         order_by="creation desc",
     )
+    production_filters = {}
     KOT = []
     for kot in kotList:
         kotdoc = frappe.get_doc("URY KOT", kot.name)
+        
+        if kotdoc.production:
+            if kotdoc.production not in production_filters:
+                prod_doc = frappe.get_doc("URY Production Unit", kotdoc.production)
+                if prod_doc.enable_order_type_wise_display_on_mosaic:
+                    production_filters[kotdoc.production] = [row.order_type for row in prod_doc.get("order_type", [])]
+                else:
+                    production_filters[kotdoc.production] = None
+            
+            allowed_order_types = production_filters[kotdoc.production]
+            if allowed_order_types is not None:
+                invoice_order_type = frappe.db.get_value("POS Invoice", kotdoc.invoice, "order_type")
+                if invoice_order_type not in allowed_order_types:
+                    continue
+
         kotjson = json.loads(frappe.as_json(kotdoc))
         KOT.append(kotjson)
     return {
@@ -114,11 +130,28 @@ def served_kot_list():
         },
         order_by="creation desc",
     )
+    production_filters = {}
+
     print(kotList,"kotList..................")
     KOT = []
     for kot in kotList:
         kotdoc = frappe.get_doc("URY KOT", kot.name)
         print(kot.name,".................kotdoc")
+        
+        if kotdoc.production:
+            if kotdoc.production not in production_filters:
+                prod_doc = frappe.get_doc("URY Production Unit", kotdoc.production)
+                if prod_doc.enable_order_type_wise_display_on_mosaic:
+                    production_filters[kotdoc.production] = [row.order_type for row in prod_doc.get("order_type", [])]
+                else:
+                    production_filters[kotdoc.production] = None
+            
+            allowed_order_types = production_filters[kotdoc.production]
+            if allowed_order_types is not None:
+                invoice_order_type = frappe.db.get_value("POS Invoice", kotdoc.invoice, "order_type")
+                if invoice_order_type not in allowed_order_types:
+                    continue
+
         invoice=frappe.db.get_value("URY KOT",kot.name,"invoice")
         print(invoice,".....................invoice")
         kotjson = json.loads(frappe.as_json(kotdoc))
