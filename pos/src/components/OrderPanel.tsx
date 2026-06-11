@@ -112,7 +112,7 @@ const OrderPanel = () => {
         customer: selectedOrderType === 'Aggregators' ? selectedAggregator?.customer : selectedCustomer?.name,
         aggregator_id: selectedOrderType === 'Aggregators' ? selectedAggregator?.customer : undefined,
         cashier: posProfile.cashier,
-        owner: user.name,
+        owner: posProfile.owner,
         mode_of_payment: paymentModes[0],
         last_invoice: isUpdatingOrder ? orderId : null,
         invoice: isUpdatingOrder ? orderId : null,
