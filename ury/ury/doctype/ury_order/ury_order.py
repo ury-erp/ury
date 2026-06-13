@@ -512,24 +512,26 @@ def captain_transfer(currentCaptain, newCaptain, invoice):
 
 @frappe.whitelist()
 def customer_favourite_item(customer_name):
-    pos = frappe.db.get_list(
-        "POS Invoice", filters={"customer": customer_name}, fields=["name"]
-    )
-
-    item_qty = {}
-
-    for invoice in pos:
-        pos_invoice = frappe.get_doc("POS Invoice", invoice)
-        for item in pos_invoice.items:
-            item_name = item.item_name
-            item_qty[item_name] = item_qty.get(item_name, 0) + item.qty
-
-    result = [
-        {"item_name": item_name, "qty": qty}
-        for item_name, qty in item_qty.items()
-        if qty > 1
-    ]
-    result = sorted(result, key=lambda x: x["qty"], reverse=True)[:3]
+    query = """
+        SELECT
+            i.item_name, sum(i.qty) as qty
+        FROM
+            `tabPOS Invoice Item` i
+        JOIN
+            `tabPOS Invoice` p ON p.name = i.parent
+        WHERE
+            p.customer = %(customer_name)s
+            AND i.parenttype = 'POS Invoice'
+            AND p.docstatus < 2
+        GROUP BY
+            i.item_name
+        HAVING
+            sum(i.qty) > 1
+        ORDER BY
+            qty DESC
+        LIMIT 3
+    """
+    result = frappe.db.sql(query, {"customer_name": customer_name}, as_dict=True)
 
     return result
 
