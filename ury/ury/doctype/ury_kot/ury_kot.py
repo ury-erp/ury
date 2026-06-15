@@ -6,11 +6,13 @@ import requests
 import json
 from frappe.utils.print_format import print_by_server
 from frappe.model.document import Document
+from ury.ury.api.ury_waiter_print import print_waiter_order_slip
 
 
 class URYKOT(Document):
     def on_submit(self):
         self.multi_print_kot()
+        print_waiter_order_slip(self)
         self.kotDisplayRealtime()
 
     def before_submit(self):
