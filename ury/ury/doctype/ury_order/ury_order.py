@@ -19,6 +19,11 @@ class URYOrder(Document):
 @frappe.whitelist()
 def merge_free_tables(table1, table2):
     """Merges two tables. If one is occupied, syncs the active invoice to the new table."""
+    t1_room = frappe.db.get_value("URY Table", table1, "restaurant_room")
+    t2_room = frappe.db.get_value("URY Table", table2, "restaurant_room")
+    if t1_room != t2_room:
+        frappe.throw("Cannot merge tables from different rooms.")
+
     t1_merged = frappe.db.get_value("URY Table", table1, "merged_with") or ""
     t2_merged = frappe.db.get_value("URY Table", table2, "merged_with") or ""
     
