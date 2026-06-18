@@ -16,31 +16,58 @@ from frappe import cache
 class URYOrder(Document):
     pass
 
+@frappe.whitelist()
+def merge_free_tables(table1, table2):
+    """Merges two tables. If one is occupied, syncs the active invoice to the new table."""
+    t1_merged = frappe.db.get_value("URY Table", table1, "merged_with") or ""
+    t2_merged = frappe.db.get_value("URY Table", table2, "merged_with") or ""
+    
+    if table2 not in t1_merged:
+        new_t1 = f"{t1_merged},{table2}" if t1_merged else table2
+        frappe.db.set_value("URY Table", table1, "merged_with", new_t1)
+        
+    if table1 not in t2_merged:
+        new_t2 = f"{t2_merged},{table1}" if t2_merged else table1
+        frappe.db.set_value("URY Table", table2, "merged_with", new_t2)
+    
+    t1_occupied = frappe.db.get_value("URY Table", table1, "occupied")
+    t2_occupied = frappe.db.get_value("URY Table", table2, "occupied")
+    
+    if t1_occupied or t2_occupied:
+        active_table = table1 if t1_occupied else table2
+        new_table = table2 if t1_occupied else table1
+        
+        invoice = get_order_invoice(table=active_table)
+        if invoice and invoice.name:
+            existing_merged = invoice.custom_merged_tables or ""
+            if new_table not in existing_merged:
+                new_merged_tables = f"{existing_merged},{new_table}" if existing_merged else new_table
+                frappe.db.set_value("POS Invoice", invoice.name, "custom_merged_tables", new_merged_tables)
+            
+            frappe.db.set_value("URY Table", new_table, {"occupied": 1, "latest_invoice_time": invoice.creation})
+            
+    return True
+
+
 
 @frappe.whitelist()
 def get_order_invoice(table=None, invoiceNo=None, order_type=None, is_payment=None):
     """returns the active invoice linked to the given table"""
 
     if table:
-        if is_payment == "Payments":
-            invoice_name = frappe.get_value(
-                "POS Invoice", dict(restaurant_table=table, docstatus=0, name=invoiceNo)
-            )
+        filters = {"docstatus": 0}
+        if invoiceNo:
+            filters["name"] = invoiceNo
+        elif is_payment != "Payments":
+            filters["invoice_printed"] = 0
             
-        else:
-            if invoiceNo:
-                invoice_name = frappe.get_value(
-                    "POS Invoice",
-                    dict(restaurant_table=table, docstatus=0, name=invoiceNo),
-                )
-               
-            else:
-                invoice_name = frappe.get_value(
-                    "POS Invoice",
-                    dict(restaurant_table=table, docstatus=0, invoice_printed=0),
-                )
-                
-        # invoice_name = frappe.get_value("POS Invoice", dict(restaurant_table=table, docstatus=0, invoice_printed=0))
+        or_filters = {
+            "restaurant_table": table,
+            "custom_merged_tables": ["like", f"%{table}%"]
+        }
+        
+        invoices = frappe.get_all("POS Invoice", filters=filters, or_filters=or_filters, limit=1)
+        invoice_name = invoices[0].name if invoices else None
         branch, menu_name, restaurant = get_restaurant_and_menu_name(table)
 
         if invoice_name:
@@ -127,7 +154,8 @@ def sync_order(
     comments=None,
     order_type=None,
     aggregator_id=None,
-    room=None
+    room=None,
+    merged_tables=None
 ):
     
     user_role = frappe.get_roles()
@@ -212,7 +240,16 @@ def sync_order(
     invoice.waiter = waiter
     invoice.custom_aggregator_id = aggregator_id
     invoice.custom_restaurant_room =room
-    invoice.restaurant_table = table
+    if not invoice.restaurant_table:
+        invoice.restaurant_table = table
+        
+    if not merged_tables:
+        merged_with = frappe.db.get_value("URY Table", invoice.restaurant_table, "merged_with")
+        if merged_with:
+            merged_tables = merged_with
+
+    if merged_tables:
+        invoice.custom_merged_tables = merged_tables
     
     if order_type == "Aggregators":
         price_list = frappe.db.get_value("Aggregator Settings",{"customer": customer, "parent": invoice.branch, "parenttype": "Branch"},"price_list",)
@@ -298,8 +335,13 @@ def sync_order(
     # table status
     if invoice.invoice_printed == 0:
         frappe.db.set_value(
-            "URY Table", table, {"occupied": 1, "latest_invoice_time": invoice.creation}
+            "URY Table", invoice.restaurant_table, {"occupied": 1, "latest_invoice_time": invoice.creation}
         )
+        if invoice.custom_merged_tables:
+            for merged_table in invoice.custom_merged_tables.split(","):
+                frappe.db.set_value(
+                    "URY Table", merged_table.strip(), {"occupied": 1, "latest_invoice_time": invoice.creation}
+                )
 
     invoice.db_set("owner", owner)
     return invoice.as_dict()
@@ -532,8 +574,15 @@ def cancel_order(invoice_id, reason):
     frappe.db.set_value(
         "URY Table",
         pos_invoice.restaurant_table,
-        {"occupied": 0, "latest_invoice_time": None},
+        {"occupied": 0, "latest_invoice_time": None, "merged_with": None},
     )
+    if pos_invoice.custom_merged_tables:
+        for merged_table in pos_invoice.custom_merged_tables.split(","):
+            frappe.db.set_value(
+                "URY Table",
+                merged_table.strip(),
+                {"occupied": 0, "latest_invoice_time": None, "merged_with": None},
+            )
 
     try:
         cancel_kot(invoice_id)
@@ -582,6 +631,17 @@ def make_invoice(customer, payments, cashier, pos_profile,owner, additionalDisco
         invoice.submit()
     except Exception as e:
         frappe.throw(f"Error while settling order: {e}")
+        
+    # Free the table and any merged tables after successful billing
+    if invoice.restaurant_table:
+        frappe.db.set_value("URY Table", invoice.restaurant_table, {"occupied": 0, "latest_invoice_time": None, "merged_with": None})
+        if invoice.custom_merged_tables:
+            for merged_table in invoice.custom_merged_tables.split(","):
+                frappe.db.set_value(
+                    "URY Table", 
+                    merged_table.strip(), 
+                    {"occupied": 0, "latest_invoice_time": None, "merged_with": None}
+                )
     
     
 

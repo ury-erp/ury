@@ -27,6 +27,9 @@ export const useTableStore = defineStore("table", {
     isTakeAway: "",
     mobileNumber: "",
     showModal: false,
+    showModalMergeFree: false,
+    mergeSourceTable: "",
+    selectedMergedTable: "",
     isTakeaeay: false,
     newTable: "",
     showTable: false,
@@ -167,6 +170,7 @@ export const useTableStore = defineStore("table", {
             "layout_x",
             "layout_y",
             "minimum_seating",
+            "merged_with"
           ],
           filters: [["restaurant_room", "=", this.selectedRoom]],
           limit: "*",
@@ -217,6 +221,36 @@ export const useTableStore = defineStore("table", {
         .catch((error) => {
           console.error(error);
         });
+    },
+    openMergeFreeModal(table) {
+      this.mergeSourceTable = table.name;
+      this.selectedMergedTable = "";
+      this.showModalMergeFree = true;
+      this.db
+        .getDocList("URY Table", {
+          filters: [["occupied", "like", "0%"], ["name", "!=", this.mergeSourceTable], ["restaurant_room", "=", this.selectedRoom]],
+          limit: "*",
+        })
+        .then((tableList) => {
+          this.transferTable = tableList;
+        })
+        .catch((error) => {
+          console.error(error);
+        });
+    },
+    async mergeFreeTablesAction() {
+      try {
+        await this.call.post(
+          "ury.ury.doctype.ury_order.ury_order.merge_free_tables",
+          {
+            table1: this.mergeSourceTable,
+            table2: this.selectedMergedTable
+          }
+        );
+        this.fetchTable();
+      } catch (error) {
+        console.error("Failed to merge tables:", error);
+      }
     },
     fetchCaptain() {
       this.db

@@ -66,8 +66,12 @@ def network_printing(
                 frappe.db.set_value(
                     "URY Table",
                     restaurant_table,
-                    {"occupied": 0, "latest_invoice_time": None},
+                    {"occupied": 0, "latest_invoice_time": None, "merged_with": None},
                 )
+                custom_merged_tables = frappe.db.get_value("POS Invoice", name, "custom_merged_tables")
+                if custom_merged_tables:
+                    for merged_table in custom_merged_tables.split(","):
+                        frappe.db.set_value("URY Table", merged_table.strip(), {"occupied": 0, "latest_invoice_time": None, "merged_with": None})
             else:
                 frappe.db.set_value("POS Invoice", name, "invoice_printed", 1)
 
@@ -134,8 +138,12 @@ def qz_print_update(invoice):
                 
                 # Update table status
                 frappe.db.set_value(
-                    "URY Table", table, {"occupied": 0, "latest_invoice_time": None}
+                    "URY Table", table, {"occupied": 0, "latest_invoice_time": None, "merged_with": None}
                 )
+                custom_merged_tables = frappe.db.get_value("POS Invoice", invoice, "custom_merged_tables")
+                if custom_merged_tables:
+                    for merged_table in custom_merged_tables.split(","):
+                        frappe.db.set_value("URY Table", merged_table.strip(), {"occupied": 0, "latest_invoice_time": None, "merged_with": None})
                 
                 # Validate both updates
                 new_invoice_printed = frappe.db.get_value("POS Invoice", invoice, "invoice_printed")
@@ -171,8 +179,12 @@ def print_pos_page(doctype, name, print_format):
             frappe.db.set_value(
                 "URY Table",
                 restaurant_table,
-                {"occupied": 0, "latest_invoice_time": None},
+                {"occupied": 0, "latest_invoice_time": None, "merged_with": None},
             )
+            custom_merged_tables = frappe.db.get_value("POS Invoice", name, "custom_merged_tables")
+            if custom_merged_tables:
+                for merged_table in custom_merged_tables.split(","):
+                    frappe.db.set_value("URY Table", merged_table.strip(), {"occupied": 0, "latest_invoice_time": None, "merged_with": None})
 
 
 @frappe.whitelist()

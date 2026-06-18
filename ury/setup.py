@@ -113,6 +113,13 @@ def get_custom_fields():
 					"read_only": 0,
 				},
 				{
+					"fieldname": "custom_merged_tables",
+					"fieldtype": "Data",
+					"insert_after": "restaurant_table",
+					"label": "Merged Tables",
+					"read_only": 1,
+				},
+				{
 					"fieldname": "column_break_gd1mq",
 					"fieldtype": "Column Break",
 					"insert_after": "restaurant_table",

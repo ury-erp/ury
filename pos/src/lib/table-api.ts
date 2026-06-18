@@ -13,6 +13,7 @@ export interface Table {
   is_take_away: number;
   restaurant_room: string;
   table_shape: 'Circle' | 'Square' | 'Rectangle';
+  merged_with?: string | null;
   no_of_seats?: number;
   layout_x?: number;
   layout_y?: number;
@@ -63,6 +64,7 @@ export async function getTables(room: string): Promise<Table[]> {
       'is_take_away',
       'restaurant_room',
       'table_shape',
+      'merged_with',
       'no_of_seats',
       'layout_x',
       'layout_y',
@@ -78,5 +80,13 @@ export async function getTables(room: string): Promise<Table[]> {
 
 export async function updateTableLayout(name: string, data: Partial<Table>) {
   return db.updateDoc(DOCTYPES.URY_TABLE, name, data);
+}
+
+export async function mergeTables(table: string, merge_with: string) {
+  const { call } = await import('./frappe-sdk');
+  return call.post('ury.ury.doctype.ury_order.ury_order.merge_free_tables', {
+    table1: table,
+    table2: merge_with
+  });
 }
 
