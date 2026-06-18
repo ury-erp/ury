@@ -116,8 +116,11 @@ def table_status_delete(doc, method):
         frappe.db.set_value(
             "URY Table",
             doc.restaurant_table,
-            {"occupied": 0, "latest_invoice_time": None},
+            {"occupied": 0, "latest_invoice_time": None, "merged_with": None},
         )
+        if hasattr(doc, "custom_merged_tables") and doc.custom_merged_tables:
+            for merged_table in doc.custom_merged_tables.split(","):
+                frappe.db.set_value("URY Table", merged_table.strip(), {"occupied": 0, "latest_invoice_time": None, "merged_with": None})
 
 
 def pos_invoice_naming(doc, method):
