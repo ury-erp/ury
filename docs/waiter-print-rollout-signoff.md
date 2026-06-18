@@ -4,7 +4,7 @@
 
 - [x] Migration completed (`bench --site ury.localhost migrate`)
 - [x] Custom field `URY Printer Settings-custom_waiter_print` present
-- [x] Print format `URY Waiter Order Slip` present on site (site-managed, not shipped from app)
+- [x] Print format `URY Waiter Order Slip` present on site (`doc_type = URY KOT`, site-managed)
 - [x] Room configuration validated (`AC` enabled, `Ground Floor` control)
 - [x] Automated tests passed (`ury.ury.api.test_ury_waiter_print`)
 - [x] Smoke eligibility checks passed on site `ury.localhost`
@@ -20,26 +20,35 @@ Table mapping verified:
 - `F1`, `F4`, `Waiting Table` (AC) -> waiter printer resolved
 - `T5` (Ground Floor) -> no waiter printer
 
+## Behavior
+
+- Waiter slip prints **once per order save** from `kot_execute`
+- Slip contains **combined delta items** from all KOTs created in that save (including cancellations)
+- Print source is **`URY KOT`** (`kot_items`), not the full `POS Invoice`
+- Kitchen KOT printing via `on_submit` is unchanged
+
 ## Verification Matrix
 
 | Scenario | Expected | Result |
 |----------|----------|--------|
-| Dine-in first save (AC table) | 1 waiter slip | Pass (`test_prints_waiter_slip_for_dine_in`) |
-| Dine-in update (modified change) | 1 updated slip | Pass (`test_reprints_on_invoice_modification`) |
-| Same revision repeated trigger | No extra slip | Pass (`test_dedupes_same_invoice_revision`) |
-| Takeaway order | No waiter slip | Pass (`test_skips_takeaway_orders`) |
+| Dine-in order update with new items | 1 combined waiter slip with delta items only | Pass (`test_prints_combined_kot_for_dine_in`) |
+| Multiple production-unit KOTs in one save | 1 combined slip with merged items | Pass (`test_build_combined_kot_doc_merges_multiple_kots`) |
+| Same item across multiple KOTs | Quantities aggregated on one slip | Pass (`test_build_combined_kot_doc_aggregates_same_item`) |
+| Item cancellation in same save | Cancel line included on combined slip | Pass (`test_build_combined_kot_doc_includes_cancel_lines`) |
+| Takeaway order | No waiter slip | Pass (`test_skips_takeaway_tables`) |
 | Control room dine-in | No waiter slip | Pass (`test_skips_when_no_waiter_printers` + GF config) |
 | KOT reprint API | No waiter slip coupling | Pass (unit test) |
-| Missing waiter format | Log and skip | Pass (unit test) |
+| Missing / wrong-doctype waiter format | Log and skip | Pass (unit tests) |
 
-## Automated Test Evidence
+## Site Print Format Setup
 
-```
-bench --site ury.localhost run-tests --module ury.ury.api.test_ury_waiter_print
-.........
-Ran 9 tests in 0.037s
-OK
-```
+The `URY Waiter Order Slip` format must use **`doc_type = URY KOT`** and iterate **`doc.kot_items`** (not `doc.items`).
+
+Required fields in the template:
+- Header: `doc.invoice`, `doc.restaurant_table`, `doc.customer_name`, `doc.date`, `doc.time`
+- Items: `item.item_name`, `item.quantity` (add lines), `item.cancelled_qty` (cancel lines)
+
+Run `bench migrate` after deploy — patch `fix_waiter_order_slip_print_format` updates existing sites automatically.
 
 ## Rollback Path
 
@@ -56,5 +65,8 @@ KOT split, bill print, and KOT reprint flows remain unchanged.
 - `apps/ury/ury/fixtures/custom_field.json`
 - `apps/ury/ury/hooks.py`
 - `apps/ury/ury/ury/api/ury_waiter_print.py`
+- `apps/ury/ury/ury/api/ury_kot_generate.py`
 - `apps/ury/ury/ury/api/test_ury_waiter_print.py`
 - `apps/ury/ury/ury/doctype/ury_kot/ury_kot.py`
+- `apps/ury/ury/ury/print_format/ury_waiter_order_slip/ury_waiter_order_slip.json`
+- `apps/ury/ury/patches/v2_0/fix_waiter_order_slip_print_format.py`

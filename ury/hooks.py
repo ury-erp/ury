@@ -380,6 +380,10 @@ fixtures = [
             ]
         ],
     },
+    {
+        "dt": "Print Format",
+        "filters": [["name", "in", {"URY Waiter Order Slip"}]],
+    },
     {"dt": "Role", "filters": [["role_name", "like", "URY %"]]},
     "Client Script",
 ]

@@ -2,20 +2,8 @@ import frappe
 from frappe.utils.print_format import print_by_server
 
 WAITER_PRINT_FORMAT = "URY Waiter Order Slip"
-WAITER_PRINT_CACHE_PREFIX = "ury_waiter_print_"
-
-
-def _get_cache_key(invoice_id):
-	return f"{WAITER_PRINT_CACHE_PREFIX}{invoice_id}"
-
-
-def _invoice_already_printed(invoice_id, modified):
-	cached_modified = frappe.cache().get_value(_get_cache_key(invoice_id))
-	return cached_modified and cached_modified == modified
-
-
-def _mark_invoice_printed(invoice_id, modified):
-	frappe.cache().set_value(_get_cache_key(invoice_id), modified)
+ADD_KOT_TYPES = ("New Order", "Order Modified")
+CANCEL_KOT_TYPES = ("Partially cancelled", "Cancelled")
 
 
 def _get_room_waiter_printers(room):
@@ -31,22 +19,106 @@ def _get_room_waiter_printers(room):
 	)
 
 
-def print_waiter_order_slip(kot_doc):
-	"""Print one waiter order slip per POS Invoice revision for dine-in tables."""
-	if not kot_doc.invoice:
+def _is_takeaway_table(restaurant_table):
+	if not restaurant_table:
+		return True
+	return frappe.db.get_value("URY Table", restaurant_table, "is_take_away") == 1
+
+
+def _aggregate_kot_items(kot_docs):
+	add_items = {}
+	cancel_items = {}
+
+	for kot in kot_docs:
+		for row in kot.kot_items:
+			key = (row.item, row.comments or "")
+			if kot.type in CANCEL_KOT_TYPES:
+				qty = int(row.cancelled_qty or 0)
+				if qty <= 0:
+					continue
+				if key in cancel_items:
+					cancel_items[key]["cancelled_qty"] += qty
+				else:
+					cancel_items[key] = {
+						"item": row.item,
+						"item_name": row.item_name,
+						"quantity": row.quantity,
+						"cancelled_qty": qty,
+						"comments": row.comments,
+						"course": row.course,
+					}
+			elif kot.type in ADD_KOT_TYPES:
+				qty = int(row.quantity or 0)
+				if qty <= 0:
+					continue
+				if key in add_items:
+					add_items[key]["quantity"] = str(int(add_items[key]["quantity"]) + qty)
+				else:
+					add_items[key] = {
+						"item": row.item,
+						"item_name": row.item_name,
+						"quantity": str(qty),
+						"comments": row.comments,
+						"course": row.course,
+					}
+
+	return list(add_items.values()) + list(cancel_items.values())
+
+
+def build_combined_kot_doc(kot_names):
+	if not kot_names:
+		return None
+
+	kot_docs = [frappe.get_doc("URY KOT", name) for name in kot_names]
+	combined_doc = frappe.copy_doc(kot_docs[0])
+	combined_doc.kot_items = []
+
+	if combined_doc.invoice:
+		waiter = frappe.db.get_value("POS Invoice", combined_doc.invoice, "waiter")
+		if waiter:
+			combined_doc.waiter = waiter
+
+	for item in _aggregate_kot_items(kot_docs):
+		combined_doc.append("kot_items", item)
+
+	return combined_doc
+
+
+def _validate_waiter_print_format(waiter_print_format, room, printer):
+	if not waiter_print_format:
+		frappe.log_error(
+			f"No waiter print format set for printer {printer} in room {room}.",
+			"URY Waiter Print",
+		)
+		return False
+
+	if not frappe.db.exists("Print Format", waiter_print_format):
+		frappe.log_error(
+			f"Waiter print format '{waiter_print_format}' not found.",
+			"URY Waiter Print",
+		)
+		return False
+
+	print_format_doctype = frappe.db.get_value("Print Format", waiter_print_format, "doc_type")
+	if print_format_doctype != "URY KOT":
+		frappe.log_error(
+			f"Waiter print format '{waiter_print_format}' must be for URY KOT, not {print_format_doctype}.",
+			"URY Waiter Print",
+		)
+		return False
+
+	return True
+
+
+def print_combined_waiter_order_slip(invoice_id, kot_names, restaurant_table):
+	"""Print one combined waiter slip for all delta KOTs created in an order update."""
+	if not invoice_id or not kot_names:
 		return
 
-	if not kot_doc.restaurant_table or kot_doc.table_takeaway == 1:
+	if not restaurant_table or _is_takeaway_table(restaurant_table):
 		return
 
-	invoice_modified = frappe.db.get_value("POS Invoice", kot_doc.invoice, "modified")
-	if not invoice_modified:
-		return
-
-	if _invoice_already_printed(kot_doc.invoice, invoice_modified):
-		return
-
-	room = frappe.db.get_value("URY Table", kot_doc.restaurant_table, "restaurant_room")
+	room = frappe.db.get_value("URY Table", restaurant_table, "restaurant_room")
 	if not room:
 		return
 
@@ -54,37 +126,28 @@ def print_waiter_order_slip(kot_doc):
 	if not waiter_printers:
 		return
 
-	printed = False
+	combined_doc = build_combined_kot_doc(kot_names)
+	if not combined_doc or not combined_doc.kot_items:
+		return
+
 	for printer_row in waiter_printers:
 		waiter_print_format = printer_row.custom_waiter_print_format
-		if not waiter_print_format:
-			frappe.log_error(
-				f"No waiter print format set for printer {printer_row.printer} in room {room}.",
-				"URY Waiter Print",
-			)
-			continue
-
-		if not frappe.db.exists("Print Format", waiter_print_format):
-			frappe.log_error(
-				f"Waiter print format '{waiter_print_format}' not found.",
-				"URY Waiter Print",
-			)
+		if not _validate_waiter_print_format(
+			waiter_print_format, room, printer_row.printer
+		):
 			continue
 
 		try:
 			print_by_server(
-				"POS Invoice",
-				kot_doc.invoice,
+				"URY KOT",
+				kot_names[0],
 				printer_row.printer,
 				waiter_print_format,
+				doc=combined_doc,
 				no_letterhead=1,
 			)
-			printed = True
 		except Exception as e:
 			frappe.log_error(
-				f"Waiter print failed for invoice {kot_doc.invoice}: {e}",
+				f"Waiter print failed for invoice {invoice_id}: {e}",
 				"URY Waiter Print",
 			)
-
-	if printed:
-		_mark_invoice_printed(kot_doc.invoice, invoice_modified)
