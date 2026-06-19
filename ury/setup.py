@@ -89,9 +89,17 @@ def get_custom_fields():
 					"insert_after": "invoice_created",
 				},
 				{
-					"fieldname": "branch",
+					"fieldname": "restaurant",
 					"fieldtype": "Link",
 					"insert_after": "restaurant_info",
+					"label": "Restaurant",
+					"options": "URY Restaurant",
+					"read_only": 0,
+				},
+				{
+					"fieldname": "branch",
+					"fieldtype": "Link",
+					"insert_after": "restaurant",
 					"label": "Branch",
 					"options": "Branch",
 					"read_only": 0,
@@ -111,13 +119,13 @@ def get_custom_fields():
 				},
 				{
 					"fieldname": "arrived_time",
-					"fieldtype": "Data",
+					"fieldtype": "Time",
 					"insert_after": "column_break_gd1mq",
 					"label": "Arrived Time"
 				},
 				{
 					"fieldname": "total_spend_time",
-					"fieldtype": "Data",
+					"fieldtype": "Time",
 					"insert_after": "arrived_time",
 					"label": "Total Spend Time"
 				}
@@ -142,6 +150,8 @@ def get_custom_fields():
 					"fieldname": "order_type",
 					"fieldtype": "Select",
 					"default": "Dine In",
+					"options": "URY Restaurant",
+					"fetch_from": "customer.mobile_number",
 					"label": "Order Type",
 					"options": "\nDine In\nTake Away\nDelivery\nPhone In\nAggregators",
 					"insert_after": "order_info",
@@ -162,7 +172,7 @@ def get_custom_fields():
 				},
 				{
 					"fieldname": "no_of_pax",
-					"fieldtype": "Int",
+					"fieldtype": "Data",
 					"label": "Pax",
 					"insert_after": "column_break_rwbwf",
 					"read_only": 0,
@@ -183,9 +193,17 @@ def get_custom_fields():
 					"insert_after": "invoice_created",
 				},
 				{
-					"fieldname": "branch",
+					"fieldname": "restaurant",
 					"fieldtype": "Link",
 					"insert_after": "restaurant_info",
+					"label": "Restaurant",
+					"options": "URY Restaurant",
+					"read_only": 0,
+				},
+				{
+					"fieldname": "branch",
+					"fieldtype": "Link",
+					"insert_after": "restaurant",
 					"label": "Branch",
 					"options": "Branch",
 					"read_only": 0,
@@ -205,13 +223,13 @@ def get_custom_fields():
 				},
 				{
 					"fieldname": "arrived_time",
-					"fieldtype": "Data",
+					"fieldtype": "Time",
 					"insert_after": "column_break_gd1mq",
 					"label": "Arrived Time"
 				},
 				{
 					"fieldname": "total_spend_time",
-					"fieldtype": "Data",
+					"fieldtype": "Time",
 					"insert_after": "arrived_time",
 					"label": "Total Spend Time"
 				}
@@ -225,11 +243,19 @@ def get_custom_fields():
 				"insert_after": "company_address",
 			},
 			{
-				"fieldname": "column_break_c10ag",
-				"fieldtype": "Column Break",
+				"fieldname": "restaurant",
+				"fieldtype": "Link",
 				"insert_after": "restaurant_info",
+				"label": "Restaurant",
+				"options": "URY Restaurant",
 			},
 			{
+				"fieldname": "column_break_c10ag",
+				"fieldtype": "Column Break",
+				"insert_after": "restaurant",
+			},
+			{
+				"fetch_from": "restaurant.branch" ,
 				"fieldname": "branch",
 				"fieldtype": "Link",
 				"insert_after": "column_break_c10ag",
@@ -274,9 +300,17 @@ def get_custom_fields():
 				"insert_after": "user",
 			},
 			{
+				"fieldname": "restaurant",
+				"fieldtype": "Link",
+				"insert_after": "restaurant_info",
+				"label": "Restaurant",
+				"options": "URY Restaurant",
+				"reqd": 1
+			},
+			{
 				"fieldname": "column_break_e3dky",
 				"fieldtype": "Column Break",
-				"insert_after": "restaurant_info",
+				"insert_after": "restaurant",
 			},
 			{	
 				"fieldname": "branch",
@@ -299,118 +333,12 @@ def get_custom_fields():
 		],
   
 		"Branch": [
-
-			{
-				"fieldname": "company",
-				"fieldtype": "Link",
-				"label": "Company",
-				"options": "Company",
-				"insert_after": "branch",
-				"reqd": 1
-			},
-
-			{
-				"fieldname": "default_tax_template",
-				"fieldtype": "Link",
-				"label": "Default Tax Template",
-				"options": "Sales Taxes and Charges Template",
-				"insert_after": "company"
-			},
-
-			{
-				"fieldname": "column_break_company",
-				"fieldtype": "Column Break",
-				"insert_after": "default_tax_template"
-			},
-
-			{
-				"fieldname": "invoice_series_prefix",
-				"fieldtype": "Data",
-				"label": "Invoice Series Prefix",
-				"insert_after": "column_break_company",
-				"reqd": 1
-			},
-			{
-				"fieldname": "aggregator_series_prefix",
-				"fieldtype": "Data",
-				"label": "Aggregator Series Prefix",
-				"insert_after": "invoice_series_prefix"
-			},
-
-			{
-				"fieldname": "menu_info_section",
-				"fieldtype": "Section Break",
-				"label": "Menu Config",
-				"insert_after": "aggregator_series_prefix"
-			},
-
-			{
-				"fieldname": "active_menu",
-				"fieldtype": "Link",
-				"label": "Default Menu",
-				"options": "URY Menu",
-				"insert_after": "menu_info_section"
-			},
-
-			{
-				"fieldname": "room_wise_menu",
-				"fieldtype": "Check",
-				"label": "Room Wise Menu",
-				"default": "0",
-				"insert_after": "active_menu"
-			},
-			{
-				"fieldname": "menu_for_room",
-				"fieldtype": "Table",
-				"label": "Menu For Room",
-				"options": "Menu for Room",
-				"depends_on": "eval:doc.room_wise_menu",
-				"insert_after": "room_wise_menu"
-			},
-
-			{
-				"fieldname": "column_break_order_type",
-				"fieldtype": "Column Break",
-				"insert_after": "menu_for_room"
-			},
-
-			{
-				"fieldname": "default_room",
-				"fieldtype": "Link",
-				"label": "Default Room",
-				"options": "URY Room",
-				"insert_after": "column_break_order_type",
-				"reqd": 1
-			},
-
-			{
-				"fieldname": "order_type_wise_menu",
-				"fieldtype": "Check",
-				"label": "Order Type Wise Menu",
-				"default": "0",
-				"insert_after": "default_room"
-			},
-			{
-				"fieldname": "order_type_menu",
-				"fieldtype": "Table",
-				"label": "Order Type Menu",
-				"options": "Order Type Menu",
-				"depends_on": "eval:doc.order_type_wise_menu",
-				"insert_after": "order_type_wise_menu"
-			},
-
-			{
-				"fieldname": "user_infor_section",
-				"fieldtype": "Section Break",
-				"insert_after": "order_type_menu"
-			},
-
 			{
 				"fieldname": "user",
 				"fieldtype": "Table",
 				"options": "URY User",
 				"label": "User",
-				"insert_after": "user_infor_section",
+				"insert_after": "branch",
 				"reqd": 1
 			}
 		],
@@ -426,7 +354,7 @@ def get_custom_fields():
 			},
 		],
 
-		"POS Invoice Item": [
+		"POS Invoice Iten": [
 			{
 				"fieldname": "comment",
 				"fieldtype": "Data",

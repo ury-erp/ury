@@ -4,6 +4,3 @@
 [post_model_sync]
 # Patches added in this section will be executed after doctypes are migrated
 ury.patches.v2_0.default_permissions
-ury.patches.v2_0.migrate_restaurant_to_branch
-ury.patches.v2_0.delete_restaurant_custom_fields
-ury.patches.v2_0.cleanup_branch_custom_fields

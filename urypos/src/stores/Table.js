@@ -121,7 +121,7 @@ export const useTableStore = defineStore("table", {
               this.handleRoomChange();
             } else {
               this.db
-                .getDocList("Branch", {
+                .getDocList("URY Restaurant", {
                   fields: ["branch", "default_room"],
                   filters: [["branch", "like", this.invoiceData.branch]],
                 })
