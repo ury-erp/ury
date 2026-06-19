@@ -86,7 +86,11 @@ const TableMergeDialog = ({
           <>
             <DialogHeader>
               <DialogTitle>{t('tables.merge_with', { table: sourceTable.name })}</DialogTitle>
-              <DialogDescription>{t('tables.select_table_to_merge')}</DialogDescription>
+              <DialogDescription>
+                {sourceTable.occupied === 1
+                  ? t('tables.merge_with_occupied_hint')
+                  : t('tables.select_table_to_merge')}
+              </DialogDescription>
             </DialogHeader>
 
             <div className="max-h-64 overflow-y-auto px-6 pb-2">
@@ -117,8 +121,11 @@ const TableMergeDialog = ({
                           </span>
                         )}
                       </div>
-                      <Badge variant="success" className="shrink-0">
-                        {t('tables.available')}
+                      <Badge
+                        variant={table.occupied === 1 ? 'secondary' : 'success'}
+                        className="shrink-0"
+                      >
+                        {table.occupied === 1 ? t('tables.occupied') : t('tables.available')}
                       </Badge>
                     </button>
                   ))}

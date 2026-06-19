@@ -23,6 +23,7 @@ const TableActionsMenu = ({
   const menuRef = useRef<HTMLDivElement>(null);
   const isAvailable = table.occupied === 0;
   const isMerged = isMergedTable(table);
+  const canUnmerge = isMerged && isAvailable;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -36,10 +37,6 @@ const TableActionsMenu = ({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isOpen, onOpenChange]);
-
-  if (!isAvailable) {
-    return null;
-  }
 
   const handleToggle = (event: ReactMouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
@@ -81,7 +78,7 @@ const TableActionsMenu = ({
             <Link2 className="h-4 w-4 shrink-0" />
             {t('tables.merge_tables')}
           </Button>
-          {isMerged && (
+          {canUnmerge && (
             <>
               <div className="my-1 border-t border-gray-100" />
               <Button

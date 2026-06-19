@@ -221,9 +221,13 @@ const TableView = () => {
 
   const mergeAvailableTables = useMemo(() => {
     if (!mergeSourceTable) return [];
-    return tables.filter(
-      (table) => table.name !== mergeSourceTable.name && table.occupied === 0
-    );
+    const sourceCluster = new Set(getMergeGroupMembers(mergeSourceTable, tables));
+    return tables.filter((table) => {
+      if (table.name === mergeSourceTable.name) return false;
+      if (sourceCluster.has(table.name)) return false;
+      if (table.occupied === 1 && mergeSourceTable.occupied === 1) return false;
+      return true;
+    });
   }, [mergeSourceTable, tables]);
 
   const tablesToDisplay = useMemo(() => sortTablesByMergeGroups(tables), [tables]);
