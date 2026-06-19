@@ -52,14 +52,18 @@ export default function Orders() {
   const [isPrinting, setIsPrinting] = React.useState(false);
 
   const canSplitBill = useMemo(() => {
-    if (!selectedOrder || selectedOrder.status !== 'Draft') return false;
-    if (String(selectedOrder.invoice_printed) !== '1') return false;
-    if (!selectedOrder.restaurant_table) return false;
+    if (!selectedOrder?.restaurant_table) return false;
     if (selectedOrderItems.length === 0) return false;
-    return (
+
+    const hasSplittableItems =
       selectedOrderItems.length >= 2 ||
-      selectedOrderItems.some((item) => item.qty > 1)
-    );
+      selectedOrderItems.some((item) => item.qty > 1);
+    if (!hasSplittableItems) return false;
+
+    // Tab label (Unbilled/Draft) is a UI filter; doc status is always "Draft" for open bills.
+    // Use invoice_printed to distinguish pre-print vs post-print split eligibility.
+    const invoicePrinted = String(selectedOrder.invoice_printed);
+    return invoicePrinted === '0' || invoicePrinted === '1';
   }, [selectedOrder, selectedOrderItems]);
 
   useEffect(() => {
@@ -212,7 +216,13 @@ export default function Orders() {
     if (!selectedOrder) return;
     const result = await splitBill(selectedOrder.name, itemsToMove);
     showToast.success(t('bill_split.split_success', { invoice: result.new_invoice }));
-    await setSelectedStatus('Unbilled');
+
+    if (String(selectedOrder.invoice_printed) === '1') {
+      await setSelectedStatus('Unbilled');
+    } else {
+      await fetchOrders();
+    }
+
     const newOrder = useRootStore.getState().orders.find((o) => o.name === result.new_invoice);
     if (newOrder) {
       await selectOrder(newOrder);
