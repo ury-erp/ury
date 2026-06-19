@@ -18,7 +18,7 @@ class URYOrder(Document):
 
 @frappe.whitelist()
 def merge_free_tables(table1, table2):
-    """Merges two available (unoccupied) tables in the same room."""
+    """Merges two tables in the same room; allows one occupied and one free."""
     t1_room = frappe.db.get_value("URY Table", table1, "restaurant_room")
     t2_room = frappe.db.get_value("URY Table", table2, "restaurant_room")
     if t1_room != t2_room:
@@ -26,8 +26,15 @@ def merge_free_tables(table1, table2):
 
     t1_occupied = frappe.db.get_value("URY Table", table1, "occupied")
     t2_occupied = frappe.db.get_value("URY Table", table2, "occupied")
-    if t1_occupied or t2_occupied:
-        frappe.throw(_("Cannot merge occupied tables. Both tables must be available."))
+    if t1_occupied and t2_occupied:
+        frappe.throw(_("Cannot merge two occupied tables."))
+
+    union_members, table_by_name = _get_union_cluster_members(table1, table2)
+    occupied_in_union = sum(
+        1 for name in union_members if table_by_name[name].occupied
+    )
+    if occupied_in_union > 1:
+        frappe.throw(_("Cannot merge tables with separate active orders."))
 
     t1_merged = frappe.db.get_value("URY Table", table1, "merged_with") or ""
     t2_merged = frappe.db.get_value("URY Table", table2, "merged_with") or ""
@@ -40,7 +47,53 @@ def merge_free_tables(table1, table2):
         new_t2 = f"{t2_merged},{table1}" if t2_merged else table1
         frappe.db.set_value("URY Table", table2, "merged_with", new_t2)
 
+    _sync_active_order_with_merge_cluster(table1)
     return True
+
+
+def _get_union_cluster_members(table1, table2):
+    members1, table_by_name = _get_merge_cluster(table1)
+    members2, _ = _get_merge_cluster(table2)
+    union = list(set(members1) | set(members2))
+    return union, table_by_name
+
+
+def _sync_active_order_with_merge_cluster(table):
+    members, table_by_name = _get_merge_cluster(table)
+    occupied_members = [name for name in members if table_by_name[name].occupied]
+    if not occupied_members:
+        return
+    if len(occupied_members) > 1:
+        return
+
+    primary_table = occupied_members[0]
+    partners = [name for name in members if name != primary_table]
+    partners_value = ",".join(partners) if partners else None
+
+    open_invoices = frappe.get_all(
+        "POS Invoice",
+        filters={"docstatus": 0, "restaurant_table": primary_table},
+        fields=["name"],
+        limit=1,
+    )
+    if open_invoices:
+        frappe.db.set_value(
+            "POS Invoice",
+            open_invoices[0].name,
+            "custom_merged_tables",
+            partners_value,
+            update_modified=False,
+        )
+
+    invoice_time = frappe.db.get_value("URY Table", primary_table, "latest_invoice_time")
+    for member in members:
+        if member == primary_table:
+            continue
+        frappe.db.set_value(
+            "URY Table",
+            member,
+            {"occupied": 1, "latest_invoice_time": invoice_time},
+        )
 
 
 def _parse_merged_with(merged_with):
