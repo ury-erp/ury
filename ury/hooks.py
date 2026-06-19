@@ -15,7 +15,7 @@ add_to_apps_screen = [
   {
     "name": "ury",
     "logo": "/assets/ury/Images/ury.png",
-    "title": "ury",
+    "title": "URY",
     "route": "/app/ury",
     "has_permission": "ury.permission.check_app_permission"
   }
@@ -92,7 +92,7 @@ website_route_rules = [
 # Uninstallation
 # ------------
 
-# before_uninstall = "ury.uninstall.before_uninstall"
+before_uninstall = "ury.uninstall.uninstall"
 # after_uninstall = "ury.uninstall.before_uninstall"
 
 # Desk Notifications

@@ -13,6 +13,7 @@ import { useNavigate } from 'react-router-dom';
 import PaymentDialog from '../components/PaymentDialog';
 import { printOrder } from '../lib/print';
 import { call } from '../lib/frappe-sdk';
+import { t } from '../i18n';
 
 export default function Orders() {
   const { 
@@ -95,7 +96,7 @@ export default function Orders() {
   async function handleCancelOrder() {
     if (!selectedOrder) return;
     if (!cancelReason.trim()) {
-      showToast.error('Please enter a reason for cancellation.');
+      showToast.error(t('errors.enter_cancel_reason'));
       return;
     }
     setCancelLoading(true);
@@ -104,13 +105,13 @@ export default function Orders() {
         invoice_id: selectedOrder.name,
         reason: cancelReason
       })
-      showToast.success('Order cancelled successfully');
+      showToast.success(t('success.order_cancelled'));
       setCancelDialogOpen(false);
       setCancelReason('');
       clearSelectedOrder();
       fetchOrders();
     } catch (err) {
-      showToast.error(err instanceof Error ? err.message : 'Failed to cancel order');
+      showToast.error(err instanceof Error ? err.message : t('errors.failed_cancel_order'));
     } finally {
       setCancelLoading(false);
     }
@@ -155,7 +156,7 @@ export default function Orders() {
       // Redirect to POS page
       navigate('/');
     } catch (err) {
-      showToast.error(err instanceof Error ? err.message : 'Failed to edit order');
+      showToast.error(err instanceof Error ? err.message : t('errors.failed_edit_order'));
     } finally {
       setEditLoading(false);
     }
@@ -169,19 +170,19 @@ export default function Orders() {
         orderId: selectedOrder.name,
         posProfile: posStore.posProfile
       });
-      showToast.success(`Printed Successfully`);
+      showToast.success(t('success.printed'));
       // Locally update selectedOrder.invoice_printed to 1
       if (selectedOrder && typeof selectedOrder === 'object') {
         selectOrder({ ...selectedOrder, invoice_printed: 1 });
       }
       // If order was Unbilled, set to Draft and reload draft orders
       if (selectedStatus === 'Unbilled') {
-        showToast.info('Order moved to Draft after printing.');
+        showToast.info(t('success.order_moved_to_draft'));
         setSelectedStatus('Draft');
         fetchOrders();
       }
     } catch (err: any) {
-      showToast.error('Print failed: ' + (err?.message || err));
+      showToast.error(t('errors.print_failed', { reason: err?.message || String(err) }));
     } finally {
       setIsPrinting(false);
     }
@@ -207,7 +208,7 @@ export default function Orders() {
       />
 
       {/* Middle Section - Order Cards */}
-      <div className="flex-1 flex flex-col h-screen overflow-hidden pr-96">
+      <div className="flex-1 flex flex-col h-screen overflow-hidden pe-96">
         <div className="flex-1 overflow-y-auto bg-gray-50 p-4 pb-40">
           {orderLoading ? (
             <div className="flex items-center justify-center h-full">
@@ -215,7 +216,7 @@ export default function Orders() {
             </div>
           ) : orders.length === 0 ? (
             <div className="text-center mt-10">
-              <p className="text-gray-500">No orders found</p>
+              <p className="text-gray-500">{t('orders.no_orders_found')}</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-screen-xl mx-auto">
@@ -235,11 +236,11 @@ export default function Orders() {
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-xs text-gray-500">
-                          {order.restaurant_table ? `Table ${order.restaurant_table} • ` : ''}{order.order_type}
+                          {order.restaurant_table ? `Table ${order.restaurant_table} • ` : ''}{t(`order_types.${order.order_type.toLowerCase().replace(/ /g, '_')}`)}
                         </p>
                       </div>
-                      <Badge variant={getBadgeVariant(order.status)} className="ml-2">
-                        {order.status}
+                      <Badge variant={getBadgeVariant(order.status)} className="ms-2">
+                        {t(`order_status_types.${order.status.toLowerCase().replace(/ /g, '_')}`)}
                       </Badge>
                     </div>
                     </div>
@@ -278,11 +279,11 @@ export default function Orders() {
                   className='w-20'
                   size="xs"
                 >
-                  Previous
+                  {t('orders.pagination.previous')}
                 </Button>
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-muted-foreground">
-                    Page {pagination.currentPage}
+                    {t('orders.pagination.page', { number: pagination.currentPage.toString() })}
                   </span>
                 </div>
                 <Button
@@ -292,7 +293,7 @@ export default function Orders() {
                   className='w-20'
                   size="xs"
                 >
-                  Next
+                  {t('orders.pagination.next')}
                 </Button>
               </div>
             </div>
@@ -301,11 +302,11 @@ export default function Orders() {
       </div>
 
       {/* Right Section - Order Details */}
-      <div className="w-96 bg-white border-l border-gray-200 flex flex-col h-[calc(100vh-4rem)] fixed right-0 z-10">
+      <div className="w-96 bg-white border-s border-gray-200 flex flex-col h-[calc(100vh-4rem)] fixed end-0 z-10">
         {!selectedOrder ? (
           <div className="text-center h-full flex flex-col items-center justify-center text-gray-500 p-6">
-            <p className="text-lg font-medium mb-2">Select an order to view details</p>
-            <p className="text-sm">Click on any order card to view its details</p>
+            <p className="text-lg font-medium mb-2">{t('order.select_to_view')}</p>
+            <p className="text-sm">{t('orders.click_to_view')}</p>
           </div>
         ) : selectedOrderLoading ? (
           <div className="flex items-center justify-center h-full">
@@ -319,7 +320,7 @@ export default function Orders() {
         ) : (
           <>
             {/* Fixed Header */}
-            <div className="sticky top-0 left-0 right-0 z-20 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between min-h-[64px]">
+            <div className="sticky top-0 start-0 end-0 z-20 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between min-h-[64px]">
               <h2 className="text-xl font-semibold text-gray-900 truncate max-w-[10rem]">{selectedOrder.name}</h2>
               <div className="flex items-center gap-2">
                 {/* Only show edit and cancel buttons for Draft, Unbilled, and Recently Paid orders */}
@@ -333,7 +334,7 @@ export default function Orders() {
                       disabled={editLoading}
                     >
                       <Pencil className="w-4 h-4" />
-                      {editLoading && <span className="ml-2 text-xs">Loading...</span>}
+                      {editLoading && <span className="ms-2 text-xs">{t('common.loading')}</span>}
                     </button>
                     <button
                       type="button"
@@ -346,7 +347,7 @@ export default function Orders() {
                   </>
                 )}
                 <Badge variant={getBadgeVariant(selectedOrder.status)}>
-                  {selectedOrder.status}
+                  {t(`order_status_types.${selectedOrder.status.toLowerCase().replace(/ /g, '_')}`)}
                 </Badge>
               </div>
             </div>
@@ -354,14 +355,14 @@ export default function Orders() {
             <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Cancel Order</DialogTitle>
+                  <DialogTitle>{t('order.cancel_order')}</DialogTitle>
                   <DialogDescription>
-                    Please provide a reason for cancelling this order.
+                    {t('errors.enter_cancel_reason')}
                   </DialogDescription>
                 </DialogHeader>
                 <div className="px-6 mb-3">
                 <Textarea
-                  placeholder="Enter cancel reason"
+                  placeholder={t('order.enter_cancel_reason')}
                   value={cancelReason}
                   onChange={e => setCancelReason(e.target.value)}
                   disabled={cancelLoading}
@@ -370,10 +371,10 @@ export default function Orders() {
                 </div>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setCancelDialogOpen(false)} disabled={cancelLoading}>
-                    Close
+                    {t('common.cancel')}
                   </Button>
                   <Button variant="danger" onClick={handleCancelOrder} disabled={cancelLoading}>
-                    {cancelLoading ? 'Cancelling...' : 'Confirm Cancel'}
+                    {cancelLoading ? t('common.cancelling') : t('common.confirm_cancel')}
                   </Button>
                 </DialogFooter>
               </DialogContent>
@@ -413,7 +414,7 @@ export default function Orders() {
 
               {/* Order Items */}
               <div className="mb-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Order Items</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('order.items_title')}</h3>
                 <div className="space-y-3">
                   {selectedOrderItems.map((item, index) => (
                     <div key={index} className="flex justify-between items-start py-2 border-b border-gray-100">
@@ -434,7 +435,7 @@ export default function Orders() {
               {/* Taxes */}
               {selectedOrderTaxes.length > 0 && (
                 <div className="mb-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Taxes & Charges</h3>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('order.taxes_charges')}</h3>
                   <div className="space-y-2">
                     {selectedOrderTaxes.map((tax, index) => (
                       <div key={index} className="flex justify-between items-center py-1">
@@ -450,7 +451,7 @@ export default function Orders() {
             </div>
 
             {/* Sticky Bottom Section - Single Row: Print | Payment | Total */}
-            <div className="border-t border-gray-200 p-6 bg-gray-50 sticky bottom-0 left-0 right-0 z-10">
+            <div className="border-t border-gray-200 p-6 bg-gray-50 sticky bottom-0 start-0 end-0 z-10">
               <div className="flex items-center gap-3 w-full">
                 {/* Print Icon Button */}
                 <Button
@@ -469,17 +470,17 @@ export default function Orders() {
                     className="flex-1"
                     onClick={() => {
                       if (String(selectedOrder.invoice_printed) === '0') {
-                        showToast.error('Please print invoice before making payment');
+                        showToast.error(t('errors.please_print_first'));
                         return;
                       }
                       setShowPaymentDialog(true);
                     }}
                   >
-                    Payment
+                    {t('order.payment')}
                   </Button>
                 )}
                 {/* Total */}
-                <span className="ml-auto text-xl font-bold text-gray-900 whitespace-nowrap">
+                <span className="ms-auto text-xl font-bold text-gray-900 whitespace-nowrap">
                   {formatCurrency(selectedOrder.rounded_total)}
                 </span>
               </div>

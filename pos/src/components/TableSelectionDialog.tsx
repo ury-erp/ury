@@ -8,6 +8,7 @@ import { getRooms, getTables, Room, Table } from '../lib/table-api';
 import { Badge } from './ui/badge';
 import { Spinner } from './ui/spinner';
 import { TableShapeIcon } from './TableShapeIcon';
+import { t } from '../i18n';
 
 interface Props {
   onClose: () => void;
@@ -56,7 +57,7 @@ const TableSelectionDialog: React.FC<Props> = ({ onClose }) => {
           sessionStorage.setItem(sessionKey, JSON.stringify(fetchedRooms));
         }
       } catch (e) {
-        setError('Failed to load rooms');
+        setError(t('errors.failed_load_rooms') || 'Failed to load rooms');
       } finally {
         setLoadingRooms(false);
       }
@@ -82,7 +83,7 @@ const TableSelectionDialog: React.FC<Props> = ({ onClose }) => {
         setTables(sortedTables);
         setTablesCache(prev => ({ ...prev, [selectedRoom]: fetchedTables }));
       } catch (e) {
-        setError('Failed to load tables');
+        setError(t('errors.failed_load_tables') || 'Failed to load tables');
         setTables([]);
       } finally {
         setLoadingTables(false);
@@ -102,7 +103,7 @@ const TableSelectionDialog: React.FC<Props> = ({ onClose }) => {
     <Dialog open onOpenChange={onClose}>
       <DialogContent className="bg-white rounded-lg w-full h-5/6 max-w-2xl mx-auto p-0 overflow-y-auto">
         <div className="p-4 border-b border-gray-200 flex justify-between items-center">
-          <h2 className="text-lg font-semibold text-gray-900">Select Table</h2>
+          <h2 className="text-lg font-semibold text-gray-900">{t('common.select_table_title')}</h2>
           <Button onClick={onClose} variant="ghost" size="icon">
             <X className="w-5 h-5" />
           </Button>
@@ -111,7 +112,7 @@ const TableSelectionDialog: React.FC<Props> = ({ onClose }) => {
           {/* Room Selection */}
           {loadingRooms ? (
             <div className="mb-6">
-              <Spinner message="Loading rooms..." />
+              <Spinner message={t('common.loading_rooms')} />
             </div>
           ) : error ? (
             <div className="mb-6 flex flex-col items-center justify-center gap-2 text-red-500">
@@ -121,7 +122,7 @@ const TableSelectionDialog: React.FC<Props> = ({ onClose }) => {
           ) : rooms.length === 0 ? (
             <div className="mb-6 flex flex-col items-center justify-center gap-2 text-gray-400">
               <Square className="w-8 h-8 mb-1" />
-              <span>No rooms found</span>
+              <span>{t('common.no_rooms_found')}</span>
             </div>
           ) : (
             <div className="flex gap-2 mb-6">
@@ -142,7 +143,7 @@ const TableSelectionDialog: React.FC<Props> = ({ onClose }) => {
           {/* Table Grid */}
           {loadingTables ? (
             <div className="">
-              <Spinner message="Loading tables..." />
+              <Spinner message={t('common.loading_tables')} />
             </div>
           ) : error ? (
             <div className="flex flex-col items-center justify-center gap-2 text-red-500 mt-8">
@@ -152,7 +153,7 @@ const TableSelectionDialog: React.FC<Props> = ({ onClose }) => {
           ) : tables.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 text-gray-400 mt-8">
               <Square className="w-8 h-8 mb-1" />
-              <span>No tables found</span>
+              <span>{t('common.no_tables_found')}</span>
             </div>
           ) : (
             <div className="grid grid-cols-3 gap-6">
@@ -186,7 +187,7 @@ const TableSelectionDialog: React.FC<Props> = ({ onClose }) => {
                     <div className="mt-2 h-4"> {/* Height placeholder that matches Badge height */}
                       {table.occupied === 1 && (
                         <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-700 hover:bg-amber-100">
-                          Occupied
+                          {t('tables.occupied')}
                         </Badge>
                       )}
                     </div>

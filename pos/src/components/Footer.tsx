@@ -5,13 +5,14 @@ import {
   Table,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { t } from '../i18n';
 
 const Footer = () => {
 
   const navItems = [
-    { icon: LayoutGrid, label: 'POS', path: '/' },
-    {icon: Table, label: 'Table', path: '/table'},
-    { icon: ClipboardList, label: 'Orders', path: '/orders' },
+    { icon: LayoutGrid, label: t('footer.pos'), path: '/' },
+    {icon: Table, label: t('footer.table'), path: '/table'},
+    { icon: ClipboardList, label: t('footer.orders'), path: '/orders' },
   ];
 
   return (

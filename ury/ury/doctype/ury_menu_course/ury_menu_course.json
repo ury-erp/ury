@@ -20,12 +20,13 @@
    "oldfieldname": "branch",
    "oldfieldtype": "Data",
    "reqd": 1,
+   "translatable": 1,
    "unique": 1
   }
  ],
  "icon": "fa fa-code-fork",
  "links": [],
- "modified": "2024-05-02 16:14:56.862267",
+ "modified": "2026-03-31 14:16:07.519200",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Menu Course",
@@ -67,6 +68,8 @@
   }
  ],
  "quick_entry": 1,
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": []
