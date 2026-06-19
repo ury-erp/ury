@@ -223,6 +223,9 @@ export const useTableStore = defineStore("table", {
         });
     },
     openMergeFreeModal(table) {
+      if (table.occupied === 1) {
+        return;
+      }
       this.mergeSourceTable = table.name;
       this.selectedMergedTable = "";
       this.showModalMergeFree = true;

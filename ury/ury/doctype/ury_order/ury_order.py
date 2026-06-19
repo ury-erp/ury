@@ -18,39 +18,28 @@ class URYOrder(Document):
 
 @frappe.whitelist()
 def merge_free_tables(table1, table2):
-    """Merges two tables. If one is occupied, syncs the active invoice to the new table."""
+    """Merges two available (unoccupied) tables in the same room."""
     t1_room = frappe.db.get_value("URY Table", table1, "restaurant_room")
     t2_room = frappe.db.get_value("URY Table", table2, "restaurant_room")
     if t1_room != t2_room:
-        frappe.throw("Cannot merge tables from different rooms.")
+        frappe.throw(_("Cannot merge tables from different rooms."))
+
+    t1_occupied = frappe.db.get_value("URY Table", table1, "occupied")
+    t2_occupied = frappe.db.get_value("URY Table", table2, "occupied")
+    if t1_occupied or t2_occupied:
+        frappe.throw(_("Cannot merge occupied tables. Both tables must be available."))
 
     t1_merged = frappe.db.get_value("URY Table", table1, "merged_with") or ""
     t2_merged = frappe.db.get_value("URY Table", table2, "merged_with") or ""
-    
+
     if table2 not in t1_merged:
         new_t1 = f"{t1_merged},{table2}" if t1_merged else table2
         frappe.db.set_value("URY Table", table1, "merged_with", new_t1)
-        
+
     if table1 not in t2_merged:
         new_t2 = f"{t2_merged},{table1}" if t2_merged else table1
         frappe.db.set_value("URY Table", table2, "merged_with", new_t2)
-    
-    t1_occupied = frappe.db.get_value("URY Table", table1, "occupied")
-    t2_occupied = frappe.db.get_value("URY Table", table2, "occupied")
-    
-    if t1_occupied or t2_occupied:
-        active_table = table1 if t1_occupied else table2
-        new_table = table2 if t1_occupied else table1
-        
-        invoice = get_order_invoice(table=active_table)
-        if invoice and invoice.name:
-            existing_merged = invoice.custom_merged_tables or ""
-            if new_table not in existing_merged:
-                new_merged_tables = f"{existing_merged},{new_table}" if existing_merged else new_table
-                frappe.db.set_value("POS Invoice", invoice.name, "custom_merged_tables", new_merged_tables)
-            
-            frappe.db.set_value("URY Table", new_table, {"occupied": 1, "latest_invoice_time": invoice.creation})
-            
+
     return True
 
 
