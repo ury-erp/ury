@@ -66,15 +66,13 @@ const TableCard = ({
             <Badge variant={isOccupied ? 'warning' : 'success'} className="whitespace-nowrap">
               {isOccupied ? t('tables.occupied') : t('tables.available')}
             </Badge>
-            {!isOccupied && (
-              <TableActionsMenu
-                table={table}
-                isOpen={menuOpen}
-                onOpenChange={onMenuOpenChange}
-                onMerge={onMerge}
-                onUnmerge={onUnmerge}
-              />
-            )}
+            <TableActionsMenu
+              table={table}
+              isOpen={menuOpen}
+              onOpenChange={onMenuOpenChange}
+              onMerge={onMerge}
+              onUnmerge={onUnmerge}
+            />
           </div>
         </div>
 
