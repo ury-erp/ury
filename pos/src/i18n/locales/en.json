@@ -193,7 +193,18 @@
     "editing_layout_hint_title": "Editing Layout",
     "drag_tables_hint": "• Drag tables to reposition",
     "autosave_hint": "• Changes autosave",
-    "zoom_pan_hint": "Use Scroll to zoom • Drag background to pan"
+    "zoom_pan_hint": "Use Scroll to zoom • Drag background to pan",
+    "table_actions": "Table actions",
+    "merge_tables": "Merge tables",
+    "merge_with": "Merge with {{table}}",
+    "select_table_to_merge": "Select a table to merge",
+    "merge_confirm": "Merge",
+    "merging_tables": "Merging tables...",
+    "merged": "Merged",
+    "merged_with_list": "With {{tables}}",
+    "no_tables_to_merge": "No available tables to merge",
+    "merge_success": "Tables merged successfully",
+    "merge_failed": "Failed to merge tables"
   },
   "footer": {
     "pos": "POS",
