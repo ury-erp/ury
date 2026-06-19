@@ -215,7 +215,7 @@ def restrict_existing_order(doc, event):
         if (
             source
             and source.docstatus == 0
-            and source.restaurant_table == doc.restaurant_table
+            and (source.restaurant_table or "") == (doc.restaurant_table or "")
         ):
             return
 
