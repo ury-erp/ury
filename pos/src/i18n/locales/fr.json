@@ -61,7 +61,8 @@
     "cancel_order": "Annuler la commande",
     "enter_cancel_reason": "Saisir le motif d'annulation",
     "print": "Imprimer",
-    "payment": "Paiement"
+    "payment": "Paiement",
+    "order_actions": "Actions sur la commande"
   },
   "payment": {
     "title": "Paiement",
@@ -212,6 +213,18 @@
     "unmerge_success": "Tables séparées avec succès",
     "unmerge_failed": "Échec de la séparation des tables",
     "not_merged": "Cette table n'est pas fusionnée"
+  },
+  "bill_split": {
+    "split_bill": "Diviser l'addition",
+    "select_items": "Choisissez les articles à déplacer vers une nouvelle addition depuis {{invoice}}",
+    "stays_on_bill": "Reste sur l'addition d'origine",
+    "moves_to_new_bill": "Déplacé vers la nouvelle addition",
+    "split_confirm": "Diviser l'addition",
+    "split_success": "Nouvelle addition {{invoice}} créée",
+    "split_failed": "Échec de la division de l'addition",
+    "cannot_move_all_items": "Au moins un article doit rester sur l'addition d'origine",
+    "available_qty": "{{qty}} disponible(s)",
+    "move_qty": "Qté à déplacer"
   },
   "footer": {
     "pos": "PDV",

@@ -61,7 +61,8 @@
     "cancel_order": "Cancel order",
     "enter_cancel_reason": "Enter cancel reason",
     "print": "Print",
-    "payment": "Payment"
+    "payment": "Payment",
+    "order_actions": "Order actions"
   },
   "payment": {
     "title": "Payment",
@@ -212,6 +213,18 @@
     "unmerge_success": "Tables unmerged successfully",
     "unmerge_failed": "Failed to unmerge tables",
     "not_merged": "This table is not merged"
+  },
+  "bill_split": {
+    "split_bill": "Split bill",
+    "select_items": "Choose items to move to a new bill from {{invoice}}",
+    "stays_on_bill": "Stays on original bill",
+    "moves_to_new_bill": "Moves to new bill",
+    "split_confirm": "Split bill",
+    "split_success": "New bill {{invoice}} created",
+    "split_failed": "Failed to split bill",
+    "cannot_move_all_items": "At least one item must remain on the original bill",
+    "available_qty": "{{qty}} available",
+    "move_qty": "Qty to move"
   },
   "footer": {
     "pos": "POS",

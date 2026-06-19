@@ -20,8 +20,10 @@ export interface POSInvoice {
 }
 
 export interface POSInvoiceItem {
+  name: string;
   item_name: string;
   qty: number;
+  rate: number;
   amount: number;
 }
 
