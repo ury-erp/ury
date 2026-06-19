@@ -273,6 +273,7 @@ fixtures = [
                     "POS Invoice-branch",
                     "POS Invoice-print",
                     "POS Invoice-restaurant_table",
+                    "POS Invoice-custom_merged_tables",
                     "POS Invoice-custom_restaurant_room",
                     "POS Invoice-column_break_gd1mq",
                     "POS Invoice-arrived_time",
