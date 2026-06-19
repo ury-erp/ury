@@ -52,8 +52,7 @@ export default function Orders() {
   const [isPrinting, setIsPrinting] = React.useState(false);
 
   const canSplitBill = useMemo(() => {
-    if (!selectedOrder?.restaurant_table) return false;
-    if (selectedOrderItems.length === 0) return false;
+    if (!selectedOrder || selectedOrderItems.length === 0) return false;
 
     const hasSplittableItems =
       selectedOrderItems.length >= 2 ||
@@ -217,7 +216,11 @@ export default function Orders() {
     const result = await splitBill(selectedOrder.name, itemsToMove);
     showToast.success(t('bill_split.split_success', { invoice: result.new_invoice }));
 
-    if (String(selectedOrder.invoice_printed) === '1') {
+    const childOnUnbilledTab =
+      !!selectedOrder.restaurant_table &&
+      String(selectedOrder.invoice_printed) === '1';
+
+    if (childOnUnbilledTab) {
       await setSelectedStatus('Unbilled');
     } else {
       await fetchOrders();
