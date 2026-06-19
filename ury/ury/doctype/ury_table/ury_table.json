@@ -12,7 +12,8 @@
   "no_of_seats",
   "minimum_seating",
   "table_shape",
-  "column_break_shak",
+  "column_break_vub4k",
+  "restaurant",
   "restaurant_room",
   "branch",
   "layout_position_section",
@@ -26,8 +27,7 @@
   "active_info_tab",
   "occupied",
   "column_break_280tb",
-  "latest_invoice_time",
-  "column_break_vub4k"
+  "latest_invoice_time"
  ],
  "fields": [
   {
@@ -51,6 +51,13 @@
    "fieldtype": "Column Break"
   },
   {
+   "fieldname": "restaurant",
+   "fieldtype": "Link",
+   "label": "Restaurant",
+   "options": "URY Restaurant",
+   "reqd": 1
+  },
+  {
    "fieldname": "restaurant_room",
    "fieldtype": "Link",
    "label": "Restaurant Room",
@@ -58,6 +65,7 @@
    "reqd": 1
   },
   {
+   "fetch_from": "restaurant.branch",
    "fieldname": "branch",
    "fieldtype": "Link",
    "label": "Branch",
@@ -131,15 +139,11 @@
    "fieldname": "layout_height",
    "fieldtype": "Float",
    "label": "Layout Height"
-  },
-  {
-   "fieldname": "column_break_shak",
-   "fieldtype": "Column Break"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-05-10 22:58:20.817009",
+ "modified": "2025-12-31 15:45:13.235634",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Table",

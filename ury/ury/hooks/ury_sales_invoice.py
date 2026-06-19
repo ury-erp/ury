@@ -17,22 +17,22 @@ def sales_invoice_naming(doc, method):
     pos_profile = frappe.db.get_value(
         "POS Profile", 
         doc.pos_profile, 
-        ["restaurant_prefix", "branch"], 
+        ["restaurant_prefix", "restaurant"], 
         as_dict=True
     )
 
     if not pos_profile:
         frappe.throw(f"POS Profile '{doc.pos_profile}' does not exist. Please select a valid POS Profile.")
     
-    branch = pos_profile.get("branch")
+    restaurant = pos_profile.get("restaurant")
 
-    if pos_profile.get("restaurant_prefix") == 1 and branch:
+    if pos_profile.get("restaurant_prefix") == 1 and restaurant:
         if doc.order_type == "Aggregators":
             
             # Get the aggregator series prefix
             aggregator_series_prefix = frappe.db.get_value(
-                "Branch", 
-                branch, 
+                "URY Restaurant", 
+                restaurant, 
                 "aggregator_series_prefix"
             )
             
@@ -41,12 +41,12 @@ def sales_invoice_naming(doc, method):
                 
             else: 
                 # Fallback to invoice_series_prefix if aggregator_series_prefix is not available            
-                doc.naming_series = "SINV-" + frappe.db.get_value("Branch", branch, "invoice_series_prefix")
+                doc.naming_series = "SINV-" + frappe.db.get_value("URY Restaurant", restaurant, "invoice_series_prefix")
                       
         else:
             # Use invoice_series_prefix for non-aggregator orders
             doc.naming_series = "SINV-" + frappe.db.get_value(
-                "Branch", branch, "invoice_series_prefix"
+                "URY Restaurant", restaurant, "invoice_series_prefix"
             )
             
             

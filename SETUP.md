@@ -69,18 +69,24 @@ This guide takes you step-by-step through setting up URY on top of ERPNext
 	- **Create Invoice without Tax** : Check this box if you want the aggregator's invoice to be created without tax. This applies to both Sales Invoice and POS Invoice.
 
 
-### Step 4 : Branch Restaurant Configurations
+### Step 4 : URY Restaurant
 
-- Go to the "Branch List" and edit your branch to add the following details:
+- Go to the "URY Restaurant List" and create a new restaurant with the following details:
 
 	The restaurant setup links your company, branch, and menu together, defining details like tax templates, invoice series, and menu configurations for rooms and order types.
 
+	<div style="text-align: center;">
+		<img src="https://raw.githubusercontent.com/ury-erp/ury/develop/DEMO/URY%20Restaurant.png" style="margin: 2rem 2rem;" alt="URY Restaurant">
+	</div>
+
+	- **Name** : Restaurant name
 	- **Company**: Specify the company under which the restaurant is being created.
 	- **Invoice Series Prefix**: allows you to define prefix for naming of an Invoice .
 	- **Aggregator Series Prefix**: allows you to define prefix for naming of a aggregator Invoice.
+	- **Branch** : Select the branch associated with the restaurant .
 	- **Default Tax Template** : Mention the [Sales tax](https://docs.erpnext.com/docs/user/manual/en/sales-taxes-and-charges-template) value if applicable.
 	- **Address** : Provide the address of the restaurant.
-	- **Default Menu** : Select Menu against the branch.
+	- **Default Menu** : Select Menu against the restaurant.
 	- **Room Wise Menu** : To enable room wise menu.
 	- **Menu For Room** : Add restaurant menu against each room to handle room wise price list. 
 	- **Order Type Wise Menu** : To enable order type wise menu for cashier.
@@ -90,7 +96,7 @@ This guide takes you step-by-step through setting up URY on top of ERPNext
 
 - Next is to Create Restaurant Room with the following details :
 
-	Rooms help organize your restaurant layout—such as indoor, outdoor, or VIP areas and define where orders and print actions (like bills or KOTs) are directed. Each room can have its own printer setup to manage room-wise printing. Make sure to add the room to the corresponding Branch.
+	Rooms help organize your restaurant layout—such as indoor, outdoor, or VIP areas and define where orders and print actions (like bills or KOTs) are directed. Each room can have its own printer setup to manage room-wise printing. Make sure to add the room to the corresponding URY Restaurant.
 
 	<div style="text-align: center;">
 		<img src="https://raw.githubusercontent.com/ury-erp/ury/refs/heads/develop/DEMO/URY%20Room.png" style="margin: 2rem 2rem;" alt="URY Room">
@@ -118,8 +124,8 @@ This guide takes you step-by-step through setting up URY on top of ERPNext
 	</div>
 
 	- **Name** : Specify a unique name to the menu .
-	- **Branch** : Linked to Branch to select branch .
-	- **Branch** : This field will be automatically populated when you select a branch.
+	- **Restaurant** : Linked to URY Restaurant to select restaurant .
+	- **Branch** : This field will be automatically populated when you select a restaurant.
 	- **Enabled** : Activate the checkbox to enable the menu.
 	- **Items** : List the items included in the menu and their respective rates.
 	- **Special Dish** : You can use this checkbox in the Item table to show an item as a `Special Items` or `Priority` item for menu display.
