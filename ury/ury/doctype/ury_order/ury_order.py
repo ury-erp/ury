@@ -38,6 +38,8 @@ def get_order_invoice(table=None, invoiceNo=None, order_type=None, is_payment=No
                 invoice_name = frappe.get_value(
                     "POS Invoice",
                     dict(restaurant_table=table, docstatus=0, invoice_printed=0),
+                )
+        
         # invoice_name = frappe.get_value("POS Invoice", dict(restaurant_table=table, docstatus=0, invoice_printed=0))
         branch, menu_name = get_branch_and_menu_name(table)
 
