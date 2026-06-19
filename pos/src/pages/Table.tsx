@@ -2,8 +2,8 @@ import { Fragment, useCallback, useEffect, useMemo, useState, type MouseEvent } 
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Layout, Square } from 'lucide-react';
 import { usePOSStore } from '../store/pos-store';
-import { getRooms, getTables, getTableCount, mergeTables, type Room, type Table } from '../lib/table-api';
-import { getTableRenderGroups, sortTablesByMergeGroups } from '../lib/table-utils';
+import { getRooms, getTables, getTableCount, mergeTables, unmergeTables, type Room, type Table } from '../lib/table-api';
+import { getMergeGroupMembers, getTableRenderGroups, sortTablesByMergeGroups } from '../lib/table-utils';
 import { Spinner } from '../components/ui/spinner';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
@@ -14,6 +14,7 @@ import { showToast } from '../components/ui/toast';
 import { t } from '../i18n';
 import LayoutView from '../components/LayoutView';
 import TableMergeDialog from '../components/TableMergeDialog';
+import TableUnmergeDialog from '../components/TableUnmergeDialog';
 import TableCard from '../components/TableCard';
 import MergeLinkConnector from '../components/MergeLinkConnector';
 
@@ -34,6 +35,7 @@ const TableView = () => {
   const [printingTable, setPrintingTable] = useState<string | null>(null);
   const [menuOpenForTable, setMenuOpenForTable] = useState<string | null>(null);
   const [mergeSourceTable, setMergeSourceTable] = useState<Table | null>(null);
+  const [unmergeSourceTable, setUnmergeSourceTable] = useState<Table | null>(null);
 
   const persistRoomCounts = useCallback((counts: Record<string, number>) => {
     if (!branch) return;
@@ -202,6 +204,21 @@ const TableView = () => {
     }
   };
 
+  const handleUnmergeConfirm = async () => {
+    if (!unmergeSourceTable) return;
+
+    try {
+      await unmergeTables(unmergeSourceTable.name);
+      if (selectedRoom) {
+        await loadTables(selectedRoom, { useCache: false });
+      }
+      showToast.success(t('tables.unmerge_success'));
+    } catch (error) {
+      showToast.error(error instanceof Error ? error.message : t('tables.unmerge_failed'));
+      throw error;
+    }
+  };
+
   const mergeAvailableTables = useMemo(() => {
     if (!mergeSourceTable) return [];
     return tables.filter(
@@ -210,6 +227,11 @@ const TableView = () => {
   }, [mergeSourceTable, tables]);
 
   const tablesToDisplay = useMemo(() => sortTablesByMergeGroups(tables), [tables]);
+
+  const unmergeGroupMembers = useMemo(() => {
+    if (!unmergeSourceTable) return [];
+    return getMergeGroupMembers(unmergeSourceTable, tablesToDisplay);
+  }, [unmergeSourceTable, tablesToDisplay]);
 
   const tableRenderGroups = useMemo(() => getTableRenderGroups(tablesToDisplay), [tablesToDisplay]);
 
@@ -221,6 +243,7 @@ const TableView = () => {
       menuOpen={menuOpenForTable === table.name}
       onMenuOpenChange={(open) => setMenuOpenForTable(open ? table.name : null)}
       onMerge={() => setMergeSourceTable(table)}
+      onUnmerge={() => setUnmergeSourceTable(table)}
       onNavigate={() => handleNavigateToPOS(table.name)}
       onPreview={(event) => handlePreviewTable(table, event)}
       onPrint={(event) => handlePrintTable(table, event)}
@@ -375,6 +398,16 @@ const TableView = () => {
         sourceTable={mergeSourceTable}
         availableTables={mergeAvailableTables}
         onConfirm={handleMergeConfirm}
+      />
+
+      <TableUnmergeDialog
+        open={unmergeSourceTable !== null}
+        onOpenChange={(open) => {
+          if (!open) setUnmergeSourceTable(null);
+        }}
+        sourceTable={unmergeSourceTable}
+        groupMembers={unmergeGroupMembers}
+        onConfirm={handleUnmergeConfirm}
       />
 
       {/* Status Legend */}

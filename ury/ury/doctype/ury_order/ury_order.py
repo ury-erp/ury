@@ -43,6 +43,72 @@ def merge_free_tables(table1, table2):
     return True
 
 
+def _parse_merged_with(merged_with):
+    if not merged_with:
+        return []
+    return [partner.strip() for partner in merged_with.split(",") if partner.strip()]
+
+
+def _get_merge_cluster(table):
+    room = frappe.db.get_value("URY Table", table, "restaurant_room")
+    if not room:
+        frappe.throw(_("Table not found."))
+
+    room_tables = frappe.get_all(
+        "URY Table",
+        filters={"restaurant_room": room},
+        fields=["name", "merged_with", "occupied"],
+    )
+    table_by_name = {row.name: row for row in room_tables}
+
+    if table not in table_by_name:
+        frappe.throw(_("Table not found."))
+
+    visited = set()
+    members = []
+    queue = [table]
+
+    while queue:
+        name = queue.pop(0)
+        if name in visited:
+            continue
+        visited.add(name)
+        members.append(name)
+
+        row = table_by_name.get(name)
+        if not row:
+            continue
+
+        for partner in _parse_merged_with(row.merged_with):
+            if partner in table_by_name and partner not in visited:
+                queue.append(partner)
+
+    return members, table_by_name
+
+
+@frappe.whitelist()
+def unmerge_tables(table):
+    """Dissolves an entire merged table group."""
+    merged_with = frappe.db.get_value("URY Table", table, "merged_with")
+    if not merged_with:
+        frappe.throw(_("Table is not merged."))
+
+    members, table_by_name = _get_merge_cluster(table)
+    if len(members) <= 1:
+        frappe.throw(_("Table is not merged."))
+
+    for member in members:
+        if table_by_name[member].occupied:
+            frappe.throw(
+                _("Cannot unmerge occupied tables. All tables in the group must be available.")
+            )
+
+    for member in members:
+        frappe.db.set_value("URY Table", member, "merged_with", None)
+
+    return True
+
+
 
 @frappe.whitelist()
 def get_order_invoice(table=None, invoiceNo=None, order_type=None, is_payment=None):

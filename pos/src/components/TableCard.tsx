@@ -13,6 +13,7 @@ interface TableCardProps {
   menuOpen: boolean;
   onMenuOpenChange: (open: boolean) => void;
   onMerge: () => void;
+  onUnmerge: () => void;
   onNavigate: () => void;
   onPreview: (event: MouseEvent<HTMLButtonElement>) => void;
   onPrint: (event: MouseEvent<HTMLButtonElement>) => void;
@@ -25,6 +26,7 @@ const TableCard = ({
   menuOpen,
   onMenuOpenChange,
   onMerge,
+  onUnmerge,
   onNavigate,
   onPreview,
   onPrint,
@@ -70,6 +72,7 @@ const TableCard = ({
                 isOpen={menuOpen}
                 onOpenChange={onMenuOpenChange}
                 onMerge={onMerge}
+                onUnmerge={onUnmerge}
               />
             )}
           </div>
