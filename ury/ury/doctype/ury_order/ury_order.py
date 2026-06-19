@@ -171,8 +171,6 @@ def split_bill(source_invoice, items_to_move):
 
     if source.docstatus != 0:
         frappe.throw(_("Only draft invoices can be split."))
-    if not source.invoice_printed:
-        frappe.throw(_("Invoice must be printed before splitting."))
 
     move_map = {
         row["name"]: float(row["qty"])
