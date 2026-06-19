@@ -224,7 +224,13 @@
     "split_failed": "Échec de la division de l'addition",
     "cannot_move_all_items": "Au moins un article doit rester sur l'addition d'origine",
     "available_qty": "{{qty}} disponible(s)",
-    "move_qty": "Qté à déplacer"
+    "move_qty": "Qté à déplacer",
+    "split_indicator": "Division {{index}} sur {{total}}",
+    "related_bills": "Additions liées",
+    "original_bill": "Originale",
+    "current_bill": "Actuelle",
+    "open_bill": "Ouverte",
+    "paid_bill": "Payée"
   },
   "footer": {
     "pos": "PDV",

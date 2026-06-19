@@ -224,7 +224,13 @@
     "split_failed": "Failed to split bill",
     "cannot_move_all_items": "At least one item must remain on the original bill",
     "available_qty": "{{qty}} available",
-    "move_qty": "Qty to move"
+    "move_qty": "Qty to move",
+    "split_indicator": "Split {{index}} of {{total}}",
+    "related_bills": "Related bills",
+    "original_bill": "Original",
+    "current_bill": "Current",
+    "open_bill": "Open",
+    "paid_bill": "Paid"
   },
   "footer": {
     "pos": "POS",

@@ -13,9 +13,15 @@ import { useNavigate } from 'react-router-dom';
 import PaymentDialog from '../components/PaymentDialog';
 import BillSplitDialog from '../components/BillSplitDialog';
 import OrderActionsMenu from '../components/OrderActionsMenu';
+import SplitGroupPanel from '../components/SplitGroupPanel';
 import { printOrder } from '../lib/print';
 import { call } from '../lib/frappe-sdk';
 import { splitBill } from '../lib/order-api';
+import {
+  getOrdersTabForInvoice,
+  mapSplitGroupInvoiceToPOSInvoice,
+  type SplitGroupInvoice,
+} from '../lib/invoice-api';
 import { t } from '../i18n';
 
 export default function Orders() {
@@ -232,6 +238,22 @@ export default function Orders() {
     }
   }
 
+  async function openRelatedInvoice(sibling: SplitGroupInvoice) {
+    if (sibling.docstatus !== 0) return;
+
+    const tab = getOrdersTabForInvoice(sibling, {
+      paidLimit: posStore.posProfile?.paid_limit,
+      viewAllStatus: posStore.posProfile?.view_all_status,
+    });
+
+    if (tab !== selectedStatus) {
+      await setSelectedStatus(tab);
+    }
+
+    const inList = useRootStore.getState().orders.find((o) => o.name === sibling.name);
+    await selectOrder(inList ?? mapSplitGroupInvoiceToPOSInvoice(sibling));
+  }
+
   if (error) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -277,15 +299,25 @@ export default function Orders() {
                     <h3 className="font-medium text-gray-900 text-sm truncate" title={order.name}>
                       {order.name}
                     </h3>
-                    <div className="flex items-center justify-between">
-                      <div>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
                         <p className="text-xs text-gray-500">
                           {order.restaurant_table ? `Table ${order.restaurant_table} • ` : ''}{t(`order_types.${order.order_type.toLowerCase().replace(/ /g, '_')}`)}
                         </p>
                       </div>
-                      <Badge variant={getBadgeVariant(order.status)} className="ms-2">
-                        {t(`order_status_types.${order.status.toLowerCase().replace(/ /g, '_')}`)}
-                      </Badge>
+                      <div className="flex shrink-0 items-center gap-1">
+                        {(order.split_total ?? 0) >= 2 && (
+                          <Badge variant="outline" className="text-xs">
+                            {t('bill_split.split_indicator', {
+                              index: order.split_index ?? 0,
+                              total: order.split_total ?? 0,
+                            })}
+                          </Badge>
+                        )}
+                        <Badge variant={getBadgeVariant(order.status)}>
+                          {t(`order_status_types.${order.status.toLowerCase().replace(/ /g, '_')}`)}
+                        </Badge>
+                      </div>
                     </div>
                     </div>
 
@@ -461,6 +493,11 @@ export default function Orders() {
                   </div>
                 </div>
               </div>
+
+              <SplitGroupPanel
+                invoiceName={selectedOrder.name}
+                onOpenInvoice={openRelatedInvoice}
+              />
 
               {/* Order Items */}
               <div className="mb-6">
