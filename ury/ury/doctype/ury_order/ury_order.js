@@ -205,7 +205,7 @@ frappe.ui.form.on('URY Order', {
 		};
 
 		frappe.db.get_list('URY Table', {
-			fields: ['name', 'occupied', 'latest_invoice_time', 'restaurant'],
+			fields: ['name', 'occupied', 'latest_invoice_time', 'branch'],
 			limit: 10000
 		}).then((records) => {
 			records.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
@@ -278,7 +278,7 @@ frappe.ui.form.on('URY Order', {
 
 	menu_listing: function (frm, index) {
 		frappe.call({
-			method: 'ury.ury.doctype.ury_order.ury_order.get_restaurant_and_menu_name',
+			method: 'ury.ury.doctype.ury_order.ury_order.get_branch_and_menu_name',
 			args: {
 				table: frm.doc.restaurant_table
 			},

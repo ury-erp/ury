@@ -39,9 +39,9 @@ def get_order_invoice(table=None, invoiceNo=None, order_type=None, is_payment=No
                     "POS Invoice",
                     dict(restaurant_table=table, docstatus=0, invoice_printed=0),
                 )
-                
+        
         # invoice_name = frappe.get_value("POS Invoice", dict(restaurant_table=table, docstatus=0, invoice_printed=0))
-        branch, menu_name, restaurant = get_restaurant_and_menu_name(table)
+        branch, menu_name = get_branch_and_menu_name(table)
 
         if invoice_name:
             invoice = frappe.get_doc("POS Invoice", invoice_name)
@@ -50,12 +50,11 @@ def get_order_invoice(table=None, invoiceNo=None, order_type=None, is_payment=No
             invoice = frappe.new_doc("POS Invoice")
 
             invoice.naming_series = frappe.db.get_value(
-                "URY Restaurant", restaurant, "invoice_series_prefix"
+                "Branch", branch, "invoice_series_prefix"
             )
 
             invoice.is_pos = 1
             invoice.update_stock = 1
-            invoice.restaurant = restaurant
             invoice.branch = branch
 
             is_take_away = frappe.db.get_value("URY Table", table, "is_take_away")
@@ -65,7 +64,7 @@ def get_order_invoice(table=None, invoiceNo=None, order_type=None, is_payment=No
                 invoice.order_type= "Dine In"
 
         invoice.taxes_and_charges = frappe.db.get_value(
-            "URY Restaurant", restaurant, "default_tax_template"
+            "Branch", branch, "default_tax_template"
         )
 
         invoice.selling_price_list = frappe.db.get_value(
@@ -94,12 +93,11 @@ def get_order_invoice(table=None, invoiceNo=None, order_type=None, is_payment=No
             invoice.update_stock = 1
         
         branch = getBranch()
-        restaurant = frappe.db.get_value("URY Restaurant", {"branch": branch}, "name")
    
         menu=get_menu_name(order_type)
  
         if (order_type == "Aggregators" and frappe.db.get_value("Branch", branch, "custom_no_taxes") == 0) or order_type != "Aggregators":
-            invoice.taxes_and_charges = frappe.db.get_value("URY Restaurant", restaurant, "default_tax_template")
+            invoice.taxes_and_charges = frappe.db.get_value("Branch", branch, "default_tax_template")
         
         invoice.selling_price_list = frappe.db.get_value(
             "Price List", dict(restaurant_menu=menu, enabled=1)
@@ -316,7 +314,7 @@ def item_query_restaurant(
     as_dict=False,
 ):
     """Return items that are selected in active menu of the restaurant"""
-    restaurant, menu = get_restaurant_and_menu_name(filters["table"])
+    branch, menu = get_branch_and_menu_name(filters["table"])
     items = frappe.db.get_all("URY Menu Item", ["item"], dict(parent=menu, disabled=0))
     del filters["table"]
     filters["name"] = ("in", [d.item for d in items])
@@ -325,59 +323,54 @@ def item_query_restaurant(
 
 
 @frappe.whitelist()
-def get_restaurant_and_menu_name(table):
+def get_branch_and_menu_name(table):
     if not table:
         frappe.throw(_("Please select a table"))
 
-    restaurant, branch, room = frappe.get_value(
+    branch, room = frappe.get_value(
         "URY Table",
         table,
-        ["restaurant", "branch", "restaurant_room"],
+        ["branch", "restaurant_room"],
     )
     room_wise_menu = frappe.db.get_value(
-        "URY Restaurant",
-        restaurant,
+        "Branch",
+        branch,
         "room_wise_menu",
     )
 
     if not room_wise_menu:
-        menu = frappe.db.get_value("URY Restaurant", restaurant, "active_menu")
+        menu = frappe.db.get_value("Branch", branch, "active_menu")
     else:
         menu = frappe.db.get_value(
             "Menu for Room",
-            {"parent": restaurant, "room": room},
+            {"parent": branch, "room": room},
             "menu",
         )
 
     if not menu:
         frappe.throw(
-            _("Please set an active menu for Restaurant {0}").format(restaurant)
+            _("Please set an active menu for Branch {0}").format(branch)
         )
 
-    return branch, menu, restaurant
+    return branch, menu
 
 @frappe.whitelist()
 def get_menu_name(order_type):
     branch = getBranch()
-    restaurant = frappe.get_value(
-        "URY Restaurant",
-        {"branch": branch},
-        "name",
-    )
     order_type_wise_menu = frappe.db.get_value(
-            "URY Restaurant", restaurant, "order_type_wise_menu"
+            "Branch", branch, "order_type_wise_menu"
         )
     
     if order_type_wise_menu:
         menu = frappe.db.get_value(
             "Order Type Menu",
-            {"parent": restaurant, "order_type": order_type},
+            {"parent": branch, "order_type": order_type},
             "menu"
         )
         if not menu:
-            menu = frappe.db.get_value("URY Restaurant", restaurant, "active_menu")
+            menu = frappe.db.get_value("Branch", branch, "active_menu")
     else:
-        menu = frappe.db.get_value("URY Restaurant", restaurant, "active_menu")   
+        menu = frappe.db.get_value("Branch", branch, "active_menu")   
     return menu  
     
 
@@ -558,10 +551,6 @@ def cancel_order(invoice_id, reason):
 def make_invoice(customer, payments, cashier, pos_profile,owner, additionalDiscount=None, table=None, invoice=None):
     order_type =  invoice_name = frappe.get_value("POS Invoice",invoice , "order_type")
     invoice = get_order_invoice(table, invoice, order_type, "Payments")
-
-    if table:
-        restaurant = get_restaurant_and_menu_name(table)
-        invoice.restaurant = restaurant
 
     invoice.customer = customer
     invoice.pos_profile = pos_profile

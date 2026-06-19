@@ -43,16 +43,6 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "URY Restaurant",
-   "link_count": 0,
-   "link_to": "URY Restaurant",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
    "label": "POS Profile",
    "link_count": 0,
    "link_to": "POS Profile",
