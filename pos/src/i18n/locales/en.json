@@ -204,7 +204,14 @@
     "merged_with_list": "With {{tables}}",
     "no_tables_to_merge": "No available tables to merge",
     "merge_success": "Tables merged successfully",
-    "merge_failed": "Failed to merge tables"
+    "merge_failed": "Failed to merge tables",
+    "unmerge_tables": "Unmerge tables",
+    "unmerge_group_title": "Unmerge table group?",
+    "unmerge_group_description": "This will separate {{tables}}. They will no longer be linked.",
+    "unmerge_confirm": "Unmerge",
+    "unmerge_success": "Tables unmerged successfully",
+    "unmerge_failed": "Failed to unmerge tables",
+    "not_merged": "This table is not merged"
   },
   "footer": {
     "pos": "POS",

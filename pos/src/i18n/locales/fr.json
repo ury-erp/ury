@@ -204,7 +204,14 @@
     "merged_with_list": "Avec {{tables}}",
     "no_tables_to_merge": "Aucune table disponible à fusionner",
     "merge_success": "Tables fusionnées avec succès",
-    "merge_failed": "Échec de la fusion des tables"
+    "merge_failed": "Échec de la fusion des tables",
+    "unmerge_tables": "Séparer les tables",
+    "unmerge_group_title": "Séparer le groupe de tables ?",
+    "unmerge_group_description": "Cela séparera {{tables}}. Elles ne seront plus liées.",
+    "unmerge_confirm": "Séparer",
+    "unmerge_success": "Tables séparées avec succès",
+    "unmerge_failed": "Échec de la séparation des tables",
+    "not_merged": "Cette table n'est pas fusionnée"
   },
   "footer": {
     "pos": "PDV",

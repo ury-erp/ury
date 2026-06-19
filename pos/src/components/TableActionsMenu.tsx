@@ -1,7 +1,8 @@
 import { useEffect, useRef, type MouseEvent as ReactMouseEvent } from 'react';
-import { Link2, MoreVertical } from 'lucide-react';
+import { Link2, MoreVertical, Unlink } from 'lucide-react';
 import { Button } from './ui/button';
 import { t } from '../i18n';
+import { isMergedTable } from '../lib/table-utils';
 import type { Table } from '../lib/table-api';
 
 interface TableActionsMenuProps {
@@ -9,11 +10,19 @@ interface TableActionsMenuProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   onMerge?: () => void;
+  onUnmerge?: () => void;
 }
 
-const TableActionsMenu = ({ table, isOpen, onOpenChange, onMerge }: TableActionsMenuProps) => {
+const TableActionsMenu = ({
+  table,
+  isOpen,
+  onOpenChange,
+  onMerge,
+  onUnmerge,
+}: TableActionsMenuProps) => {
   const menuRef = useRef<HTMLDivElement>(null);
-  const canMerge = table.occupied === 0;
+  const isAvailable = table.occupied === 0;
+  const isMerged = isMergedTable(table);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -28,7 +37,7 @@ const TableActionsMenu = ({ table, isOpen, onOpenChange, onMerge }: TableActions
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isOpen, onOpenChange]);
 
-  if (!canMerge) {
+  if (!isAvailable) {
     return null;
   }
 
@@ -41,6 +50,12 @@ const TableActionsMenu = ({ table, isOpen, onOpenChange, onMerge }: TableActions
     event.stopPropagation();
     onOpenChange(false);
     onMerge?.();
+  };
+
+  const handleUnmerge = (event: ReactMouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    onOpenChange(false);
+    onUnmerge?.();
   };
 
   return (
@@ -66,6 +81,19 @@ const TableActionsMenu = ({ table, isOpen, onOpenChange, onMerge }: TableActions
             <Link2 className="h-4 w-4 shrink-0" />
             {t('tables.merge_tables')}
           </Button>
+          {isMerged && (
+            <>
+              <div className="my-1 border-t border-gray-100" />
+              <Button
+                variant="ghost"
+                className="flex h-auto w-full justify-start gap-2 rounded-none px-4 py-2 text-sm font-normal text-red-600 hover:bg-red-50"
+                onClick={handleUnmerge}
+              >
+                <Unlink className="h-4 w-4 shrink-0" />
+                {t('tables.unmerge_tables')}
+              </Button>
+            </>
+          )}
         </div>
       )}
     </div>

@@ -90,3 +90,10 @@ export async function mergeTables(table: string, merge_with: string) {
   });
 }
 
+export async function unmergeTables(table: string) {
+  const { call } = await import('./frappe-sdk');
+  return call.post('ury.ury.doctype.ury_order.ury_order.unmerge_tables', {
+    table,
+  });
+}
+
