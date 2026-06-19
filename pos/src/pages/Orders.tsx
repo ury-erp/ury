@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { Clock, User, UserCheck, Receipt, Printer, Pencil, X } from 'lucide-react';
 import { Badge, Button, Card, CardContent } from '../components/ui';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../components/ui/dialog';
@@ -11,8 +11,11 @@ import { Textarea } from '../components/ui/textarea';
 import { usePOSStore } from '../store/pos-store';
 import { useNavigate } from 'react-router-dom';
 import PaymentDialog from '../components/PaymentDialog';
+import BillSplitDialog from '../components/BillSplitDialog';
+import OrderActionsMenu from '../components/OrderActionsMenu';
 import { printOrder } from '../lib/print';
 import { call } from '../lib/frappe-sdk';
+import { splitBill } from '../lib/order-api';
 import { t } from '../i18n';
 
 export default function Orders() {
@@ -44,7 +47,24 @@ export default function Orders() {
   const [cancelLoading, setCancelLoading] = React.useState(false);
   const [editLoading, setEditLoading] = React.useState(false);
   const [showPaymentDialog, setShowPaymentDialog] = React.useState(false);
+  const [showSplitDialog, setShowSplitDialog] = React.useState(false);
+  const [orderActionsMenuOpen, setOrderActionsMenuOpen] = React.useState(false);
   const [isPrinting, setIsPrinting] = React.useState(false);
+
+  const canSplitBill = useMemo(() => {
+    if (!selectedOrder || selectedOrder.status !== 'Draft') return false;
+    if (String(selectedOrder.invoice_printed) !== '1') return false;
+    if (!selectedOrder.restaurant_table) return false;
+    if (selectedOrderItems.length === 0) return false;
+    return (
+      selectedOrderItems.length >= 2 ||
+      selectedOrderItems.some((item) => item.qty > 1)
+    );
+  }, [selectedOrder, selectedOrderItems]);
+
+  useEffect(() => {
+    setOrderActionsMenuOpen(false);
+  }, [selectedOrder?.name]);
 
   useEffect(() => {
     fetchOrders();
@@ -188,6 +208,17 @@ export default function Orders() {
     }
   }
 
+  async function handleSplitBill(itemsToMove: Array<{ name: string; qty: number }>) {
+    if (!selectedOrder) return;
+    const result = await splitBill(selectedOrder.name, itemsToMove);
+    showToast.success(t('bill_split.split_success', { invoice: result.new_invoice }));
+    await setSelectedStatus('Unbilled');
+    const newOrder = useRootStore.getState().orders.find((o) => o.name === result.new_invoice);
+    if (newOrder) {
+      await selectOrder(newOrder);
+    }
+  }
+
   if (error) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -326,6 +357,12 @@ export default function Orders() {
                 {/* Only show edit and cancel buttons for Draft, Unbilled, and Recently Paid orders */}
                 {(selectedOrder.status === 'Draft' || selectedOrder.status === 'Unbilled' || selectedOrder.status === 'Recently Paid') && (
                   <>
+                    <OrderActionsMenu
+                      isOpen={orderActionsMenuOpen}
+                      onOpenChange={setOrderActionsMenuOpen}
+                      showSplitBill={canSplitBill}
+                      onSplitBill={() => setShowSplitDialog(true)}
+                    />
                     <button
                       type="button"
                       className="inline-flex items-center justify-center rounded-md p-2 bg-gray-100 hover:bg-gray-200 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -501,6 +538,15 @@ export default function Orders() {
           owner={posStore.posProfile?.cashier || ''}
           fetchOrders={fetchOrders}
           clearSelectedOrder={clearSelectedOrder}
+        />
+      )}
+      {selectedOrder && (
+        <BillSplitDialog
+          open={showSplitDialog}
+          onOpenChange={setShowSplitDialog}
+          invoiceName={selectedOrder.name}
+          items={selectedOrderItems}
+          onConfirm={handleSplitBill}
         />
       )}
     </div>

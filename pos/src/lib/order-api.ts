@@ -82,4 +82,25 @@ export interface SyncOrderRequest {
 
 export const syncOrder = async (data: SyncOrderRequest) => {
   return call.post( 'ury.ury.doctype.ury_order.ury_order.sync_order',data);
-}; 
+};
+
+export interface SplitBillItemMove {
+  name: string;
+  qty: number;
+}
+
+export interface SplitBillResponse {
+  source_invoice: string;
+  new_invoice: string;
+}
+
+export async function splitBill(
+  sourceInvoice: string,
+  itemsToMove: SplitBillItemMove[]
+): Promise<SplitBillResponse> {
+  const res = await call.post('ury.ury.doctype.ury_order.ury_order.split_bill', {
+    source_invoice: sourceInvoice,
+    items_to_move: itemsToMove,
+  });
+  return res.message as SplitBillResponse;
+} 
