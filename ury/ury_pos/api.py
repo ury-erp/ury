@@ -189,6 +189,93 @@ def getModeOfPayment():
         )
     return modeOfPayments
 
+
+def _enrich_split_group_meta(invoices):
+    if not invoices:
+        return invoices
+
+    groups = list(
+        {inv.get("custom_split_group") for inv in invoices if inv.get("custom_split_group")}
+    )
+    if not groups:
+        for inv in invoices:
+            inv["split_index"] = 0
+            inv["split_total"] = 0
+        return invoices
+
+    group_members = frappe.db.sql(
+        """
+        SELECT name, custom_split_group
+        FROM `tabPOS Invoice`
+        WHERE custom_split_group IN %(groups)s AND docstatus < 2
+        ORDER BY creation asc
+        """,
+        {"groups": groups},
+        as_dict=True,
+    )
+
+    group_order = {}
+    for row in group_members:
+        group_order.setdefault(row.custom_split_group, []).append(row.name)
+
+    for inv in invoices:
+        group = inv.get("custom_split_group")
+        if not group or group not in group_order:
+            inv["split_index"] = 0
+            inv["split_total"] = 0
+            continue
+        names = group_order[group]
+        inv["split_total"] = len(names)
+        try:
+            inv["split_index"] = names.index(inv["name"]) + 1
+        except ValueError:
+            inv["split_index"] = 0
+            inv["split_total"] = 0
+
+    return invoices
+
+
+@frappe.whitelist()
+def get_split_group(invoice):
+    group = frappe.db.get_value("POS Invoice", invoice, "custom_split_group")
+    if not group:
+        return {"invoices": [], "current": invoice, "group": None}
+
+    invoices = frappe.get_all(
+        "POS Invoice",
+        filters={"custom_split_group": group, "docstatus": ["<", 2]},
+        fields=[
+            "name",
+            "custom_split_from",
+            "custom_split_group",
+            "invoice_printed",
+            "restaurant_table",
+            "rounded_total",
+            "grand_total",
+            "customer",
+            "status",
+            "docstatus",
+            "posting_date",
+            "posting_time",
+            "order_type",
+            "cashier",
+            "waiter",
+            "mobile_number",
+            "net_total",
+            "total_taxes_and_charges",
+        ],
+        order_by="creation asc",
+    )
+
+    total = len(invoices)
+    for index, inv in enumerate(invoices, start=1):
+        inv["split_index"] = index
+        inv["split_total"] = total
+        inv["is_original"] = not inv.get("custom_split_from")
+
+    return {"invoices": invoices, "current": invoice, "group": group}
+
+
 @frappe.whitelist()
 def getInvoiceForCashier(status, cashier, limit, limit_start):
     branch = getBranch()
@@ -292,7 +379,8 @@ def getPosInvoice(status, limit, limit_start):
                 name, invoice_printed, grand_total, restaurant_table, 
                 cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number, 
-                posting_date, rounded_total, order_type 
+                posting_date, rounded_total, order_type,
+                custom_split_group, custom_split_from
             FROM `tabPOS Invoice` 
             WHERE branch = %s AND status = %s 
             AND (invoice_printed = 1 OR (invoice_printed = 0 AND COALESCE(restaurant_table, '') = ''))
@@ -312,7 +400,8 @@ def getPosInvoice(status, limit, limit_start):
                 name, invoice_printed, grand_total, restaurant_table, 
                 cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number, 
-                posting_date, rounded_total, order_type 
+                posting_date, rounded_total, order_type,
+                custom_split_group, custom_split_from
             FROM `tabPOS Invoice` 
             WHERE branch = %s AND status = %s 
             AND (invoice_printed = 0 AND restaurant_table IS NOT NULL)
@@ -331,7 +420,8 @@ def getPosInvoice(status, limit, limit_start):
                 name, invoice_printed, grand_total, restaurant_table, 
                 cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number,
-                posting_date, rounded_total, order_type,additional_discount_percentage,discount_amount 
+                posting_date, rounded_total, order_type, additional_discount_percentage,
+                discount_amount, custom_split_group, custom_split_from
             FROM `tabPOS Invoice` 
             WHERE branch = %s AND status = %s 
             ORDER BY modified desc
@@ -349,7 +439,8 @@ def getPosInvoice(status, limit, limit_start):
                 name, invoice_printed, grand_total, restaurant_table, 
                 cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number,
-                posting_date, rounded_total, order_type,additional_discount_percentage,discount_amount
+                posting_date, rounded_total, order_type, additional_discount_percentage,
+                discount_amount, custom_split_group, custom_split_from
             FROM `tabPOS Invoice` 
             WHERE branch = %s AND status = %s 
             ORDER BY modified desc
@@ -364,7 +455,8 @@ def getPosInvoice(status, limit, limit_start):
             next = True
             updatedlist.pop()
     else:
-            next = False   
+            next = False
+    updatedlist = _enrich_split_group_meta(updatedlist)
     return  { "data":updatedlist,"next":next}
 
 
@@ -390,9 +482,28 @@ def searchPosInvoice(query,status):
             ["customer", "like", f"%{query}%"],
             ["mobile_number", "like", f"%{query}%"],
         ],
-        fields=["name", "customer", "grand_total", "posting_date", "posting_time", "order_type", "restaurant_table","status","grand_total","rounded_total","net_total","mobile_number"],
+        fields=[
+            "name",
+            "customer",
+            "grand_total",
+            "posting_date",
+            "posting_time",
+            "order_type",
+            "restaurant_table",
+            "status",
+            "rounded_total",
+            "net_total",
+            "mobile_number",
+            "invoice_printed",
+            "cashier",
+            "waiter",
+            "total_taxes_and_charges",
+            "custom_split_group",
+            "custom_split_from",
+        ],
         limit_page_length=10 
     )
+    pos_invoices = _enrich_split_group_meta(pos_invoices)
     
     return {"data": pos_invoices, "next": len(pos_invoices) == 10}
     
