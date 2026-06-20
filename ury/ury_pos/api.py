@@ -396,11 +396,8 @@ def searchPosInvoice(query,status):
 
 @frappe.whitelist()
 def get_select_field_options():
-    options = frappe.get_meta("POS Invoice").get_field("order_type").options
-    if options:
-        return [{"name": option} for option in options.split("\n")]
-    else:
-        return []
+    order_types = frappe.get_all("URY Order Type", fields=["name"], filters={"is_active": 1})
+    return [{"name": ot.name} for ot in order_types]
 
 
 @frappe.whitelist()

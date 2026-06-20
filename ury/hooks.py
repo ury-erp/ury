@@ -380,4 +380,5 @@ fixtures = [
     },
     {"dt": "Role", "filters": [["role_name", "like", "URY %"]]},
     "Client Script",
+    "URY Order Type"
 ]
