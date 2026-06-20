@@ -1,0 +1,37 @@
+[
+ {
+  "docstatus": 0,
+  "doctype": "URY Order Type",
+  "modified": "2026-06-19 21:44:08.199902",
+  "name1": "Dine In",
+  "is_active": 1
+ },
+ {
+  "docstatus": 0,
+  "doctype": "URY Order Type",
+  "modified": "2026-06-19 21:44:08.586070",
+  "name1": "Take Away",
+  "is_active": 1
+ },
+ {
+  "docstatus": 0,
+  "doctype": "URY Order Type",
+  "modified": "2026-06-19 21:44:08.591460",
+  "name1": "Delivery",
+  "is_active": 1
+ },
+ {
+  "docstatus": 0,
+  "doctype": "URY Order Type",
+  "modified": "2026-06-19 21:44:08.597288",
+  "name1": "Phone In",
+  "is_active": 1
+ },
+ {
+  "docstatus": 0,
+  "doctype": "URY Order Type",
+  "modified": "2026-06-19 21:44:08.602316",
+  "name1": "Aggregators",
+  "is_active": 1
+ }
+]
