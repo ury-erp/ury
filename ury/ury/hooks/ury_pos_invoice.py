@@ -1,6 +1,7 @@
 import frappe
 from datetime import datetime
 from frappe.utils import now_datetime, get_time,now
+from ury.ury.doctype.ury_order.ury_order import release_merge_cluster_tables
 
 
 def before_insert(doc, method):
@@ -115,14 +116,7 @@ def validate_invoice_print(doc, method):
 
 def table_status_delete(doc, method):
     if doc.restaurant_table:
-        frappe.db.set_value(
-            "URY Table",
-            doc.restaurant_table,
-            {"occupied": 0, "latest_invoice_time": None, "merged_with": None},
-        )
-        if hasattr(doc, "custom_merged_tables") and doc.custom_merged_tables:
-            for merged_table in doc.custom_merged_tables.split(","):
-                frappe.db.set_value("URY Table", merged_table.strip(), {"occupied": 0, "latest_invoice_time": None, "merged_with": None})
+        release_merge_cluster_tables(doc.restaurant_table)
 
 
 def pos_invoice_naming(doc, method):

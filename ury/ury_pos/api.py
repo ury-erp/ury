@@ -199,9 +199,35 @@ def format_merged_table_label(primary, merged_tables=None):
     return " + ".join([primary] + sorted(partners))
 
 
+def _backfill_split_groups(invoices):
+    parent_names = [
+        inv["custom_split_from"]
+        for inv in invoices
+        if inv.get("custom_split_from") and not inv.get("custom_split_group")
+    ]
+    if not parent_names:
+        return
+
+    parent_rows = frappe.get_all(
+        "POS Invoice",
+        filters={"name": ["in", parent_names]},
+        fields=["name", "custom_split_group"],
+    )
+    parent_group_map = {
+        row.name: row.custom_split_group
+        for row in parent_rows
+        if row.custom_split_group
+    }
+    for inv in invoices:
+        if not inv.get("custom_split_group") and inv.get("custom_split_from"):
+            inv["custom_split_group"] = parent_group_map.get(inv["custom_split_from"])
+
+
 def _enrich_split_group_meta(invoices):
     if not invoices:
         return invoices
+
+    _backfill_split_groups(invoices)
 
     groups = list(
         {inv.get("custom_split_group") for inv in invoices if inv.get("custom_split_group")}
@@ -228,6 +254,17 @@ def _enrich_split_group_meta(invoices):
     for row in group_members:
         group_order.setdefault(row.custom_split_group, []).append(row.name)
 
+    for group, names in list(group_order.items()):
+        children = frappe.get_all(
+            "POS Invoice",
+            filters={"custom_split_from": ["in", names], "docstatus": ["<", 2]},
+            fields=["name"],
+            order_by="creation asc",
+        )
+        for child in children:
+            if child.name not in names:
+                names.append(child.name)
+
     for inv in invoices:
         group = inv.get("custom_split_group")
         if not group or group not in group_order:
@@ -252,35 +289,58 @@ def _enrich_split_group_meta(invoices):
 def get_split_group(invoice):
     group = frappe.db.get_value("POS Invoice", invoice, "custom_split_group")
     if not group:
+        split_from = frappe.db.get_value("POS Invoice", invoice, "custom_split_from")
+        if split_from:
+            group = frappe.db.get_value("POS Invoice", split_from, "custom_split_group")
+    if not group:
         return {"invoices": [], "current": invoice, "group": None}
+
+    split_fields = [
+        "name",
+        "custom_split_from",
+        "custom_split_group",
+        "invoice_printed",
+        "restaurant_table",
+        "custom_merged_tables",
+        "rounded_total",
+        "grand_total",
+        "customer",
+        "customer_name",
+        "status",
+        "docstatus",
+        "posting_date",
+        "posting_time",
+        "order_type",
+        "cashier",
+        "waiter",
+        "mobile_number",
+        "net_total",
+        "total_taxes_and_charges",
+        "creation",
+    ]
 
     invoices = frappe.get_all(
         "POS Invoice",
         filters={"custom_split_group": group, "docstatus": ["<", 2]},
-        fields=[
-            "name",
-            "custom_split_from",
-            "custom_split_group",
-            "invoice_printed",
-            "restaurant_table",
-            "custom_merged_tables",
-            "rounded_total",
-            "grand_total",
-            "customer",
-            "customer_name",
-            "status",
-            "docstatus",
-            "posting_date",
-            "posting_time",
-            "order_type",
-            "cashier",
-            "waiter",
-            "mobile_number",
-            "net_total",
-            "total_taxes_and_charges",
-        ],
+        fields=split_fields,
         order_by="creation asc",
     )
+
+    member_names = [inv["name"] for inv in invoices]
+    if member_names:
+        children = frappe.get_all(
+            "POS Invoice",
+            filters={"custom_split_from": ["in", member_names], "docstatus": ["<", 2]},
+            fields=split_fields,
+            order_by="creation asc",
+        )
+        existing = {inv["name"] for inv in invoices}
+        for child in children:
+            if child.name not in existing:
+                invoices.append(child)
+                existing.add(child.name)
+
+    invoices.sort(key=lambda row: row.get("creation") or row.get("name"))
 
     total = len(invoices)
     for index, inv in enumerate(invoices, start=1):

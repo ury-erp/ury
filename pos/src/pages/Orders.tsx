@@ -255,6 +255,22 @@ export default function Orders() {
       await fetchOrders();
     }
 
+    const splitGroup = await getSplitGroup(result.new_invoice).catch(() => null);
+    if (splitGroup?.invoices?.length) {
+      const enriched = new Map(
+        splitGroup.invoices.map((inv) => [inv.name, mapSplitGroupInvoiceToPOSInvoice(inv)])
+      );
+      useRootStore.setState((state) => ({
+        orders: state.orders.map((o) => enriched.get(o.name) ?? o),
+      }));
+    }
+
+    const newInvoice = splitGroup?.invoices.find((inv) => inv.name === result.new_invoice);
+    if (newInvoice) {
+      await selectOrder(mapSplitGroupInvoiceToPOSInvoice(newInvoice));
+      return;
+    }
+
     const newOrder = useRootStore.getState().orders.find((o) => o.name === result.new_invoice);
     if (newOrder) {
       await selectOrder(newOrder);
@@ -341,7 +357,7 @@ export default function Orders() {
                   key={order.name} 
                   className={`p-0 bg-white hover:shadow-md transition-shadow flex flex-col overflow-hidden cursor-pointer ${
                     selectedOrder?.name === order.name ? 'ring-2 ring-blue-500 shadow-lg' : ''
-                  } ${splitBill ? 'border-s-4 border-s-violet-500' : ''}`}
+                  } ${splitBill ? 'border-s-4 border-s-primary-500' : ''}`}
                   onClick={() => handleOrderClick(order)}
                 >
                   <CardContent className="p-0 flex flex-col h-full">
@@ -351,7 +367,10 @@ export default function Orders() {
                         {order.name}
                       </h3>
                       {splitBill && (
-                        <Badge variant="secondary" className="shrink-0 gap-1 bg-violet-100 text-violet-800 hover:bg-violet-100">
+                        <Badge
+                          variant="outline"
+                          className="shrink-0 gap-1 border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-50"
+                        >
                           <GitBranch className="h-3 w-3" />
                           {(order.split_total ?? 0) >= 2
                             ? t('bill_split.split_indicator', {
@@ -379,7 +398,7 @@ export default function Orders() {
                     {splitBill && (
                       <div className="mt-2 space-y-1">
                         {order.custom_split_from && (
-                          <p className="text-xs text-violet-700">
+                          <p className="text-xs text-primary-700">
                             {t('bill_split.split_from', { invoice: order.custom_split_from })}
                           </p>
                         )}
@@ -390,7 +409,7 @@ export default function Orders() {
                               <button
                                 key={siblingName}
                                 type="button"
-                                className="rounded bg-white px-1.5 py-0.5 text-xs font-medium text-violet-700 underline-offset-2 hover:underline"
+                                className="rounded bg-white px-1.5 py-0.5 text-xs font-medium text-primary-700 underline-offset-2 hover:underline"
                                 onClick={(event) => openSiblingByName(event, siblingName, order)}
                               >
                                 {siblingName}
@@ -482,7 +501,10 @@ export default function Orders() {
               <div className="flex min-w-0 items-center gap-2">
                 <h2 className="truncate text-xl font-semibold text-gray-900 max-w-[10rem]">{selectedOrder.name}</h2>
                 {(selectedOrder.split_total ?? 0) >= 2 || isSplitBill(selectedOrder) ? (
-                  <Badge variant="secondary" className="shrink-0 gap-1 bg-violet-100 text-violet-800 hover:bg-violet-100">
+                  <Badge
+                    variant="outline"
+                    className="shrink-0 gap-1 border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-50"
+                  >
                     <GitBranch className="h-3 w-3" />
                     {(selectedOrder.split_total ?? 0) >= 2
                       ? t('bill_split.split_indicator', {

@@ -5,6 +5,8 @@ import os
 
 from pypdf import PdfWriter
 
+from ury.ury.doctype.ury_order.ury_order import release_merge_cluster_tables
+
 no_cache = 1
 
 base_template_path = "www/printview.html"
@@ -63,15 +65,7 @@ def network_printing(
 
             if restaurant_table and invoice_printed == 0:
                 frappe.db.set_value("POS Invoice", name, "invoice_printed", 1)
-                frappe.db.set_value(
-                    "URY Table",
-                    restaurant_table,
-                    {"occupied": 0, "latest_invoice_time": None, "merged_with": None},
-                )
-                custom_merged_tables = frappe.db.get_value("POS Invoice", name, "custom_merged_tables")
-                if custom_merged_tables:
-                    for merged_table in custom_merged_tables.split(","):
-                        frappe.db.set_value("URY Table", merged_table.strip(), {"occupied": 0, "latest_invoice_time": None, "merged_with": None})
+                release_merge_cluster_tables(restaurant_table)
             else:
                 frappe.db.set_value("POS Invoice", name, "invoice_printed", 1)
 
@@ -135,16 +129,8 @@ def qz_print_update(invoice):
                 frappe.db.set_value(
                     "POS Invoice", invoice, "invoice_printed", 1, update_modified=False
                 )
-                
-                # Update table status
-                frappe.db.set_value(
-                    "URY Table", table, {"occupied": 0, "latest_invoice_time": None, "merged_with": None}
-                )
-                custom_merged_tables = frappe.db.get_value("POS Invoice", invoice, "custom_merged_tables")
-                if custom_merged_tables:
-                    for merged_table in custom_merged_tables.split(","):
-                        frappe.db.set_value("URY Table", merged_table.strip(), {"occupied": 0, "latest_invoice_time": None, "merged_with": None})
-                
+
+                release_merge_cluster_tables(table)
                 # Validate both updates
                 new_invoice_printed = frappe.db.get_value("POS Invoice", invoice, "invoice_printed")
                 new_table_status = frappe.db.get_value("URY Table", table, "occupied")
@@ -176,15 +162,7 @@ def print_pos_page(doctype, name, print_format):
         frappe.db.set_value("POS Invoice", name, "invoice_printed", 1)
 
         if restaurant_table:
-            frappe.db.set_value(
-                "URY Table",
-                restaurant_table,
-                {"occupied": 0, "latest_invoice_time": None, "merged_with": None},
-            )
-            custom_merged_tables = frappe.db.get_value("POS Invoice", name, "custom_merged_tables")
-            if custom_merged_tables:
-                for merged_table in custom_merged_tables.split(","):
-                    frappe.db.set_value("URY Table", merged_table.strip(), {"occupied": 0, "latest_invoice_time": None, "merged_with": None})
+            release_merge_cluster_tables(restaurant_table)
 
 
 @frappe.whitelist()

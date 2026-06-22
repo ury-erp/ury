@@ -1,7 +1,7 @@
 import { StateCreator } from 'zustand';
 import { OrderType } from '../../data/order-types';
 import { call } from '../../lib/frappe-sdk';
-import { getPOSInvoices, getPOSInvoiceItems, POSInvoiceItem, POSInvoiceTax } from '../../lib/invoice-api';
+import { getPOSInvoices, getPOSInvoiceItems, getSplitGroup, mapSplitGroupInvoiceToPOSInvoice, POSInvoiceItem, POSInvoiceTax } from '../../lib/invoice-api';
 import { searchPosInvoice } from '../../lib/invoice-api';
 
 export interface POSInvoice {
@@ -164,13 +164,25 @@ export const createOrdersSlice: StateCreator<
         selectedOrderError: null 
       });
 
-      const { items, taxes } = await getPOSInvoiceItems(order.name);
+      const [{ items, taxes }, splitGroup] = await Promise.all([
+        getPOSInvoiceItems(order.name),
+        getSplitGroup(order.name).catch(() => ({ invoices: [], current: order.name, group: null })),
+      ]);
+
+      const splitMatch = splitGroup.invoices.find((inv) => inv.name === order.name);
+      const enrichedOrder = splitMatch
+        ? { ...order, ...mapSplitGroupInvoiceToPOSInvoice(splitMatch) }
+        : order;
       
-      set({ 
+      set((state) => ({ 
+        selectedOrder: enrichedOrder,
         selectedOrderItems: items,
         selectedOrderTaxes: taxes,
-        selectedOrderLoading: false 
-      });
+        selectedOrderLoading: false,
+        orders: splitMatch
+          ? state.orders.map((o) => (o.name === enrichedOrder.name ? enrichedOrder : o))
+          : state.orders,
+      }));
     } catch (error) {
       set({ 
         selectedOrderError: error instanceof Error ? error.message : 'Failed to fetch order details',

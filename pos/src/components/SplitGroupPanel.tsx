@@ -69,7 +69,7 @@ const SplitGroupPanel = ({ invoiceName, onOpenInvoice }: SplitGroupPanelProps) =
   }
 
   return (
-    <div className="mb-6 rounded-lg border-2 border-violet-200 bg-violet-50/60 p-4">
+    <div className="mb-6 rounded-lg border-2 border-primary-200 bg-primary-50/60 p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Link2 className="h-4 w-4 text-gray-500" />
