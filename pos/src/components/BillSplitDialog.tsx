@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Minus, Plus } from 'lucide-react';
 import {
   Dialog,
@@ -11,6 +11,8 @@ import {
 import { Button } from './ui/button';
 import { cn, formatCurrency } from '../lib/utils';
 import { t } from '../i18n';
+import { CustomerPicker } from './CustomerPicker';
+import type { Customer } from '../store/pos-store';
 
 export interface BillSplitItem {
   name: string;
@@ -25,7 +27,11 @@ interface BillSplitDialogProps {
   onOpenChange: (open: boolean) => void;
   invoiceName: string;
   items: BillSplitItem[];
-  onConfirm: (itemsToMove: Array<{ name: string; qty: number }>) => Promise<void>;
+  sourceCustomer?: Customer | null;
+  onConfirm: (payload: {
+    itemsToMove: Array<{ name: string; qty: number }>;
+    customer?: string;
+  }) => Promise<void>;
 }
 
 const BillSplitDialog = ({
@@ -33,15 +39,29 @@ const BillSplitDialog = ({
   onOpenChange,
   invoiceName,
   items,
+  sourceCustomer,
   onConfirm,
 }: BillSplitDialogProps) => {
   const [moveQtyByRow, setMoveQtyByRow] = useState<Record<string, number>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sameAsOriginal, setSameAsOriginal] = useState(true);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+
+  useEffect(() => {
+    if (open) {
+      setSameAsOriginal(true);
+      setSelectedCustomer(sourceCustomer ?? null);
+      setMoveQtyByRow({});
+      setError(null);
+    }
+  }, [open, sourceCustomer, invoiceName]);
 
   const resetState = () => {
     setMoveQtyByRow({});
     setError(null);
+    setSameAsOriginal(true);
+    setSelectedCustomer(sourceCustomer ?? null);
   };
 
   const handleOpenChange = (next: boolean) => {
@@ -97,10 +117,19 @@ const BillSplitDialog = ({
       .map((item) => ({ name: item.name, qty: moveQtyByRow[item.name] ?? 0 }))
       .filter((row) => row.qty > 0);
 
+    const customerId = sameAsOriginal ? sourceCustomer?.id : selectedCustomer?.id;
+    if (!sameAsOriginal && !customerId) {
+      setError(t('bill_split.customer_required'));
+      return;
+    }
+
     setIsSubmitting(true);
     setError(null);
     try {
-      await onConfirm(itemsToMove);
+      await onConfirm({
+        itemsToMove,
+        customer: sameAsOriginal ? undefined : customerId,
+      });
       resetState();
       onOpenChange(false);
     } catch (err) {
@@ -192,6 +221,31 @@ const BillSplitDialog = ({
               </div>
             );
           })}
+        </div>
+
+        <div className="mx-6 mb-4 space-y-3 rounded-lg border border-gray-200 p-4">
+          <p className="text-sm font-medium text-gray-900">{t('bill_split.customer_for_new_bill')}</p>
+          <label className="flex items-center gap-2 text-sm text-gray-700">
+            <input
+              type="checkbox"
+              checked={sameAsOriginal}
+              onChange={(e) => {
+                setSameAsOriginal(e.target.checked);
+                if (e.target.checked) {
+                  setSelectedCustomer(sourceCustomer ?? null);
+                }
+              }}
+              disabled={isSubmitting}
+            />
+            {t('bill_split.same_as_original')}
+          </label>
+          {!sameAsOriginal && (
+            <CustomerPicker
+              value={selectedCustomer}
+              onChange={setSelectedCustomer}
+              disabled={isSubmitting}
+            />
+          )}
         </div>
 
         <div className="mx-6 mb-2 grid grid-cols-2 gap-3 rounded-lg bg-gray-50 p-4 text-sm">
