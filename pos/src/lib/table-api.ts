@@ -82,11 +82,11 @@ export async function updateTableLayout(name: string, data: Partial<Table>) {
   return db.updateDoc(DOCTYPES.URY_TABLE, name, data);
 }
 
-export async function mergeTables(table: string, merge_with: string) {
+export async function mergeTablesBatch(anchor: string, tables: string[]) {
   const { call } = await import('./frappe-sdk');
-  return call.post('ury.ury.doctype.ury_order.ury_order.merge_free_tables', {
-    table1: table,
-    table2: merge_with
+  return call.post('ury.ury.doctype.ury_order.ury_order.merge_tables_batch', {
+    anchor_table: anchor,
+    tables,
   });
 }
 

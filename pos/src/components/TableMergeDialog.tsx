@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Check, Link2 } from 'lucide-react';
 import {
   Dialog,
@@ -22,7 +22,7 @@ interface TableMergeDialogProps {
   onOpenChange: (open: boolean) => void;
   sourceTable: Table | null;
   availableTables: Table[];
-  onConfirm: (targetName: string) => Promise<void>;
+  onConfirm: (targetNames: string[]) => Promise<void>;
 }
 
 const MIN_ANIMATION_MS = 600;
@@ -34,30 +34,48 @@ const TableMergeDialog = ({
   availableTables,
   onConfirm,
 }: TableMergeDialogProps) => {
-  const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
+  const [selectedTargets, setSelectedTargets] = useState<Set<string>>(new Set());
   const [phase, setPhase] = useState<DialogPhase>('select');
 
   useEffect(() => {
     if (open) {
-      setSelectedTarget(null);
+      setSelectedTargets(new Set());
       setPhase('select');
     }
   }, [open, sourceTable?.name]);
+
+  const selectedTargetList = useMemo(
+    () => availableTables.filter((table) => selectedTargets.has(table.name)),
+    [availableTables, selectedTargets]
+  );
 
   const handleClose = () => {
     if (phase === 'merging') return;
     onOpenChange(false);
   };
 
-  const handleConfirm = async () => {
-    if (!selectedTarget || !sourceTable || phase !== 'select') return;
+  const toggleTarget = (tableName: string) => {
+    setSelectedTargets((prev) => {
+      const next = new Set(prev);
+      if (next.has(tableName)) {
+        next.delete(tableName);
+      } else {
+        next.add(tableName);
+      }
+      return next;
+    });
+  };
 
+  const handleConfirm = async () => {
+    if (selectedTargets.size === 0 || !sourceTable || phase !== 'select') return;
+
+    const targets = Array.from(selectedTargets);
     setPhase('merging');
     const animationStart = Date.now();
 
     try {
       await Promise.all([
-        onConfirm(selectedTarget),
+        onConfirm(targets),
         new Promise((resolve) => {
           const elapsed = Date.now() - animationStart;
           const remaining = Math.max(0, MIN_ANIMATION_MS - elapsed);
@@ -89,7 +107,7 @@ const TableMergeDialog = ({
               <DialogDescription>
                 {sourceTable.occupied === 1
                   ? t('tables.merge_with_occupied_hint')
-                  : t('tables.select_table_to_merge')}
+                  : t('tables.select_tables_to_merge')}
               </DialogDescription>
             </DialogHeader>
 
@@ -100,35 +118,48 @@ const TableMergeDialog = ({
                 </p>
               ) : (
                 <div className="grid grid-cols-2 gap-2">
-                  {availableTables.map((table) => (
-                    <button
-                      key={table.name}
-                      type="button"
-                      onClick={() => setSelectedTarget(table.name)}
-                      className={cn(
-                        'flex items-center gap-2 rounded-lg border-2 p-3 text-left transition-all',
-                        selectedTarget === table.name
-                          ? 'border-primary bg-primary-50'
-                          : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                      )}
-                    >
-                      <TableShapeIcon shape={table.table_shape || 'Rectangle'} />
-                      <div className="min-w-0 flex-1">
-                        <span className="block truncate font-medium text-gray-900">{table.name}</span>
-                        {typeof table.no_of_seats === 'number' && (
-                          <span className="text-xs text-gray-500">
-                            {t('tables.seats')}: {table.no_of_seats}
-                          </span>
+                  {availableTables.map((table) => {
+                    const isSelected = selectedTargets.has(table.name);
+                    return (
+                      <button
+                        key={table.name}
+                        type="button"
+                        onClick={() => toggleTarget(table.name)}
+                        className={cn(
+                          'flex items-center gap-2 rounded-lg border-2 p-3 text-left transition-all',
+                          isSelected
+                            ? 'border-primary bg-primary-50'
+                            : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
                         )}
-                      </div>
-                      <Badge
-                        variant={table.occupied === 1 ? 'secondary' : 'success'}
-                        className="shrink-0"
                       >
-                        {table.occupied === 1 ? t('tables.occupied') : t('tables.available')}
-                      </Badge>
-                    </button>
-                  ))}
+                        <div
+                          className={cn(
+                            'flex h-4 w-4 shrink-0 items-center justify-center rounded border',
+                            isSelected
+                              ? 'border-primary bg-primary text-white'
+                              : 'border-gray-300 bg-white'
+                          )}
+                        >
+                          {isSelected && <Check className="h-3 w-3" />}
+                        </div>
+                        <TableShapeIcon shape={table.table_shape || 'Rectangle'} />
+                        <div className="min-w-0 flex-1">
+                          <span className="block truncate font-medium text-gray-900">{table.name}</span>
+                          {typeof table.no_of_seats === 'number' && (
+                            <span className="text-xs text-gray-500">
+                              {t('tables.seats')}: {table.no_of_seats}
+                            </span>
+                          )}
+                        </div>
+                        <Badge
+                          variant={table.occupied === 1 ? 'secondary' : 'success'}
+                          className="shrink-0"
+                        >
+                          {table.occupied === 1 ? t('tables.occupied') : t('tables.available')}
+                        </Badge>
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -137,58 +168,98 @@ const TableMergeDialog = ({
               <Button variant="outline" onClick={handleClose}>
                 {t('common.cancel')}
               </Button>
-              <Button onClick={handleConfirm} disabled={!selectedTarget}>
-                {t('tables.merge_confirm')}
+              <Button onClick={handleConfirm} disabled={selectedTargets.size === 0}>
+                {selectedTargets.size > 1
+                  ? t('tables.merge_selected_count', { count: selectedTargets.size })
+                  : t('tables.merge_confirm')}
               </Button>
             </DialogFooter>
           </>
         )}
 
-        {(phase === 'merging' || phase === 'done') && selectedTarget && (
+        {(phase === 'merging' || phase === 'done') && selectedTargets.size > 0 && (
           <div className="flex flex-col items-center px-6 py-8">
             <p className="mb-6 text-sm font-medium text-gray-600">
               {phase === 'done' ? t('tables.merge_success') : t('tables.merging_tables')}
             </p>
 
-            <div className="relative flex w-full max-w-xs items-center justify-center gap-4">
-              <div
-                className={cn(
-                  'flex flex-1 flex-col items-center rounded-lg border-2 border-emerald-300 bg-emerald-50 p-4',
-                  phase === 'merging' && 'animate-merge-slide-left'
-                )}
-              >
-                <TableShapeIcon shape={sourceTable.table_shape || 'Rectangle'} />
-                <span className="mt-2 text-sm font-semibold text-gray-900">{sourceTable.name}</span>
-              </div>
+            {selectedTargetList.length === 1 ? (
+              <div className="relative flex w-full max-w-xs items-center justify-center gap-4">
+                <div
+                  className={cn(
+                    'flex flex-1 flex-col items-center rounded-lg border-2 border-emerald-300 bg-emerald-50 p-4',
+                    phase === 'merging' && 'animate-merge-slide-left'
+                  )}
+                >
+                  <TableShapeIcon shape={sourceTable.table_shape || 'Rectangle'} />
+                  <span className="mt-2 text-sm font-semibold text-gray-900">{sourceTable.name}</span>
+                </div>
 
-              <div
-                className={cn(
-                  'absolute left-1/2 z-10 flex h-10 w-10 -translate-x-1/2 items-center justify-center rounded-full bg-white shadow-md',
-                  phase === 'merging' && 'animate-merge-link-pulse',
-                  phase === 'done' && 'bg-green-100'
-                )}
-              >
-                {phase === 'done' ? (
-                  <Check className="h-5 w-5 text-green-600" />
-                ) : (
-                  <Link2 className="h-5 w-5 text-primary" />
-                )}
-              </div>
+                <div
+                  className={cn(
+                    'absolute left-1/2 z-10 flex h-10 w-10 -translate-x-1/2 items-center justify-center rounded-full bg-white shadow-md',
+                    phase === 'merging' && 'animate-merge-link-pulse',
+                    phase === 'done' && 'bg-green-100'
+                  )}
+                >
+                  {phase === 'done' ? (
+                    <Check className="h-5 w-5 text-green-600" />
+                  ) : (
+                    <Link2 className="h-5 w-5 text-primary" />
+                  )}
+                </div>
 
-              <div
-                className={cn(
-                  'flex flex-1 flex-col items-center rounded-lg border-2 border-emerald-300 bg-emerald-50 p-4',
-                  phase === 'merging' && 'animate-merge-slide-right'
-                )}
-              >
-                <TableShapeIcon
-                  shape={
-                    availableTables.find((t) => t.name === selectedTarget)?.table_shape || 'Rectangle'
-                  }
-                />
-                <span className="mt-2 text-sm font-semibold text-gray-900">{selectedTarget}</span>
+                <div
+                  className={cn(
+                    'flex flex-1 flex-col items-center rounded-lg border-2 border-emerald-300 bg-emerald-50 p-4',
+                    phase === 'merging' && 'animate-merge-slide-right'
+                  )}
+                >
+                  <TableShapeIcon shape={selectedTargetList[0].table_shape || 'Rectangle'} />
+                  <span className="mt-2 text-sm font-semibold text-gray-900">{selectedTargetList[0].name}</span>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="relative flex w-full max-w-lg items-stretch justify-center gap-3">
+                <div
+                  className={cn(
+                    'flex min-w-[7rem] flex-1 flex-col items-center justify-center rounded-lg border-2 border-emerald-300 bg-emerald-50 p-4',
+                    phase === 'merging' && 'animate-merge-slide-left'
+                  )}
+                >
+                  <TableShapeIcon shape={sourceTable.table_shape || 'Rectangle'} />
+                  <span className="mt-2 text-sm font-semibold text-gray-900">{sourceTable.name}</span>
+                </div>
+
+                <div
+                  className={cn(
+                    'absolute left-1/2 top-1/2 z-10 flex h-10 w-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white shadow-md',
+                    phase === 'merging' && 'animate-merge-link-pulse',
+                    phase === 'done' && 'bg-green-100'
+                  )}
+                >
+                  {phase === 'done' ? (
+                    <Check className="h-5 w-5 text-green-600" />
+                  ) : (
+                    <Link2 className="h-5 w-5 text-primary" />
+                  )}
+                </div>
+
+                <div
+                  className={cn(
+                    'flex flex-1 flex-wrap items-center justify-center gap-2 rounded-lg border-2 border-emerald-300 bg-emerald-50 p-3',
+                    phase === 'merging' && 'animate-merge-slide-right'
+                  )}
+                >
+                  {selectedTargetList.map((table) => (
+                    <div key={table.name} className="flex flex-col items-center px-2 py-1">
+                      <TableShapeIcon shape={table.table_shape || 'Rectangle'} />
+                      <span className="mt-1 text-xs font-semibold text-gray-900">{table.name}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </DialogContent>

@@ -199,6 +199,8 @@
     "merge_tables": "Merge tables",
     "merge_with": "Merge with {{table}}",
     "select_table_to_merge": "Select a table to merge",
+    "select_tables_to_merge": "Select one or more tables to merge with",
+    "merge_selected_count": "Merge {{count}} tables",
     "merge_confirm": "Merge",
     "merging_tables": "Merging tables...",
     "merged": "Merged",
@@ -233,7 +235,16 @@
     "original_bill": "Original",
     "current_bill": "Current",
     "open_bill": "Open",
-    "paid_bill": "Paid"
+    "paid_bill": "Paid",
+    "customer_for_new_bill": "Customer for new bill",
+    "same_as_original": "Same customer as original bill",
+    "customer_required": "Select a customer for the new bill",
+    "open_original": "Open original",
+    "prev_bill": "Previous bill",
+    "next_bill": "Next bill",
+    "split_from": "Split from {{invoice}}",
+    "related": "Related bills",
+    "open_sibling_failed": "Could not open related bill"
   },
   "footer": {
     "pos": "POS",

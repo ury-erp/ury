@@ -199,6 +199,8 @@
     "merge_tables": "Fusionner les tables",
     "merge_with": "Fusionner avec {{table}}",
     "select_table_to_merge": "Sélectionnez une table à fusionner",
+    "select_tables_to_merge": "Sélectionnez une ou plusieurs tables à fusionner",
+    "merge_selected_count": "Fusionner {{count}} tables",
     "merge_confirm": "Fusionner",
     "merging_tables": "Fusion des tables...",
     "merged": "Fusionné",
@@ -233,7 +235,16 @@
     "original_bill": "Originale",
     "current_bill": "Actuelle",
     "open_bill": "Ouverte",
-    "paid_bill": "Payée"
+    "paid_bill": "Payée",
+    "customer_for_new_bill": "Client pour la nouvelle addition",
+    "same_as_original": "Même client que l'addition d'origine",
+    "customer_required": "Sélectionnez un client pour la nouvelle addition",
+    "open_original": "Ouvrir l'originale",
+    "prev_bill": "Addition précédente",
+    "next_bill": "Addition suivante",
+    "split_from": "Divisé depuis {{invoice}}",
+    "related": "Additions liées",
+    "open_sibling_failed": "Impossible d'ouvrir l'addition liée"
   },
   "footer": {
     "pos": "PDV",

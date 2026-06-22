@@ -2,8 +2,8 @@ import { Fragment, useCallback, useEffect, useMemo, useState, type MouseEvent } 
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Layout, Square } from 'lucide-react';
 import { usePOSStore } from '../store/pos-store';
-import { getRooms, getTables, getTableCount, mergeTables, unmergeTables, type Room, type Table } from '../lib/table-api';
-import { getMergeGroupMembers, getTableRenderGroups, sortTablesByMergeGroups } from '../lib/table-utils';
+import { getRooms, getTables, getTableCount, mergeTablesBatch, unmergeTables, type Room, type Table } from '../lib/table-api';
+import { getMergeGroupMembers, formatMergedTableLabelFromGroup, getTableRenderGroups, sortTablesByMergeGroups } from '../lib/table-utils';
 import { Spinner } from '../components/ui/spinner';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
@@ -187,13 +187,13 @@ const TableView = () => {
     }
   };
 
-  const handleMergeConfirm = async (targetName: string) => {
-    if (!mergeSourceTable) return;
+  const handleMergeConfirm = async (targetNames: string[]) => {
+    if (!mergeSourceTable || targetNames.length === 0) return;
 
     const sourceName = mergeSourceTable.name;
 
     try {
-      await mergeTables(sourceName, targetName);
+      await mergeTablesBatch(sourceName, targetNames);
       if (selectedRoom) {
         await loadTables(selectedRoom, { useCache: false });
       }
@@ -239,10 +239,16 @@ const TableView = () => {
 
   const tableRenderGroups = useMemo(() => getTableRenderGroups(tablesToDisplay), [tablesToDisplay]);
 
-  const renderTableCard = (table: Table, className?: string) => (
+  const renderTableCard = (table: Table, className?: string) => {
+    const mergeMembers = getMergeGroupMembers(table, tables);
+    const mergeGroupLabel =
+      mergeMembers.length > 1 ? formatMergedTableLabelFromGroup(mergeMembers) : undefined;
+
+    return (
     <TableCard
       key={table.name}
       table={table}
+      mergeGroupLabel={mergeGroupLabel}
       className={className}
       menuOpen={menuOpenForTable === table.name}
       onMenuOpenChange={(open) => setMenuOpenForTable(open ? table.name : null)}
@@ -253,7 +259,8 @@ const TableView = () => {
       onPrint={(event) => handlePrintTable(table, event)}
       isPrinting={printingTable === table.name}
     />
-  );
+    );
+  };
 
   const hasRooms = rooms.length > 0;
   const showGridSkeleton = loadingTables || !selectedRoom;
