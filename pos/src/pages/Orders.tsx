@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { Clock, User, UserCheck, Receipt, Printer, Pencil, X } from 'lucide-react';
 import { Badge, Button, Card, CardContent } from '../components/ui';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../components/ui/dialog';
@@ -11,8 +11,17 @@ import { Textarea } from '../components/ui/textarea';
 import { usePOSStore } from '../store/pos-store';
 import { useNavigate } from 'react-router-dom';
 import PaymentDialog from '../components/PaymentDialog';
+import BillSplitDialog from '../components/BillSplitDialog';
+import OrderActionsMenu from '../components/OrderActionsMenu';
+import SplitGroupPanel from '../components/SplitGroupPanel';
 import { printOrder } from '../lib/print';
 import { call } from '../lib/frappe-sdk';
+import { splitBill } from '../lib/order-api';
+import {
+  getOrdersTabForInvoice,
+  mapSplitGroupInvoiceToPOSInvoice,
+  type SplitGroupInvoice,
+} from '../lib/invoice-api';
 import { t } from '../i18n';
 
 export default function Orders() {
@@ -44,7 +53,27 @@ export default function Orders() {
   const [cancelLoading, setCancelLoading] = React.useState(false);
   const [editLoading, setEditLoading] = React.useState(false);
   const [showPaymentDialog, setShowPaymentDialog] = React.useState(false);
+  const [showSplitDialog, setShowSplitDialog] = React.useState(false);
+  const [orderActionsMenuOpen, setOrderActionsMenuOpen] = React.useState(false);
   const [isPrinting, setIsPrinting] = React.useState(false);
+
+  const canSplitBill = useMemo(() => {
+    if (!selectedOrder || selectedOrderItems.length === 0) return false;
+
+    const hasSplittableItems =
+      selectedOrderItems.length >= 2 ||
+      selectedOrderItems.some((item) => item.qty > 1);
+    if (!hasSplittableItems) return false;
+
+    // Tab label (Unbilled/Draft) is a UI filter; doc status is always "Draft" for open bills.
+    // Use invoice_printed to distinguish pre-print vs post-print split eligibility.
+    const invoicePrinted = String(selectedOrder.invoice_printed);
+    return invoicePrinted === '0' || invoicePrinted === '1';
+  }, [selectedOrder, selectedOrderItems]);
+
+  useEffect(() => {
+    setOrderActionsMenuOpen(false);
+  }, [selectedOrder?.name]);
 
   useEffect(() => {
     fetchOrders();
@@ -188,6 +217,43 @@ export default function Orders() {
     }
   }
 
+  async function handleSplitBill(itemsToMove: Array<{ name: string; qty: number }>) {
+    if (!selectedOrder) return;
+    const result = await splitBill(selectedOrder.name, itemsToMove);
+    showToast.success(t('bill_split.split_success', { invoice: result.new_invoice }));
+
+    const childOnUnbilledTab =
+      !!selectedOrder.restaurant_table &&
+      String(selectedOrder.invoice_printed) === '1';
+
+    if (childOnUnbilledTab) {
+      await setSelectedStatus('Unbilled');
+    } else {
+      await fetchOrders();
+    }
+
+    const newOrder = useRootStore.getState().orders.find((o) => o.name === result.new_invoice);
+    if (newOrder) {
+      await selectOrder(newOrder);
+    }
+  }
+
+  async function openRelatedInvoice(sibling: SplitGroupInvoice) {
+    if (sibling.docstatus !== 0) return;
+
+    const tab = getOrdersTabForInvoice(sibling, {
+      paidLimit: posStore.posProfile?.paid_limit,
+      viewAllStatus: posStore.posProfile?.view_all_status,
+    });
+
+    if (tab !== selectedStatus) {
+      await setSelectedStatus(tab);
+    }
+
+    const inList = useRootStore.getState().orders.find((o) => o.name === sibling.name);
+    await selectOrder(inList ?? mapSplitGroupInvoiceToPOSInvoice(sibling));
+  }
+
   if (error) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -233,15 +299,25 @@ export default function Orders() {
                     <h3 className="font-medium text-gray-900 text-sm truncate" title={order.name}>
                       {order.name}
                     </h3>
-                    <div className="flex items-center justify-between">
-                      <div>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
                         <p className="text-xs text-gray-500">
                           {order.restaurant_table ? `Table ${order.restaurant_table} • ` : ''}{t(`order_types.${order.order_type.toLowerCase().replace(/ /g, '_')}`)}
                         </p>
                       </div>
-                      <Badge variant={getBadgeVariant(order.status)} className="ms-2">
-                        {t(`order_status_types.${order.status.toLowerCase().replace(/ /g, '_')}`)}
-                      </Badge>
+                      <div className="flex shrink-0 items-center gap-1">
+                        {(order.split_total ?? 0) >= 2 && (
+                          <Badge variant="outline" className="text-xs">
+                            {t('bill_split.split_indicator', {
+                              index: order.split_index ?? 0,
+                              total: order.split_total ?? 0,
+                            })}
+                          </Badge>
+                        )}
+                        <Badge variant={getBadgeVariant(order.status)}>
+                          {t(`order_status_types.${order.status.toLowerCase().replace(/ /g, '_')}`)}
+                        </Badge>
+                      </div>
                     </div>
                     </div>
 
@@ -326,6 +402,12 @@ export default function Orders() {
                 {/* Only show edit and cancel buttons for Draft, Unbilled, and Recently Paid orders */}
                 {(selectedOrder.status === 'Draft' || selectedOrder.status === 'Unbilled' || selectedOrder.status === 'Recently Paid') && (
                   <>
+                    <OrderActionsMenu
+                      isOpen={orderActionsMenuOpen}
+                      onOpenChange={setOrderActionsMenuOpen}
+                      showSplitBill={canSplitBill}
+                      onSplitBill={() => setShowSplitDialog(true)}
+                    />
                     <button
                       type="button"
                       className="inline-flex items-center justify-center rounded-md p-2 bg-gray-100 hover:bg-gray-200 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -411,6 +493,11 @@ export default function Orders() {
                   </div>
                 </div>
               </div>
+
+              <SplitGroupPanel
+                invoiceName={selectedOrder.name}
+                onOpenInvoice={openRelatedInvoice}
+              />
 
               {/* Order Items */}
               <div className="mb-6">
@@ -501,6 +588,15 @@ export default function Orders() {
           owner={posStore.posProfile?.cashier || ''}
           fetchOrders={fetchOrders}
           clearSelectedOrder={clearSelectedOrder}
+        />
+      )}
+      {selectedOrder && (
+        <BillSplitDialog
+          open={showSplitDialog}
+          onOpenChange={setShowSplitDialog}
+          invoiceName={selectedOrder.name}
+          items={selectedOrderItems}
+          onConfirm={handleSplitBill}
         />
       )}
     </div>

@@ -1,5 +1,5 @@
 import { call } from './frappe-sdk';
-import { OrderType } from '../data/order-types';
+import { OrderStatusType, OrderType } from '../data/order-types';
 
 export interface POSInvoice {
   name: string;
@@ -17,11 +17,30 @@ export interface POSInvoice {
   posting_date: string;
   rounded_total: number;
   order_type: OrderType;
+  custom_split_group?: string | null;
+  custom_split_from?: string | null;
+  split_index?: number;
+  split_total?: number;
+}
+
+export interface SplitGroupInvoice extends POSInvoice {
+  split_index: number;
+  split_total: number;
+  is_original: boolean;
+  docstatus: number;
+}
+
+export interface SplitGroupResponse {
+  invoices: SplitGroupInvoice[];
+  current: string;
+  group: string | null;
 }
 
 export interface POSInvoiceItem {
+  name: string;
   item_name: string;
   qty: number;
+  rate: number;
   amount: number;
 }
 
@@ -122,6 +141,57 @@ export async function searchPosInvoice(query: string, status: string) {
     console.error('Error searching POS invoices:', error);
     throw error;
   }
+}
+
+export async function getSplitGroup(invoiceId: string): Promise<SplitGroupResponse> {
+  const response = await call.get<{ message: SplitGroupResponse }>(
+    'ury.ury_pos.api.get_split_group',
+    { invoice: invoiceId }
+  );
+  return response.message;
+}
+
+export function getOrdersTabForInvoice(
+  inv: {
+    invoice_printed: number;
+    restaurant_table: string | null;
+    status: string;
+    docstatus?: number;
+  },
+  options?: { paidLimit?: number; viewAllStatus?: number }
+): OrderStatusType {
+  const isPaid = inv.docstatus === 1 || inv.status === 'Paid';
+  if (isPaid) {
+    if (options?.paidLimit && options.paidLimit > 0) return 'Recently Paid';
+    if (options?.viewAllStatus === 1) return 'Paid';
+    return 'Recently Paid';
+  }
+  if (inv.invoice_printed === 0 && inv.restaurant_table) return 'Unbilled';
+  return 'Draft';
+}
+
+export function mapSplitGroupInvoiceToPOSInvoice(inv: SplitGroupInvoice): POSInvoice {
+  return {
+    name: inv.name,
+    invoice_printed: inv.invoice_printed,
+    grand_total: inv.grand_total,
+    restaurant_table: inv.restaurant_table,
+    cashier: inv.cashier ?? '',
+    waiter: inv.waiter ?? '',
+    net_total: inv.net_total ?? inv.grand_total,
+    posting_time: inv.posting_time,
+    total_taxes_and_charges: inv.total_taxes_and_charges ?? 0,
+    customer: inv.customer,
+    status: inv.status,
+    mobile_number: inv.mobile_number ?? '',
+    posting_date: inv.posting_date,
+    rounded_total: inv.rounded_total,
+    order_type: inv.order_type,
+    custom_split_group: inv.custom_split_group,
+    custom_split_from: inv.custom_split_from,
+    split_index: inv.split_index,
+    split_total: inv.split_total,
+  };
 } 
 
 export async function getInvoicePrintHtml(invoiceId: string, printFormat: string) {

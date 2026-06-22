@@ -1,22 +1,22 @@
-import { useCallback, useEffect, useMemo, useState, type MouseEvent } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState, type MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, Eye, Layout, Loader2, Printer, Square, Users } from 'lucide-react';
-import { cn, formatInvoiceTime } from '../lib/utils';
+import { AlertTriangle, Layout, Square } from 'lucide-react';
 import { usePOSStore } from '../store/pos-store';
-import { getRooms, getTables, getTableCount ,type Room, type Table } from '../lib/table-api';
+import { getRooms, getTables, getTableCount, mergeTables, unmergeTables, type Room, type Table } from '../lib/table-api';
+import { getMergeGroupMembers, getTableRenderGroups, sortTablesByMergeGroups } from '../lib/table-utils';
 import { Spinner } from '../components/ui/spinner';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { DINE_IN } from '../data/order-types';
-import { TableShapeIcon } from '../components/TableShapeIcon';
 import { getTableOrder } from '../lib/order-api';
 import { printOrder } from '../lib/print';
 import { showToast } from '../components/ui/toast';
 import { t } from '../i18n';
-
 import LayoutView from '../components/LayoutView';
-
-const sortTables = (tables: Table[]) => [...tables].sort((a, b) => a.name.localeCompare(b.name));
+import TableMergeDialog from '../components/TableMergeDialog';
+import TableUnmergeDialog from '../components/TableUnmergeDialog';
+import TableCard from '../components/TableCard';
+import MergeLinkConnector from '../components/MergeLinkConnector';
 
 const TableView = () => {
   const navigate = useNavigate();
@@ -30,9 +30,12 @@ const TableView = () => {
   const [loadingRooms, setLoadingRooms] = useState(false);
   const [loadingTables, setLoadingTables] = useState(false);
   const [roomCounts, setRoomCounts] = useState<Record<string, number>>({});
-  const [loadingRoomCounts, setLoadingRoomCounts] = useState(false);
+
   const [error, setError] = useState<string | null>(null);
   const [printingTable, setPrintingTable] = useState<string | null>(null);
+  const [menuOpenForTable, setMenuOpenForTable] = useState<string | null>(null);
+  const [mergeSourceTable, setMergeSourceTable] = useState<Table | null>(null);
+  const [unmergeSourceTable, setUnmergeSourceTable] = useState<Table | null>(null);
 
   const persistRoomCounts = useCallback((counts: Record<string, number>) => {
     if (!branch) return;
@@ -52,11 +55,11 @@ const TableView = () => {
         if (cachedRooms) {
           const parsedRooms = JSON.parse(cachedRooms) as Room[];
           setRooms(parsedRooms);
-          setSelectedRoom(prev => prev ?? (parsedRooms[0]?.name ?? null));
+          setSelectedRoom((prev) => prev ?? (parsedRooms[0]?.name ?? null));
         } else {
           const fetchedRooms = await getRooms(branch);
           setRooms(fetchedRooms);
-          setSelectedRoom(prev => prev ?? (fetchedRooms[0]?.name ?? null));
+          setSelectedRoom((prev) => prev ?? (fetchedRooms[0]?.name ?? null));
           sessionStorage.setItem(sessionKey, JSON.stringify(fetchedRooms));
         }
       } catch (e) {
@@ -80,7 +83,7 @@ const TableView = () => {
       try {
         const parsedCounts = JSON.parse(cachedCounts) as Record<string, number>;
         setRoomCounts(parsedCounts);
-        const hasAllRooms = rooms.every(room => typeof parsedCounts[room.name] === 'number');
+        const hasAllRooms = rooms.every((room) => typeof parsedCounts[room.name] === 'number');
         if (hasAllRooms) {
           shouldFetch = false;
         }
@@ -91,11 +94,10 @@ const TableView = () => {
 
     if (!shouldFetch) return;
 
-  async function fetchRoomCounts() {
-      setLoadingRoomCounts(true);
+    async function fetchRoomCounts() {
       try {
         const counts = await Promise.all(
-          rooms.map(room => getTableCount(room.name, room.branch))
+          rooms.map((room) => getTableCount(room.name, room.branch))
         );
         const nextCounts = rooms.reduce((acc, room, index) => {
           acc[room.name] = counts[index];
@@ -105,8 +107,6 @@ const TableView = () => {
         persistRoomCounts(nextCounts);
       } catch (error) {
         console.error('Failed to load room counts', error);
-      } finally {
-        setLoadingRoomCounts(false);
       }
     }
 
@@ -120,7 +120,7 @@ const TableView = () => {
 
       const shouldUseCache = options?.useCache !== false;
       if (shouldUseCache && tablesCache[roomName]) {
-        setTables(sortTables(tablesCache[roomName]));
+        setTables(sortTablesByMergeGroups(tablesCache[roomName]));
         setLoadingTables(false);
         return;
       }
@@ -128,9 +128,9 @@ const TableView = () => {
       setLoadingTables(true);
       try {
         const fetchedTables = await getTables(roomName);
-        const sortedTables = sortTables(fetchedTables);
+        const sortedTables = sortTablesByMergeGroups(fetchedTables);
         setTables(sortedTables);
-        setTablesCache(prev => ({ ...prev, [roomName]: sortedTables }));
+        setTablesCache((prev) => ({ ...prev, [roomName]: sortedTables }));
       } catch (e) {
         console.error(e);
         setError('Failed to load tables');
@@ -187,7 +187,73 @@ const TableView = () => {
     }
   };
 
-  const tablesToDisplay = useMemo(() => sortTables(tables), [tables]);
+  const handleMergeConfirm = async (targetName: string) => {
+    if (!mergeSourceTable) return;
+
+    const sourceName = mergeSourceTable.name;
+
+    try {
+      await mergeTables(sourceName, targetName);
+      if (selectedRoom) {
+        await loadTables(selectedRoom, { useCache: false });
+      }
+      showToast.success(t('tables.merge_success'));
+    } catch (error) {
+      showToast.error(error instanceof Error ? error.message : t('tables.merge_failed'));
+      throw error;
+    }
+  };
+
+  const handleUnmergeConfirm = async () => {
+    if (!unmergeSourceTable) return;
+
+    try {
+      await unmergeTables(unmergeSourceTable.name);
+      if (selectedRoom) {
+        await loadTables(selectedRoom, { useCache: false });
+      }
+      showToast.success(t('tables.unmerge_success'));
+    } catch (error) {
+      showToast.error(error instanceof Error ? error.message : t('tables.unmerge_failed'));
+      throw error;
+    }
+  };
+
+  const mergeAvailableTables = useMemo(() => {
+    if (!mergeSourceTable) return [];
+    const sourceCluster = new Set(getMergeGroupMembers(mergeSourceTable, tables));
+    return tables.filter((table) => {
+      if (table.name === mergeSourceTable.name) return false;
+      if (sourceCluster.has(table.name)) return false;
+      if (table.occupied === 1 && mergeSourceTable.occupied === 1) return false;
+      return true;
+    });
+  }, [mergeSourceTable, tables]);
+
+  const tablesToDisplay = useMemo(() => sortTablesByMergeGroups(tables), [tables]);
+
+  const unmergeGroupMembers = useMemo(() => {
+    if (!unmergeSourceTable) return [];
+    return getMergeGroupMembers(unmergeSourceTable, tablesToDisplay);
+  }, [unmergeSourceTable, tablesToDisplay]);
+
+  const tableRenderGroups = useMemo(() => getTableRenderGroups(tablesToDisplay), [tablesToDisplay]);
+
+  const renderTableCard = (table: Table, className?: string) => (
+    <TableCard
+      key={table.name}
+      table={table}
+      className={className}
+      menuOpen={menuOpenForTable === table.name}
+      onMenuOpenChange={(open) => setMenuOpenForTable(open ? table.name : null)}
+      onMerge={() => setMergeSourceTable(table)}
+      onUnmerge={() => setUnmergeSourceTable(table)}
+      onNavigate={() => handleNavigateToPOS(table.name)}
+      onPreview={(event) => handlePreviewTable(table, event)}
+      onPrint={(event) => handlePrintTable(table, event)}
+      isPrinting={printingTable === table.name}
+    />
+  );
 
   const hasRooms = rooms.length > 0;
   const showGridSkeleton = loadingTables || !selectedRoom;
@@ -201,7 +267,7 @@ const TableView = () => {
     setSelectedRoom(roomName);
 
     if (tablesCache[roomName]) {
-      setTables(sortTables(tablesCache[roomName]));
+      setTables(sortTablesByMergeGroups(tablesCache[roomName]));
       setLoadingTables(false);
     } else {
       setLoadingTables(true);
@@ -249,7 +315,7 @@ const TableView = () => {
                   </div>
                 )}
 
-                {rooms.map(room => (
+                {rooms.map((room) => (
                   <Button
                     key={room.name}
                     variant="tab"
@@ -297,103 +363,56 @@ const TableView = () => {
               <p>{t('tables.no_tables_found')}</p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-              {tablesToDisplay.map(table => {
-                const isOccupied = table.occupied === 1;
-
-                return (
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+              {tableRenderGroups.map((group) =>
+                group.length === 1 ? (
+                  renderTableCard(group[0])
+                ) : (
                   <div
-                    key={table.name}
-                    role={isOccupied ? 'group' : 'button'}
-                    tabIndex={isOccupied ? -1 : 0}
-                    onClick={() => {
-                      if (!isOccupied) {
-                        handleNavigateToPOS(table.name);
-                      }
-                    }}
-                    className={cn(
-                      'relative bg-white rounded-lg border-2 p-4 transition-all flex flex-col justify-between gap-y-4',
-                      isOccupied
-                        ? 'border-amber-400 bg-amber-50 text-amber-900'
-                        : 'border-emerald-300 bg-emerald-50 text-emerald-900 hover:border-emerald-400 hover:shadow-md cursor-pointer',
-                    )}
+                    key={group.map((t) => t.name).join('-')}
+                    className="col-span-full flex flex-wrap items-stretch gap-y-2 rounded-lg border border-blue-200/70 bg-blue-50/40 p-2"
                   >
-                    <div>
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <TableShapeIcon shape={table.table_shape || 'Rectangle'} />
-                          <span className="font-semibold text-lg text-gray-900">{table.name}</span>
-                        </div>
-                        <Badge variant={isOccupied ? 'warning' : 'success'}>
-                          {isOccupied ? t('tables.occupied') : t('tables.available')}
-                        </Badge>
-                      </div>
-
-                      <div className="space-y-2 text-sm text-gray-700">
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium">{t('tables.room')}</span>
-                          <span>{table.restaurant_room}</span>
-                        </div>
-                        {isOccupied && (
-                          <div className="flex items-center justify-between">
-                            <span className="font-medium">Started at</span>
-                            <span>{formatInvoiceTime(table.latest_invoice_time)}</span>
-                          </div>
+                    {group.map((table, index) => (
+                      <Fragment key={table.name}>
+                        {renderTableCard(
+                          table,
+                          'min-w-[9.5rem] flex-1 basis-[calc(50%-1.5rem)] sm:basis-[calc(33.333%-1.5rem)] md:min-w-[10rem] md:max-w-[14rem]'
                         )}
-                        {typeof table.no_of_seats === 'number' && (
-                          <div className="flex items-center justify-between">
-                            <span className="font-medium">{t('tables.seats')}</span>
-                            <span className="flex items-center gap-1">
-                              <Users className="w-3 h-3" />
-                              {table.no_of_seats}
-                            </span>
-                          </div>
+                        {index < group.length - 1 && (
+                          <MergeLinkConnector
+                            leftTable={table.name}
+                            rightTable={group[index + 1].name}
+                          />
                         )}
-                        {table.is_take_away === 1 && (
-                          <Badge variant="pending" className="mt-2">
-                            Take away
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-
-                    {isOccupied ? (
-                      <div className="flex gap-2 pt-3 mt-3 border-t border-amber-200">
-                        <button
-                          onClick={(event) => handlePreviewTable(table, event)}
-                          className="flex-1 flex items-center justify-center gap-2 py-2 text-xs font-semibold rounded bg-white hover:bg-amber-100 transition"
-                        >
-                          <Eye className="w-3 h-3" />
-                          Preview
-                        </button>
-                        <button
-                          onClick={(event) => handlePrintTable(table, event)}
-                          disabled={printingTable === table.name}
-                          className="flex-1 flex items-center justify-center gap-2 py-2 text-xs font-semibold rounded bg-white hover:bg-amber-100 transition disabled:opacity-60 disabled:cursor-not-allowed"
-                        >
-                          {printingTable === table.name ? (
-                            <>
-                              <Loader2 className="w-3 h-3 animate-spin" />
-                              Printing...
-                            </>
-                          ) : (
-                            <>
-                              <Printer className="w-3 h-3" />
-                              Print
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    ) : (
-                      <p className="text-sm text-gray-500">{t('tables.tap_to_start')}</p>
-                    )}
+                      </Fragment>
+                    ))}
                   </div>
-                );
-              })}
+                )
+              )}
             </div>
           )}
         </div>
       </div>
+
+      <TableMergeDialog
+        open={mergeSourceTable !== null}
+        onOpenChange={(open) => {
+          if (!open) setMergeSourceTable(null);
+        }}
+        sourceTable={mergeSourceTable}
+        availableTables={mergeAvailableTables}
+        onConfirm={handleMergeConfirm}
+      />
+
+      <TableUnmergeDialog
+        open={unmergeSourceTable !== null}
+        onOpenChange={(open) => {
+          if (!open) setUnmergeSourceTable(null);
+        }}
+        sourceTable={unmergeSourceTable}
+        groupMembers={unmergeGroupMembers}
+        onConfirm={handleUnmergeConfirm}
+      />
 
       {/* Status Legend */}
       <div className="fixed bottom-[4.5rem] w-full p-4 bg-white border-t border-gray-200">

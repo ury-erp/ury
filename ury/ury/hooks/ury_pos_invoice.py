@@ -28,6 +28,8 @@ def on_trash(doc, method):
 def validate_invoice(doc, method):
     if doc.waiter == None or doc.waiter == "":
         doc.waiter = doc.modified_by
+    if getattr(frappe.flags, "ury_bill_split", False):
+        return
     remove_items = frappe.db.get_value("POS Profile", doc.pos_profile, "remove_items")
     
     if doc.invoice_printed == 1 and remove_items == 0:
@@ -116,8 +118,11 @@ def table_status_delete(doc, method):
         frappe.db.set_value(
             "URY Table",
             doc.restaurant_table,
-            {"occupied": 0, "latest_invoice_time": None},
+            {"occupied": 0, "latest_invoice_time": None, "merged_with": None},
         )
+        if hasattr(doc, "custom_merged_tables") and doc.custom_merged_tables:
+            for merged_table in doc.custom_merged_tables.split(","):
+                frappe.db.set_value("URY Table", merged_table.strip(), {"occupied": 0, "latest_invoice_time": None, "merged_with": None})
 
 
 def pos_invoice_naming(doc, method):
@@ -194,16 +199,35 @@ def validate_price_list(doc, method):
             
 
 def restrict_existing_order(doc, event):
-    if doc.restaurant_table:
-        invoice_exist = frappe.db.exists(
+    if not doc.restaurant_table:
+        return
+
+    if getattr(frappe.flags, "ury_bill_split", False):
+        return
+
+    if doc.get("custom_split_from"):
+        source = frappe.db.get_value(
             "POS Invoice",
-            {
-                "restaurant_table": doc.restaurant_table,
-                "docstatus": 0,
-                "invoice_printed": 0,
-            },
+            doc.custom_split_from,
+            ["docstatus", "restaurant_table"],
+            as_dict=True,
         )
-        if invoice_exist:
-            frappe.throw(
-                ("Table {0} has an existing invoice").format(doc.restaurant_table)
-            )
+        if (
+            source
+            and source.docstatus == 0
+            and (source.restaurant_table or "") == (doc.restaurant_table or "")
+        ):
+            return
+
+    invoice_exist = frappe.db.exists(
+        "POS Invoice",
+        {
+            "restaurant_table": doc.restaurant_table,
+            "docstatus": 0,
+            "invoice_printed": 0,
+        },
+    )
+    if invoice_exist:
+        frappe.throw(
+            ("Table {0} has an existing invoice").format(doc.restaurant_table)
+        )
