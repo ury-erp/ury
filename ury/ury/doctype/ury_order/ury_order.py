@@ -19,43 +19,67 @@ class URYOrder(Document):
 @frappe.whitelist()
 def merge_free_tables(table1, table2):
     """Merges two tables in the same room; allows one occupied and one free."""
-    t1_room = frappe.db.get_value("URY Table", table1, "restaurant_room")
-    t2_room = frappe.db.get_value("URY Table", table2, "restaurant_room")
-    if t1_room != t2_room:
-        frappe.throw(_("Cannot merge tables from different rooms."))
+    return merge_tables_batch(table1, [table2])
 
-    t1_occupied = frappe.db.get_value("URY Table", table1, "occupied")
-    t2_occupied = frappe.db.get_value("URY Table", table2, "occupied")
-    if t1_occupied and t2_occupied:
-        frappe.throw(_("Cannot merge two occupied tables."))
 
-    union_members, table_by_name = _get_union_cluster_members(table1, table2)
+@frappe.whitelist()
+def merge_tables_batch(anchor_table, tables):
+    """Merge anchor table with one or more target tables in the same room."""
+    if isinstance(tables, str):
+        tables = json.loads(tables)
+
+    targets = list(dict.fromkeys(t for t in tables if t and t != anchor_table))
+    if not targets:
+        frappe.throw(_("Select at least one table to merge."))
+
+    anchor_room = frappe.db.get_value("URY Table", anchor_table, "restaurant_room")
+    if not anchor_room:
+        frappe.throw(_("Table not found."))
+
+    anchor_cluster, table_by_name = _get_merge_cluster(anchor_table)
+    anchor_cluster_set = set(anchor_cluster)
+    targets = [t for t in targets if t not in anchor_cluster_set]
+    if not targets:
+        frappe.throw(_("Selected tables are already merged with this table."))
+
+    for target in targets:
+        target_room = frappe.db.get_value("URY Table", target, "restaurant_room")
+        if target_room != anchor_room:
+            frappe.throw(_("Cannot merge tables from different rooms."))
+        if not table_by_name.get(target):
+            frappe.throw(_("Table not found."))
+
+        anchor_occupied = table_by_name[anchor_table].occupied
+        target_occupied = table_by_name[target].occupied
+        if anchor_occupied and target_occupied:
+            frappe.throw(_("Cannot merge two occupied tables."))
+
+    union_members = set(anchor_cluster)
+    for target in targets:
+        members, table_by_name = _get_merge_cluster(target)
+        union_members.update(members)
+
     occupied_in_union = sum(
         1 for name in union_members if table_by_name[name].occupied
     )
     if occupied_in_union > 1:
         frappe.throw(_("Cannot merge tables with separate active orders."))
 
-    t1_merged = frappe.db.get_value("URY Table", table1, "merged_with") or ""
-    t2_merged = frappe.db.get_value("URY Table", table2, "merged_with") or ""
+    for target in targets:
+        _append_merged_partner(anchor_table, target)
+        _append_merged_partner(target, anchor_table)
 
-    if table2 not in t1_merged:
-        new_t1 = f"{t1_merged},{table2}" if t1_merged else table2
-        frappe.db.set_value("URY Table", table1, "merged_with", new_t1)
-
-    if table1 not in t2_merged:
-        new_t2 = f"{t2_merged},{table1}" if t2_merged else table1
-        frappe.db.set_value("URY Table", table2, "merged_with", new_t2)
-
-    _sync_active_order_with_merge_cluster(table1)
+    _sync_active_order_with_merge_cluster(anchor_table)
     return True
 
 
-def _get_union_cluster_members(table1, table2):
-    members1, table_by_name = _get_merge_cluster(table1)
-    members2, _ = _get_merge_cluster(table2)
-    union = list(set(members1) | set(members2))
-    return union, table_by_name
+def _append_merged_partner(table_name, partner):
+    merged = frappe.db.get_value("URY Table", table_name, "merged_with") or ""
+    partners = _parse_merged_with(merged)
+    if partner in partners:
+        return
+    new_merged = f"{merged},{partner}" if merged else partner
+    frappe.db.set_value("URY Table", table_name, "merged_with", new_merged)
 
 
 def _sync_active_order_with_merge_cluster(table):
@@ -215,7 +239,7 @@ def _copy_invoice_item_fields(item_row, qty):
 
 
 @frappe.whitelist()
-def split_bill(source_invoice, items_to_move):
+def split_bill(source_invoice, items_to_move, customer=None):
     """Move selected line items from a printed draft bill to a new sibling POS Invoice."""
     if isinstance(items_to_move, str):
         items_to_move = json.loads(items_to_move)
@@ -291,6 +315,11 @@ def split_bill(source_invoice, items_to_move):
     new_invoice.custom_split_group = split_group
     new_invoice.invoice_printed = 0
     new_invoice.invoice_created = 0
+
+    if customer:
+        new_invoice.customer = customer
+        new_invoice.customer_name = frappe.db.get_value("Customer", customer, "customer_name")
+        new_invoice.mobile_number = frappe.db.get_value("Customer", customer, "mobile_no")
 
     items_to_remove = []
     for item in source.items:
