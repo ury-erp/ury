@@ -385,6 +385,16 @@ def get_custom_fields():
 				"translatable": 0
 			}
 		],
+
+		"URY KOT": [
+			{
+				"fieldname": "custom_merged_tables",
+				"fieldtype": "Data",
+				"insert_after": "restaurant_table",
+				"label": "Merged Tables",
+				"read_only": 1,
+			},
+		],
      
     }
  
