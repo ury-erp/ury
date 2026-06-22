@@ -54,8 +54,19 @@ export function getMergeGroupMembers(table: Table, allTables: Table[]): string[]
   return members.sort((a, b) => a.localeCompare(b));
 }
 
-export function getMergedPartners(table: Table, allTables: Table[]): string[] {
-  return getMergeGroupMembers(table, allTables).filter((name) => name !== table.name);
+export function formatMergedTableLabel(
+  primary: string | null | undefined,
+  mergedTables?: string | null
+): string {
+  if (!primary) return '';
+  const partners = parseMergedWith(mergedTables);
+  if (!partners.length) return primary;
+  return [primary, ...partners.sort((a, b) => a.localeCompare(b))].join(' + ');
+}
+
+export function formatMergedTableLabelFromGroup(members: string[]): string {
+  if (!members.length) return '';
+  return [...members].sort((a, b) => a.localeCompare(b)).join(' + ');
 }
 
 function buildMergeClusters(tables: Table[]): string[][] {

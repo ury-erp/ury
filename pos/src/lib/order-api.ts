@@ -27,6 +27,7 @@ export interface POSInvoice {
   posting_time: string;
   order_type: string;
   restaurant_table: string;
+  custom_merged_tables?: string | null;
   custom_restaurant_room: string;
   status: string;
   total: number;
@@ -96,11 +97,13 @@ export interface SplitBillResponse {
 
 export async function splitBill(
   sourceInvoice: string,
-  itemsToMove: SplitBillItemMove[]
+  itemsToMove: SplitBillItemMove[],
+  customer?: string | null
 ): Promise<SplitBillResponse> {
   const res = await call.post('ury.ury.doctype.ury_order.ury_order.split_bill', {
     source_invoice: sourceInvoice,
     items_to_move: itemsToMove,
+    customer: customer || undefined,
   });
   return res.message as SplitBillResponse;
 } 

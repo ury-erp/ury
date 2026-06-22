@@ -190,6 +190,15 @@ def getModeOfPayment():
     return modeOfPayments
 
 
+def format_merged_table_label(primary, merged_tables=None):
+    if not primary:
+        return ""
+    partners = [p.strip() for p in (merged_tables or "").split(",") if p.strip()]
+    if not partners:
+        return primary
+    return " + ".join([primary] + sorted(partners))
+
+
 def _enrich_split_group_meta(invoices):
     if not invoices:
         return invoices
@@ -201,6 +210,7 @@ def _enrich_split_group_meta(invoices):
         for inv in invoices:
             inv["split_index"] = 0
             inv["split_total"] = 0
+            inv["split_siblings"] = []
         return invoices
 
     group_members = frappe.db.sql(
@@ -223,14 +233,17 @@ def _enrich_split_group_meta(invoices):
         if not group or group not in group_order:
             inv["split_index"] = 0
             inv["split_total"] = 0
+            inv["split_siblings"] = []
             continue
         names = group_order[group]
         inv["split_total"] = len(names)
+        inv["split_siblings"] = [name for name in names if name != inv["name"]]
         try:
             inv["split_index"] = names.index(inv["name"]) + 1
         except ValueError:
             inv["split_index"] = 0
             inv["split_total"] = 0
+            inv["split_siblings"] = []
 
     return invoices
 
@@ -250,9 +263,11 @@ def get_split_group(invoice):
             "custom_split_group",
             "invoice_printed",
             "restaurant_table",
+            "custom_merged_tables",
             "rounded_total",
             "grand_total",
             "customer",
+            "customer_name",
             "status",
             "docstatus",
             "posting_date",
@@ -272,6 +287,7 @@ def get_split_group(invoice):
         inv["split_index"] = index
         inv["split_total"] = total
         inv["is_original"] = not inv.get("custom_split_from")
+        inv["split_siblings"] = [row["name"] for row in invoices if row["name"] != inv["name"]]
 
     return {"invoices": invoices, "current": invoice, "group": group}
 
@@ -286,7 +302,7 @@ def getInvoiceForCashier(status, cashier, limit, limit_start):
         invoices = frappe.db.sql(
             """
             SELECT 
-                name, invoice_printed, grand_total, restaurant_table, 
+                name, invoice_printed, grand_total, restaurant_table, custom_merged_tables,
                 cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number, 
                 posting_date, rounded_total, order_type 
@@ -306,7 +322,7 @@ def getInvoiceForCashier(status, cashier, limit, limit_start):
         invoices = frappe.db.sql(
             """
             SELECT 
-                name, invoice_printed, grand_total, restaurant_table, 
+                name, invoice_printed, grand_total, restaurant_table, custom_merged_tables,
                 cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number, 
                 posting_date, rounded_total, order_type 
@@ -325,7 +341,7 @@ def getInvoiceForCashier(status, cashier, limit, limit_start):
         invoices = frappe.db.sql(
             """
             SELECT 
-                name, invoice_printed, grand_total, restaurant_table, 
+                name, invoice_printed, grand_total, restaurant_table, custom_merged_tables,
                 cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number,
                 posting_date, rounded_total, order_type,additional_discount_percentage,discount_amount 
@@ -343,7 +359,7 @@ def getInvoiceForCashier(status, cashier, limit, limit_start):
         invoices = frappe.db.sql(
             """
             SELECT 
-                name, invoice_printed, grand_total, restaurant_table, 
+                name, invoice_printed, grand_total, restaurant_table, custom_merged_tables,
                 cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number,
                 posting_date, rounded_total, order_type,additional_discount_percentage,discount_amount
@@ -376,7 +392,7 @@ def getPosInvoice(status, limit, limit_start):
         invoices = frappe.db.sql(
             """
             SELECT 
-                name, invoice_printed, grand_total, restaurant_table, 
+                name, invoice_printed, grand_total, restaurant_table, custom_merged_tables,
                 cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number, 
                 posting_date, rounded_total, order_type,
@@ -397,7 +413,7 @@ def getPosInvoice(status, limit, limit_start):
         invoices = frappe.db.sql(
             """
             SELECT 
-                name, invoice_printed, grand_total, restaurant_table, 
+                name, invoice_printed, grand_total, restaurant_table, custom_merged_tables,
                 cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number, 
                 posting_date, rounded_total, order_type,
@@ -417,7 +433,7 @@ def getPosInvoice(status, limit, limit_start):
         invoices = frappe.db.sql(
             """
             SELECT 
-                name, invoice_printed, grand_total, restaurant_table, 
+                name, invoice_printed, grand_total, restaurant_table, custom_merged_tables,
                 cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number,
                 posting_date, rounded_total, order_type, additional_discount_percentage,
@@ -436,7 +452,7 @@ def getPosInvoice(status, limit, limit_start):
         invoices = frappe.db.sql(
             """
             SELECT 
-                name, invoice_printed, grand_total, restaurant_table, 
+                name, invoice_printed, grand_total, restaurant_table, custom_merged_tables,
                 cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number,
                 posting_date, rounded_total, order_type, additional_discount_percentage,
@@ -490,6 +506,7 @@ def searchPosInvoice(query,status):
             "posting_time",
             "order_type",
             "restaurant_table",
+            "custom_merged_tables",
             "status",
             "rounded_total",
             "net_total",

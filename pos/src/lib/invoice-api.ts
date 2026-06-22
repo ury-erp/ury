@@ -12,15 +12,18 @@ export interface POSInvoice {
   posting_time: string;
   total_taxes_and_charges: number;
   customer: string;
+  customer_name?: string;
   status: 'Draft' | 'Unbilled' | 'Recently Paid' | 'Paid' | 'Consolidated' | 'Return';
   mobile_number: string;
   posting_date: string;
   rounded_total: number;
   order_type: OrderType;
+  custom_merged_tables?: string | null;
   custom_split_group?: string | null;
   custom_split_from?: string | null;
   split_index?: number;
   split_total?: number;
+  split_siblings?: string[];
 }
 
 export interface SplitGroupInvoice extends POSInvoice {
@@ -28,6 +31,7 @@ export interface SplitGroupInvoice extends POSInvoice {
   split_total: number;
   is_original: boolean;
   docstatus: number;
+  split_siblings?: string[];
 }
 
 export interface SplitGroupResponse {
@@ -176,6 +180,7 @@ export function mapSplitGroupInvoiceToPOSInvoice(inv: SplitGroupInvoice): POSInv
     invoice_printed: inv.invoice_printed,
     grand_total: inv.grand_total,
     restaurant_table: inv.restaurant_table,
+    custom_merged_tables: inv.custom_merged_tables,
     cashier: inv.cashier ?? '',
     waiter: inv.waiter ?? '',
     net_total: inv.net_total ?? inv.grand_total,
@@ -191,6 +196,7 @@ export function mapSplitGroupInvoiceToPOSInvoice(inv: SplitGroupInvoice): POSInv
     custom_split_from: inv.custom_split_from,
     split_index: inv.split_index,
     split_total: inv.split_total,
+    split_siblings: inv.split_siblings,
   };
 } 
 

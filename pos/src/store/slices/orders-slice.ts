@@ -20,10 +20,12 @@ export interface POSInvoice {
   posting_date: string;
   rounded_total: number;
   order_type: OrderType;
+  custom_merged_tables?: string | null;
   custom_split_group?: string | null;
   custom_split_from?: string | null;
   split_index?: number;
   split_total?: number;
+  split_siblings?: string[];
 }
 
 export interface OrdersState {
