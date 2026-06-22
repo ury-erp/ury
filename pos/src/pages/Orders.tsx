@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef } from 'react';
-import { Clock, User, UserCheck, Receipt, Printer, Pencil, X } from 'lucide-react';
+import { Clock, User, UserCheck, Receipt, Printer, Pencil, X, GitBranch } from 'lucide-react';
 import { Badge, Button, Card, CardContent } from '../components/ui';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../components/ui/dialog';
 import { showToast } from '../components/ui/toast';
@@ -19,10 +19,30 @@ import { call } from '../lib/frappe-sdk';
 import { splitBill } from '../lib/order-api';
 import {
   getOrdersTabForInvoice,
+  getSplitGroup,
   mapSplitGroupInvoiceToPOSInvoice,
+  type POSInvoice,
   type SplitGroupInvoice,
 } from '../lib/invoice-api';
+import { formatMergedTableLabel } from '../lib/table-utils';
 import { t } from '../i18n';
+
+function getOrderTableLabel(order: Pick<POSInvoice, 'restaurant_table' | 'custom_merged_tables'>) {
+  if (!order.restaurant_table) return null;
+  return formatMergedTableLabel(order.restaurant_table, order.custom_merged_tables);
+}
+
+function isOrderEditable(status: string) {
+  return status === 'Draft' || status === 'Unbilled' || status === 'Recently Paid';
+}
+
+function isSplitBill(order: Pick<POSInvoice, 'split_total' | 'custom_split_group' | 'custom_split_from'>) {
+  return (
+    (order.split_total ?? 0) >= 2 ||
+    !!order.custom_split_group ||
+    !!order.custom_split_from
+  );
+}
 
 export default function Orders() {
   const { 
@@ -217,9 +237,12 @@ export default function Orders() {
     }
   }
 
-  async function handleSplitBill(itemsToMove: Array<{ name: string; qty: number }>) {
+  async function handleSplitBill(payload: {
+    itemsToMove: Array<{ name: string; qty: number }>;
+    customer?: string;
+  }) {
     if (!selectedOrder) return;
-    const result = await splitBill(selectedOrder.name, itemsToMove);
+    const result = await splitBill(selectedOrder.name, payload.itemsToMove, payload.customer);
     showToast.success(t('bill_split.split_success', { invoice: result.new_invoice }));
 
     const childOnUnbilledTab =
@@ -239,8 +262,6 @@ export default function Orders() {
   }
 
   async function openRelatedInvoice(sibling: SplitGroupInvoice) {
-    if (sibling.docstatus !== 0) return;
-
     const tab = getOrdersTabForInvoice(sibling, {
       paidLimit: posStore.posProfile?.paid_limit,
       viewAllStatus: posStore.posProfile?.view_all_status,
@@ -252,6 +273,31 @@ export default function Orders() {
 
     const inList = useRootStore.getState().orders.find((o) => o.name === sibling.name);
     await selectOrder(inList ?? mapSplitGroupInvoiceToPOSInvoice(sibling));
+  }
+
+  async function openSiblingByName(
+    event: React.MouseEvent,
+    siblingName: string,
+    sourceOrder: POSInvoice
+  ) {
+    event.stopPropagation();
+    if (siblingName === sourceOrder.name) return;
+
+    const inList = orders.find((o) => o.name === siblingName);
+    if (inList) {
+      await selectOrder(inList);
+      return;
+    }
+
+    try {
+      const result = await getSplitGroup(sourceOrder.name);
+      const sibling = result.invoices.find((inv) => inv.name === siblingName);
+      if (sibling) {
+        await openRelatedInvoice(sibling);
+      }
+    } catch {
+      showToast.error(t('bill_split.open_sibling_failed'));
+    }
   }
 
   if (error) {
@@ -286,39 +332,74 @@ export default function Orders() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-screen-xl mx-auto">
-              {orders.map((order) => (
+              {orders.map((order) => {
+                const splitBill = isSplitBill(order);
+                const siblings = order.split_siblings ?? [];
+
+                return (
                 <Card 
                   key={order.name} 
                   className={`p-0 bg-white hover:shadow-md transition-shadow flex flex-col overflow-hidden cursor-pointer ${
                     selectedOrder?.name === order.name ? 'ring-2 ring-blue-500 shadow-lg' : ''
-                  }`}
+                  } ${splitBill ? 'border-s-4 border-s-violet-500' : ''}`}
                   onClick={() => handleOrderClick(order)}
                 >
                   <CardContent className="p-0 flex flex-col h-full">
                     <div className="p-3 bg-gray-50 border-b">
-                    <h3 className="font-medium text-gray-900 text-sm truncate" title={order.name}>
-                      {order.name}
-                    </h3>
+                    <div className="mb-1 flex items-center justify-between gap-2">
+                      <h3 className="font-medium text-gray-900 text-sm truncate" title={order.name}>
+                        {order.name}
+                      </h3>
+                      {splitBill && (
+                        <Badge variant="secondary" className="shrink-0 gap-1 bg-violet-100 text-violet-800 hover:bg-violet-100">
+                          <GitBranch className="h-3 w-3" />
+                          {(order.split_total ?? 0) >= 2
+                            ? t('bill_split.split_indicator', {
+                                index: order.split_index ?? 0,
+                                total: order.split_total ?? 0,
+                              })
+                            : t('bill_split.split_bill')}
+                        </Badge>
+                      )}
+                    </div>
                     <div className="flex items-center justify-between gap-2">
                       <div className="min-w-0">
                         <p className="text-xs text-gray-500">
-                          {order.restaurant_table ? `Table ${order.restaurant_table} • ` : ''}{t(`order_types.${order.order_type.toLowerCase().replace(/ /g, '_')}`)}
+                          {getOrderTableLabel(order)
+                            ? `Table ${getOrderTableLabel(order)} • `
+                            : ''}{t(`order_types.${order.order_type.toLowerCase().replace(/ /g, '_')}`)}
                         </p>
                       </div>
                       <div className="flex shrink-0 items-center gap-1">
-                        {(order.split_total ?? 0) >= 2 && (
-                          <Badge variant="outline" className="text-xs">
-                            {t('bill_split.split_indicator', {
-                              index: order.split_index ?? 0,
-                              total: order.split_total ?? 0,
-                            })}
-                          </Badge>
-                        )}
                         <Badge variant={getBadgeVariant(order.status)}>
                           {t(`order_status_types.${order.status.toLowerCase().replace(/ /g, '_')}`)}
                         </Badge>
                       </div>
                     </div>
+                    {splitBill && (
+                      <div className="mt-2 space-y-1">
+                        {order.custom_split_from && (
+                          <p className="text-xs text-violet-700">
+                            {t('bill_split.split_from', { invoice: order.custom_split_from })}
+                          </p>
+                        )}
+                        {siblings.length > 0 && (
+                          <div className="flex flex-wrap items-center gap-1">
+                            <span className="text-xs text-gray-500">{t('bill_split.related')}:</span>
+                            {siblings.map((siblingName) => (
+                              <button
+                                key={siblingName}
+                                type="button"
+                                className="rounded bg-white px-1.5 py-0.5 text-xs font-medium text-violet-700 underline-offset-2 hover:underline"
+                                onClick={(event) => openSiblingByName(event, siblingName, order)}
+                              >
+                                {siblingName}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                     </div>
 
                     {/* Content section - matches MenuCard padding and structure */}
@@ -341,7 +422,8 @@ export default function Orders() {
                     </div>
                   </CardContent>
                 </Card>
-              ))}
+                );
+              })}
             </div>
           )}
           {/* Pagination Controls */}
@@ -397,10 +479,22 @@ export default function Orders() {
           <>
             {/* Fixed Header */}
             <div className="sticky top-0 start-0 end-0 z-20 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between min-h-[64px]">
-              <h2 className="text-xl font-semibold text-gray-900 truncate max-w-[10rem]">{selectedOrder.name}</h2>
+              <div className="flex min-w-0 items-center gap-2">
+                <h2 className="truncate text-xl font-semibold text-gray-900 max-w-[10rem]">{selectedOrder.name}</h2>
+                {(selectedOrder.split_total ?? 0) >= 2 || isSplitBill(selectedOrder) ? (
+                  <Badge variant="secondary" className="shrink-0 gap-1 bg-violet-100 text-violet-800 hover:bg-violet-100">
+                    <GitBranch className="h-3 w-3" />
+                    {(selectedOrder.split_total ?? 0) >= 2
+                      ? t('bill_split.split_indicator', {
+                          index: selectedOrder.split_index ?? 0,
+                          total: selectedOrder.split_total ?? 0,
+                        })
+                      : t('bill_split.split_bill')}
+                  </Badge>
+                ) : null}
+              </div>
               <div className="flex items-center gap-2">
-                {/* Only show edit and cancel buttons for Draft, Unbilled, and Recently Paid orders */}
-                {(selectedOrder.status === 'Draft' || selectedOrder.status === 'Unbilled' || selectedOrder.status === 'Recently Paid') && (
+                {isOrderEditable(selectedOrder.status) && (
                   <>
                     <OrderActionsMenu
                       isOpen={orderActionsMenuOpen}
@@ -463,9 +557,12 @@ export default function Orders() {
             </Dialog>
             {/* Scrollable Content Area */}
             <div className="flex-1 overflow-y-auto p-6 pb-40">
-              {/* Order Header (now only info, not name/buttons) */}
+              <SplitGroupPanel
+                invoiceName={selectedOrder.name}
+                onOpenInvoice={openRelatedInvoice}
+              />
+
               <div className="mb-6">
-                {/* Two-column Order Info */}
                 <div className="grid grid-cols-2 gap-4">
                   {/* First column: customer and time */}
                   <div className="space-y-3">
@@ -487,17 +584,12 @@ export default function Orders() {
                     {selectedOrder.restaurant_table && (
                       <div className="flex items-center gap-3 text-sm">
                         <Receipt className="w-4 h-4 text-gray-500" />
-                        <span className="text-gray-600">{selectedOrder.restaurant_table}</span>
+                        <span className="text-gray-600">{getOrderTableLabel(selectedOrder)}</span>
                       </div>
                     )}
                   </div>
                 </div>
               </div>
-
-              <SplitGroupPanel
-                invoiceName={selectedOrder.name}
-                onOpenInvoice={openRelatedInvoice}
-              />
 
               {/* Order Items */}
               <div className="mb-6">
@@ -552,7 +644,7 @@ export default function Orders() {
                   {isPrinting ? <Spinner className="w-5 h-5" hideMessage /> : <Printer className="w-5 h-5" />}
                 </Button>
                 {/* Payment Button - Only show for Draft, Unbilled, and Recently Paid orders */}
-                {(selectedOrder.status === 'Draft' || selectedOrder.status === 'Unbilled' || selectedOrder.status === 'Recently Paid') && (
+                {isOrderEditable(selectedOrder.status) && (
                   <Button
                     className="flex-1"
                     onClick={() => {
@@ -584,6 +676,7 @@ export default function Orders() {
           customer={selectedOrder.customer}
           posProfile={posStore.posProfile?.name || ''}
           table={selectedOrder.restaurant_table || null}
+          tableLabel={getOrderTableLabel(selectedOrder)}
           cashier={posStore.posProfile?.cashier || ''}
           owner={posStore.posProfile?.cashier || ''}
           fetchOrders={fetchOrders}
@@ -596,6 +689,11 @@ export default function Orders() {
           onOpenChange={setShowSplitDialog}
           invoiceName={selectedOrder.name}
           items={selectedOrderItems}
+          sourceCustomer={
+            selectedOrder.customer
+              ? { id: selectedOrder.customer, name: selectedOrder.customer, phone: selectedOrder.mobile_number }
+              : null
+          }
           onConfirm={handleSplitBill}
         />
       )}
