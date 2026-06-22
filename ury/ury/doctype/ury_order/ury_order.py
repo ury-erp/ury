@@ -301,7 +301,7 @@ def sync_order(
             "URY Table", table, {"occupied": 1, "latest_invoice_time": invoice.creation}
         )
 
-    invoice.db_set("owner", owner)
+    invoice.db_set("owner", cashier)
     return invoice.as_dict()
 
 
