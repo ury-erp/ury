@@ -36,9 +36,30 @@ class TestURYWaiterPrint(FrappeTestCase):
 		defaults.update(kwargs)
 		return frappe._dict(defaults)
 
+	def _invoice_qty_side_effect(self, qty_map=None):
+		qty_map = qty_map or {}
+
+		def get_all(doctype, filters=None, fields=None):
+			if doctype == "POS Invoice Item":
+				return [
+					{"item_code": item_code, "qty": qty, "comment": comment}
+					for (item_code, comment), qty in qty_map.items()
+				]
+			return []
+
+		return get_all
+
+	def _build_combined(self, kot_names, invoice_qty_map=None):
+		combined = frappe._dict({"invoice": "INV-001", "kot_items": []})
+		combined.append = lambda field, item: combined.kot_items.append(frappe._dict(item))
+		return combined, invoice_qty_map
+
+	@patch("ury.ury.api.ury_waiter_print.frappe.get_all")
 	@patch("ury.ury.api.ury_waiter_print.frappe.copy_doc")
 	@patch("ury.ury.api.ury_waiter_print.frappe.get_doc")
-	def test_build_combined_kot_doc_merges_multiple_kots(self, mock_get_doc, mock_copy_doc):
+	def test_build_combined_kot_doc_merges_multiple_kots(
+		self, mock_get_doc, mock_copy_doc, mock_get_all
+	):
 		mock_get_doc.side_effect = [
 			self._make_kot_doc(
 				"KOT-1",
@@ -51,19 +72,24 @@ class TestURYWaiterPrint(FrappeTestCase):
 				[{"item": "Pasta", "item_name": "Pasta", "quantity": "2", "comments": ""}],
 			),
 		]
-		combined = frappe._dict({"kot_items": []})
-		combined.append = lambda field, item: combined.kot_items.append(frappe._dict(item))
+		combined, invoice_qty_map = self._build_combined(["KOT-1", "KOT-2"])
 		mock_copy_doc.return_value = combined
+		mock_get_all.side_effect = self._invoice_qty_side_effect(invoice_qty_map)
 
 		combined_doc = build_combined_kot_doc(["KOT-1", "KOT-2"])
 
 		self.assertEqual(len(combined_doc.kot_items), 2)
 		self.assertEqual(combined_doc.kot_items[0].item, "Pizza")
+		self.assertEqual(combined_doc.kot_items[0].display_mode, "single_qty")
 		self.assertEqual(combined_doc.kot_items[1].quantity, "2")
+		self.assertEqual(combined_doc.kot_items[1].display_mode, "single_qty")
 
+	@patch("ury.ury.api.ury_waiter_print.frappe.get_all")
 	@patch("ury.ury.api.ury_waiter_print.frappe.copy_doc")
 	@patch("ury.ury.api.ury_waiter_print.frappe.get_doc")
-	def test_build_combined_kot_doc_aggregates_same_item(self, mock_get_doc, mock_copy_doc):
+	def test_build_combined_kot_doc_aggregates_same_item(
+		self, mock_get_doc, mock_copy_doc, mock_get_all
+	):
 		mock_get_doc.side_effect = [
 			self._make_kot_doc(
 				"KOT-1",
@@ -76,18 +102,25 @@ class TestURYWaiterPrint(FrappeTestCase):
 				[{"item": "Pizza", "item_name": "Pizza", "quantity": "2", "comments": ""}],
 			),
 		]
-		combined = frappe._dict({"kot_items": []})
-		combined.append = lambda field, item: combined.kot_items.append(frappe._dict(item))
+		combined, invoice_qty_map = self._build_combined(
+			["KOT-1", "KOT-2"],
+			{("Pizza", ""): 3},
+		)
 		mock_copy_doc.return_value = combined
+		mock_get_all.side_effect = self._invoice_qty_side_effect(invoice_qty_map)
 
 		combined_doc = build_combined_kot_doc(["KOT-1", "KOT-2"])
 
 		self.assertEqual(len(combined_doc.kot_items), 1)
 		self.assertEqual(combined_doc.kot_items[0].quantity, "3")
+		self.assertEqual(combined_doc.kot_items[0].display_mode, "single_qty")
 
+	@patch("ury.ury.api.ury_waiter_print.frappe.get_all")
 	@patch("ury.ury.api.ury_waiter_print.frappe.copy_doc")
 	@patch("ury.ury.api.ury_waiter_print.frappe.get_doc")
-	def test_build_combined_kot_doc_includes_cancel_lines(self, mock_get_doc, mock_copy_doc):
+	def test_build_combined_kot_doc_includes_cancel_lines(
+		self, mock_get_doc, mock_copy_doc, mock_get_all
+	):
 		mock_get_doc.side_effect = [
 			self._make_kot_doc(
 				"KOT-1",
@@ -108,14 +141,114 @@ class TestURYWaiterPrint(FrappeTestCase):
 				],
 			),
 		]
-		combined = frappe._dict({"kot_items": []})
-		combined.append = lambda field, item: combined.kot_items.append(frappe._dict(item))
+		combined, invoice_qty_map = self._build_combined(
+			["KOT-1", "KOT-2"],
+			{("Pizza", ""): 1},
+		)
 		mock_copy_doc.return_value = combined
+		mock_get_all.side_effect = self._invoice_qty_side_effect(invoice_qty_map)
 
 		combined_doc = build_combined_kot_doc(["KOT-1", "KOT-2"])
 
 		self.assertEqual(len(combined_doc.kot_items), 2)
+		self.assertEqual(combined_doc.kot_items[0].display_mode, "single_qty")
+		self.assertEqual(combined_doc.kot_items[1].display_mode, "old_new")
+		self.assertEqual(combined_doc.kot_items[1].old_qty, 2)
+		self.assertEqual(combined_doc.kot_items[1].new_qty, 1)
 		self.assertEqual(combined_doc.kot_items[1].cancelled_qty, 1)
+
+	@patch("ury.ury.api.ury_waiter_print.frappe.get_all")
+	@patch("ury.ury.api.ury_waiter_print.frappe.copy_doc")
+	@patch("ury.ury.api.ury_waiter_print.frappe.get_doc")
+	def test_first_time_add_shows_single_quantity(self, mock_get_doc, mock_copy_doc, mock_get_all):
+		mock_get_doc.return_value = self._make_kot_doc(
+			"KOT-1",
+			"New Order",
+			[{"item": "Pizza", "item_name": "Pizza", "quantity": "3", "comments": ""}],
+		)
+		combined, invoice_qty_map = self._build_combined(["KOT-1"], {("Pizza", ""): 3})
+		mock_copy_doc.return_value = combined
+		mock_get_all.side_effect = self._invoice_qty_side_effect(invoice_qty_map)
+
+		combined_doc = build_combined_kot_doc(["KOT-1"])
+
+		self.assertEqual(combined_doc.kot_items[0].display_mode, "single_qty")
+		self.assertEqual(combined_doc.kot_items[0].quantity, "3")
+
+	@patch("ury.ury.api.ury_waiter_print.frappe.get_all")
+	@patch("ury.ury.api.ury_waiter_print.frappe.copy_doc")
+	@patch("ury.ury.api.ury_waiter_print.frappe.get_doc")
+	def test_existing_item_increase_shows_old_new(self, mock_get_doc, mock_copy_doc, mock_get_all):
+		mock_get_doc.return_value = self._make_kot_doc(
+			"KOT-1",
+			"Order Modified",
+			[{"item": "Pizza", "item_name": "Pizza", "quantity": "2", "comments": ""}],
+		)
+		combined, invoice_qty_map = self._build_combined(["KOT-1"], {("Pizza", ""): 5})
+		mock_copy_doc.return_value = combined
+		mock_get_all.side_effect = self._invoice_qty_side_effect(invoice_qty_map)
+
+		combined_doc = build_combined_kot_doc(["KOT-1"])
+
+		self.assertEqual(combined_doc.kot_items[0].display_mode, "old_new")
+		self.assertEqual(combined_doc.kot_items[0].old_qty, 3)
+		self.assertEqual(combined_doc.kot_items[0].new_qty, 5)
+
+	@patch("ury.ury.api.ury_waiter_print.frappe.get_all")
+	@patch("ury.ury.api.ury_waiter_print.frappe.copy_doc")
+	@patch("ury.ury.api.ury_waiter_print.frappe.get_doc")
+	def test_existing_item_partial_cancel_shows_old_new(
+		self, mock_get_doc, mock_copy_doc, mock_get_all
+	):
+		mock_get_doc.return_value = self._make_kot_doc(
+			"KOT-1",
+			"Partially cancelled",
+			[
+				{
+					"item": "Soup",
+					"item_name": "Soup",
+					"quantity": "10",
+					"cancelled_qty": 3,
+					"comments": "",
+				}
+			],
+		)
+		combined, invoice_qty_map = self._build_combined(["KOT-1"], {("Soup", ""): 7})
+		mock_copy_doc.return_value = combined
+		mock_get_all.side_effect = self._invoice_qty_side_effect(invoice_qty_map)
+
+		combined_doc = build_combined_kot_doc(["KOT-1"])
+
+		self.assertEqual(combined_doc.kot_items[0].display_mode, "old_new")
+		self.assertEqual(combined_doc.kot_items[0].old_qty, 10)
+		self.assertEqual(combined_doc.kot_items[0].new_qty, 7)
+
+	@patch("ury.ury.api.ury_waiter_print.frappe.get_all")
+	@patch("ury.ury.api.ury_waiter_print.frappe.copy_doc")
+	@patch("ury.ury.api.ury_waiter_print.frappe.get_doc")
+	def test_full_cancel_shows_old_to_zero(self, mock_get_doc, mock_copy_doc, mock_get_all):
+		mock_get_doc.return_value = self._make_kot_doc(
+			"KOT-1",
+			"Partially cancelled",
+			[
+				{
+					"item": "Soup",
+					"item_name": "Soup",
+					"quantity": "10",
+					"cancelled_qty": 10,
+					"comments": "",
+				}
+			],
+		)
+		combined, invoice_qty_map = self._build_combined(["KOT-1"], {})
+		mock_copy_doc.return_value = combined
+		mock_get_all.side_effect = self._invoice_qty_side_effect(invoice_qty_map)
+
+		combined_doc = build_combined_kot_doc(["KOT-1"])
+
+		self.assertEqual(combined_doc.kot_items[0].display_mode, "old_new")
+		self.assertEqual(combined_doc.kot_items[0].old_qty, 10)
+		self.assertEqual(combined_doc.kot_items[0].new_qty, 0)
 
 	@patch("ury.ury.api.ury_waiter_print.print_by_server")
 	@patch("ury.ury.api.ury_waiter_print.build_combined_kot_doc")

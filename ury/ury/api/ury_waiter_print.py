@@ -65,6 +65,56 @@ def _aggregate_kot_items(kot_docs):
 	return list(add_items.values()) + list(cancel_items.values())
 
 
+def _get_invoice_item_qty_map(invoice_id):
+	if not invoice_id:
+		return {}
+
+	qty_map = {}
+	for row in frappe.get_all(
+		"POS Invoice Item",
+		filters={"parent": invoice_id},
+		fields=["item_code", "qty", "comment"],
+	):
+		key = (row["item_code"], row.get("comment") or "")
+		qty_map[key] = int(row.get("qty") or 0)
+
+	return qty_map
+
+
+def _enrich_item_display_fields(items, invoice_id):
+	invoice_qty_map = _get_invoice_item_qty_map(invoice_id)
+	enriched_items = []
+
+	for item in items:
+		item = dict(item)
+		key = (item["item"], item.get("comments") or "")
+
+		if item.get("cancelled_qty"):
+			old_qty = int(item.get("quantity") or 0)
+			cancelled_qty = int(item.get("cancelled_qty") or 0)
+			new_qty = max(old_qty - cancelled_qty, 0)
+			item["display_mode"] = "old_new"
+			item["old_qty"] = old_qty
+			item["new_qty"] = new_qty
+		else:
+			delta_qty = int(item.get("quantity") or 0)
+			new_qty = invoice_qty_map.get(key, delta_qty)
+			old_qty = new_qty - delta_qty
+
+			if old_qty <= 0:
+				item["display_mode"] = "single_qty"
+				item["old_qty"] = 0
+				item["new_qty"] = delta_qty
+			else:
+				item["display_mode"] = "old_new"
+				item["old_qty"] = old_qty
+				item["new_qty"] = new_qty
+
+		enriched_items.append(item)
+
+	return enriched_items
+
+
 def build_combined_kot_doc(kot_names):
 	if not kot_names:
 		return None
@@ -78,7 +128,10 @@ def build_combined_kot_doc(kot_names):
 		if waiter:
 			combined_doc.waiter = waiter
 
-	for item in _aggregate_kot_items(kot_docs):
+	for item in _enrich_item_display_fields(
+		_aggregate_kot_items(kot_docs),
+		combined_doc.invoice,
+	):
 		combined_doc.append("kot_items", item)
 
 	return combined_doc
