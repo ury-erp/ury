@@ -113,10 +113,10 @@ export async function getCombinedPosProfile(): Promise<PosProfileCombined> {
   // Get limited fields first
   const limitedProfile = await getPosProfileLimitedFields();
   console.log('limitedProfile', limitedProfile);
-  
+
   // Get full profile using the pos_profile name from limited profile
   const fullProfile = await getPosProfileFull(limitedProfile.pos_profile);
-  
+
   // Merge both profiles
   const combinedProfile: PosProfileCombined = {
     ...fullProfile,
