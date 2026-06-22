@@ -9,6 +9,7 @@ import { t } from '../i18n';
 
 interface TableCardProps {
   table: Table;
+  mergeGroupLabel?: string;
   className?: string;
   menuOpen: boolean;
   onMenuOpenChange: (open: boolean) => void;
@@ -22,6 +23,7 @@ interface TableCardProps {
 
 const TableCard = ({
   table,
+  mergeGroupLabel,
   className,
   menuOpen,
   onMenuOpenChange,
@@ -58,7 +60,7 @@ const TableCard = ({
             <div className="shrink-0">
               <TableShapeIcon shape={table.table_shape || 'Rectangle'} />
             </div>
-            <span className="truncate text-lg font-semibold text-gray-900" title={table.name}>
+            <span className="truncate text-lg font-semibold text-gray-900" title={mergeGroupLabel ?? table.name}>
               {table.name}
             </span>
           </div>
@@ -75,6 +77,12 @@ const TableCard = ({
             />
           </div>
         </div>
+
+        {mergeGroupLabel && mergeGroupLabel !== table.name && (
+          <p className="mb-2 truncate text-xs font-medium text-primary-700" title={mergeGroupLabel}>
+            {t('tables.merged_with_list', { tables: mergeGroupLabel })}
+          </p>
+        )}
 
         <div className="space-y-2 text-sm text-gray-700">
           <div className="flex items-center justify-between">
