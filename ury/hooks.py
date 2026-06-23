@@ -282,6 +282,10 @@ fixtures = [
                     "POS Invoice-cancel_reason",
                     "POS Invoice Item-comment",
                     "POS Invoice Item-custom_course",
+                    "POS Invoice-custom_merged_total",
+                    "POS Invoice-custom_merged_pos_invoice_details",
+                    "POS Invoice-custom_merged_pos_invoice",
+                    "POS Invoice-custom_bill_merge_details_section",
                     "Sales Invoice-mobile_number",
                     "Sales Invoice-order_info",
                     "Sales Invoice-order_type",
@@ -363,6 +367,7 @@ fixtures = [
                     "POS Profile-custom_reprint_kot_format",
                     "Employee-payment_amount",
                     "Employee-payment_type"
+
                 },
             ]
         ],
