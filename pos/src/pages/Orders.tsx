@@ -291,31 +291,6 @@ export default function Orders() {
     await selectOrder(inList ?? mapSplitGroupInvoiceToPOSInvoice(sibling));
   }
 
-  async function openSiblingByName(
-    event: React.MouseEvent,
-    siblingName: string,
-    sourceOrder: POSInvoice
-  ) {
-    event.stopPropagation();
-    if (siblingName === sourceOrder.name) return;
-
-    const inList = orders.find((o) => o.name === siblingName);
-    if (inList) {
-      await selectOrder(inList);
-      return;
-    }
-
-    try {
-      const result = await getSplitGroup(sourceOrder.name);
-      const sibling = result.invoices.find((inv) => inv.name === siblingName);
-      if (sibling) {
-        await openRelatedInvoice(sibling);
-      }
-    } catch {
-      showToast.error(t('bill_split.open_sibling_failed'));
-    }
-  }
-
   if (error) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -350,7 +325,6 @@ export default function Orders() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-screen-xl mx-auto">
               {orders.map((order) => {
                 const splitBill = isSplitBill(order);
-                const siblings = order.split_siblings ?? [];
 
                 return (
                 <Card 
@@ -395,29 +369,10 @@ export default function Orders() {
                         </Badge>
                       </div>
                     </div>
-                    {splitBill && (
-                      <div className="mt-2 space-y-1">
-                        {order.custom_split_from && (
-                          <p className="text-xs text-primary-700">
-                            {t('bill_split.split_from', { invoice: order.custom_split_from })}
-                          </p>
-                        )}
-                        {siblings.length > 0 && (
-                          <div className="flex flex-wrap items-center gap-1">
-                            <span className="text-xs text-gray-500">{t('bill_split.related')}:</span>
-                            {siblings.map((siblingName) => (
-                              <button
-                                key={siblingName}
-                                type="button"
-                                className="rounded bg-white px-1.5 py-0.5 text-xs font-medium text-primary-700 underline-offset-2 hover:underline"
-                                onClick={(event) => openSiblingByName(event, siblingName, order)}
-                              >
-                                {siblingName}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
+                    {splitBill && order.custom_split_from && (
+                      <p className="mt-2 text-xs text-primary-700">
+                        {t('bill_split.split_from', { invoice: order.custom_split_from })}
+                      </p>
                     )}
                     </div>
 
