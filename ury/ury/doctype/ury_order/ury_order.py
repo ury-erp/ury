@@ -70,6 +70,7 @@ def merge_tables_batch(anchor_table, tables):
         _append_merged_partner(target, anchor_table)
 
     _sync_active_order_with_merge_cluster(anchor_table)
+    _reconcile_open_invoices_for_tables(_get_cluster_table_names(anchor_table))
     return True
 
 
@@ -91,8 +92,7 @@ def _sync_active_order_with_merge_cluster(table):
         return
 
     primary_table = occupied_members[0]
-    partners = [name for name in members if name != primary_table]
-    partners_value = ",".join(partners) if partners else None
+    partners_value = _merged_partners_csv(primary_table)
 
     open_invoices = frappe.get_all(
         "POS Invoice",
@@ -173,6 +173,79 @@ def _get_cluster_table_names(table):
         return [table]
 
 
+def _merged_partners_for_primary(primary_table):
+    if not primary_table:
+        return []
+    members = _get_cluster_table_names(primary_table)
+    return sorted(name for name in members if name != primary_table)
+
+
+def _merged_partners_csv(primary_table):
+    partners = _merged_partners_for_primary(primary_table)
+    return ",".join(partners) if partners else None
+
+
+def _normalize_merged_partners_csv(csv_value):
+    if not csv_value:
+        return []
+    return sorted(_parse_merged_with(csv_value))
+
+
+def _reconcile_invoice_merged_tables(invoice, persist=False):
+    """Align custom_merged_tables on an invoice with the live table merge cluster."""
+    primary = invoice.get("restaurant_table")
+    if not primary:
+        return invoice
+
+    expected = _merged_partners_for_primary(primary)
+    current = _normalize_merged_partners_csv(invoice.get("custom_merged_tables"))
+
+    if expected == current:
+        return invoice
+
+    partners_value = ",".join(expected) if expected else None
+    invoice.custom_merged_tables = partners_value
+
+    if persist and invoice.get("name"):
+        frappe.db.set_value(
+            "POS Invoice",
+            invoice.name,
+            "custom_merged_tables",
+            partners_value,
+            update_modified=False,
+        )
+
+    return invoice
+
+
+def _open_invoice_names_for_table(table):
+    names = set()
+    for row in frappe.get_all(
+        "POS Invoice",
+        filters={"docstatus": 0, "restaurant_table": table},
+        fields=["name"],
+    ):
+        names.add(row.name)
+    for row in frappe.get_all(
+        "POS Invoice",
+        filters={"docstatus": 0, "custom_merged_tables": ["like", f"%{table}%"]},
+        fields=["name"],
+    ):
+        names.add(row.name)
+    return names
+
+
+def _reconcile_open_invoices_for_tables(table_names):
+    seen = set()
+    for table in table_names:
+        for invoice_name in _open_invoice_names_for_table(table):
+            if invoice_name in seen:
+                continue
+            seen.add(invoice_name)
+            invoice = frappe.get_doc("POS Invoice", invoice_name)
+            _reconcile_invoice_merged_tables(invoice, persist=True)
+
+
 TABLE_RELEASE_FIELDS = {
     "occupied": 0,
     "latest_invoice_time": None,
@@ -219,6 +292,8 @@ def unmerge_tables(table):
 
     for member in members:
         frappe.db.set_value("URY Table", member, "merged_with", None)
+
+    _reconcile_open_invoices_for_tables(members)
 
     return True
 
@@ -439,6 +514,9 @@ def get_order_invoice(table=None, invoiceNo=None, order_type=None, is_payment=No
             "Price List", dict(restaurant_menu=menu_name, enabled=1)
         )
 
+        if invoice_name and invoice.restaurant_table:
+            _reconcile_invoice_merged_tables(invoice, persist=True)
+
     else:
 
         if is_payment == "Payments":
@@ -471,8 +549,9 @@ def get_order_invoice(table=None, invoiceNo=None, order_type=None, is_payment=No
         invoice.selling_price_list = frappe.db.get_value(
             "Price List", dict(restaurant_menu=menu, enabled=1)
         )
-        
-        
+
+        if invoice_name and invoice.restaurant_table:
+            _reconcile_invoice_merged_tables(invoice, persist=True)
 
     return invoice
 
@@ -582,14 +661,9 @@ def sync_order(
     invoice.custom_restaurant_room =room
     if not invoice.restaurant_table:
         invoice.restaurant_table = table
-        
-    if not merged_tables:
-        merged_with = frappe.db.get_value("URY Table", invoice.restaurant_table, "merged_with")
-        if merged_with:
-            merged_tables = merged_with
 
-    if merged_tables:
-        invoice.custom_merged_tables = merged_tables
+    if invoice.restaurant_table:
+        _reconcile_invoice_merged_tables(invoice)
     
     if order_type == "Aggregators":
         price_list = frappe.db.get_value("Aggregator Settings",{"customer": customer, "parent": invoice.branch, "parenttype": "Branch"},"price_list",)
