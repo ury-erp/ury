@@ -509,11 +509,16 @@ def getPosProfile():
         qz_print = pos_profiles.qz_print
         print_type = None
 
+        printers = []
         for pos_profile in pos_profiles.printer_settings:
+            
             if pos_profile.bill == 1:
-                printer = pos_profile.printer
+                printers.append(pos_profile.printer)
                 bill_present = True
-                break
+                
+        if printers:
+            printer = ",".join(printers)
+
 
         if qz_print == 1:
             print_type = "qz"
@@ -524,6 +529,8 @@ def getPosProfile():
 
         else:
             print_type = "socket"
+
+
 
     invoice_details = {
         "pos_profile": pos_profile_name,
