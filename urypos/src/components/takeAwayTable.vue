@@ -31,7 +31,7 @@
               {{ this.table.getBadgeText(table) }}
             </span>
           </div>
-          <div class="relative">
+          <div class="relative" v-if="table.occupied !== 1">
             <button
               class="inline-block rounded p-1.5 text-sm text-gray-500 dark:text-gray-400 dark:hover:bg-gray-700 dark:focus:ring-gray-700"
               type="button"
