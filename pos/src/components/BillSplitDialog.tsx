@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Minus, Plus } from 'lucide-react';
+import { Check, Minus, Plus } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -162,19 +162,32 @@ const BillSplitDialog = ({
             return (
               <div
                 key={item.name}
+                role="button"
+                tabIndex={isSubmitting ? -1 : 0}
+                onClick={() => !isSubmitting && toggleItem(item, !isSelected)}
+                onKeyDown={(e) => {
+                  if (isSubmitting) return;
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    toggleItem(item, !isSelected);
+                  }
+                }}
                 className={cn(
                   'rounded-lg border p-3 transition-colors',
-                  isSelected ? 'border-primary bg-primary-50/40' : 'border-gray-200'
+                  isSubmitting ? 'cursor-default' : 'cursor-pointer',
+                  isSelected ? 'border-primary bg-primary-50/40' : 'border-gray-200 hover:border-gray-300'
                 )}
               >
                 <div className="flex items-start gap-3">
-                  <input
-                    type="checkbox"
-                    className="mt-1 h-4 w-4 rounded border-gray-300"
-                    checked={isSelected}
-                    onChange={(e) => toggleItem(item, e.target.checked)}
-                    disabled={isSubmitting}
-                  />
+                  <div
+                    className={cn(
+                      'mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border',
+                      isSelected ? 'border-primary bg-primary text-white' : 'border-gray-300 bg-white'
+                    )}
+                    aria-hidden
+                  >
+                    {isSelected && <Check className="h-3 w-3" strokeWidth={3} />}
+                  </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-2">
                       <div>
@@ -188,8 +201,12 @@ const BillSplitDialog = ({
                       </span>
                     </div>
 
-                    {isSelected && (
-                      <div className="mt-3 flex items-center gap-2">
+                    {isSelected && item.qty > 1 && (
+                      <div
+                        className="mt-3 flex items-center gap-2"
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                      >
                         <span className="text-xs font-medium text-gray-600">
                           {t('bill_split.move_qty')}
                         </span>
@@ -198,7 +215,10 @@ const BillSplitDialog = ({
                           variant="outline"
                           size="icon"
                           className="h-7 w-7"
-                          onClick={() => adjustQty(item, -1)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            adjustQty(item, -1);
+                          }}
                           disabled={isSubmitting || moveQty <= 0}
                         >
                           <Minus className="h-3 w-3" />
@@ -209,7 +229,10 @@ const BillSplitDialog = ({
                           variant="outline"
                           size="icon"
                           className="h-7 w-7"
-                          onClick={() => adjustQty(item, 1)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            adjustQty(item, 1);
+                          }}
                           disabled={isSubmitting || moveQty >= item.qty}
                         >
                           <Plus className="h-3 w-3" />
