@@ -225,3 +225,43 @@ def restrict_existing_order(doc, event):
         frappe.throw(
             ("Table {0} has an existing invoice").format(doc.restaurant_table)
         )
+
+
+def on_update(doc, method):
+    if getattr(frappe.flags, "in_bill_merge_update", False):
+        return
+    if doc.custom_merged_pos_invoice:
+        frappe.flags.in_bill_merge_update = True
+        try:
+            merged_doc = frappe.get_doc("POS Invoice", doc.custom_merged_pos_invoice)
+            if merged_doc.invoice_printed != doc.invoice_printed:
+                frappe.db.set_value("POS Invoice", doc.custom_merged_pos_invoice, "invoice_printed", doc.invoice_printed)
+        except Exception:
+            pass
+        finally:
+            frappe.flags.in_bill_merge_update = False
+
+
+def on_submit(doc, method):
+    if getattr(frappe.flags, "in_bill_merge_submit", False):
+        return
+    if doc.custom_merged_pos_invoice:
+        frappe.flags.in_bill_merge_submit = True
+        try:
+            merged_doc = frappe.get_doc("POS Invoice", doc.custom_merged_pos_invoice)
+            if merged_doc.docstatus == 0:
+                # Add payment entry to secondary invoice if missing, to pass Frappe validation
+                if doc.payments and not merged_doc.payments:
+                    mop = doc.payments[0].mode_of_payment
+                    merged_doc.append("payments", {
+                        "mode_of_payment": mop,
+                        "amount": merged_doc.grand_total
+                    })
+                    merged_doc.paid_amount = merged_doc.grand_total
+                    merged_doc.save(ignore_permissions=True)
+                    
+                merged_doc.submit()
+        except Exception as e:
+            frappe.log_error(f"Error submitting merged invoice: {str(e)}")
+        finally:
+            frappe.flags.in_bill_merge_submit = False
