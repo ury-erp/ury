@@ -913,3 +913,31 @@ def validate_pos_close(pos_profile):
     
     return "Success"
 
+
+@frappe.whitelist()
+def merge_bills(primary_invoice, secondary_invoice):
+    try:
+        primary_doc = frappe.get_doc("POS Invoice", primary_invoice)
+        secondary_doc = frappe.get_doc("POS Invoice", secondary_invoice)
+        
+        if primary_doc.docstatus != 0 or secondary_doc.docstatus != 0:
+            frappe.throw("Both invoices must be in Draft state to merge.")
+            
+        primary_doc.custom_merged_pos_invoice = secondary_invoice
+        
+        # Populate merged details table
+        primary_doc.set("custom_merged_pos_invoice_details", [])
+        for item in secondary_doc.items:
+            primary_doc.append("custom_merged_pos_invoice_details", {
+                "item_code": item.item_code,
+                "item_name": item.item_name,
+                "qty": item.qty,
+                "rate": item.rate,
+                "amount": item.amount
+            })
+            
+        primary_doc.save(ignore_permissions=True)
+        return {"status": "success", "message": "Bills merged successfully", "name": primary_doc.name}
+    except Exception as e:
+        frappe.log_error(f"Error merging bills: {str(e)}", "Bill Merge Error")
+        return {"status": "error", "message": str(e)}
