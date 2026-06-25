@@ -35,6 +35,9 @@ export interface POSInvoice {
   items: POSInvoiceItem[];
   custom_merged_pos_invoice?: string | null;
   custom_merged_total?: number | null;
+  waiter?: string;
+  invoice_printed?: number;
+  docstatus?: number;
 }
 
 export interface TableOrder {
@@ -108,4 +111,28 @@ export async function splitBill(
     customer: customer || undefined,
   });
   return res.message as SplitBillResponse;
-} 
+}
+
+export async function tableTransfer(
+  table: string,
+  newTable: string,
+  invoice: string
+): Promise<void> {
+  await call.post('ury.ury.doctype.ury_order.ury_order.table_transfer', {
+    table,
+    newTable,
+    invoice,
+  });
+}
+
+export async function captainTransfer(
+  currentCaptain: string,
+  newCaptain: string,
+  invoice: string
+): Promise<void> {
+  await call.post('ury.ury.doctype.ury_order.ury_order.captain_transfer', {
+    currentCaptain,
+    newCaptain,
+    invoice,
+  });
+}
