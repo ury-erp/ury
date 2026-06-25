@@ -6,7 +6,7 @@ import OrderPanel from '../components/OrderPanel';
 import ProductDialog from '../components/ProductDialog';
 import MenuList from '../components/MenuList';
 import SearchBar from '../components/SearchBar';
-import { usePOSStore } from '../store/pos-store';
+import { usePOSStore, type MenuItem } from '../store/pos-store';
 import { cn } from '../lib/utils';
 import { Spinner } from '../components/ui/spinner';
 import InitialLoader from '../components/InitialLoader';
@@ -37,7 +37,7 @@ export default function POS() {
     }
   }, [showSearch]);
 
-  const handleItemClick = (item: any) => {
+  const handleItemClick = (item: MenuItem) => {
     if (isMenuInteractionDisabled()) return;
     
     clickCountRef.current += 1;

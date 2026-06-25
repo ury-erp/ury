@@ -19,6 +19,24 @@ interface Addon {
   category: 'sides' | 'drinks' | 'desserts';
 }
 
+interface FrappeItemChildEntry {
+  item: string;
+  name?: string;
+  parent?: string;
+  parentfield?: string;
+  parenttype?: string;
+}
+
+interface FrappeItemDoc {
+  name: string;
+  item_name: string;
+  image?: string;
+  item: string;
+  custom_pos_add_on_items?: FrappeItemChildEntry[];
+  custom_pos_item_variants?: FrappeItemChildEntry[];
+  [key: string]: unknown;
+}
+
 interface ProductDialogProps {
   onClose: () => void;
   editMode?: boolean;
@@ -57,7 +75,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
   ) : null;
 
   // State for the full item doc (used for all dialog content)
-  const [itemDoc, setItemDoc] = useState<any | null>(null);
+  const [itemDoc, setItemDoc] = useState<FrappeItemDoc | null>(null);
   const [isItemLoading, setIsItemLoading] = useState(false);
   const [itemError, setItemError] = useState<string | null>(null);
 
@@ -82,12 +100,12 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
     setItemError(null);
     setAddonError(null);
     db.getDoc('Item', selectedItem.item)
-      .then((doc: any) => {
+      .then((doc: FrappeItemDoc) => {
         setItemDoc(doc);
         // Extract addon codes from the same response
         if (Array.isArray(doc.custom_pos_add_on_items)) {
           const codes = doc.custom_pos_add_on_items
-            .map((entry: any) => entry.item)
+            .map((entry) => entry.item)
             .filter(Boolean);
           setAddonItemCodes(codes);
         } else {
@@ -108,8 +126,8 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
 
   const addonDetails = Array.isArray(itemDoc?.custom_pos_add_on_items)
     ? itemDoc.custom_pos_add_on_items
-        .map((entry: any) => {
-          const menuAddon = menuItems.find((menuItem: any) => menuItem.item === entry.item);
+        .map((entry: FrappeItemChildEntry) => {
+          const menuAddon = menuItems.find((menuItem) => menuItem.item === entry.item);
           return menuAddon
             ? {
                 id: menuAddon.item,
@@ -127,8 +145,8 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
 
   const variantDetails = Array.isArray(itemDoc?.custom_pos_item_variants)
     ? itemDoc.custom_pos_item_variants
-        .map((entry: any) => {
-          const menuVariant = menuItems.find((menuItem: any) => menuItem.item === entry.item);
+        .map((entry: FrappeItemChildEntry) => {
+          const menuVariant = menuItems.find((menuItem) => menuItem.item === entry.item);
           return menuVariant
             ? {
                 id: menuVariant.item,
@@ -289,7 +307,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
 
   // Handler to switch to a variant item
   const handleVariantClick = (variantId: string) => {
-    const menuVariant = menuItems.find((m: any) => m.item === variantId);
+    const menuVariant = menuItems.find((m) => m.item === variantId);
     if (menuVariant) {
       setSelectedItem(menuVariant);
     }
@@ -403,8 +421,8 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
             <div className="mt-6">
               <h3 className="text-lg font-semibold mb-3">{t('product_dialog.variants')}</h3>
               <div className="flex gap-2 flex-wrap">
-                {variantDetails.map((variant: any) => {
-                  const menuVariant = menuItems.find((m: any) => m.item === variant.id);
+                {variantDetails.map((variant) => {
+                  const menuVariant = menuItems.find((m) => m.item === variant.id);
                   return (
                     <button
                       key={variant.id}
@@ -438,7 +456,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
               <div className="mb-6">
                 <h3 className="text-lg font-semibold mb-3">{t('product_dialog.addons')}</h3>
                 <div className="space-y-2">
-                  {addonDetails.map((addon: any) => (
+                  {addonDetails.map((addon) => (
                     <button
                       key={addon.id}
                       onClick={() => handleAddonToggle({ id: addon.id, name: addon.name, price: Number(addon.price) })}

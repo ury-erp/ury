@@ -5,7 +5,7 @@ import { Badge, Button, Card, CardContent } from '../components/ui';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../components/ui/dialog';
 import { showToast } from '../components/ui/toast';
 import OrderStatusSidebar from '../components/OrderStatusSidebar';
-import { useRootStore } from '../store/root-store';
+import { useRootStore, type RootState } from '../store/root-store';
 import { formatCurrency } from '../lib/utils';
 import { Spinner } from '../components/ui/spinner';
 import { Textarea } from '../components/ui/textarea';
@@ -73,7 +73,7 @@ export default function Orders() {
     return formattedDate;
   };
 
-  const handleOrderClick = (order: any) => {
+  const handleOrderClick = (order: RootState['orders'][number]) => {
     selectOrder(order);
   };
 
@@ -132,7 +132,7 @@ export default function Orders() {
       }
       posStore.setSelectedCustomer({ id: order.customer, name: order.customer_name, phone: order.mobile_number });
       // Fill cart
-      const items = (order.items || []).map((item: any) => ({
+      const items = (order.items || []).map((item: { item_code: string; item_name: string; rate: number; qty: number; amount: number; image?: string; description?: string; comment?: string; name?: string }) => ({
         id: item.item_code,
         name: item.item_name,
         price: item.rate,
