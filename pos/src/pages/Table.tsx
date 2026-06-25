@@ -2,26 +2,32 @@ import { Fragment, useCallback, useEffect, useMemo, useState, type MouseEvent } 
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Layout, Square } from 'lucide-react';
 import { usePOSStore } from '../store/pos-store';
-import { getRooms, getTables, getTableCount, mergeTablesBatch, unmergeTables, type Room, type Table } from '../lib/table-api';
+import { useRootStore } from '../store/root-store';
+import { getRooms, getTables, getTableCount, getVacantTablesForBranch, mergeTablesBatch, unmergeTables, type Room, type Table } from '../lib/table-api';
 import { getMergeGroupMembers, formatMergedTableLabelFromGroup, getTableRenderGroups, sortTablesByMergeGroups } from '../lib/table-utils';
 import { Spinner } from '../components/ui/spinner';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { DINE_IN } from '../data/order-types';
-import { getTableOrder } from '../lib/order-api';
+import { captainTransfer, getTableOrder, tableTransfer } from '../lib/order-api';
 import { printOrder } from '../lib/print';
 import { resolvePrintFormat } from '../lib/invoice-api';
+import { canCaptainTransfer } from '../lib/role-utils';
 import { showToast } from '../components/ui/toast';
 import { t } from '../i18n';
 import LayoutView from '../components/LayoutView';
 import TableMergeDialog from '../components/TableMergeDialog';
 import TableUnmergeDialog from '../components/TableUnmergeDialog';
+import TableTransferDialog from '../components/TableTransferDialog';
+import CaptainTransferDialog from '../components/CaptainTransferDialog';
 import TableCard from '../components/TableCard';
 import MergeLinkConnector from '../components/MergeLinkConnector';
 
 const TableView = () => {
   const navigate = useNavigate();
   const { posProfile, setSelectedTable, setSelectedOrderType } = usePOSStore();
+  const user = useRootStore((state) => state.user);
+  const showCaptainTransfer = canCaptainTransfer(user, posProfile);
 
   const branch = posProfile?.branch ?? null;
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -37,6 +43,15 @@ const TableView = () => {
   const [menuOpenForTable, setMenuOpenForTable] = useState<string | null>(null);
   const [mergeSourceTable, setMergeSourceTable] = useState<Table | null>(null);
   const [unmergeSourceTable, setUnmergeSourceTable] = useState<Table | null>(null);
+  const [transferSourceTable, setTransferSourceTable] = useState<Table | null>(null);
+  const [transferInvoiceName, setTransferInvoiceName] = useState<string | null>(null);
+  const [transferDestinationTables, setTransferDestinationTables] = useState<Table[]>([]);
+  const [transferDestinationsLoading, setTransferDestinationsLoading] = useState(false);
+  const [captainTransferContext, setCaptainTransferContext] = useState<{
+    table: Table;
+    invoiceName: string;
+    currentCaptain: string;
+  } | null>(null);
 
   const persistRoomCounts = useCallback((counts: Record<string, number>) => {
     if (!branch) return;
@@ -227,6 +242,99 @@ const TableView = () => {
     }
   };
 
+  const validateActiveTableOrder = async (tableName: string) => {
+    const orderResponse = await getTableOrder(tableName);
+    const invoice = orderResponse.message;
+
+    if (!invoice?.name) {
+      throw new Error(t('tables.no_active_order'));
+    }
+    if (invoice.invoice_printed === 1) {
+      throw new Error(t('tables.order_already_billed'));
+    }
+
+    return invoice;
+  };
+
+  const handleOpenTransferTable = async (table: Table) => {
+    if (getMergeGroupMembers(table, tables).length > 1) {
+      showToast.error(t('tables.transfer_not_for_merged'));
+      return;
+    }
+
+    if (!branch) {
+      showToast.error(t('tables.transfer_failed'));
+      return;
+    }
+
+    setTransferSourceTable(table);
+    setTransferInvoiceName(null);
+    setTransferDestinationTables([]);
+    setTransferDestinationsLoading(true);
+
+    try {
+      const invoice = await validateActiveTableOrder(table.name);
+      const destinations = await getVacantTablesForBranch(branch, table.name);
+      setTransferDestinationTables(destinations);
+      setTransferInvoiceName(invoice.name);
+    } catch (error) {
+      setTransferSourceTable(null);
+      setTransferInvoiceName(null);
+      setTransferDestinationTables([]);
+      showToast.error(error instanceof Error ? error.message : t('tables.transfer_failed'));
+    } finally {
+      setTransferDestinationsLoading(false);
+    }
+  };
+
+  const handleOpenCaptainTransfer = async (table: Table) => {
+    try {
+      const invoice = await validateActiveTableOrder(table.name);
+      if (!invoice.waiter) {
+        throw new Error(t('tables.no_active_order'));
+      }
+      setCaptainTransferContext({
+        table,
+        invoiceName: invoice.name,
+        currentCaptain: invoice.waiter,
+      });
+    } catch (error) {
+      showToast.error(error instanceof Error ? error.message : t('tables.transfer_failed'));
+    }
+  };
+
+  const handleTableTransferConfirm = async (newTable: string) => {
+    if (!transferSourceTable || !transferInvoiceName) return;
+
+    try {
+      await tableTransfer(transferSourceTable.name, newTable, transferInvoiceName);
+      if (selectedRoom) {
+        await loadTables(selectedRoom, { useCache: false });
+      }
+      showToast.success(t('tables.transfer_success'));
+    } catch (error) {
+      showToast.error(error instanceof Error ? error.message : t('tables.transfer_failed'));
+      throw error;
+    }
+  };
+
+  const handleCaptainTransferConfirm = async (newCaptain: string) => {
+    if (!captainTransferContext) return;
+
+    const { currentCaptain, invoiceName } = captainTransferContext;
+
+    try {
+      await captainTransfer(currentCaptain, newCaptain, invoiceName);
+      if (selectedRoom) {
+        await loadTables(selectedRoom, { useCache: false });
+      }
+      showToast.success(t('tables.captain_transfer_success'));
+    } catch (error) {
+      showToast.error(error instanceof Error ? error.message : t('tables.transfer_failed'));
+      throw error;
+    }
+  };
+
   const mergeAvailableTables = useMemo(() => {
     if (!mergeSourceTable) return [];
     const sourceCluster = new Set(getMergeGroupMembers(mergeSourceTable, tables));
@@ -251,6 +359,7 @@ const TableView = () => {
     const mergeMembers = getMergeGroupMembers(table, tables);
     const mergeGroupLabel =
       mergeMembers.length > 1 ? formatMergedTableLabelFromGroup(mergeMembers) : undefined;
+    const canTransferTable = table.occupied === 1 && mergeMembers.length <= 1;
 
     return (
     <TableCard
@@ -262,6 +371,9 @@ const TableView = () => {
       onMenuOpenChange={(open) => setMenuOpenForTable(open ? table.name : null)}
       onMerge={() => setMergeSourceTable(table)}
       onUnmerge={() => setUnmergeSourceTable(table)}
+      onTransferTable={canTransferTable ? () => void handleOpenTransferTable(table) : undefined}
+      onTransferCaptain={() => void handleOpenCaptainTransfer(table)}
+      showCaptainTransfer={showCaptainTransfer}
       onNavigate={() => handleNavigateToPOS(table.name)}
       onPreview={(event) => handlePreviewTable(table, event)}
       onPrint={(event) => handlePrintTable(table, event)}
@@ -427,6 +539,30 @@ const TableView = () => {
         sourceTable={unmergeSourceTable}
         groupMembers={unmergeGroupMembers}
         onConfirm={handleUnmergeConfirm}
+      />
+
+      <TableTransferDialog
+        open={transferSourceTable !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setTransferSourceTable(null);
+            setTransferInvoiceName(null);
+            setTransferDestinationTables([]);
+          }
+        }}
+        sourceTable={transferSourceTable}
+        destinationTables={transferDestinationTables}
+        loading={transferDestinationsLoading}
+        onConfirm={handleTableTransferConfirm}
+      />
+
+      <CaptainTransferDialog
+        open={captainTransferContext !== null}
+        onOpenChange={(open) => {
+          if (!open) setCaptainTransferContext(null);
+        }}
+        currentCaptain={captainTransferContext?.currentCaptain ?? ''}
+        onConfirm={handleCaptainTransferConfirm}
       />
 
       {/* Status Legend */}
