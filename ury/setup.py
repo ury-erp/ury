@@ -7,7 +7,15 @@ from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 
 def after_install():
     create_custom_fields(get_custom_fields())
-    
+    add_roles_to_administrator()
+
+def add_roles_to_administrator():
+    try:
+        user = frappe.get_doc("User", "Administrator")
+        user.add_roles("URY Cashier", "URY Manager", "URY Captain")
+    except Exception as e:
+        frappe.log_error(f"Failed to add URY roles to Administrator: {e}", "URY Setup Error")
+        
 def before_uninstall():
 	delete_custom_fields(get_custom_fields())
  

@@ -3,6 +3,7 @@
 
 import frappe
 from frappe import _
+from ury.setup.demo import setup_ury_demo_data
 
 from erpnext.setup.setup_wizard.operations.install_fixtures import create_bank_account
 
