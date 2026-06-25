@@ -113,43 +113,29 @@ def qz_print_update(invoice):
     try:
         table = frappe.db.get_value("POS Invoice", invoice, "restaurant_table")
         
-        if table == None or table == "":
-            # Update invoice_printed
+        if not table:
             frappe.db.set_value(
                 "POS Invoice", invoice, "invoice_printed", 1, update_modified=False
             )
-            
-            # Validate the update
-            new_invoice_printed = frappe.db.get_value("POS Invoice", invoice, "invoice_printed")
-            if new_invoice_printed != 1:
-                return {"status": "Failure"}                
         else:
             invoice_printed = frappe.db.get_value("POS Invoice", invoice, "invoice_printed")
 
             if invoice_printed == 0:
-                # Update invoice_printed
-                frappe.db.set_value(
-                    "POS Invoice", invoice, "invoice_printed", 1, update_modified=False
+                # Use a single SQL transaction to update both atomically
+                frappe.db.sql(
+                    """UPDATE `tabPOS Invoice` SET invoice_printed = 1 WHERE name = %s""",
+                    invoice,
                 )
-                
-                # Update table status
-                frappe.db.set_value(
-                    "URY Table", table, {"occupied": 0, "latest_invoice_time": None}
+                frappe.db.sql(
+                    """UPDATE `tabURY Table` SET occupied = 0, latest_invoice_time = NULL WHERE name = %s""",
+                    table,
                 )
-                
-                # Validate both updates
-                new_invoice_printed = frappe.db.get_value("POS Invoice", invoice, "invoice_printed")
-                new_table_status = frappe.db.get_value("URY Table", table, "occupied")
-                
-                if new_invoice_printed != 1 or new_table_status != 0:
-                    return {"status": "Failure"}
         
         return {"status": "Success"}
         
     except Exception as e:
         frappe.log_error(message=e, title="Print Fail")
-        frappe.throw(_("Error while printing order",e))                   
-        return {"status": "Failure"}
+        frappe.throw(_("Error while printing order: {0}").format(str(e)))
 
 
 @frappe.whitelist()
