@@ -18,12 +18,11 @@ from erpnext.stock.doctype.material_request.material_request import make_purchas
 from erpnext.stock.doctype.material_request.material_request import make_stock_entry
 from ury.setup.pos_demo import generate_pos_demo
 from erpnext.buying.doctype.purchase_order.purchase_order import make_purchase_receipt
-
+from frappe.utils.telemetry import capture
 
 def setup_ury_demo_data(company):
-    from frappe.utils.telemetry import capture
-
     capture("demo_data_creation_started", "ury")
+    frappe.flags.mute_messages = True
     try:
         frappe.defaults.set_user_default("Company", company)
         frappe.db.set_single_value("Stock Settings", "allow_negative_stock", 1)
@@ -32,12 +31,19 @@ def setup_ury_demo_data(company):
         generate_pos_demo()
         frappe.db.set_single_value("Stock Settings", "allow_negative_stock", 0)
         frappe.cache.delete_keys("bootinfo")
+        
+        if hasattr(frappe.local, "message_log"):
+            frappe.local.message_log = []
+            
         frappe.publish_realtime("demo_data_complete")
     except Exception:
         frappe.db.set_single_value("Stock Settings", "allow_negative_stock", 0)
         frappe.log_error("Failed to create demo data")
         capture("demo_data_creation_failed", "ury", properties={"exception": frappe.get_traceback()})
         raise
+    finally:
+        frappe.flags.mute_messages = False
+
     capture("demo_data_creation_completed", "ury")
 
 
@@ -50,6 +56,8 @@ def process_masters(company):
                 replace_placeholders(item, company)
                 try:
                     doc = frappe.get_doc(item)
+                    if doc.doctype == "User":
+                        doc.send_welcome_email = 0
                     doc.insert(ignore_permissions=True, ignore_if_duplicate=True)
                     if doc.meta.is_submittable:
                         doc.submit()
@@ -315,8 +323,9 @@ def convert_production_plan_to_work_orders():
                 for se_item in se.items:
                     # Provide a source warehouse that guarantees no validation error.
                     se_item.s_warehouse = get_warehouse(plan.company)
-                se.insert(ignore_permissions=True)
-                se.submit()
+                if se.items:
+                    se.insert(ignore_permissions=True)
+                    se.submit()
 
 def get_two_warehouses(company):
     w1 = get_warehouse(company)
@@ -454,6 +463,7 @@ def clear_demo_data():
         return erpnext_clear_demo_data()
 
     capture("demo_data_erased", "ury")
+    frappe.flags.mute_messages = True
     try:
         company = frappe.db.get_single_value("Global Defaults", "demo_company")
         if not company:
@@ -467,6 +477,10 @@ def clear_demo_data():
         else:
             frappe.db.set_default("company", default_company)
         frappe.db.set_default("demo_data_type", "")
+        
+        if hasattr(frappe.local, "message_log"):
+            frappe.local.message_log = []
+            
     except Exception:
         frappe.db.rollback()
         frappe.log_error("Failed to erase demo data")
@@ -474,6 +488,8 @@ def clear_demo_data():
             _("Failed to erase demo data, please delete the demo company manually."),
             title=_("Could Not Delete Demo Data"),
         )
+    finally:
+        frappe.flags.mute_messages = False
 
 
 def create_transaction_deletion_record(company):

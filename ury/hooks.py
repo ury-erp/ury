@@ -66,12 +66,12 @@ setup_wizard_requires = [
 setup_wizard_complete = "ury.setup.setup_wizard.setup_ury_or_erpnext_demo"
 
 ury_demo_master_doctypes = [
+    "Gender",
     "Item Group",
     "Item",
     "Item Price",
     "Customer Group",
     "Customer",
-    "Gender",
     "User",
     "Employee",
     "BOM",
