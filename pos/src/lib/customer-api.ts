@@ -23,11 +23,11 @@ export interface Customer {
   is_frozen: number;
   disabled: number;
   doctype: string;
-  companies: any[];
-  credit_limits: any[];
-  accounts: any[];
-  sales_team: any[];
-  portal_users: any[];
+  companies: Record<string, unknown>[];
+  credit_limits: Record<string, unknown>[];
+  accounts: Record<string, unknown>[];
+  sales_team: Record<string, unknown>[];
+  portal_users: Record<string, unknown>[];
 }
 
 export interface CreateCustomerData {
@@ -112,7 +112,7 @@ export async function searchCustomers(search: string, limit = 5) {
       limit_start: 0,
     });
 
-    return res.map((doc: any) => ({
+    return res.map((doc: { name: string; customer_name?: string; mobile_number?: string }) => ({
       ...doc,
       content: `Customer Name : ${doc.customer_name ?? ""} | Mobile Number : ${doc.mobile_number ?? ""}`,
     }));

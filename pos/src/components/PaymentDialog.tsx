@@ -49,13 +49,12 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
 
   // Calculate split payment total
   const payments = paymentModes
-    .map((mode: any) => {
-      const id = typeof mode === 'string' ? mode : mode.id;
-      const amount = parseFloat(paymentInputs[id] || '');
-      return amount > 0 ? { mode_of_payment: id, amount } : null;
+    .map((mode: string) => {
+      const amount = parseFloat(paymentInputs[mode] || '');
+      return amount > 0 ? { mode_of_payment: mode, amount } : null;
     })
-    .filter(Boolean);
-  const paymentsTotal = payments.reduce((sum, p: any) => sum + p.amount, 0);
+    .filter(Boolean) as Array<{ mode_of_payment: string; amount: number }>;
+  const paymentsTotal = payments.reduce((sum, p) => sum + p.amount, 0);
 
   const handleApplyDiscount = () => {
     const value = parseFloat(discountValue);
@@ -194,18 +193,17 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
           <div className="space-y-4 mb-6">
             <h3 className="text-lg font-semibold">{t('payment.payment_methods')}</h3>
             <div className="grid grid-cols-1 gap-3">
-              {paymentModes.map((mode: any) => {
-                const id = typeof mode === 'string' ? mode : mode.id;
+              {paymentModes.map((mode: string) => {
                 return (
-                  <div key={id} className="flex items-center gap-3">
-                    <span className="w-24 font-medium">{typeof mode === 'string' ? mode : mode.name}</span>
+                  <div key={mode} className="flex items-center gap-3">
+                    <span className="w-24 font-medium">{mode}</span>
                     <Input
                       type="number"
                       min="0"
                       step="0.01"
-                      value={paymentInputs[id] || ''}
-                      onChange={e => setPaymentInputs(inputs => ({ ...inputs, [id]: e.target.value }))}
-                      onFocus={() => handlePaymentInputFocus(id)}
+                      value={paymentInputs[mode] || ''}
+                      onChange={e => setPaymentInputs(inputs => ({ ...inputs, [mode]: e.target.value }))}
+                      onFocus={() => handlePaymentInputFocus(mode)}
                       placeholder={t('payment.amount_placeholder')}
                       className="flex-1"
                       size="sm"

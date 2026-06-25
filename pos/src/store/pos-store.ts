@@ -470,7 +470,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
       return;
     }
     const groups = await getCustomerGroups();
-    const names = groups.map((g: any) => g.name);
+    const names = groups.map((g: { name: string }) => g.name);
     set({ customerGroups: names });
     sessionStorage.setItem('customerGroups', JSON.stringify(names));
   },
@@ -482,7 +482,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
       return;
     }
     const terrs = await getCustomerTerritories();
-    const names = terrs.map((t: any) => t.name);
+    const names = terrs.map((t: { name: string }) => t.name);
     set({ territories: names });
     sessionStorage.setItem('territories', JSON.stringify(names));
   },
