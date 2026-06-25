@@ -49,20 +49,15 @@ def merge_tables_batch(anchor_table, tables):
         if not table_by_name.get(target):
             frappe.throw(_("Table not found."))
 
-        anchor_occupied = table_by_name[anchor_table].occupied
-        target_occupied = table_by_name[target].occupied
-        if anchor_occupied and target_occupied:
-            frappe.throw(_("Cannot merge two occupied tables."))
+        if _table_has_active_order(anchor_table) and _table_has_active_order(target):
+            frappe.throw(_("Cannot merge tables with separate active orders."))
 
     union_members = set(anchor_cluster)
     for target in targets:
         members, table_by_name = _get_merge_cluster(target)
         union_members.update(members)
 
-    occupied_in_union = sum(
-        1 for name in union_members if table_by_name[name].occupied
-    )
-    if occupied_in_union > 1:
+    if _count_separate_active_orders(union_members) > 1:
         frappe.throw(_("Cannot merge tables with separate active orders."))
 
     for target in targets:
@@ -84,20 +79,27 @@ def _append_merged_partner(table_name, partner):
 
 
 def _sync_active_order_with_merge_cluster(table):
-    members, table_by_name = _get_merge_cluster(table)
-    occupied_members = [name for name in members if table_by_name[name].occupied]
-    if not occupied_members:
-        return
-    if len(occupied_members) > 1:
+    members, _ = _get_merge_cluster(table)
+    if not members:
         return
 
-    primary_table = occupied_members[0]
+    primary_table = next(
+        (name for name in members if _table_has_active_order(name)),
+        None,
+    )
+    if not primary_table:
+        return
+
     partners_value = _merged_partners_csv(primary_table)
 
     open_invoices = frappe.get_all(
         "POS Invoice",
-        filters={"docstatus": 0, "restaurant_table": primary_table},
-        fields=["name"],
+        filters={
+            "docstatus": 0,
+            "restaurant_table": primary_table,
+            "invoice_printed": 0,
+        },
+        fields=["name", "creation"],
         limit=1,
     )
     if open_invoices:
@@ -110,6 +112,9 @@ def _sync_active_order_with_merge_cluster(table):
         )
 
     invoice_time = frappe.db.get_value("URY Table", primary_table, "latest_invoice_time")
+    if not invoice_time and open_invoices:
+        invoice_time = open_invoices[0].creation
+
     for member in members:
         if member == primary_table:
             continue
@@ -124,6 +129,23 @@ def _parse_merged_with(merged_with):
     if not merged_with:
         return []
     return [partner.strip() for partner in merged_with.split(",") if partner.strip()]
+
+
+def _table_has_active_order(table_name):
+    return bool(
+        frappe.db.exists(
+            "POS Invoice",
+            {
+                "docstatus": 0,
+                "restaurant_table": table_name,
+                "invoice_printed": 0,
+            },
+        )
+    )
+
+
+def _count_separate_active_orders(table_names):
+    return sum(1 for name in table_names if _table_has_active_order(name))
 
 
 def _get_merge_cluster(table):
