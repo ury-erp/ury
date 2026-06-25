@@ -52,7 +52,7 @@ const TableCard = ({
         }
       }}
       className={cn(
-        'relative flex flex-col justify-between gap-y-4 rounded-lg border-2 bg-white p-4 transition-all',
+        'relative flex min-h-[15.5rem] flex-col rounded-lg border-2 bg-white p-4 transition-all',
         isOccupied
           ? 'border-amber-400 bg-amber-50 text-amber-900'
           : 'cursor-pointer border-emerald-300 bg-emerald-50 text-emerald-900 hover:border-emerald-400 hover:shadow-md',
@@ -60,7 +60,7 @@ const TableCard = ({
         className
       )}
     >
-      <div>
+      <div className="flex flex-1 flex-col">
         <div className="mb-3 flex items-start justify-between gap-1">
           <div className="flex min-w-0 items-center gap-2">
             <div className="shrink-0">
@@ -87,23 +87,29 @@ const TableCard = ({
           </div>
         </div>
 
-        {mergeGroupLabel && mergeGroupLabel !== table.name && (
-          <p className="mb-2 truncate text-xs font-medium text-primary-700" title={mergeGroupLabel}>
-            {t('tables.merged_with_list', { tables: mergeGroupLabel })}
-          </p>
-        )}
+        <p
+          className={cn(
+            'mb-2 min-h-[1.25rem] truncate text-xs font-medium',
+            mergeGroupLabel && mergeGroupLabel !== table.name
+              ? 'text-primary-700'
+              : 'invisible'
+          )}
+          title={mergeGroupLabel ?? undefined}
+        >
+          {mergeGroupLabel && mergeGroupLabel !== table.name
+            ? t('tables.merged_with_list', { tables: mergeGroupLabel })
+            : '\u00a0'}
+        </p>
 
         <div className="space-y-2 text-sm text-gray-700">
           <div className="flex items-center justify-between">
             <span className="font-medium">{t('tables.room')}</span>
             <span>{table.restaurant_room}</span>
           </div>
-          {isOccupied && (
-            <div className="flex items-center justify-between">
-              <span className="font-medium">{t('tables.started_at')}</span>
-              <span>{formatInvoiceTime(table.latest_invoice_time)}</span>
-            </div>
-          )}
+          <div className="flex min-h-[1.25rem] items-center justify-between">
+            <span className="font-medium">{t('tables.started_at')}</span>
+            <span>{isOccupied ? formatInvoiceTime(table.latest_invoice_time) : '—'}</span>
+          </div>
           {typeof table.no_of_seats === 'number' && (
             <div className="flex items-center justify-between">
               <span className="font-medium">{t('tables.seats')}</span>
@@ -121,34 +127,41 @@ const TableCard = ({
         </div>
       </div>
 
-      {isOccupied ? (
-        <div className="mt-3 flex gap-2 border-t border-amber-200 pt-3">
-          <button
-            onClick={onPreview}
-            className="flex flex-1 items-center justify-center gap-2 rounded bg-white py-2 text-xs font-semibold transition hover:bg-amber-100"
-          >
-            <Eye className="h-3 w-3" />
-            Preview
-          </button>
-          <button
-            onClick={onPrint}
-            disabled={isPrinting}
-            className="flex flex-1 items-center justify-center gap-2 rounded bg-white py-2 text-xs font-semibold transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {isPrinting ? (
-              <>
-                <Loader2 className="h-3 w-3 animate-spin" />
-                Printing...
-              </>
-            ) : (
-              <>
-                <Printer className="h-3 w-3" />
-                Print
-              </>
-            )}
-          </button>
-        </div>
-      ) : null}
+      <div
+        className={cn(
+          'mt-auto flex min-h-[2.75rem] gap-2 border-t pt-3',
+          isOccupied ? 'border-amber-200' : 'border-transparent'
+        )}
+      >
+        {isOccupied ? (
+          <>
+            <button
+              onClick={onPreview}
+              className="flex flex-1 items-center justify-center gap-2 rounded bg-white py-2 text-xs font-semibold transition hover:bg-amber-100"
+            >
+              <Eye className="h-3 w-3" />
+              Preview
+            </button>
+            <button
+              onClick={onPrint}
+              disabled={isPrinting}
+              className="flex flex-1 items-center justify-center gap-2 rounded bg-white py-2 text-xs font-semibold transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isPrinting ? (
+                <>
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Printing...
+                </>
+              ) : (
+                <>
+                  <Printer className="h-3 w-3" />
+                  Print
+                </>
+              )}
+            </button>
+          </>
+        ) : null}
+      </div>
     </div>
   );
 };
