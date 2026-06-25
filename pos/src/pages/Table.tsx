@@ -10,6 +10,7 @@ import { Badge } from '../components/ui/badge';
 import { DINE_IN } from '../data/order-types';
 import { getTableOrder } from '../lib/order-api';
 import { printOrder } from '../lib/print';
+import { resolvePrintFormat } from '../lib/invoice-api';
 import { showToast } from '../components/ui/toast';
 import { t } from '../i18n';
 import LayoutView from '../components/LayoutView';
@@ -177,7 +178,14 @@ const TableView = () => {
         return;
       }
 
-      await printOrder({ orderId: invoiceId, posProfile });
+      await printOrder({
+        orderId: invoiceId,
+        posProfile,
+        printFormat: resolvePrintFormat(
+          orderResponse.message ?? {},
+          posProfile.print_format
+        ),
+      });
       showToast.success('Printed successfully');
       await loadTables(table.restaurant_room, { useCache: false });
     } catch (error) {
