@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef } from 'react';
-import { Clock, User, UserCheck, Receipt, Printer, Pencil, X, GitBranch } from 'lucide-react';
+import { Clock, User, UserCheck, Receipt, Printer, Pencil, X, GitBranch, GitMerge } from 'lucide-react';
 import { Badge, Button, Card, CardContent } from '../components/ui';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../components/ui/dialog';
 import { showToast } from '../components/ui/toast';
@@ -12,14 +12,19 @@ import { usePOSStore } from '../store/pos-store';
 import { useNavigate } from 'react-router-dom';
 import PaymentDialog from '../components/PaymentDialog';
 import BillSplitDialog from '../components/BillSplitDialog';
+import BillMergeDialog from '../components/BillMergeDialog';
 import OrderActionsMenu from '../components/OrderActionsMenu';
 import SplitGroupPanel from '../components/SplitGroupPanel';
+import MergedBillPanel from '../components/MergedBillPanel';
 import { printOrder } from '../lib/print';
 import { call } from '../lib/frappe-sdk';
 import { splitBill } from '../lib/order-api';
 import {
   getOrdersTabForInvoice,
   getSplitGroup,
+  getCombinedOrderTotals,
+  isMergedBill,
+  resolvePrintFormat,
   mapSplitGroupInvoiceToPOSInvoice,
   type POSInvoice,
   type SplitGroupInvoice,
@@ -74,6 +79,7 @@ export default function Orders() {
   const [editLoading, setEditLoading] = React.useState(false);
   const [showPaymentDialog, setShowPaymentDialog] = React.useState(false);
   const [showSplitDialog, setShowSplitDialog] = React.useState(false);
+  const [showMergeDialog, setShowMergeDialog] = React.useState(false);
   const [orderActionsMenuOpen, setOrderActionsMenuOpen] = React.useState(false);
   const [isPrinting, setIsPrinting] = React.useState(false);
 
@@ -90,6 +96,26 @@ export default function Orders() {
     const invoicePrinted = String(selectedOrder.invoice_printed);
     return invoicePrinted === '0' || invoicePrinted === '1';
   }, [selectedOrder, selectedOrderItems]);
+
+  const isSecondaryMergedBill = useMemo(() => {
+    if (!selectedOrder) return false;
+    return orders.some((order) => order.custom_merged_pos_invoice === selectedOrder.name);
+  }, [orders, selectedOrder]);
+
+  const canMergeBill = useMemo(() => {
+    if (!selectedOrder || selectedOrderItems.length === 0) return false;
+    if (!isOrderEditable(selectedOrder.status)) return false;
+    if (isMergedBill(selectedOrder)) return false;
+    if (isSecondaryMergedBill) return false;
+    return true;
+  }, [selectedOrder, selectedOrderItems, isSecondaryMergedBill]);
+
+  const selectedOrderTotals = useMemo(() => {
+    if (!selectedOrder) {
+      return { grandTotal: 0, roundedTotal: 0 };
+    }
+    return getCombinedOrderTotals(selectedOrder);
+  }, [selectedOrder]);
 
   useEffect(() => {
     setOrderActionsMenuOpen(false);
@@ -217,7 +243,8 @@ export default function Orders() {
     try {
       await printOrder({
         orderId: selectedOrder.name,
-        posProfile: posStore.posProfile
+        posProfile: posStore.posProfile,
+        printFormat: resolvePrintFormat(selectedOrder, posStore.posProfile.print_format),
       });
       showToast.success(t('success.printed'));
       // Locally update selectedOrder.invoice_printed to 1
@@ -277,6 +304,28 @@ export default function Orders() {
     }
   }
 
+  async function handleMergeBill() {
+    if (!selectedOrder) return;
+    await fetchOrders();
+    const updated = useRootStore.getState().orders.find((o) => o.name === selectedOrder.name);
+    if (updated) {
+      await selectOrder(updated);
+    }
+  }
+
+  async function openSecondaryInvoice(invoiceName: string) {
+    const inList = orders.find((o) => o.name === invoiceName);
+    if (inList) {
+      await selectOrder(inList);
+      return;
+    }
+    await fetchOrders();
+    const refreshed = useRootStore.getState().orders.find((o) => o.name === invoiceName);
+    if (refreshed) {
+      await selectOrder(refreshed);
+    }
+  }
+
   async function openRelatedInvoice(sibling: SplitGroupInvoice) {
     const tab = getOrdersTabForInvoice(sibling, {
       paidLimit: posStore.posProfile?.paid_limit,
@@ -325,13 +374,17 @@ export default function Orders() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-screen-xl mx-auto">
               {orders.map((order) => {
                 const splitBill = isSplitBill(order);
+                const mergedBill = isMergedBill(order);
+                const cardTotal = mergedBill
+                  ? order.rounded_total + (order.custom_merged_total ?? 0)
+                  : order.rounded_total;
 
                 return (
                 <Card 
                   key={order.name} 
                   className={`p-0 bg-white hover:shadow-md transition-shadow flex flex-col overflow-hidden cursor-pointer ${
                     selectedOrder?.name === order.name ? 'ring-2 ring-blue-500 shadow-lg' : ''
-                  } ${splitBill ? 'border-s-4 border-s-primary-500' : ''}`}
+                  } ${splitBill || mergedBill ? 'border-s-4 border-s-primary-500' : ''}`}
                   onClick={() => handleOrderClick(order)}
                 >
                   <CardContent className="p-0 flex flex-col h-full">
@@ -340,7 +393,17 @@ export default function Orders() {
                       <h3 className="font-medium text-gray-900 text-sm truncate" title={order.name}>
                         {order.name}
                       </h3>
-                      {splitBill && (
+                      <div className="flex shrink-0 items-center gap-1">
+                        {mergedBill && (
+                          <Badge
+                            variant="outline"
+                            className="shrink-0 gap-1 border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-50"
+                          >
+                            <GitMerge className="h-3 w-3" />
+                            {t('bill_merge.merged_bill')}
+                          </Badge>
+                        )}
+                        {splitBill && (
                         <Badge
                           variant="outline"
                           className="shrink-0 gap-1 border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-50"
@@ -354,6 +417,7 @@ export default function Orders() {
                             : t('bill_split.split_bill')}
                         </Badge>
                       )}
+                      </div>
                     </div>
                     <div className="flex items-center justify-between gap-2">
                       <div className="min-w-0">
@@ -369,6 +433,11 @@ export default function Orders() {
                         </Badge>
                       </div>
                     </div>
+                    {mergedBill && order.custom_merged_pos_invoice && (
+                      <p className="mt-2 text-xs text-primary-700">
+                        {t('bill_merge.includes_bill', { invoice: order.custom_merged_pos_invoice })}
+                      </p>
+                    )}
                     {splitBill && order.custom_split_from && (
                       <p className="mt-2 text-xs text-primary-700">
                         {t('bill_split.split_from', { invoice: order.custom_split_from })}
@@ -390,7 +459,7 @@ export default function Orders() {
                       {/* Total - pushed to bottom like MenuCard */}
                       <div className="mt-auto pt-2">
                         <span className="text-sm font-semibold text-gray-900 tabular-nums">
-                          {formatCurrency(order.rounded_total)}
+                          {formatCurrency(cardTotal)}
                         </span>
                       </div>
                     </div>
@@ -469,6 +538,15 @@ export default function Orders() {
                       : t('bill_split.split_bill')}
                   </Badge>
                 ) : null}
+                {isMergedBill(selectedOrder) ? (
+                  <Badge
+                    variant="outline"
+                    className="shrink-0 gap-1 border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-50"
+                  >
+                    <GitMerge className="h-3 w-3" />
+                    {t('bill_merge.merged_bill')}
+                  </Badge>
+                ) : null}
               </div>
               <div className="flex items-center gap-2">
                 {isOrderEditable(selectedOrder.status) && (
@@ -476,6 +554,8 @@ export default function Orders() {
                     <OrderActionsMenu
                       isOpen={orderActionsMenuOpen}
                       onOpenChange={setOrderActionsMenuOpen}
+                      showMergeBill={canMergeBill}
+                      onMergeBill={() => setShowMergeDialog(true)}
                       showSplitBill={canSplitBill}
                       onSplitBill={() => setShowSplitDialog(true)}
                     />
@@ -537,6 +617,11 @@ export default function Orders() {
               <SplitGroupPanel
                 invoiceName={selectedOrder.name}
                 onOpenInvoice={openRelatedInvoice}
+              />
+
+              <MergedBillPanel
+                order={selectedOrder}
+                onOpenSecondary={openSecondaryInvoice}
               />
 
               <div className="mb-6">
@@ -637,7 +722,14 @@ export default function Orders() {
                 )}
                 {/* Total */}
                 <span className="ms-auto text-xl font-bold text-gray-900 whitespace-nowrap">
-                  {formatCurrency(selectedOrder.rounded_total)}
+                  {isMergedBill(selectedOrder) ? (
+                    <span className="flex flex-col items-end leading-tight">
+                      <span className="text-xs font-medium text-gray-500">{t('bill_merge.combined_total')}</span>
+                      <span>{formatCurrency(selectedOrderTotals.roundedTotal)}</span>
+                    </span>
+                  ) : (
+                    formatCurrency(selectedOrder.rounded_total)
+                  )}
                 </span>
               </div>
             </div>
@@ -647,8 +739,8 @@ export default function Orders() {
       {showPaymentDialog && selectedOrder && (
         <PaymentDialog
           onClose={() => setShowPaymentDialog(false)}
-          grandTotal={selectedOrder.grand_total}
-          roundedTotal={selectedOrder.rounded_total}
+          grandTotal={selectedOrderTotals.grandTotal}
+          roundedTotal={selectedOrderTotals.roundedTotal}
           invoice={selectedOrder.name}
           customer={selectedOrder.customer}
           posProfile={posStore.posProfile?.name || ''}
@@ -658,6 +750,14 @@ export default function Orders() {
           owner={posStore.posProfile?.cashier || ''}
           fetchOrders={fetchOrders}
           clearSelectedOrder={clearSelectedOrder}
+        />
+      )}
+      {selectedOrder && (
+        <BillMergeDialog
+          open={showMergeDialog}
+          onOpenChange={setShowMergeDialog}
+          invoiceName={selectedOrder.name}
+          onConfirm={handleMergeBill}
         />
       )}
       {selectedOrder && (

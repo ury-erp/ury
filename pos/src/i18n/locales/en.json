@@ -246,6 +246,22 @@
     "related": "Related bills",
     "open_sibling_failed": "Could not open related bill"
   },
+  "bill_merge": {
+    "merge_bill": "Merge bill",
+    "select_secondary": "Choose a bill to merge into {{invoice}}",
+    "merge_confirm": "Merge bills",
+    "merge_success": "Bill {{invoice}} merged successfully",
+    "merge_failed": "Failed to merge bills",
+    "merged_bill": "Merged bill",
+    "includes_bill": "Includes {{invoice}}",
+    "combined_total": "Combined total",
+    "no_candidates": "No other open bills available to merge",
+    "load_more": "Load more",
+    "already_merged": "This bill already includes a merged bill",
+    "secondary_bill": "Merged bill",
+    "open_secondary": "Open merged bill",
+    "merged_items": "Items from merged bill"
+  },
   "footer": {
     "pos": "POS",
     "table": "Table",
