@@ -121,17 +121,16 @@ def table_status_delete(doc, method):
 
 
 def pos_invoice_naming(doc, method):
-    pos_profile = frappe.get_doc("POS Profile", doc.pos_profile)
-    restaurant = pos_profile.restaurant
+    restaurant = frappe.db.get_value("POS Profile", doc.pos_profile, "restaurant")
 
     if not doc.restaurant_table:
-        doc.naming_series = frappe.db.get_value(
-            "URY Restaurant", restaurant, "invoice_series_prefix"
-        )
-        
         if doc.order_type == "Aggregators":
             doc.naming_series = frappe.db.get_value(
                 "URY Restaurant", restaurant, "aggregator_series_prefix"
+            )
+        else:
+            doc.naming_series = frappe.db.get_value(
+                "URY Restaurant", restaurant, "invoice_series_prefix"
             )
     
 
@@ -155,43 +154,32 @@ def ro_reload_submit(doc, method):
 
 
 def validate_price_list(doc, method):
-        
-    if doc.restaurant:
-        
-        if doc.restaurant_table:
-            room = frappe.db.get_value("URY Table", doc.restaurant_table, "restaurant_room")
-            menu_name = (
-                frappe.db.get_value("URY Restaurant", doc.restaurant, "active_menu")
-                if not frappe.db.get_value(
-                    "URY Restaurant", doc.restaurant, "room_wise_menu"
-                )
-                else frappe.db.get_value(
-                    "Menu for Room", {"parent": doc.restaurant, "room": room}, "menu"
-                )
-            )
-
-            doc.selling_price_list = frappe.db.get_value(
-                "Price List", dict(restaurant_menu=menu_name, enabled=1)
-            )
-        
+    if not doc.restaurant:
         if doc.order_type == "Aggregators":
-            price_list = frappe.db.get_value("Aggregator Settings",
+            price_list = frappe.db.get_value(
+                "Aggregator Settings",
                 {"customer": doc.customer, "parent": doc.branch, "parenttype": "Branch"},
                 "price_list",
-                )
-            
+            )
             if not price_list:
                 frappe.throw(f"Price list for customer {doc.customer} in branch {doc.branch} not found in Aggregator Settings.")
-                
             doc.selling_price_list = price_list
-            
-        else:
-            menu_name = frappe.db.get_value("URY Restaurant", doc.restaurant, "active_menu") 
+            return
 
-            doc.selling_price_list = frappe.db.get_value(
-                "Price List", dict(restaurant_menu=menu_name, enabled=1)
+    menu_name = frappe.db.get_value("URY Restaurant", doc.restaurant, "active_menu")
+
+    if doc.restaurant_table:
+        room = frappe.db.get_value("URY Table", doc.restaurant_table, "restaurant_room")
+        room_wise_menu = frappe.db.get_value("URY Restaurant", doc.restaurant, "room_wise_menu")
+        if room_wise_menu:
+            menu_name = frappe.db.get_value(
+                "Menu for Room", {"parent": doc.restaurant, "room": room}, "menu"
             )
-            
+
+    doc.selling_price_list = frappe.get_value(
+        "Price List", dict(restaurant_menu=menu_name, enabled=1)
+    )
+
 
 def restrict_existing_order(doc, event):
     if doc.restaurant_table:
