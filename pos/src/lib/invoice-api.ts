@@ -1,5 +1,7 @@
-import { call } from './frappe-sdk';
+import { DOCTYPES } from '../data/doctypes';
+import { call, db } from './frappe-sdk';
 import { OrderStatusType, OrderType } from '../data/order-types';
+import type { Filter } from 'frappe-js-sdk/lib/db/types';
 
 export interface POSInvoice {
   name: string;
@@ -24,6 +26,8 @@ export interface POSInvoice {
   split_index?: number;
   split_total?: number;
   split_siblings?: string[];
+  custom_merged_pos_invoice?: string | null;
+  custom_merged_total?: number | null;
 }
 
 export interface SplitGroupInvoice extends POSInvoice {
@@ -241,4 +245,173 @@ export async function selectNetworkPrinter(orderId: string, posProfile: string, 
 
 export async function updatePrintStatus(orderId: string) {
   await call.post('ury.ury.api.ury_print.qz_print_update', { invoice: orderId });
+}
+
+export const MERGED_POS_INVOICE_PRINT_FORMAT = 'Merged POS Invoice Format';
+
+export interface MergeBillCandidate {
+  name: string;
+  customer: string;
+  customer_name?: string;
+  grand_total: number;
+  rounded_total: number;
+  posting_date: string;
+  posting_time: string;
+  order_type: OrderType;
+  restaurant_table: string | null;
+  custom_merged_tables?: string | null;
+  status: string;
+  invoice_printed: number;
+  mobile_number?: string;
+}
+
+export interface MergeBillsResponse {
+  status: 'success' | 'error';
+  message: string;
+  name?: string;
+}
+
+export function getCombinedOrderTotals(order: Pick<POSInvoice, 'grand_total' | 'rounded_total' | 'custom_merged_total'>) {
+  const mergedTotal = order.custom_merged_total ?? 0;
+  return {
+    grandTotal: order.grand_total + mergedTotal,
+    roundedTotal: order.rounded_total + mergedTotal,
+  };
+}
+
+export function isMergedBill(order: Pick<POSInvoice, 'custom_merged_pos_invoice'>) {
+  return !!order.custom_merged_pos_invoice;
+}
+
+export function resolvePrintFormat(
+  order: Pick<POSInvoice, 'custom_merged_pos_invoice'>,
+  defaultFormat: string | null | undefined
+) {
+  if (order.custom_merged_pos_invoice) {
+    return MERGED_POS_INVOICE_PRINT_FORMAT;
+  }
+  return defaultFormat as string;
+}
+
+export const MERGE_CANDIDATE_PAGE_SIZE = 10;
+
+const MERGE_CANDIDATE_FIELDS = [
+  'name',
+  'customer',
+  'customer_name',
+  'grand_total',
+  'rounded_total',
+  'posting_date',
+  'posting_time',
+  'order_type',
+  'restaurant_table',
+  'custom_merged_tables',
+  'status',
+  'invoice_printed',
+  'mobile_number',
+] as const;
+
+function getBranchFromSession(): string {
+  const raw = sessionStorage.getItem('posProfile');
+  if (!raw) {
+    throw new Error('POS profile not loaded');
+  }
+  const profile = JSON.parse(raw) as { branch?: string };
+  if (!profile.branch) {
+    throw new Error('Branch not found in POS profile');
+  }
+  return profile.branch;
+}
+
+export async function getLinkedMergeSecondaries(): Promise<string[]> {
+  const rows = await db.getDocList(DOCTYPES.POS_INVOICE, {
+    fields: ['custom_merged_pos_invoice'],
+    filters: [
+      ['docstatus', '=', 0],
+      ['custom_merged_pos_invoice', 'is', 'set'],
+    ],
+    limit: 500,
+  } as unknown as Parameters<typeof db.getDocList>[1]);
+
+  return rows
+    .map((row) => row.custom_merged_pos_invoice as string | undefined)
+    .filter((name): name is string => Boolean(name));
+}
+
+export interface GetMergeBillCandidatesParams {
+  primaryInvoice: string;
+  query?: string;
+  page?: number;
+  pageSize?: number;
+  linkedSecondaries?: string[];
+}
+
+export async function getMergeBillCandidates({
+  primaryInvoice,
+  query = '',
+  page = 1,
+  pageSize = MERGE_CANDIDATE_PAGE_SIZE,
+  linkedSecondaries,
+}: GetMergeBillCandidatesParams): Promise<{ data: MergeBillCandidate[]; hasMore: boolean }> {
+  const branch = getBranchFromSession();
+  const secondaries = linkedSecondaries ?? (await getLinkedMergeSecondaries());
+  const exclude = Array.from(new Set([primaryInvoice, ...secondaries]));
+
+  const filters: Filter[] = [
+    ['branch', '=', branch],
+    ['docstatus', '=', 0],
+    ['name', 'not in', exclude],
+  ];
+
+  const q = query.trim();
+  let orFilters: Filter[] | undefined;
+
+  if (q) {
+    const pattern = `%${q}%`;
+    filters.push(['custom_merged_pos_invoice', 'is', 'not set'] as unknown as Filter);
+    orFilters = [
+      ['name', 'like', pattern],
+      ['customer', 'like', pattern],
+      ['customer_name', 'like', pattern],
+      ['restaurant_table', 'like', pattern],
+      ['mobile_number', 'like', pattern],
+    ];
+  } else {
+    orFilters = [
+      ['custom_merged_pos_invoice', 'is', 'not set'],
+      ['custom_merged_pos_invoice', '=', ''],
+    ] as unknown as Filter[];
+  }
+
+  const rows = await db.getDocList(DOCTYPES.POS_INVOICE, {
+    fields: [...MERGE_CANDIDATE_FIELDS],
+    filters,
+    orFilters,
+    orderBy: { field: 'modified', order: 'desc' },
+    limit: pageSize + 1,
+    limit_start: (page - 1) * pageSize,
+  } as unknown as Parameters<typeof db.getDocList>[1]);
+
+  const hasMore = rows.length > pageSize;
+  const data = (hasMore ? rows.slice(0, pageSize) : rows) as MergeBillCandidate[];
+
+  return { data, hasMore };
+}
+
+export async function mergeBills(
+  primaryInvoice: string,
+  secondaryInvoice: string
+): Promise<MergeBillsResponse> {
+  const response = await call.post<{ message: MergeBillsResponse }>(
+    'ury.ury_pos.api.merge_bills',
+    {
+      primary_invoice: primaryInvoice,
+      secondary_invoice: secondaryInvoice,
+    }
+  );
+  const result = response.message;
+  if (result.status === 'error') {
+    throw new Error(result.message || 'Failed to merge bills');
+  }
+  return result;
 } 
