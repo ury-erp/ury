@@ -8,9 +8,10 @@ from frappe.utils.print_format import print_by_server
 def reprint_kot(invoice_number):
 
     try:
-        pos_profile = frappe.db.get_value(
-            "POS Invoice", invoice_number, "pos_profile"
-        )
+        pos_invoice = frappe.get_doc("POS Invoice", invoice_number)
+        pos_profile = pos_invoice.pos_profile
+        order_type = pos_invoice.order_type
+
         if not pos_profile:
             frappe.throw(f"POS Profile not found for Invoice {invoice_number}.")
 
@@ -25,45 +26,69 @@ def reprint_kot(invoice_number):
 
         if not kot_print_format:
             frappe.throw("No KOT Reprint Print Format is set in POS Profile.")
-        
-        kots = frappe.get_all("URY KOT", filters={"invoice": invoice_number}, fields=["name", "production", "restaurant_table", "table_takeaway"])
-        
-        if not kots:
-            frappe.throw(f"No KOTs found for Invoice {invoice_number}.")
 
-        printed = False
-        for kot in kots:
-            if kot.production:
+        branch = pos_invoice.branch
+        productions = frappe.db.get_all(
+            "URY Production Unit", filters={"branch": branch}, fields=["name"]
+        )
+
+        printed_any = False
+        import copy
+
+        for production in productions:
+            productionItemGroupslist = frappe.get_all(
+                "URY Production Item Groups",
+                fields=["item_group"],
+                filters={
+                    "parent": production.name,
+                    "parenttype": "URY Production Unit",
+                },
+                order_by="idx",
+            )
+            productionItemGroups = [
+                item_group.item_group for item_group in productionItemGroupslist
+            ]
+
+            production_items = []
+            for item in pos_invoice.items:
+                if item.qty > 0:
+                    item_group = frappe.db.get_value("Item", item.item_code, "item_group")
+                    if item_group in productionItemGroups:
+                        production_items.append(item)
+
+            if production_items:
                 production_unit_printers = frappe.get_all(
                     "URY Printer Settings",
-                    fields=["printer", "custom_block_takeaway_kot"], 
-                    filters={"parent": kot.production, "custom_kot_print": 1, "parenttype": "URY Production Unit"},
+                    fields=["printer"], 
+                    filters={"parent": production.name, "parenttype":"URY Production Unit"},
                     order_by="idx"
                 )
+                
                 if production_unit_printers:
-                    for printer in production_unit_printers:
-                        if printer.printer:
-                            if printer.custom_block_takeaway_kot == 1:
-                                if kot.restaurant_table and kot.table_takeaway == 0:
-                                    print_kot(printer.printer, kot.name, kot_print_format)
-                                    printed = True
-                            else:
-                                print_kot(printer.printer, kot.name, kot_print_format)
-                                printed = True
+                    temp_doc = copy.deepcopy(pos_invoice)
+                    temp_doc.items = production_items
+                    temp_doc.custom_production_unit = production.name
+                    
+                    for p in production_unit_printers:
+                        frappe.log_error(f"KOT Reprint : {invoice_number}", f"Production Unit: {production.name} printer:{p.printer} kot_print_format:{kot_print_format}")
+                        print_kot(p.printer, invoice_number, kot_print_format, temp_doc)
+                        printed_any = True
 
-        if not printed:
-            frappe.throw("No production unit printers found for KOTs.")
+        if not printed_any:
+            frappe.log_error("KOT Reprint Error", f"No valid production unit printers found for Invoice {invoice_number}.")
+            return "Failure: No valid printers found"
 
         return "Success"
 
     except Exception as e:
         error_message = f"KOT Reprint Error for Invoice {invoice_number}: {str(e)}"
         frappe.log_error(error_message, "KOT Reprint Error")
-        frappe.throw(f"An unexpected error occurred while reprinting KOT. Please check logs.")
+        frappe.throw("An unexpected error occurred while reprinting KOT. Please check logs.")
 
 
-def print_kot(printer,docname, kot_print_format):
+def print_kot(printer, docname, kot_print_format, doc=None):
+    frappe.log_error(f"KOT Reprint : {docname}", f"POS Invoice: {docname}, Printer: {printer}, Print Format: {kot_print_format}")
     try:
-        print_by_server("URY KOT", docname, printer, kot_print_format)
+        print_by_server("POS Invoice", docname, printer, kot_print_format, doc=doc)
     except Exception as e:
         frappe.log_error(f"KOT Reprint Error: {e}")
