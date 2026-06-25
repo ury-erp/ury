@@ -70,7 +70,6 @@ def reprint_kot(invoice_number):
                     temp_doc.custom_production_unit = production.name
                     
                     for p in production_unit_printers:
-                        frappe.log_error(f"KOT Reprint : {invoice_number}", f"Production Unit: {production.name} printer:{p.printer} kot_print_format:{kot_print_format}")
                         print_kot(p.printer, invoice_number, kot_print_format, temp_doc)
                         printed_any = True
 
@@ -87,7 +86,6 @@ def reprint_kot(invoice_number):
 
 
 def print_kot(printer, docname, kot_print_format, doc=None):
-    frappe.log_error(f"KOT Reprint : {docname}", f"POS Invoice: {docname}, Printer: {printer}, Print Format: {kot_print_format}")
     try:
         print_by_server("POS Invoice", docname, printer, kot_print_format, doc=doc)
     except Exception as e:
