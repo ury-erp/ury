@@ -33,6 +33,8 @@ export interface POSInvoice {
   total: number;
   grand_total: number;
   items: POSInvoiceItem[];
+  custom_merged_pos_invoice?: string | null;
+  custom_merged_total?: number | null;
 }
 
 export interface TableOrder {

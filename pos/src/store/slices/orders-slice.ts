@@ -26,6 +26,8 @@ export interface POSInvoice {
   split_index?: number;
   split_total?: number;
   split_siblings?: string[];
+  custom_merged_pos_invoice?: string | null;
+  custom_merged_total?: number | null;
 }
 
 export interface OrdersState {
