@@ -456,7 +456,8 @@ def getPosInvoice(status, limit, limit_start):
                 cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number, 
                 posting_date, rounded_total, order_type,
-                custom_split_group, custom_split_from
+                custom_split_group, custom_split_from,
+                custom_merged_pos_invoice, custom_merged_total
             FROM `tabPOS Invoice` 
             WHERE branch = %s AND status = %s 
             AND (invoice_printed = 1 OR (invoice_printed = 0 AND COALESCE(restaurant_table, '') = ''))
@@ -477,7 +478,8 @@ def getPosInvoice(status, limit, limit_start):
                 cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number, 
                 posting_date, rounded_total, order_type,
-                custom_split_group, custom_split_from
+                custom_split_group, custom_split_from,
+                custom_merged_pos_invoice, custom_merged_total
             FROM `tabPOS Invoice` 
             WHERE branch = %s AND status = %s 
             AND (invoice_printed = 0 AND restaurant_table IS NOT NULL)
@@ -497,7 +499,8 @@ def getPosInvoice(status, limit, limit_start):
                 cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number,
                 posting_date, rounded_total, order_type, additional_discount_percentage,
-                discount_amount, custom_split_group, custom_split_from
+                discount_amount, custom_split_group, custom_split_from,
+                custom_merged_pos_invoice, custom_merged_total
             FROM `tabPOS Invoice` 
             WHERE branch = %s AND status = %s 
             ORDER BY modified desc
@@ -516,7 +519,8 @@ def getPosInvoice(status, limit, limit_start):
                 cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number,
                 posting_date, rounded_total, order_type, additional_discount_percentage,
-                discount_amount, custom_split_group, custom_split_from
+                discount_amount, custom_split_group, custom_split_from,
+                custom_merged_pos_invoice, custom_merged_total
             FROM `tabPOS Invoice` 
             WHERE branch = %s AND status = %s 
             ORDER BY modified desc
@@ -577,6 +581,8 @@ def searchPosInvoice(query,status):
             "total_taxes_and_charges",
             "custom_split_group",
             "custom_split_from",
+            "custom_merged_pos_invoice",
+            "custom_merged_total",
         ],
         limit_page_length=10 
     )
@@ -917,14 +923,35 @@ def validate_pos_close(pos_profile):
 @frappe.whitelist()
 def merge_bills(primary_invoice, secondary_invoice):
     try:
+        if primary_invoice == secondary_invoice:
+            frappe.throw("Cannot merge an invoice with itself.")
+
         primary_doc = frappe.get_doc("POS Invoice", primary_invoice)
         secondary_doc = frappe.get_doc("POS Invoice", secondary_invoice)
-        
+
         if primary_doc.docstatus != 0 or secondary_doc.docstatus != 0:
             frappe.throw("Both invoices must be in Draft state to merge.")
-            
+
+        if primary_doc.get("custom_merged_pos_invoice"):
+            frappe.throw("This bill already includes a merged bill.")
+
+        if secondary_doc.get("custom_merged_pos_invoice"):
+            frappe.throw("The selected bill already includes another merged bill.")
+
+        if frappe.db.exists(
+            "POS Invoice",
+            {
+                "docstatus": 0,
+                "custom_merged_pos_invoice": secondary_invoice,
+            },
+        ):
+            frappe.throw("The selected bill is already merged into another bill.")
+
+        if not secondary_doc.items:
+            frappe.throw("The selected bill has no items to merge.")
+
         primary_doc.custom_merged_pos_invoice = secondary_invoice
-        
+
         # Populate merged details table
         primary_doc.set("custom_merged_pos_invoice_details", [])
         for item in secondary_doc.items:
@@ -935,7 +962,7 @@ def merge_bills(primary_invoice, secondary_invoice):
                 "rate": item.rate,
                 "amount": item.amount
             })
-            
+
         primary_doc.save(ignore_permissions=True)
         return {"status": "success", "message": "Bills merged successfully", "name": primary_doc.name}
     except Exception as e:
