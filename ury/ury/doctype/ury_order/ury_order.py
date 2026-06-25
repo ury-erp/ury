@@ -910,37 +910,37 @@ def table_transfer(table, newTable, invoice):
     pos_invoice = frappe.get_doc("POS Invoice", invoice)
     new_table = frappe.get_doc("URY Table", newTable)
 
-    if current_table.restaurant_room == new_table.restaurant_room:
-        if new_table.occupied == 1:
-            frappe.throw(f"Table {new_table.name} is already occupied")
+    merge_members, _ = _get_merge_cluster(table)
+    if len(merge_members) > 1:
+        frappe.throw(_("Table transfer is not allowed for merged tables. Unmerge first."))
 
-        # Update table status
-        frappe.db.set_value(
-            "URY Table",
-            new_table.name,
-            {"occupied": 1, "latest_invoice_time": pos_invoice.creation},
+    if current_table.branch != new_table.branch:
+        frappe.throw(_("Table transfer between different branches is restricted."))
+
+    if new_table.occupied == 1:
+        frappe.throw(f"Table {new_table.name} is already occupied")
+
+    frappe.db.set_value(
+        "URY Table",
+        new_table.name,
+        {"occupied": 1, "latest_invoice_time": pos_invoice.creation},
+    )
+    frappe.db.set_value(
+        "URY Table",
+        current_table.name,
+        {"occupied": 0, "latest_invoice_time": None},
+    )
+
+    pos_invoice.restaurant_table = new_table.name
+    pos_invoice.custom_restaurant_room = new_table.restaurant_room
+    pos_invoice.save()
+
+    try:
+        change_table_in_kot(
+            pos_invoice.name, new_table.name, pos_invoice.branch
         )
-        frappe.db.set_value(
-            "URY Table",
-            current_table.name,
-            {"occupied": 0, "latest_invoice_time": None},
-        )
-
-        # Update POS Invoice
-        pos_invoice.restaurant_table = new_table.name
-        pos_invoice.save()
-
-        try:
-            change_table_in_kot(
-                    pos_invoice.name, new_table.name, pos_invoice.branch
-                )
-
-        except Exception as e:
-            # If an exception occurs (e.g., "kot" app not found), it will be caught here without effecting execution
-            pass
-
-    else:
-        frappe.throw(_("Table transfer between different rooms is restricted."))
+    except Exception:
+        pass
 
 
 @frappe.whitelist()
