@@ -246,6 +246,22 @@
     "related": "Additions liées",
     "open_sibling_failed": "Impossible d'ouvrir l'addition liée"
   },
+  "bill_merge": {
+    "merge_bill": "Fusionner l'addition",
+    "select_secondary": "Choisir une addition à fusionner dans {{invoice}}",
+    "merge_confirm": "Fusionner les additions",
+    "merge_success": "Addition {{invoice}} fusionnée avec succès",
+    "merge_failed": "Échec de la fusion des additions",
+    "merged_bill": "Addition fusionnée",
+    "includes_bill": "Inclut {{invoice}}",
+    "combined_total": "Total combiné",
+    "no_candidates": "Aucune autre addition ouverte disponible pour la fusion",
+    "load_more": "Charger plus",
+    "already_merged": "Cette addition inclut déjà une addition fusionnée",
+    "secondary_bill": "Addition fusionnée",
+    "open_secondary": "Ouvrir l'addition fusionnée",
+    "merged_items": "Articles de l'addition fusionnée"
+  },
   "footer": {
     "pos": "PDV",
     "table": "Table",
