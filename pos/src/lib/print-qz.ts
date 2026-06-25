@@ -1,31 +1,42 @@
 import qz from 'qz-tray';
-import axios from 'axios';
 import { KEYUTIL, KJUR, stob64, hextorstr } from 'jsrsasign';
+import { call } from './frappe-sdk';
 
-// SECURITY NOTE: The private key should be loaded from a secure runtime source,
-// not bundled into the client JS. This is a build-time import that exposes
-// the key in the browser bundle. For production, consider:
-// 1. Loading the key from an authenticated API endpoint
-// 2. Using environment variables with server-side signing
-// 3. Moving signing to a backend service
+// SECURITY: Private key is fetched at runtime from the authenticated backend API
+// (ury.ury.api.ury_print.signature_promise). This ensures the key is never bundled
+// into the client JS and is only available to authenticated users.
 let privateKey: string | undefined;
+let certLoaded = false;
 
-async function loadPrivateKey(): Promise<void> {
-  if (privateKey !== undefined) return;
+async function loadPrivateKey(): Promise<string> {
+  if (privateKey !== undefined) return privateKey;
   try {
-    const keyModule = await import('../../privateKey');
-    privateKey = keyModule?.privateKey || keyModule?.default;
-  } catch {
-    privateKey = undefined;
+    const response = await call.get('ury.ury.api.ury_print.signature_promise');
+    privateKey = response.message;
+    if (!privateKey) {
+      throw new Error('Private key not configured in site_config (qz_private_key)');
+    }
+    return privateKey;
+  } catch (err) {
+    throw new Error(`Failed to load QZ signing key from server: ${err}`);
   }
 }
 
 export async function loadQzPrinter(host: string): Promise<void> {
-  qz.security.setCertificatePromise((resolve: (data: string) => void, reject: (err?: string) => void) => {
-    axios.get('/assets/ury/files/cert.pem')
-      .then(({ data }) => resolve(data))
-      .catch((err) => reject('Error fetching certificate: ' + String(err)));
-  });
+  if (!certLoaded) {
+    const cert = await call.get('ury.ury.api.ury_print.qz_certificate');
+    const certPem = cert.message;
+    if (!certPem) {
+      throw new Error('QZ certificate not configured in site_config (qz_cert)');
+    }
+    qz.security.setCertificatePromise(
+      (resolve: (data: string) => void, reject: (err?: string) => void) => {
+        resolve(certPem);
+      }
+    );
+    certLoaded = true;
+  }
+
   if (!qz.websocket.isActive()) {
     await qz.websocket.connect({ host, usingSecure: false });
   }
@@ -39,14 +50,10 @@ export async function printWithQz(host: string, htmlToPrint: string): Promise<vo
   qz.security.setSignatureAlgorithm('SHA512');
   qz.security.setSignaturePromise((toSign: string) => async (resolve: (sig: string) => void, reject: (err?: string) => void) => {
     try {
-      await loadPrivateKey();
-      if (!privateKey) {
-        reject('Private key not configured. See print-qz.ts SECURITY NOTE.');
-        return;
-      }
-      const pk = KEYUTIL.getKey(privateKey);
+      const pk = await loadPrivateKey();
+      const key = KEYUTIL.getKey(pk);
       const sig = new KJUR.crypto.Signature({ alg: 'SHA512withRSA' });
-      sig.init(pk);
+      sig.init(key);
       sig.updateString(toSign);
       const hex = sig.sign();
       resolve(stob64(hextorstr(hex)));
@@ -68,4 +75,4 @@ export async function printWithQz(host: string, htmlToPrint: string): Promise<vo
     await loadQzPrinter(host);
     await printing();
   }
-} 
+}

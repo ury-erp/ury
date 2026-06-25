@@ -1,14 +1,13 @@
 import { createRouter, createWebHistory } from "vue-router";
 import Home from "../views/Home.vue";
 import authRoutes from './auth';
-import KOT from '../components/kot.vue';
 
 const routes = [
   {
-	path: "/",
-	name: "KOT",
-	component: KOT,
-  },  
+    path: "/",
+    name: "Home",
+    component: Home,
+  },
   ...authRoutes,
 ];
 

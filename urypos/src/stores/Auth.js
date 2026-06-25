@@ -31,10 +31,6 @@ export const useAuthStore = defineStore("auth", {
     db: frappe.db(),
     call: frappe.call(),
     auth: frappe.auth(),
-    alert: useAlert(),
-    menu: useMenuStore(),
-    table: useTableStore(),
-    invoiceData: useInvoiceDataStore(),
     userAuth: localStorage.getItem("userAuth"),
   }),
   getters: {
@@ -48,6 +44,7 @@ export const useAuthStore = defineStore("auth", {
   actions: {
     //Login
     async login() {
+      const alert = useAlert();
       try {
         await this.auth.loginWithUsernamePassword({
           username: this.userId,
@@ -58,7 +55,7 @@ export const useAuthStore = defineStore("auth", {
         localStorage.setItem("userAuth", "true");
         await this.fetchUserDetails();
       } catch (error) {
-        this.alert.createAlert("Message", error.message, "OK");
+        alert.createAlert("Message", error.message, "OK");
       }
     },
     checkAuthState() {
@@ -77,12 +74,9 @@ export const useAuthStore = defineStore("auth", {
     },
     fetchUserDetails() {
       const user = localStorage.getItem("userAuth");
-      // if (user !== "true") {
-      //   this.userAuth = false;
-      //   localStorage.removeItem("userAuth");
-      //   router.push("/login");
-      //   return
-      // }
+      const invoiceData = useInvoiceDataStore();
+      const table = useTableStore();
+
       this.auth
         .getLoggedInUser()
         .then((user) => {
@@ -92,9 +86,9 @@ export const useAuthStore = defineStore("auth", {
             localStorage.removeItem("userAuth");
           } else {
             this.userAuth = true;
-            this.invoiceData.fetchInvoiceDetails().then(() => {
+            invoiceData.fetchInvoiceDetails().then(() => {
               router.push("/Table");
-              this.table.fetchRoom();
+              table.fetchRoom();
               this.fetchUserRole();
             });
           }
@@ -107,13 +101,15 @@ export const useAuthStore = defineStore("auth", {
     },
     fetchUserRole() {
       //Fetching role based on logged user
+      const invoiceData = useInvoiceDataStore();
+      const menu = useMenuStore();
       this.db
         .getDoc("User", this.sessionUser)
         .then((doc) => {
           this.userRole = doc.roles.map((item) => item.role);
           const getPosProfile = {
             doctype: "POS Profile",
-            name: this.invoiceData.posProfile,
+            name: invoiceData.posProfile,
           };
           this.call
             .get("frappe.client.get", getPosProfile)
@@ -125,8 +121,7 @@ export const useAuthStore = defineStore("auth", {
                 this.userRole.includes(role)
               );
               if (this.cashier) {
-                this.menu.pickOrderType();
-                // this.menu.fetchItems();
+                menu.pickOrderType();
               }
               this.isPosOpenChecking();
               this.isPosCloseCheck();
@@ -159,13 +154,15 @@ export const useAuthStore = defineStore("auth", {
     },
 
     isPosOpenChecking() {
-      if (this.invoiceData.multipleCashier) {
+      const invoiceData = useInvoiceDataStore();
+      const alert = useAlert();
+      if (invoiceData.multipleCashier) {
         this.call
           .get("ury.ury.doctype.ury_order.ury_order.pos_opening_check")
           .then((result) => {
             var currentDomain = window.location.origin;
             if (!result.message.opening_exists) {
-              this.alert.createAlert("Message", "POS Opening Entry is not created", "OK").then(() => {
+              alert.createAlert("Message", "POS Opening Entry is not created", "OK").then(() => {
                 window.location.href = currentDomain + "/app/";
               });
             }
@@ -177,12 +174,12 @@ export const useAuthStore = defineStore("auth", {
             const innerMessageString = serverMessages[0];
             const innerMessage = JSON.parse(innerMessageString);
             const message = innerMessage.message;
-            this.alert.createAlert("Message", message, "OK").then(() => {
+            alert.createAlert("Message", message, "OK").then(() => {
               window.location.href = currentDomain + "/app/";
             });
 
           });
-      } 
+      }
       else {
         this.call
           .get("ury.ury_pos.api.posOpening")
@@ -191,32 +188,26 @@ export const useAuthStore = defineStore("auth", {
             const innerMessageString = serverMessages[0];
             const innerMessage = JSON.parse(innerMessageString);
             const message = innerMessage.message;
-            // if (this.cashier) {
-            //   this.alert.createAlert("Message", message, "OK").then(() => {
-            //     router.push("/posOpen");
-            //   });
-            // } else {
             var currentDomain = window.location.origin;
-            this.alert.createAlert("Message", message, "OK").then(() => {
+            alert.createAlert("Message", message, "OK").then(() => {
               window.location.href = currentDomain + "/app/";
             });
-            // }
           })
-          .catch((error) => {
-            // console.error(error)
-          });
+          .catch(() => {});
       }
     },
     isPosCloseCheck() {
+      const invoiceData = useInvoiceDataStore();
+      const alert = useAlert();
       const getPosProfile = {
-        pos_profile: this.invoiceData.posProfile,
+        pos_profile: invoiceData.posProfile,
       };
       this.call
         .get("ury.ury_pos.api.validate_pos_close", getPosProfile)
         .then((result) => {
           if (result.message === "Failed") {
             var currentDomain = window.location.origin;
-            this.alert
+            alert
               .createAlert("Message", "Please close previous POS Entry", "OK")
               .then(() => {
                 window.location.href = currentDomain + "/app/";

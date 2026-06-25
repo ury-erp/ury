@@ -232,7 +232,6 @@ async function fetchAndSetSiteName() {
         });
         const data = await response.json();
         window.globalSiteName = data.message.site_name;
-        // console.log('Global Site Name:', window.globalSiteName);
     } catch (error) {
         console.error('Failed to fetch site name:', error);
     }
@@ -259,7 +258,7 @@ initializeSocket(); // Initialize the socket after fetching the site name
 
 const frappe = new FrappeApp(url);
 export default {
-  // inject: ["$auth", "$socket"],
+  // inject: [],
   data() {
     return {
       kot: [],
@@ -346,9 +345,7 @@ export default {
           user: this.loggeduser,
         })
         .then((result) => {
-          // kot.isHidden = !kot.isHidden;
           kot.showDiv = !kot.showDiv;
-          // this.showDiv = false;
 
           this.removeAllItemsFromLocalStorage(kot);
           this.masonryLoading();
@@ -365,9 +362,7 @@ export default {
           time: this.currentTime,
         })
         .then((result) => {
-          // kot.isHidden = !kot.isHidden;
           kot.showDiv = !kot.showDiv;
-          // this.showDiv = false;
 
           this.removeAllItemsFromLocalStorage(kot);
           this.masonryLoading();
@@ -386,9 +381,6 @@ export default {
             id: kot.name,
           }
         )
-        .then((result) => {
-          // console.log("call backed ", result);
-        })
         .catch((error) => console.error(error));
     },
     toggleItemStrikeThrough(kotitem, kot) {
@@ -418,7 +410,6 @@ export default {
       } else {
         kot.color = "bg-white";
       }
-      // type color applied
     },
     updateQtyColorTable() {
       this.kot.forEach((kot) => {
@@ -463,7 +454,6 @@ export default {
     },
 
     updateTimeRemaining() {
-      // console.log("update time", this.kot_channel);
       this.kot.forEach((kot) => {
         kot.timeRemaining = this.calculateTimeRemaining(kot.time);
 

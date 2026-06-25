@@ -132,9 +132,7 @@ export const useInvoiceDataStore = defineStore("invoiceData", {
         .then((result) => {
           this.modeOfPaymentList = result.message;
         })
-        .catch((error) => {
-          // console.error(error)
-        });
+        .catch(() => {});
     },
 
     // Method for creating an invoice
@@ -672,9 +670,7 @@ export const useInvoiceDataStore = defineStore("invoiceData", {
             this.cancelReason = "";
           }
         })
-        .catch((error) => {
-          // console.error(error)
-        });
+        .catch(() => {});
     },
     cancelInvoice: async function () {
       const recentOrders = usetoggleRecentOrder();

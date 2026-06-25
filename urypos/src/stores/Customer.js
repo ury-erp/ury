@@ -8,23 +8,18 @@ import { useAlert } from "./Alert.js";
 export const useCustomerStore = defineStore("customers", {
   state: () => ({
     customer: [],
-    notification: useNotifications(),
     search: "",
-    alert: useAlert(),
     showCustomers: false,
     showOrderType: false,
     showEditOrderType: false,
     newOrderType: null,
     numberOfPax: "",
-    menu: useMenuStore(),
-    recentOrders: usetoggleRecentOrder(),
     selectedCustomerName: "",
     customerFavouriteItems: [],
     showModalNewCustomer: false,
     newCustomerMobileNo: "",
     newCustomer: "",
     orderType: [],
-    table: useTableStore(),
     showCustomersGroup: false,
     showCustomersTerritory: false,
     showAddNewCustomer: true,
@@ -108,13 +103,14 @@ export const useCustomerStore = defineStore("customers", {
       this.showCustomersTerritory = false;
     },
     newCustomerData(name) {
+      const alert = useAlert();
       this.showModalNewCustomer = true;
       if (!isNaN(parseFloat(name)) && isFinite(name)) {
         this.newCustomerMobileNo = name;
       } else if (typeof name === "string") {
         this.newCustomer = name;
       } else {
-        this.alert.createAlert("Message", "Invalid Customer", "OK");
+        alert.createAlert("Message", "Invalid Customer", "OK");
       }
     },
     editOrderType(orderType) {
@@ -128,12 +124,16 @@ export const useCustomerStore = defineStore("customers", {
       }
     },
     selecetOrderType(order_type) {
+      const menu = useMenuStore();
+      const recentOrders = usetoggleRecentOrder();
       this.showEditOrderType = false;
-      this.menu.selectedOrderType = order_type;
-      this.recentOrders.pastOrderType = order_type;
+      menu.selectedOrderType = order_type;
+      recentOrders.pastOrderType = order_type;
     },
 
     addNewCustomer: async function () {
+      const alert = useAlert();
+      const notification = useNotifications();
       if (!this.newCustomer || !this.newCustomerMobileNo) {
         let missingFields = [];
         if (!this.newCustomer) {
@@ -150,7 +150,7 @@ export const useCustomerStore = defineStore("customers", {
         }
         const missingFieldsMessage =
           "Following fields have missing values: " + missingFields.join(", ");
-        this.alert.createAlert("Message", missingFieldsMessage, "OK");
+        alert.createAlert("Message", missingFieldsMessage, "OK");
       } else {
         this.showAddNewCustomer = false;
         const db = frappe.db();
@@ -162,14 +162,14 @@ export const useCustomerStore = defineStore("customers", {
         })
           .then((doc) => {
             this.search = doc.name;
-            this.notification.createNotification("New Customer Created");
+            notification.createNotification("New Customer Created");
             this.showModalNewCustomer = false;
           })
           .catch((error) => {
             const serverMessages = JSON.parse(error._server_messages);
             const messageObject = JSON.parse(serverMessages[0]);
             const message = messageObject.message;
-            this.alert.createAlert("Message", message, "OK");
+            alert.createAlert("Message", message, "OK");
           });
       }
     },
@@ -201,7 +201,8 @@ export const useCustomerStore = defineStore("customers", {
       return "";
     },
     searchCustomer() {
-      if (this.menu.selectedAggregator) {
+      const menu = useMenuStore();
+      if (menu.selectedAggregator) {
         this.showCustomers = false;
         this.showAddNewCustomer = false;
       } else {
@@ -240,8 +241,9 @@ export const useCustomerStore = defineStore("customers", {
       }
     },
     async fectchCustomerFavouriteItem() {
-      if (this.table.previousOrderdCustomer) {
-        this.selectedCustomerName = this.table.previousOrderdCustomer;
+      const table = useTableStore();
+      if (table.previousOrderdCustomer) {
+        this.selectedCustomerName = table.previousOrderdCustomer;
       } else {
         this.selectedCustomerName = this.search;
       }
