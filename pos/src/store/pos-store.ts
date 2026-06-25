@@ -12,7 +12,6 @@ import { getPaymentModes } from '../lib/payment-api';
 // Constants
 const MAX_QUANTITY = 99;
 const MIN_QUANTITY = 0;
-const ITEMS_PER_PAGE = 10;
 
 // Custom error class for cart operations
 class CartError extends Error {
@@ -64,20 +63,6 @@ export interface Category {
   label: string;
 }
 
-export interface Order {
-  id: string;
-  cartId: string;
-  customerId?: string;
-  paymentModeId: string;
-  paymentMode: string;
-  orderType: OrderType;
-  status: 'pending' | 'paid' | 'preparing' | 'ready' | 'completed' | 'cancelled';
-  totalAmount: number;
-  paidAmount: number;
-  createdAt: string;
-  updatedAt: string;
-}
-
 interface CartTotals {
   subtotal: number;
   tax: number;
@@ -108,7 +93,6 @@ interface POSState {
   profileLoading: boolean;
   error: string | null;
   paymentModes: string[];
-  orders: Order[];
   selectedAggregator: Aggregator | null;
   currency: string;
   currencySymbol: string | null;
@@ -139,8 +123,6 @@ interface POSStore extends POSState {
   setQuickFilter: (filter: 'all' | 'special') => void;
   setSelectedItem: (item: MenuItem | null) => void;
   initializeCart: () => Promise<void>;
-  processPayment: (paymentMode: string, amount: number) => Promise<void>;
-  updateOrderStatus: (orderId: string, status: Order['status']) => Promise<void>;
   fetchPosProfile: () => Promise<void>;
   fetchCustomerGroups: () => Promise<void>;
   fetchTerritories: () => Promise<void>;
@@ -192,7 +174,6 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   profileLoading: false,
   error: null,
   paymentModes: ['Cash'],
-  orders: [],
   posProfile: null,
   customerGroups: [],
   territories: [],
@@ -481,46 +462,6 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   setSelectedItem: (item) => set({ selectedItem: item }),
   setSelectedAggregator: (aggregator) => set({ selectedAggregator: aggregator }),
   setOrderComment: (comment: string) => set({ orderComment: comment }),
-
-  processPayment: async (paymentMode: string, amount: number) => {
-    try {
-      const { activeOrders, cartId, selectedCustomer, selectedOrderType } = get();
-      
-      const order: Order = {
-        id: uuidv4(),
-        cartId: cartId!,
-        customerId: selectedCustomer?.id,
-        paymentModeId: paymentMode,
-        paymentMode,
-        orderType: selectedOrderType,
-        status: 'paid',
-        totalAmount: amount,
-        paidAmount: amount,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-
-      const newOrders = [...get().orders, order];
-      set({ orders: newOrders });
-      
-      await get().clearOrder();
-    } catch (error) {
-      set({ error: (error as Error).message });
-    }
-  },
-
-  updateOrderStatus: async (orderId: string, status: Order['status']) => {
-    try {
-      const newOrders = get().orders.map(order => 
-        order.id === orderId 
-          ? { ...order, status, updatedAt: new Date().toISOString() }
-          : order
-      );
-      set({ orders: newOrders });
-    } catch (error) {
-      set({ error: (error as Error).message });
-    }
-  },
 
   fetchCustomerGroups: async () => {
     const cached = sessionStorage.getItem('customerGroups');

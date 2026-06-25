@@ -243,7 +243,7 @@ export const useAuthStore = defineStore("auth", {
         .logout()
         .then(() => {
           router.push("/login").then(() => {
-            window.location.reload();
+            router.push("/Table").catch(() => {});
           });
           localStorage.removeItem("userAuth", "true");
           disconnectQzPrinter();

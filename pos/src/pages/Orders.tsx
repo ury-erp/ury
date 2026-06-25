@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Clock, User, UserCheck, Receipt, Printer, Pencil, X } from 'lucide-react';
+import { db } from '../lib/frappe-sdk';
 import { Badge, Button, Card, CardContent } from '../components/ui';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../components/ui/dialog';
 import { showToast } from '../components/ui/toast';
@@ -121,10 +122,7 @@ export default function Orders() {
     if (!selectedOrder) return;
     setEditLoading(true);
     try {
-      const res = await fetch(`/api/method/frappe.client.get?doctype=POS+Invoice&name=${selectedOrder.name}`);
-      if (!res.ok) throw new Error('Failed to fetch order details');
-      const data = await res.json();
-      const order = data.message;
+      const order = await db.getDoc('POS Invoice', selectedOrder.name);
       // Fill POS store
       posStore.resetOrderState();
       posStore.setSelectedOrderType(order.order_type);

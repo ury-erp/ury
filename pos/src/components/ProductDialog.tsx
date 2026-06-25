@@ -61,30 +61,51 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
   const [isItemLoading, setIsItemLoading] = useState(false);
   const [itemError, setItemError] = useState<string | null>(null);
 
-  // Fetch Item doc when dialog opens or selectedItem changes
+  // Fetch Item doc once when dialog opens or selectedItem changes
+  // (previously two separate useEffects fetching the same doc)
+  const [addonItemCodes, setAddonItemCodes] = useState<string[]>([]);
+  const [isAddonLoading, setIsAddonLoading] = useState(false);
+  const [addonError, setAddonError] = useState<string | null>(null);
+
   useEffect(() => {
     if (!selectedItem) {
       setItemDoc(null);
       setItemError(null);
       setIsItemLoading(false);
+      setAddonItemCodes([]);
+      setAddonError(null);
+      setIsAddonLoading(false);
       return;
     }
     setIsItemLoading(true);
+    setIsAddonLoading(true);
     setItemError(null);
+    setAddonError(null);
     db.getDoc('Item', selectedItem.item)
       .then((doc: any) => {
         setItemDoc(doc);
+        // Extract addon codes from the same response
+        if (Array.isArray(doc.custom_pos_add_on_items)) {
+          const codes = doc.custom_pos_add_on_items
+            .map((entry: any) => entry.item)
+            .filter(Boolean);
+          setAddonItemCodes(codes);
+        } else {
+          setAddonItemCodes([]);
+        }
       })
       .catch(() => {
         setItemError('Failed to fetch item details');
         setItemDoc(null);
+        setAddonError('Failed to fetch add-ons');
+        setAddonItemCodes([]);
       })
       .finally(() => {
         setIsItemLoading(false);
+        setIsAddonLoading(false);
       });
   }, [selectedItem]);
 
-  
   const addonDetails = Array.isArray(itemDoc?.custom_pos_add_on_items)
     ? itemDoc.custom_pos_add_on_items
         .map((entry: any) => {
@@ -127,39 +148,6 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
   const [quantity, setQuantity] = useState<string>(editMode ? initialQuantity?.toString() || '0' : '0');
   const [comments, setComments] = useState<string>(itemToReplace?.comment || existingCartItem?.comment || '');
   const dialogRef = useRef<HTMLDivElement>(null);
-
-  const [addonItemCodes, setAddonItemCodes] = useState<string[]>([]);
-  const [isAddonLoading, setIsAddonLoading] = useState(false);
-  const [addonError, setAddonError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!selectedItem) {
-      setAddonItemCodes([]);
-      setAddonError(null);
-      setIsAddonLoading(false);
-      return;
-    }
-    setIsAddonLoading(true);
-    setAddonError(null);
-    db.getDoc('Item', selectedItem.item)
-      .then((doc: any) => {
-        if (Array.isArray(doc.custom_pos_add_on_items)) {
-          const codes = doc.custom_pos_add_on_items
-            .map((entry: any) => entry.item)
-            .filter(Boolean);
-          setAddonItemCodes(codes);
-        } else {
-          setAddonItemCodes([]);
-        }
-      })
-      .catch((err: any) => {
-        setAddonError('Failed to fetch add-ons');
-        setAddonItemCodes([]);
-      })
-      .finally(() => {
-        setIsAddonLoading(false);
-      });
-  }, [selectedItem]);
 
   // Initialize quantity and comments from cart if not in edit mode
   useEffect(() => {

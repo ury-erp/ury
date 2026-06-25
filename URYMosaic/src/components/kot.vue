@@ -244,12 +244,10 @@ async function initializeSocket() {
         let site = window.globalSiteName;
         let site_url = `${url}/${site}`;
         socket = io(site_url,{ withCredentials: true });
-        console.log("socket == >",socket)
         socket.on('connect_error', (err) => {
             console.error("Socket connection error:", err);
         }); 
         socket.on('connect', () => {
-            console.log('Socket connected:', socket.connected);
         });
     } else {
         console.error('Site name is not set. Socket cannot be initialized.');
@@ -291,11 +289,15 @@ export default {
     },
     auth() {
       return new Promise((resolve, reject) => {
-        const auth = frappe.auth();
-        auth
+        const authApi = frappe.auth();
+        authApi
           .getLoggedInUser()
           .then((user) => {
             this.loggeduser = user;
+            // Update shared auth state so route guard works
+            if (window.__uryAuthState) {
+              window.__uryAuthState.isLoggedIn = true;
+            }
             resolve();
           })
           .catch((error) => {
@@ -310,7 +312,7 @@ export default {
           this.call
             .get("ury.ury.api.ury_kot_display.kot_list", {})
             .then((result) => {
-              console.log(result,"..............result")
+              // result processed successfully
               this.branch = result.message.Branch;
               this.kot_alert_time = result.message.kot_alert_time;
               this.audio_alert = result.message.audio_alert;
@@ -416,11 +418,10 @@ export default {
       } else {
         kot.color = "bg-white";
       }
-      console.log(type,".............type")
+      // type color applied
     },
     updateQtyColorTable() {
       this.kot.forEach((kot) => {
-        console.log(kot,"kot............")
         this.updateColorandTable(
           kot,
           kot.restaurant_table,
@@ -605,7 +606,7 @@ export default {
       });
     setInterval(this.updateTimeRemaining, 60000);
   },
-  beforeDestroy() {
+  beforeUnmount() {
     window.removeEventListener("online", this.handleOnline);
     window.removeEventListener("offline", this.handleOffline);
     document.removeEventListener("click", this.hideAudioAlertMessage);

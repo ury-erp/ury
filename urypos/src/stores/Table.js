@@ -353,9 +353,7 @@ export const useTableStore = defineStore("table", {
                   "OK"
                 )
                 .then(() => {
-                  router.push("/Table").then(() => {
-                    window.location.reload();
-                  });
+                  router.push("/Table").catch(() => {});
                 });
             } else {
               this.notification.createNotification("Past Order Fetched");
@@ -449,7 +447,7 @@ export const useTableStore = defineStore("table", {
           transferTable
         )
         .then(() => {
-          window.location.reload();
+          router.push("/Table").catch(() => {});
         })
         .catch((error) => {
           if (error._server_messages) {
@@ -478,7 +476,7 @@ export const useTableStore = defineStore("table", {
               "Captain Transferred Successfully"
             )
           )
-          .then(() => window.location.reload())
+          .then(() => router.push("/Table").catch(() => {}))
           .catch((error) => {
             if (error._server_messages) {
               const messages = JSON.parse(error._server_messages);

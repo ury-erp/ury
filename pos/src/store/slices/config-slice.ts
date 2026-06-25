@@ -60,7 +60,6 @@ export const createConfigSlice: StateCreator<
         set({ posProfile: profile });
         // Extract and set allowed roles from the profile
         const allowedRoles = profile.role_allowed_for_billing?.map((role: RolePermission) => role.role) || [];
-        console.log("allowedRoles", allowedRoles);
         get().setAllowedRoles(allowedRoles);
         set({ isLoading: false });
         return;

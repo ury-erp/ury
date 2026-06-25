@@ -315,7 +315,7 @@ export const useInvoiceDataStore = defineStore("invoiceData", {
     
           await this.alert.createAlert("Message", message.message, "OK");
           await router.push("/Table");
-          window.location.reload();
+          router.push("/Table").catch(() => {});
           return;
         }
     
@@ -520,7 +520,7 @@ export const useInvoiceDataStore = defineStore("invoiceData", {
                 await this.call
                   .post("ury.ury.api.ury_print.qz_print_update", sendObj)
                   .then(() => {
-                    window.location.reload();
+                    router.push("/Table").catch(() => {});
                     return 200;
                   });
               }
@@ -559,7 +559,7 @@ export const useInvoiceDataStore = defineStore("invoiceData", {
                 await this.call
                   .post("ury.ury.api.ury_print.qz_print_update", sendObj)
                   .then(() => {
-                    window.location.reload();
+                    router.push("/Table").catch(() => {});
                     return 200;
                   });
               }
@@ -612,7 +612,7 @@ export const useInvoiceDataStore = defineStore("invoiceData", {
           );
           if (response.message.status === "Success") {
             this.notification.createNotification("Print and Update Successful");
-            window.location.reload();
+            router.push("/Table").catch(() => {});
             return true;
           } else {
             this.isPrinting = false
@@ -692,7 +692,7 @@ export const useInvoiceDataStore = defineStore("invoiceData", {
         .then(() => {
           this.notification.createNotification("Invoice Cancelled");
           router.push("/Table").then(() => {
-            window.location.reload();
+            router.push("/Table").catch(() => {});
           });
         })
         .catch((error) => console.error(error));

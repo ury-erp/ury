@@ -226,7 +226,7 @@ export const useMenuStore = defineStore("menu", {
             "OK"
           )
           .then(() => {
-            window.location.reload();
+            router.push("/Table").catch(() => {});
           });
       } else {
         if (this.selectedOrderType === "Aggregators") {
@@ -258,7 +258,7 @@ export const useMenuStore = defineStore("menu", {
             "OK"
           )
           .then(() => {
-            window.location.reload();
+            router.push("/Table").catch(() => {});
           });
       } else {
         this.customer.search = this.selectedAggregator;
@@ -338,7 +338,7 @@ export const useMenuStore = defineStore("menu", {
         this.quantity > 0
       ) {
         if (!item.qty) {
-          this.$set(item, "qty", this.quantity);
+          item.qty = this.quantity;
         } else {
           item.qty = this.quantity;
           item.comment = this.itemComments;

@@ -9,26 +9,27 @@ const app = createApp(App);
 // Plugins
 app.use(router);
 
-// Global Properties,
-// components can inject this
+// Auth state shared between router guard and components
+const authState = reactive({ isLoggedIn: false });
+app.provide('authState', authState);
+window.__uryAuthState = authState;
 
-// Configure route gaurds
+// Configure route guards
 router.beforeEach(async (to, from, next) => {
-	if (to.matched.some((record) => !record.meta.isLoginPage)) {
-		// this route requires auth, check if logged in
-		// if not, redirect to login page.
-		if (!auth.isLoggedIn) {
-			next({ name: 'Login', query: { route: to.path } });
-		} else {
-			next();
-		}
-	} else {
-		if (auth.isLoggedIn) {
-			next({ name: 'Home' });
-		} else {
-			next();
-		}
-	}
+        if (to.matched.some((record) => !record.meta.isLoginPage)) {
+                // This route requires auth, check if logged in
+                if (!authState.isLoggedIn) {
+                        next({ name: 'Login', query: { route: to.path } });
+                } else {
+                        next();
+                }
+        } else {
+                if (authState.isLoggedIn) {
+                        next({ name: 'Home' });
+                } else {
+                        next();
+                }
+        }
 });
 
 app.mount("#app");

@@ -123,7 +123,7 @@ export default {
   },
   methods: {
     reload() {
-      window.location.reload();
+      this.$router.push(this.$route.path).catch(() => {});
     },
   },
 };

@@ -597,7 +597,7 @@ export const usetoggleRecentOrder = defineStore("recentOrders", {
         .post("ury.ury.doctype.ury_order.ury_order.cancel_order", updatedFields)
         .then(() => {
           this.notification.createNotification("Invoice Cancelled");
-          window.location.reload();
+          router.push("/Table").catch(() => {});
         })
         .catch((error) => console.error(error));
     },
