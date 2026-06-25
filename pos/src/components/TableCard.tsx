@@ -15,6 +15,9 @@ interface TableCardProps {
   onMenuOpenChange: (open: boolean) => void;
   onMerge: () => void;
   onUnmerge: () => void;
+  onTransferTable?: () => void;
+  onTransferCaptain?: () => void;
+  showCaptainTransfer?: boolean;
   onNavigate: () => void;
   onPreview: (event: MouseEvent<HTMLButtonElement>) => void;
   onPrint: (event: MouseEvent<HTMLButtonElement>) => void;
@@ -29,6 +32,9 @@ const TableCard = ({
   onMenuOpenChange,
   onMerge,
   onUnmerge,
+  onTransferTable,
+  onTransferCaptain,
+  showCaptainTransfer = false,
   onNavigate,
   onPreview,
   onPrint,
@@ -68,15 +74,16 @@ const TableCard = ({
             <Badge variant={isOccupied ? 'warning' : 'success'} className="whitespace-nowrap">
               {isOccupied ? t('tables.occupied') : t('tables.available')}
             </Badge>
-            {!isOccupied && (
-              <TableActionsMenu
-                table={table}
-                isOpen={menuOpen}
-                onOpenChange={onMenuOpenChange}
-                onMerge={onMerge}
-                onUnmerge={onUnmerge}
-              />
-            )}
+            <TableActionsMenu
+              table={table}
+              isOpen={menuOpen}
+              onOpenChange={onMenuOpenChange}
+              onMerge={onMerge}
+              onUnmerge={onUnmerge}
+              onTransferTable={onTransferTable}
+              onTransferCaptain={onTransferCaptain}
+              showCaptainTransfer={showCaptainTransfer}
+            />
           </div>
         </div>
 

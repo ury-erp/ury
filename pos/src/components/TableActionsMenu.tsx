@@ -1,5 +1,5 @@
 import { useEffect, useRef, type MouseEvent as ReactMouseEvent } from 'react';
-import { Link2, MoreVertical, Unlink } from 'lucide-react';
+import { ArrowRightLeft, Link2, MoreVertical, Unlink, UserRound } from 'lucide-react';
 import { Button } from './ui/button';
 import { t } from '../i18n';
 import { isMergedTable } from '../lib/table-utils';
@@ -11,6 +11,9 @@ interface TableActionsMenuProps {
   onOpenChange: (open: boolean) => void;
   onMerge?: () => void;
   onUnmerge?: () => void;
+  onTransferTable?: () => void;
+  onTransferCaptain?: () => void;
+  showCaptainTransfer?: boolean;
 }
 
 const TableActionsMenu = ({
@@ -19,9 +22,13 @@ const TableActionsMenu = ({
   onOpenChange,
   onMerge,
   onUnmerge,
+  onTransferTable,
+  onTransferCaptain,
+  showCaptainTransfer = false,
 }: TableActionsMenuProps) => {
   const menuRef = useRef<HTMLDivElement>(null);
   const isAvailable = table.occupied === 0;
+  const isOccupied = table.occupied === 1;
   const isMerged = isMergedTable(table);
   const canUnmerge = isMerged && isAvailable;
 
@@ -55,6 +62,26 @@ const TableActionsMenu = ({
     onUnmerge?.();
   };
 
+  const handleTransferTable = (event: ReactMouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    onOpenChange(false);
+    onTransferTable?.();
+  };
+
+  const handleTransferCaptain = (event: ReactMouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    onOpenChange(false);
+    onTransferCaptain?.();
+  };
+
+  const hasAvailableActions = isAvailable;
+  const hasOccupiedActions =
+    isOccupied && (onMerge || onTransferTable || (showCaptainTransfer && onTransferCaptain));
+
+  if (!hasAvailableActions && !hasOccupiedActions) {
+    return null;
+  }
+
   return (
     <div className="relative shrink-0" ref={menuRef}>
       <Button
@@ -70,25 +97,62 @@ const TableActionsMenu = ({
 
       {isOpen && (
         <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
-          <Button
-            variant="ghost"
-            className="flex h-auto w-full justify-start gap-2 rounded-none px-4 py-2 text-sm font-normal text-gray-700 hover:bg-gray-100"
-            onClick={handleMerge}
-          >
-            <Link2 className="h-4 w-4 shrink-0" />
-            {t('tables.merge_tables')}
-          </Button>
-          {canUnmerge && (
+          {isAvailable && (
             <>
-              <div className="my-1 border-t border-gray-100" />
               <Button
                 variant="ghost"
-                className="flex h-auto w-full justify-start gap-2 rounded-none px-4 py-2 text-sm font-normal text-red-600 hover:bg-red-50"
-                onClick={handleUnmerge}
+                className="flex h-auto w-full justify-start gap-2 rounded-none px-4 py-2 text-sm font-normal text-gray-700 hover:bg-gray-100"
+                onClick={handleMerge}
               >
-                <Unlink className="h-4 w-4 shrink-0" />
-                {t('tables.unmerge_tables')}
+                <Link2 className="h-4 w-4 shrink-0" />
+                {t('tables.merge_tables')}
               </Button>
+              {canUnmerge && (
+                <>
+                  <div className="my-1 border-t border-gray-100" />
+                  <Button
+                    variant="ghost"
+                    className="flex h-auto w-full justify-start gap-2 rounded-none px-4 py-2 text-sm font-normal text-red-600 hover:bg-red-50"
+                    onClick={handleUnmerge}
+                  >
+                    <Unlink className="h-4 w-4 shrink-0" />
+                    {t('tables.unmerge_tables')}
+                  </Button>
+                </>
+              )}
+            </>
+          )}
+
+          {isOccupied && (
+            <>
+              <Button
+                variant="ghost"
+                className="flex h-auto w-full justify-start gap-2 rounded-none px-4 py-2 text-sm font-normal text-gray-700 hover:bg-gray-100"
+                onClick={handleMerge}
+              >
+                <Link2 className="h-4 w-4 shrink-0" />
+                {t('tables.merge_tables')}
+              </Button>
+              {onTransferTable && (
+                <Button
+                  variant="ghost"
+                  className="flex h-auto w-full justify-start gap-2 rounded-none px-4 py-2 text-sm font-normal text-gray-700 hover:bg-gray-100"
+                  onClick={handleTransferTable}
+                >
+                  <ArrowRightLeft className="h-4 w-4 shrink-0" />
+                  {t('tables.transfer_table')}
+                </Button>
+              )}
+              {showCaptainTransfer && onTransferCaptain && (
+                <Button
+                  variant="ghost"
+                  className="flex h-auto w-full justify-start gap-2 rounded-none px-4 py-2 text-sm font-normal text-gray-700 hover:bg-gray-100"
+                  onClick={handleTransferCaptain}
+                >
+                  <UserRound className="h-4 w-4 shrink-0" />
+                  {t('tables.transfer_captain')}
+                </Button>
+              )}
             </>
           )}
         </div>

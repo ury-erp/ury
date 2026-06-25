@@ -77,6 +77,46 @@ export async function getTables(room: string): Promise<Table[]> {
   return tables as Table[];
 }
 
+const TABLE_LIST_FIELDS = [
+  'name',
+  'occupied',
+  'latest_invoice_time',
+  'is_take_away',
+  'restaurant_room',
+  'table_shape',
+  'merged_with',
+  'no_of_seats',
+  'layout_x',
+  'layout_y',
+  'minimum_seating',
+] as const;
+
+export async function getVacantTablesForBranch(
+  branch: string,
+  excludeTable?: string
+): Promise<Table[]> {
+  const filters: Array<[string, string, string | number]> = [
+    ['branch', '=', branch],
+    ['occupied', '=', 0],
+  ];
+
+  const tables = await db.getDocList(DOCTYPES.URY_TABLE, {
+    fields: [...TABLE_LIST_FIELDS],
+    filters,
+    orderBy: { field: 'restaurant_room', order: 'asc' },
+    limit: '*' as unknown as number,
+    asDict: true,
+  } as unknown as Parameters<typeof db.getDocList>[1]);
+
+  const rows = tables as Table[];
+  const vacant = excludeTable ? rows.filter((table) => table.name !== excludeTable) : rows;
+
+  return vacant.sort(
+    (a, b) =>
+      a.restaurant_room.localeCompare(b.restaurant_room) || a.name.localeCompare(b.name)
+  );
+}
+
 
 export async function updateTableLayout(name: string, data: Partial<Table>) {
   return db.updateDoc(DOCTYPES.URY_TABLE, name, data);
