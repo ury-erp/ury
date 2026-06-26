@@ -1,5 +1,6 @@
 import { DOCTYPES } from '../data/doctypes';
 import { call, db } from './frappe-sdk';
+import { getErrorMessage } from './error-utils';
 
 // Limited fields response
 export interface PosProfileLimited {
@@ -100,13 +101,21 @@ export interface PosProfileFullResponse {
 }
 
 export async function getPosProfileLimitedFields(): Promise<PosProfileLimited> {
-  const res = await call.get('ury.ury_pos.api.getPosProfile');
-  return res.message;
+  try {
+    const res = await call.get('ury.ury_pos.api.getPosProfile');
+    return res.message;
+  } catch (error) {
+    throw new Error(`Failed to fetch POS profile (limited): ${getErrorMessage(error)}`);
+  }
 }
 
 export async function getPosProfileFull(posProfileName: string): Promise<PosProfileFull> {
-  const doc = await db.getDoc(DOCTYPES.POS_PROFILE, posProfileName);
-  return doc;
+  try {
+    const doc = await db.getDoc(DOCTYPES.POS_PROFILE, posProfileName);
+    return doc;
+  } catch (error) {
+    throw new Error(`Failed to fetch POS profile '${posProfileName}': ${getErrorMessage(error)}`);
+  }
 }
 
 export async function getCombinedPosProfile(): Promise<PosProfileCombined> {
@@ -140,6 +149,10 @@ export async function getCombinedPosProfile(): Promise<PosProfileCombined> {
 }
 
 export async function getCurrencyInfo(currencyCode: string): Promise<Currency> {
-  const doc = await db.getDoc(DOCTYPES.CURRENCY, currencyCode);
-  return doc;
+  try {
+    const doc = await db.getDoc(DOCTYPES.CURRENCY, currencyCode);
+    return doc;
+  } catch (error) {
+    throw new Error(`Failed to fetch currency info for '${currencyCode}': ${getErrorMessage(error)}`);
+  }
 }

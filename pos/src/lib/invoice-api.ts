@@ -73,7 +73,7 @@ export async function getPOSInvoices({
     };
   } catch (error) {
     console.error('Error fetching POS invoices:', error);
-    throw new Error('Failed to fetch POS invoices');
+    throw new Error('Failed to fetch POS invoices', { cause: error });
   }
 }
 
@@ -92,7 +92,7 @@ export async function getPOSInvoiceItems(invoiceId: string) {
     };
   } catch (error) {
     console.error('Error fetching POS invoice items:', error);
-    throw new Error('Failed to fetch POS invoice items');
+    throw new Error('Failed to fetch POS invoice items', { cause: error });
   }
 }
 
@@ -107,7 +107,7 @@ export async function updateInvoiceStatus(
     });
   } catch (error) {
     console.error('Error updating invoice status:', error);
-    throw new Error('Failed to update invoice status');
+    throw new Error('Failed to update invoice status', { cause: error });
   }
 } 
 
@@ -141,7 +141,7 @@ export async function getInvoicePrintHtml(invoiceId: string, printFormat: string
     return response.message.html;
   } catch (error) {
     console.error('Error fetching invoice print HTML:', error);
-    throw new Error('Failed to fetch invoice print HTML');
+    throw new Error('Failed to fetch invoice print HTML', { cause: error });
   }
 } 
 

@@ -91,9 +91,13 @@ export const createMenuSlice: StateCreator<POSSliceAll, [], [], MenuSlice> = (se
     try {
       const cached = sessionStorage.getItem('menuCategories');
       if (cached) {
-        const categories = JSON.parse(cached);
-        set({ categories });
-        return;
+        try {
+          const categories = JSON.parse(cached);
+          set({ categories });
+          return;
+        } catch {
+          sessionStorage.removeItem('menuCategories');
+        }
       }
 
       const courses = await getMenuCourses();
@@ -108,24 +112,42 @@ export const createMenuSlice: StateCreator<POSSliceAll, [], [], MenuSlice> = (se
   fetchCustomerGroups: async () => {
     const cached = sessionStorage.getItem('customerGroups');
     if (cached) {
-      set({ customerGroups: JSON.parse(cached) });
-      return;
+      try {
+        set({ customerGroups: JSON.parse(cached) });
+        return;
+      } catch {
+        sessionStorage.removeItem('customerGroups');
+      }
     }
-    const groups = await getCustomerGroups();
-    const names = groups.map((g: { name: string }) => g.name);
-    set({ customerGroups: names });
-    sessionStorage.setItem('customerGroups', JSON.stringify(names));
+    try {
+      const groups = await getCustomerGroups();
+      const names = groups.map((g: { name: string }) => g.name);
+      set({ customerGroups: names });
+      sessionStorage.setItem('customerGroups', JSON.stringify(names));
+    } catch (error) {
+      set({ error: 'Failed to load customer groups' });
+      throw error;
+    }
   },
 
   fetchTerritories: async () => {
     const cached = sessionStorage.getItem('territories');
     if (cached) {
-      set({ territories: JSON.parse(cached) });
-      return;
+      try {
+        set({ territories: JSON.parse(cached) });
+        return;
+      } catch {
+        sessionStorage.removeItem('territories');
+      }
     }
-    const terrs = await getCustomerTerritories();
-    const names = terrs.map((t: { name: string }) => t.name);
-    set({ territories: names });
-    sessionStorage.setItem('territories', JSON.stringify(names));
+    try {
+      const terrs = await getCustomerTerritories();
+      const names = terrs.map((t: { name: string }) => t.name);
+      set({ territories: names });
+      sessionStorage.setItem('territories', JSON.stringify(names));
+    } catch (error) {
+      set({ error: 'Failed to load territories' });
+      throw error;
+    }
   },
 });

@@ -56,13 +56,17 @@ export const createConfigSlice: StateCreator<
       // Check session storage first if not forcing refresh
       const cached = sessionStorage.getItem('posProfile');
       if (cached && !forceRefresh) {
-        const profile = JSON.parse(cached);
-        set({ posProfile: profile });
-        // Extract and set allowed roles from the profile
-        const allowedRoles = profile.role_allowed_for_billing?.map((role: RolePermission) => role.role) || [];
-        get().setAllowedRoles(allowedRoles);
-        set({ isLoading: false });
-        return;
+        try {
+          const profile = JSON.parse(cached);
+          set({ posProfile: profile });
+          // Extract and set allowed roles from the profile
+          const allowedRoles = profile.role_allowed_for_billing?.map((role: RolePermission) => role.role) || [];
+          get().setAllowedRoles(allowedRoles);
+          set({ isLoading: false });
+          return;
+        } catch {
+          sessionStorage.removeItem('posProfile');
+        }
       }
 
       // If not in cache or forcing refresh, fetch from API

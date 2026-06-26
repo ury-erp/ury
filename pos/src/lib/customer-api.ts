@@ -1,5 +1,6 @@
 import { DOCTYPES } from '../data/doctypes';
 import { db, call } from './frappe-sdk';
+import { getErrorMessage } from './error-utils';
 
 export interface Customer {
   name: string;
@@ -44,27 +45,35 @@ export interface CreateCustomerResponse {
 
 
 export async function getCustomerGroups() {
-  const groups = await db.getDocList(DOCTYPES.CUSTOMER_GROUP, {
-    fields: ['name'],
-    limit: "*" as unknown as number,
-    orderBy: {
-      field: 'name',
-      order: 'asc',
-    },
-  });
-  return groups;
+  try {
+    const groups = await db.getDocList(DOCTYPES.CUSTOMER_GROUP, {
+      fields: ['name'],
+      limit: "*" as unknown as number,
+      orderBy: {
+        field: 'name',
+        order: 'asc',
+      },
+    });
+    return groups;
+  } catch (error) {
+    throw new Error(`Failed to fetch customer groups: ${getErrorMessage(error)}`);
+  }
 }
 
 export async function getCustomerTerritories() {
-  const territories = await db.getDocList(DOCTYPES.CUSTOMER_TERRITORY, {
-    fields: ['name'],
-    limit: "*" as unknown as number,
-    orderBy: {
-      field: 'name',
-      order: 'asc',
-    },
-  });
-  return territories;
+  try {
+    const territories = await db.getDocList(DOCTYPES.CUSTOMER_TERRITORY, {
+      fields: ['name'],
+      limit: "*" as unknown as number,
+      orderBy: {
+        field: 'name',
+        order: 'asc',
+      },
+    });
+    return territories;
+  } catch (error) {
+    throw new Error(`Failed to fetch customer territories: ${getErrorMessage(error)}`);
+  }
 }
 
 export async function addCustomer(

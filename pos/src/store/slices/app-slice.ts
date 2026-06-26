@@ -79,16 +79,20 @@ export const createAppSlice: StateCreator<POSSliceAll, [], [], AppSlice> = (set,
     try {
       const cached = sessionStorage.getItem('posProfile');
       if (cached) {
-        const profile = JSON.parse(cached);
-        set({
-          posProfile: profile,
-          profileLoading: false,
-          currency: profile.currency || 'INR',
-        });
-        if (!storage.getItem('currencySymbol')) {
-          await get().fetchCurrencySymbol();
+        try {
+          const profile = JSON.parse(cached);
+          set({
+            posProfile: profile,
+            profileLoading: false,
+            currency: profile.currency || 'INR',
+          });
+          if (!storage.getItem('currencySymbol')) {
+            await get().fetchCurrencySymbol();
+          }
+          return;
+        } catch {
+          sessionStorage.removeItem('posProfile');
         }
-        return;
       }
 
       set({ profileLoading: true, error: null });

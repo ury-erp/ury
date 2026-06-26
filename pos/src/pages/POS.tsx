@@ -109,17 +109,6 @@ export default function POS() {
     );
   }
 
-  if (error) {
-    return (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-lg font-medium text-red-600">{t('common.error_loading_menu_items')}</p>
-          <p className="text-sm text-gray-500 mt-2">{error}</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-1 overflow-hidden">
       <Sidebar disabled={isMenuInteractionDisabled()} />
