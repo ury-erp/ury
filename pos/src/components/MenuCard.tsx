@@ -45,7 +45,7 @@ const MenuCard: FC<MenuCardProps> = ({
           <img
             src={item_image}
             alt={name}
-            className="w-full h-full object-cover filter saturate-75 brightness-95"
+            className="w-full h-full object-cover"
             style={{ filter: 'saturate(0.7) brightness(0.95)' }}
             onError={() => setImgError(true)}
           />
@@ -59,7 +59,7 @@ const MenuCard: FC<MenuCardProps> = ({
       {/* Content section - flex grow with fixed padding */}
       <div className="flex-1 p-3 flex flex-col">
         {/* Name section - fixed height for 2 lines */}
-        <div className="">
+        <div>
           <h3 className="font-medium text-gray-900 text-sm leading-5 line-clamp-2" title={name}>
             {name}
           </h3>

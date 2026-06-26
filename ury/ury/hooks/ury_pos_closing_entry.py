@@ -28,8 +28,7 @@ def sub_pos_close_check(doc, method):
             )
             if has_open:
                 frappe.throw("Sub Cashier POS must be closed", title="Sub Cashier POS Closing Required")
-    else:
-        pass
+
 
 def calculate_closing_amount(doc, method):
     multiple_cashier = frappe.db.get_value("POS Profile", doc.pos_profile, "custom_enable_multiple_cashier")
@@ -67,8 +66,7 @@ def calculate_closing_amount(doc, method):
                 closing_details.difference = total_closing_amount - closing_details.expected_amount
         else:
             frappe.throw("No Sub POS Closing entries found between the given dates")
-    else:
-        pass
+
 
 def validate_cashier(doc, method):
     cashier = None
@@ -84,5 +82,3 @@ def validate_cashier(doc, method):
 
         if frappe.session.user == cashier:
             frappe.throw("Sub Cashiers are not allowed to make POS Closing Entries.")
-    else:
-        pass

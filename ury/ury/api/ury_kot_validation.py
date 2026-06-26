@@ -92,7 +92,7 @@ def get_productions_for_branch(branch):
     return frappe.get_all(
         "URY Production Unit",
         filters={"branch": branch},
-        fields=["name", "item_groups"],
+        fields=["name"],
     )
 
 

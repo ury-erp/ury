@@ -4,8 +4,8 @@ import frappe
 def before_insert(doc, method):
     sales_invoice_naming(doc, method)
 
-def on_update(doc,method):
-    aggregator_unpaid(doc,method)
+def on_update(doc, method):
+    aggregator_unpaid(doc, method)
     
 def sales_invoice_naming(doc, method):
     if not doc.is_pos:
@@ -37,7 +37,7 @@ def sales_invoice_naming(doc, method):
             )
             
             if aggregator_series_prefix: 
-                doc.naming_series = "SINV-" +  aggregator_series_prefix
+                doc.naming_series = "SINV-" + aggregator_series_prefix
                 
             else: 
                 # Fallback to invoice_series_prefix if aggregator_series_prefix is not available            
@@ -50,8 +50,8 @@ def sales_invoice_naming(doc, method):
             )
             
             
-def aggregator_unpaid(doc,method):
-    if doc.order_type == "Aggregators" and frappe.db.get_value("Branch", doc.branch , "custom_make_unpaid") == 1 :
+def aggregator_unpaid(doc, method):
+    if doc.order_type == "Aggregators" and frappe.db.get_value("Branch", doc.branch, "custom_make_unpaid") == 1:
         doc.is_pos = 0
 
         

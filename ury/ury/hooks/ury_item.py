@@ -1,8 +1,8 @@
 import frappe
 
 
-def validate(doc,method):
-    update_menu_item(doc,method)
+def validate(doc, method):
+    update_menu_item(doc, method)
     update_variants_add_on(doc, method)
     
     

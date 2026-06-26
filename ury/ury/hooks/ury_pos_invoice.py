@@ -26,7 +26,7 @@ def free_table(doc, method):
 
 
 def validate_invoice(doc, method):
-    if doc.waiter == None or doc.waiter == "":
+    if doc.waiter is None or doc.waiter == "":
         doc.waiter = doc.modified_by
     remove_items = frappe.db.get_value("POS Profile", doc.pos_profile, "remove_items")
     
@@ -76,7 +76,7 @@ def validate_invoice(doc, method):
 
 
 def validate_customer(doc, method):
-    if doc.customer_name == None or doc.customer_name == "":
+    if doc.customer_name is None or doc.customer_name == "":
         frappe.throw("Failed to load data. Please refresh the page.")
 
 
@@ -173,7 +173,7 @@ def validate_price_list(doc, method):
                 "Menu for Room", {"parent": doc.restaurant, "room": room}, "menu"
             )
 
-    doc.selling_price_list = frappe.get_value(
+    doc.selling_price_list = frappe.db.get_value(
         "Price List", dict(restaurant_menu=menu_name, enabled=1)
     )
 

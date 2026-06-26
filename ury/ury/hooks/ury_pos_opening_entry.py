@@ -1,42 +1,41 @@
 import frappe
 from frappe.utils import get_datetime, today, now
 
-def validate(doc,method):
-    set_cashier_room(doc,method)
+def validate(doc, method):
+    set_cashier_room(doc, method)
     
 def before_save(doc, method):
     main_pos_open_check(doc, method)
-    set_current_time(doc,method)
+    set_current_time(doc, method)
     
     
-def set_cashier_room(doc,method):
-    room =  frappe.db.sql("""
-                SELECT room , parent
+def set_cashier_room(doc, method):
+    room = frappe.db.sql("""
+                SELECT room, parent
                 FROM `tabURY User`
-                WHERE parent=%s AND user=%s         
-            """,(doc.branch,doc.user),as_dict=True)
-    
+                WHERE parent=%s AND user=%s
+            """, (doc.branch, doc.user), as_dict=True)
+
     if room:
         doc.custom_room = room[0]['room']
-        multiple_cashier = frappe.db.get_value("POS Profile",doc.pos_profile,"custom_enable_multiple_cashier")
+        multiple_cashier = frappe.db.get_value("POS Profile", doc.pos_profile, "custom_enable_multiple_cashier")
         if multiple_cashier:
             doc.custom_rooms = []
-            for room in room:
+            for r in room:
                 doc.append('custom_rooms', {
-                    'room': room['room']
+                    'room': r['room']
                 })
 
-def set_current_time(doc,method):
-    multiple_cashier = frappe.db.get_value("POS Profile",doc.pos_profile,"custom_enable_multiple_cashier")
+def set_current_time(doc, method):
+    multiple_cashier = frappe.db.get_value("POS Profile", doc.pos_profile, "custom_enable_multiple_cashier")
     if multiple_cashier:
         date_time = now()
         doc.period_start_date = date_time
-    else:
-        pass
 
-def main_pos_open_check(doc,method):
+
+def main_pos_open_check(doc, method):
     current_date = today()
-    multiple_cashier = frappe.db.get_value("POS Profile",doc.pos_profile,"custom_enable_multiple_cashier")
+    multiple_cashier = frappe.db.get_value("POS Profile", doc.pos_profile, "custom_enable_multiple_cashier")
     if multiple_cashier:
         # Use lightweight query instead of full get_doc
         owner = frappe.db.get_value(

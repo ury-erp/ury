@@ -12,7 +12,6 @@ standard_format = "templates/print_formats/standard.html"
 
 from frappe.www.printview import validate_print_permission
 
-
 @frappe.whitelist()
 def network_printing(
     doctype,
@@ -57,7 +56,7 @@ def network_printing(
                 output.write(f)
             conn.printFile(print_settings.printer_name, file_path, name, {})
 
-            restaurant_table, invoice_printed, name = frappe.db.get_value(
+            restaurant_table, invoice_printed, invoice_name = frappe.db.get_value(
                 "POS Invoice", name, ["restaurant_table", "invoice_printed", "name"]
             )
 
@@ -75,9 +74,7 @@ def network_printing(
         except Exception as e:
             return f"Failed to print: {str(e)}"
     except Exception as e:
-        import traceback
-
-        traceback.print_exc()  # Print the full traceback for debugging
+        frappe.log_error(message=frappe.get_traceback(), title="Network Printing Error")
         return f"An error occurred: {str(e)}"
 
 
@@ -92,20 +89,18 @@ def select_network_printer(pos_profile, invoice_id):
             "URY Printer Settings", {"parent": room, "bill": 1}, "printer"
         )
         if room_bill_printer:
-            print = network_printing(
+            return network_printing(
                 "POS Invoice", invoice_id, room_bill_printer, print_format
             )
-            return print
 
     else:
         pos_bill_printer = frappe.db.get_value(
             "URY Printer Settings", {"parent": pos_profile, "bill": 1}, "printer"
         )
         if pos_bill_printer:
-            print = network_printing(
+            return network_printing(
                 "POS Invoice", invoice_id, pos_bill_printer, print_format
             )
-            return print
 
 
 @frappe.whitelist()
@@ -142,7 +137,7 @@ def qz_print_update(invoice):
 def print_pos_page(doctype, name, print_format):
     data = {"name": name, "doctype": doctype, "print_format": print_format}
 
-    restaurant_table, branch, name = frappe.db.get_value(
+    restaurant_table, branch, invoice_name = frappe.db.get_value(
         "POS Invoice", name, ["restaurant_table", "branch", "name"]
     )
     print_channel = "{}_{}".format("print", branch)

@@ -1,6 +1,7 @@
 import re
 import frappe
 from frappe import _
+from frappe.utils import cint
 
 
 def validate_search_input(search_term):
