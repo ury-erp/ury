@@ -69,17 +69,31 @@ def merge_tables_batch(anchor_table, tables):
     return True
 
 
-def _append_merged_partner(table_name, partner):
+#def _append_merged_partner(table_name, partner):
     merged = frappe.db.get_value("URY Table", table_name, "merged_with") or ""
     partners = _parse_merged_with(merged)
     if partner in partners:
         return
     new_merged = f"{merged},{partner}" if merged else partner
     frappe.db.set_value("URY Table", table_name, "merged_with", new_merged)
-
+def _append_merged_partner(table_name, partner):
+    merged = frappe.db.get_value(
+        "URY Table",
+        table_name,
+        "merged_with"
+    ) or ""
+    partners = _parse_merged_with(merged)
+    if partner not in partners:
+        partners.append(partner)
+    frappe.db.set_value(
+        "URY Table",
+        table_name,
+        "merged_with",
+        ",".join(sorted(set(partners))),
+    )
 
 def _sync_active_order_with_merge_cluster(table):
-    members, _ = _get_merge_cluster(table)
+    members = list(dict.fromkeys(_get_cluster_table_names(table)))
     if not members:
         return
 
@@ -90,7 +104,12 @@ def _sync_active_order_with_merge_cluster(table):
     if not primary_table:
         return
 
-    partners_value = _merged_partners_csv(primary_table)
+    partners = sorted(
+    t for t in members
+    if t != primary_table
+    )
+
+    partners_value = ",".join(partners) if partners else None
 
     open_invoices = frappe.get_all(
         "POS Invoice",
