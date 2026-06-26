@@ -29,16 +29,6 @@ export function getActiveDirection(): 'ltr' | 'rtl' {
 }
 
 /**
- * Apply lang and dir to <html> after i18n is resolved.
- * Call this once in main.tsx before rendering the React tree.
- */
-export function applyDocumentLocale(): void {
-  const root = document.documentElement;
-  root.lang = activeLanguage;
-  root.dir = getActiveDirection();
-}
-
-/**
  * Get the currently active language code.
  */
 export function getActiveLanguage(): string {

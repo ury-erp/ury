@@ -3,6 +3,7 @@ import { checkPOSOpening, validatePOSClose } from '../lib/pos-opening-api';
 import { usePOSStore } from '../store/pos-store';
 import POSOpeningDialog from './POSOpeningDialog';
 import { t } from '../i18n';
+import { getErrorMessage } from '../lib/error-utils';
 
 interface POSOpeningProviderProps {
   children: React.ReactNode;
@@ -39,9 +40,8 @@ const POSOpeningProvider = ({ children }: POSOpeningProviderProps) => {
             return;
           }
         } catch (error) {
-          console.error('Failed to validate POS close status:', error);
           // On error, show error state with retry instead of assuming failure
-          setErrorMessage('Failed to validate POS close status. Please try again.');
+          setErrorMessage(getErrorMessage(error));
           setValidationType('error');
           return;
         }
@@ -50,9 +50,8 @@ const POSOpeningProvider = ({ children }: POSOpeningProviderProps) => {
       // All validations passed
       setValidationType(null);
     } catch (error) {
-      console.error('Failed to check POS opening status:', error);
       // Show error state with retry instead of assuming POS is not opened
-      setErrorMessage('Failed to check POS status. Please try again.');
+      setErrorMessage(getErrorMessage(error));
       setValidationType('error');
     } finally {
       setIsLoading(false);
@@ -96,7 +95,7 @@ const POSOpeningProvider = ({ children }: POSOpeningProviderProps) => {
             onClick={handleRetry}
             className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
           >
-            Retry
+            {t('common.retry')}
           </button>
         </div>
       </div>

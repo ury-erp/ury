@@ -95,8 +95,7 @@ export async function addCustomer(
     };
 
   } catch (error) {
-    console.error('Error creating customer:', error);
-    throw error;
+    throw new Error(`Failed to create customer: ${getErrorMessage(error)}`);
   }
 }
 
@@ -126,7 +125,6 @@ export async function searchCustomers(search: string, limit = 5) {
       content: `Customer Name : ${doc.customer_name ?? ""} | Mobile Number : ${doc.mobile_number ?? ""}`,
     }));
   } catch (error) {
-    console.error("Customer search error:", error);
-    throw error;
+    throw new Error(`Customer search failed: ${getErrorMessage(error)}`);
   }
 }

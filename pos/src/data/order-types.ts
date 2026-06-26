@@ -95,5 +95,3 @@ export const getOrderStatusTypes = (viewAllStatus?: number, paidLimit?: number) 
     return statusTypes;
 };
 
-// Legacy export for backward compatibility
-export const ORDER_STATUS_TYPES = BASE_ORDER_STATUS_TYPES;

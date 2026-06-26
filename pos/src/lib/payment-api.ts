@@ -30,7 +30,6 @@ export const getPaymentModes = async (): Promise<string[]> => {
     
     return paymentModes;
   } catch (error) {
-    console.error('Failed to fetch payment modes:', error);
-    throw error;
+    throw new Error(`Failed to fetch payment modes: ${getErrorMessage(error)}`);
   }
 }; 
