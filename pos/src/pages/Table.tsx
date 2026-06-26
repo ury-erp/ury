@@ -13,6 +13,7 @@ import { getTableOrder } from '../lib/order-api';
 import { printOrder } from '../lib/print';
 import { showToast } from '../components/ui/toast';
 import { t } from '../i18n';
+import { getErrorMessage } from '../lib/error-utils';
 
 import LayoutView from '../components/LayoutView';
 
@@ -181,7 +182,7 @@ const TableView = () => {
       showToast.success('Printed successfully');
       await loadTables(table.restaurant_room, { useCache: false });
     } catch (error) {
-      showToast.error(error instanceof Error ? error.message : 'Failed to print order');
+      showToast.error(getErrorMessage(error));
     } finally {
       setPrintingTable(null);
     }
@@ -238,7 +239,7 @@ const TableView = () => {
               <div className="flex flex-wrap gap-2">
                 {loadingRooms && (
                   <div className="flex-1 min-w-[160px]">
-                    <Spinner message="Loading rooms..." />
+                    <Spinner message={t('common.loading_rooms')} />
                   </div>
                 )}
 

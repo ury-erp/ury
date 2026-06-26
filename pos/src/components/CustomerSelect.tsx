@@ -8,6 +8,7 @@ import React from 'react';
 import { addCustomer, type CreateCustomerData, searchCustomers } from '../lib/customer-api';
 import { AggregatorSelect } from './AggregatorSelect';
 import { t } from '../i18n';
+import { getErrorMessage } from '../lib/error-utils';
 
 // NewCustomerForm component
 function NewCustomerForm({ 
@@ -104,9 +105,9 @@ function NewCustomerForm({
       setNewCustomerTerritory("");
       if (onSuccess) onSuccess();
       onClose();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to create customer:', error);
-      setApiError(error?.message || t('customer.failed_create'));
+      setApiError(getErrorMessage(error));
     } finally {
       setIsCreatingCustomer(false);
     }
@@ -296,7 +297,7 @@ export function CustomerSelect({ disabled }: CustomerSelectProps) {
   };
 
   if (selectedOrderType === 'Aggregators') {
-    return <AggregatorSelect />;
+    return <AggregatorSelect disabled={disabled} />;
   }
 
   return (

@@ -1,7 +1,7 @@
 <template>
   <div>
-    <Header />
-    <KOT />
+    <Header @refresh="handleRefresh" />
+    <KOT ref="kotRef" />
   </div>
 </template>
 
@@ -14,6 +14,13 @@ export default {
   components: {
     KOT,
     Header,
+  },
+  methods: {
+    handleRefresh() {
+      if (this.$refs.kotRef && typeof this.$refs.kotRef.fetchKOT === 'function') {
+        this.$refs.kotRef.fetchKOT();
+      }
+    },
   },
 };
 </script>

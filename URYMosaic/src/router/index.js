@@ -7,13 +7,13 @@ const routes = [
     path: "/",
     name: "Home",
     component: Home,
+    meta: { isLoginPage: false },
   },
   ...authRoutes,
 ];
 
 const router = createRouter({
-  base: "/URYMosaic/",
-  history: createWebHistory(),
+  history: createWebHistory("/URYMosaic/"),
   routes,
 });
 

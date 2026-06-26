@@ -8,7 +8,7 @@ import ScreenSizeProvider from './components/ScreenSizeProvider';
 import { ToastProvider } from './components/ui/toast';
 import { usePOSStore } from './store/pos-store';
 import { Spinner } from './components/ui/spinner';
-import { getActiveLanguage } from './i18n';
+import { getActiveLanguage, getActiveDirection } from './i18n';
 
 const POS = lazy(() => import('./pages/POS'));
 const Orders = lazy(() => import('./pages/Orders'));
@@ -24,10 +24,8 @@ function App() {
   }, [initializeApp]);
 
   useEffect(() => {
-    const lang = getActiveLanguage();
-    const isRtl = ['ar', 'he', 'fa', 'ur', 'ku'].includes(lang);
-    document.documentElement.dir = isRtl ? 'rtl' : 'ltr';
-    document.documentElement.lang = lang || 'en';
+    document.documentElement.dir = getActiveDirection();
+    document.documentElement.lang = getActiveLanguage() || 'en';
   }, []);
   return (
     <>

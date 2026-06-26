@@ -1,4 +1,5 @@
 import { call } from './frappe-sdk';
+import { getErrorMessage } from './error-utils';
 
 export interface POSOpeningResponse {
   message: number;
@@ -16,8 +17,7 @@ export const checkPOSOpening = async (): Promise<POSOpeningResponse> => {
     
     return response;
   } catch (error) {
-    console.error('Error checking POS opening status:', error);
-    throw error;
+    throw new Error(`Failed to check POS opening status: ${getErrorMessage(error)}`);
   }
 };
 
@@ -32,7 +32,6 @@ export const validatePOSClose = async (posProfile: string): Promise<POSCloseVali
     
     return response;
   } catch (error) {
-    console.error('Error validating POS close status:', error);
-    throw error;
+    throw new Error(`Failed to validate POS close status: ${getErrorMessage(error)}`);
   }
 }; 

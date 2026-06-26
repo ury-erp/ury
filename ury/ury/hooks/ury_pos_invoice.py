@@ -21,7 +21,7 @@ def before_submit(doc, method):
     ro_reload_submit(doc, method)
 
 
-def on_trash(doc, method):
+def free_table(doc, method):
     table_status_delete(doc, method)
 
 
@@ -31,13 +31,14 @@ def validate_invoice(doc, method):
     remove_items = frappe.db.get_value("POS Profile", doc.pos_profile, "remove_items")
     
     if doc.invoice_printed == 1 and remove_items == 0:
-        # Get the original items from db
-        original_doc = frappe.get_doc("POS Invoice", doc.name)
-        
-        # Create dictionaries to store both quantities and names
+        # Get the original items from db (lightweight query — no full document load)
         original_items = {
-            item.item_code: {"qty": item.qty, "name": item.item_name} 
-            for item in original_doc.items
+            r.item_code: {"qty": r.qty, "name": r.item_name}
+            for r in frappe.db.get_all(
+                "POS Invoice Item",
+                filters={"parent": doc.name, "parenttype": "POS Invoice"},
+                fields=["item_code", "qty", "item_name"],
+            )
         }
         current_items = {
             item.item_code: {"qty": item.qty, "name": item.item_name} 
@@ -76,11 +77,7 @@ def validate_invoice(doc, method):
 
 def validate_customer(doc, method):
     if doc.customer_name == None or doc.customer_name == "":
-        frappe.throw(
-            (" Failed to load data , Please Refresh the page ").format(
-                doc.customer_name
-            )
-        )
+        frappe.throw("Failed to load data. Please refresh the page.")
 
 
 def calculate_and_set_times(doc, method):

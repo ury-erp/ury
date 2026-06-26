@@ -6,7 +6,7 @@
           src="/assets/ury/images/mosaic.jpg"
           alt="URY Mosaic"
           class="w-20 h-20 mx-auto mb-4 rounded-lg"
-          onerror="this.style.display='none'"
+          @error="$event.target.style.display='none'"
         />
         <h1 class="text-2xl font-bold text-gray-800">URY Kitchen Display</h1>
         <p class="text-gray-500 mt-1">Sign in to access the kitchen display</p>
@@ -55,6 +55,7 @@
 <script>
 export default {
   name: "Login",
+  inject: ['authState'],
   data() {
     return {
       username: "",
@@ -78,12 +79,18 @@ export default {
           }),
         });
 
+        if (!res.ok) {
+          const text = await res.text().catch(() => '');
+          this.error = text || `Server error (${res.status})`;
+          return;
+        }
+
         const data = await res.json();
 
-        if (data.message === "Logged In") {
+        if (res.ok && (data.message === "Logged In" || data.home_page)) {
           // Update shared auth state so route guard works
-          if (window.__uryAuthState) {
-            window.__uryAuthState.isLoggedIn = true;
+          if (this.authState) {
+            this.authState.isLoggedIn = true;
           }
           // Navigate to the intended route or home
           const redirectPath = this.$route.query.route || "/";

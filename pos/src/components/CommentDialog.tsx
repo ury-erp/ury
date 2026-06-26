@@ -13,6 +13,11 @@ interface CommentDialogProps {
 const CommentDialog = ({ isOpen, onClose, onSave, initialComment = '' }: CommentDialogProps) => {
   const [comment, setComment] = useState(initialComment);
 
+  // Sync comment state when dialog opens with a new initialComment
+  useEffect(() => {
+    if (isOpen) setComment(initialComment);
+  }, [isOpen, initialComment]);
+
   const handleSave = () => {
     onSave(comment);
     onClose();

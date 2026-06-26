@@ -7,9 +7,17 @@ from frappe.model.document import Document
 
 class URYMenu(Document):
     def validate(self):
-        for d in self.items:
-            if not d.rate:
-                d.rate = frappe.db.get_value("Item", d.item, "standard_rate")
+        items_without_rate = [d for d in self.items if not d.rate]
+        if items_without_rate:
+            item_codes = list({d.item for d in items_without_rate})
+            rates = {
+                r[0]: r[1]
+                for r in frappe.db.get_values(
+                    "Item", {"name": ("in", item_codes)}, ["name", "standard_rate"]
+                )
+            }
+            for d in items_without_rate:
+                d.rate = rates.get(d.item)
 
     def on_update(self):
         """Sync Price List"""
@@ -33,6 +41,7 @@ class URYMenu(Document):
         # delete old items
         self.clear_item_price(price_list.name)
 
+        # batch insert item prices
         for d in self.items:
             frappe.get_doc(
                 dict(
@@ -41,7 +50,7 @@ class URYMenu(Document):
                     item_code=d.item,
                     price_list_rate=d.rate,
                 )
-            ).insert()
+            ).insert(ignore_permissions=True)
 
     def get_price_list(self):
         """Create price list for menu if missing"""
@@ -49,14 +58,14 @@ class URYMenu(Document):
             "Price List", dict(restaurant_menu=self.name)
         )
         if price_list_name:
-            price_list = frappe.get_doc("Price List", price_list_name)
-        else:
-            price_list = frappe.new_doc("Price List")
-            price_list.restaurant_menu = self.name
-            price_list.price_list_name = self.name
+            frappe.db.set_value("Price List", price_list_name, {"enabled": 1, "selling": 1})
+            return frappe.get_doc("Price List", price_list_name)
 
+        price_list = frappe.new_doc("Price List")
+        price_list.restaurant_menu = self.name
+        price_list.price_list_name = self.name
         price_list.enabled = 1
         price_list.selling = 1
-        price_list.save()
+        price_list.insert()
 
         return price_list
