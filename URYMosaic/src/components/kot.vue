@@ -238,7 +238,7 @@ async function fetchAndSetSiteName() {
         const data = await response.json();
         window.globalSiteName = data?.message?.site_name || '';
     } catch (error) {
-        console.error('Failed to fetch site name:', error);
+        if (import.meta.env?.DEV) console.error('Failed to fetch site name:', error);
     }
 }
 
@@ -329,7 +329,7 @@ export default {
               resolve();
             })
             .catch((error) => {
-              console.error(error);
+              if (import.meta.env?.DEV) console.error(error);
               reject(error);
             });
         } catch (error) {
@@ -388,7 +388,7 @@ export default {
             id: kot.name,
           }
         )
-        .catch((error) => console.error(error));
+        .catch((error) => { if (import.meta.env?.DEV) console.error(error); });
     },
     toggleItemStrikeThrough(kotitem, kot) {
       kotitem.striked = !kotitem.striked;
@@ -402,17 +402,17 @@ export default {
       if (restaurant_table === undefined) {
         kot.tableortakeaway = "Takeaway";
       } else {
-        if (table_takeaway == 1) {
+        if (table_takeaway === 1) {
           kot.tableortakeaway = "Takeaway";
         } else {
           kot.tableortakeaway = restaurant_table;
         }
       }
-      if (type == "Order Modified") {
+      if (type === "Order Modified") {
         kot.color = "bg-[#FFD493] border border-[#FFC700]";
-      } else if (type == "Partially cancelled" || type == "Cancelled") {
+      } else if (type === "Partially cancelled" || type === "Cancelled") {
         kot.color = "bg-[#FFD2D2] border border-[#FAA7A7]";
-      } else if (restaurant_table === undefined || table_takeaway == 1) {
+      } else if (restaurant_table === undefined || table_takeaway === 1) {
         kot.color = "bg-blue-100 border border-blue-200";
       } else {
         kot.color = "bg-white";
@@ -449,7 +449,7 @@ export default {
     },
     calculateQty(kotitem, qty, type, cancelled_qty) {
       kotitem.qty = qty;
-      if (type == "Partially cancelled" || type == "Cancelled") {
+      if (type === "Partially cancelled" || type === "Cancelled") {
         kotitem.qty = qty - cancelled_qty;
       }
     },
@@ -470,7 +470,7 @@ export default {
 
         const timeRemaining = kot.timeRemaining.split(":");
         const minutes =
-          parseInt(timeRemaining[0]) * 60 + parseInt(timeRemaining[1]);
+          parseInt(timeRemaining[0], 10) * 60 + parseInt(timeRemaining[1], 10);
 
         if (
           minutes === this.kot_alert_time &&
@@ -620,7 +620,7 @@ export default {
               }, 1500);
               if (doc.kot) localStorage.setItem("kot_time", doc.kot.time);
             } catch (err) {
-              console.error("Socket handler error:", err);
+              if (import.meta.env?.DEV) console.error("Socket handler error:", err);
             }
           };
           socket.on(this.kot_channel, this.socketHandler);

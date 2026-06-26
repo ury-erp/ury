@@ -249,7 +249,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
         persistTableUpdate(table.name, {
           layout_x: table.x,
           layout_y: table.y
-        }).catch(err => console.error("Failed to save layout", err));
+        }).catch(err => { if (import.meta.env.DEV) console.error("Failed to save layout", err); });
       }
     }
 
@@ -267,7 +267,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
       const myId = ++requestIdRef.current;
       getTableOrder(table.name).then(res => {
         if (requestIdRef.current === myId) setSelectedTableOrder(res.message);
-      }).catch(console.error);
+      }).catch(err => { if (import.meta.env.DEV) console.error(err); });
     } else {
       setSelectedTableOrder(null);
     }
@@ -294,7 +294,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
     // Always update the input field value to allow free typing
     setCapacityInput(capacityStr);
 
-    const capacity = parseInt(capacityStr);
+    const capacity = parseInt(capacityStr, 10);
     if (isNaN(capacity) || capacity < 1 || capacity > 20) return;
 
     const currentTable = tablesWithPosition.find(t => t.name === selectedTable);
@@ -309,7 +309,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
     }));
 
     updateTableLayout(selectedTable, { no_of_seats: capacity })
-      .catch(console.error);
+      .catch(err => { if (import.meta.env.DEV) console.error(err); });
   }
 
   const handleDropdownShapeChange = (shape: string) => {
@@ -326,7 +326,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
     }));
 
     updateTableLayout(selectedTable, { table_shape: shape as TableShapeName })
-      .catch(console.error);
+      .catch(err => { if (import.meta.env.DEV) console.error(err); });
   }
 
   const selectedTableData = tablesWithPosition.find(t => t.name === selectedTable);

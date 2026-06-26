@@ -499,7 +499,7 @@ def getAggregatorMOP(aggregator):
     )
     modeOfPaymentsList = []
     modeOfPaymentsList.append(
-            {"mode_of_payment": modeOfPayment, "opening_amount": float(0)}
+            {"mode_of_payment": modeOfPayment, "opening_amount": 0.0}
     )
     return modeOfPaymentsList
 @frappe.whitelist()
@@ -513,7 +513,6 @@ def create_customer(customer_name, mobile_number=None, customer_group="Individua
     except Exception:
         frappe.throw("Invalid mobile number format")
 
-    """Create a new customer"""
     try:
         customer = frappe.get_doc({
             "doctype": "Customer",
@@ -543,7 +542,7 @@ def create_customer(customer_name, mobile_number=None, customer_group="Individua
 
 @frappe.whitelist()
 def validate_pos_close(pos_profile): 
-    enable_unclosed_pos_check = frappe.db.get_value("POS Profile",pos_profile,"custom_daily_pos_close")
+    enable_unclosed_pos_check = frappe.db.get_value("POS Profile", pos_profile, "custom_daily_pos_close")
     
     if enable_unclosed_pos_check:
         current_datetime = frappe.utils.now_datetime()

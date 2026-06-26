@@ -20,7 +20,7 @@ export function AggregatorSelect({ disabled }: AggregatorSelectProps) {
         const data = await getAggregators();
         setAggregators(data);
       } catch (error) {
-        console.error('Failed to fetch aggregators:', error);
+        if (import.meta.env.DEV) console.error('Failed to fetch aggregators:', error);
       } finally {
         setLoading(false);
       }
@@ -37,7 +37,7 @@ export function AggregatorSelect({ disabled }: AggregatorSelectProps) {
       try {
         await fetchAggregatorMenu(aggregator.customer);
       } catch (error) {
-        console.error('Failed to fetch aggregator menu:', error);
+        if (import.meta.env.DEV) console.error('Failed to fetch aggregator menu:', error);
       }
     }
   };

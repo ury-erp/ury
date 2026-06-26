@@ -91,11 +91,16 @@ class URYKOT(Document):
         production = self.production
 
         if production:
-            production_doc = frappe.get_doc("URY Production Unit", production)
-            if production_doc.enable_order_type_wise_display_on_mosaic:
+            enable_ot_display = frappe.db.get_value(
+                "URY Production Unit", production, "enable_order_type_wise_display_on_mosaic"
+            )
+            if enable_ot_display:
                 invoice_order_type = frappe.db.get_value("POS Invoice", self.invoice, "order_type")
-                allowed_order_types = [row.order_type for row in production_doc.get("order_type", [])]
-                if invoice_order_type not in allowed_order_types:
+                allowed_rows = frappe.get_all(
+                    "KDS Order Type", filters={"parent": production}, fields=["order_type"]
+                )
+                allowed_types = {row.order_type for row in allowed_rows}
+                if invoice_order_type not in allowed_types:
                     return
 
         kotjson = json.loads(frappe.as_json(self))

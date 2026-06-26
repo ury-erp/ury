@@ -106,7 +106,7 @@ function NewCustomerForm({
       if (onSuccess) onSuccess();
       onClose();
     } catch (error: unknown) {
-      console.error('Failed to create customer:', error);
+      if (import.meta.env.DEV) console.error('Failed to create customer:', error);
       setApiError(getErrorMessage(error));
     } finally {
       setIsCreatingCustomer(false);
