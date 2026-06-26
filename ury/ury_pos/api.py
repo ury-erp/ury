@@ -923,61 +923,102 @@ def validate_pos_close(pos_profile):
 
 @frappe.whitelist()
 def merge_bills(primary_invoice, secondary_invoice):
+
     try:
+
         if primary_invoice == secondary_invoice:
             frappe.throw("Cannot merge an invoice with itself.")
 
-        primary_doc = frappe.get_doc("POS Invoice", primary_invoice)
-        secondary_doc = frappe.get_doc("POS Invoice", secondary_invoice)
+        primary_doc = frappe.get_doc("POS Invoice",primary_invoice,)
+        secondary_doc = frappe.get_doc("POS Invoice",secondary_invoice,)
 
-        if primary_doc.docstatus != 0 or secondary_doc.docstatus != 0:
+        # Validation
+        if (primary_doc.docstatus != 0 or secondary_doc.docstatus != 0):
             frappe.throw("Both invoices must be in Draft state to merge.")
 
-        if primary_doc.get("custom_merged_pos_invoice"):
+        if primary_doc.custom_merged_pos_invoice:
             frappe.throw("This bill already includes a merged bill.")
 
-        if secondary_doc.get("custom_merged_pos_invoice"):
-            frappe.throw("The selected bill already includes another merged bill.")
-
-        if frappe.db.exists(
-            "POS Invoice",
-            {
-                "docstatus": 0,
-                "custom_merged_pos_invoice": secondary_invoice,
-            },
-        ):
-            frappe.throw("The selected bill is already merged into another bill.")
+        if secondary_doc.custom_merged_pos_invoice:
+            frappe.throw("The selected bill already includes another bill.")
 
         if not secondary_doc.items:
             frappe.throw("The selected bill has no items to merge.")
 
-        primary_doc.custom_merged_pos_invoice = secondary_invoice
 
-        # Populate merged details table
-        primary_doc.set("custom_merged_pos_invoice_details", [])
-        for item in secondary_doc.items:
-            primary_doc.append("custom_merged_pos_invoice_details", {
-                "item_code": item.item_code,
-                "item_name": item.item_name,
-                "qty": item.qty,
-                "rate": item.rate,
-                "amount": item.amount
-            })
+        def update_merge_details(target_invoice,source_invoice,):
 
-        primary_doc.custom_merged_pos_invoice = secondary_invoice
+            doc = frappe.get_doc("POS Invoice",target_invoice,)
 
-        # save primary normally
-        primary_doc.save(ignore_permissions=True)
+            # clear old rows
+            doc.set("custom_merged_pos_invoice_details",[],)
 
-        # update secondary directly to avoid modified timestamp conflict
+            # only linked invoice items
+            for item in source_invoice.items:
+
+                doc.append(
+                    "custom_merged_pos_invoice_details",
+                    {
+                        "item_code": item.item_code,
+                        "item_name": item.item_name,
+                        "qty": item.qty,
+                        "rate": item.rate,
+                        "amount": item.amount,
+                    },
+                )
+
+            doc.flags.ignore_version = True
+
+            doc.save(
+                ignore_permissions=True,
+                ignore_version=True,
+            )
+
+
+        # Update merge references directly
         frappe.db.set_value(
             "POS Invoice",
-            secondary_invoice,
+            primary_doc.name,
             "custom_merged_pos_invoice",
-            primary_invoice,
+            secondary_doc.name,
             update_modified=False,
         )
-        return {"status": "success", "message": "Bills merged successfully", "name": primary_doc.name}
+
+        frappe.db.set_value(
+            "POS Invoice",
+            secondary_doc.name,
+            "custom_merged_pos_invoice",
+            primary_doc.name,
+            update_modified=False,
+        )
+
+
+        # Build detail table
+        update_merge_details(primary_doc.name,secondary_doc,)
+
+        update_merge_details(secondary_doc.name,primary_doc,)
+
+
+        frappe.db.commit()
+
+
+        return {
+            "status": "success",
+            "message": "Bills merged successfully",
+            "name": primary_doc.name,
+        }
+
+
     except Exception as e:
-        frappe.log_error(title="Bill Merge Error",message=frappe.get_traceback())
-        return {"status": "error", "message": str(e)}
+
+        frappe.db.rollback()
+
+        frappe.log_error(
+            title="Bill Merge Error",
+            message=frappe.get_traceback(),
+        )
+
+        return {
+            "status": "error",
+            "message": str(e),
+        }
