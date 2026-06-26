@@ -24,11 +24,20 @@ const MenuCard: FC<MenuCardProps> = ({
 }) => {
   return (
     <div
+      role="button"
+      tabIndex={disabled ? -1 : 0}
+      aria-label={`${name}, ${formatCurrency(price)}${course ? `, ${course}` : ''}`}
       className={cn(
         "bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow cursor-pointer h-56 flex flex-col",
         disabled && "opacity-50 cursor-not-allowed pointer-events-none"
       )}
       onClick={disabled ? undefined : onClick}
+      onKeyDown={disabled ? undefined : (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onClick?.();
+        }
+      }}
     >
       {/* Image section - fixed height */}
       <div className="h-24">

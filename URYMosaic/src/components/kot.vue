@@ -242,7 +242,13 @@ async function initializeSocket() {
     if (window.globalSiteName) {
         let site = window.globalSiteName;
         let site_url = `${url}/${site}`;
-        socket = io(site_url,{ withCredentials: true });
+        socket = io(site_url, {
+          withCredentials: true,
+          reconnection: true,
+          reconnectionAttempts: Infinity,
+          reconnectionDelay: 1000,
+          reconnectionDelayMax: 5000,
+        });
         socket.on('connect_error', (err) => {
             console.error("Socket connection error:", err);
         }); 
@@ -350,7 +356,11 @@ export default {
           this.removeAllItemsFromLocalStorage(kot);
           this.masonryLoading();
         })
-        .catch((error) => console.error(error));
+        .catch((error) => {
+          console.error(error);
+          this.setStatusMessage("Action failed. Please try again.");
+          this.hideStatusMessageAfterDelay();
+        });
     },
     async serveOrder(kot) {
       const now = new Date();
@@ -367,7 +377,11 @@ export default {
           this.removeAllItemsFromLocalStorage(kot);
           this.masonryLoading();
         })
-        .catch((error) => console.error(error));
+        .catch((error) => {
+          console.error(error);
+          this.setStatusMessage("Action failed. Please try again.");
+          this.hideStatusMessageAfterDelay();
+        });
     },
 
     async orderDelayNotify(kot) {
@@ -554,7 +568,7 @@ export default {
     const decodedProduction = decodeURIComponent(production);
     this.production = decodedProduction;
     const self = this;
-    window.addEventListener("resize", this.masonryLoading());
+    window.addEventListener("resize", this.masonryLoading);
     this.masonryLoading();
 
     this.auth()
@@ -594,12 +608,14 @@ export default {
         console.error("Authentication error:", error);
         this.showModal = true;
       });
-    setInterval(this.updateTimeRemaining, 60000);
+    this.timer = setInterval(this.updateTimeRemaining, 60000);
   },
   beforeUnmount() {
     window.removeEventListener("online", this.handleOnline);
     window.removeEventListener("offline", this.handleOffline);
     document.removeEventListener("click", this.hideAudioAlertMessage);
+    window.removeEventListener("resize", this.masonryLoading);
+    if (this.timer) clearInterval(this.timer);
   },
   computed: {
     sortedKotItems() {

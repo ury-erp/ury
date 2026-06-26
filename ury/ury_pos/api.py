@@ -1,7 +1,7 @@
 import frappe
 from frappe import _
+from frappe.utils import flt, validate_phone_number
 from datetime import date, datetime, timedelta
-from frappe.utils import validate_phone_number
 
 
 #GetTable  decripted temporarily
@@ -80,6 +80,18 @@ def getRestaurantMenu(pos_profile, room=None, order_type=None):
         order_by="item_name asc"
     )
     
+    # Batch-fetch item images in a single query
+    item_codes = [item.item for item in menu_items]
+    image_map = {}
+    if item_codes:
+        image_rows = frappe.db.get_values(
+            "Item",
+            {"name": ("in", item_codes)},
+            ["name", "image"],
+            as_dict=True,
+        )
+        image_map = {row.name: row.image for row in image_rows}
+
     menu_items_with_image = [
         {
             "item": item.item,
@@ -87,7 +99,7 @@ def getRestaurantMenu(pos_profile, room=None, order_type=None):
             "rate": item.rate,
             "special_dish": item.special_dish,
             "disabled": item.disabled,
-            "item_image": frappe.db.get_value("Item", item.item, "image"),
+            "item_image": image_map.get(item.item),
             "course": item.course,
             "course_label": _(item.course) if item.course else item.course,
         }
@@ -405,24 +417,22 @@ def get_select_field_options():
 
 @frappe.whitelist()
 def fav_items(customer):
-    pos_invoices = frappe.get_all(
-        "POS Invoice", filters={"customer": customer}, fields=["name"]
+    invoice_names = frappe.get_all(
+        "POS Invoice", filters={"customer": customer}, fields=["name"], pluck="name"
     )
+    if not invoice_names:
+        return []
+
     item_qty = {}
+    invoice_items = frappe.get_all(
+        "POS Invoice Item",
+        filters={"parent": ("in", invoice_names)},
+        fields=["item_name", "qty"],
+    )
+    for row in invoice_items:
+        item_qty[row.item_name] = item_qty.get(row.item_name, 0) + flt(row.qty)
 
-    for invoice in pos_invoices:
-        pos_invoice = frappe.get_doc("POS Invoice", invoice.name)
-        for item in pos_invoice.items:
-            item_name = item.item_name
-            qty = item.qty
-            if item_name not in item_qty:
-                item_qty[item_name] = 0
-            item_qty[item_name] += qty
-
-    favorite_items = [
-        {"item_name": item_name, "qty": qty} for item_name, qty in item_qty.items()
-    ]
-    return favorite_items
+    return [{"item_name": name, "qty": qty} for name, qty in item_qty.items()]
 
 @frappe.whitelist()
 def getCashier(room):
@@ -627,15 +637,28 @@ def getAggregatorItem(aggregator):
         fields=["item_code", "item_name", "price_list_rate"],
         filters={"selling": 1, "price_list": priceList},
     )
+
+    # Batch-fetch image and disabled status in a single query
+    item_codes = [item.item_code for item in aggregatorItem]
+    item_info = {}
+    if item_codes:
+        rows = frappe.db.get_values(
+            "Item",
+            {"name": ("in", item_codes)},
+            ["name", "image", "disabled"],
+            as_dict=True,
+        )
+        item_info = {row.name: row for row in rows}
+
     aggregatorItemList = [
         {
             "item": item.item_code,
             "item_name": item.item_name,
             "rate": item.price_list_rate,
-            "item_image": frappe.db.get_value("Item", item.item, "image"),
+            "item_image": item_info.get(item.item_code, {}).get("image"),
         }
         for item in aggregatorItem
-        if not frappe.db.get_value("Item", item.item_code, "disabled")
+        if not item_info.get(item.item_code, {}).get("disabled")
     ]
     return aggregatorItemList
 
