@@ -963,8 +963,20 @@ def merge_bills(primary_invoice, secondary_invoice):
                 "amount": item.amount
             })
 
+        primary_doc.custom_merged_pos_invoice = secondary_invoice
+
+        # save primary normally
         primary_doc.save(ignore_permissions=True)
+
+        # update secondary directly to avoid modified timestamp conflict
+        frappe.db.set_value(
+            "POS Invoice",
+            secondary_invoice,
+            "custom_merged_pos_invoice",
+            primary_invoice,
+            update_modified=False,
+        )
         return {"status": "success", "message": "Bills merged successfully", "name": primary_doc.name}
     except Exception as e:
-        frappe.log_error(f"Error merging bills: {str(e)}", "Bill Merge Error")
+        frappe.log_error(title="Bill Merge Error",message=frappe.get_traceback())
         return {"status": "error", "message": str(e)}
