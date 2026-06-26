@@ -6,16 +6,19 @@ from datetime import datetime, timedelta
 
 @frappe.whitelist()
 def getRestaurantMenu(pos_profile, room=None, order_type=None):
-    menu_items = []
     menu_items_with_image = []
 
-    user_role = frappe.get_roles()
+    user_roles = set(frappe.get_roles())
 
-    pos_profile = frappe.get_doc("POS Profile", pos_profile)
-
-    cashier = any(
-        role.role in user_role for role in pos_profile.role_allowed_for_billing
+    # Check billing roles without loading full POS Profile document
+    billing_roles = frappe.get_all(
+        "POS Profile Role",
+        filters={"parent": pos_profile},
+        fields=["role"],
+        pluck="role",
     )
+    cashier = bool(user_roles.intersection(billing_roles))
+
     branch_name = getBranch()
     restaurant = frappe.db.get_value("URY Restaurant", {"branch": branch_name}, "name")
     
@@ -125,57 +128,33 @@ def getBranch():
 
     return branch_name
 
-@frappe.whitelist()
-def getBranchRoom():
-    user = frappe.session.user
-    sql_query = """
-        SELECT b.branch , a.room
-        FROM `tabURY User` AS a
-        INNER JOIN `tabBranch` AS b ON a.parent = b.name
-        WHERE a.user = %s
-    """
-    branch_array = frappe.db.sql(sql_query, user, as_dict=True)
-    
-    if not branch_array:
-        frappe.throw("No branch or room information found for the user. Please contact your administrator.")
-    
-    branch_name = branch_array[0].get("branch")
-    room_name = branch_array[0].get("room")
-
-    if not branch_name:
-        frappe.throw("Branch information is missing for the user. Please contact your administrator.")
-
-    if not room_name:
-        frappe.throw("No room assigned to this user. Please contact your administrator.")
-
-    return [{
-        "name":room_name ,
-        "branch": branch_name,
-    }]
-
-@frappe.whitelist()
-def getRoom():
-    user = frappe.session.user
-    sql_query = """
+def _get_user_branch_rooms():
+    """Shared query for user's branch-room mapping."""
+    return frappe.db.sql("""
         SELECT b.branch, a.room
         FROM `tabURY User` AS a
         INNER JOIN `tabBranch` AS b ON a.parent = b.name
         WHERE a.user = %s
-    """
-    branch_array = frappe.db.sql(sql_query, user, as_dict=True)
-    
-    if not branch_array:
-        frappe.throw("No branch or room information found for the user. Please contact your administrator.")
-    
-    room_details = [
-        {
-            "name": row.get("room"),
-            "branch": row.get("branch")
-        } 
-        for row in branch_array
-    ]
+    """, frappe.session.user, as_dict=True)
 
-    return room_details
+@frappe.whitelist()
+def getBranchRoom():
+    rows = _get_user_branch_rooms()
+    if not rows:
+        frappe.throw("No branch or room information found for the user. Please contact your administrator.")
+    row = rows[0]
+    if not row.branch:
+        frappe.throw("Branch information is missing for the user. Please contact your administrator.")
+    if not row.room:
+        frappe.throw("No room assigned to this user. Please contact your administrator.")
+    return [{"name": row.room, "branch": row.branch}]
+
+@frappe.whitelist()
+def getRoom():
+    rows = _get_user_branch_rooms()
+    if not rows:
+        frappe.throw("No branch or room information found for the user. Please contact your administrator.")
+    return [{"name": row.room, "branch": row.branch} for row in rows]
 
 @frappe.whitelist()
 def getModeOfPayment():
@@ -312,136 +291,122 @@ def fav_items(customer):
 
     return [{"item_name": name, "qty": qty} for name, qty in item_qty.items()]
 
-@frappe.whitelist()
-def getCashier(room):
-    branch = getBranch()
-    cashier = None
-    pos_opening_list = frappe.db.sql("""
-        SELECT DISTINCT `tabPOS Opening Entry`.name 
+def _get_opening_entry_for_room(branch, room):
+    """Find an open POS Opening Entry that includes the given room via Multiple Rooms."""
+    result = frappe.db.sql("""
+        SELECT DISTINCT `tabPOS Opening Entry`.name
         FROM `tabPOS Opening Entry`
-        INNER JOIN `tabMultiple Rooms` 
+        INNER JOIN `tabMultiple Rooms`
         ON `tabMultiple Rooms`.parent = `tabPOS Opening Entry`.name
         WHERE `tabPOS Opening Entry`.branch = %s
         AND `tabPOS Opening Entry`.status = 'Open'
         AND `tabPOS Opening Entry`.docstatus = 1
         AND `tabMultiple Rooms`.room = %s
     """, (branch, room), as_dict=True)
-    if pos_opening_list:
-        cashier = frappe.db.get_value(
-            "POS Opening Entry",
-            {"name": pos_opening_list[0].name},
-            "user",)
-    return cashier       
+    return result[0].name if result else None
+
+@frappe.whitelist()
+def getCashier(room):
+    branch = getBranch()
+    opening_name = _get_opening_entry_for_room(branch, room)
+    if opening_name:
+        return frappe.db.get_value("POS Opening Entry", opening_name, "user")
+    return None       
     
 
 @frappe.whitelist()
 def getPosProfile():
     branchName = getBranch()
     waiter = frappe.session.user
-    bill_present = False
-    qz_host = None
-    printer = None
+
+    pos_profile_name = frappe.db.exists("POS Profile", {"branch": branchName})
+    if not pos_profile_name:
+        frappe.throw(_("No POS Profile found for branch {0}").format(branchName))
+
+    # Fetch all needed scalar fields in one query (no child tables)
+    fields = [
+        "branch", "company", "warehouse", "print_format", "paid_limit",
+        "table_attention_time", "custom_enable_discount",
+        "custom_enable_multiple_cashier", "custom_edit_order_type",
+        "custom_enable_kot_reprint", "qz_print", "qz_host",
+    ]
+    vals = frappe.db.get_value("POS Profile", pos_profile_name, fields, as_dict=True)
+
+    if vals.branch != branchName:
+        frappe.throw(_("POS Profile branch mismatch"))
+
+    disable_rounded_total = frappe.db.get_value("Global Defaults", None, "disable_rounded_total")
+
+    # Determine cashier
     cashier = None
     owner = None
-    posProfile = frappe.db.exists("POS Profile", {"branch": branchName})
-    if not posProfile:
-        frappe.throw(_("No POS Profile found for branch {0}").format(branchName))
-    pos_profiles = frappe.get_doc("POS Profile", posProfile)
-    global_defaults = frappe.get_single('Global Defaults')
-    disable_rounded_total = global_defaults.disable_rounded_total
-    
+    multiple_cashier = vals.custom_enable_multiple_cashier
 
-    if pos_profiles.branch == branchName:
-        pos_profile_name = pos_profiles.name
-        warehouse = pos_profiles.warehouse
-        branch = pos_profiles.branch
-        company = pos_profiles.company
-        tableAttention = pos_profiles.table_attention_time
-        get_cashier = pos_profiles
-        print_format = pos_profiles.print_format
-        paid_limit=pos_profiles.paid_limit
-        enable_discount = pos_profiles.custom_enable_discount
-        multiple_cashier = pos_profiles.custom_enable_multiple_cashier
-        edit_order_type = pos_profiles.custom_edit_order_type
-        enable_kot_reprint = pos_profiles.custom_enable_kot_reprint
-        if multiple_cashier:
-            details = getBranchRoom()
-            room = details[0].get('name') 
-            branch = details[0].get('branch')
+    if multiple_cashier:
+        # Find main cashier with a single query instead of iterating child table
+        owner = frappe.db.get_value(
+            "POS Profile User",
+            {"parent": pos_profile_name, "custom_main_cashier": 1},
+            "user",
+        )
 
-            pos_opening_list = frappe.db.sql("""
-                SELECT DISTINCT `tabPOS Opening Entry`.name 
-                FROM `tabPOS Opening Entry`
-                INNER JOIN `tabMultiple Rooms` 
-                ON `tabMultiple Rooms`.parent = `tabPOS Opening Entry`.name
-                WHERE `tabPOS Opening Entry`.branch = %s
-                AND `tabPOS Opening Entry`.status = 'Open'
-                AND `tabPOS Opening Entry`.docstatus = 1
-                AND `tabMultiple Rooms`.room = %s
-            """, (branch, room), as_dict=True)
-            if pos_opening_list:
-                pos_opened_cashier = frappe.db.get_value(
-                    "POS Opening Entry",
-                    {"name": pos_opening_list[0].name},
-                    "user",)
-            else:
-                pos_opened_cashier = None
-            for user_details in get_cashier.applicable_for_users:
-                if user_details.custom_main_cashier:
-                    owner = user_details.user
-                
-                if frappe.session.user == owner:
-                    cashier = owner
-                else:
-                    cashier = pos_opened_cashier    
-                
-        else:    
-            cashier = get_cashier.applicable_for_users[0].user
-            owner = get_cashier.applicable_for_users[0].user
-        
-        qz_print = pos_profiles.qz_print
-        print_type = None
-
-        for pos_profile in pos_profiles.printer_settings:
-            if pos_profile.bill == 1:
-                printer = pos_profile.printer
-                bill_present = True
-                break
-
-        if qz_print == 1:
-            print_type = "qz"
-            qz_host = pos_profiles.qz_host
-
-        elif bill_present == True:
-            print_type = "network"
-
+        if frappe.session.user == owner:
+            cashier = owner
         else:
-            print_type = "socket"
+            # Find the currently open POS Opening Entry for this user's room
+            details = getBranchRoom()
+            room = details[0].get("name")
+            branch = details[0].get("branch")
+            opening_name = _get_opening_entry_for_room(branch, room)
+            cashier = frappe.db.get_value("POS Opening Entry", opening_name, "user") if opening_name else None
+    else:
+        # Single cashier mode — get first user from POS Profile
+        first_user = frappe.db.get_value(
+            "POS Profile User",
+            {"parent": pos_profile_name},
+            "user",
+        )
+        cashier = first_user
+        owner = first_user
 
-    invoice_details = {
+    # Determine printer setup
+    printer = None
+    bill_present = False
+    if not vals.qz_print:
+        # Check printer settings child table without loading full doc
+        bill_row = frappe.db.get_value(
+            "POS Profile Printer Settings",
+            {"parent": pos_profile_name, "bill": 1},
+            "printer",
+        )
+        if bill_row:
+            printer = bill_row
+            bill_present = True
+        print_type = "network" if bill_present else "socket"
+    else:
+        print_type = "qz"
+
+    return {
         "pos_profile": pos_profile_name,
-        "branch": branch,
-        "company": company,
+        "branch": vals.branch,
+        "company": vals.company,
         "waiter": waiter,
-        "warehouse": warehouse,
+        "warehouse": vals.warehouse,
         "cashier": cashier,
-        "print_format": print_format,
-        "qz_print": qz_print,
-        "qz_host": qz_host,
+        "print_format": vals.print_format,
+        "qz_print": vals.qz_print,
+        "qz_host": vals.qz_host,
         "printer": printer,
         "print_type": print_type,
-        "tableAttention": tableAttention,
-        "paid_limit":paid_limit,
-        "disable_rounded_total":disable_rounded_total,
-        "enable_discount":enable_discount,
-        "multiple_cashier":multiple_cashier,
-        "owner":owner,
-        "edit_order_type":edit_order_type,
-        "enable_kot_reprint":enable_kot_reprint
-
+        "tableAttention": vals.table_attention_time,
+        "paid_limit": vals.paid_limit,
+        "disable_rounded_total": disable_rounded_total,
+        "enable_discount": vals.custom_enable_discount,
+        "multiple_cashier": multiple_cashier,
+        "owner": owner,
+        "edit_order_type": vals.custom_edit_order_type,
+        "enable_kot_reprint": vals.custom_enable_kot_reprint,
     }
-
-    return invoice_details
 
 
 @frappe.whitelist()
@@ -487,7 +452,6 @@ def getAggregator():
 @frappe.whitelist()
 def getAggregatorItem(aggregator):
     branchName = getBranch()
-    aggregatorItem = []
     aggregatorItemList = []
     priceList = frappe.db.get_value(
         "Aggregator Settings",
