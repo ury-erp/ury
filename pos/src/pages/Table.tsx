@@ -61,8 +61,7 @@ const TableView = () => {
           sessionStorage.setItem(sessionKey, JSON.stringify(fetchedRooms));
         }
       } catch (e) {
-        console.error(e);
-        setError('Failed to load rooms');
+        setError(t('errors.failed_load_rooms'));
       } finally {
         setLoadingRooms(false);
       }
@@ -104,8 +103,8 @@ const TableView = () => {
         }, {} as Record<string, number>);
         setRoomCounts(nextCounts);
         persistRoomCounts(nextCounts);
-      } catch (error) {
-        console.error('Failed to load room counts', error);
+      } catch (_error) {
+        if (import.meta.env.DEV) console.error('Failed to load room counts', _error);
       } finally {
         setLoadingRoomCounts(false);
       }
@@ -133,8 +132,7 @@ const TableView = () => {
         setTables(sortedTables);
         setTablesCache(prev => ({ ...prev, [roomName]: sortedTables }));
       } catch (e) {
-        console.error(e);
-        setError('Failed to load tables');
+        setError(t('errors.failed_load_tables'));
         setTables([]);
       } finally {
         setLoadingTables(false);
@@ -174,12 +172,12 @@ const TableView = () => {
       const invoiceId = orderResponse.message?.name;
 
       if (!invoiceId) {
-        showToast.error('No active order found for this table');
+        showToast.error(t('errors.no_active_order'));
         return;
       }
 
       await printOrder({ orderId: invoiceId, posProfile });
-      showToast.success('Printed successfully');
+      showToast.success(t('success.printed'));
       await loadTables(table.restaurant_room, { useCache: false });
     } catch (error) {
       showToast.error(getErrorMessage(error));
