@@ -110,71 +110,68 @@ def getMenuCourses():
 @frappe.whitelist()
 def getBranch():
     user = frappe.session.user
-    if user != "Administrator":
-        sql_query = """
-            SELECT b.branch
-            FROM `tabURY User` AS a
-            INNER JOIN `tabBranch` AS b ON a.parent = b.name
-            WHERE a.user = %s
-        """
-        branch_array = frappe.db.sql(sql_query, user, as_dict=True)
-        if not branch_array:
-            frappe.throw("User is not Associated with any Branch.Please refresh Page")
+    sql_query = """
+        SELECT b.branch
+        FROM `tabURY User` AS a
+        INNER JOIN `tabBranch` AS b ON a.parent = b.name
+        WHERE a.user = %s
+    """
+    branch_array = frappe.db.sql(sql_query, user, as_dict=True)
+    if not branch_array:
+        frappe.throw("User is not Associated with any Branch.Please refresh Page")
 
-        branch_name = branch_array[0].get("branch")
+    branch_name = branch_array[0].get("branch")
 
-        return branch_name
+    return branch_name
 
 @frappe.whitelist()
 def getBranchRoom():
     user = frappe.session.user
-    if user != "Administrator":
-        sql_query = """
-            SELECT b.branch , a.room
-            FROM `tabURY User` AS a
-            INNER JOIN `tabBranch` AS b ON a.parent = b.name
-            WHERE a.user = %s
-        """
-        branch_array = frappe.db.sql(sql_query, user, as_dict=True)
-        
-        branch_name = branch_array[0].get("branch")
-        room_name = branch_array[0].get("room")
+    sql_query = """
+        SELECT b.branch , a.room
+        FROM `tabURY User` AS a
+        INNER JOIN `tabBranch` AS b ON a.parent = b.name
+        WHERE a.user = %s
+    """
+    branch_array = frappe.db.sql(sql_query, user, as_dict=True)
     
-        if not branch_name:
-            frappe.throw("Branch information is missing for the user. Please contact your administrator.")
+    branch_name = branch_array[0].get("branch")
+    room_name = branch_array[0].get("room")
 
-        if not room_name:
-            frappe.throw("No room assigned to this user. Please contact your administrator.")
+    if not branch_name:
+        frappe.throw("Branch information is missing for the user. Please contact your administrator.")
 
-        return [{
-            "name":room_name ,
-            "branch": branch_name,
-        }]
+    if not room_name:
+        frappe.throw("No room assigned to this user. Please contact your administrator.")
+
+    return [{
+        "name":room_name ,
+        "branch": branch_name,
+    }]
 
 @frappe.whitelist()
 def getRoom():
     user = frappe.session.user
-    if user != "Administrator":
-        sql_query = """
-            SELECT b.branch, a.room
-            FROM `tabURY User` AS a
-            INNER JOIN `tabBranch` AS b ON a.parent = b.name
-            WHERE a.user = %s
-        """
-        branch_array = frappe.db.sql(sql_query, user, as_dict=True)
-        
-        if not branch_array:
-            frappe.throw("No branch or room information found for the user. Please contact your administrator.")
-        
-        room_details = [
-            {
-                "name": row.get("room"),
-                "branch": row.get("branch")
-            } 
-            for row in branch_array
-        ]
+    sql_query = """
+        SELECT b.branch, a.room
+        FROM `tabURY User` AS a
+        INNER JOIN `tabBranch` AS b ON a.parent = b.name
+        WHERE a.user = %s
+    """
+    branch_array = frappe.db.sql(sql_query, user, as_dict=True)
+    
+    if not branch_array:
+        frappe.throw("No branch or room information found for the user. Please contact your administrator.")
+    
+    room_details = [
+        {
+            "name": row.get("room"),
+            "branch": row.get("branch")
+        } 
+        for row in branch_array
+    ]
 
-        return room_details
+    return room_details
 
 @frappe.whitelist()
 def getModeOfPayment():
@@ -593,11 +590,8 @@ def searchPosInvoice(query,status):
 
 @frappe.whitelist()
 def get_select_field_options():
-    options = frappe.get_meta("POS Invoice").get_field("order_type").options
-    if options:
-        return [{"name": option} for option in options.split("\n")]
-    else:
-        return []
+    order_types = frappe.get_all("URY Order Type", fields=["name"], filters={"is_active": 1})
+    return [{"name": ot.name} for ot in order_types]
 
 
 @frappe.whitelist()
@@ -709,11 +703,16 @@ def getPosProfile():
         qz_print = pos_profiles.qz_print
         print_type = None
 
+        printers = []
         for pos_profile in pos_profiles.printer_settings:
+            
             if pos_profile.bill == 1:
-                printer = pos_profile.printer
+                printers.append(pos_profile.printer)
                 bill_present = True
-                break
+                
+        if printers:
+            printer = ",".join(printers)
+
 
         if qz_print == 1:
             print_type = "qz"
@@ -724,6 +723,8 @@ def getPosProfile():
 
         else:
             print_type = "socket"
+
+
 
     invoice_details = {
         "pos_profile": pos_profile_name,
