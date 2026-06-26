@@ -1,10 +1,8 @@
 
 import frappe
 from frappe import _
-from frappe.utils import flt, get_datetime, now
-from datetime import datetime, timedelta
+from frappe.utils import now
 from frappe.model.document import Document
-import json
 from ury.ury_pos.api import getBranch
 
 
@@ -61,8 +59,7 @@ class SubPOSClosing(Document):
                     owner = user_details.user
             if frappe.session.user == owner:
                 frappe.throw("The Main Cashier cannot close a Sub POS Closing entry.")
-        else:
-            pass
+
     
     def on_submit(self):
         opening_entry = frappe.get_doc("POS Opening Entry", self.pos_opening_entry)

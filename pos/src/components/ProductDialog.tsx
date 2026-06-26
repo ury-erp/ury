@@ -114,9 +114,9 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
         }
       })
       .catch(() => {
-        setItemError('Failed to fetch item details');
+        setItemError(t('errors.failed_fetch_item_details'));
         setItemDoc(null);
-        setAddonError('Failed to fetch add-ons');
+        setAddonError(t('errors.failed_fetch_addons'));
         setAddonItemCodes([]);
       })
       .finally(() => {

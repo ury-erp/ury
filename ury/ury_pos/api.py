@@ -188,183 +188,69 @@ def getModeOfPayment():
     )
     return [{"mode_of_payment": p.mode_of_payment, "opening_amount": 0.0} for p in payments]
 
+def _get_invoices_list(branch, status, limit, limit_start, cashier=None):
+    """Shared invoice list query logic for getPosInvoice and getInvoiceForCashier."""
+    limit = int(limit) + 1
+    limit_start = int(limit_start)
+    
+    base_fields = """name, invoice_printed, grand_total, restaurant_table, 
+                cashier, waiter, net_total, posting_time, 
+                total_taxes_and_charges, customer, status, mobile_number, 
+                posting_date, rounded_total, order_type"""
+    extra_fields = ", additional_discount_percentage, discount_amount"
+    
+    if status == "Draft":
+        sql_status = status
+        extra_where = "AND (invoice_printed = 1 OR (invoice_printed = 0 AND COALESCE(restaurant_table, '') = ''))"
+        use_extra_fields = False
+    elif status == "Unbilled":
+        sql_status = "Draft"
+        extra_where = "AND (invoice_printed = 0 AND restaurant_table IS NOT NULL)"
+        use_extra_fields = False
+    elif status == "Recently Paid":
+        sql_status = "Paid"
+        extra_where = ""
+        use_extra_fields = True
+    else:
+        sql_status = status
+        extra_where = ""
+        use_extra_fields = True
+    
+    fields = base_fields + (extra_fields if use_extra_fields else "")
+    cashier_clause = "AND cashier = %s" if cashier else ""
+    
+    sql = f"""
+        SELECT {fields}
+        FROM `tabPOS Invoice` 
+        WHERE branch = %s AND status = %s {cashier_clause} {extra_where}
+        ORDER BY modified desc
+        LIMIT %s OFFSET %s
+    """.strip()
+    
+    params = [branch, sql_status]
+    if cashier:
+        params.append(cashier)
+    params.extend([limit, limit_start])
+    
+    invoices = frappe.db.sql(sql, tuple(params), as_dict=True)
+    
+    has_next = len(invoices) == limit and status != "Recently Paid"
+    if has_next:
+        invoices.pop()
+    
+    return {"data": invoices, "next": has_next}
+
+
 @frappe.whitelist()
 def getInvoiceForCashier(status, cashier, limit, limit_start):
     branch = getBranch()
-    updatedlist = []
-    limit = int(limit)+1
-    limit_start = int(limit_start)
-    if status == "Draft":
-        invoices = frappe.db.sql(
-            """
-            SELECT 
-                name, invoice_printed, grand_total, restaurant_table, 
-                cashier, waiter, net_total, posting_time, 
-                total_taxes_and_charges, customer, status, mobile_number, 
-                posting_date, rounded_total, order_type 
-            FROM `tabPOS Invoice` 
-            WHERE branch = %s AND status = %s AND cashier = %s
-            AND (invoice_printed = 1 OR (invoice_printed = 0 AND COALESCE(restaurant_table, '') = ''))
-            ORDER BY modified desc
-            LIMIT %s OFFSET %s
-            """,
-            (branch, status, cashier, limit,limit_start),
-            as_dict=True,
-        )
-        updatedlist.extend(invoices)
-    elif status == "Unbilled":
-        
-        docstatus = "Draft"
-        invoices = frappe.db.sql(
-            """
-            SELECT 
-                name, invoice_printed, grand_total, restaurant_table, 
-                cashier, waiter, net_total, posting_time, 
-                total_taxes_and_charges, customer, status, mobile_number, 
-                posting_date, rounded_total, order_type 
-            FROM `tabPOS Invoice` 
-            WHERE branch = %s AND status = %s AND cashier = %s
-            AND (invoice_printed = 0 AND restaurant_table IS NOT NULL)
-            ORDER BY modified desc
-            LIMIT %s OFFSET %s
-            """,
-            (branch, docstatus, cashier, limit, limit_start),
-            as_dict=True,
-        )
-        updatedlist.extend(invoices)
-    elif status == "Recently Paid":
-        docstatus = "Paid"
-        invoices = frappe.db.sql(
-            """
-            SELECT 
-                name, invoice_printed, grand_total, restaurant_table, 
-                cashier, waiter, net_total, posting_time, 
-                total_taxes_and_charges, customer, status, mobile_number,
-                posting_date, rounded_total, order_type,additional_discount_percentage,discount_amount 
-            FROM `tabPOS Invoice` 
-            WHERE branch = %s AND status = %s AND cashier = %s
-            ORDER BY modified desc
-            LIMIT %s OFFSET %s
-            """,
-            (branch, docstatus, cashier, limit, limit_start),
-            as_dict=True,
-        )
-        updatedlist.extend(invoices)    
-    else:
-        
-        invoices = frappe.db.sql(
-            """
-            SELECT 
-                name, invoice_printed, grand_total, restaurant_table, 
-                cashier, waiter, net_total, posting_time, 
-                total_taxes_and_charges, customer, status, mobile_number,
-                posting_date, rounded_total, order_type,additional_discount_percentage,discount_amount
-            FROM `tabPOS Invoice` 
-            WHERE branch = %s AND status = %s AND cashier = %s
-            ORDER BY modified desc
-            LIMIT %s OFFSET %s
-            """,
-            (branch, status, cashier, limit, limit_start),
-            as_dict=True,
-        )
-
-        updatedlist.extend(invoices)
-    if len(updatedlist) == limit and status != "Recently Paid":
-            has_next = True
-            updatedlist.pop()
-    else:
-            has_next = False   
-    return  { "data":updatedlist,"next":has_next}
-
+    return _get_invoices_list(branch, status, limit, limit_start, cashier=cashier)
 
 
 @frappe.whitelist()
 def getPosInvoice(status, limit, limit_start):
     branch = getBranch()
-    updatedlist = []
-    limit = int(limit)+1
-    limit_start = int(limit_start)
-    if status == "Draft":
-        invoices = frappe.db.sql(
-            """
-            SELECT 
-                name, invoice_printed, grand_total, restaurant_table, 
-                cashier, waiter, net_total, posting_time, 
-                total_taxes_and_charges, customer, status, mobile_number, 
-                posting_date, rounded_total, order_type 
-            FROM `tabPOS Invoice` 
-            WHERE branch = %s AND status = %s 
-            AND (invoice_printed = 1 OR (invoice_printed = 0 AND COALESCE(restaurant_table, '') = ''))
-            ORDER BY modified desc
-            LIMIT %s OFFSET %s
-            """,
-            (branch, status, limit,limit_start),
-            as_dict=True,
-        )
-        updatedlist.extend(invoices)
-    elif status == "Unbilled":
-        
-        docstatus = "Draft"
-        invoices = frappe.db.sql(
-            """
-            SELECT 
-                name, invoice_printed, grand_total, restaurant_table, 
-                cashier, waiter, net_total, posting_time, 
-                total_taxes_and_charges, customer, status, mobile_number, 
-                posting_date, rounded_total, order_type 
-            FROM `tabPOS Invoice` 
-            WHERE branch = %s AND status = %s 
-            AND (invoice_printed = 0 AND restaurant_table IS NOT NULL)
-            ORDER BY modified desc
-            LIMIT %s OFFSET %s
-            """,
-            (branch, docstatus, limit, limit_start),
-            as_dict=True,
-        )
-        updatedlist.extend(invoices)
-    elif status == "Recently Paid":
-        docstatus = "Paid"
-        invoices = frappe.db.sql(
-            """
-            SELECT 
-                name, invoice_printed, grand_total, restaurant_table, 
-                cashier, waiter, net_total, posting_time, 
-                total_taxes_and_charges, customer, status, mobile_number,
-                posting_date, rounded_total, order_type,additional_discount_percentage,discount_amount 
-            FROM `tabPOS Invoice` 
-            WHERE branch = %s AND status = %s 
-            ORDER BY modified desc
-            LIMIT %s OFFSET %s
-            """,
-            (branch, docstatus, limit, limit_start),
-            as_dict=True,
-        )
-        updatedlist.extend(invoices)    
-    else:
-        
-        invoices = frappe.db.sql(
-            """
-            SELECT 
-                name, invoice_printed, grand_total, restaurant_table, 
-                cashier, waiter, net_total, posting_time, 
-                total_taxes_and_charges, customer, status, mobile_number,
-                posting_date, rounded_total, order_type,additional_discount_percentage,discount_amount
-            FROM `tabPOS Invoice` 
-            WHERE branch = %s AND status = %s 
-            ORDER BY modified desc
-            LIMIT %s OFFSET %s
-            """,
-            (branch, status, limit, limit_start),
-            as_dict=True,
-        )
-
-        updatedlist.extend(invoices)
-    if len(updatedlist) == limit and status != "Recently Paid":
-            has_next = True
-            updatedlist.pop()
-    else:
-            has_next = False   
-    return  { "data":updatedlist,"next":has_next}
+    return _get_invoices_list(branch, status, limit, limit_start)
 
 
 @frappe.whitelist()

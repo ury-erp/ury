@@ -1,4 +1,5 @@
 import React from 'react';
+import { t } from '../i18n';
 
 interface ErrorBoundaryProps {
   children: React.ReactNode;
@@ -39,10 +40,10 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
           <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full text-center">
             <div className="text-5xl mb-4">⚠️</div>
             <h1 className="text-xl font-semibold text-gray-900 mb-2">
-              Something went wrong
+              {t('error_boundary.title')}
             </h1>
             <p className="text-gray-600 mb-2">
-              An unexpected error occurred. Please try again.
+              {t('error_boundary.message')}
             </p>
             {this.state.error && (
               <p className="text-sm text-red-500 bg-red-50 rounded p-3 mb-4 font-mono break-all">
@@ -54,13 +55,13 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
                 onClick={this.handleRetry}
                 className="px-4 py-2 bg-gray-900 text-white rounded-md hover:bg-gray-800 transition-colors"
               >
-                Try Again
+                {t('error_boundary.try_again')}
               </button>
               <button
                 onClick={() => window.location.reload()}
                 className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors"
               >
-                Reload Page
+                {t('error_boundary.reload_page')}
               </button>
             </div>
           </div>

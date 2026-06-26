@@ -1,5 +1,6 @@
 import { Monitor, Smartphone, ExternalLink } from 'lucide-react';
 import { Button } from './ui';
+import { t } from '../i18n';
 
 const ScreenSizeDialog = () => {
   const handleSwitchToVersion1 = () => {
@@ -22,26 +23,26 @@ const ScreenSizeDialog = () => {
           
           {/* Title */}
           <h2 className="text-2xl font-bold text-gray-900 mb-4">
-            Desktop Only
+            {t('screen_size.title')}
           </h2>
           
           {/* Message */}
           <div className="text-gray-600 mb-8 space-y-3">
             <p className="text-lg">
-              This POS system is designed for desktop computers and tablets with larger screens.
+              {t('screen_size.message')}
             </p>
             <p className="text-sm">
-              Mobile support will be available in a future update. Please use a device with a screen width of 1024px or larger.
+              {t('screen_size.mobile_hint')}
             </p>
           </div>
           
           {/* Current Screen Info */}
           <div className="bg-gray-50 rounded-lg p-4 mb-6">
             <p className="text-sm text-gray-600">
-              Current screen width: <span className="font-semibold text-gray-800">{window.innerWidth}px</span>
+              {t('screen_size.current_width')} <span className="font-semibold text-gray-800">{window.innerWidth}px</span>
             </p>
             <p className="text-sm text-gray-600">
-              Required: <span className="font-semibold text-gray-800">1024px or larger</span>
+              {t('screen_size.required')} <span className="font-semibold text-gray-800">1024px or larger</span>
             </p>
           </div>
           
@@ -55,7 +56,7 @@ const ScreenSizeDialog = () => {
               className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 text-sm"
             >
               <ExternalLink className="w-4 h-4 mr-2" />
-              Switch to Version 1
+              {t('screen_size.switch_v1')}
             </Button>
           </div>
         </div>

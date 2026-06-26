@@ -191,7 +191,7 @@ export default function Orders() {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-center">
-          <p className="text-xl font-semibold text-red-600 mb-2">Failed to load orders</p>
+          <p className="text-xl font-semibold text-red-600 mb-2">{t('errors.failed_load_orders')}</p>
           <p className="text-gray-600">{error}</p>
         </div>
       </div>
@@ -313,7 +313,7 @@ export default function Orders() {
           </div>
         ) : selectedOrderError ? (
           <div className="text-center h-full flex flex-col items-center justify-center text-red-500 p-6">
-            <p className="text-lg font-medium mb-2">Failed to load order details</p>
+            <p className="text-lg font-medium mb-2">{t('errors.failed_load_order_details')}</p>
             <p className="text-sm">{selectedOrderError}</p>
           </div>
         ) : (
