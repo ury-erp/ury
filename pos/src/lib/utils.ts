@@ -8,7 +8,7 @@ export function cn(...inputs: ClassValue[]) {
 
 export function formatCurrency(amount: number): string {
   const symbol = storage.getItem('currencySymbol');
-  return `${symbol} ${amount}`;
+  return `${symbol ?? ''} ${amount}`;
 } 
 
 export const formatInvoiceTime = (timestamp: string | null) => {

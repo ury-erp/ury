@@ -21,16 +21,6 @@ export interface Table {
 }
 
 
-export async function getRestaurantMenu(posProfile: string, room?: string | null) {
-  const { call } = await import('./frappe-sdk');
-  const params: Record<string, string> = { pos_profile: posProfile };
-  if (room) {
-    params.room = room;
-  }
-  const res = await call.get('ury.ury_pos.api.getRestaurantMenu', params);
-  return res.message;
-}
-
 export async function getRooms(branch: string): Promise<Room[]> {
   try {
     const rooms = await db.getDocList(DOCTYPES.URY_ROOM, {

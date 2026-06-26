@@ -13,6 +13,16 @@ initI18n().then(() => {
       </ErrorBoundary>
     </StrictMode>,
   )
-})
+}).catch((err) => {
+  console.error('Failed to initialize i18n:', err);
+  // Fallback: render app anyway with default language
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <ErrorBoundary>
+        <App />
+      </ErrorBoundary>
+    </StrictMode>,
+  )
+});
 
   

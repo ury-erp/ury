@@ -1,14 +1,11 @@
 
 import frappe
 from frappe import _
-from frappe.utils import flt, get_datetime
+from frappe.utils import flt, get_datetime, now
 from datetime import datetime, timedelta
 from frappe.model.document import Document
 import json
-import requests
-from datetime import datetime
 from ury.ury_pos.api import getBranch
-from frappe.utils import  get_datetime,now
 
 
 class SubPOSClosing(Document):
@@ -75,7 +72,7 @@ class SubPOSClosing(Document):
     
     def on_cancel(self):
         opening_entry = frappe.get_doc("POS Opening Entry", self.pos_opening_entry)
-        opening_entry.custom_sub_pos_close = self.name
+        opening_entry.custom_sub_pos_close = None
         opening_entry.status = "Open"
         opening_entry.save()
 

@@ -126,7 +126,6 @@
               <div v-show="kot.comments" class="text-[#6B7280] font-medium">
                 ( {{ kot.comments }} )
               </div>
-              <div></div>
               <div>
                 <div
                   class="font-semibold justify-between items-center mt-2"
@@ -222,6 +221,14 @@ let url = port ? `${protocol}//${host}:${port}` : `${protocol}//${host}`;
 window.globalSiteName = '';
 let socket; 
 
+function debounce(fn, delay) {
+    let timer = null;
+    return function(...args) {
+        clearTimeout(timer);
+        timer = setTimeout(() => fn.apply(this, args), delay);
+    };
+}
+
 async function fetchAndSetSiteName() {
     try {
         const response = await fetch('/api/method/ury.ury.api.ury_kot_display.get_site_name', {
@@ -249,11 +256,6 @@ async function initializeSocket() {
           reconnectionDelay: 1000,
           reconnectionDelayMax: 5000,
         });
-        socket.on('connect_error', (err) => {
-            console.error("Socket connection error:", err);
-        }); 
-        socket.on('connect', () => {
-        });
     } else {
         console.error('Site name is not set. Socket cannot be initialized.');
     }
@@ -264,7 +266,6 @@ initializeSocket(); // Initialize the socket after fetching the site name
 
 const frappe = new FrappeApp(url);
 export default {
-  // inject: [],
   data() {
     return {
       kot: [],
@@ -282,7 +283,8 @@ export default {
       audio_alert: 0,
       isOnline: navigator.onLine,
       statusMessage: "",
-      daily_order_number:0
+      daily_order_number:0,
+      socketHandler: null
     };
   },
   methods: {
@@ -290,7 +292,7 @@ export default {
       var currentDomain = window.location.origin;
       var audio_path = currentDomain + path;
       const audio = new Audio(audio_path);
-      audio.play();
+      audio.play().catch(() => {});
     },
     auth() {
       return new Promise((resolve, reject) => {
@@ -439,7 +441,11 @@ export default {
             `${kot.name}_${kotitem.name}_strike`
           );
           if (savedState) {
-            kotitem.striked = JSON.parse(savedState);
+            try {
+              kotitem.striked = JSON.parse(savedState);
+            } catch (e) {
+              kotitem.striked = false;
+            }
           }
           this.calculateQty(
             kotitem,
@@ -490,6 +496,7 @@ export default {
       });
     },
     calculateTimeRemaining(targetTime) {
+      if (!targetTime || !targetTime.includes(":")) return '— : —';
       const currentTime = new Date();
       const [targetHours, targetMinutes, targetSeconds] = targetTime.split(":");
       const targetDate = new Date(
@@ -518,6 +525,10 @@ export default {
         currentDomain + "/login?redirect-to=URYMosaic/" + this.production;
     },
     masonryLoading() {
+      if (this.masonry) {
+        this.masonry.destroy();
+        this.masonry = null;
+      }
       this.$nextTick(() => {
         this.masonry = new Masonry(this.$el.querySelector(".grid"), {
           itemSelector: ".masonry-item",
@@ -567,41 +578,53 @@ export default {
     const production = parts[parts.length - 1];
     const decodedProduction = decodeURIComponent(production);
     this.production = decodedProduction;
-    const self = this;
-    window.addEventListener("resize", this.masonryLoading);
+
+    const debouncedMasonry = debounce(() => { this.masonryLoading(); }, 150);
+    this._resizeHandler = debouncedMasonry;
+    window.addEventListener("resize", this._resizeHandler);
     this.masonryLoading();
+
+    socket.on('connect_error', (err) => {
+      console.error("Socket connection error:", err);
+      this.statusMessage = "Connection error. Retrying...";
+    });
+    socket.on('disconnect', (reason) => {
+      console.warn("Socket disconnected:", reason);
+      this.statusMessage = "Connection lost. Reconnecting...";
+    });
 
     this.auth()
       .then(() => {
-        self.fetchKOT().then(() => {
+        this.fetchKOT().then(() => {
           if (this.audio_alert === 1) {
             this.showAudioAlertMessage = true;
           }
-          socket.on(this.kot_channel, (doc) => {
+          this.socketHandler = (doc) => {
             if (this.audio_alert === 1) {
               this.playAlertSound(doc.audio_file);
             }
             let kottime = localStorage.getItem("kot_time");
-            if (doc.last_kot_time !== null) {
-              if (doc.last_kot_time !== kottime) {
-                this.fetchKOT().then(() => {
-                  this.masonryLoading();
-                });
-              }
+            if (doc.last_kot_time !== kottime) {
+              // Full refresh needed — skip intermediate mutations
+              this.fetchKOT().then(() => { this.masonryLoading(); });
+            } else {
+              // Incremental update
+              const newKot = { isRotated: false, showDiv: false, timecolor: 'text-black', timeRemaining: '— : —', ...doc.kot };
+              this.kot.unshift(newKot);
+              this.updateQtyColorTable();
+              this.updateTimeRemaining();
+              this.masonryLoading();
             }
-            this.kot.unshift(doc.kot);
-            this.masonryLoading();
-            this.updateQtyColorTable();
-            this.updateTimeRemaining();
-            setTimeout(()=>{
-              if (doc.kot.type === "Cancelled"){
+            this._cancelTimeout = setTimeout(() => {
+              if (doc.kot.type === "Cancelled") {
                 this.fetchKOT().then(() => {
                   this.masonryLoading();
                 });
               }
-            },1500)
+            }, 1500);
             localStorage.setItem("kot_time", doc.kot.time);
-          });
+          };
+          socket.on(this.kot_channel, this.socketHandler);
         });
       })
       .catch((error) => {
@@ -614,13 +637,19 @@ export default {
     window.removeEventListener("online", this.handleOnline);
     window.removeEventListener("offline", this.handleOffline);
     document.removeEventListener("click", this.hideAudioAlertMessage);
-    window.removeEventListener("resize", this.masonryLoading);
+    window.removeEventListener("resize", this._resizeHandler);
+    if (this.socketHandler) {
+      socket.off(this.kot_channel, this.socketHandler);
+    }
+    socket.off('connect_error');
+    socket.off('disconnect');
+    if (this._cancelTimeout) clearTimeout(this._cancelTimeout);
     if (this.timer) clearInterval(this.timer);
   },
   computed: {
     sortedKotItems() {
       return (kot) => {
-        return kot.kot_items.sort((a, b) => a.serve_priority - b.serve_priority);
+        return [...kot.kot_items].sort((a, b) => a.serve_priority - b.serve_priority);
       };
     },
   },

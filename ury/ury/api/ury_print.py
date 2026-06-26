@@ -171,7 +171,8 @@ def qz_certificate():
 
 @frappe.whitelist()
 def signature_promise():
+    if "System Manager" not in frappe.get_roles():
+        frappe.throw(_("Not permitted"), frappe.PermissionError)
     site_config = frappe.get_site_config()
     key_value = site_config.get("qz_private_key")
-
     return key_value

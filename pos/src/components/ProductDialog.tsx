@@ -84,6 +84,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
   const [addonItemCodes, setAddonItemCodes] = useState<string[]>([]);
   const [isAddonLoading, setIsAddonLoading] = useState(false);
   const [addonError, setAddonError] = useState<string | null>(null);
+  const [imgError, setImgError] = useState(false);
 
   useEffect(() => {
     if (!selectedItem) {
@@ -323,23 +324,13 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
       >
         {/* Left Column - Image  */}
         <div className="md:w-1/3 relative">
-          {itemDoc?.image ? (
+          {itemDoc?.image && !imgError ? (
             <img
               src={itemDoc.image}
               alt={itemDoc.name}
               className="w-full min-h-96 h-full object-cover rounded-t-lg md:rounded-l-lg md:rounded-tr-none filter saturate-75 brightness-95"
               style={{ filter: 'saturate(0.7) brightness(0.95)' }}
-              onError={(e) => {
-                const target = e.target as HTMLImageElement;
-                target.style.display = 'none';
-                const parent = target.parentElement;
-                if (parent) {
-                  const placeholder = document.createElement('div');
-                  placeholder.className = 'w-full h-96 bg-gray-200 flex items-center justify-center text-[8rem] text-gray-400 font-medium rounded-t-lg md:rounded-l-lg md:rounded-tr-none';
-                  placeholder.textContent = itemDoc.name.slice(0, 2).toUpperCase();
-                  parent.insertBefore(placeholder, target);
-                }
-              }}
+              onError={() => setImgError(true)}
             />
           ) : (
             <div className="w-full min-h-96 h-full bg-gray-200 flex items-center justify-center text-[8rem] text-gray-400 font-medium rounded-t-lg md:rounded-l-lg md:rounded-tr-none">

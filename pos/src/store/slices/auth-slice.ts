@@ -1,5 +1,6 @@
 import { StateCreator } from 'zustand';
 import { getLoggedUser, getUserRoles } from '../../lib/auth-api';
+import { getErrorMessage } from '../../lib/error-utils';
 
 export interface User {
   name: string; // This stores the user ID
@@ -54,7 +55,7 @@ export const createAuthSlice: StateCreator<AuthSlice> = (set, get) => ({
       });
     } catch (error) {
       set({ 
-        error: (error as Error).message,
+        error: getErrorMessage(error),
         isLoading: false,
         user: null,
       });

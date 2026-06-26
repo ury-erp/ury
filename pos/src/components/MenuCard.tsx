@@ -1,4 +1,4 @@
-import { FC } from 'react';
+import { FC, useState } from 'react';
 import { formatCurrency, cn } from '../lib/utils';
 
 interface MenuCardProps {
@@ -22,6 +22,8 @@ const MenuCard: FC<MenuCardProps> = ({
   onClick,
   disabled 
 }) => {
+  const [imgError, setImgError] = useState(false);
+
   return (
     <div
       role="button"
@@ -41,23 +43,13 @@ const MenuCard: FC<MenuCardProps> = ({
     >
       {/* Image section - fixed height */}
       <div className="h-24">
-        {item_image ? (
+        {item_image && !imgError ? (
           <img
             src={item_image}
             alt={name}
             className="w-full h-full object-cover filter saturate-75 brightness-95"
             style={{ filter: 'saturate(0.7) brightness(0.95)' }}
-            onError={(e) => {
-              const target = e.target as HTMLImageElement;
-              target.style.display = 'none';
-              const parent = target.parentElement;
-              if (parent) {
-                const placeholder = document.createElement('div');
-                placeholder.className = 'w-full h-full bg-gray-200 flex items-center justify-center text-2xl text-gray-400 font-medium';
-                placeholder.textContent = name.slice(0, 2).toUpperCase();
-                parent.insertBefore(placeholder, target);
-              }
-            }}
+            onError={() => setImgError(true)}
           />
         ) : (
           <div className="w-full h-full bg-gray-200 flex items-center justify-center text-2xl text-gray-400 font-medium">

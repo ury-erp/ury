@@ -1,7 +1,7 @@
 import frappe
 from frappe import _
 from frappe.utils import flt, validate_phone_number
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 
 
 #GetTable  decripted temporarily
@@ -147,6 +147,9 @@ def getBranchRoom():
     """
     branch_array = frappe.db.sql(sql_query, user, as_dict=True)
     
+    if not branch_array:
+        frappe.throw("No branch or room information found for the user. Please contact your administrator.")
+    
     branch_name = branch_array[0].get("branch")
     room_name = branch_array[0].get("room")
 
@@ -280,11 +283,11 @@ def getInvoiceForCashier(status, cashier, limit, limit_start):
 
         updatedlist.extend(invoices)
     if len(updatedlist) == limit and status != "Recently Paid":
-            next = True
+            has_next = True
             updatedlist.pop()
     else:
-            next = False   
-    return  { "data":updatedlist,"next":next}
+            has_next = False   
+    return  { "data":updatedlist,"next":has_next}
 
 
 
@@ -370,11 +373,11 @@ def getPosInvoice(status, limit, limit_start):
 
         updatedlist.extend(invoices)
     if len(updatedlist) == limit and status != "Recently Paid":
-            next = True
+            has_next = True
             updatedlist.pop()
     else:
-            next = False   
-    return  { "data":updatedlist,"next":next}
+            has_next = False   
+    return  { "data":updatedlist,"next":has_next}
 
 
 @frappe.whitelist()
@@ -382,22 +385,24 @@ def searchPosInvoice(query,status):
     if not query:
         return {"data": [], "next": False}
     query = query.lower()
+    # Escape LIKE wildcards to prevent pattern injection
+    escaped_query = frappe.db.escape(f"%{query}%")
     filters = {"status": "Paid" if status == "Recently Paid" else status}
     
     # Add additional conditions for Unbilled status
     if status == "Unbilled":
         filters.update({
             "status":"draft",
-            "restaurant_table": ["not in", [None, ""]],  # Check if restaurant_table has value
-            "invoice_printed": 0  # Check if invoice_printed is 0
+            "restaurant_table": ["not in", [None, ""]],
+            "invoice_printed": 0
         })
     pos_invoices = frappe.get_all(
         "POS Invoice",
         filters=filters,           
         or_filters=[
-            ["name", "like", f"%{query}%"],
-            ["customer", "like", f"%{query}%"],
-            ["mobile_number", "like", f"%{query}%"],
+            ["name", "like", escaped_query],
+            ["customer", "like", escaped_query],
+            ["mobile_number", "like", escaped_query],
         ],
         fields=["name", "customer", "grand_total", "posting_date", "posting_time", "order_type", "restaurant_table","status","grand_total","rounded_total","net_total","mobile_number"],
         limit_page_length=10 
@@ -696,7 +701,7 @@ def create_customer(customer_name, mobile_number=None, customer_group="Individua
             "customer_group": customer_group,
             "territory": territory
         })
-        customer.insert(ignore_permissions=True)
+        customer.insert()
         frappe.db.commit()
 
         return {

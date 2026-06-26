@@ -1,6 +1,7 @@
 import { StateCreator } from 'zustand';
 import { AuthSlice } from './auth-slice';
 import { getCombinedPosProfile, PosProfileCombined } from '../../lib/pos-profile-api';
+import { getErrorMessage } from '../../lib/error-utils';
 
 interface RolePermission {
   name: string;
@@ -82,7 +83,7 @@ export const createConfigSlice: StateCreator<
       set({ isLoading: false });
     } catch (error) {
       set({ 
-        error: (error as Error).message,
+        error: getErrorMessage(error),
         isLoading: false,
       });
     }

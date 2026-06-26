@@ -10,8 +10,6 @@ from ury.ury_pos.api import getBranch, getBranchRoom
 from ury.ury.api.ury_kot_generate import kot_execute
 from ury.ury.api.ury_kot_generate import process_items_for_cancel_kot
 
-from frappe import cache
-
 
 class URYOrder(Document):
     pass
@@ -249,37 +247,51 @@ def sync_order(
     invoice.items = []
     
     menu = frappe.db.get_value("URY Menu", {"branch": invoice.branch}, "name")
-   
-    for d in items:
-        
-        course = frappe.db.get_value("URY Menu Item", {"item": d.get("item"),"parent":menu}, "course")
-        
-        item_prices = frappe.db.get_list(
-            "Item Price",
-            filters={"item_code": d.get("item"), "price_list": price_list},
-            fields=["price_list_rate"],
-        )
 
-        if not item_prices:
+    # Batch-fetch courses, prices, and cost_center to avoid N+1 queries
+    item_codes = [d.get("item") for d in items]
+    item_codes_unique = list(set(item_codes))
+
+    courses = {}
+    if item_codes_unique:
+        course_rows = frappe.db.get_all(
+            "URY Menu Item",
+            filters={"item": ("in", item_codes_unique), "parent": menu},
+            fields=["item", "course"],
+        )
+        courses = {r.item: r.course for r in course_rows}
+
+    prices = {}
+    if item_codes_unique:
+        price_rows = frappe.db.get_all(
+            "Item Price",
+            filters={"item_code": ("in", item_codes_unique), "price_list": price_list},
+            fields=["item_code", "price_list_rate"],
+        )
+        prices = {r.item_code: r.price_list_rate for r in price_rows}
+
+    cost_center = frappe.db.get_value("POS Profile", pos_profile, "cost_center")
+
+    for d in items:
+        course = courses.get(d.get("item"))
+        rate = prices.get(d.get("item"))
+        if not rate:
             frappe.throw(_("No item price found for Item: {0} in Price List: {1}. Please check the price list settings.").format(d.get("item"), price_list))
 
-        else:
-            invoice.append(
-                "items",
-                dict(
-                    item_code=d.get("item"),
-                    item_name=d.get("item_name"),
-                    qty=d.get("qty"),
-                    **({"custom_course": course} if course else {}),
-                    comment=d.get("comment"),
-                    rate = item_prices[0].price_list_rate,
-                    price_list_rate = item_prices[0].price_list_rate,
-                    base_price_list_rate = item_prices[0].price_list_rate,
-                    cost_center = frappe.db.get_value(
-                        "POS Profile", pos_profile, "cost_center"
-                        ),
-                ),
-            )
+        invoice.append(
+            "items",
+            dict(
+                item_code=d.get("item"),
+                item_name=d.get("item_name"),
+                qty=d.get("qty"),
+                **({"custom_course": course} if course else {}),
+                comment=d.get("comment"),
+                rate=rate,
+                price_list_rate=rate,
+                base_price_list_rate=rate,
+                cost_center=cost_center,
+            ),
+        )
 
     try:
         invoice.save()
@@ -292,7 +304,7 @@ def sync_order(
 
     except Exception as e:
         # If an exception occurs (e.g., "kot" app not found), it will be caught here without affect the code execution.
-        error_msg = f"KOT Creation Failes {str(e)}"            
+        error_msg = f"KOT Creation Failed: {str(e)}"            
         frappe.log_error(error_msg, "KOT Error")
 
     # table status
@@ -471,7 +483,7 @@ def captain_transfer(currentCaptain, newCaptain, invoice):
     multiple_cashier = frappe.db.get_value("POS Profile",pos_profile,"custom_enable_multiple_cashier")
     branch=frappe.get_value("POS Invoice", invoice,"branch")
     if multiple_cashier:
-        table=pos_profile=frappe.get_value("POS Invoice", invoice,"restaurant_table")
+        table = frappe.get_value("POS Invoice", invoice, "restaurant_table")
         current_room = frappe.get_value("URY Table", table,"restaurant_room")
         new_captain_room =  frappe.db.sql("""
                 SELECT room
@@ -537,21 +549,24 @@ def cancel_order(invoice_id, reason):
 
     try:
         cancel_kot(invoice_id)
-
     except Exception as e:
-        # If an exception occurs (e.g., "kot" app not found), it will be caught here without effecting execution
-        pass
+        frappe.log_error(f"Failed to create cancellation KOT for {invoice_id}: {frappe.get_traceback()}", "Cancel KOT Error")
 
-    # Update invoice status
-    frappe.db.sql("""
-        UPDATE `tabPOS Invoice Item`
-        SET docstatus = 2
-        WHERE parent = %s
-    """, (invoice_id,))
-
-    frappe.db.set_value("POS Invoice", invoice_id, "docstatus", 2)
-    frappe.db.set_value("POS Invoice", invoice_id, "status", "Cancelled")
-    frappe.db.set_value("POS Invoice", invoice_id, "cancel_reason", reason)
+    # Update invoice status atomically
+    frappe.db.begin()
+    try:
+        frappe.db.sql("""
+            UPDATE `tabPOS Invoice Item`
+            SET docstatus = 2
+            WHERE parent = %s
+        """, (invoice_id,))
+        frappe.db.set_value("POS Invoice", invoice_id, "docstatus", 2)
+        frappe.db.set_value("POS Invoice", invoice_id, "status", "Cancelled")
+        frappe.db.set_value("POS Invoice", invoice_id, "cancel_reason", reason)
+        frappe.db.commit()
+    except Exception:
+        frappe.db.rollback()
+        raise
 
 # Method for URY POS
 @frappe.whitelist()
@@ -609,6 +624,12 @@ def cancel_kot(invoice_id):
     else:
         restaurant_table = None
 
+    # Build invoiceItems list for comparison in cancel KOT processing
+    invoice_items = [
+        {"item_code": item.item_code, "item_name": item.item_name, "qty": item.qty}
+        for item in pos_invoice.items
+    ]
+
     # Process items for a canceled KOT
     process_items_for_cancel_kot(
         invoice_id,
@@ -619,7 +640,9 @@ def cancel_kot(invoice_id):
         pos_profile_id,
         cancel_kot_naming_series,
         "Cancelled",
-        items,
+        invoice_items,
+        pos_invoice,
+        pos_invoice.branch,
     )
 
     # Set the KOTs associated with the invoice as canceled

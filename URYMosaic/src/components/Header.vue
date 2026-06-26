@@ -23,13 +23,9 @@
 <script>
 
 import uriMosaicImage from "@/assets/logos/mosaic.jpg";
-// import KOT from './kot.vue';
 
 export default {
   name: "Header",
-  setup() {
-    
-  },
   data() {
     return {
       imagePath: uriMosaicImage,
@@ -37,12 +33,8 @@ export default {
   },
   methods:{
     reloadKOT(){
-      // KOT.methods.fetchKOT(this);
       window.location.reload();
     }
-  },
-  computed: {
-    
   },
 };
 </script>

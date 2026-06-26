@@ -35,7 +35,7 @@ def process_invoice(invoice):
     posInvoice = frappe.get_doc("POS Invoice", invoice.name)
     waiter = posInvoice.waiter
     pos_profile = frappe.get_doc("POS Profile", posInvoice.pos_profile)
-    kot_naming_series = pos_profile.kot_naming_series
+    kot_naming_series = pos_profile.custom_kot_naming_series
 
     # Check if KOT already exists for this invoice
     kot_list = frappe.get_list(
@@ -53,15 +53,24 @@ def process_invoice(invoice):
     item_codes = list({i.item_code for i in posInvoice.items})
     item_groups = {}
     if item_codes:
-        for item_code in item_codes:
-            item_groups[item_code] = frappe.db.get_value("Item", item_code, "item_group")
+        rows = frappe.db.get_all("Item", filters={"name": ("in", item_codes)}, fields=["name", "item_group"])
+        item_groups = {r.name: r.item_group for r in rows}
+
+    # Batch-fetch production unit item groups
+    production_names = [p.name for p in productions]
+    prod_item_groups = {}
+    if production_names:
+        pig_rows = frappe.db.get_all(
+            "URY Production Unit Item Group",
+            filters={"parent": ("in", production_names)},
+            fields=["parent", "item_group"],
+        )
+        for r in pig_rows:
+            prod_item_groups.setdefault(r.parent, set()).add(r.item_group)
 
     # Group invoice items by production unit
     for production in productions:
-        productionDoc = frappe.get_doc("URY Production Unit", production.name)
-        production_item_groups = {
-            ig.item_group for ig in productionDoc.item_groups
-        }
+        production_item_groups = prod_item_groups.get(production.name, set())
 
         # Filter items belonging to this production unit
         production_items = [
@@ -101,7 +110,7 @@ def create_kot(
             "pos_profile": pos_profile.name,
             "customer_name": posInvoice.customer,
             "production": production_name,
-            "order_no": getattr(posInvoice, "order_no", None),
+            "order_no": getattr(posInvoice, "custom_ury_order_number", None),
         }
     )
 

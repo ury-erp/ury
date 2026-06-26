@@ -5,8 +5,7 @@ import {
 import { usePOSStore } from '../store/pos-store';
 import { cn } from '../lib/utils';
 import { Button, Badge } from './ui';
-import CommentDialog from './CommentDialog';
-import { useState } from 'react';
+import { useMemo } from 'react';
 import { t } from '../i18n';
 
 interface SidebarProps {
@@ -14,23 +13,17 @@ interface SidebarProps {
 }
 
 const Sidebar = ({ disabled }: SidebarProps) => {
-  const { selectedCategory, setSelectedCategory, menuItems, categories, orderComment, setOrderComment } = usePOSStore();
-  const [showCommentDialog, setShowCommentDialog] = useState(false);
+  const { selectedCategory, setSelectedCategory, menuItems, categories } = usePOSStore();
 
-  // Count items per category
-  const getCategoryCount = (category: string) => {
-    const count = menuItems.filter(item => item.course === category).length;
-    return count;
-  };
-
-  const getAllItemsCount = () => {
-    const count = menuItems.length;
-    return count;
-  };
-
-  const handleCommentSave = (comment: string) => {
-    setOrderComment(comment);
-  };
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    menuItems.forEach(item => {
+      if (item.course) {
+        counts[item.course] = (counts[item.course] || 0) + 1;
+      }
+    });
+    return counts;
+  }, [menuItems]);
 
   return (
     <div className={cn(
@@ -68,7 +61,7 @@ const Sidebar = ({ disabled }: SidebarProps) => {
             </div>
             
             <Badge variant="secondary" size="sm" className="text-xs text-gray-500 bg-gray-100 min-w-[24px] text-center">
-              {getAllItemsCount()}
+              {menuItems.length}
             </Badge>
           </Button>
 
@@ -78,7 +71,7 @@ const Sidebar = ({ disabled }: SidebarProps) => {
           {/* Category Items */}
           <div className="space-y-1">
             {categories.map((category) => {
-              const count = getCategoryCount(category.name);
+              const count = categoryCounts[category.name] ?? 0;
               return (
                 <Button
                   key={category.name}
@@ -110,13 +103,6 @@ const Sidebar = ({ disabled }: SidebarProps) => {
         </div>
       </nav>
 
-      {/* Comment Dialog is rendered from sidebar but triggered from order panel, to not mount it on every order panel render */}
-      <CommentDialog
-        isOpen={showCommentDialog}
-        onClose={() => setShowCommentDialog(false)}
-        onSave={handleCommentSave}
-        initialComment={orderComment}
-      />
     </div>
   );
 };

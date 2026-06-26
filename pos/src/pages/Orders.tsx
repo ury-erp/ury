@@ -11,6 +11,7 @@ import { Spinner } from '../components/ui/spinner';
 import { Textarea } from '../components/ui/textarea';
 import { usePOSStore } from '../store/pos-store';
 import { useNavigate } from 'react-router-dom';
+import { getErrorMessage } from '../lib/error-utils';
 import PaymentDialog from '../components/PaymentDialog';
 import { printOrder } from '../lib/print';
 import { call } from '../lib/frappe-sdk';
@@ -179,8 +180,8 @@ export default function Orders() {
         setSelectedStatus('Draft');
         fetchOrders();
       }
-    } catch (err: any) {
-      showToast.error(t('errors.print_failed', { reason: err?.message || String(err) }));
+    } catch (err: unknown) {
+      showToast.error(t('errors.print_failed', { reason: getErrorMessage(err) }));
     } finally {
       setIsPrinting(false);
     }

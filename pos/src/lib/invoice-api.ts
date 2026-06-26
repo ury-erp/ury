@@ -1,5 +1,6 @@
 import { call } from './frappe-sdk';
 import { OrderType } from '../data/order-types';
+import { getErrorMessage } from './error-utils';
 
 export interface POSInvoice {
   name: string;
@@ -146,23 +147,35 @@ export async function getInvoicePrintHtml(invoiceId: string, printFormat: string
 } 
 
 export async function networkPrint(orderId: string, printer: string, printFormat: string) {
-  await call.post('ury.ury.api.ury_print.network_printing', {
-    doctype: 'POS Invoice',
-    name: orderId,
-    printer_setting: printer,
-    print_format: printFormat,
-  });
+  try {
+    await call.post('ury.ury.api.ury_print.network_printing', {
+      doctype: 'POS Invoice',
+      name: orderId,
+      printer_setting: printer,
+      print_format: printFormat,
+    });
+  } catch (error) {
+    throw new Error(`Failed to print order ${orderId}: ${getErrorMessage(error)}`);
+  }
 }
 
 export async function selectNetworkPrinter(orderId: string, posProfile: string, printFormat?: string | null) {
-  await call.post('ury.ury.api.ury_print.select_network_printer', {
-    invoice_id: orderId,
-    pos_profile: posProfile,
-    print_format: printFormat,
-  });
+  try {
+    await call.post('ury.ury.api.ury_print.select_network_printer', {
+      invoice_id: orderId,
+      pos_profile: posProfile,
+      print_format: printFormat,
+    });
+  } catch (error) {
+    throw new Error(`Failed to select network printer for order ${orderId}: ${getErrorMessage(error)}`);
+  }
 }
 
 
 export async function updatePrintStatus(orderId: string) {
-  await call.post('ury.ury.api.ury_print.qz_print_update', { invoice: orderId });
+  try {
+    await call.post('ury.ury.api.ury_print.qz_print_update', { invoice: orderId });
+  } catch (error) {
+    throw new Error(`Failed to update print status for order ${orderId}: ${getErrorMessage(error)}`);
+  }
 } 

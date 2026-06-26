@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, Percent, Coins } from 'lucide-react';
 import { usePOSStore } from '../store/pos-store';
 import { cn, formatCurrency } from '../lib/utils';
@@ -42,6 +42,11 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   const [discountValue, setDiscountValue] = useState<string>('');
   const [appliedDiscount, setAppliedDiscount] = useState<number>(0);
   const [paymentInputs, setPaymentInputs] = useState<{ [mode: string]: string }>({});
+  const userEditedRef = useRef(false);
+
+  useEffect(() => {
+    userEditedRef.current = false;
+  }, []);
 
   useEffect(() => {
     fetchPaymentModes();
@@ -85,6 +90,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   const showFinalAdjustment = Math.abs(roundedFinalAdjustment) > 0.001;
 
   useEffect(()=>{
+    if (userEditedRef.current) return;
     const defaultPaymentModePresent=paymentModes.find((mode)=>mode===DEFAULT_PAYMENT_MODE)
     //only one payment mode should be present, then autofill the final amount, if not do not fill
     const otherPaymentModesNotEntered=Object.keys(paymentInputs).length<=1;
@@ -202,7 +208,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
                       min="0"
                       step="0.01"
                       value={paymentInputs[mode] || ''}
-                      onChange={e => setPaymentInputs(inputs => ({ ...inputs, [mode]: e.target.value }))}
+                      onChange={e => { userEditedRef.current = true; setPaymentInputs(inputs => ({ ...inputs, [mode]: e.target.value })); }}
                       onFocus={() => handlePaymentInputFocus(mode)}
                       placeholder={t('payment.amount_placeholder')}
                       className="flex-1"
