@@ -440,6 +440,8 @@ def pos_opening_check():
 
 @frappe.whitelist()
 def table_transfer(table, newTable, invoice):
+    if not frappe.has_permission("POS Invoice", "write", invoice):
+        frappe.throw(_("Not permitted to transfer tables"), frappe.PermissionError)
     current_table = frappe.get_doc("URY Table", table)
     pos_invoice = frappe.get_doc("POS Invoice", invoice)
     new_table = frappe.get_doc("URY Table", newTable)
@@ -479,6 +481,8 @@ def table_transfer(table, newTable, invoice):
 
 @frappe.whitelist()
 def captain_transfer(currentCaptain, newCaptain, invoice):
+    if not frappe.has_permission("POS Invoice", "write", invoice):
+        frappe.throw(_("Not permitted to transfer captain"), frappe.PermissionError)
     pos_profile=frappe.get_value("POS Invoice", invoice,"pos_profile")
     multiple_cashier = frappe.db.get_value("POS Profile",pos_profile,"custom_enable_multiple_cashier")
     branch=frappe.get_value("POS Invoice", invoice,"branch")
@@ -514,17 +518,23 @@ def captain_transfer(currentCaptain, newCaptain, invoice):
 
 @frappe.whitelist()
 def customer_favourite_item(customer_name):
-    pos = frappe.db.get_list(
-        "POS Invoice", filters={"customer": customer_name}, fields=["name"]
+    # Get invoice names for this customer
+    invoice_names = frappe.db.get_list(
+        "POS Invoice", filters={"customer": customer_name}, fields=["name"], pluck="name"
+    )
+    if not invoice_names:
+        return []
+
+    # Batch-fetch all items for these invoices in a single query (avoids N+1 get_doc)
+    invoice_items = frappe.db.get_all(
+        "POS Invoice Item",
+        filters={"parent": ("in", invoice_names)},
+        fields=["item_name", "qty"],
     )
 
     item_qty = {}
-
-    for invoice in pos:
-        pos_invoice = frappe.get_doc("POS Invoice", invoice)
-        for item in pos_invoice.items:
-            item_name = item.item_name
-            item_qty[item_name] = item_qty.get(item_name, 0) + item.qty
+    for row in invoice_items:
+        item_qty[row.item_name] = item_qty.get(row.item_name, 0) + row.qty
 
     result = [
         {"item_name": item_name, "qty": qty}
@@ -538,6 +548,8 @@ def customer_favourite_item(customer_name):
 
 @frappe.whitelist()
 def cancel_order(invoice_id, reason):
+    if not frappe.has_permission("POS Invoice", "cancel", invoice_id):
+        frappe.throw(_("Not permitted to cancel orders"), frappe.PermissionError)
     pos_invoice = frappe.get_doc("POS Invoice", invoice_id)
 
     # Update table status

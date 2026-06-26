@@ -31,9 +31,13 @@ export function AggregatorSelect({ disabled }: AggregatorSelectProps) {
   const handleAggregatorChange = async (value: string) => {
     const aggregator = aggregators.find(a => a.customer === value);
     setSelectedAggregator(aggregator || null);
-    
+
     if (aggregator) {
-      await fetchAggregatorMenu(aggregator.customer);
+      try {
+        await fetchAggregatorMenu(aggregator.customer);
+      } catch (error) {
+        console.error('Failed to fetch aggregator menu:', error);
+      }
     }
   };
 

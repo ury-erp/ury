@@ -8,17 +8,19 @@ interface POSOpeningProviderProps {
   children: React.ReactNode;
 }
 
-type ValidationType = 'opening' | 'closing' | null;
+type ValidationType = 'opening' | 'closing' | 'error' | null;
 
 const POSOpeningProvider = ({ children }: POSOpeningProviderProps) => {
   const [validationType, setValidationType] = useState<ValidationType>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const { posProfile } = usePOSStore();
 
   const checkPOSStatus = async () => {
     try {
       setIsLoading(true);
-      
+      setErrorMessage(null);
+
       // First check if POS is opened
       const openingResponse = await checkPOSOpening();
       if (openingResponse.message === 1) {
@@ -38,8 +40,9 @@ const POSOpeningProvider = ({ children }: POSOpeningProviderProps) => {
           }
         } catch (error) {
           console.error('Failed to validate POS close status:', error);
-          // On error, assume POS is not closed for safety
-          setValidationType('closing');
+          // On error, show error state with retry instead of assuming failure
+          setErrorMessage('Failed to validate POS close status. Please try again.');
+          setValidationType('error');
           return;
         }
       }
@@ -48,8 +51,9 @@ const POSOpeningProvider = ({ children }: POSOpeningProviderProps) => {
       setValidationType(null);
     } catch (error) {
       console.error('Failed to check POS opening status:', error);
-      // On error, assume POS is not opened for safety
-      setValidationType('opening');
+      // Show error state with retry instead of assuming POS is not opened
+      setErrorMessage('Failed to check POS status. Please try again.');
+      setValidationType('error');
     } finally {
       setIsLoading(false);
     }
@@ -57,6 +61,10 @@ const POSOpeningProvider = ({ children }: POSOpeningProviderProps) => {
 
   const handleReload = () => {
     window.location.reload();
+  };
+
+  const handleRetry = () => {
+    checkPOSStatus();
   };
 
   useEffect(() => {
@@ -78,8 +86,25 @@ const POSOpeningProvider = ({ children }: POSOpeningProviderProps) => {
     );
   }
 
+  // Show error state with retry button
+  if (validationType === 'error' && errorMessage) {
+    return (
+      <div className="fixed inset-0 bg-white flex items-center justify-center z-50">
+        <div className="text-center p-8">
+          <p className="text-red-600 mb-4">{errorMessage}</p>
+          <button
+            onClick={handleRetry}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   // Show dialog if there's a validation issue
-  if (validationType) {
+  if (validationType === 'opening' || validationType === 'closing') {
     return <POSOpeningDialog onReload={handleReload} type={validationType} />;
   }
 

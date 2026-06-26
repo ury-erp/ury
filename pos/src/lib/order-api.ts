@@ -1,4 +1,5 @@
 import { call } from './frappe-sdk';
+import { getErrorMessage } from './error-utils';
 
 export interface POSInvoiceItem {
   name: string;
@@ -81,5 +82,9 @@ export interface SyncOrderRequest {
 }
 
 export const syncOrder = async (data: SyncOrderRequest) => {
-  return call.post( 'ury.ury.doctype.ury_order.ury_order.sync_order',data);
+  try {
+    return await call.post('ury.ury.doctype.ury_order.ury_order.sync_order', data);
+  } catch (error) {
+    throw new Error(`Failed to sync order: ${getErrorMessage(error)}`);
+  }
 }; 

@@ -238,7 +238,7 @@ async function fetchAndSetSiteName() {
             }
         });
         const data = await response.json();
-        window.globalSiteName = data.message.site_name;
+        window.globalSiteName = data?.message?.site_name || '';
     } catch (error) {
         console.error('Failed to fetch site name:', error);
     }
@@ -558,7 +558,7 @@ export default {
       this.statusMessage = message;
     },
     hideStatusMessageAfterDelay() {
-      setTimeout(() => {
+      this._statusTimeout = setTimeout(() => {
         this.statusMessage = "";
       }, 3000);
     },
@@ -644,6 +644,7 @@ export default {
     socket.off('connect_error');
     socket.off('disconnect');
     if (this._cancelTimeout) clearTimeout(this._cancelTimeout);
+    if (this._statusTimeout) clearTimeout(this._statusTimeout);
     if (this.timer) clearInterval(this.timer);
   },
   computed: {

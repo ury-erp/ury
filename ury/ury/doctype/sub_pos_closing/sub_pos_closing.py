@@ -95,6 +95,7 @@ def get_cashiers(doctype, txt, searchfield, start, page_len, filters):
 
 @frappe.whitelist()
 def get_pos_invoices(start, end, pos_profile, user):
+    # Filter by date range in SQL instead of Python (M9)
     data = frappe.db.sql(
         """
         select
@@ -102,19 +103,14 @@ def get_pos_invoices(start, end, pos_profile, user):
         from
             `tabPOS Invoice`
         where
-            cashier = %s and docstatus = 1 and pos_profile = %s and ifnull(consolidated_invoice,'') = '' and status != "Consolidated"
+            cashier = %s and docstatus = 1 and pos_profile = %s
+            and ifnull(consolidated_invoice,'') = ''
+            and status != "Consolidated"
+            and timestamp(posting_date, posting_time) >= %s
+            and timestamp(posting_date, posting_time) <= %s
         """,
-        (user, pos_profile),
+        (user, pos_profile, start, end),
         as_dict=1,
-    )
-
-    data = list(
-        filter(
-            lambda d: get_datetime(start)
-            <= get_datetime(d.timestamp)
-            <= get_datetime(end),
-            data,
-        )
     )
     # need to get taxes and payments so can't avoid get_doc
     data = [frappe.get_doc("POS Invoice", d.name).as_dict() for d in data]
