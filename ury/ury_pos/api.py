@@ -404,7 +404,7 @@ def searchPosInvoice(query,status):
             ["customer", "like", escaped_query],
             ["mobile_number", "like", escaped_query],
         ],
-        fields=["name", "customer", "grand_total", "posting_date", "posting_time", "order_type", "restaurant_table","status","grand_total","rounded_total","net_total","mobile_number"],
+        fields=["name", "customer", "grand_total", "posting_date", "posting_time", "order_type", "restaurant_table", "status", "rounded_total", "net_total", "mobile_number"],
         limit_page_length=10 
     )
     
@@ -471,6 +471,8 @@ def getPosProfile():
     cashier = None
     owner = None
     posProfile = frappe.db.exists("POS Profile", {"branch": branchName})
+    if not posProfile:
+        frappe.throw(_("No POS Profile found for branch {0}").format(branchName))
     pos_profiles = frappe.get_doc("POS Profile", posProfile)
     global_defaults = frappe.get_single('Global Defaults')
     disable_rounded_total = global_defaults.disable_rounded_total
@@ -482,7 +484,7 @@ def getPosProfile():
         branch = pos_profiles.branch
         company = pos_profiles.company
         tableAttention = pos_profiles.table_attention_time
-        get_cashier = frappe.get_doc("POS Profile", pos_profile_name)
+        get_cashier = pos_profiles
         print_format = pos_profiles.print_format
         paid_limit=pos_profiles.paid_limit
         enable_discount = pos_profiles.custom_enable_discount

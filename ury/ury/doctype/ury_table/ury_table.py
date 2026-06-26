@@ -1,7 +1,9 @@
 # Copyright (c) 2023, Tridz Technologies Pvt. Ltd. and contributors
 # For license information, please see license.txt
 
-# import frappe
+import re
+import frappe
+from frappe.model.naming import make_autoname
 from frappe.model.document import Document
 
 

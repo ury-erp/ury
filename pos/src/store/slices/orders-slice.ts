@@ -3,6 +3,7 @@ import { OrderType } from '../../data/order-types';
 import { call } from '../../lib/frappe-sdk';
 import { getPOSInvoices, getPOSInvoiceItems, POSInvoiceItem, POSInvoiceTax } from '../../lib/invoice-api';
 import { searchPosInvoice } from '../../lib/invoice-api';
+import { getErrorMessage } from '../../lib/error-utils';
 
 export interface POSInvoice {
   name: string;
@@ -86,8 +87,15 @@ export const createOrdersSlice: StateCreator<
       
       // Get POS profile to access paid_limit
       const posProfile = sessionStorage.getItem('posProfile');
-      const profile = posProfile ? JSON.parse(posProfile) : null;
-      const paidLimit = profile?.paid_limit;
+      let paidLimit: number | undefined;
+      if (posProfile) {
+        try {
+          const profile = JSON.parse(posProfile);
+          paidLimit = profile?.paid_limit;
+        } catch {
+          sessionStorage.removeItem('posProfile');
+        }
+      }
       
       if (orderSearchQuery && orderSearchQuery.trim()) {
         // Use search API
@@ -123,7 +131,7 @@ export const createOrdersSlice: StateCreator<
       });
     } catch (error) {
       set({ 
-        error: error instanceof Error ? error.message : 'Failed to fetch orders',
+        error: getErrorMessage(error),
         orderLoading: false 
       });
     }
@@ -167,7 +175,7 @@ export const createOrdersSlice: StateCreator<
       });
     } catch (error) {
       set({ 
-        selectedOrderError: error instanceof Error ? error.message : 'Failed to fetch order details',
+        selectedOrderError: getErrorMessage(error),
         selectedOrderLoading: false 
       });
     }
@@ -197,7 +205,7 @@ export const createOrdersSlice: StateCreator<
       set({ orderLoading: false });
     } catch (error) {
       set({ 
-        error: error instanceof Error ? error.message : 'Failed to update order status',
+        error: getErrorMessage(error),
         orderLoading: false 
       });
     }

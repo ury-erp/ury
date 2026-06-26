@@ -112,7 +112,66 @@ def get_pos_invoices(start, end, pos_profile, user):
         (user, pos_profile, start, end),
         as_dict=1,
     )
-    # need to get taxes and payments so can't avoid get_doc
-    data = [frappe.get_doc("POS Invoice", d.name).as_dict() for d in data]
+    if not data:
+        return []
+
+    invoice_names = [d.name for d in data]
+
+    # Batch-fetch child tables to avoid N+1 get_doc calls
+    items = frappe.db.get_all(
+        "POS Invoice Item",
+        filters={"parent": ("in", invoice_names)},
+        fields=["parent", "name", "item_code", "item_name", "qty", "rate",
+                "amount", "base_rate", "base_amount", "cost_center", "comment",
+                "discount_percentage", "discount_amount", "price_list_rate",
+                "net_rate", "net_amount", "item_group", "warehouse",
+                "stock_uom", "uom", "conversion_factor", "weight_uom",
+                "weight_per_unit", "total_weight", "is_free_item",
+                "custom_course"],
+    )
+    taxes = frappe.db.get_all(
+        "POS Invoice Taxes and Charges",
+        filters={"parent": ("in", invoice_names)},
+        fields=["parent", "name", "charge_type", "account_head", "description",
+                "rate", "tax_amount", "total", "base_total", "cost_center",
+                "included_in_print_rate", "included_in_paid_amount",
+                "doctype"],
+    )
+    payments = frappe.db.get_all(
+        "POS Invoice Payment",
+        filters={"parent": ("in", invoice_names)},
+        fields=["parent", "name", "mode_of_payment", "amount",
+                "base_amount", "type", "account", "reference_no",
+                "reference_date", "default"],
+    )
+
+    items_by_parent = {}
+    for row in items:
+        items_by_parent.setdefault(row.parent, []).append(row)
+    taxes_by_parent = {}
+    for row in taxes:
+        taxes_by_parent.setdefault(row.parent, []).append(row)
+    payments_by_parent = {}
+    for row in payments:
+        payments_by_parent.setdefault(row.parent, []).append(row)
+
+    # Batch-fetch all parent invoice fields in one query
+    parent_fields = ["name", "customer", "grand_total", "rounded_total", "net_total",
+                     "posting_date", "posting_time", "branch", "company", "currency",
+                     "restaurant_table", "pos_profile", "status", "docstatus",
+                     "order_type", "selling_price_list", "is_pos", "update_stock",
+                     "cashier", "waiter", "no_of_pax", "invoice_printed",
+                     "additional_discount_percentage", "discount_amount",
+                     "total_taxes_and_charges", "total_qty"]
+    data = frappe.get_all(
+        "POS Invoice",
+        filters={"name": ("in", invoice_names)},
+        fields=parent_fields,
+    )
+
+    for d in data:
+        d["items"] = items_by_parent.get(d.name, [])
+        d["taxes"] = taxes_by_parent.get(d.name, [])
+        d["payments"] = payments_by_parent.get(d.name, [])
 
     return data

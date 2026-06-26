@@ -13,9 +13,11 @@ def serve_kot(name, time):
 
     production_time = current_time - creation_time
     production_time_minutes = production_time.total_seconds() / 60
-    frappe.db.set_value("URY KOT", name, "start_time_serv", time)
-    frappe.db.set_value("URY KOT", name, "production_time", production_time_minutes)
-    frappe.db.set_value("URY KOT", name, "order_status", "Served")
+    frappe.db.set_value("URY KOT", name, {
+        "start_time_serv": time,
+        "production_time": production_time_minutes,
+        "order_status": "Served",
+    })
 
 
 # Function to mark it as verified by a user in cancel type KOT
@@ -33,16 +35,16 @@ def get_site_name():
 def _build_kot_response(kots, branch, status_filter):
     """Shared logic for kot_list and served_kot_list with batch queries."""
     today = frappe.utils.now()
-    kot_alert_time = frappe.db.get_value(
-        "POS Profile", {"branch": branch}, "custom_kot_warning_time"
+    pos_profile_vals = frappe.db.get_value(
+        "POS Profile",
+        {"branch": branch},
+        ["custom_kot_warning_time", "custom_reset_order_number_daily", "custom_kot_alert"],
+        as_dict=True,
     )
-    daily_order_number = frappe.db.get_value(
-        "POS Profile", {"branch": branch}, "custom_reset_order_number_daily"
-    )
+    kot_alert_time = pos_profile_vals.custom_kot_warning_time
+    daily_order_number = pos_profile_vals.custom_reset_order_number_daily
+    audio_alert = pos_profile_vals.custom_kot_alert
     three_hours_ago = frappe.utils.add_to_date(today, hours=-3)
-    audio_alert = frappe.db.get_value(
-        "POS Profile", {"branch": branch}, "custom_kot_alert"
-    )
 
     # Step 1: Get all KOT names matching the status filter
     kot_list = frappe.get_list(

@@ -13,7 +13,11 @@ export const getPaymentModes = async (): Promise<string[]> => {
   // Check session storage first
   const cached = sessionStorage.getItem('payment_modes');
   if (cached) {
-    return JSON.parse(cached);
+    try {
+      return JSON.parse(cached);
+    } catch {
+      sessionStorage.removeItem('payment_modes');
+    }
   }
 
   try {

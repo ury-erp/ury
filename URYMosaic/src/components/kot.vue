@@ -97,7 +97,7 @@
                   </span><br v-if="kot.is_aggregator"/>
                   <span class="text-sm font-medium text-[#6B7280]">Order</span>
                   <span class="text-black-500 ml-2 font-semibold"
-                    >{{ this.daily_order_number ? kot.order_no : kot.invoice.slice(-4) }}
+                    >{{ this.daily_order_number ? kot.order_no : (kot.invoice ? kot.invoice.slice(-4) : '—') }}
                     
                   </span>
                   <span
@@ -364,7 +364,7 @@ export default {
           this.hideStatusMessageAfterDelay();
         });
     },
-    async serveOrder(kot) {
+    serveOrder(kot) {
       const now = new Date();
       this.currentTime = now.toLocaleTimeString();
 
@@ -386,9 +386,7 @@ export default {
         });
     },
 
-    async orderDelayNotify(kot) {
-      const now = new Date();
-      this.currentTime = now.toLocaleTimeString();
+    orderDelayNotify(kot) {
 
       this.call
         .post(
@@ -530,6 +528,7 @@ export default {
         this.masonry = null;
       }
       this.$nextTick(() => {
+        if (!this.$el) return;
         this.masonry = new Masonry(this.$el.querySelector(".grid"), {
           itemSelector: ".masonry-item",
           gutter: 28,
@@ -592,6 +591,10 @@ export default {
       console.warn("Socket disconnected:", reason);
       this.statusMessage = "Connection lost. Reconnecting...";
     });
+    socket.on('connect', () => {
+      this.setStatusMessage("Reconnected");
+      this.hideStatusMessageAfterDelay();
+    });
 
     this.auth()
       .then(() => {
@@ -600,29 +603,34 @@ export default {
             this.showAudioAlertMessage = true;
           }
           this.socketHandler = (doc) => {
-            if (this.audio_alert === 1) {
-              this.playAlertSound(doc.audio_file);
-            }
-            let kottime = localStorage.getItem("kot_time");
-            if (doc.last_kot_time !== kottime) {
-              // Full refresh needed — skip intermediate mutations
-              this.fetchKOT().then(() => { this.masonryLoading(); });
-            } else {
-              // Incremental update
-              const newKot = { isRotated: false, showDiv: false, timecolor: 'text-black', timeRemaining: '— : —', ...doc.kot };
-              this.kot.unshift(newKot);
-              this.updateQtyColorTable();
-              this.updateTimeRemaining();
-              this.masonryLoading();
-            }
-            this._cancelTimeout = setTimeout(() => {
-              if (doc.kot.type === "Cancelled") {
-                this.fetchKOT().then(() => {
-                  this.masonryLoading();
-                });
+            try {
+              if (this.audio_alert === 1) {
+                this.playAlertSound(doc.audio_file);
               }
-            }, 1500);
-            localStorage.setItem("kot_time", doc.kot.time);
+              let kottime = localStorage.getItem("kot_time");
+              if (doc.last_kot_time !== kottime) {
+                // Full refresh needed — skip intermediate mutations
+                this.fetchKOT().then(() => { this.masonryLoading(); });
+              } else {
+                // Incremental update
+                const newKot = { isRotated: false, showDiv: false, timecolor: 'text-black', timeRemaining: '— : —', ...doc.kot };
+                this.kot.unshift(newKot);
+                this.updateQtyColorTable();
+                this.updateTimeRemaining();
+                this.masonryLoading();
+              }
+              if (this._cancelTimeout) clearTimeout(this._cancelTimeout);
+              this._cancelTimeout = setTimeout(() => {
+                if (doc.kot && doc.kot.type === "Cancelled") {
+                  this.fetchKOT().then(() => {
+                    this.masonryLoading();
+                  });
+                }
+              }, 1500);
+              if (doc.kot) localStorage.setItem("kot_time", doc.kot.time);
+            } catch (err) {
+              console.error("Socket handler error:", err);
+            }
           };
           socket.on(this.kot_channel, this.socketHandler);
         });
@@ -641,8 +649,11 @@ export default {
     if (this.socketHandler) {
       socket.off(this.kot_channel, this.socketHandler);
     }
-    socket.off('connect_error');
-    socket.off('disconnect');
+    if (socket) {
+      socket.off('connect_error');
+      socket.off('disconnect');
+      socket.off('connect');
+    }
     if (this._cancelTimeout) clearTimeout(this._cancelTimeout);
     if (this._statusTimeout) clearTimeout(this._statusTimeout);
     if (this.timer) clearInterval(this.timer);

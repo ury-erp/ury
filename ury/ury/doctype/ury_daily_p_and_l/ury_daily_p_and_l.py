@@ -204,13 +204,26 @@ class URYDailyPandL(Document):
                                 cogs = cogs + rate * qty
                 
                 unset_bom_item_prices = []
+                # Batch-fetch all BOMs needed for bom_item_sales
+                bom_item_codes = [item['Item Code'] for item in bom_item_sales]
+                bom_map = {}
+                if bom_item_codes:
+                        bom_rows = frappe.db.get_all(
+                                "BOM",
+                                filters={"item": ("in", bom_item_codes), "is_active": 1, "is_default": 1, "docstatus": 1},
+                                fields=["name", "item"],
+                        )
+                        for row in bom_rows:
+                                if row.item not in bom_map:
+                                        bom_map[row.item] = row.name
+
                 for item in bom_item_sales:
                         buying_price = 0
                         buying_price_list = report_settings.buying_price_list
-                        boms = frappe.db.get_all("BOM",fields = ("*"),filters = {'item':item['Item Code'],'is_active':1,'is_default':1,'docstatus':1})
-                        if not boms:
+                        bom_name = bom_map.get(item['Item Code'])
+                        if not bom_name:
                                 continue
-                        bom = frappe.get_doc("BOM",boms[0].name)
+                        bom = frappe.get_doc("BOM", bom_name)
                         bom_data = inner_bom_process(buying_price_list,bom)
                         bom_buying_price = bom_data['bom_buying_price']
                         unset_bom_items = bom_data['unset_bom_items']
@@ -231,15 +244,27 @@ class URYDailyPandL(Document):
                                 cogs = cogs + buying_price * qty
 
                 unset_pb_item_prices = []
+                # Batch-fetch all Product Bundles needed
+                pb_item_codes = [item['Item Code'] for item in pb_item_sales]
+                pb_map = {}
+                if pb_item_codes:
+                        pb_rows = frappe.db.get_all(
+                                "Product Bundle",
+                                filters={"new_item_code": ("in", pb_item_codes)},
+                                fields=["name", "new_item_code"],
+                        )
+                        for row in pb_rows:
+                                pb_map[row.new_item_code] = row.name
+
                 for item in pb_item_sales:
-                        pb_items = frappe.db.get_all("Product Bundle",fields = ("*"),filters = {'new_item_code':item['Item Code']})
-                        if not pb_items:
+                        pb_name = pb_map.get(item['Item Code'])
+                        if not pb_name:
                                 continue
-                        pb = frappe.get_doc("Product Bundle",pb_items[0].name)
+                        pb = frappe.get_doc("Product Bundle", pb_name)
                         buying_price = 0
                         for pb_item in pb.items:
                                 item_qty = pb_item.qty
-                                boms = frappe.db.get_all("BOM",fields = ("*"),filters = {'item':pb_item.item_code,'is_active':1,'is_default':1,'docstatus':1})
+                                boms = frappe.db.get_all("BOM",fields = ["name"],filters = {'item':pb_item.item_code,'is_active':1,'is_default':1,'docstatus':1})
                                 if len(boms) > 0:
                                         buying_price_list = report_settings.buying_price_list
                                         bom = frappe.get_doc("BOM",boms[0].name)
@@ -251,9 +276,8 @@ class URYDailyPandL(Document):
                                                 if unset_item not in unset_bom_item_prices:
                                                         unset_bom_item_prices.append(unset_item)
                                 else:
-                                        sub_item = frappe.get_doc("Item",pb_item.item_code)
-                                        item_name = sub_item.item_name
-                                        items_price = frappe.db.get_all("Item Price",fields = ['name','price_list_rate'],filters = {'price_list':report_settings.buying_price_list,'item_code':pb_item.item_code})
+                                        item_name = frappe.db.get_value("Item", pb_item.item_code, "item_name") or pb_item.item_code
+                                        items_price = frappe.db.get_all("Item Price",fields = ['price_list_rate'],filters = {'price_list':report_settings.buying_price_list,'item_code':pb_item.item_code})
                                         if len(items_price) == 0:
                                                 if item_name not in unset_pb_item_prices:
                                                         unset_pb_item_prices.append(item_name)

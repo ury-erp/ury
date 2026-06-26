@@ -34,8 +34,7 @@ def get_unprocessed_invoices(start_time, end_time):
 def process_invoice(invoice):
     posInvoice = frappe.get_doc("POS Invoice", invoice.name)
     waiter = posInvoice.waiter
-    pos_profile = frappe.get_doc("POS Profile", posInvoice.pos_profile)
-    kot_naming_series = pos_profile.custom_kot_naming_series
+    kot_naming_series = frappe.db.get_value("POS Profile", posInvoice.pos_profile, "custom_kot_naming_series")
 
     # Check if KOT already exists for this invoice
     kot_list = frappe.get_list(
@@ -81,7 +80,7 @@ def process_invoice(invoice):
         if production_items:
             create_kot(
                 posInvoice,
-                pos_profile,
+                posInvoice.pos_profile,
                 kot_naming_series,
                 production_items,
                 waiter,
@@ -98,7 +97,7 @@ def get_productions_for_branch(branch):
 
 
 def create_kot(
-    posInvoice, pos_profile, kot_naming_series, production_items, owner, production_name
+    posInvoice, pos_profile_name, kot_naming_series, production_items, owner, production_name
 ):
     kotdoc = frappe.new_doc("URY KOT")
     kotdoc.update(
@@ -107,7 +106,7 @@ def create_kot(
             "restaurant_table": posInvoice.restaurant_table,
             "naming_series": kot_naming_series,
             "type": "Duplicate",
-            "pos_profile": pos_profile.name,
+            "pos_profile": pos_profile_name,
             "customer_name": posInvoice.customer,
             "production": production_name,
             "order_no": getattr(posInvoice, "custom_ury_order_number", None),

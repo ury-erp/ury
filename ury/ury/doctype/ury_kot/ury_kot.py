@@ -2,7 +2,6 @@
 # For license information, please see license.txt
 
 import frappe
-import requests
 import json
 from frappe.utils.print_format import print_by_server
 from frappe.model.document import Document
@@ -23,8 +22,11 @@ class URYKOT(Document):
             try:
                 # Print KOT using a server function (print_by_server)
                 print_by_server("URY KOT", self.name, printer, kot_print_format)
-            except:
-                pass
+            except Exception:
+                frappe.log_error(
+                    f"KOT Print Failed for {self.name} on printer {printer}",
+                    "KOT Print Error",
+                )
 
         
         pos_kot_printers = frappe.db.get_all(
@@ -110,5 +112,4 @@ class URYKOT(Document):
         frappe.cache().set_value(cache_key, self.time)
 
     def userSetting(self):
-        userDoc = frappe.get_doc("User", self.owner)
-        self.user = userDoc.full_name
+        self.user = frappe.db.get_value("User", self.owner, "full_name")

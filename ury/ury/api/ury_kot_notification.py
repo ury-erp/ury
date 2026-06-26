@@ -23,6 +23,9 @@ def order_delay_notification(id):
         as_dict=True,
     )
 
+    if not kot:
+        frappe.throw(_("KOT {0} not found").format(id))
+
     table = kot.restaurant_table or "Take Away"
     order_id = kot.invoice[-5:] if kot.invoice else id
     items = frappe.get_all(

@@ -165,14 +165,13 @@ def process_items_for_kot(
     pos_invoice,  # passed in to avoid re-fetching
     branch,
 ):
-    pos_profile = frappe.get_doc("POS Profile", pos_profile_id)
     productions = frappe.db.get_all(
-        "URY Production Unit", filters={"branch": pos_profile.branch}, fields=["name"]
+        "URY Production Unit", filters={"branch": branch}, fields=["name"]
     )
 
     if not productions:
         frappe.throw(
-            "Create URY Production unit against POS Profile: %s" % pos_profile.name
+            "Create URY Production unit against POS Profile: %s" % pos_profile_id
         )
 
     item_codes = [i["item_code"] for i in items]
@@ -249,9 +248,8 @@ def process_items_for_cancel_kot(
     pos_invoice,  # passed in to avoid re-fetching
     branch,
 ):
-    pos_profile = frappe.get_doc("POS Profile", pos_profile_id)
     productions = frappe.db.get_all(
-        "URY Production Unit", filters={"branch": pos_profile.branch}, fields=["name"]
+        "URY Production Unit", filters={"branch": branch}, fields=["name"]
     )
 
     item_codes = [i["item_code"] for i in items]
@@ -385,14 +383,15 @@ def kot_execute(
 
     pos_invoice = frappe.get_doc("POS Invoice", invoice_id)
     pos_profile_id = pos_invoice.pos_profile
-    pos_profile = frappe.get_doc("POS Profile", pos_profile_id)
-    kot_naming_series = pos_profile.custom_kot_naming_series
+    kot_naming_series = frappe.db.get_value(
+        "POS Profile", pos_profile_id, "custom_kot_naming_series"
+    )
     if kot_naming_series:
         cancel_kot_naming_series = "CNCL-" + kot_naming_series
     else:
         frappe.throw(
             "KOT Naming Series is mandatory for the auto creation of KOT. "
-            "Ensure it is configured in the POS Profile: %s" % pos_profile.name
+            "Ensure it is configured in the POS Profile: %s" % pos_profile_id
         )
 
     branch = getBranch()

@@ -497,23 +497,10 @@ def captain_transfer(currentCaptain, newCaptain, invoice):
         room_match = any(room['room'] == current_room for room in new_captain_room)
         if not room_match:
             frappe.throw(_("Captain transfer is not allowed between different rooms"))
-        else:
-            current_captain_doc = frappe.get_doc("User", currentCaptain)
-            pos_invoice = frappe.get_doc("POS Invoice", invoice)
-            new_captain_doc = frappe.get_doc("User", newCaptain)
 
-            # Update the waiter field of the POS Invoice
-            pos_invoice.waiter = new_captain_doc.name
-            pos_invoice.save()
-
-    else:
-        current_captain_doc = frappe.get_doc("User", currentCaptain)
-        pos_invoice = frappe.get_doc("POS Invoice", invoice)
-        new_captain_doc = frappe.get_doc("User", newCaptain)
-
-        # Update the waiter field of the POS Invoice
-        pos_invoice.waiter = new_captain_doc.name
-        pos_invoice.save()
+    pos_invoice = frappe.get_doc("POS Invoice", invoice)
+    pos_invoice.waiter = newCaptain
+    pos_invoice.save()
 
 
 @frappe.whitelist()
@@ -552,21 +539,19 @@ def cancel_order(invoice_id, reason):
         frappe.throw(_("Not permitted to cancel orders"), frappe.PermissionError)
     pos_invoice = frappe.get_doc("POS Invoice", invoice_id)
 
-    # Update table status
-    frappe.db.set_value(
-        "URY Table",
-        pos_invoice.restaurant_table,
-        {"occupied": 0, "latest_invoice_time": None},
-    )
-
     try:
         cancel_kot(invoice_id)
     except Exception as e:
         frappe.log_error(f"Failed to create cancellation KOT for {invoice_id}: {frappe.get_traceback()}", "Cancel KOT Error")
 
-    # Update invoice status atomically
+    # Update table and invoice status atomically in a single transaction
     frappe.db.begin()
     try:
+        frappe.db.set_value(
+            "URY Table",
+            pos_invoice.restaurant_table,
+            {"occupied": 0, "latest_invoice_time": None},
+        )
         frappe.db.sql("""
             UPDATE `tabPOS Invoice Item`
             SET docstatus = 2
@@ -583,7 +568,7 @@ def cancel_order(invoice_id, reason):
 # Method for URY POS
 @frappe.whitelist()
 def make_invoice(customer, payments, cashier, pos_profile,owner, additionalDiscount=None, table=None, invoice=None):
-    order_type =  invoice_name = frappe.get_value("POS Invoice",invoice , "order_type")
+    order_type = frappe.get_value("POS Invoice", invoice, "order_type")
     invoice = get_order_invoice(table, invoice, order_type, "Payments")
 
     if table:
@@ -657,21 +642,23 @@ def cancel_kot(invoice_id):
         pos_invoice.branch,
     )
 
-    # Set the KOTs associated with the invoice as canceled
-    kot_list = frappe.db.get_list(
+    # Set the KOTs associated with the invoice as canceled via batch SQL
+    kot_names = frappe.db.get_list(
         "URY KOT",
         filters={
             "invoice": invoice_id,
             "type": ("in", ("New Order", "Order Modified")),
             "docstatus": 1,
         },
-        fields=("*"),
+        fields=["name"],
+        pluck="name",
     )
 
-    for item in kot_list:
-        kot_doc = frappe.get_doc("URY KOT", item.name)
-        kot_doc.docstatus = 2
-        kot_doc.save()
+    if kot_names:
+        frappe.db.sql(
+            """UPDATE `tabURY KOT` SET docstatus = 2 WHERE name IN %s""",
+            (kot_names,),
+        )
 
 
 def change_table_in_kot(invoice, new_table, branch):
@@ -684,11 +671,11 @@ def change_table_in_kot(invoice, new_table, branch):
             "order_status": "Ready For Prepare",
             "verified": 0,
         },
+        fields=["name", "production"],
     )
 
     # Update each KOT's restaurant_table and send a real-time update
     for kot in kot_list:
         frappe.db.set_value("URY KOT", kot.name, "restaurant_table", new_table)
-        production = frappe.db.get_value("URY KOT", kot.name, "production")
-        kot_channel = "{}_{}_{}".format("kot_update", branch, production)
+        kot_channel = "{}_{}_{}".format("kot_update", branch, kot.production)
         frappe.publish_realtime(kot_channel)
