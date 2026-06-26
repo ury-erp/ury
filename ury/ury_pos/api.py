@@ -4,17 +4,6 @@ from frappe.utils import flt, validate_phone_number
 from datetime import datetime, timedelta
 
 
-#GetTable  decripted temporarily
-# @frappe.whitelist()
-# def getTable(room):
-#     branch_name = getBranch()   
-#     tables = frappe.get_all(
-#         "URY Table",
-#         fields=["name", "occupied", "latest_invoice_time", "is_take_away", "restaurant_room","table_shape","no_of_seats","layout_x","layout_y"],
-#         filters={"branch": branch_name,"restaurant_room":room,}
-#     )    
-#     return tables
-
 @frappe.whitelist()
 def getRestaurantMenu(pos_profile, room=None, order_type=None):
     menu_items = []
@@ -130,7 +119,7 @@ def getBranch():
     """
     branch_array = frappe.db.sql(sql_query, user, as_dict=True)
     if not branch_array:
-        frappe.throw("User is not Associated with any Branch.Please refresh Page")
+        frappe.throw("User is not associated with any branch. Please refresh the page.")
 
     branch_name = branch_array[0].get("branch")
 
@@ -192,14 +181,12 @@ def getRoom():
 def getModeOfPayment():
     posDetails = getPosProfile()
     posProfile = posDetails["pos_profile"]
-    posProfiles = frappe.get_doc("POS Profile", posProfile)
-    mode_of_payments = posProfiles.payments
-    modeOfPayments = []
-    for mop in mode_of_payments:
-        modeOfPayments.append(
-            {"mode_of_payment": mop.mode_of_payment, "opening_amount": float(0)}
-        )
-    return modeOfPayments
+    payments = frappe.get_all(
+        "POS Profile Payment",
+        filters={"parent": posProfile},
+        fields=["mode_of_payment"],
+    )
+    return [{"mode_of_payment": p.mode_of_payment, "opening_amount": 0.0} for p in payments]
 
 @frappe.whitelist()
 def getInvoiceForCashier(status, cashier, limit, limit_start):
@@ -573,49 +560,31 @@ def getPosProfile():
 
 @frappe.whitelist()
 def getPosInvoiceItems(invoice):
-    itemDetails = []
-    taxDetails = []
-    orderdItems = frappe.get_doc("POS Invoice", invoice)
-    posItems = orderdItems.items
-    for items in posItems:
-        item_name = items.item_name
-        qty = items.qty
-        amount = items.rate
-        itemDetails.append(
-            {
-                "item_name": item_name,
-                "qty": qty,
-                "amount": amount,
-            }
-        )
-    taxDetail = orderdItems.taxes
-    for tax in taxDetail:
-        description = tax.description
-        rate = tax.tax_amount
-        taxDetails.append(
-            {
-                "description": description,
-                "rate": rate,
-            }
-        )
-    return itemDetails, taxDetails
+    items = frappe.get_all(
+        "POS Invoice Item",
+        filters={"parent": invoice},
+        fields=["item_name", "qty", "rate"],
+    )
+    taxes = frappe.get_all(
+        "POS Invoice Item Tax",
+        filters={"parent": invoice},
+        fields=["description", "tax_amount"],
+    )
+    item_details = [{"item_name": i.item_name, "qty": i.qty, "amount": i.rate} for i in items]
+    tax_details = [{"description": t.description, "rate": t.tax_amount} for t in taxes]
+    return item_details, tax_details
 
 
 @frappe.whitelist()
 def posOpening():
     branchName = getBranch()
-    pos_opening_list = frappe.get_all(
+    has_open = frappe.db.exists(
         "POS Opening Entry",
-        fields=["name", "docstatus", "status", "posting_date"],
-        filters={"branch": branchName},
+        {"branch": branchName, "status": "Open", "docstatus": 1},
     )
-    flag = 1
-    for pos_opening in pos_opening_list:
-        if pos_opening.status == "Open" and pos_opening.docstatus == 1:
-            flag = 0
-    if flag == 1:
-        frappe.msgprint(title="Message", indicator="red", msg=("Please Open POS Entry"))
-    return flag
+    if not has_open:
+        frappe.msgprint(title="Message", indicator="red", msg=_("Please Open POS Entry"))
+    return 0 if has_open else 1
 
 
 @frappe.whitelist()

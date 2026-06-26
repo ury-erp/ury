@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { t } from '../i18n';
 import { Star, TrendingUp } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
@@ -25,16 +25,8 @@ export default function POS() {
   } = usePOSStore();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [showSearch, setShowSearch] = useState(false);
   const clickTimerRef = useRef<NodeJS.Timeout | null>(null);
   const clickCountRef = useRef(0);
-
-  useEffect(() => {
-    if (showSearch) {
-      // The searchInputRef.current.focus() line was removed as per the new_code,
-      // as the SearchBar component now handles its own focus.
-    }
-  }, [showSearch]);
 
   const handleItemClick = (item: MenuItem) => {
     if (isMenuInteractionDisabled()) return;

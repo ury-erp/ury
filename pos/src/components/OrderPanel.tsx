@@ -127,7 +127,6 @@ const OrderPanel = () => {
       resetOrderState();
       showToast.success(isUpdatingOrder ? t('success.order_updated') : t('success.order_created'));
     } catch (error) {
-      console.error('Failed to sync order:', error);
       showToast.error(getErrorMessage(error));
     } finally {
       setIsSubmitting(false);

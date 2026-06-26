@@ -52,7 +52,6 @@ export async function getTableOrder(table_no: string): Promise<TableOrder> {
     });
     return res as TableOrder;
   } catch (error) {
-    console.error('Error fetching table order:', error);
     throw error;
   }
 } 

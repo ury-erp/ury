@@ -1,11 +1,12 @@
 import { Globe, Phone, ShoppingBag, Truck, Utensils } from "lucide-react";
+import type { ElementType } from 'react';
 
 export type OrderType = "Dine In" | "Take Away" | "Delivery" | "Phone In" | "Aggregators";
 
 export type OrderTypes= {
     label: string;
     value: OrderType;
-    icon: React.ElementType;
+    icon: ElementType;
 }
 
 export const ORDER_TYPES: OrderTypes[] = [

@@ -6,6 +6,8 @@ import { Button, Input, Dialog, DialogContent } from './ui';
 import { call } from '../lib/frappe-sdk';
 import { DEFAULT_PAYMENT_MODE } from '../data/order-types';
 import { t } from '../i18n';
+import { showToast } from './ui/toast';
+import { getErrorMessage } from '../lib/error-utils';
 
 
 interface PaymentDialogProps {
@@ -137,15 +139,12 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
         pos_profile: posProfile,
         table,
       });
-      // Show toast and reload orders (assume showToast and reload available globally)
-      if (typeof window !== 'undefined' && (window as any).showToast) {
-        (window as any).showToast.success('Payment successful');
-      }
+      showToast.success(t('success.payment_successful'));
       onClose();
       clearSelectedOrder();
       await fetchOrders();
     } catch (err) {
-      setError((err as Error).message);
+      setError(getErrorMessage(err));
     } finally {
       setIsProcessing(false);
     }

@@ -109,7 +109,7 @@ export const createAppSlice: StateCreator<POSSliceAll, [], [], AppSlice> = (set,
         await get().fetchCurrencySymbol();
       }
     } catch (error) {
-      console.error('Error fetching POS profile:', error);
+      if (import.meta.env.DEV) console.error('Error fetching POS profile:', error);
       set({
         error: 'Failed to fetch POS profile',
         profileLoading: false,
@@ -126,7 +126,7 @@ export const createAppSlice: StateCreator<POSSliceAll, [], [], AppSlice> = (set,
       set({ currencySymbol: symbol });
       storage.setItem('currencySymbol', symbol);
     } catch (error) {
-      console.error('Error fetching currency symbol:', error);
+      if (import.meta.env.DEV) console.error('Error fetching currency symbol:', error);
       set({ currencySymbol: get().currency });
       storage.setItem('currencySymbol', get().currency);
     }
@@ -137,7 +137,7 @@ export const createAppSlice: StateCreator<POSSliceAll, [], [], AppSlice> = (set,
       const modes = await getPaymentModes();
       set({ paymentModes: modes });
     } catch (error) {
-      console.error('Failed to fetch payment modes:', error);
+      if (import.meta.env.DEV) console.error('Failed to fetch payment modes:', error);
     }
   },
 

@@ -1,27 +1,8 @@
 import { StateCreator } from 'zustand';
-import { OrderType } from '../../data/order-types';
 import { call } from '../../lib/frappe-sdk';
-import { getPOSInvoices, getPOSInvoiceItems, POSInvoiceItem, POSInvoiceTax } from '../../lib/invoice-api';
-import { searchPosInvoice } from '../../lib/invoice-api';
+import { getPOSInvoices, getPOSInvoiceItems, searchPosInvoice, POSInvoiceItem, POSInvoiceTax } from '../../lib/invoice-api';
+import type { POSInvoice } from '../../lib/invoice-api';
 import { getErrorMessage } from '../../lib/error-utils';
-
-export interface POSInvoice {
-  name: string;
-  invoice_printed: number;
-  grand_total: number;
-  restaurant_table: string | null;
-  cashier: string;
-  waiter: string;
-  net_total: number;
-  posting_time: string;
-  total_taxes_and_charges: number;
-  customer: string;
-  status: 'Draft' | 'Unbilled' | 'Recently Paid' | 'Paid' | 'Consolidated' | 'Return';
-  mobile_number: string;
-  posting_date: string;
-  rounded_total: number;
-  order_type: OrderType;
-}
 
 export interface OrdersState {
   orders: POSInvoice[];

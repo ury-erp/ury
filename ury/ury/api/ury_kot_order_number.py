@@ -48,10 +48,6 @@ def set_order_number(doc, event):
             "name",
         )
 
-        # invoice = frappe.get_last_doc(
-        #     "POS Invoice", filters={"pos_profile": doc.pos_profile}
-        # )
-
         if doc.order_type == "Aggregators":
             aggregator_invoice =frappe.get_last_doc(
                 "POS Invoice", filters={"pos_profile": doc.pos_profile,"order_type": "Aggregators"}

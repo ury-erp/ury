@@ -2,8 +2,10 @@
   <div class="mx-auto p-6 mb-16 relative">
     <!-- Alert Modal div start-->
     <div
-      v-if="this.showModal"
-      class="fixed inset-0 z-10 overflow-y-auto bg-gray-100"
+      v-if="showModal"
+      class="fixed inset-0 z-10 overflow-y-auto modal-overlay"
+      role="dialog"
+      aria-modal="true"
     >
       <div class="flex items-center justify-center">
         <div class="w-full rounded-lg bg-white p-6 shadow-lg md:max-w-md">
@@ -24,8 +26,8 @@
           <div class="flex justify">
             <button
               @click="
-                this.showModal = false;
-                this.redirectToLogin();
+                showModal = false;
+                redirectToLogin();
               "
               class="mt-8 rounded bg-blue-500 px-3 py-2 text-white hover:bg-blue-600"
             >
@@ -40,14 +42,14 @@
     <div
       class="grid grid-cols-1 gap-10 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
     >
-      <div v-for="kot in this.kot" :key="kot.name">
+      <div v-for="kot in kot" :key="kot.name">
         <div
           :class="[kot.color]"
-          class="inline-block shadow-lg gap-4 p-3 rounded-2xl w-90 h-auto masonry-item"
+          class="inline-block shadow-lg gap-4 p-3 rounded-2xl w-80 h-auto masonry-item"
           style="margin-top: 28px"
           v-if="!kot.showDiv && kot.production === production"
         >
-          <div class="w-64 check">
+          <div class="w-64">
             <div
               :class="[{ hidden: !kot.isRotated }]"
               @click="rotateCard(kot)"
@@ -70,9 +72,6 @@
               </button>
             </div>
 
-            
-              <!-- Serve Button -->
-
               <!-- Card Header: Table Name and Order Number -->
               <div class="flex justify-between" @click="rotateCard(kot)">
                 <div class="text-sm w-48">
@@ -81,27 +80,27 @@
                     class="text-sm font-medium text-[#6B7280]"
                     >Table
                   </span>
-                  <span class="text-black-500 font-semibold">
+                  <span class="text-gray-900 font-semibold">
                     {{ kot.tableortakeaway }}
                     <span class="text-sm font-medium text-[#6B7280]"
                       >( {{ kot.user }} )</span
                     ></span
                   ><br />
                   <span v-if="kot.is_aggregator" class="text-sm font-medium text-[#6B7280]">Aggregator</span>
-                  <span v-if="kot.is_aggregator" class="text-black-500 ml-2 font-semibold"
+                  <span v-if="kot.is_aggregator" class="text-gray-900 ml-2 font-semibold"
                     >{{ kot.customer_name }}
                   </span><br v-if="kot.is_aggregator" />
                   <span v-if="kot.is_aggregator" class="text-sm font-medium text-[#6B7280]">Aggregator ID</span>
-                  <span v-if="kot.is_aggregator" class="text-black-500 ml-2 font-semibold"
+                  <span v-if="kot.is_aggregator" class="text-gray-900 ml-2 font-semibold"
                     >{{ kot.aggregator_id }}
                   </span><br v-if="kot.is_aggregator"/>
                   <span class="text-sm font-medium text-[#6B7280]">Order</span>
-                  <span class="text-black-500 ml-2 font-semibold"
-                    >{{ this.daily_order_number ? kot.order_no : (kot.invoice ? kot.invoice.slice(-4) : '—') }}
+                  <span class="text-gray-900 ml-2 font-semibold"
+                    >{{ daily_order_number ? kot.order_no : (kot.invoice ? kot.invoice.slice(-4) : '—') }}
                     
                   </span>
                   <span
-                    class="text-black-500 ml-2 font-semibold"
+                    class="text-gray-900 ml-2 font-semibold"
                     v-if="
                       kot.type === 'Partially cancelled' ||
                       kot.type === 'Cancelled'
@@ -112,7 +111,7 @@
                 </div>
                 <div
                   :class="kot.timecolor"
-                  class="font-inter font-semibold text-2xl leading-10"
+                  class="font-semibold text-2xl leading-10"
                 >
                   {{ kot.timeRemaining }}
                 </div>
@@ -144,13 +143,13 @@
                     class="flex font-semibold justify-between items-center"
                   >
                     <div>
-                      <span class="ml-2 text-black-100">{{
+                      <span class="ml-2 text-gray-900">{{
                         kotitem.item_name
                       }}<span v-show="kotitem.indicate_course" class="text-sm text-gray-500 ml-1"> ( {{kotitem.course}} )</span>
                       </span
                       ><br />
                       <span
-                        class="ml-2 text-black-100"
+                        class="ml-2 text-gray-900"
                         v-if="
                           kot.type === 'Partially cancelled' ||
                           kot.type === 'Cancelled'
@@ -159,7 +158,7 @@
                       >
                     </div>
                     <div>
-                      <span class="ml-2 text-black-100">{{ kotitem.qty }}</span>
+                      <span class="ml-2 text-gray-900">{{ kotitem.qty }}</span>
                     </div>
                   </div>
                   <div>
@@ -175,7 +174,6 @@
               </div>
             
           </div>
-          <!-- You can add more item/quantity pairs here as needed -->
         </div>
       </div>
     </div>
@@ -274,7 +272,6 @@ export default {
       production: "",
       branch: "",
       kot_channel: "",
-      clickedItems: new Set(),
       struckThroughItems: {},
       loggeduser: "",
       showModal: false,
@@ -289,8 +286,8 @@ export default {
   },
   methods: {
     playAlertSound(path) {
-      var currentDomain = window.location.origin;
-      var audio_path = currentDomain + path;
+      const currentDomain = window.location.origin;
+      const audio_path = currentDomain + path;
       const audio = new Audio(audio_path);
       audio.play().catch(() => {});
     },
@@ -345,8 +342,6 @@ export default {
       kot.isRotated = !kot.isRotated;
     },
     confirmOrder(kot) {
-      const now = new Date();
-      this.currentTime = now.toLocaleTimeString();
       this.call
         .post("ury.ury.api.ury_kot_display.confirm_cancel_kot", {
           name: kot.name,
@@ -359,7 +354,6 @@ export default {
           this.masonryLoading();
         })
         .catch((error) => {
-          console.error(error);
           this.setStatusMessage("Action failed. Please try again.");
           this.hideStatusMessageAfterDelay();
         });
@@ -379,8 +373,7 @@ export default {
           this.removeAllItemsFromLocalStorage(kot);
           this.masonryLoading();
         })
-        .catch((error) => {
-          console.error(error);
+        .catch(() => {
           this.setStatusMessage("Action failed. Please try again.");
           this.hideStatusMessageAfterDelay();
         });
@@ -518,7 +511,7 @@ export default {
       });
     },
     redirectToLogin() {
-      var currentDomain = window.location.origin;
+      const currentDomain = window.location.origin;
       window.location.href =
         currentDomain + "/login?redirect-to=URYMosaic/" + this.production;
     },
@@ -532,8 +525,6 @@ export default {
         this.masonry = new Masonry(this.$el.querySelector(".grid"), {
           itemSelector: ".masonry-item",
           gutter: 28,
-
-          // Other Masonry options can be added here
         });
         this.masonry.layout();
       });
@@ -667,8 +658,8 @@ export default {
   },
 };
 </script>
-<style>
-.bg-gray-100 {
+<style scoped>
+.modal-overlay {
   background-color: rgba(0, 0, 0, 0.2);
 }
 </style>

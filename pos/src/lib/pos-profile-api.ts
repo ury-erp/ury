@@ -28,7 +28,7 @@ export interface PosProfileLimitedResponse {
   message: PosProfileLimited;
 }
 
-interface RolePermission {
+export interface RolePermission {
   name: string;
   owner: string;
   creation: string;

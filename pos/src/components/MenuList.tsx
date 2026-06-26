@@ -71,7 +71,6 @@ const MenuList: React.FC<MenuListProps> = ({ onItemClick }) => {
             {filteredItems.map((item) => (
               <MenuCard
                 key={item.id}
-                id={item.id}
                 name={item.name}
                 price={item.price}
                 item_image={item.image}

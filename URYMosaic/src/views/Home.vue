@@ -18,7 +18,7 @@ export default {
   methods: {
     handleRefresh() {
       if (this.$refs.kotRef && typeof this.$refs.kotRef.fetchKOT === 'function') {
-        this.$refs.kotRef.fetchKOT();
+        this.$refs.kotRef.fetchKOT().catch(() => {});
       }
     },
   },

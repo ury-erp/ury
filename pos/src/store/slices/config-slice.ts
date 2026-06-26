@@ -1,22 +1,8 @@
 import { StateCreator } from 'zustand';
 import { AuthSlice } from './auth-slice';
 import { getCombinedPosProfile, PosProfileCombined } from '../../lib/pos-profile-api';
+import type { RolePermission } from '../../lib/pos-profile-api';
 import { getErrorMessage } from '../../lib/error-utils';
-
-interface RolePermission {
-  name: string;
-  owner: string;
-  creation: string;
-  modified: string;
-  modified_by: string;
-  docstatus: number;
-  idx: number;
-  role: string;
-  parent: string;
-  parentfield: string;
-  parenttype: string;
-  doctype: string;
-}
 
 export interface ConfigState {
   allowedRoles: string[];

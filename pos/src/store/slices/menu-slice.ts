@@ -60,7 +60,7 @@ export const createMenuSlice: StateCreator<POSSliceAll, [], [], MenuSlice> = (se
       set({ menuItems });
     } catch (error) {
       set({ error: 'Failed to load menu items' });
-      console.error('Error loading menu items:', error);
+      if (import.meta.env.DEV) console.error('Error loading menu items:', error);
     } finally {
       set({ menuLoading: false });
     }
@@ -83,7 +83,7 @@ export const createMenuSlice: StateCreator<POSSliceAll, [], [], MenuSlice> = (se
       set({ menuItems, menuLoading: false });
     } catch (error) {
       set({ error: 'Failed to load aggregator menu', menuLoading: false });
-      console.error('Error loading aggregator menu:', error);
+      if (import.meta.env.DEV) console.error('Error loading aggregator menu:', error);
     }
   },
 

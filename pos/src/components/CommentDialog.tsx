@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { MessageSquare, X } from 'lucide-react';
 import { Button } from './ui';
 import { t } from '../i18n';

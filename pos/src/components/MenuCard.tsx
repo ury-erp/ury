@@ -2,7 +2,6 @@ import { FC, useState } from 'react';
 import { formatCurrency, cn } from '../lib/utils';
 
 interface MenuCardProps {
-  id: string;
   name: string;
   price: number;
   item_image: string | null;
@@ -13,7 +12,6 @@ interface MenuCardProps {
 }
 
 const MenuCard: FC<MenuCardProps> = ({ 
-  id, 
   name, 
   price, 
   item_image, 

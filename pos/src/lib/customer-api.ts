@@ -83,7 +83,7 @@ export async function addCustomer(
     const response = await call.post('ury.ury_pos.api.create_customer', customerData);
     const msg = response.message;
     if (!msg || msg.status !== "success") {
-      throw new Error("Failed to create Customer,API Response error");
+      throw new Error("Failed to create Customer. API response error");
     }
     return {
       data: {

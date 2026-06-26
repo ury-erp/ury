@@ -23,8 +23,7 @@ def serve_kot(name, time):
 # Function to mark it as verified by a user in cancel type KOT
 @frappe.whitelist()
 def confirm_cancel_kot(name, user):
-    frappe.db.set_value("URY KOT", name, "verified", 1)
-    frappe.db.set_value("URY KOT", name, "verified_by", user)
+    frappe.db.set_value("URY KOT", name, {"verified": 1, "verified_by": user})
 
 
 @frappe.whitelist(allow_guest=True)
@@ -32,7 +31,7 @@ def get_site_name():
     return {"site_name": frappe.local.site}
 
 
-def _build_kot_response(kots, branch, status_filter):
+def _build_kot_response(_kots, branch, status_filter):
     """Shared logic for kot_list and served_kot_list with batch queries."""
     today = frappe.utils.now()
     pos_profile_vals = frappe.db.get_value(
