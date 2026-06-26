@@ -227,7 +227,7 @@ def restrict_existing_order(doc, event):
         )
 
 
-def on_update(doc, method):
+#def on_update(doc, method):
     if getattr(frappe.flags, "in_bill_merge_update", False):
         return
     if doc.custom_merged_pos_invoice:
@@ -242,7 +242,7 @@ def on_update(doc, method):
             frappe.flags.in_bill_merge_update = False
 
 
-def on_submit(doc, method):
+#def on_submit(doc, method):
     if getattr(frappe.flags, "in_bill_merge_submit", False):
         return
     if doc.custom_merged_pos_invoice:
@@ -250,18 +250,103 @@ def on_submit(doc, method):
         try:
             merged_doc = frappe.get_doc("POS Invoice", doc.custom_merged_pos_invoice)
             if merged_doc.docstatus == 0:
-                # Add payment entry to secondary invoice if missing, to pass Frappe validation
+                # Ensure the secondary invoice has a payment entry matching the primary
                 if doc.payments and not merged_doc.payments:
-                    mop = doc.payments[0].mode_of_payment
+                    # Use the first payment entry from primary as a template
+                    primary_payment = doc.payments[0]
                     merged_doc.append("payments", {
-                        "mode_of_payment": mop,
-                        "amount": merged_doc.grand_total
+                        "mode_of_payment": primary_payment.mode_of_payment,
+                        "account": primary_payment.account if hasattr(primary_payment, "account") else "",
+                        "amount": merged_doc.grand_total,
+                        "base_amount": merged_doc.grand_total,
                     })
                     merged_doc.paid_amount = merged_doc.grand_total
                     merged_doc.save(ignore_permissions=True)
                     
                 merged_doc.submit()
+                # sync printed flag to secondary after primary is printed
+                merged_doc.invoice_printed = doc.invoice_printed
+                merged_doc.save(ignore_permissions=True)
+                # notify any open POS clients about the status change
+                frappe.publish_realtime(event="pos_invoice_updated", message={
+                    "name": merged_doc.name,
+                    "docstatus": merged_doc.docstatus,
+                    "invoice_printed": merged_doc.invoice_printed
+                })
         except Exception as e:
             frappe.log_error(f"Error submitting merged invoice: {str(e)}")
         finally:
             frappe.flags.in_bill_merge_submit = False
+
+def sync_merged_invoice(doc):
+    if getattr(frappe.flags, "in_bill_merge_sync", False):
+        return
+
+    linked_invoice = doc.custom_merged_pos_invoice
+    if not linked_invoice:
+        return
+
+    frappe.flags.in_bill_merge_sync = True
+
+    try:
+        if not frappe.db.exists("POS Invoice", linked_invoice):
+            return
+
+        target = frappe.get_doc("POS Invoice", linked_invoice)
+
+        # sync invoice printed
+        target.invoice_printed = doc.invoice_printed
+
+        # sync payment
+        if doc.paid_amount > 0:
+
+            target.set("payments", [])
+
+            for p in doc.payments:
+                target.append("payments", {
+                    "mode_of_payment": p.mode_of_payment,
+                    "amount": target.grand_total,
+                    "base_amount": target.grand_total,
+                    "account": getattr(p, "account", None)
+                })
+
+            target.paid_amount = target.grand_total
+
+        # sync submit/payment status
+        if doc.docstatus == 1 and target.docstatus == 0:
+
+            target.flags.ignore_validate_update_after_submit = True
+
+            if target.docstatus == 0:
+                target.save(ignore_permissions=True)
+                target.submit()
+
+        else:
+            target.save(ignore_permissions=True)
+
+        frappe.publish_realtime(
+            "pos_invoice_updated",
+            {
+                "name": target.name,
+                "docstatus": target.docstatus,
+                "paid_amount": target.paid_amount,
+                "invoice_printed": target.invoice_printed
+            }
+        )
+
+    except Exception:
+        frappe.log_error(
+            frappe.get_traceback(),
+            "Merged Invoice Sync Failed"
+        )
+
+    finally:
+        frappe.flags.in_bill_merge_sync = False
+
+
+def on_update(doc, method):
+    sync_merged_invoice(doc)
+
+
+def on_submit(doc, method):
+    sync_merged_invoice(doc)
