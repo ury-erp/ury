@@ -1,6 +1,7 @@
 import qz from 'qz-tray';
 import { KEYUTIL, KJUR, stob64, hextorstr } from 'jsrsasign';
 import { call } from './frappe-sdk';
+import { getErrorMessage } from './error-utils';
 
 // SECURITY: Private key is fetched at runtime from the authenticated backend API
 // (ury.ury.api.ury_print.signature_promise). This ensures the key is never bundled
@@ -18,7 +19,7 @@ async function loadPrivateKey(): Promise<string> {
     }
     return privateKey;
   } catch (err) {
-    throw new Error(`Failed to load QZ signing key from server: ${err}`);
+    throw new Error(`Failed to load QZ signing key from server: ${getErrorMessage(err)}`);
   }
 }
 
@@ -64,6 +65,9 @@ export async function printWithQz(host: string, htmlToPrint: string): Promise<vo
 
   const printing = async () => {
     const printer = await qz.printers.getDefault();
+    if (!printer) {
+      throw new Error('No default printer configured in QZ Tray');
+    }
     const data = [{ type: 'html', format: 'plain', data: htmlToPrint }];
     const config = qz.configs.create(printer);
     await qz.print(config, data as any);

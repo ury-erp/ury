@@ -80,8 +80,8 @@ export const createSelectionSlice: StateCreator<POSSliceAll, [], [], SelectionSl
   },
 
   setSelectedOrderType: (type) => {
+    get().clearOrder();
     set({
-      activeOrders: [],
       selectedOrderType: type,
       isUpdatingOrder: false,
       orderId: null,

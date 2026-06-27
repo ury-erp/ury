@@ -40,7 +40,7 @@ export async function printOrder({ orderId, posProfile }: PrintOrderParams): Pro
     return 'network';
   } else {
     // Redirect to printview page
-    const url = `/printview?doctype=POS Invoice&name=${orderId}&format=${print_format}&no_letterhead=1&settings={}&letterhead=No Letterhead&trigger_print=1&_lang=en`;
+    const url = `/printview?doctype=${encodeURIComponent('POS Invoice')}&name=${encodeURIComponent(orderId)}&format=${encodeURIComponent(print_format)}&no_letterhead=1&settings={}&letterhead=No Letterhead&trigger_print=1&_lang=en`;
     window.open(url, '_blank', 'noopener,noreferrer');
     await updatePrintStatus(orderId);
     return 'socket';

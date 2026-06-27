@@ -335,7 +335,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
             />
           ) : (
             <div className="w-full min-h-96 h-full bg-gray-200 flex items-center justify-center text-[8rem] text-gray-400 font-medium rounded-t-lg md:rounded-l-lg md:rounded-tr-none">
-              {itemDoc?.name.slice(0, 2).toUpperCase()}
+              {itemDoc?.name?.slice(0, 2)?.toUpperCase() || ''}
             </div>
           )}
           <Button

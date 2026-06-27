@@ -138,9 +138,9 @@ def sync_order(
         and (not billing_user)
     ):
         frappe.msgprint(
-            title="Invoice Already Billed",
+            title=_("Invoice Already Billed"),
             indicator="red",
-            msg=("This order has already been billed. Please reload the page."),
+            msg=_("This order has already been billed. Please reload the page."),
         )
         return {"status": "Failure"}
 
@@ -170,21 +170,17 @@ def sync_order(
                 )
         if lastModifiedTime != last_modified_time:
             frappe.msgprint(
-                title="Order has been modified",
+                title=_("Order has been modified"),
                 indicator="red",
-                msg=(
-                    "This order has been modified. Please reload the page to retrieve the latest edits."
-                ),
+                msg=_("This order has been modified. Please reload the page to retrieve the latest edits."),
             )
             return {"status": "Failure"}
     else:
         if invoice.name and invoice.invoice_printed == 0 and not billing_user:
             frappe.msgprint(
-                title="Table occupied ",
+                title=_("Table Occupied"),
                 indicator="red",
-                msg=("{0} is already occupied . Please refresh the page.").format(
-                    table
-                ),
+                msg=_("{0} is already occupied. Please refresh the page.").format(table),
             )
             return {"status": "Failure"}
 
@@ -600,7 +596,7 @@ def make_invoice(customer, payments, cashier, pos_profile,owner, additionalDisco
     try:
         invoice.submit()
     except Exception as e:
-        frappe.throw(f"Error while settling order: {e}")
+        frappe.throw(_("Error while settling order: {0}").format(str(e)))
     
     
 

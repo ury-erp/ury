@@ -4,6 +4,7 @@
 import frappe
 from frappe import _
 from frappe.model.document import Document
+from frappe.utils import flt
 import json
 import calendar
 from datetime import datetime
@@ -196,7 +197,7 @@ class URYDailyPandL(Document):
                         if not rate:
                                 unset_item_prices.append(item_name)
                         else:
-                                qty = int(item['Qty'])
+                                qty = flt(item['Qty'])
                                 self.append("cost_of_goods" ,{
                                         "item_code":item['Item Code'],
                                         "item_name":item['Item Name'],
@@ -306,9 +307,9 @@ class URYDailyPandL(Document):
                         ("BUNDLE SUB ITEMS", unset_pb_item_prices),
                         ("BOM SUB ITEMS", unset_bom_item_prices)
                 ]
-                remarks = "BUYING PRICE NOT SET<br><br>" + "<br><br>".join(f"{label}:-<br>{items}" for label, items in unset_prices if items)
+                remarks = _("BUYING PRICE NOT SET") + "<br><br>" + "<br><br>".join(f"{label}:-<br>{items}" for label, items in unset_prices if items)
                 if any(items for label, items in unset_prices):
-                        remarks += "<br><br>Update the item prices and then submit the document again to ensure accurate Cost of Goods"
+                        remarks += "<br><br>" + _("Update the item prices and then submit the document again to ensure accurate Cost of Goods")
                         self.remarks = remarks
                 else:
                         self.remarks = ""

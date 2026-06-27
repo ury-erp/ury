@@ -153,7 +153,7 @@ def getBranchRoom():
 def getRoom():
     rows = _get_user_branch_rooms()
     if not rows:
-        frappe.throw("No branch or room information found for the user. Please contact your administrator.")
+        frappe.throw(_("No branch or room information found for the user. Please contact your administrator."))
     return [{"name": row.room, "branch": row.branch} for row in rows]
 
 @frappe.whitelist()
@@ -237,8 +237,8 @@ def searchPosInvoice(query,status):
     if not query:
         return {"data": [], "next": False}
     query = query.lower()
-    # Escape LIKE wildcards to prevent pattern injection
-    escaped_query = frappe.db.escape(f"%{query}%")
+    escaped = query.replace("%", r"\\%").replace("_", r"\\_")
+    search_value = f"%{escaped}%"
     filters = {"status": "Paid" if status == "Recently Paid" else status}
     
     # Add additional conditions for Unbilled status
@@ -252,9 +252,9 @@ def searchPosInvoice(query,status):
         "POS Invoice",
         filters=filters,           
         or_filters=[
-            ["name", "like", escaped_query],
-            ["customer", "like", escaped_query],
-            ["mobile_number", "like", escaped_query],
+            ["name", "like", search_value],
+            ["customer", "like", search_value],
+            ["mobile_number", "like", search_value],
         ],
         fields=["name", "customer", "grand_total", "posting_date", "posting_time", "order_type", "restaurant_table", "status", "rounded_total", "net_total", "mobile_number"],
         limit_page_length=10 
@@ -524,7 +524,7 @@ def create_customer(customer_name, mobile_number=None, customer_group="Individua
 
         return {
             "status": "success",
-            "message": "Customer created successfully",
+            "message": _("Customer created successfully"),
             "customer_name": customer_name,
             "mobile_number": mobile_number,
             "customer_group": customer_group,

@@ -117,7 +117,7 @@ export async function searchPosInvoice(query: string, status: string) {
     });
     return response.message;
   } catch (error) {
-    throw error;
+    throw new Error('Failed to search POS invoices', { cause: error });
   }
 } 
 

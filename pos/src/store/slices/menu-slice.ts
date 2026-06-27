@@ -46,7 +46,7 @@ export const createMenuSlice: StateCreator<POSSliceAll, [], [], MenuSlice> = (se
         id: item.item,
         name: item.item_name,
         image: item.item_image || null,
-        price: typeof item.rate === 'string' ? parseFloat(item.rate) : item.rate || 0,
+        price: typeof item.rate === 'string' ? (parseFloat(item.rate) || 0) : (item.rate || 0),
         item: item.item,
         item_name: item.item_name,
         item_image: item.item_image,
@@ -76,7 +76,7 @@ export const createMenuSlice: StateCreator<POSSliceAll, [], [], MenuSlice> = (se
         id: item.item,
         name: item.item_name,
         image: item.item_image || null,
-        price: typeof item.rate === 'string' ? parseFloat(item.rate) : item.rate || 0,
+        price: typeof item.rate === 'string' ? (parseFloat(item.rate) || 0) : (item.rate || 0),
         category: item.course,
       }));
 
@@ -105,7 +105,6 @@ export const createMenuSlice: StateCreator<POSSliceAll, [], [], MenuSlice> = (se
       set({ categories: courses });
     } catch (error) {
       set({ error: 'Failed to load menu categories' });
-      throw error;
     }
   },
 
@@ -126,7 +125,6 @@ export const createMenuSlice: StateCreator<POSSliceAll, [], [], MenuSlice> = (se
       sessionStorage.setItem('customerGroups', JSON.stringify(names));
     } catch (error) {
       set({ error: 'Failed to load customer groups' });
-      throw error;
     }
   },
 
@@ -147,7 +145,6 @@ export const createMenuSlice: StateCreator<POSSliceAll, [], [], MenuSlice> = (se
       sessionStorage.setItem('territories', JSON.stringify(names));
     } catch (error) {
       set({ error: 'Failed to load territories' });
-      throw error;
     }
   },
 });

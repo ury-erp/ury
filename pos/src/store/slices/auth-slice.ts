@@ -60,7 +60,7 @@ export const createAuthSlice: StateCreator<AuthSlice> = (set, get) => ({
         user: null,
       });
       // Redirect to login on error
-      window.location.href = '/login?redirect-to=%2Fapp';
+      window.location.href = '/login?redirect-to=%2Fpos';
     }
   },
 
