@@ -1,4 +1,5 @@
 import frappe
+from frappe import _
 
 
 def before_insert(doc, method):

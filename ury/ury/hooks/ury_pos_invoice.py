@@ -66,12 +66,12 @@ def validate_invoice(doc, method):
                     original_items[item_code]["name"] 
                     for item_code in removed_items
                 ]
-                error_msg.append(f"Removed items: {', '.join(removed_item_names)}")
+                error_msg.append(_("Removed items: {0}").format(', '.join(removed_item_names)))
             if reduced_qty_items:
-                error_msg.append(f"Modified quantities: {', '.join(reduced_qty_items)}")
+                error_msg.append(_("Modified quantities: {0}").format(', '.join(reduced_qty_items)))
                 
             frappe.throw(
-                ("Cannot modify items after invoice is printed.\n{0}")
+                _("Cannot modify items after invoice is printed.\n{0}")
                 .format("\n".join(error_msg))
             )
 
