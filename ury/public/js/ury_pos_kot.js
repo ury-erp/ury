@@ -1,15 +1,14 @@
 let old_items = [];
 let new_items = [];
-let finalarray = [];
 frappe.ui.form.on("POS Invoice", {
   refresh: function (frm) {
-    cur_frm.check = true;
+    frm.check = true;
   },
   after_save: function (frm) {
-    let invoice_comment = cur_frm.order_comments;
+    let invoice_comment = frm.order_comments;
 
-    if (cur_frm.check == true) {
-      old_items = cur_frm.old_items;
+    if (frm.check == true) {
+      old_items = frm.old_items || [];
     }
     let newItems = frm.doc.items;
     let invoice_id = frm.doc.name;
@@ -34,14 +33,17 @@ frappe.ui.form.on("POS Invoice", {
         comments: invoice_comment,
       },
       callback: function (r) {
-        cur_frm.order_comments = "";
+        frm.order_comments = "";
 
         old_items = new_items;
 
         new_items = [];
-        cur_frm.check = false;
+        frm.check = false;
 
         frappe.show_alert({ message: __("Order Updated"), indicator: "green" });
+      },
+      error: function () {
+        new_items = [];
       },
     });
   },

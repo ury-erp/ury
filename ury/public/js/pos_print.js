@@ -94,7 +94,7 @@ frappe.ui.form.on('POS Invoice', {
                                                     callback: function (r) {
                                                     }
                                                 });
-                                                cur_frm.set_value('invoice_printed', 1);
+                                                frm.set_value('invoice_printed', 1);
                                                 frappe.dom.unfreeze();
                                                 frappe.show_alert({ message: __('Invoice Printed'), indicator: 'green' });
                                             })
@@ -119,7 +119,7 @@ frappe.ui.form.on('POS Invoice', {
                         },
                     });
                 }
-                else if (profile.printer_settings.some(e => e.bill == 1)) {
+                else if (profile.printer_settings && profile.printer_settings.some(e => e.bill == 1)) {
                     profile.printer_settings.forEach(print => {
                         frappe.call({
                             method: `ury.ury.api.ury_print.network_printing`,
@@ -130,12 +130,12 @@ frappe.ui.form.on('POS Invoice', {
                                 print_format: profile.print_format
                             },
                             callback: function (r) {
-                                if (r.message == "Success") {
+                                if (r.message && r.message == "Success") {
                                     $('.standard-actions').addClass('hidden-xs hidden-md');
                                     frappe.show_alert({ message: __('Invoice Printed'), indicator: 'green' });
-                                    cur_frm.set_value('invoice_printed', 1);
+                                    frm.set_value('invoice_printed', 1);
                                     frappe.dom.unfreeze();
-                                    cur_frm.reload_doc();
+                                    frm.reload_doc();
                                 }
                                 else {
                                     console.error(r.message);
@@ -165,7 +165,7 @@ frappe.ui.form.on('POS Invoice', {
                         },
                         callback: function (r) {
                             $('.standard-actions').addClass('hidden-xs hidden-md');
-                            cur_frm.set_value('invoice_printed', 1);
+                            frm.set_value('invoice_printed', 1);
                             frappe.show_alert({ message: __('Invoice Printed'), indicator: 'green' });
                             frappe.ui.toolbar.clear_cache()
                             frappe.dom.unfreeze();

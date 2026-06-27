@@ -27,7 +27,7 @@ def order_delay_notification(id):
     if not kot:
         frappe.throw(_("KOT {0} not found").format(id))
 
-    table = kot.restaurant_table or "Take Away"
+    table = kot.restaurant_table or _("Take Away")
     order_id = kot.invoice[-5:] if kot.invoice else id
     items = frappe.get_all(
         "URY KOT Items",
@@ -36,19 +36,19 @@ def order_delay_notification(id):
         order_by="idx",
     )
 
-    subject = f"Order #{order_id} Delayed"
+    subject = _("Order #{0} Delayed").format(order_id)
 
     item_lines = "\n".join(
         f"<li>{i.item_name} x {i.quantity}</li>" for i in items
     )
 
-    message = f"""<ul>
-    <li><b>Table:</b> {table}</li>
-    <li><b>Type:</b> {kot.type}</li>
+    message = _("""<ul>
+    <li><b>{0}:</b> {1}</li>
+    <li><b>{2}:</b> {3}</li>
 </ul>
 <ul>
-    {item_lines}
-</ul>"""
+    {4}
+</ul>""").format(_("Table"), table, _("Type"), kot.type, item_lines)
 
     recipients = frappe.get_all(
         "URY Notification Recipient",

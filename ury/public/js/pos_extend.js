@@ -18,9 +18,9 @@ frappe.pages["point-of-sale"].on_page_load = function (wrapper) {
         const me = this;
         this.search_field = frappe.ui.form.make_control({
           df: {
-            label: ('Search'),
+            label: __('Search'),
             fieldtype: 'Data',
-            placeholder:('Search by invoice id or customer name')
+            placeholder: __('Search by invoice id or customer name')
           },
           parent: this.$component.find(".search-field"),
           render_input: true,
@@ -28,10 +28,10 @@ frappe.pages["point-of-sale"].on_page_load = function (wrapper) {
 
         this.status_field = frappe.ui.form.make_control({
           df: {
-            label: ('Invoice Status'),
+            label: __('Invoice Status'),
             fieldtype: 'Select',
             options: `Draft\nTo Bill`,
-            placeholder: ('Filter by invoice status'),
+            placeholder: __('Filter by invoice status'),
             onchange: function () {
               if (me.$component.is(":visible")) me.refresh_list();
             },
@@ -57,11 +57,13 @@ frappe.pages["point-of-sale"].on_page_load = function (wrapper) {
           args: { search_term, status },
           callback: (response) => {
             frappe.dom.unfreeze();
+            if (!response.message) return;
             response.message.forEach((invoice) => {
               const invoice_html = this.get_invoice_html(invoice);
               this.$invoices_container.append(invoice_html);
             });
           },
+          error: () => { frappe.dom.unfreeze(); }
         });
       }
     };
@@ -173,26 +175,26 @@ frappe.pages["point-of-sale"].on_page_load = function (wrapper) {
         return `<div class="invoice-wrapper" data-invoice-name="${escape(
           invoice.name
         )}">
-						<div class="invoice-name-date">
-							<div class="invoice-name">${invoice.name}</div>
-							<div class="invoice-date">
-								<svg class="mr-2" width="12" height="12" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
-									<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
-								</svg>
-								${frappe.ellipsis(invoice.customer, 20)}
-							</div>
-						</div>
-						<div class="invoice-table" style="display:flex; text-align:center; align-items: center; font-weight: 600; font-size: 14px;">${
+                                                <div class="invoice-name-date">
+                                                        <div class="invoice-name">${invoice.name}</div>
+                                                        <div class="invoice-date">
+                                                                <svg class="mr-2" width="12" height="12" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
+                                                                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+                                                                </svg>
+                                                                ${frappe.ellipsis(invoice.customer, 20)}
+                                                        </div>
+                                                </div>
+                                                <div class="invoice-table" style="display:flex; text-align:center; align-items: center; font-weight: 600; font-size: 14px;">${
               invoice.restaurant_table ? invoice.restaurant_table : ""
             }</div>
-						<div class="invoice-total-status">
-							<div class="invoice-total">${
+                                                <div class="invoice-total-status">
+                                                        <div class="invoice-total">${
                 format_currency(invoice.grand_total, invoice.currency, 0) || 0
               }</div>
-							<div class="invoice-date">${posting_datetime}</div>
-						</div>
-					</div>
-					<div class="seperator"></div>`;
+                                                        <div class="invoice-date">${posting_datetime}</div>
+                                                </div>
+                                        </div>
+                                        <div class="seperator"></div>`;
       }
     };
 
@@ -216,6 +218,7 @@ frappe.pages["point-of-sale"].on_page_load = function (wrapper) {
           var addCommentWrapper = document.querySelector(
             ".add-comment-wrapper"
           );
+          if (!addCommentWrapper) return;
           addCommentWrapper.style.display = "flex";
           this.events.edit_order(this.doc.name);
           // this.check();
@@ -257,6 +260,7 @@ frappe.pages["point-of-sale"].on_page_load = function (wrapper) {
           var addCommentWrapper = document.querySelector(
             ".add-comment-wrapper"
           );
+          if (!addCommentWrapper) return;
           addCommentWrapper.style.display = "flex";
 
           this.events.new_order();
@@ -288,18 +292,18 @@ frappe.pages["point-of-sale"].on_page_load = function (wrapper) {
       init_cart_components() {
         this.$component.append(
           `<div class="cart-container">
-						<div class="abs-cart-container">
-							<div class="cart-label">${__("Item Cart")}</div>
-							<div class="cart-header">
-								<div class="name-header">${__("Item")}</div>
-								<div class="qty-header">${__("Quantity")}</div>
-								<div class="rate-amount-header">${__("Amount")}</div>
-							</div>
-							<div class="cart-items-section"></div>
-							<div class="cart-totals-section"></div>
-							<div class="numpad-section"></div>
-						</div>
-					</div>`
+                                                <div class="abs-cart-container">
+                                                        <div class="cart-label">${__("Item Cart")}</div>
+                                                        <div class="cart-header">
+                                                                <div class="name-header">${__("Item")}</div>
+                                                                <div class="qty-header">${__("Quantity")}</div>
+                                                                <div class="rate-amount-header">${__("Amount")}</div>
+                                                        </div>
+                                                        <div class="cart-items-section"></div>
+                                                        <div class="cart-totals-section"></div>
+                                                        <div class="numpad-section"></div>
+                                                </div>
+                                        </div>`
         );
         this.$cart_container = this.$component.find(".cart-container");
 
@@ -311,16 +315,16 @@ frappe.pages["point-of-sale"].on_page_load = function (wrapper) {
         );
         commentButton.on("click", () => {
           let d = new frappe.ui.Dialog({
-            title: "Enter Comment",
+            title: __("Enter Comment"),
             fields: [
               {
-                label: "Comment",
+                label: __("Comment"),
                 fieldname: "comment",
                 fieldtype: "Data",
                 default: cur_frm.order_comments,
               },
             ],
-            primary_action_label: "Add",
+            primary_action_label: __("Add"),
             primary_action: (values) => {
               cur_frm.order_comments = values.comment;
               d.hide();
@@ -338,26 +342,26 @@ frappe.pages["point-of-sale"].on_page_load = function (wrapper) {
 
         this.$totals_section.append(
           `<div class="add-comment-wrapper" style="display: flex; justify-content: center; align-items: center;">
-						<button class="btn btn-primary btn-sm primary-action" style="width: 300px; height: 40px; font-size: 16px; background-color: #428bca; color: #fff; border: none; border-radius: 4px;">Add Comment</button>
-					</div>
-					<div class="add-discount-wrapper">
-						${this.get_discount_icon()} ${__("Add Discount")}
-					</div>
-					<div class="item-qty-total-container">
-						<div class="item-qty-total-label">${__("Total Items")}</div>
-						<div class="item-qty-total-value">0.00</div>
-					</div>
-					<div class="net-total-container">
-						<div class="net-total-label">${__("Net Total")}</div>
-						<div class="net-total-value">0.00</div>
-					</div>
-					<div class="taxes-container"></div>
-					<div class="grand-total-container">
-						<div>${__("Grand Total")}</div>
-						<div>0.00</div>
-					</div>
-					<div class="checkout-btn">${__("Checkout")}</div>
-					<div class="edit-cart-btn">${__("Edit Cart")}</div>`
+                                                <button class="btn btn-primary btn-sm primary-action" style="width: 300px; height: 40px; font-size: 16px; background-color: #428bca; color: #fff; border: none; border-radius: 4px;">${__("Add Comment")}</button>
+                                        </div>
+                                        <div class="add-discount-wrapper">
+                                                ${this.get_discount_icon()} ${__("Add Discount")}
+                                        </div>
+                                        <div class="item-qty-total-container">
+                                                <div class="item-qty-total-label">${__("Total Items")}</div>
+                                                <div class="item-qty-total-value">0.00</div>
+                                        </div>
+                                        <div class="net-total-container">
+                                                <div class="net-total-label">${__("Net Total")}</div>
+                                                <div class="net-total-value">0.00</div>
+                                        </div>
+                                        <div class="taxes-container"></div>
+                                        <div class="grand-total-container">
+                                                <div>${__("Grand Total")}</div>
+                                                <div>0.00</div>
+                                        </div>
+                                        <div class="checkout-btn">${__("Checkout")}</div>
+                                        <div class="edit-cart-btn">${__("Edit Cart")}</div>`
         );
 
         this.$add_discount_elem = this.$component.find(".add-discount-wrapper");
