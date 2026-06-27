@@ -2,6 +2,7 @@
 # For license information, please see license.txt
 
 import frappe
+from frappe import _
 from frappe.model.document import Document
 
 
@@ -35,31 +36,31 @@ class URYMenu(Document):
 
     def make_price_list(self):
         # create price list for menu
-        price_list = self.get_price_list()
-        self.db_set("price_list", price_list.name)
+        price_list_name = self.get_price_list()
+        self.db_set("price_list", price_list_name)
 
         # delete old items
-        self.clear_item_price(price_list.name)
+        self.clear_item_price(price_list_name)
 
         # batch insert item prices
         for d in self.items:
             frappe.get_doc(
                 dict(
                     doctype="Item Price",
-                    price_list=price_list.name,
+                    price_list=price_list_name,
                     item_code=d.item,
                     price_list_rate=d.rate,
                 )
             ).insert(ignore_permissions=True)
 
     def get_price_list(self):
-        """Create price list for menu if missing"""
+        """Return price list name; create if missing."""
         price_list_name = frappe.db.get_value(
             "Price List", dict(restaurant_menu=self.name)
         )
         if price_list_name:
             frappe.db.set_value("Price List", price_list_name, {"enabled": 1, "selling": 1})
-            return frappe.get_doc("Price List", price_list_name)
+            return price_list_name
 
         price_list = frappe.new_doc("Price List")
         price_list.restaurant_menu = self.name
@@ -68,4 +69,4 @@ class URYMenu(Document):
         price_list.selling = 1
         price_list.insert()
 
-        return price_list
+        return price_list.name

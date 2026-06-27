@@ -2,9 +2,13 @@
 # For license information, please see license.txt
 
 import frappe
+from frappe import _
 from frappe.model.document import Document
 
 class URYReportSettings(Document):
         def validate(self):
-                if self.extended_hours ==1 and self.hours == 0:
-                        frappe.throw(msg=('Value cannot be zero for URY Report Settings: <strong>No Of Hours</strong>'), title=("Zero Value"))
+                if self.extended_hours == 1 and self.hours == 0:
+                        frappe.throw(
+                                msg=_("Value cannot be zero for URY Report Settings: <strong>No Of Hours</strong>"),
+                                title=_("Zero Value"),
+                        )

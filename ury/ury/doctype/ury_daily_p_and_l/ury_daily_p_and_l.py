@@ -2,6 +2,7 @@
 # For license information, please see license.txt
 
 import frappe
+from frappe import _
 from frappe.model.document import Document
 import json
 import calendar
@@ -14,7 +15,7 @@ def inner_bom_process(buying_price_list, bom):
     for bom_item in bom.items:
         bom_item_qty = bom_item.qty
         bom_item_name = bom_item.item_name
-        boms = frappe.db.get_all("BOM", fields=("*"), filters={'item': bom_item.item_code, 'is_active': 1, 'is_default': 1, 'docstatus': 1})
+        boms = frappe.db.get_all("BOM", fields=["name", "item"], filters={'item': bom_item.item_code, 'is_active': 1, 'is_default': 1, 'docstatus': 1})
         
         if len(boms) > 0:
             inner_bom = frappe.get_doc("BOM", boms[0].name)
@@ -59,17 +60,20 @@ def inner_inner_bom_process(buying_price_list, bom):
 
 class URYDailyPandL(Document):
         def cogs_sold(self):
-                report_settings = frappe.get_doc("URY Report Settings",self.branch)
+                # Cache on self so before_submit can reuse without re-fetching
+                if not hasattr(self, '_report_settings'):
+                        self._report_settings = frappe.get_doc("URY Report Settings", self.branch)
+                report_settings = self._report_settings
                 self.cost_of_goods = []
                 cogs = 0
                 electricity_reading = self.electricity_closing - self.electricity_opening
                 if electricity_reading <= 0:
-                        frappe.throw("Invalid Electricity Reading")
+                        frappe.throw(_("Invalid Electricity Reading"))
 
                 # Append materials consumed
                 for expense in self.materials_consumed:
                         if expense.units_consumed <= 0:
-                                frappe.throw("Invalid Units Consumed for "+expense.material)
+                                frappe.throw(_("Invalid Units Consumed for {0}").format(expense.material))
                 non_pb_item_sales = frappe.db.sql('''
                         SELECT
                                 c.item_group AS "Item Group",
@@ -313,12 +317,13 @@ class URYDailyPandL(Document):
         def before_save(self):
                 self.cogs_sold()
                 if self.remarks != "":
-                        frappe.msgprint(title='SET BUYING PRICE',msg=("Please review the remarks below for the items. Submitting now will exclude these items from the cost of goods."))
+                        frappe.msgprint(title=_('Set Buying Price'), msg=_("Please review the remarks below for the items. Submitting now will exclude these items from the cost of goods."))
         
         def before_submit(self):
                 self.cogs_sold()
                 
-                report_settings = frappe.get_doc("URY Report Settings",self.branch)
+                # Reuse cached report_settings from cogs_sold()
+                report_settings = self._report_settings
 
                 self.direct_expenses_breakup = []
                 self.employee_costs_breakup = []
@@ -429,7 +434,7 @@ class URYDailyPandL(Document):
                 attendance_count =  attendance_count[0]
 
                 if attendance_count['Total Attendance'] == 0:
-                        frappe.throw(title='No Attendance !',msg=("Attendance not marked"))
+                        frappe.throw(title=_('No Attendance'), msg=_("Attendance not marked"))
 
                 ns_employee_attendance_list = frappe.db.sql(''' 
                         SELECT
@@ -451,8 +456,8 @@ class URYDailyPandL(Document):
                 ''', {"branch": self.branch, "date": self.date}, as_dict=True)
 
                 if len(ns_employee_attendance_list) > 0:
-                        ns_employee_attendance_list = json.dumps(ns_employee_attendance_list)
-                        frappe.throw(title='Set Payment Type/Amount',msg=("Employees:  {0}").format(ns_employee_attendance_list))
+                        ns_employee_names = ", ".join(e["Name"] for e in ns_employee_attendance_list)
+                        frappe.throw(title=_('Set Payment Type/Amount'), msg=_("Employees: {0}").format(ns_employee_names))
 
                 employee_attendance_dw_list = frappe.db.sql('''
                         SELECT
