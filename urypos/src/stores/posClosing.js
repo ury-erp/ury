@@ -75,6 +75,9 @@ export const posClosing = defineStore("posClose", {
         .catch((error) => console.error(error));
     },
     getInvoice() {
+      this.grandTotal = 0;
+      this.netTotal = 0;
+      this.totalQty = 0;
       const invoiceData = useInvoiceDataStore();
       if (this.periodEndDate) {
         const date = new Date(this.periodEndDate);
@@ -137,7 +140,7 @@ export const posClosing = defineStore("posClose", {
 
           this.posInvoice = this.invoiceDetails.map((item) => ({
             pos_invoice: item.name,
-            date: item.modified.split(" ")[0],
+            date: (item.modified || "").split(" ")[0],
             amount: item.grand_total,
           }));
         })

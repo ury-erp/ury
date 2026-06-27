@@ -110,7 +110,7 @@ export const useMenuStore = defineStore("menu", {
     grand_total() {
       return this.cart
         .reduce((total, item) => {
-          return total + parseFloat(item.rate) * item.qty;
+          return total + parseFloat(item.rate || 0) * item.qty;
         }, 0)
         .toFixed(2);
     },
@@ -357,7 +357,8 @@ export const useMenuStore = defineStore("menu", {
     },
 
     getitemQty(item) {
-      item.qty = this.cart.qty;
+      const cartItem = this.cart.find(i => i.item === item.item);
+      item.qty = cartItem ? cartItem.qty : 0;
     },
     addToCart(item) {
       const notification = useNotifications();

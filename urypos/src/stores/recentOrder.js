@@ -52,6 +52,8 @@ export const usetoggleRecentOrder = defineStore("recentOrders", {
     restaurantTable: null,
     modeOfPaymentName: null,
     additionalPiscountPercentage: null,
+    changeToReturn: 0,
+    discountAmount: null,
     isLoading: false,
     isChecked: false,
     showOrder: false,
@@ -108,7 +110,6 @@ export const usetoggleRecentOrder = defineStore("recentOrders", {
         this.call
           .get("ury.ury_pos.api.getInvoiceForCashier", recentOrder)
           .then((result) => {
-            console.log(result.message.data,"result.message.data")
             this.recentOrderList = result.message.data;
             this.next = result.message.next;
             return this.recentOrderList, this.next;
@@ -199,8 +200,8 @@ export const usetoggleRecentOrder = defineStore("recentOrders", {
     matchesSearchOrder(order) {
       const query = this.searchOrder.toLowerCase();
       const name = order.name.toLowerCase();
-      const customer = order.customer.toLowerCase();
-      const mobileNumber = order.mobile_number.toLowerCase();
+      const customer = (order.customer || "").toLowerCase();
+      const mobileNumber = (order.mobile_number || "").toLowerCase();
 
       return name.includes(query) || customer.includes(query) || mobileNumber.includes(query);
     },
@@ -533,9 +534,11 @@ export const usetoggleRecentOrder = defineStore("recentOrders", {
           })
           .catch((error) => {
             this.isLoading = false;
-            const messages = JSON.parse(error._server_messages);
-            const message = JSON.parse(messages[0]);
-            alert.createAlert("Message", message.message, "OK");
+            if (error._server_messages) {
+              const messages = JSON.parse(error._server_messages);
+              const message = JSON.parse(messages[0]);
+              alert.createAlert("Message", message.message, "OK");
+            }
           });
       }
     },

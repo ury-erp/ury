@@ -11,7 +11,7 @@
       class="fixed inset-0 z-50 flex items-center justify-center bg-gray-300 bg-opacity-50 text-lg"
       v-if="this.recentOrders.isLoading"
     >
-      Payment Being Processing
+      Payment is Being Processed
     </div>
     <div
       class="max-w-lg flex-1 rounded-lg border border-gray-200 bg-white p-4 shadow dark:border-gray-700 dark:bg-gray-800 sm:p-8"
@@ -601,7 +601,7 @@
             <div v-if="recentOrders.changeAmount > 0" class="mt-4 p-4 bg-gray-50 rounded-lg">
               <div class="flex justify-between items-center mt-2 text-green-600">
                 <span class="text-lg font-medium">Change Amount:</span>
-                <span class="text-lg">₹ {{ recentOrders.changeAmount.toFixed(2) }}</span>
+                <span class="text-lg">{{ invoiceData.currency }} {{ (recentOrders.changeAmount || 0).toFixed(2) }}</span>
               </div>
             </div>
             <div class="flex justify-end">

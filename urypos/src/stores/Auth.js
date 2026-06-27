@@ -166,15 +166,16 @@ export const useAuthStore = defineStore("auth", {
 
           })
           .catch((error) => {
-            var currentDomain = window.location.origin;
-            const serverMessages = JSON.parse(error._server_messages);
-            const innerMessageString = serverMessages[0];
-            const innerMessage = JSON.parse(innerMessageString);
-            const message = innerMessage.message;
-            alert.createAlert("Message", message, "OK").then(() => {
-              window.location.href = currentDomain + "/app/";
-            });
-
+            if (error._server_messages) {
+              var currentDomain = window.location.origin;
+              const serverMessages = JSON.parse(error._server_messages);
+              const innerMessageString = serverMessages[0];
+              const innerMessage = JSON.parse(innerMessageString);
+              const message = innerMessage.message;
+              alert.createAlert("Message", message, "OK").then(() => {
+                window.location.href = currentDomain + "/app/";
+              });
+            }
           });
       }
       else {

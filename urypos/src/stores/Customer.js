@@ -166,10 +166,12 @@ export const useCustomerStore = defineStore("customers", {
             this.showModalNewCustomer = false;
           })
           .catch((error) => {
-            const serverMessages = JSON.parse(error._server_messages);
-            const messageObject = JSON.parse(serverMessages[0]);
-            const message = messageObject.message;
-            alert.createAlert("Message", message, "OK");
+            if (error._server_messages) {
+              const serverMessages = JSON.parse(error._server_messages);
+              const messageObject = JSON.parse(serverMessages[0]);
+              const message = messageObject.message;
+              alert.createAlert("Message", message, "OK");
+            }
           });
       }
     },

@@ -1,11 +1,12 @@
 import frappe
-from frappe.utils import get_datetime, datetime
+from datetime import timedelta
+from frappe.utils import get_datetime
 
 
 def kotValidationThread():
     current_datetime = get_datetime()
-    one_minute_ago = current_datetime - datetime.timedelta(minutes=1)
-    five_minutes_ago = current_datetime - datetime.timedelta(minutes=5)
+    one_minute_ago = current_datetime - timedelta(minutes=1)
+    five_minutes_ago = current_datetime - timedelta(minutes=5)
 
     # Get a list of unprocessed invoices within the last 5 minutes
     invoice_list = get_unprocessed_invoices(five_minutes_ago, one_minute_ago)

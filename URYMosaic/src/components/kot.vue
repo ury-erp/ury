@@ -305,7 +305,7 @@ export default {
             resolve();
           })
           .catch((error) => {
-            console.error(error);
+            if (import.meta.env?.DEV) console.error(error);
             reject(error);
           });
       });
@@ -472,7 +472,7 @@ export default {
           parseInt(timeRemaining[0], 10) * 60 + parseInt(timeRemaining[1], 10);
 
         if (
-          minutes === this.kot_alert_time &&
+          minutes === Number(this.kot_alert_time) &&
           kot.type !== "Cancelled" &&
           kot.type !== "Partially cancelled"
         ) {
@@ -507,7 +507,7 @@ export default {
     fetchkotwithmasonry() {
       return this.fetchKOT().then(() => {
         this.masonryLoading();
-      });
+      }).catch((e) => { console.error("KOT fetch failed:", e); });
     },
     redirectToLogin() {
       const currentDomain = window.location.origin;
@@ -521,7 +521,9 @@ export default {
       }
       this.$nextTick(() => {
         if (!this.$el) return;
-        this.masonry = new Masonry(this.$el.querySelector(".grid"), {
+        const grid = this.$el.querySelector(".grid");
+        if (!grid) return;
+        this.masonry = new Masonry(grid, {
           itemSelector: ".masonry-item",
           gutter: 28,
         });
@@ -537,7 +539,7 @@ export default {
       this.hideStatusMessageAfterDelay();
       this.fetchKOT().then(() => {
         this.masonryLoading();
-      });
+      }).catch((e) => { console.error("KOT fetch failed:", e); });
     },
     handleOffline() {
       this.isOnline = false;
@@ -577,15 +579,15 @@ export default {
     window.addEventListener("resize", this._resizeHandler);
     this.masonryLoading();
 
-    socket.on('connect_error', (err) => {
+    if (socket) socket.on('connect_error', (err) => {
       console.error("Socket connection error:", err);
       this.setStatusMessage("Connection error. Retrying...");
     });
-    socket.on('disconnect', (reason) => {
+    if (socket) socket.on('disconnect', (reason) => {
       console.warn("Socket disconnected:", reason);
       this.setStatusMessage("Connection lost. Reconnecting...");
     });
-    socket.on('connect', () => {
+    if (socket) socket.on('connect', () => {
       this.setStatusMessage("Reconnected");
       this.hideStatusMessageAfterDelay();
     });
@@ -604,7 +606,7 @@ export default {
               let kottime = localStorage.getItem("kot_time");
               if (doc.last_kot_time !== kottime) {
                 // Full refresh needed — skip intermediate mutations
-                this.fetchKOT().then(() => { this.masonryLoading(); });
+                this.fetchKOT().then(() => { this.masonryLoading(); }).catch((e) => { console.error("KOT fetch failed:", e); });
               } else {
                 // Incremental update
                 const newKot = { isRotated: false, showDiv: false, timecolor: 'text-black', timeRemaining: '— : —', ...doc.kot };
@@ -618,7 +620,7 @@ export default {
                 if (doc.kot && doc.kot.type === "Cancelled") {
                   this.fetchKOT().then(() => {
                     this.masonryLoading();
-                  });
+                  }).catch((e) => { console.error("KOT fetch failed:", e); });
                 }
               }, 1500);
               if (doc.kot) localStorage.setItem("kot_time", doc.kot.time);
@@ -626,8 +628,8 @@ export default {
               if (import.meta.env?.DEV) console.error("Socket handler error:", err);
             }
           };
-          socket.on(this.kot_channel, this.socketHandler);
-        });
+          if (socket) socket.on(this.kot_channel, this.socketHandler);
+        }).catch((e) => { console.error("KOT fetch failed:", e); });
       })
       .catch((error) => {
         console.error("Authentication error:", error);
@@ -655,7 +657,7 @@ export default {
   computed: {
     sortedKotItems() {
       return (kot) => {
-        return [...kot.kot_items].sort((a, b) => a.serve_priority - b.serve_priority);
+        return [...(kot.kot_items || [])].sort((a, b) => a.serve_priority - b.serve_priority);
       };
     },
   },

@@ -155,9 +155,7 @@ export const useInvoiceDataStore = defineStore("invoiceData", {
         this.recentOrders.draftInvoice ||
         this.table.invoiceNo ||
         null;
-      let cashier= this.table.cashier ||
-        this.cashier ||
-        this.cashier;
+      let cashier = this.table.cashier || this.cashier;
 
       selectedTables =
         this.table.selectedTable || this.recentOrders.restaurantTable;
@@ -307,14 +305,15 @@ export const useInvoiceDataStore = defineStore("invoiceData", {
     
         this.showUpdateButtton = true;
         if (response.message.status === "Failure") {
-          const alert = response._server_messages;
-          const messages = JSON.parse(alert);
-          const message = JSON.parse(messages[0]);
+          if (response._server_messages) {
+            const messages = JSON.parse(response._server_messages);
+            const message = JSON.parse(messages[0]);
     
-          await this.alert.createAlert("Message", message.message, "OK");
-          await router.push("/Table");
-          router.push("/Table").catch(() => {});
-          return;
+            await this.alert.createAlert("Message", message.message, "OK");
+            await router.push("/Table");
+            router.push("/Table").catch(() => {});
+            return;
+          }
         }
     
         // Handle successful response

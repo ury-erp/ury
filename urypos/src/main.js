@@ -41,6 +41,6 @@ router.beforeEach((to, from, next) => {
         }
 });
 
-app.mount("#app");
 app.component('NotificationModal', NotificationModal);
+app.mount("#app");
 
