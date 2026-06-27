@@ -185,7 +185,8 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dialogRef.current && !dialogRef.current.contains(event.target as Node)) {
-        handleClose();
+        setSelectedItem(null);
+        onClose();
       }
     };
 
@@ -193,13 +194,14 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, []);
+  }, [onClose]);
 
   // Handle escape key to close dialog
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        handleClose();
+        setSelectedItem(null);
+        onClose();
       }
     };
 
@@ -207,7 +209,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
     return () => {
       document.removeEventListener('keydown', handleEscape);
     };
-  }, []);
+  }, [onClose]);
 
   if (!selectedItem) return null;
 

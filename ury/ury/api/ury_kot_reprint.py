@@ -8,9 +8,12 @@ from frappe.utils.print_format import print_by_server
 def reprint_kot(invoice_number):
 
     try:
-        pos_profile, _, order_type = frappe.db.get_value(
-            "POS Invoice", invoice_number, ["pos_profile", "restaurant_table","order_type"]
+        result = frappe.db.get_value(
+            "POS Invoice", invoice_number, ["pos_profile", "restaurant_table", "order_type"]
         )
+        if not result:
+            frappe.throw(f"POS Invoice {invoice_number} not found.")
+        pos_profile, _, order_type = result
         if not pos_profile:
             frappe.throw(f"POS Profile not found for Invoice {invoice_number}.")
 

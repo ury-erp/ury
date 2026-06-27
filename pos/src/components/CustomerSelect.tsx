@@ -61,7 +61,7 @@ function NewCustomerForm({
       setLoadingTerritories(true);
       fetchTerritories().finally(() => setLoadingTerritories(false));
     }
-  }, []);
+  }, [customerGroups, territories, fetchCustomerGroups, fetchTerritories]);
 
 
 

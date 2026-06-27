@@ -1,6 +1,7 @@
 import json
 
 import frappe
+from frappe import _
 from ury.ury_pos.api import getBranch
 from frappe.utils import get_datetime
 
@@ -10,6 +11,8 @@ from frappe.utils import get_datetime
 def serve_kot(name, time):
     current_time = get_datetime()
     creation_time = frappe.db.get_value("URY KOT", name, "creation")
+    if not creation_time:
+        frappe.throw(_("KOT {0} not found").format(name))
 
     production_time = current_time - creation_time
     production_time_minutes = production_time.total_seconds() / 60
@@ -40,6 +43,8 @@ def _build_kot_response(_kots, branch, status_filter):
         ["custom_kot_warning_time", "custom_reset_order_number_daily", "custom_kot_alert"],
         as_dict=True,
     )
+    if not pos_profile_vals:
+        frappe.throw(_("No POS Profile found for branch {0}").format(branch))
     kot_alert_time = pos_profile_vals.custom_kot_warning_time
     daily_order_number = pos_profile_vals.custom_reset_order_number_daily
     audio_alert = pos_profile_vals.custom_kot_alert

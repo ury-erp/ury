@@ -28,14 +28,14 @@ def network_printing(
         try:
             import cups
         except ImportError:
-            return "Failed to import cups"
+            frappe.throw(_("CUPS library is not installed on the server"))
 
         try:
             cups.setServer(print_settings.server_ip)
             cups.setPort(print_settings.port)
             conn = cups.Connection()
         except Exception as e:
-            return f"Failed to connect to the printer: {str(e)}"
+            frappe.throw(_("Failed to connect to the printer: {0}").format(str(e)))
 
         try:
             output = PdfWriter()
@@ -72,10 +72,11 @@ def network_printing(
 
             return "Success"
         except Exception as e:
-            return f"Failed to print: {str(e)}"
+            frappe.log_error(message=frappe.get_traceback(), title="Network Printing - Print Error")
+            frappe.throw(_("Failed to print: {0}").format(str(e)))
     except Exception as e:
         frappe.log_error(message=frappe.get_traceback(), title="Network Printing Error")
-        return f"An error occurred: {str(e)}"
+        frappe.throw(_("An error occurred: {0}").format(str(e)))
 
 
 @frappe.whitelist()
@@ -102,12 +103,14 @@ def select_network_printer(pos_profile, invoice_id):
                 "POS Invoice", invoice_id, pos_bill_printer, print_format
             )
 
+    frappe.throw(_("No printer configured for this POS Profile or table"))
+
 
 @frappe.whitelist()
 def qz_print_update(invoice):
     try:
         table = frappe.db.get_value("POS Invoice", invoice, "restaurant_table")
-        
+
         if not table:
             frappe.db.set_value(
                 "POS Invoice", invoice, "invoice_printed", 1, update_modified=False
@@ -125,9 +128,9 @@ def qz_print_update(invoice):
                     """UPDATE `tabURY Table` SET occupied = 0, latest_invoice_time = NULL WHERE name = %s""",
                     table,
                 )
-        
+
         return {"status": "Success"}
-        
+
     except Exception as e:
         frappe.log_error(message=e, title="Print Fail")
         frappe.throw(_("Error while printing order: {0}").format(str(e)))
@@ -137,9 +140,12 @@ def qz_print_update(invoice):
 def print_pos_page(doctype, name, print_format):
     data = {"name": name, "doctype": doctype, "print_format": print_format}
 
-    restaurant_table, branch, invoice_name = frappe.db.get_value(
+    result = frappe.db.get_value(
         "POS Invoice", name, ["restaurant_table", "branch", "name"]
     )
+    if not result:
+        frappe.throw(_("POS Invoice {0} not found").format(name))
+    restaurant_table, branch, invoice_name = result
     print_channel = "{}_{}".format("print", branch)
     frappe.publish_realtime(print_channel, {"data": data})
 

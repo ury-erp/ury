@@ -1,4 +1,5 @@
 import frappe
+from frappe import _
 
 
 def set_order_number(doc, event):
@@ -49,21 +50,26 @@ def set_order_number(doc, event):
         )
 
         if doc.order_type == "Aggregators":
-            aggregator_invoice = frappe.get_last_doc(
-                "POS Invoice", filters={"pos_profile": doc.pos_profile, "order_type": "Aggregators"}
-            )
-            aggregator_invoice_number = int(aggregator_invoice.name[-5:])
-            aggregator_last_order_number = aggregator_invoice_number - 1
+            try:
+                aggregator_invoice = frappe.get_last_doc(
+                    "POS Invoice", filters={"pos_profile": doc.pos_profile, "order_type": "Aggregators"}
+                )
+                aggregator_invoice_number = int(aggregator_invoice.name[-5:])
+                aggregator_last_order_number = aggregator_invoice_number - 1
+            except frappe.DoesNotExist:
+                aggregator_last_order_number = 0
             frappe.db.set_value(
                 "POS Opening Entry", pos_open_name, "custom_ury_last_aggregator_invoice", aggregator_last_order_number
             )
         else:
-            invoice = frappe.get_last_doc(
-                "POS Invoice", filters={"pos_profile": doc.pos_profile, "order_type": ["!=", "Aggregators"]}
-            )
-
-            invoice_number = int(invoice.name[-5:])
-            last_order_number = invoice_number - 1
+            try:
+                invoice = frappe.get_last_doc(
+                    "POS Invoice", filters={"pos_profile": doc.pos_profile, "order_type": ["!=", "Aggregators"]}
+                )
+                invoice_number = int(invoice.name[-5:])
+                last_order_number = invoice_number - 1
+            except frappe.DoesNotExist:
+                last_order_number = 0
 
             frappe.db.set_value(
                 "POS Opening Entry", pos_open_name, "custom_ury_last_invoice", last_order_number

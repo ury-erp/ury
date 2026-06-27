@@ -40,7 +40,7 @@ export default function Orders() {
 
   const posStore = usePOSStore();
   const navigate = useNavigate();
-  const mounted = useRef(false);
+  const prevSearchRef = useRef(orderSearchQuery);
   const [cancelDialogOpen, setCancelDialogOpen] = React.useState(false);
   const [cancelReason, setCancelReason] = React.useState('');
   const [cancelLoading, setCancelLoading] = React.useState(false);
@@ -53,13 +53,11 @@ export default function Orders() {
   }, [fetchOrders]);
 
   useEffect(() => {
-    if (!mounted.current) {
-      mounted.current = true;
-      return; // Skip the first run
+    if (prevSearchRef.current !== orderSearchQuery) {
+      prevSearchRef.current = orderSearchQuery;
+      fetchOrders();
     }
-    fetchOrders();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orderSearchQuery]);
+  }, [orderSearchQuery, fetchOrders]);
 
 
   // Function to format the date and time

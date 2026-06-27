@@ -1,6 +1,7 @@
 import json
 
 import frappe
+from frappe import _
 from ury.ury_pos.api import getBranch
 
 
@@ -15,10 +16,14 @@ def create_order_items(items):
     """Convert raw item dicts to a normalized format."""
     order_items = []
     for item in items:
+        qty = item.get("qty")
+        item_name = item.get("item_name")
+        if qty is None or item_name is None:
+            frappe.throw(_("Item data is missing required fields (qty, item_name)"))
         order_item = {
             "item_code": item.get("item", item.get("item_code")),
-            "qty": item["qty"],
-            "item_name": item["item_name"],
+            "qty": qty,
+            "item_name": item_name,
             "comments": item.get("comment", item.get("comments", "")),
         }
         order_items.append(order_item)
@@ -28,9 +33,12 @@ def create_order_items(items):
 def _get_menu_for_invoice(restaurant_table, branch):
     """Look up the active URY Menu for an invoice's table or branch."""
     if restaurant_table:
-        room, restaurant = frappe.db.get_value(
+        result = frappe.db.get_value(
             "URY Table", restaurant_table, ["restaurant_room", "restaurant"]
         )
+        if not result:
+            frappe.throw(_("URY Table {0} not found").format(restaurant_table))
+        room, restaurant = result
         menu = frappe.db.get_value(
             "Menu for Room", {"room": room, "parent": restaurant}, "menu"
         )

@@ -264,11 +264,11 @@ initializeSocket(); // Initialize the socket after fetching the site name
 
 const frappe = new FrappeApp(url);
 export default {
+  inject: ['authState'],
   data() {
     return {
       kot: [],
       masonry: null,
-      call: frappe.call(),
       production: "",
       branch: "",
       kot_channel: "",
@@ -299,8 +299,8 @@ export default {
           .then((user) => {
             this.loggeduser = user;
             // Update shared auth state so route guard works
-            if (window.__uryAuthState) {
-              window.__uryAuthState.isLoggedIn = true;
+            if (this.authState) {
+              this.authState.isLoggedIn = true;
             }
             resolve();
           })
@@ -359,13 +359,12 @@ export default {
         });
     },
     serveOrder(kot) {
-      const now = new Date();
-      this.currentTime = now.toLocaleTimeString();
+      const currentTime = new Date().toLocaleTimeString();
 
       this.call
         .post("ury.ury.api.ury_kot_display.serve_kot", {
           name: kot.name,
-          time: this.currentTime,
+          time: currentTime,
         })
         .then((result) => {
           kot.showDiv = !kot.showDiv;
@@ -558,6 +557,10 @@ export default {
         this.setStatusMessage("");
       }
     },
+  },
+  created() {
+    // API client as non-reactive instance property (avoids Proxy overhead)
+    this.call = frappe.call();
   },
   mounted() {
     window.addEventListener("online", this.handleOnline);

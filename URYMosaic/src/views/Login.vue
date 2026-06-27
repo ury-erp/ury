@@ -3,10 +3,11 @@
     <div class="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
       <div class="text-center mb-6">
         <img
+          v-if="!imageFailed"
           src="/assets/ury/images/mosaic.jpg"
           alt="URY Mosaic"
           class="w-20 h-20 mx-auto mb-4 rounded-lg"
-          @error="$event.target.style.display='none'"
+          @error="imageFailed = true"
         />
         <h1 class="text-2xl font-bold text-gray-800">URY Kitchen Display</h1>
         <p class="text-gray-500 mt-1">Sign in to access the kitchen display</p>
@@ -62,6 +63,7 @@ export default {
       password: "",
       error: "",
       isLoading: false,
+      imageFailed: false,
     };
   },
   methods: {
