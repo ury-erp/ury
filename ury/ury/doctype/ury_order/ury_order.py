@@ -129,11 +129,13 @@ def sync_order(
 ):
     
     user_role = frappe.get_roles()
-    posprofile = frappe.get_doc("POS Profile", pos_profile)
-    
-    billing_user = any(
-        role.role in user_role for role in posprofile.role_allowed_for_billing
+    billing_roles = frappe.get_all(
+        "POS Profile Role",
+        filters={"parent": pos_profile},
+        fields=["role"],
+        pluck="role",
     )
+    billing_user = bool(set(user_role).intersection(billing_roles))
 
     # Check if the last invoice was already billed
     if (
@@ -193,15 +195,14 @@ def sync_order(
             return {"status": "Failure"}
 
     if not customer:
-        frappe.throw("Please enter valid customer details")
+        frappe.throw(_("Please enter valid customer details"))
     else:
         invoice.customer = customer
 
     if order_type:
         invoice.order_type = order_type
 
-    customerdoc = frappe.get_doc("Customer", customer)
-    invoice.mobile_number = customerdoc.mobile_number
+    invoice.mobile_number = frappe.db.get_value("Customer", customer, "mobile_number")
     if comments:
         invoice.custom_comments = comments
     invoice.no_of_pax = no_of_pax
@@ -216,7 +217,7 @@ def sync_order(
         price_list = frappe.db.get_value("Aggregator Settings",{"customer": customer, "parent": invoice.branch, "parenttype": "Branch"},"price_list",)
         
         if not price_list:
-            frappe.throw(f"Price list for customer {customer} in branch {invoice.branch} not found in Aggregator Settings.")
+            frappe.throw(_("Price list for customer {0} in branch {1} not found in Aggregator Settings.").format(customer, invoice.branch))
     else:
         price_list = invoice.selling_price_list
 
@@ -296,7 +297,7 @@ def sync_order(
     try:
         invoice.save()
     except Exception as e:
-        frappe.throw(f"Error while updating order: {e}")   
+        frappe.throw(_("Error while updating order: {0}").format(e))   
 
 
     try:
@@ -341,11 +342,14 @@ def get_restaurant_and_menu_name(table):
     if not table:
         frappe.throw(_("Please select a table"))
 
-    restaurant, branch, room = frappe.get_value(
+    result = frappe.get_value(
         "URY Table",
         table,
         ["restaurant", "branch", "restaurant_room"],
     )
+    if not result:
+        frappe.throw(_("URY Table {0} not found").format(table))
+    restaurant, branch, room = result
     room_wise_menu = frappe.db.get_value(
         "URY Restaurant",
         restaurant,
@@ -428,12 +432,13 @@ def pos_opening_check():
     }
 
     if result["opening_exists"]:
-        # If POS opening entry exists, fetch the cashier from the first entry
-        opening_entry = frappe.get_doc("POS Opening Entry", pos_opening_list[0].name)
-        result["cashier"] = (
-            opening_entry.user
-        )  # Fetch values from POS Profile linked to POS Opening Entry
-        result["pos_profile"] = opening_entry.pos_profile
+        opening_vals = frappe.db.get_value(
+            "POS Opening Entry", pos_opening_list[0].name,
+            ["user", "pos_profile"],
+            as_dict=True,
+        )
+        result["cashier"] = opening_vals.user
+        result["pos_profile"] = opening_vals.pos_profile
         
     return result
 
@@ -442,28 +447,30 @@ def pos_opening_check():
 def table_transfer(table, newTable, invoice):
     if not frappe.has_permission("POS Invoice", "write", invoice):
         frappe.throw(_("Not permitted to transfer tables"), frappe.PermissionError)
-    current_table = frappe.get_doc("URY Table", table)
+    current_room = frappe.db.get_value("URY Table", table, "restaurant_room")
+    new_table_room, new_table_occupied = frappe.db.get_value(
+        "URY Table", newTable, ["restaurant_room", "occupied"]
+    )
     pos_invoice = frappe.get_doc("POS Invoice", invoice)
-    new_table = frappe.get_doc("URY Table", newTable)
 
-    if current_table.restaurant_room == new_table.restaurant_room:
-        if new_table.occupied == 1:
-            frappe.throw(f"Table {new_table.name} is already occupied")
+    if current_room == new_table_room:
+        if new_table_occupied == 1:
+            frappe.throw(_("Table {0} is already occupied").format(new_table.name))
 
         # Update table status
         frappe.db.set_value(
             "URY Table",
-            new_table.name,
+            newTable,
             {"occupied": 1, "latest_invoice_time": pos_invoice.creation},
         )
         frappe.db.set_value(
             "URY Table",
-            current_table.name,
+            table,
             {"occupied": 0, "latest_invoice_time": None},
         )
 
         # Update POS Invoice
-        pos_invoice.restaurant_table = new_table.name
+        pos_invoice.restaurant_table = newTable
         pos_invoice.save()
 
         try:
@@ -572,8 +579,12 @@ def make_invoice(customer, payments, cashier, pos_profile,owner, additionalDisco
     invoice = get_order_invoice(table, invoice, order_type, "Payments")
 
     if table:
-        restaurant = get_restaurant_and_menu_name(table)
+        _, _, restaurant = get_restaurant_and_menu_name(table)
         invoice.restaurant = restaurant
+    elif not invoice.restaurant:
+        restaurant = frappe.db.get_value("URY Restaurant", {"branch": invoice.branch}, "name")
+        if restaurant:
+            invoice.restaurant = restaurant
 
     invoice.customer = customer
     invoice.pos_profile = pos_profile

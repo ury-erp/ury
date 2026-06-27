@@ -179,7 +179,7 @@ def process_items_for_kot(
 
     if not productions:
         frappe.throw(
-            "Create URY Production unit against POS Profile: %s" % pos_profile_id
+            _("Create URY Production unit against POS Profile: {0}").format(pos_profile_id)
         )
 
     item_codes = [i["item_code"] for i in items]
@@ -195,8 +195,8 @@ def process_items_for_kot(
         ig = item_groups.get(item["item_code"])
         if ig and ig not in all_groups:
             frappe.msgprint(
-                "Item group '%s' for item '%s' is not in any production."
-                % (ig, item["item_code"])
+                _("Item group '{0}' for item '{1}' is not in any production.")
+                .format(ig, item["item_code"])
             )
 
     # Fetch menu once for course lookups
@@ -398,8 +398,8 @@ def kot_execute(
         cancel_kot_naming_series = "CNCL-" + kot_naming_series
     else:
         frappe.throw(
-            "KOT Naming Series is mandatory for the auto creation of KOT. "
-            "Ensure it is configured in the POS Profile: %s" % pos_profile_id
+            _("KOT Naming Series is mandatory for the auto creation of KOT. "
+              "Ensure it is configured in the POS Profile: {0}").format(pos_profile_id)
         )
 
     branch = getBranch()

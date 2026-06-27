@@ -122,7 +122,7 @@ def getBranch():
     """
     branch_array = frappe.db.sql(sql_query, user, as_dict=True)
     if not branch_array:
-        frappe.throw("User is not associated with any branch. Please refresh the page.")
+        frappe.throw(_("User is not associated with any branch. Please refresh the page."))
 
     branch_name = branch_array[0].get("branch")
 
@@ -141,12 +141,12 @@ def _get_user_branch_rooms():
 def getBranchRoom():
     rows = _get_user_branch_rooms()
     if not rows:
-        frappe.throw("No branch or room information found for the user. Please contact your administrator.")
+        frappe.throw(_("No branch or room information found for the user. Please contact your administrator."))
     row = rows[0]
     if not row.branch:
-        frappe.throw("Branch information is missing for the user. Please contact your administrator.")
+        frappe.throw(_("Branch information is missing for the user. Please contact your administrator."))
     if not row.room:
-        frappe.throw("No room assigned to this user. Please contact your administrator.")
+        frappe.throw(_("No room assigned to this user. Please contact your administrator."))
     return [{"name": row.room, "branch": row.branch}]
 
 @frappe.whitelist()
@@ -497,21 +497,19 @@ def getAggregatorMOP(aggregator):
         {"customer": aggregator, "parent": branchName, "parenttype": "Branch"},
         "mode_of_payments",
     )
-    modeOfPaymentsList = []
-    modeOfPaymentsList.append(
-            {"mode_of_payment": modeOfPayment, "opening_amount": 0.0}
-    )
-    return modeOfPaymentsList
+    if not modeOfPayment:
+        frappe.throw(_("No mode of payment configured for aggregator {0}").format(aggregator))
+    return [{"mode_of_payment": modeOfPayment, "opening_amount": 0.0}]
 @frappe.whitelist()
 def create_customer(customer_name, mobile_number=None, customer_group="Individual", territory="India"):
     if not customer_name:
-        frappe.throw("Customer name is required")
+        frappe.throw(_("Customer name is required"))
     if not mobile_number:
-        frappe.throw("Mobile Number is required")
+        frappe.throw(_("Mobile Number is required"))
     try:
         validate_phone_number(mobile_number, throw=True)
     except Exception:
-        frappe.throw("Invalid mobile number format")
+        frappe.throw(_("Invalid mobile number format"))
 
     try:
         customer = frappe.get_doc({
@@ -533,12 +531,11 @@ def create_customer(customer_name, mobile_number=None, customer_group="Individua
             "territory": territory
         }
 
+    except frappe.ValidationError:
+        raise  # Let frappe.throw() validation errors propagate to the client
     except Exception as e:
         frappe.log_error(message=frappe.get_traceback(), title="Customer Creation Failed")
-        return {
-            "status": "error",
-            "message": str(e)
-        }
+        frappe.throw(_("Failed to create customer: {0}").format(str(e)))
 
 @frappe.whitelist()
 def validate_pos_close(pos_profile): 

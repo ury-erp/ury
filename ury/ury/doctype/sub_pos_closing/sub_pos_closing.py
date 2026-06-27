@@ -17,7 +17,7 @@ class SubPOSClosing(Document):
             filters={"branch": branch, "status": "Draft", "docstatus": "0","cashier":self.user},
         )
         if draft_invoices:
-            frappe.throw("Submit/Delete Draft Invoices")
+            frappe.throw(_("Submit/Delete Draft Invoices"))
 
         date_time = now()
         if isinstance(date_time, str):
@@ -53,25 +53,26 @@ class SubPOSClosing(Document):
 
         multiple_cashier = frappe.db.get_value("POS Profile", self.pos_profile, "custom_enable_multiple_cashier")
         if multiple_cashier:
-            get_cashier = frappe.get_doc("POS Profile", self.pos_profile)
-            for user_details in get_cashier.applicable_for_users:
-                if user_details.custom_main_cashier:
-                    owner = user_details.user
-            if frappe.session.user == owner:
-                frappe.throw("The Main Cashier cannot close a Sub POS Closing entry.")
+            main_cashier_row = frappe.db.get_value(
+                "POS Profile User",
+                {"parent": self.pos_profile, "custom_main_cashier": 1},
+                "user",
+            )
+            if main_cashier_row and frappe.session.user == main_cashier_row:
+                frappe.throw(_("The Main Cashier cannot close a Sub POS Closing entry."))
 
     
     def on_submit(self):
-        opening_entry = frappe.get_doc("POS Opening Entry", self.pos_opening_entry)
-        opening_entry.custom_sub_pos_close = self.name
-        opening_entry.status = "Closed"
-        opening_entry.save()
+        frappe.db.set_value("POS Opening Entry", self.pos_opening_entry, {
+            "custom_sub_pos_close": self.name,
+            "status": "Closed",
+        })
     
     def on_cancel(self):
-        opening_entry = frappe.get_doc("POS Opening Entry", self.pos_opening_entry)
-        opening_entry.custom_sub_pos_close = None
-        opening_entry.status = "Open"
-        opening_entry.save()
+        frappe.db.set_value("POS Opening Entry", self.pos_opening_entry, {
+            "custom_sub_pos_close": None,
+            "status": "Open",
+        })
 
 
 @frappe.whitelist()
