@@ -1,4 +1,5 @@
 import frappe
+from frappe import _
 from frappe.utils import get_datetime, today, now
 
 def validate(doc, method):
@@ -50,4 +51,4 @@ def main_pos_open_check(doc, method):
                 {"branch": doc.branch, "user": owner, "posting_date": current_date, "status": "Open", "docstatus": 1},
             )
             if not has_open:
-                frappe.throw("Main Cashier POS must be open", title="Main Cashier POS Required")
+                frappe.throw(_("Main Cashier POS must be open"), title=_("Main Cashier POS Required"))

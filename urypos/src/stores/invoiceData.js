@@ -499,79 +499,35 @@ export const useInvoiceDataStore = defineStore("invoiceData", {
               printer_setting: this.printer,
               print_format: this.print_format,
             };
-            const printingCall = async () => {
-              const res = await this.call.post(
-                "ury.ury.api.ury_print.network_printing",
-                sendObj
-              );
-              return res.message;
-            };
-            let i = 0;
-            let errorMessage = "";
-            do {
-              const res = await printingCall();
-              if (res === "Success") {
-                this.notification.createNotification("Print Successful");
-                const sendObj = {
-                  invoice: invoiceNo,
-                };
-                await this.call
-                  .post("ury.ury.api.ury_print.qz_print_update", sendObj)
-                  .then(() => {
-                    router.push("/Table").catch(() => {});
-                    return 200;
-                  });
-              }
-              errorMessage = res;
-              i++;
-            } while (i < 1);
-            throw {
-              alert: this.alert.createAlert(
-                "Message",
-                `Message:${errorMessage}`,
-                "OK"
-              ),
-              custom: (this.isPrinting = false),
-            };
+            const res = await this.call.post(
+              "ury.ury.api.ury_print.network_printing",
+              sendObj
+            );
+            if (res.message === "Success") {
+              this.notification.createNotification("Print Successful");
+              await this.call.post("ury.ury.api.ury_print.qz_print_update", { invoice: invoiceNo });
+              router.push("/Table").catch(() => {});
+            } else {
+              this.isPrinting = false;
+              await this.alert.createAlert("Message", `Message: ${res.message}`, "OK");
+            }
           } else {
             const networkPrint = {
               invoice_id: invoiceNo,
               pos_profile: this.posProfile,
             };
-            const networkPrintPrintingCall = async () => {
-              const res = await this.call.post(
-                "ury.ury.api.ury_print.select_network_printer",
-                networkPrint
-              );
-              return res.message;
-            };
-            let i = 0;
-            let errorMessage = "";
-            do {
-              const res = await networkPrintPrintingCall();
-              if (res === "Success") {
-                this.notification.createNotification("Print Successful");
-                const sendObj = {
-                  invoice: invoiceNo,
-                };
-                await this.call
-                  .post("ury.ury.api.ury_print.qz_print_update", sendObj)
-                  .then(() => {
-                    router.push("/Table").catch(() => {});
-                    return 200;
-                  });
-              }
-              errorMessage = res;
-              i++;
-            } while (i < 1);
-            throw {
-              alert: this.alert.createAlert(
-                "Message",
-                `Message:${errorMessage}`,
-                "OK"
-              ),
-              custom: (this.isPrinting = false),
-            };
+            const res = await this.call.post(
+              "ury.ury.api.ury_print.select_network_printer",
+              networkPrint
+            );
+            if (res.message === "Success") {
+              this.notification.createNotification("Print Successful");
+              await this.call.post("ury.ury.api.ury_print.qz_print_update", { invoice: invoiceNo });
+              router.push("/Table").catch(() => {});
+            } else {
+              this.isPrinting = false;
+              await this.alert.createAlert("Message", `Message: ${res.message}`, "OK");
+            }
           }
         } else {
           // Socket printing using printview redirection
@@ -588,10 +544,10 @@ export const useInvoiceDataStore = defineStore("invoiceData", {
           this.isPrinting = false;
         }
       } catch (e) {
-        if (e?.custom) {
-          this.isPrinting = false;
-
-          return this.alert.createAlert("Error", e?.title, "OK");
+        if (e?._server_messages) {
+          const messages = JSON.parse(e._server_messages);
+          const message = JSON.parse(messages[0]);
+          await this.alert.createAlert("Message", message.message, "OK");
         }
       }
     },
@@ -644,8 +600,7 @@ export const useInvoiceDataStore = defineStore("invoiceData", {
 
     loadPrinter: async function (qz_host) {
       try {
-        const res = await loadQzPrinter(url, qz_host);
-        print(qz_host);
+        const res = await loadQzPrinter(qz_host);
         if (res === "success")
           this.notification.createNotification("Printer loaded");
       } catch (err) {

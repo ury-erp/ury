@@ -36,11 +36,7 @@ export const posClosing = defineStore("posClose", {
     isPosClose: null,
     showSumbitPosclose: false,
   }),
-  getters: {
-    isFlagSet() {
-      return this.customer.length === 0;
-    },
-  },
+  getters: {},
   actions: {
     selectPosOpen() {
       this.db

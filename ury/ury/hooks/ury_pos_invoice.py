@@ -1,4 +1,5 @@
 import frappe
+from frappe import _
 from datetime import datetime
 from frappe.utils import now_datetime, get_time,now
 
@@ -77,7 +78,7 @@ def validate_invoice(doc, method):
 
 def validate_customer(doc, method):
     if doc.customer_name is None or doc.customer_name == "":
-        frappe.throw("Failed to load data. Please refresh the page.")
+        frappe.throw(_("Failed to load data. Please refresh the page."))
 
 
 def calculate_and_set_times(doc, method):
@@ -104,7 +105,7 @@ def validate_invoice_print(doc, method):
     # If the invoice is associated with a restaurant table and hasn't been printed
     if doc.restaurant_table and invoice_printed == 0:
         frappe.throw(
-            "Printing the invoice is mandatory before submitting. Please print the invoice."
+            _("Printing the invoice is mandatory before submitting. Please print the invoice.")
         )
 
 
@@ -159,7 +160,7 @@ def validate_price_list(doc, method):
                 "price_list",
             )
             if not price_list:
-                frappe.throw(f"Price list for customer {doc.customer} in branch {doc.branch} not found in Aggregator Settings.")
+                frappe.throw(_("Price list for customer {0} in branch {1} not found in Aggregator Settings.").format(doc.customer, doc.branch))
             doc.selling_price_list = price_list
             return
 
@@ -190,5 +191,5 @@ def restrict_existing_order(doc, event):
         )
         if invoice_exist:
             frappe.throw(
-                ("Table {0} has an existing invoice").format(doc.restaurant_table)
+                _("Table {0} has an existing invoice").format(doc.restaurant_table)
             )

@@ -34,9 +34,6 @@ export const useAuthStore = defineStore("auth", {
     userAuth: localStorage.getItem("userAuth"),
   }),
   getters: {
-    isAuthenticated(state) {
-      state.isAuthenticated;
-    },
     passwordFieldType() {
       return this.showPassword ? "text" : "password";
     },
@@ -184,14 +181,12 @@ export const useAuthStore = defineStore("auth", {
         this.call
           .get("ury.ury_pos.api.posOpening")
           .then((result) => {
-            const serverMessages = JSON.parse(result._server_messages);
-            const innerMessageString = serverMessages[0];
-            const innerMessage = JSON.parse(innerMessageString);
-            const message = innerMessage.message;
-            var currentDomain = window.location.origin;
-            alert.createAlert("Message", message, "OK").then(() => {
-              window.location.href = currentDomain + "/app/";
-            });
+            if (result.message) {
+              var currentDomain = window.location.origin;
+              alert.createAlert("Message", result.message, "OK").then(() => {
+                window.location.href = currentDomain + "/app/";
+              });
+            }
           })
           .catch(() => {});
       }

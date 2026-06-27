@@ -1,4 +1,5 @@
 import frappe
+from frappe import _
 
 def before_save(doc, method):
     sub_pos_close_check(doc, method)
@@ -27,7 +28,7 @@ def sub_pos_close_check(doc, method):
                 {"branch": branch, "user": cashier, "status": "Open", "docstatus": 1},
             )
             if has_open:
-                frappe.throw("Sub Cashier POS must be closed", title="Sub Cashier POS Closing Required")
+                frappe.throw(_("Sub Cashier POS must be closed"), title=_("Sub Cashier POS Closing Required"))
 
 
 def calculate_closing_amount(doc, method):
@@ -65,7 +66,7 @@ def calculate_closing_amount(doc, method):
                 closing_details.closing_amount = total_closing_amount
                 closing_details.difference = total_closing_amount - closing_details.expected_amount
         else:
-            frappe.throw("No Sub POS Closing entries found between the given dates")
+            frappe.throw(_("No Sub POS Closing entries found between the given dates"))
 
 
 def validate_cashier(doc, method):
@@ -81,4 +82,4 @@ def validate_cashier(doc, method):
         cashier = sub_cashier
 
         if frappe.session.user == cashier:
-            frappe.throw("Sub Cashiers are not allowed to make POS Closing Entries.")
+            frappe.throw(_("Sub Cashiers are not allowed to make POS Closing Entries."))

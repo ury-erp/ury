@@ -281,7 +281,7 @@ export const useMenuStore = defineStore("menu", {
             if (result.message) {
               this.items = result.message;
             } else {
-              this.items = defautlMenu;
+              this.items = this.defautlMenu;
             }
           })
           .catch((error) => {
