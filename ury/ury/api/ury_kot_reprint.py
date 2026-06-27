@@ -1,4 +1,5 @@
 import frappe
+from frappe import _
 from frappe.utils import cint
 from frappe.utils.print_format import print_by_server
 

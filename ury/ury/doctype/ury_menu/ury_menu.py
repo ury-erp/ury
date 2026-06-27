@@ -31,7 +31,7 @@ class URYMenu(Document):
     def clear_item_price(self, price_list=None):
         """clear all item prices for this menu"""
         if not price_list:
-            price_list = self.get_price_list().name
+            price_list = self.get_price_list()
         frappe.db.sql("delete from `tabItem Price` where price_list = %s", price_list)
 
     def make_price_list(self):
@@ -42,16 +42,17 @@ class URYMenu(Document):
         # delete old items
         self.clear_item_price(price_list_name)
 
-        # batch insert item prices
-        for d in self.items:
-            frappe.get_doc(
-                dict(
-                    doctype="Item Price",
-                    price_list=price_list_name,
-                    item_code=d.item,
-                    price_list_rate=d.rate,
-                )
-            ).insert(ignore_permissions=True)
+        # batch insert item prices using bulk SQL
+        if self.items:
+            rows = []
+            for d in self.items:
+                rows.append((price_list_name, d.item, d.rate))
+            frappe.db.bulk_insert(
+                "Item Price",
+                ["price_list", "item_code", "price_list_rate"],
+                rows,
+                ignore_duplicates=True,
+            )
 
     def get_price_list(self):
         """Return price list name; create if missing."""

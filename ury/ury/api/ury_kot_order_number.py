@@ -17,11 +17,12 @@ def set_order_number(doc, event):
             "custom_ury_last_invoice",
         )
     if last_invoice:
-        last_invoice_number = int(last_invoice[-5:])
+        last_invoice_str = str(last_invoice)
+        last_invoice_number = int(last_invoice_str[-5:])
 
         current_invoice = doc.name
 
-        current_invoice_number = int(current_invoice[-5:])
+        current_invoice_number = int(str(current_invoice)[-5:])
 
         order_number = current_invoice_number - last_invoice_number
         if order_number > 0:

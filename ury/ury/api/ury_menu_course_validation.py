@@ -1,4 +1,5 @@
 import frappe
+from frappe import _
 
 def validate_priority(doc,event):
     # Check if the selected priority is already used by another course
@@ -11,4 +12,4 @@ def validate_priority(doc,event):
     )
 
     if existing_course:
-        frappe.throw(f"Priority {doc.custom_serving_priority} is already assigned to another course. Please choose a different priority.")
+        frappe.throw(_("Priority {0} is already assigned to another course. Please choose a different priority.").format(doc.custom_serving_priority))

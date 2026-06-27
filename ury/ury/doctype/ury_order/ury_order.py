@@ -72,13 +72,7 @@ def get_order_invoice(table=None, invoiceNo=None, order_type=None, is_payment=No
 
     else:
 
-        if is_payment == "Payments":
-            invoice_name = frappe.get_value(
-                "POS Invoice", dict(restaurant_table=table, docstatus=0, name=invoiceNo)
-            )
-            
-        else:
-            invoice_name = frappe.get_value(
+        invoice_name = frappe.get_value(
                 "POS Invoice", dict(docstatus=0, name=invoiceNo)
             )
             
@@ -410,8 +404,10 @@ def pos_opening_check():
         }
     
     details = getBranchRoom()
-    room = details[0].get('name')    # 'Beach'
-    branch = details[0].get('branch') # 'Beach'
+    if not details:
+        frappe.throw(_("No room/branch configuration found for the current user."))
+    room = details[0].get('name')
+    branch = details[0].get('branch')
     
     pos_opening_list = frappe.db.sql("""
         SELECT DISTINCT `tabPOS Opening Entry`.name 
@@ -455,7 +451,7 @@ def table_transfer(table, newTable, invoice):
 
     if current_room == new_table_room:
         if new_table_occupied == 1:
-            frappe.throw(_("Table {0} is already occupied").format(new_table.name))
+            frappe.throw(_("Table {0} is already occupied").format(newTable))
 
         # Update table status
         frappe.db.set_value(
@@ -475,7 +471,7 @@ def table_transfer(table, newTable, invoice):
 
         try:
             change_table_in_kot(
-                    pos_invoice.name, new_table.name, pos_invoice.branch
+                    pos_invoice.name, newTable, pos_invoice.branch
                 )
 
         except Exception as e:

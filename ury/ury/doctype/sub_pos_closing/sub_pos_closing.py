@@ -8,7 +8,6 @@ from ury.ury_pos.api import getBranch
 
 class SubPOSClosing(Document):
     def validate(self):
-        owner = None
         branch = frappe.db.get_value("POS Profile", self.pos_profile, "branch")
 
         draft_invoices = frappe.get_all(

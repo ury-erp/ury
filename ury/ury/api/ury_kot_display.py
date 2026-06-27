@@ -1,5 +1,3 @@
-import json
-
 import frappe
 from frappe import _
 from ury.ury_pos.api import getBranch
@@ -34,7 +32,7 @@ def get_site_name():
     return {"site_name": frappe.local.site}
 
 
-def _build_kot_response(_kots, branch, status_filter):
+def _build_kot_response(branch, status_filter):
     """Shared logic for kot_list and served_kot_list with batch queries."""
     today = frappe.utils.now()
     pos_profile_vals = frappe.db.get_value(
@@ -209,10 +207,10 @@ def _build_kot_response(_kots, branch, status_filter):
 @frappe.whitelist()
 def kot_list():
     branch = getBranch()
-    return _build_kot_response([], branch, "Ready For Prepare")
+    return _build_kot_response(branch, "Ready For Prepare")
 
 
 @frappe.whitelist()
 def served_kot_list():
     branch = getBranch()
-    return _build_kot_response([], branch, "Served")
+    return _build_kot_response(branch, "Served")
