@@ -48,16 +48,16 @@ frappe.ui.form.on('URY Order', {
                         method: 'ury.ury.doctype.ury_order.ury_order.pos_opening_check',
                         callback: function (r) {
                                 if (!r.message) {
-                                        frappe.msgprint('Server Error');
+                                        frappe.msgprint(__('Server Error'));
                                 }
                                 else if (!r.message.opening_exists) {
-                                        frappe.msgprint('POS Opening Entry is not created');
+                                        frappe.msgprint(__('POS Opening Entry is not created'));
                                         document.addEventListener('click', function () {
                                                 window.location.reload();
                                         });
                                 }
                                 else if (!r.message.cashier || !r.message.pos_profile) {
-                                        frappe.msgprint('Incomplete data. Check POS Opening Entry.');
+                                        frappe.msgprint(__('Incomplete data. Check POS Opening Entry.'));
                                 }
                                 else {
                                         frappe.dom.unfreeze();
@@ -80,7 +80,7 @@ frappe.ui.form.on('URY Order', {
 
                 // For adding placeholder in search box
                 $("[data-fieldname='item_search']").addClass("item_search");
-                $(".item_search").attr('placeholder', 'Search')
+                $(".item_search").attr('placeholder', __('Search'))
 
         },
 
@@ -304,7 +304,7 @@ frappe.ui.form.on('URY Order', {
         calculate_total: function (frm, price, qty) {
                 let total = frm.doc.grand_total
                 let grand_total = total + (price * qty)
-                cur_frm.set_value("grand_total", grand_total);
+                frm.set_value("grand_total", grand_total);
         },
 
         display_menu: function (frm) {
@@ -359,23 +359,23 @@ frappe.ui.form.on('URY Order', {
                 let names = menu_item_list.item_name
                 var added = false;
                 let d = new frappe.ui.Dialog({
-                        title: 'Enter details',
+                        title: __('Enter details'),
                         fields: [
                                 {
-                                        label: 'Quantity',
+                                        label: __('Quantity'),
                                         fieldname: 'qty',
                                         fieldtype: 'Int',
                                         type: 'number',
                                         default: $(`#${OrderItems}_cartqty`).val()
                                 },
                                 {
-                                        label: 'Comment',
+                                        label: __('Comment'),
                                         fieldname: 'comment',
                                         fieldtype: 'Data',
                                         default: $(`#${OrderItems}_comment`).val()
                                 }
                         ],
-                        primary_action_label: 'Add',
+                        primary_action_label: __('Add'),
                         primary_action(values) {
                                 d.hide();
                                 (frm.doc.items || []).forEach((d) => {
@@ -394,7 +394,7 @@ frappe.ui.form.on('URY Order', {
                                                 d.comment = values.comment
                                                 added = true;
                                                 frappe.show_alert({
-                                                        message: __('Item Added Total Qty= ' + d.qty + ''),
+                                                        message: __('Item Added Total Qty= {0}', [d.qty]),
                                                         indicator: 'green'
                                                 }, 0.85);
 
@@ -413,7 +413,7 @@ frappe.ui.form.on('URY Order', {
                                                 ) {
                                                         $(`#${index}_input`).val(values.qty)
                                                         frappe.show_alert({
-                                                                message: __('Item Added Total Qty= 1'),
+                                                                message: __('Item Added Total Qty= {0}', [1]),
                                                                 indicator: 'green'
                                                         }, 0.85);
 
@@ -460,7 +460,7 @@ frappe.ui.form.on('URY Order', {
                                         if (!added) {
                                                 $(`#${index}_input`).val(1);
                                                 frappe.show_alert({
-                                                        message: __('Item Added Total Qty= 1'),
+                                                        message: __('Item Added Total Qty= {0}', [1]),
                                                         indicator: 'green'
                                                 }, 0.85);
 
@@ -761,7 +761,7 @@ frappe.ui.form.on('URY Order', {
                                                         });
                                                 }
                                                 else {
-                                                        cur_frm.set_value("modified_time", invoice.modified);
+                                                        frm.set_value("modified_time", invoice.modified);
                                                         frm.events.set_invoice_items(frm, r);
                                                         frappe.show_alert({ message: __('Order Updated'), indicator: 'green' });
                                                         localStorage.removeItem('check');
@@ -1063,10 +1063,10 @@ frappe.ui.form.on('URY Order', {
 
                                 else {
                                         const d = new frappe.ui.Dialog({
-                                                title: 'Transfer Table',
+                                                title: __('Transfer Table'),
                                                 fields: [
                                                         {
-                                                                label: 'New Table',
+                                                                label: __('New Table'),
                                                                 fieldname: 'table',
                                                                 fieldtype: 'Link',
                                                                 options: 'URY Table',
@@ -1075,14 +1075,14 @@ frappe.ui.form.on('URY Order', {
                                                                 }
                                                         },
                                                         {
-                                                                label: 'Current Table',
+                                                                label: __('Current Table'),
                                                                 fieldname: 'cur_table',
                                                                 fieldtype: 'Data',
                                                                 read_only: true,
                                                                 default: frm.doc.restaurant_table
                                                         }
                                                 ],
-                                                primary_action_label: 'Transfer',
+                                                primary_action_label: __('Transfer'),
                                                 primary_action(values) {
                                                         frappe.dom.freeze();
                                                         frm.call({
@@ -1133,16 +1133,16 @@ frappe.ui.form.on('URY Order', {
                                                                 }
                                                                 else {
                                                                         let d = new frappe.ui.Dialog({
-                                                                                title: 'Transfer Captain',
+                                                                                title: __('Transfer Captain'),
                                                                                 fields: [
                                                                                         {
-                                                                                                label: 'New Captain',
+                                                                                                label: __('New Captain'),
                                                                                                 fieldname: 'captain',
                                                                                                 fieldtype: 'Link',
                                                                                                 options: 'User',
                                                                                         },
                                                                                         {
-                                                                                                label: 'Current Captain',
+                                                                                                label: __('Current Captain'),
                                                                                                 fieldname: 'cur_captain',
                                                                                                 fieldtype: 'Data',
                                                                                                 read_only: true,
@@ -1150,7 +1150,7 @@ frappe.ui.form.on('URY Order', {
                                                                                         }
 
                                                                                 ],
-                                                                                primary_action_label: 'Transfer',
+                                                                                primary_action_label: __('Transfer'),
                                                                                 primary_action(values) {
                                                                                         frappe.dom.freeze();
                                                                                         frm.call({
