@@ -579,11 +579,11 @@ export default {
 
     socket.on('connect_error', (err) => {
       console.error("Socket connection error:", err);
-      this.statusMessage = "Connection error. Retrying...";
+      this.setStatusMessage("Connection error. Retrying...");
     });
     socket.on('disconnect', (reason) => {
       console.warn("Socket disconnected:", reason);
-      this.statusMessage = "Connection lost. Reconnecting...";
+      this.setStatusMessage("Connection lost. Reconnecting...");
     });
     socket.on('connect', () => {
       this.setStatusMessage("Reconnected");
