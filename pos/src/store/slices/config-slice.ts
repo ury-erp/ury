@@ -88,10 +88,7 @@ export const createConfigSlice: StateCreator<
     const hasAccess = user.name === 'Administrator' || user.roles.some(role => allowedRoles.includes(role));
     set({ hasAccess });
 
-    // If no access, we could redirect or show an error message
-    if (!hasAccess) {
-      set({ error: 'You do not have permission to access this application.' });
-    }
+    // Note: AuthGuard handles the no-access UI via !hasAccess check with proper i18n
   },
 
   setAllowedRoles: (roles) => {

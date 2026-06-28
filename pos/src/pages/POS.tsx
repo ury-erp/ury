@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import { useEffect, useState, useRef, type ElementType } from 'react';
 import { t } from '../i18n';
 import { Star, TrendingUp } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
@@ -50,9 +50,15 @@ export default function POS() {
     }, 250); // 250ms threshold for double click
   };
 
+  useEffect(() => {
+    return () => {
+      if (clickTimerRef.current) clearTimeout(clickTimerRef.current);
+    };
+  }, []);
+
   const QuickFilterButton = ({ filter, icon: Icon, label }: { 
     filter: 'all' | 'special';
-    icon: React.ElementType;
+    icon: ElementType;
     label: string;
   }) => (
     <button

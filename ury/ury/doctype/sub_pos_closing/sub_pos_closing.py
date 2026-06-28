@@ -87,7 +87,7 @@ def get_cashiers(doctype, txt, searchfield, start, page_len, filters):
     cashiers_list = frappe.get_all(
         "POS Profile User", filters=filters, fields=["user"], as_list=1
     )
-    return [c for c in cashiers_list]
+    return cashiers_list
 
 
 @frappe.whitelist()

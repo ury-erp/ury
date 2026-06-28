@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type MouseEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Eye, Layout, Loader2, Printer, Square, Users } from 'lucide-react';
 import { cn, formatInvoiceTime } from '../lib/utils';
@@ -28,6 +28,8 @@ const TableView = () => {
   const [selectedRoom, setSelectedRoom] = useState<string | null>(null);
   const [tables, setTables] = useState<Table[]>([]);
   const [tablesCache, setTablesCache] = useState<Record<string, Table[]>>({});
+  const tablesCacheRef = useRef(tablesCache);
+  tablesCacheRef.current = tablesCache;
   const [loadingRooms, setLoadingRooms] = useState(false);
   const [loadingTables, setLoadingTables] = useState(false);
   const [roomCounts, setRoomCounts] = useState<Record<string, number>>({});
@@ -119,8 +121,8 @@ const TableView = () => {
       setError(null);
 
       const shouldUseCache = options?.useCache !== false;
-      if (shouldUseCache && tablesCache[roomName]) {
-        setTables(sortTables(tablesCache[roomName]));
+      if (shouldUseCache && tablesCacheRef.current[roomName]) {
+        setTables(sortTables(tablesCacheRef.current[roomName]));
         setLoadingTables(false);
         return;
       }
@@ -138,7 +140,7 @@ const TableView = () => {
         setLoadingTables(false);
       }
     },
-    [tablesCache]
+    []
   );
 
   useEffect(() => {

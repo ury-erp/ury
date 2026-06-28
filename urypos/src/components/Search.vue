@@ -6,7 +6,6 @@
     <div
       class="relative w-full"
       :class="{
-        'md:w-full': this.menu.selectedOrderType === 'Aggregators',
         'md:w-3/4': this.menu.selectedOrderType === 'Aggregators',
       }"
     >

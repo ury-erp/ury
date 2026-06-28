@@ -134,46 +134,47 @@ export const useCustomerStore = defineStore("customers", {
     addNewCustomer: async function () {
       const alert = useAlert();
       const notification = useNotifications();
-      if (!this.newCustomer || !this.newCustomerMobileNo) {
-        let missingFields = [];
-        if (!this.newCustomer) {
-          missingFields.push("Customer Name");
-        }
-        if (!this.newCustomerMobileNo) {
-          missingFields.push("Mobile Number");
-        }
-        if (!this.customerGroup) {
-          missingFields.push("Customer Group");
-        }
-        if (!this.customerTerritory) {
-          missingFields.push("Territory");
-        }
+      let missingFields = [];
+      if (!this.newCustomer) {
+        missingFields.push("Customer Name");
+      }
+      if (!this.newCustomerMobileNo) {
+        missingFields.push("Mobile Number");
+      }
+      if (!this.customerGroup) {
+        missingFields.push("Customer Group");
+      }
+      if (!this.customerTerritory) {
+        missingFields.push("Territory");
+      }
+      if (missingFields.length > 0) {
         const missingFieldsMessage =
           "Following fields have missing values: " + missingFields.join(", ");
         alert.createAlert("Message", missingFieldsMessage, "OK");
-      } else {
-        this.showAddNewCustomer = false;
-        const db = frappe.db();
-        db.createDoc("Customer", {
-          customer_name: this.newCustomer,
-          mobile_number: this.newCustomerMobileNo.toString(),
-          customer_group: this.customerGroup,
-          territory: this.customerTerritory,
-        })
-          .then((doc) => {
-            this.search = doc.name;
-            notification.createNotification("New Customer Created");
-            this.showModalNewCustomer = false;
-          })
-          .catch((error) => {
-            if (error._server_messages) {
-              const serverMessages = JSON.parse(error._server_messages);
-              const messageObject = JSON.parse(serverMessages[0]);
-              const message = messageObject.message;
-              alert.createAlert("Message", message, "OK");
-            }
-          });
+        return;
       }
+
+      this.showAddNewCustomer = false;
+      const db = frappe.db();
+      db.createDoc("Customer", {
+        customer_name: this.newCustomer,
+        mobile_number: this.newCustomerMobileNo.toString(),
+        customer_group: this.customerGroup,
+        territory: this.customerTerritory,
+      })
+        .then((doc) => {
+          this.search = doc.name;
+          notification.createNotification("New Customer Created");
+          this.showModalNewCustomer = false;
+        })
+        .catch((error) => {
+          if (error._server_messages) {
+            const serverMessages = JSON.parse(error._server_messages);
+            const messageObject = JSON.parse(serverMessages[0]);
+            const message = messageObject.message;
+            alert.createAlert("Message", message, "OK");
+          }
+        });
     },
     extractName(content) {
       if (content) {

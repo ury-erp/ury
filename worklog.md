@@ -69,3 +69,24 @@ Stage Summary:
 - POS Frontend: comprehensive i18n for AuthGuard, ScreenSizeDialog, ErrorBoundary, AggregatorSelect, ProductDialog, Orders, Header
 - Doctype scan: all 23 files verified clean
 - **Cumulative across all 8 rounds**: ~145+ issues fixed, 10 commits on develop branch
+
+---
+Task ID: 18
+Agent: Main Agent
+Task: Round 18 — Fix 5 CRITICAL backend bugs, XSS, validation bypass, crash guards
+
+Work Log:
+- Launched 3 parallel scan agents (POS v2 React, Vue POS, Python backend)
+- React scan: 20 issues found (1 HIGH, 7 MEDIUM, 12 LOW)
+- Vue scan: 13 issues found (1 CRITICAL XSS, 4 HIGH, 6 MEDIUM, 2 LOW)
+- Python scan: 11 issues found (5 CRITICAL, 3 HIGH, 2 MEDIUM, 1 LOW)
+- Applied 21 fixes across all 3 codebases
+- Python compile check: all 6 modified files pass
+- Committed as 78f3fa1 and pushed to origin/develop
+
+Stage Summary:
+- 21 files changed, 142 insertions, 87 deletions (net +55 lines)
+- **Python (7 fixes)**: Wrong doctype name breaking KOT validation entirely, wrong parenttype breaking delay notifications, int() crash on short invoice names, division-by-zero in P&L BOM, empty query result crash in P&L, msgprint→frappe.throw for validation, pay.delete()→payments=[] fix
+- **Vue POS (13 fixes)**: XSS via innerHTML→textContent in Alert store, bottomTabs validation bypass, 3 unhandled promise rejections, non-existent method call, qz-tray signature promise error handling, customerFavouriteItems type mismatch (4 locations), dead code removal (5 files), duplicate route name
+- **React POS (2 fixes)**: paymentModes[0] null guard, unused import cleanup
+- **Cumulative across all 18 rounds**: ~200+ issues fixed, 19 commits on develop branch

@@ -1,7 +1,7 @@
 import frappe
 from frappe import _
 from frappe.utils import flt, validate_phone_number
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 
 @frappe.whitelist()
@@ -21,9 +21,11 @@ def getRestaurantMenu(pos_profile, room=None, order_type=None):
 
     branch_name = getBranch()
     restaurant = frappe.db.get_value("URY Restaurant", {"branch": branch_name}, "name")
+
+    if not restaurant:
+        frappe.throw(_("No Restaurant found for branch {0}. Please contact your administrator.").format(branch_name))
     
     if room:
-    
         room_wise_menu = frappe.db.get_value(
             "URY Restaurant", restaurant, "room_wise_menu"
         )
@@ -169,8 +171,11 @@ def getModeOfPayment():
 
 def _get_invoices_list(branch, status, limit, limit_start, cashier=None):
     """Shared invoice list query logic for getPosInvoice and getInvoiceForCashier."""
-    limit = int(limit) + 1
-    limit_start = int(limit_start)
+    try:
+        limit = int(limit) + 1
+        limit_start = int(limit_start)
+    except (ValueError, TypeError):
+        frappe.throw(_("Invalid pagination parameters"))
     
     base_fields = """name, invoice_printed, grand_total, restaurant_table, 
                 cashier, waiter, net_total, posting_time, 
@@ -244,7 +249,7 @@ def searchPosInvoice(query,status):
     # Add additional conditions for Unbilled status
     if status == "Unbilled":
         filters.update({
-            "status":"draft",
+            "status": "Draft",
             "restaurant_table": ["not in", [None, ""]],
             "invoice_printed": 0
         })
@@ -458,6 +463,10 @@ def getAggregatorItem(aggregator):
         {"customer": aggregator, "parent": branchName, "parenttype": "Branch"},
         "price_list",
     )
+
+    if not priceList:
+        frappe.throw(_("No price list configured for aggregator {0} in branch {1}").format(aggregator, branchName))
+
     aggregatorItem = frappe.get_all(
         "Item Price",
         fields=["item_code", "item_name", "price_list_rate"],

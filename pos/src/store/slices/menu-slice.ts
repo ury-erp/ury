@@ -77,7 +77,6 @@ export const createMenuSlice: StateCreator<POSSliceAll, [], [], MenuSlice> = (se
         name: item.item_name,
         image: item.item_image || null,
         price: typeof item.rate === 'string' ? (parseFloat(item.rate) || 0) : (item.rate || 0),
-        category: item.course,
       }));
 
       set({ menuItems, menuLoading: false });

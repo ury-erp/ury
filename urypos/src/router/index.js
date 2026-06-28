@@ -1,6 +1,5 @@
 import { createRouter, createWebHistory } from "vue-router";
 import authRoutes from './auth';
-import { useAuthStore } from "@/stores/Auth.js";
 import Table from "../components/Table.vue";
 import Customer from "../components/Customer.vue";
 import Menu from "../components/Menu.vue";

@@ -30,7 +30,7 @@ app.use(pinia)
 
 router.beforeEach((to, from, next) => {
         const auth = useAuthStore();
-        const isAuthenticated = auth.userAuth
+        const isAuthenticated = auth.userAuth === true || auth.userAuth === "true"
 
         if (to.name !== 'Login' && !isAuthenticated) {
                 next({ name: 'Login' });

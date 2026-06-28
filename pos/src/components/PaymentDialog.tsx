@@ -130,7 +130,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
     setError(null);
     try {
       await call.post('ury.ury.doctype.ury_order.ury_order.make_invoice', {
-        additionalDiscount: discountValue ? parseInt(discountValue) : null,
+        additionalDiscount: discountValue ? parseFloat(discountValue) : null,
         cashier,
         customer,
         invoice,
@@ -278,8 +278,8 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
           {/* Payment Button */}
           <Button
             onClick={handlePayment}
-            disabled={isProcessing || payments.length === 0}
-            variant={isProcessing || payments.length === 0 ? "secondary" : "default"}
+            disabled={isProcessing || payments.length === 0 || paymentsTotal < finalTotal}
+            variant={isProcessing || payments.length === 0 || paymentsTotal < finalTotal ? "secondary" : "default"}
             className="w-full"
           >
             {isProcessing ? t('payment.processing') : t('payment.pay_button', { amount: formatCurrency(paymentsTotal > 0 ? paymentsTotal : finalTotal) })}
