@@ -36,7 +36,8 @@ const BillMergeDialog = ({
   onConfirm,
 }: BillMergeDialogProps) => {
   const [candidates, setCandidates] = useState<MergeBillCandidate[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
@@ -56,7 +57,7 @@ const BillMergeDialog = ({
 
   const fetchCandidates = useCallback(
     async (nextPage: number, append: boolean) => {
-      const setBusy = append ? setLoadingMore : setLoading;
+      const setBusy = append ? setLoadingMore : setSearchLoading;
       setBusy(true);
       setLoadError(null);
 
@@ -92,7 +93,8 @@ const BillMergeDialog = ({
     let cancelled = false;
 
     setCandidates([]);
-    setLoading(true);
+    setInitialLoading(true);
+    setSearchLoading(false);
     setLoadingMore(false);
     setLoadError(null);
     setSelected(null);
@@ -125,7 +127,7 @@ const BillMergeDialog = ({
         }
       } finally {
         if (!cancelled) {
-          setLoading(false);
+          setInitialLoading(false);
         }
       }
     })();
@@ -146,7 +148,7 @@ const BillMergeDialog = ({
   }, [debouncedSearch, fetchCandidates, open]);
 
   const handleLoadMore = () => {
-    if (loading || loadingMore || !hasMore) return;
+    if (initialLoading || searchLoading || loadingMore || !hasMore) return;
     void fetchCandidates(page + 1, true);
   };
 
@@ -171,99 +173,120 @@ const BillMergeDialog = ({
     }
   };
 
+  const renderListContent = () => {
+    if (initialLoading) {
+      return (
+        <div className="flex items-center justify-center py-8">
+          <Spinner hideMessage />
+        </div>
+      );
+    }
+
+    if (loadError) {
+      return <p className="py-4 text-sm text-red-600">{loadError}</p>;
+    }
+
+    if (candidates.length === 0 && !searchLoading) {
+      return <p className="py-4 text-sm text-gray-500">{t('bill_merge.no_candidates')}</p>;
+    }
+
+    return (
+      <div className={cn('relative space-y-2', searchLoading && 'opacity-60')}>
+        {searchLoading && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center">
+            <Spinner hideMessage />
+          </div>
+        )}
+        {candidates.map((row) => {
+          const isSelected = selected === row.name;
+          const tableLabel = formatMergedTableLabel(
+            row.restaurant_table,
+            row.custom_merged_tables
+          );
+
+          return (
+            <button
+              key={row.name}
+              type="button"
+              disabled={isSubmitting}
+              onClick={() => setSelected(row.name)}
+              className={cn(
+                'flex w-full items-center justify-between rounded-lg border p-3 text-left transition-colors',
+                isSelected
+                  ? 'border-primary bg-primary-50/40'
+                  : 'border-gray-200 hover:border-gray-300'
+              )}
+            >
+              <div className="min-w-0">
+                <p className="font-medium text-gray-900">{row.name}</p>
+                <p className="text-xs text-gray-500">
+                  {row.customer_name || row.customer}
+                  {tableLabel ? ` • Table ${tableLabel}` : ''}
+                </p>
+              </div>
+              <span className="ms-3 shrink-0 text-sm font-semibold text-gray-900 tabular-nums">
+                {formatCurrency(row.rounded_total ?? row.grand_total)}
+              </span>
+            </button>
+          );
+        })}
+
+        {hasMore && (
+          <div className="pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={handleLoadMore}
+              disabled={isSubmitting || loadingMore}
+            >
+              {loadingMore ? t('common.loading') : t('bill_merge.load_more')}
+            </Button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
         variant="large"
-        size="lg"
         onClose={() => handleOpenChange(false)}
-        className="max-h-[90vh] overflow-y-auto"
+        className="flex max-h-[85vh] flex-col overflow-hidden"
       >
-        <DialogHeader>
+        <DialogHeader className="shrink-0">
           <DialogTitle>{t('bill_merge.merge_bill')}</DialogTitle>
           <DialogDescription>
             {t('bill_merge.select_secondary', { invoice: invoiceName })}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="px-6 pb-2">
+        <div className="shrink-0 px-6">
           <input
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t('header.search_placeholder_orders')}
-            className="mb-3 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-            disabled={isSubmitting || loading}
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+            disabled={isSubmitting}
           />
-
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <Spinner hideMessage />
-            </div>
-          ) : loadError ? (
-            <p className="py-4 text-sm text-red-600">{loadError}</p>
-          ) : candidates.length === 0 ? (
-            <p className="py-4 text-sm text-gray-500">{t('bill_merge.no_candidates')}</p>
-          ) : (
-            <div className="space-y-2">
-              {candidates.map((row) => {
-                const isSelected = selected === row.name;
-                const tableLabel = formatMergedTableLabel(
-                  row.restaurant_table,
-                  row.custom_merged_tables
-                );
-
-                return (
-                  <button
-                    key={row.name}
-                    type="button"
-                    disabled={isSubmitting}
-                    onClick={() => setSelected(row.name)}
-                    className={cn(
-                      'flex w-full items-center justify-between rounded-lg border p-3 text-left transition-colors',
-                      isSelected
-                        ? 'border-primary bg-primary-50/40'
-                        : 'border-gray-200 hover:border-gray-300'
-                    )}
-                  >
-                    <div className="min-w-0">
-                      <p className="font-medium text-gray-900">{row.name}</p>
-                      <p className="text-xs text-gray-500">
-                        {row.customer_name || row.customer}
-                        {tableLabel ? ` • Table ${tableLabel}` : ''}
-                      </p>
-                    </div>
-                    <span className="ms-3 shrink-0 text-sm font-semibold text-gray-900 tabular-nums">
-                      {formatCurrency(row.rounded_total ?? row.grand_total)}
-                    </span>
-                  </button>
-                );
-              })}
-
-              {hasMore && (
-                <div className="pt-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full"
-                    onClick={handleLoadMore}
-                    disabled={isSubmitting || loadingMore}
-                  >
-                    {loadingMore ? t('common.loading') : t('bill_merge.load_more')}
-                  </Button>
-                </div>
-              )}
-            </div>
-          )}
         </div>
 
-        {error && <p className="px-6 pb-2 text-sm text-red-600">{error}</p>}
+        <div className="flex-1 min-h-[320px] max-h-[50vh] overflow-y-auto px-6 py-3">
+          {renderListContent()}
+        </div>
 
-        <DialogFooter>
+        {error && <p className="shrink-0 px-6 pb-2 text-sm text-red-600">{error}</p>}
+
+        <DialogFooter className="shrink-0">
           <Button variant="outline" onClick={() => handleOpenChange(false)} disabled={isSubmitting}>
             {t('common.cancel')}
           </Button>
-          <Button onClick={handleConfirm} disabled={isSubmitting || !selected || loading}>
+          <Button
+            onClick={handleConfirm}
+            disabled={isSubmitting || !selected || initialLoading}
+          >
             {isSubmitting ? t('common.loading') : t('bill_merge.merge_confirm')}
           </Button>
         </DialogFooter>
