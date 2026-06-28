@@ -15,7 +15,7 @@ interface OrderTypeSelectProps {
 }
 
 const OrderTypeSelect = ({ disabled }: OrderTypeSelectProps) => {
-  const { selectedOrderType, setSelectedOrderType, selectedTable, tableOrder, posProfile, isUpdatingOrder, , orderTypes } = usePOSStore();
+  const { selectedOrderType, setSelectedOrderType, selectedTable, tableOrder, posProfile, isUpdatingOrder, orderTypes } = usePOSStore();
   const { user } = useRootStore();
   const [showTableDialog, setShowTableDialog] = useState(false);
 
