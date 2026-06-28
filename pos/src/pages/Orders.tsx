@@ -521,68 +521,76 @@ export default function Orders() {
         ) : (
           <>
             {/* Fixed Header */}
-            <div className="sticky top-0 start-0 end-0 z-20 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between min-h-[64px]">
-              <div className="flex min-w-0 items-center gap-2">
-                <h2 className="truncate text-xl font-semibold text-gray-900 max-w-[10rem]">{selectedOrder.name}</h2>
-                {(selectedOrder.split_total ?? 0) >= 2 || isSplitBill(selectedOrder) ? (
-                  <Badge
-                    variant="outline"
-                    className="shrink-0 gap-1 border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-50"
-                  >
-                    <GitBranch className="h-3 w-3" />
-                    {(selectedOrder.split_total ?? 0) >= 2
-                      ? t('bill_split.split_indicator', {
-                          index: selectedOrder.split_index ?? 0,
-                          total: selectedOrder.split_total ?? 0,
-                        })
-                      : t('bill_split.split_bill')}
+            <div className="sticky top-0 start-0 end-0 z-20 border-b border-gray-200 bg-white px-6 py-4">
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="min-w-0 flex-1 truncate text-xl font-semibold text-gray-900">
+                  {selectedOrder.name}
+                </h2>
+                <div className="flex shrink-0 items-center gap-2">
+                  {isOrderEditable(selectedOrder.status) && (
+                    <>
+                      <OrderActionsMenu
+                        isOpen={orderActionsMenuOpen}
+                        onOpenChange={setOrderActionsMenuOpen}
+                        showMergeBill={canMergeBill}
+                        onMergeBill={() => setShowMergeDialog(true)}
+                        showSplitBill={canSplitBill}
+                        onSplitBill={() => setShowSplitDialog(true)}
+                      />
+                      <button
+                        type="button"
+                        className="inline-flex items-center justify-center rounded-md p-2 bg-gray-100 hover:bg-gray-200 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        aria-label="Edit order"
+                        onClick={handleEditOrder}
+                        disabled={editLoading}
+                      >
+                        <Pencil className="w-4 h-4" />
+                        {editLoading && <span className="ms-2 text-xs">{t('common.loading')}</span>}
+                      </button>
+                      <button
+                        type="button"
+                        className="inline-flex items-center justify-center rounded-md p-2 bg-gray-100 hover:bg-gray-200 text-red-600 focus:outline-none focus:ring-2 focus:ring-red-500"
+                        aria-label="Cancel order"
+                        onClick={() => setCancelDialogOpen(true)}
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </>
+                  )}
+                  <Badge variant={getBadgeVariant(selectedOrder.status)}>
+                    {t(`order_status_types.${selectedOrder.status.toLowerCase().replace(/ /g, '_')}`)}
                   </Badge>
-                ) : null}
-                {isMergedBill(selectedOrder) ? (
-                  <Badge
-                    variant="outline"
-                    className="shrink-0 gap-1 border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-50"
-                  >
-                    <GitMerge className="h-3 w-3" />
-                    {t('bill_merge.merged_bill')}
-                  </Badge>
-                ) : null}
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                {isOrderEditable(selectedOrder.status) && (
-                  <>
-                    <OrderActionsMenu
-                      isOpen={orderActionsMenuOpen}
-                      onOpenChange={setOrderActionsMenuOpen}
-                      showMergeBill={canMergeBill}
-                      onMergeBill={() => setShowMergeDialog(true)}
-                      showSplitBill={canSplitBill}
-                      onSplitBill={() => setShowSplitDialog(true)}
-                    />
-                    <button
-                      type="button"
-                      className="inline-flex items-center justify-center rounded-md p-2 bg-gray-100 hover:bg-gray-200 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      aria-label="Edit order"
-                      onClick={handleEditOrder}
-                      disabled={editLoading}
+              {((selectedOrder.split_total ?? 0) >= 2 ||
+                isSplitBill(selectedOrder) ||
+                isMergedBill(selectedOrder)) && (
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  {(selectedOrder.split_total ?? 0) >= 2 || isSplitBill(selectedOrder) ? (
+                    <Badge
+                      variant="outline"
+                      className="gap-1 border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-50"
                     >
-                      <Pencil className="w-4 h-4" />
-                      {editLoading && <span className="ms-2 text-xs">{t('common.loading')}</span>}
-                    </button>
-                    <button
-                      type="button"
-                      className="inline-flex items-center justify-center rounded-md p-2 bg-gray-100 hover:bg-gray-200 text-red-600 focus:outline-none focus:ring-2 focus:ring-red-500"
-                      aria-label="Cancel order"
-                      onClick={() => setCancelDialogOpen(true)}
+                      <GitBranch className="h-3 w-3" />
+                      {(selectedOrder.split_total ?? 0) >= 2
+                        ? t('bill_split.split_indicator', {
+                            index: selectedOrder.split_index ?? 0,
+                            total: selectedOrder.split_total ?? 0,
+                          })
+                        : t('bill_split.split_bill')}
+                    </Badge>
+                  ) : null}
+                  {isMergedBill(selectedOrder) ? (
+                    <Badge
+                      variant="outline"
+                      className="gap-1 border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-50"
                     >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </>
-                )}
-                <Badge variant={getBadgeVariant(selectedOrder.status)}>
-                  {t(`order_status_types.${selectedOrder.status.toLowerCase().replace(/ /g, '_')}`)}
-                </Badge>
-              </div>
+                      <GitMerge className="h-3 w-3" />
+                      {t('bill_merge.merged_bill')}
+                    </Badge>
+                  ) : null}
+                </div>
+              )}
             </div>
             {/* Cancel Order Dialog */}
             <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
