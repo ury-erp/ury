@@ -119,24 +119,35 @@ const SplitGroupPanel = ({ invoiceName, onOpenInvoice }: SplitGroupPanelProps) =
           return (
             <div
               key={invoice.name}
+              role="button"
+              tabIndex={isCurrent ? -1 : 0}
+              onClick={() => {
+                if (!isCurrent) onOpenInvoice(invoice);
+              }}
+              onKeyDown={(e) => {
+                if (isCurrent) return;
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onOpenInvoice(invoice);
+                }
+              }}
               className={cn(
                 'flex items-center justify-between rounded-md border px-3 py-2 text-sm',
-                isCurrent ? 'border-primary bg-primary-50/50' : 'border-gray-200 bg-white',
+                isCurrent
+                  ? 'border-primary bg-primary-50/50'
+                  : 'cursor-pointer border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50',
                 isPaid && !isCurrent && 'opacity-80'
               )}
             >
               <div className="min-w-0 flex-1">
-                <button
-                  type="button"
+                <span
                   className={cn(
-                    'truncate text-left font-medium hover:underline',
+                    'truncate font-medium',
                     isCurrent ? 'text-primary' : 'text-gray-900'
                   )}
-                  onClick={() => onOpenInvoice(invoice)}
-                  disabled={isCurrent}
                 >
                   {invoice.name}
-                </button>
+                </span>
                 <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-gray-500">
                   {invoice.is_original && <span>{t('bill_split.original_bill')}</span>}
                   {isCurrent && <span>{t('bill_split.current_bill')}</span>}
