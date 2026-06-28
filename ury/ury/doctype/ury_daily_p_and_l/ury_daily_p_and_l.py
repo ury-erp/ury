@@ -37,6 +37,8 @@ def inner_bom_process(buying_price_list, bom):
             else:
                 bom_buying_price += float(bom_items_price[0].price_list_rate) * bom_item_qty
 
+    if not bom.quantity:
+        return {"bom_buying_price": 0, "unset_bom_items": unset_bom_items}
     bom_buying_price = bom_buying_price / bom.quantity
     return {"bom_buying_price": bom_buying_price, "unset_bom_items": unset_bom_items}
 
@@ -55,6 +57,8 @@ def inner_inner_bom_process(buying_price_list, bom):
         else:
             bom_buying_price += float(bom_items_price[0].price_list_rate) * bom_item_qty
 
+    if not bom.quantity:
+        return {"bom_buying_price": 0, "unset_bom_items": unset_bom_items}
     bom_buying_price = bom_buying_price / bom.quantity
     return {"bom_buying_price": bom_buying_price, "unset_bom_items": unset_bom_items}
 
@@ -360,19 +364,21 @@ class URYDailyPandL(Document):
 
                 # GROSS AND NET SALES
                 self.gross_sales = 0.0
-                gross_sales_all =  gross_sales[0]
-                if gross_sales_all['Total Invoices'] == 0:
-                        self.gross_sales = 0.0
-                        gross_sales = gross_sales[0]
-                        gross_sales["Round Off"] = gross_sales["Cash Discounts"] = gross_sales["Tax"] = 0.0
+                if not gross_sales:
+                        self.cash_discount_round_off = 0.0
+                        self.tax = 0.0
+                        self.net_sales = 0.0
                 else:
-                        gross_sales = gross_sales[0]
-                        self.gross_sales = gross_sales["Grand Total"]
+                        gross_sales_all = gross_sales[0]
+                        if gross_sales_all['Total Invoices'] == 0:
+                                self.gross_sales = 0.0
+                                gross_sales_all["Round Off"] = gross_sales_all["Cash Discounts"] = gross_sales_all["Tax"] = 0.0
+                        else:
+                                self.gross_sales = gross_sales_all["Grand Total"]
 
-                self.cash_discount_round_off = round((gross_sales["Round Off"] + gross_sales["Cash Discounts"]),2)
-                self.tax = gross_sales["Tax"]
-
-                self.net_sales = self.gross_sales - self.cash_discount_round_off - self.tax
+                        self.cash_discount_round_off = round((gross_sales_all["Round Off"] + gross_sales_all["Cash Discounts"]),2)
+                        self.tax = gross_sales_all["Tax"]
+                        self.net_sales = self.gross_sales - self.cash_discount_round_off - self.tax
 
                 if self.net_sales == 0.0:
                         self.gross_sales_percent = self.cash_discount_round_off_percent = self.tax_percent = self.cogs_percent = self.total_direct_expenses_percent = self.gross_profit_percent = self.total_employee_costs_percent = self.other_expenses_percent = self.depreciation_percent = self.total_indirect_expenses_percent = self.net_profit_percent = 0.0

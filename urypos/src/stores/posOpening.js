@@ -18,11 +18,6 @@ export const posOpening = defineStore("posOpen", {
     showSumbitPosOpen: false,
     isPosOpen: null,
   }),
-  getters: {
-    currentDateTime: {
-      get() {},
-    },
-  },
   actions: {
     savePosOpening() {
       const invoiceData = useInvoiceDataStore();

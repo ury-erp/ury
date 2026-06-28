@@ -312,7 +312,7 @@ export const usetoggleRecentOrder = defineStore("recentOrders", {
           } else {
             customers.search = "";
             customers.numberOfPax = "";
-            customers.customerFavouriteItems = "";
+            customers.customerFavouriteItems = [];
           }
 
           items.forEach((item) => {
@@ -559,7 +559,7 @@ export const usetoggleRecentOrder = defineStore("recentOrders", {
       customers.selectedOrderType = "";
       menu.selectedAggregator = "";
       invoiceData.invoiceNumber = "";
-      customers.customerFavouriteItems = "";
+      customers.customerFavouriteItems = [];
       customers.search = "";
       invoiceData.tableInvoiceNo = "";
       this.pastOrderType = "";

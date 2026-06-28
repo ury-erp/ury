@@ -67,7 +67,7 @@ export function printWithQz(host, htmlToPrint){
     return new Promise((resolve,reject)=>{
         qz.security.setSignatureAlgorithm("SHA512");
         qz.security.setSignaturePromise(function(toSign) {
-            return async function(res) {
+            return async function(res, rej) {
                 try {
                     const pk = await fetchPrivateKey();
                     var key = KEYUTIL.getKey(pk);
@@ -77,6 +77,7 @@ export function printWithQz(host, htmlToPrint){
                     var hex = sig.sign();
                     res(stob64(hextorstr(hex)));
                 } catch (err) {
+                    rej(err);
                     reject(err);
                 }
             };

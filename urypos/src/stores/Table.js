@@ -95,6 +95,8 @@ export const useTableStore = defineStore("table", {
             this.handleRoomChange();
           }
 
+        }).catch(() => {
+          this.rooms = [];
         });
       } else {
         this.db
@@ -146,6 +148,8 @@ export const useTableStore = defineStore("table", {
       };
       this.call.get("ury.ury_pos.api.getCashier", getCashier).then((result) => {
         this.cashier = result.message
+      }).catch(() => {
+        this.cashier = null;
       });
     },
     fetchTable() {
@@ -173,6 +177,8 @@ export const useTableStore = defineStore("table", {
               sensitivity: "base",
             });
           });
+        }).catch(() => {
+          this.tables = [];
         });
     },
     async getMenu() {
@@ -377,7 +383,7 @@ export const useTableStore = defineStore("table", {
           } else {
             customers.search = "";
             customers.numberOfPax = "";
-            customers.customerFavouriteItems = "";
+            customers.customerFavouriteItems = [];
             customers.newCustomerMobileNo = ""
           }
 

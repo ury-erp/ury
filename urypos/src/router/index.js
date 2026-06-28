@@ -20,7 +20,7 @@ const routes = [
   },
   {
     path: "/Table",
-    name: "Table",
+    name: "TableView",
     component: Table,
   },
   {

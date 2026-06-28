@@ -471,8 +471,10 @@ def table_transfer(table, newTable, invoice):
                 )
 
         except Exception as e:
-            # If an exception occurs (e.g., "kot" app not found), it will be caught here without effecting execution
-            pass
+            frappe.log_error(
+                f"KOT table transfer failed for {pos_invoice.name}: {frappe.get_traceback()}",
+                "KOT Table Transfer Error"
+            )
 
     else:
         frappe.throw(_("Table transfer between different rooms is restricted."))
@@ -583,8 +585,7 @@ def make_invoice(customer, payments, cashier, pos_profile,owner, additionalDisco
     invoice.additional_discount_percentage=additionalDiscount
     invoice.calculate_taxes_and_totals()
 
-    for pay in invoice.payments:
-        pay.delete(pay.mode_of_payment)
+    invoice.payments = []
 
     for d in payments:
         invoice.append(
@@ -605,9 +606,8 @@ def cancel_kot(invoice_id):
 
     pos_invoice = frappe.get_doc("POS Invoice", invoice_id)
     pos_profile_id = pos_invoice.pos_profile
-    pos_profile = frappe.get_doc("POS Profile", pos_profile_id)
-    kot_naming_series = pos_profile.custom_kot_naming_series
-    cancel_kot_naming_series = "CNCL-" + kot_naming_series
+    kot_naming_series = frappe.db.get_value("POS Profile", pos_profile_id, "custom_kot_naming_series")
+    cancel_kot_naming_series = "CNCL-" + (kot_naming_series or "")
 
     items = []
     # Create a list of items for the canceled KOT

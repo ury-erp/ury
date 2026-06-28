@@ -61,7 +61,7 @@ def process_invoice(invoice):
     prod_item_groups = {}
     if production_names:
         pig_rows = frappe.db.get_all(
-            "URY Production Unit Item Group",
+            "URY Production Item Groups",
             filters={"parent": ("in", production_names)},
             fields=["parent", "item_group"],
         )

@@ -95,6 +95,12 @@ const OrderPanel = () => {
         return;
       }
 
+      // Validate payment modes are loaded
+      if (!paymentModes.length) {
+        showToast.error(t('errors.no_payment_modes'));
+        return;
+      }
+
       setIsSubmitting(true);
       
       const orderData = {

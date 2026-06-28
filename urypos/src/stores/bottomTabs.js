@@ -29,7 +29,9 @@ export const tabFunctions = defineStore("tabClick", {
           .then(() => {
             router.push("/Table");
           });
+        return false;
       }
+      return true;
     },
     clickMenuTab() {
       const auth = useAuthStore();
@@ -46,6 +48,7 @@ export const tabFunctions = defineStore("tabClick", {
           .then(() => {
             router.push("/Table");
           });
+        return false;
       }
       if (auth.cashier && !menu.selectedOrderType) {
         alert
@@ -57,6 +60,7 @@ export const tabFunctions = defineStore("tabClick", {
           .then(() => {
             router.push("/Table");
           });
+        return false;
       }
       if (
         auth.cashier &&
@@ -68,7 +72,9 @@ export const tabFunctions = defineStore("tabClick", {
           .then(() => {
             router.push("/Table");
           });
+        return false;
       }
+      return true;
     },
   },
 });

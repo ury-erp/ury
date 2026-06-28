@@ -32,7 +32,7 @@ def order_delay_notification(id):
     items = frappe.get_all(
         "URY KOT Items",
         fields=["item_name", "quantity"],
-        filters={"parent": id, "parenttype": "KOT"},
+        filters={"parent": id},
         order_by="idx",
     )
 

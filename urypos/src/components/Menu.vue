@@ -240,18 +240,12 @@
 <script>
 import Search from "./Search.vue";
 import orderInfo from "./orderInfo.vue";
-import frappe from "@/stores/frappeSdk.js";
 import { useMenuStore } from "@/stores/Menu.js";
 import { useAuthStore } from "@/stores/Auth.js";
 import { usetoggleRecentOrder } from "@/stores/recentOrder.js";
 import { useInvoiceDataStore } from "@/stores/invoiceData.js";
 
 export default {
-  data() {
-    return {
-      frappe: frappe,
-    };
-  },
   setup() {
     const menu = useMenuStore();
     const auth = useAuthStore();

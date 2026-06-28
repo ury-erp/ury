@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { UserPlus, Mail, Phone, Loader } from 'lucide-react';
+import { UserPlus, Phone, Loader } from 'lucide-react';
 import { usePOSStore, type Customer } from '../store/pos-store';
 import { Button, Dialog, DialogContent, Input } from './ui';
 import { Select, SelectItem } from './ui';

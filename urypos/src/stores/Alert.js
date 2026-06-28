@@ -41,20 +41,29 @@ export const useAlert = defineStore("alert", {
         }
         document.body.appendChild(modal);
 
-        // Create the modal content
-        const modalContent = document.createElement("div");
-        modalContent.innerHTML = `
-          <h2 class="text-base font-semibold mb-4">${title}</h2>
-          <hr class="my-6 border-t border-gray-300" />
+        // Create the modal content using textContent to prevent XSS
+        const heading = document.createElement("h2");
+        heading.className = "text-base font-semibold mb-4";
+        heading.textContent = title;
 
-          <p class="mb-4 text-justify text-sm">${message}</p>
-          <button class="bg-blue-700 md:ml-96 ml-64 text-white px-4 py-2 rounded-md">${buttonText}</button>
-        `;
-        modal.appendChild(modalContent);
+        const hr = document.createElement("hr");
+        hr.className = "my-6 border-t border-gray-300";
+
+        const para = document.createElement("p");
+        para.className = "mb-4 text-justify text-sm";
+        para.textContent = message;
+
+        const button = document.createElement("button");
+        button.className = "bg-blue-700 md:ml-96 ml-64 text-white px-4 py-2 rounded-md";
+        button.textContent = buttonText;
+
+        modal.appendChild(heading);
+        modal.appendChild(hr);
+        modal.appendChild(para);
+        modal.appendChild(button);
 
         // Close the modal and remove the backdrop when the button is clicked
-        const closeButton = modalContent.querySelector("button");
-        closeButton.addEventListener("click", () => {
+        button.addEventListener("click", () => {
           modal.remove();
           backdrop.remove();
           resolve();

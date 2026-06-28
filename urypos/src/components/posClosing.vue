@@ -390,11 +390,10 @@ import { useInvoiceDataStore } from "@/stores/invoiceData.js";
 import { posClosing } from "@/stores/posClosing.js";
 import DatePicker from "vue-datepicker-next";
 import "vue-datepicker-next/index.css";
-import { Badge } from "flowbite-vue";
 
 export default {
   name: "posClose",
-  components: { DatePicker, Badge },
+  components: { DatePicker },
   setup() {
     const invoiceData = useInvoiceDataStore();
     const posClose = posClosing();

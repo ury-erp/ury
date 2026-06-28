@@ -164,7 +164,7 @@
               name="amount"
               v-model="modeOfPayment.opening_amount"
               class="border-none text-center"
-              @input="posOpen.changePaidAmount(modeOfPayment.opening_amount)"
+              @input=""
             />
           </td>
 
