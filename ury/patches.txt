@@ -6,3 +6,4 @@
 ury.patches.v2_0.default_permissions
 ury.patches.v2_0.fix_waiter_order_slip_print_format
 ury.patches.v2_0.create_order_types
+ury.patches.v2_0.fix_pos_invoice_no_of_pax_fieldname
