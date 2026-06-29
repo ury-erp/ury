@@ -135,14 +135,4 @@ export async function captainTransfer(
     newCaptain,
     invoice,
   });
-}; 
-
-export async function getOrderTypes() {
-  try {
-    const res = await call.get('ury.ury_pos.api.get_select_field_options');
-    return res.message || [];
-  } catch (error) {
-    console.error('Error fetching order types:', error);
-    return [];
-  }
 }

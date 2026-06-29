@@ -6,20 +6,10 @@ from frappe import _
 from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 
 def after_install():
-    # create_custom_fields(get_custom_fields())
-    create_order_types()
+    create_custom_fields(get_custom_fields())
     
 def before_uninstall():
 	delete_custom_fields(get_custom_fields())
-
-def create_order_types():
-    order_types = ["Dine In", "Take Away", "Delivery", "Phone In", "Aggregators"]
-    for ot in order_types:
-        if not frappe.db.exists("URY Order Type", ot):
-            doc = frappe.new_doc("URY Order Type")
-            doc.name1 = ot
-            doc.is_active = 1
-            doc.insert(ignore_permissions=True)
  
 def get_custom_fields():
 	"""URY specific custom fields that need to be added to the masters in ERPNext"""
@@ -41,10 +31,10 @@ def get_custom_fields():
 				},
 				{
 					"fieldname": "order_type",
-					"fieldtype": "Link",
+					"fieldtype": "Select",
 					"default": "Dine In",
 					"label": "Order Type",
-					"options": "URY Order Type",
+					"options": "\nDine In\nTake Away\nDelivery\nPhone In\nAggregators",
 					"insert_after": "order_info",
 					"translatable": 0
 				},
@@ -180,12 +170,12 @@ def get_custom_fields():
 				},
 				{
 					"fieldname": "order_type",
-					"fieldtype": "Link",
+					"fieldtype": "Select",
 					"default": "Dine In",
 					"options": "URY Restaurant",
 					"fetch_from": "customer.mobile_number",
 					"label": "Order Type",
-					"options": "URY Order Type",
+					"options": "\nDine In\nTake Away\nDelivery\nPhone In\nAggregators",
 					"insert_after": "order_info",
 					"translatable": 0
 				},
@@ -386,7 +376,7 @@ def get_custom_fields():
 			},
 		],
 
-		"POS Invoice Item": [
+		"POS Invoice Iten": [
 			{
 				"fieldname": "comment",
 				"fieldtype": "Data",

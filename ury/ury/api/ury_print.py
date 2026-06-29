@@ -86,31 +86,23 @@ def select_network_printer(pos_profile, invoice_id):
 
     if table:
         room = frappe.db.get_value("URY Table", table, "restaurant_room")
-        room_bill_printers = frappe.get_all(
-            "URY Printer Settings",
-            filters={"parent": room, "parenttype": "URY Room", "bill": 1},
-            pluck="printer",
-            order_by="idx"
+        room_bill_printer = frappe.db.get_value(
+            "URY Printer Settings", {"parent": room, "bill": 1}, "printer"
         )
-        if room_bill_printers:
-            for printer in room_bill_printers:
-                print = network_printing(
-                    "POS Invoice", invoice_id, printer, print_format
-                )
+        if room_bill_printer:
+            print = network_printing(
+                "POS Invoice", invoice_id, room_bill_printer, print_format
+            )
             return print
 
     else:
-        pos_bill_printers = frappe.get_all(
-            "URY Printer Settings",
-            filters={"parent": pos_profile, "parenttype": "POS Profile", "bill": 1},
-            pluck="printer",
-            order_by="idx"
+        pos_bill_printer = frappe.db.get_value(
+            "URY Printer Settings", {"parent": pos_profile, "bill": 1}, "printer"
         )
-        if pos_bill_printers:
-            for printer in pos_bill_printers:
-                print = network_printing(
-                    "POS Invoice", invoice_id, printer, print_format
-                )
+        if pos_bill_printer:
+            print = network_printing(
+                "POS Invoice", invoice_id, pos_bill_printer, print_format
+            )
             return print
 
 

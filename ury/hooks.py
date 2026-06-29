@@ -88,7 +88,6 @@ website_route_rules = [
 
 # before_install = "ury.install.before_install"
 # after_install = "ury.install.after_install"
-after_install = "ury.setup.after_install" 
 
 # Uninstallation
 # ------------
@@ -357,8 +356,6 @@ fixtures = [
                     "POS Profile-custom_notify_kot_delay",
                     "POS Profile-custom_recipients",
                     "URY Printer Settings-custom_block_takeaway_kot",
-                    "URY Printer Settings-custom_waiter_print",
-                    "URY Printer Settings-custom_waiter_print_format",
                     "POS Opening Entry-custom_ury_last_invoice",
                     "POS Opening Entry-custom_ury_last_aggregator_invoice",
                     "POS Profile-custom_reset_order_number_daily",
@@ -389,5 +386,5 @@ fixtures = [
         ],
     },
     {"dt": "Role", "filters": [["role_name", "like", "URY %"]]},
-    "Client Script"
+    "Client Script",
 ]
