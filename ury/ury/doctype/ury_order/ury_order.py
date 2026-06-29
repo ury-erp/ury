@@ -24,58 +24,120 @@ def merge_free_tables(table1, table2):
 
 @frappe.whitelist()
 def merge_tables_batch(anchor_table, tables):
-    """Merge anchor table with one or more target tables in the same room."""
+
     if isinstance(tables, str):
         tables = json.loads(tables)
 
-    targets = list(dict.fromkeys(t for t in tables if t and t != anchor_table))
+    targets = list(
+        dict.fromkeys(
+            t
+            for t in tables
+            if t and t != anchor_table
+        )
+    )
+
     if not targets:
-        frappe.throw(_("Select at least one table to merge."))
+        frappe.throw(
+            _("Select at least one table to merge.")
+        )
 
-    anchor_room = frappe.db.get_value("URY Table", anchor_table, "restaurant_room")
-    if not anchor_room:
-        frappe.throw(_("Table not found."))
+    room = frappe.db.get_value(
+        "URY Table",
+        anchor_table,
+        "restaurant_room",
+    )
 
-    anchor_cluster, table_by_name = _get_merge_cluster(anchor_table)
-    anchor_cluster_set = set(anchor_cluster)
-    targets = [t for t in targets if t not in anchor_cluster_set]
-    if not targets:
-        frappe.throw(_("Selected tables are already merged with this table."))
+    if not room:
+        frappe.throw(
+            _("Table not found.")
+        )
 
-    for target in targets:
-        target_room = frappe.db.get_value("URY Table", target, "restaurant_room")
-        if target_room != anchor_room:
-            frappe.throw(_("Cannot merge tables from different rooms."))
-        if not table_by_name.get(target):
-            frappe.throw(_("Table not found."))
+    # Start from anchor cluster only
+    cluster, table_map = _get_merge_cluster(
+        anchor_table
+    )
 
-        if _table_has_active_order(anchor_table) and _table_has_active_order(target):
-            frappe.throw(_("Cannot merge tables with separate active orders."))
-
-    union_members = set(anchor_cluster)
-    for target in targets:
-        members, table_by_name = _get_merge_cluster(target)
-        union_members.update(members)
-
-    if _count_separate_active_orders(union_members) > 1:
-        frappe.throw(_("Cannot merge tables with separate active orders."))
+    cluster = set(cluster)
 
     for target in targets:
-        _append_merged_partner(anchor_table, target)
-        _append_merged_partner(target, anchor_table)
 
-    _sync_active_order_with_merge_cluster(anchor_table)
-    _reconcile_open_invoices_for_tables(_get_cluster_table_names(anchor_table))
+        target_room = frappe.db.get_value(
+            "URY Table",
+            target,
+            "restaurant_room",
+        )
+
+        if target_room != room:
+            frappe.throw(
+                _("Cannot merge tables from different rooms.")
+            )
+
+        target_cluster, _ = _get_merge_cluster(
+            target
+        )
+
+        # Prevent importing another merged group
+        if len(target_cluster) > 1:
+            frappe.throw(
+                _(
+                    "Cannot merge an already merged table."
+                )
+            )
+
+        # Prevent occupied table merge
+        occupied = frappe.db.get_value(
+            "URY Table",
+            target,
+            "occupied",
+        )
+
+        if occupied:
+            frappe.throw(
+                _("Occupied tables cannot be merged.")
+            )
+
+        cluster.add(target)
+
+    if _count_separate_active_orders(cluster) > 1:
+        frappe.throw(
+            _(
+                "Cannot merge tables with separate active orders."
+            )
+        )
+
+    cluster = sorted(cluster)
+
+    # Make relationships symmetric
+    for table in cluster:
+
+        partners = [
+            t
+            for t in cluster
+            if t != table
+        ]
+
+        frappe.db.set_value(
+            "URY Table",
+            table,
+            "merged_with",
+            ",".join(partners)
+            if partners
+            else None,
+            update_modified=False,
+        )
+
+    # Sync order only to selected cluster
+    _sync_active_order_with_merge_cluster(
+        anchor_table
+    )
+
+    _reconcile_open_invoices_for_tables(
+        cluster
+    )
+
+    frappe.db.commit()
+
     return True
-
-
-#def _append_merged_partner(table_name, partner):
-    merged = frappe.db.get_value("URY Table", table_name, "merged_with") or ""
-    partners = _parse_merged_with(merged)
-    if partner in partners:
-        return
-    new_merged = f"{merged},{partner}" if merged else partner
-    frappe.db.set_value("URY Table", table_name, "merged_with", new_merged)
 def _append_merged_partner(table_name, partner):
     merged = frappe.db.get_value(
         "URY Table",
@@ -93,56 +155,64 @@ def _append_merged_partner(table_name, partner):
     )
 
 def _sync_active_order_with_merge_cluster(table):
-    members = list(dict.fromkeys(_get_cluster_table_names(table)))
-    if not members:
-        return
 
-    primary_table = next(
-        (name for name in members if _table_has_active_order(name)),
-        None,
-    )
-    if not primary_table:
-        return
+    members = _get_cluster_table_names(table)
 
-    partners = sorted(
-    t for t in members
-    if t != primary_table
-    )
-
-    partners_value = ",".join(partners) if partners else None
-
-    open_invoices = frappe.get_all(
+    invoices = frappe.get_all(
         "POS Invoice",
         filters={
             "docstatus": 0,
-            "restaurant_table": primary_table,
             "invoice_printed": 0,
         },
-        fields=["name", "creation"],
-        limit=1,
+        fields=[
+            "name",
+            "restaurant_table",
+            "creation",
+        ],
     )
-    if open_invoices:
-        frappe.db.set_value(
-            "POS Invoice",
-            open_invoices[0].name,
-            "custom_merged_tables",
-            partners_value,
-            update_modified=False,
+
+    active = [
+        x
+        for x in invoices
+        if x.restaurant_table in members
+    ]
+
+    if not active:
+        return
+
+    primary = sorted(
+        active,
+        key=lambda x: x.creation
+    )[0]
+
+    merged_tables = ",".join(
+        sorted(
+            [
+                x
+                for x in members
+                if x != primary.restaurant_table
+            ]
         )
+    )
 
-    invoice_time = frappe.db.get_value("URY Table", primary_table, "latest_invoice_time")
-    if not invoice_time and open_invoices:
-        invoice_time = open_invoices[0].creation
+    frappe.db.set_value(
+        "POS Invoice",
+        primary.name,
+        "custom_merged_tables",
+        merged_tables,
+        update_modified=False,
+    )
 
-    for member in members:
-        if member == primary_table:
-            continue
+    for table_name in members:
+
         frappe.db.set_value(
             "URY Table",
-            member,
-            {"occupied": 1, "latest_invoice_time": invoice_time},
+            table_name,
+            {
+                "occupied": 1,
+                "latest_invoice_time": primary.creation,
+            },
         )
-
 
 def _parse_merged_with(merged_with):
     if not merged_with:
@@ -295,46 +365,128 @@ TABLE_RELEASE_FIELDS = {
 
 
 def release_merge_cluster_tables(table):
-    """Mark every table in a merge cluster available and dissolve all merge links."""
-    for member in _get_cluster_table_names(table):
-        frappe.db.set_value("URY Table", member, TABLE_RELEASE_FIELDS)
+
+    cluster = _get_cluster_table_names(
+        table
+    )
+
+    if _has_open_pos_invoices_for_cluster(
+        cluster
+    ):
+        return
+
+    for member in cluster:
+
+        frappe.db.set_value(
+            "URY Table",
+            member,
+            TABLE_RELEASE_FIELDS,
+        )
+
+    frappe.db.commit()
+
+@frappe.whitelist()
+def release_tables_after_print(invoice):
+
+    invoice_doc = frappe.get_doc(
+        "POS Invoice",
+        invoice,
+    )
+
+    tables = _get_table_group(
+        invoice_doc.restaurant_table,
+        invoice_doc.custom_merged_tables,
+    )
+
+    for table in tables:
+
+        frappe.db.set_value(
+            "URY Table",
+            table,
+            {
+                "occupied": 0,
+                "latest_invoice_time": None,
+            },
+        )
+
+    frappe.db.commit()
+
+    return True
 
 
 def _has_open_pos_invoices_for_cluster(tables):
+
     if not tables:
         return False
+
     for table in tables:
-        if frappe.db.exists("POS Invoice", {"docstatus": 0, "restaurant_table": table}):
-            return True
-        if frappe.db.exists(
+
+        invoices = frappe.get_all(
             "POS Invoice",
-            {"docstatus": 0, "custom_merged_tables": ["like", f"%{table}%"]},
-        ):
-            return True
+            filters={
+                "docstatus": 0,
+                "restaurant_table": table,
+            },
+            fields=[
+                "name",
+                "invoice_printed",
+            ],
+        )
+
+        for inv in invoices:
+            if inv.invoice_printed == 0:
+                return True
+
+
+        merged = frappe.get_all(
+            "POS Invoice",
+            filters={
+                "docstatus": 0,
+                "custom_merged_tables": ["like", f"%{table}%"],
+            },
+            fields=[
+                "name",
+                "invoice_printed",
+            ],
+        )
+
+        for inv in merged:
+
+            if inv.invoice_printed == 0:
+                return True
+
     return False
 
 
 @frappe.whitelist()
 def unmerge_tables(table):
-    """Dissolves an entire merged table group."""
-    merged_with = frappe.db.get_value("URY Table", table, "merged_with")
-    if not merged_with:
-        frappe.throw(_("Table is not merged."))
 
-    members, table_by_name = _get_merge_cluster(table)
-    if len(members) <= 1:
-        frappe.throw(_("Table is not merged."))
+    cluster = _get_cluster_table_names(
+        table
+    )
 
-    for member in members:
-        if table_by_name[member].occupied:
-            frappe.throw(
-                _("Cannot unmerge occupied tables. All tables in the group must be available.")
-            )
+    if len(cluster) <= 1:
+        frappe.throw(
+            _("Table is not merged.")
+        )
 
-    for member in members:
-        frappe.db.set_value("URY Table", member, "merged_with", None)
+    if _has_open_pos_invoices_for_cluster(
+        cluster
+    ):
+        frappe.throw(
+            _("Cannot unmerge active tables.")
+        )
 
-    _reconcile_open_invoices_for_tables(members)
+    for member in cluster:
+
+        frappe.db.set_value(
+            "URY Table",
+            member,
+            "merged_with",
+            None,
+        )
+
+    frappe.db.commit()
 
     return True
 
@@ -353,14 +505,25 @@ def _has_open_pos_invoices_for_tables(tables):
     return _has_open_pos_invoices_for_cluster(tables)
 
 
-def _free_tables_if_no_open_invoices(restaurant_table, custom_merged_tables=None):
+def _free_tables_if_no_open_invoices(
+    restaurant_table,
+    custom_merged_tables=None,
+):
+
     if not restaurant_table:
         return
-    tables = _get_table_group(restaurant_table, custom_merged_tables)
+
+    tables = _get_table_group(
+        restaurant_table,
+        custom_merged_tables,
+    )
+
     if _has_open_pos_invoices_for_cluster(tables):
         return
-    for table_name in tables:
-        frappe.db.set_value("URY Table", table_name, TABLE_RELEASE_FIELDS)
+
+    release_merge_cluster_tables(
+        restaurant_table
+    )
 
 
 def _copy_invoice_item_fields(item_row, qty):
