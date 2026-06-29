@@ -475,7 +475,7 @@ const TableView = () => {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto bg-gray-50 p-6 pb-40">
+      <div className="flex-1 overflow-auto bg-gray-50 p-6">
         <div className="max-w-screen-xl mx-auto h-full">
           {error && !loadingTables ? (
             <div className="h-full flex flex-col items-center justify-center gap-3 text-red-500">
@@ -490,7 +490,7 @@ const TableView = () => {
               <p>{t('tables.no_tables_found')}</p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 pb-40">
               {tableRenderGroups.map((group) =>
                 group.length === 1 ? (
                   renderTableCard(group[0])
