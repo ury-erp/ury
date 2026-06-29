@@ -4,6 +4,36 @@ frappe.require([
     '/assets/ury/js/sign-message.js'
 ]);
 
+async function updateMergedInvoicePrint(invoice) {
+
+    await frappe.call({
+        method: "ury.ury.api.ury_print.qz_print_update",
+        args: {
+            invoice: invoice,
+        },
+    });
+
+    await frappe.call({
+        method:
+            "ury.ury.doctype.ury_order.ury_order.release_tables_after_print",
+        args: {
+            invoice: invoice,
+        },
+    });
+
+    cur_frm.set_value(
+        "invoice_printed",
+        1,
+    );
+
+    cur_frm.reload_doc();
+
+    frappe.show_alert({
+        message: __("Invoice Printed"),
+        indicator: "green",
+    });
+}
+
 frappe.ui.form.on('POS Invoice', {
 
     before_save: function (frm) {
@@ -94,7 +124,7 @@ frappe.ui.form.on('POS Invoice', {
                                                     callback: function (r) {
                                                     }
                                                 });
-                                                cur_frm.set_value('invoice_printed', 1);
+                                                updateMergedInvoicePrint(invoice);
                                                 frappe.dom.unfreeze();
                                                 frappe.show_alert({ message: __('Invoice Printed'), indicator: 'green' });
                                             })
@@ -133,7 +163,7 @@ frappe.ui.form.on('POS Invoice', {
                                 if (r.message == "Success") {
                                     $('.standard-actions').addClass('hidden-xs hidden-md');
                                     frappe.show_alert({ message: __('Invoice Printed'), indicator: 'green' });
-                                    cur_frm.set_value('invoice_printed', 1);
+                                    updateMergedInvoicePrint(invoice);
                                     frappe.dom.unfreeze();
                                     cur_frm.reload_doc();
                                 }
@@ -165,7 +195,7 @@ frappe.ui.form.on('POS Invoice', {
                         },
                         callback: function (r) {
                             $('.standard-actions').addClass('hidden-xs hidden-md');
-                            cur_frm.set_value('invoice_printed', 1);
+                            updateMergedInvoicePrint(invoice);
                             frappe.show_alert({ message: __('Invoice Printed'), indicator: 'green' });
                             frappe.ui.toolbar.clear_cache()
                             frappe.dom.unfreeze();

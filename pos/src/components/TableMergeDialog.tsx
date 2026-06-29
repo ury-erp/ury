@@ -48,6 +48,14 @@ const TableMergeDialog = ({
     () => availableTables.filter((table) => selectedTargets.has(table.name)),
     [availableTables, selectedTargets]
   );
+  const mergeCandidates = useMemo(() => {
+    return availableTables.filter((table) => {
+      return (
+        table.occupied !== 1 &&
+        table.name !== sourceTable?.name
+      );
+    });
+  }, [availableTables, sourceTable?.name]);
 
   const handleClose = () => {
     if (phase === 'merging') return;
@@ -112,13 +120,13 @@ const TableMergeDialog = ({
             </DialogHeader>
 
             <div className="max-h-64 overflow-y-auto px-6 pb-2">
-              {availableTables.length === 0 ? (
+              {mergeCandidates.length === 0 ? (
                 <p className="py-4 text-center text-sm text-gray-500">
                   {t('tables.no_tables_to_merge')}
                 </p>
               ) : (
                 <div className="grid grid-cols-2 gap-2">
-                  {availableTables.map((table) => {
+                  {mergeCandidates.map((table) => {
                     const isSelected = selectedTargets.has(table.name);
                     return (
                       <button
