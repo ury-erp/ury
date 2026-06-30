@@ -1,4 +1,4 @@
-import { call } from './frappe-sdk';
+import { call } from './frappe-sdk-retry';
 
 export interface POSOpeningResponse {
   message: number;

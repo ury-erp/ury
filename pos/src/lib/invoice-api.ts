@@ -1,4 +1,4 @@
-import { call } from './frappe-sdk';
+import { call } from './frappe-sdk-retry';
 import { OrderType } from '../data/order-types';
 
 export interface POSInvoice {

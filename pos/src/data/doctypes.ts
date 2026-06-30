@@ -7,4 +7,11 @@ export const DOCTYPES={
     "CUSTOMER_GROUP": "Customer Group",
     "CUSTOMER_TERRITORY": "Territory",
     "CURRENCY": "Currency",
+    "URY_MENU": "URY Menu",
+    "URY_MENU_ITEM": "URY Menu Item",
+    "URY_RESTAURANT": "URY Restaurant",
+    "URY_ORDER": "URY Order",
+    "URY_KOT": "URY KOT",
+    "POS_INVOICE": "POS Invoice",
+    "ITEM": "Item",
 }

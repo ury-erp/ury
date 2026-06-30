@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 import { storage } from '../lib/storage';
+import { logger } from '../lib/logger';
 import { getRestaurantMenu, getAggregatorMenu, MenuItem as APIMenuItem } from '../lib/menu-api';
 import { getCurrencyInfo, PosProfileCombined, getCombinedPosProfile } from '../lib/pos-profile-api';
 import { getMenuCourses } from '../lib/menu-course-api';
@@ -266,7 +267,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
         await get().fetchCurrencySymbol();
       }
     } catch (error) {
-      console.error('Error fetching POS profile:', error);
+      logger.error('Error fetching POS profile:', error);
       set({ 
         error: 'Failed to fetch POS profile',
         profileLoading: false 
@@ -283,7 +284,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
       set({ currencySymbol: symbol });
       storage.setItem('currencySymbol', symbol);
     } catch (error) {
-      console.error('Error fetching currency symbol:', error);
+      logger.error('Error fetching currency symbol:', error);
       set({ currencySymbol: get().currency });
       storage.setItem('currencySymbol', get().currency);
     }
@@ -315,7 +316,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
       set({ menuItems });
     } catch (error) {
       set({ error: 'Failed to load menu items' });
-      console.error('Error loading menu items:', error);
+      logger.error('Error loading menu items:', error);
     } finally {
       set({ menuLoading: false });
     }
@@ -338,7 +339,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
       set({ menuItems, menuLoading: false });
     } catch (error) {
       set({ error: 'Failed to load aggregator menu', menuLoading: false });
-      console.error('Error loading aggregator menu:', error);
+      logger.error('Error loading aggregator menu:', error);
     }
   },
 
@@ -365,7 +366,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
       const modes = await getPaymentModes();
       set({ paymentModes: modes });
     } catch (error) {
-      console.error('Failed to fetch payment modes:', error);
+      logger.error('Failed to fetch payment modes:', error);
     }
   },
 

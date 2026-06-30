@@ -1,5 +1,6 @@
 import { DOCTYPES } from '../data/doctypes';
-import { db, call } from './frappe-sdk';
+import { call } from './frappe-sdk-retry';
+import { db } from './frappe-sdk';
 
 export interface Customer {
   name: string;

@@ -1,5 +1,6 @@
 import { DOCTYPES } from '../data/doctypes';
-import { call, db } from './frappe-sdk';
+import { call } from './frappe-sdk-retry';
+import { db } from './frappe-sdk';
 
 // Limited fields response
 export interface PosProfileLimited {
@@ -112,7 +113,6 @@ export async function getPosProfileFull(posProfileName: string): Promise<PosProf
 export async function getCombinedPosProfile(): Promise<PosProfileCombined> {
   // Get limited fields first
   const limitedProfile = await getPosProfileLimitedFields();
-  console.log('limitedProfile', limitedProfile);
   
   // Get full profile using the pos_profile name from limited profile
   const fullProfile = await getPosProfileFull(limitedProfile.pos_profile);

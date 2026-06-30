@@ -1,4 +1,4 @@
-import { call } from './frappe-sdk';
+import { call } from './frappe-sdk-retry';
 
 interface PaymentMode {
   mode_of_payment: string;

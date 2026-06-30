@@ -1,4 +1,5 @@
-import { call, db, auth } from './frappe-sdk';
+import { call } from './frappe-sdk-retry';
+import { db, auth } from './frappe-sdk';
 
 type LoggedUserResponse = string | null;
 
