@@ -1,5 +1,5 @@
-import { call } from './frappe-sdk-retry';
-import { db, auth } from './frappe-sdk';
+import { call, db, auth } from './frappe-sdk';
+import { getErrorMessage } from './error-utils';
 
 type LoggedUserResponse = string | null;
 
@@ -18,8 +18,7 @@ export const getLoggedUser = async (): Promise<LoggedUserResponse> => {
     const response = await auth.getLoggedInUser();
     return response as LoggedUserResponse;
   } catch (error) {
-    console.error('Error getting logged user:', error);
-    return null;
+    throw new Error(`Failed to get logged user: ${getErrorMessage(error)}`);
   }
 };
 
@@ -38,8 +37,7 @@ export const getUserRoles = async (email: string): Promise<{ roles: string[]; fu
       full_name: userDoc.full_name
     };
   } catch (error) {
-    console.error('Error getting user details:', error);
-    return { roles: [], full_name: '' };
+    throw new Error(`Failed to get user roles: ${getErrorMessage(error)}`);
   }
 };
 
@@ -47,7 +45,6 @@ export const logout = async () => {
   try {
     return auth.logout();
   }catch(e){
-    console.error('Error logging out:', e);
-    return false;
+    throw new Error(`Failed to logout: ${getErrorMessage(e)}`);
   }
 }

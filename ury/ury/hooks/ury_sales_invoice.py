@@ -1,11 +1,12 @@
 import frappe
+from frappe import _
 
 
 def before_insert(doc, method):
     sales_invoice_naming(doc, method)
 
-def on_update(doc,method):
-    aggregator_unpaid(doc,method)
+def on_update(doc, method):
+    aggregator_unpaid(doc, method)
     
 def sales_invoice_naming(doc, method):
     if not doc.is_pos:
@@ -22,7 +23,7 @@ def sales_invoice_naming(doc, method):
     )
 
     if not pos_profile:
-        frappe.throw(f"POS Profile '{doc.pos_profile}' does not exist. Please select a valid POS Profile.")
+        frappe.throw(_("POS Profile '{0}' does not exist. Please select a valid POS Profile.").format(doc.pos_profile))
     
     restaurant = pos_profile.get("restaurant")
 
@@ -37,7 +38,7 @@ def sales_invoice_naming(doc, method):
             )
             
             if aggregator_series_prefix: 
-                doc.naming_series = "SINV-" +  aggregator_series_prefix
+                doc.naming_series = "SINV-" + aggregator_series_prefix
                 
             else: 
                 # Fallback to invoice_series_prefix if aggregator_series_prefix is not available            
@@ -50,23 +51,9 @@ def sales_invoice_naming(doc, method):
             )
             
             
-def aggregator_unpaid(doc,method):
-    if doc.order_type == "Aggregators" and frappe.db.get_value("Branch", doc.branch , "custom_make_unpaid") == 1 :
+def aggregator_unpaid(doc, method):
+    if doc.order_type == "Aggregators" and frappe.db.get_value("Branch", doc.branch, "custom_make_unpaid") == 1:
         doc.is_pos = 0
-        
-        
-def remove_tax(doc,method):
-    
-    if doc.order_type == "Aggregators" and frappe.db.get_value("Branch", doc.branch , "custom_no_taxes") == 1 :
-
-        doc.taxes_and_charges = None
-        
-        doc.taxes.clear()
-       # Manually adjust totals
-        # doc.total_taxes_and_charges = 0
-        # doc.grand_total = doc.base_grand_total = doc.net_total
-        # doc.outstanding_amount = doc.grand_total - doc.paid_amount
-        # doc.run_method("validate")
 
         
 

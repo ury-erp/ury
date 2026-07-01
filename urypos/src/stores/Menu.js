@@ -39,13 +39,6 @@ export const useMenuStore = defineStore("menu", {
     showDialogCart: false,
     db: frappe.db(),
     call: frappe.call(),
-    alert: useAlert(),
-    auth: useAuthStore(),
-    table: useTableStore(),
-    customer: useCustomerStore(),
-    notification: useNotifications(),
-    invoiceData: useInvoiceDataStore(),
-    recentOrders: usetoggleRecentOrder(),
   }),
   getters: {
     filteredItems(state) {
@@ -100,14 +93,16 @@ export const useMenuStore = defineStore("menu", {
       return pageNumbers;
     },
     setColorForBilledInvoice() {
+      const recentOrders = usetoggleRecentOrder();
+      const auth = useAuthStore();
       if (
-        this.recentOrders.editPrintedInvoice === 0 ||
-        this.auth.removeTableOrderItem === 1
+        recentOrders.editPrintedInvoice === 0 ||
+        auth.removeTableOrderItem === 1
       ) {
         return "black";
       } else if (
-        this.recentOrders.editPrintedInvoice === 1 ||
-        this.auth.removeTableOrderItem === 0
+        recentOrders.editPrintedInvoice === 1 ||
+        auth.removeTableOrderItem === 0
       ) {
         return "gray";
       }
@@ -115,28 +110,32 @@ export const useMenuStore = defineStore("menu", {
     grand_total() {
       return this.cart
         .reduce((total, item) => {
-          return total + parseFloat(item.rate) * item.qty;
+          return total + parseFloat(item.rate || 0) * item.qty;
         }, 0)
         .toFixed(2);
     },
   },
   actions: {
     fetchItems() {
+      const auth = useAuthStore();
+      const invoiceData = useInvoiceDataStore();
+      const table = useTableStore();
+      const alert = useAlert();
       let order_type = null
-      if (this.auth.cashier) {
+      if (auth.cashier) {
         order_type = this.selectedOrderType;
       }else{
         order_type = null
       }
       const getMenu = {
-        pos_profile: this.invoiceData.posProfile,
+        pos_profile: invoiceData.posProfile,
         order_type:order_type
       };
       this.call
         .get("ury.ury_pos.api.getRestaurantMenu", getMenu)
         .then((result) => {
-          if (!this.auth.cashier && this.table.tableMenu) {
-            this.items = this.table.tableMenu;
+          if (!auth.cashier && table.tableMenu) {
+            this.items = table.tableMenu;
           } else {
             this.defautlMenu = result.message.items;
             this.items = this.defautlMenu;
@@ -153,7 +152,7 @@ export const useMenuStore = defineStore("menu", {
           if (error._server_messages) {
             const messages = JSON.parse(error._server_messages);
             const message = JSON.parse(messages[0]);
-            this.alert.createAlert("Message", message.message, "OK");
+            alert.createAlert("Message", message.message, "OK");
           }
         });
       this.db
@@ -176,37 +175,44 @@ export const useMenuStore = defineStore("menu", {
         .catch((error) => console.error(error));
     },
     clearPreviousData() {
-      this.recentOrders.selectedTable = "";
-      this.recentOrders.previousOrderdCustomer = ""
-      this.recentOrders.selectedStatus = "Draft"
-      this.table.invoiceNo = "";
-      this.table.selectedTable = "";
-      this.invoiceData.invoiceNumber = "";
-      this.recentOrders.showOrder = "";
-      this.recentOrders.invoiceNumber = "";
-      this.recentOrders.recentOrderListItems = [];
-      this.recentOrders.texDetails = [];
-      this.recentOrders.orderType = "";
-      this.recentOrders.draftInvoice = "";
-      this.recentOrders.netTotal = 0;
-      this.recentOrders.grandTotal = 0;
-      this.recentOrders.invoiceNumber = "";
-      this.recentOrders.selectedOrder = [];
-      this.recentOrders.selectedTable = "";
-      this.customer.search = "";
-      this.recentOrders.restaurantTable = ""
-      this.recentOrders.restaurantTable = null
+      const recentOrders = usetoggleRecentOrder();
+      const table = useTableStore();
+      const invoiceData = useInvoiceDataStore();
+      const customer = useCustomerStore();
+      recentOrders.selectedTable = "";
+      recentOrders.previousOrderdCustomer = ""
+      recentOrders.selectedStatus = "Draft"
+      table.invoiceNo = "";
+      table.selectedTable = "";
+      invoiceData.invoiceNumber = "";
+      recentOrders.showOrder = "";
+      recentOrders.invoiceNumber = "";
+      recentOrders.recentOrderListItems = [];
+      recentOrders.texDetails = [];
+      recentOrders.orderType = "";
+      recentOrders.draftInvoice = "";
+      recentOrders.netTotal = 0;
+      recentOrders.grandTotal = 0;
+      recentOrders.invoiceNumber = "";
+      recentOrders.selectedOrder = [];
+      recentOrders.selectedTable = "";
+      customer.search = "";
+      recentOrders.restaurantTable = ""
+      recentOrders.restaurantTable = null
       this.aggregatorItem = []
     },
     orderTypeSelection() {
+      const customer = useCustomerStore();
+      const recentOrders = usetoggleRecentOrder();
+      const alert = useAlert();
       this.clearPreviousData();
-      this.customer.selectedOrderType = this.selectedOrderType;
+      customer.selectedOrderType = this.selectedOrderType;
       if (
         this.selectedOrderType === "Dine In" &&
-        !this.recentOrders.restaurantTable
+        !recentOrders.restaurantTable
       ) {
         this.selectedOrderType = null;
-        this.alert.createAlert(
+        alert.createAlert(
           "Message",
           "Dine in is not permitted for takeaway orders.",
           "OK"
@@ -219,14 +225,14 @@ export const useMenuStore = defineStore("menu", {
       }
 
       if (this.cart.length > 0) {
-        this.alert
+        alert
           .createAlert(
             "Cart Not Empty",
             "Please clear your cart before selecting an order type.",
             "OK"
           )
           .then(() => {
-            window.location.reload();
+            router.push("/Table").catch(() => {});
           });
       } else {
         if (this.selectedOrderType === "Aggregators") {
@@ -239,7 +245,7 @@ export const useMenuStore = defineStore("menu", {
               if (error._server_messages) {
                 const messages = JSON.parse(error._server_messages);
                 const message = JSON.parse(messages[0]);
-                this.alert.createAlert("Message", message.message, "OK");
+                alert.createAlert("Message", message.message, "OK");
               }
             });
         } else {
@@ -250,18 +256,20 @@ export const useMenuStore = defineStore("menu", {
       }
     },
     handleAggregatorChange() {
+      const customer = useCustomerStore();
+      const alert = useAlert();
       if (this.selectedOrderType === "Aggregators" && this.cart.length > 0) {
-        this.alert
+        alert
           .createAlert(
             "Cart Not Empty",
             "Please empty your cart before selecting an aggregator.",
             "OK"
           )
           .then(() => {
-            window.location.reload();
+            router.push("/Table").catch(() => {});
           });
       } else {
-        this.customer.search = this.selectedAggregator;
+        customer.search = this.selectedAggregator;
         const getMenu = {
           aggregator: this.selectedAggregator,
         };
@@ -273,14 +281,14 @@ export const useMenuStore = defineStore("menu", {
             if (result.message) {
               this.items = result.message;
             } else {
-              this.items = defautlMenu;
+              this.items = this.defautlMenu;
             }
           })
           .catch((error) => {
             if (error._server_messages) {
               const messages = JSON.parse(error._server_messages);
               const message = JSON.parse(messages[0]);
-              this.alert.createAlert("Message", message.message, "OK");
+              alert.createAlert("Message", message.message, "OK");
             }
           });
       }
@@ -338,7 +346,7 @@ export const useMenuStore = defineStore("menu", {
         this.quantity > 0
       ) {
         if (!item.qty) {
-          this.$set(item, "qty", this.quantity);
+          item.qty = this.quantity;
         } else {
           item.qty = this.quantity;
           item.comment = this.itemComments;
@@ -349,9 +357,11 @@ export const useMenuStore = defineStore("menu", {
     },
 
     getitemQty(item) {
-      item.qty = this.cart.qty;
+      const cartItem = this.cart.find(i => i.item === item.item);
+      item.qty = cartItem ? cartItem.qty : 0;
     },
     addToCart(item) {
+      const notification = useNotifications();
       const itemIndex = this.cart.findIndex((obj) => obj.item === item.item);
       const itemIndexExists = itemIndex !== -1;
 
@@ -361,14 +371,17 @@ export const useMenuStore = defineStore("menu", {
         this.cart.push(item);
 
         let message = `Added ${item.item} to Cart`;
-        this.notification.createNotification(message);
+        notification.createNotification(message);
       }
     },
     incrementItemQuantity(item) {
+      const invoiceData = useInvoiceDataStore();
+      const table = useTableStore();
+      const notification = useNotifications();
       const itemIndex = this.cart.findIndex((obj) => obj.item === item.item);
       const itemIndexExists = itemIndex !== -1;
-      const posProfile = this.invoiceData.posProfile;
-      let previousOrderItem = this.table.previousOrderdItem;
+      const posProfile = invoiceData.posProfile;
+      let previousOrderItem = table.previousOrderdItem;
       // Check if item exists in previous orders
       const previousItem = previousOrderItem.find(
         (previous_item) => previous_item.item_code === item.item
@@ -383,13 +396,14 @@ export const useMenuStore = defineStore("menu", {
         item.comment = "";
         this.cart[itemIndex].qty++;
         let message = `${item.item}'s Qty updated to ${item.qty} in Cart`;
-        this.notification.createNotification(message);
+        notification.createNotification(message);
       } else {
         item.comment = "";
         this.cart.push({ item: item.item, qty: 1 });
       }
     },
     decrementItemQuantity(item) {
+      const notification = useNotifications();
       const itemIndex = this.cart.findIndex((obj) => obj.item === item.item);
       const itemIndexExists = itemIndex !== -1;
       if (itemIndexExists) {
@@ -399,7 +413,7 @@ export const useMenuStore = defineStore("menu", {
           item.qty > 0
             ? `${item.item}'s Qty Reduced from Cart Total Qty=${item.qty}`
             : `${item.item} has been removed from Cart`;
-        this.notification.createNotification(message);
+        notification.createNotification(message);
       }
     },
     removeItemFromCart(index) {

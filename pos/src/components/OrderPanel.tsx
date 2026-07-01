@@ -9,6 +9,7 @@ import CommentDialog from './CommentDialog';
 import { Button } from './ui/button';
 import { Spinner } from './ui/spinner';
 import { syncOrder } from '../lib/order-api';
+import { getErrorMessage } from '../lib/error-utils';
 import { useRootStore } from '../store/root-store';
 import type { RootState } from '../store/root-store';
 import { showToast } from './ui/toast';
@@ -94,6 +95,12 @@ const OrderPanel = () => {
         return;
       }
 
+      // Validate payment modes are loaded
+      if (!paymentModes.length) {
+        showToast.error(t('errors.no_payment_modes'));
+        return;
+      }
+
       setIsSubmitting(true);
       
       const orderData = {
@@ -126,21 +133,7 @@ const OrderPanel = () => {
       resetOrderState();
       showToast.success(isUpdatingOrder ? t('success.order_updated') : t('success.order_created'));
     } catch (error) {
-      console.error('Failed to sync order:', error);
-      // Frappe API error handling
-      if (error && typeof error === 'object' && '_server_messages' in error && typeof (error as any)._server_messages === 'string') {
-        try {
-          const messages = JSON.parse((error as any)._server_messages);
-          const messageObj = JSON.parse(messages[0]);
-          showToast.error(messageObj.message || 'API error');
-        } catch {
-          showToast.error('API error');
-        }
-      } else if (error instanceof Error) {
-        showToast.error(error.message);
-      } else {
-        showToast.error(t('errors.failed_process_order'));
-      }
+      showToast.error(getErrorMessage(error));
     } finally {
       setIsSubmitting(false);
     }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type MouseEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Eye, Layout, Loader2, Printer, Square, Users } from 'lucide-react';
 import { cn, formatInvoiceTime } from '../lib/utils';
@@ -13,6 +13,7 @@ import { getTableOrder } from '../lib/order-api';
 import { printOrder } from '../lib/print';
 import { showToast } from '../components/ui/toast';
 import { t } from '../i18n';
+import { getErrorMessage } from '../lib/error-utils';
 
 import LayoutView from '../components/LayoutView';
 
@@ -27,6 +28,8 @@ const TableView = () => {
   const [selectedRoom, setSelectedRoom] = useState<string | null>(null);
   const [tables, setTables] = useState<Table[]>([]);
   const [tablesCache, setTablesCache] = useState<Record<string, Table[]>>({});
+  const tablesCacheRef = useRef(tablesCache);
+  tablesCacheRef.current = tablesCache;
   const [loadingRooms, setLoadingRooms] = useState(false);
   const [loadingTables, setLoadingTables] = useState(false);
   const [roomCounts, setRoomCounts] = useState<Record<string, number>>({});
@@ -60,8 +63,7 @@ const TableView = () => {
           sessionStorage.setItem(sessionKey, JSON.stringify(fetchedRooms));
         }
       } catch (e) {
-        console.error(e);
-        setError('Failed to load rooms');
+        setError(t('errors.failed_load_rooms'));
       } finally {
         setLoadingRooms(false);
       }
@@ -103,8 +105,8 @@ const TableView = () => {
         }, {} as Record<string, number>);
         setRoomCounts(nextCounts);
         persistRoomCounts(nextCounts);
-      } catch (error) {
-        console.error('Failed to load room counts', error);
+      } catch (_error) {
+        if (import.meta.env.DEV) console.error('Failed to load room counts', _error);
       } finally {
         setLoadingRoomCounts(false);
       }
@@ -119,8 +121,8 @@ const TableView = () => {
       setError(null);
 
       const shouldUseCache = options?.useCache !== false;
-      if (shouldUseCache && tablesCache[roomName]) {
-        setTables(sortTables(tablesCache[roomName]));
+      if (shouldUseCache && tablesCacheRef.current[roomName]) {
+        setTables(sortTables(tablesCacheRef.current[roomName]));
         setLoadingTables(false);
         return;
       }
@@ -132,14 +134,13 @@ const TableView = () => {
         setTables(sortedTables);
         setTablesCache(prev => ({ ...prev, [roomName]: sortedTables }));
       } catch (e) {
-        console.error(e);
-        setError('Failed to load tables');
+        setError(t('errors.failed_load_tables'));
         setTables([]);
       } finally {
         setLoadingTables(false);
       }
     },
-    [tablesCache]
+    []
   );
 
   useEffect(() => {
@@ -173,15 +174,15 @@ const TableView = () => {
       const invoiceId = orderResponse.message?.name;
 
       if (!invoiceId) {
-        showToast.error('No active order found for this table');
+        showToast.error(t('errors.no_active_order'));
         return;
       }
 
       await printOrder({ orderId: invoiceId, posProfile });
-      showToast.success('Printed successfully');
+      showToast.success(t('success.printed'));
       await loadTables(table.restaurant_room, { useCache: false });
     } catch (error) {
-      showToast.error(error instanceof Error ? error.message : 'Failed to print order');
+      showToast.error(getErrorMessage(error));
     } finally {
       setPrintingTable(null);
     }
@@ -238,7 +239,7 @@ const TableView = () => {
               <div className="flex flex-wrap gap-2">
                 {loadingRooms && (
                   <div className="flex-1 min-w-[160px]">
-                    <Spinner message="Loading rooms..." />
+                    <Spinner message={t('common.loading_rooms')} />
                   </div>
                 )}
 

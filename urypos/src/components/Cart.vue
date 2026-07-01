@@ -383,8 +383,6 @@ export default {
   },
   methods: {
     handleConfirmCancellation() {
-      console.log(this.invoiceData.cancelReason);
-      console.log(!this.invoiceData.cancelReason || this.invoiceData.cancelReason.trim() === '');
       if (!this.invoiceData.cancelReason || this.invoiceData.cancelReason.trim() === '') {
         this.notification.createNotification('Please enter a reason for cancellation');
         return;

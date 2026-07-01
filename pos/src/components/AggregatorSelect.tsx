@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { usePOSStore } from '../store/pos-store';
+import { t } from '../i18n';
 import { Select, SelectItem } from './ui/select';
 import { getAggregators, type Aggregator } from '../lib/aggregator-api';
 
@@ -19,7 +20,7 @@ export function AggregatorSelect({ disabled }: AggregatorSelectProps) {
         const data = await getAggregators();
         setAggregators(data);
       } catch (error) {
-        console.error('Failed to fetch aggregators:', error);
+        if (import.meta.env.DEV) console.error('Failed to fetch aggregators:', error);
       } finally {
         setLoading(false);
       }
@@ -31,9 +32,13 @@ export function AggregatorSelect({ disabled }: AggregatorSelectProps) {
   const handleAggregatorChange = async (value: string) => {
     const aggregator = aggregators.find(a => a.customer === value);
     setSelectedAggregator(aggregator || null);
-    
+
     if (aggregator) {
-      await fetchAggregatorMenu(aggregator.customer);
+      try {
+        await fetchAggregatorMenu(aggregator.customer);
+      } catch (error) {
+        if (import.meta.env.DEV) console.error('Failed to fetch aggregator menu:', error);
+      }
     }
   };
 
@@ -43,7 +48,7 @@ export function AggregatorSelect({ disabled }: AggregatorSelectProps) {
         value={selectedAggregator?.customer || ''}
         onValueChange={handleAggregatorChange}
         disabled={disabled || loading}
-        placeholder={loading ? 'Loading aggregators...' : 'Select an aggregator'}
+        placeholder={loading ? t('aggregator.loading') : t('aggregator.select_placeholder')}
       >
         {aggregators.map((aggregator) => (
           <SelectItem 

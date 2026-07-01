@@ -6,12 +6,7 @@ import { useTableStore } from "./Table.js";
 import { useMenuStore } from "./Menu.js";
 
 export const tabFunctions = defineStore("tabClick", {
-  state: () => ({
-    auth: useAuthStore(),
-    alert: useAlert(),
-    menu: useMenuStore(),
-    table: useTableStore(),
-  }),
+  state: () => ({}),
   getters: {
     isLoginPage() {
       return router.currentRoute.value.path === "/login";
@@ -22,8 +17,10 @@ export const tabFunctions = defineStore("tabClick", {
   },
   actions: {
     checkActiveTable() {
-      if (!this.table.selectedTable) {
-        this.alert
+      const table = useTableStore();
+      const alert = useAlert();
+      if (!table.selectedTable) {
+        alert
           .createAlert(
             "No Active Table",
             "You have not selected an active table",
@@ -32,11 +29,17 @@ export const tabFunctions = defineStore("tabClick", {
           .then(() => {
             router.push("/Table");
           });
+        return false;
       }
+      return true;
     },
     clickMenuTab() {
-      if (!this.auth.cashier && !this.table.selectedTable) {
-        this.alert
+      const auth = useAuthStore();
+      const table = useTableStore();
+      const alert = useAlert();
+      const menu = useMenuStore();
+      if (!auth.cashier && !table.selectedTable) {
+        alert
           .createAlert(
             "No Active Table",
             "You have not selected an active table",
@@ -45,9 +48,10 @@ export const tabFunctions = defineStore("tabClick", {
           .then(() => {
             router.push("/Table");
           });
+        return false;
       }
-      if (this.auth.cashier && !this.menu.selectedOrderType) {
-        this.alert
+      if (auth.cashier && !menu.selectedOrderType) {
+        alert
           .createAlert(
             "No Order Type",
             "Please select an Order Type",
@@ -56,18 +60,21 @@ export const tabFunctions = defineStore("tabClick", {
           .then(() => {
             router.push("/Table");
           });
+        return false;
       }
       if (
-        this.auth.cashier &&
-        this.menu.selectedOrderType === "Aggregators" &&
-        !this.menu.selectedAggregator
+        auth.cashier &&
+        menu.selectedOrderType === "Aggregators" &&
+        !menu.selectedAggregator
       ) {
-        this.alert
+        alert
           .createAlert("No Aggregator", "Please select an Aggregator", "Ok")
           .then(() => {
             router.push("/Table");
           });
+        return false;
       }
+      return true;
     },
   },
 });

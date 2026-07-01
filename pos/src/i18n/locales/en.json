@@ -53,7 +53,8 @@
     "search_placeholder_menu": "Search Menu",
     "switch_to_desk": "Switch To Desk",
     "clear_cache": "Clear Cache",
-    "logout": "Logout"
+    "logout": "Logout",
+    "default_user": "User"
   },
   "menu": {
     "special_items": "Special Items"
@@ -159,7 +160,13 @@
     "discount_exceeds_max": "Percentage discount cannot exceed 100%",
     "please_print_first": "Please print invoice before making payment",
     "enter_cancel_reason": "Please enter a reason for cancellation.",
-    "dine_in_restricted": "Dine In is not available for your role"
+    "dine_in_restricted": "Dine In is not available for your role",
+    "failed_load_orders": "Failed to load orders",
+    "failed_load_order_details": "Failed to load order details",
+    "failed_load_pos": "Failed to load POS",
+    "failed_fetch_item_details": "Failed to fetch item details",
+    "failed_fetch_addons": "Failed to fetch add-ons",
+    "no_rooms_for_branch": "No rooms found for this branch"
   },
   "success": {
     "order_cancelled": "Order cancelled successfully",
@@ -380,5 +387,32 @@
     "paid": "Paid",
     "consolidated": "Consolidated",
     "return": "Return"
+  },
+  "auth_guard": {
+    "access_denied": "Access Denied",
+    "configuration_error": "Configuration Error",
+    "pos_profile_not_configured": "POS Profile not found or not configured.",
+    "permission_required": "Permission Required",
+    "no_permission": "You do not have permission to access this application.",
+    "required_roles": "Required roles:",
+    "recheck_permissions": "Recheck Permissions"
+  },
+  "screen_size": {
+    "title": "Desktop Only",
+    "message": "This POS system is designed for desktop computers.",
+    "mobile_hint": "Mobile support will be available in a future version.",
+    "current_width": "Current screen width:",
+    "required": "Required:",
+    "switch_v1": "Switch to Version 1"
+  },
+  "error_boundary": {
+    "title": "Something went wrong",
+    "message": "An unexpected error occurred. Please try again.",
+    "try_again": "Try Again",
+    "reload_page": "Reload Page"
+  },
+  "aggregator": {
+    "loading": "Loading aggregators...",
+    "select_placeholder": "Select an aggregator"
   }
 }

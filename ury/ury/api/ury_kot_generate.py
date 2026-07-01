@@ -1,31 +1,118 @@
 import json
 
 import frappe
+from frappe import _
 from ury.ury_pos.api import getBranch
 
 
-# Load JSON data or return as is if it's already a Python dictionary
 def load_json(data):
+    """Parse JSON string or return as-is if already a dict."""
     if isinstance(data, str):
         return json.loads(data)
     return data
 
 
-# Create a list of order items from a list of input items
 def create_order_items(items):
+    """Convert raw item dicts to a normalized format."""
     order_items = []
     for item in items:
+        qty = item.get("qty")
+        item_name = item.get("item_name")
+        if qty is None or item_name is None:
+            frappe.throw(_("Item data is missing required fields (qty, item_name)"))
         order_item = {
             "item_code": item.get("item", item.get("item_code")),
-            "qty": item["qty"],
-            "item_name": item["item_name"],
+            "qty": qty,
+            "item_name": item_name,
             "comments": item.get("comment", item.get("comments", "")),
         }
         order_items.append(order_item)
     return order_items
 
 
-# Create a KOT (Kitchen Order Ticket) document
+def _get_menu_for_invoice(restaurant_table, branch):
+    """Look up the active URY Menu for an invoice's table or branch."""
+    if restaurant_table:
+        result = frappe.db.get_value(
+            "URY Table", restaurant_table, ["restaurant_room", "restaurant"]
+        )
+        if not result:
+            frappe.throw(_("URY Table {0} not found").format(restaurant_table))
+        room, restaurant = result
+        menu = frappe.db.get_value(
+            "Menu for Room", {"room": room, "parent": restaurant}, "menu"
+        )
+        return menu
+    else:
+        return frappe.db.get_value("URY Restaurant", {"branch": branch}, "active_menu")
+
+
+def _get_item_courses(item_codes, menu):
+    """Batch-fetch course for all items in a single query."""
+    if not item_codes:
+        return {}
+    rows = frappe.db.sql(
+        """SELECT item, course FROM `tabURY Menu Item`
+           WHERE parent = %s AND item IN %s""",
+        (menu, item_codes),
+        as_dict=True,
+    )
+    return {r.item: r.course for r in rows}
+
+
+def _get_item_groups(item_codes):
+    """Batch-fetch item_group for all item codes in a single query."""
+    if not item_codes:
+        return {}
+    rows = frappe.db.sql(
+        """SELECT name, item_group FROM `tabItem` WHERE name IN %s""",
+        (item_codes,),
+        as_dict=True,
+    )
+    return {r.name: r.item_group for r in rows}
+
+
+def _get_production_item_groups(productions):
+    """Fetch item_group for each production unit in batch."""
+    if not productions:
+        return {}
+
+    production_names = [p.name for p in productions]
+    rows = frappe.db.sql(
+        """SELECT parent, item_group FROM `tabURY Production Item Groups`
+           WHERE parenttype = 'URY Production Unit' AND parent IN %s
+           ORDER BY idx""",
+        (production_names,),
+        as_dict=True,
+    )
+    groups = {}
+    for row in rows:
+        groups.setdefault(row.parent, []).append(row.item_group)
+    return groups
+
+
+def _get_existing_kots_with_items(invoice_id):
+    """Fetch all submitted KOTs for an invoice and their items in one query."""
+    rows = frappe.db.sql(
+        """SELECT ki.parent as kot_name, ki.item
+           FROM `tabURY KOT Item` ki
+           INNER JOIN `tabURY KOT` k ON ki.parent = k.name
+           WHERE k.invoice = %s AND k.docstatus = 1
+               AND k.type IN ('New Order', 'Order Modified')""",
+        (invoice_id,),
+        as_dict=True,
+    )
+    # Build {item_code: [kot_name, ...]}
+    result = {}
+    for row in rows:
+        result.setdefault(row.item, []).append(row.kot_name)
+    return result
+
+
+# ---------------------------------------------------------------------------
+# KOT creation (New Order / Order Modified)
+# ---------------------------------------------------------------------------
+
 def create_kot_doc(
     invoice_id,
     customer,
@@ -36,13 +123,13 @@ def create_kot_doc(
     pos_profile_id,
     kot_naming_series,
     production,
+    pos_invoice,  # passed in to avoid re-fetching
+    item_courses,  # pre-fetched {item_code: course}
 ):
-    pos_invoice = frappe.get_doc("POS Invoice", invoice_id)
     order_number = pos_invoice.custom_ury_order_number
-    is_aggregator = 0
-    if pos_invoice.order_type == "Aggregators":
-        is_aggregator = 1
-    kot_doc = frappe.get_doc(
+    is_aggregator = 1 if pos_invoice.order_type == "Aggregators" else 0
+
+    kot_doc = frappe.new_doc(
         {
             "doctype": "URY KOT",
             "invoice": invoice_id,
@@ -53,22 +140,13 @@ def create_kot_doc(
             "type": kot_type,
             "naming_series": kot_naming_series,
             "production": production,
-            "aggregator_id":pos_invoice.custom_aggregator_id,
-            "is_aggregator":is_aggregator,
-            "order_no":order_number
+            "aggregator_id": pos_invoice.custom_aggregator_id,
+            "is_aggregator": is_aggregator,
+            "order_no": order_number,
         }
     )
-    branch = getBranch()
-    if restaurant_table:
-        room = frappe.db.get_value("URY Table", restaurant_table, "restaurant_room")
-        restaurant = frappe.db.get_value("URY Table", restaurant_table, "restaurant")
-        menu = frappe.db.get_value("Menu for Room", {"room": room,"parent":restaurant}, "menu")
-        
-    else:
-        menu = frappe.db.get_value("URY Restaurant", {"branch": branch}, "active_menu")
 
     for item in items:
-        course = frappe.db.get_value("URY Menu Item", {"item": item["item_code"],"parent":menu}, "course")
         kot_doc.append(
             "kot_items",
             {
@@ -76,37 +154,13 @@ def create_kot_doc(
                 "item_name": item["item_name"],
                 "quantity": item["qty"],
                 "comments": item["comments"],
-                "course":course
+                "course": item_courses.get(item["item_code"]),
             },
         )
     kot_doc.insert()
     kot_doc.submit()
 
-# Function to get all production item groups for a given branch
-def get_all_production_item_groups(branch):
-    productions = frappe.db.get_all(
-        "URY Production Unit", filters={"branch": branch}, fields=["name"]
-    )
-    if productions:
-        all_production_item_groups = set()
-        for production in productions:
-            productionItemGroupslist = frappe.get_all(
-                "URY Production Item Groups",
-                fields=["item_group"],
-                filters={
-                    "parent": production.name,
-                    "parenttype": "URY Production Unit",
-                },
-                order_by="idx",
-            )
-            productionItemGroups = [
-                item_group.item_group for item_group in productionItemGroupslist
-            ]
-            all_production_item_groups.update(productionItemGroups)
-        return all_production_item_groups
 
-
-# Process items to create KOT documents
 def process_items_for_kot(
     invoice_id,
     customer,
@@ -116,74 +170,79 @@ def process_items_for_kot(
     pos_profile_id,
     kot_naming_series,
     kot_type,
+    pos_invoice,  # passed in to avoid re-fetching
+    branch,
 ):
-    kot_items = create_order_items(items)
-    pos_profile = frappe.get_doc("POS Profile", pos_profile_id)
     productions = frappe.db.get_all(
-        "URY Production Unit", filters={"branch": pos_profile.branch}, fields=["name"]
+        "URY Production Unit", filters={"branch": branch}, fields=["name"]
     )
 
-    if productions:
-        all_production_item_groups = get_all_production_item_groups(pos_profile.branch)
-        
-        # Iterate through each item and check if item group belongs to a production unit
-        for item in kot_items:
-            item_group = frappe.db.get_value("Item", item["item_code"], "item_group")
-            item_code = item["item_code"]
-            if item_group not in all_production_item_groups:
-                frappe.msgprint(
-                    f"Item group '{item_group}' for item '{item_code}' is not in any production."
-                )
-        for production in productions:
-            productionItemGroupslist = frappe.get_all(
-                "URY Production Item Groups",
-                fields=["item_group"],
-                filters={
-                    "parent": production.name,
-                    "parenttype": "URY Production Unit",
-                },
-                order_by="idx",
-            )
-            productionItemGroups = [
-                item_group.item_group for item_group in productionItemGroupslist
-            ]
-            production_items = [
-                item
-                for item in kot_items
-                if frappe.db.get_value("Item", item["item_code"], "item_group")
-                in productionItemGroups
-            ]
-
-            if production_items:
-                invoice_exist = frappe.db.exists(
-                    "URY KOT",
-                    {
-                        "invoice": invoice_id,
-                        "docstatus": 1,
-                        "production": production.name,
-                    },
-                )
-                if invoice_exist:
-                    kot_type = "Order Modified"
-
-                create_kot_doc(
-                    invoice_id,
-                    customer,
-                    restaurant_table,
-                    production_items,
-                    kot_type,
-                    comments,
-                    pos_profile_id,
-                    kot_naming_series,
-                    production.name,
-                )
-    else:
+    if not productions:
         frappe.throw(
-            "Create URY Production unit against POS Profile: %s " % pos_profile.name
+            _("Create URY Production unit against POS Profile: {0}").format(pos_profile_id)
+        )
+
+    item_codes = [i["item_code"] for i in items]
+    item_groups = _get_item_groups(item_codes)
+
+    # Warn about items not in any production unit
+    all_groups = set()
+    prod_groups = _get_production_item_groups(productions)
+    for groups in prod_groups.values():
+        all_groups.update(groups)
+
+    for item in items:
+        ig = item_groups.get(item["item_code"])
+        if ig and ig not in all_groups:
+            frappe.msgprint(
+                _("Item group '{0}' for item '{1}' is not in any production.")
+                .format(ig, item["item_code"])
+            )
+
+    # Fetch menu once for course lookups
+    menu = _get_menu_for_invoice(restaurant_table, branch)
+    item_courses = _get_item_courses(item_codes, menu) if menu else {}
+
+    for production in productions:
+        production_groups = set(prod_groups.get(production.name, []))
+        production_items = [
+            item
+            for item in items
+            if item_groups.get(item["item_code"]) in production_groups
+        ]
+
+        if not production_items:
+            continue
+
+        invoice_exist = frappe.db.exists(
+            "URY KOT",
+            {
+                "invoice": invoice_id,
+                "docstatus": 1,
+                "production": production.name,
+            },
+        )
+        actual_type = "Order Modified" if invoice_exist else kot_type
+
+        create_kot_doc(
+            invoice_id,
+            customer,
+            restaurant_table,
+            production_items,
+            actual_type,
+            comments,
+            pos_profile_id,
+            kot_naming_series,
+            production.name,
+            pos_invoice,
+            item_courses,
         )
 
 
-# Process items to create a cancel KOT document
+# ---------------------------------------------------------------------------
+# KOT creation (Cancelled / Partially cancelled)
+# ---------------------------------------------------------------------------
+
 def process_items_for_cancel_kot(
     invoice_id,
     customer,
@@ -194,42 +253,61 @@ def process_items_for_cancel_kot(
     cancel_kot_naming_series,
     kot_type,
     invoiceItems,
+    pos_invoice,  # passed in to avoid re-fetching
+    branch,
 ):
-
-    kot_items = create_order_items(items)
-    pos_profile = frappe.get_doc("POS Profile", pos_profile_id)
     productions = frappe.db.get_all(
-        "URY Production Unit", filters={"branch": pos_profile.branch}, fields=["name"]
+        "URY Production Unit", filters={"branch": branch}, fields=["name"]
     )
 
+    item_codes = [i["item_code"] for i in items]
+    item_groups = _get_item_groups(item_codes)
+    prod_groups = _get_production_item_groups(productions)
+
+    # Batch-fetch existing KOT items for this invoice
+    kot_item_map = _get_existing_kots_with_items(invoice_id)
+
+    # Fetch menu once
+    menu = _get_menu_for_invoice(restaurant_table, branch)
+    item_courses = _get_item_courses(item_codes, menu) if menu else {}
+
     for production in productions:
-        productionDoc = frappe.get_doc("URY Production Unit", production.name)
-        productionItemGroups = [
-            item_group.item_group for item_group in productionDoc.item_groups
-        ]
+        production_groups = set(prod_groups.get(production.name, []))
         production_items = [
             item
-            for item in kot_items
-            if frappe.get_doc("Item", item["item_code"]).item_group
-            in productionItemGroups
+            for item in items
+            if item_groups.get(item["item_code"]) in production_groups
         ]
 
-        if production_items:
-            create_cancel_kot_doc(
-                invoice_id,
-                restaurant_table,
-                production_items,
-                kot_type,
-                customer,
-                comments,
-                pos_profile_id,
-                cancel_kot_naming_series,
-                invoiceItems,
-                production.name,
-            )
+        if not production_items:
+            continue
+
+        # Find original KOTs that contain any of the cancelled items
+        original_kots = set()
+        for item in production_items:
+            for kot_name in kot_item_map.get(item["item_code"], []):
+                original_kots.add(kot_name)
+
+        if not original_kots:
+            continue
+
+        create_cancel_kot_doc(
+            invoice_id,
+            restaurant_table,
+            production_items,
+            kot_type,
+            customer,
+            comments,
+            pos_profile_id,
+            cancel_kot_naming_series,
+            invoiceItems,
+            production.name,
+            pos_invoice,
+            original_kots,
+            item_courses,
+        )
 
 
-# Create a cancel KOT document
 def create_cancel_kot_doc(
     invoice_id,
     restaurant_table,
@@ -241,43 +319,18 @@ def create_cancel_kot_doc(
     cancel_kot_naming_series,
     invoiceItems,
     production,
+    pos_invoice,  # passed in
+    original_kots,  # set of KOT names
+    item_courses,  # pre-fetched
 ):
-    pos_invoice = frappe.get_doc("POS Invoice", invoice_id)
-    order_number = pos_invoice.custom_ury_order_number  
-    is_aggregator = 0
-    if pos_invoice.order_type == "Aggregators":
-        is_aggregator = 1
-    kot_list = frappe.db.get_list(
-        "URY KOT",
-        filters={
-            "invoice": invoice_id,
-            "type": ("in", ("New Order", "Order Modified")),
-        },
-        fields=("name"),
-    )
+    order_number = pos_invoice.custom_ury_order_number
+    is_aggregator = 1 if pos_invoice.order_type == "Aggregators" else 0
 
-    # Find original KOTs related to the cancel items
-    original_kots = []
-    for cancelItem in cancel_items:
-        for kot in kot_list:
-            kot_doc = frappe.get_doc("URY KOT", kot.name)
-            kot_cancel_items = kot_doc.kot_items
-            itemCheckFlag = False
-            for kotItem in kot_cancel_items:
-                if cancelItem["item_code"] == kotItem.item:
-                    itemCheckFlag = True
-            if itemCheckFlag:
-                original_kots.append(kot_doc.name)
-                break
-
-    # Remove duplicate KOT names and join them into a single string
-    set_kots = [*set(original_kots)]
-    set_kots = ",".join(set_kots)
-    kot_cancel_doc = frappe.get_doc(
+    kot_cancel_doc = frappe.new_doc(
         {
             "doctype": "URY KOT",
             "naming_series": cancel_kot_naming_series,
-            "original_kot": set_kots,
+            "original_kot": ",".join(sorted(original_kots)),
             "restaurant_table": restaurant_table,
             "customer_name": customer,
             "type": kot_type,
@@ -285,51 +338,51 @@ def create_cancel_kot_doc(
             "pos_profile": pos_profile_id,
             "comments": comments,
             "production": production,
-            "is_aggregator":is_aggregator,
-            "order_no":order_number
+            "is_aggregator": is_aggregator,
+            "order_no": order_number,
         }
     )
 
-    branch = getBranch()
-    if restaurant_table:
-        room = frappe.db.get_value("URY Table", restaurant_table, "restaurant_room")
-        restaurant = frappe.db.get_value("URY Table", restaurant_table, "restaurant")
-        menu = frappe.db.get_value("Menu for Room", {"room": room,"parent":restaurant}, "menu")
-        
-    else:
-        menu = frappe.db.get_value("URY Restaurant", {"branch": branch}, "active_menu")
     for cancelItem in cancel_items:
-        course = frappe.db.get_value("URY Menu Item", {"item": cancelItem["item_code"],"parent":menu}, "course")
-        for item in invoiceItems:
-            if cancelItem["item_code"] == item["item_code"]:
-                kot_cancel_doc.append(
-                    "kot_items",
-                    {
-                        "item": cancelItem["item_code"],
-                        "item_name": cancelItem["item_name"],
-                        "cancelled_qty": abs(int(cancelItem["qty"])),
-                        "quantity": item["qty"],
-                        "comments": cancelItem["comments"],
-                        "course":course
-                    },
-                )
+        matching_invoice_item = next(
+            (i for i in invoiceItems if cancelItem["item_code"] == i["item_code"]),
+            None,
+        )
+        if not matching_invoice_item:
+            continue
+        kot_cancel_doc.append(
+            "kot_items",
+            {
+                "item": cancelItem["item_code"],
+                "item_name": cancelItem["item_name"],
+                "cancelled_qty": abs(int(cancelItem["qty"])),
+                "quantity": matching_invoice_item["qty"],
+                "comments": cancelItem["comments"],
+                "course": item_courses.get(cancelItem["item_code"]),
+            },
+        )
 
     kot_cancel_doc.insert()
     kot_cancel_doc.submit()
 
 
-# Whitelisted function to handle KOT entry
+# ---------------------------------------------------------------------------
+# Public entry point
+# ---------------------------------------------------------------------------
+
 @frappe.whitelist()
 def kot_execute(
     invoice_id,
     customer,
     restaurant_table=None,
-    current_items=[],
-    previous_items=[],
+    current_items=None,
+    previous_items=None,
     comments=None,
 ):
-    current_items = load_json(current_items)
-    previous_items = load_json(previous_items)
+    # Avoid mutable default argument pitfall
+    current_items = load_json(current_items or [])
+    previous_items = load_json(previous_items or [])
+
     new_invoice_items_array = create_order_items(previous_items)
     new_Order_items_array = create_order_items(current_items)
 
@@ -338,67 +391,83 @@ def kot_execute(
 
     pos_invoice = frappe.get_doc("POS Invoice", invoice_id)
     pos_profile_id = pos_invoice.pos_profile
-    pos_profile = frappe.get_doc("POS Profile", pos_profile_id)
-    kot_naming_series = pos_profile.custom_kot_naming_series
+    kot_naming_series = frappe.db.get_value(
+        "POS Profile", pos_profile_id, "custom_kot_naming_series"
+    )
     if kot_naming_series:
         cancel_kot_naming_series = "CNCL-" + kot_naming_series
     else:
         frappe.throw(
-            "KOT Naming Series is mandatory for the auto creation of KOT.Ensure it is configured in the POS Profile: %s"
-            % pos_profile.name
+            _("KOT Naming Series is mandatory for the auto creation of KOT. "
+              "Ensure it is configured in the POS Profile: {0}").format(pos_profile_id)
         )
+
+    branch = getBranch()
 
     positive_qty_items = [item for item in final_array if int(item["qty"]) > 0]
     negative_qty_items = [item for item in final_array if int(item["qty"]) <= 0]
     total_cancel_items = negative_qty_items + removed_item
+
+    # Common data fetched once and passed to both processors
+    shared_kwargs = {
+        "invoice_id": invoice_id,
+        "customer": customer,
+        "restaurant_table": restaurant_table,
+        "comments": comments,
+        "pos_profile_id": pos_profile_id,
+        "pos_invoice": pos_invoice,
+        "branch": branch,
+    }
+
     if positive_qty_items:
         process_items_for_kot(
-            invoice_id,
-            customer,
-            restaurant_table,
-            positive_qty_items,
-            comments,
-            pos_profile_id,
-            kot_naming_series,
-            "New Order",
+            **shared_kwargs,
+            items=positive_qty_items,
+            kot_naming_series=kot_naming_series,
+            kot_type="New Order",
         )
+
     if total_cancel_items:
         process_items_for_cancel_kot(
-            invoice_id,
-            customer,
-            restaurant_table,
-            total_cancel_items,
-            comments,
-            pos_profile_id,
-            cancel_kot_naming_series,
-            "Partially cancelled",
-            new_invoice_items_array,
+            **shared_kwargs,
+            items=total_cancel_items,
+            cancel_kot_naming_series=cancel_kot_naming_series,
+            kot_type="Partially cancelled",
+            invoiceItems=new_invoice_items_array,
         )
 
 
-# Compare two arrays and return the items that are different
+# ---------------------------------------------------------------------------
+# Array comparison helpers
+# ---------------------------------------------------------------------------
+
 def compare_two_array(array_1, array_2):
+    """Return items in array_1 whose qty differs from array_2."""
     finalarray = []
-    for index, x in enumerate(array_1):
-        a = list(
-            filter(
-                lambda y: y["item_code"] == x["item_code"] and y["qty"] == x["qty"],
-                array_2,
-            )
-        )
-        if len(a) == 0:
-            b = list(filter(lambda z: z["item_code"] == x["item_code"], array_2))
-            for qtb in b:
-                x["qty"] = int(x["qty"]) - int(qtb["qty"])
-            finalarray.append(x)
+    # Build a lookup for array_2 keyed by item_code
+    array_2_by_code = {item["item_code"]: item for item in array_2}
+
+    for x in array_1:
+        code = x["item_code"]
+        # Make a copy to avoid mutating the original dict
+        item = dict(x)
+
+        if code not in array_2_by_code:
+            # Item was added (new)
+            finalarray.append(item)
+            continue
+
+        if item["qty"] == array_2_by_code[code]["qty"]:
+            # No change
+            continue
+
+        item["qty"] = int(item["qty"]) - int(array_2_by_code[code]["qty"])
+        finalarray.append(item)
+
     return finalarray
 
 
-# Get the items that have been removed from the second array compared to the first array
 def get_removed_items(array_1, array_2):
-    removed_objects = [
-        obj
-        for obj in array_1
-        if obj["item_code"] not in [x["item_code"] for x in array_2]
-    ]
-    return removed_objects
+    """Return items present in array_1 but absent from array_2."""
+    array_2_codes = {x["item_code"] for x in array_2}
+    return [obj for obj in array_1 if obj["item_code"] not in array_2_codes]

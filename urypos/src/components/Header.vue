@@ -47,7 +47,7 @@
               <span
                 class="text-sm font-medium text-gray-700 dark:text-gray-300"
               >
-                {{ this.auth.sessionUser.charAt(0).toUpperCase() }}
+                {{ (this.auth.sessionUser || '').charAt(0).toUpperCase() }}
               </span>
             </div>
           </button>
@@ -123,7 +123,7 @@ export default {
   },
   methods: {
     reload() {
-      window.location.reload();
+      this.$router.push(this.$route.path).catch(() => {});
     },
   },
 };

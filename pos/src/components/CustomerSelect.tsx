@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { UserPlus, Mail, Phone, Loader } from 'lucide-react';
+import { UserPlus, Phone, Loader } from 'lucide-react';
 import { usePOSStore, type Customer } from '../store/pos-store';
 import { Button, Dialog, DialogContent, Input } from './ui';
 import { Select, SelectItem } from './ui';
@@ -8,6 +8,7 @@ import React from 'react';
 import { addCustomer, type CreateCustomerData, searchCustomers } from '../lib/customer-api';
 import { AggregatorSelect } from './AggregatorSelect';
 import { t } from '../i18n';
+import { getErrorMessage } from '../lib/error-utils';
 
 // NewCustomerForm component
 function NewCustomerForm({ 
@@ -60,7 +61,7 @@ function NewCustomerForm({
       setLoadingTerritories(true);
       fetchTerritories().finally(() => setLoadingTerritories(false));
     }
-  }, []);
+  }, [customerGroups, territories, fetchCustomerGroups, fetchTerritories]);
 
 
 
@@ -104,9 +105,9 @@ function NewCustomerForm({
       setNewCustomerTerritory("");
       if (onSuccess) onSuccess();
       onClose();
-    } catch (error: any) {
-      console.error('Failed to create customer:', error);
-      setApiError(error?.message || t('customer.failed_create'));
+    } catch (error: unknown) {
+      if (import.meta.env.DEV) console.error('Failed to create customer:', error);
+      setApiError(getErrorMessage(error));
     } finally {
       setIsCreatingCustomer(false);
     }
@@ -296,7 +297,7 @@ export function CustomerSelect({ disabled }: CustomerSelectProps) {
   };
 
   if (selectedOrderType === 'Aggregators') {
-    return <AggregatorSelect />;
+    return <AggregatorSelect disabled={disabled} />;
   }
 
   return (

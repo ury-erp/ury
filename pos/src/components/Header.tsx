@@ -144,7 +144,7 @@ const Header = () => {
               <div className="w-8 h-8 bg-primary-500 rounded-full flex items-center justify-center">
                 <User className="w-4 h-4 text-white" />
               </div>
-              <span className="text-sm font-medium">{user?.full_name || 'User'}</span>
+              <span className="text-sm font-medium">{user?.full_name || t('header.default_user')}</span>
               <ChevronDown className="w-4 h-4" />
             </Button>
 
@@ -152,7 +152,7 @@ const Header = () => {
             {showUserMenu && (
               <div className="absolute end-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
                 <div className="p-4 border-b border-gray-200">
-                  <p className="text-sm font-medium text-gray-900">{user?.full_name || 'User'}</p>
+                  <p className="text-sm font-medium text-gray-900">{user?.full_name || t('header.default_user')}</p>
                   <p className="text-sm text-gray-500">{user?.name || ''}</p>
                 </div>
                 <div className="py-2">

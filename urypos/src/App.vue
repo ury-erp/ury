@@ -30,10 +30,5 @@ export default {
   mounted() {
     this.auth.fetchUserDetails();
   },
-  computed: {
-    isLoginPage() {
-      return this.$route.path === "/";
-    },
-  },
 };
 </script>

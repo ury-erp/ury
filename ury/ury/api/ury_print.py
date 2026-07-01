@@ -12,7 +12,6 @@ standard_format = "templates/print_formats/standard.html"
 
 from frappe.www.printview import validate_print_permission
 
-
 @frappe.whitelist()
 def network_printing(
     doctype,
@@ -29,14 +28,14 @@ def network_printing(
         try:
             import cups
         except ImportError:
-            return "Failed to import cups"
+            frappe.throw(_("CUPS library is not installed on the server"))
 
         try:
             cups.setServer(print_settings.server_ip)
             cups.setPort(print_settings.port)
             conn = cups.Connection()
         except Exception as e:
-            return f"Failed to connect to the printer: {str(e)}"
+            frappe.throw(_("Failed to connect to the printer: {0}").format(str(e)))
 
         try:
             output = PdfWriter()
@@ -57,7 +56,7 @@ def network_printing(
                 output.write(f)
             conn.printFile(print_settings.printer_name, file_path, name, {})
 
-            restaurant_table, invoice_printed, name = frappe.db.get_value(
+            restaurant_table, invoice_printed, invoice_name = frappe.db.get_value(
                 "POS Invoice", name, ["restaurant_table", "invoice_printed", "name"]
             )
 
@@ -73,12 +72,11 @@ def network_printing(
 
             return "Success"
         except Exception as e:
-            return f"Failed to print: {str(e)}"
+            frappe.log_error(message=frappe.get_traceback(), title="Network Printing - Print Error")
+            frappe.throw(_("Failed to print: {0}").format(str(e)))
     except Exception as e:
-        import traceback
-
-        traceback.print_exc()  # Print the full traceback for debugging
-        return f"An error occurred: {str(e)}"
+        frappe.log_error(message=frappe.get_traceback(), title="Network Printing Error")
+        frappe.throw(_("An error occurred: {0}").format(str(e)))
 
 
 @frappe.whitelist()
@@ -92,73 +90,62 @@ def select_network_printer(pos_profile, invoice_id):
             "URY Printer Settings", {"parent": room, "bill": 1}, "printer"
         )
         if room_bill_printer:
-            print = network_printing(
+            return network_printing(
                 "POS Invoice", invoice_id, room_bill_printer, print_format
             )
-            return print
 
     else:
         pos_bill_printer = frappe.db.get_value(
             "URY Printer Settings", {"parent": pos_profile, "bill": 1}, "printer"
         )
         if pos_bill_printer:
-            print = network_printing(
+            return network_printing(
                 "POS Invoice", invoice_id, pos_bill_printer, print_format
             )
-            return print
+
+    frappe.throw(_("No printer configured for this POS Profile or table"))
 
 
 @frappe.whitelist()
 def qz_print_update(invoice):
     try:
         table = frappe.db.get_value("POS Invoice", invoice, "restaurant_table")
-        
-        if table == None or table == "":
-            # Update invoice_printed
+
+        if not table:
             frappe.db.set_value(
                 "POS Invoice", invoice, "invoice_printed", 1, update_modified=False
             )
-            
-            # Validate the update
-            new_invoice_printed = frappe.db.get_value("POS Invoice", invoice, "invoice_printed")
-            if new_invoice_printed != 1:
-                return {"status": "Failure"}                
         else:
             invoice_printed = frappe.db.get_value("POS Invoice", invoice, "invoice_printed")
 
             if invoice_printed == 0:
-                # Update invoice_printed
-                frappe.db.set_value(
-                    "POS Invoice", invoice, "invoice_printed", 1, update_modified=False
+                # Use a single SQL transaction to update both atomically
+                frappe.db.sql(
+                    """UPDATE `tabPOS Invoice` SET invoice_printed = 1 WHERE name = %s""",
+                    invoice,
                 )
-                
-                # Update table status
-                frappe.db.set_value(
-                    "URY Table", table, {"occupied": 0, "latest_invoice_time": None}
+                frappe.db.sql(
+                    """UPDATE `tabURY Table` SET occupied = 0, latest_invoice_time = NULL WHERE name = %s""",
+                    table,
                 )
-                
-                # Validate both updates
-                new_invoice_printed = frappe.db.get_value("POS Invoice", invoice, "invoice_printed")
-                new_table_status = frappe.db.get_value("URY Table", table, "occupied")
-                
-                if new_invoice_printed != 1 or new_table_status != 0:
-                    return {"status": "Failure"}
-        
+
         return {"status": "Success"}
-        
+
     except Exception as e:
         frappe.log_error(message=e, title="Print Fail")
-        frappe.throw(_("Error while printing order",e))                   
-        return {"status": "Failure"}
+        frappe.throw(_("Error while printing order: {0}").format(str(e)))
 
 
 @frappe.whitelist()
 def print_pos_page(doctype, name, print_format):
     data = {"name": name, "doctype": doctype, "print_format": print_format}
 
-    restaurant_table, branch, name = frappe.db.get_value(
+    result = frappe.db.get_value(
         "POS Invoice", name, ["restaurant_table", "branch", "name"]
     )
+    if not result:
+        frappe.throw(_("POS Invoice {0} not found").format(name))
+    restaurant_table, branch, invoice_name = result
     print_channel = "{}_{}".format("print", branch)
     frappe.publish_realtime(print_channel, {"data": data})
 
@@ -185,7 +172,8 @@ def qz_certificate():
 
 @frappe.whitelist()
 def signature_promise():
+    if "System Manager" not in frappe.get_roles():
+        frappe.throw(_("Not permitted"), frappe.PermissionError)
     site_config = frappe.get_site_config()
     key_value = site_config.get("qz_private_key")
-
     return key_value

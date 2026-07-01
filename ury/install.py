@@ -7,10 +7,7 @@ def after_install():
     try:
         print("Setting up URY...")
         setup()
-        
         click.secho("Thank you for installing URY App!", fg="green")
-
-        
-    except:
-        pass
-     
+    except Exception:
+        click.secho("URY installation failed. Check logs for details.", fg="red")
+        raise

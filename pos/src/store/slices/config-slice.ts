@@ -1,21 +1,8 @@
 import { StateCreator } from 'zustand';
 import { AuthSlice } from './auth-slice';
 import { getCombinedPosProfile, PosProfileCombined } from '../../lib/pos-profile-api';
-
-interface RolePermission {
-  name: string;
-  owner: string;
-  creation: string;
-  modified: string;
-  modified_by: string;
-  docstatus: number;
-  idx: number;
-  role: string;
-  parent: string;
-  parentfield: string;
-  parenttype: string;
-  doctype: string;
-}
+import type { RolePermission } from '../../lib/pos-profile-api';
+import { getErrorMessage } from '../../lib/error-utils';
 
 export interface ConfigState {
   allowedRoles: string[];
@@ -56,13 +43,17 @@ export const createConfigSlice: StateCreator<
       // Check session storage first if not forcing refresh
       const cached = sessionStorage.getItem('posProfile');
       if (cached && !forceRefresh) {
-        const profile = JSON.parse(cached);
-        set({ posProfile: profile });
-        // Extract and set allowed roles from the profile
-        const allowedRoles = profile.role_allowed_for_billing?.map((role: RolePermission) => role.role) || [];
-        get().setAllowedRoles(allowedRoles);
-        set({ isLoading: false });
-        return;
+        try {
+          const profile = JSON.parse(cached);
+          set({ posProfile: profile });
+          // Extract and set allowed roles from the profile
+          const allowedRoles = profile.role_allowed_for_billing?.map((role: RolePermission) => role.role) || [];
+          get().setAllowedRoles(allowedRoles);
+          set({ isLoading: false });
+          return;
+        } catch {
+          sessionStorage.removeItem('posProfile');
+        }
       }
 
       // If not in cache or forcing refresh, fetch from API
@@ -78,7 +69,7 @@ export const createConfigSlice: StateCreator<
       set({ isLoading: false });
     } catch (error) {
       set({ 
-        error: (error as Error).message,
+        error: getErrorMessage(error),
         isLoading: false,
       });
     }
@@ -97,10 +88,7 @@ export const createConfigSlice: StateCreator<
     const hasAccess = user.name === 'Administrator' || user.roles.some(role => allowedRoles.includes(role));
     set({ hasAccess });
 
-    // If no access, we could redirect or show an error message
-    if (!hasAccess) {
-      set({ error: 'You do not have permission to access this application.' });
-    }
+    // Note: AuthGuard handles the no-access UI via !hasAccess check with proper i18n
   },
 
   setAllowedRoles: (roles) => {

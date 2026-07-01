@@ -1,8 +1,7 @@
-import { FC } from 'react';
+import { FC, useState } from 'react';
 import { formatCurrency, cn } from '../lib/utils';
 
 interface MenuCardProps {
-  id: string;
   name: string;
   price: number;
   item_image: string | null;
@@ -13,7 +12,6 @@ interface MenuCardProps {
 }
 
 const MenuCard: FC<MenuCardProps> = ({ 
-  id, 
   name, 
   price, 
   item_image, 
@@ -22,33 +20,34 @@ const MenuCard: FC<MenuCardProps> = ({
   onClick,
   disabled 
 }) => {
+  const [imgError, setImgError] = useState(false);
+
   return (
     <div
+      role="button"
+      tabIndex={disabled ? -1 : 0}
+      aria-label={`${name}, ${formatCurrency(price)}${course ? `, ${course}` : ''}`}
       className={cn(
         "bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow cursor-pointer h-56 flex flex-col",
         disabled && "opacity-50 cursor-not-allowed pointer-events-none"
       )}
       onClick={disabled ? undefined : onClick}
+      onKeyDown={disabled ? undefined : (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onClick?.();
+        }
+      }}
     >
       {/* Image section - fixed height */}
       <div className="h-24">
-        {item_image ? (
+        {item_image && !imgError ? (
           <img
             src={item_image}
             alt={name}
-            className="w-full h-full object-cover filter saturate-75 brightness-95"
+            className="w-full h-full object-cover"
             style={{ filter: 'saturate(0.7) brightness(0.95)' }}
-            onError={(e) => {
-              const target = e.target as HTMLImageElement;
-              target.style.display = 'none';
-              const parent = target.parentElement;
-              if (parent) {
-                const placeholder = document.createElement('div');
-                placeholder.className = 'w-full h-full bg-gray-200 flex items-center justify-center text-2xl text-gray-400 font-medium';
-                placeholder.textContent = name.slice(0, 2).toUpperCase();
-                parent.insertBefore(placeholder, target);
-              }
-            }}
+            onError={() => setImgError(true)}
           />
         ) : (
           <div className="w-full h-full bg-gray-200 flex items-center justify-center text-2xl text-gray-400 font-medium">
@@ -60,7 +59,7 @@ const MenuCard: FC<MenuCardProps> = ({
       {/* Content section - flex grow with fixed padding */}
       <div className="flex-1 p-3 flex flex-col">
         {/* Name section - fixed height for 2 lines */}
-        <div className="">
+        <div>
           <h3 className="font-medium text-gray-900 text-sm leading-5 line-clamp-2" title={name}>
             {name}
           </h3>

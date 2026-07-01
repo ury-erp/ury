@@ -6,12 +6,10 @@ import frappe from "./frappeSdk.js";
 
 export const posOpening = defineStore("posOpen", {
   state: () => ({
-    invoiceData: useInvoiceDataStore(),
     call: frappe.call(),
     startDate: new Date(),
     formattedDateTime: null,
     postingDate: null,
-    alert: useAlert(),
     posOpencreation: true,
     currentDate: new Date(),
     posOpenSaved: false,
@@ -20,13 +18,10 @@ export const posOpening = defineStore("posOpen", {
     showSumbitPosOpen: false,
     isPosOpen: null,
   }),
-  getters: {
-    currentDateTime: {
-      get() {},
-    },
-  },
   actions: {
     savePosOpening() {
+      const invoiceData = useInvoiceDataStore();
+      const alert = useAlert();
       if (this.startDate) {
         const date = new Date(this.startDate);
         const year = date.getFullYear();
@@ -44,11 +39,11 @@ export const posOpening = defineStore("posOpen", {
         .createDoc("POS Opening Entry", {
           period_start_date: this.formattedDateTime,
           posting_date: this.postingDate,
-          company: this.invoiceData.company,
-          pos_profile: this.invoiceData.posProfile,
-          balance_details: this.invoiceData.modeOfPaymentList,
-          branch: this.invoiceData.branch,
-          user: this.invoiceData.cashier,
+          company: invoiceData.company,
+          pos_profile: invoiceData.posProfile,
+          balance_details: invoiceData.modeOfPaymentList,
+          branch: invoiceData.branch,
+          user: invoiceData.cashier,
           docstatus: 0,
         })
         .then((doc) => {
@@ -61,7 +56,7 @@ export const posOpening = defineStore("posOpen", {
           if (error._server_messages) {
             const messages = JSON.parse(error._server_messages);
             const message = JSON.parse(messages[0]);
-            this.alert.createAlert("Message", message.message, "OK");
+            alert.createAlert("Message", message.message, "OK");
           }
         });
     },
@@ -101,7 +96,8 @@ export const posOpening = defineStore("posOpen", {
       this.postingDate = `${year}-${month}-${day}`;
     },
     deleteRow(index) {
-      this.invoiceData.modeOfPaymentList.splice(index, 1);
+      const invoiceData = useInvoiceDataStore();
+      invoiceData.modeOfPaymentList.splice(index, 1);
     },
     routeToPosOpen() {
       router.push("/posOpen");

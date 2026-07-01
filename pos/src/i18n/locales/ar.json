@@ -28,7 +28,8 @@
         "cancelling": "جاري الإلغاء...",
         "confirm_cancel": "تأكيد الإلغاء",
         "loading_ury_pos": "جاري تحميل URY POS...",
-        "please_wait_setup": "يرجى الانتظار بينما نقوم بضبط الأشياء..."
+        "please_wait_setup": "يرجى الانتظار بينما نقوم بضبط الأشياء...",
+        "retry": "إعادة المحاولة"
     },
     "header": {
         "search_placeholder_default": "ابحث عن الطلبات، عناصر القائمة، أو العملاء...",
@@ -36,7 +37,8 @@
         "search_placeholder_menu": "ابحث في القائمة",
         "switch_to_desk": "التبديل إلى المكتب",
         "clear_cache": "مسح ذاكرة التخزين المؤقت",
-        "logout": "تسجيل الخروج"
+        "logout": "تسجيل الخروج",
+        "default_user": "مستخدم"
     },
     "menu": {
         "special_items": "أصناف مميزة"
@@ -142,7 +144,12 @@
         "discount_exceeds_max": "لا يمكن أن تتجاوز نسبة الخصم 100٪",
         "please_print_first": "يرجى طباعة الفاتورة قبل إتمام عملية الدفع",
         "enter_cancel_reason": "يرجى إدخال سبب للإلغاء.",
-        "dine_in_restricted": "الطلبات المحلية غير متاحة للدور الخاص بك"
+        "dine_in_restricted": "الطلبات المحلية غير متاحة للدور الخاص بك",
+        "failed_load_orders": "فشل في تحميل الطلبات",
+        "failed_load_order_details": "فشل في تحميل تفاصيل الطلب",
+        "failed_fetch_item_details": "فشل في جلب تفاصيل العنصر",
+        "failed_fetch_addons": "فشل في جلب الإضافات",
+        "no_rooms_for_branch": "لم يتم العثور على قاعات لهذا الفرع"
     },
     "success": {
         "order_cancelled": "تم إلغاء الطلب بنجاح",
@@ -233,5 +240,32 @@
         "paid": "مدفوع",
         "consolidated": "مجمع",
         "return": "مرتجع"
+    },
+    "auth_guard": {
+        "access_denied": "تم رفض الوصول",
+        "configuration_error": "خطأ في التكوين",
+        "no_permission": "ليس لديك صلاحية للوصول إلى هذا التطبيق.",
+        "permission_required": "صلاحية مطلوبة",
+        "pos_profile_not_configured": "ملف تعريف نقطة البيع غير موجود أو غير مُعد.",
+        "recheck_permissions": "إعادة التحقق من الصلاحيات",
+        "required_roles": "الأدوار المطلوبة:"
+    },
+    "screen_size": {
+        "current_width": "عرض الشاشة الحالي:",
+        "message": "تم تصميم نظام نقطة البيع هذا لأجهزة سطح المكتب.",
+        "mobile_hint": "ستتوفر دعم الأجهزة المحمولة في إصدار مستقبلي.",
+        "required": "المطلوب:",
+        "switch_v1": "التبديل إلى الإصدار 1",
+        "title": "سطح المكتب فقط"
+    },
+    "error_boundary": {
+        "message": "حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى.",
+        "reload_page": "إعادة تحميل الصفحة",
+        "title": "حدث خطأ ما",
+        "try_again": "حاول مرة أخرى"
+    },
+    "aggregator": {
+        "loading": "جاري تحميل منصات التجميع...",
+        "select_placeholder": "اختر منصة تجميع"
     }
 }

@@ -1,42 +1,60 @@
-import axios from "axios";
-import qz from "qz-tray";  
-import { privateKey } from "../../../privateKey";
-
+import qz from "qz-tray";
 import {
     KEYUTIL,
     KJUR,
     stob64,
     hextorstr,
 } from 'jsrsasign';
+import { frappe } from '../frappeSdk';
+
+const call = frappe.call();
+let loadedKey = null;
+
+async function fetchPrivateKey() {
+    if (loadedKey) return loadedKey;
+    const response = await call.get('ury.ury.api.ury_print.signature_promise');
+    loadedKey = response.message;
+    if (!loadedKey) {
+        throw new Error('Private key not configured in site_config (qz_private_key)');
+    }
+    return loadedKey;
+}
 
 export function loadQzPrinter(host){
     return new Promise((resolve,reject)=>{
-        qz.security.setCertificatePromise((resolve)=>{
-            axios.get("/assets/ury/files/cert.pem")
-            .then((response)=>{
-                resolve(response.data)  
-            }).catch((err)=>{
+        call.get('ury.ury.api.ury_print.qz_certificate')
+            .then((response) => {
+                const cert = response.message;
+                if (!cert) {
+                    reject({ custom: true, title: 'Certificate not configured', message: 'qz_cert missing in site_config' });
+                    return;
+                }
+                qz.security.setCertificatePromise((res) => res(cert));
+
+                if(!qz.websocket.isActive()){
+                    qz.websocket.connect({
+                        host,
+                        usingSecure:false
+                    })
+                    .then(()=>resolve("success"))
+                    .catch((err)=>{
+                        reject({
+                            custom:true,
+                            title:"Error during connection to printer",
+                            message:String(err)
+                        });
+                    })
+                } else {
+                    resolve("success");
+                }
+            })
+            .catch((err) => {
                 reject({
-                    custom:true,
-                    title:"Error during fetching certificate",
-                    message:err
+                    custom: true,
+                    title: "Error fetching certificate",
+                    message: String(err)
                 });
-            })
-        });
-        if(!qz.websocket.isActive()){
-            qz.websocket.connect({
-                host,
-                usingSecure:false
-            })
-            .then(()=>resolve("success"))
-            .catch((err)=>{
-                reject({
-                    custom:true,
-                    title:"Error during connection to printer",
-                    message:String(err)
-                });
-            })
-        }
+            });
     });
 }
 
@@ -45,20 +63,21 @@ export function disconnectQzPrinter(){
         qz.websocket.disconnect();
 }
 
-export function printWithQz(host,htmlToPrint){
-    
+export function printWithQz(host, htmlToPrint){
     return new Promise((resolve,reject)=>{
-        qz.security.setSignatureAlgorithm("SHA512"); // Since 2.1
+        qz.security.setSignatureAlgorithm("SHA512");
         qz.security.setSignaturePromise(function(toSign) {
-            return function(resolve) {
+            return async function(res, rej) {
                 try {
-                    var pk = KEYUTIL.getKey(privateKey);
-                    var sig = new KJUR.crypto.Signature({"alg": "SHA512withRSA"});  // Use "SHA1withRSA" for QZ Tray 2.0 and older
-                    sig.init(pk); 
+                    const pk = await fetchPrivateKey();
+                    var key = KEYUTIL.getKey(pk);
+                    var sig = new KJUR.crypto.Signature({"alg": "SHA512withRSA"});
+                    sig.init(key);
                     sig.updateString(toSign);
                     var hex = sig.sign();
-                    resolve(stob64(hextorstr(hex)));
+                    res(stob64(hextorstr(hex)));
                 } catch (err) {
+                    rej(err);
                     reject(err);
                 }
             };

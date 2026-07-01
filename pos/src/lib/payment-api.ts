@@ -1,4 +1,5 @@
-import { call } from './frappe-sdk-retry';
+import { call } from './frappe-sdk';
+import { getErrorMessage } from './error-utils';
 
 interface PaymentMode {
   mode_of_payment: string;
@@ -13,7 +14,11 @@ export const getPaymentModes = async (): Promise<string[]> => {
   // Check session storage first
   const cached = sessionStorage.getItem('payment_modes');
   if (cached) {
-    return JSON.parse(cached);
+    try {
+      return JSON.parse(cached);
+    } catch {
+      sessionStorage.removeItem('payment_modes');
+    }
   }
 
   try {
@@ -26,7 +31,6 @@ export const getPaymentModes = async (): Promise<string[]> => {
     
     return paymentModes;
   } catch (error) {
-    console.error('Failed to fetch payment modes:', error);
-    throw error;
+    throw new Error(`Failed to fetch payment modes: ${getErrorMessage(error)}`);
   }
 }; 

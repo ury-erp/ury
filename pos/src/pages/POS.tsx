@@ -1,12 +1,11 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useEffect, useState, useRef, type ElementType } from 'react';
 import { t } from '../i18n';
 import { Star, TrendingUp } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import OrderPanel from '../components/OrderPanel';
 import ProductDialog from '../components/ProductDialog';
 import MenuList from '../components/MenuList';
-import SearchBar from '../components/SearchBar';
-import { usePOSStore } from '../store/pos-store';
+import { usePOSStore, type MenuItem } from '../store/pos-store';
 import { cn } from '../lib/utils';
 import { Spinner } from '../components/ui/spinner';
 import InitialLoader from '../components/InitialLoader';
@@ -26,18 +25,10 @@ export default function POS() {
   } = usePOSStore();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [showSearch, setShowSearch] = useState(false);
   const clickTimerRef = useRef<NodeJS.Timeout | null>(null);
   const clickCountRef = useRef(0);
 
-  useEffect(() => {
-    if (showSearch) {
-      // The searchInputRef.current.focus() line was removed as per the new_code,
-      // as the SearchBar component now handles its own focus.
-    }
-  }, [showSearch]);
-
-  const handleItemClick = (item: any) => {
+  const handleItemClick = (item: MenuItem) => {
     if (isMenuInteractionDisabled()) return;
     
     clickCountRef.current += 1;
@@ -59,9 +50,15 @@ export default function POS() {
     }, 250); // 250ms threshold for double click
   };
 
+  useEffect(() => {
+    return () => {
+      if (clickTimerRef.current) clearTimeout(clickTimerRef.current);
+    };
+  }, []);
+
   const QuickFilterButton = ({ filter, icon: Icon, label }: { 
     filter: 'all' | 'special';
-    icon: React.ElementType;
+    icon: ElementType;
     label: string;
   }) => (
     <button
@@ -88,13 +85,13 @@ export default function POS() {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-center">
-          <p className="text-xl font-semibold text-red-600 mb-2">Failed to load POS</p>
+          <p className="text-xl font-semibold text-red-600 mb-2">{t('errors.failed_load_pos')}</p>
           <p className="text-gray-600">{error}</p>
           <button 
             onClick={() => window.location.reload()}
             className="mt-4 px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700"
           >
-            Retry
+            {t('common.retry')}
           </button>
         </div>
       </div>
@@ -105,17 +102,6 @@ export default function POS() {
     return (
       <div className="flex-1 flex items-center justify-center">
         <Spinner message={t('common.loading_menu_items')} />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-lg font-medium text-red-600">{t('common.error_loading_menu_items')}</p>
-          <p className="text-sm text-gray-500 mt-2">{error}</p>
-        </div>
       </div>
     );
   }

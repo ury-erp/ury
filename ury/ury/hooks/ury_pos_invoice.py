@@ -1,4 +1,5 @@
 import frappe
+from frappe import _
 from datetime import datetime
 from frappe.utils import now_datetime, get_time,now
 
@@ -21,23 +22,24 @@ def before_submit(doc, method):
     ro_reload_submit(doc, method)
 
 
-def on_trash(doc, method):
+def free_table(doc, method):
     table_status_delete(doc, method)
 
 
 def validate_invoice(doc, method):
-    if doc.waiter == None or doc.waiter == "":
+    if doc.waiter is None or doc.waiter == "":
         doc.waiter = doc.modified_by
     remove_items = frappe.db.get_value("POS Profile", doc.pos_profile, "remove_items")
     
     if doc.invoice_printed == 1 and remove_items == 0:
-        # Get the original items from db
-        original_doc = frappe.get_doc("POS Invoice", doc.name)
-        
-        # Create dictionaries to store both quantities and names
+        # Get the original items from db (lightweight query — no full document load)
         original_items = {
-            item.item_code: {"qty": item.qty, "name": item.item_name} 
-            for item in original_doc.items
+            r.item_code: {"qty": r.qty, "name": r.item_name}
+            for r in frappe.db.get_all(
+                "POS Invoice Item",
+                filters={"parent": doc.name, "parenttype": "POS Invoice"},
+                fields=["item_code", "qty", "item_name"],
+            )
         }
         current_items = {
             item.item_code: {"qty": item.qty, "name": item.item_name} 
@@ -64,23 +66,19 @@ def validate_invoice(doc, method):
                     original_items[item_code]["name"] 
                     for item_code in removed_items
                 ]
-                error_msg.append(f"Removed items: {', '.join(removed_item_names)}")
+                error_msg.append(_("Removed items: {0}").format(', '.join(removed_item_names)))
             if reduced_qty_items:
-                error_msg.append(f"Modified quantities: {', '.join(reduced_qty_items)}")
+                error_msg.append(_("Modified quantities: {0}").format(', '.join(reduced_qty_items)))
                 
             frappe.throw(
-                ("Cannot modify items after invoice is printed.\n{0}")
+                _("Cannot modify items after invoice is printed.\n{0}")
                 .format("\n".join(error_msg))
             )
 
 
 def validate_customer(doc, method):
-    if doc.customer_name == None or doc.customer_name == "":
-        frappe.throw(
-            (" Failed to load data , Please Refresh the page ").format(
-                doc.customer_name
-            )
-        )
+    if doc.customer_name is None or doc.customer_name == "":
+        frappe.throw(_("Failed to load data. Please refresh the page."))
 
 
 def calculate_and_set_times(doc, method):
@@ -107,7 +105,7 @@ def validate_invoice_print(doc, method):
     # If the invoice is associated with a restaurant table and hasn't been printed
     if doc.restaurant_table and invoice_printed == 0:
         frappe.throw(
-            "Printing the invoice is mandatory before submitting. Please print the invoice."
+            _("Printing the invoice is mandatory before submitting. Please print the invoice.")
         )
 
 
@@ -121,17 +119,16 @@ def table_status_delete(doc, method):
 
 
 def pos_invoice_naming(doc, method):
-    pos_profile = frappe.get_doc("POS Profile", doc.pos_profile)
-    restaurant = pos_profile.restaurant
+    restaurant = frappe.db.get_value("POS Profile", doc.pos_profile, "restaurant")
 
     if not doc.restaurant_table:
-        doc.naming_series = frappe.db.get_value(
-            "URY Restaurant", restaurant, "invoice_series_prefix"
-        )
-        
         if doc.order_type == "Aggregators":
             doc.naming_series = frappe.db.get_value(
                 "URY Restaurant", restaurant, "aggregator_series_prefix"
+            )
+        else:
+            doc.naming_series = frappe.db.get_value(
+                "URY Restaurant", restaurant, "invoice_series_prefix"
             )
     
 
@@ -155,43 +152,32 @@ def ro_reload_submit(doc, method):
 
 
 def validate_price_list(doc, method):
-        
-    if doc.restaurant:
-        
-        if doc.restaurant_table:
-            room = frappe.db.get_value("URY Table", doc.restaurant_table, "restaurant_room")
-            menu_name = (
-                frappe.db.get_value("URY Restaurant", doc.restaurant, "active_menu")
-                if not frappe.db.get_value(
-                    "URY Restaurant", doc.restaurant, "room_wise_menu"
-                )
-                else frappe.db.get_value(
-                    "Menu for Room", {"parent": doc.restaurant, "room": room}, "menu"
-                )
-            )
-
-            doc.selling_price_list = frappe.db.get_value(
-                "Price List", dict(restaurant_menu=menu_name, enabled=1)
-            )
-        
+    if not doc.restaurant:
         if doc.order_type == "Aggregators":
-            price_list = frappe.db.get_value("Aggregator Settings",
+            price_list = frappe.db.get_value(
+                "Aggregator Settings",
                 {"customer": doc.customer, "parent": doc.branch, "parenttype": "Branch"},
                 "price_list",
-                )
-            
-            if not price_list:
-                frappe.throw(f"Price list for customer {doc.customer} in branch {doc.branch} not found in Aggregator Settings.")
-                
-            doc.selling_price_list = price_list
-            
-        else:
-            menu_name = frappe.db.get_value("URY Restaurant", doc.restaurant, "active_menu") 
-
-            doc.selling_price_list = frappe.db.get_value(
-                "Price List", dict(restaurant_menu=menu_name, enabled=1)
             )
-            
+            if not price_list:
+                frappe.throw(_("Price list for customer {0} in branch {1} not found in Aggregator Settings.").format(doc.customer, doc.branch))
+            doc.selling_price_list = price_list
+            return
+
+    menu_name = frappe.db.get_value("URY Restaurant", doc.restaurant, "active_menu")
+
+    if doc.restaurant_table:
+        room = frappe.db.get_value("URY Table", doc.restaurant_table, "restaurant_room")
+        room_wise_menu = frappe.db.get_value("URY Restaurant", doc.restaurant, "room_wise_menu")
+        if room_wise_menu:
+            menu_name = frappe.db.get_value(
+                "Menu for Room", {"parent": doc.restaurant, "room": room}, "menu"
+            )
+
+    doc.selling_price_list = frappe.db.get_value(
+        "Price List", dict(restaurant_menu=menu_name, enabled=1)
+    )
+
 
 def restrict_existing_order(doc, event):
     if doc.restaurant_table:
@@ -205,5 +191,5 @@ def restrict_existing_order(doc, event):
         )
         if invoice_exist:
             frappe.throw(
-                ("Table {0} has an existing invoice").format(doc.restaurant_table)
+                _("Table {0} has an existing invoice").format(doc.restaurant_table)
             )

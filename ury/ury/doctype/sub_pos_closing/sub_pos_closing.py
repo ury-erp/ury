@@ -1,19 +1,13 @@
 
 import frappe
 from frappe import _
-from frappe.utils import flt, get_datetime
-from datetime import datetime, timedelta
+from frappe.utils import now
 from frappe.model.document import Document
-import json
-import requests
-from datetime import datetime
 from ury.ury_pos.api import getBranch
-from frappe.utils import  get_datetime,now
 
 
 class SubPOSClosing(Document):
     def validate(self):
-        owner = None
         branch = frappe.db.get_value("POS Profile", self.pos_profile, "branch")
 
         draft_invoices = frappe.get_all(
@@ -22,7 +16,7 @@ class SubPOSClosing(Document):
             filters={"branch": branch, "status": "Draft", "docstatus": "0","cashier":self.user},
         )
         if draft_invoices:
-            frappe.throw("Submit/Delete Draft Invoices")
+            frappe.throw(_("Submit/Delete Draft Invoices"))
 
         date_time = now()
         if isinstance(date_time, str):
@@ -58,26 +52,26 @@ class SubPOSClosing(Document):
 
         multiple_cashier = frappe.db.get_value("POS Profile", self.pos_profile, "custom_enable_multiple_cashier")
         if multiple_cashier:
-            get_cashier = frappe.get_doc("POS Profile", self.pos_profile)
-            for user_details in get_cashier.applicable_for_users:
-                if user_details.custom_main_cashier:
-                    owner = user_details.user
-            if frappe.session.user == owner:
-                frappe.throw("The Main Cashier cannot close a Sub POS Closing entry.")
-        else:
-            pass
+            main_cashier_row = frappe.db.get_value(
+                "POS Profile User",
+                {"parent": self.pos_profile, "custom_main_cashier": 1},
+                "user",
+            )
+            if main_cashier_row and frappe.session.user == main_cashier_row:
+                frappe.throw(_("The Main Cashier cannot close a Sub POS Closing entry."))
+
     
     def on_submit(self):
-        opening_entry = frappe.get_doc("POS Opening Entry", self.pos_opening_entry)
-        opening_entry.custom_sub_pos_close = self.name
-        opening_entry.status = "Closed"
-        opening_entry.save()
+        frappe.db.set_value("POS Opening Entry", self.pos_opening_entry, {
+            "custom_sub_pos_close": self.name,
+            "status": "Closed",
+        })
     
     def on_cancel(self):
-        opening_entry = frappe.get_doc("POS Opening Entry", self.pos_opening_entry)
-        opening_entry.custom_sub_pos_close = self.name
-        opening_entry.status = "Open"
-        opening_entry.save()
+        frappe.db.set_value("POS Opening Entry", self.pos_opening_entry, {
+            "custom_sub_pos_close": None,
+            "status": "Open",
+        })
 
 
 @frappe.whitelist()
@@ -93,11 +87,12 @@ def get_cashiers(doctype, txt, searchfield, start, page_len, filters):
     cashiers_list = frappe.get_all(
         "POS Profile User", filters=filters, fields=["user"], as_list=1
     )
-    return [c for c in cashiers_list]
+    return cashiers_list
 
 
 @frappe.whitelist()
 def get_pos_invoices(start, end, pos_profile, user):
+    # Filter by date range in SQL instead of Python (M9)
     data = frappe.db.sql(
         """
         select
@@ -105,21 +100,75 @@ def get_pos_invoices(start, end, pos_profile, user):
         from
             `tabPOS Invoice`
         where
-            cashier = %s and docstatus = 1 and pos_profile = %s and ifnull(consolidated_invoice,'') = '' and status != "Consolidated"
+            cashier = %s and docstatus = 1 and pos_profile = %s
+            and ifnull(consolidated_invoice,'') = ''
+            and status != "Consolidated"
+            and timestamp(posting_date, posting_time) >= %s
+            and timestamp(posting_date, posting_time) <= %s
         """,
-        (user, pos_profile),
+        (user, pos_profile, start, end),
         as_dict=1,
     )
+    if not data:
+        return []
 
-    data = list(
-        filter(
-            lambda d: get_datetime(start)
-            <= get_datetime(d.timestamp)
-            <= get_datetime(end),
-            data,
-        )
+    invoice_names = [d.name for d in data]
+
+    # Batch-fetch child tables to avoid N+1 get_doc calls
+    items = frappe.db.get_all(
+        "POS Invoice Item",
+        filters={"parent": ("in", invoice_names)},
+        fields=["parent", "name", "item_code", "item_name", "qty", "rate",
+                "amount", "base_rate", "base_amount", "cost_center", "comment",
+                "discount_percentage", "discount_amount", "price_list_rate",
+                "net_rate", "net_amount", "item_group", "warehouse",
+                "stock_uom", "uom", "conversion_factor", "weight_uom",
+                "weight_per_unit", "total_weight", "is_free_item",
+                "custom_course"],
     )
-    # need to get taxes and payments so can't avoid get_doc
-    data = [frappe.get_doc("POS Invoice", d.name).as_dict() for d in data]
+    taxes = frappe.db.get_all(
+        "POS Invoice Taxes and Charges",
+        filters={"parent": ("in", invoice_names)},
+        fields=["parent", "name", "charge_type", "account_head", "description",
+                "rate", "tax_amount", "total", "base_total", "cost_center",
+                "included_in_print_rate", "included_in_paid_amount",
+                "doctype"],
+    )
+    payments = frappe.db.get_all(
+        "POS Invoice Payment",
+        filters={"parent": ("in", invoice_names)},
+        fields=["parent", "name", "mode_of_payment", "amount",
+                "base_amount", "type", "account", "reference_no",
+                "reference_date", "default"],
+    )
+
+    items_by_parent = {}
+    for row in items:
+        items_by_parent.setdefault(row.parent, []).append(row)
+    taxes_by_parent = {}
+    for row in taxes:
+        taxes_by_parent.setdefault(row.parent, []).append(row)
+    payments_by_parent = {}
+    for row in payments:
+        payments_by_parent.setdefault(row.parent, []).append(row)
+
+    # Batch-fetch all parent invoice fields in one query
+    parent_fields = ["name", "customer", "grand_total", "rounded_total", "net_total",
+                     "posting_date", "posting_time", "branch", "company", "currency",
+                     "restaurant_table", "pos_profile", "status", "docstatus",
+                     "order_type", "selling_price_list", "is_pos", "update_stock",
+                     "cashier", "waiter", "no_of_pax", "invoice_printed",
+                     "additional_discount_percentage", "discount_amount",
+                     "total_taxes_and_charges", "total_qty"]
+    data = frappe.get_all(
+        "POS Invoice",
+        filters={"name": ("in", invoice_names)},
+        fields=parent_fields,
+    )
+
+    for d in data:
+        d["items"] = items_by_parent.get(d.name, [])
+        d["taxes"] = taxes_by_parent.get(d.name, [])
+        d["payments"] = payments_by_parent.get(d.name, [])
 
     return data

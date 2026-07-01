@@ -17,12 +17,9 @@ export const useTableStore = defineStore("table", {
     previousOrderdItem: [],
     invoiceNo: "",
     takeAwayTable: 0,
-    alert: useAlert(),
     previousOrder: [],
     previousOrderdCustomer: "",
-    invoiceData: useInvoiceDataStore(),
     grandTotal: "",
-    notification: useNotifications(),
     selectedOption: "",
     isTakeAway: "",
     mobileNumber: "",
@@ -31,7 +28,6 @@ export const useTableStore = defineStore("table", {
     newTable: "",
     showTable: false,
     transferTable: [],
-    menu: useMenuStore(),
     tableMenu: [],
     activeDropdown: null,
     currentCaptain: null,
@@ -43,9 +39,7 @@ export const useTableStore = defineStore("table", {
     previousWaiter: null,
     newCaptain: "",
     invoicePrinted: "",
-    auth: useAuthStore(),
     call: frappe.call(),
-    customers: useCustomerStore(),
     db: frappe.db(),
     totalMinutes: null,
     invoiceNumber: null,
@@ -54,7 +48,6 @@ export const useTableStore = defineStore("table", {
     orderModified: null,
     menuName: null,
     rooms: [],
-    recentOrders: usetoggleRecentOrder()
   }),
   getters: {
     filteredTables(state) {
@@ -87,8 +80,9 @@ export const useTableStore = defineStore("table", {
   },
   actions: {
     fetchRoom() {
+      const invoiceData = useInvoiceDataStore();
       this.selectedOption = "Table";
-      if (this.invoiceData.multipleCashier) {
+      if (invoiceData.multipleCashier) {
         this.call.get("ury.ury_pos.api.getRoom").then((result) => {
           this.rooms = result.message;
           const selectedRoom = localStorage.getItem("selectedRoom");
@@ -101,12 +95,14 @@ export const useTableStore = defineStore("table", {
             this.handleRoomChange();
           }
 
+        }).catch(() => {
+          this.rooms = [];
         });
       } else {
         this.db
           .getDocList("URY Room", {
             fields: ["name", "branch"],
-            filters: [["branch", "like", this.invoiceData.branch]],
+            filters: [["branch", "like", invoiceData.branch]],
             limit: "*",
           })
           .then((docs) => {
@@ -123,7 +119,7 @@ export const useTableStore = defineStore("table", {
               this.db
                 .getDocList("URY Restaurant", {
                   fields: ["branch", "default_room"],
-                  filters: [["branch", "like", this.invoiceData.branch]],
+                  filters: [["branch", "like", invoiceData.branch]],
                 })
                 .then((docs) => {
                   let room = docs.find((room) => room.default_room);
@@ -138,10 +134,11 @@ export const useTableStore = defineStore("table", {
       }
     },
     async handleRoomChange() {
+      const invoiceData = useInvoiceDataStore();
       localStorage.setItem("selectedRoom", this.selectedRoom);
       await this.fetchTable();
       await this.getMenu();
-      if (this.invoiceData.multipleCashier) {
+      if (invoiceData.multipleCashier) {
         this.getCashier()
       }
     },
@@ -151,6 +148,8 @@ export const useTableStore = defineStore("table", {
       };
       this.call.get("ury.ury_pos.api.getCashier", getCashier).then((result) => {
         this.cashier = result.message
+      }).catch(() => {
+        this.cashier = null;
       });
     },
     fetchTable() {
@@ -178,12 +177,17 @@ export const useTableStore = defineStore("table", {
               sensitivity: "base",
             });
           });
+        }).catch(() => {
+          this.tables = [];
         });
     },
     async getMenu() {
+      const invoiceData = useInvoiceDataStore();
+      const menu = useMenuStore();
+      const alert = useAlert();
       const getMenuIem = {
         room: this.selectedRoom,
-        pos_profile: this.invoiceData.posProfile,
+        pos_profile: invoiceData.posProfile,
       };
       try {
         await this.call
@@ -192,13 +196,13 @@ export const useTableStore = defineStore("table", {
             this.tableMenu = result.message.items;
             this.menuName = result.message.name;
             this.orderModified = result.message.modified;
-            this.menu.fetchItems();
+            menu.fetchItems();
           });
       } catch (error) {
         if (error._server_messages) {
           const messages = JSON.parse(error._server_messages);
           const message = JSON.parse(messages[0])
-          this.alert.createAlert("Message", message.message, "OK");
+          alert.createAlert("Message", message.message, "OK");
         }
       }
     },
@@ -273,6 +277,7 @@ export const useTableStore = defineStore("table", {
       return formattedTimeDifference;
     },
     getBadgeType(table) {
+      const invoiceData = useInvoiceDataStore();
       if (table.occupied != 1 && table.name !== this.selectedTable) {
         return "green";
       } else if (table.name === this.selectedTable) {
@@ -281,7 +286,7 @@ export const useTableStore = defineStore("table", {
         const timeDifference = this.getTimeDifference(table);
         const [hours, minutes] = timeDifference.split(":");
         const totalMinutes = parseInt(hours) * 60 + parseInt(minutes);
-        if (totalMinutes > this.invoiceData.tableAttention) {
+        if (totalMinutes > invoiceData.tableAttention) {
           return "red";
         } else {
           return "yellow";
@@ -289,6 +294,7 @@ export const useTableStore = defineStore("table", {
       }
     },
     getBadgeText(table) {
+      const invoiceData = useInvoiceDataStore();
       if (table.occupied != 1 && table.name !== this.selectedTable) {
         return "Free";
       } else if (table.name === this.selectedTable) {
@@ -297,7 +303,7 @@ export const useTableStore = defineStore("table", {
         const timeDifference = this.getTimeDifference(table);
         const [hours, minutes] = timeDifference.split(":");
         const totalMinutes = parseInt(hours) * 60 + parseInt(minutes);
-        if (totalMinutes > this.invoiceData.tableAttention) {
+        if (totalMinutes > invoiceData.tableAttention) {
           return "Attention";
         } else {
           return "Occupied";
@@ -305,6 +311,12 @@ export const useTableStore = defineStore("table", {
       }
     },
     async addToSelectedTables(table) {
+      const recentOrders = usetoggleRecentOrder();
+      const menu = useMenuStore();
+      const auth = useAuthStore();
+      const alert = useAlert();
+      const notification = useNotifications();
+      const customers = useCustomerStore();
       this.selectedTable = table.name;
       this.takeAwayTable = 0;
 
@@ -314,14 +326,14 @@ export const useTableStore = defineStore("table", {
       }
       let previousOrderdNumberOfPax = "";
       this.previousOrderdItem = [];
-      this.recentOrders.modifiedTime = ""
-      this.recentOrders.pastOrderdItem = []
+      recentOrders.modifiedTime = ""
+      recentOrders.pastOrderdItem = []
       this.invoiceNo = "";
       let items = this.tableMenu;
       items.forEach((item) => {
         item.qty = "";
       });
-      let cart = this.menu.cart;
+      let cart = menu.cart;
       cart.splice(0, cart.length);
       const getPreviousOrder = {
         table: this.selectedTable,
@@ -334,7 +346,7 @@ export const useTableStore = defineStore("table", {
         .then((result) => {
           this.previousOrder = result.message;
           this.invoicePrinted = this.previousOrder.invoice_printed;
-          this.menu.comments = this.previousOrder.custom_comments;
+          menu.comments = this.previousOrder.custom_comments;
           this.modifiedTime = this.previousOrder.modified;
           this.grandTotal = this.previousOrder.grand_total;
           this.mobileNumber = this.previousOrder.mobile_number;
@@ -342,23 +354,21 @@ export const useTableStore = defineStore("table", {
           this.previousWaiter = this.previousOrder.waiter;
           if (this.invoiceNo) {
             if (
-              !this.auth.hasAccess &&
-              !this.auth.cashier &&
-              this.auth.sessionUser !== this.previousOrder.waiter
+              !auth.hasAccess &&
+              !auth.cashier &&
+              auth.sessionUser !== this.previousOrder.waiter
             ) {
-              this.alert
+              alert
                 .createAlert(
                   "Message",
                   "Table is assigned to " + this.previousOrder.waiter,
                   "OK"
                 )
                 .then(() => {
-                  router.push("/Table").then(() => {
-                    window.location.reload();
-                  });
+                  router.push("/Table").catch(() => {});
                 });
             } else {
-              this.notification.createNotification("Past Order Fetched");
+              notification.createNotification("Past Order Fetched");
             }
           } else {
             router.push("/Menu");
@@ -367,14 +377,14 @@ export const useTableStore = defineStore("table", {
           this.previousOrderdCustomer = this.previousOrder.customer;
           previousOrderdNumberOfPax = this.previousOrder.no_of_pax;
           if (this.previousOrderdCustomer) {
-            this.customers.search = this.previousOrderdCustomer;
-            this.customers.numberOfPax = previousOrderdNumberOfPax;
-            this.customers.fectchCustomerFavouriteItem();
+            customers.search = this.previousOrderdCustomer;
+            customers.numberOfPax = previousOrderdNumberOfPax;
+            customers.fectchCustomerFavouriteItem();
           } else {
-            this.customers.search = "";
-            this.customers.numberOfPax = "";
-            this.customers.customerFavouriteItems = "";
-            this.customers.newCustomerMobileNo = ""
+            customers.search = "";
+            customers.numberOfPax = "";
+            customers.customerFavouriteItems = [];
+            customers.newCustomerMobileNo = ""
           }
 
           items.forEach((item) => {
@@ -437,6 +447,7 @@ export const useTableStore = defineStore("table", {
       }
     },
     tableTransfer: async function () {
+      const alert = useAlert();
       await this.invoiceNumberFetching();
       const transferTable = {
         table: this.tableName,
@@ -449,18 +460,20 @@ export const useTableStore = defineStore("table", {
           transferTable
         )
         .then(() => {
-          window.location.reload();
+          router.push("/Table").catch(() => {});
         })
         .catch((error) => {
           if (error._server_messages) {
             this.newTable = "";
             const messages = JSON.parse(error._server_messages);
             const message = JSON.parse(messages[0]);
-            this.alert.createAlert("Message", message.message, "OK");
+            alert.createAlert("Message", message.message, "OK");
           }
         });
     },
     captianTransfer: async function () {
+      const notification = useNotifications();
+      const alert = useAlert();
       await this.invoiceNumberFetching();
       if (this.invoiceNumber) {
         const transferCaptain = {
@@ -474,16 +487,16 @@ export const useTableStore = defineStore("table", {
             transferCaptain
           )
           .then(() =>
-            this.notification.createNotification(
+            notification.createNotification(
               "Captain Transferred Successfully"
             )
           )
-          .then(() => window.location.reload())
+          .then(() => router.push("/Table").catch(() => {}))
           .catch((error) => {
             if (error._server_messages) {
               const messages = JSON.parse(error._server_messages);
               const message = JSON.parse(messages[0]);
-              this.alert.createAlert("Message", message.message, "OK");
+              alert.createAlert("Message", message.message, "OK");
             }
           });
       }

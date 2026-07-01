@@ -1,22 +1,26 @@
 <template>
   <div>
-	<h1>Home Page</h1>
-	<!-- Fetch the resource on click -->
-	<button @click="$resources.ping.fetch()">Ping</button>
+    <Header @refresh="handleRefresh" />
+    <KOT ref="kotRef" />
   </div>
 </template>
 
 <script>
+import KOT from "../components/kot.vue";
+import Header from "../components/Header.vue";
+
 export default {
-  resources: {
-	ping() {
-	  return {
-		method: "frappe.ping", // Method to call on backend
-		onSuccess(d) {
-		  alert(d);
-		},
-	  };
-	},
+  name: "Home",
+  components: {
+    KOT,
+    Header,
+  },
+  methods: {
+    handleRefresh() {
+      if (this.$refs.kotRef && typeof this.$refs.kotRef.fetchKOT === 'function') {
+        this.$refs.kotRef.fetchKOT().catch(() => {});
+      }
+    },
   },
 };
 </script>

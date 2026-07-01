@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, Percent, Coins } from 'lucide-react';
 import { usePOSStore } from '../store/pos-store';
 import { cn, formatCurrency } from '../lib/utils';
@@ -6,6 +6,8 @@ import { Button, Input, Dialog, DialogContent } from './ui';
 import { call } from '../lib/frappe-sdk';
 import { DEFAULT_PAYMENT_MODE } from '../data/order-types';
 import { t } from '../i18n';
+import { showToast } from './ui/toast';
+import { getErrorMessage } from '../lib/error-utils';
 
 
 interface PaymentDialogProps {
@@ -42,6 +44,11 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   const [discountValue, setDiscountValue] = useState<string>('');
   const [appliedDiscount, setAppliedDiscount] = useState<number>(0);
   const [paymentInputs, setPaymentInputs] = useState<{ [mode: string]: string }>({});
+  const userEditedRef = useRef(false);
+
+  useEffect(() => {
+    userEditedRef.current = false;
+  }, []);
 
   useEffect(() => {
     fetchPaymentModes();
@@ -49,13 +56,12 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
 
   // Calculate split payment total
   const payments = paymentModes
-    .map((mode: any) => {
-      const id = typeof mode === 'string' ? mode : mode.id;
-      const amount = parseFloat(paymentInputs[id] || '');
-      return amount > 0 ? { mode_of_payment: id, amount } : null;
+    .map((mode: string) => {
+      const amount = parseFloat(paymentInputs[mode] || '');
+      return amount > 0 ? { mode_of_payment: mode, amount } : null;
     })
-    .filter(Boolean);
-  const paymentsTotal = payments.reduce((sum, p: any) => sum + p.amount, 0);
+    .filter(Boolean) as Array<{ mode_of_payment: string; amount: number }>;
+  const paymentsTotal = payments.reduce((sum, p) => sum + p.amount, 0);
 
   const handleApplyDiscount = () => {
     const value = parseFloat(discountValue);
@@ -86,6 +92,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   const showFinalAdjustment = Math.abs(roundedFinalAdjustment) > 0.001;
 
   useEffect(()=>{
+    if (userEditedRef.current) return;
     const defaultPaymentModePresent=paymentModes.find((mode)=>mode===DEFAULT_PAYMENT_MODE)
     //only one payment mode should be present, then autofill the final amount, if not do not fill
     const otherPaymentModesNotEntered=Object.keys(paymentInputs).length<=1;
@@ -123,7 +130,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
     setError(null);
     try {
       await call.post('ury.ury.doctype.ury_order.ury_order.make_invoice', {
-        additionalDiscount: discountValue ? parseInt(discountValue) : null,
+        additionalDiscount: discountValue ? parseFloat(discountValue) : null,
         cashier,
         customer,
         invoice,
@@ -132,15 +139,12 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
         pos_profile: posProfile,
         table,
       });
-      // Show toast and reload orders (assume showToast and reload available globally)
-      if (typeof window !== 'undefined' && (window as any).showToast) {
-        (window as any).showToast.success('Payment successful');
-      }
+      showToast.success(t('success.payment_successful'));
       onClose();
       clearSelectedOrder();
       await fetchOrders();
     } catch (err) {
-      setError((err as Error).message);
+      setError(getErrorMessage(err));
     } finally {
       setIsProcessing(false);
     }
@@ -194,18 +198,17 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
           <div className="space-y-4 mb-6">
             <h3 className="text-lg font-semibold">{t('payment.payment_methods')}</h3>
             <div className="grid grid-cols-1 gap-3">
-              {paymentModes.map((mode: any) => {
-                const id = typeof mode === 'string' ? mode : mode.id;
+              {paymentModes.map((mode: string) => {
                 return (
-                  <div key={id} className="flex items-center gap-3">
-                    <span className="w-24 font-medium">{typeof mode === 'string' ? mode : mode.name}</span>
+                  <div key={mode} className="flex items-center gap-3">
+                    <span className="w-24 font-medium">{mode}</span>
                     <Input
                       type="number"
                       min="0"
                       step="0.01"
-                      value={paymentInputs[id] || ''}
-                      onChange={e => setPaymentInputs(inputs => ({ ...inputs, [id]: e.target.value }))}
-                      onFocus={() => handlePaymentInputFocus(id)}
+                      value={paymentInputs[mode] || ''}
+                      onChange={e => { userEditedRef.current = true; setPaymentInputs(inputs => ({ ...inputs, [mode]: e.target.value })); }}
+                      onFocus={() => handlePaymentInputFocus(mode)}
                       placeholder={t('payment.amount_placeholder')}
                       className="flex-1"
                       size="sm"
@@ -275,8 +278,8 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
           {/* Payment Button */}
           <Button
             onClick={handlePayment}
-            disabled={isProcessing || payments.length === 0}
-            variant={isProcessing || payments.length === 0 ? "secondary" : "default"}
+            disabled={isProcessing || payments.length === 0 || paymentsTotal < finalTotal}
+            variant={isProcessing || payments.length === 0 || paymentsTotal < finalTotal ? "secondary" : "default"}
             className="w-full"
           >
             {isProcessing ? t('payment.processing') : t('payment.pay_button', { amount: formatCurrency(paymentsTotal > 0 ? paymentsTotal : finalTotal) })}

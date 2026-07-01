@@ -13,9 +13,12 @@
         },
       ]"
     >
-      <router-link
-        :to="invoiceData.invoiceUpdating ? '#' : '/Table'"
-        class="group inline-flex flex-col items-center justify-center border-x border-gray-200 px-5 hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800"
+      <a
+        href="#"
+        :class="[
+          'group inline-flex flex-col items-center justify-center border-x border-gray-200 px-5 hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800',
+        ]"
+        @click.prevent="navigateTo('/Table')"
       >
         <svg
           class="h-6 w-6"
@@ -45,12 +48,12 @@
           ]"
           >Table</span
         >
-      </router-link>
+      </a>
 
-      <router-link
-        :to="invoiceData.invoiceUpdating ? '#' : '/Menu'"
+      <a
+        href="#"
         class="group inline-flex flex-col items-center justify-center border-r border-gray-200 px-5 hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800"
-        @click="this.tabClick.clickMenuTab()"
+        @click.prevent="handleMenuTab"
       >
         <svg
           class="h-6 w-6"
@@ -81,12 +84,13 @@
             },
           ]"
           >Menu</span
-        ></router-link
-      >
-      <router-link
-        :to="invoiceData.invoiceUpdating ? '#' : '/Customer'"
+        >
+      </a>
+
+      <a
+        href="#"
         class="group inline-flex flex-col items-center justify-center px-5 hover:bg-gray-50 dark:hover:bg-gray-800"
-        @click="!this.auth.cashier && this.tabClick.checkActiveTable()"
+        @click.prevent="handleCustomerTab"
       >
         <svg
           class="h-6 w-6"
@@ -117,12 +121,12 @@
             },
           ]"
           >Customer</span
-        ></router-link
-      >
-      <router-link
-        to="/Cart"
+        >
+      </a>
+      <a
+        href="#"
         class="group inline-flex flex-col items-center justify-center border-x border-gray-200 px-5 hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800"
-        @click="!this.auth.cashier && this.tabClick.checkActiveTable()"
+        @click.prevent="handleCartTab"
       >
         <svg
           aria-hidden="true"
@@ -152,11 +156,12 @@
           ]"
           >Cart</span
         >
-      </router-link>
-      <router-link
-        :to="invoiceData.invoiceUpdating ? '#' : '/recentOrder'"
+      </a>
+      <a
+        href="#"
         v-if="this.auth.cashier"
         class="group inline-flex flex-col items-center justify-center border-x border-gray-200 px-5 hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800"
+        @click.prevent="navigateTo('/recentOrder')"
       >
         <svg
           class="h-5 w-5"
@@ -189,7 +194,7 @@
           ]"
           >OrderLog</span
         >
-      </router-link>
+      </a>
     </div>
   </div>
 </template>
@@ -198,13 +203,42 @@
 import { useAuthStore } from "@/stores/Auth.js";
 import { tabFunctions } from "@/stores/bottomTabs.js";
 import { useInvoiceDataStore } from "@/stores/invoiceData.js";
+import router from "@/router";
 export default {
   name: "Bottom Tabs",
   setup() {
     const auth = useAuthStore();
     const invoiceData = useInvoiceDataStore();
     const tabClick = tabFunctions();
-    return { auth, tabClick, invoiceData };
+
+    const navigateTo = (path) => {
+      if (invoiceData.invoiceUpdating) return;
+      router.push(path);
+    };
+
+    const handleMenuTab = () => {
+      if (invoiceData.invoiceUpdating) return;
+      if (tabClick.clickMenuTab()) {
+        router.push('/Menu');
+      }
+    };
+
+    const handleCustomerTab = () => {
+      if (invoiceData.invoiceUpdating) return;
+      if (!auth.cashier && !tabClick.checkActiveTable()) {
+        return;
+      }
+      router.push('/Customer');
+    };
+
+    const handleCartTab = () => {
+      if (!auth.cashier && !tabClick.checkActiveTable()) {
+        return;
+      }
+      router.push('/Cart');
+    };
+
+    return { auth, tabClick, invoiceData, navigateTo, handleMenuTab, handleCustomerTab, handleCartTab };
   },
 };
 </script>

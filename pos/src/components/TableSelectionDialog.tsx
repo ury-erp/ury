@@ -92,15 +92,11 @@ const TableSelectionDialog: React.FC<Props> = ({ onClose }) => {
     fetchTables();
   }, [selectedRoom]);
 
-  // Clear cache when modal closes
-  useEffect(() => {
-    if (!selectedRoom) {
-      setTablesCache({});
-    }
-  }, [onClose]);
-
   return (
-    <Dialog open onOpenChange={onClose}>
+    <Dialog open onOpenChange={(open) => {
+      if (!open) setTablesCache({});
+      onClose();
+    }}>
       <DialogContent className="bg-white rounded-lg w-full h-5/6 max-w-2xl mx-auto p-0 overflow-y-auto">
         <div className="p-4 border-b border-gray-200 flex justify-between items-center">
           <h2 className="text-lg font-semibold text-gray-900">{t('common.select_table_title')}</h2>

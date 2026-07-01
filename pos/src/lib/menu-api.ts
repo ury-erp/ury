@@ -1,4 +1,5 @@
-import { call } from './frappe-sdk-retry';
+import { call } from './frappe-sdk';
+import { getErrorMessage } from './error-utils';
 
 export interface MenuItem {
   item: string;
@@ -35,13 +36,8 @@ export const getRestaurantMenu = async (posProfile: string, room: string | null,
       }
     );
     return response.message.items;
-  } catch (error: any) {
-    if (error._server_messages) {
-      const messages = JSON.parse(error._server_messages);
-      const message = JSON.parse(messages[0]);
-      throw new Error(message.message);
-    }
-    throw error;
+  } catch (error) {
+    throw new Error(`Failed to fetch menu: ${getErrorMessage(error)}`);
   }
 };
 
@@ -54,12 +50,7 @@ export const getAggregatorMenu = async (aggregator: string) => {
       }
     );
     return response.message;
-  } catch (error: any) {
-    if (error._server_messages) {
-      const messages = JSON.parse(error._server_messages);
-      const message = JSON.parse(messages[0]);
-      throw new Error(message.message);
-    }
-    throw error;
+  } catch (error) {
+    throw new Error(`Failed to fetch aggregator menu: ${getErrorMessage(error)}`);
   }
-}; 
+};

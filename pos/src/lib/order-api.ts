@@ -1,4 +1,5 @@
-import { call } from './frappe-sdk-retry';
+import { call } from './frappe-sdk';
+import { getErrorMessage } from './error-utils';
 
 export interface POSInvoiceItem {
   name: string;
@@ -44,15 +45,13 @@ export interface TableOrder {
  * @returns The order details and customer information if an active order exists
  */
 export async function getTableOrder(table_no: string): Promise<TableOrder> {
-  const { call } = await import('./frappe-sdk');
   try {
     const res = await call.get('ury.ury.doctype.ury_order.ury_order.get_order_invoice', { 
       table: table_no
     });
     return res as TableOrder;
   } catch (error) {
-    console.error('Error fetching table order:', error);
-    return { message: null };
+    throw error;
   }
 } 
 
@@ -81,5 +80,9 @@ export interface SyncOrderRequest {
 }
 
 export const syncOrder = async (data: SyncOrderRequest) => {
-  return call.post( 'ury.ury.doctype.ury_order.ury_order.sync_order',data);
+  try {
+    return await call.post('ury.ury.doctype.ury_order.ury_order.sync_order', data);
+  } catch (error) {
+    throw new Error(`Failed to sync order: ${getErrorMessage(error)}`);
+  }
 }; 

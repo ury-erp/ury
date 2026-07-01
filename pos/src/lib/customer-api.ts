@@ -1,6 +1,6 @@
 import { DOCTYPES } from '../data/doctypes';
-import { call } from './frappe-sdk-retry';
-import { db } from './frappe-sdk';
+import { db, call } from './frappe-sdk';
+import { getErrorMessage } from './error-utils';
 
 export interface Customer {
   name: string;
@@ -24,11 +24,11 @@ export interface Customer {
   is_frozen: number;
   disabled: number;
   doctype: string;
-  companies: any[];
-  credit_limits: any[];
-  accounts: any[];
-  sales_team: any[];
-  portal_users: any[];
+  companies: Record<string, unknown>[];
+  credit_limits: Record<string, unknown>[];
+  accounts: Record<string, unknown>[];
+  sales_team: Record<string, unknown>[];
+  portal_users: Record<string, unknown>[];
 }
 
 export interface CreateCustomerData {
@@ -45,27 +45,35 @@ export interface CreateCustomerResponse {
 
 
 export async function getCustomerGroups() {
-  const groups = await db.getDocList(DOCTYPES.CUSTOMER_GROUP, {
-    fields: ['name'],
-    limit: "*" as unknown as number,
-    orderBy: {
-      field: 'name',
-      order: 'asc',
-    },
-  });
-  return groups;
+  try {
+    const groups = await db.getDocList(DOCTYPES.CUSTOMER_GROUP, {
+      fields: ['name'],
+      limit: "*" as unknown as number,
+      orderBy: {
+        field: 'name',
+        order: 'asc',
+      },
+    });
+    return groups;
+  } catch (error) {
+    throw new Error(`Failed to fetch customer groups: ${getErrorMessage(error)}`);
+  }
 }
 
 export async function getCustomerTerritories() {
-  const territories = await db.getDocList(DOCTYPES.CUSTOMER_TERRITORY, {
-    fields: ['name'],
-    limit: "*" as unknown as number,
-    orderBy: {
-      field: 'name',
-      order: 'asc',
-    },
-  });
-  return territories;
+  try {
+    const territories = await db.getDocList(DOCTYPES.CUSTOMER_TERRITORY, {
+      fields: ['name'],
+      limit: "*" as unknown as number,
+      orderBy: {
+        field: 'name',
+        order: 'asc',
+      },
+    });
+    return territories;
+  } catch (error) {
+    throw new Error(`Failed to fetch customer territories: ${getErrorMessage(error)}`);
+  }
 }
 
 export async function addCustomer(
@@ -75,7 +83,7 @@ export async function addCustomer(
     const response = await call.post('ury.ury_pos.api.create_customer', customerData);
     const msg = response.message;
     if (!msg || msg.status !== "success") {
-      throw new Error("Failed to create Customer,API Response error");
+      throw new Error("Failed to create Customer. API response error");
     }
     return {
       data: {
@@ -87,8 +95,7 @@ export async function addCustomer(
     };
 
   } catch (error) {
-    console.error('Error creating customer:', error);
-    throw error;
+    throw new Error(`Failed to create customer: ${getErrorMessage(error)}`);
   }
 }
 
@@ -113,12 +120,11 @@ export async function searchCustomers(search: string, limit = 5) {
       limit_start: 0,
     });
 
-    return res.map((doc: any) => ({
+    return res.map((doc: { name: string; customer_name?: string; mobile_number?: string }) => ({
       ...doc,
       content: `Customer Name : ${doc.customer_name ?? ""} | Mobile Number : ${doc.mobile_number ?? ""}`,
     }));
   } catch (error) {
-    console.error("Customer search error:", error);
-    throw error;
+    throw new Error(`Customer search failed: ${getErrorMessage(error)}`);
   }
 }

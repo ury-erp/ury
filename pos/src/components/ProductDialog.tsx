@@ -19,6 +19,24 @@ interface Addon {
   category: 'sides' | 'drinks' | 'desserts';
 }
 
+interface FrappeItemChildEntry {
+  item: string;
+  name?: string;
+  parent?: string;
+  parentfield?: string;
+  parenttype?: string;
+}
+
+interface FrappeItemDoc {
+  name: string;
+  item_name: string;
+  image?: string;
+  item: string;
+  custom_pos_add_on_items?: FrappeItemChildEntry[];
+  custom_pos_item_variants?: FrappeItemChildEntry[];
+  [key: string]: unknown;
+}
+
 interface ProductDialogProps {
   onClose: () => void;
   editMode?: boolean;
@@ -57,38 +75,60 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
   ) : null;
 
   // State for the full item doc (used for all dialog content)
-  const [itemDoc, setItemDoc] = useState<any | null>(null);
+  const [itemDoc, setItemDoc] = useState<FrappeItemDoc | null>(null);
   const [isItemLoading, setIsItemLoading] = useState(false);
   const [itemError, setItemError] = useState<string | null>(null);
 
-  // Fetch Item doc when dialog opens or selectedItem changes
+  // Fetch Item doc once when dialog opens or selectedItem changes
+  // (previously two separate useEffects fetching the same doc)
+  const [addonItemCodes, setAddonItemCodes] = useState<string[]>([]);
+  const [isAddonLoading, setIsAddonLoading] = useState(false);
+  const [addonError, setAddonError] = useState<string | null>(null);
+  const [imgError, setImgError] = useState(false);
+
   useEffect(() => {
     if (!selectedItem) {
       setItemDoc(null);
       setItemError(null);
       setIsItemLoading(false);
+      setAddonItemCodes([]);
+      setAddonError(null);
+      setIsAddonLoading(false);
       return;
     }
     setIsItemLoading(true);
+    setIsAddonLoading(true);
     setItemError(null);
+    setAddonError(null);
     db.getDoc('Item', selectedItem.item)
-      .then((doc: any) => {
+      .then((doc: FrappeItemDoc) => {
         setItemDoc(doc);
+        // Extract addon codes from the same response
+        if (Array.isArray(doc.custom_pos_add_on_items)) {
+          const codes = doc.custom_pos_add_on_items
+            .map((entry) => entry.item)
+            .filter(Boolean);
+          setAddonItemCodes(codes);
+        } else {
+          setAddonItemCodes([]);
+        }
       })
       .catch(() => {
-        setItemError('Failed to fetch item details');
+        setItemError(t('errors.failed_fetch_item_details'));
         setItemDoc(null);
+        setAddonError(t('errors.failed_fetch_addons'));
+        setAddonItemCodes([]);
       })
       .finally(() => {
         setIsItemLoading(false);
+        setIsAddonLoading(false);
       });
   }, [selectedItem]);
 
-  
   const addonDetails = Array.isArray(itemDoc?.custom_pos_add_on_items)
     ? itemDoc.custom_pos_add_on_items
-        .map((entry: any) => {
-          const menuAddon = menuItems.find((menuItem: any) => menuItem.item === entry.item);
+        .map((entry: FrappeItemChildEntry) => {
+          const menuAddon = menuItems.find((menuItem) => menuItem.item === entry.item);
           return menuAddon
             ? {
                 id: menuAddon.item,
@@ -106,8 +146,8 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
 
   const variantDetails = Array.isArray(itemDoc?.custom_pos_item_variants)
     ? itemDoc.custom_pos_item_variants
-        .map((entry: any) => {
-          const menuVariant = menuItems.find((menuItem: any) => menuItem.item === entry.item);
+        .map((entry: FrappeItemChildEntry) => {
+          const menuVariant = menuItems.find((menuItem) => menuItem.item === entry.item);
           return menuVariant
             ? {
                 id: menuVariant.item,
@@ -128,39 +168,6 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
   const [comments, setComments] = useState<string>(itemToReplace?.comment || existingCartItem?.comment || '');
   const dialogRef = useRef<HTMLDivElement>(null);
 
-  const [addonItemCodes, setAddonItemCodes] = useState<string[]>([]);
-  const [isAddonLoading, setIsAddonLoading] = useState(false);
-  const [addonError, setAddonError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!selectedItem) {
-      setAddonItemCodes([]);
-      setAddonError(null);
-      setIsAddonLoading(false);
-      return;
-    }
-    setIsAddonLoading(true);
-    setAddonError(null);
-    db.getDoc('Item', selectedItem.item)
-      .then((doc: any) => {
-        if (Array.isArray(doc.custom_pos_add_on_items)) {
-          const codes = doc.custom_pos_add_on_items
-            .map((entry: any) => entry.item)
-            .filter(Boolean);
-          setAddonItemCodes(codes);
-        } else {
-          setAddonItemCodes([]);
-        }
-      })
-      .catch((err: any) => {
-        setAddonError('Failed to fetch add-ons');
-        setAddonItemCodes([]);
-      })
-      .finally(() => {
-        setIsAddonLoading(false);
-      });
-  }, [selectedItem]);
-
   // Initialize quantity and comments from cart if not in edit mode
   useEffect(() => {
     if (!editMode && selectedItem) {
@@ -178,7 +185,8 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dialogRef.current && !dialogRef.current.contains(event.target as Node)) {
-        handleClose();
+        setSelectedItem(null);
+        onClose();
       }
     };
 
@@ -186,13 +194,14 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, []);
+  }, [onClose]);
 
   // Handle escape key to close dialog
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        handleClose();
+        setSelectedItem(null);
+        onClose();
       }
     };
 
@@ -200,7 +209,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
     return () => {
       document.removeEventListener('keydown', handleEscape);
     };
-  }, []);
+  }, [onClose]);
 
   if (!selectedItem) return null;
 
@@ -301,7 +310,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
 
   // Handler to switch to a variant item
   const handleVariantClick = (variantId: string) => {
-    const menuVariant = menuItems.find((m: any) => m.item === variantId);
+    const menuVariant = menuItems.find((m) => m.item === variantId);
     if (menuVariant) {
       setSelectedItem(menuVariant);
     }
@@ -317,27 +326,16 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
       >
         {/* Left Column - Image  */}
         <div className="md:w-1/3 relative">
-          {itemDoc?.image ? (
+          {itemDoc?.image && !imgError ? (
             <img
               src={itemDoc.image}
               alt={itemDoc.name}
-              className="w-full min-h-96 h-full object-cover rounded-t-lg md:rounded-l-lg md:rounded-tr-none filter saturate-75 brightness-95"
-              style={{ filter: 'saturate(0.7) brightness(0.95)' }}
-              onError={(e) => {
-                const target = e.target as HTMLImageElement;
-                target.style.display = 'none';
-                const parent = target.parentElement;
-                if (parent) {
-                  const placeholder = document.createElement('div');
-                  placeholder.className = 'w-full h-96 bg-gray-200 flex items-center justify-center text-[8rem] text-gray-400 font-medium rounded-t-lg md:rounded-l-lg md:rounded-tr-none';
-                  placeholder.textContent = itemDoc.name.slice(0, 2).toUpperCase();
-                  parent.insertBefore(placeholder, target);
-                }
-              }}
+              className="w-full min-h-96 h-full object-cover rounded-t-lg md:rounded-l-lg md:rounded-tr-none"
+              onError={() => setImgError(true)}
             />
           ) : (
             <div className="w-full min-h-96 h-full bg-gray-200 flex items-center justify-center text-[8rem] text-gray-400 font-medium rounded-t-lg md:rounded-l-lg md:rounded-tr-none">
-              {itemDoc?.name.slice(0, 2).toUpperCase()}
+              {itemDoc?.name?.slice(0, 2)?.toUpperCase() || ''}
             </div>
           )}
           <Button
@@ -415,8 +413,8 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
             <div className="mt-6">
               <h3 className="text-lg font-semibold mb-3">{t('product_dialog.variants')}</h3>
               <div className="flex gap-2 flex-wrap">
-                {variantDetails.map((variant: any) => {
-                  const menuVariant = menuItems.find((m: any) => m.item === variant.id);
+                {variantDetails.map((variant) => {
+                  const menuVariant = menuItems.find((m) => m.item === variant.id);
                   return (
                     <button
                       key={variant.id}
@@ -450,7 +448,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
               <div className="mb-6">
                 <h3 className="text-lg font-semibold mb-3">{t('product_dialog.addons')}</h3>
                 <div className="space-y-2">
-                  {addonDetails.map((addon: any) => (
+                  {addonDetails.map((addon) => (
                     <button
                       key={addon.id}
                       onClick={() => handleAddonToggle({ id: addon.id, name: addon.name, price: Number(addon.price) })}

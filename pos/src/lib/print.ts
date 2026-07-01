@@ -15,17 +15,24 @@ interface PrintOrderParams {
 export async function printOrder({ orderId, posProfile }: PrintOrderParams): Promise<'qz' | 'network' | 'socket'> {
   const { print_type, qz_host, print_format, printer, name, cashier, multiple_cashier } = posProfile;
 
+  if (!print_format) {
+    throw new Error('Print format is not configured in POS Profile');
+  }
+
   if (print_type === 'qz') {
     if (!qz_host) {
       throw new Error('QZ host is not set');
     }
-    const html = await getInvoicePrintHtml(orderId, print_format as string);
+    const html = await getInvoicePrintHtml(orderId, print_format);
     await printWithQz(qz_host, html);
     await updatePrintStatus(orderId);
     return 'qz';
   } else if (print_type === 'network') {
     if (cashier && !multiple_cashier) {
-      await networkPrint(orderId, printer as string, print_format as string);
+      if (!printer) {
+        throw new Error('Printer is not configured in POS Profile');
+      }
+      await networkPrint(orderId, printer, print_format);
     } else {
       await selectNetworkPrinter(orderId, name, print_format);
     }
@@ -33,7 +40,7 @@ export async function printOrder({ orderId, posProfile }: PrintOrderParams): Pro
     return 'network';
   } else {
     // Redirect to printview page
-    const url = `/printview?doctype=POS Invoice&name=${orderId}&format=${print_format}&no_letterhead=1&settings={}&letterhead=No Letterhead&trigger_print=1&_lang=en`;
+    const url = `/printview?doctype=${encodeURIComponent('POS Invoice')}&name=${encodeURIComponent(orderId)}&format=${encodeURIComponent(print_format)}&no_letterhead=1&settings={}&letterhead=No Letterhead&trigger_print=1&_lang=en`;
     window.open(url, '_blank', 'noopener,noreferrer');
     await updatePrintStatus(orderId);
     return 'socket';

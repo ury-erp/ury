@@ -1,15 +1,17 @@
 import React, { useEffect, useRef } from 'react';
 import { Clock, User, UserCheck, Receipt, Printer, Pencil, X } from 'lucide-react';
+import { db } from '../lib/frappe-sdk';
 import { Badge, Button, Card, CardContent } from '../components/ui';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../components/ui/dialog';
 import { showToast } from '../components/ui/toast';
 import OrderStatusSidebar from '../components/OrderStatusSidebar';
-import { useRootStore } from '../store/root-store';
+import { useRootStore, type RootState } from '../store/root-store';
 import { formatCurrency } from '../lib/utils';
 import { Spinner } from '../components/ui/spinner';
 import { Textarea } from '../components/ui/textarea';
 import { usePOSStore } from '../store/pos-store';
 import { useNavigate } from 'react-router-dom';
+import { getErrorMessage } from '../lib/error-utils';
 import PaymentDialog from '../components/PaymentDialog';
 import { printOrder } from '../lib/print';
 import { call } from '../lib/frappe-sdk';
@@ -38,7 +40,7 @@ export default function Orders() {
 
   const posStore = usePOSStore();
   const navigate = useNavigate();
-  const mounted = useRef(false);
+  const prevSearchRef = useRef(orderSearchQuery);
   const [cancelDialogOpen, setCancelDialogOpen] = React.useState(false);
   const [cancelReason, setCancelReason] = React.useState('');
   const [cancelLoading, setCancelLoading] = React.useState(false);
@@ -51,13 +53,11 @@ export default function Orders() {
   }, [fetchOrders]);
 
   useEffect(() => {
-    if (!mounted.current) {
-      mounted.current = true;
-      return; // Skip the first run
+    if (prevSearchRef.current !== orderSearchQuery) {
+      prevSearchRef.current = orderSearchQuery;
+      fetchOrders();
     }
-    fetchOrders();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orderSearchQuery]);
+  }, [orderSearchQuery, fetchOrders]);
 
 
   // Function to format the date and time
@@ -72,7 +72,7 @@ export default function Orders() {
     return formattedDate;
   };
 
-  const handleOrderClick = (order: any) => {
+  const handleOrderClick = (order: RootState['orders'][number]) => {
     selectOrder(order);
   };
 
@@ -111,7 +111,7 @@ export default function Orders() {
       clearSelectedOrder();
       fetchOrders();
     } catch (err) {
-      showToast.error(err instanceof Error ? err.message : t('errors.failed_cancel_order'));
+      showToast.error(getErrorMessage(err));
     } finally {
       setCancelLoading(false);
     }
@@ -121,10 +121,7 @@ export default function Orders() {
     if (!selectedOrder) return;
     setEditLoading(true);
     try {
-      const res = await fetch(`/api/method/frappe.client.get?doctype=POS+Invoice&name=${selectedOrder.name}`);
-      if (!res.ok) throw new Error('Failed to fetch order details');
-      const data = await res.json();
-      const order = data.message;
+      const order = await db.getDoc('POS Invoice', selectedOrder.name);
       // Fill POS store
       posStore.resetOrderState();
       posStore.setSelectedOrderType(order.order_type);
@@ -134,7 +131,7 @@ export default function Orders() {
       }
       posStore.setSelectedCustomer({ id: order.customer, name: order.customer_name, phone: order.mobile_number });
       // Fill cart
-      const items = (order.items || []).map((item: any) => ({
+      const items = (order.items || []).map((item: { item_code: string; item_name: string; rate: number; qty: number; amount: number; image?: string; description?: string; comment?: string; name?: string }) => ({
         id: item.item_code,
         name: item.item_name,
         price: item.rate,
@@ -156,7 +153,7 @@ export default function Orders() {
       // Redirect to POS page
       navigate('/');
     } catch (err) {
-      showToast.error(err instanceof Error ? err.message : t('errors.failed_edit_order'));
+      showToast.error(getErrorMessage(err));
     } finally {
       setEditLoading(false);
     }
@@ -181,8 +178,8 @@ export default function Orders() {
         setSelectedStatus('Draft');
         fetchOrders();
       }
-    } catch (err: any) {
-      showToast.error(t('errors.print_failed', { reason: err?.message || String(err) }));
+    } catch (err: unknown) {
+      showToast.error(t('errors.print_failed', { reason: getErrorMessage(err) }));
     } finally {
       setIsPrinting(false);
     }
@@ -192,7 +189,7 @@ export default function Orders() {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-center">
-          <p className="text-xl font-semibold text-red-600 mb-2">Failed to load orders</p>
+          <p className="text-xl font-semibold text-red-600 mb-2">{t('errors.failed_load_orders')}</p>
           <p className="text-gray-600">{error}</p>
         </div>
       </div>
@@ -314,7 +311,7 @@ export default function Orders() {
           </div>
         ) : selectedOrderError ? (
           <div className="text-center h-full flex flex-col items-center justify-center text-red-500 p-6">
-            <p className="text-lg font-medium mb-2">Failed to load order details</p>
+            <p className="text-lg font-medium mb-2">{t('errors.failed_load_order_details')}</p>
             <p className="text-sm">{selectedOrderError}</p>
           </div>
         ) : (

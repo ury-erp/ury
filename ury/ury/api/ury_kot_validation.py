@@ -1,23 +1,24 @@
 import frappe
-import json
-
-from frappe.utils import get_datetime, datetime
+from datetime import timedelta
+from frappe.utils import get_datetime
 
 
 def kotValidationThread():
     current_datetime = get_datetime()
-    one_minute_ago = current_datetime - datetime.timedelta(minutes=1)
-    five_minutes_ago = current_datetime - datetime.timedelta(minutes=5)
+    one_minute_ago = current_datetime - timedelta(minutes=1)
+    five_minutes_ago = current_datetime - timedelta(minutes=5)
 
     # Get a list of unprocessed invoices within the last 5 minutes
     invoice_list = get_unprocessed_invoices(five_minutes_ago, one_minute_ago)
 
-    # Process each invoice
+    # Process each invoice independently so one failure doesn't block others
     for invoice in invoice_list:
-        process_invoice(invoice)
+        try:
+            process_invoice(invoice)
+        except Exception:
+            frappe.log_error("URY KOT Validation Error", f"Failed to process invoice {invoice.name}")
 
 
-# Function to fetch unprocessed invoices within a time range
 def get_unprocessed_invoices(start_time, end_time):
     return frappe.db.sql(
         """
@@ -31,66 +32,74 @@ def get_unprocessed_invoices(start_time, end_time):
     )
 
 
-# Function to process an invoice
 def process_invoice(invoice):
-    posInvoice = frappe.get_doc("POS Invoice", invoice)
+    posInvoice = frappe.get_doc("POS Invoice", invoice.name)
     waiter = posInvoice.waiter
-    pos_profile = frappe.get_doc("POS Profile", posInvoice.pos_profile)
+    kot_naming_series = frappe.db.get_value("POS Profile", posInvoice.pos_profile, "custom_kot_naming_series")
 
-    # Determine the owner based on the restaurant table
-    owner = waiter if not invoice.restaurant_table else waiter
-
-    kot_naming_series = pos_profile.kot_naming_series
+    # Check if KOT already exists for this invoice
     kot_list = frappe.get_list(
         "URY KOT",
         filters={"creation": (">", posInvoice.creation), "invoice": posInvoice.name},
     )
 
-    # If no KOT exists for the invoice, process it
-    if not kot_list:
-        production_items = []
-        productionDoc = None
+    if kot_list:
+        return  # KOT already generated, nothing to do
 
-        # Fetch production units for the branch
-        productions = get_productions_for_branch(posInvoice.branch)
+    # Fetch production units for the branch
+    productions = get_productions_for_branch(posInvoice.branch)
 
-        for p in productions:
-            productionDoc = frappe.get_doc("URY Production Unit", p.name)
-            productionItemGroups = [
-                item_group.item_group for item_group in productionDoc.item_groups
-            ]
-            p_flag = 0
+    # Batch-fetch all item groups to avoid N+1 queries
+    item_codes = list({i.item_code for i in posInvoice.items})
+    item_groups = {}
+    if item_codes:
+        rows = frappe.db.get_all("Item", filters={"name": ("in", item_codes)}, fields=["name", "item_group"])
+        item_groups = {r.name: r.item_group for r in rows}
 
-            # Check if items in the invoice belong to production groups
-            for i in posInvoice.items:
-                item = frappe.get_doc("Item", i.item_code)
-                if item.item_group in productionItemGroups:
-                    p_flag = 1
-                    production_items.append(i)
+    # Batch-fetch production unit item groups
+    production_names = [p.name for p in productions]
+    prod_item_groups = {}
+    if production_names:
+        pig_rows = frappe.db.get_all(
+            "URY Production Item Groups",
+            filters={"parent": ("in", production_names)},
+            fields=["parent", "item_group"],
+        )
+        for r in pig_rows:
+            prod_item_groups.setdefault(r.parent, set()).add(r.item_group)
 
-            if p_flag == 1:
-                create_kot(
-                    invoice,
-                    pos_profile,
-                    kot_naming_series,
-                    production_items,
-                    owner,
-                    p.name,
-                )
+    # Group invoice items by production unit
+    for production in productions:
+        production_item_groups = prod_item_groups.get(production.name, set())
+
+        # Filter items belonging to this production unit
+        production_items = [
+            i for i in posInvoice.items
+            if item_groups.get(i.item_code) in production_item_groups
+        ]
+
+        if production_items:
+            create_kot(
+                posInvoice,
+                posInvoice.pos_profile,
+                kot_naming_series,
+                production_items,
+                waiter,
+                production.name,
+            )
 
 
-# Function to fetch production units for a branch
 def get_productions_for_branch(branch):
     return frappe.get_all(
-        "URY Production Unit", filters={"branch": branch}, fields=["name", "item_groups"]
+        "URY Production Unit",
+        filters={"branch": branch},
+        fields=["name"],
     )
 
 
-# Function to create a KOT
 def create_kot(
-    invoice, pos_profile, kot_naming_series, production_items, owner, production_name
+    posInvoice, pos_profile_name, kot_naming_series, production_items, owner, production_name
 ):
-    posInvoice = frappe.get_doc("POS Invoice", invoice)
     kotdoc = frappe.new_doc("URY KOT")
     kotdoc.update(
         {
@@ -98,19 +107,21 @@ def create_kot(
             "restaurant_table": posInvoice.restaurant_table,
             "naming_series": kot_naming_series,
             "type": "Duplicate",
-            "pos_profile": pos_profile.name,
+            "pos_profile": pos_profile_name,
             "customer_name": posInvoice.customer,
             "production": production_name,
-            "order_no": posInvoice.order_no
-            if hasattr(posInvoice, "order_no")
-            else None,
+            "order_no": getattr(posInvoice, "custom_ury_order_number", None),
         }
     )
 
-    for pr in production_items:
+    for item in production_items:
         kotdoc.append(
             "kot_items",
-            {"item": pr.item_code, "item_name": pr.item_name, "quantity": pr.qty},
+            {
+                "item": item.item_code,
+                "item_name": item.item_name,
+                "quantity": item.qty,
+            },
         )
 
     kotdoc.insert()
@@ -118,12 +129,10 @@ def create_kot(
     kotdoc.db_set("owner", owner)
 
     # Create a KOT Log entry
-    create_kot_log(kotdoc, invoice)
+    create_kot_log(kotdoc, posInvoice)
 
 
-# Function to create a KOT Log entry
-def create_kot_log(kotdoc, invoice):
-    posInvoice = frappe.get_doc("POS Invoice", invoice)
+def create_kot_log(kotdoc, posInvoice):
     KOTLog = frappe.new_doc("URY KOT Error Log")
     KOTLog.update(
         {
@@ -132,5 +141,4 @@ def create_kot_log(kotdoc, invoice):
             "invoice_creation_time": posInvoice.creation,
         }
     )
-
     KOTLog.insert()

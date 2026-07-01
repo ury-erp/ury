@@ -132,9 +132,7 @@ export const useInvoiceDataStore = defineStore("invoiceData", {
         .then((result) => {
           this.modeOfPaymentList = result.message;
         })
-        .catch((error) => {
-          // console.error(error)
-        });
+        .catch(() => {});
     },
 
     // Method for creating an invoice
@@ -157,9 +155,7 @@ export const useInvoiceDataStore = defineStore("invoiceData", {
         this.recentOrders.draftInvoice ||
         this.table.invoiceNo ||
         null;
-      let cashier= this.table.cashier ||
-        this.cashier ||
-        this.cashier;
+      let cashier = this.table.cashier || this.cashier;
 
       selectedTables =
         this.table.selectedTable || this.recentOrders.restaurantTable;
@@ -309,14 +305,15 @@ export const useInvoiceDataStore = defineStore("invoiceData", {
     
         this.showUpdateButtton = true;
         if (response.message.status === "Failure") {
-          const alert = response._server_messages;
-          const messages = JSON.parse(alert);
-          const message = JSON.parse(messages[0]);
+          if (response._server_messages) {
+            const messages = JSON.parse(response._server_messages);
+            const message = JSON.parse(messages[0]);
     
-          await this.alert.createAlert("Message", message.message, "OK");
-          await router.push("/Table");
-          window.location.reload();
-          return;
+            await this.alert.createAlert("Message", message.message, "OK");
+            await router.push("/Table");
+            router.push("/Table").catch(() => {});
+            return;
+          }
         }
     
         // Handle successful response
@@ -372,7 +369,7 @@ export const useInvoiceDataStore = defineStore("invoiceData", {
       this.menu.selectedAggregator = "";
       this.invoiceNumber = "";
       this.tableInvoiceNo = "";
-      this.customers.customerFavouriteItems = "";
+      this.customers.customerFavouriteItems = [];
       this.customers.search = "";
       this.recentOrders.pastOrderType = "";
       this.recentOrders.showOrder = false;
@@ -501,79 +498,35 @@ export const useInvoiceDataStore = defineStore("invoiceData", {
               printer_setting: this.printer,
               print_format: this.print_format,
             };
-            const printingCall = async () => {
-              const res = await this.call.post(
-                "ury.ury.api.ury_print.network_printing",
-                sendObj
-              );
-              return res.message;
-            };
-            let i = 0;
-            let errorMessage = "";
-            do {
-              const res = await printingCall();
-              if (res === "Success") {
-                this.notification.createNotification("Print Successful");
-                const sendObj = {
-                  invoice: invoiceNo,
-                };
-                await this.call
-                  .post("ury.ury.api.ury_print.qz_print_update", sendObj)
-                  .then(() => {
-                    window.location.reload();
-                    return 200;
-                  });
-              }
-              errorMessage = res;
-              i++;
-            } while (i < 1);
-            throw {
-              alert: this.alert.createAlert(
-                "Message",
-                `Message:${errorMessage}`,
-                "OK"
-              ),
-              custom: (this.isPrinting = false),
-            };
+            const res = await this.call.post(
+              "ury.ury.api.ury_print.network_printing",
+              sendObj
+            );
+            if (res.message === "Success") {
+              this.notification.createNotification("Print Successful");
+              await this.call.post("ury.ury.api.ury_print.qz_print_update", { invoice: invoiceNo });
+              router.push("/Table").catch(() => {});
+            } else {
+              this.isPrinting = false;
+              await this.alert.createAlert("Message", `Message: ${res.message}`, "OK");
+            }
           } else {
             const networkPrint = {
               invoice_id: invoiceNo,
               pos_profile: this.posProfile,
             };
-            const networkPrintPrintingCall = async () => {
-              const res = await this.call.post(
-                "ury.ury.api.ury_print.select_network_printer",
-                networkPrint
-              );
-              return res.message;
-            };
-            let i = 0;
-            let errorMessage = "";
-            do {
-              const res = await networkPrintPrintingCall();
-              if (res === "Success") {
-                this.notification.createNotification("Print Successful");
-                const sendObj = {
-                  invoice: invoiceNo,
-                };
-                await this.call
-                  .post("ury.ury.api.ury_print.qz_print_update", sendObj)
-                  .then(() => {
-                    window.location.reload();
-                    return 200;
-                  });
-              }
-              errorMessage = res;
-              i++;
-            } while (i < 1);
-            throw {
-              alert: this.alert.createAlert(
-                "Message",
-                `Message:${errorMessage}`,
-                "OK"
-              ),
-              custom: (this.isPrinting = false),
-            };
+            const res = await this.call.post(
+              "ury.ury.api.ury_print.select_network_printer",
+              networkPrint
+            );
+            if (res.message === "Success") {
+              this.notification.createNotification("Print Successful");
+              await this.call.post("ury.ury.api.ury_print.qz_print_update", { invoice: invoiceNo });
+              router.push("/Table").catch(() => {});
+            } else {
+              this.isPrinting = false;
+              await this.alert.createAlert("Message", `Message: ${res.message}`, "OK");
+            }
           }
         } else {
           // Socket printing using printview redirection
@@ -590,10 +543,10 @@ export const useInvoiceDataStore = defineStore("invoiceData", {
           this.isPrinting = false;
         }
       } catch (e) {
-        if (e?.custom) {
-          this.isPrinting = false;
-
-          return this.alert.createAlert("Error", e?.title, "OK");
+        if (e?._server_messages) {
+          const messages = JSON.parse(e._server_messages);
+          const message = JSON.parse(messages[0]);
+          await this.alert.createAlert("Message", message.message, "OK");
         }
       }
     },
@@ -612,7 +565,7 @@ export const useInvoiceDataStore = defineStore("invoiceData", {
           );
           if (response.message.status === "Success") {
             this.notification.createNotification("Print and Update Successful");
-            window.location.reload();
+            router.push("/Table").catch(() => {});
             return true;
           } else {
             this.isPrinting = false
@@ -646,8 +599,7 @@ export const useInvoiceDataStore = defineStore("invoiceData", {
 
     loadPrinter: async function (qz_host) {
       try {
-        const res = await loadQzPrinter(url, qz_host);
-        print(qz_host);
+        const res = await loadQzPrinter(qz_host);
         if (res === "success")
           this.notification.createNotification("Printer loaded");
       } catch (err) {
@@ -672,9 +624,7 @@ export const useInvoiceDataStore = defineStore("invoiceData", {
             this.cancelReason = "";
           }
         })
-        .catch((error) => {
-          // console.error(error)
-        });
+        .catch(() => {});
     },
     cancelInvoice: async function () {
       const recentOrders = usetoggleRecentOrder();
@@ -692,7 +642,7 @@ export const useInvoiceDataStore = defineStore("invoiceData", {
         .then(() => {
           this.notification.createNotification("Invoice Cancelled");
           router.push("/Table").then(() => {
-            window.location.reload();
+            router.push("/Table").catch(() => {});
           });
         })
         .catch((error) => console.error(error));

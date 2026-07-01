@@ -1,12 +1,12 @@
 import { useEffect, useMemo } from 'react';
-import { usePOSStore } from '../store/pos-store';
+import { usePOSStore, type MenuItem } from '../store/pos-store';
 import MenuCard from './MenuCard';
 import { Spinner } from './ui/spinner';
 import { cn } from '../lib/utils';
 import { t } from '../i18n';
 
 interface MenuListProps {
-  onItemClick: (item: any) => void;
+  onItemClick: (item: MenuItem) => void;
 }
 
 const MenuList: React.FC<MenuListProps> = ({ onItemClick }) => {
@@ -71,7 +71,6 @@ const MenuList: React.FC<MenuListProps> = ({ onItemClick }) => {
             {filteredItems.map((item) => (
               <MenuCard
                 key={item.id}
-                id={item.id}
                 name={item.name}
                 price={item.price}
                 item_image={item.image}

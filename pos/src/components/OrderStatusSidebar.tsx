@@ -9,7 +9,6 @@ interface OrderStatusSidebarProps {
   disabled?: boolean;
   selectedStatus: OrderStatusType;
   setSelectedStatus: (status: OrderStatusType) => void;
-  getStatusCount?: (status: OrderStatusType) => number;
 }
 
 const OrderStatusSidebar = ({ 

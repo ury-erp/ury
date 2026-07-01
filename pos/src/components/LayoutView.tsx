@@ -5,6 +5,85 @@ import { Table, updateTableLayout } from '../lib/table-api';
 import { getTableOrder, POSInvoice } from '../lib/order-api';
 import { Button } from './ui';
 import { t } from '../i18n';
+import { getActiveDirection } from '../i18n';
+
+
+type TableShapeName = 'Circle' | 'Square' | 'Rectangle';
+
+// Extracted outside component to prevent re-creation on every render
+interface TableShapeProps {
+  table: {
+    name: string;
+    x: number;
+    y: number;
+    table_shape: string;
+    no_of_seats?: number;
+    occupied?: number;
+  };
+  isEditMode: boolean;
+  draggedTable: string | null;
+  selectedTable: string | null;
+  zoom: number;
+  onMouseDown: (e: React.MouseEvent, table: TableShapeProps['table']) => void;
+  getTableDimensions: (shape: string, capacity?: number) => { width: number; height: number };
+}
+
+const TableShapeComponent: React.FC<TableShapeProps> = ({ table, isEditMode, draggedTable, selectedTable, zoom, onMouseDown, getTableDimensions }) => {
+  const dimensions = getTableDimensions(table.table_shape, table.no_of_seats);
+
+  const getTableStatusColor = (occupied?: number) => {
+    return occupied
+      ? 'bg-amber-100 border-amber-300 text-amber-900 shadow-sm'
+      : 'bg-emerald-50 border-emerald-200 text-emerald-800 hover:shadow-md';
+  };
+
+  const baseClasses = cn(
+    'absolute border-2 flex items-center justify-center text-sm font-semibold cursor-pointer transition-all select-none',
+    getTableStatusColor(table.occupied),
+    isEditMode && 'hover:ring-2 hover:ring-blue-400 cursor-move',
+    draggedTable === table.name && 'shadow-xl scale-105 z-20',
+    selectedTable === table.name && 'ring-2 ring-blue-600 z-10'
+  );
+
+  const style = {
+    left: table.x,
+    top: table.y,
+    width: dimensions.width,
+    height: dimensions.height,
+    transform: `scale(${zoom})`,
+    transformOrigin: 'top left',
+  };
+
+  const shapeLower = table.table_shape?.toLowerCase();
+  const shapeClasses: Record<string, string> = {
+    circle: 'rounded-full',
+    square: 'rounded-lg',
+    rectangle: 'rounded-md'
+  };
+
+  const roundedClass = shapeClasses[shapeLower || 'rectangle'];
+
+  return (
+    <div
+      className={cn(baseClasses, roundedClass)}
+      style={style}
+      onMouseDown={(e) => onMouseDown(e, table)}
+    >
+      <div className="text-center p-1 overflow-hidden pointer-events-none">
+        <div className="font-bold truncate px-1">{table.name}</div>
+        <div className="text-[10px] flex items-center justify-center gap-1 opacity-80">
+          <Users className="w-3 h-3" />
+          {table.no_of_seats || '-'}
+        </div>
+      </div>
+      {isEditMode && (
+        <div className="absolute -top-1 -right-1 bg-blue-500 text-white rounded-full p-0.5 shadow-sm">
+          <Move className="w-2 h-2" />
+        </div>
+      )}
+    </div>
+  );
+};
 
 
 
@@ -16,13 +95,14 @@ interface Props {
 }
 
 const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRefresh }) => {
-  const isRTL = document.dir === 'rtl';
+  const isRTL = getActiveDirection() === 'rtl';
   const [isEditMode, setIsEditMode] = useState(false);
 
   // Local state for optimistic updates
   const [localLayouts, setLocalLayouts] = useState<Record<string, Partial<Table>>>({});
   const [draggedTable, setDraggedTable] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const requestIdRef = useRef(0);
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
   const [selectedTableOrder, setSelectedTableOrder] = useState<POSInvoice | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -148,14 +228,14 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
 
   const persistTableUpdate = (tableName: string, changes: Partial<Table>) => {
     const table = tablesWithPosition.find(t => t.name === tableName);
-    if (!table) return Promise.reject("Table not found");
+    if (!table) return Promise.reject(new Error('Table not found'));
 
     // AND ensure we fallback to backend values for undefined fields.
     const payload = {
       layout_x: changes.layout_x ?? table.x,
       layout_y: changes.layout_y ?? table.y,
-      table_shape: changes.table_shape ?? table.table_shape,
-      no_of_seats: changes.no_of_seats ?? table.no_of_seats,
+        table_shape: changes.table_shape as TableShapeName ?? table.table_shape,
+        no_of_seats: changes.no_of_seats ?? table.no_of_seats,
       minimum_seating: table.minimum_seating // preserve existing if not changing
     };
     return updateTableLayout(tableName, payload);
@@ -169,7 +249,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
         persistTableUpdate(table.name, {
           layout_x: table.x,
           layout_y: table.y
-        }).catch(err => console.error("Failed to save layout", err));
+        }).catch(err => { if (import.meta.env.DEV) console.error("Failed to save layout", err); });
       }
     }
 
@@ -178,21 +258,16 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
     setDragOffset({ x: 0, y: 0 });
   };
 
-  const getTableStatusColor = (occupied: number) => {
-    return occupied
-      ? 'bg-amber-100 border-amber-300 text-amber-900 shadow-sm'
-      : 'bg-emerald-50 border-emerald-200 text-emerald-800 hover:shadow-md';
-  };
-
   const handleMouseDown = (e: React.MouseEvent, table: typeof tablesWithPosition[0]) => {
     e.stopPropagation();
 
     setSelectedTable(table.name);
 
     if (table.occupied) {
+      const myId = ++requestIdRef.current;
       getTableOrder(table.name).then(res => {
-        setSelectedTableOrder(res.message);
-      }).catch(console.error);
+        if (requestIdRef.current === myId) setSelectedTableOrder(res.message);
+      }).catch(err => { if (import.meta.env.DEV) console.error(err); });
     } else {
       setSelectedTableOrder(null);
     }
@@ -201,21 +276,6 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
 
     const canvasRect = canvasRef.current?.getBoundingClientRect();
     if (!canvasRect) return;
-
-    // Calculate offset for drag start
-    // We need to match the drag math: 
-    // newX = (mouseX - rect.left)/zoom - dragOffset - pan/zoom
-    // So dragOffset = (mouseX - rect)/zoom - startX - pan/zoom
-
-    // Actually, just use standard offset from top-left of element?
-    // Wait, the newX formula sets the new TopLeft.
-    // So dragOffset should be the difference between Mouse and TableTopLeft (in scaled/world units?)
-
-    // User formula: newX = (mouseX - canvasRect.left) / zoom - dragOffset.x - panOffset.x / zoom
-
-    // So when we start drag:
-    // table.x = (mouseX - rect.left)/zoom - dragOffset.x - panOffset.x/zoom
-    // dragOffset.x = (mouseX - rect.left)/zoom - table.x - panOffset.x/zoom
 
     const mouseX = e.clientX;
     const mouseY = e.clientY;
@@ -227,67 +287,14 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
     });
   };
 
-  const TableShape = ({ table }: { table: typeof tablesWithPosition[0] }) => {
-    const dimensions = getTableDimensions(table.table_shape, table.no_of_seats);
 
-    const baseClasses = cn(
-      'absolute border-2 flex items-center justify-center text-sm font-semibold cursor-pointer transition-all select-none',
-      getTableStatusColor(table.occupied),
-      isEditMode && 'hover:ring-2 hover:ring-blue-400 cursor-move',
-      draggedTable === table.name && 'shadow-xl scale-105 z-20',
-      selectedTable === table.name && 'ring-2 ring-blue-600 z-10'
-    );
-
-    const style = {
-      left: table.x,
-      top: table.y,
-      width: dimensions.width,
-      height: dimensions.height,
-      transform: `scale(${zoom})`,
-      transformOrigin: 'top left',
-    };
-
-    const shapeLower = table.table_shape?.toLowerCase();
-    const shapeClasses = {
-      circle: 'rounded-full',
-      square: 'rounded-lg',
-      rectangle: 'rounded-md'
-    };
-
-    const roundedClass = shapeClasses[shapeLower as keyof typeof shapeClasses] || shapeClasses.rectangle;
-
-    return (
-      <div
-        className={cn(baseClasses, roundedClass)}
-        style={style}
-        onMouseDown={(e) => handleMouseDown(e, table)}
-      >
-        <div className="text-center p-1 overflow-hidden pointer-events-none">
-          <div className="font-bold truncate px-1">{table.name}</div>
-          <div className="text-[10px] flex items-center justify-center gap-1 opacity-80">
-            <Users className="w-3 h-3" />
-            {table.no_of_seats || '-'}
-          </div>
-        </div>
-        {isEditMode && (
-          <>
-            <div className="absolute -top-1 -right-1 bg-blue-500 text-white rounded-full p-0.5 shadow-sm">
-              <Move className="w-2 h-2" />
-            </div>
-          </>
-        )}
-      </div>
-    );
-  };
-
-  // Helper to format invoice time (consistent with Table.tsx) removed - imported from utils
   const handleCapacityChange = (capacityStr: string) => {
     if (!selectedTable) return;
 
     // Always update the input field value to allow free typing
     setCapacityInput(capacityStr);
 
-    const capacity = parseInt(capacityStr);
+    const capacity = parseInt(capacityStr, 10);
     if (isNaN(capacity) || capacity < 1 || capacity > 20) return;
 
     const currentTable = tablesWithPosition.find(t => t.name === selectedTable);
@@ -302,7 +309,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
     }));
 
     updateTableLayout(selectedTable, { no_of_seats: capacity })
-      .catch(console.error);
+      .catch(err => { if (import.meta.env.DEV) console.error(err); });
   }
 
   const handleDropdownShapeChange = (shape: string) => {
@@ -314,12 +321,12 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
       ...prev,
       [selectedTable]: {
         ...(prev[selectedTable] || {}),
-        table_shape: shape as any
+        table_shape: shape as TableShapeName
       }
     }));
 
-    updateTableLayout(selectedTable, { table_shape: shape as any })
-      .catch(console.error);
+    updateTableLayout(selectedTable, { table_shape: shape as TableShapeName })
+      .catch(err => { if (import.meta.env.DEV) console.error(err); });
   }
 
   const selectedTableData = tablesWithPosition.find(t => t.name === selectedTable);
@@ -434,7 +441,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
             }}
           >
             {tablesWithPosition.map(table => (
-              <TableShape key={table.name} table={table} />
+              <TableShapeComponent key={table.name} table={table} isEditMode={isEditMode} draggedTable={draggedTable} selectedTable={selectedTable} zoom={zoom} onMouseDown={handleMouseDown} getTableDimensions={getTableDimensions} />
             ))}
           </div>
         </div>

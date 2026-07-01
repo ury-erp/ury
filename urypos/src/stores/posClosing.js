@@ -6,11 +6,9 @@ import frappe from "./frappeSdk.js";
 
 export const posClosing = defineStore("posClose", {
   state: () => ({
-    invoiceData: useInvoiceDataStore(),
     call: frappe.call(),
     db: frappe.db(),
     startDate: null,
-    alert:useAlert(),
     postingDate: null,
     periodEndDate: new Date(),
     posClosecreation: true,
@@ -38,11 +36,7 @@ export const posClosing = defineStore("posClose", {
     isPosClose: null,
     showSumbitPosclose: false,
   }),
-  getters: {
-    isFlagSet() {
-      return this.customer.length === 0;
-    },
-  },
+  getters: {},
   actions: {
     selectPosOpen() {
       this.db
@@ -81,6 +75,10 @@ export const posClosing = defineStore("posClose", {
         .catch((error) => console.error(error));
     },
     getInvoice() {
+      this.grandTotal = 0;
+      this.netTotal = 0;
+      this.totalQty = 0;
+      const invoiceData = useInvoiceDataStore();
       if (this.periodEndDate) {
         const date = new Date(this.periodEndDate);
         const year = date.getFullYear();
@@ -96,7 +94,7 @@ export const posClosing = defineStore("posClose", {
       const PosOpenEntry = {
         start: this.startDate,
         end: this.formattedDateTime,
-        pos_profile: this.invoiceData.posProfile,
+        pos_profile: invoiceData.posProfile,
         user: this.cashier,
       };
       this.call
@@ -142,13 +140,15 @@ export const posClosing = defineStore("posClose", {
 
           this.posInvoice = this.invoiceDetails.map((item) => ({
             pos_invoice: item.name,
-            date: item.modified.split(" ")[0],
+            date: (item.modified || "").split(" ")[0],
             amount: item.grand_total,
           }));
         })
         .catch((error) => console.error(error));
     },
     savePosClosing() {
+      const invoiceData = useInvoiceDataStore();
+      const alert = useAlert();
       let formattedTime;
       if (this.postingTime) {
         const date = new Date(this.postingTime);
@@ -183,8 +183,8 @@ export const posClosing = defineStore("posClose", {
           period_end_date: this.formattedDateTime,
           posting_date: this.postingDate,
           posting_time: formattedTime,
-          company: this.invoiceData.company,
-          pos_profile: this.invoiceData.posProfile,
+          company: invoiceData.company,
+          pos_profile: invoiceData.posProfile,
           payment_reconciliation: payment_reconciliation,
           pos_transactions: this.posInvoice,
           pos_opening_entry: this.selectedPosOpenEntry,
@@ -204,7 +204,7 @@ export const posClosing = defineStore("posClose", {
           if (error._server_messages) {
             const messages = JSON.parse(error._server_messages);
             const message = JSON.parse(messages[0]);
-            this.alert.createAlert("Message",message.message, "OK")
+            alert.createAlert("Message",message.message, "OK")
           }
         });
     },
@@ -226,6 +226,7 @@ export const posClosing = defineStore("posClose", {
       this.showSumbitPosclose = true;
     },
     sumbitPosClosing() {
+      const alert = useAlert();
       this.showSumbitPosclose = false;
       this.db
         .updateDoc("POS Closing Entry", this.posClosingEntry, {
@@ -238,8 +239,8 @@ export const posClosing = defineStore("posClose", {
           if (error._server_messages) {
             const messages = JSON.parse(error._server_messages);
             const message = JSON.parse(messages[0]);
-            this.alert.createAlert("Message",message.message, "OK")
-            
+            alert.createAlert("Message",message.message, "OK")
+
           }
         });
     },

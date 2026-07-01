@@ -52,6 +52,8 @@ export const usetoggleRecentOrder = defineStore("recentOrders", {
     restaurantTable: null,
     modeOfPaymentName: null,
     additionalPiscountPercentage: null,
+    changeToReturn: 0,
+    discountAmount: null,
     isLoading: false,
     isChecked: false,
     showOrder: false,
@@ -60,13 +62,7 @@ export const usetoggleRecentOrder = defineStore("recentOrders", {
     showPayment: false,
     showDiscount: false,
     cancelInvoiceFlag: false,
-    alert: useAlert(),
     call: frappe.call(),
-    menu: useMenuStore(),
-    tables: useTableStore(),
-    customers: useCustomerStore(),
-    notification: useNotifications(),
-    invoiceData: useInvoiceDataStore(),
   }),
   getters: {
     filteredOrders() {
@@ -88,8 +84,9 @@ export const usetoggleRecentOrder = defineStore("recentOrders", {
       return Math.max(0, totalPaid - this.grandTotal);
     },
     orderNumber() {
-      if (this.draftInvoice || this.invoiceData.invoiceNumber) {
-        let orderNo = this.draftInvoice || this.invoiceData.invoiceNumber;
+      const invoiceData = useInvoiceDataStore();
+      if (this.draftInvoice || invoiceData.invoiceNumber) {
+        let orderNo = this.draftInvoice || invoiceData.invoiceNumber;
         return orderNo;
       } else {
         return "New";
@@ -102,17 +99,17 @@ export const usetoggleRecentOrder = defineStore("recentOrders", {
   },
   actions: {
     async getPosInvoice(selectedStatus, limit, startLimit) {
-      if(this.invoiceData.multipleCashier){
+      const invoiceData = useInvoiceDataStore();
+      if(invoiceData.multipleCashier){
         const recentOrder = {
           status: selectedStatus,
           limit: limit,
           limit_start: startLimit,
-          cashier:this.invoiceData.cashier
+          cashier:invoiceData.cashier
         };
         this.call
           .get("ury.ury_pos.api.getInvoiceForCashier", recentOrder)
           .then((result) => {
-            console.log(result.message.data,"result.message.data")
             this.recentOrderList = result.message.data;
             this.next = result.message.next;
             return this.recentOrderList, this.next;
@@ -136,11 +133,12 @@ export const usetoggleRecentOrder = defineStore("recentOrders", {
       }
     },
     async handleStatusChange() {
+      const invoiceData = useInvoiceDataStore();
       this.currentPage = 1;
       let limit = 0;
       let startLimit = 0;
       if (this.selectedStatus === "Recently Paid") {
-        limit = this.invoiceData.paidLimit;
+        limit = invoiceData.paidLimit;
         this.getPosInvoice(this.selectedStatus, limit, startLimit);
       } else {
         limit = 10;
@@ -202,8 +200,8 @@ export const usetoggleRecentOrder = defineStore("recentOrders", {
     matchesSearchOrder(order) {
       const query = this.searchOrder.toLowerCase();
       const name = order.name.toLowerCase();
-      const customer = order.customer.toLowerCase();
-      const mobileNumber = order.mobile_number.toLowerCase();
+      const customer = (order.customer || "").toLowerCase();
+      const mobileNumber = (order.mobile_number || "").toLowerCase();
 
       return name.includes(query) || customer.includes(query) || mobileNumber.includes(query);
     },
@@ -226,8 +224,10 @@ export const usetoggleRecentOrder = defineStore("recentOrders", {
     },
 
     async viewRecentOrder(recentOrder) {
+      const tables = useTableStore();
+      const invoiceData = useInvoiceDataStore();
       this.payments = [];
-      this.tables.previousOrderdItem=[]
+      tables.previousOrderdItem=[]
       this.additionalPiscountPercentage = null
       this.discountAmount = null
       this.percentage = ""
@@ -236,7 +236,7 @@ export const usetoggleRecentOrder = defineStore("recentOrders", {
       if (recentOrder.name === this.invoiceNumber) return;
       this.orderType = recentOrder.order_type;
       this.netTotal = recentOrder.net_total;
-      if (this.invoiceData.disableRoundedTotal === 1) {
+      if (invoiceData.disableRoundedTotal === 1) {
         this.grandTotal = recentOrder.grand_total;
       } else {
         this.grandTotal = recentOrder.rounded_total;
@@ -263,20 +263,22 @@ export const usetoggleRecentOrder = defineStore("recentOrders", {
       this.showOrder = true;
     },
     async editOrder() {
+      const customers = useCustomerStore();
+      const menu = useMenuStore();
       this.payments = [];
       let previousOrderdNumberOfPax = "";
       this.pastOrderdItem = [];
       this.previousOrderdCustomer = "";
       this.pastOrderType = "";
       this.modifiedTime = "";
-      this.customers.newCustomerMobileNo=""
-      let items = this.menu.items;
+      customers.newCustomerMobileNo=""
+      let items = menu.items;
       this.draftInvoice = this.invoiceNumber;
       this.editPrintedInvoice = this.invoicePrinted;
       items.forEach((item) => {
         item.qty = "";
       });
-      let cart = this.menu.cart;
+      let cart = menu.cart;
       cart.splice(0, cart.length);
       const getOrderInvoice = {
         doctype: "POS Invoice",
@@ -292,25 +294,25 @@ export const usetoggleRecentOrder = defineStore("recentOrders", {
           this.recentWaiter = pastOrder.waiter;
           this.pastOrderType = pastOrder.order_type;
           this.modifiedTime = pastOrder.modified;
-          this.menu.comments= pastOrder.custom_comments;
+          menu.comments= pastOrder.custom_comments;
           if (this.pastOrderType) {
-            this.menu.selectedOrderType = pastOrder.order_type;
-            this.menu.pickOrderType();
+            menu.selectedOrderType = pastOrder.order_type;
+            menu.pickOrderType();
             if (this.pastOrderType === "Aggregators") {
-              this.menu.selectedAggregator = pastOrder.customer;
+              menu.selectedAggregator = pastOrder.customer;
             }
           }
           this.previousOrderdCustomer = pastOrder.customer;
           previousOrderdNumberOfPax = pastOrder.no_of_pax;
           router.push("/Menu");
           if (this.previousOrderdCustomer) {
-            this.customers.search = this.previousOrderdCustomer;
-            this.customers.numberOfPax = previousOrderdNumberOfPax;
-            this.customers.fectchCustomerFavouriteItem();
+            customers.search = this.previousOrderdCustomer;
+            customers.numberOfPax = previousOrderdNumberOfPax;
+            customers.fectchCustomerFavouriteItem();
           } else {
-            this.customers.search = "";
-            this.customers.numberOfPax = "";
-            this.customers.customerFavouriteItems = "";
+            customers.search = "";
+            customers.numberOfPax = "";
+            customers.customerFavouriteItems = [];
           }
 
           items.forEach((item) => {
@@ -375,6 +377,7 @@ export const usetoggleRecentOrder = defineStore("recentOrders", {
       this.showDiscount = true;
     },
     getModeofPayment(customer) {
+      const alert = useAlert();
       if (customer) {
         const aggregator = {
           aggregator: customer,
@@ -388,12 +391,13 @@ export const usetoggleRecentOrder = defineStore("recentOrders", {
             if (error._server_messages) {
               const messages = JSON.parse(error._server_messages);
               const message = JSON.parse(messages[0]);
-              this.alert.createAlert("Message", message.message, "OK");
+              alert.createAlert("Message", message.message, "OK");
             }
           });
       }
     },
     billing: async function () {
+      const alert = useAlert();
       this.modeOfPaymentList=[]
       this.openPaymentModal()
       const getOrderInvoice = {
@@ -415,14 +419,12 @@ export const usetoggleRecentOrder = defineStore("recentOrders", {
               .then((result) => {
                 this.modeOfPaymentList = result.message;
               })
-              .catch((error) => {
-                // console.error(error)
-              });
+              .catch(() => {});
           }
 
           this.table = this.pastOrder.restaurant_table;
           if (this.invoicePrinted === 0) {
-            this.alert.createAlert(
+            alert.createAlert(
               "Alert",
               "Please Print Invoice before Payment",
               "OK"
@@ -443,7 +445,6 @@ export const usetoggleRecentOrder = defineStore("recentOrders", {
       } else {
         this.billAmount = this.grandTotal;
       }
-      // this.billAmount = this.grandTotal;
       let balanceAmount = this.billAmount - this.total;
       if (balanceAmount > 0) {
         paymentMethod.value = balanceAmount;
@@ -498,14 +499,17 @@ export const usetoggleRecentOrder = defineStore("recentOrders", {
 
     //Making Payment
     makePayment: async function () {
+      const alert = useAlert();
+      const invoiceData = useInvoiceDataStore();
+      const notification = useNotifications();
 
       this.isLoading = true;
       const invoicePayment = {
         table: this.selectedTable,
         invoice: this.invoiceNumber,
         customer: this.customerNameForBilling,
-        owner:this.invoiceData.owner,
-        cashier: this.invoiceData.cashier,
+        owner:invoiceData.owner,
+        cashier: invoiceData.cashier,
         payments: this.payments,
         pos_profile: this.posProfile,
         additionalDiscount: this.percentage
@@ -515,7 +519,7 @@ export const usetoggleRecentOrder = defineStore("recentOrders", {
       let r_total = this.grandTotal;
       let diff = r_total - amount;
       if (diff > 5 && !this.percentage) {
-        this.alert.createAlert("Message", "Round Off Limit Exceeded", "OK");
+        alert.createAlert("Message", "Round Off Limit Exceeded", "OK");
         this.isLoading = false;
       } else {
         this.call
@@ -524,35 +528,40 @@ export const usetoggleRecentOrder = defineStore("recentOrders", {
             invoicePayment
           )
           .then(() => {
-            this.notification.createNotification("Payment Completed");
+            notification.createNotification("Payment Completed");
             this.getPosInvoice(this.selectedStatus, 10, 0);
             this.clearData();
           })
           .catch((error) => {
             this.isLoading = false;
-            const messages = JSON.parse(error._server_messages);
-            const message = JSON.parse(messages[0]);
-            this.alert.createAlert("Message", message.message, "OK");
+            if (error._server_messages) {
+              const messages = JSON.parse(error._server_messages);
+              const message = JSON.parse(messages[0]);
+              alert.createAlert("Message", message.message, "OK");
+            }
           });
       }
     },
     clearData() {
-      this.menu.selectedOrderType = "";
+      const menu = useMenuStore();
+      const customers = useCustomerStore();
+      const invoiceData = useInvoiceDataStore();
+      menu.selectedOrderType = "";
       this.isLoading = false;
       this.pastOrderType = "";
-      this.menu.items.forEach((item) => {
+      menu.items.forEach((item) => {
         item.comment = "";
         item.qty = "";
       });
       this.selectedStatus = "Draft";
-      this.menu.cart = [];
+      menu.cart = [];
       this.draftInvoice = "";
-      this.customers.selectedOrderType = "";
-      this.menu.selectedAggregator = "";
-      this.invoiceData.invoiceNumber = "";
-      this.customers.customerFavouriteItems = "";
-      this.customers.search = "";
-      this.invoiceData.tableInvoiceNo = "";
+      customers.selectedOrderType = "";
+      menu.selectedAggregator = "";
+      invoiceData.invoiceNumber = "";
+      customers.customerFavouriteItems = [];
+      customers.search = "";
+      invoiceData.tableInvoiceNo = "";
       this.pastOrderType = "";
       this.netTotal = 0;
       this.paidAmount = 0;
@@ -567,6 +576,7 @@ export const usetoggleRecentOrder = defineStore("recentOrders", {
       this.texDetails = [];
     },
     showCancelInvoiceModal() {
+      const alert = useAlert();
       this.call
         .get("ury.ury.api.button_permission.cancel_check")
         .then((result) => {
@@ -574,7 +584,7 @@ export const usetoggleRecentOrder = defineStore("recentOrders", {
             this.cancelInvoiceFlag = true;
             this.cancelReason = "";
           } else {
-            this.alert.createAlert(
+            alert.createAlert(
               "Message",
               "You don't Have Permission to Cancel ",
               "OK"
@@ -583,12 +593,11 @@ export const usetoggleRecentOrder = defineStore("recentOrders", {
             this.cancelReason = "";
           }
         })
-        .catch((error) => {
-          // console.error(error)
-        });
+        .catch(() => {});
     },
 
     cancelInvoice: async function () {
+      const notification = useNotifications();
       const updatedFields = {
         invoice_id: this.invoiceNumber,
         reason: this.cancelReason,
@@ -596,8 +605,8 @@ export const usetoggleRecentOrder = defineStore("recentOrders", {
       this.call
         .post("ury.ury.doctype.ury_order.ury_order.cancel_order", updatedFields)
         .then(() => {
-          this.notification.createNotification("Invoice Cancelled");
-          window.location.reload();
+          notification.createNotification("Invoice Cancelled");
+          router.push("/Table").catch(() => {});
         })
         .catch((error) => console.error(error));
     },

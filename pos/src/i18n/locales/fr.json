@@ -21,7 +21,8 @@
     "cancelling": "Annulation en cours...",
     "confirm_cancel": "Confirmer l'annulation",
     "loading_ury_pos": "Chargement de URY POS...",
-    "please_wait_setup": "Veuillez patienter pendant que nous préparons tout"
+    "please_wait_setup": "Veuillez patienter pendant que nous préparons tout",
+    "retry": "Réessayer"
   },
   "header": {
     "search_placeholder_default": "Rechercher commandes, articles ou clients...",
@@ -29,7 +30,8 @@
     "search_placeholder_menu": "Rechercher dans le menu",
     "switch_to_desk": "Accéder au bureau",
     "clear_cache": "Vider le cache",
-    "logout": "Déconnexion"
+    "logout": "Déconnexion",
+    "default_user": "Utilisateur"
   },
   "menu": {
     "special_items": "Plats spéciaux"
@@ -135,7 +137,12 @@
     "discount_exceeds_max": "La remise en pourcentage ne peut pas dépasser 100 %",
     "please_print_first": "Veuillez imprimer la facture avant d'effectuer le paiement",
     "enter_cancel_reason": "Veuillez entrer un motif d'annulation.",
-    "dine_in_restricted": "La consommation sur place n'est pas disponible pour votre rôle"
+    "dine_in_restricted": "La consommation sur place n'est pas disponible pour votre rôle",
+    "failed_fetch_addons": "Échec du chargement des suppléments",
+    "failed_fetch_item_details": "Échec du chargement des détails de l'article",
+    "failed_load_order_details": "Échec du chargement des détails de la commande",
+    "failed_load_orders": "Échec du chargement des commandes",
+    "no_rooms_for_branch": "Aucune salle trouvée pour cet établissement"
   },
   "success": {
     "order_cancelled": "Commande annulée avec succès",
@@ -226,5 +233,32 @@
     "paid": "Payé",
     "consolidated": "Consolidé",
     "return": "Retour"
+  },
+  "auth_guard": {
+    "access_denied": "Accès refusé",
+    "configuration_error": "Erreur de configuration",
+    "no_permission": "Vous n'avez pas la permission d'accéder à cette application.",
+    "permission_required": "Permission requise",
+    "pos_profile_not_configured": "Profil PDV introuvable ou non configuré.",
+    "recheck_permissions": "Revérifier les permissions",
+    "required_roles": "Rôles requis :"
+  },
+  "screen_size": {
+    "current_width": "Largeur d'écran actuelle :",
+    "message": "Ce système de point de vente est conçu pour les ordinateurs de bureau.",
+    "mobile_hint": "La prise en charge mobile sera disponible dans une future version.",
+    "required": "Requis :",
+    "switch_v1": "Passer à la version 1",
+    "title": "Bureau uniquement"
+  },
+  "error_boundary": {
+    "message": "Une erreur inattendue s'est produite. Veuillez réessayer.",
+    "reload_page": "Recharger la page",
+    "title": "Une erreur est survenue",
+    "try_again": "Réessayer"
+  },
+  "aggregator": {
+    "loading": "Chargement des agrégateurs...",
+    "select_placeholder": "Sélectionner un agrégateur"
   }
 }

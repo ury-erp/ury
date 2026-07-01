@@ -5,7 +5,13 @@ export const storage = {
 
   getPosProfileFull: () => {
     const profile = localStorage.getItem('pos_profile');
-    return profile ? JSON.parse(profile) : null;
+    if (!profile) return null;
+    try {
+      return JSON.parse(profile);
+    } catch {
+      localStorage.removeItem('pos_profile');
+      return null;
+    }
   },
 
   setItem: (key: string, value: string) => {
