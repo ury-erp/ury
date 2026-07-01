@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import Footer from './components/Footer';
 import Header from './components/Header';
 import AuthGuard from './components/AuthGuard';
@@ -11,6 +11,7 @@ import { usePOSStore } from './store/pos-store';
 import { Spinner } from './components/ui/spinner';
 import { getActiveLanguage, getActiveDirection } from './i18n';
 import { registerServiceWorker } from './lib/sw-register';
+import { shortcutRegistry } from './lib/keyboard-shortcuts';
 
 const POS = lazy(() => import('./pages/POS'));
 const Orders = lazy(() => import('./pages/Orders'));
@@ -18,6 +19,89 @@ const Table = lazy(() => import('./pages/Table'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const MenuManagement = lazy(() => import('./pages/MenuManagement'));
 const Reports = lazy(() => import('./pages/Reports'));
+
+/** Registers global keyboard shortcuts for navigation */
+function GlobalShortcuts() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    // Map routes to scopes for shortcut activation
+    const scopeMap: Record<string, string> = {
+      '/': 'pos',
+      '/orders': 'orders',
+      '/table': 'pos',
+      '/dashboard': 'dashboard',
+      '/menu-management': 'menu-management',
+      '/reports': 'reports',
+    };
+    const scope = (scopeMap[location.pathname] || 'global') as 'pos' | 'orders' | 'dashboard' | 'menu-management' | 'reports' | 'global';
+    shortcutRegistry.setScope(scope);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    // Register global navigation shortcuts
+    shortcutRegistry.register({
+      id: 'nav-pos',
+      key: '1',
+      modifiers: ['alt'],
+      description: 'Navigate to POS',
+      scope: 'global',
+      handler: () => navigate('/'),
+    });
+    shortcutRegistry.register({
+      id: 'nav-orders',
+      key: '2',
+      modifiers: ['alt'],
+      description: 'Navigate to Orders',
+      scope: 'global',
+      handler: () => navigate('/orders'),
+    });
+    shortcutRegistry.register({
+      id: 'nav-table',
+      key: '3',
+      modifiers: ['alt'],
+      description: 'Navigate to Tables',
+      scope: 'global',
+      handler: () => navigate('/table'),
+    });
+    shortcutRegistry.register({
+      id: 'nav-dashboard',
+      key: '4',
+      modifiers: ['alt'],
+      description: 'Navigate to Dashboard',
+      scope: 'global',
+      handler: () => navigate('/dashboard'),
+    });
+    shortcutRegistry.register({
+      id: 'nav-menu-mgmt',
+      key: '5',
+      modifiers: ['alt'],
+      description: 'Navigate to Menu Management',
+      scope: 'global',
+      handler: () => navigate('/menu-management'),
+    });
+    shortcutRegistry.register({
+      id: 'nav-reports',
+      key: '6',
+      modifiers: ['alt'],
+      description: 'Navigate to Reports',
+      scope: 'global',
+      handler: () => navigate('/reports'),
+    });
+
+    return () => {
+      shortcutRegistry.unregister('nav-pos');
+      shortcutRegistry.unregister('nav-orders');
+      shortcutRegistry.unregister('nav-table');
+      shortcutRegistry.unregister('nav-dashboard');
+      shortcutRegistry.unregister('nav-menu-mgmt');
+      shortcutRegistry.unregister('nav-reports');
+    };
+  }, [navigate]);
+
+  return null;
+}
 
 function App() {
   const {
@@ -45,6 +129,7 @@ function App() {
         <AuthGuard>
           <POSOpeningProvider>
             <Router basename="/pos">
+              <GlobalShortcuts />
               <div className="flex flex-col h-screen bg-gray-100 font-inter">
                 <Header />
                 <div className="flex-1 overflow-hidden">

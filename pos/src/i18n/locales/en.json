@@ -416,6 +416,17 @@
     "offline": "You are offline — some features may be unavailable",
     "back_online": "Back online"
   },
+  "shortcuts": {
+    "title": "Keyboard Shortcuts",
+    "search": "Search",
+    "nav_pos": "Go to POS",
+    "nav_orders": "Go to Orders",
+    "nav_table": "Go to Tables",
+    "nav_dashboard": "Go to Dashboard",
+    "nav_menu": "Go to Menu Management",
+    "nav_reports": "Go to Reports",
+    "alt_prefix": "Alt+"
+  },
   "aggregator": {
     "loading": "Loading aggregators...",
     "select_placeholder": "Select an aggregator"

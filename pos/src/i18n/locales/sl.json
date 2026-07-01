@@ -391,5 +391,16 @@
   "network": {
     "offline": "Brez povezave — nekatere funkcije morda niso na voljo",
     "back_online": "Povezava je ponovno vzpostavljena"
+  },
+  "shortcuts": {
+    "title": "Tipkovne bližnjice",
+    "search": "Iskanje",
+    "nav_pos": "Pojdi na POS",
+    "nav_orders": "Pojdi na Naročila",
+    "nav_table": "Pojdi na Mize",
+    "nav_dashboard": "Pojdi na Nadzorno ploščo",
+    "nav_menu": "Pojdi na Upravljanje jedilnika",
+    "nav_reports": "Pojdi na Poročila",
+    "alt_prefix": "Alt+"
   }
 }
