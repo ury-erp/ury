@@ -1,6 +1,6 @@
 import qz from 'qz-tray';
 import { KEYUTIL, KJUR, stob64, hextorstr } from 'jsrsasign';
-import { call } from './frappe-sdk';
+import { call } from './frappe-sdk-retry';
 import { getErrorMessage } from './error-utils';
 
 // SECURITY: Private key is fetched at runtime from the authenticated backend API

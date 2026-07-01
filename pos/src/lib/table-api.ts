@@ -1,5 +1,5 @@
 import { DOCTYPES } from '../data/doctypes';
-import { db } from './frappe-sdk';
+import { db } from './frappe-sdk-retry';
 import { getErrorMessage } from './error-utils';
 
 export interface Room {

@@ -1,5 +1,5 @@
 import { DOCTYPES } from '../data/doctypes';
-import { call, db } from './frappe-sdk';
+import { call, db } from './frappe-sdk-retry';
 import { getErrorMessage } from './error-utils';
 
 // Limited fields response

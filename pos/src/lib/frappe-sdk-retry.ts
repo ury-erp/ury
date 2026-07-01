@@ -1,15 +1,16 @@
 /**
- * Retry-enabled wrapper around the Frappe SDK call object.
+ * Retry-enabled wrapper around the Frappe SDK.
  *
- * Drop-in replacement: change `import { call } from './frappe-sdk'`
- * to `import { call } from './frappe-sdk-retry'` in any API file
+ * Drop-in replacement: change `import { call, db, auth } from './frappe-sdk'`
+ * to `import { call, db, auth } from './frappe-sdk-retry'` in any API file
  * to get automatic retry with exponential backoff on network/5xx errors.
  *
- * All other SDK methods (db, auth) are unchanged — only `call.get` and
- * `call.post` are wrapped with `withRetry`.
+ * - `call.get` / `call.post` — wrapped with retry (GET: 3 retries, POST: 2)
+ * - `db.getDocList` / `db.getDoc` / `db.getValue` / `db.getCount` — wrapped with retry (3 retries)
+ * - `auth` — passed through without retry (login/signup are idempotent-safe but shouldn't auto-retry)
  */
 
-import { call as originalCall } from './frappe-sdk';
+import { call as originalCall, db as originalDb, auth as originalAuth } from './frappe-sdk';
 import { withRetry, type RetryOptions } from './retry';
 
 /** Default retry options for read (GET) operations — more retries, longer backoff */
@@ -28,9 +29,17 @@ const POST_RETRY_OPTIONS: Partial<RetryOptions> = {
   maxDelay: 5000,
 };
 
+/** Default retry options for DB read operations */
+const DB_READ_RETRY_OPTIONS: Partial<RetryOptions> = {
+  maxRetries: 3,
+  initialDelay: 600,
+  backoffMultiplier: 2,
+  maxDelay: 6000,
+};
+
 /**
- * Create a retry-enabled version of the `call` object from frappe-js-sdk.
- * The interface is identical so it can be used as a drop-in replacement.
+ * Retry-enabled version of the `call` object from frappe-js-sdk.
+ * Interface is identical so it can be used as a drop-in replacement.
  */
 const callWithRetry = {
   get: <T = unknown>(method: string, params?: Record<string, unknown>, options?: Partial<RetryOptions>) =>
@@ -46,4 +55,34 @@ const callWithRetry = {
     ),
 };
 
-export { callWithRetry as call };
+/**
+ * Retry-enabled version of the `db` object from frappe-js-sdk.
+ * Wraps common DB operations with retry logic.
+ */
+const dbWithRetry = {
+  getDocList: <T = unknown>(doctype: string, params?: Record<string, unknown>, options?: Partial<RetryOptions>) =>
+    withRetry<T>(
+      () => originalDb.getDocList<T>(doctype, params),
+      { ...DB_READ_RETRY_OPTIONS, ...options }
+    ),
+
+  getDoc: <T = unknown>(doctype: string, name: string, options?: Partial<RetryOptions>) =>
+    withRetry<T>(
+      () => originalDb.getDoc<T>(doctype, name),
+      { ...DB_READ_RETRY_OPTIONS, ...options }
+    ),
+
+  getValue: <T = unknown>(doctype: string, name: string, fieldname: string | string[], options?: Partial<RetryOptions>) =>
+    withRetry<T>(
+      () => originalDb.getValue<T>(doctype, name, fieldname),
+      { ...DB_READ_RETRY_OPTIONS, ...options }
+    ),
+
+  getCount: <T = unknown>(doctype: string, params?: Record<string, unknown>, options?: Partial<RetryOptions>) =>
+    withRetry<T>(
+      () => originalDb.getCount<T>(doctype, params),
+      { ...DB_READ_RETRY_OPTIONS, ...options }
+    ),
+};
+
+export { callWithRetry as call, dbWithRetry as db, originalAuth as auth };
