@@ -10,6 +10,7 @@ import { ToastProvider } from './components/ui/toast';
 import { usePOSStore } from './store/pos-store';
 import { Spinner } from './components/ui/spinner';
 import { getActiveLanguage, getActiveDirection } from './i18n';
+import { registerServiceWorker } from './lib/sw-register';
 
 const POS = lazy(() => import('./pages/POS'));
 const Orders = lazy(() => import('./pages/Orders'));
@@ -30,6 +31,11 @@ function App() {
   useEffect(() => {
     document.documentElement.dir = getActiveDirection();
     document.documentElement.lang = getActiveLanguage() || 'en';
+  }, []);
+
+  // Register service worker for PWA support
+  useEffect(() => {
+    registerServiceWorker();
   }, []);
   return (
     <>

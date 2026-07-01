@@ -1,0 +1,22 @@
+{
+  "name": "URY POS",
+  "short_name": "URY POS",
+  "description": "Restaurant Point of Sale System",
+  "start_url": "/pos/",
+  "display": "standalone",
+  "background_color": "#f3f4f6",
+  "theme_color": "#111827",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/pos/ury_pos.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/pos/ury_pos.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
