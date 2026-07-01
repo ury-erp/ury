@@ -30,37 +30,27 @@ def _aggregate_kot_items(kot_docs):
 	cancel_items = {}
 
 	for kot in kot_docs:
-		for row in kot.kot_items:
-			key = (row.item, row.comments or "")
-			if kot.type in CANCEL_KOT_TYPES:
-				qty = int(row.cancelled_qty or 0)
-				if qty <= 0:
-					continue
-				if key in cancel_items:
-					cancel_items[key]["cancelled_qty"] += qty
-				else:
-					cancel_items[key] = {
-						"item": row.item,
-						"item_name": row.item_name,
-						"quantity": row.quantity,
-						"cancelled_qty": qty,
-						"comments": row.comments,
-						"course": row.course,
-					}
-			elif kot.type in ADD_KOT_TYPES:
-				qty = int(row.quantity or 0)
-				if qty <= 0:
-					continue
-				if key in add_items:
-					add_items[key]["quantity"] = str(int(add_items[key]["quantity"]) + qty)
-				else:
-					add_items[key] = {
-						"item": row.item,
-						"item_name": row.item_name,
-						"quantity": str(qty),
-						"comments": row.comments,
-						"course": row.course,
-					}
+	for row in kot.kot_items:
+		key = (row.item, row.comments or "")
+		if kot.type in CANCEL_KOT_TYPES:
+		if key not in cancel_items:
+			cancel_items[key] = {
+			"item": row.item,
+			"item_name": row.item_name,
+			"quantity": int(row.quantity or 0),
+			"cancelled_qty": int(row.cancelled_qty or 0),
+			"comments": row.comments,
+			"course": row.course,
+			}
+		elif kot.type in ADD_KOT_TYPES:
+		if key not in add_items:
+			add_items[key] = {
+			"item": row.item,
+			"item_name": row.item_name,
+			"quantity": int(row.quantity or 0),
+			"comments": row.comments,
+			"course": row.course,
+			}
 
 	return list(add_items.values()) + list(cancel_items.values())
 
