@@ -1,3 +1,4 @@
+import { dedupedCall } from './api-dedup';
 import { call } from './frappe-sdk-retry';
 
 // ---- Types ----
@@ -106,9 +107,10 @@ export async function getSalesReport(
   fromDate?: string,
   toDate?: string
 ): Promise<SalesReport> {
-  const response = await call.get<{ message: SalesReport }>(
+  const response = await dedupedCall.get<{ message: SalesReport }>(
     'ury.ury.api.ury_reports.get_sales_report',
-    { period, from_date: fromDate, to_date: toDate }
+    { period, from_date: fromDate, to_date: toDate },
+    { cacheTtl: 120_000 } // 2 min cache for reports
   );
   return response.message;
 }
@@ -117,9 +119,10 @@ export async function getExpenseReport(
   fromDate?: string,
   toDate?: string
 ): Promise<ExpenseReport> {
-  const response = await call.get<{ message: ExpenseReport }>(
+  const response = await dedupedCall.get<{ message: ExpenseReport }>(
     'ury.ury.api.ury_reports.get_expense_report',
-    { from_date: fromDate, to_date: toDate }
+    { from_date: fromDate, to_date: toDate },
+    { cacheTtl: 120_000 }
   );
   return response.message;
 }
@@ -128,9 +131,10 @@ export async function getProfitLossReport(
   fromDate?: string,
   toDate?: string
 ): Promise<ProfitLossReport> {
-  const response = await call.get<{ message: ProfitLossReport }>(
+  const response = await dedupedCall.get<{ message: ProfitLossReport }>(
     'ury.ury.api.ury_reports.get_profit_loss_report',
-    { from_date: fromDate, to_date: toDate }
+    { from_date: fromDate, to_date: toDate },
+    { cacheTtl: 120_000 }
   );
   return response.message;
 }
@@ -141,6 +145,7 @@ export async function exportReportPdf(
   fromDate?: string,
   toDate?: string
 ): Promise<string> {
+  // No caching for PDF exports — always fresh
   const response = await call.get<{ message: string }>(
     'ury.ury.api.ury_reports.export_report_pdf',
     { report_type: reportType, period, from_date: fromDate, to_date: toDate }

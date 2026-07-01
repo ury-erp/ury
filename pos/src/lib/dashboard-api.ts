@@ -1,4 +1,4 @@
-import { call } from './frappe-sdk-retry';
+import { dedupedCall } from './api-dedup';
 
 // ---- Types ----
 
@@ -134,9 +134,10 @@ export type ChartGranularity = 'hourly' | 'daily' | 'weekly' | 'monthly';
 export async function getDashboardSummary(
   period: DashboardPeriod = 'today'
 ): Promise<DashboardSummary> {
-  const response = await call.get<{ message: DashboardSummary }>(
+  const response = await dedupedCall.get<{ message: DashboardSummary }>(
     'ury.ury.api.ury_dashboard.get_dashboard_summary',
-    { period }
+    { period },
+    { cacheTtl: 60_000 } // 1 min cache for summary
   );
   return response.message;
 }
@@ -145,9 +146,10 @@ export async function getRevenueChart(
   period: DashboardPeriod = 'this_month',
   granularity: ChartGranularity = 'daily'
 ): Promise<RevenueChartData> {
-  const response = await call.get<{ message: RevenueChartData }>(
+  const response = await dedupedCall.get<{ message: RevenueChartData }>(
     'ury.ury.api.ury_dashboard.get_revenue_chart',
-    { period, granularity }
+    { period, granularity },
+    { cacheTtl: 120_000 } // 2 min cache for charts
   );
   return response.message;
 }
@@ -155,8 +157,9 @@ export async function getRevenueChart(
 export async function getOrdersChart(
   period: DashboardPeriod = 'this_month'
 ): Promise<OrdersChartData> {
-  const response = await call.get<{ message: OrdersChartData }>(
-    'ury.ury.api.ury_dashboard.get_orders_chart', { period }
+  const response = await dedupedCall.get<{ message: OrdersChartData }>(
+    'ury.ury.api.ury_dashboard.get_orders_chart', { period },
+    { cacheTtl: 120_000 }
   );
   return response.message;
 }
@@ -164,9 +167,10 @@ export async function getOrdersChart(
 export async function getCategorySalesChart(
   period: DashboardPeriod = 'this_month'
 ): Promise<CategorySalesData> {
-  const response = await call.get<{ message: CategorySalesData }>(
+  const response = await dedupedCall.get<{ message: CategorySalesData }>(
     'ury.ury.api.ury_dashboard.get_category_sales_chart',
-    { period }
+    { period },
+    { cacheTtl: 120_000 }
   );
   return response.message;
 }
@@ -174,23 +178,28 @@ export async function getCategorySalesChart(
 export async function getPaymentMethodChart(
   period: DashboardPeriod = 'this_month'
 ): Promise<PaymentMethodChartData> {
-  const response = await call.get<{ message: PaymentMethodChartData }>(
+  const response = await dedupedCall.get<{ message: PaymentMethodChartData }>(
     'ury.ury.api.ury_dashboard.get_payment_method_chart',
-    { period }
+    { period },
+    { cacheTtl: 120_000 }
   );
   return response.message;
 }
 
 export async function getTableOccupancy(): Promise<TableOccupancy> {
-  const response = await call.get<{ message: TableOccupancy }>(
-    'ury.ury.api.ury_dashboard.get_table_occupancy'
+  const response = await dedupedCall.get<{ message: TableOccupancy }>(
+    'ury.ury.api.ury_dashboard.get_table_occupancy',
+    undefined,
+    { cacheTtl: 30_000 } // 30s for live data
   );
   return response.message;
 }
 
 export async function getLiveMetrics(): Promise<LiveMetrics> {
-  const response = await call.get<{ message: LiveMetrics }>(
-    'ury.ury.api.ury_dashboard.get_live_metrics'
+  const response = await dedupedCall.get<{ message: LiveMetrics }>(
+    'ury.ury.api.ury_dashboard.get_live_metrics',
+    undefined,
+    { cacheTtl: 15_000 } // 15s for real-time metrics
   );
   return response.message;
 }
