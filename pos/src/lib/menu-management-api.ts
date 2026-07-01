@@ -1,5 +1,6 @@
 import { call } from './frappe-sdk-retry';
 import { db } from './frappe-sdk-retry';
+import { dedupedCall } from './api-dedup';
 
 // ---- Types ----
 
@@ -43,16 +44,19 @@ export interface AvailableItem {
 // ---- API Functions ----
 
 export async function getMenus(): Promise<URYMenu[]> {
-  const response = await call.get<{ message: URYMenu[] }>(
-    'ury.ury.api.ury_menu_management.get_menus'
+  const response = await dedupedCall.get<{ message: URYMenu[] }>(
+    'ury.ury.api.ury_menu_management.get_menus',
+    undefined,
+    { cacheTtl: 60_000 } // 1 min cache for menu list
   );
   return response.message;
 }
 
 export async function getMenuDetail(menuName: string): Promise<URYMenu> {
-  const response = await call.get<{ message: URYMenu }>(
+  const response = await dedupedCall.get<{ message: URYMenu }>(
     'ury.ury.api.ury_menu_management.get_menu_detail',
-    { menu_name: menuName }
+    { menu_name: menuName },
+    { cacheTtl: 60_000 }
   );
   return response.message;
 }
@@ -131,8 +135,10 @@ export async function batchUpdatePrices(
 }
 
 export async function getCoursesDetail(): Promise<URYMenuCourse[]> {
-  const response = await call.get<{ message: URYMenuCourse[] }>(
-    'ury.ury.api.ury_menu_management.get_courses_detail'
+  const response = await dedupedCall.get<{ message: URYMenuCourse[] }>(
+    'ury.ury.api.ury_menu_management.get_courses_detail',
+    undefined,
+    { cacheTtl: 120_000 } // 2 min cache for courses
   );
   return response.message;
 }
@@ -175,8 +181,10 @@ export async function deleteMenuCourse(
 }
 
 export async function getAvailableItems(): Promise<AvailableItem[]> {
-  const response = await call.get<{ message: AvailableItem[] }>(
-    'ury.ury.api.ury_menu_management.get_available_items'
+  const response = await dedupedCall.get<{ message: AvailableItem[] }>(
+    'ury.ury.api.ury_menu_management.get_available_items',
+    undefined,
+    { cacheTtl: 120_000 } // 2 min cache for items
   );
   return response.message;
 }

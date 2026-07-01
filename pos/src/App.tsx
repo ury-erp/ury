@@ -5,6 +5,7 @@ import Header from './components/Header';
 import AuthGuard from './components/AuthGuard';
 import POSOpeningProvider from './components/POSOpeningProvider';
 import ScreenSizeProvider from './components/ScreenSizeProvider';
+import { NetworkStatus } from './components/NetworkStatus';
 import { ToastProvider } from './components/ui/toast';
 import { usePOSStore } from './store/pos-store';
 import { Spinner } from './components/ui/spinner';
@@ -30,6 +31,7 @@ function App() {
   return (
     <>
       <ToastProvider />
+      <NetworkStatus />
       <ScreenSizeProvider>
         <AuthGuard>
           <POSOpeningProvider>

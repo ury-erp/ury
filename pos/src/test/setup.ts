@@ -22,12 +22,17 @@ vi.stubGlobal('import.meta', {
   },
 });
 
-// Mock sessionStorage and localStorage
-const localStorageMock = {
-  getItem: vi.fn(),
-  setItem: vi.fn(),
-  removeItem: vi.fn(),
-  clear: vi.fn(),
-};
-Object.defineProperty(window, 'localStorage', { value: localStorageMock });
-Object.defineProperty(window, 'sessionStorage', { value: localStorageMock });
+// Mock sessionStorage and localStorage with a real storage implementation
+function createStorageMock(): Storage {
+  let store: Record<string, string> = {};
+  return {
+    getItem: (key: string) => store[key] ?? null,
+    setItem: (key: string, value: string) => { store[key] = value; },
+    removeItem: (key: string) => { delete store[key]; },
+    clear: () => { store = {}; },
+    get length() { return Object.keys(store).length; },
+    key: (index: number) => Object.keys(store)[index] ?? null,
+  };
+}
+Object.defineProperty(window, 'localStorage', { value: createStorageMock(), writable: true });
+Object.defineProperty(window, 'sessionStorage', { value: createStorageMock(), writable: true });

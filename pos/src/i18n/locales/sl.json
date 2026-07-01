@@ -380,5 +380,16 @@
     "paid": "Plačano",
     "consolidated": "Konsolidirano",
     "return": "Vračilo"
+  },
+  "error_boundary": {
+    "title": "Nekaj je šlo narobe",
+    "message": "Prišlo je do nepričakovane napake. Poskusite znova.",
+    "try_again": "Poskusi znova",
+    "reload_page": "Ponovno naloži stran",
+    "persistent_error": "Ta napaka se ponavlja. Ponovna nalozitev strani lahko pomaga."
+  },
+  "network": {
+    "offline": "Brez povezave — nekatere funkcije morda niso na voljo",
+    "back_online": "Povezava je ponovno vzpostavljena"
   }
 }

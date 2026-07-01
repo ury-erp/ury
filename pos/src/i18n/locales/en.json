@@ -409,7 +409,12 @@
     "title": "Something went wrong",
     "message": "An unexpected error occurred. Please try again.",
     "try_again": "Try Again",
-    "reload_page": "Reload Page"
+    "reload_page": "Reload Page",
+    "persistent_error": "This error keeps recurring. Reloading the page may help."
+  },
+  "network": {
+    "offline": "You are offline — some features may be unavailable",
+    "back_online": "Back online"
   },
   "aggregator": {
     "loading": "Loading aggregators...",
