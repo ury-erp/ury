@@ -6339,7 +6339,7 @@
   "docstatus": 0,
   "doctype": "Custom Field",
   "dt": "POS Invoice",
-  "fetch_from": "custom_merged_pos_invoice.grand_total",
+  "fetch_from": "custom_merged_pos_invoice.rounded_total",
   "fetch_if_empty": 0,
   "fieldname": "custom_merged_total",
   "fieldtype": "Currency",

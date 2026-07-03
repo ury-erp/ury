@@ -75,16 +75,16 @@ interface GetPOSInvoiceItemsResponse {
   message: [POSInvoiceItem[], POSInvoiceTax[]];
 }
 
-export async function getPOSInvoices({ 
-  status, 
-  limit, 
+export async function getPOSInvoices({
+  status,
+  limit,
   limit_start,
   paid_limit
 }: GetPOSInvoicesParams) {
   try {
     // Use paid_limit as the limit for Recently Paid status
     const actualLimit = status === 'Recently Paid' && paid_limit ? paid_limit : limit;
-    
+
     const response = await call.get<GetPOSInvoicesResponse>(
       'ury.ury_pos.api.getPosInvoice',
       {
@@ -136,7 +136,7 @@ export async function updateInvoiceStatus(
     console.error('Error updating invoice status:', error);
     throw new Error('Failed to update invoice status');
   }
-} 
+}
 
 export async function searchPosInvoice(query: string, status: string) {
   try {
@@ -202,7 +202,7 @@ export function mapSplitGroupInvoiceToPOSInvoice(inv: SplitGroupInvoice): POSInv
     split_total: inv.split_total,
     split_siblings: inv.split_siblings,
   };
-} 
+}
 
 export async function getInvoicePrintHtml(invoiceId: string, printFormat: string) {
   try {
@@ -214,8 +214,8 @@ export async function getInvoicePrintHtml(invoiceId: string, printFormat: string
         print_format: printFormat,
         _lang: 'en',
         no_letterhead: 1,
-        letterhead:"No Letterhead",
-        settings:{}
+        letterhead: "No Letterhead",
+        settings: {}
       }
     );
     return response.message.html;
@@ -223,7 +223,7 @@ export async function getInvoicePrintHtml(invoiceId: string, printFormat: string
     console.error('Error fetching invoice print HTML:', error);
     throw new Error('Failed to fetch invoice print HTML');
   }
-} 
+}
 
 export async function networkPrint(orderId: string, printer: string, printFormat: string) {
   await call.post('ury.ury.api.ury_print.network_printing', {
@@ -271,11 +271,22 @@ export interface MergeBillsResponse {
   name?: string;
 }
 
-export function getCombinedOrderTotals(order: Pick<POSInvoice, 'grand_total' | 'rounded_total' | 'custom_merged_total'>) {
-  const mergedTotal = order.custom_merged_total ?? 0;
+// export function getCombinedOrderTotals(order: Pick<POSInvoice, 'grand_total' | 'rounded_total' | 'custom_merged_total'>) {
+//   const mergedTotal = order.custom_merged_total ?? 0;
+//   return {
+//     grandTotal: order.grand_total + mergedTotal,
+//     roundedTotal: order.rounded_total + mergedTotal,
+//   };
+// }
+export function getCombinedOrderTotals(
+  order: Pick<POSInvoice, 'rounded_total' | 'custom_merged_total'>
+) {
+  const roundedTotal =
+    (order.rounded_total ?? 0) + Math.round(order.custom_merged_total ?? 0);
+
   return {
-    grandTotal: order.grand_total + mergedTotal,
-    roundedTotal: order.rounded_total + mergedTotal,
+    grandTotal: roundedTotal,
+    roundedTotal,
   };
 }
 

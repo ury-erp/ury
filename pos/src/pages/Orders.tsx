@@ -376,7 +376,7 @@ export default function Orders() {
                 const splitBill = isSplitBill(order);
                 const mergedBill = isMergedBill(order);
                 const cardTotal = mergedBill
-                  ? order.rounded_total + (order.custom_merged_total ?? 0)
+                  ? order.rounded_total + Math.round(order.custom_merged_total ?? 0)
                   : order.rounded_total;
 
                 return (
