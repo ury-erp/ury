@@ -159,9 +159,6 @@ def get_custom_fields():
 				{
 					"fieldname": "order_type",
 					"fieldtype": "Link",
-					"default": "Dine In",
-					"options": "URY Restaurant",
-					"fetch_from": "customer.mobile_number",
 					"label": "Order Type",
 					"options": "URY Order Type",
 					"insert_after": "order_info",
