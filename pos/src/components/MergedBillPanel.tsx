@@ -71,7 +71,7 @@ const MergedBillPanel = ({ order, onOpenSecondary }: MergedBillPanelProps) => {
       <div className="mb-3 flex items-center justify-between rounded-md border border-gray-200 bg-white px-3 py-2 text-sm">
         <span className="font-medium text-gray-900">{secondaryName}</span>
         <span className="font-semibold text-gray-900 tabular-nums">
-          {formatCurrency(order.custom_merged_total ?? 0)}
+          {formatCurrency(Math.round(order.custom_merged_total ?? 0))}
         </span>
       </div>
 

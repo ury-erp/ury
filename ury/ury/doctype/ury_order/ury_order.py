@@ -364,23 +364,19 @@ TABLE_RELEASE_FIELDS = {
 }
 
 
-def release_merge_cluster_tables(table):
+def release_merge_cluster_tables(table_or_tables):
 
-    cluster = _get_cluster_table_names(
-        table
-    )
-
-    if _has_open_pos_invoices_for_cluster(
-        cluster
-    ):
-        return
+    if isinstance(table_or_tables, (list, tuple, set)):
+        cluster = list(table_or_tables)
+    else:
+        cluster = _get_table_group(table_or_tables)
 
     for member in cluster:
-
         frappe.db.set_value(
             "URY Table",
             member,
             TABLE_RELEASE_FIELDS,
+            update_modified=False,
         )
 
     frappe.db.commit()
@@ -521,9 +517,7 @@ def _free_tables_if_no_open_invoices(
     if _has_open_pos_invoices_for_cluster(tables):
         return
 
-    release_merge_cluster_tables(
-        restaurant_table
-    )
+    release_merge_cluster_tables(tables)
 
 
 def _copy_invoice_item_fields(item_row, qty):
@@ -638,17 +632,23 @@ def split_bill(source_invoice, items_to_move, customer=None):
 
     frappe.flags.ury_bill_split = True
     try:
+        source.set_missing_values()
+        source.run_method("set_missing_values")
         source.calculate_taxes_and_totals()
+
+        new_invoice.set_missing_values()
+        new_invoice.run_method("set_missing_values")
         new_invoice.calculate_taxes_and_totals()
 
         if payment_mode and new_invoice.invoice_created == 0:
             new_invoice.append(
                 "payments",
-                dict(mode_of_payment=payment_mode, amount=new_invoice.grand_total),
+                dict(mode_of_payment=payment_mode, amount=new_invoice.rounded_total),
             )
             new_invoice.invoice_created = 1
 
         new_invoice.insert()
+        new_invoice.reload()
         frappe.db.set_value(
             "POS Invoice",
             new_invoice.name,
@@ -1241,13 +1241,27 @@ def make_invoice(customer, payments, cashier, pos_profile,owner, additionalDisco
         frappe.throw(f"Error while settling order: {e}")
         
     # Free the table when no other open drafts remain on this table group
-    if invoice.restaurant_table:
-        _free_tables_if_no_open_invoices(
-            invoice.restaurant_table,
-            invoice.custom_merged_tables,
+
+    release_invoice = invoice
+
+    # If this invoice is a secondary merged bill,
+    # resolve the primary invoice that owns the tables.
+    if (
+        not release_invoice.restaurant_table
+        and release_invoice.custom_merged_pos_invoice
+    ):
+        release_invoice = frappe.get_doc(
+            "POS Invoice",
+            release_invoice.custom_merged_pos_invoice,
         )
-    
-    
+
+    if release_invoice.restaurant_table:
+        _free_tables_if_no_open_invoices(
+            release_invoice.restaurant_table,
+            release_invoice.custom_merged_tables,
+        )
+        
+        
 
 # Cancel KOT Doc Creation
 def cancel_kot(invoice_id):
