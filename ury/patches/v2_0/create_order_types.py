@@ -14,9 +14,8 @@ def execute():
 		doc = frappe.get_doc("Custom Field", cf.name)
 		if doc.fieldtype == "Link" and doc.options == "URY Order Type":
 			continue
-		doc.fieldtype = "Link"
-		doc.options = "URY Order Type"
-		doc.save()
+		frappe.db.set_value("Custom Field", cf.name, "fieldtype", "Link")
+		frappe.db.set_value("Custom Field", cf.name, "options", "URY Order Type")
 	
 	frappe.clear_cache(doctype="POS Invoice")
 	frappe.clear_cache(doctype="Sales Invoice")
