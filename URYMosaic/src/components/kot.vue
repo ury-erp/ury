@@ -397,14 +397,24 @@ export default {
       );
     },
 
-    updateColorandTable(kot, restaurant_table, type, table_takeaway) {
+    updateColorandTable(kot, restaurant_table, type, table_takeaway, custom_merged_tables) {
       if (restaurant_table === undefined) {
         kot.tableortakeaway = "Takeaway";
       } else {
         if (table_takeaway == 1) {
           kot.tableortakeaway = "Takeaway";
         } else {
-          kot.tableortakeaway = restaurant_table;
+          let label = restaurant_table;
+          if (custom_merged_tables) {
+            const partners = custom_merged_tables
+              .split(",")
+              .map((name) => name.trim())
+              .filter(Boolean);
+            if (partners.length) {
+              label = [restaurant_table, ...partners].join(" + ");
+            }
+          }
+          kot.tableortakeaway = label;
         }
       }
       if (type == "Order Modified") {
@@ -425,7 +435,8 @@ export default {
           kot,
           kot.restaurant_table,
           kot.type,
-          kot.table_takeaway
+          kot.table_takeaway,
+          kot.custom_merged_tables
         );
 
         kot.kot_items.forEach((kotitem) => {

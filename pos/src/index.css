@@ -135,3 +135,41 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer utilities {
+  @keyframes merge-slide-left {
+    to {
+      transform: translateX(2rem);
+      opacity: 0.6;
+    }
+  }
+
+  @keyframes merge-slide-right {
+    to {
+      transform: translateX(-2rem);
+      opacity: 0.6;
+    }
+  }
+
+  @keyframes merge-link-pulse {
+    0%,
+    100% {
+      transform: translateX(-50%) scale(1);
+    }
+    50% {
+      transform: translateX(-50%) scale(1.2);
+    }
+  }
+
+  .animate-merge-slide-left {
+    animation: merge-slide-left 0.6s ease-in-out forwards;
+  }
+
+  .animate-merge-slide-right {
+    animation: merge-slide-right 0.6s ease-in-out forwards;
+  }
+
+  .animate-merge-link-pulse {
+    animation: merge-link-pulse 0.6s ease-in-out infinite;
+  }
+}
