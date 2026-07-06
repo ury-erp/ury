@@ -356,6 +356,8 @@ fixtures = [
                     "POS Profile-custom_notify_kot_delay",
                     "POS Profile-custom_recipients",
                     "URY Printer Settings-custom_block_takeaway_kot",
+                    "URY Printer Settings-custom_waiter_print",
+                    "URY Printer Settings-custom_waiter_print_format",
                     "URY Printer Settings-custom_kot_reprint",
                     "URY Printer Settings-custom_kot_reprint_format",
                     "POS Opening Entry-custom_ury_last_invoice",
