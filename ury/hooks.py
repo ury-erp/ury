@@ -228,9 +228,9 @@ scheduler_events = {
 # Overriding Methods
 # ------------------------------
 #
-# override_whitelisted_methods = {
-# 	"frappe.desk.doctype.event.event.get_events": "ury.event.get_events"
-# }
+override_whitelisted_methods = {
+	"erpnext.setup.demo.clear_demo_data": "ury.setup.demo.clear_demo_data"
+}
 #
 # each overriding function accepts a `data` argument;
 # generated from the base implementation of the doctype dashboard,

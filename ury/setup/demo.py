@@ -465,14 +465,26 @@ def clear_demo_data():
     capture("demo_data_erased", "ury")
     frappe.flags.mute_messages = True
     try:
-        company = frappe.db.get_single_value("Global Defaults", "demo_company")
-        if not company:
-            frappe.throw(_("No demo company found in Global Defaults"))
-        create_transaction_deletion_record(company)
-        clear_masters()
-        delete_company(company)
+        global_company = frappe.db.get_single_value("Global Defaults", "demo_company")
+        demo_companies = frappe.db.get_all("Company", filters={"name": ["like", "%(Demo)%"]}, pluck="name")
+        
+        if global_company and global_company not in demo_companies:
+            demo_companies.append(global_company)
+            
+        if not demo_companies:
+            # Maybe the company is not ending with (Demo) but set in global defaults
+            pass
+            
+        for company in demo_companies:
+            try:
+                create_transaction_deletion_record(company)
+                clear_masters(company)
+                delete_company(company)
+            except Exception as e:
+                frappe.log_error(f"Failed to erase demo data for company {company}")
+                
         default_company = frappe.db.get_single_value("Global Defaults", "default_company")
-        if default_company == company:
+        if default_company in demo_companies:
             frappe.db.set_default("company", "")
         else:
             frappe.db.set_default("company", default_company)
@@ -501,9 +513,8 @@ def create_transaction_deletion_record(company):
     transaction_deletion_record.start_deletion_tasks()
 
 
-def clear_masters():
+def clear_masters(company):
     # Explicitly nuke dynamic dependencies to evade LinkExistsError blocks before hitting strictly ordered JSON
-    company = frappe.db.get_single_value("Global Defaults", "demo_company")
     for pos_profile in frappe.get_all("POS Profile", filters={"company": company}, pluck="name"):
         frappe.delete_doc("POS Profile", pos_profile, force=1, ignore_permissions=True)
         
@@ -514,19 +525,31 @@ def clear_masters():
         data = read_data_file_using_hooks(doctype)
         if data:
             for item in json.loads(data):
-                clear_demo_record(item)
+                clear_demo_record(item, company)
 
 
-def clear_demo_record(document):
+def clear_demo_record(document, company):
     document_type = document.get("doctype")
     del document["doctype"]
 
     valid_columns = frappe.get_meta(document_type).get_valid_columns()
 
-    filters = document
-    for key in list(filters):
-        if key not in valid_columns:
-            filters.pop(key, None)
+    filters = {}
+    for key, value in document.items():
+        if key in valid_columns:
+            if isinstance(value, str):
+                if value == "__COMPANY__":
+                    filters[key] = company
+                elif value.startswith("__"):
+                    # Skip dynamic placeholders in filters to avoid mismatch
+                    continue
+                else:
+                    filters[key] = value
+            else:
+                filters[key] = value
+
+    if not filters:
+        return
 
     # Use frappe.db.get_value to silently check existence instead of getting noisy UI msgprint dumps
     docname = frappe.db.get_value(document_type, filters, "name")
