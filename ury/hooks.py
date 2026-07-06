@@ -88,7 +88,6 @@ website_route_rules = [
 
 # before_install = "ury.install.before_install"
 # after_install = "ury.install.after_install"
-after_install = "ury.setup.after_install" 
 
 # Uninstallation
 # ------------
@@ -380,5 +379,5 @@ fixtures = [
         ],
     },
     {"dt": "Role", "filters": [["role_name", "like", "URY %"]]},
-    "Client Script"
+    "Client Script",
 ]
