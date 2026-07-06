@@ -966,6 +966,8 @@ def merge_bills(primary_invoice, secondary_invoice):
                     },
                 )
 
+            doc.custom_merged_total = source_invoice.rounded_total
+
             doc.flags.ignore_version = True
 
             doc.save(
