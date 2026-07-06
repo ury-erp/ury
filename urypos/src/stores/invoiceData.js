@@ -260,6 +260,7 @@ export const useInvoiceDataStore = defineStore("invoiceData", {
       // Only proceed with API call if no rejection occurred
       const creatingInvoice = {
         table: selectedTables,
+        merged_tables: "",
         customer: customerName,
         items: cart,
         no_of_pax: numberOfPax,
@@ -368,6 +369,8 @@ export const useInvoiceDataStore = defineStore("invoiceData", {
       this.customers.numberOfPax = "";
       this.customers.newCustomerMobileNo=""
       this.menu.cart = [];
+      this.table.selectedMergedTable = "";
+      this.table.mergeSourceTable = "";
       this.recentOrders.draftInvoice = "";
       this.menu.selectedAggregator = "";
       this.invoiceNumber = "";

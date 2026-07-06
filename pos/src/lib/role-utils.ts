@@ -16,4 +16,16 @@ export const isUserRestrictedFromTableOrders = (
   const hasRestrictedRole = user.roles.some(role => restrictedRoles.includes(role));
   
   return hasRestrictedRole;
-}; 
+};
+
+export const canCaptainTransfer = (
+  user: User | null,
+  posProfile: PosProfileCombined | null
+): boolean => {
+  if (!user || !posProfile || !user.roles || !posProfile.transfer_role_permissions?.length) {
+    return false;
+  }
+
+  const transferRoles = posProfile.transfer_role_permissions.map((role) => role.role);
+  return user.roles.some((role) => transferRoles.includes(role));
+};
