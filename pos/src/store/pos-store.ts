@@ -6,7 +6,7 @@ import { getCurrencyInfo, PosProfileCombined, getCombinedPosProfile } from '../l
 import { getMenuCourses } from '../lib/menu-course-api';
 import { getCustomerGroups, getCustomerTerritories } from '../lib/customer-api';
 import { DEFAULT_ORDER_TYPE, OrderType } from '../data/order-types';
-import { getTableOrder, TableOrder, getOrderTypes } from '../lib/order-api';
+import { getTableOrder, TableOrder } from '../lib/order-api';
 import { getPaymentModes } from '../lib/payment-api';
 
 // Constants
@@ -90,7 +90,6 @@ interface Aggregator {
 }
 
 interface POSState {
-  orderTypes: string[];
   menuItems: MenuItem[];
   categories: Category[];
   activeOrders: OrderItem[];
@@ -124,7 +123,6 @@ interface POSState {
 }
 
 interface POSStore extends POSState {
-  fetchOrderTypes: () => Promise<void>;
   fetchMenuItems: () => Promise<void>;
   fetchAggregatorMenu: (aggregator: string) => Promise<void>;
   fetchCategories: () => Promise<void>;
@@ -176,7 +174,6 @@ const calculateItemPrice = (item: OrderItem): number => {
 };
 
 export const usePOSStore = create<POSStore>((set, get) => ({
-  orderTypes: [],
   menuItems: [],
   categories: [],
   activeOrders: [],
@@ -208,32 +205,21 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   orderId: null,
   orderComment: '',
 
-  fetchOrderTypes: async () => {
-    try {
-      const types = await getOrderTypes();
-      set({ orderTypes: types.map((t: any) => t.name) });
-    } catch (error) {
-      console.error('Failed to load order types', error);
-    }
-  },
-
   initializeApp: async () => {
     try {
       set({ isInitializing: true, error: null });
       
-      const [profileResult, menuResult, categoriesResult, paymentModesResult, orderTypesResult] = await Promise.allSettled([
+      const [profileResult, menuResult, categoriesResult, paymentModesResult] = await Promise.allSettled([
         get().fetchPosProfile(),
         get().fetchMenuItems(),
         get().fetchCategories(),
-        get().fetchPaymentModes(),
-        get().fetchOrderTypes()
+        get().fetchPaymentModes()
       ]);
 
       if (profileResult.status === 'rejected' || 
           menuResult.status === 'rejected' || 
           categoriesResult.status === 'rejected' ||
-          paymentModesResult.status === 'rejected' ||
-          orderTypesResult.status === 'rejected') {
+          paymentModesResult.status === 'rejected') {
         set({ 
           error: 'Failed to initialize app. Please refresh the page.',
           isInitializing: false 
