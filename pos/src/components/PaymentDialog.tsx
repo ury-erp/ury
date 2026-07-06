@@ -16,6 +16,7 @@ interface PaymentDialogProps {
   customer: string;
   posProfile: string;
   table: string | null;
+  tableLabel?: string | null;
   cashier: string;
   owner: string;
   fetchOrders: () => Promise<void>;
@@ -30,6 +31,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   customer,
   posProfile,
   table,
+  tableLabel,
   cashier,
   owner,
   fetchOrders,
@@ -242,6 +244,12 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
           {/* Order Summary */}
           <div className="space-y-3 mb-6">
             <h3 className="text-lg font-semibold">{t('payment.order_summary')}</h3>
+            {tableLabel && (
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">{t('tables.table_name')}</span>
+                <span className="font-medium">{tableLabel}</span>
+              </div>
+            )}
             <div className="space-y-2 text-sm">
               {/* Subtotal (Grand Total) */}
               <div className="flex justify-between">
