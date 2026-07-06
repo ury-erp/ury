@@ -89,6 +89,16 @@ export interface SyncOrderRequest {
 
 export const syncOrder = async (data: SyncOrderRequest) => {
   return call.post( 'ury.ury.doctype.ury_order.ury_order.sync_order',data);
+}; 
+
+export async function getOrderTypes() {
+  try {
+    const res = await call.get('ury.ury_pos.api.get_select_field_options');
+    return res.message || [];
+  } catch (error) {
+    console.error('Error fetching order types:', error);
+    return [];
+  }
 };
 
 export interface SplitBillItemMove {
