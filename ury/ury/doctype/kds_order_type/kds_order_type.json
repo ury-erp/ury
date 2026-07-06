@@ -11,10 +11,10 @@
  "fields": [
   {
    "fieldname": "order_type",
-   "fieldtype": "Link",
+   "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Order Type",
-   "options": "URY Order Type"
+   "options": "\nDine In\nPhone In\nTake Away\nDelivery\nAggregators"
   }
  ],
  "grid_page_length": 50,

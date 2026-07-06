@@ -14,10 +14,10 @@
   {
    "columns": 5,
    "fieldname": "order_type",
-   "fieldtype": "Link",
+   "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Order Type",
-   "options": "URY Order Type"
+   "options": "\nPhone In\nTake Away\nDelivery"
   },
   {
    "columns": 5,
