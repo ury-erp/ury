@@ -246,19 +246,19 @@ def sync_merged_invoice(doc):
         target.invoice_printed = doc.invoice_printed
 
         # sync payment
-        if doc.paid_amount > 0:
+        if doc.paid_amount > 0 and not getattr(doc.flags, "ignore_payment_sync", False):
 
             target.set("payments", [])
 
             for p in doc.payments:
                 target.append("payments", {
                     "mode_of_payment": p.mode_of_payment,
-                    "amount": target.grand_total,
-                    "base_amount": target.grand_total,
+                    "amount": target.rounded_total,
+                    "base_amount": target.rounded_total,
                     "account": getattr(p, "account", None)
                 })
 
-            target.paid_amount = target.grand_total
+            target.paid_amount = target.rounded_total
 
         # sync submit/payment status
         if doc.docstatus == 1 and target.docstatus == 0:

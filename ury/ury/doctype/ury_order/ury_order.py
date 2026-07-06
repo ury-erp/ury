@@ -1225,13 +1225,47 @@ def make_invoice(customer, payments, cashier, pos_profile,owner, additionalDisco
     invoice.additional_discount_percentage=additionalDiscount
     invoice.calculate_taxes_and_totals()
 
-    for pay in invoice.payments:
-        pay.delete(pay.mode_of_payment)
+    invoice.set("payments", [])
 
-    for d in payments:
-        invoice.append(
-            "payments", dict(mode_of_payment=d["mode_of_payment"], amount=d["amount"])
-        )
+    if invoice.custom_merged_pos_invoice:
+        target = frappe.get_doc("POS Invoice", invoice.custom_merged_pos_invoice)
+        target.calculate_taxes_and_totals()
+        
+        doc_req = invoice.rounded_total
+        target_req = target.rounded_total
+        
+        target.set("payments", [])
+        
+        for d in payments:
+            amt = float(d["amount"])
+            mode = d["mode_of_payment"]
+            
+            if doc_req > 0:
+                give = min(amt, doc_req)
+                invoice.append("payments", dict(mode_of_payment=mode, amount=give))
+                amt -= give
+                doc_req -= give
+                
+            if target_req > 0 and amt > 0:
+                give = min(amt, target_req)
+                target.append("payments", dict(mode_of_payment=mode, amount=give))
+                amt -= give
+                target_req -= give
+                
+        target.flags.ignore_payment_sync = True
+        
+        frappe.flags.in_bill_merge_sync = True
+        try:
+            target.save(ignore_permissions=True)
+        finally:
+            frappe.flags.in_bill_merge_sync = False
+            
+        invoice.flags.ignore_payment_sync = True
+    else:
+        for d in payments:
+            invoice.append(
+                "payments", dict(mode_of_payment=d["mode_of_payment"], amount=d["amount"])
+            )
 
     # invoice.owner = owner
     invoice.save()
