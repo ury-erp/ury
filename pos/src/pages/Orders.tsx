@@ -1,5 +1,5 @@
-import React, { useEffect, useRef } from 'react';
-import { Clock, User, UserCheck, Receipt, Printer, Pencil, X } from 'lucide-react';
+import React, { useEffect, useMemo, useRef } from 'react';
+import { Clock, User, UserCheck, Receipt, Printer, Pencil, X, GitBranch, GitMerge } from 'lucide-react';
 import { Badge, Button, Card, CardContent } from '../components/ui';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../components/ui/dialog';
 import { showToast } from '../components/ui/toast';
@@ -11,9 +11,43 @@ import { Textarea } from '../components/ui/textarea';
 import { usePOSStore } from '../store/pos-store';
 import { useNavigate } from 'react-router-dom';
 import PaymentDialog from '../components/PaymentDialog';
+import BillSplitDialog from '../components/BillSplitDialog';
+import BillMergeDialog from '../components/BillMergeDialog';
+import OrderActionsMenu from '../components/OrderActionsMenu';
+import SplitGroupPanel from '../components/SplitGroupPanel';
+import MergedBillPanel from '../components/MergedBillPanel';
 import { printOrder } from '../lib/print';
 import { call } from '../lib/frappe-sdk';
+import { splitBill } from '../lib/order-api';
+import {
+  getOrdersTabForInvoice,
+  getSplitGroup,
+  getCombinedOrderTotals,
+  isMergedBill,
+  resolvePrintFormat,
+  mapSplitGroupInvoiceToPOSInvoice,
+  type POSInvoice,
+  type SplitGroupInvoice,
+} from '../lib/invoice-api';
+import { formatMergedTableLabel } from '../lib/table-utils';
 import { t } from '../i18n';
+
+function getOrderTableLabel(order: Pick<POSInvoice, 'restaurant_table' | 'custom_merged_tables'>) {
+  if (!order.restaurant_table) return null;
+  return formatMergedTableLabel(order.restaurant_table, order.custom_merged_tables);
+}
+
+function isOrderEditable(status: string) {
+  return status === 'Draft' || status === 'Unbilled' || status === 'Recently Paid';
+}
+
+function isSplitBill(order: Pick<POSInvoice, 'split_total' | 'custom_split_group' | 'custom_split_from'>) {
+  return (
+    (order.split_total ?? 0) >= 2 ||
+    !!order.custom_split_group ||
+    !!order.custom_split_from
+  );
+}
 
 export default function Orders() {
   const { 
@@ -44,7 +78,48 @@ export default function Orders() {
   const [cancelLoading, setCancelLoading] = React.useState(false);
   const [editLoading, setEditLoading] = React.useState(false);
   const [showPaymentDialog, setShowPaymentDialog] = React.useState(false);
+  const [showSplitDialog, setShowSplitDialog] = React.useState(false);
+  const [showMergeDialog, setShowMergeDialog] = React.useState(false);
+  const [orderActionsMenuOpen, setOrderActionsMenuOpen] = React.useState(false);
   const [isPrinting, setIsPrinting] = React.useState(false);
+
+  const canSplitBill = useMemo(() => {
+    if (!selectedOrder || selectedOrderItems.length === 0) return false;
+
+    const hasSplittableItems =
+      selectedOrderItems.length >= 2 ||
+      selectedOrderItems.some((item) => item.qty > 1);
+    if (!hasSplittableItems) return false;
+
+    // Tab label (Unbilled/Draft) is a UI filter; doc status is always "Draft" for open bills.
+    // Use invoice_printed to distinguish pre-print vs post-print split eligibility.
+    const invoicePrinted = String(selectedOrder.invoice_printed);
+    return invoicePrinted === '0' || invoicePrinted === '1';
+  }, [selectedOrder, selectedOrderItems]);
+
+  const isSecondaryMergedBill = useMemo(() => {
+    if (!selectedOrder) return false;
+    return orders.some((order) => order.custom_merged_pos_invoice === selectedOrder.name);
+  }, [orders, selectedOrder]);
+
+  const canMergeBill = useMemo(() => {
+    if (!selectedOrder || selectedOrderItems.length === 0) return false;
+    if (!isOrderEditable(selectedOrder.status)) return false;
+    if (isMergedBill(selectedOrder)) return false;
+    if (isSecondaryMergedBill) return false;
+    return true;
+  }, [selectedOrder, selectedOrderItems, isSecondaryMergedBill]);
+
+  const selectedOrderTotals = useMemo(() => {
+    if (!selectedOrder) {
+      return { grandTotal: 0, roundedTotal: 0 };
+    }
+    return getCombinedOrderTotals(selectedOrder);
+  }, [selectedOrder]);
+
+  useEffect(() => {
+    setOrderActionsMenuOpen(false);
+  }, [selectedOrder?.name]);
 
   useEffect(() => {
     fetchOrders();
@@ -168,7 +243,8 @@ export default function Orders() {
     try {
       await printOrder({
         orderId: selectedOrder.name,
-        posProfile: posStore.posProfile
+        posProfile: posStore.posProfile,
+        printFormat: resolvePrintFormat(selectedOrder, posStore.posProfile.print_format),
       });
       showToast.success(t('success.printed'));
       // Locally update selectedOrder.invoice_printed to 1
@@ -186,6 +262,82 @@ export default function Orders() {
     } finally {
       setIsPrinting(false);
     }
+  }
+
+  async function handleSplitBill(payload: {
+    itemsToMove: Array<{ name: string; qty: number }>;
+    customer?: string;
+  }) {
+    if (!selectedOrder) return;
+    const result = await splitBill(selectedOrder.name, payload.itemsToMove, payload.customer);
+    showToast.success(t('bill_split.split_success', { invoice: result.new_invoice }));
+
+    const childOnUnbilledTab =
+      !!selectedOrder.restaurant_table &&
+      String(selectedOrder.invoice_printed) === '1';
+
+    if (childOnUnbilledTab) {
+      await setSelectedStatus('Unbilled');
+    } else {
+      await fetchOrders();
+    }
+
+    const splitGroup = await getSplitGroup(result.new_invoice).catch(() => null);
+    if (splitGroup?.invoices?.length) {
+      const enriched = new Map(
+        splitGroup.invoices.map((inv) => [inv.name, mapSplitGroupInvoiceToPOSInvoice(inv)])
+      );
+      useRootStore.setState((state) => ({
+        orders: state.orders.map((o) => enriched.get(o.name) ?? o),
+      }));
+    }
+
+    const newInvoice = splitGroup?.invoices.find((inv) => inv.name === result.new_invoice);
+    if (newInvoice) {
+      await selectOrder(mapSplitGroupInvoiceToPOSInvoice(newInvoice));
+      return;
+    }
+
+    const newOrder = useRootStore.getState().orders.find((o) => o.name === result.new_invoice);
+    if (newOrder) {
+      await selectOrder(newOrder);
+    }
+  }
+
+  async function handleMergeBill() {
+    if (!selectedOrder) return;
+    await fetchOrders();
+    const updated = useRootStore.getState().orders.find((o) => o.name === selectedOrder.name);
+    if (updated) {
+      await selectOrder(updated);
+    }
+  }
+
+  async function openSecondaryInvoice(invoiceName: string) {
+    const inList = orders.find((o) => o.name === invoiceName);
+    if (inList) {
+      await selectOrder(inList);
+      return;
+    }
+    await fetchOrders();
+    const refreshed = useRootStore.getState().orders.find((o) => o.name === invoiceName);
+    if (refreshed) {
+      await selectOrder(refreshed);
+    }
+  }
+
+  async function openRelatedInvoice(sibling: SplitGroupInvoice) {
+    const tab = getOrdersTabForInvoice(sibling, {
+      paidLimit: posStore.posProfile?.paid_limit,
+      viewAllStatus: posStore.posProfile?.view_all_status,
+    });
+
+    if (tab !== selectedStatus) {
+      await setSelectedStatus(tab);
+    }
+
+    const inList = useRootStore.getState().orders.find((o) => o.name === sibling.name);
+    await selectOrder(inList ?? mapSplitGroupInvoiceToPOSInvoice(sibling));
   }
 
   if (error) {
@@ -220,29 +372,77 @@ export default function Orders() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-screen-xl mx-auto">
-              {orders.map((order) => (
+              {orders.map((order) => {
+                const splitBill = isSplitBill(order);
+                const mergedBill = isMergedBill(order);
+                const cardTotal = mergedBill
+                  ? order.rounded_total + Math.round(order.custom_merged_total ?? 0)
+                  : order.rounded_total;
+
+                return (
                 <Card 
                   key={order.name} 
                   className={`p-0 bg-white hover:shadow-md transition-shadow flex flex-col overflow-hidden cursor-pointer ${
                     selectedOrder?.name === order.name ? 'ring-2 ring-blue-500 shadow-lg' : ''
-                  }`}
+                  } ${splitBill || mergedBill ? 'border-s-4 border-s-primary-500' : ''}`}
                   onClick={() => handleOrderClick(order)}
                 >
                   <CardContent className="p-0 flex flex-col h-full">
                     <div className="p-3 bg-gray-50 border-b">
-                    <h3 className="font-medium text-gray-900 text-sm truncate" title={order.name}>
-                      {order.name}
-                    </h3>
-                    <div className="flex items-center justify-between">
-                      <div>
+                    <div className="mb-1 flex items-center justify-between gap-2">
+                      <h3 className="font-medium text-gray-900 text-sm truncate" title={order.name}>
+                        {order.name}
+                      </h3>
+                      <div className="flex shrink-0 items-center gap-1">
+                        {mergedBill && (
+                          <Badge
+                            variant="outline"
+                            className="shrink-0 gap-1 border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-50"
+                          >
+                            <GitMerge className="h-3 w-3" />
+                            {t('bill_merge.merged_bill')}
+                          </Badge>
+                        )}
+                        {splitBill && (
+                        <Badge
+                          variant="outline"
+                          className="shrink-0 gap-1 border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-50"
+                        >
+                          <GitBranch className="h-3 w-3" />
+                          {(order.split_total ?? 0) >= 2
+                            ? t('bill_split.split_indicator', {
+                                index: order.split_index ?? 0,
+                                total: order.split_total ?? 0,
+                              })
+                            : t('bill_split.split_bill')}
+                        </Badge>
+                      )}
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
                         <p className="text-xs text-gray-500">
-                          {order.restaurant_table ? `Table ${order.restaurant_table} • ` : ''}{t(`order_types.${order.order_type.toLowerCase().replace(/ /g, '_')}`)}
+                          {getOrderTableLabel(order)
+                            ? `Table ${getOrderTableLabel(order)} • `
+                            : ''}{t(`order_types.${order.order_type.toLowerCase().replace(/ /g, '_')}`)}
                         </p>
                       </div>
-                      <Badge variant={getBadgeVariant(order.status)} className="ms-2">
-                        {t(`order_status_types.${order.status.toLowerCase().replace(/ /g, '_')}`)}
-                      </Badge>
+                      <div className="flex shrink-0 items-center gap-1">
+                        <Badge variant={getBadgeVariant(order.status)}>
+                          {t(`order_status_types.${order.status.toLowerCase().replace(/ /g, '_')}`)}
+                        </Badge>
+                      </div>
                     </div>
+                    {mergedBill && order.custom_merged_pos_invoice && (
+                      <p className="mt-2 text-xs text-primary-700">
+                        {t('bill_merge.includes_bill', { invoice: order.custom_merged_pos_invoice })}
+                      </p>
+                    )}
+                    {splitBill && order.custom_split_from && (
+                      <p className="mt-2 text-xs text-primary-700">
+                        {t('bill_split.split_from', { invoice: order.custom_split_from })}
+                      </p>
+                    )}
                     </div>
 
                     {/* Content section - matches MenuCard padding and structure */}
@@ -259,13 +459,14 @@ export default function Orders() {
                       {/* Total - pushed to bottom like MenuCard */}
                       <div className="mt-auto pt-2">
                         <span className="text-sm font-semibold text-gray-900 tabular-nums">
-                          {formatCurrency(order.rounded_total)}
+                          {formatCurrency(cardTotal)}
                         </span>
                       </div>
                     </div>
                   </CardContent>
                 </Card>
-              ))}
+                );
+              })}
             </div>
           )}
           {/* Pagination Controls */}
@@ -320,36 +521,76 @@ export default function Orders() {
         ) : (
           <>
             {/* Fixed Header */}
-            <div className="sticky top-0 start-0 end-0 z-20 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between min-h-[64px]">
-              <h2 className="text-xl font-semibold text-gray-900 truncate max-w-[10rem]">{selectedOrder.name}</h2>
-              <div className="flex items-center gap-2">
-                {/* Only show edit and cancel buttons for Draft, Unbilled, and Recently Paid orders */}
-                {(selectedOrder.status === 'Draft' || selectedOrder.status === 'Unbilled' || selectedOrder.status === 'Recently Paid') && (
-                  <>
-                    <button
-                      type="button"
-                      className="inline-flex items-center justify-center rounded-md p-2 bg-gray-100 hover:bg-gray-200 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      aria-label="Edit order"
-                      onClick={handleEditOrder}
-                      disabled={editLoading}
-                    >
-                      <Pencil className="w-4 h-4" />
-                      {editLoading && <span className="ms-2 text-xs">{t('common.loading')}</span>}
-                    </button>
-                    <button
-                      type="button"
-                      className="inline-flex items-center justify-center rounded-md p-2 bg-gray-100 hover:bg-gray-200 text-red-600 focus:outline-none focus:ring-2 focus:ring-red-500"
-                      aria-label="Cancel order"
-                      onClick={() => setCancelDialogOpen(true)}
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </>
-                )}
-                <Badge variant={getBadgeVariant(selectedOrder.status)}>
-                  {t(`order_status_types.${selectedOrder.status.toLowerCase().replace(/ /g, '_')}`)}
-                </Badge>
+            <div className="sticky top-0 start-0 end-0 z-20 border-b border-gray-200 bg-white px-6 py-4">
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="min-w-0 flex-1 truncate text-xl font-semibold text-gray-900">
+                  {selectedOrder.name}
+                </h2>
+                <div className="flex shrink-0 items-center gap-2">
+                  {isOrderEditable(selectedOrder.status) && (
+                    <>
+                      <OrderActionsMenu
+                        isOpen={orderActionsMenuOpen}
+                        onOpenChange={setOrderActionsMenuOpen}
+                        showMergeBill={canMergeBill}
+                        onMergeBill={() => setShowMergeDialog(true)}
+                        showSplitBill={canSplitBill}
+                        onSplitBill={() => setShowSplitDialog(true)}
+                      />
+                      <button
+                        type="button"
+                        className="inline-flex items-center justify-center rounded-md p-2 bg-gray-100 hover:bg-gray-200 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        aria-label="Edit order"
+                        onClick={handleEditOrder}
+                        disabled={editLoading}
+                      >
+                        <Pencil className="w-4 h-4" />
+                        {editLoading && <span className="ms-2 text-xs">{t('common.loading')}</span>}
+                      </button>
+                      <button
+                        type="button"
+                        className="inline-flex items-center justify-center rounded-md p-2 bg-gray-100 hover:bg-gray-200 text-red-600 focus:outline-none focus:ring-2 focus:ring-red-500"
+                        aria-label="Cancel order"
+                        onClick={() => setCancelDialogOpen(true)}
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </>
+                  )}
+                  <Badge variant={getBadgeVariant(selectedOrder.status)}>
+                    {t(`order_status_types.${selectedOrder.status.toLowerCase().replace(/ /g, '_')}`)}
+                  </Badge>
+                </div>
               </div>
+              {((selectedOrder.split_total ?? 0) >= 2 ||
+                isSplitBill(selectedOrder) ||
+                isMergedBill(selectedOrder)) && (
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  {(selectedOrder.split_total ?? 0) >= 2 || isSplitBill(selectedOrder) ? (
+                    <Badge
+                      variant="outline"
+                      className="gap-1 border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-50"
+                    >
+                      <GitBranch className="h-3 w-3" />
+                      {(selectedOrder.split_total ?? 0) >= 2
+                        ? t('bill_split.split_indicator', {
+                            index: selectedOrder.split_index ?? 0,
+                            total: selectedOrder.split_total ?? 0,
+                          })
+                        : t('bill_split.split_bill')}
+                    </Badge>
+                  ) : null}
+                  {isMergedBill(selectedOrder) ? (
+                    <Badge
+                      variant="outline"
+                      className="gap-1 border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-50"
+                    >
+                      <GitMerge className="h-3 w-3" />
+                      {t('bill_merge.merged_bill')}
+                    </Badge>
+                  ) : null}
+                </div>
+              )}
             </div>
             {/* Cancel Order Dialog */}
             <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
@@ -381,9 +622,17 @@ export default function Orders() {
             </Dialog>
             {/* Scrollable Content Area */}
             <div className="flex-1 overflow-y-auto p-6 pb-40">
-              {/* Order Header (now only info, not name/buttons) */}
+              <SplitGroupPanel
+                invoiceName={selectedOrder.name}
+                onOpenInvoice={openRelatedInvoice}
+              />
+
+              <MergedBillPanel
+                order={selectedOrder}
+                onOpenSecondary={openSecondaryInvoice}
+              />
+
               <div className="mb-6">
-                {/* Two-column Order Info */}
                 <div className="grid grid-cols-2 gap-4">
                   {/* First column: customer and time */}
                   <div className="space-y-3">
@@ -405,7 +654,7 @@ export default function Orders() {
                     {selectedOrder.restaurant_table && (
                       <div className="flex items-center gap-3 text-sm">
                         <Receipt className="w-4 h-4 text-gray-500" />
-                        <span className="text-gray-600">{selectedOrder.restaurant_table}</span>
+                        <span className="text-gray-600">{getOrderTableLabel(selectedOrder)}</span>
                       </div>
                     )}
                   </div>
@@ -465,7 +714,7 @@ export default function Orders() {
                   {isPrinting ? <Spinner className="w-5 h-5" hideMessage /> : <Printer className="w-5 h-5" />}
                 </Button>
                 {/* Payment Button - Only show for Draft, Unbilled, and Recently Paid orders */}
-                {(selectedOrder.status === 'Draft' || selectedOrder.status === 'Unbilled' || selectedOrder.status === 'Recently Paid') && (
+                {isOrderEditable(selectedOrder.status) && (
                   <Button
                     className="flex-1"
                     onClick={() => {
@@ -481,7 +730,14 @@ export default function Orders() {
                 )}
                 {/* Total */}
                 <span className="ms-auto text-xl font-bold text-gray-900 whitespace-nowrap">
-                  {formatCurrency(selectedOrder.rounded_total)}
+                  {isMergedBill(selectedOrder) ? (
+                    <span className="flex flex-col items-end leading-tight">
+                      <span className="text-xs font-medium text-gray-500">{t('bill_merge.combined_total')}</span>
+                      <span>{formatCurrency(selectedOrderTotals.roundedTotal)}</span>
+                    </span>
+                  ) : (
+                    formatCurrency(selectedOrder.rounded_total)
+                  )}
                 </span>
               </div>
             </div>
@@ -491,16 +747,39 @@ export default function Orders() {
       {showPaymentDialog && selectedOrder && (
         <PaymentDialog
           onClose={() => setShowPaymentDialog(false)}
-          grandTotal={selectedOrder.grand_total}
-          roundedTotal={selectedOrder.rounded_total}
+          grandTotal={selectedOrderTotals.grandTotal}
+          roundedTotal={selectedOrderTotals.roundedTotal}
           invoice={selectedOrder.name}
           customer={selectedOrder.customer}
           posProfile={posStore.posProfile?.name || ''}
           table={selectedOrder.restaurant_table || null}
+          tableLabel={getOrderTableLabel(selectedOrder)}
           cashier={posStore.posProfile?.cashier || ''}
           owner={posStore.posProfile?.cashier || ''}
           fetchOrders={fetchOrders}
           clearSelectedOrder={clearSelectedOrder}
+        />
+      )}
+      {selectedOrder && (
+        <BillMergeDialog
+          open={showMergeDialog}
+          onOpenChange={setShowMergeDialog}
+          invoiceName={selectedOrder.name}
+          onConfirm={handleMergeBill}
+        />
+      )}
+      {selectedOrder && (
+        <BillSplitDialog
+          open={showSplitDialog}
+          onOpenChange={setShowSplitDialog}
+          invoiceName={selectedOrder.name}
+          items={selectedOrderItems}
+          sourceCustomer={
+            selectedOrder.customer
+              ? { id: selectedOrder.customer, name: selectedOrder.customer, phone: selectedOrder.mobile_number }
+              : null
+          }
+          onConfirm={handleSplitBill}
         />
       )}
     </div>
