@@ -42,6 +42,8 @@ interface GetPOSInvoicesParams {
   limit?: number;
   limit_start?: number;
   paid_limit?: number;
+  multipleCashier?: boolean | number;
+  cashier?: string;
 }
 
 interface GetPOSInvoiceItemsResponse {
@@ -52,25 +54,44 @@ export async function getPOSInvoices({
   status, 
   limit, 
   limit_start,
-  paid_limit
+  paid_limit,
+  multipleCashier,
+  cashier
 }: GetPOSInvoicesParams) {
   try {
     // Use paid_limit as the limit for Recently Paid status
     const actualLimit = status === 'Recently Paid' && paid_limit ? paid_limit : limit;
-    
-    const response = await call.get<GetPOSInvoicesResponse>(
-      'ury.ury_pos.api.getPosInvoice',
-      {
-        status,
-        limit: actualLimit,
-        limit_start
-      }
-    );
 
-    return {
-      invoices: response.message.data,
-      hasMore: response.message.next
-    };
+    if (multipleCashier) {
+      const response = await call.get<GetPOSInvoicesResponse>(
+        'ury.ury_pos.api.getInvoiceForCashier',
+        {
+          status,
+          limit: actualLimit,
+          limit_start,
+          cashier
+        }
+      );
+
+      return {
+        invoices: response.message.data,
+        hasMore: response.message.next
+      };
+    } else {
+      const response = await call.get<GetPOSInvoicesResponse>(
+        'ury.ury_pos.api.getPosInvoice',
+        {
+          status,
+          limit: actualLimit,
+          limit_start
+        }
+      );
+
+      return {
+        invoices: response.message.data,
+        hasMore: response.message.next
+      };
+    }
   } catch (error) {
     console.error('Error fetching POS invoices:', error);
     throw new Error('Failed to fetch POS invoices');

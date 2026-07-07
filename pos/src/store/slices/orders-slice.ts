@@ -88,6 +88,8 @@ export const createOrdersSlice: StateCreator<
       const posProfile = sessionStorage.getItem('posProfile');
       const profile = posProfile ? JSON.parse(posProfile) : null;
       const paidLimit = profile?.paid_limit;
+      const multipleCashier = profile?.multiple_cashier;
+      const cashier = profile?.cashier;
       
       if (orderSearchQuery && orderSearchQuery.trim()) {
         // Use search API
@@ -110,7 +112,9 @@ export const createOrdersSlice: StateCreator<
         status,
         limit: ITEMS_PER_PAGE,
         limit_start: limitStart,
-        paid_limit: paidLimit
+        paid_limit: paidLimit,
+        multipleCashier: multipleCashier,
+        cashier: cashier
       });
       set({ 
         orders: invoices,
