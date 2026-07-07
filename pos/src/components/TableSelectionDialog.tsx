@@ -48,7 +48,7 @@ const TableSelectionDialog: React.FC<Props> = ({ onClose }) => {
           }
         } else {
           // If not in session storage, fetch from API
-          const fetchedRooms = await getRooms(posProfile.branch);
+          const fetchedRooms = await getRooms(posProfile.branch, posProfile.multiple_cashier);
           setRooms(fetchedRooms);
           if (fetchedRooms.length > 0) {
             setSelectedRoom(fetchedRooms[0].name);

@@ -54,7 +54,7 @@ const TableView = () => {
           setRooms(parsedRooms);
           setSelectedRoom(prev => prev ?? (parsedRooms[0]?.name ?? null));
         } else {
-          const fetchedRooms = await getRooms(branch);
+          const fetchedRooms = await getRooms(branch, posProfile?.multiple_cashier);
           setRooms(fetchedRooms);
           setSelectedRoom(prev => prev ?? (fetchedRooms[0]?.name ?? null));
           sessionStorage.setItem(sessionKey, JSON.stringify(fetchedRooms));

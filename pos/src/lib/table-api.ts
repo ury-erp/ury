@@ -30,7 +30,12 @@ export async function getRestaurantMenu(posProfile: string, room?: string | null
   return res.message;
 }
 
-export async function getRooms(branch: string): Promise<Room[]> {
+export async function getRooms(branch: string, multipleCashier?: boolean | number): Promise<Room[]> {
+  if (multipleCashier) {
+    const { call } = await import('./frappe-sdk');
+    const response = await call.get<{ message: Room[] }>('ury.ury_pos.api.getRoom');
+    return response.message;
+  }
   const rooms = await db.getDocList(DOCTYPES.URY_ROOM, {
     fields: ['name', 'branch'],
     filters: [['branch', 'like', branch]],
