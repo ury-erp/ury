@@ -87,6 +87,7 @@
           </button>
           <input
             type="number"
+            step="any"
             id="qty_input"
             name="qty_input"
             class="block w-full border border-gray-200 text-center text-sm shadow-sm"
@@ -143,6 +144,7 @@
               </label>
               <input
                 type="number"
+                step="any"
                 id="quantity"
                 class="mt-4 w-full appearance-none rounded border p-2 leading-tight text-gray-900 shadow focus:outline-none"
                 v-model="this.menu.quantity"
