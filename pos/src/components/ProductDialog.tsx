@@ -206,7 +206,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
 
   // Always get price from menuItems for the main item
   const basePrice = selectedItem?.price ? Number(selectedItem.price) : 0;
-  const numericQuantity = quantity === '' ? 0 : parseInt(quantity, 10);
+  const numericQuantity = quantity === '' ? 0 : parseFloat(quantity);
   const addonsTotal = selectedAddons.reduce((sum, addon) => sum + addon.price, 0);
   const total = (basePrice + addonsTotal) * numericQuantity;
 
@@ -217,28 +217,28 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
       return;
     }
 
-    const num = parseInt(value, 10);
+    const num = parseFloat(value);
     if (!isNaN(num) && num >= 0 && num <= 99) {
-      setQuantity(num.toString());
+      setQuantity(value);
     }
   };
 
   const handleIncrement = () => {
-    const currentNum = quantity === '' ? 0 : parseInt(quantity, 10);
+    const currentNum = quantity === '' ? 0 : parseFloat(quantity);
     if (currentNum < 99) {
       setQuantity((currentNum + 1).toString());
     }
   };
 
   const handleDecrement = () => {
-    const currentNum = quantity === '' ? 0 : parseInt(quantity, 10);
+    const currentNum = quantity === '' ? 0 : parseFloat(quantity);
     if (currentNum > 0) {
       setQuantity((currentNum - 1).toString());
     }
   };
 
   const handleAddToOrder = () => {
-    const numericQuantity = typeof quantity === 'string' ? parseInt(quantity, 10) : quantity;
+    const numericQuantity = typeof quantity === 'string' ? parseFloat(quantity) : quantity;
     if (isNaN(numericQuantity) || numericQuantity === 0) {
       return; // Don't add to order if quantity is 0 or invalid
     }
@@ -390,6 +390,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
                 type="number"
                 min="0"
                 max="99"
+                step="any"
                 value={quantity}
                 onChange={(e) => handleQuantityChange(e.target.value)}
                 onBlur={() => {

@@ -47,6 +47,7 @@ def create_kot_doc(
             "doctype": "URY KOT",
             "invoice": invoice_id,
             "restaurant_table": restaurant_table,
+            "custom_merged_tables": pos_invoice.get("custom_merged_tables"),
             "customer_name": customer,
             "pos_profile": pos_profile_id,
             "comments": comments,
@@ -81,6 +82,7 @@ def create_kot_doc(
         )
     kot_doc.insert()
     kot_doc.submit()
+    return kot_doc.name
 
 # Function to get all production item groups for a given branch
 def get_all_production_item_groups(branch):
@@ -122,6 +124,8 @@ def process_items_for_kot(
     productions = frappe.db.get_all(
         "URY Production Unit", filters={"branch": pos_profile.branch}, fields=["name"]
     )
+
+    created_kot_names = []
 
     if productions:
         all_production_item_groups = get_all_production_item_groups(pos_profile.branch)
@@ -166,7 +170,7 @@ def process_items_for_kot(
                 if invoice_exist:
                     kot_type = "Order Modified"
 
-                create_kot_doc(
+                kot_name = create_kot_doc(
                     invoice_id,
                     customer,
                     restaurant_table,
@@ -177,10 +181,13 @@ def process_items_for_kot(
                     kot_naming_series,
                     production.name,
                 )
+                created_kot_names.append(kot_name)
     else:
         frappe.throw(
             "Create URY Production unit against POS Profile: %s " % pos_profile.name
         )
+
+    return created_kot_names
 
 
 # Process items to create a cancel KOT document
@@ -202,6 +209,8 @@ def process_items_for_cancel_kot(
         "URY Production Unit", filters={"branch": pos_profile.branch}, fields=["name"]
     )
 
+    created_kot_names = []
+
     for production in productions:
         productionDoc = frappe.get_doc("URY Production Unit", production.name)
         productionItemGroups = [
@@ -215,7 +224,7 @@ def process_items_for_cancel_kot(
         ]
 
         if production_items:
-            create_cancel_kot_doc(
+            kot_name = create_cancel_kot_doc(
                 invoice_id,
                 restaurant_table,
                 production_items,
@@ -227,6 +236,9 @@ def process_items_for_cancel_kot(
                 invoiceItems,
                 production.name,
             )
+            created_kot_names.append(kot_name)
+
+    return created_kot_names
 
 
 # Create a cancel KOT document
@@ -316,6 +328,7 @@ def create_cancel_kot_doc(
 
     kot_cancel_doc.insert()
     kot_cancel_doc.submit()
+    return kot_cancel_doc.name
 
 
 # Whitelisted function to handle KOT entry
@@ -348,32 +361,43 @@ def kot_execute(
             % pos_profile.name
         )
 
+    from ury.ury.api.ury_waiter_print import print_combined_waiter_order_slip
+
     positive_qty_items = [item for item in final_array if int(item["qty"]) > 0]
     negative_qty_items = [item for item in final_array if int(item["qty"]) <= 0]
     total_cancel_items = negative_qty_items + removed_item
+    created_kot_names = []
+
     if positive_qty_items:
-        process_items_for_kot(
-            invoice_id,
-            customer,
-            restaurant_table,
-            positive_qty_items,
-            comments,
-            pos_profile_id,
-            kot_naming_series,
-            "New Order",
+        created_kot_names.extend(
+            process_items_for_kot(
+                invoice_id,
+                customer,
+                restaurant_table,
+                positive_qty_items,
+                comments,
+                pos_profile_id,
+                kot_naming_series,
+                "New Order",
+            )
         )
     if total_cancel_items:
-        process_items_for_cancel_kot(
-            invoice_id,
-            customer,
-            restaurant_table,
-            total_cancel_items,
-            comments,
-            pos_profile_id,
-            cancel_kot_naming_series,
-            "Partially cancelled",
-            new_invoice_items_array,
+        created_kot_names.extend(
+            process_items_for_cancel_kot(
+                invoice_id,
+                customer,
+                restaurant_table,
+                total_cancel_items,
+                comments,
+                pos_profile_id,
+                cancel_kot_naming_series,
+                "Partially cancelled",
+                new_invoice_items_array,
+            )
         )
+
+    if created_kot_names:
+        print_combined_waiter_order_slip(invoice_id, created_kot_names, restaurant_table)
 
 
 # Compare two arrays and return the items that are different
