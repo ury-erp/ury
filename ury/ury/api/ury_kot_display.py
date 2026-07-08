@@ -1,9 +1,7 @@
 import json
-
 import frappe
 from ury.ury_pos.api import getBranch
 from frappe.utils import get_datetime
-
 
 # Function to set order status in a KOT document
 @frappe.whitelist()
@@ -28,6 +26,35 @@ def confirm_cancel_kot(name, user):
 @frappe.whitelist(allow_guest=True)
 def get_site_name():
     return {"site_name": frappe.local.site}
+
+def build_dashboard_summary(kot_list):
+    summary = {}
+
+    for kot in kot_list:
+        production = kot.get("production")
+
+        if not production:
+            continue
+
+        if production not in summary:
+            summary[production] = {
+                "name": production,
+                "active_orders": 0,
+                "pending_orders": 0,
+                "ready_orders": 0,
+                "orders": []
+            }
+
+        summary[production]["active_orders"] += 1
+
+        if kot.get("order_status") == "Ready For Prepare":
+            summary[production]["ready_orders"] += 1
+        else:
+            summary[production]["pending_orders"] += 1
+
+        summary[production]["orders"].append(kot)
+
+    return list(summary.values())
 
 @frappe.whitelist()
 def kot_list():
@@ -86,8 +113,10 @@ def kot_list():
 
         kotjson = json.loads(frappe.as_json(kotdoc))
         KOT.append(kotjson)
+    dashboard = build_dashboard_summary(KOT)
     return {
         "KOT": KOT,
+        "Dashboard": dashboard,
         "Branch": branch,
         "kot_alert_time": kot_alert_time,
         "audio_alert": audio_alert,

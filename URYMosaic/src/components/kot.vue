@@ -37,6 +37,10 @@
     </div>
     <!-- Alert Modal div end-->
 
+    <div v-if="kot.filter(k => k.production === production).length === 0 && !loadingKots" class="text-center py-10 text-gray-500 text-xl">
+      No active orders for {{ production }}
+    </div>
+
     <div
       class="grid grid-cols-1 gap-10 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
     >
@@ -262,12 +266,12 @@ initializeSocket(); // Initialize the socket after fetching the site name
 const frappe = new FrappeApp(url);
 export default {
   // inject: ["$auth", "$socket"],
+  props: ["production"],
   data() {
     return {
       kot: [],
       masonry: null,
       call: frappe.call(),
-      production: "",
       branch: "",
       kot_channel: "",
       clickedItems: new Set(),
@@ -279,7 +283,8 @@ export default {
       audio_alert: 0,
       isOnline: navigator.onLine,
       statusMessage: "",
-      daily_order_number:0
+      daily_order_number:0,
+      loadingKots: true
     };
   },
   methods: {
@@ -317,6 +322,7 @@ export default {
               this.daily_order_number = result.message.daily_order_number;
               this.kot_channel = `kot_update_${this.branch}_${this.production}`;
               this.kot = result.message.KOT;
+              this.loadingKots = false;
               this.updateQtyColorTable();
               this.updateTimeRemaining();
               this.masonryLoading();
@@ -324,9 +330,11 @@ export default {
             })
             .catch((error) => {
               console.error(error);
+              this.loadingKots = false;
               reject(error);
             });
         } catch (error) {
+          this.loadingKots = false;
           reject(error);
         }
       });
@@ -557,13 +565,8 @@ export default {
     window.addEventListener("online", this.handleOnline);
     window.addEventListener("offline", this.handleOffline);
     document.addEventListener("click", this.hideAudioAlertMessage);
-    const currentUrl = window.location.href;
-    const parts = currentUrl.split("/");
-    const production = parts[parts.length - 1];
-    const decodedProduction = decodeURIComponent(production);
-    this.production = decodedProduction;
     const self = this;
-    window.addEventListener("resize", this.masonryLoading());
+    window.addEventListener("resize", this.masonryLoading);
     this.masonryLoading();
 
     this.auth()
