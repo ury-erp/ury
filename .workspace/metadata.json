@@ -1,0 +1,38 @@
+{
+  "workspace": {
+    "name": "default",
+    "purpose": "Documentation-only stub workspace for URY (Frappe/ERPNext restaurant app) planning. One task per branch; branches are independent and never merged into the workspace base branch. Source code is not stored here.",
+    "base_branch": "default",
+    "upstream_branch": "develop",
+    "created_at": "2026-07-08T10:31:48Z",
+    "path": "C:/Users/swafa/Projects/Workspaces/ury/default"
+  },
+  "project": {
+    "name": "URY",
+    "full_name": "URY - Open Source Restaurant Management System",
+    "description": "A complete restaurant order-taking and management system built on Frappe/ERPNext.",
+    "license": "MIT",
+    "publisher": "Tridz Technologies Pvt. Ltd.",
+    "supported_by": "Frappe",
+    "github_url": "https://github.com/ury-erp/ury",
+    "docs_url": "https://ury.app/docs/",
+    "version_at_creation": "0.2.1"
+  },
+  "tech_stack": {
+    "backend_framework": "Frappe Framework v15",
+    "erp": "ERPNext v15",
+    "hr": "Frappe HR (hrms)",
+    "python_version": ">=3.10",
+    "node_version": ">=18.20",
+    "pos_frontend": "React 19 + TypeScript + Vite + Zustand + Tailwind CSS",
+    "kds_frontend": "Vue 3 + Vite + Socket.io + Tailwind CSS",
+    "legacy_pos": "Vue 3 + Vite",
+    "package_manager": "Yarn workspace"
+  },
+  "workspace_rules": {
+    "branch_model": "one_branch_per_task",
+    "merge_policy": "never_merge_task_branches_into_default",
+    "upstream_pr_target": "ury-erp/ury:develop",
+    "keep_default_branch_clean": true
+  }
+}

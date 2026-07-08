@@ -1,0 +1,17 @@
+# Workspace-specific ignores
+# This is a documentation/planning stub; no code build artifacts expected here.
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Temporary files
+*.tmp
+*.log
