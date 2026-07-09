@@ -22,6 +22,16 @@ It does **NOT** contain the active Frappe application codebase in its Git tree. 
    - Execute code modifications in the WSL environment.
    - Update documentation as progress is made.
 
+### 2.1. Local Track Overrides & Selective Tracking
+To avoid pulling/tracking other users' tracks or to work on a subset of active tracks:
+- **Local-Only Ignores**: Add local-only tracks (that you do not want to push to the remote) to `.git/info/exclude` instead of `.gitignore`.
+- **Sparse Checkout (Hide other tracks)**: You can configure git to only check out the core workspace files and your own tracks:
+  ```bash
+  git sparse-checkout init --cone
+  git sparse-checkout set docs/ skills/ index.md AGENTS.MD WORKSPACE.md tracks/sa-*
+  ```
+  Replace `sa-*` with your owner prefix. This prevents local clutter from other users' fast-moving tracks.
+
 ## 3. Development Environment & Code Execution
 The URY application is hosted in a Frappe bench inside WSL. 
 
