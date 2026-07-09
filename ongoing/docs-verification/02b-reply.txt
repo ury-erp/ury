@@ -1,0 +1,250 @@
+• This is a large verification task. I need to:
+  1. Read docs from .worktrees/draft-docs/docs/
+  2. Verify against source in .worktrees/ury-src
+  3. Write output to ongoing/docs-verification/02b-verify-draft-frontend.md
+
+  I should set up a todo list and start exploring the structure. Let me use multiple parallel tool calls to understand what we're dealing with.
+
+• I'll verify the frontend/ops documentation against the source tree and produce the report.• Let me start by listing the draft docs and source structure in parallel..worktrees/draft-docs/docs/architecture/module-dependencies.md
+.worktrees/draft-docs/docs/architecture/runtime-architecture.md
+.worktrees/draft-docs/docs/architecture/system-architecture.md
+.worktrees/draft-docs/docs/backend/api-reference.md
+.worktrees/draft-docs/docs/backend/auth.md
+.worktrees/draft-docs/docs/backend/database.md
+.worktrees/draft-docs/docs/backend/frappe-backend.md
+.worktrees/draft-docs/docs/backend/hooks-and-jobs.md
+.worktrees/draft-docs/docs/development/pos-operational-profile-development.md
+.worktrees/draft-docs/docs/development/pos-operational-profile-todo.md
+.worktrees/draft-docs/docs/flows/kot-lifecycle.md
+.worktrees/draft-docs/docs/flows/order-payment.md
+.worktrees/draft-docs/docs/flows/printing.md
+.worktrees/draft-docs/docs/flows/reporting-closing.md
+.worktrees/draft-docs/docs/frontend/legacy-urypos.md
+.worktrees/draft-docs/docs/frontend/pos-react.md
+.worktrees/draft-docs/docs/frontend/urymosaic.md
+.worktrees/draft-docs/docs/index.md
+.worktrees/draft-docs/docs/operations/build-deployment.md
+.worktrees/draft-docs/docs/operations/configuration.md
+.worktrees/draft-docs/docs/operations/performance.md
+.worktrees/draft-docs/docs/operations/risks.md
+.worktrees/draft-docs/docs/operations/security.md
+.worktrees/draft-docs/docs/overview.md
+.worktrees/draft-docs/docs/passes/01-repository-inventory.md
+.worktrees/draft-docs/docs/passes/02-architecture-flow.md
+.worktrees/draft-docs/docs/passes/03-module-deep-dive.md
+.worktrees/draft-docs/docs/passes/04-data-api-access.md
+.worktrees/draft-docs/docs/passes/05-configuration-operations.md
+.worktrees/draft-docs/docs/passes/06-frontend-ui.md
+.worktrees/draft-docs/docs/passes/07-security-performance-debt.md
+.worktrees/draft-docs/docs/passes/08-cross-reference-index.md
+.worktrees/draft-docs/docs/project-structure.md
+.worktrees/draft-docs/docs/proposals/pos-operational-profile-brd.md
+.worktrees/draft-docs/docs/reference/glossary.md
+.worktrees/draft-docs/docs/reference/repository-inventory.md
+.worktrees/draft-docs/docs/reference/source-evidence.md
+---
+cat: .worktrees/draft-docs/docs/mkdocs.yml: No such file or directory
+total 142
+drwxr-xr-x 1 swafa 197609     0 Jul  8 16:45 .
+drwxr-xr-x 1 swafa 197609     0 Jul  8 16:45 ..
+-rw-r--r-- 1 swafa 197609    70 Jul  8 16:45 .git
+-rw-r--r-- 1 swafa 197609   279 Jul  8 16:45 .gitignore
+-rw-r--r-- 1 swafa 197609 11497 Jul  8 16:45 AGENTS.MD
+-rw-r--r-- 1 swafa 197609    11 Jul  8 16:45 CLAUDE.MD
+drwxr-xr-x 1 swafa 197609     0 Jul  8 16:45 DEMO
+-rw-r--r-- 1 swafa 197609 12428 Jul  8 16:45 FEATURES.md
+-rw-r--r-- 1 swafa 197609  1603 Jul  8 16:45 INSTALLATION.md
+-rw-r--r-- 1 swafa 197609 35184 Jul  8 16:45 LICENSE
+-rw-r--r-- 1 swafa 197609   451 Jul  8 16:45 MANIFEST.in
+-rw-r--r-- 1 swafa 197609  6070 Jul  8 16:45 README.md
+-rw-r--r-- 1 swafa 197609 20843 Jul  8 16:45 SETUP.md
+-rw-r--r-- 1 swafa 197609   953 Jul  8 16:45 TERMS.md
+drwxr-xr-x 1 swafa 197609     0 Jul  8 16:45 URYMosaic
+-rw-r--r-- 1 swafa 197609   648 Jul  8 16:45 package.json
+drwxr-xr-x 1 swafa 197609     0 Jul  8 16:45 pos
+-rw-r--r-- 1 swafa 197609  1542 Jul  8 16:45 pyproject.toml
+-rw-r--r-- 1 swafa 197609   107 Jul  8 16:45 requirements.txt
+-rw-r--r-- 1 swafa 197609   519 Jul  8 16:45 setup.py
+drwxr-xr-x 1 swafa 197609     0 Jul  8 16:45 ury
+drwxr-xr-x 1 swafa 197609     0 Jul  8 16:45 urypos
+---
+.worktrees/ury-src/URYMosaic/package.json
+.worktrees/ury-src/URYMosaic/vite.config.js
+.worktrees/ury-src/package.json
+.worktrees/ury-src/pos/package.json
+.worktrees/ury-src/pos/vite.config.ts
+.worktrees/ury-src/urypos/package.json
+.worktrees/ury-src/urypos/vite.config.js
+mkdocs.yml isn't in docs/, likely at draft-docs root. Let me find it and read key files..worktrees/draft-docs/mkdocs.yml
+---
+total 9
+drwxr-xr-x 1 swafa 197609    0 Jul  8 16:45 .
+drwxr-xr-x 1 swafa 197609    0 Jul  8 16:45 ..
+-rw-r--r-- 1 swafa 197609   73 Jul  8 16:45 .git
+drwxr-xr-x 1 swafa 197609    0 Jul  8 16:45 docs
+-rw-r--r-- 1 swafa 197609 2941 Jul  8 16:45 mkdocs.yml
+Now I need to read source files to verify claims. Let me read package.jsons and vite configs, main files for each frontend.Good. Now I need to verify frontend source structure claims. Let me list source directories for each frontend.=== urypos/src ===
+.worktrees/ury-src/urypos/src/App.vue
+.worktrees/ury-src/urypos/src/assets/vue.svg
+.worktrees/ury-src/urypos/src/components/Cart.vue
+.worktrees/ury-src/urypos/src/components/Customer.vue
+.worktrees/ury-src/urypos/src/components/Header.vue
+.worktrees/ury-src/urypos/src/components/Login.vue
+.worktrees/ury-src/urypos/src/components/Menu.vue
+.worktrees/ury-src/urypos/src/components/NotificationModal.vue
+.worktrees/ury-src/urypos/src/components/Search.vue
+.worktrees/ury-src/urypos/src/components/Table.vue
+.worktrees/ury-src/urypos/src/components/bottomTabs.vue
+.worktrees/ury-src/urypos/src/components/orderInfo.vue
+.worktrees/ury-src/urypos/src/components/posClosing.vue
+.worktrees/ury-src/urypos/src/components/posOpening.vue
+.worktrees/ury-src/urypos/src/components/recentOrder.vue
+.worktrees/ury-src/urypos/src/components/takeAwayTable.vue
+.worktrees/ury-src/urypos/src/index.css
+.worktrees/ury-src/urypos/src/main.js
+.worktrees/ury-src/urypos/src/router/auth.js
+.worktrees/ury-src/urypos/src/router/index.js
+.worktrees/ury-src/urypos/src/stores/Alert.js
+.worktrees/ury-src/urypos/src/stores/Auth.js
+.worktrees/ury-src/urypos/src/stores/Customer.js
+.worktrees/ury-src/urypos/src/stores/Menu.js
+.worktrees/ury-src/urypos/src/stores/Notification.js
+.worktrees/ury-src/urypos/src/stores/NotificationModal.js
+.worktrees/ury-src/urypos/src/stores/Table.js
+.worktrees/ury-src/urypos/src/stores/bottomTabs.js
+.worktrees/ury-src/urypos/src/stores/frappeSdk.js
+.worktrees/ury-src/urypos/src/stores/invoiceData.js
+.worktrees/ury-src/urypos/src/stores/posClosing.js
+.worktrees/ury-src/urypos/src/stores/posOpening.js
+.worktrees/ury-src/urypos/src/stores/recentOrder.js
+.worktrees/ury-src/urypos/src/style.css
+.worktrees/ury-src/urypos/src/views/Home.vue
+.worktrees/ury-src/urypos/src/views/Login.vue
+=== pos/src ===
+.worktrees/ury-src/pos/src/App.tsx
+.worktrees/ury-src/pos/src/assets/react.svg
+.worktrees/ury-src/pos/src/components/AggregatorSelect.tsx
+.worktrees/ury-src/pos/src/components/AuthGuard.tsx
+.worktrees/ury-src/pos/src/components/CommentDialog.tsx
+.worktrees/ury-src/pos/src/components/CustomerSelect.tsx
+.worktrees/ury-src/pos/src/components/Footer.tsx
+.worktrees/ury-src/pos/src/components/Header.tsx
+.worktrees/ury-src/pos/src/components/InitialLoader.tsx
+.worktrees/ury-src/pos/src/components/LayoutView.tsx
+.worktrees/ury-src/pos/src/components/MenuCard.tsx
+.worktrees/ury-src/pos/src/components/MenuList.tsx
+.worktrees/ury-src/pos/src/components/OrderPanel.tsx
+.worktrees/ury-src/pos/src/components/OrderStatusSidebar.tsx
+.worktrees/ury-src/pos/src/components/OrderTypeSelect.tsx
+.worktrees/ury-src/pos/src/components/POSOpeningDialog.tsx
+.worktrees/ury-src/pos/src/components/POSOpeningProvider.tsx
+.worktrees/ury-src/pos/src/components/PaymentDialog.tsx
+.worktrees/ury-src/pos/src/components/ProductDialog.tsx
+.worktrees/ury-src/pos/src/components/ScreenSizeDialog.tsx
+.worktrees/ury-src/pos/src/components/ScreenSizeProvider.tsx
+.worktrees/ury-src/pos/src/components/SearchBar.tsx
+.worktrees/ury-src/pos/src/components/Sidebar.tsx
+.worktrees/ury-src/pos/src/components/Spotlight.tsx
+.worktrees/ury-src/pos/src/components/TableSelectionDialog.tsx
+.worktrees/ury-src/pos/src/components/TableShapeIcon.tsx
+.worktrees/ury-src/pos/src/data/doctypes.ts
+.worktrees/ury-src/pos/src/data/menu-data.ts
+.worktrees/ury-src/pos/src/data/order-types.ts
+.worktrees/ury-src/pos/src/i18n/config.ts
+.worktrees/ury-src/pos/src/i18n/index.ts
+.worktrees/ury-src/pos/src/i18n/loader.ts
+.worktrees/ury-src/pos/src/i18n/resolve-language.ts
+.worktrees/ury-src/pos/src/index.css
+.worktrees/ury-src/pos/src/lib/aggregator-api.ts
+.worktrees/ury-src/pos/src/lib/auth-api.ts
+.worktrees/ury-src/pos/src/lib/customer-api.ts
+.worktrees/ury-src/pos/src/lib/frappe-sdk.ts
+.worktrees/ury-src/pos/src/lib/invoice-api.ts
+.worktrees/ury-src/pos/src/lib/menu-api.ts
+.worktrees/ury-src/pos/src/lib/menu-course-api.ts
+.worktrees/ury-src/pos/src/lib/order-api.ts
+.worktrees/ury-src/pos/src/lib/payment-api.ts
+.worktrees/ury-src/pos/src/lib/pos-opening-api.ts
+.worktrees/ury-src/pos/src/lib/pos-profile-api.ts
+.worktrees/ury-src/pos/src/lib/print-qz.ts
+.worktrees/ury-src/pos/src/lib/print.ts
+.worktrees/ury-src/pos/src/lib/role-utils.ts
+.worktrees/ury-src/pos/src/lib/storage.ts
+.worktrees/ury-src/pos/src/lib/table-api.ts
+.worktrees/ury-src/pos/src/lib/utils.ts
+.worktrees/ury-src/pos/src/main.tsx
+.worktrees/ury-src/pos/src/pages/Orders.tsx
+.worktrees/ury-src/pos/src/pages/POS.tsx
+.worktrees/ury-src/pos/src/pages/Table.tsx
+.worktrees/ury-src/pos/src/store/pos-store.ts
+.worktrees/ury-src/pos/src/store/root-store.ts
+.worktrees/ury-src/pos/src/vite-env.d.ts
+=== URYMosaic/src ===
+.worktrees/ury-src/URYMosaic/src/App.vue
+.worktrees/ury-src/URYMosaic/src/assets/vue.svg
+.worktrees/ury-src/URYMosaic/src/components/Header.vue
+.worktrees/ury-src/URYMosaic/src/components/kot.vue
+.worktrees/ury-src/URYMosaic/src/index.css
+.worktrees/ury-src/URYMosaic/src/main.js
+.worktrees/ury-src/URYMosaic/src/router/auth.js
+.worktrees/ury-src/URYMosaic/src/router/index.js
+.worktrees/ury-src/URYMosaic/src/style.css
+.worktrees/ury-src/URYMosaic/src/views/Home.vue
+.worktrees/ury-src/URYMosaic/src/views/Login.vue
+I see some inaccuracies already:
+  - urypos doesn't have src/stores/utils/PrintWithQz.js; PrintWithQz seems to not exist. Let me verify with grep.
+  - urypos components: opening/closing, customer, recent orders exist but maybe naming differs.
+  - pos-react: i18n is in src/i18n/config.ts not just main.tsx. Main.tsx initializes i18n? Let me check.
+
+  Let me read key files to verify more details, and also check pos lib files for API wrapper names/paths.Good. I see in kot.vue the methods are `serveOrder` and `confirmOrder`, not `serve_kot`/`confirm_cancel_kot` as function names. But the API endpoints are correct.
+
+  Now I need to check if urypos has PrintWithQz.js..worktrees/ury-src/urypos/src/stores/utils/PrintWithQz.js
+---
+.worktrees/ury-src/urypos/src/stores/Auth.js:10:import { disconnectQzPrinter } from "./utils/PrintWithQz";
+.worktrees/ury-src/urypos/src/stores/invoiceData.js:14:  printWithQz,
+.worktrees/ury-src/urypos/src/stores/invoiceData.js:17:} from "./utils/PrintWithQz";
+.worktrees/ury-src/urypos/src/stores/invoiceData.js:485:          const print = await printWithQz(this.qz_host, result?.message?.html);
+.worktrees/ury-src/urypos/src/stores/utils/PrintWithQz.js:2:import qz from "qz-tray";  
+.worktrees/ury-src/urypos/src/stores/utils/PrintWithQz.js:10:} from 'jsrsasign';
+.worktrees/ury-src/urypos/src/stores/utils/PrintWithQz.js:48:export function printWithQz(host,htmlToPrint){
+Good. So legacy-urypos doc is mostly accurate except:
+  1. "State | Pinia" - yes
+  2. "src/stores/utils/PrintWithQz.js" - yes exists
+  3. "vue-datepicker" and "vue-datepicker-next" both in deps - yes
+  4. Build command exact - yes
+  5. Component names: posClosing/posOpening are lowercase, not opening/closing. But claim says "opening/closing" as purpose, not exact name. Still, the component names are posOpening.vue and posClosing.vue. The doc says "opening/closing" which is slightly vague. Might be OK.
+  6. "It remains in the repository and is built by root yarn build script before the React POS v2 build" - root package.json builds ury-pos-build then ury-mosaic-build then ury-posv2-build, so yes, urypos built first.
+
+  Now pos-react doc:
+  1. "src/main.tsx | Initializes i18n and mounts React" - accurate
+  2. "src/App.tsx | Root routing and app shell" - accurate
+  3. "src/pages/POS.tsx | Main ordering surface" - accurate
+  4. "src/pages/Orders.tsx | Invoice/order history, payment, print, cancel flows" - need verify
+  5. "src/store/pos-store.ts | Menu, cart, active order, selected table/customer/order type state" - need verify
+  6. API wrappers: getRestaurantMenu, getAggregatorMenu, syncOrder, getTableOrder, getPOSInvoices, getPOSInvoiceItems all accurate per files read. networkPrint, selectNetworkPrinter, updatePrintStatus accurate but they're in invoice-api.ts, not print.ts as doc implies by table order. The doc table just says "Wrapper | Backend endpoint" without claiming which file. But naming: doc says `networkPrint` wrapper; source exports `networkPrint` from invoice-api.ts. Good. `updatePrintStatus` from invoice-api.ts. Good.
+  7. Sequence diagram: "API->Invoice: Save draft POS Invoice" - sync_order actually creates/updates URY Order and POS Invoice. Need check. "API->KOT: kot_execute" - need verify the backend function name. The doc says "kot_execute" but maybe actual is different.
+  8. "Several wrappers parse Frappe `_server_messages`" - accurate for menu-api, aggregator-api. invoice-api catches and throws generic Error. order-api doesn't parse _server_messages, just console.error and returns {message:null}. So "Several wrappers" is accurate but not all.
+  9. "Tailwind CSS 3" - pos/package.json has tailwindcss ^3.4.17, but also @tailwindcss/postcss ^4.1.11. The doc says Tailwind CSS 3, which is accurate (v3 runtime). But v4 dep for postcss might be a mismatch. Hmm, maybe claim "Tailwind CSS 3" is INACCURATE because package.json includes @tailwindcss/postcss 4.1.11. But the main tailwindcss is 3.4.17. I think it's acceptable as "Styling | Tailwind CSS 3" but technically there is v4 postcss package. I'd mark it potentially inaccurate if strict.
+
+  Need to verify pos-react POS flow: syncOrder endpoint path in backend. Let me read ury_order.py and ury_kot.py..worktrees/ury-src/ury/ury/doctype/ury_order/test_ury_order.py
+.worktrees/ury-src/ury/ury/doctype/ury_order/ury_order.js
+.worktrees/ury-src/ury/ury/doctype/ury_order/ury_order.json
+.worktrees/ury-src/ury/ury/doctype/ury_order/ury_order.py
+.worktrees/ury-src/ury/ury/doctype/ury_order/__init__.py
+---
+.worktrees/ury-src/ury/ury/api/button_permission.py
+.worktrees/ury-src/ury/ury/api/pos_extend.py
+.worktrees/ury-src/ury/ury/api/ury_kot_display.py
+.worktrees/ury-src/ury/ury/api/ury_kot_generate.py
+.worktrees/ury-src/ury/ury/api/ury_kot_notification.py
+.worktrees/ury-src/ury/ury/api/ury_kot_order_number.py
+.worktrees/ury-src/ury/ury/api/ury_kot_reprint.py
+.worktrees/ury-src/ury/ury/api/ury_kot_validation.py
+.worktrees/ury-src/ury/ury/api/ury_menu_course_validation.py
+.worktrees/ury-src/ury/ury/api/ury_print.py
+Need verify order-payment flow. Let me read ury_order.py sync_order and KOT generate function.Need read more of ury_kot_generate.py and sync_order in ury_order.py to verify KOT lifecycle.
+
+
+
+error: failed to run prompt: provider.connection_error: Connection error.
+See log: C:/Users/swafa/.kimi-code/logs/kimi-code.log

@@ -1,0 +1,681 @@
+• I need to verify documentation accuracy against source code. This is a substantial read-only investigation task. I should:
+
+  1. First set up a todo list
+  2. Read the docs files and source files
+  3. Extract and verify claims
+  4. Write output to the specified file
+  5. Verify git status shows only ongoing/ paths
+
+  Let me start by reading the docs and key source files. I'll use parallel reads where possible.
+
+  Key source files to check:
+  - .worktrees/ury-src/pyproject.toml
+  - .worktrees/ury-src/setup.py
+  - .worktrees/ury-src/hooks.py
+  - .worktrees/ury-src/package.json
+  - .worktrees/ury-src/README.md
+  - .worktrees/ury-src/INSTALLATION.md
+  - .worktrees/ury-src/SETUP.md
+  - .worktrees/ury-src/FEATURES.md
+  - .worktrees/ury-src/ury/ury_pos/api.py
+  - .worktrees/ury-src/ury/ury/doctype/ directories
+  - .worktrees/ury-src/ury/hooks.py
+  - .worktrees/ury-src/ury/ury/api/*.py
+
+  Let me start with reading all the docs and key source files in parallel.I need to read all the docs and source files. Let me do this in parallel.The root hooks.py doesn't exist - it's at ury/hooks.py. Let me read that plus other source files. I also need to check the doctype directories, api files, etc.
+
+  Let me read:
+  - .worktrees/ury-src/ury/hooks.py
+  - .worktrees/ury-src/ury/ury_pos/api.py
+  - .worktrees/ury-src/ury/ury/api/*.py
+  - .worktrees/ury-src/ury/__init__.py (for version)
+  - .worktrees/ury-src/ury/ury/doctype/ directory listing
+
+  Let me use Glob and Read in parallel.I have a lot of source now. Let me also check:
+  - pos/package.json for React/Vite versions
+  - URYMosaic/package.json for Vue version
+  - urypos/package.json for Vue version
+  - pos/AGENTS.MD maybe for tech stack
+  - setup.py custom fields
+  - fixtures/role.json
+  - ury/ury/doctype complete list (count)
+  - ury_order.py for sync_order
+
+  Let me also read the remaining doctype files that were truncated. I need to count doctypes and verify names. Let me get directory listing only (not files).36
+__init__.py
+aggregator_settings
+item_add_on
+kds_order_type
+menu_for_room
+multiple_rooms
+order_type_menu
+pos_item_variants
+role_permitted
+sub_pos_closing
+sub_pos_closing_payment
+sub_pos_invoices
+ury_cost_of_goods
+ury_daily_p_and_l
+ury_fixed_expenses
+ury_kot
+ury_kot_error_log
+ury_kot_items
+ury_materials
+ury_menu
+ury_menu_course
+ury_menu_item
+ury_notification_recipient
+ury_order
+ury_order_item
+ury_p_and_l_breakup
+ury_p_and_l_materials
+ury_printer_settings
+ury_production_item_groups
+ury_production_unit
+ury_report_settings
+ury_restaurant
+ury_room
+ury_table
+ury_user
+ury_variable_expenses
+I need to read role.json and also check the URY Order doctype for sync_order. Also need to check if there's createPaymentEntry in api.py (I didn't see it - only create_customer, validate_pos_close, etc.). Need to check the ury_order.py controller. Also need to check for "make_invoice" or payment flow.
+
+  Let me read role.json, ury_order.py, and search for createPaymentEntry.I need to also check:
+  - URY Restaurant JSON fields to verify setup guide fields
+  - URY Room JSON fields
+  - URY Table JSON fields
+  - URY Menu JSON fields
+  - POS Profile custom fields are in hooks fixtures (already have)
+  - URY Production Unit JSON fields
+  - Sub POS Closing doctype exists
+  - Employee custom fields
+  - socket.io / realtime channel format
+
+  Also I need to check if there's a "createPaymentEntry" anywhere. I searched and didn't find it. The project-specifications.md says it's in ury/ury_pos/api.py but it's not there. That's an inaccuracy.
+
+  Also project-specifications.md says "getBranchRoom" - not in the listed API methods (OK, it's not claiming it is).
+
+  Let me check a few more doctype JSONs to verify field names in setup-guide.md.I need to check a few more things:
+  - Does URY Room have "Bill" and "KOT Print" fields? The JSON shows only "printer_settings" table with "bill" and "printer" - no "KOT Print" field in the room itself. But the setup-guide.md says "Bill — Enable for invoice printing. KOT Print — Enable for KOT printing." Actually the URY Printer Settings child table has only "bill" field, no "kot_print". Let me check if there's a KOT Print in the child table or if it's elsewhere. Wait, in URY Restaurant maybe? No. The setup guide might be inaccurate about KOT Print in URY Room.
+
+  Wait, the URY Printer Settings child table is used in both POS Profile and URY Room and URY Production Unit. Its fields are "bill" and "printer" only. So there's no KOT Print field. That's an inaccuracy in setup-guide.md.
+
+  But wait, the upstream SETUP.md says: "Bill : Enable for Invoice Printing . KOT Print : Enable for KOT Printing ." So it's copied from upstream, but upstream itself may be inaccurate relative to current source. The policy says "A claim copied correctly from upstream INSTALLATION.md/SETUP.md counts as accurate." Hmm, but the task says "verify against source code". I think the policy means if Agent A copied it correctly from upstream, it's accurate. But if upstream is wrong, we need to decide. Actually re-reading: "A claim copied correctly from upstream INSTALLATION.md/SETUP.md counts as accurate." So if Agent A copied "KOT Print" from upstream, it counts as accurate even if upstream is wrong. But is it copied correctly? Upstream SETUP.md says "KOT Print" in URY Room section. Agent A says "KOT Print — Enable for KOT printing." That's a correct copy. So it counts as accurate per policy.
+
+  Actually wait - the task is to verify documentation accuracy against real source code. The ground facts say "Upstream's own docs ... are the author-maintained reference; Agent A may have paraphrased them." And policy says "A claim copied correctly from upstream INSTALLATION.md/SETUP.md counts as accurate." So I should mark it accurate if it's a faithful copy. But the inaccuracy would be upstream's, not Agent A's. Hmm.
+
+  But then what's the point of verifying against source? I think the key is: if Agent A makes a claim that is NOT in upstream and is wrong against source, it's inaccurate. If it's in upstream, even if wrong, it's "accurate" as a copy. But I should note it maybe? Actually the instructions say verdict per claim: ACCURATE / INACCURATE / UNVERIFIABLE. So I think I should mark it ACCURATE if copied from upstream correctly, even if source differs. But I'll note in coverage or as a caveat.
+
+  Actually, let me re-read carefully: "A claim copied correctly from upstream INSTALLATION.md/SETUP.md counts as accurate." This explicitly says it counts as accurate. So I should follow that.
+
+  But there's a subtlety: setup-guide.md says "Bill — Enable for invoice printing. KOT Print — Enable for KOT printing." This is a paraphrase of upstream. Upstream says "Bill : Enable for Invoice Printing . KOT Print : Enable for KOT Printing ." This is copied correctly. So ACCURATE per policy.
+
+  However, project-specifications.md claims about source code (DocTypes, endpoints, etc.) should be verified against source. There, "createPaymentEntry" is claimed but doesn't exist in source. That's inaccurate.
+
+  Let me also verify the POS Profile custom fields list in project-specifications.md:
+  - `restaurant`, `branch`, `printer_settings`, `qz_print`, `qz_host`, `enable_discount`, `enable_multiple_cashier`, `reset_order_number_daily`
+  From hooks.py fixtures, the actual fieldnames include:
+  - `restaurant`, `branch`, `printer_settings`, `qz_print`, `qz_host`
+  - `custom_enable_discount` (enable_discount)
+  - `custom_enable_multiple_cashier` (enable_multiple_cashier)
+  - `custom_reset_order_number_daily` (reset_order_number_daily)
+  So the labels match. The claim says these are custom fields on POS Profile. That's accurate.
+
+  But the claim also says "POS Closing Entry: extended for multi-cashier" - need to verify. From fixtures, there's `POS Closing Entry Detail-custom_closing_amount` and `POS Opening Entry-custom_sub_pos_close_entry`. The closing entry is extended. This seems accurate but vague. I'll count it.
+
+  For POS Invoice / Sales Invoice custom fields:
+  Claim: `order_type`, `waiter`, `no_of_pax`, `cashier`, `restaurant`, `branch`, `restaurant_table`, `invoice_printed`, `cancel_reason`, `custom_comments`, `custom_ury_order_number`
+  Source (fixtures): 
+  - POS Invoice: order_type, waiter, no_of_pax, cashier, restaurant, branch, restaurant_table, invoice_printed, cancel_reason, custom_comments, custom_ury_order_number - all present
+  - Sales Invoice: order_type, waiter, no_of_pax, cashier, restaurant, branch, restaurant_table, but NOT invoice_printed, NOT cancel_reason, NOT custom_comments, NOT custom_ury_order_number.
+  The claim groups them together with "/". This is inaccurate because Sales Invoice doesn't have all those fields. Source: hooks.py fixtures lines 284-300. Sales Invoice has mobile_number, order_info, order_type, waiter, no_of_pax, cashier, restaurant_info, restaurant, branch, restaurant_table, custom_restaurant_room, arrived_time, total_spend_time, custom_aggregator_id, and Sales Invoice Item-custom_course. No invoice_printed, cancel_reason, custom_comments, custom_ury_order_number.
+
+  This is an inaccuracy in project-specifications.md.
+
+  POS Opening Entry claim: `restaurant`, `branch`, `custom_room`, `custom_rooms`
+  Source: fixtures has `POS Opening Entry-restaurant`, `POS Opening Entry-branch`, `POS Opening Entry-custom_room`, `POS Opening Entry-custom_rooms`. Also has `custom_sub_pos_close_entry`, `custom_ury_last_invoice`, `custom_ury_last_aggregator_invoice`. The claim is accurate for what it lists.
+
+  Branch claim: `user` (URY User table), `custom_aggregators`
+  Source: fixtures has Branch-user, Branch-custom_aggregator_settings, Branch-custom_aggregators, Branch-custom_make_unpaid, Branch-custom_no_taxes. So `custom_aggregators` exists. `user` exists. Accurate.
+
+  Customer: mobile_number - accurate.
+  Price List: restaurant_menu - accurate.
+
+  DocType list in project-specifications.md:
+  - `URY Order` - yes
+  - `URY Order Item` - yes
+  - `URY KOT` - yes
+  - `URY KOT Items` - actual is `URY KOT Items`? Let me check. The directory is `ury_kot_items` and the JSON name is `URY KOT Items`. Yes.
+  - `URY Menu` - yes
+  - `URY Menu Item` - yes
+  - `URY Menu Course` - yes
+  - `URY Restaurant` - yes
+  - `URY Room` - yes
+  - `URY Table` - yes
+  - `URY Printer Settings` - yes
+  - `URY User` - yes
+  - `Aggregator Settings` - yes
+  - `Item Add On` - yes
+  - `POS Item Variants` - yes
+  - `URY Daily P and L` - yes
+  - `URY Cost of Goods` - yes
+  - `Sub POS Closing` - yes (sub_pos_closing)
+
+  So all DocType names are accurate.
+
+  But project-specifications.md says "35+ custom Frappe doctypes". Actual count is 36 directories minus __init__.py = 35 directories? Wait, the ls output shows 36 lines including __init__.py. So 35 actual doctype directories. So "35+" is accurate (there are 35). Actually wait: the ls -1 output had 36 lines, first was __init__.py, so 35 doctypes. So "35+" is accurate.
+
+  Now for hooks table:
+  - POS Invoice before_insert: "Set arrived_time, validate restaurant/branch" - actual handler is `ury.ury.hooks.ury_pos_invoice.before_insert`. Let me check what it does. I haven't read that file. Need to verify the description. But probably accurate.
+  - validate: validate order fields - actual `ury.ury.hooks.ury_pos_invoice.validate`
+  - after_insert: set daily order number - actual `ury.ury.api.ury_kot_order_number.set_order_number`. Hmm, does this set order number? Let me check ury_kot_order_number.py.
+  - before_submit: final validation - actual `ury.ury.hooks.ury_pos_invoice.before_submit`
+  - on_cancel/on_trash: cleanup KOTs - actual `ury.ury.hooks.ury_pos_invoice.on_trash`
+  - POS Profile validate: validate printer/restaurant setup - actual `ury.ury.hooks.ury_pos_profile.validate`
+  - Sales Invoice before_insert, on_update: copy restaurant fields from POS Invoice - actual `ury.ury.hooks.ury_sales_invoice.before_insert` and `on_update`
+  - Item validate: validate menu item configuration - actual `ury.ury.hooks.ury_item.validate`
+  - POS Opening Entry validate: set cashier room assignment - actual `ury.ury.hooks.ury_pos_opening_entry.set_cashier_room`
+  - before_save: validation - actual `ury.ury.hooks.ury_pos_opening_entry.before_save`
+  - before_insert: set last invoice reference - actual `ury.ury.api.ury_kot_order_number.set_last_invoice_in_pos_open`
+  - POS Closing Entry before_save, validate: closing validation - actual `ury.ury.hooks.ury_pos_closing_entry.before_save` and `validate`
+
+  These are mostly accurate descriptions. But I should verify a couple. The after_insert handler is `set_order_number` from `ury_kot_order_number.py`. Let me check. Also POS Opening Entry validate handler is `set_cashier_room`, which the doc says "Set cashier room assignment" - that's accurate based on the function name. But let me verify the actual content.
+
+  Let me read those hook files.Now I have enough to verify the hooks descriptions. Let me also check the API endpoints list.
+
+  Main POS API methods claimed:
+  - `getRestaurantMenu` - yes (api.py:19)
+  - `getBranch` - yes (api.py:111)
+  - `getModeOfPayment` - yes (api.py:177)
+  - `getPosProfile` - yes (api.py:450)
+  - `getAggregatorItem` - yes (api.py:616)
+  - `createPaymentEntry` - NO, not found
+  - `getInvoiceForCashier` - yes (api.py:190)
+
+  Also there are other methods not listed: getMenuCourses, getBranchRoom, getRoom, getPosInvoice, searchPosInvoice, get_select_field_options, fav_items, getCashier, posOpening, getAggregator, getAggregatorMOP, create_customer, validate_pos_close. The list is incomplete but that's OK - it's "such as".
+
+  KOT API methods claimed:
+  - `get_site_name` - yes (ury_kot_display.py:29)
+  - `kot_list` - yes (ury_kot_display.py:33)
+  - `serve_kot` - yes (ury_kot_display.py:10)
+  - `confirm_cancel_kot` - yes (ury_kot_display.py:23)
+
+  Order API: `sync_order` - yes (ury_order.py:114)
+
+  Scheduler: `ury.ury.api.ury_kot_validation.kotValidationThread` runs every minute - yes (hooks.py:160-165)
+
+  Integration points:
+  - Orders create POS Invoices - yes
+  - Consolidation creates Sales Invoices - this is standard ERPNext behavior; in source Sales Invoice hooks copy fields from POS Invoice. Accurate.
+  - Payments use ERPNext POS payment flow via `make_invoice` - `make_invoice` is a whitelisted function in ury_order.py:558, not ERPNext's flow. It submits the POS Invoice. This is partially accurate/inaccurate. Actually the doc says "Payments use ERPNext POS payment flow via make_invoice" - but `make_invoice` is a URY function, not ERPNext's. However it does trigger the standard submission. This is vague. I might mark it accurate enough or note it's URY's function.
+  - Price Lists, Customers, Payment Modes, Tax Templates standard - accurate.
+
+  Route rules: 
+  - `/pos/<path:app_path>` to `pos` - yes
+  - `/URYMosaic/<path:app_path>` to `URYMosaic` - yes
+  But there's also `/urypos/<path:app_path>` to `urypos` missing. The doc only lists 2 of 3. That's a coverage miss, not necessarily an inaccuracy.
+
+  Real-time channel format: `kot_update_{branch}_{production_unit}` - source ury_order.py:659 shows exactly this format. Accurate.
+
+  Printing:
+  - QZ Tray - accurate
+  - Network Printing via ERPNext Network Printer Settings / CUPS - accurate
+  - WebSocket Printing fallback page at `/app/websocket-print` - the hooks.py has `page/` websocket_print. The FEATURES.md says `/app/websocket-print`. Accurate.
+
+  Build & asset flow - accurate.
+
+  Roles: URY Manager, URY Captain, URY Cashier - all in role.json. Accurate.
+
+  Tech stack:
+  - Frappe Framework v15 - pyproject.toml doesn't specify but README/INSTALLATION use version-15. The app itself doesn't require v15 explicitly. But it's reasonable.
+  - ERPNext v15 - branch version-15 in INSTALLATION. Accurate.
+  - Frappe HR (hrms) - accurate
+  - Python >= 3.10 - pyproject.toml line 7. Accurate.
+  - Frappe ORM, @frappe.whitelist() RPC - accurate
+  - Frappe scheduler - accurate
+  - Frappe Socket.io - accurate
+
+  Frontend apps:
+  - POS v2 (current): React 19 + TypeScript, Vite 6, Zustand, /pos - React 19 yes, TypeScript yes, Vite 6 yes, Zustand yes. Accurate.
+  - URYMosaic (KDS): Vue 3 (Options API), Vite 4, Vue data, /URYMosaic/<production_unit> - Vue 3 yes, Vite 4 yes, but "Vue data" is vague. I need to check if it uses Options API. Let me check URYMosaic source briefly. Actually not necessary - it's a reasonable claim.
+  - POS v1 (legacy): Vue 3, Vite, Vuex/Pinia, /urypos - Vue 3 yes, Vite 4.5.2 yes, Pinia yes. It doesn't use Vuex but Pinia. So "Vuex/Pinia" is OK. Accurate.
+
+  Shared libraries:
+  - Tailwind CSS - yes in all package.json
+  - frappe-js-sdk - yes
+  - lucide-react (POS) - yes
+  - @radix-ui/react-select (POS) - yes
+  - qz-tray (thermal printing) - yes in pos and urypos
+  - socket.io-client (KDS) - yes
+  - masonry-layout (KDS) - yes
+
+  Repository structure claims - mostly accurate. 
+  - `permission.py` exists? Need to check. The AGENTS.md says permission.py. Let me verify.
+  - `patches.txt` - yes
+  - `setup.py` - yes
+  - `install.py` - yes
+  - `uninstall.py` - yes
+  - `ury/ury/api/` - yes
+  - `ury/ury/page/websocket_print/` - yes
+  - `ury/ury_pos/api.py` - yes
+  - `fixtures/` - yes
+  - `public/` - yes
+  - `www/` - yes
+  - `patches/v2_0/` - need to check if it exists.
+
+  Let me verify permission.py and patches directory.C:/Users/swafa/Projects/Workspaces/ury/.worktrees/ury-src/ury/install.py
+C:/Users/swafa/Projects/Workspaces/ury/.worktrees/ury-src/ury/patches.txt
+C:/Users/swafa/Projects/Workspaces/ury/.worktrees/ury-src/ury/permission.py
+C:/Users/swafa/Projects/Workspaces/ury/.worktrees/ury-src/ury/uninstall.py
+
+C:/Users/swafa/Projects/Workspaces/ury/.worktrees/ury-src/ury/patches/v2_0:
+default_permissions.py
+__init__.py
+websocket_print.js
+websocket_print.json
+__init__.py
+pos.py
+images
+js
+Good. Now I need to verify setup-guide.md fields against source. Let me check the relevant doctype JSONs and custom fields.
+
+  Setup-guide.md Step 4 URY Restaurant fields:
+  - Name - yes (autoname: prompt)
+  - Company - yes
+  - Invoice Series Prefix - yes
+  - Aggregator Series Prefix - yes
+  - Branch - yes
+  - Default Tax Template - yes
+  - Address - yes
+  - Default Menu - yes (active_menu label "Default Menu")
+  - Room Wise Menu - yes
+  - Order Type Wise Menu - yes
+
+  These are all accurate.
+
+  Step 5 URY Room:
+  - Name - yes (autoname: Prompt)
+  - Room Type - yes
+  - Print Settings - yes
+  - Bill - yes (in child table URY Printer Settings)
+  - KOT Print - as discussed, copied from upstream. Mark accurate per policy.
+
+  Step 7 URY Menu:
+  - Name - yes
+  - Restaurant - hmm, URY Menu JSON doesn't have a "Restaurant" field. It has branch and price_list. The source says `branch` is a Link to Branch, and `price_list` is read-only auto-created. There's no `restaurant` field.
+  Wait, upstream SETUP.md says: "Restaurant : Linked to URY Restaurant to select restaurant." But source JSON has no restaurant field. So setup-guide.md says "Restaurant — Linked restaurant." This is copied from upstream but is wrong against source. Per policy, if copied correctly from upstream, it counts as accurate. But actually, is it copied correctly? Upstream says "Restaurant : Linked to URY Restaurant to select restaurant ." Agent A says "Restaurant — Linked restaurant." That's a paraphrase. The policy says "copied correctly" counts as accurate. Paraphrased might not count. Hmm.
+
+  Actually, re-reading the task: "A claim copied correctly from upstream INSTALLATION.md/SETUP.md counts as accurate." The word "correctly" suggests faithful reproduction. Agent A's version is a slight paraphrase. But the factual content is the same (that URY Menu has a Restaurant field linked to URY Restaurant). Since the upstream claim itself is inaccurate against source, and Agent A reproduces it, should it be accurate or inaccurate?
+
+  I think the intent is: don't penalize Agent A for accurately transcribing upstream docs, even if upstream is stale. So I should mark it ACCURATE as a faithful copy. But I need to be careful: if Agent A paraphrased and the paraphrase introduces a new error, that's inaccurate.
+
+  For URY Menu Restaurant field: upstream says it's linked to URY Restaurant; Agent A says "Linked restaurant." This is a faithful paraphrase. So per policy, accurate.
+
+  - Branch — Auto-populated from restaurant. Source: URY Menu has branch field (Link to Branch), reqd, not fetch_from. But maybe it's auto-populated via client script or logic. Upstream says "Branch : This field will be automatically populated when you select a restaurant." Since URY Menu doesn't have restaurant field, this is upstream error. But copied faithfully. Per policy, accurate.
+
+  - Enabled - yes
+  - Items - yes
+  - Special Dish - this is a field in URY Menu Item (special_dish), not directly in URY Menu. Upstream says "Special Dish : You can use this checkbox in the Item table to show an item as a Special Items". Agent A says "Special Dish — Highlight priority/special items." This is vague enough; it's referring to the item table. Accurate.
+  - Disabled - field in URY Menu Item (disabled). Agent A says "Disabled — Remove items temporarily." Again refers to item table. Accurate.
+  - Course - field in URY Menu Item (course). Accurate.
+
+  Step 8 URY Table:
+  - Name - yes
+  - Restaurant - yes
+  - Restaurant Room - yes
+  - Branch - yes (fetch_from restaurant.branch)
+  - No of seat - label is "No of Seats" (plural). Claim says "No of seat" (singular). This is a minor case difference but the field label is "No of Seats". Not really an inaccuracy for a setup guide.
+  - Minimum seating - yes
+  - Is Take Away - yes
+  - Table Shape - yes
+
+  Step 9 POS Profile:
+  Many fields. Need to verify against fixtures in hooks.py. The custom fields in POS Profile include:
+  - printer_settings (Printer Settings table)
+  - qz_print (QZ Print)
+  - qz_host (QZ Host)
+  - transfer_role_permissions (Captain Transfer Role Permissions)
+  - role_allowed_for_billing (Role Allowed For Billing)
+  - role_restricted_for_table_order (Role Restricted For Table Order)
+  - view_all_status (Allow Cashier To View All Status)
+  - remove_items (Allow Cashier To Edit And Remove Table Order Items)
+  - show_image (Show Item Image In URY POS)
+  - custom_daily_pos_close (Require Daily POS Closing)
+  - custom_enable_discount (Enable Discount)
+  - custom_edit_order_type (Enable Order Type Edit)
+  - custom_enable_multiple_cashier (Enable Multiple Cashier)
+  - kot_naming_series (URY KOT Naming Series)
+  - custom_kot_warning_time (KOT Warning Time)
+  - custom_enable_kot_reprint (Enable KOT Reprint)
+  - custom_kot_alert (Enable KOT Audio Alert)
+  - custom_notify_kot_delay (Notify KOT Delay)
+  - custom_recipients (Recipients (By Role))
+  - custom_reset_order_number_daily (Reset Order Number Daily)
+  - paid_limit (Show Limited Paid Invoices)
+  - table_attention_time (Table Attention Time)
+
+  Also restaurant_prefix, custom_parcel_order_printer, custom_table_order_printer, custom_reprint_kot_format.
+
+  Setup-guide.md lists:
+  - Printer Settings - yes
+  - QZ Print - yes
+  - QZ Host - yes
+  - Captain Transfer Role Permissions - yes
+  - Role Allowed For Billing - yes
+  - Role Restricted For Table Order - yes
+  - Table Attention Time - yes
+  - Show Limited Paid Invoices - yes
+  - Allow Cashier To View All Status - yes
+  - Allow Cashier To Edit And Remove Table Order Items - yes
+  - Show Item Image In URY POS - yes
+  - Require Daily POS Closing - yes
+  - Enable Discount - yes
+  - Enable Order Type Edit - yes
+  - Enable Multiple Cashier - yes
+  - URY KOT Naming Series - yes
+  - KOT Warning Time - yes
+  - Enable KOT Reprint - yes
+  - Enable KOT Audio Alert - yes
+  - Notify KOT Delay - yes
+  - Recipients (By Role) - yes
+  - Reset Order Number Daily - yes
+
+  All accurate.
+
+  Step 10 URY Production Unit:
+  - Production - yes
+  - POS Profile - yes
+  - Branch - yes (auto-fetched)
+  - Warehouse - yes (auto-fetched)
+  - Item Groups - yes
+  - Printers - yes
+
+  Accurate.
+
+  Step 12 Printer Setup:
+  - cert.pem path: `ury/public/files/cert.pem` - need to verify if this path is documented/used. The source has `public/js/sign-message.js` and `jsrsasign-all-min.js`. The cert path is not in source code but is a setup instruction. Upstream says "Add your certificate file is at `ury/public/files/cert.pem`." Agent A says "Place the certificate file at `ury/public/files/cert.pem`." Copied correctly. Accurate per policy.
+  - pos/privateKey.js and urypos/privateKey.js - need to verify these files exist. Let me check.
+
+  Step 14 Multiple Cashier Workflow - accurate.
+
+  Step 15 URY Report Settings:
+  - Extended Hours - yes
+  - No of Hours - label "No Of Hours" (capital O). Claim says "No of Hours". Minor.
+  - Buying Price List - yes
+  - Direct Expenses / Consumables / Direct Fixed Expenses - yes
+  - Indirect Expenses / Electricity Charges / Indirect Fixed Expenses / Percentage Expenses - yes
+  - Employee Costs - yes
+  - Depreciation - yes
+  - Payment Type / Payment Amount in Employee - yes (Employee-payment_type, Employee-payment_amount in fixtures)
+
+  All accurate.
+
+  Now I should also verify installation.md:
+  - Frappe bench environment prerequisite - vague, not checkable? It's a reasonable prerequisite.
+  - Python >= 3.10 - pyproject.toml line 7. Accurate.
+  - Node.js >= 18.20 - upstream INSTALLATION says "Minimum Node Version 18.20.*+ required". Agent A says Node.js >= 18.20. Accurate.
+  - Install ERPNext version-15 branch - upstream and source branch version-15. Accurate.
+  - Frappe HR branch hrms - upstream and source. Accurate.
+  - URY from https://github.com/ury-erp/ury.git - upstream and README. Accurate.
+  - bench new-site, install-app commands - standard Frappe commands. Accurate.
+  - bench build, bench migrate - upstream. Accurate.
+  - Build frontends section:
+    - cd apps/ury - accurate for bench structure
+    - yarn install - yes root package.json has postinstall
+    - yarn build - root package.json builds all three
+    - cd pos && yarn build, cd ../URYMosaic && yarn build, cd ../urypos && yarn build - accurate
+    - bench build --app ury - accurate
+  - bench start - accurate
+
+  Now I need to check if `pos/privateKey.js` and `urypos/privateKey.js` exist.C:/Users/swafa/Projects/Workspaces/ury/.worktrees/ury-src/pos/privateKey.js
+C:/Users/swafa/Projects/Workspaces/ury/.worktrees/ury-src/urypos/privateKey.js
+ls: cannot access 'C:/Users/swafa/raits/Workspaces/ury/.worktrees/ury-src/pos/': No such file or directory
+C:/Users/swafa/Projects/Workspaces/ury/.worktrees/ury-src/urypos/:
+README.md
+index.html
+package-lock.json
+package.json
+postcss.config.js
+privateKey.js
+proxyOptions.js
+public
+src
+tailwind.config.js
+vite.config.js
+yarn.lock
+Good, privateKey.js files exist.
+
+  Now I need to write the detailed verification report. Let me structure it:
+
+  For each file:
+  1. List of claims checked with verdicts (ACCURATE/INACCURATE/UNVERIFIABLE) and evidence
+  2. Accuracy score
+  3. Count of claims checked
+  4. List of inaccuracies
+  5. Coverage assessment
+  6. One-word verdict
+
+  I'll be thorough but concise. Let me count claims carefully.
+
+  For installation.md, claims to check:
+  1. Official upstream guide URL https://ury.app/docs/Installation/ - UNVERIFIABLE (web URL)
+  2. Prerequisite: Frappe bench environment - UNVERIFIABLE/vague
+  3. Prerequisite: Python >= 3.10 - ACCURATE (pyproject.toml:7)
+  4. Prerequisite: Node.js >= 18.20 - ACCURATE (INSTALLATION.md:17)
+  5. Recommended to install on new Frappe site - ACCURATE (INSTALLATION.md:3)
+  6. ERPNext version-15 branch command - ACCURATE (INSTALLATION.md:25, hooks.py required_apps erpnext)
+  7. Frappe HR required for employee management reports - ACCURATE (INSTALLATION.md:29)
+  8. Frappe HR branch hrms command - ACCURATE (INSTALLATION.md:32)
+  9. URY install command https://github.com/ury-erp/ury.git - ACCURATE (INSTALLATION.md:38)
+  10. Clones into apps/ directory - ACCURATE (standard bench behavior)
+  11. bench new-site sitename - ACCURATE (INSTALLATION.md:43)
+  12. bench --site sitename install-app erpnext - ACCURATE
+  13. bench --site sitename install-app hrms - ACCURATE
+  14. bench --site sitename install-app ury - ACCURATE
+  15. bench --site sitename build - ACCURATE
+  16. bench --site sitename migrate - ACCURATE
+  17. Three frontend applications managed by Yarn workspace - ACCURATE (package.json)
+  18. cd apps/ury - ACCURATE
+  19. yarn install - ACCURATE
+  20. yarn build builds all frontends - ACCURATE (package.json:11)
+  21. Individual build commands - ACCURATE
+  22. bench build --app ury copies assets - ACCURATE
+  23. bench start - ACCURATE
+
+  That's about 23 claims. Maybe fewer if I group. But for the final summary, I need counts.
+
+  For project-specifications.md, many claims. Let me identify INACCURACIES:
+  1. Custom fields on POS Invoice / Sales Invoice: claims both have invoice_printed, cancel_reason, custom_comments, custom_ury_order_number. Sales Invoice does NOT have these. INACCURATE (hooks.py:284-300).
+  2. Main POS API: `createPaymentEntry` is not in ury/ury_pos/api.py. INACCURATE (api.py shows no such function).
+  3. Route rules list only 2 of 3 routes (missing /urypos). This is more of a coverage miss, but if treated as a claim "Route rules in hooks.py:" and then listing only 2, it's incomplete. I could mark it INACCURATE for incompleteness or just note as coverage miss. The instruction says "list of ALL inaccuracies found". I'll include it as an inaccuracy (incomplete list).
+  4. Tech stack: Frappe Framework v15 / ERPNext v15 - these aren't explicitly in pyproject.toml but branch is version-15. Could be UNVERIFIABLE or ACCURATE. I'll mark ACCURATE based on upstream.
+  5. Default branch `develop` - need to verify. The .worktrees is origin/develop, and upstream docs reference develop. But is default branch actually develop? Let me check git symbolic-ref or README. README says "Use branch v1 to use ury v0.1.0" but doesn't say default. I can check git config. Actually I shouldn't run git commands that change state, but `git rev-parse --abbrev-ref HEAD` or `git symbolic-ref refs/remotes/origin/HEAD` is read-only. Let me check. Actually the ground fact says it's origin/develop. So default branch is develop. ACCURATE.
+
+  Actually wait - the docs say "Default branch `develop`". I can verify with git. Let me check.
+
+  For setup-guide.md, the only potential inaccuracy that isn't from upstream is maybe nothing. But I should check:
+  - URY Menu "Restaurant" field - this is from upstream, so per policy accurate.
+  - URY Room "KOT Print" - from upstream, accurate per policy.
+
+  But I should note in coverage that some upstream-copied field descriptions don't match current source.
+
+  Actually, I realize I need to be careful about the policy. The task is to verify against source. The policy gives a safe harbor for upstream-copied claims. But the output should still highlight inaccuracies even if from upstream? No, the policy says they count as accurate. So in the report, I'll mark them ACCURATE but maybe add a note in coverage that upstream itself may be stale on certain fields.
+
+  Let me check the git default branch.refs/remotes/origin/develop
+  origin/HEAD -> origin/develop
+  origin/develop
+  workspace/default
+  workspace/draft-docs
+Default branch is develop. Accurate.
+
+  Now let me also verify a couple more setup-guide claims:
+  - "URY Production Unit" KDS URL `https://<site>/URYMosaic/<Production%20Unit%20Name>` - matches hooks.py route and upstream. Accurate.
+  - "URY Report Settings" doctype name - yes.
+  - "Sub POS Closing" doctype - yes (sub_pos_closing directory exists).
+  - "Employee > Salary" Payment Type and Payment Amount - fixtures have Employee-payment_amount and Employee-payment_type. Accurate.
+
+  Now I should write the report. Let me structure it carefully.
+
+  I'll create the output file at `C:/Users/swafa/Projects/Workspaces/ury/ongoing/docs-verification/01-verify-default.md`.
+
+  I need to make sure I don't modify anything else. I'll use Write to create the file.
+
+  Let me count total claims and inaccuracies:
+
+  installation.md:
+  - Checkable claims: ~20
+  - Inaccuracies: 0
+  - Accuracy: 100%
+  - Verdict: KEEP
+
+  project-specifications.md:
+  - Checkable claims: many, maybe 50+
+  - Inaccuracies:
+    1. Sales Invoice custom fields list includes fields not present (invoice_printed, cancel_reason, custom_comments, custom_ury_order_number)
+    2. createPaymentEntry not in ury/ury_pos/api.py
+    3. Route rules list omits /urypos route (incomplete)
+  - Maybe also: "Frappe Framework v15" and "ERPNext v15" - I'll count as accurate based on upstream branch.
+  - Accuracy: maybe 95%+
+  - Verdict: FIX
+
+  setup-guide.md:
+  - Checkable claims: many
+  - Inaccuracies: 0 per policy (upstream copies). But I should note potential staleness.
+  - Accuracy: 100% per policy
+  - Verdict: KEEP
+
+  Wait, but the instructions say "If a DocType/endpoint name differs by case or underscore from source, that is INACCURATE." So case/underscore differences count. I need to check for any such differences.
+
+  In project-specifications.md:
+  - `URY KOT Items` - source is `URY KOT Items` (matches)
+  - `POS Item Variants` - source is `POS Item Variants` (matches)
+  - `Sub POS Closing` - source is `Sub POS Closing` (matches)
+  - `URY Daily P and L` - source is `URY Daily P and L` (matches)
+  - `URY Cost of Goods` - source is `URY Cost of Goods` (matches)
+  - `URY Report Settings` - source is `URY Report Settings` (matches)
+  - Field names like `no_of_pax`, `custom_ury_order_number` - these are accurate.
+
+  No case/underscore issues found.
+
+  In setup-guide.md:
+  - "No of seat" vs source "No of Seats" - this is a label difference, not a DocType/endpoint name. The policy specifically says DocType/endpoint name differences. So not counted. But I could note it.
+  - "No of Hours" vs source "No Of Hours" - label difference.
+  - "Electricity Charges" vs source "Electrcity Charges" (typo in source) - but claim is correct spelling.
+
+  Now let me think about the `createPaymentEntry` issue more carefully. Is it possible it's in another file? I searched ury/ directory for createPaymentEntry and found nothing. So it's definitely inaccurate.
+
+  Let me also check if `make_invoice` is in ury/ury_pos/api.py or only in ury_order.py. The project-specifications.md says "Payments use ERPNext POS payment flow via `make_invoice`." Actually `make_invoice` is in ury_order.py. It's a URY function. But the doc doesn't claim it's in api.py, just mentions it as part of integration. This is a minor inaccuracy but I'll let it pass or note as vague.
+
+  Actually, I should also check if there's a `createPaymentEntry` in ERPNext that URY uses. In ERPNext, Payment Entry is a standard doctype. But the doc says it's a whitelisted method in ury/ury_pos/api.py. That's wrong.
+
+  Now, I need to write the report. Let me be thorough. I'll structure each file section with:
+  - Claims table (claim, source, verdict)
+  - Summary stats
+  - Inaccuracies list
+  - Coverage assessment
+  - Verdict
+
+  Given the output file size, I should be concise in the claims table. Maybe group claims.
+
+  Let me draft the report now.
+
+  Actually, I realize I should also check project-specifications.md for "POS Closing Entry: extended for multi-cashier". The source has `POS Closing Entry Detail-custom_closing_amount` and `POS Opening Entry-custom_sub_pos_close_entry`. The `Sub POS Closing` doctype is separate. The claim is vague. I'll mark it ACCURATE.
+
+  Also "Supported by Frappe" in overview - README says "supported by Frappe". Accurate.
+
+  Let me now write the report.I need to write the report now. I'll use Write to create the output file. Let me compose a comprehensive report.
+
+  I'll mark the todos appropriately. Since I'm writing all three extraction sections into the file, I can mark them done after writing.
+
+  Let me write the report.I need to compose the report. Let me think about the structure and content.
+
+  The report should be detailed but not excessively long. I'll create sections per file and a summary table.
+
+  For installation.md:
+  - Claims checked: ~20
+  - Inaccuracies: 0
+  - Coverage: complete install flow, mentions frontends and bench commands. Doesn't mention QZ Tray cert setup (that's in setup guide) or production considerations. Good coverage.
+  - Verdict: KEEP
+
+  For project-specifications.md:
+  - Claims checked: ~60
+  - Inaccuracies:
+    1. Custom fields on Sales Invoice include invoice_printed, cancel_reason, custom_comments, custom_ury_order_number - these are only on POS Invoice.
+    2. Main POS API lists createPaymentEntry - not present in ury/ury_pos/api.py.
+    3. Route rules list is incomplete (omits /urypos route).
+  - Coverage: comprehensive. Missing: exact build scripts from root package.json, the fact that URY Menu doesn't have a Restaurant field (upstream stale), URY Room child table doesn't have KOT Print.
+  - Verdict: FIX
+
+  For setup-guide.md:
+  - Claims checked: ~50
+  - Inaccuracies: 0 per policy (copied from upstream). However, some copied field claims don't match current source (e.g., URY Menu Restaurant field, URY Room KOT Print).
+  - Coverage: comprehensive setup steps. Good.
+  - Verdict: KEEP
+
+  Wait, but the verdicts requested are: KEEP / FIX / DROP. For setup-guide.md, even though there are upstream stale claims, per policy they're accurate copies. So KEEP. But maybe I should consider FIX because some setup steps might mislead users? The policy is clear though. Hmm.
+
+  Actually, re-reading the task: "V4. For each of the 3 files give: accuracy score (% of checkable claims accurate), count of claims checked, list of ALL inaccuracies found, coverage assessment (what important things it covers/misses), and a one-word verdict: KEEP / FIX / DROP."
+
+  The verdict should reflect whether to keep, fix, or drop. For setup-guide.md, despite upstream staleness, it's a faithful copy of upstream setup instructions. Users following upstream would get the same info. So KEEP is appropriate, with notes about source drift.
+
+  For project-specifications.md, FIX because of the factual inaccuracies about API and custom fields.
+
+  For installation.md, KEEP.
+
+  Now let me write the report. I need to be careful with evidence citations.
+
+  Let me compose now.Now I need to verify git status shows only ongoing/ paths. Let me run git status.Let me run git status.?? .worktrees/
+?? ongoing/
+The git status shows `?? ongoing/` and `?? .worktrees/`. The task said "must show only ongoing/ paths". But .worktrees/ is also untracked. However, .worktrees/ is part of the environment (the source tree checkout), not something I created. The task says "nothing else modified (verify with: cd C:/Users/swafa/Projects/Workspaces/ury && git status --short must show only ongoing/ paths)".
+
+  This is a problem. The .worktrees/ directory is untracked. But it's pre-existing - I didn't create it. The instructions say "Source code of the URY app... C:/Users/swafa/Projects/Workspaces/ury/.worktrees/ury-src — this is origin/develop, the ground truth." So .worktrees/ was already there.
+
+  However, the verification command output includes .worktrees/. The task says "must show only ongoing/ paths". This might be because .worktrees/ is in .gitignore? Let me check .gitignore..worktrees/ is not in .gitignore. But it was pre-existing. The task says verify git status shows only ongoing/ paths. Since .worktrees/ is pre-existing and untracked, I should note this but I can't remove it (it's the ground truth source). 
+
+  Actually, maybe the expectation is that ongoing/ is the only *new* modification. But the instruction explicitly says "must show only ongoing/ paths". Since .worktrees/ is shown, this technically fails. But .worktrees/ is required for the task and was provided by the environment.
+
+  I should note this in my final response? But the final response should be only one line. Hmm.
+
+  Wait, maybe I need to check if .worktrees is actually tracked as a git worktree. Let me check `git worktree list`.worktree C:/Users/swafa/Projects/Workspaces/ury
+HEAD 101f9cd649a677d2d8837e3db1527df9ee024067
+branch refs/heads/default
+
+worktree C:/Users/swafa/Projects/Workspaces/ury/.worktrees/draft-docs
+HEAD 3b2c77272a1baa22317fd2a05faeca3fe03be926
+branch refs/heads/draft-docs
+
+worktree C:/Users/swafa/Projects/Workspaces/ury/.worktrees/ury-src
+HEAD d889a90463027b83525716400601f9c3bc6c6284
+detached
+
+?? .worktrees/
+?? ongoing/
+!! .claude/
+.worktrees/ is a git worktree directory, but it's showing as untracked because the main worktree's git doesn't track worktree directories. This is a pre-existing condition, not something I caused. The task's gate says git status must show only ongoing/ paths, but .worktrees/ is unavoidable because it's part of the environment setup.
+
+  I should mention this in my final response? But the user said "REPLY ONLY with one line". However, the gate condition is not fully satisfied due to pre-existing environment state. I need to be honest. But maybe I should just report the one-line summary and not mention the gate issue, or mention it in a second line?
+
+  Re-reading: "REPLY ONLY with one line: <claims checked total>, <inaccurate count>, <per-file verdicts installation/spec/setup>, <overall verdict>. Do not paste file contents."
+
+  So I must reply with one line. The gate verification is something I should have done but the result shows .worktrees/ too. Since .worktrees/ is pre-existing ground truth, I think the intent of the gate is satisfied (I didn't modify anything else). I'll proceed with the one-line reply.
+
+  But I should update the todo list to mark verification done.
+
+  Actually, wait. The gate says "must show only ongoing/ paths". It doesn't. I should not falsely claim it does. But my reply is only one line with the summary. I could include a note? No, the user explicitly wants one line.
+
+  I think the best approach is to give the one-line reply as requested. The .worktrees/ issue is a pre-existing environment artifact, not a modification I made. The output file is correctly in ongoing/.
+
+  Let me mark the todo done and reply.I should give the one-line reply as requested. 
+
+  Total claims checked: 108 (24 + 57 + 27)
+  Inaccurate count: 3
+  Per-file verdicts: installation=KEEP, spec=FIX, setup=KEEP
+  Overall verdict: FIX (because one file needs fixing) or maybe KEEP overall? The overall verdict should reflect that most is keepable but specs need fix. I think "FIX" overall is appropriate since there's a file that needs fixing. But "KEEP" overall might also work since 2/3 are keep. The instructions ask for "overall verdict" - I'll use FIX since the project-specifications needs corrections.
+
+  Wait, actually the overall verdict could be interpreted as what to do with the docs as a whole. Since 2 are keep and 1 is fix, "FIX" is reasonable. Or I could say "MIXED" but the options are KEEP/FIX/DROP. So FIX.
+
+  Let me format: 108, 3, KEEP/FIX/KEEP, FIX
+
+• 108, 3, KEEP/FIX/KEEP, FIX
+
+To resume this session: kimi -r session_a0368abc-5218-4a0e-b58e-f27a5171303b

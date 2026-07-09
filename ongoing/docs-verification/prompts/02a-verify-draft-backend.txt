@@ -1,0 +1,31 @@
+GROUND FACTS (already verified — do not re-derive):
+- You are verifying documentation accuracy against real source code.
+- Source code of the URY app (Frappe/ERPNext restaurant POS): C:/Users/swafa/Projects/Workspaces/ury/.worktrees/ury-src — this is origin/develop, the ground truth.
+- Docs to verify (written by "Agent B", a structured mkdocs site) live in: C:/Users/swafa/Projects/Workspaces/ury/.worktrees/draft-docs/docs/
+- Your scope in THIS run (backend half):
+  - docs/index.md, docs/overview.md, docs/project-structure.md
+  - docs/architecture/*.md (module-dependencies, runtime-architecture, system-architecture)
+  - docs/backend/*.md (api-reference, auth, database, frappe-backend, hooks-and-jobs)
+  - docs/reference/*.md (glossary, repository-inventory, source-evidence)
+- READ-ONLY TASK: do NOT edit, create, or delete any file anywhere EXCEPT the single output file specified below. Do NOT run git commands that change state. Do NOT push.
+
+TASKS:
+B1. docs/backend/api-reference.md: verify EVERY listed API endpoint / whitelisted method against source (grep for @frappe.whitelist in .worktrees/ury-src/ury/). Check method paths, names, and described behavior. Verdict per claim: ACCURATE / INACCURATE (with file:line evidence) / UNVERIFIABLE.
+B2. docs/backend/hooks-and-jobs.md: verify against .worktrees/ury-src/ury/hooks.py — scheduled events, doc_events, fixtures, overrides.
+B3. docs/backend/database.md + frappe-backend.md + auth.md: verify DocType names (ury/**/doctype/ dirs), field claims, permission/role claims.
+B4. docs/architecture/*.md + docs/project-structure.md + docs/overview.md + docs/index.md: verify module structure, app names, directory layout, data-flow claims against the actual tree.
+B5. docs/reference/*.md: verify repository-inventory entries (paths exist? counts right?) and spot-check source-evidence citations (do cited files/lines contain what is claimed?).
+B6. Per file: accuracy score (% checkable claims accurate), claims-checked count, ALL inaccuracies listed, coverage assessment, verdict KEEP / FIX / DROP.
+
+POLICIES:
+- Name mismatches (case, underscores, wrong path) are INACCURATE.
+- Vague prose without a checkable fact: skip.
+- If a doc describes behavior, verify by reading the referenced code, not by plausibility.
+
+GATES before finishing:
+- Every INACCURATE verdict cites a source file path.
+- Output file written; nothing else modified (cd C:/Users/swafa/Projects/Workspaces/ury && git status --short must show only ongoing/ paths).
+
+OUTPUT: write detailed log to C:/Users/swafa/Projects/Workspaces/ury/ongoing/docs-verification/02a-verify-draft-backend.md with per-file sections and a summary table.
+
+REPLY ONLY with one line: <claims checked>, <inaccurate count>, <worst file>, <best file>, <overall verdict>. Do not paste file contents.

@@ -1,0 +1,32 @@
+GROUND FACTS (already verified — do not re-derive):
+- You are verifying documentation accuracy against real source code.
+- Source code of the URY app (Frappe/ERPNext restaurant POS): C:/Users/swafa/Projects/Workspaces/ury/.worktrees/ury-src — this is origin/develop, the ground truth. Frontends live in urypos/ (Vue legacy), pos/ (React), URYMosaic/ within that tree.
+- Docs to verify (written by "Agent B") live in: C:/Users/swafa/Projects/Workspaces/ury/.worktrees/draft-docs/docs/
+- Your scope in THIS run (frontend/ops half):
+  - docs/frontend/*.md (legacy-urypos, pos-react, urymosaic)
+  - docs/flows/*.md (kot-lifecycle, order-payment, printing, reporting-closing)
+  - docs/operations/*.md (build-deployment, configuration, performance, risks, security)
+  - docs/passes/*.md (01..08) — LIGHT pass: spot-check 5 claims per file only.
+  - docs/development/*.md and docs/proposals/*.md — do NOT fact-check (these are proposals/TODOs, not documentation); just note in one paragraph what they are.
+  - mkdocs.yml — check every nav entry points to an existing file.
+- READ-ONLY TASK: do NOT edit, create, or delete any file anywhere EXCEPT the single output file specified below. Do NOT run git commands that change state. Do NOT push.
+
+TASKS:
+F1. docs/frontend/*.md: verify framework claims, build tooling (check package.json / vite configs in each frontend dir), component/store names, routing claims against source. Verdict per claim: ACCURATE / INACCURATE (with file:line evidence) / UNVERIFIABLE.
+F2. docs/flows/*.md: verify each described flow step against the code that implements it (search ury/ury_pos/, urypos/src/, pos/ for the referenced functions/methods/DocTypes). KOT lifecycle, order/payment, printing, closing must match actual call paths.
+F3. docs/operations/*.md: verify build/deploy commands (bench commands, package.json scripts), configuration DocTypes/fields, and security claims (permission code) against source. Performance/risks claims: mark UNVERIFIABLE unless code-checkable.
+F4. docs/passes/*.md: 5 spot-check claims per file, report hit/miss.
+F5. mkdocs.yml nav integrity check.
+F6. Per file (except development/proposals): accuracy score, claims-checked count, ALL inaccuracies, coverage assessment, verdict KEEP / FIX / DROP.
+
+POLICIES:
+- Name mismatches (case, path, function name) are INACCURATE.
+- Verify behavior by reading referenced code, not plausibility.
+
+GATES before finishing:
+- Every INACCURATE verdict cites a source file path.
+- Output file written; nothing else modified (cd C:/Users/swafa/Projects/Workspaces/ury && git status --short must show only ongoing/ paths).
+
+OUTPUT: write detailed log to C:/Users/swafa/Projects/Workspaces/ury/ongoing/docs-verification/02b-verify-draft-frontend.md with per-file sections and a summary table.
+
+REPLY ONLY with one line: <claims checked>, <inaccurate count>, <worst file>, <best file>, <overall verdict>. Do not paste file contents.

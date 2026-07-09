@@ -1,0 +1,28 @@
+GROUND FACTS (already verified — do not re-derive):
+- You are verifying documentation accuracy against real source code.
+- Source code of the URY app (Frappe/ERPNext restaurant POS): C:/Users/swafa/Projects/Workspaces/ury/.worktrees/ury-src — this is origin/develop, the ground truth.
+- Docs to verify (written by "Agent A"):
+  - C:/Users/swafa/Projects/Workspaces/ury/docs/installation.md
+  - C:/Users/swafa/Projects/Workspaces/ury/docs/project-specifications.md
+  - C:/Users/swafa/Projects/Workspaces/ury/docs/setup-guide.md
+- Upstream's own docs (INSTALLATION.md, SETUP.md, FEATURES.md at source root) are the author-maintained reference; Agent A may have paraphrased them.
+- READ-ONLY TASK: do NOT edit, create, or delete any file anywhere EXCEPT the single output file specified below. Do NOT run git commands that change state. Do NOT push.
+
+TASKS:
+V1. For docs/installation.md: extract every checkable factual claim (commands, package names, app names, branch names, ports, prerequisites, versions, file paths) and verify each against the source tree (pyproject.toml, setup.py, hooks.py, package.json, README/INSTALLATION at source root). Verdict per claim: ACCURATE / INACCURATE (say what's actually true, with file:line evidence) / UNVERIFIABLE.
+V2. Same for docs/project-specifications.md: verify claimed module list, DocTypes (check ury/**/doctype/ directories), API endpoints (whitelisted methods), tech stack, frontend apps (urypos, pos, URYMosaic), scheduled jobs (hooks.py) against source.
+V3. Same for docs/setup-guide.md: verify setup steps, DocType names used in configuration steps, role names, workflow claims against source.
+V4. For each of the 3 files give: accuracy score (% of checkable claims accurate), count of claims checked, list of ALL inaccuracies found, coverage assessment (what important things it covers/misses), and a one-word verdict: KEEP / FIX / DROP.
+
+POLICIES:
+- A claim copied correctly from upstream INSTALLATION.md/SETUP.md counts as accurate.
+- Vague marketing language is not a claim; skip it.
+- If a DocType/endpoint name differs by case or underscore from source, that is INACCURATE.
+
+GATES before finishing:
+- Every INACCURATE verdict must cite a source file path as evidence.
+- Output file written; nothing else modified (verify with: cd C:/Users/swafa/Projects/Workspaces/ury && git status --short must show only ongoing/ paths).
+
+OUTPUT: write the detailed log to C:/Users/swafa/Projects/Workspaces/ury/ongoing/docs-verification/01-verify-default.md with sections per file and a summary table.
+
+REPLY ONLY with one line: <claims checked total>, <inaccurate count>, <per-file verdicts installation/spec/setup>, <overall verdict>. Do not paste file contents.

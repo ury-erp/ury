@@ -45,6 +45,7 @@ The URY application is hosted in a Frappe bench inside WSL.
 ## 4. Knowledge Base, Features & Skills
 We maintain URY-specific documentation and AI agent skills directly in this workspace:
 - **Feature & Code Mapping**: Feature specifications, architecture documents, and code-to-feature mapping are maintained in the `docs/` folder (e.g., `docs/features/`). `docs/URY_APP_ARCHITECTURE.md` holds legacy architecture details.
+- **Universal Documentation**: The complete architecture, doctype mapping, hooks, and frontend layouts (React POS v2, KDS Vue, Legacy POS) are documented in `URY_UNIVERSAL_DOCS.md` at the root of the workspace. This acts as an index to the 17 comprehensive documentation files located in the `docs/` directory.
 - **Agent Skills**: URY-specific and project-specific skills (e.g., custom scripts for testing, POS build workflows) are maintained in the `skills/` directory. When applicable, relate these to your global skills to leverage existing capabilities (e.g., standard Node/Python skills).
 
 ## 5. Version Control & Codebase Management (URY App)
