@@ -173,6 +173,14 @@ const calculateItemPrice = (item: OrderItem): number => {
   return basePrice + addonsTotal;
 };
 
+// POS Profile's "Customer" field, as a selectable customer. Null when unset.
+const defaultCustomerOf = (
+  profile: PosProfileCombined | null
+): Customer | null =>
+  profile?.customer
+    ? { id: profile.customer, name: profile.customer, phone: '' }
+    : null;
+
 export const usePOSStore = create<POSStore>((set, get) => ({
   menuItems: [],
   categories: [],
@@ -241,10 +249,11 @@ export const usePOSStore = create<POSStore>((set, get) => ({
       const cached = sessionStorage.getItem('posProfile');
       if (cached) {
         const profile = JSON.parse(cached);
-        set({ 
-          posProfile: profile, 
+        set({
+          posProfile: profile,
           profileLoading: false,
-          currency: profile.currency || 'INR'
+          currency: profile.currency || 'INR',
+          ...(get().selectedCustomer ? {} : { selectedCustomer: defaultCustomerOf(profile) })
         });
         if (!storage.getItem('currencySymbol')) {
           await get().fetchCurrencySymbol();
@@ -254,12 +263,13 @@ export const usePOSStore = create<POSStore>((set, get) => ({
 
       set({ profileLoading: true, error: null });
       const combinedProfile = await getCombinedPosProfile();
-      
+
       sessionStorage.setItem('posProfile', JSON.stringify(combinedProfile));
-      set({ 
-        posProfile: combinedProfile, 
+      set({
+        posProfile: combinedProfile,
         profileLoading: false,
-        currency: combinedProfile.currency || 'INR'
+        currency: combinedProfile.currency || 'INR',
+        ...(get().selectedCustomer ? {} : { selectedCustomer: defaultCustomerOf(combinedProfile) })
       });
       
       if (!storage.getItem('currencySymbol')) {
@@ -668,10 +678,10 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   },
 
   resetOrderState: () => {
-    const { fetchMenuItems } = get();
-    
+    const { fetchMenuItems, posProfile } = get();
+
     set({
-      selectedCustomer: null,
+      selectedCustomer: defaultCustomerOf(posProfile),
       selectedTable: null,
       selectedRoom: null,
       selectedAggregator: null,
