@@ -17,6 +17,10 @@ export interface POSInvoice {
   posting_date: string;
   rounded_total: number;
   order_type: OrderType;
+  /** Set when several table orders were combined into this bill. */
+  custom_is_merged?: number;
+  /** Comma separated tables the merged orders came from, e.g. "T1, T2, T3". */
+  custom_merged_tables?: string | null;
 }
 
 export interface POSInvoiceItem {

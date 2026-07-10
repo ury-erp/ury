@@ -80,3 +80,16 @@ export async function updateTableLayout(name: string, data: Partial<Table>) {
   return db.updateDoc(DOCTYPES.URY_TABLE, name, data);
 }
 
+/**
+ * Move an open order from one table to another.
+ * The server rejects transfers across rooms and onto occupied tables.
+ */
+export async function transferTable(table: string, newTable: string, invoice: string) {
+  const { call } = await import('./frappe-sdk');
+  return call.post('ury.ury.doctype.ury_order.ury_order.table_transfer', {
+    table,
+    newTable,
+    invoice,
+  });
+}
+

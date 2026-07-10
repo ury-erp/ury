@@ -84,6 +84,10 @@ export interface PosProfileCombined extends PosProfileFull {
   edit_order_type?: number;
   view_all_status?: number;
   custom_daily_pos_close?: number;
+  /** POS Profile: "Allow Cashier To Edit And Remove Table Order Items".
+   *  When 0, a printed invoice can no longer be edited. The server already
+   *  rejects item removals in that state (validate_invoice). */
+  remove_items?: number;
 }
 
 export interface Currency {

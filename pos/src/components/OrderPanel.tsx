@@ -206,6 +206,12 @@ const OrderPanel = () => {
                     <div className="flex items-center justify-between">
                       <h3 className="font-medium text-gray-900 text-sm">{item.name}</h3>
                     </div>
+                    {item.comment?.trim() && (
+                      <p className="mt-0.5 flex items-start gap-1 text-xs text-amber-700">
+                        <MessageSquare className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                        <span>{item.comment.trim()}</span>
+                      </p>
+                    )}
                     {item.selectedVariant && (
                       <p className="text-sm text-gray-600">{item.selectedVariant.name}</p>
                     )}
