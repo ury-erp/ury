@@ -28,6 +28,7 @@ export interface POSInvoice {
   order_type: string;
   restaurant_table: string;
   custom_restaurant_room: string;
+  waiter: string;
   status: string;
   total: number;
   grand_total: number;

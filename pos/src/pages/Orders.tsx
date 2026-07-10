@@ -172,6 +172,7 @@ export default function Orders() {
         posStore.setSelectedTable(order.restaurant_table, order.custom_restaurant_room || null,true);
       }
       posStore.setSelectedCustomer({ id: order.customer, name: order.customer_name, phone: order.mobile_number });
+      posStore.setSelectedWaiter(order.waiter || null);
       // Fill cart
       const items = (order.items || []).map((item: any) => ({
         id: item.item_code,

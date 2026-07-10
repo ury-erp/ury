@@ -723,3 +723,14 @@ def validate_pos_close(pos_profile):
     
     return "Success"
 
+
+
+@frappe.whitelist()
+def get_waiters():
+    """Active employees, offered as waiters when tagging an order in POS."""
+    return frappe.get_all(
+        "Employee",
+        filters={"status": "Active"},
+        fields=["name", "employee_name"],
+        order_by="employee_name asc",
+    )

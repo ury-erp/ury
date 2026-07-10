@@ -98,6 +98,8 @@ interface POSState {
   selectedRoom: string | null;
   searchQuery: string;
   selectedCustomer: Customer | null;
+  /** Employee name tagged as waiter for the order being created. */
+  selectedWaiter: string | null;
   selectedOrderType: OrderType;
   quickFilter: 'all' | 'special';
   selectedItem: MenuItem | null;
@@ -134,6 +136,7 @@ interface POSStore extends POSState {
   setSelectedCategory: (category: string) => void;
   setSearchQuery: (query: string) => void;
   setSelectedCustomer: (customer: Customer | null) => void;
+  setSelectedWaiter: (waiter: string | null) => void;
   setSelectedTable: (table: string | null, room: string | null, doNotLoadOrder?: boolean) => void;
   setSelectedOrderType: (type: OrderType) => void;
   setQuickFilter: (filter: 'all' | 'special') => void;
@@ -190,6 +193,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   selectedRoom: null,
   searchQuery: '',
   selectedCustomer: null,
+  selectedWaiter: null,
   selectedOrderType: DEFAULT_ORDER_TYPE as OrderType,
   quickFilter: "all",
   selectedItem: null,
@@ -461,6 +465,8 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   setSelectedCategory: (category) => set({ selectedCategory: category }),
   setSearchQuery: (query) => set({ searchQuery: query }),
   setSelectedCustomer: (customer) => set({ selectedCustomer: customer }),
+
+  setSelectedWaiter: (waiter) => set({ selectedWaiter: waiter }),
   setSelectedTable: (table: string | null, room: string | null, doNotLoadOrder: boolean = false) => {
     set({ selectedTable: table, selectedRoom: room });
     if (table ) {
@@ -634,6 +640,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
             name: order.customer_name,
             phone: order.mobile_number,
           } : defaultCustomerOf(get().posProfile),
+          selectedWaiter: order.waiter || null,
           isUpdatingOrder: true,
           orderId: order.name,
         });
@@ -642,6 +649,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
           tableOrder: null,
           activeOrders: [],
           selectedCustomer: defaultCustomerOf(get().posProfile),
+          selectedWaiter: null,
           isUpdatingOrder: false,
           orderId: null,
         });
@@ -665,6 +673,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
       tableOrder: null,
       activeOrders: [],
       selectedCustomer: defaultCustomerOf(get().posProfile),
+      selectedWaiter: null,
       isUpdatingOrder: false,
       orderId: null,
     });
@@ -682,6 +691,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
 
     set({
       selectedCustomer: defaultCustomerOf(posProfile),
+      selectedWaiter: null,
       selectedTable: null,
       selectedRoom: null,
       selectedAggregator: null,
