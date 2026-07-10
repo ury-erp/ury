@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Clock, User, UserCheck, Receipt, Printer, Pencil, X } from 'lucide-react';
+import { Clock, User, UserCheck, Receipt, Printer, Pencil, X, Merge } from 'lucide-react';
 import { Badge, Button, Card, CardContent } from '../components/ui';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../components/ui/dialog';
 import { showToast } from '../components/ui/toast';
@@ -14,6 +14,8 @@ import PaymentDialog from '../components/PaymentDialog';
 import { printOrder } from '../lib/print';
 import { call } from '../lib/frappe-sdk';
 import { t } from '../i18n';
+import MergeOrdersDialog from '../components/MergeOrdersDialog';
+import { mergeInvoices } from '../lib/order-api';
 
 export default function Orders() {
   const { 
@@ -37,6 +39,43 @@ export default function Orders() {
   } = useRootStore();
 
   const posStore = usePOSStore();
+  const [mergeDialogOpen, setMergeDialogOpen] = React.useState(false);
+  const [mergeSelection, setMergeSelection] = React.useState<string[]>([]);
+  const [merging, setMerging] = React.useState(false);
+
+  const toggleMergeSelection = (name: string) =>
+    setMergeSelection((prev) =>
+      prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]
+    );
+
+  const handleMergeOrders = async () => {
+    if (!selectedOrder || mergeSelection.length === 0) return;
+    setMerging(true);
+    try {
+      await mergeInvoices(selectedOrder.name, mergeSelection);
+      showToast.success(`Merged into ${selectedOrder.name}`);
+      setMergeDialogOpen(false);
+      setMergeSelection([]);
+      clearSelectedOrder();
+      await fetchOrders();
+    } catch (error) {
+      const message =
+        error && typeof error === 'object' && '_server_messages' in error
+          ? (() => {
+              try {
+                return JSON.parse(JSON.parse((error as any)._server_messages)[0]).message;
+              } catch {
+                return 'Failed to merge orders';
+              }
+            })()
+          : error instanceof Error
+            ? error.message
+            : 'Failed to merge orders';
+      showToast.error(message);
+    } finally {
+      setMerging(false);
+    }
+  };
   const navigate = useNavigate();
   const mounted = useRef(false);
   const [cancelDialogOpen, setCancelDialogOpen] = React.useState(false);
@@ -199,6 +238,12 @@ export default function Orders() {
     );
   }
 
+  // Once the bill is printed the order is locked, unless the POS Profile
+  // explicitly allows the cashier to edit/remove printed order items.
+  const isPrinted = String(selectedOrder?.invoice_printed) === '1';
+  const allowEditAfterPrint = posStore.posProfile?.remove_items === 1;
+  const canEditOrder = !isPrinted || allowEditAfterPrint;
+
   return (
     <div className="flex h-screen overflow-hidden">
       {/* Left Sidebar - Order Types */}
@@ -230,13 +275,18 @@ export default function Orders() {
                 >
                   <CardContent className="p-0 flex flex-col h-full">
                     <div className="p-3 bg-gray-50 border-b">
-                    <h3 className="font-medium text-gray-900 text-sm truncate" title={order.name}>
+                    <h3 className="font-medium text-gray-900 text-sm truncate flex items-center gap-1" title={order.name}>
+                      {order.custom_is_merged === 1 && (
+                        <Merge className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" aria-label="Merged bill" />
+                      )}
                       {order.name}
                     </h3>
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-xs text-gray-500">
-                          {order.restaurant_table ? `Table ${order.restaurant_table} • ` : ''}{t(`order_types.${order.order_type.toLowerCase().replace(/ /g, '_')}`)}
+                          {order.custom_is_merged === 1 && order.custom_merged_tables
+                            ? `Tables ${order.custom_merged_tables} • `
+                            : order.restaurant_table ? `Table ${order.restaurant_table} • ` : ''}{t(`order_types.${order.order_type.toLowerCase().replace(/ /g, '_')}`)}
                         </p>
                       </div>
                       <Badge variant={getBadgeVariant(order.status)} className="ms-2">
@@ -326,6 +376,7 @@ export default function Orders() {
                 {/* Only show edit and cancel buttons for Draft, Unbilled, and Recently Paid orders */}
                 {(selectedOrder.status === 'Draft' || selectedOrder.status === 'Unbilled' || selectedOrder.status === 'Recently Paid') && (
                   <>
+                    {canEditOrder && (
                     <button
                       type="button"
                       className="inline-flex items-center justify-center rounded-md p-2 bg-gray-100 hover:bg-gray-200 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -336,6 +387,18 @@ export default function Orders() {
                       <Pencil className="w-4 h-4" />
                       {editLoading && <span className="ms-2 text-xs">{t('common.loading')}</span>}
                     </button>
+                    )}
+                    {!isPrinted && (
+                    <button
+                      type="button"
+                      className="inline-flex items-center justify-center rounded-md p-2 bg-gray-100 hover:bg-gray-200 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      aria-label="Merge orders"
+                      title="Merge other orders into this bill"
+                      onClick={() => { setMergeSelection([]); setMergeDialogOpen(true); }}
+                    >
+                      <Merge className="w-4 h-4" />
+                    </button>
+                    )}
                     <button
                       type="button"
                       className="inline-flex items-center justify-center rounded-md p-2 bg-gray-100 hover:bg-gray-200 text-red-600 focus:outline-none focus:ring-2 focus:ring-red-500"
@@ -405,7 +468,17 @@ export default function Orders() {
                     {selectedOrder.restaurant_table && (
                       <div className="flex items-center gap-3 text-sm">
                         <Receipt className="w-4 h-4 text-gray-500" />
-                        <span className="text-gray-600">{selectedOrder.restaurant_table}</span>
+                        <span className="text-gray-600">
+                          {selectedOrder.custom_is_merged === 1 && selectedOrder.custom_merged_tables
+                            ? selectedOrder.custom_merged_tables
+                            : selectedOrder.restaurant_table}
+                        </span>
+                      </div>
+                    )}
+                    {selectedOrder.custom_is_merged === 1 && (
+                      <div className="flex items-center gap-3 text-sm">
+                        <Merge className="w-4 h-4 text-blue-600" />
+                        <span className="text-blue-700 font-medium">Merged bill</span>
                       </div>
                     )}
                   </div>
@@ -488,6 +561,17 @@ export default function Orders() {
           </>
         )}
       </div>
+      <MergeOrdersDialog
+        isOpen={mergeDialogOpen}
+        primary={selectedOrder}
+        orders={orders}
+        selected={mergeSelection}
+        merging={merging}
+        onToggle={toggleMergeSelection}
+        onClose={() => setMergeDialogOpen(false)}
+        onConfirm={handleMergeOrders}
+      />
+
       {showPaymentDialog && selectedOrder && (
         <PaymentDialog
           onClose={() => setShowPaymentDialog(false)}

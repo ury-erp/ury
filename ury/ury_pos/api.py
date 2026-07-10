@@ -199,7 +199,7 @@ def getInvoiceForCashier(status, cashier, limit, limit_start):
                 name, invoice_printed, grand_total, restaurant_table, 
                 cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number, 
-                posting_date, rounded_total, order_type 
+                posting_date, rounded_total, order_type, custom_is_merged, custom_merged_tables 
             FROM `tabPOS Invoice` 
             WHERE branch = %s AND status = %s AND cashier = %s
             AND (invoice_printed = 1 OR (invoice_printed = 0 AND COALESCE(restaurant_table, '') = ''))
@@ -219,7 +219,7 @@ def getInvoiceForCashier(status, cashier, limit, limit_start):
                 name, invoice_printed, grand_total, restaurant_table, 
                 cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number, 
-                posting_date, rounded_total, order_type 
+                posting_date, rounded_total, order_type, custom_is_merged, custom_merged_tables 
             FROM `tabPOS Invoice` 
             WHERE branch = %s AND status = %s AND cashier = %s
             AND (invoice_printed = 0 AND restaurant_table IS NOT NULL)
@@ -238,7 +238,7 @@ def getInvoiceForCashier(status, cashier, limit, limit_start):
                 name, invoice_printed, grand_total, restaurant_table, 
                 cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number,
-                posting_date, rounded_total, order_type,additional_discount_percentage,discount_amount 
+                posting_date, rounded_total, order_type, custom_is_merged, custom_merged_tables,additional_discount_percentage,discount_amount 
             FROM `tabPOS Invoice` 
             WHERE branch = %s AND status = %s AND cashier = %s
             ORDER BY modified desc
@@ -256,7 +256,7 @@ def getInvoiceForCashier(status, cashier, limit, limit_start):
                 name, invoice_printed, grand_total, restaurant_table, 
                 cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number,
-                posting_date, rounded_total, order_type,additional_discount_percentage,discount_amount
+                posting_date, rounded_total, order_type, custom_is_merged, custom_merged_tables,additional_discount_percentage,discount_amount
             FROM `tabPOS Invoice` 
             WHERE branch = %s AND status = %s AND cashier = %s
             ORDER BY modified desc
@@ -289,7 +289,7 @@ def getPosInvoice(status, limit, limit_start):
                 name, invoice_printed, grand_total, restaurant_table, 
                 cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number, 
-                posting_date, rounded_total, order_type 
+                posting_date, rounded_total, order_type, custom_is_merged, custom_merged_tables 
             FROM `tabPOS Invoice` 
             WHERE branch = %s AND status = %s 
             AND (invoice_printed = 1 OR (invoice_printed = 0 AND COALESCE(restaurant_table, '') = ''))
@@ -309,7 +309,7 @@ def getPosInvoice(status, limit, limit_start):
                 name, invoice_printed, grand_total, restaurant_table, 
                 cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number, 
-                posting_date, rounded_total, order_type 
+                posting_date, rounded_total, order_type, custom_is_merged, custom_merged_tables 
             FROM `tabPOS Invoice` 
             WHERE branch = %s AND status = %s 
             AND (invoice_printed = 0 AND restaurant_table IS NOT NULL)
@@ -328,7 +328,7 @@ def getPosInvoice(status, limit, limit_start):
                 name, invoice_printed, grand_total, restaurant_table, 
                 cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number,
-                posting_date, rounded_total, order_type,additional_discount_percentage,discount_amount 
+                posting_date, rounded_total, order_type, custom_is_merged, custom_merged_tables,additional_discount_percentage,discount_amount 
             FROM `tabPOS Invoice` 
             WHERE branch = %s AND status = %s 
             ORDER BY modified desc
@@ -346,7 +346,7 @@ def getPosInvoice(status, limit, limit_start):
                 name, invoice_printed, grand_total, restaurant_table, 
                 cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number,
-                posting_date, rounded_total, order_type,additional_discount_percentage,discount_amount
+                posting_date, rounded_total, order_type, custom_is_merged, custom_merged_tables,additional_discount_percentage,discount_amount
             FROM `tabPOS Invoice` 
             WHERE branch = %s AND status = %s 
             ORDER BY modified desc
@@ -387,7 +387,7 @@ def searchPosInvoice(query,status):
             ["customer", "like", f"%{query}%"],
             ["mobile_number", "like", f"%{query}%"],
         ],
-        fields=["name", "customer", "grand_total", "posting_date", "posting_time", "order_type", "restaurant_table","status","grand_total","rounded_total","net_total","mobile_number"],
+        fields=["name", "customer", "grand_total", "posting_date", "posting_time", "order_type", "restaurant_table","status","grand_total","rounded_total","net_total","mobile_number","custom_is_merged","custom_merged_tables"],
         limit_page_length=10 
     )
     

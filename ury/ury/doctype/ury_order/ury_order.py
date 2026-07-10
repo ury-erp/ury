@@ -657,3 +657,113 @@ def change_table_in_kot(invoice, new_table, branch):
         production = frappe.db.get_value("URY KOT", kot.name, "production")
         kot_channel = "{}_{}_{}".format("kot_update", branch, production)
         frappe.publish_realtime(kot_channel)
+
+
+@frappe.whitelist()
+def merge_invoices(primary_invoice, invoices_to_merge):
+    """Combine several open table orders into a single bill.
+
+    Items from `invoices_to_merge` are appended to `primary_invoice`, their KOTs
+    are repointed at the primary so the kitchen display stays consistent, and the
+    now-empty invoices are deleted. Deleting them releases their tables via the
+    POS Invoice `on_trash` hook, so the secondary tables become free immediately —
+    merge when the guests are ready to pay.
+
+    KOT.restaurant_table is deliberately left untouched: the kitchen still needs
+    to know which table each dish belongs to.
+    """
+    if isinstance(invoices_to_merge, str):
+        invoices_to_merge = json.loads(invoices_to_merge)
+
+    invoices_to_merge = [i for i in invoices_to_merge if i and i != primary_invoice]
+    if not invoices_to_merge:
+        frappe.throw(_("Select at least one other order to merge."))
+
+    primary = frappe.get_doc("POS Invoice", primary_invoice)
+    _validate_mergeable(primary, primary)
+
+    others = [frappe.get_doc("POS Invoice", name) for name in invoices_to_merge]
+    for other in others:
+        _validate_mergeable(other, primary)
+
+    # Remember what this bill is made of. The printed bill should name every table
+    # the guests used, not just the one the surviving order happened to sit on.
+    merged_tables = _split(primary.get("custom_merged_tables")) or (
+        [primary.restaurant_table] if primary.restaurant_table else []
+    )
+    merged_orders = _split(primary.get("custom_merged_invoices"))
+
+    for other in others:
+        if other.restaurant_table and other.restaurant_table not in merged_tables:
+            merged_tables.append(other.restaurant_table)
+        merged_orders.append(other.name)
+
+        for item in other.items:
+            primary.append(
+                "items",
+                {
+                    "item_code": item.item_code,
+                    "item_name": item.item_name,
+                    "qty": item.qty,
+                    "rate": item.rate,
+                    "price_list_rate": item.price_list_rate,
+                    "base_price_list_rate": item.base_price_list_rate,
+                    "comment": item.get("comment"),
+                    "custom_course": item.get("custom_course"),
+                    "cost_center": item.get("cost_center"),
+                },
+            )
+
+        # Point this order's KOTs at the surviving invoice before it disappears.
+        for kot in frappe.get_all("URY KOT", filters={"invoice": other.name}, pluck="name"):
+            frappe.db.set_value("URY KOT", kot, "invoice", primary.name)
+
+    primary.custom_is_merged = 1
+    primary.custom_merged_tables = ", ".join(merged_tables)
+    primary.custom_merged_invoices = ", ".join(merged_orders)
+
+    primary.save()
+
+    for other in others:
+        other.delete()
+
+    frappe.db.commit()
+    return primary.name
+
+
+def _split(value):
+    """Comma separated field -> list, tolerating None and stray spaces."""
+    return [part.strip() for part in (value or "").split(",") if part.strip()]
+
+
+def _validate_mergeable(doc, primary):
+    """Reject anything that would produce a wrong or unpayable bill."""
+    if doc.docstatus != 0:
+        frappe.throw(_("Order {0} is already submitted.").format(doc.name))
+
+    if doc.invoice_printed:
+        frappe.throw(_("Order {0} is already billed and cannot be merged.").format(doc.name))
+
+    if doc.order_type == "Aggregators":
+        frappe.throw(_("Aggregator order {0} cannot be merged.").format(doc.name))
+
+    if doc.name == primary.name:
+        return
+
+    if doc.customer != primary.customer:
+        frappe.throw(
+            _("Order {0} belongs to {1}, not {2}. Merge orders of the same customer.").format(
+                doc.name, doc.customer, primary.customer
+            )
+        )
+
+    for field, label in (
+        ("branch", _("branch")),
+        ("pos_profile", _("POS Profile")),
+        ("company", _("company")),
+        ("selling_price_list", _("price list")),
+    ):
+        if doc.get(field) != primary.get(field):
+            frappe.throw(
+                _("Order {0} has a different {1} and cannot be merged.").format(doc.name, label)
+            )
