@@ -633,25 +633,25 @@ export const usePOSStore = create<POSStore>((set, get) => ({
             id: order.customer,
             name: order.customer_name,
             phone: order.mobile_number,
-          } : null,
+          } : defaultCustomerOf(get().posProfile),
           isUpdatingOrder: true,
           orderId: order.name,
         });
       } else {
-        set({ 
+        set({
           tableOrder: null,
           activeOrders: [],
-          selectedCustomer: null,
+          selectedCustomer: defaultCustomerOf(get().posProfile),
           isUpdatingOrder: false,
           orderId: null,
         });
       }
     } catch (error) {
-      set({ 
+      set({
         error: 'Failed to load table order',
         tableOrder: null,
         activeOrders: [],
-        selectedCustomer: null,
+        selectedCustomer: defaultCustomerOf(get().posProfile),
         isUpdatingOrder: false,
         orderId: null,
       });
@@ -661,10 +661,10 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   },
 
   clearTableOrder: () => {
-    set({ 
+    set({
       tableOrder: null,
       activeOrders: [],
-      selectedCustomer: null,
+      selectedCustomer: defaultCustomerOf(get().posProfile),
       isUpdatingOrder: false,
       orderId: null,
     });
