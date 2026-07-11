@@ -2,6 +2,8 @@ import { call } from './frappe-sdk';
 
 export interface MenuItem {
   item: string;
+  /** Item Code from the Item doctype, shown on the card when enabled in POS Profile */
+  item_code?: string;
   item_name: string;
   item_image: string | null;
   rate: number | string;

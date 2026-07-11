@@ -317,6 +317,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
         image: item.item_image || null,
         price: typeof item.rate === 'string' ? parseFloat(item.rate) : item.rate || 0,
         item: item.item,
+        item_code: item.item_code,
         item_name: item.item_name,
         item_image: item.item_image,
         course: item.course,

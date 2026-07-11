@@ -176,6 +176,8 @@ export interface Waiter {
   name: string;
   /** Display name — what gets stored on POS Invoice.waiter and printed */
   employee_name: string;
+  /** Avatar path: Employee image, falling back to the linked User's image */
+  image?: string | null;
 }
 
 /** Active employees, offered as waiters when tagging an order. */

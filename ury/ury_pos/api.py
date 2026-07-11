@@ -80,19 +80,24 @@ def getRestaurantMenu(pos_profile, room=None, order_type=None):
         order_by="item_name asc"
     )
     
-    menu_items_with_image = [
-        {
-            "item": item.item,
-            "item_name": _(item.item_name) if item.item_name else item.item_name,
-            "rate": item.rate,
-            "special_dish": item.special_dish,
-            "disabled": item.disabled,
-            "item_image": frappe.db.get_value("Item", item.item, "image"),
-            "course": item.course,
-            "course_label": _(item.course) if item.course else item.course,
-        }
-        for item in menu_items
-    ]
+    menu_items_with_image = []
+    for item in menu_items:
+        image, item_code = frappe.db.get_value(
+            "Item", item.item, ["image", "item_code"]
+        ) or (None, None)
+        menu_items_with_image.append(
+            {
+                "item": item.item,
+                "item_code": item_code,
+                "item_name": _(item.item_name) if item.item_name else item.item_name,
+                "rate": item.rate,
+                "special_dish": item.special_dish,
+                "disabled": item.disabled,
+                "item_image": image,
+                "course": item.course,
+                "course_label": _(item.course) if item.course else item.course,
+            }
+        )
     modified = frappe.db.get_value("URY Menu", menu, "modified")
     
     
@@ -727,10 +732,34 @@ def validate_pos_close(pos_profile):
 
 @frappe.whitelist()
 def get_waiters():
-    """Active employees, offered as waiters when tagging an order in POS."""
-    return frappe.get_all(
+    """Active employees, offered as waiters when tagging an order in POS.
+
+    Each waiter carries an ``image`` for the picker grid: the Employee's own
+    image when set, otherwise the linked User's ``user_image`` as a fallback.
+    """
+    waiters = frappe.get_all(
         "Employee",
         filters={"status": "Active"},
-        fields=["name", "employee_name"],
+        fields=["name", "employee_name", "image", "user_id"],
         order_by="employee_name asc",
     )
+
+    # Resolve missing employee images from the linked User in a single query.
+    user_ids = [w.user_id for w in waiters if not w.image and w.user_id]
+    user_images = {}
+    if user_ids:
+        user_images = {
+            u.name: u.user_image
+            for u in frappe.get_all(
+                "User",
+                filters={"name": ["in", user_ids]},
+                fields=["name", "user_image"],
+            )
+        }
+
+    for waiter in waiters:
+        if not waiter.image and waiter.user_id:
+            waiter.image = user_images.get(waiter.user_id)
+        waiter.pop("user_id", None)
+
+    return waiters
