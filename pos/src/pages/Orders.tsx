@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Clock, User, UserCheck, Receipt, Printer, Pencil, X, Merge } from 'lucide-react';
+import { Clock, User, Receipt, Printer, Pencil, X, Merge } from 'lucide-react';
 import { Badge, Button, Card, CardContent } from '../components/ui';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../components/ui/dialog';
 import { showToast } from '../components/ui/toast';
@@ -16,6 +16,8 @@ import { call } from '../lib/frappe-sdk';
 import { t } from '../i18n';
 import MergeOrdersDialog from '../components/MergeOrdersDialog';
 import { mergeInvoices } from '../lib/order-api';
+import { getWaiters, Waiter } from '../lib/invoice-api';
+import { WaiterAvatar } from '../components/WaiterAvatar';
 
 export default function Orders() {
   const { 
@@ -42,6 +44,16 @@ export default function Orders() {
   const [mergeDialogOpen, setMergeDialogOpen] = React.useState(false);
   const [mergeSelection, setMergeSelection] = React.useState<string[]>([]);
   const [merging, setMerging] = React.useState(false);
+
+  // Waiters, to show the tagged waiter's avatar in the order details panel.
+  const [waiters, setWaiters] = React.useState<Waiter[]>([]);
+  useEffect(() => {
+    getWaiters()
+      .then(setWaiters)
+      .catch(() => setWaiters([]));
+  }, []);
+  const waiterImageOf = (name?: string | null) =>
+    waiters.find((w) => (w.employee_name || w.name) === name)?.image;
 
   const toggleMergeSelection = (name: string) =>
     setMergeSelection((prev) =>
@@ -462,10 +474,16 @@ export default function Orders() {
                   </div>
                   {/* Second column: waiter and table */}
                   <div className="space-y-3">
-                    <div className="flex items-center gap-3 text-sm">
-                      <UserCheck className="w-4 h-4 text-gray-500" />
-                      <span className="text-gray-600">{selectedOrder.waiter}</span>
-                    </div>
+                    {selectedOrder.waiter && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <WaiterAvatar
+                          name={selectedOrder.waiter}
+                          image={waiterImageOf(selectedOrder.waiter)}
+                          size={24}
+                        />
+                        <span className="text-gray-600">{selectedOrder.waiter}</span>
+                      </div>
+                    )}
                     {selectedOrder.restaurant_table && (
                       <div className="flex items-center gap-3 text-sm">
                         <Receipt className="w-4 h-4 text-gray-500" />

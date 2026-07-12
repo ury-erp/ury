@@ -8,19 +8,23 @@ interface MenuCardProps {
   item_image: string | null;
   course?: string;
   item: string;
+  item_code?: string;
+  showItemCode?: boolean;
   onClick?: () => void;
   disabled?: boolean;
 }
 
-const MenuCard: FC<MenuCardProps> = ({ 
-  id, 
-  name, 
-  price, 
-  item_image, 
-  course, 
-  item, 
+const MenuCard: FC<MenuCardProps> = ({
+  id,
+  name,
+  price,
+  item_image,
+  course,
+  item,
+  item_code,
+  showItemCode,
   onClick,
-  disabled 
+  disabled
 }) => {
   return (
     <div
@@ -59,12 +63,24 @@ const MenuCard: FC<MenuCardProps> = ({
 
       {/* Content section - flex grow with fixed padding */}
       <div className="flex-1 p-3 flex flex-col">
-        {/* Name section - fixed height for 2 lines */}
-        <div className="">
+        {/* Name / item code section.
+            When the POS Profile enables item code, the code becomes the primary
+            (dark, on top) label and the name drops to a lighter secondary line.
+            Otherwise the name stays the primary label. */}
+        {showItemCode && (item_code || item) ? (
+          <div>
+            <p className="font-semibold text-gray-900 text-sm leading-5 font-mono truncate" title={item_code || item}>
+              {item_code || item}
+            </p>
+            <h3 className="text-xs text-gray-500 leading-4 line-clamp-2 mt-0.5" title={name}>
+              {name}
+            </h3>
+          </div>
+        ) : (
           <h3 className="font-medium text-gray-900 text-sm leading-5 line-clamp-2" title={name}>
             {name}
           </h3>
-        </div>
+        )}
 
         {/* Course section - fixed height for 1 line */}
         <div className="h-5 mt-1">
