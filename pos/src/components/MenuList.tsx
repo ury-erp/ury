@@ -19,8 +19,11 @@ const MenuList: React.FC<MenuListProps> = ({ onItemClick }) => {
     quickFilter,
     fetchMenuItems,
     isMenuInteractionDisabled,
-    isOrderInteractionDisabled
+    isOrderInteractionDisabled,
+    posProfile
   } = usePOSStore();
+
+  const showItemCode = !!posProfile?.show_item_code;
 
   useEffect(() => {
     fetchMenuItems();
@@ -77,6 +80,8 @@ const MenuList: React.FC<MenuListProps> = ({ onItemClick }) => {
                 item_image={item.image}
                 course={item.course_label || item.course}
                 item={item.item}
+                item_code={item.item_code}
+                showItemCode={showItemCode}
                 onClick={() => onItemClick(item)}
                 disabled={isInteractionDisabled}
               />

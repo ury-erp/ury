@@ -110,5 +110,13 @@ class URYKOT(Document):
         frappe.cache().set_value(cache_key, self.time)
 
     def userSetting(self):
-        userDoc = frappe.get_doc("User", self.owner)
-        self.user = userDoc.full_name
+        # Prefer the waiter tagged on the order; fall back to the KOT creator.
+        # `waiter` may hold an employee display name (tagged in POS) or a user id
+        # (older orders / untagged) — resolve a user id to its full name, else
+        # show the stored value as-is.
+        waiter = (
+            frappe.db.get_value("POS Invoice", self.invoice, "waiter")
+            if self.invoice
+            else None
+        ) or self.owner
+        self.user = frappe.db.get_value("User", waiter, "full_name") or waiter
