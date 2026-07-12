@@ -17,6 +17,10 @@ export interface POSInvoice {
   posting_date: string;
   rounded_total: number;
   order_type: OrderType;
+  /** Set when several table orders were combined into this bill. */
+  custom_is_merged?: number;
+  /** Comma separated tables the merged orders came from, e.g. "T1, T2, T3". */
+  custom_merged_tables?: string | null;
 }
 
 export interface POSInvoiceItem {
@@ -165,4 +169,19 @@ export async function selectNetworkPrinter(orderId: string, posProfile: string, 
 
 export async function updatePrintStatus(orderId: string) {
   await call.post('ury.ury.api.ury_print.qz_print_update', { invoice: orderId });
-} 
+}
+
+export interface Waiter {
+  /** Employee id (e.g. HR-EMP-00001) */
+  name: string;
+  /** Display name — what gets stored on POS Invoice.waiter and printed */
+  employee_name: string;
+  /** Avatar path: Employee image, falling back to the linked User's image */
+  image?: string | null;
+}
+
+/** Active employees, offered as waiters when tagging an order. */
+export async function getWaiters(): Promise<Waiter[]> {
+  const response = await call.get<{ message: Waiter[] }>('ury.ury_pos.api.get_waiters');
+  return response.message || [];
+}

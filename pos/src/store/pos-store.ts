@@ -98,6 +98,8 @@ interface POSState {
   selectedRoom: string | null;
   searchQuery: string;
   selectedCustomer: Customer | null;
+  /** Employee name tagged as waiter for the order being created. */
+  selectedWaiter: string | null;
   selectedOrderType: OrderType;
   quickFilter: 'all' | 'special';
   selectedItem: MenuItem | null;
@@ -134,6 +136,7 @@ interface POSStore extends POSState {
   setSelectedCategory: (category: string) => void;
   setSearchQuery: (query: string) => void;
   setSelectedCustomer: (customer: Customer | null) => void;
+  setSelectedWaiter: (waiter: string | null) => void;
   setSelectedTable: (table: string | null, room: string | null, doNotLoadOrder?: boolean) => void;
   setSelectedOrderType: (type: OrderType) => void;
   setQuickFilter: (filter: 'all' | 'special') => void;
@@ -173,6 +176,14 @@ const calculateItemPrice = (item: OrderItem): number => {
   return basePrice + addonsTotal;
 };
 
+// POS Profile's "Customer" field, as a selectable customer. Null when unset.
+const defaultCustomerOf = (
+  profile: PosProfileCombined | null
+): Customer | null =>
+  profile?.customer
+    ? { id: profile.customer, name: profile.customer, phone: '' }
+    : null;
+
 export const usePOSStore = create<POSStore>((set, get) => ({
   menuItems: [],
   categories: [],
@@ -182,6 +193,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   selectedRoom: null,
   searchQuery: '',
   selectedCustomer: null,
+  selectedWaiter: null,
   selectedOrderType: DEFAULT_ORDER_TYPE as OrderType,
   quickFilter: "all",
   selectedItem: null,
@@ -241,10 +253,11 @@ export const usePOSStore = create<POSStore>((set, get) => ({
       const cached = sessionStorage.getItem('posProfile');
       if (cached) {
         const profile = JSON.parse(cached);
-        set({ 
-          posProfile: profile, 
+        set({
+          posProfile: profile,
           profileLoading: false,
-          currency: profile.currency || 'INR'
+          currency: profile.currency || 'INR',
+          ...(get().selectedCustomer ? {} : { selectedCustomer: defaultCustomerOf(profile) })
         });
         if (!storage.getItem('currencySymbol')) {
           await get().fetchCurrencySymbol();
@@ -254,12 +267,13 @@ export const usePOSStore = create<POSStore>((set, get) => ({
 
       set({ profileLoading: true, error: null });
       const combinedProfile = await getCombinedPosProfile();
-      
+
       sessionStorage.setItem('posProfile', JSON.stringify(combinedProfile));
-      set({ 
-        posProfile: combinedProfile, 
+      set({
+        posProfile: combinedProfile,
         profileLoading: false,
-        currency: combinedProfile.currency || 'INR'
+        currency: combinedProfile.currency || 'INR',
+        ...(get().selectedCustomer ? {} : { selectedCustomer: defaultCustomerOf(combinedProfile) })
       });
       
       if (!storage.getItem('currencySymbol')) {
@@ -303,6 +317,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
         image: item.item_image || null,
         price: typeof item.rate === 'string' ? parseFloat(item.rate) : item.rate || 0,
         item: item.item,
+        item_code: item.item_code,
         item_name: item.item_name,
         item_image: item.item_image,
         course: item.course,
@@ -451,6 +466,8 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   setSelectedCategory: (category) => set({ selectedCategory: category }),
   setSearchQuery: (query) => set({ searchQuery: query }),
   setSelectedCustomer: (customer) => set({ selectedCustomer: customer }),
+
+  setSelectedWaiter: (waiter) => set({ selectedWaiter: waiter }),
   setSelectedTable: (table: string | null, room: string | null, doNotLoadOrder: boolean = false) => {
     set({ selectedTable: table, selectedRoom: room });
     if (table ) {
@@ -623,25 +640,27 @@ export const usePOSStore = create<POSStore>((set, get) => ({
             id: order.customer,
             name: order.customer_name,
             phone: order.mobile_number,
-          } : null,
+          } : defaultCustomerOf(get().posProfile),
+          selectedWaiter: order.waiter || null,
           isUpdatingOrder: true,
           orderId: order.name,
         });
       } else {
-        set({ 
+        set({
           tableOrder: null,
           activeOrders: [],
-          selectedCustomer: null,
+          selectedCustomer: defaultCustomerOf(get().posProfile),
+          selectedWaiter: null,
           isUpdatingOrder: false,
           orderId: null,
         });
       }
     } catch (error) {
-      set({ 
+      set({
         error: 'Failed to load table order',
         tableOrder: null,
         activeOrders: [],
-        selectedCustomer: null,
+        selectedCustomer: defaultCustomerOf(get().posProfile),
         isUpdatingOrder: false,
         orderId: null,
       });
@@ -651,10 +670,11 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   },
 
   clearTableOrder: () => {
-    set({ 
+    set({
       tableOrder: null,
       activeOrders: [],
-      selectedCustomer: null,
+      selectedCustomer: defaultCustomerOf(get().posProfile),
+      selectedWaiter: null,
       isUpdatingOrder: false,
       orderId: null,
     });
@@ -668,10 +688,11 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   },
 
   resetOrderState: () => {
-    const { fetchMenuItems } = get();
-    
+    const { fetchMenuItems, posProfile } = get();
+
     set({
-      selectedCustomer: null,
+      selectedCustomer: defaultCustomerOf(posProfile),
+      selectedWaiter: null,
       selectedTable: null,
       selectedRoom: null,
       selectedAggregator: null,

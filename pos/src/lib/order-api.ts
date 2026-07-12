@@ -28,6 +28,7 @@ export interface POSInvoice {
   order_type: string;
   restaurant_table: string;
   custom_restaurant_room: string;
+  waiter: string;
   status: string;
   total: number;
   grand_total: number;
@@ -82,4 +83,15 @@ export interface SyncOrderRequest {
 
 export const syncOrder = async (data: SyncOrderRequest) => {
   return call.post( 'ury.ury.doctype.ury_order.ury_order.sync_order',data);
-}; 
+};
+
+/**
+ * Combine several open orders into one bill. Items move onto `primaryInvoice`;
+ * the other orders are deleted and their tables released. Returns the survivor.
+ */
+export const mergeInvoices = async (primaryInvoice: string, invoicesToMerge: string[]) => {
+  return call.post('ury.ury.doctype.ury_order.ury_order.merge_invoices', {
+    primary_invoice: primaryInvoice,
+    invoices_to_merge: invoicesToMerge,
+  });
+};

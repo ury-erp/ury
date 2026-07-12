@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState, type MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, Eye, Layout, Loader2, Printer, Square, Users } from 'lucide-react';
+import { AlertTriangle, ArrowLeftRight, Eye, Layout, Loader2, Printer, Square, Users } from 'lucide-react';
 import { cn, formatInvoiceTime } from '../lib/utils';
 import { usePOSStore } from '../store/pos-store';
-import { getRooms, getTables, getTableCount ,type Room, type Table } from '../lib/table-api';
+import { getRooms, getTables, getTableCount, transferTable, type Room, type Table } from '../lib/table-api';
 import { Spinner } from '../components/ui/spinner';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
@@ -15,6 +15,7 @@ import { showToast } from '../components/ui/toast';
 import { t } from '../i18n';
 
 import LayoutView from '../components/LayoutView';
+import TableSwitchDialog from '../components/TableSwitchDialog';
 
 const sortTables = (tables: Table[]) => [...tables].sort((a, b) => a.name.localeCompare(b.name));
 
@@ -33,6 +34,8 @@ const TableView = () => {
   const [loadingRoomCounts, setLoadingRoomCounts] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [printingTable, setPrintingTable] = useState<string | null>(null);
+  const [switchFromTable, setSwitchFromTable] = useState<Table | null>(null);
+  const [switchingTo, setSwitchingTo] = useState<string | null>(null);
 
   const persistRoomCounts = useCallback((counts: Record<string, number>) => {
     if (!branch) return;
@@ -131,6 +134,15 @@ const TableView = () => {
         const sortedTables = sortTables(fetchedTables);
         setTables(sortedTables);
         setTablesCache(prev => ({ ...prev, [roomName]: sortedTables }));
+
+        // Keep the room chip in sync: the cached count is otherwise never
+        // invalidated when tables are added or removed.
+        setRoomCounts(prev => {
+          if (prev[roomName] === sortedTables.length) return prev;
+          const next = { ...prev, [roomName]: sortedTables.length };
+          persistRoomCounts(next);
+          return next;
+        });
       } catch (e) {
         console.error(e);
         setError('Failed to load tables');
@@ -139,7 +151,7 @@ const TableView = () => {
         setLoadingTables(false);
       }
     },
-    [tablesCache]
+    [tablesCache, persistRoomCounts]
   );
 
   useEffect(() => {
@@ -184,6 +196,35 @@ const TableView = () => {
       showToast.error(error instanceof Error ? error.message : 'Failed to print order');
     } finally {
       setPrintingTable(null);
+    }
+  };
+
+  const handleOpenSwitch = (table: Table, event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    setSwitchFromTable(table);
+  };
+
+  const handleSwitchTable = async (target: Table) => {
+    if (!switchFromTable) return;
+
+    setSwitchingTo(target.name);
+    try {
+      const orderResponse = await getTableOrder(switchFromTable.name);
+      const invoiceId = orderResponse.message?.name;
+
+      if (!invoiceId) {
+        showToast.error('No active order found for this table');
+        return;
+      }
+
+      await transferTable(switchFromTable.name, target.name, invoiceId);
+      showToast.success(`Order moved to ${target.name}`);
+      setSwitchFromTable(null);
+      await loadTables(switchFromTable.restaurant_room, { useCache: false });
+    } catch (error) {
+      showToast.error(error instanceof Error ? error.message : 'Failed to switch table');
+    } finally {
+      setSwitchingTo(null);
     }
   };
 
@@ -367,6 +408,13 @@ const TableView = () => {
                           Preview
                         </button>
                         <button
+                          onClick={(event) => handleOpenSwitch(table, event)}
+                          className="flex-1 flex items-center justify-center gap-2 py-2 text-xs font-semibold rounded bg-white hover:bg-amber-100 transition"
+                        >
+                          <ArrowLeftRight className="w-3 h-3" />
+                          Switch
+                        </button>
+                        <button
                           onClick={(event) => handlePrintTable(table, event)}
                           disabled={printingTable === table.name}
                           className="flex-1 flex items-center justify-center gap-2 py-2 text-xs font-semibold rounded bg-white hover:bg-amber-100 transition disabled:opacity-60 disabled:cursor-not-allowed"
@@ -410,6 +458,15 @@ const TableView = () => {
           </div>
         </div>
       </div>
+
+      <TableSwitchDialog
+        isOpen={!!switchFromTable}
+        fromTable={switchFromTable}
+        tables={tables}
+        switching={switchingTo}
+        onClose={() => setSwitchFromTable(null)}
+        onSelect={handleSwitchTable}
+      />
     </div>
   );
 };

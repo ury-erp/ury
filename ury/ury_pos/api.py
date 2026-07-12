@@ -80,19 +80,24 @@ def getRestaurantMenu(pos_profile, room=None, order_type=None):
         order_by="item_name asc"
     )
     
-    menu_items_with_image = [
-        {
-            "item": item.item,
-            "item_name": _(item.item_name) if item.item_name else item.item_name,
-            "rate": item.rate,
-            "special_dish": item.special_dish,
-            "disabled": item.disabled,
-            "item_image": frappe.db.get_value("Item", item.item, "image"),
-            "course": item.course,
-            "course_label": _(item.course) if item.course else item.course,
-        }
-        for item in menu_items
-    ]
+    menu_items_with_image = []
+    for item in menu_items:
+        image, item_code = frappe.db.get_value(
+            "Item", item.item, ["image", "item_code"]
+        ) or (None, None)
+        menu_items_with_image.append(
+            {
+                "item": item.item,
+                "item_code": item_code,
+                "item_name": _(item.item_name) if item.item_name else item.item_name,
+                "rate": item.rate,
+                "special_dish": item.special_dish,
+                "disabled": item.disabled,
+                "item_image": image,
+                "course": item.course,
+                "course_label": _(item.course) if item.course else item.course,
+            }
+        )
     modified = frappe.db.get_value("URY Menu", menu, "modified")
     
     
@@ -199,7 +204,7 @@ def getInvoiceForCashier(status, cashier, limit, limit_start):
                 name, invoice_printed, grand_total, restaurant_table, 
                 cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number, 
-                posting_date, rounded_total, order_type 
+                posting_date, rounded_total, order_type, custom_is_merged, custom_merged_tables 
             FROM `tabPOS Invoice` 
             WHERE branch = %s AND status = %s AND cashier = %s
             AND (invoice_printed = 1 OR (invoice_printed = 0 AND COALESCE(restaurant_table, '') = ''))
@@ -219,7 +224,7 @@ def getInvoiceForCashier(status, cashier, limit, limit_start):
                 name, invoice_printed, grand_total, restaurant_table, 
                 cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number, 
-                posting_date, rounded_total, order_type 
+                posting_date, rounded_total, order_type, custom_is_merged, custom_merged_tables 
             FROM `tabPOS Invoice` 
             WHERE branch = %s AND status = %s AND cashier = %s
             AND (invoice_printed = 0 AND restaurant_table IS NOT NULL)
@@ -238,7 +243,7 @@ def getInvoiceForCashier(status, cashier, limit, limit_start):
                 name, invoice_printed, grand_total, restaurant_table, 
                 cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number,
-                posting_date, rounded_total, order_type,additional_discount_percentage,discount_amount 
+                posting_date, rounded_total, order_type, custom_is_merged, custom_merged_tables,additional_discount_percentage,discount_amount 
             FROM `tabPOS Invoice` 
             WHERE branch = %s AND status = %s AND cashier = %s
             ORDER BY modified desc
@@ -256,7 +261,7 @@ def getInvoiceForCashier(status, cashier, limit, limit_start):
                 name, invoice_printed, grand_total, restaurant_table, 
                 cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number,
-                posting_date, rounded_total, order_type,additional_discount_percentage,discount_amount
+                posting_date, rounded_total, order_type, custom_is_merged, custom_merged_tables,additional_discount_percentage,discount_amount
             FROM `tabPOS Invoice` 
             WHERE branch = %s AND status = %s AND cashier = %s
             ORDER BY modified desc
@@ -289,7 +294,7 @@ def getPosInvoice(status, limit, limit_start):
                 name, invoice_printed, grand_total, restaurant_table, 
                 cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number, 
-                posting_date, rounded_total, order_type 
+                posting_date, rounded_total, order_type, custom_is_merged, custom_merged_tables 
             FROM `tabPOS Invoice` 
             WHERE branch = %s AND status = %s 
             AND (invoice_printed = 1 OR (invoice_printed = 0 AND COALESCE(restaurant_table, '') = ''))
@@ -309,7 +314,7 @@ def getPosInvoice(status, limit, limit_start):
                 name, invoice_printed, grand_total, restaurant_table, 
                 cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number, 
-                posting_date, rounded_total, order_type 
+                posting_date, rounded_total, order_type, custom_is_merged, custom_merged_tables 
             FROM `tabPOS Invoice` 
             WHERE branch = %s AND status = %s 
             AND (invoice_printed = 0 AND restaurant_table IS NOT NULL)
@@ -328,7 +333,7 @@ def getPosInvoice(status, limit, limit_start):
                 name, invoice_printed, grand_total, restaurant_table, 
                 cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number,
-                posting_date, rounded_total, order_type,additional_discount_percentage,discount_amount 
+                posting_date, rounded_total, order_type, custom_is_merged, custom_merged_tables,additional_discount_percentage,discount_amount 
             FROM `tabPOS Invoice` 
             WHERE branch = %s AND status = %s 
             ORDER BY modified desc
@@ -346,7 +351,7 @@ def getPosInvoice(status, limit, limit_start):
                 name, invoice_printed, grand_total, restaurant_table, 
                 cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number,
-                posting_date, rounded_total, order_type,additional_discount_percentage,discount_amount
+                posting_date, rounded_total, order_type, custom_is_merged, custom_merged_tables,additional_discount_percentage,discount_amount
             FROM `tabPOS Invoice` 
             WHERE branch = %s AND status = %s 
             ORDER BY modified desc
@@ -387,7 +392,7 @@ def searchPosInvoice(query,status):
             ["customer", "like", f"%{query}%"],
             ["mobile_number", "like", f"%{query}%"],
         ],
-        fields=["name", "customer", "grand_total", "posting_date", "posting_time", "order_type", "restaurant_table","status","grand_total","rounded_total","net_total","mobile_number"],
+        fields=["name", "customer", "grand_total", "posting_date", "posting_time", "order_type", "restaurant_table","status","grand_total","rounded_total","net_total","mobile_number","custom_is_merged","custom_merged_tables"],
         limit_page_length=10 
     )
     
@@ -723,3 +728,38 @@ def validate_pos_close(pos_profile):
     
     return "Success"
 
+
+
+@frappe.whitelist()
+def get_waiters():
+    """Active employees, offered as waiters when tagging an order in POS.
+
+    Each waiter carries an ``image`` for the picker grid: the Employee's own
+    image when set, otherwise the linked User's ``user_image`` as a fallback.
+    """
+    waiters = frappe.get_all(
+        "Employee",
+        filters={"status": "Active"},
+        fields=["name", "employee_name", "image", "user_id"],
+        order_by="employee_name asc",
+    )
+
+    # Resolve missing employee images from the linked User in a single query.
+    user_ids = [w.user_id for w in waiters if not w.image and w.user_id]
+    user_images = {}
+    if user_ids:
+        user_images = {
+            u.name: u.user_image
+            for u in frappe.get_all(
+                "User",
+                filters={"name": ["in", user_ids]},
+                fields=["name", "user_image"],
+            )
+        }
+
+    for waiter in waiters:
+        if not waiter.image and waiter.user_id:
+            waiter.image = user_images.get(waiter.user_id)
+        waiter.pop("user_id", None)
+
+    return waiters

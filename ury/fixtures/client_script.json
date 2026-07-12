@@ -2,6 +2,28 @@
  {
   "docstatus": 0,
   "doctype": "Client Script",
+  "dt": "Event",
+  "enabled": 1,
+  "modified": "2025-12-04 23:52:21.258501",
+  "module": null,
+  "name": "event calendar view",
+  "script": "frappe.listview_settings['Event'] = {\n    onload: function(listview) {\n        // Switch to calendar on initial load\n        if (!listview._switched_to_calendar) {\n            listview._switched_to_calendar = true;\n            setTimeout(() => {\n                if (frappe.get_route()[2] !== 'Calendar') {\n                    frappe.set_route('List', 'Event', 'Calendar');\n                }\n            }, 150);\n        }\n    }\n};\n\n// Hook into route changes to catch all navigation scenarios\n$(document).on('app_ready', function() {\n    frappe.router.on('change', function() {\n        let route = frappe.get_route();\n        \n        // Check if navigating to Event List view\n        if (route[0] === 'List' && route[1] === 'Event' && route[2] !== 'Calendar') {\n            // Small delay to let the page load\n            setTimeout(() => {\n                frappe.set_route('List', 'Event', 'Calendar');\n            }, 100);\n        }\n    });\n});",
+  "view": "List"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "Sales Order",
+  "enabled": 0,
+  "modified": "2025-12-06 11:50:02.877249",
+  "module": null,
+  "name": "calendar view for sales order",
+  "script": "// Client Script for Sales Order - Set Calendar View as Default\n// Handles all navigation scenarios including search and breadcrumb clicks\n\nfrappe.listview_settings['Sales Order'] = {\n    onload: function(listview) {\n        // Switch to calendar on initial load\n        if (!listview._switched_to_calendar) {\n            listview._switched_to_calendar = true;\n            setTimeout(() => {\n                if (frappe.get_route()[2] !== 'Calendar') {\n                    frappe.set_route('List', 'Sales Order', 'Calendar');\n                }\n            }, 150);\n        }\n    }\n};\n\n// Hook into route changes to catch all navigation scenarios\n$(document).on('app_ready', function() {\n    frappe.router.on('change', function() {\n        let route = frappe.get_route();\n        \n        // Check if navigating to Sales Order List view\n        if (route[0] === 'List' && route[1] === 'Sales Order' && route[2] !== 'Calendar') {\n            // Small delay to let the page load\n            setTimeout(() => {\n                frappe.set_route('List', 'Sales Order', 'Calendar');\n            }, 100);\n        }\n    });\n});\n\n// Handle search results - when user searches \"sales order\" from awesomebar\n$(document).on('click', '[data-route^=\"List/Sales Order\"]', function(e) {\n    e.preventDefault();\n    frappe.set_route('List', 'Sales Order', 'Calendar');\n});\n\n// Handle breadcrumb clicks - when clicking \"Sales Order\" from inside a record\n$(document).on('click', '.breadcrumb-item a[href*=\"Sales Order\"]', function(e) {\n    let href = $(this).attr('href');\n    \n    // Check if it's a link to the list view\n    if (href && (href.includes('/app/sales-order') || href.includes('List/Sales Order'))) {\n        e.preventDefault();\n        frappe.set_route('List', 'Sales Order', 'Calendar');\n    }\n});\n\n// Additional handler for awesomebar navigation\nfrappe.ui.toolbar.Awesomebar && $(document).on('awesomebar:navigate', function(e, data) {\n    if (data && data.route && data.route.includes('Sales Order') && data.type === 'List') {\n        setTimeout(() => {\n            frappe.set_route('List', 'Sales Order', 'Calendar');\n        }, 100);\n    }\n});",
+  "view": "List"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
   "dt": "POS Invoice",
   "enabled": 0,
   "modified": "2023-12-19 15:34:46.018469",

@@ -226,5 +226,10 @@
     "paid": "Payé",
     "consolidated": "Consolidé",
     "return": "Retour"
+  },
+  "waiter": {
+    "label": "Serveur",
+    "search_placeholder": "Sélectionner un serveur...",
+    "no_waiters_found": "Aucun employé trouvé"
   }
 }

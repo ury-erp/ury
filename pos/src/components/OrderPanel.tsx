@@ -3,6 +3,7 @@ import { Trash2, Edit, FrownIcon, Plus, Loader2, MessageSquare } from 'lucide-re
 import { usePOSStore } from '../store/pos-store';
 import { formatCurrency, cn } from '../lib/utils';
 import { CustomerSelect } from './CustomerSelect';
+import { WaiterSelect } from './WaiterSelect';
 import ProductDialog from './ProductDialog';
 import OrderTypeSelect from './OrderTypeSelect';
 import CommentDialog from './CommentDialog';
@@ -30,6 +31,7 @@ const OrderPanel = () => {
     selectedTable,
     selectedRoom,
     selectedCustomer,
+    selectedWaiter,
     selectedAggregator,
     resetOrderState,
     paymentModes,
@@ -116,7 +118,7 @@ const OrderPanel = () => {
         mode_of_payment: paymentModes[0],
         last_invoice: isUpdatingOrder ? orderId : null,
         invoice: isUpdatingOrder ? orderId : null,
-        waiter: user.name,
+        waiter: selectedWaiter || user.name,
         comments: orderComment || undefined
       };
 
@@ -184,6 +186,7 @@ const OrderPanel = () => {
       <div className="p-4 border-b border-gray-200 flex-shrink-0">
         <OrderTypeSelect disabled={isInteractionDisabled} />
         <div className="mt-3"><CustomerSelect disabled={isInteractionDisabled} /></div>
+        <div className="mt-3"><WaiterSelect disabled={isInteractionDisabled} /></div>
       </div>
       
       {orderLoading ? (
@@ -206,6 +209,12 @@ const OrderPanel = () => {
                     <div className="flex items-center justify-between">
                       <h3 className="font-medium text-gray-900 text-sm">{item.name}</h3>
                     </div>
+                    {item.comment?.trim() && (
+                      <p className="mt-0.5 flex items-start gap-1 text-xs text-amber-700">
+                        <MessageSquare className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                        <span>{item.comment.trim()}</span>
+                      </p>
+                    )}
                     {item.selectedVariant && (
                       <p className="text-sm text-gray-600">{item.selectedVariant.name}</p>
                     )}

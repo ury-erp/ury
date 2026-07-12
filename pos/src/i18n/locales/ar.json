@@ -233,5 +233,10 @@
         "paid": "مدفوع",
         "consolidated": "مجمع",
         "return": "مرتجع"
+    },
+    "waiter": {
+        "label": "النادل",
+        "search_placeholder": "اختر النادل...",
+        "no_waiters_found": "لم يتم العثور على موظفين"
     }
 }

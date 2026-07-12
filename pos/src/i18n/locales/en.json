@@ -226,5 +226,10 @@
     "paid": "Paid",
     "consolidated": "Consolidated",
     "return": "Return"
+  },
+  "waiter": {
+    "label": "Waiter",
+    "search_placeholder": "Select waiter...",
+    "no_waiters_found": "No employees found"
   }
 }

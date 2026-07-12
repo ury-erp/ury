@@ -7,4 +7,5 @@ export const DOCTYPES={
     "CUSTOMER_GROUP": "Customer Group",
     "CUSTOMER_TERRITORY": "Territory",
     "CURRENCY": "Currency",
+    "WEBSITE_SETTINGS": "Website Settings",
 }
