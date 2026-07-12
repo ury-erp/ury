@@ -14,7 +14,22 @@ import { useRootStore } from '../store/root-store';
 import { usePOSStore } from '../store/pos-store';
 import type { RootState } from '../store/root-store';
 import { logout } from '../lib/auth-api';
+import { getWebsiteBranding } from '../lib/website-settings-api';
 import { showToast } from './ui/toast';
+
+// Bundled fallback used until Website Settings loads, or if no App Logo is set.
+const DEFAULT_LOGO = '/assets/ury/pos/ury_pos.png';
+
+/** Point the browser-tab favicon at the given URL, creating the <link> if needed. */
+function setFavicon(href: string) {
+  let link = document.head.querySelector<HTMLLinkElement>("link[rel~='icon']");
+  if (!link) {
+    link = document.createElement('link');
+    link.rel = 'icon';
+    document.head.appendChild(link);
+  }
+  link.href = href;
+}
 
 const Header = () => {
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -25,6 +40,20 @@ const Header = () => {
   const { searchQuery, setSearchQuery } = usePOSStore();
   const { orderSearchQuery, setOrderSearchQuery } = useRootStore();
   const [orderSearchInput, setOrderSearchInput] = useState(orderSearchQuery);
+  const [appLogo, setAppLogo] = useState<string>(DEFAULT_LOGO);
+
+  // Load logo + favicon from Website Settings (App Logo / Favicon fields).
+  useEffect(() => {
+    let cancelled = false;
+    getWebsiteBranding().then(({ appLogo, favicon }) => {
+      if (cancelled) return;
+      if (appLogo) setAppLogo(appLogo);
+      if (favicon) setFavicon(favicon);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Determine placeholder and handlers based on route
   let searchPlaceholder = t('header.search_placeholder_default');
@@ -89,7 +118,7 @@ const Header = () => {
     try {
       await logout();
       window.location.href = '/login?redirect-to=%2Fpos';
-    } catch (error) {
+    } catch {
       showToast.error(t('errors.failed_logout'));
     }
   };
@@ -109,9 +138,9 @@ const Header = () => {
         {/* Logo */}
         <div className="flex items-center">
         <Link to="/" className="flex items-center gap-3">
-            <img 
-              src="/assets/ury/pos/ury_pos.png" 
-              alt="URY POS" 
+            <img
+              src={appLogo}
+              alt="URY POS"
               className="h-10 w-auto"
             />
           </Link>
