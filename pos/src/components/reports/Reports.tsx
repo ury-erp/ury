@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import {
   FileText,
   Download,
@@ -13,12 +13,17 @@ import {
 import { Button, Input, Spinner } from '../ui';
 import { cn } from '../../lib/utils';
 import { useReportsStore } from '../../store/reports-store';
+import { isAIEnabled } from '../../lib/ai-service';
+import { useAIStore } from '../../store/ai-store';
 import { t } from '../../i18n';
 import SalesReportView from './SalesReportView';
 import ExpenseReportView from './ExpenseReportView';
 import ProfitLossView from './ProfitLossView';
 import InventoryReportView from './InventoryReportView';
 import PeriodComparisonView from './PeriodComparisonView';
+
+// Lazy-loaded AI Insights — only loaded when AI is enabled AND user opens it
+const AIInsightsPanel = lazy(() => import('../ai/AIInsightsPanel'));
 
 type ReportType = 'sales' | 'expense' | 'profit_loss' | 'inventory';
 type ReportPeriod = 'daily' | 'weekly' | 'monthly' | 'yesterday' | 'last_7_days' | 'last_30_days' | 'last_month';
@@ -37,7 +42,14 @@ const Reports = () => {
     setSelectedPeriod,
     setCustomDateRange,
     setComparePeriods,
+    salesReport,
+    expenseReport,
+    profitLossReport,
+    inventoryReport,
   } = useReportsStore();
+
+  const { setReportContext, panelOpen } = useAIStore();
+  const aiEnabled = isAIEnabled();
 
   const [showCustomDate, setShowCustomDate] = useState(false);
   const [customFrom, setCustomFrom] = useState('');
@@ -47,6 +59,24 @@ const Reports = () => {
     fetchCurrentReport();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Sync report context to AI store when report type or data changes
+  useEffect(() => {
+    if (!aiEnabled) return;
+
+    const reportDataMap: Record<string, Record<string, unknown>> = {
+      sales: salesReport || {},
+      expense: expenseReport || {},
+      profit_loss: profitLossReport || {},
+      inventory: inventoryReport || {},
+    };
+
+    setReportContext(
+      selectedReportType,
+      reportDataMap[selectedReportType] || {},
+      'EUR'
+    );
+  }, [selectedReportType, salesReport, expenseReport, profitLossReport, inventoryReport, aiEnabled, setReportContext]);
 
   const handlePeriodChange = (period: ReportPeriod) => {
     setShowCustomDate(false);
@@ -234,6 +264,13 @@ const Reports = () => {
           {selectedReportType === 'profit_loss' && <ProfitLossView />}
           {selectedReportType === 'inventory' && <InventoryReportView />}
         </div>
+      )}
+
+      {/* AI Insights Panel — lazy-loaded, only rendered when AI is enabled */}
+      {aiEnabled && (
+        <Suspense fallback={null}>
+          <AIInsightsPanel />
+        </Suspense>
       )}
     </div>
   );

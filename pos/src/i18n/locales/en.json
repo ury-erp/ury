@@ -430,5 +430,23 @@
   "aggregator": {
     "loading": "Loading aggregators...",
     "select_placeholder": "Select an aggregator"
+  },
+  "ai": {
+    "title": "AI Insights",
+    "insights": "AI Insights",
+    "open_panel": "Open AI Insights",
+    "close": "Close",
+    "clear": "Clear conversation",
+    "quick_actions": "Quick actions",
+    "analyze_report": "Analyze Report",
+    "top_selling": "Top Items",
+    "trends": "Trends",
+    "empty_state": "Ask anything about your report data",
+    "thinking": "Thinking...",
+    "input_placeholder": "Ask about your reports...",
+    "disclaimer": "AI insights are suggestions — always verify with actual data",
+    "default_question_top_items": "What are the top selling items?",
+    "default_question_trends": "What trends do you see?",
+    "not_configured": "AI Insights requires configuration. Set VITE_AI_BASE_URL and VITE_AI_API_KEY environment variables."
   }
 }

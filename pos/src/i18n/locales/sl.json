@@ -402,5 +402,23 @@
     "nav_menu": "Pojdi na Upravljanje jedilnika",
     "nav_reports": "Pojdi na Poročila",
     "alt_prefix": "Alt+"
+  },
+  "ai": {
+    "title": "AI Vpogledi",
+    "insights": "AI Vpogledi",
+    "open_panel": "Odpri AI Vpoglede",
+    "close": "Zapri",
+    "clear": "Počisti pogovor",
+    "quick_actions": "Hitra dejanja",
+    "analyze_report": "Analiziraj poročilo",
+    "top_selling": "Top artikli",
+    "trends": "Trendi",
+    "empty_state": "Vprašajte karkoli o svojih podatkih",
+    "thinking": "Razmišljam...",
+    "input_placeholder": "Vprašajte o svojih poročilih...",
+    "disclaimer": "AI vpogledi so predlogi — vedno preverite z dejanskimi podatki",
+    "default_question_top_items": "Kateri artikli se prodajajo najbolje?",
+    "default_question_trends": "Kakšne trende opažate?",
+    "not_configured": "AI Vpogledi zahtevajo konfiguracijo. Nastavite VITE_AI_BASE_URL in VITE_AI_API_KEY okoljske spremenljivke."
   }
 }

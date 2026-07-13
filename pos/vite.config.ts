@@ -107,6 +107,10 @@ export default defineConfig({
           if (id.includes('node_modules/')) {
             return 'vendor';
           }
+          // AI module — lazy-loaded, separate chunk to not affect main bundle
+          if (id.includes('/src/components/ai/') || id.includes('/src/lib/ai-service') || id.includes('/src/store/ai-store')) {
+            return 'ai-module';
+          }
         },
       },
     },
