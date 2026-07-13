@@ -1,5 +1,4 @@
 import { call } from './frappe-sdk-retry';
-import { db } from './frappe-sdk-retry';
 import { dedupedCall } from './api-dedup';
 
 // ---- Types ----

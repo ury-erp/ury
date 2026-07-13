@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Plus, Pencil, Trash2, GripVertical, X, Check } from 'lucide-react';
 import { Button, Input } from '../ui';
 import { useMenuManagementStore } from '../../store/menu-management-store';
+import type { URYMenuCourse } from '../../lib/menu-management-api';
 import { t } from '../../i18n';
 
 const CourseManager = () => {
@@ -21,7 +22,7 @@ const CourseManager = () => {
     setNewPriority(0);
   };
 
-  const handleStartEdit = (course: any) => {
+  const handleStartEdit = (course: URYMenuCourse) => {
     setEditingCourse(course.name);
     setEditName(course.course);
     setEditPriority(course.custom_serving_priority || 0);

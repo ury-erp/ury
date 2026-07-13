@@ -45,14 +45,10 @@ export interface TableOrder {
  * @returns The order details and customer information if an active order exists
  */
 export async function getTableOrder(table_no: string): Promise<TableOrder> {
-  try {
-    const res = await call.get('ury.ury.doctype.ury_order.ury_order.get_order_invoice', { 
-      table: table_no
-    });
-    return res as TableOrder;
-  } catch (error) {
-    throw error;
-  }
+  const res = await call.get('ury.ury.doctype.ury_order.ury_order.get_order_invoice', { 
+    table: table_no
+  });
+  return res as TableOrder;
 } 
 
 export interface SyncOrderRequest {

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Percent, Coins } from 'lucide-react';
 import { usePOSStore } from '../store/pos-store';
-import { cn, formatCurrency } from '../lib/utils';
+import { formatCurrency } from '../lib/utils';
 import { Button, Input, Dialog, DialogContent } from './ui';
 import { call } from '../lib/frappe-sdk';
 import { DEFAULT_PAYMENT_MODE } from '../data/order-types';
@@ -40,7 +40,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   const { paymentModes, fetchPaymentModes, posProfile: storePosProfile } = usePOSStore();
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [discountType] = useState<'percentage'>('percentage'); // Only percentage now
+  const [_discountType] = useState<'percentage'>('percentage'); // Only percentage now
   const [discountValue, setDiscountValue] = useState<string>('');
   const [appliedDiscount, setAppliedDiscount] = useState<number>(0);
   const [paymentInputs, setPaymentInputs] = useState<{ [mode: string]: string }>({});
@@ -82,7 +82,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   const subtotal = grandTotal;
   const adjustment = roundedTotal - grandTotal;
   const roundedAdjustment = Math.round(adjustment * 100) / 100;
-  const showAdjustment = Math.abs(roundedAdjustment) > 0.001;
+  const _showAdjustment = Math.abs(roundedAdjustment) > 0.001;
   const totalDiscount = appliedDiscount;
   const discountedTotal = Math.max(0, subtotal - totalDiscount);
   // If discount is applied, round up; else, round normally
@@ -109,7 +109,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   const getRemainingBalance = (currentId: string) => {
     const totalEntered = Object.entries(paymentInputs)
       .filter(([id]) => id !== currentId)
-      .reduce((sum, [_, val]) => sum + (parseFloat(val) || 0), 0);
+      .reduce((sum, [_key, val]) => sum + (parseFloat(val) || 0), 0);
     return Math.max(0, finalTotal - totalEntered);
   };
 

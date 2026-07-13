@@ -8,7 +8,6 @@
  * - Automatic cache cleanup on new version deployment
  */
 
-const CACHE_NAME = 'ury-pos-v1';
 const STATIC_CACHE = 'ury-pos-static-v1';
 const API_CACHE = 'ury-pos-api-v1';
 

@@ -31,7 +31,7 @@ export async function loadQzPrinter(host: string): Promise<void> {
       throw new Error('QZ certificate not configured in site_config (qz_cert)');
     }
     qz.security.setCertificatePromise(
-      (resolve: (data: string) => void, reject: (err?: string) => void) => {
+      (resolve: (data: string) => void, _reject: (err?: string) => void) => {
         resolve(certPem);
       }
     );
@@ -70,7 +70,7 @@ export async function printWithQz(host: string, htmlToPrint: string): Promise<vo
     }
     const data = [{ type: 'html', format: 'plain', data: htmlToPrint }];
     const config = qz.configs.create(printer);
-    await qz.print(config, data as any);
+    await qz.print(config, data as [{ type: string; format: string; data: string }]);
   };
 
   if (qz.websocket.isActive()) {

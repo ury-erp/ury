@@ -89,7 +89,7 @@ const Header = () => {
     try {
       await logout();
       window.location.href = '/login?redirect-to=%2Fpos';
-    } catch (error) {
+    } catch {
       showToast.error(t('errors.failed_logout'));
     }
   };

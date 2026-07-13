@@ -81,7 +81,7 @@ export const EXTENDED_ORDER_STATUS_TYPES = [
 
 // Function to get order status types based on POS profile settings
 export const getOrderStatusTypes = (viewAllStatus?: number, paidLimit?: number) => {
-    let statusTypes = [...BASE_ORDER_STATUS_TYPES];
+    const statusTypes = [...BASE_ORDER_STATUS_TYPES];
     
     // Add Recently Paid if paid_limit > 0
     if (paidLimit && paidLimit > 0) {

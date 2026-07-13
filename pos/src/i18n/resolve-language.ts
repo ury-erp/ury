@@ -9,7 +9,7 @@ import { DEFAULT_LANGUAGE, SUPPORTED_LANGUAGES } from './config';
 export function resolveLanguage(): string {
   // 1. Frappe boot object
   const frappeLang: string | undefined =
-    (window as any)?.frappe?.boot?.lang;
+    (window as { frappe?: { boot?: { lang?: string } } })?.frappe?.boot?.lang;
   if (frappeLang && SUPPORTED_LANGUAGES[frappeLang]) {
     return frappeLang;
   }

@@ -6,7 +6,6 @@ import {
   BarChart3,
   ChefHat,
   FileText,
-  MoreHorizontal,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { t } from '../i18n';

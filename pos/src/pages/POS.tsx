@@ -12,8 +12,8 @@ import InitialLoader from '../components/InitialLoader';
 
 export default function POS() {
   const {
-    searchQuery,
-    setSearchQuery,
+    _searchQuery,
+    _setSearchQuery,
     quickFilter,
     setQuickFilter,
     setSelectedItem,

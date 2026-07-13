@@ -9,6 +9,7 @@ import {
 } from 'recharts';
 import { useDashboardStore } from '../../store/dashboard-store';
 import { formatCurrency } from '../../lib/utils';
+import type { CategorySalesItem } from '../../lib/dashboard-api';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316'];
 
@@ -17,7 +18,7 @@ const CategorySalesChart = () => {
 
   const chartData = useMemo(() => {
     if (!categorySales?.data) return [];
-    return categorySales.data.map((item: any) => ({
+    return categorySales.data.map((item: CategorySalesItem) => ({
       name: item.category || 'Uncategorized',
       value: Number(item.total_amount) || 0,
       qty: Number(item.total_qty) || 0,

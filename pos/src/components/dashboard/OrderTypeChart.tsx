@@ -12,7 +12,7 @@ import {
 import { useDashboardStore } from '../../store/dashboard-store';
 import { formatCurrency } from '../../lib/utils';
 import { t } from '../../i18n';
-import { cn } from '../../lib/utils';
+
 
 const ORDER_TYPE_COLORS: Record<string, string> = {
   'Dine In': '#3b82f6',
@@ -37,7 +37,7 @@ const OrderTypeChart = () => {
     }));
   }, [summary?.order_type_breakdown]);
 
-  const customTooltip = ({ active, payload }: any) => {
+  const customTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ payload: { name: string; orders: number; revenue: number } }> }) => {
     if (active && payload && payload.length) {
       const data = payload[0]?.payload;
       if (!data) return null;

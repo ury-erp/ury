@@ -24,7 +24,7 @@ const HourlyHeatmap = () => {
 
     // Check if the data includes day information
     const hasDayInfo = summary.hourly_breakdown.some(
-      (item: any) => item.day !== undefined || item.day_of_week !== undefined
+      (item: { day?: number; day_of_week?: number; hour: number; order_count: number }) => item.day !== undefined || item.day_of_week !== undefined
     );
 
     for (const item of summary.hourly_breakdown) {

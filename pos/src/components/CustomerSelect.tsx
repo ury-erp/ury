@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { UserPlus, Phone, Loader } from 'lucide-react';
-import { usePOSStore, type Customer } from '../store/pos-store';
+import { usePOSStore } from '../store/pos-store';
 import { Button, Dialog, DialogContent, Input } from './ui';
 import { Select, SelectItem } from './ui';
 import { ChevronDown } from 'lucide-react';
@@ -230,7 +230,7 @@ export function CustomerSelect({ disabled }: CustomerSelectProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
-  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searchResults, setSearchResults] = useState<{ name: string; customer_name?: string; mobile_number?: string; content: string }[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -253,7 +253,7 @@ export function CustomerSelect({ disabled }: CustomerSelectProps) {
           setSearchResults(results);
           setIsSearching(false);
         })
-        .catch(err => {
+        .catch(() => {
           setSearchError(t('customer.failed_search'));
           setIsSearching(false);
         });
@@ -331,7 +331,7 @@ export function CustomerSelect({ disabled }: CustomerSelectProps) {
                 setHighlightedIndex(0);
               }}
               onFocus={() => setIsOpen(true)}
-              onBlur={e => {
+              onBlur={() => {
                 setTimeout(() => setIsOpen(false), 100);
               }}
               onKeyDown={handleKeyDown}

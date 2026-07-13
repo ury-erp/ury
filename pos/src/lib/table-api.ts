@@ -43,7 +43,7 @@ export async function getTableCount(room: string, branch?: string): Promise<numb
     ];
     const rows = await db.getDocList(DOCTYPES.URY_TABLE, {
       fields: ['count(name) as count'],
-      filters: filters as any,
+      filters: filters as Array<string | string[]>,
       limit: 1,
       asDict: true,
     }) as Array<{ count?: number | string }>;

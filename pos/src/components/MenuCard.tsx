@@ -16,7 +16,7 @@ const MenuCard: FC<MenuCardProps> = ({
   price, 
   item_image, 
   course, 
-  item, 
+  _item, 
   onClick,
   disabled 
 }) => {

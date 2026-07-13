@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import {
   BarChart3,
   RefreshCw,
-  TrendingUp,
   ShoppingCart,
   Users,
   DollarSign,
@@ -11,9 +10,10 @@ import {
   ArrowUpRight,
   ArrowDownRight,
 } from 'lucide-react';
-import { Button, Spinner, Badge } from '../ui';
+import { Button, Spinner } from '../ui';
 import { cn } from '../../lib/utils';
 import { useDashboardStore } from '../../store/dashboard-store';
+import type { DashboardPeriod } from '../../lib/dashboard-api';
 import { formatCurrency } from '../../lib/utils';
 import { t } from '../../i18n';
 import RevenueChartComponent from './RevenueChart';
@@ -67,7 +67,7 @@ const Dashboard = () => {
   };
 
   const handlePeriodChange = (period: string) => {
-    setSelectedPeriod(period as any);
+    setSelectedPeriod(period as DashboardPeriod);
   };
 
   return (
@@ -241,7 +241,7 @@ interface KPICardProps {
 }
 
 const KPICard = ({ title, value, icon, color, subtitle, trend, trendValue }: KPICardProps) => {
-  const colorMap = {
+  const _colorMap = {
     blue: 'bg-blue-50 text-blue-600',
     emerald: 'bg-emerald-50 text-emerald-600',
     purple: 'bg-purple-50 text-purple-600',

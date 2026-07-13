@@ -10,7 +10,7 @@ import {
 import { useDashboardStore } from '../../store/dashboard-store';
 import { formatCurrency } from '../../lib/utils';
 import { t } from '../../i18n';
-import { getPaymentMethodChart } from '../../lib/dashboard-api';
+import { getPaymentMethodChart, type PaymentMethodDataPoint } from '../../lib/dashboard-api';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316'];
 
@@ -31,7 +31,7 @@ const PaymentMethodChart = () => {
       try {
         const result = await getPaymentMethodChart(selectedPeriod);
         setData(
-          (result?.data || []).map((item: any) => ({
+          (result?.data || []).map((item: PaymentMethodDataPoint) => ({
             method: item.method || item.mode_of_payment || 'Unknown',
             amount: Number(item.amount) || 0,
             count: Number(item.count) || 0,
@@ -59,7 +59,7 @@ const PaymentMethodChart = () => {
     return chartData.reduce((sum, item) => sum + item.value, 0);
   }, [chartData]);
 
-  const renderCenterText = () => {
+  const _renderCenterText = () => {
     return (
       <text
         x="50%"
@@ -78,7 +78,7 @@ const PaymentMethodChart = () => {
     );
   };
 
-  const customTooltip = ({ active, payload }: any) => {
+  const customTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ name: string; value: number }> }) => {
     if (active && payload && payload.length) {
       const item = payload[0];
       const percentage = totalAmount > 0 ? ((item.value / totalAmount) * 100).toFixed(1) : '0';

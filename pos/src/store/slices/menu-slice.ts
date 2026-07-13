@@ -102,7 +102,7 @@ export const createMenuSlice: StateCreator<POSSliceAll, [], [], MenuSlice> = (se
       const courses = await getMenuCourses();
       sessionStorage.setItem('menuCategories', JSON.stringify(courses));
       set({ categories: courses });
-    } catch (error) {
+    } catch {
       set({ error: 'Failed to load menu categories' });
     }
   },
@@ -122,7 +122,7 @@ export const createMenuSlice: StateCreator<POSSliceAll, [], [], MenuSlice> = (se
       const names = groups.map((g: { name: string }) => g.name);
       set({ customerGroups: names });
       sessionStorage.setItem('customerGroups', JSON.stringify(names));
-    } catch (error) {
+    } catch {
       set({ error: 'Failed to load customer groups' });
     }
   },
@@ -142,7 +142,7 @@ export const createMenuSlice: StateCreator<POSSliceAll, [], [], MenuSlice> = (se
       const names = terrs.map((t: { name: string }) => t.name);
       set({ territories: names });
       sessionStorage.setItem('territories', JSON.stringify(names));
-    } catch (error) {
+    } catch {
       set({ error: 'Failed to load territories' });
     }
   },

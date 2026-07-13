@@ -13,7 +13,6 @@ import {
   getAvailableItems,
   toggleMenu,
   URYMenu,
-  URYMenuItem,
   URYMenuCourse,
   AvailableItem,
 } from '../lib/menu-management-api';
@@ -100,7 +99,7 @@ export const useMenuManagementStore = create<
       set({ loading: true, error: null });
       const menus = await getMenus();
       set({ menus, loading: false });
-    } catch (error) {
+    } catch {
       set({ error: 'Failed to load menus', loading: false });
       showToast.error('Failed to load menus');
     }
@@ -111,7 +110,7 @@ export const useMenuManagementStore = create<
       set({ menuDetailLoading: true, error: null });
       const menu = await getMenuDetail(menuName);
       set({ selectedMenu: menu, menuDetailLoading: false });
-    } catch (error) {
+    } catch {
       set({ error: 'Failed to load menu details', menuDetailLoading: false });
       showToast.error('Failed to load menu details');
     }
@@ -122,7 +121,7 @@ export const useMenuManagementStore = create<
       set({ coursesLoading: true });
       const courses = await getCoursesDetail();
       set({ courses, coursesLoading: false });
-    } catch (error) {
+    } catch {
       set({ coursesLoading: false });
       showToast.error('Failed to load courses');
     }
@@ -133,7 +132,7 @@ export const useMenuManagementStore = create<
       set({ itemsLoading: true });
       const items = await getAvailableItems();
       set({ availableItems: items, itemsLoading: false });
-    } catch (error) {
+    } catch {
       set({ itemsLoading: false });
       showToast.error('Failed to load available items');
     }
@@ -145,7 +144,7 @@ export const useMenuManagementStore = create<
       const menus = await getMenus();
       set({ menus });
       showToast.success(enabled ? 'Menu enabled' : 'Menu disabled');
-    } catch (error) {
+    } catch {
       showToast.error('Failed to toggle menu status');
     }
   },
@@ -155,9 +154,10 @@ export const useMenuManagementStore = create<
       await addMenuItem(menuName, item, rate, course, specialDish);
       await get().fetchMenuDetail(menuName);
       showToast.success('Item added to menu');
-    } catch (error: any) {
-      const msg = error?._server_messages
-        ? JSON.parse(JSON.parse(error._server_messages)[0]).message
+    } catch (error: unknown) {
+      const err = error as { _server_messages?: string };
+      const msg = err?._server_messages
+        ? JSON.parse(JSON.parse(err._server_messages)[0]).message
         : 'Failed to add item';
       showToast.error(msg);
     }
@@ -168,7 +168,7 @@ export const useMenuManagementStore = create<
       await updateMenuItem(menuName, itemRowName, updates);
       await get().fetchMenuDetail(menuName);
       showToast.success('Item updated');
-    } catch (error) {
+    } catch {
       showToast.error('Failed to update item');
     }
   },
@@ -178,7 +178,7 @@ export const useMenuManagementStore = create<
       await removeMenuItem(menuName, itemRowName);
       await get().fetchMenuDetail(menuName);
       showToast.success('Item removed from menu');
-    } catch (error) {
+    } catch {
       showToast.error('Failed to remove item');
     }
   },
@@ -188,7 +188,7 @@ export const useMenuManagementStore = create<
       await batchUpdatePrices(menuName, updates);
       await get().fetchMenuDetail(menuName);
       showToast.success(`${updates.length} prices updated`);
-    } catch (error) {
+    } catch {
       showToast.error('Failed to update prices');
     }
   },
@@ -198,9 +198,10 @@ export const useMenuManagementStore = create<
       await createMenuCourse(course, servingPriority, indicateInKds);
       await get().fetchCourses();
       showToast.success('Course created');
-    } catch (error: any) {
-      const msg = error?._server_messages
-        ? JSON.parse(JSON.parse(error._server_messages)[0]).message
+    } catch (error: unknown) {
+      const err = error as { _server_messages?: string };
+      const msg = err?._server_messages
+        ? JSON.parse(JSON.parse(err._server_messages)[0]).message
         : 'Failed to create course';
       showToast.error(msg);
     }
@@ -211,7 +212,7 @@ export const useMenuManagementStore = create<
       await updateMenuCourse(courseName, updates);
       await get().fetchCourses();
       showToast.success('Course updated');
-    } catch (error) {
+    } catch {
       showToast.error('Failed to update course');
     }
   },
@@ -221,9 +222,10 @@ export const useMenuManagementStore = create<
       await deleteMenuCourse(courseName);
       await get().fetchCourses();
       showToast.success('Course deleted');
-    } catch (error: any) {
-      const msg = error?._server_messages
-        ? JSON.parse(JSON.parse(error._server_messages)[0]).message
+    } catch (error: unknown) {
+      const err = error as { _server_messages?: string };
+      const msg = err?._server_messages
+        ? JSON.parse(JSON.parse(err._server_messages)[0]).message
         : 'Failed to delete course';
       showToast.error(msg);
     }

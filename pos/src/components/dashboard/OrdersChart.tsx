@@ -10,13 +10,14 @@ import {
   Legend,
 } from 'recharts';
 import { useDashboardStore } from '../../store/dashboard-store';
+import type { OrdersChartDataPoint } from '../../lib/dashboard-api';
 
 const OrdersChartComponent = () => {
   const { ordersChart } = useDashboardStore();
 
   const chartData = useMemo(() => {
     if (!ordersChart?.data) return [];
-    return ordersChart.data.map((point: any) => ({
+    return ordersChart.data.map((point: OrdersChartDataPoint) => ({
       name: point.date,
       total: Number(point.total_orders) || 0,
       paid: Number(point.paid_orders) || 0,

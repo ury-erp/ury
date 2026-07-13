@@ -33,7 +33,7 @@ const TableView = () => {
   const [loadingRooms, setLoadingRooms] = useState(false);
   const [loadingTables, setLoadingTables] = useState(false);
   const [roomCounts, setRoomCounts] = useState<Record<string, number>>({});
-  const [loadingRoomCounts, setLoadingRoomCounts] = useState(false);
+  const [_loadingRoomCounts, setLoadingRoomCounts] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [printingTable, setPrintingTable] = useState<string | null>(null);
 
@@ -62,7 +62,7 @@ const TableView = () => {
           setSelectedRoom(prev => prev ?? (fetchedRooms[0]?.name ?? null));
           sessionStorage.setItem(sessionKey, JSON.stringify(fetchedRooms));
         }
-      } catch (e) {
+      } catch {
         setError(t('errors.failed_load_rooms'));
       } finally {
         setLoadingRooms(false);
@@ -133,7 +133,7 @@ const TableView = () => {
         const sortedTables = sortTables(fetchedTables);
         setTables(sortedTables);
         setTablesCache(prev => ({ ...prev, [roomName]: sortedTables }));
-      } catch (e) {
+      } catch {
         setError(t('errors.failed_load_tables'));
         setTables([]);
       } finally {

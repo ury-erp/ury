@@ -10,6 +10,7 @@ import {
   Legend,
 } from 'recharts';
 import { useDashboardStore } from '../../store/dashboard-store';
+import type { ChartGranularity } from '../../lib/dashboard-api';
 import { formatCurrency } from '../../lib/utils';
 
 const RevenueChartComponent = () => {
@@ -49,7 +50,7 @@ const RevenueChartComponent = () => {
                   ? 'bg-blue-100 text-blue-700'
                   : 'text-gray-500 hover:bg-gray-100'
               }`}
-              onClick={() => setSelectedGranularity(g.value as any)}
+              onClick={() => setSelectedGranularity(g.value as ChartGranularity)}
             >
               {g.label}
             </button>

@@ -172,7 +172,7 @@ export const useDashboardStore = create<DashboardState & DashboardActions>(
           get().fetchLiveMetrics(),
         ]);
         set({ loading: false });
-      } catch (error) {
+      } catch {
         set({ error: 'Failed to load dashboard data', loading: false });
       }
     },

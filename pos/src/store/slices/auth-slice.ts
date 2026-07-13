@@ -28,7 +28,7 @@ const initialState: AuthState = {
   error: null,
 };
 
-export const createAuthSlice: StateCreator<AuthSlice> = (set, get) => ({
+export const createAuthSlice: StateCreator<AuthSlice> = (set, _get) => ({
   ...initialState,
 
   checkAuth: async () => {
