@@ -14,7 +14,10 @@
   "warehouse",
   "item_groups",
   "printer_info_section",
-  "printer_settings"
+  "printer_settings",
+  "section_break_sevj",
+  "enable_order_type_wise_display_on_mosaic",
+  "order_type"
  ],
  "fields": [
   {
@@ -62,11 +65,30 @@
    "fieldtype": "Table",
    "label": "Printers",
    "options": "URY Printer Settings"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "section_break_sevj",
+   "fieldtype": "Section Break",
+   "label": "KDS Settings"
+  },
+  {
+   "default": "0",
+   "fieldname": "enable_order_type_wise_display_on_mosaic",
+   "fieldtype": "Check",
+   "label": "Enable order type wise display on mosaic"
+  },
+  {
+   "depends_on": "eval:doc.enable_order_type_wise_display_on_mosaic == 1",
+   "fieldname": "order_type",
+   "fieldtype": "Table",
+   "label": "Order Type",
+   "options": "KDS Order Type"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2023-10-04 18:52:21.594992",
+ "modified": "2026-06-10 19:51:25.907064",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Production Unit",
@@ -119,6 +141,7 @@
    "share": 1
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": []
