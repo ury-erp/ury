@@ -231,8 +231,8 @@ const OrderPanel = () => {
                     <div className="flex items-center gap-2">
                       <Button
                         onClick={() => {
-                          const newQuantity = Math.max(0, item.quantity - 1);
-                          if (newQuantity === 0) {
+                          const newQuantity = Math.max(0, Math.round((item.quantity - 1) * 1000) / 1000);
+                          if (newQuantity <= 0) {
                             removeFromOrder(item.uniqueId!);
                           } else {
                             updateQuantity(item.uniqueId!, newQuantity);
@@ -247,7 +247,7 @@ const OrderPanel = () => {
                       </Button>
                       <span className="w-6 text-center">{item.quantity}</span>
                       <Button
-                        onClick={() => updateQuantity(item.uniqueId!, item.quantity + 1)}
+                        onClick={() => updateQuantity(item.uniqueId!, Math.round((item.quantity + 1) * 1000) / 1000)}
                         variant="outline"
                         size="icon"
                         className="w-8 h-8 rounded-full"

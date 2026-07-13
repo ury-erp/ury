@@ -28,6 +28,8 @@ export interface POSInvoice {
   split_siblings?: string[];
   custom_merged_pos_invoice?: string | null;
   custom_merged_total?: number | null;
+  discount_amount?: number;
+  additional_discount_percentage?: number;
 }
 
 export interface SplitGroupInvoice extends POSInvoice {
@@ -201,6 +203,8 @@ export function mapSplitGroupInvoiceToPOSInvoice(inv: SplitGroupInvoice): POSInv
     split_index: inv.split_index,
     split_total: inv.split_total,
     split_siblings: inv.split_siblings,
+    discount_amount: inv.discount_amount,
+    additional_discount_percentage: inv.additional_discount_percentage,
   };
 }
 
