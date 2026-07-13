@@ -5,6 +5,7 @@ import type {
   ExpenseReport,
   ProfitLossReport,
 } from '../lib/reports-api';
+import type { InventoryReport } from './reports-store';
 
 // ---- Mocks ----
 
@@ -60,6 +61,7 @@ vi.mock('jspdf-autotable', () => ({
 import { getSalesReport, getExpenseReport, getProfitLossReport, exportReportPdf } from '../lib/reports-api';
 import { showToast } from '../components/ui/toast';
 import { logger } from '../lib/logger';
+import jsPDF from 'jspdf';
 
 // ---- Test Fixtures ----
 
@@ -117,6 +119,58 @@ const mockProfitLossReport: ProfitLossReport = {
   profit_margin: 10.0,
 };
 
+const mockInventoryReport: InventoryReport = {
+  from_date: '2025-01-15',
+  to_date: '2025-01-15',
+  summary: {
+    total_items: 10,
+    low_stock_items: 2,
+    out_of_stock_items: 1,
+    total_stock_value: 5000.0,
+  },
+  items: [
+    {
+      item_code: 'ITEM001',
+      item_name: 'Coffee Beans',
+      current_stock: 50,
+      reorder_level: 10,
+      stock_uom: 'Kg',
+      valuation_rate: 20.0,
+      stock_value: 1000.0,
+      status: 'OK',
+    },
+    {
+      item_code: 'ITEM002',
+      item_name: 'Sugar',
+      current_stock: 3,
+      reorder_level: 5,
+      stock_uom: 'Kg',
+      valuation_rate: 5.0,
+      stock_value: 15.0,
+      status: 'Low',
+    },
+    {
+      item_code: 'ITEM003',
+      item_name: 'Tea Bags',
+      current_stock: 0,
+      reorder_level: 10,
+      stock_uom: 'Box',
+      valuation_rate: 8.0,
+      stock_value: 0.0,
+      status: 'Out of Stock',
+    },
+  ],
+};
+
+const mockSalesReportWithCancellations: SalesReport = {
+  ...mockSalesReport,
+  cancelled_orders: { count: 2, amount: 75.0 },
+  top_customers: [
+    { customer: 'C001', customer_name: 'John', order_count: 3, total_spent: 450.0 },
+    { customer: 'C002', customer_name: 'Jane', order_count: 2, total_spent: 300.0 },
+  ],
+};
+
 // ---- Helper to reset store state ----
 
 function resetStore() {
@@ -137,11 +191,45 @@ function resetStore() {
   });
 }
 
+// ---- Helper for CSV download mocking ----
+
+function setupCsvDownloadMocks() {
+  const mockCreateObjectURL = vi.fn().mockReturnValue('blob:http://localhost/test');
+  const mockRevokeObjectURL = vi.fn();
+  vi.stubGlobal('URL', { createObjectURL: mockCreateObjectURL, revokeObjectURL: mockRevokeObjectURL });
+  const mockLink = { setAttribute: vi.fn(), click: vi.fn(), remove: vi.fn() };
+  const origCreateElement = document.createElement.bind(document);
+  vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
+    if (tag === 'a') return mockLink as unknown as HTMLElement;
+    return origCreateElement(tag);
+  });
+  vi.spyOn(document.body, 'appendChild').mockImplementation((node: Node) => node);
+  vi.spyOn(document.body, 'removeChild').mockImplementation((node: Node) => node);
+  return { mockCreateObjectURL, mockRevokeObjectURL, mockLink };
+}
+
 // ---- Tests ----
 
 describe('useReportsStore', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Re-establish jsPDF mock implementation (vi.restoreAllMocks in CSV tests resets it)
+    vi.mocked(jsPDF).mockImplementation(() => ({
+      setFontSize: vi.fn(),
+      setTextColor: vi.fn(),
+      setFont: vi.fn(),
+      text: vi.fn(),
+      setDrawColor: vi.fn(),
+      setLineWidth: vi.fn(),
+      line: vi.fn(),
+      setFillColor: vi.fn(),
+      rect: vi.fn(),
+      save: vi.fn(),
+      addPage: vi.fn(),
+      setPage: vi.fn(),
+      getNumberOfPages: vi.fn().mockReturnValue(1),
+      internal: { pageSize: { getWidth: () => 210 } },
+    }));
     resetStore();
   });
 
@@ -773,6 +861,281 @@ describe('useReportsStore', () => {
 
       expect(getSalesReport).not.toHaveBeenCalled();
       expect(useReportsStore.getState().comparePeriods).toBe(true);
+    });
+  });
+
+  // ---- getPreviousPeriodDates via fetchPreviousSalesReport ----
+
+  describe('getPreviousPeriodDates via fetchPreviousSalesReport', () => {
+    it('calculates previous period for weekly', async () => {
+      vi.mocked(getSalesReport).mockResolvedValue(mockSalesReport);
+      useReportsStore.setState({ selectedPeriod: 'weekly' });
+      await useReportsStore.getState().fetchPreviousSalesReport();
+      const callArgs = vi.mocked(getSalesReport).mock.calls[0];
+      expect(callArgs[0]).toBe('weekly');
+      expect(callArgs[1]).toBeDefined();
+      expect(callArgs[2]).toBeDefined();
+    });
+
+    it('calculates previous period for monthly', async () => {
+      vi.mocked(getSalesReport).mockResolvedValue(mockSalesReport);
+      useReportsStore.setState({ selectedPeriod: 'monthly' });
+      await useReportsStore.getState().fetchPreviousSalesReport();
+      const callArgs = vi.mocked(getSalesReport).mock.calls[0];
+      expect(callArgs[0]).toBe('monthly');
+      expect(callArgs[1]).toBeDefined();
+      expect(callArgs[2]).toBeDefined();
+    });
+
+    it('calculates previous period for last_month', async () => {
+      vi.mocked(getSalesReport).mockResolvedValue(mockSalesReport);
+      useReportsStore.setState({ selectedPeriod: 'last_month' });
+      await useReportsStore.getState().fetchPreviousSalesReport();
+      const callArgs = vi.mocked(getSalesReport).mock.calls[0];
+      expect(callArgs[0]).toBe('last_month');
+      expect(callArgs[1]).toBeDefined();
+      expect(callArgs[2]).toBeDefined();
+    });
+
+    it('calculates previous period for last_7_days', async () => {
+      vi.mocked(getSalesReport).mockResolvedValue(mockSalesReport);
+      useReportsStore.setState({ selectedPeriod: 'last_7_days' });
+      await useReportsStore.getState().fetchPreviousSalesReport();
+      const callArgs = vi.mocked(getSalesReport).mock.calls[0];
+      expect(callArgs[0]).toBe('last_7_days');
+      expect(callArgs[1]).toBeDefined();
+      expect(callArgs[2]).toBeDefined();
+    });
+
+    it('calculates previous period for last_30_days', async () => {
+      vi.mocked(getSalesReport).mockResolvedValue(mockSalesReport);
+      useReportsStore.setState({ selectedPeriod: 'last_30_days' });
+      await useReportsStore.getState().fetchPreviousSalesReport();
+      const callArgs = vi.mocked(getSalesReport).mock.calls[0];
+      expect(callArgs[0]).toBe('last_30_days');
+      expect(callArgs[1]).toBeDefined();
+      expect(callArgs[2]).toBeDefined();
+    });
+
+    it('calculates previous period for yesterday', async () => {
+      vi.mocked(getSalesReport).mockResolvedValue(mockSalesReport);
+      useReportsStore.setState({ selectedPeriod: 'yesterday' });
+      await useReportsStore.getState().fetchPreviousSalesReport();
+      const callArgs = vi.mocked(getSalesReport).mock.calls[0];
+      expect(callArgs[0]).toBe('yesterday');
+      expect(callArgs[1]).toBeDefined();
+      expect(callArgs[2]).toBeDefined();
+    });
+  });
+
+  // ---- exportToPdf client-side generation ----
+
+  describe('exportToPdf client-side generation', () => {
+    it('generates client-side PDF for expense report', async () => {
+      vi.mocked(exportReportPdf).mockRejectedValue(new Error('Server error'));
+      useReportsStore.setState({
+        selectedReportType: 'expense',
+        expenseReport: mockExpenseReport,
+      });
+      await useReportsStore.getState().exportToPdf();
+      expect(useReportsStore.getState().exporting).toBe(false);
+      expect(showToast.success).toHaveBeenCalledWith('PDF report downloaded');
+    });
+
+    it('generates client-side PDF for profit_loss report', async () => {
+      vi.mocked(exportReportPdf).mockRejectedValue(new Error('Server error'));
+      useReportsStore.setState({
+        selectedReportType: 'profit_loss',
+        profitLossReport: mockProfitLossReport,
+      });
+      await useReportsStore.getState().exportToPdf();
+      expect(useReportsStore.getState().exporting).toBe(false);
+      expect(showToast.success).toHaveBeenCalledWith('PDF report downloaded');
+    });
+
+    it('generates client-side PDF for inventory report', async () => {
+      vi.mocked(exportReportPdf).mockRejectedValue(new Error('Server error'));
+      useReportsStore.setState({
+        selectedReportType: 'inventory',
+        inventoryReport: mockInventoryReport,
+      });
+      await useReportsStore.getState().exportToPdf();
+      expect(useReportsStore.getState().exporting).toBe(false);
+      expect(showToast.success).toHaveBeenCalledWith('PDF report downloaded');
+    });
+
+    it('generates client-side PDF for sales with cancelled orders and top customers', async () => {
+      vi.mocked(exportReportPdf).mockRejectedValue(new Error('Server error'));
+      useReportsStore.setState({
+        selectedReportType: 'sales',
+        salesReport: mockSalesReportWithCancellations,
+      });
+      await useReportsStore.getState().exportToPdf();
+      expect(useReportsStore.getState().exporting).toBe(false);
+      expect(showToast.success).toHaveBeenCalledWith('PDF report downloaded');
+    });
+
+    it('falls back to client-side when server returns null', async () => {
+      vi.mocked(exportReportPdf).mockResolvedValue(null as any);
+      useReportsStore.setState({
+        selectedReportType: 'sales',
+        salesReport: mockSalesReport,
+      });
+      await useReportsStore.getState().exportToPdf();
+      expect(useReportsStore.getState().exporting).toBe(false);
+      expect(showToast.success).toHaveBeenCalledWith('PDF report downloaded');
+    });
+
+    it('falls back to client-side when server returns empty string', async () => {
+      vi.mocked(exportReportPdf).mockResolvedValue('');
+      useReportsStore.setState({
+        selectedReportType: 'sales',
+        salesReport: mockSalesReport,
+      });
+      await useReportsStore.getState().exportToPdf();
+      expect(useReportsStore.getState().exporting).toBe(false);
+      expect(showToast.success).toHaveBeenCalledWith('PDF report downloaded');
+    });
+
+    it('handles total failure and shows error toast', async () => {
+      vi.mocked(exportReportPdf).mockRejectedValue(new Error('Server error'));
+      const throwImpl = () => { throw new Error('PDF error'); };
+      vi.mocked(jsPDF).mockImplementationOnce(throwImpl as any);
+      useReportsStore.setState({
+        selectedReportType: 'sales',
+        salesReport: mockSalesReport,
+      });
+      await useReportsStore.getState().exportToPdf();
+      expect(useReportsStore.getState().exporting).toBe(false);
+      expect(showToast.error).toHaveBeenCalledWith('Failed to export PDF');
+    });
+
+    it('generates PDF with no report data for selected type', async () => {
+      vi.mocked(exportReportPdf).mockRejectedValue(new Error('Server error'));
+      useReportsStore.setState({
+        selectedReportType: 'sales',
+        salesReport: null,
+      });
+      await useReportsStore.getState().exportToPdf();
+      expect(useReportsStore.getState().exporting).toBe(false);
+      expect(showToast.success).toHaveBeenCalledWith('PDF report downloaded');
+    });
+  });
+
+  // ---- exportToCsv inventory with data ----
+
+  describe('exportToCsv inventory with data', () => {
+    it('generates CSV for inventory report', () => {
+      useReportsStore.setState({ selectedReportType: 'inventory', inventoryReport: mockInventoryReport });
+      setupCsvDownloadMocks();
+      useReportsStore.getState().exportToCsv();
+      expect(showToast.success).toHaveBeenCalledWith('CSV exported successfully');
+    });
+
+    it('shows error toast for profit_loss report with no data', () => {
+      useReportsStore.setState({ selectedReportType: 'profit_loss', profitLossReport: null });
+      useReportsStore.getState().exportToCsv();
+      expect(showToast.error).toHaveBeenCalledWith('No profit & loss report data to export');
+    });
+  });
+
+  // ---- exportToCsv error handling ----
+
+  describe('exportToCsv error handling', () => {
+    it('shows error toast when CSV generation throws', () => {
+      useReportsStore.setState({ selectedReportType: 'sales', salesReport: mockSalesReport });
+      vi.stubGlobal('URL', {
+        createObjectURL: vi.fn().mockImplementation(() => { throw new Error('Blob error'); }),
+        revokeObjectURL: vi.fn(),
+      });
+      useReportsStore.getState().exportToCsv();
+      expect(showToast.error).toHaveBeenCalledWith('Failed to export CSV');
+    });
+  });
+
+  // ---- CSV content generation ----
+
+  describe('CSV content generation', () => {
+    it('generates sales CSV with all sections including cancellations', () => {
+      useReportsStore.setState({ selectedReportType: 'sales', salesReport: mockSalesReportWithCancellations });
+      const { mockLink } = setupCsvDownloadMocks();
+      useReportsStore.getState().exportToCsv();
+      expect(mockLink.setAttribute).toHaveBeenCalledWith('download', expect.stringContaining('sales_report'));
+      expect(mockLink.click).toHaveBeenCalled();
+    });
+
+    it('generates expense CSV with fixed and variable expenses', () => {
+      useReportsStore.setState({ selectedReportType: 'expense', expenseReport: mockExpenseReport });
+      setupCsvDownloadMocks();
+      useReportsStore.getState().exportToCsv();
+      expect(showToast.success).toHaveBeenCalledWith('CSV exported successfully');
+    });
+
+    it('generates profit_loss CSV with correct format', () => {
+      useReportsStore.setState({ selectedReportType: 'profit_loss', profitLossReport: mockProfitLossReport });
+      setupCsvDownloadMocks();
+      useReportsStore.getState().exportToCsv();
+      expect(showToast.success).toHaveBeenCalledWith('CSV exported successfully');
+    });
+
+    it('handles special characters in CSV fields (commas, quotes, newlines)', () => {
+      const specialCharReport: SalesReport = {
+        ...mockSalesReport,
+        item_sales: [
+          { item_code: 'ITEM001', item_name: 'Coffee, "Premium"', total_qty: 5, total_amount: 25.0, avg_rate: 5.0 },
+          { item_code: 'ITEM002', item_name: 'Tea\nGreen', total_qty: 3, total_amount: 15.0, avg_rate: 5.0 },
+        ],
+        order_type_sales: [
+          { order_type: 'Dine In, Takeaway', order_count: 6, revenue: 900.0 },
+        ],
+      };
+      useReportsStore.setState({ selectedReportType: 'sales', salesReport: specialCharReport });
+      setupCsvDownloadMocks();
+      useReportsStore.getState().exportToCsv();
+      expect(showToast.success).toHaveBeenCalledWith('CSV exported successfully');
+    });
+  });
+
+  // ---- exportToPdf with custom dates ----
+
+  describe('exportToPdf with custom dates', () => {
+    it('passes custom dates to exportReportPdf', async () => {
+      vi.mocked(exportReportPdf).mockResolvedValue('http://example.com/report.pdf');
+      vi.stubGlobal('open', vi.fn());
+      useReportsStore.setState({
+        selectedReportType: 'sales',
+        selectedPeriod: 'monthly',
+        customFromDate: '2025-01-01',
+        customToDate: '2025-01-31',
+      });
+      await useReportsStore.getState().exportToPdf();
+      expect(exportReportPdf).toHaveBeenCalledWith('sales', 'monthly', '2025-01-01', '2025-01-31');
+    });
+  });
+
+  // ---- fetchCurrentReport without custom dates ----
+
+  describe('fetchCurrentReport without custom dates', () => {
+    it('passes undefined for null custom dates to fetchExpenseReport', async () => {
+      vi.mocked(getExpenseReport).mockResolvedValue(mockExpenseReport);
+      useReportsStore.setState({
+        selectedReportType: 'expense',
+        customFromDate: null,
+        customToDate: null,
+      });
+      await useReportsStore.getState().fetchCurrentReport();
+      expect(getExpenseReport).toHaveBeenCalledWith(undefined, undefined);
+    });
+
+    it('passes undefined for null custom dates to fetchProfitLossReport', async () => {
+      vi.mocked(getProfitLossReport).mockResolvedValue(mockProfitLossReport);
+      useReportsStore.setState({
+        selectedReportType: 'profit_loss',
+        customFromDate: null,
+        customToDate: null,
+      });
+      await useReportsStore.getState().fetchCurrentReport();
+      expect(getProfitLossReport).toHaveBeenCalledWith(undefined, undefined);
     });
   });
 });
