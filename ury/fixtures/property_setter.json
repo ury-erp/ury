@@ -8,7 +8,7 @@
   "field_name": "closing_amount",
   "is_system_generated": 0,
   "modified": "2025-03-26 10:17:33.707296",
-  "module": null,
+  "module": "URY",
   "name": "POS Closing Entry Detail-closing_amount-label",
   "property": "label",
   "property_type": "Data",

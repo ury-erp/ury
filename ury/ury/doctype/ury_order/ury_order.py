@@ -16,31 +16,677 @@ from frappe import cache
 class URYOrder(Document):
     pass
 
+@frappe.whitelist()
+def merge_free_tables(table1, table2):
+    """Merges two tables in the same room; allows one occupied and one free."""
+    return merge_tables_batch(table1, [table2])
+
+
+@frappe.whitelist()
+def merge_tables_batch(anchor_table, tables):
+
+    if isinstance(tables, str):
+        tables = json.loads(tables)
+
+    targets = list(
+        dict.fromkeys(
+            t
+            for t in tables
+            if t and t != anchor_table
+        )
+    )
+
+    if not targets:
+        frappe.throw(
+            _("Select at least one table to merge.")
+        )
+
+    room = frappe.db.get_value(
+        "URY Table",
+        anchor_table,
+        "restaurant_room",
+    )
+
+    if not room:
+        frappe.throw(
+            _("Table not found.")
+        )
+
+    # Start from anchor cluster only
+    cluster, table_map = _get_merge_cluster(
+        anchor_table
+    )
+
+    cluster = set(cluster)
+
+    for target in targets:
+
+        target_room = frappe.db.get_value(
+            "URY Table",
+            target,
+            "restaurant_room",
+        )
+
+        if target_room != room:
+            frappe.throw(
+                _("Cannot merge tables from different rooms.")
+            )
+
+        target_cluster, _ = _get_merge_cluster(
+            target
+        )
+
+        # Prevent importing another merged group
+        if len(target_cluster) > 1:
+            frappe.throw(
+                _(
+                    "Cannot merge an already merged table."
+                )
+            )
+
+        # Prevent occupied table merge
+        occupied = frappe.db.get_value(
+            "URY Table",
+            target,
+            "occupied",
+        )
+
+        if occupied:
+            frappe.throw(
+                _("Occupied tables cannot be merged.")
+            )
+
+        cluster.add(target)
+
+    if _count_separate_active_orders(cluster) > 1:
+        frappe.throw(
+            _(
+                "Cannot merge tables with separate active orders."
+            )
+        )
+
+    cluster = sorted(cluster)
+
+    # Make relationships symmetric
+    for table in cluster:
+
+        partners = [
+            t
+            for t in cluster
+            if t != table
+        ]
+
+        frappe.db.set_value(
+            "URY Table",
+            table,
+            "merged_with",
+            ",".join(partners)
+            if partners
+            else None,
+            update_modified=False,
+        )
+
+    # Sync order only to selected cluster
+    _sync_active_order_with_merge_cluster(
+        anchor_table
+    )
+
+    _reconcile_open_invoices_for_tables(
+        cluster
+    )
+
+    frappe.db.commit()
+
+    return True
+def _append_merged_partner(table_name, partner):
+    merged = frappe.db.get_value(
+        "URY Table",
+        table_name,
+        "merged_with"
+    ) or ""
+    partners = _parse_merged_with(merged)
+    if partner not in partners:
+        partners.append(partner)
+    frappe.db.set_value(
+        "URY Table",
+        table_name,
+        "merged_with",
+        ",".join(sorted(set(partners))),
+    )
+
+def _sync_active_order_with_merge_cluster(table):
+
+    members = _get_cluster_table_names(table)
+
+    invoices = frappe.get_all(
+        "POS Invoice",
+        filters={
+            "docstatus": 0,
+            "invoice_printed": 0,
+        },
+        fields=[
+            "name",
+            "restaurant_table",
+            "creation",
+        ],
+    )
+
+    active = [
+        x
+        for x in invoices
+        if x.restaurant_table in members
+    ]
+
+    if not active:
+        return
+
+    primary = sorted(
+        active,
+        key=lambda x: x.creation
+    )[0]
+
+    merged_tables = ",".join(
+        sorted(
+            [
+                x
+                for x in members
+                if x != primary.restaurant_table
+            ]
+        )
+    )
+
+    frappe.db.set_value(
+        "POS Invoice",
+        primary.name,
+        "custom_merged_tables",
+        merged_tables,
+        update_modified=False,
+    )
+
+    for table_name in members:
+
+        frappe.db.set_value(
+            "URY Table",
+            table_name,
+            {
+                "occupied": 1,
+                "latest_invoice_time": primary.creation,
+            },
+        )
+
+def _parse_merged_with(merged_with):
+    if not merged_with:
+        return []
+    return [partner.strip() for partner in merged_with.split(",") if partner.strip()]
+
+
+def _table_has_active_order(table_name):
+    return bool(
+        frappe.db.exists(
+            "POS Invoice",
+            {
+                "docstatus": 0,
+                "restaurant_table": table_name,
+                "invoice_printed": 0,
+            },
+        )
+    )
+
+
+def _count_separate_active_orders(table_names):
+    return sum(1 for name in table_names if _table_has_active_order(name))
+
+
+def _get_merge_cluster(table):
+    room = frappe.db.get_value("URY Table", table, "restaurant_room")
+    if not room:
+        frappe.throw(_("Table not found."))
+
+    room_tables = frappe.get_all(
+        "URY Table",
+        filters={"restaurant_room": room},
+        fields=["name", "merged_with", "occupied"],
+    )
+    table_by_name = {row.name: row for row in room_tables}
+
+    if table not in table_by_name:
+        frappe.throw(_("Table not found."))
+
+    visited = set()
+    members = []
+    queue = [table]
+
+    while queue:
+        name = queue.pop(0)
+        if name in visited:
+            continue
+        visited.add(name)
+        members.append(name)
+
+        row = table_by_name.get(name)
+        if not row:
+            continue
+
+        for partner in _parse_merged_with(row.merged_with):
+            if partner in table_by_name and partner not in visited:
+                queue.append(partner)
+
+    return members, table_by_name
+
+
+def _get_cluster_table_names(table):
+    if not table:
+        return []
+    try:
+        members, _ = _get_merge_cluster(table)
+        return members
+    except Exception:
+        return [table]
+
+
+def _merged_partners_for_primary(primary_table):
+    if not primary_table:
+        return []
+    members = _get_cluster_table_names(primary_table)
+    return sorted(name for name in members if name != primary_table)
+
+
+def _merged_partners_csv(primary_table):
+    partners = _merged_partners_for_primary(primary_table)
+    return ",".join(partners) if partners else None
+
+
+def _normalize_merged_partners_csv(csv_value):
+    if not csv_value:
+        return []
+    return sorted(_parse_merged_with(csv_value))
+
+
+def _reconcile_invoice_merged_tables(invoice, persist=False):
+    """Align custom_merged_tables on an invoice with the live table merge cluster."""
+    primary = invoice.get("restaurant_table")
+    if not primary:
+        return invoice
+
+    expected = _merged_partners_for_primary(primary)
+    current = _normalize_merged_partners_csv(invoice.get("custom_merged_tables"))
+
+    if expected == current:
+        return invoice
+
+    partners_value = ",".join(expected) if expected else None
+    invoice.custom_merged_tables = partners_value
+
+    if persist and invoice.get("name"):
+        frappe.db.set_value(
+            "POS Invoice",
+            invoice.name,
+            "custom_merged_tables",
+            partners_value,
+            update_modified=False,
+        )
+
+    return invoice
+
+
+def _open_invoice_names_for_table(table):
+    names = set()
+    for row in frappe.get_all(
+        "POS Invoice",
+        filters={"docstatus": 0, "restaurant_table": table},
+        fields=["name"],
+    ):
+        names.add(row.name)
+    for row in frappe.get_all(
+        "POS Invoice",
+        filters={"docstatus": 0, "custom_merged_tables": ["like", f"%{table}%"]},
+        fields=["name"],
+    ):
+        names.add(row.name)
+    return names
+
+
+def _reconcile_open_invoices_for_tables(table_names):
+    seen = set()
+    for table in table_names:
+        for invoice_name in _open_invoice_names_for_table(table):
+            if invoice_name in seen:
+                continue
+            seen.add(invoice_name)
+            invoice = frappe.get_doc("POS Invoice", invoice_name)
+            _reconcile_invoice_merged_tables(invoice, persist=True)
+
+
+TABLE_RELEASE_FIELDS = {
+    "occupied": 0,
+    "latest_invoice_time": None,
+    "merged_with": None,
+}
+
+
+def release_merge_cluster_tables(table_or_tables):
+
+    if isinstance(table_or_tables, (list, tuple, set)):
+        cluster = list(table_or_tables)
+    else:
+        cluster = _get_table_group(table_or_tables)
+
+    for member in cluster:
+        frappe.db.set_value(
+            "URY Table",
+            member,
+            TABLE_RELEASE_FIELDS,
+            update_modified=False,
+        )
+
+    frappe.db.commit()
+
+@frappe.whitelist()
+def release_tables_after_print(invoice):
+
+    invoice_doc = frappe.get_doc(
+        "POS Invoice",
+        invoice,
+    )
+
+    tables = _get_table_group(
+        invoice_doc.restaurant_table,
+        invoice_doc.custom_merged_tables,
+    )
+
+    for table in tables:
+
+        frappe.db.set_value(
+            "URY Table",
+            table,
+            {
+                "occupied": 0,
+                "latest_invoice_time": None,
+            },
+        )
+
+    frappe.db.commit()
+
+    return True
+
+
+def _has_open_pos_invoices_for_cluster(tables):
+
+    if not tables:
+        return False
+
+    for table in tables:
+
+        invoices = frappe.get_all(
+            "POS Invoice",
+            filters={
+                "docstatus": 0,
+                "restaurant_table": table,
+            },
+            fields=[
+                "name",
+                "invoice_printed",
+            ],
+        )
+
+        for inv in invoices:
+            if inv.invoice_printed == 0:
+                return True
+
+
+        merged = frappe.get_all(
+            "POS Invoice",
+            filters={
+                "docstatus": 0,
+                "custom_merged_tables": ["like", f"%{table}%"],
+            },
+            fields=[
+                "name",
+                "invoice_printed",
+            ],
+        )
+
+        for inv in merged:
+
+            if inv.invoice_printed == 0:
+                return True
+
+    return False
+
+
+@frappe.whitelist()
+def unmerge_tables(table):
+
+    cluster = _get_cluster_table_names(
+        table
+    )
+
+    if len(cluster) <= 1:
+        frappe.throw(
+            _("Table is not merged.")
+        )
+
+    if _has_open_pos_invoices_for_cluster(
+        cluster
+    ):
+        frappe.throw(
+            _("Cannot unmerge active tables.")
+        )
+
+    for member in cluster:
+
+        frappe.db.set_value(
+            "URY Table",
+            member,
+            "merged_with",
+            None,
+        )
+
+    frappe.db.commit()
+
+    return True
+
+
+def _get_table_group(restaurant_table, custom_merged_tables=None):
+    tables = _get_cluster_table_names(restaurant_table)
+    if custom_merged_tables:
+        for table_name in custom_merged_tables.split(","):
+            table_name = table_name.strip()
+            if table_name and table_name not in tables:
+                tables.append(table_name)
+    return tables
+
+
+def _has_open_pos_invoices_for_tables(tables):
+    return _has_open_pos_invoices_for_cluster(tables)
+
+
+def _free_tables_if_no_open_invoices(
+    restaurant_table,
+    custom_merged_tables=None,
+):
+
+    if not restaurant_table:
+        return
+
+    tables = _get_table_group(
+        restaurant_table,
+        custom_merged_tables,
+    )
+
+    if _has_open_pos_invoices_for_cluster(tables):
+        return
+
+    release_merge_cluster_tables(tables)
+
+
+def _copy_invoice_item_fields(item_row, qty):
+    return dict(
+        item_code=item_row.item_code,
+        item_name=item_row.item_name,
+        qty=qty,
+        rate=item_row.rate,
+        price_list_rate=item_row.price_list_rate,
+        base_price_list_rate=item_row.base_price_list_rate,
+        comment=item_row.get("comment"),
+        custom_course=item_row.get("custom_course"),
+        cost_center=item_row.cost_center,
+        uom=item_row.uom,
+        conversion_factor=item_row.conversion_factor,
+        warehouse=item_row.warehouse,
+    )
+
+
+@frappe.whitelist()
+def split_bill(source_invoice, items_to_move, customer=None):
+    """Move selected line items from a printed draft bill to a new sibling POS Invoice."""
+    if isinstance(items_to_move, str):
+        items_to_move = json.loads(items_to_move)
+
+    source = frappe.get_doc("POS Invoice", source_invoice)
+
+    if source.docstatus != 0:
+        frappe.throw(_("Only draft invoices can be split."))
+
+    move_map = {
+        row["name"]: float(row["qty"])
+        for row in items_to_move
+        if row.get("name") and float(row.get("qty", 0)) > 0
+    }
+    if not move_map:
+        frappe.throw(_("Select at least one item to move."))
+
+    total_moving_qty = 0.0
+    total_remaining_qty = 0.0
+    for item in source.items:
+        move_qty = move_map.get(item.name, 0)
+        if move_qty > item.qty:
+            frappe.throw(
+                _("Cannot move more than available quantity for {0}.").format(item.item_name)
+            )
+        total_moving_qty += move_qty
+        total_remaining_qty += item.qty - move_qty
+
+    if total_moving_qty <= 0:
+        frappe.throw(_("Select at least one item to move."))
+    if total_remaining_qty <= 0:
+        frappe.throw(_("At least one item must remain on the original bill."))
+
+    new_invoice = frappe.new_doc("POS Invoice")
+    header_fields = [
+        "is_pos",
+        "update_stock",
+        "naming_series",
+        "restaurant",
+        "branch",
+        "restaurant_table",
+        "custom_restaurant_room",
+        "custom_merged_tables",
+        "waiter",
+        "cashier",
+        "pos_profile",
+        "order_type",
+        "no_of_pax",
+        "customer",
+        "customer_name",
+        "selling_price_list",
+        "taxes_and_charges",
+        "company",
+        "currency",
+        "conversion_rate",
+        "price_list_currency",
+    ]
+    for field in header_fields:
+        if source.get(field) is not None:
+            new_invoice.set(field, source.get(field))
+
+    split_group = source.get("custom_split_group") or frappe.generate_hash(length=10)
+    source.custom_split_group = split_group
+
+    new_invoice.custom_split_from = source.name
+    new_invoice.custom_split_group = split_group
+    new_invoice.invoice_printed = 0
+    new_invoice.invoice_created = 0
+
+    if customer:
+        new_invoice.customer = customer
+        new_invoice.customer_name = frappe.db.get_value("Customer", customer, "customer_name")
+        new_invoice.mobile_number = frappe.db.get_value("Customer", customer, "mobile_no")
+
+    items_to_remove = []
+    for item in source.items:
+        move_qty = move_map.get(item.name, 0)
+        if move_qty <= 0:
+            continue
+        if move_qty >= item.qty:
+            new_invoice.append("items", _copy_invoice_item_fields(item, item.qty))
+            items_to_remove.append(item)
+        else:
+            new_invoice.append("items", _copy_invoice_item_fields(item, move_qty))
+            item.qty -= move_qty
+
+    for item in items_to_remove:
+        source.remove(item)
+
+    payment_mode = source.payments[0].mode_of_payment if source.payments else None
+
+    frappe.flags.ury_bill_split = True
+    try:
+        source.set_missing_values()
+        source.run_method("set_missing_values")
+        source.calculate_taxes_and_totals()
+
+        new_invoice.set_missing_values()
+        new_invoice.run_method("set_missing_values")
+        new_invoice.calculate_taxes_and_totals()
+
+        if payment_mode and new_invoice.invoice_created == 0:
+            new_invoice.append(
+                "payments",
+                dict(mode_of_payment=payment_mode, amount=new_invoice.rounded_total),
+            )
+            new_invoice.invoice_created = 1
+
+        new_invoice.insert()
+        new_invoice.reload()
+        frappe.db.set_value(
+            "POS Invoice",
+            new_invoice.name,
+            {
+                "custom_split_from": source.name,
+                "custom_split_group": split_group,
+            },
+            update_modified=False,
+        )
+        source.save()
+    finally:
+        frappe.flags.ury_bill_split = False
+
+    return {
+        "source_invoice": source.name,
+        "new_invoice": new_invoice.name,
+    }
+
+
 
 @frappe.whitelist()
 def get_order_invoice(table=None, invoiceNo=None, order_type=None, is_payment=None):
     """returns the active invoice linked to the given table"""
 
     if table:
-        if is_payment == "Payments":
-            invoice_name = frappe.get_value(
-                "POS Invoice", dict(restaurant_table=table, docstatus=0, name=invoiceNo)
-            )
+        filters = {"docstatus": 0}
+        if invoiceNo:
+            filters["name"] = invoiceNo
+        elif is_payment != "Payments":
+            filters["invoice_printed"] = 0
             
-        else:
-            if invoiceNo:
-                invoice_name = frappe.get_value(
-                    "POS Invoice",
-                    dict(restaurant_table=table, docstatus=0, name=invoiceNo),
-                )
-               
-            else:
-                invoice_name = frappe.get_value(
-                    "POS Invoice",
-                    dict(restaurant_table=table, docstatus=0, invoice_printed=0),
-                )
-                
-        # invoice_name = frappe.get_value("POS Invoice", dict(restaurant_table=table, docstatus=0, invoice_printed=0))
+        or_filters = {
+            "restaurant_table": table,
+            "custom_merged_tables": ["like", f"%{table}%"]
+        }
+        
+        invoices = frappe.get_all("POS Invoice", filters=filters, or_filters=or_filters, limit=1)
+        invoice_name = invoices[0].name if invoices else None
         branch, menu_name, restaurant = get_restaurant_and_menu_name(table)
 
         if invoice_name:
@@ -71,6 +717,9 @@ def get_order_invoice(table=None, invoiceNo=None, order_type=None, is_payment=No
         invoice.selling_price_list = frappe.db.get_value(
             "Price List", dict(restaurant_menu=menu_name, enabled=1)
         )
+
+        if invoice_name and invoice.restaurant_table:
+            _reconcile_invoice_merged_tables(invoice, persist=True)
 
     else:
 
@@ -104,8 +753,9 @@ def get_order_invoice(table=None, invoiceNo=None, order_type=None, is_payment=No
         invoice.selling_price_list = frappe.db.get_value(
             "Price List", dict(restaurant_menu=menu, enabled=1)
         )
-        
-        
+
+        if invoice_name and invoice.restaurant_table:
+            _reconcile_invoice_merged_tables(invoice, persist=True)
 
     return invoice
 
@@ -127,7 +777,8 @@ def sync_order(
     comments=None,
     order_type=None,
     aggregator_id=None,
-    room=None
+    room=None,
+    merged_tables=None
 ):
     
     user_role = frappe.get_roles()
@@ -212,7 +863,11 @@ def sync_order(
     invoice.waiter = waiter
     invoice.custom_aggregator_id = aggregator_id
     invoice.custom_restaurant_room =room
-    invoice.restaurant_table = table
+    if not invoice.restaurant_table:
+        invoice.restaurant_table = table
+
+    if invoice.restaurant_table:
+        _reconcile_invoice_merged_tables(invoice)
     
     if order_type == "Aggregators":
         price_list = frappe.db.get_value("Aggregator Settings",{"customer": customer, "parent": invoice.branch, "parenttype": "Branch"},"price_list",)
@@ -298,10 +953,15 @@ def sync_order(
     # table status
     if invoice.invoice_printed == 0:
         frappe.db.set_value(
-            "URY Table", table, {"occupied": 1, "latest_invoice_time": invoice.creation}
+            "URY Table", invoice.restaurant_table, {"occupied": 1, "latest_invoice_time": invoice.creation}
         )
+        if invoice.custom_merged_tables:
+            for merged_table in invoice.custom_merged_tables.split(","):
+                frappe.db.set_value(
+                    "URY Table", merged_table.strip(), {"occupied": 1, "latest_invoice_time": invoice.creation}
+                )
 
-    invoice.db_set("owner", owner)
+    invoice.db_set("owner", cashier)
     return invoice.as_dict()
 
 
@@ -432,37 +1092,37 @@ def table_transfer(table, newTable, invoice):
     pos_invoice = frappe.get_doc("POS Invoice", invoice)
     new_table = frappe.get_doc("URY Table", newTable)
 
-    if current_table.restaurant_room == new_table.restaurant_room:
-        if new_table.occupied == 1:
-            frappe.throw(f"Table {new_table.name} is already occupied")
+    merge_members, _ = _get_merge_cluster(table)
+    if len(merge_members) > 1:
+        frappe.throw(_("Table transfer is not allowed for merged tables. Unmerge first."))
 
-        # Update table status
-        frappe.db.set_value(
-            "URY Table",
-            new_table.name,
-            {"occupied": 1, "latest_invoice_time": pos_invoice.creation},
+    if current_table.branch != new_table.branch:
+        frappe.throw(_("Table transfer between different branches is restricted."))
+
+    if new_table.occupied == 1:
+        frappe.throw(f"Table {new_table.name} is already occupied")
+
+    frappe.db.set_value(
+        "URY Table",
+        new_table.name,
+        {"occupied": 1, "latest_invoice_time": pos_invoice.creation},
+    )
+    frappe.db.set_value(
+        "URY Table",
+        current_table.name,
+        {"occupied": 0, "latest_invoice_time": None},
+    )
+
+    pos_invoice.restaurant_table = new_table.name
+    pos_invoice.custom_restaurant_room = new_table.restaurant_room
+    pos_invoice.save()
+
+    try:
+        change_table_in_kot(
+            pos_invoice.name, new_table.name, pos_invoice.branch
         )
-        frappe.db.set_value(
-            "URY Table",
-            current_table.name,
-            {"occupied": 0, "latest_invoice_time": None},
-        )
-
-        # Update POS Invoice
-        pos_invoice.restaurant_table = new_table.name
-        pos_invoice.save()
-
-        try:
-            change_table_in_kot(
-                    pos_invoice.name, new_table.name, pos_invoice.branch
-                )
-
-        except Exception as e:
-            # If an exception occurs (e.g., "kot" app not found), it will be caught here without effecting execution
-            pass
-
-    else:
-        frappe.throw(_("Table transfer between different rooms is restricted."))
+    except Exception:
+        pass
 
 
 @frappe.whitelist()
@@ -528,12 +1188,9 @@ def customer_favourite_item(customer_name):
 def cancel_order(invoice_id, reason):
     pos_invoice = frappe.get_doc("POS Invoice", invoice_id)
 
-    # Update table status
-    frappe.db.set_value(
-        "URY Table",
-        pos_invoice.restaurant_table,
-        {"occupied": 0, "latest_invoice_time": None},
-    )
+    # Release the full merge cluster, not only the primary table and CSV partners.
+    if pos_invoice.restaurant_table:
+        release_merge_cluster_tables(pos_invoice.restaurant_table)
 
     try:
         cancel_kot(invoice_id)
@@ -568,13 +1225,47 @@ def make_invoice(customer, payments, cashier, pos_profile,owner, additionalDisco
     invoice.additional_discount_percentage=additionalDiscount
     invoice.calculate_taxes_and_totals()
 
-    for pay in invoice.payments:
-        pay.delete(pay.mode_of_payment)
+    invoice.set("payments", [])
 
-    for d in payments:
-        invoice.append(
-            "payments", dict(mode_of_payment=d["mode_of_payment"], amount=d["amount"])
-        )
+    if invoice.custom_merged_pos_invoice:
+        target = frappe.get_doc("POS Invoice", invoice.custom_merged_pos_invoice)
+        target.calculate_taxes_and_totals()
+        
+        doc_req = invoice.rounded_total
+        target_req = target.rounded_total
+        
+        target.set("payments", [])
+        
+        for d in payments:
+            amt = float(d["amount"])
+            mode = d["mode_of_payment"]
+            
+            if doc_req > 0:
+                give = min(amt, doc_req)
+                invoice.append("payments", dict(mode_of_payment=mode, amount=give))
+                amt -= give
+                doc_req -= give
+                
+            if target_req > 0 and amt > 0:
+                give = min(amt, target_req)
+                target.append("payments", dict(mode_of_payment=mode, amount=give))
+                amt -= give
+                target_req -= give
+                
+        target.flags.ignore_payment_sync = True
+        
+        frappe.flags.in_bill_merge_sync = True
+        try:
+            target.save(ignore_permissions=True)
+        finally:
+            frappe.flags.in_bill_merge_sync = False
+            
+        invoice.flags.ignore_payment_sync = True
+    else:
+        for d in payments:
+            invoice.append(
+                "payments", dict(mode_of_payment=d["mode_of_payment"], amount=d["amount"])
+            )
 
     # invoice.owner = owner
     invoice.save()
@@ -582,8 +1273,29 @@ def make_invoice(customer, payments, cashier, pos_profile,owner, additionalDisco
         invoice.submit()
     except Exception as e:
         frappe.throw(f"Error while settling order: {e}")
-    
-    
+        
+    # Free the table when no other open drafts remain on this table group
+
+    release_invoice = invoice
+
+    # If this invoice is a secondary merged bill,
+    # resolve the primary invoice that owns the tables.
+    if (
+        not release_invoice.restaurant_table
+        and release_invoice.custom_merged_pos_invoice
+    ):
+        release_invoice = frappe.get_doc(
+            "POS Invoice",
+            release_invoice.custom_merged_pos_invoice,
+        )
+
+    if release_invoice.restaurant_table:
+        _free_tables_if_no_open_invoices(
+            release_invoice.restaurant_table,
+            release_invoice.custom_merged_tables,
+        )
+        
+        
 
 # Cancel KOT Doc Creation
 def cancel_kot(invoice_id):

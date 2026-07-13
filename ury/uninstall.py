@@ -1,4 +1,5 @@
 import click
+import frappe
 
 from ury.setup import before_uninstall as remove_custom_fields
 
@@ -10,3 +11,11 @@ def before_uninstall():
 
     except:
         print("Failed To Remove Customizations.")
+
+def uninstall():
+	ROLES = ["URY Manager", "URY Captain", "URY Cashier"]
+
+	frappe.db.delete("Custom DocPerm",{"role": ["in", ROLES]})
+
+	print ("* removing URY Roles...")
+	frappe.db.delete("Role", {"name": ["in", ROLES]})

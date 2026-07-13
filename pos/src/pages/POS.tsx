@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { t } from '../i18n';
 import { Star, TrendingUp } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import OrderPanel from '../components/OrderPanel';
@@ -103,7 +104,7 @@ export default function POS() {
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <Spinner message="Loading menu items..." />
+        <Spinner message={t('common.loading_menu_items')} />
       </div>
     );
   }
@@ -112,7 +113,7 @@ export default function POS() {
     return (
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center">
-          <p className="text-lg font-medium text-red-600">Error loading menu</p>
+          <p className="text-lg font-medium text-red-600">{t('common.error_loading_menu_items')}</p>
           <p className="text-sm text-gray-500 mt-2">{error}</p>
         </div>
       </div>
@@ -122,7 +123,7 @@ export default function POS() {
   return (
     <div className="flex flex-1 overflow-hidden">
       <Sidebar disabled={isMenuInteractionDisabled()} />
-      <div className="flex-1 flex flex-col h-screen overflow-hidden pr-96">
+      <div className="flex-1 flex flex-col h-screen overflow-hidden pe-96">
         <div className="p-4 bg-white border-b border-gray-200">
           <div className="max-w-screen-xl mx-auto space-y-3">
             <div className="flex items-center gap-2 overflow-x-auto overflow-y-hidden">
@@ -134,8 +135,8 @@ export default function POS() {
                 disabled={isMenuInteractionDisabled()}
               /> */}
               
-              <QuickFilterButton filter="all" icon={Star} label="All" />
-              <QuickFilterButton filter="special" icon={TrendingUp} label="Special Items" />
+              <QuickFilterButton filter="all" icon={Star} label={t('common.all')} />
+              <QuickFilterButton filter="special" icon={TrendingUp} label={t('menu.special_items')} />
             </div>
           </div>
         </div>

@@ -13,8 +13,8 @@ export const useCustomerStore = defineStore("customers", {
     alert: useAlert(),
     showCustomers: false,
     showOrderType: false,
-    showEditOrderType:false,
-    newOrderType:null,
+    showEditOrderType: false,
+    newOrderType: null,
     numberOfPax: "",
     menu: useMenuStore(),
     recentOrders: usetoggleRecentOrder(),
@@ -34,7 +34,7 @@ export const useCustomerStore = defineStore("customers", {
     customerGroup: null,
     call: frappe.call(),
     db: frappe.db(),
-    timer:null,
+    timer: null,
   }),
   getters: {
     isFlagSet() {
@@ -43,25 +43,45 @@ export const useCustomerStore = defineStore("customers", {
   },
   actions: {
     async pickCustomer() {
-      const searchParams = {
-        text: this.search,
-        doctype: "Customer",
-        limit: 5,
+      if (!this.search.trim()) {
+        this.customer = [];
+        return;
+      }
+
+      const getscramblePattern = (text) => {
+        return `%${text.split("").join("%")}%`;
       };
 
-      this.call
-        .get("frappe.utils.global_search.search", searchParams)
-        .then((result) => {
-          this.customer = result.message;
+      const pattern = getscramblePattern(this.search);
+
+      const searchParams = {
+        fields: ["name", "customer_name", "mobile_number"],
+        orFilters: [
+          ["customer_name", "like", pattern],
+          ["mobile_number", "like", pattern],
+          ["name", "like", pattern],
+        ],
+        limit: 5,
+        limit_start: 0,
+      };
+
+      this.db
+        .getDocList("Customer", searchParams)
+        .then((docs) => {
+          this.customer = docs.map((doc) => ({
+            ...doc,
+            content: `Customer Name : ${doc.customer_name ?? ""} | Mobile Number : ${doc.mobile_number ?? ""
+              }`,
+          }));
         })
         .catch((error) => console.error(error));
     },
     handleSearchInput(event) {
       this.search = event.target.value;
       clearTimeout(this.timer);
-      this.timer=setTimeout(()=>{
+      this.timer = setTimeout(() => {
         this.pickCustomer();
-      },500);
+      }, 500);
     },
     pickCustomerGroup() {
       this.db
@@ -97,23 +117,22 @@ export const useCustomerStore = defineStore("customers", {
         this.alert.createAlert("Message", "Invalid Customer", "OK");
       }
     },
-    editOrderType(orderType){
-      this.showEditOrderType=true
-      if(orderType == "Take Away"){
-        this.newOrderType="Delivery"
-      }else if(orderType == "Delivery"){
-        this.newOrderType="Take Away"
-      }else{
-        return
+    editOrderType(orderType) {
+      this.showEditOrderType = true;
+      if (orderType == "Take Away") {
+        this.newOrderType = "Delivery";
+      } else if (orderType == "Delivery") {
+        this.newOrderType = "Take Away";
+      } else {
+        return;
       }
-      
     },
-    selecetOrderType(order_type){
-      this.showEditOrderType=false
-      this.menu.selectedOrderType = order_type
-      this.recentOrders.pastOrderType = order_type
+    selecetOrderType(order_type) {
+      this.showEditOrderType = false;
+      this.menu.selectedOrderType = order_type;
+      this.recentOrders.pastOrderType = order_type;
     },
-    
+
     addNewCustomer: async function () {
       if (!this.newCustomer || !this.newCustomerMobileNo) {
         let missingFields = [];
@@ -158,10 +177,21 @@ export const useCustomerStore = defineStore("customers", {
       if (content) {
         const mobileStartIndex = content.indexOf("Mobile Number :");
         if (mobileStartIndex !== -1) {
-          const mobileEndIndex = content.indexOf("|||", mobileStartIndex);
+          // Check for new delimiter '|' or end of string
+          let mobileEndIndex = content.indexOf("|", mobileStartIndex);
+          if (mobileEndIndex === -1) {
+            // If no | found, check for old delimiter ||| just in case, but mostly it might be end of string
+            mobileEndIndex = content.indexOf("|||", mobileStartIndex);
+          }
+
+          // If still -1, it means it might be at the end of the string
+          if (mobileEndIndex === -1) {
+            mobileEndIndex = content.length;
+          }
+
           if (mobileEndIndex !== -1) {
             const mobileNumber = content
-              .substring(mobileStartIndex, mobileEndIndex)
+              .substring(mobileStartIndex + "Mobile Number :".length, mobileEndIndex)
               .trim();
 
             return mobileNumber;
@@ -181,17 +211,18 @@ export const useCustomerStore = defineStore("customers", {
     },
     async selectCustomer(customer) {
       this.search = customer.name;
-      const content = customer.content;
-      const mobileStartIndex = content.indexOf("Mobile Number :");
-      if (mobileStartIndex !== -1) {
-        const mobileEndIndex = content.indexOf("|||", mobileStartIndex);
-        if (mobileEndIndex !== -1) {
-          const mobileNumber = content
-            .substring(mobileStartIndex + "Mobile Number :".length, mobileEndIndex)
-            .trim();
+
+      // Use direct property if available (new method), fallback to parsing (old method/compatibility)
+      if (customer.mobile_number) {
+        this.newCustomerMobileNo = customer.mobile_number;
+      } else {
+        const content = customer.content;
+        const mobileNumber = this.extractName(content);
+        if (mobileNumber) {
           this.newCustomerMobileNo = mobileNumber;
         }
       }
+
       this.showCustomers = false;
       this.fectchCustomerFavouriteItem();
     },

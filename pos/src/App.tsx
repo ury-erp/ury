@@ -10,6 +10,7 @@ import ScreenSizeProvider from './components/ScreenSizeProvider';
 import { ToastProvider } from './components/ui/toast';
 import { usePOSStore } from './store/pos-store';
 import { useEffect } from 'react';
+import { getActiveLanguage } from './i18n';
 
 function App() {
   const {
@@ -19,6 +20,13 @@ function App() {
   useEffect(() => {
     initializeApp();
   }, [initializeApp]);
+
+  useEffect(() => {
+    const lang = getActiveLanguage();
+    const isRtl = ['ar', 'he', 'fa', 'ur', 'ku'].includes(lang);
+    document.documentElement.dir = isRtl ? 'rtl' : 'ltr';
+    document.documentElement.lang = lang || 'en';
+  }, []);
   return (
     <>
       <ToastProvider />

@@ -91,18 +91,33 @@ export async function addCustomer(
   }
 }
 
+function getscramblePattern(text: string) {
+  return `%${text.split("").join("%")}%`;
+}
 
 export async function searchCustomers(search: string, limit = 5) {
   if (!search.trim()) return [];
+
+  const pattern = getscramblePattern(search);
+
   try {
-    const res = await call.get('frappe.utils.global_search.search', {
-      text: search,
-      doctype: DOCTYPES.CUSTOMER,
+    const res = await db.getDocList(DOCTYPES.CUSTOMER, {
+      fields: ["name", "customer_name", "mobile_number"],
+      orFilters: [
+        ["customer_name", "like", pattern],
+        ["mobile_number", "like", pattern],
+        ["name", "like", pattern],
+      ],
       limit,
+      limit_start: 0,
     });
-    return res.message || [];
+
+    return res.map((doc: any) => ({
+      ...doc,
+      content: `Customer Name : ${doc.customer_name ?? ""} | Mobile Number : ${doc.mobile_number ?? ""}`,
+    }));
   } catch (error) {
-    console.error('Customer search error:', error);
+    console.error("Customer search error:", error);
     throw error;
   }
 }

@@ -6,6 +6,7 @@ export interface MenuItem {
   item_image: string | null;
   rate: number | string;
   course: string;
+  course_label?: string;
   trending?: boolean;
   popular?: boolean;
   recommended?: boolean;

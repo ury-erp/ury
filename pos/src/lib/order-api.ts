@@ -27,11 +27,18 @@ export interface POSInvoice {
   posting_time: string;
   order_type: string;
   restaurant_table: string;
+  custom_merged_tables?: string | null;
   custom_restaurant_room: string;
   status: string;
   total: number;
   grand_total: number;
+  rounded_total: number;
   items: POSInvoiceItem[];
+  custom_merged_pos_invoice?: string | null;
+  custom_merged_total?: number | null;
+  waiter?: string;
+  invoice_printed?: number;
+  docstatus?: number;
 }
 
 export interface TableOrder {
@@ -64,6 +71,7 @@ export interface SyncOrderRequest {
     item_name: string;
     rate: number;
     qty: number;
+    comment?: string;
   }>;
   no_of_pax: number;
   mode_of_payment?: string;
@@ -81,4 +89,51 @@ export interface SyncOrderRequest {
 
 export const syncOrder = async (data: SyncOrderRequest) => {
   return call.post( 'ury.ury.doctype.ury_order.ury_order.sync_order',data);
-}; 
+};
+
+export interface SplitBillItemMove {
+  name: string;
+  qty: number;
+}
+
+export interface SplitBillResponse {
+  source_invoice: string;
+  new_invoice: string;
+}
+
+export async function splitBill(
+  sourceInvoice: string,
+  itemsToMove: SplitBillItemMove[],
+  customer?: string | null
+): Promise<SplitBillResponse> {
+  const res = await call.post('ury.ury.doctype.ury_order.ury_order.split_bill', {
+    source_invoice: sourceInvoice,
+    items_to_move: itemsToMove,
+    customer: customer || undefined,
+  });
+  return res.message as SplitBillResponse;
+}
+
+export async function tableTransfer(
+  table: string,
+  newTable: string,
+  invoice: string
+): Promise<void> {
+  await call.post('ury.ury.doctype.ury_order.ury_order.table_transfer', {
+    table,
+    newTable,
+    invoice,
+  });
+}
+
+export async function captainTransfer(
+  currentCaptain: string,
+  newCaptain: string,
+  invoice: string
+): Promise<void> {
+  await call.post('ury.ury.doctype.ury_order.ury_order.captain_transfer', {
+    currentCaptain,
+    newCaptain,
+    invoice,
+  });
+}

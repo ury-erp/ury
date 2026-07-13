@@ -87,6 +87,15 @@ class URYKOT(Document):
     def kotDisplayRealtime(self):
         currentBranch = self.branch
         production = self.production
+
+        if production:
+            production_doc = frappe.get_doc("URY Production Unit", production)
+            if production_doc.enable_order_type_wise_display_on_mosaic:
+                invoice_order_type = frappe.db.get_value("POS Invoice", self.invoice, "order_type")
+                allowed_order_types = [row.order_type for row in production_doc.get("order_type", [])]
+                if invoice_order_type not in allowed_order_types:
+                    return
+
         kotjson = json.loads(frappe.as_json(self))
         audio_file = frappe.db.get_value(
             "POS Profile", self.pos_profile, "custom_kot_alert_sound"

@@ -63,6 +63,7 @@ export interface PosProfileFull {
   currency: string;
   role_allowed_for_billing: RolePermission[];
   role_restricted_for_table_order?: RolePermission[];
+  transfer_role_permissions?: RolePermission[];
   paid_limit?: number;
 }
 
@@ -120,6 +121,7 @@ export async function getCombinedPosProfile(): Promise<PosProfileCombined> {
   // Merge both profiles
   const combinedProfile: PosProfileCombined = {
     ...fullProfile,
+    owner: limitedProfile.owner,
     waiter: limitedProfile.waiter,
     cashier: limitedProfile.cashier,
     print_format: limitedProfile.print_format,
