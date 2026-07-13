@@ -52,7 +52,7 @@ export function getActiveLanguage(): string {
  *   t('errors.user_not_logged_in')           → "User not logged in"
  *   t('common.greeting', { name: 'Alice' })  → "Hello, Alice"
  */
-export function t(key: string, params?: Record<string, string>): string {
+export function t(key: string, params?: Record<string, string | number>): string {
   const parts = key.split('.');
   let value: unknown = activeLocale;
 
@@ -72,5 +72,5 @@ export function t(key: string, params?: Record<string, string>): string {
 
   if (!params) return value;
 
-  return value.replace(/\{\{(\w+)\}\}/g, (_, k) => params[k] ?? `{{${k}}}`);
+  return value.replace(/\{\{(\w+)\}\}/g, (_, k) => String(params[k] ?? `{{${k}}}`));
 }

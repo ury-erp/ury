@@ -1,6 +1,7 @@
 import frappe
 from datetime import datetime
 from frappe.utils import now_datetime, get_time,now
+from ury.ury.doctype.ury_order.ury_order import release_merge_cluster_tables
 
 
 def before_insert(doc, method):
@@ -28,6 +29,8 @@ def on_trash(doc, method):
 def validate_invoice(doc, method):
     if doc.waiter == None or doc.waiter == "":
         doc.waiter = doc.modified_by
+    if getattr(frappe.flags, "ury_bill_split", False):
+        return
     remove_items = frappe.db.get_value("POS Profile", doc.pos_profile, "remove_items")
     
     if doc.invoice_printed == 1 and remove_items == 0:
@@ -113,11 +116,7 @@ def validate_invoice_print(doc, method):
 
 def table_status_delete(doc, method):
     if doc.restaurant_table:
-        frappe.db.set_value(
-            "URY Table",
-            doc.restaurant_table,
-            {"occupied": 0, "latest_invoice_time": None},
-        )
+        release_merge_cluster_tables(doc.restaurant_table)
 
 
 def pos_invoice_naming(doc, method):
@@ -194,16 +193,143 @@ def validate_price_list(doc, method):
             
 
 def restrict_existing_order(doc, event):
-    if doc.restaurant_table:
-        invoice_exist = frappe.db.exists(
+    if not doc.restaurant_table:
+        return
+
+    if getattr(frappe.flags, "ury_bill_split", False):
+        return
+
+    if doc.get("custom_split_from"):
+        source = frappe.db.get_value(
             "POS Invoice",
-            {
-                "restaurant_table": doc.restaurant_table,
-                "docstatus": 0,
-                "invoice_printed": 0,
-            },
+            doc.custom_split_from,
+            ["docstatus", "restaurant_table"],
+            as_dict=True,
         )
-        if invoice_exist:
-            frappe.throw(
-                ("Table {0} has an existing invoice").format(doc.restaurant_table)
+        if (
+            source
+            and source.docstatus == 0
+            and (source.restaurant_table or "") == (doc.restaurant_table or "")
+        ):
+            return
+
+    invoice_exist = frappe.db.exists(
+        "POS Invoice",
+        {
+            "restaurant_table": doc.restaurant_table,
+            "docstatus": 0,
+            "invoice_printed": 0,
+        },
+    )
+    if invoice_exist:
+        frappe.throw(
+            ("Table {0} has an existing invoice").format(doc.restaurant_table)
+        )
+
+def sync_merged_invoice(doc):
+    if getattr(frappe.flags, "in_bill_merge_sync", False):
+        return
+
+    linked_invoice = doc.custom_merged_pos_invoice
+    if not linked_invoice:
+        return
+
+    frappe.flags.in_bill_merge_sync = True
+
+    try:
+        if not frappe.db.exists("POS Invoice", linked_invoice):
+            return
+
+        target = frappe.get_doc("POS Invoice", linked_invoice)
+
+        # sync invoice printed
+        target.invoice_printed = doc.invoice_printed
+
+        # sync payment
+        if doc.paid_amount > 0 and not getattr(doc.flags, "ignore_payment_sync", False):
+
+            target.set("payments", [])
+
+            for p in doc.payments:
+                target.append("payments", {
+                    "mode_of_payment": p.mode_of_payment,
+                    "amount": target.rounded_total,
+                    "base_amount": target.rounded_total,
+                    "account": getattr(p, "account", None)
+                })
+
+            target.paid_amount = target.rounded_total
+
+        # sync submit/payment status
+        if doc.docstatus == 1 and target.docstatus == 0:
+
+            target.flags.ignore_validate_update_after_submit = True
+
+            if target.docstatus == 0:
+                target.save(ignore_permissions=True)
+                target.submit()
+
+        else:
+            target.save(ignore_permissions=True)
+
+        frappe.publish_realtime(
+            "pos_invoice_updated",
+            {
+                "name": target.name,
+                "docstatus": target.docstatus,
+                "paid_amount": target.paid_amount,
+                "invoice_printed": target.invoice_printed
+            }
+        )
+
+    except Exception:
+        frappe.log_error(
+            frappe.get_traceback(),
+            "Merged Invoice Sync Failed"
+        )
+
+    finally:
+        frappe.flags.in_bill_merge_sync = False
+
+
+def on_update(doc, method):
+    sync_merged_invoice(doc)
+
+
+def on_submit(doc, method):
+    sync_merged_invoice(doc)
+    release_merged_tables(doc)
+
+def release_merged_tables(doc):
+
+    invoices = [doc]
+
+    if doc.custom_merged_pos_invoice:
+        try:
+            invoices.append(
+                frappe.get_doc(
+                    "POS Invoice",
+                    doc.custom_merged_pos_invoice
+                )
             )
+        except Exception:
+            pass
+
+    for invoice in invoices:
+
+        # only release dine in tables
+        if invoice.order_type != "Dine In":
+            continue
+
+        if not invoice.restaurant_table:
+            continue
+
+        frappe.db.set_value(
+            "URY Table",
+            invoice.restaurant_table,
+            {
+                "occupied": 0,
+                "latest_invoice_time": None,
+            },
+            update_modified=False,
+        )

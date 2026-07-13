@@ -186,6 +186,169 @@ def getModeOfPayment():
         )
     return modeOfPayments
 
+
+def format_merged_table_label(primary, merged_tables=None):
+    if not primary:
+        return ""
+    partners = [p.strip() for p in (merged_tables or "").split(",") if p.strip()]
+    if not partners:
+        return primary
+    return " + ".join([primary] + sorted(partners))
+
+
+def _backfill_split_groups(invoices):
+    parent_names = [
+        inv["custom_split_from"]
+        for inv in invoices
+        if inv.get("custom_split_from") and not inv.get("custom_split_group")
+    ]
+    if not parent_names:
+        return
+
+    parent_rows = frappe.get_all(
+        "POS Invoice",
+        filters={"name": ["in", parent_names]},
+        fields=["name", "custom_split_group"],
+    )
+    parent_group_map = {
+        row.name: row.custom_split_group
+        for row in parent_rows
+        if row.custom_split_group
+    }
+    for inv in invoices:
+        if not inv.get("custom_split_group") and inv.get("custom_split_from"):
+            inv["custom_split_group"] = parent_group_map.get(inv["custom_split_from"])
+
+
+def _enrich_split_group_meta(invoices):
+    if not invoices:
+        return invoices
+
+    _backfill_split_groups(invoices)
+
+    groups = list(
+        {inv.get("custom_split_group") for inv in invoices if inv.get("custom_split_group")}
+    )
+    if not groups:
+        for inv in invoices:
+            inv["split_index"] = 0
+            inv["split_total"] = 0
+            inv["split_siblings"] = []
+        return invoices
+
+    group_members = frappe.db.sql(
+        """
+        SELECT name, custom_split_group
+        FROM `tabPOS Invoice`
+        WHERE custom_split_group IN %(groups)s AND docstatus < 2
+        ORDER BY creation asc
+        """,
+        {"groups": groups},
+        as_dict=True,
+    )
+
+    group_order = {}
+    for row in group_members:
+        group_order.setdefault(row.custom_split_group, []).append(row.name)
+
+    for group, names in list(group_order.items()):
+        children = frappe.get_all(
+            "POS Invoice",
+            filters={"custom_split_from": ["in", names], "docstatus": ["<", 2]},
+            fields=["name"],
+            order_by="creation asc",
+        )
+        for child in children:
+            if child.name not in names:
+                names.append(child.name)
+
+    for inv in invoices:
+        group = inv.get("custom_split_group")
+        if not group or group not in group_order:
+            inv["split_index"] = 0
+            inv["split_total"] = 0
+            inv["split_siblings"] = []
+            continue
+        names = group_order[group]
+        inv["split_total"] = len(names)
+        inv["split_siblings"] = [name for name in names if name != inv["name"]]
+        try:
+            inv["split_index"] = names.index(inv["name"]) + 1
+        except ValueError:
+            inv["split_index"] = 0
+            inv["split_total"] = 0
+            inv["split_siblings"] = []
+
+    return invoices
+
+
+@frappe.whitelist()
+def get_split_group(invoice):
+    group = frappe.db.get_value("POS Invoice", invoice, "custom_split_group")
+    if not group:
+        split_from = frappe.db.get_value("POS Invoice", invoice, "custom_split_from")
+        if split_from:
+            group = frappe.db.get_value("POS Invoice", split_from, "custom_split_group")
+    if not group:
+        return {"invoices": [], "current": invoice, "group": None}
+
+    split_fields = [
+        "name",
+        "custom_split_from",
+        "custom_split_group",
+        "invoice_printed",
+        "restaurant_table",
+        "custom_merged_tables",
+        "rounded_total",
+        "grand_total",
+        "customer",
+        "customer_name",
+        "status",
+        "docstatus",
+        "posting_date",
+        "posting_time",
+        "order_type",
+        "cashier",
+        "waiter",
+        "mobile_number",
+        "net_total",
+        "total_taxes_and_charges",
+        "creation",
+    ]
+
+    invoices = frappe.get_all(
+        "POS Invoice",
+        filters={"custom_split_group": group, "docstatus": ["<", 2]},
+        fields=split_fields,
+        order_by="creation asc",
+    )
+
+    member_names = [inv["name"] for inv in invoices]
+    if member_names:
+        children = frappe.get_all(
+            "POS Invoice",
+            filters={"custom_split_from": ["in", member_names], "docstatus": ["<", 2]},
+            fields=split_fields,
+            order_by="creation asc",
+        )
+        existing = {inv["name"] for inv in invoices}
+        for child in children:
+            if child.name not in existing:
+                invoices.append(child)
+                existing.add(child.name)
+
+    invoices.sort(key=lambda row: row.get("creation") or row.get("name"))
+
+    total = len(invoices)
+    for index, inv in enumerate(invoices, start=1):
+        inv["split_index"] = index
+        inv["split_total"] = total
+        inv["is_original"] = not inv.get("custom_split_from")
+        inv["split_siblings"] = [row["name"] for row in invoices if row["name"] != inv["name"]]
+
+    return {"invoices": invoices, "current": invoice, "group": group}
+
+
 @frappe.whitelist()
 def getInvoiceForCashier(status, cashier, limit, limit_start):
     branch = getBranch()
@@ -196,7 +359,7 @@ def getInvoiceForCashier(status, cashier, limit, limit_start):
         invoices = frappe.db.sql(
             """
             SELECT 
-                name, invoice_printed, grand_total, restaurant_table, 
+                name, invoice_printed, grand_total, restaurant_table, custom_merged_tables,
                 cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number, 
                 posting_date, rounded_total, order_type 
@@ -216,7 +379,7 @@ def getInvoiceForCashier(status, cashier, limit, limit_start):
         invoices = frappe.db.sql(
             """
             SELECT 
-                name, invoice_printed, grand_total, restaurant_table, 
+                name, invoice_printed, grand_total, restaurant_table, custom_merged_tables,
                 cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number, 
                 posting_date, rounded_total, order_type 
@@ -235,7 +398,7 @@ def getInvoiceForCashier(status, cashier, limit, limit_start):
         invoices = frappe.db.sql(
             """
             SELECT 
-                name, invoice_printed, grand_total, restaurant_table, 
+                name, invoice_printed, grand_total, restaurant_table, custom_merged_tables,
                 cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number,
                 posting_date, rounded_total, order_type,additional_discount_percentage,discount_amount 
@@ -253,7 +416,7 @@ def getInvoiceForCashier(status, cashier, limit, limit_start):
         invoices = frappe.db.sql(
             """
             SELECT 
-                name, invoice_printed, grand_total, restaurant_table, 
+                name, invoice_printed, grand_total, restaurant_table, custom_merged_tables,
                 cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number,
                 posting_date, rounded_total, order_type,additional_discount_percentage,discount_amount
@@ -286,10 +449,12 @@ def getPosInvoice(status, limit, limit_start):
         invoices = frappe.db.sql(
             """
             SELECT 
-                name, invoice_printed, grand_total, restaurant_table, 
+                name, invoice_printed, grand_total, restaurant_table, custom_merged_tables,
                 cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number, 
-                posting_date, rounded_total, order_type 
+                posting_date, rounded_total, order_type,
+                custom_split_group, custom_split_from,
+                custom_merged_pos_invoice, custom_merged_total
             FROM `tabPOS Invoice` 
             WHERE branch = %s AND status = %s 
             AND (invoice_printed = 1 OR (invoice_printed = 0 AND COALESCE(restaurant_table, '') = ''))
@@ -306,10 +471,12 @@ def getPosInvoice(status, limit, limit_start):
         invoices = frappe.db.sql(
             """
             SELECT 
-                name, invoice_printed, grand_total, restaurant_table, 
+                name, invoice_printed, grand_total, restaurant_table, custom_merged_tables,
                 cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number, 
-                posting_date, rounded_total, order_type 
+                posting_date, rounded_total, order_type,
+                custom_split_group, custom_split_from,
+                custom_merged_pos_invoice, custom_merged_total
             FROM `tabPOS Invoice` 
             WHERE branch = %s AND status = %s 
             AND (invoice_printed = 0 AND restaurant_table IS NOT NULL)
@@ -325,10 +492,12 @@ def getPosInvoice(status, limit, limit_start):
         invoices = frappe.db.sql(
             """
             SELECT 
-                name, invoice_printed, grand_total, restaurant_table, 
+                name, invoice_printed, grand_total, restaurant_table, custom_merged_tables,
                 cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number,
-                posting_date, rounded_total, order_type,additional_discount_percentage,discount_amount 
+                posting_date, rounded_total, order_type, additional_discount_percentage,
+                discount_amount, custom_split_group, custom_split_from,
+                custom_merged_pos_invoice, custom_merged_total
             FROM `tabPOS Invoice` 
             WHERE branch = %s AND status = %s 
             ORDER BY modified desc
@@ -343,10 +512,12 @@ def getPosInvoice(status, limit, limit_start):
         invoices = frappe.db.sql(
             """
             SELECT 
-                name, invoice_printed, grand_total, restaurant_table, 
+                name, invoice_printed, grand_total, restaurant_table, custom_merged_tables,
                 cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number,
-                posting_date, rounded_total, order_type,additional_discount_percentage,discount_amount
+                posting_date, rounded_total, order_type, additional_discount_percentage,
+                discount_amount, custom_split_group, custom_split_from,
+                custom_merged_pos_invoice, custom_merged_total
             FROM `tabPOS Invoice` 
             WHERE branch = %s AND status = %s 
             ORDER BY modified desc
@@ -361,7 +532,8 @@ def getPosInvoice(status, limit, limit_start):
             next = True
             updatedlist.pop()
     else:
-            next = False   
+            next = False
+    updatedlist = _enrich_split_group_meta(updatedlist)
     return  { "data":updatedlist,"next":next}
 
 
@@ -387,9 +559,31 @@ def searchPosInvoice(query,status):
             ["customer", "like", f"%{query}%"],
             ["mobile_number", "like", f"%{query}%"],
         ],
-        fields=["name", "customer", "grand_total", "posting_date", "posting_time", "order_type", "restaurant_table","status","grand_total","rounded_total","net_total","mobile_number"],
+        fields=[
+            "name",
+            "customer",
+            "grand_total",
+            "posting_date",
+            "posting_time",
+            "order_type",
+            "restaurant_table",
+            "custom_merged_tables",
+            "status",
+            "rounded_total",
+            "net_total",
+            "mobile_number",
+            "invoice_printed",
+            "cashier",
+            "waiter",
+            "total_taxes_and_charges",
+            "custom_split_group",
+            "custom_split_from",
+            "custom_merged_pos_invoice",
+            "custom_merged_total",
+        ],
         limit_page_length=10 
     )
+    pos_invoices = _enrich_split_group_meta(pos_invoices)
     
     return {"data": pos_invoices, "next": len(pos_invoices) == 10}
     
@@ -561,14 +755,13 @@ def getPosInvoiceItems(invoice):
     orderdItems = frappe.get_doc("POS Invoice", invoice)
     posItems = orderdItems.items
     for items in posItems:
-        item_name = items.item_name
-        qty = items.qty
-        amount = items.rate
         itemDetails.append(
             {
-                "item_name": item_name,
-                "qty": qty,
-                "amount": amount,
+                "name": items.name,
+                "item_name": items.item_name,
+                "qty": items.qty,
+                "rate": items.rate,
+                "amount": items.amount,
             }
         )
     taxDetail = orderdItems.taxes
@@ -723,3 +916,107 @@ def validate_pos_close(pos_profile):
     
     return "Success"
 
+
+@frappe.whitelist()
+def merge_bills(primary_invoice, secondary_invoice):
+
+    try:
+
+        if primary_invoice == secondary_invoice:
+            frappe.throw("Cannot merge an invoice with itself.")
+
+        primary_doc = frappe.get_doc("POS Invoice",primary_invoice,)
+        secondary_doc = frappe.get_doc("POS Invoice",secondary_invoice,)
+
+        # Validation
+        if (primary_doc.docstatus != 0 or secondary_doc.docstatus != 0):
+            frappe.throw("Both invoices must be in Draft state to merge.")
+
+        if primary_doc.custom_merged_pos_invoice:
+            frappe.throw("This bill already includes a merged bill.")
+
+        if secondary_doc.custom_merged_pos_invoice:
+            frappe.throw("The selected bill already includes another bill.")
+
+        if not secondary_doc.items:
+            frappe.throw("The selected bill has no items to merge.")
+
+
+        def update_merge_details(target_invoice,source_invoice,):
+
+            doc = frappe.get_doc("POS Invoice",target_invoice,)
+
+            # clear old rows
+            doc.set("custom_merged_pos_invoice_details",[],)
+
+            # only linked invoice items
+            for item in source_invoice.items:
+
+                doc.append(
+                    "custom_merged_pos_invoice_details",
+                    {
+                        "item_code": item.item_code,
+                        "item_name": item.item_name,
+                        "qty": item.qty,
+                        "rate": item.rate,
+                        "amount": item.amount,
+                    },
+                )
+
+            doc.custom_merged_total = source_invoice.rounded_total
+
+            doc.flags.ignore_version = True
+
+            doc.save(
+                ignore_permissions=True,
+                ignore_version=True,
+            )
+
+
+        # Update merge references directly
+        frappe.db.set_value(
+            "POS Invoice",
+            primary_doc.name,
+            "custom_merged_pos_invoice",
+            secondary_doc.name,
+            update_modified=False,
+        )
+
+        frappe.db.set_value(
+            "POS Invoice",
+            secondary_doc.name,
+            "custom_merged_pos_invoice",
+            primary_doc.name,
+            update_modified=False,
+        )
+
+
+        # Build detail table
+        update_merge_details(primary_doc.name,secondary_doc,)
+
+        update_merge_details(secondary_doc.name,primary_doc,)
+
+
+        frappe.db.commit()
+
+
+        return {
+            "status": "success",
+            "message": "Bills merged successfully",
+            "name": primary_doc.name,
+        }
+
+
+    except Exception as e:
+
+        frappe.db.rollback()
+
+        frappe.log_error(
+            title="Bill Merge Error",
+            message=frappe.get_traceback(),
+        )
+
+        return {
+            "status": "error",
+            "message": str(e),
+        }
