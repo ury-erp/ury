@@ -1,5 +1,30 @@
 {
   "name": "@ury/core",
   "version": "0.0.0",
-  "private": true
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "axios": ">=1",
+    "frappe-js-sdk": "^1.10.0",
+    "jsrsasign": "^11.1.0",
+    "qz-tray": "^2.2.5"
+  },
+  "devDependencies": {
+    "@types/jsrsasign": "^10.5.15",
+    "axios": "^1.7.0",
+    "@types/qz-tray": "^2.2.2",
+    "frappe-js-sdk": "^1.10.0",
+    "jsrsasign": "^11.1.0",
+    "qz-tray": "^2.2.5",
+    "typescript": "~5.7.2"
+  }
 }
