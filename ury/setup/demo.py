@@ -29,6 +29,10 @@ def setup_ury_demo_data(company):
         process_masters(company)
         process_transactions(company)
         generate_pos_demo()
+
+        admin = frappe.get_doc("User", "Administrator")
+        admin.add_roles("URY Cashier", "URY Captain", "URY Manager")
+
         frappe.db.set_single_value("Stock Settings", "allow_negative_stock", 0)
         frappe.cache.delete_keys("bootinfo")
         
@@ -532,21 +536,24 @@ def clear_demo_record(document, company):
     document_type = document.get("doctype")
     del document["doctype"]
 
-    valid_columns = frappe.get_meta(document_type).get_valid_columns()
+    if document_type == "User":
+        filters = {"name": document.get("email")}
+    else:
+        valid_columns = frappe.get_meta(document_type).get_valid_columns()
 
-    filters = {}
-    for key, value in document.items():
-        if key in valid_columns:
-            if isinstance(value, str):
-                if value == "__COMPANY__":
-                    filters[key] = company
-                elif value.startswith("__"):
-                    # Skip dynamic placeholders in filters to avoid mismatch
-                    continue
+        filters = {}
+        for key, value in document.items():
+            if key in valid_columns:
+                if isinstance(value, str):
+                    if value == "__COMPANY__":
+                        filters[key] = company
+                    elif value.startswith("__"):
+                        # Skip dynamic placeholders in filters to avoid mismatch
+                        continue
+                    else:
+                        filters[key] = value
                 else:
                     filters[key] = value
-            else:
-                filters[key] = value
 
     if not filters:
         return
