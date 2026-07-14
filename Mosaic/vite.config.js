@@ -16,7 +16,7 @@ export default defineConfig({
 		}
 	},
 	build: {
-		outDir: '../ury/public/mosaic',
+		outDir: '../ury/public/Mosaic',
 		emptyOutDir: true,
 		target: 'es2015',
 		// rollupOptions: {

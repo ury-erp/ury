@@ -397,24 +397,14 @@ export default {
       );
     },
 
-    updateColorandTable(kot, restaurant_table, type, table_takeaway, custom_merged_tables) {
+    updateColorandTable(kot, restaurant_table, type, table_takeaway) {
       if (restaurant_table === undefined) {
         kot.tableortakeaway = "Takeaway";
       } else {
         if (table_takeaway == 1) {
           kot.tableortakeaway = "Takeaway";
         } else {
-          let label = restaurant_table;
-          if (custom_merged_tables) {
-            const partners = custom_merged_tables
-              .split(",")
-              .map((name) => name.trim())
-              .filter(Boolean);
-            if (partners.length) {
-              label = [restaurant_table, ...partners].join(" + ");
-            }
-          }
-          kot.tableortakeaway = label;
+          kot.tableortakeaway = restaurant_table;
         }
       }
       if (type == "Order Modified") {
@@ -435,8 +425,7 @@ export default {
           kot,
           kot.restaurant_table,
           kot.type,
-          kot.table_takeaway,
-          kot.custom_merged_tables
+          kot.table_takeaway
         );
 
         kot.kot_items.forEach((kotitem) => {
@@ -521,7 +510,7 @@ export default {
     redirectToLogin() {
       var currentDomain = window.location.origin;
       window.location.href =
-        currentDomain + "/login?redirect-to=URYMosaic/" + this.production;
+        currentDomain + "/login?redirect-to=Mosaic/" + this.production;
     },
     masonryLoading() {
       this.$nextTick(() => {
