@@ -11,7 +11,7 @@
 
 The system covers the full restaurant workflow: menu management, table management, order taking (POS), kitchen display (KOT), payments (integrated with ERPNext POS), P&L reporting, and multi-branch support.
 
-**POS frontend is located in `/pos` and has its own `AGENTS.MD` with detailed documentation.**
+**POS frontend is located in `/pos` and has its own `AGENTS.MD` with detailed documentation. The shared `@ury/core` utility package is documented in `packages/core/AGENTS.MD`.**
 
 ---
 
@@ -220,6 +220,12 @@ After building, run `bench build --app ury` to copy assets to the Frappe public 
 
 **To modify POS UI behaviour or translations:**
 → Work in `pos/`. Read `pos/AGENTS.MD` first.
+
+**To modify shared frontend utilities (frappe client, auth/roles, storage, formatting, QZ print transport):**
+→ Work in `packages/core/`. Read `packages/core/AGENTS.MD` first — changes affect `pos/` AND `frontend/`; typecheck the package and rebuild both apps.
+
+**To modify shared React components, theme tokens, or the Tailwind preset:**
+→ Work in `packages/ui/` (same blast radius: `pos/` and `frontend/`).
 
 **To modify KOT display logic:**
 → Work in `URYMosaic/`. Read `URYMosaic/AGENTS.MD` first.
