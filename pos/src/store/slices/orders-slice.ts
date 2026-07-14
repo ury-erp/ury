@@ -1,6 +1,6 @@
 import { StateCreator } from 'zustand';
 import { OrderType } from '../../data/order-types';
-import { call } from '../../lib/frappe-sdk';
+import { call } from '@ury/core';
 import { getPOSInvoices, getPOSInvoiceItems, getSplitGroup, mapSplitGroupInvoiceToPOSInvoice, POSInvoiceItem, POSInvoiceTax } from '../../lib/invoice-api';
 import { searchPosInvoice } from '../../lib/invoice-api';
 

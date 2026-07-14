@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Link2 } from 'lucide-react';
-import { formatCurrency } from '../lib/utils';
+import { formatCurrency } from '@ury/core';
 import { getPOSInvoiceItems, type POSInvoice, type POSInvoiceItem } from '../lib/invoice-api';
 import { t } from '../i18n';
-import { Spinner } from './ui/spinner';
-import { Button } from './ui/button';
+import { Spinner } from '@ury/ui';
+import { Button } from '@ury/ui';
 
 interface MergedBillPanelProps {
   order: Pick<POSInvoice, 'name' | 'custom_merged_pos_invoice' | 'custom_merged_total' | 'rounded_total'>;
@@ -77,7 +77,7 @@ const MergedBillPanel = ({ order, onOpenSecondary }: MergedBillPanelProps) => {
 
       {loading ? (
         <div className="flex items-center gap-2 text-sm text-gray-500">
-          <Spinner className="h-4 w-4" hideMessage />
+          <Spinner className="h-4 w-4" hideMessage  message={t('common.loading')} />
           {t('common.loading')}
         </div>
       ) : items.length > 0 ? (

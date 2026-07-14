@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { usePOSStore } from '../store/pos-store';
 import { useRootStore } from '../store/root-store';
-import { cn } from '../lib/utils';
-import { Button } from './ui';
+import { cn } from '@ury/ui';
+import { Button } from '@ury/ui';
 import TableSelectionDialog from './TableSelectionDialog';
 import { DEFAULT_ORDER_TYPE, DINE_IN, ORDER_TYPES , type OrderType} from '../data/order-types';
 import { HandPlatter } from 'lucide-react';
-import { isUserRestrictedFromTableOrders } from '../lib/role-utils';
+import { isUserRestrictedFromTableOrders } from '@ury/core';
 import { formatMergedTableLabel } from '../lib/table-utils';
 import { t } from '../i18n';
 
