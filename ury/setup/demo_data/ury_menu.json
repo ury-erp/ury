@@ -52,6 +52,14 @@
                 "rate": 200.0,
                 "course": "Demo Course",
                 "parentfield": "items"
+            },
+            {
+                "doctype": "URY Menu Item",
+                "item": "MOM",
+                "item_name": "Momo",
+                "rate": 40.0,
+                "course": "Demo Course",
+                "parentfield": "items"
             }
         ]
     }
