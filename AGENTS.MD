@@ -20,17 +20,21 @@ The system covers the full restaurant workflow: menu management, table managemen
 ```
 ury/                          ← repo root
 ├── ury/                      ← Frappe app Python package (main backend)
-├── pos/                      ← React 19 POS frontend (v2, current)
+├── packages/                 ← Shared frontend packages (yarn workspaces)
+│   ├── core/                 ← @ury/core: framework-agnostic utils (frappe client, auth/roles, storage, formatting, QZ print transport)
+│   └── ui/                   ← @ury/ui: shared React components + theme.css + Tailwind preset
+├── pos/                      ← React 19 POS frontend (v2, current) — consumes @ury/ui + @ury/core
+├── frontend/                 ← React 19 URY management frontend (served at /ury) — consumes @ury/ui + @ury/core
 ├── URYMosaic/                ← Vue 3 KOT kitchen display app
 ├── urypos/                   ← Vue 3 POS frontend (v1, legacy)
 ├── DEMO/                     ← Demo screenshots / assets
 ├── requirements.txt          ← Python dependencies
 ├── setup.py                  ← Python package setup
-├── package.json              ← Yarn workspace root (manages all JS apps)
+├── package.json              ← Yarn classic workspace root (workspaces: packages/*, pos, frontend)
 └── FEATURES.md / README.md   ← Human-readable documentation
 ```
 
-The Yarn workspace (`package.json`) at the root manages three JS sub-projects: `pos/`, `URYMosaic/`, and `urypos/`.
+Root `package.json` defines yarn classic **workspaces** for `packages/*`, `pos`, and `frontend` (single root `yarn.lock`, hoisted `node_modules`). The Vue apps (`urypos/`, `URYMosaic/`) are **not** workspace members — they keep their own lockfiles and are installed via the root `postinstall` script. The shared packages are source-linked (their `exports` point at TypeScript source; no per-package build step) and are consumed only by the React apps.
 
 ---
 
@@ -190,17 +194,23 @@ All frontends are served as Frappe web pages. Route rules in `hooks.py` (`websit
 | App | Source | Build output | URL |
 |---|---|---|---|
 | POS v2 (React) | `pos/src/` | `ury/public/pos/` | `/pos` |
+| URY management (React) | `frontend/src/` | `ury/public/ury/` | `/ury` |
 | KOT display (Vue) | `URYMosaic/src/` | `ury/public/URYMosaic/` | `/URYMosaic/<unit>` |
 | POS v1 (Vue, legacy) | `urypos/src/` | `ury/public/urypos/` | `/urypos` |
 
-Build commands (from repo root):
-```bash
-cd pos && yarn build       # builds React POS
-cd URYMosaic && yarn build # builds KOT display
-cd urypos && yarn build    # builds legacy POS
-```
+Shared code for the React apps lives in `packages/`:
+- `@ury/ui` — components (`import { Button, Dialog, ... } from '@ury/ui'`), theme tokens (`@import '@ury/ui/styles/theme.css'`), Tailwind preset (`presets: [preset]` from `@ury/ui/tailwind-preset`). Consumer Tailwind configs must include `"../packages/ui/src/**/*.{ts,tsx}"` in `content`.
+- `@ury/core` — frappe client (`call`/`db`/`auth`), auth/role helpers, `storage`, formatting, QZ print transport. Printing requires `initPrinting({ signKey })` at app startup; the signing key stays in the consuming app (never in `packages/`).
 
-Or from root: `yarn build` (if configured in root package.json).
+Build commands:
+```bash
+yarn install               # at repo root: installs workspaces + Vue apps (postinstall)
+yarn build                 # at repo root: builds all four frontends (this is what `bench build` runs)
+yarn workspace @ury/core typecheck
+yarn workspace @ury/ui typecheck
+cd pos && yarn build       # single app
+cd frontend && yarn build  # single app
+```
 
 After building, run `bench build --app ury` to copy assets to the Frappe public directory.
 
