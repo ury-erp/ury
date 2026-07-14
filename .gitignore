@@ -9,12 +9,12 @@ node_modules/
 ury/public/pos
 ury/www/pos.html
 ury/public/urypos
-ury/public/mosaic
+ury/public/Mosaic
 ury/public/node_modules
 urypos/yarn.lock
-mosaic/yarn.lock
+Mosaic/yarn.lock
 ury/www/urypos.html
-ury/www/mosaic.html
+ury/www/Mosaic.html
 build
 
 *.lock
