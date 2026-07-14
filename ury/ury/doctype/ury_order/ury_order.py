@@ -853,6 +853,19 @@ def sync_order(
     if order_type:
         invoice.order_type = order_type
 
+    # Explicitly set restaurant on every save — fetch_from does not fire
+    # during programmatic invoice.save() calls, so the field would be None
+    # on all invoices created or updated via this API endpoint without this.
+    if not invoice.restaurant:
+        if table:
+            _branch, _menu, _restaurant = get_restaurant_and_menu_name(table)
+            invoice.restaurant = _restaurant
+        else:
+            _branch = getBranch()
+            invoice.restaurant = frappe.db.get_value(
+                "URY Restaurant", {"branch": _branch}, "name"
+            )
+
     customerdoc = frappe.get_doc("Customer", customer)
     invoice.mobile_number = customerdoc.mobile_number
     if comments:

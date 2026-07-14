@@ -10,6 +10,10 @@ import { useNotificationModal } from './NotificationModal';
 import { useAuthStore } from "./Auth.js";
 import frappe from "./frappeSdk.js";
 
+// ── Sprint 5: offline support ─────────────────────────────────────────────────
+import { useOfflineStore } from "./Offline.js";
+// ─────────────────────────────────────────────────────────────────────────────
+
 import {
   printWithQz,
   loadQzPrinter,
@@ -92,6 +96,14 @@ export const useInvoiceDataStore = defineStore("invoiceData", {
           if (this.qz_host) {
             loadQzPrinter(this.qz_host);
           }
+
+          // ── Sprint 5: cache POS profile settings for offline use ───────────
+          if (this.branch) {
+            const offline = useOfflineStore();
+            offline.cacheSettings(this.branch, result.message);
+          }
+          // ───────────────────────────────────────────────────────────────────
+
           this.db
             .getDoc("Company", this.company)
             .then((doc) => {
@@ -121,11 +133,15 @@ export const useInvoiceDataStore = defineStore("invoiceData", {
             });
         });
       } catch (error) {
-        if (error._server_messages) {
+        // ── Sprint 5: if getPosProfile fails offline, try IDB cache ──────────
+        if (!navigator.onLine) {
+          await this._loadSettingsFromCache();
+        } else if (error._server_messages) {
           const messages = JSON.parse(error._server_messages);
           const message = JSON.parse(messages[0]);
           this.alert.createAlert("Message", message.message, "OK");
         }
+        // ─────────────────────────────────────────────────────────────────────
       }
       this.call
         .get("ury.ury_pos.api.getModeOfPayment")
@@ -137,16 +153,71 @@ export const useInvoiceDataStore = defineStore("invoiceData", {
         });
     },
 
+    // ── Sprint 5: restore POS profile state from IDB cache ───────────────────
+    /**
+     * Populate store state from a previously-cached getPosProfile response.
+     * Called when fetchInvoiceDetails() fails because the device is offline.
+     * Only restores the fields that the rest of the app reads from this store
+     * — does not attempt to load Company/Currency (those are display-only).
+     */
+    async _loadSettingsFromCache() {
+      try {
+        const offline = useOfflineStore();
+        // branch may not be set yet if this is a fresh page load offline —
+        // try a generic fallback key first, then give up gracefully.
+        const branch = this.branch || localStorage.getItem('ury_branch') || null;
+        if (!branch) return;
+
+        const cached = await offline.getCachedSettings(branch);
+        if (!cached) return;
+
+        this.tableAttention = cached.tableAttention;
+        this.warehouse = cached.warehouse;
+        this.posProfile = cached.pos_profile;
+        this.waiter = cached.waiter;
+        this.cashier = cached.cashier;
+        this.owner = cached.owner;
+        this.branch = cached.branch;
+        this.company = cached.company;
+        this.print_format = cached.print_format;
+        this.qz_print = cached.qz_print;
+        this.qz_host = cached.qz_host;
+        this.print_type = cached.print_type;
+        this.printer = cached.printer;
+        this.paidLimit = cached.paid_limit;
+        this.disableRoundedTotal = cached.disable_rounded_total;
+        this.enableDiscount = cached.enable_discount;
+        this.enableKotReprint = cached.enable_kot_reprint;
+        this.multipleCashier = cached.multiple_cashier;
+        this.editOrderType = cached.edit_order_type;
+
+        if (this.qz_host) {
+          loadQzPrinter(this.qz_host);
+        }
+
+        // Persist branch to localStorage so the next offline page load can
+        // find the cache without waiting for a live API response.
+        localStorage.setItem('ury_branch', this.branch);
+
+        this.notification.createNotification(
+          "Offline — using cached POS profile"
+        );
+      } catch (err) {
+        console.warn('[URY] _loadSettingsFromCache failed:', err);
+      }
+    },
+    // ─────────────────────────────────────────────────────────────────────────
+
     // Method for creating an invoice
     async invoiceCreation() {
       this.showUpdateButtton = false;
       this.invoiceUpdating = true;
       let selectedTables = "";
       let cart = this.menu.cart;
-      const customerName = this.customers.search;
+      const customerName = this.customers.search || "Walk-in Customer";
       const ordeType =
         this.menu.selectedOrderType || this.recentOrders.pastOrderType;
-      const numberOfPax = this.customers.numberOfPax;
+      const numberOfPax = this.customers.numberOfPax || 1;
       let invoice =
         this.recentOrders.draftInvoice ||
         this.table.invoiceNo ||
@@ -302,47 +373,31 @@ export const useInvoiceDataStore = defineStore("invoiceData", {
         return;
       }
     
+      // ── Sprint 5: offline intercept ─────────────────────────────────────────
+      // If the device is offline, queue the payload to IDB and return a stub
+      // response so the rest of this function continues without modification.
+      // The Offline store's flush() will replay the payload when reconnected.
+      if (!navigator.onLine) {
+        const offline = useOfflineStore();
+        const queuedResponse = await offline.enqueueOrder(creatingInvoice);
+        this._handleSyncOrderResponse(queuedResponse, cartCopy, ordeType);
+        return;
+      }
+      // ─────────────────────────────────────────────────────────────────────────
+
       try {
         const response = await this.call.post(
           "ury.ury.doctype.ury_order.ury_order.sync_order",
           creatingInvoice
         );
     
-        this.showUpdateButtton = true;
-        if (response.message.status === "Failure") {
-          const alert = response._server_messages;
-          const messages = JSON.parse(alert);
-          const message = JSON.parse(messages[0]);
-    
-          await this.alert.createAlert("Message", message.message, "OK");
-          await router.push("/Table");
-          window.location.reload();
-          return;
+        // ── Sprint 5: cache branch to localStorage on every online save ───────
+        if (this.branch) {
+          localStorage.setItem('ury_branch', this.branch);
         }
-    
-        // Handle successful response
-        this.invoiceNumber = response.message.name;
-        this.grandTotal = response.message.grand_total;
-        this.notification.createNotification("Order Update");
-        this.table.fetchTable();
-        
-        let items = this.menu.items;
-        // items.forEach((item) => {
-        //   item.comment = "";
-        // });
-        
-        this.table.previousOrderdItem = response.message.items;
-        this.recentOrders.pastOrderdItem = response.message.items;
-        this.previousOrderItem.splice(0, this.previousOrderItem.length);
-        this.previousOrderItem.splice(0, this.previousOrderItem.length, ...cartCopy);
-        this.invoiceUpdating = false;
-        this.table.modifiedTime = response.message.modified;
-        this.recentOrders.modifiedTime = response.message.modified;
-        if (this.auth.cashier) {
-          this.clearDataAfterUpdate();
-          await router.push("/recentOrder");
-          this.recentOrders.viewRecentOrder(response.message);
-        }
+        // ──────────────────────────────────────────────────────────────────────
+
+        this._handleSyncOrderResponse(response, cartCopy, ordeType);
       } catch (error) {
         this.showUpdateButtton = true;
         this.invoiceUpdating = false;
@@ -356,6 +411,74 @@ export const useInvoiceDataStore = defineStore("invoiceData", {
         }
       }
     },
+
+    // ── Sprint 5: extracted response handler ─────────────────────────────────
+    /**
+     * Process a sync_order response — real (online) or stub (offline/queued).
+     * Extracted from invoiceCreation() so the offline and online paths share
+     * identical post-response UI logic.
+     *
+     * @param {object} response   The frappe.call response or offline stub
+     * @param {Array}  cartCopy   Deep copy of cart taken before the call
+     * @param {string} ordeType   Current order type string
+     */
+    async _handleSyncOrderResponse(response, cartCopy, ordeType) {
+      this.showUpdateButtton = true;
+
+      // ── Offline stub path ───────────────────────────────────────────────────
+      if (response?.message?._offline) {
+        // Order was queued, not saved yet. Give minimal UI feedback.
+        this.notification.createNotification(
+          "Offline — order queued, will sync when reconnected"
+        );
+        // Keep invoiceNumber and modifiedTime unchanged so a subsequent
+        // online Update on the same table sends the correct last_invoice.
+        this.table.previousOrderdItem = cartCopy.map(i => ({
+          item_code: i.item,
+          item_name: i.item_name,
+          qty: i.qty,
+          comment: i.comment || "",
+          rate: i.rate,
+        }));
+        this.recentOrders.pastOrderdItem = this.table.previousOrderdItem;
+        this.previousOrderItem.splice(0, this.previousOrderItem.length, ...cartCopy);
+        this.invoiceUpdating = false;
+        return;
+      }
+      // ─────────────────────────────────────────────────────────────────────────
+
+      // ── Server Failure response ───────────────────────────────────────────
+      if (response.message.status === "Failure") {
+        const alert = response._server_messages;
+        const messages = JSON.parse(alert);
+        const message = JSON.parse(messages[0]);
+
+        await this.alert.createAlert("Message", message.message, "OK");
+        await router.push("/Table");
+        window.location.reload();
+        return;
+      }
+
+      // ── Successful online response ────────────────────────────────────────
+      this.invoiceNumber = response.message.name;
+      this.grandTotal = response.message.grand_total;
+      this.notification.createNotification("Order Update");
+      this.table.fetchTable();
+
+      this.table.previousOrderdItem = response.message.items;
+      this.recentOrders.pastOrderdItem = response.message.items;
+      this.previousOrderItem.splice(0, this.previousOrderItem.length);
+      this.previousOrderItem.splice(0, this.previousOrderItem.length, ...cartCopy);
+      this.invoiceUpdating = false;
+      this.table.modifiedTime = response.message.modified;
+      this.recentOrders.modifiedTime = response.message.modified;
+      if (this.auth.cashier) {
+        this.clearDataAfterUpdate();
+        await router.push("/recentOrder");
+        this.recentOrders.viewRecentOrder(response.message);
+      }
+    },
+    // ─────────────────────────────────────────────────────────────────────────
 
     clearDataAfterUpdate() {
       this.menu.items.forEach((item) => {

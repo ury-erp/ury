@@ -9,6 +9,10 @@ import { useAlert } from "./Alert.js";
 import frappe from "./frappeSdk.js";
 import { usetoggleRecentOrder } from "./recentOrder.js";
 
+// ── Sprint 5: offline support ─────────────────────────────────────────────────
+import { useOfflineStore } from "./Offline.js";
+// ─────────────────────────────────────────────────────────────────────────────
+
 
 export const useTableStore = defineStore("table", {
   state: () => ({
@@ -197,8 +201,24 @@ export const useTableStore = defineStore("table", {
             this.menuName = result.message.name;
             this.orderModified = result.message.modified;
             this.menu.fetchItems();
+
+            // ── Sprint 5: cache menu for offline use ──────────────────────────
+            // Only cache when we have both branch and room — these are the keys
+            // used by Offline.getCachedMenu() during the offline fallback path.
+            const branch = this.invoiceData.branch;
+            if (branch) {
+              const offline = useOfflineStore();
+              offline.cacheMenu(branch, this.selectedRoom, result.message);
+            }
+            // ─────────────────────────────────────────────────────────────────
           });
       } catch (error) {
+        // ── Sprint 5: offline fallback — serve cached menu ────────────────────
+        if (!navigator.onLine) {
+          await this._loadMenuFromCache();
+          return;
+        }
+        // ─────────────────────────────────────────────────────────────────────
         if (error._server_messages) {
           const messages = JSON.parse(error._server_messages);
           const message = JSON.parse(messages[0])
@@ -206,6 +226,66 @@ export const useTableStore = defineStore("table", {
         }
       }
     },
+
+    // ── Sprint 5: menu cache fallback ─────────────────────────────────────────
+    /**
+     * Load the most recently cached getRestaurantMenu() response from IDB
+     * and apply it to the store. Called when getMenu() fails offline.
+     *
+     * Applies the same fields that the online success path sets:
+     *   tableMenu, menuName, orderModified
+     * and calls menu.fetchItems() which reads from this.tableMenu.
+     *
+     * If no cache exists (first-ever offline session) the function logs a
+     * warning and shows a user-facing alert rather than leaving the menu
+     * in an indeterminate state.
+     */
+    async _loadMenuFromCache() {
+      try {
+        const branch = this.invoiceData.branch;
+        if (!branch) {
+          this.notification.createNotification(
+            "Offline — branch not set, cannot load cached menu"
+          );
+          return;
+        }
+
+        const offline = useOfflineStore();
+        const cached = await offline.getCachedMenu(branch, this.selectedRoom);
+
+        if (!cached) {
+          // No cache available — this happens on the very first offline session
+          // before any menu was ever loaded online. Surface a clear message.
+          this.alert.createAlert(
+            "Offline",
+            "No cached menu available. Please connect to the internet and reload to download the menu.",
+            "OK"
+          );
+          return;
+        }
+
+        // Apply cached data — same fields as the online success path
+        this.tableMenu = cached.items || [];
+        this.menuName = cached.name || null;
+        this.orderModified = cached.modified_time || null;
+
+        // menu.fetchItems() reads from this.tableMenu (set above) when the
+        // table store already has a tableMenu populated — it will use it
+        // directly for the waiter's item list
+        this.menu.fetchItems();
+
+        this.notification.createNotification(
+          "Offline — showing cached menu"
+        );
+      } catch (err) {
+        console.warn('[URY] _loadMenuFromCache failed:', err);
+        this.notification.createNotification(
+          "Offline — could not load cached menu"
+        );
+      }
+    },
+    // ─────────────────────────────────────────────────────────────────────────
+
     toggleTableTypeSwitch() {
       this.isTakeaeay = !this.isTakeaeay;
     },
