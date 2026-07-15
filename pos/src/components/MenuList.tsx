@@ -1,8 +1,8 @@
 import { useEffect, useMemo } from 'react';
 import { usePOSStore } from '../store/pos-store';
 import MenuCard from './MenuCard';
-import { Spinner } from './ui/spinner';
-import { cn } from '../lib/utils';
+import { Spinner } from '@ury/ui';
+import { cn } from '@ury/ui';
 import { t } from '../i18n';
 
 interface MenuListProps {

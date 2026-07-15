@@ -6,8 +6,8 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from './ui/dialog';
-import { Button } from './ui/button';
+} from '@ury/ui';
+import { Button } from '@ury/ui';
 import { t } from '../i18n';
 import type { Table } from '../lib/table-api';
 

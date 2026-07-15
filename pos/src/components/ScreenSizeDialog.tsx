@@ -1,5 +1,5 @@
 import { Monitor, Smartphone, ExternalLink } from 'lucide-react';
-import { Button } from './ui';
+import { Button } from '@ury/ui';
 
 const ScreenSizeDialog = () => {
   const handleSwitchToVersion1 = () => {

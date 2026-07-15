@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, Link2 } from 'lucide-react';
-import { cn, formatCurrency } from '../lib/utils';
+import { cn } from '@ury/ui';
+import { formatCurrency } from '@ury/core';
 import { getSplitGroup, type SplitGroupInvoice } from '../lib/invoice-api';
 import { t } from '../i18n';
-import { Spinner } from './ui/spinner';
-import { Button } from './ui/button';
+import { Spinner } from '@ury/ui';
+import { Button } from '@ury/ui';
 
 interface SplitGroupPanelProps {
   invoiceName: string;
@@ -58,7 +59,7 @@ const SplitGroupPanel = ({ invoiceName, onOpenInvoice }: SplitGroupPanelProps) =
   if (loading) {
     return (
       <div className="mb-6 flex items-center gap-2 text-sm text-gray-500">
-        <Spinner className="h-4 w-4" hideMessage />
+        <Spinner className="h-4 w-4" hideMessage  message={t('common.loading')} />
         {t('common.loading')}
       </div>
     );
