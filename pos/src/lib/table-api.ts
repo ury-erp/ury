@@ -76,6 +76,20 @@ export async function getTables(room: string): Promise<Table[]> {
 }
 
 
+export interface TableInvoiceStatus {
+  invoice: string;
+  invoice_printed: number;
+}
+
+/** Open-invoice state per occupied table: printed bill ⇒ Payment action. */
+export async function getTableInvoiceStatus(
+  room: string
+): Promise<Record<string, TableInvoiceStatus>> {
+  const { call } = await import('./frappe-sdk');
+  const res = await call.get('ury.ury_pos.api.getTableInvoiceStatus', { room });
+  return res.message || {};
+}
+
 export async function updateTableLayout(name: string, data: Partial<Table>) {
   return db.updateDoc(DOCTYPES.URY_TABLE, name, data);
 }

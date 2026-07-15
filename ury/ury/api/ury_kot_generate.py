@@ -339,14 +339,11 @@ def kot_execute(
     pos_invoice = frappe.get_doc("POS Invoice", invoice_id)
     pos_profile_id = pos_invoice.pos_profile
     pos_profile = frappe.get_doc("POS Profile", pos_profile_id)
-    kot_naming_series = pos_profile.custom_kot_naming_series
-    if kot_naming_series:
-        cancel_kot_naming_series = "CNCL-" + kot_naming_series
-    else:
-        frappe.throw(
-            "KOT Naming Series is mandatory for the auto creation of KOT.Ensure it is configured in the POS Profile: %s"
-            % pos_profile.name
-        )
+    # Naming series is optional — KOTs default to "KOT-" so a blank POS
+    # Profile never blocks KOT creation (the printed number can be the
+    # daily count instead; see the KOT print format).
+    kot_naming_series = pos_profile.custom_kot_naming_series or "KOT-"
+    cancel_kot_naming_series = "CNCL-" + kot_naming_series
 
     positive_qty_items = [item for item in final_array if int(item["qty"]) > 0]
     negative_qty_items = [item for item in final_array if int(item["qty"]) <= 0]

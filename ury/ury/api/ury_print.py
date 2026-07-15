@@ -57,19 +57,9 @@ def network_printing(
                 output.write(f)
             conn.printFile(print_settings.printer_name, file_path, name, {})
 
-            restaurant_table, invoice_printed, name = frappe.db.get_value(
-                "POS Invoice", name, ["restaurant_table", "invoice_printed", "name"]
-            )
-
-            if restaurant_table and invoice_printed == 0:
-                frappe.db.set_value("POS Invoice", name, "invoice_printed", 1)
-                frappe.db.set_value(
-                    "URY Table",
-                    restaurant_table,
-                    {"occupied": 0, "latest_invoice_time": None},
-                )
-            else:
-                frappe.db.set_value("POS Invoice", name, "invoice_printed", 1)
+            # Printing the bill no longer frees the table: it stays occupied
+            # until the invoice is settled (see release_table on submit).
+            frappe.db.set_value("POS Invoice", name, "invoice_printed", 1)
 
             return "Success"
         except Exception as e:
@@ -111,44 +101,21 @@ def select_network_printer(pos_profile, invoice_id):
 @frappe.whitelist()
 def qz_print_update(invoice):
     try:
-        table = frappe.db.get_value("POS Invoice", invoice, "restaurant_table")
-        
-        if table == None or table == "":
-            # Update invoice_printed
-            frappe.db.set_value(
-                "POS Invoice", invoice, "invoice_printed", 1, update_modified=False
-            )
-            
-            # Validate the update
-            new_invoice_printed = frappe.db.get_value("POS Invoice", invoice, "invoice_printed")
-            if new_invoice_printed != 1:
-                return {"status": "Failure"}                
-        else:
-            invoice_printed = frappe.db.get_value("POS Invoice", invoice, "invoice_printed")
+        # Printing the bill no longer frees the table: it stays occupied
+        # until the invoice is settled (see release_table on submit).
+        frappe.db.set_value(
+            "POS Invoice", invoice, "invoice_printed", 1, update_modified=False
+        )
 
-            if invoice_printed == 0:
-                # Update invoice_printed
-                frappe.db.set_value(
-                    "POS Invoice", invoice, "invoice_printed", 1, update_modified=False
-                )
-                
-                # Update table status
-                frappe.db.set_value(
-                    "URY Table", table, {"occupied": 0, "latest_invoice_time": None}
-                )
-                
-                # Validate both updates
-                new_invoice_printed = frappe.db.get_value("POS Invoice", invoice, "invoice_printed")
-                new_table_status = frappe.db.get_value("URY Table", table, "occupied")
-                
-                if new_invoice_printed != 1 or new_table_status != 0:
-                    return {"status": "Failure"}
-        
+        new_invoice_printed = frappe.db.get_value("POS Invoice", invoice, "invoice_printed")
+        if new_invoice_printed != 1:
+            return {"status": "Failure"}
+
         return {"status": "Success"}
-        
+
     except Exception as e:
         frappe.log_error(message=e, title="Print Fail")
-        frappe.throw(_("Error while printing order",e))                   
+        frappe.throw(_("Error while printing order",e))
         return {"status": "Failure"}
 
 
@@ -162,17 +129,9 @@ def print_pos_page(doctype, name, print_format):
     print_channel = "{}_{}".format("print", branch)
     frappe.publish_realtime(print_channel, {"data": data})
 
-    invoice_printed = frappe.db.get_value("POS Invoice", name, "invoice_printed")
-
-    if invoice_printed == 0:
-        frappe.db.set_value("POS Invoice", name, "invoice_printed", 1)
-
-        if restaurant_table:
-            frappe.db.set_value(
-                "URY Table",
-                restaurant_table,
-                {"occupied": 0, "latest_invoice_time": None},
-            )
+    # Printing the bill no longer frees the table: it stays occupied
+    # until the invoice is settled (see release_table on submit).
+    frappe.db.set_value("POS Invoice", name, "invoice_printed", 1)
 
 
 @frappe.whitelist()

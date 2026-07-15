@@ -93,6 +93,14 @@
    "role": "URY Cashier",
    "select": 1,
    "write": 1
+  },
+  {
+   "create": 1,
+   "export": 1,
+   "read": 1,
+   "role": "URY Waiter",
+   "select": 1,
+   "write": 1
   }
  ],
  "sort_field": "modified",

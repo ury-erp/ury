@@ -26,6 +26,17 @@ const MenuCard: FC<MenuCardProps> = ({
   onClick,
   disabled
 }) => {
+  // Image placeholder: prefer the item code; long codes shrink instead of
+  // overflowing the fixed-height image area.
+  const placeholderText = item_code || item || name.slice(0, 2).toUpperCase();
+  const placeholderSize =
+    placeholderText.length <= 6
+      ? 'text-2xl'
+      : placeholderText.length <= 14
+        ? 'text-lg'
+        : 'text-xs';
+  const placeholderClass = `w-full h-full bg-gray-200 flex items-center justify-center text-gray-400 font-medium font-mono px-2 text-center break-all overflow-hidden ${placeholderSize}`;
+
   return (
     <div
       className={cn(
@@ -48,15 +59,15 @@ const MenuCard: FC<MenuCardProps> = ({
               const parent = target.parentElement;
               if (parent) {
                 const placeholder = document.createElement('div');
-                placeholder.className = 'w-full h-full bg-gray-200 flex items-center justify-center text-2xl text-gray-400 font-medium';
-                placeholder.textContent = name.slice(0, 2).toUpperCase();
+                placeholder.className = placeholderClass;
+                placeholder.textContent = placeholderText;
                 parent.insertBefore(placeholder, target);
               }
             }}
           />
         ) : (
-          <div className="w-full h-full bg-gray-200 flex items-center justify-center text-2xl text-gray-400 font-medium">
-            {name.slice(0, 2).toUpperCase()}
+          <div className={placeholderClass}>
+            {placeholderText}
           </div>
         )}
       </div>

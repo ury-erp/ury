@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Footer from './components/Footer';
 import Header from './components/Header';
 import Orders from './pages/Orders';
@@ -9,13 +9,19 @@ import POSOpeningProvider from './components/POSOpeningProvider';
 import ScreenSizeProvider from './components/ScreenSizeProvider';
 import { ToastProvider } from './components/ui/toast';
 import { usePOSStore } from './store/pos-store';
+import { useRootStore } from './store/root-store';
+import type { RootState } from './store/root-store';
+import { canUserBill } from './lib/role-utils';
 import { useEffect } from 'react';
 import { getActiveLanguage } from './i18n';
 
 function App() {
   const {
-    initializeApp
+    initializeApp,
+    posProfile
   } = usePOSStore();
+  const user = useRootStore((state: RootState) => state.user);
+  const userCanBill = canUserBill(user, posProfile);
   
   useEffect(() => {
     initializeApp();
@@ -39,7 +45,11 @@ function App() {
                 <div className="flex-1 overflow-hidden">
                   <Routes>
                     <Route path="/" element={<POS/>} />
-                    <Route path="/orders" element={<Orders />} />
+                    {/* Waiters take orders but never bill: no Orders section. */}
+                    <Route
+                      path="/orders"
+                      element={userCanBill ? <Orders /> : <Navigate to="/" replace />}
+                    />
                     <Route path="/table" element={<Table />} />
                   </Routes>
                 </div>

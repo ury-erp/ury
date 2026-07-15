@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState, type MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, ArrowLeftRight, Eye, Layout, Loader2, Printer, Square, Users } from 'lucide-react';
+import { AlertTriangle, ArrowLeftRight, Coins, Eye, Layout, Loader2, Printer, Square, Users } from 'lucide-react';
 import { cn, formatInvoiceTime } from '../lib/utils';
 import { usePOSStore } from '../store/pos-store';
-import { getRooms, getTables, getTableCount, transferTable, type Room, type Table } from '../lib/table-api';
+import { getRooms, getTables, getTableCount, getTableInvoiceStatus, transferTable, type Room, type Table, type TableInvoiceStatus } from '../lib/table-api';
 import { Spinner } from '../components/ui/spinner';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
@@ -12,16 +12,31 @@ import { TableShapeIcon } from '../components/TableShapeIcon';
 import { getTableOrder } from '../lib/order-api';
 import { printOrder } from '../lib/print';
 import { showToast } from '../components/ui/toast';
+import { canUserBill } from '../lib/role-utils';
+import { useRootStore } from '../store/root-store';
+import type { RootState } from '../store/root-store';
 import { t } from '../i18n';
 
 import LayoutView from '../components/LayoutView';
 import TableSwitchDialog from '../components/TableSwitchDialog';
+import PaymentDialog from '../components/PaymentDialog';
+
+interface PendingPayment {
+  invoice: string;
+  customer: string;
+  table: string;
+  room: string;
+  grandTotal: number;
+  roundedTotal: number;
+}
 
 const sortTables = (tables: Table[]) => [...tables].sort((a, b) => a.name.localeCompare(b.name));
 
 const TableView = () => {
   const navigate = useNavigate();
   const { posProfile, setSelectedTable, setSelectedOrderType } = usePOSStore();
+  const user = useRootStore((state: RootState) => state.user);
+  const userCanBill = canUserBill(user, posProfile);
 
   const branch = posProfile?.branch ?? null;
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -36,6 +51,8 @@ const TableView = () => {
   const [printingTable, setPrintingTable] = useState<string | null>(null);
   const [switchFromTable, setSwitchFromTable] = useState<Table | null>(null);
   const [switchingTo, setSwitchingTo] = useState<string | null>(null);
+  const [pendingPayment, setPendingPayment] = useState<PendingPayment | null>(null);
+  const [invoiceStatus, setInvoiceStatus] = useState<Record<string, TableInvoiceStatus>>({});
 
   const persistRoomCounts = useCallback((counts: Record<string, number>) => {
     if (!branch) return;
@@ -125,12 +142,18 @@ const TableView = () => {
       if (shouldUseCache && tablesCache[roomName]) {
         setTables(sortTables(tablesCache[roomName]));
         setLoadingTables(false);
+        // Printed-bill state is never cached: it changes with every print.
+        getTableInvoiceStatus(roomName).then(setInvoiceStatus).catch(() => setInvoiceStatus({}));
         return;
       }
 
       setLoadingTables(true);
       try {
-        const fetchedTables = await getTables(roomName);
+        const [fetchedTables, fetchedStatus] = await Promise.all([
+          getTables(roomName),
+          getTableInvoiceStatus(roomName).catch(() => ({})),
+        ]);
+        setInvoiceStatus(fetchedStatus);
         const sortedTables = sortTables(fetchedTables);
         setTables(sortedTables);
         setTablesCache(prev => ({ ...prev, [roomName]: sortedTables }));
@@ -182,18 +205,66 @@ const TableView = () => {
     setPrintingTable(table.name);
     try {
       const orderResponse = await getTableOrder(table.name);
-      const invoiceId = orderResponse.message?.name;
+      const order = orderResponse.message;
+      const invoiceId = order?.name;
 
-      if (!invoiceId) {
+      if (!order || !invoiceId) {
         showToast.error('No active order found for this table');
         return;
       }
 
-      await printOrder({ orderId: invoiceId, posProfile });
-      showToast.success('Printed successfully');
-      await loadTables(table.restaurant_room, { useCache: false });
+      // Print only once — a second tap goes straight to payment instead of
+      // producing a duplicate bill. The table stays occupied until settled.
+      if (order.invoice_printed !== 1) {
+        await printOrder({ orderId: invoiceId, posProfile });
+        showToast.success('Printed successfully');
+      }
+      setInvoiceStatus(prev => ({
+        ...prev,
+        [table.name]: { invoice: invoiceId, invoice_printed: 1 },
+      }));
+
+      // Waiters may print the bill but not collect payment.
+      if (!userCanBill) return;
+
+      setPendingPayment({
+        invoice: invoiceId,
+        customer: order.customer,
+        table: table.name,
+        room: table.restaurant_room,
+        grandTotal: order.grand_total,
+        roundedTotal: order.rounded_total ?? order.grand_total,
+      });
     } catch (error) {
       showToast.error(error instanceof Error ? error.message : 'Failed to print order');
+    } finally {
+      setPrintingTable(null);
+    }
+  };
+
+  const handlePayTable = async (table: Table, event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+
+    setPrintingTable(table.name);
+    try {
+      const orderResponse = await getTableOrder(table.name);
+      const order = orderResponse.message;
+
+      if (!order?.name) {
+        showToast.error('No active order found for this table');
+        return;
+      }
+
+      setPendingPayment({
+        invoice: order.name,
+        customer: order.customer,
+        table: table.name,
+        room: table.restaurant_room,
+        grandTotal: order.grand_total,
+        roundedTotal: order.rounded_total ?? order.grand_total,
+      });
+    } catch (error) {
+      showToast.error(error instanceof Error ? error.message : 'Failed to load order');
     } finally {
       setPrintingTable(null);
     }
@@ -341,6 +412,7 @@ const TableView = () => {
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
               {tablesToDisplay.map(table => {
                 const isOccupied = table.occupied === 1;
+                const isBillPrinted = invoiceStatus[table.name]?.invoice_printed === 1;
 
                 return (
                   <div
@@ -398,7 +470,35 @@ const TableView = () => {
                       </div>
                     </div>
 
-                    {isOccupied ? (
+                    {isOccupied && isBillPrinted ? (
+                      // Bill already printed: the only remaining action is
+                      // collecting payment (the table frees on settle).
+                      <div className="flex gap-2 pt-3 mt-3 border-t border-amber-200">
+                        {userCanBill ? (
+                          <button
+                            onClick={(event) => handlePayTable(table, event)}
+                            disabled={printingTable === table.name}
+                            className="flex-1 flex items-center justify-center gap-2 py-2 text-xs font-semibold rounded bg-emerald-600 text-white hover:bg-emerald-700 transition disabled:opacity-60 disabled:cursor-not-allowed"
+                          >
+                            {printingTable === table.name ? (
+                              <>
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                                Loading...
+                              </>
+                            ) : (
+                              <>
+                                <Coins className="w-3 h-3" />
+                                Payment
+                              </>
+                            )}
+                          </button>
+                        ) : (
+                          <p className="flex-1 text-center py-2 text-xs font-semibold text-amber-800">
+                            Awaiting payment
+                          </p>
+                        )}
+                      </div>
+                    ) : isOccupied ? (
                       <div className="flex gap-2 pt-3 mt-3 border-t border-amber-200">
                         <button
                           onClick={(event) => handlePreviewTable(table, event)}
@@ -467,6 +567,22 @@ const TableView = () => {
         onClose={() => setSwitchFromTable(null)}
         onSelect={handleSwitchTable}
       />
+
+      {pendingPayment && posProfile && (
+        <PaymentDialog
+          onClose={() => setPendingPayment(null)}
+          grandTotal={pendingPayment.grandTotal}
+          roundedTotal={pendingPayment.roundedTotal}
+          invoice={pendingPayment.invoice}
+          customer={pendingPayment.customer}
+          posProfile={posProfile.name}
+          table={pendingPayment.table}
+          cashier={posProfile.cashier}
+          owner={posProfile.owner}
+          fetchOrders={() => loadTables(pendingPayment.room, { useCache: false })}
+          clearSelectedOrder={() => setPendingPayment(null)}
+        />
+      )}
     </div>
   );
 };

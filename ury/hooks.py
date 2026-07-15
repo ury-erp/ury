@@ -131,6 +131,7 @@ doc_events = {
         "validate": "ury.ury.hooks.ury_pos_invoice.validate",
         "after_insert":"ury.ury.api.ury_kot_order_number.set_order_number",
         "before_submit": "ury.ury.hooks.ury_pos_invoice.before_submit",
+        "on_submit": "ury.ury.hooks.ury_pos_invoice.on_submit",
         "on_cancel": "ury.ury.hooks.ury_pos_invoice.on_trash",
         "on_trash": "ury.ury.hooks.ury_pos_invoice.on_trash",
     },
@@ -383,5 +384,9 @@ fixtures = [
         ],
     },
     {"dt": "Role", "filters": [["role_name", "like", "URY %"]]},
+    # URY Waiter can take orders but not bill: its permissions on core
+    # doctypes (POS Invoice without submit, etc.) ship as fixtures so the
+    # role works out of the box; removed again in uninstall.py.
+    {"dt": "Custom DocPerm", "filters": [["role", "=", "URY Waiter"]]},
     "Client Script",
 ]

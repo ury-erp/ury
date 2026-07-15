@@ -179,6 +179,30 @@ def getRoom():
     return room_details
 
 @frappe.whitelist()
+def getTableInvoiceStatus(room):
+    """Open-invoice state per occupied table in a room: whether the bill has
+    been printed (table then shows a Payment action instead of Print)."""
+    tables = frappe.get_all(
+        "URY Table", filters={"restaurant_room": room}, pluck="name"
+    )
+    if not tables:
+        return {}
+
+    invoices = frappe.get_all(
+        "POS Invoice",
+        filters={"docstatus": 0, "restaurant_table": ["in", tables]},
+        fields=["name", "restaurant_table", "invoice_printed"],
+    )
+    return {
+        inv.restaurant_table: {
+            "invoice": inv.name,
+            "invoice_printed": inv.invoice_printed,
+        }
+        for inv in invoices
+    }
+
+
+@frappe.whitelist()
 def getModeOfPayment():
     posDetails = getPosProfile()
     posProfile = posDetails["pos_profile"]
