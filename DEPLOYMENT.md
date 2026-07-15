@@ -87,18 +87,26 @@ bench --site chefworks.storenxt.in set-maintenance-mode off
 
 ## 5. If someone added a Custom Field directly on the live site (not via code)
 
-Custom Fields added through Desk UI live only in the DB until exported. Do this **every time** that happens, so the fork stays the source of truth:
+**Preferred: don't export on the server at all.** Recreate the field in code on a dev bench, open a PR, and let the normal pull + migrate create it on the site. The server repo stays clean.
+
+If you must export on the server, understand the risk first: `export-fixtures`
+**rewrites the whole fixtures file from this site's DB**. Any field that exists
+in the file but not on this site (e.g. from a branch this site hasn't migrated
+yet) is silently DELETED from the file. This is exactly how
+`show_item_code` was lost once already (commit `e7b28e9`).
 
 ```bash
 bench --site chefworks.storenxt.in export-fixtures --app ury
 cd ~/frappe-bench/apps/ury
-git diff ury/fixtures/
+git diff ury/fixtures/          # REVIEW: added lines = your new field.
+                                # DELETED lines = someone else's field being
+                                # destroyed — STOP and git checkout -- the file.
 git add ury/fixtures/
 git commit -m "Sync fixtures from live DB: <describe what was added>"
-git push <remote> <branch>
+git push <remote> <branch>      # push a branch + PR; never commit straight to develop
 ```
 
-Skipping this step is the #1 cause of the "field's in fixtures but not on the site" confusion — the file and the DB silently drift apart.
+**Never leave the export uncommitted.** A dirty `ury/fixtures/*.json` blocks every future `git pull` on the server. If you find the file dirty and don't know why, `git diff` it; if the diff only re-adds things the fork already has, discard it: `git checkout -- ury/fixtures/custom_field.json`.
 
 ---
 
