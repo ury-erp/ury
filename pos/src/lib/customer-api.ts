@@ -1,5 +1,5 @@
 import { DOCTYPES } from '../data/doctypes';
-import { db, call } from './frappe-sdk';
+import { db, call } from '@ury/core';
 
 export interface Customer {
   name: string;
@@ -35,6 +35,7 @@ export interface CreateCustomerData {
   mobile_number: string;
   customer_group?: string;
   territory?: string;
+  name?: string;
 }
 
 export interface CreateCustomerResponse {

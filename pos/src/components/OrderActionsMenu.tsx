@@ -1,6 +1,6 @@
 import { useEffect, useRef, type MouseEvent as ReactMouseEvent } from 'react';
 import { GitMerge, MoreVertical, SplitSquareHorizontal } from 'lucide-react';
-import { Button } from './ui/button';
+import { Button } from '@ury/ui';
 import { t } from '../i18n';
 
 interface OrderActionsMenuProps {

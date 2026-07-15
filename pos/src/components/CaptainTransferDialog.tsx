@@ -6,12 +6,12 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from './ui/dialog';
-import { Button } from './ui/button';
-import { cn } from '../lib/utils';
+} from '@ury/ui';
+import { Button } from '@ury/ui';
+import { cn } from '@ury/ui';
 import { t } from '../i18n';
-import { Spinner } from './ui/spinner';
-import { db } from '../lib/frappe-sdk';
+import { Spinner } from '@ury/ui';
+import { db } from '@ury/core';
 
 interface CaptainTransferDialogProps {
   open: boolean;
@@ -156,7 +156,7 @@ const CaptainTransferDialog = ({
 
           {loading ? (
             <div className="flex items-center justify-center py-8">
-              <Spinner hideMessage />
+              <Spinner hideMessage  message={t('common.loading')} />
             </div>
           ) : loadError ? (
             <p className="py-4 text-sm text-red-600">{loadError}</p>

@@ -1,5 +1,5 @@
 import { DOCTYPES } from '../data/doctypes';
-import { call, db } from './frappe-sdk';
+import { call, db } from '@ury/core';
 import { OrderStatusType, OrderType } from '../data/order-types';
 import type { Filter } from 'frappe-js-sdk/lib/db/types';
 
@@ -345,7 +345,7 @@ export async function getLinkedMergeSecondaries(): Promise<string[]> {
   } as unknown as Parameters<typeof db.getDocList>[1]);
 
   return rows
-    .map((row) => row.custom_merged_pos_invoice as string | undefined)
+    .map((row: any) => row.custom_merged_pos_invoice as string | undefined)
     .filter((name): name is string => Boolean(name));
 }
 

@@ -7,9 +7,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from './ui/dialog';
-import { Button } from './ui/button';
-import { cn, formatCurrency } from '../lib/utils';
+} from '@ury/ui';
+import { Button } from '@ury/ui';
+import { cn } from '@ury/ui';
+import { formatCurrency } from '@ury/core';
 import { t } from '../i18n';
 import { CustomerPicker } from './CustomerPicker';
 import type { Customer } from '../store/pos-store';

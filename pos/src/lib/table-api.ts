@@ -1,5 +1,5 @@
 import { DOCTYPES } from '../data/doctypes';
-import { db } from './frappe-sdk';
+import { db } from '@ury/core';
 
 export interface Room {
   name: string;
@@ -22,7 +22,7 @@ export interface Table {
 
 
 export async function getRestaurantMenu(posProfile: string, room?: string | null) {
-  const { call } = await import('./frappe-sdk');
+  const { call } = await import('@ury/core');
   const params: Record<string, string> = { pos_profile: posProfile };
   if (room) {
     params.room = room;
@@ -123,7 +123,7 @@ export async function updateTableLayout(name: string, data: Partial<Table>) {
 }
 
 export async function mergeTablesBatch(anchor: string, tables: string[]) {
-  const { call } = await import('./frappe-sdk');
+  const { call } = await import('@ury/core');
   return call.post('ury.ury.doctype.ury_order.ury_order.merge_tables_batch', {
     anchor_table: anchor,
     tables,
@@ -131,7 +131,7 @@ export async function mergeTablesBatch(anchor: string, tables: string[]) {
 }
 
 export async function unmergeTables(table: string) {
-  const { call } = await import('./frappe-sdk');
+  const { call } = await import('@ury/core');
   return call.post('ury.ury.doctype.ury_order.ury_order.unmerge_tables', {
     table,
   });
