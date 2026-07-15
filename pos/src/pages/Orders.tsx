@@ -197,7 +197,7 @@ export default function Orders() {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-screen overflow-hidden" data-testid="page-orders">
       {/* Left Sidebar - Order Types */}
       <OrderStatusSidebar
         selectedStatus={selectedStatus}

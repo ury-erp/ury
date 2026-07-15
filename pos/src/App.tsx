@@ -130,7 +130,7 @@ function App() {
           <POSOpeningProvider>
             <Router basename="/pos">
               <GlobalShortcuts />
-              <div className="flex flex-col h-screen bg-gray-100 font-inter">
+              <div className="flex flex-col h-screen bg-gray-100 font-inter" data-testid="app-layout">
                 <Header />
                 <div className="flex-1 overflow-hidden">
                   <Suspense fallback={

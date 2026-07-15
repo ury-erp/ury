@@ -323,7 +323,7 @@ const MenuManagement = () => {
 
   // Menu detail view (menu selected)
   return (
-    <div className="flex flex-col h-full p-6">
+    <div className="flex flex-col h-full p-6" data-testid="page-menu-management">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">

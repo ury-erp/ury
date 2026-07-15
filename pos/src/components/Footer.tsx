@@ -13,12 +13,12 @@ import { t } from '../i18n';
 const Footer = () => {
 
   const navItems = [
-    { icon: LayoutGrid, label: t('footer.pos') || 'POS', path: '/' },
-    { icon: Table, label: t('footer.table') || 'Table', path: '/table' },
-    { icon: ClipboardList, label: t('footer.orders') || 'Orders', path: '/orders' },
-    { icon: BarChart3, label: t('footer.dashboard') || 'Dashboard', path: '/dashboard' },
-    { icon: ChefHat, label: t('footer.menu') || 'Menu', path: '/menu-management' },
-    { icon: FileText, label: t('footer.reports') || 'Reports', path: '/reports' },
+    { icon: LayoutGrid, label: t('footer.pos') || 'POS', path: '/', testId: 'nav-pos' },
+    { icon: Table, label: t('footer.table') || 'Table', path: '/table', testId: 'nav-table' },
+    { icon: ClipboardList, label: t('footer.orders') || 'Orders', path: '/orders', testId: 'nav-orders' },
+    { icon: BarChart3, label: t('footer.dashboard') || 'Dashboard', path: '/dashboard', testId: 'nav-dashboard' },
+    { icon: ChefHat, label: t('footer.menu') || 'Menu', path: '/menu-management', testId: 'nav-menu-management' },
+    { icon: FileText, label: t('footer.reports') || 'Reports', path: '/reports', testId: 'nav-reports' },
   ];
 
   return (
@@ -29,6 +29,7 @@ const Footer = () => {
             <NavLink
               key={item.path}
               to={item.path}
+              data-testid={item.testId}
               className={({ isActive }) =>
                 cn(
                   'flex flex-col items-center px-2 sm:px-3 py-1.5 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors',
