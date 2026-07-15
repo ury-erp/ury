@@ -15,11 +15,38 @@ class URYKOT(Document):
 
     def before_submit(self):
         self.userSetting()
+        self.set_kot_number()
+
+    def set_kot_number(self):
+        """Sequential ticket number shown on the printed KOT instead of the
+        internal document name. Resets each day when the POS Profile has
+        'Reset Order Number Daily' enabled, else counts up forever."""
+        if self.kot_number or self.type not in ("New Order", "Order Modified"):
+            return
+        filters = [
+            ["branch", "=", self.branch],
+            ["docstatus", "=", 1],
+            ["type", "in", ["New Order", "Order Modified"]],
+            ["kot_number", ">", 0],
+        ]
+        daily_reset = frappe.db.get_value(
+            "POS Profile", self.pos_profile, "custom_reset_order_number_daily"
+        )
+        if daily_reset:
+            filters.append(["creation", ">=", frappe.utils.today()])
+        self.kot_number = frappe.db.count("URY KOT", filters=filters) + 1
 
     # Function for printing multiple KOTs.
     def multi_print_kot(self):
+        # The same physical printer may be configured on the POS Profile, the
+        # production unit and the room; print each printer only once per KOT.
+        printed = set()
+
         # Function for printing a KOT on a specified printer using a print format.
         def print_kot(printer, kot_print_format):
+            if printer in printed:
+                return
+            printed.add(printer)
             try:
                 # Print KOT using a server function (print_by_server)
                 print_by_server("URY KOT", self.name, printer, kot_print_format)

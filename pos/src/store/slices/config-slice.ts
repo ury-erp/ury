@@ -94,8 +94,12 @@ export const createConfigSlice: StateCreator<
       return;
     }
 
-    // Check if user has any of the allowed roles
-    const hasAccess = user.name === 'Administrator' || user.roles.some(role => allowedRoles.includes(role));
+    // Billing roles open the app; URY Waiter also gets in (order-taking
+    // only — billing screens are gated separately via canUserBill).
+    const hasAccess =
+      user.name === 'Administrator' ||
+      user.roles.some(role => allowedRoles.includes(role)) ||
+      user.roles.includes('URY Waiter');
     set({ hasAccess });
 
     // If no access, we could redirect or show an error message

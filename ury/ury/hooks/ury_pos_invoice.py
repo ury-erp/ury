@@ -21,6 +21,12 @@ def before_submit(doc, method):
     ro_reload_submit(doc, method)
 
 
+def on_submit(doc, method):
+    # The table is released only when the bill is settled — printing the
+    # bill keeps it occupied so the POS shows a payment-pending table.
+    table_status_delete(doc, method)
+
+
 def on_trash(doc, method):
     table_status_delete(doc, method)
 

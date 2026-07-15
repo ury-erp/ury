@@ -40,7 +40,7 @@ def process_invoice(invoice):
     # Determine the owner based on the restaurant table
     owner = waiter if not invoice.restaurant_table else waiter
 
-    kot_naming_series = pos_profile.kot_naming_series
+    kot_naming_series = pos_profile.get("custom_kot_naming_series") or "KOT-"
     kot_list = frappe.get_list(
         "URY KOT",
         filters={"creation": (">", posInvoice.creation), "invoice": posInvoice.name},

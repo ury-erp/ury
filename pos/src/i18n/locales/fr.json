@@ -230,6 +230,8 @@
   "waiter": {
     "label": "Serveur",
     "search_placeholder": "Sélectionner un serveur...",
-    "no_waiters_found": "Aucun employé trouvé"
+    "no_waiters_found": "Aucun employé trouvé",
+    "required_message": "Sélectionnez le serveur de cette commande avant de continuer.",
+    "dialog_title": "Sélectionner le serveur"
   }
 }

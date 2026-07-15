@@ -7,6 +7,7 @@ import { WaiterSelect } from './WaiterSelect';
 import ProductDialog from './ProductDialog';
 import OrderTypeSelect from './OrderTypeSelect';
 import CommentDialog from './CommentDialog';
+import { WaiterPickerDialog } from './WaiterPickerDialog';
 import { Button } from './ui/button';
 import { Spinner } from './ui/spinner';
 import { syncOrder } from '../lib/order-api';
@@ -32,6 +33,7 @@ const OrderPanel = () => {
     selectedRoom,
     selectedCustomer,
     selectedWaiter,
+    setSelectedWaiter,
     selectedAggregator,
     resetOrderState,
     paymentModes,
@@ -43,6 +45,7 @@ const OrderPanel = () => {
   const [editingItem, setEditingItem] = useState<typeof activeOrders[0] | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCommentDialog, setShowCommentDialog] = useState(false);
+  const [showWaiterDialog, setShowWaiterDialog] = useState(false);
 
   const calculateItemTotal = (item: typeof activeOrders[0]) => {
     const basePrice = item.selectedVariant?.price || item.price;
@@ -69,7 +72,8 @@ const OrderPanel = () => {
     setOrderComment(comment);
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (waiterOverride?: string) => {
+    const waiter = waiterOverride || selectedWaiter;
     try {
       if (!posProfile) {
         throw new Error(t('errors.pos_profile_not_found'));
@@ -96,6 +100,13 @@ const OrderPanel = () => {
         return;
       }
 
+      // A waiter must be tagged on every order: pop the picker and stop
+      // until one is chosen (no silent fallback to the logged-in user).
+      if (!waiter) {
+        setShowWaiterDialog(true);
+        return;
+      }
+
       setIsSubmitting(true);
       
       const orderData = {
@@ -118,7 +129,7 @@ const OrderPanel = () => {
         mode_of_payment: paymentModes[0],
         last_invoice: isUpdatingOrder ? orderId : null,
         invoice: isUpdatingOrder ? orderId : null,
-        waiter: selectedWaiter || user.name,
+        waiter,
         comments: orderComment || undefined
       };
 
@@ -204,11 +215,18 @@ const OrderPanel = () => {
                   isInteractionDisabled && "opacity-50"
                 )}
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
+                <div className="flex items-center justify-between gap-2">
+                  {/* min-w-0 lets long names/codes truncate instead of pushing
+                      the quantity controls off the panel */}
+                  <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
-                      <h3 className="font-medium text-gray-900 text-sm">{item.name}</h3>
+                      <h3 className="font-medium text-gray-900 text-sm line-clamp-2">{item.name}</h3>
                     </div>
+                    {posProfile?.show_item_code ? (
+                      <p className="text-xs font-mono text-gray-500 truncate" title={item.id}>
+                        {item.id}
+                      </p>
+                    ) : null}
                     {item.comment?.trim() && (
                       <p className="mt-0.5 flex items-start gap-1 text-xs text-amber-700">
                         <MessageSquare className="w-3 h-3 mt-0.5 flex-shrink-0" />
@@ -226,7 +244,7 @@ const OrderPanel = () => {
                     <p className="text-gray-600 text-sm">{formatCurrency(calculateItemTotal(item))}</p>
                   </div>
                   
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-shrink-0">
                     <Button
                       onClick={() => handleEdit(item)}
                       variant="ghost"
@@ -313,7 +331,7 @@ const OrderPanel = () => {
               <span className="text-lg font-semibold">{formatCurrency(total)}</span>
             </div>
             <Button
-              onClick={handleSubmit}
+              onClick={() => handleSubmit()}
               variant="default"
               size="default"
               className="w-full"
@@ -354,6 +372,19 @@ const OrderPanel = () => {
         onClose={() => setShowCommentDialog(false)}
         onSave={handleCommentSave}
         initialComment={orderComment}
+      />
+
+      {/* Waiter is mandatory: shown when the order is submitted without one.
+          The order is placed only when the user presses the confirm button. */}
+      <WaiterPickerDialog
+        open={showWaiterDialog}
+        onClose={() => setShowWaiterDialog(false)}
+        confirmLabel={isUpdatingOrder ? t('cart.update_order') : t('cart.add_new_order')}
+        onConfirm={(waiter) => {
+          setSelectedWaiter(waiter);
+          setShowWaiterDialog(false);
+          handleSubmit(waiter);
+        }}
       />
     </div>
   );

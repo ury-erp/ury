@@ -39,7 +39,13 @@ def get_order_invoice(table=None, invoiceNo=None, order_type=None, is_payment=No
                     "POS Invoice",
                     dict(restaurant_table=table, docstatus=0, invoice_printed=0),
                 )
-                
+                if not invoice_name:
+                    # Bill already printed but not settled — the table stays
+                    # occupied until payment, so keep returning its invoice.
+                    invoice_name = frappe.get_value(
+                        "POS Invoice", dict(restaurant_table=table, docstatus=0)
+                    )
+
         # invoice_name = frappe.get_value("POS Invoice", dict(restaurant_table=table, docstatus=0, invoice_printed=0))
         branch, menu_name, restaurant = get_restaurant_and_menu_name(table)
 
@@ -556,6 +562,21 @@ def cancel_order(invoice_id, reason):
 # Method for URY POS
 @frappe.whitelist()
 def make_invoice(customer, payments, cashier, pos_profile,owner, additionalDiscount=None, table=None, invoice=None):
+    # Waiters may take orders and print bills but never settle them, unless
+    # they also hold one of the profile's explicit billing roles ("All" is
+    # excluded — every user has it, so it can't act as a billing grant).
+    # Administrators / System Managers hold every role, so they are exempt.
+    user_roles = frappe.get_roles()
+    is_privileged = (
+        frappe.session.user == "Administrator" or "System Manager" in user_roles
+    )
+    if "URY Waiter" in user_roles and not is_privileged:
+        profile_doc = frappe.get_doc("POS Profile", pos_profile)
+        billing_roles = [
+            r.role for r in profile_doc.role_allowed_for_billing if r.role != "All"
+        ]
+        if not any(role in user_roles for role in billing_roles):
+            frappe.throw(_("Waiters cannot settle bills. Please call a cashier."))
     order_type =  invoice_name = frappe.get_value("POS Invoice",invoice , "order_type")
     invoice = get_order_invoice(table, invoice, order_type, "Payments")
 
@@ -591,7 +612,7 @@ def cancel_kot(invoice_id):
     pos_invoice = frappe.get_doc("POS Invoice", invoice_id)
     pos_profile_id = pos_invoice.pos_profile
     pos_profile = frappe.get_doc("POS Profile", pos_profile_id)
-    kot_naming_series = pos_profile.custom_kot_naming_series
+    kot_naming_series = pos_profile.custom_kot_naming_series or "KOT-"
     cancel_kot_naming_series = "CNCL-" + kot_naming_series
 
     items = []

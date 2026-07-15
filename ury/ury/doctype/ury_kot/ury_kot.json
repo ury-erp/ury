@@ -16,6 +16,7 @@
   "date",
   "time",
   "type",
+  "kot_number",
   "section_break_l97s0",
   "order_status",
   "production",
@@ -97,6 +98,14 @@
    "label": "Type",
    "options": "\nNew Order\nOrder Modified\nCancelled\nPartially cancelled\nDuplicate",
    "read_only": 1
+  },
+  {
+   "fieldname": "kot_number",
+   "fieldtype": "Int",
+   "label": "KOT Number",
+   "read_only": 1,
+   "in_list_view": 1,
+   "description": "Sequential ticket number; resets daily when 'Reset Order Number Daily' is enabled on the POS Profile"
   },
   {
    "fieldname": "section_break_l97s0",
@@ -314,6 +323,20 @@
    "read": 1,
    "report": 1,
    "role": "URY Cashier",
+   "select": 1,
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "cancel": 1,
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "URY Waiter",
    "select": 1,
    "share": 1,
    "submit": 1,

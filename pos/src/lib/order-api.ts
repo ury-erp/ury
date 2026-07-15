@@ -32,6 +32,8 @@ export interface POSInvoice {
   status: string;
   total: number;
   grand_total: number;
+  rounded_total?: number;
+  invoice_printed?: number;
   items: POSInvoiceItem[];
 }
 

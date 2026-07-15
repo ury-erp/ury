@@ -230,6 +230,8 @@
   "waiter": {
     "label": "Waiter",
     "search_placeholder": "Select waiter...",
-    "no_waiters_found": "No employees found"
+    "no_waiters_found": "No employees found",
+    "required_message": "Select the waiter for this order before continuing.",
+    "dialog_title": "Select Waiter"
   }
 }
