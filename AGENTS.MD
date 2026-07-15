@@ -21,7 +21,7 @@ The system covers the full restaurant workflow: menu management, table managemen
 ury/                          ← repo root
 ├── ury/                      ← Frappe app Python package (main backend)
 ├── pos/                      ← React 19 POS frontend (v2, current)
-├── URYMosaic/                ← Vue 3 KOT kitchen display app
+├── Mosaic/                ← Vue 3 KOT kitchen display app
 ├── urypos/                   ← Vue 3 POS frontend (v1, legacy)
 ├── DEMO/                     ← Demo screenshots / assets
 ├── requirements.txt          ← Python dependencies
@@ -30,7 +30,7 @@ ury/                          ← repo root
 └── FEATURES.md / README.md   ← Human-readable documentation
 ```
 
-The Yarn workspace (`package.json`) at the root manages three JS sub-projects: `pos/`, `URYMosaic/`, and `urypos/`.
+The Yarn workspace (`package.json`) at the root manages three JS sub-projects: `pos/`, `Mosaic/`, and `urypos/`.
 
 ---
 
@@ -82,7 +82,7 @@ ury/
 │   │   ├── ury_pos_kot.js            ← KOT related JS
 │   │   └── sign-message.js / jsrsasign-all-min.js  ← QZ Tray signing
 │   ├── pos/              ← Built React POS assets (output of `cd pos && yarn build`)
-│   ├── URYMosaic/        ← Built KOT display assets
+│   ├── Mosaic/        ← Built KOT display assets
 │   └── urypos/           ← Built legacy POS assets
 │
 ├── fixtures/             ← Data fixtures exported via `bench export-fixtures`
@@ -166,16 +166,16 @@ ury/
 ### Frontend Apps
 - **`/pos`** — React POS v2 (see `pos/AGENTS.MD`)
 - **`/urypos`** — Vue POS v1 (legacy, `urypos/`)
-- **`/URYMosaic/<production_unit>`** — Vue KOT display (see `URYMosaic/AGENTS.MD`)
+- **`/Mosaic/<production_unit>`** — Vue KOT display (see `Mosaic/AGENTS.MD`)
 
 All frontends are served as Frappe web pages. Route rules in `hooks.py` (`website_route_rules`) handle SPA routing:
 ```python
 {"from_route": "/pos/<path:app_path>", "to_route": "pos"},
-{"from_route": "/URYMosaic/<path:app_path>", "to_route": "URYMosaic"},
+{"from_route": "/Mosaic/<path:app_path>", "to_route": "Mosaic"},
 ```
 
 ### Real-time (Socket.io)
-- KOT updates are broadcast via Frappe's Socket.io to the `URYMosaic` kitchen display.
+- KOT updates are broadcast via Frappe's Socket.io to the `Mosaic` kitchen display.
 - Channel format: `kot_update_{branch}_{production_unit}`
 
 ### QZ Tray
@@ -190,13 +190,13 @@ All frontends are served as Frappe web pages. Route rules in `hooks.py` (`websit
 | App | Source | Build output | URL |
 |---|---|---|---|
 | POS v2 (React) | `pos/src/` | `ury/public/pos/` | `/pos` |
-| KOT display (Vue) | `URYMosaic/src/` | `ury/public/URYMosaic/` | `/URYMosaic/<unit>` |
+| KOT display (Vue) | `Mosaic/src/` | `ury/public/Mosaic/` | `/Mosaic/<unit>` |
 | POS v1 (Vue, legacy) | `urypos/src/` | `ury/public/urypos/` | `/urypos` |
 
 Build commands (from repo root):
 ```bash
 cd pos && yarn build       # builds React POS
-cd URYMosaic && yarn build # builds KOT display
+cd Mosaic && yarn build # builds KOT display
 cd urypos && yarn build    # builds legacy POS
 ```
 
@@ -212,7 +212,7 @@ After building, run `bench build --app ury` to copy assets to the Frappe public 
 → Work in `pos/`. Read `pos/AGENTS.MD` first.
 
 **To modify KOT display logic:**
-→ Work in `URYMosaic/`. Read `URYMosaic/AGENTS.MD` first.
+→ Work in `Mosaic/`. Read `Mosaic/AGENTS.MD` first.
 
 **To add or modify a Frappe API endpoint:**
 → Edit `ury/ury_pos/api.py` (main POS API) or `ury/ury/api/<module>.py`.
@@ -235,6 +235,6 @@ After building, run `bench build --app ury` to copy assets to the Frappe public 
 → Hook registration is in `hooks.py` `doc_events`.
 
 **Never:**
-- Modify `ury/public/pos/`, `ury/public/URYMosaic/`, or `ury/public/urypos/` directly — these are build output, not source.
+- Modify `ury/public/pos/`, `ury/public/Mosaic/`, or `ury/public/urypos/` directly — these are build output, not source.
 - Edit `fixtures/custom_field.json` directly — export from Frappe desk instead.
 - Add business logic to `www/pos.py` — it should only return boot context data.
