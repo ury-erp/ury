@@ -2,7 +2,7 @@ import frappe
 from datetime import datetime
 from frappe.utils import now_datetime, get_time,now
 from ury.ury.doctype.ury_order.ury_order import release_merge_cluster_tables
-
+from frappe.utils import now_datetime, get_datetime
 
 def before_insert(doc, method):
     pos_invoice_naming(doc, method)
@@ -85,23 +85,19 @@ def validate_customer(doc, method):
             )
         )
 
-
 def calculate_and_set_times(doc, method):
     doc.arrived_time = doc.creation
 
-    current_time_str = now()
-    
-    current_time = datetime.strptime(current_time_str, "%Y-%m-%d %H:%M:%S.%f")
-    
-    time_difference = current_time - doc.creation
-    
+    current_time = now_datetime()
+    creation_time = get_datetime(doc.creation)
+
+    time_difference = current_time - creation_time
+
     total_seconds = int(time_difference.total_seconds())
     hours, remainder = divmod(total_seconds, 3600)
     minutes, seconds = divmod(remainder, 60)
-    
-    formatted_spend_time = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
-    doc.total_spend_time = formatted_spend_time
 
+    doc.total_spend_time = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
 
 def validate_invoice_print(doc, method):
     # Check if the invoice has been printed

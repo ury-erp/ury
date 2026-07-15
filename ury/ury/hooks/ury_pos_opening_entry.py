@@ -3,8 +3,16 @@ from frappe.utils import today
 from frappe.utils import  get_datetime,today,now
 
 def validate(doc,method):
+    if doc.pos_profile:
+        pos_profile = frappe.db.get_value("POS Profile", doc.pos_profile, 
+            ["custom_enable_multiple_cashier", "restaurant", "branch"], as_dict=True)
+        if pos_profile and (pos_profile.custom_enable_multiple_cashier or pos_profile.restaurant or pos_profile.branch):
+            if not doc.restaurant:
+                frappe.throw("Restaurant is mandatory for URY POS Opening Entry.")
+            if not doc.branch:
+                frappe.throw("Branch is mandatory for URY POS Opening Entry.")
     set_cashier_room(doc,method)
-    
+
 def before_save(doc, method):
     main_pos_open_check(doc, method)
     set_current_time(doc,method)
