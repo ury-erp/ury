@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { MessageSquare, X } from 'lucide-react';
-import { Button } from './ui';
+import { Button } from '@ury/ui';
 import { t } from '../i18n';
 
 interface CommentDialogProps {

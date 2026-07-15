@@ -5,6 +5,8 @@ import os
 
 from pypdf import PdfWriter
 
+from ury.ury.doctype.ury_order.ury_order import release_merge_cluster_tables
+
 no_cache = 1
 
 base_template_path = "www/printview.html"
@@ -63,11 +65,7 @@ def network_printing(
 
             if restaurant_table and invoice_printed == 0:
                 frappe.db.set_value("POS Invoice", name, "invoice_printed", 1)
-                frappe.db.set_value(
-                    "URY Table",
-                    restaurant_table,
-                    {"occupied": 0, "latest_invoice_time": None},
-                )
+                release_merge_cluster_tables(restaurant_table)
             else:
                 frappe.db.set_value("POS Invoice", name, "invoice_printed", 1)
 
@@ -88,23 +86,31 @@ def select_network_printer(pos_profile, invoice_id):
 
     if table:
         room = frappe.db.get_value("URY Table", table, "restaurant_room")
-        room_bill_printer = frappe.db.get_value(
-            "URY Printer Settings", {"parent": room, "bill": 1}, "printer"
+        room_bill_printers = frappe.get_all(
+            "URY Printer Settings",
+            filters={"parent": room, "parenttype": "URY Room", "bill": 1},
+            pluck="printer",
+            order_by="idx"
         )
-        if room_bill_printer:
-            print = network_printing(
-                "POS Invoice", invoice_id, room_bill_printer, print_format
-            )
+        if room_bill_printers:
+            for printer in room_bill_printers:
+                print = network_printing(
+                    "POS Invoice", invoice_id, printer, print_format
+                )
             return print
 
     else:
-        pos_bill_printer = frappe.db.get_value(
-            "URY Printer Settings", {"parent": pos_profile, "bill": 1}, "printer"
+        pos_bill_printers = frappe.get_all(
+            "URY Printer Settings",
+            filters={"parent": pos_profile, "parenttype": "POS Profile", "bill": 1},
+            pluck="printer",
+            order_by="idx"
         )
-        if pos_bill_printer:
-            print = network_printing(
-                "POS Invoice", invoice_id, pos_bill_printer, print_format
-            )
+        if pos_bill_printers:
+            for printer in pos_bill_printers:
+                print = network_printing(
+                    "POS Invoice", invoice_id, printer, print_format
+                )
             return print
 
 
@@ -131,12 +137,8 @@ def qz_print_update(invoice):
                 frappe.db.set_value(
                     "POS Invoice", invoice, "invoice_printed", 1, update_modified=False
                 )
-                
-                # Update table status
-                frappe.db.set_value(
-                    "URY Table", table, {"occupied": 0, "latest_invoice_time": None}
-                )
-                
+
+                release_merge_cluster_tables(table)
                 # Validate both updates
                 new_invoice_printed = frappe.db.get_value("POS Invoice", invoice, "invoice_printed")
                 new_table_status = frappe.db.get_value("URY Table", table, "occupied")
@@ -168,11 +170,7 @@ def print_pos_page(doctype, name, print_format):
         frappe.db.set_value("POS Invoice", name, "invoice_printed", 1)
 
         if restaurant_table:
-            frappe.db.set_value(
-                "URY Table",
-                restaurant_table,
-                {"occupied": 0, "latest_invoice_time": None},
-            )
+            release_merge_cluster_tables(restaurant_table)
 
 
 @frappe.whitelist()

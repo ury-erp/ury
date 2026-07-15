@@ -25,7 +25,8 @@ This is the **URY POS v2** — a React 19 single-page application that serves as
 | State management | Zustand 5.0.6 |
 | Routing | React Router DOM 6.30.1 |
 | Styling | Tailwind CSS 3.4.17 |
-| Backend API | frappe-js-sdk 1.10.0 |
+| Backend API | frappe-js-sdk 1.10.0 (via `@ury/core`) |
+| Shared packages | `@ury/ui` (components, theme, Tailwind preset) + `@ury/core` (frappe client, auth/roles, storage, format, QZ transport) — workspace packages in `../packages/`; see `../packages/core/AGENTS.MD` |
 | Notifications | react-toastify 11.0.5 |
 | Thermal printing | qz-tray 2.2.5 |
 | Icons | lucide-react |
@@ -50,7 +51,8 @@ pos/
 │   │   └── Table.tsx         # Table layout spatial view
 │   │
 │   ├── components/           # All UI components
-│   │   ├── ui/               # Headless/primitive components (Button, Input, Dialog…)
+│   │   │                     # (primitive components — Button, Input, Dialog… — come from
+│   │   │                     #  the shared @ury/ui workspace package, ../packages/ui)
 │   │   ├── Header.tsx        # Top bar: logo, search, user menu
 │   │   ├── Sidebar.tsx       # Left nav: menu categories / courses
 │   │   ├── MenuList.tsx      # Grid of MenuCard items
@@ -79,8 +81,8 @@ pos/
 │   │       ├── config-slice.ts
 │   │       └── orders-slice.ts
 │   │
-│   ├── lib/                  # API wrappers and utilities
-│   │   ├── frappe-sdk.ts     # Frappe SDK instance (call, db, auth)
+│   ├── lib/                  # Domain API wrappers (generic utilities live in @ury/core;
+│   │   │                     #  see ../packages/core/AGENTS.MD)
 │   │   ├── menu-api.ts       # getRestaurantMenu, getAggregatorMenu
 │   │   ├── order-api.ts      # syncOrder, cancelOrder, getTableOrder
 │   │   ├── payment-api.ts    # getPaymentModes
@@ -90,11 +92,7 @@ pos/
 │   │   ├── customer-api.ts   # searchCustomers, addCustomer
 │   │   ├── aggregator-api.ts # getAggregators
 │   │   ├── table-api.ts      # getTables, getRooms
-│   │   ├── print.ts          # HTML invoice printing
-│   │   ├── print-qz.ts       # QZ Tray thermal print
-│   │   ├── role-utils.ts     # Role permission checks
-│   │   ├── utils.ts          # formatCurrency, cn (classnames)
-│   │   └── storage.ts        # localStorage/sessionStorage helpers
+│   │   └── print.ts          # printOrder orchestration (qz/network/printview)
 │   │
 │   ├── data/
 │   │   ├── order-types.ts    # DINE_IN, TAKEAWAY, AGGREGATORS constants
@@ -167,12 +165,11 @@ UI renders
 
 ## 6. API Integration
 
-**SDK initialisation** (`lib/frappe-sdk.ts`):
+**SDK access** — `call`, `db`, and `auth` come from the shared `@ury/core` package (see `../packages/core/AGENTS.MD`):
 ```typescript
-const frappe = new FrappeApp(import.meta.env.VITE_FRAPPE_BASE_URL);
-export const call = frappe.call();  // RPC-style POST/GET
-export const db   = frappe.db();    // CRUD
-export const auth = frappe.auth();  // login/logout/getLoggedInUser
+import { call, db, auth } from '@ury/core';
+// call: RPC-style POST/GET · db: CRUD · auth: login/logout/getLoggedInUser
+// Base URL: VITE_FRAPPE_BASE_URL env (dev) or same-origin (production)
 ```
 
 **Calling a whitelisted Python method:**
@@ -266,10 +263,10 @@ src/i18n/
 - Zustand stores: `use<Name>Store` hooks, state slices in `store/slices/`.
 - API wrappers: `lib/<domain>-api.ts`, exported as named functions (`getX`, `createX`, `syncX`).
 - Constants: SCREAMING_SNAKE_CASE in `data/` files.
-- CSS: Tailwind utility classes only; no custom CSS except in `index.css` and `ui/toast.css`.
+- CSS: Tailwind utility classes only; no custom CSS except in `index.css`. Theme tokens and the Tailwind preset come from `@ury/ui` (`@import '@ury/ui/styles/theme.css'`, `presets` in `tailwind.config.js`).
 
 **Component boundaries:**
-- Components do not import from other components' subdirectories — they import from `../components/<Name>` or `../components/ui`.
+- Components do not import from other components' subdirectories — they import siblings from `../components/<Name>` and primitives from `@ury/ui`.
 - Store slices are combined in `root-store.ts` — add new slices there, not as separate stores.
 
 **State handling rules:**
@@ -297,7 +294,8 @@ src/i18n/
 5. No need to modify `main.tsx`, `App.tsx`, or `vite.config.ts` for typical features.
 
 ### What NOT to break
-- **`frappe-sdk.ts`** — do not change how `call`, `db`, `auth` are exported; every API file depends on them.
+- **`@ury/core` exports (`call`, `db`, `auth`, …)** — every API file depends on them; do not rename or re-wrap. Shared-package changes affect `frontend/` too (see `../packages/core/AGENTS.MD`).
+- **`main.tsx` `initPrinting({ signKey: privateKey })`** — must run before any QZ print; the signing key stays in `pos/privateKey`, never in `packages/`.
 - **`pos-store.ts` `resetOrderState()`** — called after every successful order submit/payment; must reset all transient order fields.
 - **`main.tsx` init sequence** — `initI18n()` must resolve before `ReactDOM.render()`.
 - **`AuthGuard`** — do not bypass or remove; it protects the entire app.
@@ -308,5 +306,5 @@ src/i18n/
 ### Common pitfalls
 - Frappe API errors come in `error._server_messages` (double-encoded JSON), not `error.message`. Use the existing error parsing pattern in `OrderPanel.tsx`.
 - `posProfile` can be `null` during initialisation. Always null-check before reading `.name`, `.cashier`, etc.
-- QZ Tray printing requires `qz_print === 1` on the POS profile. Check `posProfile.qz_print` before calling `print-qz.ts`.
+- QZ Tray printing requires `qz_print === 1` on the POS profile. Check `posProfile.qz_print` before calling `printWithQz` (from `@ury/core`).
 - Do not add dependencies to `package.json` without confirming the build still outputs to `../ury/public/pos/`.
