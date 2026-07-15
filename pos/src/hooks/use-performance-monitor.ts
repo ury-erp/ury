@@ -72,7 +72,6 @@ export function usePerformanceMonitor(
   });
 
   const latencySamples = useRef<number[]>([]);
-  const eventTimestamps = useRef<number[]>([]);
   const lastResponseTime = useRef<number>(Date.now());
 
   // Main sampling loop
@@ -105,11 +104,11 @@ export function usePerformanceMonitor(
         return sorted[Math.max(0, idx)];
       })();
 
-      // Calculate event rate (events per minute)
-      const oneMinuteAgo = Date.now() - 60_000;
-      const recentEvents = eventTimestamps.current.filter((t) => t > oneMinuteAgo);
-      eventTimestamps.current = recentEvents;
-      const eventRate = recentEvents.length;
+      // Calculate event rate (events per minute) from perfMonitor entries
+      const oneMinuteAgo = performance.now() - 60_000;
+      const allEntries = perfMonitor.getEntries();
+      const recentEntries = allEntries.filter((e) => e.endTime > oneMinuteAgo);
+      const eventRate = recentEntries.length;
 
       // Determine connection state
       const timeSinceLastResponse = Date.now() - lastResponseTime.current;

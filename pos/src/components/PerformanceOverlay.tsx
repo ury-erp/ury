@@ -11,10 +11,29 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { usePerformanceMonitor, type ConnectionState } from '../hooks/use-performance-monitor';
-import { Activity, X, ChevronUp, ChevronDown, Zap, Clock, Wifi, WifiOff, AlertTriangle } from 'lucide-react';
+import { Activity, X, ChevronUp, ChevronDown, Zap, Clock, Wifi, WifiOff, AlertTriangle, Gauge, Timer } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 type OverlayState = 'collapsed' | 'expanded' | 'hidden';
+
+/** Mini token availability bar for one priority level */
+function TokenBar({ available, max }: { available: number; max: number }) {
+  const ratio = Math.min(1, available / max);
+  const barWidth = Math.round(ratio * 40); // max 40px wide
+  const color = ratio > 0.5 ? 'bg-green-500' : ratio > 0.2 ? 'bg-amber-500' : 'bg-red-500';
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <div className="w-10 h-1.5 bg-gray-800 rounded-full overflow-hidden">
+        <div
+          className={cn('h-full rounded-full transition-all duration-300', color)}
+          style={{ width: `${barWidth}px` }}
+        />
+      </div>
+      <span className="text-gray-500 text-[10px] w-4 text-right">{available}</span>
+    </div>
+  );
+}
 
 const STATUS_COLORS: Record<ConnectionState, string> = {
   connected: 'text-green-400',
@@ -110,6 +129,11 @@ function PerformanceOverlayInner() {
           <span className="text-gray-400">{metrics.latency}ms</span>
         )}
         <span className="text-gray-500">{metrics.eventRate}/m</span>
+        {metrics.rateLimiter.queuedRequests > 0 && (
+          <span className="text-amber-400 text-[10px]">
+            {metrics.rateLimiter.queuedRequests}q
+          </span>
+        )}
         <button
           data-testid="perf-overlay-close"
           onClick={(e) => { e.stopPropagation(); setState('hidden'); }}
@@ -202,10 +226,17 @@ function PerformanceOverlayInner() {
 
         {/* Rate Limiter */}
         <div className="pt-1 border-t border-gray-700/50">
-          <div className="text-gray-500 mb-1">Rate Limiter</div>
+          <div className="text-gray-500 mb-1 flex items-center gap-1.5">
+            <Gauge className="w-3 h-3" />
+            Rate Limiter
+          </div>
+
+          {/* Throughput row */}
           <div className="flex items-center justify-between">
             <span className="text-gray-400">Active</span>
-            <span className="text-gray-200">{metrics.rateLimiter.activeRequests}/{metrics.rateLimiter.activeRequests > 0 ? '6' : '0'}</span>
+            <span className="text-gray-200">
+              {metrics.rateLimiter.activeRequests}/{metrics.rateLimiter.maxConcurrent}
+            </span>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-gray-400">Queued</span>
@@ -217,8 +248,76 @@ function PerformanceOverlayInner() {
             <span className="text-gray-400">Completed</span>
             <span className="text-gray-200">{metrics.rateLimiter.completedRequests}</span>
           </div>
+
+          {/* Error metrics — only show if non-zero */}
+          {(metrics.rateLimiter.failedRequests > 0 || metrics.rateLimiter.timedOutRequests > 0 || metrics.rateLimiter.rejectedRequests > 0 || metrics.rateLimiter.queueDrops > 0) && (
+            <div className="mt-1 pt-1 border-t border-gray-800/50">
+              <div className="text-gray-600 mb-0.5 text-[10px]">Errors</div>
+              {metrics.rateLimiter.failedRequests > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-500">Failed</span>
+                  <span className="text-red-400">{metrics.rateLimiter.failedRequests}</span>
+                </div>
+              )}
+              {metrics.rateLimiter.timedOutRequests > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-500">Timeouts</span>
+                  <span className="text-amber-400">{metrics.rateLimiter.timedOutRequests}</span>
+                </div>
+              )}
+              {metrics.rateLimiter.rejectedRequests > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-500">Rejected</span>
+                  <span className="text-amber-400">{metrics.rateLimiter.rejectedRequests}</span>
+                </div>
+              )}
+              {metrics.rateLimiter.queueDrops > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-500">Dropped</span>
+                  <span className="text-red-400">{metrics.rateLimiter.queueDrops}</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Token availability per priority */}
+          <div className="mt-1 pt-1 border-t border-gray-800/50">
+            <div className="text-gray-600 mb-0.5 text-[10px]">Tokens</div>
+            <div className="flex items-center justify-between">
+              <span className="text-red-400/70 text-[10px]">CRT</span>
+              <TokenBar available={metrics.rateLimiter.availableTokens.critical} max={10} />
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-blue-400/70 text-[10px]">NRM</span>
+              <TokenBar available={metrics.rateLimiter.availableTokens.normal} max={5} />
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-gray-500 text-[10px]">LOW</span>
+              <TokenBar available={metrics.rateLimiter.availableTokens.low} max={2} />
+            </div>
+          </div>
+
+          {/* Avg queue wait */}
+          {metrics.rateLimiter.avgQueueWaitMs > 0 && (
+            <div className="flex items-center justify-between mt-1 pt-1 border-t border-gray-800/50">
+              <span className="text-gray-400 flex items-center gap-1">
+                <Timer className="w-3 h-3" />
+                Avg Wait
+              </span>
+              <span className={metrics.rateLimiter.avgQueueWaitMs > 1000 ? 'text-red-400' : metrics.rateLimiter.avgQueueWaitMs > 200 ? 'text-amber-400' : 'text-gray-200'}>
+                {metrics.rateLimiter.avgQueueWaitMs >= 1000
+                  ? `${(metrics.rateLimiter.avgQueueWaitMs / 1000).toFixed(1)}s`
+                  : `${Math.round(metrics.rateLimiter.avgQueueWaitMs)}ms`}
+              </span>
+            </div>
+          )}
+
+          {/* Overload warning */}
           {metrics.rateLimiter.isOverloaded && (
-            <div className="text-red-400 mt-1">⚠ Queue overloaded</div>
+            <div className="text-red-400 mt-1 flex items-center gap-1">
+              <AlertTriangle className="w-3 h-3" />
+              Queue overloaded
+            </div>
           )}
         </div>
       </div>

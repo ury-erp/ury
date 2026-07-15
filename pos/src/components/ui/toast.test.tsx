@@ -15,6 +15,7 @@ vi.mock('lucide-react', () => ({
   CheckCircle: () => <span data-testid="check-circle-icon">✓</span>,
   XCircle: () => <span data-testid="x-circle-icon">✗</span>,
   Info: () => <span data-testid="info-icon">ℹ</span>,
+  AlertTriangle: () => <span data-testid="alert-triangle-icon">⚠</span>,
 }));
 
 // Mock CSS imports

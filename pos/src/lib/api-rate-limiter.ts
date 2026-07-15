@@ -143,8 +143,10 @@ export interface RateLimiterMetrics {
   queueDrops: number;
   activeRequests: number;
   queuedRequests: number;
+  maxConcurrent: number;
   availableTokens: Record<RequestPriority, number>;
   avgQueueWaitMs: number;
+  isOverloaded: boolean;
 }
 
 // ---- Rate Limiter ----
@@ -219,8 +221,10 @@ export class ApiRateLimiter {
       ...this.metrics,
       activeRequests: this.activeCount,
       queuedRequests: this.queue.length,
+      maxConcurrent: this.config.maxConcurrent,
       availableTokens,
       avgQueueWaitMs,
+      isOverloaded: this.isOverloaded,
     };
   }
 
