@@ -139,11 +139,17 @@
    "fieldname": "layout_height",
    "fieldtype": "Float",
    "label": "Layout Height"
+  },
+  {
+   "fieldname": "merged_with",
+   "fieldtype": "Data",
+   "label": "Merged With",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-12-31 15:45:13.235634",
+ "modified": "2026-06-17 15:45:13.235634",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Table",

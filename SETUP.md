@@ -249,6 +249,9 @@ This guide takes you step-by-step through setting up URY on top of ERPNext
     - **KOT Print** : Enable for KOT Printing .
     - **KOT Print Format** : Select print format for KOT .
     - **Block Takeaway KOT** : Enable for block Takeaway KOT printing .
+  - **KDS Settings** :
+    - **Enable order type wise display on mosaic** : Enable this checkbox to filter KOTs displayed on the Kitchen Display System (KDS) based on specific order types.
+    - **Order Type** : List the allowed order types (e.g., Dine In, Take Away) in the child table. Only orders matching these types will be displayed in the KDS for this production unit.
 
 > **Note:** To access KDS follow the site url with `/Mosaic/Production%20Unit%20Name`. eg: [https://ury.xxxx.com/Mosaic/Kitchen](https://ury.xxx.com/Mosaic/Kitchen)
 
@@ -359,3 +362,21 @@ bench --site site-name rebuild-global-search
 
 
 Follow the [Attendance documentation](https://frappehr.com/docs/v14/en/attendance#3-features) for marking the attendance or use the [Employee Attendance Tool](https://frappehr.com/docs/v14/en/employee-attendance-tool#2-how-to-mark-attendance-using-employee-attendance-tool)
+
+### Step 16: Table Merge, Bill Merge & Bill Split (POS v2)
+
+URY POS v2 provides intuitive interfaces to handle complex table grouping and split payments:
+- **Table Merge** : Combine multiple tables into a single order group. Access this by selecting an occupied table, opening the **Table Actions** menu, and choosing **Table Merge** to link it with occupied or free tables.
+- **Bill Merge** : Consolidate separate draft invoices for a dining group. Open the **Order Actions** menu on the Orders page, select the draft invoices, and choose **Bill Merge**.
+- **Bill Split** : Split items from a single order across different customer accounts or separate bills. Open the **Order Actions** menu for an order, select **Bill Split**, choose the items to split, and assign them to the target customers or new invoices.
+
+### Step 17: Visual Table Layout Management
+
+Configure and customize dining floor layouts interactively on the POS screen:
+- **Configure Table Shapes** : In the **URY Table** DocType settings, configure table seating capacity, shapes (e.g., Circle, Square, Rectangle), and default positions.
+- **Edit Table Layouts** : Open the POS Table screen. Click **Edit Layout** on the room header to enter layout edit mode. You can drag and drop tables to position them, scale them individually, and adjust shape orientations. Click **Save** to persist the seating layout.
+
+### Step 18: URY Order Type Customization
+
+Restaurant order types are fully dynamic:
+- **Add Order Types** : Navigate to the **URY Order Type** list in your site. Add, modify, or disable order types (e.g., Dine In, Take Away, Delivery, Aggregators). These dynamic entries will automatically populate the order type select controls across the POS and KDS screens.

@@ -4,7 +4,7 @@ import {
   ClipboardList, 
   Table,
 } from 'lucide-react';
-import { cn } from '../lib/utils';
+import { cn } from '@ury/ui';
 import { t } from '../i18n';
 
 const Footer = () => {

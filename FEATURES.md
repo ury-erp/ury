@@ -29,6 +29,15 @@ A POS Closing Entry must be created at the end of each day to complete the daily
 - **Sidebar Menu Course Navigation**
 	- A left sidebar on the POS page allows quick switching between menu courses (e.g., Starters, Mains, Desserts).
 
+- **Visual Table Layout Management**
+	- Drag-and-drop table grid layout editor that allows managers to position, resize, and assign shapes to dining tables visually on the POS screen.
+
+- **Advanced Table & Bill Operations**
+	- Supports visual table merging, combining separate bills, and splitting bills by order items or custom customer splits in POS v2.
+
+- **Internationalization (i18n) & RTL Support**
+	- Introduces multilingual translations and native Right-to-Left (RTL) layout styling, specifically optimized for Arabic users.
+
 ### Version 1
 
 - **Room Selection**

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { X, Percent, Coins } from 'lucide-react';
 import { usePOSStore } from '../store/pos-store';
-import { cn, formatCurrency } from '../lib/utils';
-import { Button, Input, Dialog, DialogContent } from './ui';
-import { call } from '../lib/frappe-sdk';
+import { formatCurrency } from '@ury/core';
+import { Button, Input, Dialog, DialogContent } from '@ury/ui';
+import { call } from '@ury/core';
 import { DEFAULT_PAYMENT_MODE } from '../data/order-types';
 import { t } from '../i18n';
 
@@ -16,6 +16,7 @@ interface PaymentDialogProps {
   customer: string;
   posProfile: string;
   table: string | null;
+  tableLabel?: string | null;
   cashier: string;
   owner: string;
   fetchOrders: () => Promise<void>;
@@ -25,11 +26,11 @@ interface PaymentDialogProps {
 const PaymentDialog: React.FC<PaymentDialogProps> = ({
   onClose,
   grandTotal,
-  roundedTotal,
   invoice,
   customer,
   posProfile,
   table,
+  tableLabel,
   cashier,
   owner,
   fetchOrders,
@@ -38,7 +39,6 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   const { paymentModes, fetchPaymentModes, posProfile: storePosProfile } = usePOSStore();
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [discountType] = useState<'percentage'>('percentage'); // Only percentage now
   const [discountValue, setDiscountValue] = useState<string>('');
   const [appliedDiscount, setAppliedDiscount] = useState<number>(0);
   const [paymentInputs, setPaymentInputs] = useState<{ [mode: string]: string }>({});
@@ -74,9 +74,6 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
 
   // Order summary logic
   const subtotal = grandTotal;
-  const adjustment = roundedTotal - grandTotal;
-  const roundedAdjustment = Math.round(adjustment * 100) / 100;
-  const showAdjustment = Math.abs(roundedAdjustment) > 0.001;
   const totalDiscount = appliedDiscount;
   const discountedTotal = Math.max(0, subtotal - totalDiscount);
   // If discount is applied, round up; else, round normally
@@ -242,6 +239,12 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
           {/* Order Summary */}
           <div className="space-y-3 mb-6">
             <h3 className="text-lg font-semibold">{t('payment.order_summary')}</h3>
+            {tableLabel && (
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">{t('tables.table_name')}</span>
+                <span className="font-medium">{tableLabel}</span>
+              </div>
+            )}
             <div className="space-y-2 text-sm">
               {/* Subtotal (Grand Total) */}
               <div className="flex justify-between">
