@@ -20,7 +20,8 @@
         :activeOrders="unit.active_orders"
         :servedOrders="unit.served_orders"
         :totalOrders="unit.total_orders"
-        @open="openProduction(unit.name)"
+        :disabled="!!unit.disable"
+        @open="!unit.disable && openProduction(unit.name)"
       />
     </div>
 
@@ -54,12 +55,11 @@ export default {
 
   methods: {
     loadDashboard() {
-      console.log("this.call =", this.call);
-
       this.call
         .get("ury.ury.api.ury_mosaic.get_production_dashboard")
         .then((result) => {
-          console.log(result);
+          console.log("Dashboard:", result);
+
           this.dashboard = result.message || [];
           this.loading = false;
         })
@@ -68,6 +68,7 @@ export default {
           this.loading = false;
         });
     },
+
     openProduction(productionName) {
       this.$router.push(`/${productionName}`);
     },

@@ -1,33 +1,28 @@
 <template>
   <div
-    @click="$emit('open')"
+    @click="!disabled && $emit('open')"
+    :class="{
+      'opacity-50 blur-[1px] cursor-not-allowed': disabled
+    }"
     class="bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer p-5"
   >
     <!-- Header -->
-    <div class="flex justify-between items-start">
-      <div class="flex items-center gap-3">
-        <div
-          class="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center text-2xl"
-        >
-          🍳
-        </div>
-
-        <div>
-          <h2 class="text-xl font-bold text-gray-800">
-            {{ title }}
-          </h2>
-
-          <p class="text-sm text-gray-500">
-            Production Unit
-          </p>
-        </div>
+    <div class="flex items-center gap-3">
+      <div
+        class="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center text-2xl"
+      >
+        🍳
       </div>
 
-      <span
-        class="bg-green-100 text-green-700 text-xs font-semibold px-3 py-1 rounded-full"
-      >
-        Live
-      </span>
+      <div>
+        <h2 class="text-xl font-bold text-gray-800">
+          {{ title }}
+        </h2>
+
+        <p class="text-sm text-gray-500">
+          Production Unit
+        </p>
+      </div>
     </div>
 
     <!-- Statistics -->
@@ -69,15 +64,12 @@
     </div>
 
     <!-- Footer -->
-    <div class="mt-6 flex justify-between items-center border-t pt-4">
+    <div class="mt-6 border-t pt-4">
       <span class="text-xs text-gray-400">
         Click to view KOTs
       </span>
-
-      <span class="text-blue-600 font-semibold">
-        View →
-      </span>
     </div>
+
   </div>
 </template>
 
@@ -106,6 +98,11 @@ export default {
     totalOrders: {
       type: Number,
       default: 0,
+    },
+
+    disabled: {
+      type: Boolean,
+      default: false,
     },
   },
 };

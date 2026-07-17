@@ -3,7 +3,7 @@ import frappe
 def get_production_units():
     return frappe.get_all(
         "URY Production Unit",
-        fields=["name"],
+        fields=["name", "disable"],
         order_by="name asc",
     )
 
@@ -47,6 +47,7 @@ def get_production_dashboard():
         dashboard.append(
             {
                 "name": unit["name"],
+                "disable": unit["disable"],
                 "active_orders": counts["active_orders"],
                 "served_orders": counts["served_orders"],
                 "total_orders": counts["total_orders"],
