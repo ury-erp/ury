@@ -42,12 +42,13 @@ export default defineConfig({
     },
   ],
 
-  // Run dev server with MSW enabled before tests
-  // reuseExistingServer: true means if a server is already running, use it
+  // Run dev server with MSW enabled before tests.
+  // reuseExistingServer: true means if a server is already running, use it.
+  // Longer timeout to allow Vite + MSW service worker to initialize.
   webServer: {
     command: 'VITE_MSW_ENABLED=true npx vite --port 5173',
     url: 'http://localhost:5173/pos/',
     reuseExistingServer: !process.env.CI,
-    timeout: 30_000,
+    timeout: 60_000,
   },
 });
