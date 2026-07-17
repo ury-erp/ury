@@ -22,7 +22,7 @@
 
 <script>
 
-import uriMosaicImage from "@/assets/logos/mosaic.jpg";
+import urimosaicImage from "@/assets/logos/mosaic.jpg";
 // import KOT from './kot.vue';
 
 export default {
@@ -32,7 +32,7 @@ export default {
   },
   data() {
     return {
-      imagePath: uriMosaicImage,
+      imagePath: urimosaicImage,
     };
   },
   methods:{

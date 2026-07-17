@@ -529,7 +529,7 @@ export default {
     redirectToLogin() {
       var currentDomain = window.location.origin;
       window.location.href =
-        currentDomain + "/login?redirect-to=Mosaic/" + this.production;
+        currentDomain + "/login?redirect-to=mosaic/" + this.production;
     },
     masonryLoading() {
       this.$nextTick(() => {
