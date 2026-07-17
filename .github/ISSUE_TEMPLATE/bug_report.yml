@@ -1,0 +1,87 @@
+name: Bug Report
+description: Report a bug or unexpected behavior in URY
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting a bug! Please fill out the sections below to help us resolve it quickly.
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      description: Which part of URY is affected?
+      options:
+        - Dashboard (Next.js frontend)
+        - POS v2 (React app)
+        - @ury/ui (shared components)
+        - Backend (Frappe/Python)
+        - Infrastructure (CI/Docker)
+        - Storybook
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear description of what the bug is and what you expected to happen.
+      placeholder: "When I click the 'Pay Now' button on the POS screen, the order total shows 0.00 instead of the actual amount."
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: Step-by-step instructions to reproduce the issue.
+      placeholder: |
+        1. Go to the POS screen
+        2. Add items to the order
+        3. Click 'Pay Now'
+        4. See incorrect total
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+      placeholder: "The order total should display the correct sum of all items."
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happened?
+      placeholder: "The total shows 0.00 regardless of items added."
+    validations:
+      required: false
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots / Logs
+      description: Attach screenshots, error logs, or console output if available.
+    validations:
+      required: false
+
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Browser, OS, or deployment environment
+      placeholder: "Chrome 126, macOS 15, Docker dev stack"
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Any other context, links, or references.
+    validations:
+      required: false

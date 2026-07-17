@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://github.com/ury-erp/ury#readme
+    about: Check the README and CONTRIBUTING.md for setup guides and usage instructions.

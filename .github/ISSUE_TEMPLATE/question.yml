@@ -1,0 +1,42 @@
+name: Question / Support
+description: Ask a question or request help with URY
+labels: ["question", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have a question about URY? We are happy to help! Please check existing issues and documentation first.
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      description: Which part of URY is your question about?
+      options:
+        - Dashboard (Next.js frontend)
+        - POS v2 (React app)
+        - @ury/ui (shared components)
+        - Backend (Frappe/Python)
+        - Infrastructure (CI/Docker/Dev Setup)
+        - Storybook
+        - General
+    validations:
+      required: true
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Your Question
+      description: Describe what you would like to know.
+      placeholder: "How do I set up the Docker development environment with custom database credentials?"
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: What Have You Tried?
+      description: What have you already tried or researched?
+      placeholder: "I read the CONTRIBUTING.md and tried `make dev-up` but the database connection fails."
+    validations:
+      required: false

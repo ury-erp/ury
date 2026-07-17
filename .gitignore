@@ -20,3 +20,25 @@ ury/www/URYMosaic.html
 build
 
 *.lock
+
+# Next.js
+.next/
+out/
+
+# Storybook
+storybook-static/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Testing
+coverage/
+test-results.json
+playwright-report/
+eslint-report.json
+
+# Docker volumes
+postgres-data/
+redis-data/

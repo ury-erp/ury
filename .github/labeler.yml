@@ -1,0 +1,66 @@
+# URY Dashboard — PR Auto-label Configuration
+# Maps file paths to labels for automatic PR categorization
+
+# UI components
+ui:
+  - changed-files:
+      - any-glob-to-any-file: "packages/ui/**"
+
+# POS application
+pos:
+  - changed-files:
+      - any-glob-to-any-file: "pos/**"
+
+# Frontend dashboard
+frontend:
+  - changed-files:
+      - any-glob-to-any-file: "frontend/**"
+
+# Backend (Frappe)
+backend:
+  - changed-files:
+      - any-glob-to-any-file: "ury/**"
+      - any-glob-to-any-file: "urypos/**"
+
+# Infrastructure & CI/CD
+infrastructure:
+  - changed-files:
+      - any-glob-to-any-file: ".github/**"
+      - any-glob-to-any-file: "Dockerfile*"
+      - any-glob-to-any-file: "docker-compose*.yml"
+      - any-glob-to-any-file: "scripts/**"
+      - any-glob-to-any-file: "Makefile"
+
+# Storybook
+storybook:
+  - changed-files:
+      - any-glob-to-any-file: ".storybook/**"
+      - any-glob-to-any-file: "packages/ui/src/components/__stories__/**"
+
+# Dependencies
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file: "package.json"
+      - any-glob-to-any-file: "packages/ui/package.json"
+      - any-glob-to-any-file: "pos/package.json"
+      - any-glob-to-any-file: "frontend/package.json"
+      - any-glob-to-any-file: "yarn.lock"
+
+# Documentation
+documentation:
+  - changed-files:
+      - any-glob-to-any-file: "*.md"
+      - any-glob-to-any-file: "CONTRIBUTING.md"
+      - any-glob-to-any-file: "README.md"
+
+# Docker
+docker:
+  - changed-files:
+      - any-glob-to-any-file: "Dockerfile*"
+      - any-glob-to-any-file: "docker-compose*.yml"
+      - any-glob-to-any-file: ".devcontainer/**"
+
+# Database
+database:
+  - changed-files:
+      - any-glob-to-any-file: "prisma/**"
