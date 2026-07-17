@@ -1,0 +1,74 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  build-and-release:
+    name: Build & Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+        env:
+          VITE_FRAPPE_BASE_URL: http://localhost:8000
+
+      - name: Build for production
+        run: npm run build
+        env:
+          VITE_FRAPPE_BASE_URL: http://localhost:8000
+
+      - name: Create distribution archive
+        run: |
+          cd ../ury/public/pos
+          tar -czf /tmp/ury-pos-dist.tar.gz .
+          zip -r /tmp/ury-pos-dist.zip .
+
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          # Extract version from tag
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          
+          # Get changelog section for this version
+          if [ -f CHANGELOG.md ]; then
+            # Extract the section between the first two version headers
+            sed -n "/^## \[${VERSION}\]/,/^## /p" CHANGELOG.md | head -n -1 > /tmp/release-notes.md
+            if [ ! -s /tmp/release-notes.md ]; then
+              echo "No changelog entry found for ${VERSION}" > /tmp/release-notes.md
+            fi
+          else
+            echo "Release ${VERSION}" > /tmp/release-notes.md
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: URY POS v${{ steps.release_notes.outputs.version }}
+          body_path: /tmp/release-notes.md
+          draft: false
+          prerelease: ${{ contains(steps.release_notes.outputs.version, '-') }}
+          files: |
+            /tmp/ury-pos-dist.tar.gz
+            /tmp/ury-pos-dist.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

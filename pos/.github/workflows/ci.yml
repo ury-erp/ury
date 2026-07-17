@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [develop, main]
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   NODE_VERSION: '20'
 
@@ -50,6 +54,14 @@ jobs:
         env:
           VITE_FRAPPE_BASE_URL: http://localhost:8000
 
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 7
+
   # ── Build ─────────────────────────────────────────────
   build:
     name: Build Check
@@ -72,11 +84,19 @@ jobs:
         env:
           VITE_FRAPPE_BASE_URL: http://localhost:8000
 
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-output
+          path: ../ury/public/pos/
+          retention-days: 3
+
   # ── E2E Tests ─────────────────────────────────────────
   e2e-tests:
     name: E2E Tests (Playwright + MSW)
     runs-on: ubuntu-latest
     needs: [build]
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -102,13 +122,58 @@ jobs:
           VITE_MSW_ENABLED: true
           VITE_FRAPPE_BASE_URL: ''
 
-      - name: Upload test artifacts
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14
+
+      - name: Upload E2E test results
         uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: playwright-report
+          name: e2e-test-results
           path: |
-            playwright-report/
-            e2e-report/
             test-results/
+            e2e-report/
           retention-days: 7
+
+      - name: Upload Playwright traces
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-traces
+          path: test-results/**/trace.zip
+          retention-days: 7
+
+  # ── Summary ───────────────────────────────────────────
+  ci-summary:
+    name: CI Summary
+    runs-on: ubuntu-latest
+    needs: [lint, unit-tests, build, e2e-tests]
+    if: always()
+    steps:
+      - name: Check CI results
+        run: |
+          echo "## CI Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Lint | ${{ needs.lint.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Unit Tests | ${{ needs.unit-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Build | ${{ needs.build.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| E2E Tests | ${{ needs.e2e-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ needs.lint.result }}" = "failure" ] || \
+             [ "${{ needs.unit-tests.result }}" = "failure" ] || \
+             [ "${{ needs.build.result }}" = "failure" ] || \
+             [ "${{ needs.e2e-tests.result }}" = "failure" ]; then
+            echo ""
+            echo "::error::CI pipeline failed. Check individual jobs for details."
+            exit 1
+          fi
+          
+          echo ""
+          echo "All CI checks passed!"
