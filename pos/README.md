@@ -18,20 +18,24 @@ A modern, feature-rich Point of Sale frontend for restaurant management, built w
 
 ## Tech Stack
 
-| Concern | Technology |
-|---|---|
-| UI Framework | React 19 + TypeScript 5.7 |
-| Build Tool | Vite 6 |
-| State Management | Zustand 5 |
-| Routing | React Router DOM 6 |
-| Styling | Tailwind CSS 3 + class-variance-authority |
-| Charts | Recharts 3 |
-| PDF Generation | jsPDF + jspdf-autotable |
-| Backend SDK | frappe-js-sdk |
-| API Mocking | MSW (Mock Service Worker) 2 |
-| Testing | Vitest + Testing Library + MSW |
-| E2E Testing | Playwright |
-| Icons | Lucide React |
+| Concern          | Technology                                |
+| ---------------- | ----------------------------------------- |
+| UI Framework     | React 19 + TypeScript 5.7                 |
+| Build Tool       | Vite 6                                    |
+| State Management | Zustand 5                                 |
+| Routing          | React Router DOM 6                        |
+| Styling          | Tailwind CSS 3 + class-variance-authority |
+| Charts           | Recharts 3                                |
+| PDF Generation   | jsPDF + jspdf-autotable                   |
+| Backend SDK      | frappe-js-sdk                             |
+| API Mocking      | MSW (Mock Service Worker) 2               |
+| Testing          | Vitest + Testing Library + MSW            |
+| E2E Testing      | Playwright                                |
+| Linting          | ESLint 9 + typescript-eslint              |
+| Formatting       | Prettier 3                                |
+| Pre-commit Hooks | Husky + lint-staged                       |
+| CI/CD            | GitHub Actions                            |
+| Icons            | Lucide React                              |
 
 ## Prerequisites
 
@@ -57,6 +61,7 @@ cp .env.example .env
 ```
 
 Edit `.env`:
+
 ```
 VITE_FRAPPE_BASE_URL=http://localhost:8000
 ```
@@ -88,6 +93,7 @@ VITE_FRAPPE_BASE_URL=
 ```
 
 When `VITE_MSW_ENABLED=true`:
+
 - The MSW service worker intercepts all API requests and returns realistic mock data
 - `VITE_FRAPPE_BASE_URL` must be empty so the SDK sends same-origin requests (service workers cannot intercept cross-origin requests)
 - The Vite proxy is automatically disabled to prevent auth redirect loops
@@ -96,21 +102,50 @@ When `VITE_MSW_ENABLED=true`:
 
 ## Available Scripts
 
-| Script | Description |
-|---|---|
-| `npm run dev` | Start Vite dev server |
-| `npm run build` | Production build |
-| `npm run preview` | Preview production build |
-| `npm run test` | Run tests once |
-| `npm run test:watch` | Run tests in watch mode |
-| `npm run test:coverage` | Run tests with coverage report |
-| `npm run test:e2e` | Run Playwright E2E tests |
-| `npm run test:e2e:ui` | Run E2E tests with Playwright UI |
-| `npm run lint` | Lint with ESLint |
-| `npm run format` | Format code with Prettier |
-| `npm run format:check` | Check formatting without writing |
-| `npm run type-check` | TypeScript type checking |
-| `npm run check-all` | Run all checks (type, lint, test, build) |
+| Script                  | Description                              |
+| ----------------------- | ---------------------------------------- |
+| `npm run dev`           | Start Vite dev server                    |
+| `npm run build`         | Production build                         |
+| `npm run preview`       | Preview production build                 |
+| `npm run test`          | Run tests once                           |
+| `npm run test:watch`    | Run tests in watch mode                  |
+| `npm run test:coverage` | Run tests with coverage report           |
+| `npm run test:e2e`      | Run Playwright E2E tests                 |
+| `npm run test:e2e:ui`   | Run E2E tests with Playwright UI         |
+| `npm run lint`          | Lint with ESLint                         |
+| `npm run format`        | Format code with Prettier                |
+| `npm run format:check`  | Check formatting without writing         |
+| `npm run type-check`    | TypeScript type checking                 |
+| `npm run check-all`     | Run all checks (type, lint, test, build) |
+
+## Code Quality
+
+### Pre-commit Hooks
+
+[Husky](https://typicode.github.io/husky/) + [lint-staged](https://github.com/okonet/lint-staged) automatically run code quality checks before each commit:
+
+- **Pre-commit**: ESLint + Prettier on staged `.ts`/`.tsx` files, Prettier on staged `.json`/`.md`/`.yml`/`.css` files
+- **Commit-msg**: Validates [Conventional Commits](https://www.conventionalcommits.org/) format (`type(scope): description`)
+
+These hooks are installed automatically when you run `npm install` in the repo root.
+
+### Prettier
+
+Code formatting is enforced via Prettier with these settings (`.prettierrc`):
+
+- Single quotes, trailing commas, 100 character line width, 2-space indentation
+- Run `npm run format` to format all files, or `npm run format:check` to check without writing
+
+### Coverage Thresholds
+
+Vitest enforces minimum coverage thresholds to prevent regression:
+
+| Metric     | Minimum |
+| ---------- | ------- |
+| Lines      | 60%     |
+| Statements | 60%     |
+| Branches   | 50%     |
+| Functions  | 55%     |
 
 ## Project Structure
 
@@ -182,6 +217,7 @@ const result = await call.post('ury.ury.api.endpoint', { data });
 ```
 
 Retry behavior:
+
 - **Network errors** → retry
 - **5xx server errors** → retry
 - **429 Too Many Requests** → retry
@@ -258,7 +294,7 @@ it('handles 500 error gracefully', async () => {
   server.use(
     http.get('*/api/method/ury.ury_pos.api.get_menu', () => {
       return HttpResponse.json({ exc_type: 'Internal Server Error' }, { status: 500 });
-    })
+    }),
   );
   invalidateCache(); // Clear dedup cache so override takes effect
 
@@ -271,7 +307,7 @@ After `server.resetHandlers()` (called in `afterEach`), overrides are automatica
 ## Testing
 
 ```bash
-# Run all tests (1742+ across 92 files)
+# Run all unit tests (1813 across 95 files)
 npm test
 
 # Watch mode
@@ -294,6 +330,7 @@ npm run test:e2e
 ### Coverage
 
 The test suite covers:
+
 - All API functions (auth, menu, orders, payments, tables, customers, dashboard, reports, etc.)
 - Zustand store slices (auth, config, menu, orders, helpers, combined)
 - Utility modules (logger, debounce, keyboard shortcuts, performance, storage, error-utils, role-utils, api-dedup)
@@ -302,15 +339,17 @@ The test suite covers:
 - AI service and insights
 - Dashboard store and reports store
 
+Run `npm run test:coverage` for a detailed coverage report. The CI pipeline runs coverage on every push and uploads the report as an artifact.
+
 ## Environment Variables
 
-| Variable | Default | Description |
-|---|---|---|
+| Variable               | Default                 | Description                                    |
+| ---------------------- | ----------------------- | ---------------------------------------------- |
 | `VITE_FRAPPE_BASE_URL` | `http://localhost:8000` | Frappe backend URL (empty when MSW is enabled) |
-| `VITE_MSW_ENABLED` | `false` | Enable MSW API mocking for development |
-| `VITE_AI_BASE_URL` | — | OpenAI-compatible API base URL for AI Insights |
-| `VITE_AI_API_KEY` | — | API key for the AI service |
-| `VITE_AI_MODEL` | — | Default AI model to use |
+| `VITE_MSW_ENABLED`     | `false`                 | Enable MSW API mocking for development         |
+| `VITE_AI_BASE_URL`     | —                       | OpenAI-compatible API base URL for AI Insights |
+| `VITE_AI_API_KEY`      | —                       | API key for the AI service                     |
+| `VITE_AI_MODEL`        | —                       | Default AI model to use                        |
 
 ## License
 

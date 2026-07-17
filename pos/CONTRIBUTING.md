@@ -13,11 +13,13 @@ Thank you for your interest in contributing to URY POS! This guide will help you
 
 ```bash
 cd pos
-npm install
+npm install       # Installs dependencies + Husky git hooks
 cp .env.example .env
 # Edit .env with your Frappe backend URL or enable MSW for offline development
 npm run dev
 ```
+
+Husky pre-commit hooks are installed automatically during `npm install`. They run ESLint + Prettier on staged files and validate commit message format.
 
 ### Running Without a Backend (MSW Mode)
 
@@ -44,7 +46,41 @@ VITE_FRAPPE_BASE_URL=
    - `docs: update API integration guide`
    - `test: add coverage for order sync`
    - `refactor: extract shared cart logic`
+
+   The commit-msg hook validates this format automatically. If you need to bypass it (e.g., for merge commits), use `git commit --no-verify`.
+
 5. **Push** and open a Pull Request against `develop`
+
+## Code Quality
+
+### Pre-commit Hooks
+
+[Husky](https://typicode.github.io/husky/) + [lint-staged](https://github.com/okonet/lint-staged) enforce code quality automatically:
+
+- **Pre-commit**: ESLint (`--fix`) + Prettier (`--write`) on staged `.ts`/`.tsx` files
+- **Pre-commit**: Prettier on staged `.json`/`.md`/`.yml`/`.css` files
+- **Commit-msg**: Validates Conventional Commits format
+
+### Prettier
+
+Formatting is enforced by Prettier (`.prettierrc`):
+
+- Single quotes, trailing commas, 100 character line width, 2-space indentation
+- Run `npm run format` to format all files
+- Run `npm run format:check` to verify formatting in CI
+
+### Coverage Thresholds
+
+Vitest enforces minimum coverage thresholds:
+
+| Metric     | Minimum |
+| ---------- | ------- |
+| Lines      | 60%     |
+| Statements | 60%     |
+| Branches   | 50%     |
+| Functions  | 55%     |
+
+Run `npm run test:coverage` to check locally. The CI pipeline will fail if thresholds are not met.
 
 ## Code Standards
 
@@ -103,7 +139,7 @@ VITE_MSW_ENABLED=true npx playwright test
     await page.goto(path);
     await page.waitForFunction(
       () => document.documentElement.getAttribute('data-msw-ready') === 'true',
-      { timeout: 20000 }
+      { timeout: 20000 },
     );
     await page.waitForTimeout(3000);
   }
@@ -147,10 +183,13 @@ src/
 
 - [ ] All checks pass (`npm run check-all`)
 - [ ] New features have unit tests
+- [ ] Coverage thresholds are met (`npm run test:coverage`)
 - [ ] New API endpoints have MSW handlers and fixture data
 - [ ] User-facing strings use `t()` for i18n
 - [ ] No `any` types introduced without justification
+- [ ] Code is formatted (`npm run format:check`)
 - [ ] Commit messages follow Conventional Commits
+- [ ] CHANGELOG.md updated (if applicable)
 
 ## License
 

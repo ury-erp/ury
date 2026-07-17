@@ -128,3 +128,30 @@ Stage Summary:
 - Release workflow ready for version tagging (git tag v1.0.0 && git push --tags)
 - Dependabot will auto-create PRs for dependency updates
 - All 64 commits now on GitHub fork/develop
+
+---
+Task ID: 22
+Agent: Main Agent
+Task: CODEOWNERS, Husky hooks, Prettier, PR labeler, coverage thresholds, security audit
+
+Work Log:
+- Created CODEOWNERS for automatic PR review assignment (@ury-erp owns all paths)
+- Added Husky pre-commit hook (lint-staged: ESLint + Prettier on staged files)
+- Added Husky commit-msg hook (validates conventional commit format: type(scope): description)
+- Configured Prettier (.prettierrc + .prettierignore) — single quotes, trailing commas, 100 char width
+- Created PR labeler workflow + labeler.yml — auto-labels PRs by changed files
+  (frontend, backend, ci-cd, testing, documentation, msw, i18n, dependencies)
+- Enhanced CI: added security audit job, TypeScript type-check step
+- CI: unit tests now run with coverage + summary in GitHub Step Summary
+- CI: bundle size check after build step
+- Added Vitest coverage thresholds (lines 60%, statements 60%, branches 50%, functions 55%)
+- Added package.json scripts: type-check, check-all, prepare
+- Updated .gitignore with .prettiercache, Thumbs.db
+- Committed as 51dae45 and pushed to fork/develop
+
+Stage Summary:
+- 12 files changed, 239 insertions, 9 deletions
+- CI pipeline now has 6 jobs: lint+type-check, security, unit-tests, build, e2e, summary
+- Pre-commit hooks enforce code quality before each commit
+- Coverage thresholds prevent regression
+- TypeScript type-check: 0 errors
