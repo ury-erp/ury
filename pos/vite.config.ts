@@ -19,6 +19,20 @@ export default defineConfig({
       brotliSize: true,
     }) as PluginOption,
   ],
+  // Proxy API requests to Frappe backend when MSW is NOT active.
+  // When VITE_MSW_ENABLED=true, we disable the proxy so that unhandled
+  // API requests return 404 instead of being forwarded to a (possibly
+  // non-existent) Frappe backend, which could cause auth redirect loops.
+  server: {
+    proxy: process.env.VITE_MSW_ENABLED
+      ? undefined
+      : {
+          '/api': {
+            target: process.env.VITE_FRAPPE_BASE_URL || 'http://localhost:8000',
+            changeOrigin: true,
+          },
+        },
+  },
   resolve: {
     alias: {
       "@": resolve(__dirname, "./src"),

@@ -1,4 +1,5 @@
 import '@testing-library/jest-dom';
+import { server } from '../mocks/server';
 
 // Mock window.frappe for tests
 Object.defineProperty(window, 'frappe', {
@@ -36,3 +37,16 @@ function createStorageMock(): Storage {
 }
 Object.defineProperty(window, 'localStorage', { value: createStorageMock(), writable: true });
 Object.defineProperty(window, 'sessionStorage', { value: createStorageMock(), writable: true });
+
+// ─── MSW Server Lifecycle ─────────────────────────────────────────────────────
+beforeAll(() => {
+  server.listen({ onUnhandledRequest: 'error' });
+});
+
+afterEach(() => {
+  server.resetHandlers();
+});
+
+afterAll(() => {
+  server.close();
+});
