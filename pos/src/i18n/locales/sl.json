@@ -46,17 +46,20 @@
     "select_all": "Izberi vse",
     "deselect_all": "Odstrani izbiro",
     "selected_count": "Izbrano: {{count}}",
+    "skip_to_content": "Preskoči na vsebino",
     "back": "Nazaj",
     "next": "Naprej",
     "previous": "Prejšnje"
   },
   "header": {
+    "search": "Iskanje",
     "search_placeholder_default": "Išči naročila, jedi ali stranke...",
     "search_placeholder_orders": "Išči naročila",
     "search_placeholder_menu": "Išči jedi",
     "switch_to_desk": "Preklopi na namizje",
     "clear_cache": "Počisti predpomnilnik",
-    "logout": "Odjava"
+    "logout": "Odjava",
+    "default_user": "Uporabnik"
   },
   "menu": {
     "special_items": "Posebne jedi"
@@ -162,7 +165,13 @@
     "discount_exceeds_max": "Odstotni popust ne more preseči 100%",
     "please_print_first": "Prosimo, natisnite račun pred plačilom",
     "enter_cancel_reason": "Vnesite razlog za preklic.",
-    "dine_in_restricted": "Naročanje na mestu ni na voljo za vašo vlogo"
+    "dine_in_restricted": "Naročanje na mestu ni na voljo za vašo vlogo",
+    "failed_load_orders": "Neuspešno nalaganje naročil",
+    "failed_load_order_details": "Neuspešno nalaganje podrobnosti naročila",
+    "failed_load_pos": "Neuspešno nalaganje POS",
+    "failed_fetch_item_details": "Neuspešno pridobivanje podrobnosti artikla",
+    "failed_fetch_addons": "Neuspešno pridobivanje dodatkov",
+    "no_rooms_for_branch": "Ni najdenih prostorov za to podružnico"
   },
   "success": {
     "order_cancelled": "Naročilo uspešno preklicano",
@@ -228,7 +237,8 @@
     "orders": "Naročila",
     "dashboard": "Nadzorna plošča",
     "menu": "Jedilnik",
-    "reports": "Poročila"
+    "reports": "Poročila",
+    "navigation": "Navigacija"
   },
   "menu_management": {
     "title": "Upravljanje jedilnika",
@@ -274,7 +284,10 @@
     "items_updated": "Jedi posodobljene",
     "duplicate_item": "Podvoji jed",
     "print_menu": "Natisni jedilnik",
-    "export_menu": "Izvozi jedilnik"
+    "export_menu": "Izvozi jedilnik",
+    "current_price": "Trenutna cena",
+    "fixed_amount": "Fiksno",
+    "change": "Sprememba"
   },
   "dashboard": {
     "title": "Nadzorna plošča",
@@ -381,6 +394,23 @@
     "consolidated": "Konsolidirano",
     "return": "Vračilo"
   },
+  "auth_guard": {
+    "access_denied": "Dostop zavrnjen",
+    "configuration_error": "Napaka konfiguracije",
+    "pos_profile_not_configured": "POS profil ni najden ali ni konfiguriran.",
+    "permission_required": "Potrebno dovoljenje",
+    "no_permission": "Nimate dovoljenja za dostop do te aplikacije.",
+    "required_roles": "Zahtevane vloge:",
+    "recheck_permissions": "Ponovno preveri dovoljenja"
+  },
+  "screen_size": {
+    "title": "Samo namizje",
+    "message": "Ta POS sistem je zasnovan za namizne računalnike.",
+    "mobile_hint": "Podpora za mobilne naprave bo na voljo v prihodnji različici.",
+    "current_width": "Trenutna širina zaslona:",
+    "required": "Zahtevano:",
+    "switch_v1": "Preklopi na različico 1"
+  },
   "error_boundary": {
     "title": "Nekaj je šlo narobe",
     "message": "Prišlo je do nepričakovane napake. Poskusite znova.",
@@ -402,6 +432,18 @@
     "nav_menu": "Pojdi na Upravljanje jedilnika",
     "nav_reports": "Pojdi na Poročila",
     "alt_prefix": "Alt+"
+  },
+  "aggregator": {
+    "loading": "Nalaganje agregatorjev...",
+    "select_placeholder": "Izberite agregatorja"
+  },
+  "accessibility": {
+    "loading_content": "Nalaganje vsebine...",
+    "error_occurred": "Prišlo je do napake",
+    "retry_loading": "Poskusi znova",
+    "page_navigation": "Navigacija po strani",
+    "close_menu": "Zapri meni",
+    "open_menu": "Odpri meni"
   },
   "ai": {
     "title": "AI Vpogledi",

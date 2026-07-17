@@ -6,6 +6,7 @@ import AuthGuard from './components/AuthGuard';
 import POSOpeningProvider from './components/POSOpeningProvider';
 import ScreenSizeProvider from './components/ScreenSizeProvider';
 import ErrorBoundary from './components/ErrorBoundary';
+import { SkipToContent } from './components/SkipToContent';
 import { NetworkStatus } from './components/NetworkStatus';
 import { ToastProvider } from './components/ui/toast';
 import { usePOSStore } from './store/pos-store';
@@ -131,12 +132,13 @@ function App() {
             <Router basename="/pos">
               <ErrorBoundary>
                 <GlobalShortcuts />
+                <SkipToContent />
                 <div
                   className="flex flex-col h-screen bg-gray-100 font-inter"
                   data-testid="app-layout"
                 >
                   <Header />
-                  <div className="flex-1 overflow-hidden">
+                  <div id="main-content" className="flex-1 overflow-hidden" tabIndex={-1}>
                     <Suspense
                       fallback={
                         <div

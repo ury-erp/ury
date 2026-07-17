@@ -2,7 +2,7 @@
 
 All notable changes to the URY POS project will be documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.2.0] — 2026-07-18
 
 ### Added
 
@@ -132,3 +132,20 @@ All notable changes to the URY POS project will be documented in this file. The 
 - Multi-language support (EN, FR, AR, SL)
 - QZ Tray thermal printing integration
 - Frappe SDK backend integration
+
+## [Unreleased]
+
+### Added
+
+- Skip-to-content link for keyboard accessibility
+- Skeleton loading components (MenuCard, DashboardCard, TableRow, Chart variants)
+- EmptyState component for consistent empty data display
+- CSS animations: shimmer (skeleton), slide-down (network), fade-in (page transitions)
+- i18n: synced all 4 locale files (en, sl, fr, ar) with 400+ keys each
+
+### Changed
+
+- React.memo on MenuCard and LiveMetricsPanel for render optimization
+- ARIA attributes added to Footer, Header, Sidebar, NetworkStatus, ErrorBoundary
+- ErrorBoundary wraps Router content in App.tsx
+- Suspense fallback improved with role=status and loading text

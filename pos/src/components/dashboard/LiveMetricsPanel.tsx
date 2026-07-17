@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, memo } from 'react';
 import { Activity, DollarSign, ShoppingCart, Clock } from 'lucide-react';
 import { useDashboardStore } from '../../store/dashboard-store';
 import { formatCurrency, formatInvoiceTime } from '../../lib/utils';
@@ -47,26 +47,30 @@ const LiveMetricsPanel = () => {
                 <ShoppingCart className="w-4 h-4 text-emerald-500" />
                 <span className="text-xs text-emerald-600">Today Orders</span>
               </div>
-              <p className="text-lg font-bold text-emerald-700">
-                {liveMetrics.today_orders}
-              </p>
+              <p className="text-lg font-bold text-emerald-700">{liveMetrics.today_orders}</p>
             </div>
           </div>
 
           {/* Pending KOTs */}
-          <div className={cn(
-            'rounded-lg p-3',
-            liveMetrics.pending_kots > 0 ? 'bg-amber-50' : 'bg-gray-50'
-          )}>
+          <div
+            className={cn(
+              'rounded-lg p-3',
+              liveMetrics.pending_kots > 0 ? 'bg-amber-50' : 'bg-gray-50',
+            )}
+          >
             <div className="flex items-center gap-2">
-              <Clock className={cn(
-                'w-4 h-4',
-                liveMetrics.pending_kots > 0 ? 'text-amber-500' : 'text-gray-400'
-              )} />
-              <span className={cn(
-                'text-sm font-medium',
-                liveMetrics.pending_kots > 0 ? 'text-amber-700' : 'text-gray-500'
-              )}>
+              <Clock
+                className={cn(
+                  'w-4 h-4',
+                  liveMetrics.pending_kots > 0 ? 'text-amber-500' : 'text-gray-400',
+                )}
+              />
+              <span
+                className={cn(
+                  'text-sm font-medium',
+                  liveMetrics.pending_kots > 0 ? 'text-amber-700' : 'text-gray-500',
+                )}
+              >
                 {liveMetrics.pending_kots} Pending KOTs
               </span>
             </div>
@@ -82,9 +86,7 @@ const LiveMetricsPanel = () => {
                   className="flex items-center justify-between py-2 px-3 bg-gray-50 rounded-lg"
                 >
                   <div>
-                    <p className="text-sm font-medium text-gray-900">
-                      {order.customer}
-                    </p>
+                    <p className="text-sm font-medium text-gray-900">{order.customer}</p>
                     <p className="text-xs text-gray-400">
                       {order.name} | {order.order_type}
                     </p>
@@ -93,9 +95,7 @@ const LiveMetricsPanel = () => {
                     <p className="text-sm font-medium text-gray-900">
                       {formatCurrency(order.grand_total)}
                     </p>
-                    <p className="text-xs text-gray-400">
-                      {formatInvoiceTime(order.posting_time)}
-                    </p>
+                    <p className="text-xs text-gray-400">{formatInvoiceTime(order.posting_time)}</p>
                   </div>
                 </div>
               ))}
@@ -112,4 +112,4 @@ const LiveMetricsPanel = () => {
   );
 };
 
-export default LiveMetricsPanel;
+export default memo(LiveMetricsPanel);

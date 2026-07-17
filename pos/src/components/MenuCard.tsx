@@ -1,4 +1,4 @@
-import { FC, useState } from 'react';
+import { FC, useState, memo } from 'react';
 import { formatCurrency, cn } from '../lib/utils';
 
 interface MenuCardProps {
@@ -11,14 +11,14 @@ interface MenuCardProps {
   disabled?: boolean;
 }
 
-const MenuCard: FC<MenuCardProps> = ({ 
-  name, 
-  price, 
-  item_image, 
-  course, 
-  _item, 
+const MenuCard: FC<MenuCardProps> = ({
+  name,
+  price,
+  item_image,
+  course,
+  _item,
   onClick,
-  disabled 
+  disabled,
 }) => {
   const [imgError, setImgError] = useState(false);
 
@@ -28,16 +28,20 @@ const MenuCard: FC<MenuCardProps> = ({
       tabIndex={disabled ? -1 : 0}
       aria-label={`${name}, ${formatCurrency(price)}${course ? `, ${course}` : ''}`}
       className={cn(
-        "bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow cursor-pointer h-56 flex flex-col",
-        disabled && "opacity-50 cursor-not-allowed pointer-events-none"
+        'bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow cursor-pointer h-56 flex flex-col',
+        disabled && 'opacity-50 cursor-not-allowed pointer-events-none',
       )}
       onClick={disabled ? undefined : onClick}
-      onKeyDown={disabled ? undefined : (e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onClick?.();
-        }
-      }}
+      onKeyDown={
+        disabled
+          ? undefined
+          : (e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onClick?.();
+              }
+            }
+      }
     >
       {/* Image section - fixed height */}
       <div className="h-24">
@@ -83,4 +87,4 @@ const MenuCard: FC<MenuCardProps> = ({
   );
 };
 
-export default MenuCard; 
+export default memo(MenuCard);

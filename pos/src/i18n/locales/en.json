@@ -43,11 +43,13 @@
     "select_all": "Select All",
     "deselect_all": "Deselect All",
     "selected_count": "Selected: {{count}}",
+    "skip_to_content": "Skip to content",
     "back": "Back",
     "next": "Next",
     "previous": "Previous"
   },
   "header": {
+    "search": "Search",
     "search_placeholder_default": "Search orders, menu items, or customers...",
     "search_placeholder_orders": "Search Orders",
     "search_placeholder_menu": "Search Menu",
@@ -232,7 +234,8 @@
     "orders": "Orders",
     "dashboard": "Dashboard",
     "menu": "Menu",
-    "reports": "Reports"
+    "reports": "Reports",
+    "navigation": "Main navigation"
   },
   "menu_management": {
     "title": "Menu Management",
@@ -430,6 +433,14 @@
   "aggregator": {
     "loading": "Loading aggregators...",
     "select_placeholder": "Select an aggregator"
+  },
+  "accessibility": {
+    "loading_content": "Loading content...",
+    "error_occurred": "An error occurred",
+    "retry_loading": "Retry loading",
+    "page_navigation": "Page navigation",
+    "close_menu": "Close menu",
+    "open_menu": "Open menu"
   },
   "ai": {
     "title": "AI Insights",
