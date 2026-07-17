@@ -1,0 +1,105 @@
+# URY Dashboard — Dependabot Configuration
+# Automated dependency updates for npm, Docker, and GitHub Actions
+
+version: 2
+
+updates:
+  # ── npm / Yarn dependencies ─────────────────────────────
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "ury-erp/core"
+    labels:
+      - "dependencies"
+      - "automated"
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+    groups:
+      react:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+      storybook:
+        patterns:
+          - "storybook"
+          - "@storybook/*"
+          - "@chromatic-com/*"
+      radix:
+        patterns:
+          - "@radix-ui/*"
+
+  # ── @ury/ui package ─────────────────────────────────────
+  - package-ecosystem: npm
+    directory: "/packages/ui"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "ui"
+    commit-message:
+      prefix: "chore(deps-ui)"
+
+  # ── POS workspace ───────────────────────────────────────
+  - package-ecosystem: npm
+    directory: "/pos"
+    schedule:
+      interval: weekly
+      day: tuesday
+      time: "06:00"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "pos"
+    commit-message:
+      prefix: "chore(deps-pos)"
+
+  # ── Frontend workspace ──────────────────────────────────
+  - package-ecosystem: npm
+    directory: "/frontend"
+    schedule:
+      interval: weekly
+      day: tuesday
+      time: "06:00"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "frontend"
+    commit-message:
+      prefix: "chore(deps-frontend)"
+
+  # ── Docker ──────────────────────────────────────────────
+  - package-ecosystem: docker
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: wednesday
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "docker"
+    commit-message:
+      prefix: "chore(docker)"
+
+  # ── GitHub Actions ──────────────────────────────────────
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: wednesday
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "ci"
+    commit-message:
+      prefix: "chore(ci-deps)"

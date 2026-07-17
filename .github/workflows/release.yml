@@ -1,6 +1,6 @@
 # URY Dashboard — Release Workflow
 # Creates a release when a tag is pushed (e.g. v1.2.0)
-# Steps: build Docker image, create GitHub release with changelog
+# Steps: build all workspaces, create GitHub release with changelog, push Docker image
 
 name: Release
 
@@ -26,15 +26,18 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
+
+      - name: Enable Corepack
+        run: corepack enable
 
       - name: Install dependencies
-        run: npm ci
+        run: yarn install --immutable --immutable-cache || yarn install --frozen-lockfile || yarn install
 
-      - name: Build
-        run: npm run build
+      - name: Build all workspaces
+        run: yarn build
         env:
           NEXT_TELEMETRY_DISABLED: 1
+          NODE_ENV: production
 
       - name: Generate changelog
         id: changelog
@@ -75,7 +78,7 @@ jobs:
             const fixes = `${{ steps.changelog.outputs.fixes }}`.trim();
             const other = `${{ steps.changelog.outputs.other }}`.trim();
             
-            let body = `## URY Dashboard ${version}\n\n`;
+            let body = `## URY ${version}\n\n`;
             
             if (features) {
               body += `### Features\n${features}\n\n`;
@@ -87,13 +90,13 @@ jobs:
               body += `### Other Changes\n${other}\n\n`;
             }
             
-            body += `### Docker\n\`\`\`bash\ndocker pull ghcr.io/ury-erp/ury-dashboard:${version}\ndocker pull ghcr.io/ury-erp/ury-dashboard:latest\n\`\`\`\n`;
+            body += `### Docker\n\`\`\`bash\ndocker pull ghcr.io/ury-erp/ury:${version}\ndocker pull ghcr.io/ury-erp/ury:latest\n\`\`\`\n`;
             
             const { data: release } = await github.rest.releases.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
               tag_name: tag,
-              name: `URY Dashboard ${version}`,
+              name: `URY ${version}`,
               body: body,
               draft: false,
               prerelease: tag.includes('-') // e.g. v1.0.0-beta
