@@ -5,11 +5,12 @@ import Header from './components/Header';
 import AuthGuard from './components/AuthGuard';
 import POSOpeningProvider from './components/POSOpeningProvider';
 import ScreenSizeProvider from './components/ScreenSizeProvider';
+import ErrorBoundary from './components/ErrorBoundary';
 import { NetworkStatus } from './components/NetworkStatus';
 import { ToastProvider } from './components/ui/toast';
 import { usePOSStore } from './store/pos-store';
 import { Spinner } from './components/ui/spinner';
-import { getActiveLanguage, getActiveDirection } from './i18n';
+import { getActiveLanguage, getActiveDirection, t } from './i18n';
 import { registerServiceWorker } from './lib/sw-register';
 import { shortcutRegistry } from './lib/keyboard-shortcuts';
 
@@ -35,7 +36,8 @@ function GlobalShortcuts() {
       '/menu-management': 'menu-management',
       '/reports': 'reports',
     };
-    const scope = (scopeMap[location.pathname] || 'global') as 'pos' | 'orders' | 'dashboard' | 'menu-management' | 'reports' | 'global';
+    const scope = (scopeMap[location.pathname] || 'global') as
+      'pos' | 'orders' | 'dashboard' | 'menu-management' | 'reports' | 'global';
     shortcutRegistry.setScope(scope);
   }, [location.pathname]);
 
@@ -104,10 +106,8 @@ function GlobalShortcuts() {
 }
 
 function App() {
-  const {
-    initializeApp
-  } = usePOSStore();
-  
+  const { initializeApp } = usePOSStore();
+
   useEffect(() => {
     initializeApp();
   }, [initializeApp]);
@@ -129,27 +129,41 @@ function App() {
         <AuthGuard>
           <POSOpeningProvider>
             <Router basename="/pos">
-              <GlobalShortcuts />
-              <div className="flex flex-col h-screen bg-gray-100 font-inter" data-testid="app-layout">
-                <Header />
-                <div className="flex-1 overflow-hidden">
-                  <Suspense fallback={
-                  <div className="flex items-center justify-center h-full">
-                    <Spinner />
+              <ErrorBoundary>
+                <GlobalShortcuts />
+                <div
+                  className="flex flex-col h-screen bg-gray-100 font-inter"
+                  data-testid="app-layout"
+                >
+                  <Header />
+                  <div className="flex-1 overflow-hidden">
+                    <Suspense
+                      fallback={
+                        <div
+                          className="flex items-center justify-center h-full"
+                          role="status"
+                          aria-label={t('common.loading')}
+                        >
+                          <div className="text-center">
+                            <Spinner />
+                            <p className="mt-3 text-sm text-gray-500">{t('common.loading')}</p>
+                          </div>
+                        </div>
+                      }
+                    >
+                      <Routes>
+                        <Route path="/" element={<POS />} />
+                        <Route path="/orders" element={<Orders />} />
+                        <Route path="/table" element={<Table />} />
+                        <Route path="/dashboard" element={<Dashboard />} />
+                        <Route path="/menu-management" element={<MenuManagement />} />
+                        <Route path="/reports" element={<Reports />} />
+                      </Routes>
+                    </Suspense>
                   </div>
-                }>
-                  <Routes>
-                    <Route path="/" element={<POS/>} />
-                    <Route path="/orders" element={<Orders />} />
-                    <Route path="/table" element={<Table />} />
-                    <Route path="/dashboard" element={<Dashboard />} />
-                    <Route path="/menu-management" element={<MenuManagement />} />
-                    <Route path="/reports" element={<Reports />} />
-                  </Routes>
-                </Suspense>
+                  <Footer />
                 </div>
-                <Footer />
-              </div>
+              </ErrorBoundary>
             </Router>
           </POSOpeningProvider>
         </AuthGuard>
