@@ -266,12 +266,24 @@ const TableView = () => {
   };
 
   // Print button: with KOT reprint enabled offer KOT vs Bill, otherwise keep
-  // the one-tap bill flow.
+  // the one-tap bill flow. Waiters (no billing role) never get the Bill
+  // option — their Print goes straight to KOT.
+  const kotReprintEnabled = posProfile?.custom_enable_kot_reprint === 1;
+
   const handlePrintTable = (table: Table, event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
-    if (posProfile?.custom_enable_kot_reprint === 1) {
+    if (kotReprintEnabled && userCanBill) {
       setPrintChoiceTable(table);
-    } else {
+    } else if (kotReprintEnabled) {
+      void (async () => {
+        setPrintingTable(table.name);
+        try {
+          await handlePrintKot(table);
+        } finally {
+          setPrintingTable(null);
+        }
+      })();
+    } else if (userCanBill) {
       void handlePrintBill(table);
     }
   };
@@ -570,23 +582,25 @@ const TableView = () => {
                           <ArrowLeftRight className="w-3 h-3" />
                           Switch
                         </button>
-                        <button
-                          onClick={(event) => handlePrintTable(table, event)}
-                          disabled={printingTable === table.name}
-                          className="flex-1 flex items-center justify-center gap-2 py-2 text-xs font-semibold rounded bg-white hover:bg-amber-100 transition disabled:opacity-60 disabled:cursor-not-allowed"
-                        >
-                          {printingTable === table.name ? (
-                            <>
-                              <Loader2 className="w-3 h-3 animate-spin" />
-                              Printing...
-                            </>
-                          ) : (
-                            <>
-                              <Printer className="w-3 h-3" />
-                              Print
-                            </>
-                          )}
-                        </button>
+                        {(userCanBill || kotReprintEnabled) && (
+                          <button
+                            onClick={(event) => handlePrintTable(table, event)}
+                            disabled={printingTable === table.name}
+                            className="flex-1 flex items-center justify-center gap-2 py-2 text-xs font-semibold rounded bg-white hover:bg-amber-100 transition disabled:opacity-60 disabled:cursor-not-allowed"
+                          >
+                            {printingTable === table.name ? (
+                              <>
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                                Printing...
+                              </>
+                            ) : (
+                              <>
+                                <Printer className="w-3 h-3" />
+                                {userCanBill ? 'Print' : 'KOT'}
+                              </>
+                            )}
+                          </button>
+                        )}
                       </div>
                     ) : (
                       <p className="text-sm text-gray-500">{t('tables.tap_to_start')}</p>
