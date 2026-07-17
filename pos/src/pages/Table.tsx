@@ -10,6 +10,7 @@ import { Badge } from '../components/ui/badge';
 import { DINE_IN } from '../data/order-types';
 import { TableShapeIcon } from '../components/TableShapeIcon';
 import { getTableOrder } from '../lib/order-api';
+import { reprintKot } from '../lib/invoice-api';
 import { printOrder } from '../lib/print';
 import { showToast } from '../components/ui/toast';
 import { canUserBill } from '../lib/role-utils';
@@ -19,6 +20,7 @@ import { t } from '../i18n';
 
 import LayoutView from '../components/LayoutView';
 import TableSwitchDialog from '../components/TableSwitchDialog';
+import PrintChoiceDialog from '../components/PrintChoiceDialog';
 import PaymentDialog from '../components/PaymentDialog';
 
 interface PendingPayment {
@@ -51,6 +53,8 @@ const TableView = () => {
   const [printingTable, setPrintingTable] = useState<string | null>(null);
   const [switchFromTable, setSwitchFromTable] = useState<Table | null>(null);
   const [switchingTo, setSwitchingTo] = useState<string | null>(null);
+  const [printChoiceTable, setPrintChoiceTable] = useState<Table | null>(null);
+  const [printBusy, setPrintBusy] = useState<'kot' | 'bill' | null>(null);
   const [pendingPayment, setPendingPayment] = useState<PendingPayment | null>(null);
   const [invoiceStatus, setInvoiceStatus] = useState<Record<string, TableInvoiceStatus>>({});
 
@@ -194,8 +198,8 @@ const TableView = () => {
     handleNavigateToPOS(table.name);
   };
 
-  const handlePrintTable = async (table: Table, event: MouseEvent<HTMLButtonElement>) => {
-    event.stopPropagation();
+  const handlePrintBill = async (table: Table, event?: MouseEvent<HTMLButtonElement>) => {
+    event?.stopPropagation();
 
     if (!posProfile) {
       showToast.error('POS profile not loaded yet');
@@ -239,6 +243,70 @@ const TableView = () => {
       showToast.error(error instanceof Error ? error.message : 'Failed to print order');
     } finally {
       setPrintingTable(null);
+    }
+  };
+
+  // Full-order KOT to the billing-area printer (POS Profile table/parcel
+  // order printer). Never touches invoice_printed and never opens payment.
+  const handlePrintKot = async (table: Table) => {
+    try {
+      const orderResponse = await getTableOrder(table.name);
+      const order = orderResponse.message;
+
+      if (!order?.name) {
+        showToast.error('No active order found for this table');
+        return;
+      }
+
+      await reprintKot(order.name);
+      showToast.success('KOT printed');
+    } catch (error) {
+      showToast.error(error instanceof Error ? error.message : 'Failed to print KOT');
+    }
+  };
+
+  // Print button: with KOT reprint enabled offer KOT vs Bill, otherwise keep
+  // the one-tap bill flow. Waiters (no billing role) never get the Bill
+  // option — their Print goes straight to KOT.
+  const kotReprintEnabled = posProfile?.custom_enable_kot_reprint === 1;
+
+  const handlePrintTable = (table: Table, event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    if (kotReprintEnabled && userCanBill) {
+      setPrintChoiceTable(table);
+    } else if (kotReprintEnabled) {
+      void (async () => {
+        setPrintingTable(table.name);
+        try {
+          await handlePrintKot(table);
+        } finally {
+          setPrintingTable(null);
+        }
+      })();
+    } else if (userCanBill) {
+      void handlePrintBill(table);
+    }
+  };
+
+  const handleChooseKot = async () => {
+    if (!printChoiceTable) return;
+    setPrintBusy('kot');
+    try {
+      await handlePrintKot(printChoiceTable);
+    } finally {
+      setPrintBusy(null);
+      setPrintChoiceTable(null);
+    }
+  };
+
+  const handleChooseBill = async () => {
+    if (!printChoiceTable) return;
+    setPrintBusy('bill');
+    try {
+      await handlePrintBill(printChoiceTable);
+    } finally {
+      setPrintBusy(null);
+      setPrintChoiceTable(null);
     }
   };
 
@@ -514,23 +582,25 @@ const TableView = () => {
                           <ArrowLeftRight className="w-3 h-3" />
                           Switch
                         </button>
-                        <button
-                          onClick={(event) => handlePrintTable(table, event)}
-                          disabled={printingTable === table.name}
-                          className="flex-1 flex items-center justify-center gap-2 py-2 text-xs font-semibold rounded bg-white hover:bg-amber-100 transition disabled:opacity-60 disabled:cursor-not-allowed"
-                        >
-                          {printingTable === table.name ? (
-                            <>
-                              <Loader2 className="w-3 h-3 animate-spin" />
-                              Printing...
-                            </>
-                          ) : (
-                            <>
-                              <Printer className="w-3 h-3" />
-                              Print
-                            </>
-                          )}
-                        </button>
+                        {(userCanBill || kotReprintEnabled) && (
+                          <button
+                            onClick={(event) => handlePrintTable(table, event)}
+                            disabled={printingTable === table.name}
+                            className="flex-1 flex items-center justify-center gap-2 py-2 text-xs font-semibold rounded bg-white hover:bg-amber-100 transition disabled:opacity-60 disabled:cursor-not-allowed"
+                          >
+                            {printingTable === table.name ? (
+                              <>
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                                Printing...
+                              </>
+                            ) : (
+                              <>
+                                <Printer className="w-3 h-3" />
+                                {userCanBill ? 'Print' : 'KOT'}
+                              </>
+                            )}
+                          </button>
+                        )}
                       </div>
                     ) : (
                       <p className="text-sm text-gray-500">{t('tables.tap_to_start')}</p>
@@ -566,6 +636,15 @@ const TableView = () => {
         switching={switchingTo}
         onClose={() => setSwitchFromTable(null)}
         onSelect={handleSwitchTable}
+      />
+
+      <PrintChoiceDialog
+        isOpen={!!printChoiceTable}
+        tableName={printChoiceTable?.name ?? null}
+        busy={printBusy}
+        onClose={() => setPrintChoiceTable(null)}
+        onPrintKot={handleChooseKot}
+        onPrintBill={handleChooseBill}
       />
 
       {pendingPayment && posProfile && (

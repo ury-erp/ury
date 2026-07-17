@@ -365,6 +365,7 @@ fixtures = [
                     "POS Profile-custom_column_break_wwq3q",
                     "POS Profile-custom_table_order_printer",
                     "POS Profile-custom_reprint_kot_format",
+                    "POS Profile-custom_block_on_print_failure",
                     "Employee-payment_amount",
                     "Employee-payment_type"
                 },
