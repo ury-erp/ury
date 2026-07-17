@@ -189,9 +189,11 @@ describe('TableSelectionDialog', () => {
     await waitFor(() => {
       expect(screen.getByText('Terrace')).toBeInTheDocument();
     });
-    // Tables spinner should be present
-    const spinners = screen.getAllByTestId('spinner');
-    expect(spinners.length).toBeGreaterThanOrEqual(1);
+    // Tables spinner should be present (may take a tick to appear)
+    await waitFor(() => {
+      const spinners = screen.getAllByTestId('spinner');
+      expect(spinners.length).toBeGreaterThanOrEqual(1);
+    });
   });
 
   it('should display tables after fetching', async () => {

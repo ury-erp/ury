@@ -35,3 +35,11 @@ privateKey.js
 
 # Test coverage
 coverage/
+
+# Playwright E2E test artifacts
+test-results/
+e2e-report/
+playwright-report/
+
+# Bundle analysis
+../bundle-analysis/
