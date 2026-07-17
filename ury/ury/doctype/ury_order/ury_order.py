@@ -9,6 +9,7 @@ from erpnext.controllers.queries import item_query
 from ury.ury_pos.api import getBranch, getBranchRoom
 from ury.ury.api.ury_kot_generate import kot_execute
 from ury.ury.api.ury_kot_generate import process_items_for_cancel_kot
+from ury.ury.api.ury_print import is_strict_print
 
 from frappe import cache
 
@@ -297,8 +298,13 @@ def sync_order(
         kot_execute(invoice.name, customer, table, items, past_item, comments)
 
     except Exception as e:
-        # If an exception occurs (e.g., "kot" app not found), it will be caught here without affect the code execution.
-        error_msg = f"KOT Creation Failes {str(e)}"            
+        # With "Fail Order When Printer Offline" enabled a KOT failure aborts
+        # the whole order: the exception propagates, the request rolls back
+        # and nothing is saved (invoice, table status, KOT).
+        if is_strict_print(pos_profile):
+            raise
+        # Otherwise it is caught here without affecting the code execution.
+        error_msg = f"KOT Creation Failes {str(e)}"
         frappe.log_error(error_msg, "KOT Error")
 
     # table status

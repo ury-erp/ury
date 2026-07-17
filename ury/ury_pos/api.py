@@ -1,7 +1,7 @@
 import frappe
 from frappe import _
 from datetime import date, datetime, timedelta
-from frappe.utils import validate_phone_number
+from frappe.utils import cint, validate_phone_number
 
 
 #GetTable  decripted temporarily
@@ -576,7 +576,9 @@ def getPosProfile():
         "multiple_cashier":multiple_cashier,
         "owner":owner,
         "edit_order_type":edit_order_type,
-        "enable_kot_reprint":enable_kot_reprint
+        "enable_kot_reprint":enable_kot_reprint,
+        # .get: survives a site whose Custom Field is not migrated yet
+        "block_on_print_failure": cint(pos_profiles.get("custom_block_on_print_failure")),
 
     }
 

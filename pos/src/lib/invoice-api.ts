@@ -150,20 +150,63 @@ export async function getInvoicePrintHtml(invoiceId: string, printFormat: string
 } 
 
 export async function networkPrint(orderId: string, printer: string, printFormat: string) {
-  await call.post('ury.ury.api.ury_print.network_printing', {
+  const res = await call.post<{ message?: string }>('ury.ury.api.ury_print.network_printing', {
     doctype: 'POS Invoice',
     name: orderId,
     printer_setting: printer,
     print_format: printFormat,
   });
+  // Backend reports failures as a string ("Failed to print: ..."), not an
+  // HTTP error — surface them instead of faking success.
+  if (res?.message !== 'Success') {
+    throw new Error(res?.message || 'Print failed');
+  }
 }
 
 export async function selectNetworkPrinter(orderId: string, posProfile: string, printFormat?: string | null) {
-  await call.post('ury.ury.api.ury_print.select_network_printer', {
+  const res = await call.post<{ message?: string }>('ury.ury.api.ury_print.select_network_printer', {
     invoice_id: orderId,
     pos_profile: posProfile,
     print_format: printFormat,
   });
+  if (res?.message !== 'Success') {
+    throw new Error(res?.message || 'No bill printer configured for this room/profile');
+  }
+}
+
+/** frappe-js-sdk rejects with a plain object, not an Error — pull the
+ *  human-readable server message out so catch blocks can toast it. */
+function toPrintError(err: unknown, fallback: string): Error {
+  if (err instanceof Error) return err;
+  if (err && typeof err === 'object') {
+    const e = err as { _server_messages?: string; message?: string };
+    if (typeof e._server_messages === 'string') {
+      try {
+        const parsed = JSON.parse(JSON.parse(e._server_messages)[0]);
+        if (parsed?.message) return new Error(parsed.message);
+      } catch {
+        // fall through
+      }
+    }
+    if (e.message) return new Error(e.message);
+  }
+  return new Error(fallback);
+}
+
+/** Print the full current order KOT-style (codes + qty, no prices) on the
+ *  POS Profile's table/parcel order printer — the billing-area printer. */
+export async function reprintKot(invoiceId: string) {
+  let res: { message?: string } | undefined;
+  try {
+    res = await call.post<{ message?: string }>('ury.ury.api.ury_kot_reprint.reprint_kot', {
+      invoice_number: invoiceId,
+    });
+  } catch (err) {
+    throw toPrintError(err, 'KOT print failed');
+  }
+  if (res?.message !== 'Success') {
+    throw new Error(res?.message || 'KOT print failed');
+  }
 }
 
 

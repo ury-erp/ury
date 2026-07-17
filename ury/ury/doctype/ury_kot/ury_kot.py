@@ -4,8 +4,9 @@
 import frappe
 import requests
 import json
-from frappe.utils.print_format import print_by_server
 from frappe.model.document import Document
+
+from ury.ury.api.ury_print import check_printer_ready, is_strict_print, print_via_cups
 
 
 class URYKOT(Document):
@@ -38,34 +39,34 @@ class URYKOT(Document):
 
     # Function for printing multiple KOTs.
     def multi_print_kot(self):
+        # Collect print targets first, then print, so strict mode can verify
+        # every printer is reachable before a single slip comes out.
+        targets = []
         # The same physical printer may be configured on the POS Profile, the
-        # production unit and the room; print each printer only once per KOT.
-        printed = set()
+        # production unit and the room; print each (printer, format) pair only
+        # once per KOT. Same printer with two different formats prints both —
+        # that is how a single-printer site gets Kitchen + Billing slips.
+        seen = set()
 
-        # Function for printing a KOT on a specified printer using a print format.
-        def print_kot(printer, kot_print_format):
-            if printer in printed:
+        def add_target(printer, kot_print_format):
+            if (printer, kot_print_format) in seen:
                 return
-            printed.add(printer)
-            try:
-                # Print KOT using a server function (print_by_server)
-                print_by_server("URY KOT", self.name, printer, kot_print_format)
-            except:
-                pass
+            seen.add((printer, kot_print_format))
+            targets.append((printer, kot_print_format))
 
-        
+
         pos_kot_printers = frappe.db.get_all(
             "URY Printer Settings",
-            fields=["printer", "custom_kot_print_format","custom_kot_print"], 
+            fields=["printer", "custom_kot_print_format","custom_kot_print"],
             filters={"parent": self.pos_profile, "custom_kot_print": 1,"parenttype":"POS Profile"},
             order_by="idx"
         )
-    
+
         pos_print_flag = True
         if self.production:
             production_unit_printers = frappe.get_all(
                 "URY Printer Settings",
-                fields=["printer", "custom_kot_print_format","custom_kot_print","custom_block_takeaway_kot"], 
+                fields=["printer", "custom_kot_print_format","custom_kot_print","custom_block_takeaway_kot"],
                 filters={"parent": self.production, "custom_kot_print": 1,"parenttype":"URY Production Unit"},
                 order_by="idx"
             )
@@ -76,9 +77,9 @@ class URYKOT(Document):
                     pos_print_flag = False
                     if printer.custom_block_takeaway_kot == 1 :
                         if self.restaurant_table and self.table_takeaway == 0:
-                            print_kot(printer.printer, printer.custom_kot_print_format)
+                            add_target(printer.printer, printer.custom_kot_print_format)
                     else:
-                        print_kot(printer.printer, printer.custom_kot_print_format)
+                        add_target(printer.printer, printer.custom_kot_print_format)
 
                 # Check if restaurant table is specified and it's not a takeaway order
                 if self.restaurant_table and self.table_takeaway == 0:
@@ -92,22 +93,43 @@ class URYKOT(Document):
                         filters={"parent": room, "custom_kot_print": 1,"parenttype":"URY Room"},
                         order_by="idx"
                     )
-                    
+
                     # If room printer is specified, print KOT in room
                     if room_kot_printers:
                         for printer in room_kot_printers:
                             pos_print_flag = False
-                            print_kot(printer.printer, printer.custom_kot_print_format)
+                            add_target(printer.printer, printer.custom_kot_print_format)
 
                     if pos_print_flag == True:
                         if pos_kot_printers:
                             for printer in pos_kot_printers:
-                                print_kot(printer.printer, printer.custom_kot_print_format)
+                                add_target(printer.printer, printer.custom_kot_print_format)
 
                 else:
                     if pos_kot_printers:
                         for printer in pos_kot_printers:
-                            print_kot(printer.printer, printer.custom_kot_print_format)
+                            add_target(printer.printer, printer.custom_kot_print_format)
+
+        strict = is_strict_print(self.pos_profile)
+
+        if strict:
+            # Fail before ANY slip prints: a dead print node or stopped queue
+            # aborts the whole KOT (and with it the order) up front. A printer
+            # that is powered off behind a live node is only caught by the
+            # job-state polling below — that slip-level failure can leave
+            # earlier slips already printed.
+            for printer_setting in dict.fromkeys(t[0] for t in targets):
+                check_printer_ready(printer_setting)
+
+        for printer, kot_print_format in targets:
+            try:
+                print_via_cups(
+                    "URY KOT", self.name, printer, kot_print_format, strict=bool(strict)
+                )
+            except Exception:
+                if strict:
+                    raise
+                frappe.log_error(frappe.get_traceback(), "KOT Print Failed")
 
 
     # Function for displaying KOT-related information in real-time On KDS(Kitchen Display System)

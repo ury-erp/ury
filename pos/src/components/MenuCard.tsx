@@ -35,7 +35,7 @@ const MenuCard: FC<MenuCardProps> = ({
       : placeholderText.length <= 14
         ? 'text-lg'
         : 'text-xs';
-  const placeholderClass = `w-full h-full bg-gray-200 flex items-center justify-center text-gray-400 font-medium font-mono px-2 text-center break-all overflow-hidden ${placeholderSize}`;
+  const placeholderClass = `w-full h-full bg-[#0000A0] flex items-center justify-center text-white font-bold font-mono px-2 text-center break-all overflow-hidden ${placeholderSize}`;
 
   return (
     <div
@@ -80,7 +80,7 @@ const MenuCard: FC<MenuCardProps> = ({
             Otherwise the name stays the primary label. */}
         {showItemCode && (item_code || item) ? (
           <div>
-            <p className="font-semibold text-gray-900 text-sm leading-5 font-mono truncate" title={item_code || item}>
+            <p className="font-semibold text-[#333333] text-sm leading-5 font-mono truncate" title={item_code || item}>
               {item_code || item}
             </p>
             <h3 className="text-xs text-gray-500 leading-4 line-clamp-2 mt-0.5" title={name}>
@@ -88,7 +88,7 @@ const MenuCard: FC<MenuCardProps> = ({
             </h3>
           </div>
         ) : (
-          <h3 className="font-medium text-gray-900 text-sm leading-5 line-clamp-2" title={name}>
+          <h3 className="font-medium text-[#333333] text-sm leading-5 line-clamp-2" title={name}>
             {name}
           </h3>
         )}
@@ -102,7 +102,7 @@ const MenuCard: FC<MenuCardProps> = ({
 
         {/* Price section - pushed to bottom */}
         <div className="mt-auto pt-2">
-          <span className="text-sm font-semibold text-gray-900 tabular-nums">
+          <span className="text-sm font-semibold text-[#333333] tabular-nums">
             {formatCurrency(price)}
           </span>
         </div>

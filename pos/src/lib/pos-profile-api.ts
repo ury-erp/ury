@@ -64,6 +64,11 @@ export interface PosProfileFull {
   role_allowed_for_billing: RolePermission[];
   role_restricted_for_table_order?: RolePermission[];
   paid_limit?: number;
+  /** POS Profile: "Enable KOT Reprint" — also gates the KOT option in the
+   *  table-page print chooser. Comes with the full doc spread. */
+  custom_enable_kot_reprint?: number;
+  /** POS Profile: "Fail Order When Printer Offline" — strict print mode. */
+  custom_block_on_print_failure?: number;
 }
 
 // Combined POS Profile with both limited and full fields
