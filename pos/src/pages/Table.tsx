@@ -231,7 +231,7 @@ const TableView = () => {
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full" data-testid="page-table">
       <div className="p-4 bg-white border-b border-gray-200">
         <div className="max-w-screen-xl mx-auto">
           <div className="flex flex-col gap-3">

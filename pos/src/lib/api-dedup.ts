@@ -3,14 +3,20 @@
  *
  * Prevents duplicate in-flight requests for the same endpoint+params,
  * and optionally caches GET responses with TTL.
+ * Integrates with the API rate limiter for request prioritization.
+ *
+ * Architecture:
+ *   dedupedCall.get → cache check → dedup check → rate limiter → call.get (retry)
  *
  * Usage:
  *   import { dedupedCall } from './api-dedup';
  *   const data = await dedupedCall.get('ury_dashboard.api.summary');
+ *   const data = await dedupedCall.get('sync_order', params, { priority: 'critical' });
  */
 
 import { call } from './frappe-sdk-retry';
 import { logger } from './logger';
+import { apiRateLimiter, inferPriority, type RequestPriority } from './api-rate-limiter';
 
 interface CacheEntry<T> {
   data: T;
@@ -82,9 +88,12 @@ export const dedupedCall = {
       cacheTtl?: number;
       /** Skip dedup entirely */
       noDedup?: boolean;
+      /** Request priority for rate limiting (default: auto-inferred from method) */
+      priority?: RequestPriority;
     }
   ): Promise<T> => {
     const cacheTtl = options?.cacheTtl ?? DEFAULT_CACHE_TTL;
+    const priority = options?.priority ?? inferPriority(method);
     const key = makeKey(method, params);
 
     // Clean up stale entries periodically
@@ -109,8 +118,11 @@ export const dedupedCall = {
       }
     }
 
-    // Make the actual request
-    const promise = call.get<T>(method, params)
+    // Route through rate limiter → retry → actual call
+    const promise = apiRateLimiter.execute<T>(
+      () => call.get<T>(method, params),
+      priority
+    )
       .then((data) => {
         // Cache the response
         if (cacheTtl > 0) {
@@ -134,9 +146,14 @@ export const dedupedCall = {
 
   post: async <T = unknown>(
     method: string,
-    params?: Record<string, unknown>
+    params?: Record<string, unknown>,
+    options?: {
+      /** Request priority for rate limiting (default: auto-inferred from method) */
+      priority?: RequestPriority;
+    }
   ): Promise<T> => {
     // POST requests are never cached, but we still dedup in-flight
+    const priority = options?.priority ?? inferPriority(method);
     const key = makeKey(method, params);
 
     cleanupStalePending();
@@ -147,7 +164,11 @@ export const dedupedCall = {
       return pending.promise as Promise<T>;
     }
 
-    const promise = call.post<T>(method, params)
+    // Route through rate limiter → retry → actual call
+    const promise = apiRateLimiter.execute<T>(
+      () => call.post<T>(method, params),
+      priority
+    )
       .then((data) => {
         pendingRequests.delete(key);
         // Invalidate any cached GET responses for related endpoints

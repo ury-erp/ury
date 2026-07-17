@@ -26,10 +26,13 @@ const Sidebar = ({ disabled }: SidebarProps) => {
   }, [menuItems]);
 
   return (
-    <div className={cn(
-      "w-64 bg-white border-e border-gray-200 h-screen flex flex-col",
-      disabled && "opacity-50 pointer-events-none"
-    )}>
+    <div
+      className={cn(
+        "w-64 bg-white border-e border-gray-200 h-screen flex flex-col",
+        disabled && "opacity-50 pointer-events-none"
+      )}
+      data-testid="sidebar"
+    >
       {/* Categories List */}
       <nav className="flex-1 p-6 overflow-y-auto">
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
@@ -42,6 +45,7 @@ const Sidebar = ({ disabled }: SidebarProps) => {
           <Button
             onClick={() => setSelectedCategory('')}
             variant="ghost"
+            data-testid="sidebar-all-items"
             className={cn(
               'w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium transition-all duration-200 group relative mb-1',
               selectedCategory === ''

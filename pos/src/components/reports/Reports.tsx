@@ -108,7 +108,7 @@ const Reports = () => {
   ];
 
   return (
-    <div className="flex flex-col h-full overflow-y-auto p-6">
+    <div className="flex flex-col h-full overflow-y-auto p-6" data-testid="page-reports">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>

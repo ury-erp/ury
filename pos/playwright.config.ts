@@ -5,6 +5,7 @@ import { defineConfig, devices } from '@playwright/test';
  *
  * Tests use MSW to mock API calls, so no Frappe backend is needed.
  * The dev server must be running with VITE_MSW_ENABLED=true.
+ * The POS app uses React Router with basename="/pos", served at /pos/.
  *
  * Usage:
  *   npx playwright test           — run all E2E tests
@@ -19,17 +20,19 @@ export default defineConfig({
   workers: 1, // Single worker for stability with MSW
   reporter: process.env.CI
     ? [['list'], ['html', { open: 'never' }]]
-    : [['list'], ['html', { open: 'on-failure' }]],
+    : [['list'], ['html', { open: 'on-failure', outputFolder: 'e2e-report' }]],
   timeout: 30000,
   expect: {
     timeout: 10000,
   },
 
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL: 'http://localhost:5173/pos',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
+    actionTimeout: 15_000,
+    navigationTimeout: 30_000,
   },
 
   projects: [
@@ -43,8 +46,8 @@ export default defineConfig({
   // reuseExistingServer: true means if a server is already running, use it
   webServer: {
     command: 'VITE_MSW_ENABLED=true npx vite --port 5173',
-    url: 'http://localhost:5173',
-    reuseExistingServer: true,
-    timeout: 30000,
+    url: 'http://localhost:5173/pos/',
+    reuseExistingServer: !process.env.CI,
+    timeout: 30_000,
   },
 });

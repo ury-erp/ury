@@ -104,11 +104,11 @@ const Header = () => {
   };
 
   return (
-    <header className="bg-white border-b border-gray-200">
+    <header className="bg-white border-b border-gray-200" data-testid="header">
       <div className="flex items-center justify-between h-16 px-6">
         {/* Logo */}
         <div className="flex items-center">
-        <Link to="/" className="flex items-center gap-3">
+        <Link to="/" className="flex items-center gap-3" data-testid="header-logo">
             <img 
               src="/assets/ury/pos/ury_pos.png" 
               alt="URY POS" 
@@ -122,6 +122,7 @@ const Header = () => {
             <Input
               ref={searchInputRef}
               placeholder={searchPlaceholder}
+              data-testid="header-search"
               className="h-fit p-0 w-full bg-transparent border-0 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
               value={searchValue}
               onChange={searchOnChange}
@@ -139,6 +140,7 @@ const Header = () => {
             <Button
               onClick={handleUserMenuToggle}
               variant="ghost"
+              data-testid="header-user-menu"
               className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
             >
               <div className="w-8 h-8 bg-primary-500 rounded-full flex items-center justify-center">
@@ -150,7 +152,7 @@ const Header = () => {
 
             {/* User dropdown */}
             {showUserMenu && (
-              <div className="absolute end-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+              <div className="absolute end-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-50" data-testid="header-user-dropdown">
                 <div className="p-4 border-b border-gray-200">
                   <p className="text-sm font-medium text-gray-900">{user?.full_name || t('header.default_user')}</p>
                   <p className="text-sm text-gray-500">{user?.name || ''}</p>
@@ -174,6 +176,7 @@ const Header = () => {
                   </Button>
                   <Button
                     variant="ghost"
+                    data-testid="header-logout"
                     className="flex justify-start items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 hover:text-red-700 transition-colors"
                     onClick={handleLogout}
                   >
