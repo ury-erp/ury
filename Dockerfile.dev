@@ -1,0 +1,29 @@
+# URY Dashboard — Development Dockerfile
+# Hot-reload capable Next.js development image
+# Usage: docker compose -f docker-compose.dev.yml up
+
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install dependencies first (cached layer)
+COPY package.json yarn.lock* package-lock.json* ./
+COPY packages/ui/package.json ./packages/ui/package.json
+COPY pos/package.json ./pos/package.json
+COPY frontend/package.json ./frontend/package.json
+
+# Install all workspace dependencies
+RUN npm install --ignore-scripts || yarn install --ignore-scripts || true
+
+# Copy source code
+COPY . .
+
+# Expose Next.js dev server port
+EXPOSE 3000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/ || exit 1
+
+# Start development server with hot-reload
+CMD ["npm", "run", "dev", "--", "-H", "0.0.0.0"]

@@ -13,14 +13,14 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, "..");
 
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
-const REPO = process.env.REPO; // e.g. "ury-erp/ury-dashboard"
+const REPO = process.env.REPO; // e.g. "ury-erp/ury"
 
 if (!GITHUB_TOKEN) {
   console.error("ERROR: GITHUB_TOKEN environment variable is required");
   process.exit(1);
 }
 if (!REPO) {
-  console.error("ERROR: REPO environment variable is required (e.g. ury-erp/ury-dashboard)");
+  console.error("ERROR: REPO environment variable is required (e.g. ury-erp/ury)");
   process.exit(1);
 }
 

@@ -16,7 +16,7 @@
 set -euo pipefail
 
 # ── Configuration ──────────────────────────────────────────
-UPSTREAM_REPO="${UPSTREAM_REPO:-ury-erp/ury-dashboard}"
+UPSTREAM_REPO="${UPSTREAM_REPO:-ury-erp/ury}"
 UPSTREAM_REMOTE="${UPSTREAM_REMOTE:-upstream}"
 FORK_REMOTE="${FORK_REMOTE:-origin}"
 DEFAULT_TARGET_BRANCH="${DEFAULT_TARGET_BRANCH:-develop}"

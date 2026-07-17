@@ -1,0 +1,118 @@
+# URY Dashboard — Development Docker Compose
+# Full development stack: Dashboard + PostgreSQL + Redis + Adminer
+# Usage: docker compose -f docker-compose.dev.yml up
+
+version: "3.8"
+
+services:
+  # ── Dashboard (Next.js) ─────────────────────────────────
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: ury-dashboard
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/packages/ui/node_modules
+      - /app/pos/node_modules
+      - /app/frontend/node_modules
+    environment:
+      - NODE_ENV=development
+      - NEXT_TELEMETRY_DISABLED=1
+      - DATABASE_URL=postgresql://ury:ury_dev_2024@postgres:5432/ury_dashboard
+      - REDIS_URL=redis://redis:6379
+      - NEXTAUTH_SECRET=dev-secret-change-in-production
+      - NEXTAUTH_URL=http://localhost:3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - ury-dev
+
+  # ── PostgreSQL 16 ───────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: ury-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: ury_dashboard
+      POSTGRES_USER: ury
+      POSTGRES_PASSWORD: ury_dev_2024
+    volumes:
+      - ury-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ury -d ury_dashboard"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - ury-dev
+
+  # ── Adminer (DB GUI) ────────────────────────────────────
+  adminer:
+    image: adminer:latest
+    container_name: ury-adminer
+    ports:
+      - "8080:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - ury-dev
+
+  # ── Redis 7 ─────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: ury-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - ury-redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - ury-dev
+
+  # ── URY Realtime (WebSocket) ────────────────────────────
+  ury-realtime:
+    build:
+      context: ./mini-services/ury-realtime
+      dockerfile: Dockerfile
+    container_name: ury-realtime
+    ports:
+      - "4000:4000"
+    environment:
+      - NODE_ENV=development
+      - REDIS_URL=redis://redis:6379
+      - PORT=4000
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - ury-dev
+
+volumes:
+  ury-pgdata:
+    driver: local
+  ury-redisdata:
+    driver: local
+
+networks:
+  ury-dev:
+    driver: bridge

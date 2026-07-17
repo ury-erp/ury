@@ -30,7 +30,7 @@ jobs:
     name: Create Upstream PR
     runs-on: ubuntu-latest
     # Only run on forks (where github.repository != the upstream repo)
-    if: github.event_name == 'workflow_dispatch' || github.repository != 'ury-erp/ury-dashboard'
+    if: github.event_name == 'workflow_dispatch' || github.repository != 'ury-erp/ury'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -65,7 +65,7 @@ jobs:
             const sourceBranch = '${{ steps.branches.outputs.source }}';
             const targetBranch = '${{ steps.branches.outputs.target }}';
             const forkRepo = '${{ github.repository }}';
-            const upstreamRepo = '${{ secrets.UPSTREAM_REPO || 'ury-erp/ury-dashboard' }}';
+            const upstreamRepo = '${{ secrets.UPSTREAM_REPO || 'ury-erp/ury' }}';
             const commitMessages = `${{ steps.commits.outputs.messages }}`;
 
             const title = `Sync: ${forkRepo}:${sourceBranch} → ${targetBranch}`;
@@ -112,7 +112,7 @@ jobs:
 
       - name: Add upstream remote
         run: |
-          UPSTREAM_REPO="${{ secrets.UPSTREAM_REPO || 'ury-erp/ury-dashboard' }}"
+          UPSTREAM_REPO="${{ secrets.UPSTREAM_REPO || 'ury-erp/ury' }}"
           git remote add upstream "https://github.com/${UPSTREAM_REPO}.git" 2>/dev/null || true
           git fetch upstream
 
