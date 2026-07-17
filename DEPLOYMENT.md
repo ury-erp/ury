@@ -87,24 +87,40 @@ bench --site chefworks.storenxt.in set-maintenance-mode off
 
 ## 5. If someone added a Custom Field directly on the live site (not via code)
 
-Custom Fields added through Desk UI live only in the DB until exported. Do this **every time** that happens, so the fork stays the source of truth:
+**Never run `bench export-fixtures` on the live server.** It rewrites `ury/fixtures/*.json`
+in the live git folder from whatever that one site's DB holds — it drops fields the repo
+has but that site doesn't (that's how `show_item_code` was lost), and it dirties the tree
+so every later `git pull` aborts with "local changes would be overwritten". Both of our
+broken deploys trace back to exactly this command being run here.
+
+Fixtures flow **one direction only**: repo → server. The server consumes fixtures via
+`bench migrate`; it never produces them.
+
+When a field was created on the live site through Desk UI, bring it into the repo **on
+your local machine**:
 
 ```bash
-bench --site chefworks.storenxt.in export-fixtures --app ury
-cd ~/frappe-bench/apps/ury
-git diff ury/fixtures/
-git add ury/fixtures/
-git commit -m "Sync fixtures from live DB: <describe what was added>"
-git push <remote> <branch>
+# on the developer machine, local dev site (NOT the server)
+# 1. create the same Custom Field on the local site (Desk UI or bench console)
+bench --site <local-dev-site> export-fixtures --app ury
+cd apps/ury
+git diff ury/fixtures/          # review: ONLY the intended field may appear
+git add ury/fixtures/ && git commit -m "fix: add <field> to fixtures"
+# push, PR, merge, then deploy normally
 ```
 
-Skipping this step is the #1 cause of the "field's in fixtures but not on the site" confusion — the file and the DB silently drift apart.
+The live site already has the field in its DB, so the next `bench migrate` simply
+aligns the two — nothing is lost, nothing drifts.
+
+If the live tree is already dirty from a past export: `git stash push -m "server drift"`
+(recoverable backup), pull, deploy — and don't `git stash pop`.
 
 ---
 
 ## Golden rules
 1. One app folder (`apps/ury`) — never a second clone.
-2. Always confirm `git status` is clean before pulling.
-3. Always check migrate output for "Skipping fixture syncing" lines.
-4. Always confirm at the DB level (`frappe.db.exists(...)`) before assuming a fixture didn't sync — most "not reflecting" issues are cache, not import failures.
-5. Backup before any of this: `bench --site chefworks.storenxt.in backup --with-files`
+2. Always confirm `git status` is clean before pulling — `scripts/deploy.sh` enforces this and the rest of this runbook automatically.
+3. **Never run `bench export-fixtures` on the server, and never create doctype fields directly on the live site** — local dev site → fixtures → PR → migrate is the only path.
+4. Always check migrate output for "Skipping fixture syncing" lines.
+5. Always confirm at the DB level (`frappe.db.exists(...)`) before assuming a fixture didn't sync — most "not reflecting" issues are cache, not import failures.
+6. Backup before any of this: `bench --site chefworks.storenxt.in backup --with-files`
