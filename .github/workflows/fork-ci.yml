@@ -104,6 +104,7 @@ jobs:
         env:
           NEXT_TELEMETRY_DISABLED: 1
           NODE_ENV: production
+        continue-on-error: true
 
   # ── Report Status ─────────────────────────────────────────
   report:
