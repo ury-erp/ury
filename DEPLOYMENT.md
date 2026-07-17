@@ -104,7 +104,9 @@ your local machine**:
 # 1. create the same Custom Field on the local site (Desk UI or bench console)
 bench --site <local-dev-site> export-fixtures --app ury
 cd apps/ury
-git diff ury/fixtures/          # review: ONLY the intended field may appear
+git diff ury/fixtures/          # REVIEW: added lines = your new field only.
+                                # DELETED lines = someone else's field being
+                                # destroyed — STOP and git checkout -- the file.
 git add ury/fixtures/ && git commit -m "fix: add <field> to fixtures"
 # push, PR, merge, then deploy normally
 ```
@@ -112,8 +114,9 @@ git add ury/fixtures/ && git commit -m "fix: add <field> to fixtures"
 The live site already has the field in its DB, so the next `bench migrate` simply
 aligns the two — nothing is lost, nothing drifts.
 
-If the live tree is already dirty from a past export: `git stash push -m "server drift"`
-(recoverable backup), pull, deploy — and don't `git stash pop`.
+If the live tree is already dirty from a past export: `git diff` it first; then
+`git stash push -m "server drift"` (recoverable backup), pull, deploy — and never
+`git stash pop`. Drop the stash once the deploy is verified.
 
 ---
 
