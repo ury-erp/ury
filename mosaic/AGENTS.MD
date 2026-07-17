@@ -1,12 +1,12 @@
-# Mosaic — Agent Documentation
+# mosaic — Agent Documentation
 
 ## 1. Overview
 
-**Mosaic** is a Vue 3 real-time Kitchen Order Ticket (KOT) display system. It runs on a screen in the kitchen and shows live order tickets as they are placed or modified by the POS. Kitchen staff use it to track what to prepare and mark orders as served.
+**mosaic** is a Vue 3 real-time Kitchen Order Ticket (KOT) display system. It runs on a screen in the kitchen and shows live order tickets as they are placed or modified by the POS. Kitchen staff use it to track what to prepare and mark orders as served.
 
-- **URL:** `/Mosaic/<production_unit_name>` (e.g., `/Mosaic/Kitchen`)
-- **Served as:** Frappe web page (`ury/www/Mosaic.html`)
-- **Build output:** `ury/public/Mosaic/`
+- **URL:** `/mosaic/<production_unit_name>` (e.g., `/mosaic/Kitchen`)
+- **Served as:** Frappe web page (`ury/www/mosaic.html`)
+- **Build output:** `ury/public/mosaic/`
 
 The production unit name in the URL determines which KOTs are displayed. Each physical kitchen station has its own URL pointing to its production unit.
 
@@ -29,7 +29,7 @@ The production unit name in the URL determines which KOTs are displayed. Each ph
 ## 3. Project Structure
 
 ```
-Mosaic/
+mosaic/
 ├── src/
 │   ├── main.js           ← Vue app entry point
 │   ├── App.vue           ← Root component: mounts Header + KOT
@@ -207,7 +207,7 @@ KOTs are hidden from the board by setting `kot.showDiv = true` (not by removing 
 `audio_alert` is fetched from the backend (`POS Profile` / `URY Printer Settings`). Audio only plays if `audio_alert === 1` AND the user has clicked the page at least once (browser autoplay policy). The `showAudioAlertMessage` banner guides users to click.
 
 ### Authentication
-If `auth()` fails, `this.showModal = true` shows a "Not Permitted / Login" modal. The redirect goes to `/login?redirect-to=Mosaic/{production}`. Do not remove this auth check.
+If `auth()` fails, `this.showModal = true` shows a "Not Permitted / Login" modal. The redirect goes to `/login?redirect-to=mosaic/{production}`. Do not remove this auth check.
 
 ### What NOT to change
 - The `kot_channel` computation — changing it breaks real-time updates.
