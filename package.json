@@ -13,9 +13,18 @@
     "ury-posv2-build": "cd pos && yarn build",
     "ury-frontend-build": "cd frontend && yarn build",
     "postinstall": "yarn ury-pos-install && yarn ury-mosaic-install",
-    "build": "yarn ury-pos-build && yarn ury-mosaic-build && yarn ury-posv2-build && yarn ury-frontend-build"
+    "build": "yarn ury-pos-build && yarn ury-mosaic-build && yarn ury-posv2-build && yarn ury-frontend-build",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build"
   },
   "devDependencies": {
-    "@types/qz-tray": "^2.2.2"
+    "@types/qz-tray": "^2.2.2",
+    "storybook": "^10.5.2",
+    "@storybook/react-vite": "^10.5.2",
+    "@chromatic-com/storybook": "^5.2.1",
+    "@storybook/addon-vitest": "^10.5.2",
+    "@storybook/addon-a11y": "^10.5.2",
+    "@storybook/addon-docs": "^10.5.2",
+    "eslint-plugin-storybook": "^10.5.2"
   }
 }
