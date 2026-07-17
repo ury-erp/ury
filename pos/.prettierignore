@@ -1,7 +1,9 @@
 node_modules
 dist
 coverage
+build
 *.min.js
 *.min.css
 package-lock.json
-yarn.lock
+public/mockServiceWorker.js
+../bundle-analysis/

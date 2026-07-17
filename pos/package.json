@@ -14,7 +14,10 @@
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:e2e:debug": "playwright test --debug"
+    "test:e2e:debug": "playwright test --debug",
+    "type-check": "tsc --noEmit",
+    "check-all": "npm run type-check && npm run lint && npm test && npm run build",
+    "prepare": "husky"
   },
   "dependencies": {
     "@radix-ui/react-select": "^2.2.5",
@@ -62,6 +65,15 @@
     "typescript-eslint": "^8.24.1",
     "vite": "^6.2.0",
     "vitest": "^3.1.1"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml,css}": [
+      "prettier --write"
+    ]
   },
   "msw": {
     "workerDirectory": [

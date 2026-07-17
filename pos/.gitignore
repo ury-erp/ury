@@ -43,3 +43,9 @@ playwright-report/
 
 # Bundle analysis
 ../bundle-analysis/
+
+# Prettier
+.prettiercache
+
+# OS files
+Thumbs.db

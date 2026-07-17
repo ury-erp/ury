@@ -33,6 +33,33 @@ jobs:
       - name: Run ESLint
         run: npm run lint
 
+      - name: TypeScript type check
+        run: npx tsc --noEmit
+
+  # ── Security Audit ────────────────────────────────────
+  security:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Run npm audit
+        run: npm audit --audit-level=high --omit=dev
+        continue-on-error: true
+
+      - name: Check for known vulnerabilities
+        run: npx better-npm-audit audit --level=high || true
+        continue-on-error: true
+
   # ── Unit Tests ────────────────────────────────────────
   unit-tests:
     name: Unit Tests (Vitest)
@@ -49,8 +76,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run Vitest
-        run: npm test
+      - name: Run Vitest with coverage
+        run: npm run test:coverage
         env:
           VITE_FRAPPE_BASE_URL: http://localhost:8000
 
@@ -61,6 +88,23 @@ jobs:
           name: coverage-report
           path: coverage/
           retention-days: 7
+
+      - name: Coverage summary
+        if: always()
+        run: |
+          if [ -f coverage/coverage-summary.json ]; then
+            echo "## Test Coverage" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            cat coverage/coverage-summary.json | python3 -c "
+          import json, sys
+          data = json.load(sys.stdin)
+          total = data.get('total', {})
+          for key in ['lines', 'statements', 'functions', 'branches']:
+            pct = total.get(key, {}).get('pct', 0)
+            print(f'{key:>12}: {pct:.1f}%')
+          " >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
 
   # ── Build ─────────────────────────────────────────────
   build:
@@ -83,6 +127,15 @@ jobs:
         run: npm run build
         env:
           VITE_FRAPPE_BASE_URL: http://localhost:8000
+
+      - name: Check bundle size
+        run: |
+          echo "## Bundle Size" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cd ../ury/public/pos/assets/
+          du -sh . | head -1
+          du -sh *.js | sort -rh | head -10
+          echo '```' >> $GITHUB_STEP_SUMMARY
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
@@ -152,7 +205,7 @@ jobs:
   ci-summary:
     name: CI Summary
     runs-on: ubuntu-latest
-    needs: [lint, unit-tests, build, e2e-tests]
+    needs: [lint, security, unit-tests, build, e2e-tests]
     if: always()
     steps:
       - name: Check CI results
@@ -161,7 +214,8 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Lint | ${{ needs.lint.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Lint & Type Check | ${{ needs.lint.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Security Audit | ${{ needs.security.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Unit Tests | ${{ needs.unit-tests.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Build | ${{ needs.build.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| E2E Tests | ${{ needs.e2e-tests.result }} |" >> $GITHUB_STEP_SUMMARY

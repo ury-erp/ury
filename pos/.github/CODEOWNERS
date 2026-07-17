@@ -1,0 +1,23 @@
+# CODEOWNERS — Automatic PR review assignment
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owners for everything in the repo
+*       @ury-erp
+
+# Frontend (React POS)
+pos/src/              @ury-erp
+pos/e2e/              @ury-erp
+
+# MSW mocking layer
+pos/src/mocks/        @ury-erp
+
+# CI/CD and GitHub configuration
+pos/.github/          @ury-erp
+
+# Backend (Frappe/Python)
+ury/                  @ury-erp
+
+# Documentation
+pos/README.md         @ury-erp
+pos/CHANGELOG.md      @ury-erp
+pos/CONTRIBUTING.md   @ury-erp

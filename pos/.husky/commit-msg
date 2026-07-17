@@ -1,0 +1,21 @@
+# Validate conventional commit format
+# Format: type(scope): description
+# Types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert
+MSG="$(cat "$1")"
+PATTERN='^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?: .{1,100}'
+
+if ! echo "$MSG" | grep -qE "$PATTERN"; then
+  echo "Invalid commit message format!"
+  echo ""
+  echo "Expected: type(scope): description"
+  echo "Types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert"
+  echo ""
+  echo "Examples:"
+  echo "  feat: add new payment method"
+  echo "  fix(cart): correct tax calculation"
+  echo "  docs: update API integration guide"
+  echo "  test: add coverage for order sync"
+  echo ""
+  echo "Your message: $MSG"
+  exit 1
+fi

@@ -135,5 +135,28 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
     css: true,
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'lcov', 'json-summary', 'html'],
+      reportsDirectory: './coverage',
+      // Thresholds — prevent coverage from regressing
+      thresholds: {
+        lines: 60,
+        statements: 60,
+        branches: 50,
+        functions: 55,
+      },
+      // Exclude files that don't need coverage
+      exclude: [
+        'src/test/**',
+        'src/mocks/**',
+        'src/vite-env.d.ts',
+        'src/sw.ts',
+        'src/main.tsx',
+        '**/*.test.*',
+        '**/*.spec.*',
+        '**/index.ts',
+      ],
+    },
   },
 })

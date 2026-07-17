@@ -1,0 +1,48 @@
+# Auto-label rules for PRs
+# https://github.com/actions/labeler
+
+# Frontend
+frontend:
+  - changed-files:
+      - any-glob-to-any-file: 'pos/src/**/*'
+      - any-glob-to-any-file: 'pos/e2e/**/*'
+
+# Backend
+backend:
+  - changed-files:
+      - any-glob-to-any-file: 'ury/**/*.py'
+      - any-glob-to-any-file: 'ury/**/*.json'
+
+# CI/CD
+ci-cd:
+  - changed-files:
+      - any-glob-to-any-file: '.github/workflows/**/*'
+      - any-glob-to-any-file: '.github/dependabot.yml'
+
+# Testing
+testing:
+  - changed-files:
+      - any-glob-to-any-file: 'pos/src/**/*.test.*'
+      - any-glob-to-any-file: 'pos/e2e/**/*'
+
+# Documentation
+documentation:
+  - changed-files:
+      - any-glob-to-any-file: '**/*.md'
+      - any-glob-to-any-file: '**/README*'
+
+# MSW / Mocking
+msw:
+  - changed-files:
+      - any-glob-to-any-file: 'pos/src/mocks/**/*'
+
+# Dependencies
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file: 'pos/package.json'
+      - any-glob-to-any-file: 'pos/package-lock.json'
+
+# i18n
+i18n:
+  - changed-files:
+      - any-glob-to-any-file: 'pos/src/i18n/**/*'

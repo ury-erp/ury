@@ -107,3 +107,24 @@ Stage Summary:
 - CHANGELOG.md created with [Unreleased] and [0.1.0] sections
 - All 63 commits now pushed to GitHub fork (develop branch)
 - Documentation is complete: README.md, CONTRIBUTING.md, CHANGELOG.md, GitHub templates, CI/CD workflow
+
+---
+Task ID: 21
+Agent: Main Agent
+Task: CI/CD pipeline enhancements, Dependabot, release workflow, editorconfig
+
+Work Log:
+- Enhanced CI/CD: added concurrency groups (cancel-in-progress), coverage artifact upload, Playwright trace/video artifact separation, CI summary job with GitHub Step Summary table
+- CI now always uploads Playwright report (even on success) for trend analysis
+- Added release.yml workflow: automated GitHub Release on v* tags with changelog extraction, dist archives (tar.gz + zip), prerelease detection
+- Added dependabot.yml: weekly npm updates (grouped dev/prod deps), monthly GH Actions updates, scoped labels and commit prefixes
+- Created .editorconfig: 2-space indent, LF line endings, UTF-8 charset, Python 4-space exception
+- Enhanced GitHub templates: bug report (console errors section, device type, backend mode), feature request (use cases, PR willingness), PR template (CHANGELOG checklist, test type checklist)
+- Committed as eb86169 and pushed to fork/develop
+
+Stage Summary:
+- 8 files changed, 304 insertions, 23 deletions
+- CI pipeline now has 5 jobs: lint, unit-tests, build, e2e-tests, ci-summary
+- Release workflow ready for version tagging (git tag v1.0.0 && git push --tags)
+- Dependabot will auto-create PRs for dependency updates
+- All 64 commits now on GitHub fork/develop
