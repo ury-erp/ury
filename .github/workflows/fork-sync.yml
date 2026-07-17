@@ -1,0 +1,132 @@
+# URY Dashboard — Fork-to-Upstream PR Workflow
+# GitHub Actions workflow that handles PR creation between fork and upstream repositories
+# Automatically creates a PR from fork branches to upstream/develop
+
+name: Fork Sync & PR
+
+on:
+  # Trigger when a push happens on a fork's develop or feature branch
+  push:
+    branches: [develop, 'feature/**']
+  # Allow manual trigger
+  workflow_dispatch:
+    inputs:
+      source_branch:
+        description: 'Source branch on fork'
+        required: true
+        default: 'develop'
+      target_branch:
+        description: 'Target branch on upstream'
+        required: true
+        default: 'develop'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  # ── Create PR from Fork to Upstream ──────────────────────
+  create-upstream-pr:
+    name: Create Upstream PR
+    runs-on: ubuntu-latest
+    # Only run on forks (where github.repository != the upstream repo)
+    if: github.event_name == 'workflow_dispatch' || github.repository != 'ury-erp/ury-dashboard'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine branches
+        id: branches
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "source=${{ inputs.source_branch }}" >> $GITHUB_OUTPUT
+            echo "target=${{ inputs.target_branch }}" >> $GITHUB_OUTPUT
+          else
+            echo "source=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            echo "target=develop" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Get recent commits for PR body
+        id: commits
+        run: |
+          SOURCE="${{ steps.branches.outputs.source }}"
+          # Get last 10 commit messages
+          MESSAGES=$(git log --oneline -10 origin/$SOURCE 2>/dev/null || git log --oneline -10 $SOURCE)
+          echo "messages<<EOF" >> $GITHUB_OUTPUT
+          echo "$MESSAGES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create Pull Request to Upstream
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.UPSTREAM_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+          script: |
+            const sourceBranch = '${{ steps.branches.outputs.source }}';
+            const targetBranch = '${{ steps.branches.outputs.target }}';
+            const forkRepo = '${{ github.repository }}';
+            const upstreamRepo = '${{ secrets.UPSTREAM_REPO || 'ury-erp/ury-dashboard' }}';
+            const commitMessages = `${{ steps.commits.outputs.messages }}`;
+
+            const title = `Sync: ${forkRepo}:${sourceBranch} → ${targetBranch}`;
+            const body = `## Automated Fork Sync
+
+            **Source:** \`${forkRepo}:${sourceBranch}\`
+            **Target:** \`${upstreamRepo}:${targetBranch}\`
+
+            ### Recent Commits
+            ${commitMessages.split('\n').map(m => `- ${m}`).join('\n')}
+
+            ---
+            This PR was automatically created by the Fork Sync workflow.
+            Please review the changes before merging.`;
+
+            try {
+              const { data: pr } = await github.rest.pulls.create({
+                owner: upstreamRepo.split('/')[0],
+                repo: upstreamRepo.split('/')[1],
+                title: title,
+                body: body,
+                head: `${forkRepo}:${sourceBranch}`,
+                base: targetBranch,
+              });
+              console.log(`Created PR #${pr.number}: ${pr.html_url}`);
+            } catch (error) {
+              if (error.status === 422) {
+                console.log('A PR already exists for this branch combination.');
+              } else {
+                throw error;
+              }
+            }
+
+  # ── Sync Upstream Changes to Fork ──────────────────────
+  sync-upstream-to-fork:
+    name: Sync Upstream to Fork
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.FORK_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Add upstream remote
+        run: |
+          UPSTREAM_REPO="${{ secrets.UPSTREAM_REPO || 'ury-erp/ury-dashboard' }}"
+          git remote add upstream "https://github.com/${UPSTREAM_REPO}.git" 2>/dev/null || true
+          git fetch upstream
+
+      - name: Sync fork with upstream
+        run: |
+          CURRENT_BRANCH=$(git branch --show-current)
+          UPSTREAM_BRANCH="${{ inputs.target_branch || 'develop' }}"
+
+          echo "Syncing upstream/$UPSTREAM_BRANCH into $CURRENT_BRANCH..."
+          git merge upstream/$UPSTREAM_BRANCH --no-edit
+
+          if git diff --quiet HEAD; then
+            echo "Fork is already up to date with upstream"
+          else
+            echo "Changes merged from upstream. Pushing..."
+            git push
+          fi

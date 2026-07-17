@@ -1,0 +1,141 @@
+# URY Dashboard — Release Workflow
+# Creates a release when a tag is pushed (e.g. v1.2.0)
+# Steps: build Docker image, create GitHub release with changelog
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  # ── Create GitHub Release ─────────────────────────────────
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Get the previous tag
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          
+          if [ -z "$PREV_TAG" ]; then
+            COMMITS=$(git log --pretty=format:"- %s (%h)" --no-merges)
+          else
+            COMMITS=$(git log --pretty=format:"- %s (%h)" --no-merges ${PREV_TAG}..HEAD)
+          fi
+          
+          # Categorize commits
+          FEATURES=$(echo "$COMMITS" | grep -iE "feat|feature" || true)
+          FIXES=$(echo "$COMMITS" | grep -iE "fix|bug" || true)
+          OTHER=$(echo "$COMMITS" | grep -viE "feat|feature|fix|bug" || true)
+          
+          echo "features<<EOF" >> $GITHUB_OUTPUT
+          echo "$FEATURES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          
+          echo "fixes<<EOF" >> $GITHUB_OUTPUT
+          echo "$FIXES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          
+          echo "other<<EOF" >> $GITHUB_OUTPUT
+          echo "$OTHER" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tag = context.ref.replace('refs/tags/', '');
+            const version = tag.replace('v', '');
+            const features = `${{ steps.changelog.outputs.features }}`.trim();
+            const fixes = `${{ steps.changelog.outputs.fixes }}`.trim();
+            const other = `${{ steps.changelog.outputs.other }}`.trim();
+            
+            let body = `## URY Dashboard ${version}\n\n`;
+            
+            if (features) {
+              body += `### Features\n${features}\n\n`;
+            }
+            if (fixes) {
+              body += `### Bug Fixes\n${fixes}\n\n`;
+            }
+            if (other) {
+              body += `### Other Changes\n${other}\n\n`;
+            }
+            
+            body += `### Docker\n\`\`\`bash\ndocker pull ghcr.io/ury-erp/ury-dashboard:${version}\ndocker pull ghcr.io/ury-erp/ury-dashboard:latest\n\`\`\`\n`;
+            
+            const { data: release } = await github.rest.releases.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: tag,
+              name: `URY Dashboard ${version}`,
+              body: body,
+              draft: false,
+              prerelease: tag.includes('-') // e.g. v1.0.0-beta
+            });
+            
+            console.log(`Release created: ${release.html_url}`);
+
+  # ── Build & Push Docker Image ────────────────────────────
+  docker:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    needs: release
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract version
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

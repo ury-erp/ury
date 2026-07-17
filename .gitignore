@@ -1,20 +1,34 @@
-.DS_Store
-*.pyc
-*.egg-info
-*.swp
-tags
-ury/docs/current
+skills/
 node_modules/
 
-ury/public/pos
-ury/www/pos.html
-ury/public/urypos
-ury/public/URYMosaic
-ury/public/node_modules
-urypos/yarn.lock
-URYMosaic/yarn.lock
-ury/www/urypos.html
-ury/www/URYMosaic.html
-build
+# Storybook
+*storybook.log
+storybook-static/
 
-*.lock
+# Next.js
+.next/
+out/
+
+# Environment files
+.env
+.env.local
+.env*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+coverage/
+test-results/
+playwright-report/
+blob-report/
+
+# Docker
+docker-data/

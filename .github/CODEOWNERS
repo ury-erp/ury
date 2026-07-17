@@ -1,0 +1,37 @@
+# URY Dashboard — CODEOWNERS
+# Controls who is required to review PRs for specific paths
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owners for everything in the repo
+* @ury-erp/core
+
+# Dashboard components (Next.js)
+/src/components/dashboard/ @ury-erp/frontend
+/src/app/                 @ury-erp/frontend
+
+# UI components (shared)
+/src/components/ui/       @ury-erp/frontend
+
+# Backend Frappe app
+/ury/ury/                 @ury-erp/backend
+
+# POS React app
+/ury/pos/                 @ury-erp/pos-team
+
+# Infrastructure & CI
+/.github/                 @ury-erp/devops
+/Dockerfile               @ury-erp/devops
+/docker-compose*.yml      @ury-erp/devops
+/Caddyfile                @ury-erp/devops
+/scripts/                 @ury-erp/devops
+
+# Database
+/prisma/                  @ury-erp/backend
+
+# Tests
+/e2e/                     @ury-erp/qa
+/**/*.test.*              @ury-erp/qa
+
+# Documentation
+/README.md                @ury-erp/core
+/CHANGELOG.md             @ury-erp/core

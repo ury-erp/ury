@@ -1,0 +1,142 @@
+# URY Dashboard — Development Docker Compose
+# Usage: docker compose -f docker-compose.dev.yml up
+#
+# This provides a consistent development environment with:
+# - Hot-reload Next.js dashboard
+# - PostgreSQL database for Prisma
+# - Adminer for database inspection
+# - Redis for caching/sessions (optional)
+# - URY realtime mini-service
+
+services:
+  # ── Dashboard (Next.js with hot-reload) ─────────────────
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: ury-dashboard-dev
+    restart: unless-stopped
+    ports:
+      - "${DASHBOARD_PORT:-3000}:3000"
+    volumes:
+      # Mount source code for hot-reload
+      - ./src:/app/src:cached
+      - ./public:/app/public:cached
+      - ./prisma:/app/prisma:cached
+      - ./components.json:/app/components.json:cached
+      - ./tailwind.config.ts:/app/tailwind.config.ts:cached
+      - ./next.config.ts:/app/next.config.ts:cached
+      - ./postcss.config.mjs:/app/postcss.config.mjs:cached
+      - ./tsconfig.json:/app/tsconfig.json:cached
+      # Persist node_modules and .next for performance
+      - dashboard-node-modules:/app/node_modules
+      - dashboard-next-cache:/app/.next
+    environment:
+      - NODE_ENV=development
+      - NEXT_TELEMETRY_DISABLED=1
+      - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:3000}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-dev-secret-change-in-production}
+      - NEXT_PUBLIC_FRAPPE_URL=${FRAPPE_URL:-http://localhost:8000}
+      - NEXT_PUBLIC_REFRESH_INTERVAL=${REFRESH_INTERVAL:-30000}
+      - NEXT_PUBLIC_RESTAURANT_NAME=${RESTAURANT_NAME:-URY Restaurant}
+      - NEXT_PUBLIC_CURRENCY=${CURRENCY:-€}
+      - NEXT_PUBLIC_SOCKET_PORT=${SOCKET_PORT:-3003}
+      - DATABASE_URL=postgresql://ury:ury@postgres:5432/ury_dashboard
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - ury-dev
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # ── PostgreSQL Database ─────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: ury-postgres-dev
+    restart: unless-stopped
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_USER: ury
+      POSTGRES_PASSWORD: ury
+      POSTGRES_DB: ury_dashboard
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - ury-dev
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ury -d ury_dashboard"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Adminer (Database GUI) ──────────────────────────────
+  adminer:
+    image: adminer:latest
+    container_name: ury-adminer-dev
+    restart: unless-stopped
+    ports:
+      - "${ADMINER_PORT:-8080}:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+      ADMINER_DESIGN: pepa-linha
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - ury-dev
+
+  # ── Redis (Optional - for caching/sessions) ─────────────
+  redis:
+    image: redis:7-alpine
+    container_name: ury-redis-dev
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - ury-dev
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── URY Realtime (WebSocket service) ────────────────────
+  realtime:
+    build:
+      context: ./mini-services/ury-realtime
+      dockerfile: Dockerfile
+    container_name: ury-realtime-dev
+    restart: unless-stopped
+    ports:
+      - "${SOCKET_PORT:-3003}:3003"
+    environment:
+      - PORT=3003
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - ury-dev
+
+networks:
+  ury-dev:
+    driver: bridge
+    name: ury-dev-network
+
+volumes:
+  postgres-data:
+    name: ury-dev-postgres
+  redis-data:
+    name: ury-dev-redis
+  dashboard-node-modules:
+    name: ury-dev-node-modules
+  dashboard-next-cache:
+    name: ury-dev-next-cache

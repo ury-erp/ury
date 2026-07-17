@@ -1,0 +1,39 @@
+# URY Dashboard — Development Dockerfile
+# Optimized for fast development with hot-reload and volume mounting
+# Usage: docker compose -f docker-compose.dev.yml up
+
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install system dependencies for native modules (sharp, etc.)
+RUN apk add --no-cache \
+    python3 \
+    make \
+    g++ \
+    git
+
+# Copy package files first for dependency caching
+COPY package.json package-lock.json* bun.lockb* ./
+
+# Install ALL dependencies (including dev)
+RUN npm ci
+
+# Copy source code (will be overridden by volume mount in dev)
+COPY . .
+
+# Expose Next.js dev server
+EXPOSE 3000
+
+# Environment
+ENV NODE_ENV=development
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD wget -qO- http://localhost:3000/ || exit 1
+
+# Start dev server with hot reload
+CMD ["npm", "run", "dev"]
