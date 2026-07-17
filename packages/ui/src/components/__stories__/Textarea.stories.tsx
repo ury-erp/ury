@@ -9,17 +9,11 @@ const meta: Meta<typeof Textarea> = {
     docs: {
       description: {
         component:
-          "Textarea component for the URY POS system. Used for order notes, special instructions, and multi-line text input throughout the dashboard and POS interface.",
+          "Textarea component for the URY POS system. Used for order notes, special instructions, and multi-line text input throughout the dashboard and POS interface. Supports all standard HTML textarea attributes.",
       },
     },
   },
   argTypes: {
-    variant: {
-      control: "select",
-      options: ["default", "error"],
-      description: "Visual variant of the textarea",
-      table: { defaultValue: { summary: "default" } },
-    },
     disabled: {
       control: "boolean",
       description: "Whether the textarea is disabled",
@@ -27,6 +21,10 @@ const meta: Meta<typeof Textarea> = {
     placeholder: {
       control: "text",
       description: "Placeholder text",
+    },
+    rows: {
+      control: "number",
+      description: "Number of visible text rows",
     },
   },
 };
@@ -42,8 +40,15 @@ export const Default: Story = {
 
 export const WithError: Story = {
   args: {
-    variant: "error",
     placeholder: "Please fix the errors above",
+    className: "border-red-300 focus:border-red-500 focus:ring-red-200",
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: "Error state achieved via className override with red border styling.",
+      },
+    },
   },
 };
 
@@ -64,7 +69,7 @@ export const OrderNotes: Story = {
       />
       <Textarea
         placeholder="Allergy notes..."
-        variant="error"
+        className="border-red-300 focus:border-red-500 focus:ring-red-200"
         rows={2}
       />
     </div>
