@@ -1,5 +1,5 @@
 import { StateCreator } from 'zustand';
-import { getLoggedUser, getUserRoles } from '../../lib/auth-api';
+import { getLoggedUser, getUserRoles } from '@ury/core';
 
 export interface User {
   name: string; // This stores the user ID
@@ -27,7 +27,7 @@ const initialState: AuthState = {
   error: null,
 };
 
-export const createAuthSlice: StateCreator<AuthSlice> = (set, get) => ({
+export const createAuthSlice: StateCreator<AuthSlice> = (set, _get) => ({
   ...initialState,
 
   checkAuth: async () => {

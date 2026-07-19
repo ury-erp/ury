@@ -1,17 +1,18 @@
 import { useState } from 'react';
 import { Trash2, Edit, FrownIcon, Plus, Loader2, MessageSquare } from 'lucide-react';
 import { usePOSStore } from '../store/pos-store';
-import { formatCurrency, cn } from '../lib/utils';
+import { cn } from '@ury/ui';
+import { formatCurrency } from '@ury/core';
 import { CustomerSelect } from './CustomerSelect';
 import ProductDialog from './ProductDialog';
 import OrderTypeSelect from './OrderTypeSelect';
 import CommentDialog from './CommentDialog';
-import { Button } from './ui/button';
-import { Spinner } from './ui/spinner';
+import { Button } from '@ury/ui';
+import { Spinner } from '@ury/ui';
 import { syncOrder } from '../lib/order-api';
 import { useRootStore } from '../store/root-store';
 import type { RootState } from '../store/root-store';
-import { showToast } from './ui/toast';
+import { showToast } from '@ury/ui';
 import { DINE_IN } from '../data/order-types';
 import { t } from '../i18n';
 

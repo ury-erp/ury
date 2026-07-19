@@ -1,5 +1,6 @@
 import { FC } from 'react';
-import { formatCurrency, cn } from '../lib/utils';
+import { cn } from '@ury/ui';
+import { formatCurrency } from '@ury/core';
 
 interface MenuCardProps {
   id: string;
@@ -13,12 +14,10 @@ interface MenuCardProps {
 }
 
 const MenuCard: FC<MenuCardProps> = ({ 
-  id, 
   name, 
   price, 
   item_image, 
   course, 
-  item, 
   onClick,
   disabled 
 }) => {

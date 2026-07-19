@@ -1,10 +1,11 @@
 import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import { CreditCard as Edit3, Save, Users, Move, X, Grid3x3 as Grid3X3, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
-import { cn, formatInvoiceTime } from '../lib/utils';
+import { cn } from '@ury/ui';
+import { formatInvoiceTime } from '@ury/core';
 import { Table, updateTableLayout } from '../lib/table-api';
 import { getTableOrder, POSInvoice } from '../lib/order-api';
 import { getCombinedOrderTotals } from '../lib/invoice-api';
-import { Button } from './ui';
+import { Button } from '@ury/ui';
 import { t } from '../i18n';
 
 

@@ -13,6 +13,12 @@ export default defineConfig({
     alias: {
       "@": resolve(__dirname, "./src"),
     },
+    dedupe: ['react', 'react-dom'],
+  },
+  server: {
+    fs: {
+      allow: ['..'],
+    },
   },
   build: {
     outDir: "../ury/public/pos",

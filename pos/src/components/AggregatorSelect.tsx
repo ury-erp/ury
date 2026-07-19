@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { usePOSStore } from '../store/pos-store';
-import { Select, SelectItem } from './ui/select';
+import { Select, SelectItem } from '@ury/ui';
 import { getAggregators, type Aggregator } from '../lib/aggregator-api';
 
 interface AggregatorSelectProps {

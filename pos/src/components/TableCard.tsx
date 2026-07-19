@@ -1,8 +1,9 @@
 import { type MouseEvent } from 'react';
 import { Eye, Loader2, Printer, Users } from 'lucide-react';
-import { cn, formatInvoiceTime } from '../lib/utils';
+import { cn } from '@ury/ui';
+import { formatInvoiceTime } from '@ury/core';
 import type { Table } from '../lib/table-api';
-import { Badge } from './ui/badge';
+import { Badge } from '@ury/ui';
 import { TableShapeIcon } from './TableShapeIcon';
 import TableActionsMenu from './TableActionsMenu';
 import { t } from '../i18n';

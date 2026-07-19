@@ -3,8 +3,8 @@ import {
   UtensilsCrossed,
 } from 'lucide-react';
 import { usePOSStore } from '../store/pos-store';
-import { cn } from '../lib/utils';
-import { Button, Badge } from './ui';
+import { cn } from '@ury/ui';
+import { Button, Badge } from '@ury/ui';
 import CommentDialog from './CommentDialog';
 import { useState } from 'react';
 import { t } from '../i18n';

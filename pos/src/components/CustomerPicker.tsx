@@ -1,7 +1,7 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { UserPlus, Phone, Loader, ChevronDown } from 'lucide-react';
-import { Button, Dialog, DialogContent, Input } from './ui';
-import { Select, SelectItem } from './ui';
+import { Button, Dialog, DialogContent, Input } from '@ury/ui';
+
 import { addCustomer, type CreateCustomerData, searchCustomers } from '../lib/customer-api';
 import { usePOSStore, type Customer } from '../store/pos-store';
 import { t } from '../i18n';
@@ -34,10 +34,10 @@ function NewCustomerForm({
   const [newCustomerPhone, setNewCustomerPhone] = useState('');
   const [newCustomerGroup, setNewCustomerGroup] = useState('');
   const [newCustomerTerritory, setNewCustomerTerritory] = useState('');
-  const [formError, setFormError] = useState(false);
+  const [, setFormError] = useState(false);
   const [apiError, setApiError] = useState('');
-  const [loadingGroups, setLoadingGroups] = useState(false);
-  const [loadingTerritories, setLoadingTerritories] = useState(false);
+  const [, setLoadingGroups] = useState(false);
+  const [, setLoadingTerritories] = useState(false);
   const [localIsCreatingCustomer, setLocalIsCreatingCustomer] = useState(false);
   const isCreatingCustomer = parentIsCreatingCustomer ?? localIsCreatingCustomer;
   const setIsCreatingCustomer = setParentIsCreatingCustomer ?? setLocalIsCreatingCustomer;
@@ -80,7 +80,7 @@ function NewCustomerForm({
       const response = await addCustomer(customerData);
       const created = response.data;
       onCustomerCreated({
-        id: created.name,
+        id: created.name ?? created.customer_name,
         name: created.customer_name,
         phone: created.mobile_number,
       });

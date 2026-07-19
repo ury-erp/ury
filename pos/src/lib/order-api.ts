@@ -1,4 +1,4 @@
-import { call } from './frappe-sdk';
+import { call } from '@ury/core';
 
 export interface POSInvoiceItem {
   name: string;
@@ -51,7 +51,7 @@ export interface TableOrder {
  * @returns The order details and customer information if an active order exists
  */
 export async function getTableOrder(table_no: string): Promise<TableOrder> {
-  const { call } = await import('./frappe-sdk');
+  const { call } = await import('@ury/core');
   try {
     const res = await call.get('ury.ury.doctype.ury_order.ury_order.get_order_invoice', { 
       table: table_no
