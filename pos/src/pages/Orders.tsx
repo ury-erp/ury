@@ -1,13 +1,13 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { Clock, User, UserCheck, Receipt, Printer, Pencil, X, GitBranch, GitMerge } from 'lucide-react';
-import { Badge, Button, Card, CardContent } from '../components/ui';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../components/ui/dialog';
-import { showToast } from '../components/ui/toast';
+import { Badge, Button, Card, CardContent } from '@ury/ui';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@ury/ui';
+import { showToast } from '@ury/ui';
 import OrderStatusSidebar from '../components/OrderStatusSidebar';
 import { useRootStore } from '../store/root-store';
-import { formatCurrency } from '../lib/utils';
-import { Spinner } from '../components/ui/spinner';
-import { Textarea } from '../components/ui/textarea';
+import { formatCurrency } from '@ury/core';
+import { Spinner } from '@ury/ui';
+import { Textarea } from '@ury/ui';
 import { usePOSStore } from '../store/pos-store';
 import { useNavigate } from 'react-router-dom';
 import PaymentDialog from '../components/PaymentDialog';
@@ -17,7 +17,7 @@ import OrderActionsMenu from '../components/OrderActionsMenu';
 import SplitGroupPanel from '../components/SplitGroupPanel';
 import MergedBillPanel from '../components/MergedBillPanel';
 import { printOrder } from '../lib/print';
-import { call } from '../lib/frappe-sdk';
+import { call } from '@ury/core';
 import { splitBill } from '../lib/order-api';
 import {
   getOrdersTabForInvoice,
@@ -364,7 +364,7 @@ export default function Orders() {
         <div className="flex-1 overflow-y-auto bg-gray-50 p-4 pb-40">
           {orderLoading ? (
             <div className="flex items-center justify-center h-full">
-              <Spinner />
+              <Spinner  message={t('common.loading')} />
             </div>
           ) : orders.length === 0 ? (
             <div className="text-center mt-10">
@@ -511,7 +511,7 @@ export default function Orders() {
           </div>
         ) : selectedOrderLoading ? (
           <div className="flex items-center justify-center h-full">
-            <Spinner />
+            <Spinner  message={t('common.loading')} />
           </div>
         ) : selectedOrderError ? (
           <div className="text-center h-full flex flex-col items-center justify-center text-red-500 p-6">
@@ -711,7 +711,7 @@ export default function Orders() {
                   aria-label="Print"
                   disabled={isPrinting}
                 >
-                  {isPrinting ? <Spinner className="w-5 h-5" hideMessage /> : <Printer className="w-5 h-5" />}
+                  {isPrinting ? <Spinner className="w-5 h-5" hideMessage  message={t('common.loading')} /> : <Printer className="w-5 h-5" />}
                 </Button>
                 {/* Payment Button - Only show for Draft, Unbilled, and Recently Paid orders */}
                 {isOrderEditable(selectedOrder.status) && (

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { X, Percent, Coins } from 'lucide-react';
 import { usePOSStore } from '../store/pos-store';
-import { cn, formatCurrency } from '../lib/utils';
-import { Button, Input, Dialog, DialogContent } from './ui';
-import { call } from '../lib/frappe-sdk';
+import { formatCurrency } from '@ury/core';
+import { Button, Input, Dialog, DialogContent } from '@ury/ui';
+import { call } from '@ury/core';
 import { DEFAULT_PAYMENT_MODE } from '../data/order-types';
 import { t } from '../i18n';
 
@@ -28,7 +28,6 @@ interface PaymentDialogProps {
 const PaymentDialog: React.FC<PaymentDialogProps> = ({
   onClose,
   grandTotal,
-  roundedTotal,
   invoice,
   customer,
   posProfile,

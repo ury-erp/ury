@@ -6,12 +6,13 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from './ui/dialog';
-import { Button } from './ui/button';
-import { cn, formatCurrency } from '../lib/utils';
+} from '@ury/ui';
+import { Button } from '@ury/ui';
+import { cn } from '@ury/ui';
+import { formatCurrency } from '@ury/core';
 import { t } from '../i18n';
-import { showToast } from './ui/toast';
-import { Spinner } from './ui/spinner';
+import { showToast } from '@ury/ui';
+import { Spinner } from '@ury/ui';
 import { formatMergedTableLabel } from '../lib/table-utils';
 import {
   getLinkedMergeSecondaries,
@@ -177,7 +178,7 @@ const BillMergeDialog = ({
     if (initialLoading) {
       return (
         <div className="flex items-center justify-center py-8">
-          <Spinner hideMessage />
+          <Spinner hideMessage  message={t('common.loading')} />
         </div>
       );
     }
@@ -194,7 +195,7 @@ const BillMergeDialog = ({
       <div className={cn('relative space-y-2', searchLoading && 'opacity-60')}>
         {searchLoading && (
           <div className="absolute inset-0 z-10 flex items-center justify-center">
-            <Spinner hideMessage />
+            <Spinner hideMessage  message={t('common.loading')} />
           </div>
         )}
         {candidates.map((row) => {

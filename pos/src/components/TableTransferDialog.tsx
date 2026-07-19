@@ -6,11 +6,11 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from './ui/dialog';
-import { Button } from './ui/button';
-import { cn } from '../lib/utils';
+} from '@ury/ui';
+import { Button } from '@ury/ui';
+import { cn } from '@ury/ui';
 import { t } from '../i18n';
-import { Spinner } from './ui/spinner';
+import { Spinner } from '@ury/ui';
 import { TableShapeIcon } from './TableShapeIcon';
 import type { Table } from '../lib/table-api';
 
@@ -132,7 +132,7 @@ const TableTransferDialog = ({
 
           {loading ? (
             <div className="flex items-center justify-center py-8">
-              <Spinner hideMessage />
+              <Spinner hideMessage  message={t('common.loading')} />
             </div>
           ) : filtered.length === 0 ? (
             <p className="py-4 text-sm text-gray-500">{t('tables.no_destination_tables')}</p>
