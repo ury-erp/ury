@@ -18,11 +18,19 @@ def serve_kot(name, time):
     frappe.db.set_value("URY KOT", name, "order_status", "Served")
 
 
-# Function to mark it as verified by a user in cancel type KOT
+# Function to mark it as verified in a cancel type KOT.
+# The verifying user is derived from the session and must hold a manager-level
+# role, so confirmation cannot be self-attributed or forged by the caller.
 @frappe.whitelist()
-def confirm_cancel_kot(name, user):
+def confirm_cancel_kot(name):
+    manager_roles = {"URY Manager", "URY Admin", "System Manager"}
+    if not manager_roles.intersection(frappe.get_roles()):
+        frappe.throw(
+            "Only a manager can confirm a cancelled KOT.",
+            frappe.PermissionError,
+        )
     frappe.db.set_value("URY KOT", name, "verified", 1)
-    frappe.db.set_value("URY KOT", name, "verified_by", user)
+    frappe.db.set_value("URY KOT", name, "verified_by", frappe.session.user)
 
 
 @frappe.whitelist(allow_guest=True)

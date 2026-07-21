@@ -341,7 +341,6 @@ export default {
       this.call
         .post("ury.ury.api.ury_kot_display.confirm_cancel_kot", {
           name: kot.name,
-          user: this.loggeduser,
         })
         .then((result) => {
           // kot.isHidden = !kot.isHidden;
