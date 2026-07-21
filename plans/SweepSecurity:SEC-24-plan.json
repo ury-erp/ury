@@ -1,0 +1,17 @@
+{
+  "subtasks": [
+    {
+      "objective": "Remove guest access from the get_site_name Frappe endpoint so the internal tenant/site name is only returned to authenticated callers.",
+      "acceptance": "The get_site_name endpoint in ury/ury/api/ury_kot_display.py no longer uses allow_guest=True, remains whitelisted for authenticated users, and existing authenticated KOT display usage can still fetch the site name.",
+      "scope": [
+        "ury/ury/api/ury_kot_display.py",
+        "URYMosaic/src/components/kot.vue"
+      ],
+      "task_type": "impl",
+      "difficulty": 1,
+      "risk": 1,
+      "uncertainty": 1,
+      "priority": 100
+    }
+  ]
+}
