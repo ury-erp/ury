@@ -24,7 +24,7 @@ def network_printing(
     doc=None,
     no_letterhead=0,
 ):
-    validate_print_permission(doctype, name)
+    validate_print_permission(frappe.get_doc(doctype, name))
 
     try:
         print_settings = frappe.get_doc("Network Printer Settings", printer_setting)
