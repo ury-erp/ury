@@ -6,7 +6,12 @@ import frappe
 from frappe import _
 from frappe.model.document import Document
 from erpnext.controllers.queries import item_query
-from ury.ury_pos.api import getBranch, getBranchRoom
+from ury.ury_pos.api import (
+    assert_branch_access,
+    assert_pos_invoice_access,
+    getBranch,
+    getBranchRoom,
+)
 from ury.ury.api.ury_kot_generate import kot_execute
 from ury.ury.api.ury_kot_generate import process_items_for_cancel_kot
 
@@ -688,9 +693,10 @@ def get_order_invoice(table=None, invoiceNo=None, order_type=None, is_payment=No
         invoices = frappe.get_all("POS Invoice", filters=filters, or_filters=or_filters, limit=1)
         invoice_name = invoices[0].name if invoices else None
         branch, menu_name, restaurant = get_restaurant_and_menu_name(table)
+        assert_branch_access(branch)
 
         if invoice_name:
-            invoice = frappe.get_doc("POS Invoice", invoice_name)
+            invoice = assert_pos_invoice_access(invoice_name)
 
         else:
             invoice = frappe.new_doc("POS Invoice")
@@ -734,7 +740,7 @@ def get_order_invoice(table=None, invoiceNo=None, order_type=None, is_payment=No
             )
             
         if invoice_name:
-            invoice = frappe.get_doc("POS Invoice", invoice_name)
+            invoice = assert_pos_invoice_access(invoice_name)
             
 
         else:

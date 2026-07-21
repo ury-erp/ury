@@ -4,6 +4,23 @@ from datetime import date, datetime, timedelta
 from frappe.utils import validate_phone_number
 
 
+def _deny_pos_invoice_access():
+    frappe.throw(_("Not permitted to access this POS Invoice."), frappe.PermissionError)
+
+
+def assert_branch_access(branch):
+    if branch and branch != getBranch():
+        _deny_pos_invoice_access()
+
+
+def assert_pos_invoice_access(invoice, invoice_doc=None):
+    invoice_doc = invoice_doc or frappe.get_doc("POS Invoice", invoice)
+    if not frappe.has_permission("POS Invoice", "read", doc=invoice_doc):
+        _deny_pos_invoice_access()
+    assert_branch_access(invoice_doc.get("branch"))
+    return invoice_doc
+
+
 #GetTable  decripted temporarily
 # @frappe.whitelist()
 # def getTable(room):
@@ -284,11 +301,13 @@ def _enrich_split_group_meta(invoices):
 
 @frappe.whitelist()
 def get_split_group(invoice):
-    group = frappe.db.get_value("POS Invoice", invoice, "custom_split_group")
+    current_invoice = assert_pos_invoice_access(invoice)
+    group = current_invoice.get("custom_split_group")
     if not group:
-        split_from = frappe.db.get_value("POS Invoice", invoice, "custom_split_from")
+        split_from = current_invoice.get("custom_split_from")
         if split_from:
-            group = frappe.db.get_value("POS Invoice", split_from, "custom_split_group")
+            split_from_invoice = assert_pos_invoice_access(split_from)
+            group = split_from_invoice.get("custom_split_group")
     if not group:
         return {"invoices": [], "current": invoice, "group": None}
 
@@ -323,6 +342,12 @@ def get_split_group(invoice):
         order_by="creation asc",
     )
 
+    invoices = [
+        inv
+        for inv in invoices
+        if _can_read_pos_invoice_row(inv)
+    ]
+
     member_names = [inv["name"] for inv in invoices]
     if member_names:
         children = frappe.get_all(
@@ -331,6 +356,11 @@ def get_split_group(invoice):
             fields=split_fields,
             order_by="creation asc",
         )
+        children = [
+            child
+            for child in children
+            if _can_read_pos_invoice_row(child)
+        ]
         existing = {inv["name"] for inv in invoices}
         for child in children:
             if child.name not in existing:
@@ -347,6 +377,14 @@ def get_split_group(invoice):
         inv["split_siblings"] = [row["name"] for row in invoices if row["name"] != inv["name"]]
 
     return {"invoices": invoices, "current": invoice, "group": group}
+
+
+def _can_read_pos_invoice_row(invoice_row):
+    try:
+        assert_pos_invoice_access(invoice_row["name"])
+    except frappe.PermissionError:
+        return False
+    return True
 
 
 @frappe.whitelist()
@@ -756,7 +794,7 @@ def getPosProfile():
 def getPosInvoiceItems(invoice):
     itemDetails = []
     taxDetails = []
-    orderdItems = frappe.get_doc("POS Invoice", invoice)
+    orderdItems = assert_pos_invoice_access(invoice)
     posItems = orderdItems.items
     for items in posItems:
         itemDetails.append(
