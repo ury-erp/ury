@@ -1,0 +1,16 @@
+{
+  "subtasks": [
+    {
+      "objective": "Harden URY Order sync_order authorization and attribution so authenticated callers cannot spoof cashier, waiter, or owner fields or replace POS Invoice items without write permission.",
+      "acceptance": "sync_order derives cashier and waiter attribution from the current session and valid POS Opening Entry or server-side user assignment instead of trusting request parameters; existing POS Invoice updates call check_permission(\"write\") before mutating invoice fields or replacing items; sync_order no longer calls invoice.db_set(\"owner\", cashier) from caller-controlled input; new-order behavior remains compatible with existing POS flow and unauthorized invoice mutation attempts fail before item replacement.",
+      "scope": [
+        "ury/ury/doctype/ury_order/ury_order.py"
+      ],
+      "task_type": "impl",
+      "difficulty": 3,
+      "risk": 4,
+      "uncertainty": 3,
+      "priority": 90
+    }
+  ]
+}
