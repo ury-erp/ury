@@ -1,0 +1,16 @@
+{
+  "subtasks": [
+    {
+      "objective": "Fix SEC-09: lock down the whitelisted get_pos_invoices(start, end, pos_profile, user) in ury/ury/doctype/sub_pos_closing/sub_pos_closing.py:99-125, which currently returns full POS Invoice documents (.as_dict(), including taxes/payments) for any caller-supplied cashier and POS Profile with no permission or branch scoping, enabling bulk sales-data exfiltration. Change it to (1) restrict the queried cashier: force user = frappe.session.user unless the session user holds a supervisor/manager role (e.g. URY Admin / System Manager / Accounts Manager — reuse whatever role check pattern the codebase already uses), and (2) scope the query to the session user's branch: resolve branch via the existing getBranch() helper imported from ury.ury_pos.api and assert the supplied pos_profile's branch matches it (frappe.throw a PermissionError-style message on mismatch). Optionally validate read permission with frappe.has_permission('POS Invoice', 'read', doc=...) before including each document. Keep the response shape (list of full invoice dicts) unchanged for legitimate callers so the Sub POS Closing desk flow keeps working.",
+      "acceptance": "Calling get_pos_invoices with a cashier other than the session user (without a supervisor role) returns only the session user's invoices (or throws); calling it with a pos_profile belonging to another branch raises a permission error and returns no data; a legitimate cashier querying their own invoices for their own branch's POS Profile still receives the full invoice list including taxes and payments (Sub POS Closing flow unbroken); python -c compile/import of the edited file succeeds.",
+      "scope": [
+        "ury/ury/doctype/sub_pos_closing/sub_pos_closing.py"
+      ],
+      "task_type": "impl",
+      "difficulty": 2,
+      "risk": 2,
+      "uncertainty": 2,
+      "priority": 85
+    }
+  ]
+}
