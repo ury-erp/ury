@@ -65,6 +65,8 @@ def network_printing(
     no_letterhead=0,
     file_path=None,
 ):
+    if doctype == "POS Invoice":
+        _validate_invoice_access(name)
     try:
         print_settings = frappe.get_doc("Network Printer Settings", printer_setting)
 
