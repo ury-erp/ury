@@ -10,6 +10,8 @@ A POS Closing Entry must be created at the end of each day to complete the daily
 - **Key Features**
 	- All Major POS Features from Version 1 Retained
 	- Core functionalities from the previous version are preserved for consistency.
+	- **Multi-POS Profile Access & Accessibility Control**: POS Profiles can now specify accessible rooms and multiple linked profiles for captains and cashiers. Cashiers and Captains with enabled multi-profile accessibility can view invoices across linked POS profiles.
+	- **Atomic Branch-Level Sequential Order Numbering**: Order numbers are managed sequentially at the Branch level rather than per POS profile, with daily automatic counter resets and atomic increments to prevent concurrency race conditions.
 
 - **Unified Order-Taking Interface**
 	- A single page handles the entire order flow—streamlining operations and reducing clicks.
