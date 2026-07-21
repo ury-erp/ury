@@ -19,6 +19,7 @@ import MergedBillPanel from '../components/MergedBillPanel';
 import { printOrder } from '../lib/print';
 import { call } from '@ury/core';
 import { splitBill } from '../lib/order-api';
+import { subscribeRealtimeEvent } from '../lib/realtime';
 import {
   getOrdersTabForInvoice,
   getSplitGroup,
@@ -124,6 +125,33 @@ export default function Orders() {
   useEffect(() => {
     fetchOrders();
   }, [fetchOrders]);
+
+  useEffect(() => {
+    return subscribeRealtimeEvent('reload_ro', () => {
+      const refreshOrders = async () => {
+        const {
+          pagination: currentPagination,
+          fetchOrders: fetchCurrentOrders,
+          orders: currentOrders,
+          selectedOrder: currentSelectedOrder,
+          selectOrder: selectCurrentOrder,
+        } = useRootStore.getState();
+
+        await fetchCurrentOrders(currentPagination.currentPage);
+
+        if (!currentSelectedOrder) return;
+
+        const refreshedOrder =
+          useRootStore.getState().orders.find((order) => order.name === currentSelectedOrder.name) ??
+          currentOrders.find((order) => order.name === currentSelectedOrder.name) ??
+          currentSelectedOrder;
+
+        await selectCurrentOrder(refreshedOrder);
+      };
+
+      void refreshOrders();
+    });
+  }, []);
 
   useEffect(() => {
     if (!mounted.current) {

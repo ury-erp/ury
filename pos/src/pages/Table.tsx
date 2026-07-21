@@ -22,6 +22,7 @@ import TableTransferDialog from '../components/TableTransferDialog';
 import CaptainTransferDialog from '../components/CaptainTransferDialog';
 import TableCard from '../components/TableCard';
 import MergeLinkConnector from '../components/MergeLinkConnector';
+import { subscribeRealtimeEvent } from '../lib/realtime';
 
 const TableView = () => {
   const navigate = useNavigate();
@@ -57,6 +58,24 @@ const TableView = () => {
     if (!branch) return;
     sessionStorage.setItem(`ury_room_counts_${branch}`, JSON.stringify(counts));
   }, [branch]);
+
+  const fetchRoomCounts = useCallback(async () => {
+    if (!branch || rooms.length === 0) return;
+
+    try {
+      const counts = await Promise.all(
+        rooms.map((room) => getTableCount(room.name, room.branch))
+      );
+      const nextCounts = rooms.reduce((acc, room, index) => {
+        acc[room.name] = counts[index];
+        return acc;
+      }, {} as Record<string, number>);
+      setRoomCounts(nextCounts);
+      persistRoomCounts(nextCounts);
+    } catch (error) {
+      console.error('Failed to load room counts', error);
+    }
+  }, [branch, persistRoomCounts, rooms]);
 
   useEffect(() => {
     async function fetchRooms() {
@@ -110,24 +129,8 @@ const TableView = () => {
 
     if (!shouldFetch) return;
 
-    async function fetchRoomCounts() {
-      try {
-        const counts = await Promise.all(
-          rooms.map((room) => getTableCount(room.name, room.branch))
-        );
-        const nextCounts = rooms.reduce((acc, room, index) => {
-          acc[room.name] = counts[index];
-          return acc;
-        }, {} as Record<string, number>);
-        setRoomCounts(nextCounts);
-        persistRoomCounts(nextCounts);
-      } catch (error) {
-        console.error('Failed to load room counts', error);
-      }
-    }
-
-    fetchRoomCounts();
-  }, [branch, rooms, persistRoomCounts]);
+    void fetchRoomCounts();
+  }, [branch, fetchRoomCounts, rooms]);
 
   const loadTables = useCallback(
     async (roomName: string, options?: { useCache?: boolean }) => {
@@ -162,6 +165,29 @@ const TableView = () => {
     if (!selectedRoom) return;
     loadTables(selectedRoom);
   }, [selectedRoom, loadTables]);
+
+  useEffect(() => {
+    if (!branch) return;
+
+    return subscribeRealtimeEvent('reload_ro', () => {
+      setTablesCache((prev) => {
+        if (selectedRoom) {
+          const freshCache = { ...prev };
+          delete freshCache[selectedRoom];
+          return freshCache;
+        }
+
+        return {};
+      });
+
+      sessionStorage.removeItem(`ury_room_counts_${branch}`);
+      void fetchRoomCounts();
+
+      if (selectedRoom) {
+        void loadTables(selectedRoom, { useCache: false });
+      }
+    });
+  }, [branch, fetchRoomCounts, loadTables, selectedRoom]);
 
   const handleNavigateToPOS = (tableName: string) => {
     if (!selectedRoom) return;
