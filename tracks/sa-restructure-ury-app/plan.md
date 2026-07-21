@@ -236,6 +236,7 @@ To ensure smooth transition for existing sites, a `patch` (Python script execute
 ---
 
 ## Follow-up Tasks
-- [x] Retain `get_user_pos_profile` as the foundational lookup method for resolving the appropriate POS Profile for the current session user.
-- [x] Restore `multiple_cashier` and `owner` properties to the `getPosProfile` API response.
-- [x] Refactor imports for `get_user_pos_profile` to be global in `pos_extend.py` and `ury_kot_display.py`.
+- [x] Removed `get_user_pos_profile` and `get_users_for_branch_filter` APIs.
+- [x] Inlined the POS Profile resolution logic inside the existing `getPosProfile` API.
+- [x] Updated all references (`pos_extend.py`, `ury_kot_display.py`, `getBranchRoom`, etc.) to use `getPosProfile().get("pos_profile")` instead.
+- [x] Removed the custom frontend query for user filtering on POS Profile as requested.
