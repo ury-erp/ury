@@ -1,0 +1,19 @@
+{
+  "subtasks": [
+    {
+      "objective": "Prevent arbitrary customer order-history disclosure from fav_items and customer_favourite_item by enforcing authorization on the requested Customer before aggregating POS Invoice item history.",
+      "acceptance": "fav_items(customer) and customer_favourite_item(customer_name) reject requests for customers the current user cannot read or that are outside the user's permitted restaurant/branch context, and still return the existing favorite-item aggregate for authorized customers. Add focused backend tests or equivalent Frappe test coverage showing unauthorized customer requests are denied and authorized requests preserve the expected aggregation.",
+      "scope": [
+        "ury/ury_pos/api.py",
+        "ury/ury/doctype/ury_order/ury_order.py",
+        "ury/**/test*.py",
+        "ury/**/test_*.py"
+      ],
+      "task_type": "impl",
+      "difficulty": 2,
+      "risk": 2,
+      "uncertainty": 2,
+      "priority": 90
+    }
+  ]
+}
