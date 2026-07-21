@@ -5,6 +5,7 @@ import json
 import frappe
 from frappe import _
 from frappe.model.document import Document
+from frappe.utils import flt
 from erpnext.controllers.queries import item_query
 from ury.ury_pos.api import getBranch, getBranchRoom
 from ury.ury.api.ury_kot_generate import kot_execute
@@ -1210,9 +1211,64 @@ def cancel_order(invoice_id, reason):
     frappe.db.set_value("POS Invoice", invoice_id, "status", "Cancelled")
     frappe.db.set_value("POS Invoice", invoice_id, "cancel_reason", reason)
 
+# Roles permitted to authorize an additional discount when settling an order.
+DISCOUNT_ALLOWED_ROLES = frozenset(
+    {"URY Manager", "URY Cashier", "System Manager", "Administrator"}
+)
+MAX_DISCOUNT_PERCENTAGE = 100
+
+
+def _validate_additional_discount(additional_discount, pos_profile):
+    """Server-side authorization for the discount applied in make_invoice.
+
+    The client-side gate (POS Profile "Enable Discount" checkbox) is only a
+    UI convenience; this check is authoritative. Returns the sanitized
+    discount percentage (0 when no discount is applied). Raises before any
+    invoice state is mutated on failure.
+    """
+    if additional_discount in (None, ""):
+        return 0
+
+    try:
+        discount = flt(additional_discount)
+    except (TypeError, ValueError):
+        frappe.throw(
+            _("Invalid discount value: {0}").format(additional_discount),
+            frappe.ValidationError,
+        )
+
+    if discount <= 0:
+        return 0
+
+    profile = frappe.get_doc("POS Profile", pos_profile)
+
+    if not profile.custom_enable_discount:
+        frappe.throw(
+            _("Discounts are not enabled for POS Profile {0}.").format(pos_profile),
+            frappe.PermissionError,
+        )
+
+    if discount > MAX_DISCOUNT_PERCENTAGE:
+        frappe.throw(
+            _("Discount of {0}% exceeds the maximum allowed discount of {1}%.").format(
+                discount, MAX_DISCOUNT_PERCENTAGE
+            )
+        )
+
+    if not DISCOUNT_ALLOWED_ROLES.intersection(frappe.get_roles()):
+        frappe.throw(
+            _("You do not have permission to apply a discount on this order."),
+            frappe.PermissionError,
+        )
+
+    return discount
+
+
 # Method for URY POS
 @frappe.whitelist()
 def make_invoice(customer, payments, cashier, pos_profile,owner, additionalDiscount=None, table=None, invoice=None):
+    additionalDiscount = _validate_additional_discount(additionalDiscount, pos_profile)
+
     order_type =  invoice_name = frappe.get_value("POS Invoice",invoice , "order_type")
     invoice = get_order_invoice(table, invoice, order_type, "Payments")
 
