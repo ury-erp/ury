@@ -164,6 +164,7 @@
     "layout": "Layout",
     "available": "Available",
     "occupied": "Occupied",
+    "attention": "Attention",
     "room": "Room",
     "seats": "Seats",
     "tap_to_start": "Tap to start a new dine-in order",
