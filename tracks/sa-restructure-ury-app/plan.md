@@ -232,3 +232,10 @@ To ensure smooth transition for existing sites, a `patch` (Python script execute
 - [x] P6: Execute frontend changes.
 - [x] P7: Write data migration patch for existing POS Profiles, Order Counters, and URY User room data.
 - [x] P8: Test all affected flows end-to-end against a mock of an existing database.
+
+---
+
+## Follow-up Tasks
+- [x] Retain `get_user_pos_profile` as the foundational lookup method for resolving the appropriate POS Profile for the current session user.
+- [x] Restore `multiple_cashier` and `owner` properties to the `getPosProfile` API response.
+- [x] Refactor imports for `get_user_pos_profile` to be global in `pos_extend.py` and `ury_kot_display.py`.
