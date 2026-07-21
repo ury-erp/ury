@@ -1,0 +1,16 @@
+{
+  "subtasks": [
+    {
+      "objective": "Add server-side discount authorization to the whitelisted `make_invoice(customer, payments, cashier, pos_profile, owner, additionalDiscount=None, table=None, invoice=None)` endpoint in `ury/ury/doctype/ury_order/ury_order.py` (function starts at line 1215; the unsafe assignment `invoice.additional_discount_percentage=additionalDiscount` is at line 1225). Before applying `additionalDiscount`, load the POS Profile named by the `pos_profile` argument and enforce: (1) if `additionalDiscount` is set (non-null and > 0) and the profile's `custom_enable_discount` flag is falsy, raise `frappe.throw` with a permission-style error and do not settle the invoice; (2) clamp/reject the value so it is a number within 0-100, and reject values exceeding the profile's configured discount cap (`paid_limit` per the SEC-02 finding in SWEEP-SECURITY.md — verify its semantics during implementation; if `paid_limit` turns out to be unrelated to discounts, enforce the role-based check below plus the 0-100 bound instead); (3) require the caller (`frappe.session.user` via `frappe.get_roles()`) to hold a role permitted to give discounts (e.g. URY Admin / URY Cashier as defined by the project's roles) before accepting a non-zero discount. Keep the client-side gate in `pos/src/components/PaymentDialog.tsx:164` unchanged; the server check must be authoritative. Rejecting must happen before `invoice.calculate_taxes_and_totals()` and before any payment rows are appended/submitted so no state is mutated on failure.",
+      "acceptance": "Calling `make_invoice` via `frappe.call` (or curl with a valid session) as an authenticated user with a non-zero `additionalDiscount` fails with a Frappe exception and leaves the POS Invoice unmodified when (a) the POS Profile has `custom_enable_discount` unset, or (b) the discount exceeds the enforced limit, or (c) the caller lacks the required role. A call with a permitted discount (flag enabled, within limit, authorized role) succeeds and settles the invoice exactly as before. `bench run-tests` for the ury app (or at minimum `python -m compileall ury/ury/doctype/ury_order/ury_order.py` plus a manual bench-console smoke test of both the reject and accept paths) passes.",
+      "scope": [
+        "ury/ury/doctype/ury_order/ury_order.py"
+      ],
+      "task_type": "impl",
+      "difficulty": 2,
+      "risk": 3,
+      "uncertainty": 3,
+      "priority": 95
+    }
+  ]
+}
