@@ -16,6 +16,43 @@ from frappe import cache
 class URYOrder(Document):
     pass
 
+
+DEFAULT_TRANSFER_ROLES = {"URY Cashier", "URY Manager"}
+
+
+def _get_transfer_roles(pos_profile):
+    roles = []
+    if pos_profile:
+        roles = frappe.get_all(
+            "Role Permitted",
+            filters={
+                "parenttype": "POS Profile",
+                "parent": pos_profile,
+                "parentfield": "transfer_role_permissions",
+            },
+            pluck="role",
+        )
+
+    return set(roles) or DEFAULT_TRANSFER_ROLES
+
+
+def _validate_transfer_permission(pos_invoice):
+    if not frappe.has_permission("POS Invoice", "write", doc=pos_invoice):
+        frappe.throw(
+            _("Not permitted to transfer this POS Invoice."),
+            frappe.PermissionError,
+        )
+
+    permitted_roles = _get_transfer_roles(pos_invoice.pos_profile)
+    user_roles = set(frappe.get_roles(frappe.session.user))
+
+    if not permitted_roles.intersection(user_roles):
+        frappe.throw(
+            _("Only users with an approved transfer role can transfer orders."),
+            frappe.PermissionError,
+        )
+
+
 @frappe.whitelist()
 def merge_free_tables(table1, table2):
     """Merges two tables in the same room; allows one occupied and one free."""
@@ -1091,6 +1128,7 @@ def table_transfer(table, newTable, invoice):
     current_table = frappe.get_doc("URY Table", table)
     pos_invoice = frappe.get_doc("POS Invoice", invoice)
     new_table = frappe.get_doc("URY Table", newTable)
+    _validate_transfer_permission(pos_invoice)
 
     merge_members, _ = _get_merge_cluster(table)
     if len(merge_members) > 1:
@@ -1127,12 +1165,15 @@ def table_transfer(table, newTable, invoice):
 
 @frappe.whitelist()
 def captain_transfer(currentCaptain, newCaptain, invoice):
-    pos_profile=frappe.get_value("POS Invoice", invoice,"pos_profile")
-    multiple_cashier = frappe.db.get_value("POS Profile",pos_profile,"custom_enable_multiple_cashier")
-    branch=frappe.get_value("POS Invoice", invoice,"branch")
+    pos_invoice = frappe.get_doc("POS Invoice", invoice)
+    _validate_transfer_permission(pos_invoice)
+
+    pos_profile = pos_invoice.pos_profile
+    multiple_cashier = frappe.db.get_value("POS Profile", pos_profile, "custom_enable_multiple_cashier")
+    branch = pos_invoice.branch
     if multiple_cashier:
-        table=pos_profile=frappe.get_value("POS Invoice", invoice,"restaurant_table")
-        current_room = frappe.get_value("URY Table", table,"restaurant_room")
+        table = pos_invoice.restaurant_table
+        current_room = frappe.get_value("URY Table", table, "restaurant_room")
         new_captain_room =  frappe.db.sql("""
                 SELECT room
                 FROM `tabURY User`
@@ -1143,7 +1184,6 @@ def captain_transfer(currentCaptain, newCaptain, invoice):
             frappe.throw(_("Captain transfer is not allowed between different rooms"))
         else:
             current_captain_doc = frappe.get_doc("User", currentCaptain)
-            pos_invoice = frappe.get_doc("POS Invoice", invoice)
             new_captain_doc = frappe.get_doc("User", newCaptain)
 
             # Update the waiter field of the POS Invoice
@@ -1152,7 +1192,6 @@ def captain_transfer(currentCaptain, newCaptain, invoice):
 
     else:
         current_captain_doc = frappe.get_doc("User", currentCaptain)
-        pos_invoice = frappe.get_doc("POS Invoice", invoice)
         new_captain_doc = frappe.get_doc("User", newCaptain)
 
         # Update the waiter field of the POS Invoice
