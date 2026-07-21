@@ -1,4 +1,5 @@
 import frappe
+from frappe import _
 
 
 def get_users_with_role(role_name):
@@ -16,17 +17,38 @@ def get_users_with_role(role_name):
     return user_details
 
 
+def _get_authorized_kot(kot_id):
+    """Load the URY KOT and verify the caller may access it.
+
+    Only users whose roles grant read access to the specific KOT
+    (e.g. System Manager, URY Manager, URY Captain, URY Cashier) may
+    trigger delay notifications for it. This prevents arbitrary
+    authenticated users from spamming manager Notification Logs for
+    any KOT.
+    """
+    if not kot_id or not frappe.db.exists("URY KOT", kot_id):
+        frappe.throw(_("URY KOT {0} does not exist").format(kot_id))
+
+    kot = frappe.get_doc("URY KOT", kot_id)
+    if not kot.has_permission("read"):
+        frappe.throw(
+            _("Not permitted to send delay notification for URY KOT {0}").format(
+                kot_id
+            ),
+            frappe.PermissionError,
+        )
+    return kot
+
+
 @frappe.whitelist()
 def order_delay_notification(id):
-    table = frappe.db.get_value("URY KOT", id, "restaurant_table")
-    tableOrTakeaway = "Take Away"
-    if table:
-        tableOrTakeaway = table
-    order_status = frappe.db.get_value("URY KOT", id, "order_status")
-    invoice_id = frappe.db.get_value("URY KOT", id, "invoice")
-    order_id = invoice_id[-5:]
-    kot_type = frappe.db.get_value("URY KOT", id, "type")
-    pos_profile = frappe.db.get_value("URY KOT", id, "pos_profile")
+    kot = _get_authorized_kot(id)
+
+    tableOrTakeaway = kot.restaurant_table or "Take Away"
+    order_status = kot.order_status
+    order_id = (kot.invoice or "")[-5:] or kot.name
+    kot_type = kot.type
+    pos_profile = kot.pos_profile
     items = frappe.get_all(
         "URY KOT Items",
         fields=["item_name", "quantity"],
