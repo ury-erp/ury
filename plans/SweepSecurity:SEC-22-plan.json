@@ -1,0 +1,17 @@
+{
+  "subtasks": [
+    {
+      "objective": "Restrict the developer boot context helper used by the POS and URY web routes so guest users cannot receive full session boot data, even when developer_mode is enabled.",
+      "acceptance": "In both ury/www/pos.py and ury/www/ury.py, get_context_for_dev no longer exposes boot/session internals to guests based only on developer_mode; access requires an authenticated System Manager or equivalent Frappe permission check. The affected routes still render normally for permitted developers, unauthorized access returns no sensitive boot data, and the change is covered by focused verification or tests for guest and authorized-user behavior.",
+      "scope": [
+        "ury/www/pos.py",
+        "ury/www/ury.py"
+      ],
+      "task_type": "impl",
+      "difficulty": 2,
+      "risk": 2,
+      "uncertainty": 2,
+      "priority": 90
+    }
+  ]
+}
