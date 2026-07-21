@@ -31,5 +31,16 @@
   "name": "Fetch Merged POS Invoice Details",
   "script": "\nfrappe.ui.form.on('POS Invoice', {\n    setup: function(frm) {\n        frm.set_query('custom_merged_pos_invoice', function() {\n            if (frm.doc.name && !frm.doc.__islocal) {\n                return {\n                    filters: {\n                        name: ['!=', frm.doc.name]\n                    }\n                };\n            }\n        });\n    },\n    custom_merged_pos_invoice: function(frm) {\n        if(frm.doc.custom_merged_pos_invoice) {\n            frappe.call({\n                method: \"frappe.client.get\",\n                args: {\n                    doctype: \"POS Invoice\",\n                    name: frm.doc.custom_merged_pos_invoice\n                },\n                callback: function(r) {\n                    if(r.message && r.message.items) {\n                        frm.clear_table(\"custom_merged_pos_invoice_details\");\n                        r.message.items.forEach(function(item) {\n                            let row = frm.add_child(\"custom_merged_pos_invoice_details\");\n                            row.item_code = item.item_code;\n                            row.item_name = item.item_name;\n                            row.qty = item.qty;\n                            row.rate = item.rate;\n                            row.amount = item.amount;\n                        });\n                        frm.refresh_field(\"custom_merged_pos_invoice_details\");\n                    }\n                }\n            });\n        } else {\n            frm.clear_table(\"custom_merged_pos_invoice_details\");\n            frm.refresh_field(\"custom_merged_pos_invoice_details\");\n        }\n    }\n});\n",
   "view": "Form"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Client Script",
+  "dt": "POS Profile",
+  "enabled": 1,
+  "modified": "2026-07-21 09:49:17.648121",
+  "module": "URY",
+  "name": "POS Profile User Branch Filter",
+  "script": "\nfrappe.ui.form.on('POS Profile', {\n    setup: function(frm) {\n        frm.set_query('user', 'applicable_for_users', function(doc) {\n            return {\n                query: 'ury.ury_pos.api.get_users_for_branch_filter',\n                filters: {\n                    branch: doc.branch\n                }\n            };\n        });\n    }\n});\n",
+  "view": "Form"
  }
 ]
