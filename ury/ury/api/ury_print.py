@@ -15,6 +15,46 @@ standard_format = "templates/print_formats/standard.html"
 from frappe.www.printview import validate_print_permission
 
 
+def _user_branches(user):
+    """Return the set of branches the given user is assigned to (via URY User)."""
+    return {
+        row.branch
+        for row in frappe.db.sql(
+            """
+            SELECT b.branch
+            FROM `tabURY User` AS a
+            INNER JOIN `tabBranch` AS b ON a.parent = b.name
+            WHERE a.user = %s
+            """,
+            user,
+            as_dict=True,
+        )
+    }
+
+
+def _validate_invoice_access(invoice_name):
+    """Load a POS Invoice and enforce document-level print permission and
+    same-branch access. Raises DoesNotExistError / PermissionError on failure."""
+    doc = frappe.get_doc("POS Invoice", invoice_name)
+
+    # Document-level permission (read/print) as enforced by standard printview.
+    validate_print_permission(doc)
+
+    user = frappe.session.user
+    if (
+        doc.branch
+        and user != "Administrator"
+        and "System Manager" not in frappe.get_roles(user)
+        and doc.branch not in _user_branches(user)
+    ):
+        frappe.throw(
+            _("You are not authorized to print this invoice."),
+            frappe.PermissionError,
+        )
+
+    return doc
+
+
 @frappe.whitelist()
 def network_printing(
     doctype,
@@ -116,8 +156,11 @@ def select_network_printer(pos_profile, invoice_id):
 
 @frappe.whitelist()
 def qz_print_update(invoice):
+    # Enforce document-level permission and same-branch access before mutating.
+    doc = _validate_invoice_access(invoice)
+
     try:
-        table = frappe.db.get_value("POS Invoice", invoice, "restaurant_table")
+        table = doc.restaurant_table
         
         if table == None or table == "":
             # Update invoice_printed
@@ -156,21 +199,20 @@ def qz_print_update(invoice):
 
 @frappe.whitelist()
 def print_pos_page(doctype, name, print_format):
+    # Enforce document-level permission and same-branch access before
+    # publishing the realtime print job or mutating the invoice.
+    doc = _validate_invoice_access(name)
+
     data = {"name": name, "doctype": doctype, "print_format": print_format}
 
-    restaurant_table, branch, name = frappe.db.get_value(
-        "POS Invoice", name, ["restaurant_table", "branch", "name"]
-    )
-    print_channel = "{}_{}".format("print", branch)
+    print_channel = "{}_{}".format("print", doc.branch)
     frappe.publish_realtime(print_channel, {"data": data})
 
-    invoice_printed = frappe.db.get_value("POS Invoice", name, "invoice_printed")
-
-    if invoice_printed == 0:
+    if doc.invoice_printed == 0:
         frappe.db.set_value("POS Invoice", name, "invoice_printed", 1)
 
-        if restaurant_table:
-            release_merge_cluster_tables(restaurant_table)
+        if doc.restaurant_table:
+            release_merge_cluster_tables(doc.restaurant_table)
 
 
 @frappe.whitelist()
