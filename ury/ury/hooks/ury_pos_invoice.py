@@ -8,6 +8,7 @@ def before_insert(doc, method):
     pos_invoice_naming(doc, method)
     order_type_update(doc, method)
     restrict_existing_order(doc, method)
+    set_cashier_owner(doc, method)
 
 
 def validate(doc, method):
@@ -17,9 +18,26 @@ def validate(doc, method):
 
 
 def before_submit(doc, method):
+    doc.cashier = frappe.session.user
+    if doc.owner != frappe.session.user:
+        doc.owner = frappe.session.user
+        frappe.db.set_value("POS Invoice", doc.name, "owner", frappe.session.user, update_modified=False)
     calculate_and_set_times(doc, method)
     validate_invoice_print(doc, method)
     ro_reload_submit(doc, method)
+
+
+def set_cashier_owner(doc, method=None):
+    if not doc.pos_profile:
+        return
+    users = frappe.db.get_all(
+        "POS Profile User",
+        filters={"parent": doc.pos_profile},
+        fields=["user"],
+        order_by="idx asc"
+    )
+    if users and users[0].get("user"):
+        doc.owner = users[0].user
 
 
 def on_trash(doc, method):

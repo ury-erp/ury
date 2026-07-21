@@ -146,11 +146,9 @@ doc_events = {
     "POS Opening Entry": {
         "validate":"ury.ury.hooks.ury_pos_opening_entry.set_cashier_room",
         "before_save": "ury.ury.hooks.ury_pos_opening_entry.before_save",
-        "before_insert":"ury.ury.api.ury_kot_order_number.set_last_invoice_in_pos_open",
         },
     "POS Closing Entry": {
-        "before_save": "ury.ury.hooks.ury_pos_closing_entry.before_save",
-        "validate":"ury.ury.hooks.ury_pos_closing_entry.validate"
+        "on_submit": "ury.ury.hooks.ury_pos_closing_entry.on_submit",
         },
     "URY Menu Course": {
 		"validate": "ury.ury.api.ury_menu_course_validation.validate_priority",
@@ -369,7 +367,18 @@ fixtures = [
                     "POS Profile-custom_table_order_printer",
                     "POS Profile-custom_reprint_kot_format",
                     "Employee-payment_amount",
-                    "Employee-payment_type"
+                    "Employee-payment_type",
+                    "Branch-custom_branch_settings_section",
+                    "Branch-custom_reset_order_number_daily",
+                    "Branch-custom_order_counter",
+                    "Branch-custom_aggregator_order_counter",
+                    "Branch-custom_last_reset_date",
+                    "POS Profile-custom_captains",
+                    "POS Profile-custom_rooms",
+                    "POS Profile-custom_captain_access_to_other_profiles",
+                    "POS Profile-custom_cashier_access_to_other_profiles",
+                    "POS Profile-custom_captain_accessible_profiles",
+                    "POS Profile-custom_cashier_accessible_profiles"
                 },
             ]
         ],
