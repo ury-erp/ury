@@ -32,16 +32,6 @@
         "applicable_for_users": [
             {
                 "doctype": "POS Profile User",
-                "user": "captain@ury.com",
-                "parentfield": "applicable_for_users"
-            },
-            {
-                "doctype": "POS Profile User",
-                "user": "manager@ury.com",
-                "parentfield": "applicable_for_users"
-            },
-            {
-                "doctype": "POS Profile User",
                 "user": "cashier@ury.com",
                 "default": "1",
                 "parentfield": "applicable_for_users"
