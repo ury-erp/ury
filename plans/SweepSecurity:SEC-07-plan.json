@@ -1,0 +1,14 @@
+{
+  "subtasks": [
+    {
+      "objective": "Fix SEC-07: secure the merge_bills endpoint in ury/ury_pos/api.py (lines ~924-1026). Currently any authenticated user can merge/modify any two draft POS Invoices because there is no role/permission/branch check and the save uses doc.save(ignore_permissions=True). Add authorization: verify the current session user has write permission on BOTH POS Invoices (frappe.has_permission(\"POS Invoice\", \"write\", doc=primary_doc) and same for secondary_doc, throwing frappe.PermissionError otherwise) and verify both invoices belong to the same branch (compare the branch field; throw if they differ or if the user's permitted branch does not match, following how other endpoints in the same file resolve the caller's branch). In the nested update_merge_details() function, drop ignore_permissions=True from doc.save() so the write runs under the caller's permissions. Keep all existing validation logic, merged-details table behaviour, and the success/error response shape unchanged.",
+      "acceptance": "merge_bills in ury/ury_pos/api.py: (1) raises a PermissionError (not swallowed into the generic success path) when the caller lacks write permission on either invoice; (2) refuses to merge invoices from different branches; (3) contains no ignore_permissions=True save; (4) the happy path for an authorized same-branch user still returns {\"status\": \"success\", ...} and populates custom_merged_pos_invoice / custom_merged_pos_invoice_details exactly as before; (5) python -m py_compile ury/ury_pos/api.py succeeds.",
+      "scope": ["ury/ury_pos/api.py"],
+      "task_type": "impl",
+      "difficulty": 2,
+      "risk": 2,
+      "uncertainty": 2,
+      "priority": 90
+    }
+  ]
+}
