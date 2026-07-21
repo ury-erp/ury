@@ -1,7 +1,7 @@
 import json
 
 import frappe
-from ury.ury_pos.api import getBranch
+from ury.ury_pos.api import getBranch, getPosProfile
 from frappe.utils import get_datetime
 
 
@@ -33,8 +33,10 @@ def get_site_name():
 def kot_list():
     today = frappe.utils.now()
     branch = getBranch()
-    from ury.ury_pos.api import get_user_pos_profile
-    pos_profile = get_user_pos_profile(frappe.session.user, branch)
+    try:
+        pos_profile = getPosProfile().get("pos_profile")
+    except Exception:
+        frappe.throw("No POS Profile found for user")
     kot_alert_time = frappe.db.get_value(
         "POS Profile", pos_profile, "custom_kot_warning_time"
     )
@@ -100,8 +102,10 @@ def kot_list():
 def served_kot_list():
     today = frappe.utils.now()
     branch = getBranch()
-    from ury.ury_pos.api import get_user_pos_profile
-    pos_profile = get_user_pos_profile(frappe.session.user, branch)
+    try:
+        pos_profile = getPosProfile().get("pos_profile")
+    except Exception:
+        frappe.throw("No POS Profile found for user")
     kot_alert_time = frappe.db.get_value(
         "POS Profile", pos_profile, "custom_kot_warning_time"
     )

@@ -1,7 +1,7 @@
 import frappe
 from frappe.tests.utils import FrappeTestCase
 from frappe.utils import today, add_to_date
-from ury.ury_pos.api import getBranch, getBranchRoom, getRoom, get_user_pos_profile, get_allowed_profiles
+from ury.ury_pos.api import getBranch, getBranchRoom, getRoom, get_allowed_profiles
 from ury.ury.api.ury_kot_order_number import set_order_number
 from erpnext.accounts.doctype.pos_profile.pos_profile import POSProfile
 import ury.ury.hooks.ury_pos_profile

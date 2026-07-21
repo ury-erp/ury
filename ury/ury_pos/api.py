@@ -107,41 +107,15 @@ def getMenuCourses():
     courses = frappe.get_all("URY Menu Course", fields=["name"])
     return [{"name": d.name, "label": _(d.name)} for d in courses]
 
-@frappe.whitelist()
-def get_users_for_branch_filter(doctype, txt, searchfield, start, page_len, filters):
-    branch = filters.get("branch") if filters else None
-    if not branch:
-        return []
-    users = frappe.db.sql("""
-        SELECT user FROM `tabURY User`
-        WHERE parent = %s AND user LIKE %s
-    """, (branch, f"%{txt}%"), as_list=True)
-    return users
 
-def get_user_pos_profile(user, branch=None):
-    if not branch:
-        branch = getBranch()
-    profile = frappe.db.sql("""
-        SELECT parent FROM `tabPOS Profile User` WHERE user = %s
-    """, (user,), as_dict=True)
-    if profile:
-        for p in profile:
-            if frappe.db.get_value("POS Profile", p.parent, "branch") == branch:
-                return p.parent
-    captain_profile = frappe.db.sql("""
-        SELECT parent FROM `tabPOS Profile Captain` WHERE user = %s
-    """, (user,), as_dict=True)
-    if captain_profile:
-        for p in captain_profile:
-            if frappe.db.get_value("POS Profile", p.parent, "branch") == branch:
-                return p.parent
-    fallback = frappe.db.get_value("POS Profile", {"branch": branch}, "name")
-    return fallback
 
 def get_allowed_profiles(user, branch=None):
     if not branch:
         branch = getBranch()
-    primary = get_user_pos_profile(user, branch)
+    try:
+        primary = getPosProfile().get("pos_profile")
+    except Exception:
+        primary = None
     if not primary:
         return []
     
@@ -193,7 +167,10 @@ def getBranch():
 def getBranchRoom():
     user = frappe.session.user
     branch = getBranch()
-    pos_profile = get_user_pos_profile(user, branch)
+    try:
+        pos_profile = getPosProfile().get("pos_profile")
+    except Exception:
+        pos_profile = None
     if not pos_profile:
         frappe.throw("No POS Profile found for user/branch. Please contact your administrator.")
     
@@ -212,7 +189,10 @@ def getBranchRoom():
 def getRoom():
     user = frappe.session.user
     branch = getBranch()
-    pos_profile = get_user_pos_profile(user, branch)
+    try:
+        pos_profile = getPosProfile().get("pos_profile")
+    except Exception:
+        pos_profile = None
     if not pos_profile:
         frappe.throw("No POS Profile found for user/branch. Please contact your administrator.")
     
@@ -410,7 +390,10 @@ def getInvoiceForCashier(status, cashier, limit, limit_start):
     if not allowed_profiles:
         return {"data": [], "next": False}
         
-    primary_profile = get_user_pos_profile(frappe.session.user, branch)
+    try:
+        primary_profile = getPosProfile().get("pos_profile")
+    except Exception:
+        primary_profile = None
     other_profiles = [p for p in allowed_profiles if p != primary_profile]
     
     if other_profiles:
@@ -764,7 +747,28 @@ def getPosProfile():
     printer = None
     cashier = waiter
     owner = waiter
-    posProfile = get_user_pos_profile(waiter, branchName)
+
+    posProfile = None
+    profile_users = frappe.db.sql("""
+        SELECT parent FROM `tabPOS Profile User` WHERE user = %s
+    """, (waiter,), as_dict=True)
+    if profile_users:
+        for p in profile_users:
+            if frappe.db.get_value("POS Profile", p.parent, "branch") == branchName:
+                posProfile = p.parent
+                break
+    if not posProfile:
+        captain_profiles = frappe.db.sql("""
+            SELECT parent FROM `tabPOS Profile Captain` WHERE user = %s
+        """, (waiter,), as_dict=True)
+        if captain_profiles:
+            for p in captain_profiles:
+                if frappe.db.get_value("POS Profile", p.parent, "branch") == branchName:
+                    posProfile = p.parent
+                    break
+    if not posProfile:
+        posProfile = frappe.db.get_value("POS Profile", {"branch": branchName}, "name")
+
     if not posProfile:
         frappe.throw(f"No POS Profile found for user {waiter} on branch {branchName}")
         
@@ -803,6 +807,8 @@ def getPosProfile():
     else:
         print_type = "socket"
 
+    multiple_cashier = 1
+
     invoice_details = {
         "pos_profile": pos_profile_name,
         "branch": branch,
@@ -819,6 +825,8 @@ def getPosProfile():
         "paid_limit": paid_limit,
         "disable_rounded_total": disable_rounded_total,
         "enable_discount": enable_discount,
+        "multiple_cashier": multiple_cashier,
+        "owner": owner,
         "edit_order_type": edit_order_type,
         "enable_kot_reprint": enable_kot_reprint
     }
