@@ -1,0 +1,17 @@
+{
+  "subtasks": [
+    {
+      "objective": "Restrict searchPosInvoice results to the authenticated user's active branch by adding the branch returned by getBranch() to the POS Invoice filters.",
+      "acceptance": "searchPosInvoice in ury/ury_pos/api.py includes branch scoping for all status paths, including Recently Paid and Unbilled; searches no longer return POS Invoice records from other branches; existing query matching by invoice name, customer, and mobile number still works within the branch; add or update focused tests if a backend test harness exists for this API.",
+      "scope": [
+        "ury/ury_pos/api.py",
+        "ury/**/test*.py"
+      ],
+      "task_type": "impl",
+      "difficulty": 2,
+      "risk": 2,
+      "uncertainty": 2,
+      "priority": 100
+    }
+  ]
+}
