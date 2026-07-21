@@ -1,0 +1,17 @@
+{
+  "subtasks": [
+    {
+      "objective": "Stop serving the QZ Tray private key to clients. Replace the whitelisted `signature_promise()` endpoint in `ury/ury/api/ury_print.py` (lines 184-189), which currently returns the `qz_private_key` value from site_config to any authenticated user, with a server-side sign-only endpoint per QZ Tray's recommended model: the endpoint accepts the `toSign` string from the client, verifies the caller is authenticated and holds an appropriate POS role (e.g. URY Cashier / URY Admin via `frappe.get_roles()`), reads the private key from site_config server-side, signs `toSign` (RSA/SHA, matching the algorithm QZ expects and the current client-side signing in `ury/public/js/sign-message.js`), and returns only the signature — never the key or its path. Update `ury/public/js/sign-message.js` (lines 44-56) to stop fetching the key path and fetching `/private/<path>`; instead send the `toSign` value to the new endpoint and use the returned signature with `qz.security.setSignaturePromise`. Ensure unauthenticated callers and users without the required role get a 403 (frappe.throw with frappe.PermissionError) and that no code path returns `qz_private_key` or its file path to the client.",
+      "acceptance": "`signature_promise` (or its replacement) never returns the private key value or key path; the key is read and used only server-side. Calling the signing endpoint as Guest or as an authenticated user without the required POS role returns 403; calling it as an authorized POS user with a `toSign` payload returns a valid signature that QZ Tray accepts (print jobs still work end-to-end). `ury/public/js/sign-message.js` no longer fetches the key path or `/private/<path>`. `grep` for `qz_private_key` shows it is only read server-side in `ury/ury/api/ury_print.py`.",
+      "scope": [
+        "ury/ury/api/ury_print.py",
+        "ury/public/js/sign-message.js"
+      ],
+      "task_type": "impl",
+      "difficulty": 3,
+      "risk": 3,
+      "uncertainty": 2,
+      "priority": 90
+    }
+  ]
+}
