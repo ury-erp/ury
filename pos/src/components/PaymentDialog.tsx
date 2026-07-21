@@ -21,6 +21,8 @@ interface PaymentDialogProps {
   owner: string;
   fetchOrders: () => Promise<void>;
   clearSelectedOrder: () => void;
+  discountPercentage?: number;
+  discountAmount?: number;
 }
 
 const PaymentDialog: React.FC<PaymentDialogProps> = ({
@@ -34,13 +36,24 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   cashier,
   owner,
   fetchOrders,
-  clearSelectedOrder
+  clearSelectedOrder,
+  discountPercentage,
+  discountAmount
 }) => {
   const { paymentModes, fetchPaymentModes, posProfile: storePosProfile } = usePOSStore();
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [discountValue, setDiscountValue] = useState<string>('');
-  const [appliedDiscount, setAppliedDiscount] = useState<number>(0);
+  const [discountType] = useState<'percentage'>('percentage'); // Only percentage now
+  
+  // Calculate effective percentage if only amount is provided (for invoice-level discounts)
+  const effectivePercentage = discountPercentage 
+    ? discountPercentage 
+    : (discountAmount && grandTotal + discountAmount > 0 
+        ? (discountAmount / (grandTotal + discountAmount)) * 100 
+        : 0);
+        
+  const [discountValue, setDiscountValue] = useState<string>(effectivePercentage > 0 ? String(effectivePercentage) : '');
+  const [appliedDiscount, setAppliedDiscount] = useState<number>(discountAmount || 0); // Only tracking transaction discount!
   const [paymentInputs, setPaymentInputs] = useState<{ [mode: string]: string }>({});
 
   useEffect(() => {
@@ -57,6 +70,9 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
     .filter(Boolean);
   const paymentsTotal = payments.reduce((sum, p: any) => sum + p.amount, 0);
 
+  // baseTotal represents the amount before any invoice-level discount (like pricing rule or manual discount)
+  const baseTotal = grandTotal + (discountAmount || 0);
+
   const handleApplyDiscount = () => {
     const value = parseFloat(discountValue);
     if (isNaN(value) || value <= 0) {
@@ -67,13 +83,16 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
       setError(t('errors.discount_exceeds_max'));
       return;
     }
-    const calculatedDiscount = (grandTotal * value) / 100;
+    const calculatedDiscount = (baseTotal * value) / 100;
     setAppliedDiscount(calculatedDiscount);
     setError(null);
   };
 
   // Order summary logic
-  const subtotal = grandTotal;
+  const subtotal = baseTotal;
+  const adjustment = roundedTotal - grandTotal;
+  const roundedAdjustment = Math.round(adjustment * 100) / 100;
+  const showAdjustment = Math.abs(roundedAdjustment) > 0.001;
   const totalDiscount = appliedDiscount;
   const discountedTotal = Math.max(0, subtotal - totalDiscount);
   // If discount is applied, round up; else, round normally
@@ -120,7 +139,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
     setError(null);
     try {
       await call.post('ury.ury.doctype.ury_order.ury_order.make_invoice', {
-        additionalDiscount: discountValue ? parseInt(discountValue) : null,
+        additionalDiscount: discountValue ? parseFloat(discountValue) : null,
         cashier,
         customer,
         invoice,
