@@ -182,8 +182,30 @@ def qz_certificate():
 
 
 @frappe.whitelist()
-def signature_promise():
-    site_config = frappe.get_site_config()
-    key_value = site_config.get("qz_private_key")
+def qz_sign():
+    """Sign a QZ Tray payload server-side.
 
-    return key_value
+    The RSA private key lives only in the site config (``qz_private_key``) and
+    is never sent to the browser. The client submits each ``toSign`` string
+    produced by QZ Tray and receives the base64-encoded SHA512withRSA
+    signature in return.
+    """
+    to_sign = frappe.form_dict.get("toSign")
+    if not to_sign:
+        frappe.throw(_("Missing payload to sign"))
+
+    private_key = frappe.get_site_config().get("qz_private_key")
+    if not private_key:
+        frappe.throw(_("QZ private key is not configured in the site config"))
+
+    import base64
+
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import padding
+
+    key = serialization.load_pem_private_key(private_key.encode(), password=None)
+    signature = key.sign(
+        to_sign.encode(), padding.PKCS1v15(), hashes.SHA512()
+    )
+
+    return base64.b64encode(signature).decode()

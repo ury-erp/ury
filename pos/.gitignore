@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# QZ Tray signing key — never commit; signing is done server-side
+privateKey.js
+privateKey.d.ts
