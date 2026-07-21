@@ -961,7 +961,7 @@ def sync_order(
                     "URY Table", merged_table.strip(), {"occupied": 1, "latest_invoice_time": invoice.creation}
                 )
 
-    invoice.db_set("owner", cashier)
+    invoice.db_set("owner", owner)
     return invoice.as_dict()
 
 
@@ -1267,6 +1267,8 @@ def make_invoice(customer, payments, cashier, pos_profile,owner, additionalDisco
                 "payments", dict(mode_of_payment=d["mode_of_payment"], amount=d["amount"])
             )
 
+    if owner and invoice.owner != owner:
+        invoice.db_set("owner", owner)
     # invoice.owner = owner
     invoice.save()
     try:
