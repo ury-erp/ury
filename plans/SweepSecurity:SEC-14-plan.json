@@ -1,0 +1,23 @@
+{
+  "subtasks": [
+    {
+      "objective": "Require POST for all state-changing Frappe whitelisted endpoints identified by SEC-14 so browser-navigable GET requests cannot mutate restaurant, invoice, KOT, printing, table, or customer state.",
+      "acceptance": "Every SEC-14 mutating whitelisted method, including cancel_order, serve_kot, confirm_cancel_kot, qz_print_update, merge_bills, split_bill, table_transfer, create_customer, release_tables_after_print, and kot_execute, is decorated with @frappe.whitelist(methods=[\"POST\"]) or an equivalent POST-only whitelist declaration; non-mutating whitelisted methods remain unchanged; existing callers/tests are updated where needed to use POST; targeted validation confirms these endpoints no longer accept GET.",
+      "scope": [
+        "ury/ury/doctype/ury_order/ury_order.py",
+        "ury/ury/api/ury_kot_display.py",
+        "ury/ury/api/ury_print.py",
+        "ury/ury_pos/api.py",
+        "pos/src/**/*",
+        "frontend/src/**/*",
+        "URYMosaic/src/**/*",
+        "urypos/src/**/*"
+      ],
+      "task_type": "impl",
+      "difficulty": 2,
+      "risk": 3,
+      "uncertainty": 2,
+      "priority": 86
+    }
+  ]
+}
