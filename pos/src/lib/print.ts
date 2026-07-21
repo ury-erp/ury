@@ -1,4 +1,4 @@
-import { printWithQz } from './print-qz';
+import { printWithQz } from '@ury/core';
 import {
   getInvoicePrintHtml,
   networkPrint,

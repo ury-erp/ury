@@ -9,12 +9,12 @@ import {
   LogOut,
   RefreshCw,
 } from 'lucide-react';
-import { Button, Input } from './ui';
+import { Button, Input } from '@ury/ui';
 import { useRootStore } from '../store/root-store';
 import { usePOSStore } from '../store/pos-store';
 import type { RootState } from '../store/root-store';
-import { logout } from '../lib/auth-api';
-import { showToast } from './ui/toast';
+import { logout } from '@ury/core';
+import { showToast } from '@ury/ui';
 
 const Header = () => {
   const [showUserMenu, setShowUserMenu] = useState(false);
