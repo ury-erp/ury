@@ -1,6 +1,6 @@
 import { useEffect, useRef, type MouseEvent as ReactMouseEvent } from 'react';
 import { ArrowRightLeft, Link2, MoreVertical, Unlink, UserRound } from 'lucide-react';
-import { Button } from './ui/button';
+import { Button } from '@ury/ui';
 import { t } from '../i18n';
 import { isMergedTable } from '../lib/table-utils';
 import type { Table } from '../lib/table-api';

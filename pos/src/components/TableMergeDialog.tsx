@@ -7,11 +7,11 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from './ui/dialog';
-import { Button } from './ui/button';
-import { Badge } from './ui/badge';
+} from '@ury/ui';
+import { Button } from '@ury/ui';
+import { Badge } from '@ury/ui';
 import { TableShapeIcon } from './TableShapeIcon';
-import { cn } from '../lib/utils';
+import { cn } from '@ury/ui';
 import { t } from '../i18n';
 import type { Table } from '../lib/table-api';
 
