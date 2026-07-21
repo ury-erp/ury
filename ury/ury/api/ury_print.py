@@ -23,8 +23,9 @@ def network_printing(
     print_format=None,
     doc=None,
     no_letterhead=0,
-    file_path=None,
 ):
+    validate_print_permission(doctype, name)
+
     try:
         print_settings = frappe.get_doc("Network Printer Settings", printer_setting)
 
@@ -51,10 +52,9 @@ def network_printing(
                 as_pdf=True,
                 output=output,
             )
-            if not file_path:
-                file_path = os.path.join(
-                    "/", "tmp", f"frappe-pdf-{frappe.generate_hash()}.pdf"
-                )
+            file_path = os.path.join(
+                "/", "tmp", f"frappe-pdf-{frappe.generate_hash()}.pdf"
+            )
             with open(file_path, "wb") as f:
                 output.write(f)
             conn.printFile(print_settings.printer_name, file_path, name, {})
