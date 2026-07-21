@@ -240,3 +240,4 @@ To ensure smooth transition for existing sites, a `patch` (Python script execute
 - [x] Inlined the POS Profile resolution logic inside the existing `getPosProfile` API.
 - [x] Updated all references (`pos_extend.py`, `ury_kot_display.py`, `getBranchRoom`, etc.) to use `getPosProfile().get("pos_profile")` instead.
 - [x] Removed the custom frontend query for user filtering on POS Profile as requested.
+- [x] Corrected `cashier` and `owner` assignment in `getPosProfile`: set them as the session user (`waiter`) for cashier profiles (`POS Profile User`), and as the mapped user in `applicable_for_users` for captain profiles (`POS Profile Captain`).
