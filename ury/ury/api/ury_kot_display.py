@@ -1,19 +1,46 @@
 import json
 
 import frappe
+from frappe import _
 from ury.ury_pos.api import getBranch
 from frappe.utils import get_datetime
 
 
+# Roles allowed to mark a KOT as served from the kitchen display.
+KITCHEN_SERVE_ROLES = {"URY Manager", "URY Captain", "System Manager", "Administrator"}
+
+# Roles that are not tied to a single branch and may serve KOTs across branches.
+BRANCH_PRIVILEGED_ROLES = {"System Manager", "Administrator"}
+
+
 # Function to set order status in a KOT document
-@frappe.whitelist()
-def serve_kot(name, time):
+@frappe.whitelist(methods=["POST"])
+def serve_kot(name, time=None):
+    # `time` is accepted for backward compatibility with older clients but is
+    # never trusted — the served timestamp is always taken from the server.
+    user_roles = set(frappe.get_roles())
+    if not KITCHEN_SERVE_ROLES & user_roles:
+        frappe.throw(
+            _("You do not have permission to serve KOTs."),
+            frappe.PermissionError,
+        )
+
+    kot = frappe.get_doc("URY KOT", name)
+
+    if not BRANCH_PRIVILEGED_ROLES & user_roles:
+        user_branch = getBranch()
+        if kot.branch and kot.branch != user_branch:
+            frappe.throw(
+                _("You are not authorized to serve KOTs for this branch."),
+                frappe.PermissionError,
+            )
+
     current_time = get_datetime()
-    creation_time = frappe.db.get_value("URY KOT",name,"creation")
+    creation_time = kot.creation
 
     production_time = current_time - creation_time
     production_time_minutes = production_time.total_seconds() / 60
-    frappe.db.set_value("URY KOT", name, "start_time_serv", time)
+    frappe.db.set_value("URY KOT", name, "start_time_serv", current_time.strftime("%I:%M:%S %p"))
     frappe.db.set_value("URY KOT",name,"production_time",production_time_minutes)
     frappe.db.set_value("URY KOT", name, "order_status", "Served")
 
