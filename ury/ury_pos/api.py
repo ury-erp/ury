@@ -745,8 +745,8 @@ def getPosProfile():
     bill_present = False
     qz_host = None
     printer = None
-    cashier = waiter
-    owner = waiter
+    cashier = None
+    owner = None
 
     posProfile = None
     profile_users = frappe.db.sql("""
@@ -790,6 +790,10 @@ def getPosProfile():
     qz_print = pos_profiles.qz_print
     print_type = None
 
+    if pos_profiles.applicable_for_users:
+        cashier = pos_profiles.applicable_for_users[0].user
+        owner = pos_profiles.applicable_for_users[0].user
+
     printers = []
     for pos_profile in pos_profiles.printer_settings:
         if pos_profile.bill == 1:
@@ -807,8 +811,6 @@ def getPosProfile():
     else:
         print_type = "socket"
 
-    multiple_cashier = 1
-
     invoice_details = {
         "pos_profile": pos_profile_name,
         "branch": branch,
@@ -825,7 +827,6 @@ def getPosProfile():
         "paid_limit": paid_limit,
         "disable_rounded_total": disable_rounded_total,
         "enable_discount": enable_discount,
-        "multiple_cashier": multiple_cashier,
         "owner": owner,
         "edit_order_type": edit_order_type,
         "enable_kot_reprint": enable_kot_reprint
