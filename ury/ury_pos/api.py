@@ -113,7 +113,7 @@ def get_allowed_profiles(user, branch=None):
     if not branch:
         branch = getBranch()
     try:
-        primary = getPosProfile().get("pos_profile")
+        primary = _resolve_pos_profile(user, branch)
     except Exception:
         primary = None
     if not primary:
@@ -391,7 +391,7 @@ def getInvoiceForCashier(status, cashier, limit, limit_start):
         return {"data": [], "next": False}
         
     try:
-        primary_profile = getPosProfile().get("pos_profile")
+        primary_profile = _resolve_pos_profile(frappe.session.user, branch)
     except Exception:
         primary_profile = None
     other_profiles = [p for p in allowed_profiles if p != primary_profile]
@@ -738,6 +738,35 @@ def getCashier(room):
     return cashier       
     
 
+def _resolve_pos_profile(user, branch):
+    """Return the POS Profile name for `user` on `branch`.
+
+    Resolution order:
+    1. tabPOS Profile User  – user is a direct cashier
+    2. tabPOS Profile Captain – user is a captain
+    3. Branch fallback – first profile assigned to the branch
+    """
+    profile_users = frappe.db.sql("""
+        SELECT parent FROM `tabPOS Profile User` WHERE user = %s
+    """, (user,), as_dict=True)
+    for p in profile_users:
+        if frappe.db.get_value("POS Profile", p.parent, "branch") == branch:
+            return p.parent
+
+    captain_profiles = frappe.db.sql("""
+        SELECT parent FROM `tabPOS Profile Captain` WHERE user = %s
+    """, (user,), as_dict=True)
+    for p in captain_profiles:
+        if frappe.db.get_value("POS Profile", p.parent, "branch") == branch:
+            return p.parent
+
+    fallback = frappe.db.get_value("POS Profile", {"branch": branch}, "name")
+    if fallback:
+        return fallback
+
+    frappe.throw(f"No POS Profile found for user {user} on branch {branch}")
+
+
 @frappe.whitelist()
 def getPosProfile():
     branchName = getBranch()
@@ -748,30 +777,8 @@ def getPosProfile():
     cashier = None
     owner = None
 
-    posProfile = None
-    profile_users = frappe.db.sql("""
-        SELECT parent FROM `tabPOS Profile User` WHERE user = %s
-    """, (waiter,), as_dict=True)
-    if profile_users:
-        for p in profile_users:
-            if frappe.db.get_value("POS Profile", p.parent, "branch") == branchName:
-                posProfile = p.parent
-                break
-    if not posProfile:
-        captain_profiles = frappe.db.sql("""
-            SELECT parent FROM `tabPOS Profile Captain` WHERE user = %s
-        """, (waiter,), as_dict=True)
-        if captain_profiles:
-            for p in captain_profiles:
-                if frappe.db.get_value("POS Profile", p.parent, "branch") == branchName:
-                    posProfile = p.parent
-                    break
-    if not posProfile:
-        posProfile = frappe.db.get_value("POS Profile", {"branch": branchName}, "name")
+    posProfile = _resolve_pos_profile(waiter, branchName)
 
-    if not posProfile:
-        frappe.throw(f"No POS Profile found for user {waiter} on branch {branchName}")
-        
     pos_profiles = frappe.get_doc("POS Profile", posProfile)
     global_defaults = frappe.get_single('Global Defaults')
     disable_rounded_total = global_defaults.disable_rounded_total

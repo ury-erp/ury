@@ -1,6 +1,6 @@
 import frappe
 from frappe import _
-from ury.ury_pos.api import getBranch, getPosProfile
+from ury.ury_pos.api import getBranch, getPosProfile, _resolve_pos_profile
 
 def validate_search_input(search_term):
     """Validate and sanitize search input"""
@@ -26,7 +26,7 @@ def overrided_past_order_list(search_term, status, limit=20):
     if user != "Administrator":
         branch_name = getBranch()
         try:
-            pos_profile = getPosProfile().get("pos_profile")
+            pos_profile = _resolve_pos_profile(user, branch_name)
         except Exception:
             pos_profile = None
         if not pos_profile:
