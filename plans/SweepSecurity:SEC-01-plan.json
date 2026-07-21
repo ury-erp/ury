@@ -1,0 +1,16 @@
+{
+  "subtasks": [
+    {
+      "objective": "Secure the whitelisted `cancel_order` endpoint in `ury/ury/doctype/ury_order/ury_order.py` (currently at ~:1187): (1) add a server-side authorization gate before any mutation — `frappe.has_permission(\"POS Invoice\", \"cancel\", doc=pos_invoice)` (throw `frappe.PermissionError` when false) plus a branch check verifying the invoice's `branch` matches the session user's allowed branch (mirroring the branch-scoping pattern already used elsewhere in the codebase, e.g. `getBranch()` in `ury/ury_pos/api.py`); (2) replace the raw direct writes (`frappe.db.sql` UPDATE on `tabPOS Invoice Item` setting docstatus=2, and `frappe.db.set_value` for `docstatus`/`status` at ~:1203-1210) with the Frappe cancel workflow `pos_invoice.cancel()` so stock/payment reversals and the audit trail run; keep the `cancel_reason` set via the normal document API (assign on the doc before cancel, or `set_value` after cancel for that custom field only), and keep the existing merge-cluster table release and `cancel_kot` best-effort call.",
+      "acceptance": "An authenticated user without `cancel` permission on POS Invoice receives a PermissionError (HTTP 403) from `cancel_order` and the invoice is unchanged; a user whose branch does not match the invoice's branch is likewise rejected. A permitted user (e.g. URY Cashier/Manager role with cancel rights, same branch) cancels the invoice through `doc.cancel()`, producing docstatus=2 via the standard workflow (on_cancel hooks run, GL/payment reversal and Error Log/audit entries occur, no raw SQL UPDATE on `tabPOS Invoice Item` remains in the function). `python -c \"import ast; ast.parse(open('ury/ury/doctype/ury_order/ury_order.py').read())\"` passes, and `cancel_reason` is still persisted on the cancelled invoice.",
+      "scope": [
+        "ury/ury/doctype/ury_order/ury_order.py"
+      ],
+      "task_type": "impl",
+      "difficulty": 2,
+      "risk": 3,
+      "uncertainty": 2,
+      "priority": 95
+    }
+  ]
+}
