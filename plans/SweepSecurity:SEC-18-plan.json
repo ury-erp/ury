@@ -1,0 +1,18 @@
+{
+  "subtasks": [
+    {
+      "objective": "Prevent direct client invocation of KOT generation for arbitrary POS Invoice IDs by removing or restricting the whitelisted `kot_execute` entry point while preserving legitimate server-side KOT creation from URY order update and cancellation flows.",
+      "acceptance": "`kot_execute` can no longer be used by an authenticated user to create new or cancel KOT documents for an arbitrary invoice without authorization; legitimate order update and cancel paths still create the expected KOT/cancel-KOT records; any remaining whitelisted replacement validates POS Invoice permissions and branch/profile access before generating KOTs; focused tests or manual Frappe checks cover denied direct calls and allowed order flows.",
+      "scope": [
+        "ury/ury/api/ury_kot_generate.py",
+        "ury/ury/doctype/ury_order/ury_order.py",
+        "ury/public/js/ury_pos_kot.js"
+      ],
+      "task_type": "impl",
+      "difficulty": 2,
+      "risk": 2,
+      "uncertainty": 2,
+      "priority": 82
+    }
+  ]
+}
