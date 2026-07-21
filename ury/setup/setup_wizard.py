@@ -20,10 +20,7 @@ def setup_ury_or_erpnext_demo(args):
         frappe.db.set_default("company", company)
         frappe.db.set_default("demo_data_type", "ury")
 
-        # FIX: Set setup_complete early to prevent infinite redirect loops if the demo generation times out
-        frappe.db.set_value("System Settings", "System Settings", "setup_complete", 1)
-        frappe.db.commit()
-
+        # Removed early setup_complete to avoid breaking Frappe's setup router
         from ury.setup.demo import setup_ury_demo_data
         setup_ury_demo_data(company)
 
