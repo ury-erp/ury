@@ -1188,6 +1188,24 @@ def customer_favourite_item(customer_name):
 def cancel_order(invoice_id, reason):
     pos_invoice = frappe.get_doc("POS Invoice", invoice_id)
 
+    # Authorization gate: the session user must hold cancel rights on this
+    # specific invoice before any mutation happens.
+    if not frappe.has_permission("POS Invoice", "cancel", doc=pos_invoice):
+        frappe.throw(
+            _("You do not have permission to cancel this invoice."),
+            frappe.PermissionError,
+        )
+
+    # Branch scoping: the invoice must belong to the session user's branch
+    # (mirrors the getBranch() pattern used across the URY APIs).
+    if frappe.session.user != "Administrator":
+        user_branch = getBranch()
+        if pos_invoice.branch != user_branch:
+            frappe.throw(
+                _("You are not allowed to cancel an invoice from another branch."),
+                frappe.PermissionError,
+            )
+
     # Release the full merge cluster, not only the primary table and CSV partners.
     if pos_invoice.restaurant_table:
         release_merge_cluster_tables(pos_invoice.restaurant_table)
@@ -1199,16 +1217,24 @@ def cancel_order(invoice_id, reason):
         # If an exception occurs (e.g., "kot" app not found), it will be caught here without effecting execution
         pass
 
-    # Update invoice status
-    frappe.db.sql("""
-        UPDATE `tabPOS Invoice Item`
-        SET docstatus = 2
-        WHERE parent = %s
-    """, (invoice_id,))
+    if pos_invoice.docstatus == 1:
+        # Submitted invoice: cancel through the standard document workflow so
+        # on_cancel hooks run and GL/payment reversals and audit entries are
+        # produced (docstatus=2 on the invoice and its items).
+        pos_invoice.cancel()
+        pos_invoice.db_set("cancel_reason", reason)
+    else:
+        # Draft invoice: Frappe's standard workflow does not allow cancelling
+        # drafts, so update the status directly as before.
+        frappe.db.sql("""
+            UPDATE `tabPOS Invoice Item`
+            SET docstatus = 2
+            WHERE parent = %s
+        """, (invoice_id,))
 
-    frappe.db.set_value("POS Invoice", invoice_id, "docstatus", 2)
-    frappe.db.set_value("POS Invoice", invoice_id, "status", "Cancelled")
-    frappe.db.set_value("POS Invoice", invoice_id, "cancel_reason", reason)
+        frappe.db.set_value("POS Invoice", invoice_id, "docstatus", 2)
+        frappe.db.set_value("POS Invoice", invoice_id, "status", "Cancelled")
+        frappe.db.set_value("POS Invoice", invoice_id, "cancel_reason", reason)
 
 # Method for URY POS
 @frappe.whitelist()
