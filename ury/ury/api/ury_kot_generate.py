@@ -1,6 +1,7 @@
 import json
 
 import frappe
+from frappe import _
 from ury.ury_pos.api import getBranch
 
 
@@ -319,8 +320,94 @@ def create_cancel_kot_doc(
     kot_cancel_doc.submit()
 
 
-# Whitelisted function to handle KOT entry
+def _get_user_branches(user=None):
+    """Return the branches the given user is assigned to via URY User."""
+    user = user or frappe.session.user
+    return frappe.db.sql(
+        """
+        SELECT b.branch
+        FROM `tabURY User` AS a
+        INNER JOIN `tabBranch` AS b ON a.parent = b.name
+        WHERE a.user = %s
+        """,
+        user,
+        pluck="branch",
+    )
+
+
+def _validate_kot_access(pos_invoice):
+    """Ensure the session user is authorized to generate KOTs for a POS Invoice.
+
+    Requires write permission on the POS Invoice and, for non-admin users,
+    assignment to the invoice's branch (via URY User).
+    """
+    if not frappe.has_permission("POS Invoice", "write", doc=pos_invoice):
+        frappe.throw(
+            _("Not permitted to generate KOTs for POS Invoice {0}.").format(
+                pos_invoice.name
+            ),
+            frappe.PermissionError,
+        )
+
+    user = frappe.session.user
+    if user == "Administrator" or "System Manager" in frappe.get_roles(user):
+        return
+
+    if pos_invoice.branch and pos_invoice.branch not in _get_user_branches(user):
+        frappe.throw(
+            _("You are not assigned to branch {0}.").format(pos_invoice.branch),
+            frappe.PermissionError,
+        )
+
+
 @frappe.whitelist()
+def kot_execute_for_invoice(
+    invoice_id,
+    restaurant_table=None,
+    previous_items=None,
+    comments=None,
+):
+    """Whitelisted endpoint used by the POS Invoice form to update KOTs.
+
+    Validates POS Invoice write permission and branch/profile access, then
+    derives the current items from the saved invoice instead of trusting
+    client-supplied item data.
+    """
+    previous_items = load_json(previous_items) or []
+
+    pos_invoice = frappe.get_doc("POS Invoice", invoice_id)
+
+    _validate_kot_access(pos_invoice)
+
+    if pos_invoice.docstatus != 0:
+        frappe.throw(
+            _("KOTs can only be updated for draft POS Invoice {0}.").format(
+                invoice_id
+            )
+        )
+
+    current_items = [
+        {
+            "item_code": item.item_code,
+            "qty": item.qty,
+            "item_name": item.item_name,
+            "comments": item.get("comment") or "",
+        }
+        for item in pos_invoice.items
+    ]
+
+    kot_execute(
+        invoice_id,
+        pos_invoice.customer,
+        restaurant_table or pos_invoice.restaurant_table,
+        current_items,
+        previous_items,
+        comments,
+    )
+
+
+# Server-side only: handles KOT entry. Called from the URY order sync flow
+# (ury_order.sync_order) and from kot_execute_for_invoice after authorization.
 def kot_execute(
     invoice_id,
     customer,
