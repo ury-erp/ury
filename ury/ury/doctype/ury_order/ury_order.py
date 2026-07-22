@@ -1269,6 +1269,7 @@ def make_invoice(customer, payments, cashier, pos_profile,owner, additionalDisco
 
     if owner and invoice.owner != owner:
         invoice.db_set("owner", owner)
+        invoice.cashier = owner
     # invoice.owner = owner
     invoice.save()
     try:
