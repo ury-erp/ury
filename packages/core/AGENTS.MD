@@ -19,7 +19,7 @@ packages/core/src/
 ├── types.ts            ← User, PosProfileCombined (shared doctype shapes)
 ├── frappe/
 │   ├── client.ts       ← createFrappeClient() factory + call/db/auth singletons
-│   ├── auth.ts         ← getLoggedUser(), getUserRoles(email), logout()
+│   ├── auth.ts         ← getLoggedUser(), getUserRoles(), logout()
 │   └── roles.ts        ← isUserRestrictedFromTableOrders(), canCaptainTransfer()
 ├── storage.ts          ← storage: localStorage wrapper (+ POS-profile helpers)
 ├── format.ts           ← formatCurrency(), formatInvoiceTime()
@@ -43,7 +43,7 @@ Dev setup: set `VITE_FRAPPE_BASE_URL` in the app's `.env.local` to point at the 
 
 ### Auth (`frappe/auth.ts`)
 - `getLoggedUser()` → current session user's email, or `null` on error.
-- `getUserRoles(email)` → `{ roles: string[], full_name }` read from the `User` doctype.
+- `getUserRoles()` → `{ roles: string[], full_name }` read from the Frappe page boot payload (`frappe.boot.user`).
 - `logout()` → ends the Frappe session.
 
 All three swallow errors (log + safe fallback) — callers branch on the return value, not try/catch.
