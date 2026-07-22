@@ -66,16 +66,16 @@ def execute():
     for profile in profiles:
         branch_users = frappe.get_all("URY User", filters={"parent": profile.branch}, fields=["user"])
         profile_doc = frappe.get_doc("POS Profile", profile.name)
-        existing_users = {u.user for u in profile_doc.applicable_for_users}
+        existing_users = {u.user for u in profile_doc.custom_captains}
         
         for bu in branch_users:
             if bu.user and bu.user not in existing_users:
-                profile_doc.append("applicable_for_users", {
+                profile_doc.append("custom_captains", {
                     "user": bu.user,
                     "default": 0
                 })
         profile_doc.save(ignore_permissions=True)
-        print(f"Migrated branch users to applicable_for_users in POS Profile {profile.name}")
+        print(f"Migrated branch users to custom_captains in POS Profile {profile.name}")
 
     # 3. Room Mapping Migration
     branch_rooms = {}
