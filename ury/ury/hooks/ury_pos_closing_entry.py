@@ -1,7 +1,8 @@
 import frappe
 
 def on_submit(doc, method=None):
-    branch = doc.branch or frappe.db.get_value("POS Profile", doc.pos_profile, "branch")
+    pos_profile = doc.get("pos_profile")
+    branch = doc.get("branch") or (frappe.db.get_value("POS Profile", pos_profile, "branch") if pos_profile else None)
     if not branch:
         return
         
@@ -11,15 +12,16 @@ def on_submit(doc, method=None):
         return
 
     # Check if there are any remaining open POS Opening Entries for this branch
-    open_entries = frappe.db.count(
-        "POS Opening Entry",
-        filters={
-            "branch": branch,
-            "status": "Open",
-            "docstatus": 1,
-            "name": ["!=", doc.pos_opening_entry]
-        }
-    )
+    filters = {
+        "branch": branch,
+        "status": "Open",
+        "docstatus": 1,
+    }
+    pos_opening_entry = doc.get("pos_opening_entry")
+    if pos_opening_entry:
+        filters["name"] = ["!=", pos_opening_entry]
+
+    open_entries = frappe.db.count("POS Opening Entry", filters=filters)
     
     if open_entries == 0:
         # Reset counters on branch when all POS sessions are closed
