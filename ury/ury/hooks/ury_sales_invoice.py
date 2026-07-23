@@ -26,28 +26,31 @@ def sales_invoice_naming(doc, method):
     
     restaurant = pos_profile.get("restaurant")
 
-    if pos_profile.get("restaurant_prefix") == 1 and restaurant:
+    if pos_profile.get("restaurant_prefix") == 1:
         if doc.order_type == "Aggregators":
-            
-            # Get the aggregator series prefix
-            aggregator_series_prefix = frappe.db.get_value(
-                "URY Restaurant", 
-                restaurant, 
-                "aggregator_series_prefix"
-            )
+            aggregator_series_prefix = frappe.db.get_value("Branch", doc.branch, "custom_aggregator_series_prefix") if doc.branch else None
+            if not aggregator_series_prefix and restaurant:
+                aggregator_series_prefix = frappe.db.get_value(
+                    "URY Restaurant", 
+                    restaurant, 
+                    "aggregator_series_prefix"
+                )
             
             if aggregator_series_prefix: 
                 doc.naming_series = "SINV-" +  aggregator_series_prefix
-                
             else: 
-                # Fallback to invoice_series_prefix if aggregator_series_prefix is not available            
-                doc.naming_series = "SINV-" + frappe.db.get_value("URY Restaurant", restaurant, "invoice_series_prefix")
+                invoice_series_prefix = frappe.db.get_value("Branch", doc.branch, "custom_invoice_series_prefix") if doc.branch else None
+                if not invoice_series_prefix and restaurant:
+                    invoice_series_prefix = frappe.db.get_value("URY Restaurant", restaurant, "invoice_series_prefix")
+                if invoice_series_prefix:
+                    doc.naming_series = "SINV-" + invoice_series_prefix
                       
         else:
-            # Use invoice_series_prefix for non-aggregator orders
-            doc.naming_series = "SINV-" + frappe.db.get_value(
-                "URY Restaurant", restaurant, "invoice_series_prefix"
-            )
+            invoice_series_prefix = frappe.db.get_value("Branch", doc.branch, "custom_invoice_series_prefix") if doc.branch else None
+            if not invoice_series_prefix and restaurant:
+                invoice_series_prefix = frappe.db.get_value("URY Restaurant", restaurant, "invoice_series_prefix")
+            if invoice_series_prefix:
+                doc.naming_series = "SINV-" + invoice_series_prefix
             
             
 def aggregator_unpaid(doc,method):
