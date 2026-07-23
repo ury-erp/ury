@@ -5,3 +5,4 @@
 # Patches added in this section will be executed after doctypes are migrated
 ury.patches.v2_0.default_permissions
 ury.patches.v2_0.restructure_pos_and_counters
+ury.patches.v2_0.migrate_restaurant_to_branch
