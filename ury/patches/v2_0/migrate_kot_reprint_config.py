@@ -1,37 +1,46 @@
 """
-Patch: Migrate legacy POS Profile KOT reprint configuration to URY Printer Settings rows.
+Patch: Enable KOT reprint flags on existing URY Printer Settings rows.
 
 Background
 ----------
 Prior to PR #145 (Dynamic KOT Reprint Logic by Production Unit, Room, and Profile),
-KOT reprint was configured via three flat fields on ``POS Profile``:
+KOT reprint was triggered via three flat fields on ``POS Profile``:
 
-- ``custom_enable_kot_reprint``   – master kill-switch (still used; not migrated)
-- ``custom_table_order_printer``  – static printer for dine-in KOT reprints (deprecated)
-- ``custom_parcel_order_printer`` – static printer for takeaway KOT reprints (deprecated)
-- ``custom_reprint_kot_format``   – single print format for all reprints (deprecated)
+- ``custom_enable_kot_reprint``  – master kill-switch (still used; not migrated)
+- ``custom_reprint_kot_format``  – single print format for all reprints (deprecated)
+- ``custom_table_order_printer`` – static dine-in printer (deprecated)
+- ``custom_parcel_order_printer``– static takeaway printer (deprecated)
 
-The new code routes reprints through per-row ``custom_kot_reprint`` /
-``custom_kot_reprint_format`` flags on ``URY Printer Settings`` child rows.
+The new code routes reprints through the per-row ``custom_kot_reprint`` /
+``custom_kot_reprint_format`` flags on existing ``URY Printer Settings`` child
+rows on **POS Profile**, **URY Production Unit**, and **URY Room**.
 
-This patch ensures existing sites that relied on the old static fields continue to
-work after upgrade by:
+Migration strategy
+------------------
+**Do NOT create or remove any printer rows.**  The existing rows in each
+``printer_settings`` child table are already the correct printers for that
+parent — the only thing missing is the two new flags.
 
-1. Finding every ``POS Profile`` that has a static printer and format configured.
-2. Iterating over the profile's ``printer_settings`` child rows.
-3. Setting ``custom_kot_reprint = 1`` and ``custom_kot_reprint_format`` on:
-   - The row matching ``custom_table_order_printer`` (dine-in → this row gets reprint).
-   - The row matching ``custom_parcel_order_printer`` (takeaway → this row is *not*
-     blocked for takeaway, so we set ``custom_block_takeaway_kot = 0`` explicitly).
-   - If no matching row exists, a new row is appended.
+For each ``POS Profile`` that has ``custom_enable_kot_reprint = 1`` and a
+``custom_reprint_kot_format`` value set:
 
-If a profile has the format but *no* printer rows at all, a single row is appended
-for each legacy printer so that at minimum the old behaviour is preserved.
+  1. Iterate over its existing ``printer_settings`` rows.
+  2. Set ``custom_kot_reprint = 1`` and
+     ``custom_kot_reprint_format = profile.custom_reprint_kot_format``
+     on every row that doesn't already have it.
+
+For ``URY Production Unit`` and ``URY Room``:
+
+  These doctypes had no equivalent legacy static-printer fields, so their
+  existing rows are migrated using the reprint format discovered from the
+  POS Profile(s) in the same branch.  Only rows that have no
+  ``custom_kot_reprint_format`` set yet are touched.
 
 Idempotency
 -----------
-The patch skips profiles whose ``printer_settings`` rows *already* have at least
-one ``custom_kot_reprint = 1`` row, assuming those were manually configured.
+A profile / production-unit / room whose rows *already* have at least one
+``custom_kot_reprint = 1`` row is skipped — it was already configured
+manually or by a previous run of this patch.
 """
 
 import frappe
@@ -49,81 +58,143 @@ def execute():
 		)
 		return
 
-	profiles = frappe.get_all(
-		"POS Profile",
-		filters=[["custom_enable_kot_reprint", "=", 1]],
-		fields=[
-			"name",
-			"custom_table_order_printer",
-			"custom_parcel_order_printer",
-			"custom_reprint_kot_format",
-		],
-	)
+	migrated_profiles = _migrate_pos_profiles()
+	migrated_units = _migrate_production_units()
+	migrated_rooms = _migrate_rooms()
 
-	migrated_count = 0
-
-	for profile_meta in profiles:
-		profile_name = profile_meta["name"]
-		table_printer = profile_meta.get("custom_table_order_printer")
-		parcel_printer = profile_meta.get("custom_parcel_order_printer")
-		reprint_format = profile_meta.get("custom_reprint_kot_format")
-
-		# Nothing to migrate if no format is set
-		if not reprint_format:
-			continue
-
-		# If neither legacy printer is set, skip
-		if not table_printer and not parcel_printer:
-			continue
-
-		profile = frappe.get_doc("POS Profile", profile_name)
-
-		# Skip profiles already having at least one reprint-enabled row (manually configured)
-		already_configured = any(
-			getattr(row, "custom_kot_reprint", 0)
-			for row in profile.get("printer_settings", [])
-		)
-		if already_configured:
-			continue
-
-		changed = False
-
-		# -- Migrate table (dine-in) printer --
-		if table_printer:
-			changed |= _ensure_reprint_row(
-				profile,
-				printer=table_printer,
-				reprint_format=reprint_format,
-				block_takeaway=0,  # dine-in printer; must NOT block takeaway
-			)
-
-		# -- Migrate parcel (takeaway) printer --
-		if parcel_printer and parcel_printer != table_printer:
-			changed |= _ensure_reprint_row(
-				profile,
-				printer=parcel_printer,
-				reprint_format=reprint_format,
-				block_takeaway=1,  # takeaway printer; block it from dine-in KOTs
-			)
-
-		if changed:
-			profile.flags.ignore_permissions = True
-			profile.flags.ignore_validate = True
-			profile.save()
-			migrated_count += 1
+	total = migrated_profiles + migrated_units + migrated_rooms
 
 	frappe.db.commit()
 
-	if migrated_count:
+	if total:
 		frappe.log_error(
 			"kot_reprint_migration",
-			f"Migrated KOT reprint configuration for {migrated_count} POS Profile(s). "
-			"Review each profile's Printer Settings tab to confirm correctness.",
+			f"KOT reprint migration complete: {migrated_profiles} POS Profile(s), "
+			f"{migrated_units} URY Production Unit(s), {migrated_rooms} URY Room(s) updated. "
+			"Review each document's Printer Settings tab to confirm correctness.",
 		)
 
 
 # ---------------------------------------------------------------------------
-# Helpers
+# Per-doctype migration helpers
+# ---------------------------------------------------------------------------
+
+def _migrate_pos_profiles() -> int:
+	"""
+	Enable reprint flags on existing POS Profile printer rows.
+
+	Uses ``custom_reprint_kot_format`` from the profile itself as the format
+	for every row.  No rows are created or deleted.
+	"""
+	profiles = frappe.get_all(
+		"POS Profile",
+		filters=[["custom_enable_kot_reprint", "=", 1]],
+		fields=["name", "custom_reprint_kot_format"],
+	)
+
+	count = 0
+	for meta in profiles:
+		reprint_format = meta.get("custom_reprint_kot_format")
+		if not reprint_format:
+			continue  # nothing to migrate without a format
+
+		profile = frappe.get_doc("POS Profile", meta["name"])
+		rows = profile.get("printer_settings", [])
+
+		if not rows:
+			continue  # no existing rows to enable
+
+		if _already_configured(rows):
+			continue  # already done
+
+		for row in rows:
+			row.custom_kot_reprint = 1
+			row.custom_kot_reprint_format = reprint_format
+
+		profile.flags.ignore_permissions = True
+		profile.flags.ignore_validate = True
+		profile.save()
+		count += 1
+
+	return count
+
+
+def _migrate_production_units() -> int:
+	"""
+	Enable reprint flags on existing URY Production Unit printer rows.
+
+	The reprint format is sourced from the POS Profile of the same branch
+	(first match).  Units whose rows are already configured are skipped.
+	"""
+	units = frappe.get_all("URY Production Unit", fields=["name", "branch"])
+	if not units:
+		return 0
+
+	# Build a branch → reprint_format map from POS Profiles
+	branch_format_map = _build_branch_format_map()
+
+	count = 0
+	for unit_meta in units:
+		reprint_format = branch_format_map.get(unit_meta.get("branch"))
+		if not reprint_format:
+			continue
+
+		unit = frappe.get_doc("URY Production Unit", unit_meta["name"])
+		rows = unit.get("printer_settings", [])
+
+		if not rows or _already_configured(rows):
+			continue
+
+		for row in rows:
+			row.custom_kot_reprint = 1
+			row.custom_kot_reprint_format = reprint_format
+
+		unit.flags.ignore_permissions = True
+		unit.flags.ignore_validate = True
+		unit.save()
+		count += 1
+
+	return count
+
+
+def _migrate_rooms() -> int:
+	"""
+	Enable reprint flags on existing URY Room printer rows.
+
+	The reprint format is sourced from the POS Profile of the room's branch.
+	"""
+	rooms = frappe.get_all("URY Room", fields=["name", "branch"])
+	if not rooms:
+		return 0
+
+	branch_format_map = _build_branch_format_map()
+
+	count = 0
+	for room_meta in rooms:
+		reprint_format = branch_format_map.get(room_meta.get("branch"))
+		if not reprint_format:
+			continue
+
+		room = frappe.get_doc("URY Room", room_meta["name"])
+		rows = room.get("printer_settings", [])
+
+		if not rows or _already_configured(rows):
+			continue
+
+		for row in rows:
+			row.custom_kot_reprint = 1
+			row.custom_kot_reprint_format = reprint_format
+
+		room.flags.ignore_permissions = True
+		room.flags.ignore_validate = True
+		room.save()
+		count += 1
+
+	return count
+
+
+# ---------------------------------------------------------------------------
+# Shared helpers
 # ---------------------------------------------------------------------------
 
 def _custom_fields_exist() -> bool:
@@ -136,30 +207,27 @@ def _custom_fields_exist() -> bool:
 	)
 
 
-def _ensure_reprint_row(profile, printer: str, reprint_format: str, block_takeaway: int) -> bool:
-	"""
-	Find an existing row for *printer* and enable reprint on it, or append a new row.
+def _already_configured(rows) -> bool:
+	"""Return True if at least one row already has ``custom_kot_reprint`` enabled."""
+	return any(getattr(row, "custom_kot_reprint", 0) for row in rows)
 
-	Returns True if anything was changed / added.
-	"""
-	for row in profile.get("printer_settings", []):
-		if row.get("printer") == printer:
-			row.custom_kot_reprint = 1
-			row.custom_kot_reprint_format = reprint_format
-			# Honour block_takeaway only when upgrading; don't override a value that
-			# was already set to something meaningful.
-			if not getattr(row, "custom_block_takeaway_kot", None):
-				row.custom_block_takeaway_kot = block_takeaway
-			return True
 
-	# No matching row found → append a new one
-	profile.append(
-		"printer_settings",
-		{
-			"printer": printer,
-			"custom_kot_reprint": 1,
-			"custom_kot_reprint_format": reprint_format,
-			"custom_block_takeaway_kot": block_takeaway,
-		},
+def _build_branch_format_map() -> dict:
+	"""
+	Return a dict of ``{branch: custom_reprint_kot_format}`` from POS Profiles
+	that have reprint enabled and a format set.
+
+	When multiple profiles share a branch, the first non-empty format wins.
+	"""
+	profiles = frappe.get_all(
+		"POS Profile",
+		filters=[["custom_enable_kot_reprint", "=", 1]],
+		fields=["branch", "custom_reprint_kot_format"],
 	)
-	return True
+	mapping = {}
+	for p in profiles:
+		branch = p.get("branch")
+		fmt = p.get("custom_reprint_kot_format")
+		if branch and fmt and branch not in mapping:
+			mapping[branch] = fmt
+	return mapping
