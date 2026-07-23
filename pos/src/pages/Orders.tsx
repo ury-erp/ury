@@ -18,7 +18,7 @@ import SplitGroupPanel from '../components/SplitGroupPanel';
 import MergedBillPanel from '../components/MergedBillPanel';
 import { printOrder } from '../lib/print';
 import { call } from '@ury/core';
-import { splitBill } from '../lib/order-api';
+import { splitBill, reprintKOT } from '../lib/order-api';
 import {
   getOrdersTabForInvoice,
   getSplitGroup,
@@ -261,6 +261,32 @@ export default function Orders() {
       showToast.error(t('errors.print_failed', { reason: err?.message || String(err) }));
     } finally {
       setIsPrinting(false);
+    }
+  }
+
+  async function handleKOTReprint() {
+    if (!selectedOrder) return;
+    try {
+      const res = await reprintKOT(selectedOrder.name);
+      const message = typeof res === 'string' ? res : res?.message;
+      if (typeof message === 'string' && message.startsWith('Failure')) {
+        showToast.error(message);
+      } else {
+        showToast.success(t('success.kot_reprinted') || 'KOT Reprinted successfully');
+      }
+    } catch (error: any) {
+      console.error('Failed to reprint KOT:', error);
+      if (error && typeof error === 'object' && '_server_messages' in error && typeof error._server_messages === 'string') {
+        try {
+          const messages = JSON.parse(error._server_messages);
+          const messageObj = JSON.parse(messages[0]);
+          showToast.error(messageObj.message || 'API error');
+        } catch {
+          showToast.error('API error');
+        }
+      } else {
+        showToast.error(error.message || 'Failed to reprint KOT');
+      }
     }
   }
 
@@ -536,6 +562,8 @@ export default function Orders() {
                         onMergeBill={() => setShowMergeDialog(true)}
                         showSplitBill={canSplitBill}
                         onSplitBill={() => setShowSplitDialog(true)}
+                        showReprintKOT={posStore.posProfile?.enable_kot_reprint === 1 && !!selectedOrder}
+                        onReprintKOT={handleKOTReprint}
                       />
                       <button
                         type="button"

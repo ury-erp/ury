@@ -10,6 +10,8 @@ interface OrderActionsMenuProps {
   onSplitBill?: () => void;
   showMergeBill?: boolean;
   onMergeBill?: () => void;
+  showReprintKOT?: boolean;
+  onReprintKOT?: () => void;
 }
 
 const OrderActionsMenu = ({
@@ -19,6 +21,8 @@ const OrderActionsMenu = ({
   onSplitBill,
   showMergeBill = false,
   onMergeBill,
+  showReprintKOT = false,
+  onReprintKOT,
 }: OrderActionsMenuProps) => {
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -35,7 +39,7 @@ const OrderActionsMenu = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isOpen, onOpenChange]);
 
-  if (!showSplitBill && !showMergeBill) {
+  if (!showSplitBill && !showMergeBill && !showReprintKOT) {
     return null;
   }
 
@@ -54,6 +58,12 @@ const OrderActionsMenu = ({
     event.stopPropagation();
     onOpenChange(false);
     onMergeBill?.();
+  };
+
+  const handleReprintKOT = (event: ReactMouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    onOpenChange(false);
+    onReprintKOT?.();
   };
 
   return (
@@ -89,6 +99,15 @@ const OrderActionsMenu = ({
             >
               <SplitSquareHorizontal className="h-4 w-4 shrink-0" />
               {t('bill_split.split_bill')}
+            </Button>
+          )}
+          {showReprintKOT && (
+            <Button
+              variant="ghost"
+              className="flex h-auto w-full justify-start rounded-none px-4 py-2 text-sm font-normal text-gray-700 hover:bg-gray-100"
+              onClick={handleReprintKOT}
+            >
+              {t('cart.reprint_kot') || 'Reprint KOT'}
             </Button>
           )}
         </div>
