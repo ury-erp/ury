@@ -93,6 +93,7 @@ def get_custom_fields():
 					"fieldtype": "Link",
 					"insert_after": "restaurant_info",
 					"label": "Restaurant",
+					"description": "DEPRECATED: Will be removed in future. Use Branch instead.",
 					"options": "URY Restaurant",
 					"read_only": 0,
 				},
@@ -219,6 +220,7 @@ def get_custom_fields():
 					"fieldtype": "Link",
 					"insert_after": "restaurant_info",
 					"label": "Restaurant",
+					"description": "DEPRECATED: Will be removed in future. Use Branch instead.",
 					"options": "URY Restaurant",
 					"read_only": 0,
 				},
@@ -269,6 +271,7 @@ def get_custom_fields():
 				"fieldtype": "Link",
 				"insert_after": "restaurant_info",
 				"label": "Restaurant",
+				"description": "DEPRECATED: Will be removed in future. Use Branch instead.",
 				"options": "URY Restaurant",
 			},
 			{
@@ -326,8 +329,8 @@ def get_custom_fields():
 				"fieldtype": "Link",
 				"insert_after": "restaurant_info",
 				"label": "Restaurant",
-				"options": "URY Restaurant",
-				"reqd": 1
+				"description": "DEPRECATED: Will be removed in future. Use Branch instead.",
+				"options": "URY Restaurant"
 			},
 			{
 				"fieldname": "column_break_e3dky",
