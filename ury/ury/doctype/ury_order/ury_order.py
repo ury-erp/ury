@@ -1216,12 +1216,16 @@ def make_invoice(customer, payments, cashier, pos_profile,owner, additionalDisco
     order_type =  invoice_name = frappe.get_value("POS Invoice",invoice , "order_type")
     invoice = get_order_invoice(table, invoice, order_type, "Payments")
 
+    if owner and invoice.owner != owner:
+        invoice.db_set("owner", owner)
+
     if table:
         restaurant = get_restaurant_and_menu_name(table)
         invoice.restaurant = restaurant
 
     invoice.customer = customer
     invoice.pos_profile = pos_profile
+    invoice.cashier = cashier
     invoice.additional_discount_percentage=additionalDiscount
     invoice.calculate_taxes_and_totals()
 
@@ -1267,10 +1271,6 @@ def make_invoice(customer, payments, cashier, pos_profile,owner, additionalDisco
                 "payments", dict(mode_of_payment=d["mode_of_payment"], amount=d["amount"])
             )
 
-    if owner and invoice.owner != owner:
-        invoice.db_set("owner", owner)
-        invoice.cashier = owner
-    # invoice.owner = owner
     invoice.save()
     try:
         invoice.submit()
