@@ -4,26 +4,42 @@ def set_order_number(doc, event=None):
     if not doc.branch:
         return
 
-    # Increment appropriate counter atomically
+    # Increment appropriate counter atomically with row lock to prevent race conditions
     if doc.order_type == "Aggregators":
-        frappe.db.sql("""
-            UPDATE `tabBranch`
-            SET custom_aggregator_order_counter = custom_aggregator_order_counter + 1
-            WHERE name = %s
+        res = frappe.db.sql("""
+            SELECT custom_aggregator_order_counter 
+            FROM `tabBranch` 
+            WHERE name = %s 
+            FOR UPDATE
         """, (doc.branch,))
         
-        # Retrieve incremented value
-        val = frappe.db.get_value("Branch", doc.branch, "custom_aggregator_order_counter")
+        val = (res[0][0] or 0) + 1 if res else 1
+        
+        frappe.db.set_value(
+            "Branch",
+            doc.branch,
+            "custom_aggregator_order_counter",
+            val,
+            update_modified=False,
+        )
         order_number = f"AGR - {val}"
     else:
-        frappe.db.sql("""
-            UPDATE `tabBranch`
-            SET custom_order_counter = custom_order_counter + 1
-            WHERE name = %s
+        res = frappe.db.sql("""
+            SELECT custom_order_counter 
+            FROM `tabBranch` 
+            WHERE name = %s 
+            FOR UPDATE
         """, (doc.branch,))
         
-        # Retrieve incremented value
-        val = frappe.db.get_value("Branch", doc.branch, "custom_order_counter")
+        val = (res[0][0] or 0) + 1 if res else 1
+        
+        frappe.db.set_value(
+            "Branch",
+            doc.branch,
+            "custom_order_counter",
+            val,
+            update_modified=False,
+        )
         order_number = str(val)
 
     # Set order number on POS Invoice

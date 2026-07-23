@@ -54,17 +54,28 @@ def overrided_past_order_list(search_term, status, limit=20):
     updated_list = []
 
     if search_term and status:
+        filters_customer = {
+            "customer": ["like", "%{}%".format(frappe.db.escape(search_term))],
+            "status": status,
+        }
+        filters_name = {
+            "name": ["like", "%{}%".format(frappe.db.escape(search_term))],
+            "status": status,
+        }
+        if user != "Administrator":
+            filters_customer["branch"] = branch_name
+            filters_customer["custom_restaurant_room"] = ["in", room_names]
+            filters_name["branch"] = branch_name
+            filters_name["custom_restaurant_room"] = ["in", room_names]
+
         invoices_by_customer = frappe.db.get_all(
             "POS Invoice",
-            filters={
-                "customer": ["like", "%{}%".format(frappe.db.escape(search_term))],
-                "status": status,
-            },
+            filters=filters_customer,
             fields=fields,
         )
         invoices_by_name = frappe.db.get_all(
             "POS Invoice",
-            filters={"name": ["like", "%{}%".format(frappe.db.escape(search_term))], "status": status},
+            filters=filters_name,
             fields=fields,
         )
         invoice_list = invoices_by_customer + invoices_by_name

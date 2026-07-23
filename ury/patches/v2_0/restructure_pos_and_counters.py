@@ -104,17 +104,17 @@ def execute():
         units = frappe.db.sql("SELECT name, pos_profile, branch, warehouse FROM `tabURY Production Unit`", as_dict=True)
         for unit in units:
             if unit.get("pos_profile") and not unit.get("branch"):
-                profile_branch, profile_warehouse = frappe.db.get_value("POS Profile", unit.pos_profile, ["branch", "warehouse"])
-                if profile_branch:
+                profile_info = frappe.db.get_value("POS Profile", unit.pos_profile, ["branch", "warehouse"], as_dict=True)
+                if profile_info and profile_info.get("branch"):
                     frappe.db.set_value(
                         "URY Production Unit",
                         unit.name,
                         {
-                            "branch": profile_branch,
-                            "warehouse": profile_warehouse or unit.warehouse
+                            "branch": profile_info.branch,
+                            "warehouse": profile_info.warehouse or unit.warehouse
                         },
                         update_modified=False
                     )
-                    print(f"Updated production unit {unit.name} with branch {profile_branch} and warehouse {profile_warehouse}")
+                    print(f"Updated production unit {unit.name} with branch {profile_info.branch} and warehouse {profile_info.warehouse}")
     except Exception as e:
         print(f"Failed to migrate production units: {e}")
