@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Trash2, Edit, FrownIcon, Plus, Loader2, MessageSquare } from 'lucide-react';
+import { Trash2, Edit, FrownIcon, Plus, Loader2, MessageSquare, Printer } from 'lucide-react';
 import { usePOSStore } from '../store/pos-store';
 import { formatCurrency, cn } from '../lib/utils';
 import { CustomerSelect } from './CustomerSelect';
@@ -8,7 +8,7 @@ import OrderTypeSelect from './OrderTypeSelect';
 import CommentDialog from './CommentDialog';
 import { Button } from './ui/button';
 import { Spinner } from './ui/spinner';
-import { syncOrder } from '../lib/order-api';
+import { syncOrder, reprintKOT } from '../lib/order-api';
 import { useRootStore } from '../store/root-store';
 import type { RootState } from '../store/root-store';
 import { showToast } from './ui/toast';
@@ -41,6 +41,7 @@ const OrderPanel = () => {
   const [editingItem, setEditingItem] = useState<typeof activeOrders[0] | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCommentDialog, setShowCommentDialog] = useState(false);
+  const [isReprintingKOT, setIsReprintingKOT] = useState(false);
 
   const calculateItemTotal = (item: typeof activeOrders[0]) => {
     const basePrice = item.selectedVariant?.price || item.price;
@@ -65,6 +66,31 @@ const OrderPanel = () => {
 
   const handleCommentSave = (comment: string) => {
     setOrderComment(comment);
+  };
+
+  const handleKOTReprint = async () => {
+    if (!orderId) return;
+    try {
+      setIsReprintingKOT(true);
+      await reprintKOT(orderId);
+      showToast.success(t('success.kot_reprinted') || 'KOT Reprinted successfully');
+    } catch (error: any) {
+      console.error('Failed to reprint KOT:', error);
+      // Frappe API error handling
+      if (error && typeof error === 'object' && '_server_messages' in error && typeof error._server_messages === 'string') {
+        try {
+          const messages = JSON.parse(error._server_messages);
+          const messageObj = JSON.parse(messages[0]);
+          showToast.error(messageObj.message || 'API error');
+        } catch {
+          showToast.error('API error');
+        }
+      } else {
+        showToast.error(error.message || 'Failed to reprint KOT');
+      }
+    } finally {
+      setIsReprintingKOT(false);
+    }
   };
 
   const handleSubmit = async () => {
@@ -299,6 +325,18 @@ const OrderPanel = () => {
                 >
                   <MessageSquare className="w-4 h-4" />
                 </Button>
+                {posProfile?.enable_kot_reprint === 1 && isUpdatingOrder && orderId && (
+                  <Button
+                    onClick={handleKOTReprint}
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0 text-gray-500 hover:text-gray-700"
+                    disabled={isInteractionDisabled || isReprintingKOT}
+                    title={t('cart.reprint_kot') || 'Reprint KOT'}
+                  >
+                    {isReprintingKOT ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
+                  </Button>
+                )}
                 <span className="text-lg font-semibold">{t('cart.total')}</span>
               </div>
               <span className="text-lg font-semibold">{formatCurrency(total)}</span>
@@ -350,4 +388,4 @@ const OrderPanel = () => {
   );
 };
 
-export default OrderPanel; 
+export default OrderPanel;

@@ -83,3 +83,8 @@ export interface SyncOrderRequest {
 export const syncOrder = async (data: SyncOrderRequest) => {
   return call.post( 'ury.ury.doctype.ury_order.ury_order.sync_order',data);
 }; 
+
+export const reprintKOT = async (invoice_number: string) => {
+  const { call } = await import('./frappe-sdk');
+  return call.post('ury.ury.api.ury_kot_reprint.reprint_kot', { invoice_number });
+};
