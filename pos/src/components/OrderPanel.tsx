@@ -72,8 +72,13 @@ const OrderPanel = () => {
     if (!orderId) return;
     try {
       setIsReprintingKOT(true);
-      await reprintKOT(orderId);
-      showToast.success(t('success.kot_reprinted') || 'KOT Reprinted successfully');
+      const res = await reprintKOT(orderId);
+      const message = typeof res === 'string' ? res : res?.message;
+      if (typeof message === 'string' && message.startsWith('Failure')) {
+        showToast.error(message);
+      } else {
+        showToast.success(t('success.kot_reprinted') || 'KOT Reprinted successfully');
+      }
     } catch (error: any) {
       console.error('Failed to reprint KOT:', error);
       // Frappe API error handling
