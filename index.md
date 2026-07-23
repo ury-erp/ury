@@ -14,15 +14,30 @@ This file keeps track of all jobs, initiatives, and work tracks for the URY app 
   - Owner: sa-user (swafaalikkal)
   - Goal: Draft a comprehensive feature proposal for restructuring the URY application.
 
+- [sa-migrate-restaurant-to-branch](./tracks/sa-migrate-restaurant-to-branch/)
+  - Status: Completed
+  - Owner: sa-user (swafaalikkal)
+  - Goal: Migrate all fields in URY Restaurant to Branch (except address) with backward-compatibility patches and deprecations.
+
 - [sa-kot-reprint](./tracks/sa-kot-reprint/)
   - Status: Completed
   - Owner: sa-user (swafaalikkal)
   - Goal: Add KOT reprint button in the order cart of React POS UI next to the comment button.
 
+- [sa-setup-wizard](./tracks/sa-setup-wizard/)
+  - Status: Active
+  - Owner: sa-user (swafaalikkal)
+  - Goal: Build custom JSON-driven two-step setup wizard replacing the default ERPNext/Frappe onboarding flow.
+
 - [ag-setup-wizard-frontend](./tracks/ag-setup-wizard-frontend/)
   - Status: Completed
   - Owner: antigravity
   - Goal: Build custom setup wizard in URY frontend and intercept default Frappe setup.
+
+- [ag-move-reprint-kot](./tracks/ag-move-reprint-kot/)
+  - Status: Completed
+  - Owner: antigravity
+  - Goal: Move the KOT reprint option to the order log under the option menu on the right side bar.
 
 ## Archived Tracks
 
