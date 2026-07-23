@@ -38,6 +38,7 @@ The URY application is hosted in a Frappe bench inside WSL.
 - **Bench Path (WSL)**: `/mnt/c/Users/swafa/Projects/Bench/ury-bench`
 - **Site Path (WSL)**: `/mnt/c/Users/swafa/Projects/Bench/ury-bench/sites/ury.local`
 - **URY App Path (WSL)**: `/mnt/c/Users/swafa/Projects/Bench/ury-bench/apps/ury`
+- **Node Version**: Node 20 or above is required for URY.
 
 **CRITICAL RULE**: Any command related to Frappe (`bench`), Node (`yarn`, `npm`), or direct code manipulation must be executed through WSL using the `wsl` prefix and appropriate directory paths.
 - Example: `wsl --cd /mnt/c/Users/swafa/Projects/Bench/ury-bench bench restart`
