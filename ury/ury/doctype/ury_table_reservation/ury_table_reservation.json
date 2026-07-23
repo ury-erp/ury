@@ -1,0 +1,98 @@
+{
+ "actions": [],
+ "autoname": "TR-.YYYY.-.#####",
+ "creation": "2026-07-22 21:55:03.871477",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "reserved_table",
+  "customer",
+  "status",
+  "column_break_qgwh",
+  "reserved_by",
+  "reserved_at",
+  "section_break_lboi",
+  "comments"
+ ],
+ "fields": [
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "label": "Customer",
+   "options": "Customer",
+   "reqd": 1
+  },
+  {
+   "default": "Active",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_filter": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Active\nCompleted\nCancelled",
+   "reqd": 1
+  },
+  {
+   "fieldname": "reserved_by",
+   "fieldtype": "Link",
+   "label": "Reserved By",
+   "options": "User"
+  },
+  {
+   "fieldname": "comments",
+   "fieldtype": "Small Text",
+   "label": "Comments"
+  },
+  {
+   "fieldname": "column_break_qgwh",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_lboi",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "reserved_table",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Table",
+   "options": "URY Table",
+   "reqd": 1
+  },
+  {
+   "default": "Now",
+   "fieldname": "reserved_at",
+   "fieldtype": "Datetime",
+   "label": "Reserved At"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-07-23 00:45:21.921688",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY Table Reservation",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

@@ -137,3 +137,55 @@ export async function unmergeTables(table: string) {
   });
 }
 
+export async function checkTableReservation(table: string): Promise<any> {
+  const { call } = await import('@ury/core');
+
+  const response = await call.get(
+    'ury.ury.api.table_reservation.check_table_reservation',
+    { table }
+  );
+
+  return response.message ?? null;
+}
+
+export async function createTableReservation(data: {
+  table: string;
+  customer: string;
+  reserved_at: string;
+  notes?: string;
+}) {
+  const { call } = await import('@ury/core');
+
+  const response = await call.post(
+    'ury.ury.api.table_reservation.create_table_reservation',
+    {
+      table: data.table,
+      customer: data.customer,
+      reserved_at: data.reserved_at,
+      notes: data.notes,
+    }
+  );
+
+  return response.message;
+}
+
+export async function updateTableReservationStatus(reservationName: string, status: string) {
+  const { call } = await import('@ury/core');
+  
+  const response = await call.post(
+    'ury.ury.api.table_reservation.update_reservation_status',
+    {
+      reservation_name: reservationName,
+      status,
+    }
+  );
+
+  return response.message;
+}
+
+export async function getActiveReservations(): Promise<string[]> {
+  const { call } = await import('@ury/core');
+  
+  const response = await call.get('ury.ury.api.table_reservation.get_active_reservations');
+  return response.message ?? [];
+}

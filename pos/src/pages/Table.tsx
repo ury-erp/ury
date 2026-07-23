@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Layout, Square } from 'lucide-react';
 import { usePOSStore } from '../store/pos-store';
 import { useRootStore } from '../store/root-store';
-import { getRooms, getTables, getTableCount, getVacantTablesForBranch, mergeTablesBatch, unmergeTables, type Room, type Table } from '../lib/table-api';
+import { getRooms, getTables, getTableCount, getVacantTablesForBranch, mergeTablesBatch, unmergeTables, checkTableReservation, createTableReservation, updateTableReservationStatus, getActiveReservations, type Room, type Table } from '../lib/table-api';
 import { getMergeGroupMembers, formatMergedTableLabelFromGroup, getTableRenderGroups, sortTablesByMergeGroups } from '../lib/table-utils';
 import { Spinner } from '@ury/ui';
 import { Button } from '@ury/ui';
@@ -22,6 +22,9 @@ import TableTransferDialog from '../components/TableTransferDialog';
 import CaptainTransferDialog from '../components/CaptainTransferDialog';
 import TableCard from '../components/TableCard';
 import MergeLinkConnector from '../components/MergeLinkConnector';
+import TableReservationDialog from '../components/TableReservationDialog';
+import TableReservationWarningDialog from '../components/TableReservationWarningDialog';
+import TableReservationCancelDialog from '../components/TableReservationCancelDialog';
 
 const TableView = () => {
   const navigate = useNavigate();
@@ -52,6 +55,14 @@ const TableView = () => {
     invoiceName: string;
     currentCaptain: string;
   } | null>(null);
+  const [reservationTable, setReservationTable] = useState<Table | null>(null);
+  const [reservationWarningOpen, setReservationWarningOpen] = useState(false);
+  const [pendingTable, setPendingTable] = useState<string | null>(null);
+  const [reservationInfo, setReservationInfo] = useState<any | null>(null);
+  const [reservedTables, setReservedTables] = useState<Set<string>>(new Set());
+  const [cancelReservationTable, setCancelReservationTable] = useState<string | null>(null);
+  const [cancelReservationInfo, setCancelReservationInfo] = useState<any | null>(null);
+  const [cancelReservationLoading, setCancelReservationLoading] = useState(false);
 
   const persistRoomCounts = useCallback((counts: Record<string, number>) => {
     if (!branch) return;
@@ -137,16 +148,21 @@ const TableView = () => {
       const shouldUseCache = options?.useCache !== false;
       if (shouldUseCache && tablesCache[roomName]) {
         setTables(sortTablesByMergeGroups(tablesCache[roomName]));
+        getActiveReservations().then(res => setReservedTables(new Set(res))).catch(console.error);
         setLoadingTables(false);
         return;
       }
 
       setLoadingTables(true);
       try {
-        const fetchedTables = await getTables(roomName);
+        const [fetchedTables, activeReservations] = await Promise.all([
+          getTables(roomName),
+          getActiveReservations()
+        ]);
         const sortedTables = sortTablesByMergeGroups(fetchedTables);
         setTables(sortedTables);
         setTablesCache((prev) => ({ ...prev, [roomName]: sortedTables }));
+        setReservedTables(new Set(activeReservations));
       } catch (e) {
         console.error(e);
         setError('Failed to load tables');
@@ -163,11 +179,88 @@ const TableView = () => {
     loadTables(selectedRoom);
   }, [selectedRoom, loadTables]);
 
-  const handleNavigateToPOS = (tableName: string) => {
+  const handleNavigateToPOS = async (tableName: string) => {
     if (!selectedRoom) return;
+
+    try {
+      const reservation = await checkTableReservation(tableName);
+
+      if (reservation) {
+        setPendingTable(tableName);
+        setReservationInfo(reservation);
+        setReservationWarningOpen(true);
+        return;
+      }
+
+      setSelectedOrderType(DINE_IN);
+      setSelectedTable(tableName, selectedRoom);
+      navigate("/");
+
+    } catch {
+      setSelectedOrderType(DINE_IN);
+      setSelectedTable(tableName, selectedRoom);
+      navigate("/");
+    }
+  };
+
+  const handleReservationContinue = async () => {
+    if (!pendingTable || !selectedRoom) return;
+
+    setReservationWarningOpen(false);
+
+    try {
+      if (reservationInfo?.name) {
+        await updateTableReservationStatus(reservationInfo.name, 'Completed');
+      }
+    } catch (error) {
+      console.error(error);
+    }
+
     setSelectedOrderType(DINE_IN);
-    setSelectedTable(tableName, selectedRoom);
-    navigate('/');
+    setSelectedTable(pendingTable, selectedRoom);
+
+    navigate("/");
+
+    setPendingTable(null);
+    setReservationInfo(null);
+  };
+
+  const handleCancelReservation = async (tableName: string) => {
+    try {
+      const reservation = await checkTableReservation(tableName);
+      if (!reservation) {
+        showToast.error("This table has no active reservation");
+        return;
+      }
+      setCancelReservationTable(tableName);
+      setCancelReservationInfo(reservation);
+    } catch (error) {
+      showToast.error(error instanceof Error ? error.message : 'Failed to fetch reservation details');
+    }
+  };
+
+  const handleCancelReservationConfirm = async () => {
+    if (!cancelReservationTable || !cancelReservationInfo) return;
+    setCancelReservationLoading(true);
+    try {
+      await updateTableReservationStatus(cancelReservationInfo.name, 'Cancelled');
+      showToast.success('Reservation cancelled successfully');
+      if (selectedRoom) {
+        await loadTables(selectedRoom, { useCache: false });
+      }
+      setCancelReservationTable(null);
+      setCancelReservationInfo(null);
+    } catch (error) {
+      showToast.error(error instanceof Error ? error.message : 'Failed to cancel reservation');
+    } finally {
+      setCancelReservationLoading(false);
+    }
+  };
+
+  const handleReservationCancel = () => {
+    setReservationWarningOpen(false);
+    setPendingTable(null);
+    setReservationInfo(null);
   };
 
   const handlePreviewTable = (table: Table, event?: MouseEvent<HTMLButtonElement>) => {
@@ -335,6 +428,30 @@ const TableView = () => {
     }
   };
 
+  const handleReserveConfirm = async (data: {
+    customer: string;
+    reservedAt: string;
+    notes: string;
+  }) => {
+    if (!reservationTable) return;
+    try {
+      await createTableReservation({
+        table: reservationTable.name,
+        customer: data.customer,
+        reserved_at: data.reservedAt,
+        notes: data.notes,
+      });
+      showToast.success('Table reserved successfully');
+      if (selectedRoom) {
+        await loadTables(selectedRoom, { useCache: false });
+      }
+      setReservationTable(null);
+    } catch (error) {
+      showToast.error(error instanceof Error ? error.message : 'Failed to reserve table');
+      throw error;
+    }
+  };
+
   const mergeAvailableTables = useMemo(() => {
     if (!mergeSourceTable) return [];
     const sourceCluster = new Set(getMergeGroupMembers(mergeSourceTable, tables));
@@ -362,23 +479,26 @@ const TableView = () => {
     const canTransferTable = table.occupied === 1 && mergeMembers.length <= 1;
 
     return (
-    <TableCard
-      key={table.name}
-      table={table}
-      mergeGroupLabel={mergeGroupLabel}
-      className={className}
-      menuOpen={menuOpenForTable === table.name}
-      onMenuOpenChange={(open) => setMenuOpenForTable(open ? table.name : null)}
-      onMerge={() => setMergeSourceTable(table)}
-      onUnmerge={() => setUnmergeSourceTable(table)}
-      onTransferTable={canTransferTable ? () => void handleOpenTransferTable(table) : undefined}
-      onTransferCaptain={() => void handleOpenCaptainTransfer(table)}
-      showCaptainTransfer={showCaptainTransfer}
-      onNavigate={() => handleNavigateToPOS(table.name)}
-      onPreview={(event) => handlePreviewTable(table, event)}
-      onPrint={(event) => handlePrintTable(table, event)}
-      isPrinting={printingTable === table.name}
-    />
+      <TableCard
+        key={table.name}
+        table={table}
+        isReserved={reservedTables.has(table.name)}
+        mergeGroupLabel={mergeGroupLabel}
+        className={className}
+        menuOpen={menuOpenForTable === table.name}
+        onMenuOpenChange={(open) => setMenuOpenForTable(open ? table.name : null)}
+        onMerge={() => setMergeSourceTable(table)}
+        onUnmerge={() => setUnmergeSourceTable(table)}
+        onTransferTable={canTransferTable ? () => void handleOpenTransferTable(table) : undefined}
+        onTransferCaptain={() => void handleOpenCaptainTransfer(table)}
+        showCaptainTransfer={showCaptainTransfer}
+        onReserve={() => setReservationTable(table)}
+        onCancelReservation={() => void handleCancelReservation(table.name)}
+        onNavigate={() => handleNavigateToPOS(table.name)}
+        onPreview={(event) => handlePreviewTable(table, event)}
+        onPrint={(event) => handlePrintTable(table, event)}
+        isPrinting={printingTable === table.name}
+      />
     );
   };
 
@@ -565,6 +685,35 @@ const TableView = () => {
         onConfirm={handleCaptainTransferConfirm}
       />
 
+      <TableReservationDialog
+        open={reservationTable !== null}
+        table={reservationTable}
+        onOpenChange={(open) => {
+          if (!open) setReservationTable(null);
+        }}
+        onConfirm={handleReserveConfirm}
+      />
+
+      <TableReservationWarningDialog
+        open={reservationWarningOpen}
+        reservation={reservationInfo}
+        tableName={pendingTable ?? ""}
+        onContinue={handleReservationContinue}
+        onCancel={handleReservationCancel}
+      />
+
+      <TableReservationCancelDialog
+        open={cancelReservationTable !== null}
+        reservation={cancelReservationInfo}
+        tableName={cancelReservationTable ?? ""}
+        loading={cancelReservationLoading}
+        onConfirm={handleCancelReservationConfirm}
+        onClose={() => {
+          setCancelReservationTable(null);
+          setCancelReservationInfo(null);
+        }}
+      />
+
       {/* Status Legend */}
       <div className="fixed bottom-[4.5rem] w-full p-4 bg-white border-t border-gray-200">
         <div className="max-w-screen-xl mx-auto">
@@ -585,3 +734,5 @@ const TableView = () => {
 };
 
 export default TableView;
+
+

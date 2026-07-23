@@ -10,6 +10,7 @@ import { t } from '../i18n';
 
 interface TableCardProps {
   table: Table;
+  isReserved?: boolean;
   mergeGroupLabel?: string;
   className?: string;
   menuOpen: boolean;
@@ -23,10 +24,13 @@ interface TableCardProps {
   onPreview: (event: MouseEvent<HTMLButtonElement>) => void;
   onPrint: (event: MouseEvent<HTMLButtonElement>) => void;
   isPrinting: boolean;
+  onReserve?: () => void;
+  onCancelReservation?: () => void;
 }
 
 const TableCard = ({
   table,
+  isReserved = false,
   mergeGroupLabel,
   className,
   menuOpen,
@@ -40,6 +44,8 @@ const TableCard = ({
   onPreview,
   onPrint,
   isPrinting,
+  onReserve,
+  onCancelReservation,
 }: TableCardProps) => {
   const isOccupied = table.occupied === 1;
 
@@ -77,6 +83,7 @@ const TableCard = ({
             </Badge>
             <TableActionsMenu
               table={table}
+              isReserved={isReserved}
               isOpen={menuOpen}
               onOpenChange={onMenuOpenChange}
               onMerge={onMerge}
@@ -84,6 +91,8 @@ const TableCard = ({
               onTransferTable={onTransferTable}
               onTransferCaptain={onTransferCaptain}
               showCaptainTransfer={showCaptainTransfer}
+              onReserve={onReserve}
+              onCancelReservation={onCancelReservation}
             />
           </div>
         </div>

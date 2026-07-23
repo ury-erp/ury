@@ -7,6 +7,7 @@ import type { Table } from '../lib/table-api';
 
 interface TableActionsMenuProps {
   table: Table;
+  isReserved?: boolean;
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   onMerge?: () => void;
@@ -14,10 +15,13 @@ interface TableActionsMenuProps {
   onTransferTable?: () => void;
   onTransferCaptain?: () => void;
   showCaptainTransfer?: boolean;
+  onReserve?: () => void;
+  onCancelReservation?: () => void;
 }
 
 const TableActionsMenu = ({
   table,
+  isReserved = false,
   isOpen,
   onOpenChange,
   onMerge,
@@ -25,6 +29,8 @@ const TableActionsMenu = ({
   onTransferTable,
   onTransferCaptain,
   showCaptainTransfer = false,
+  onReserve,
+  onCancelReservation,
 }: TableActionsMenuProps) => {
   const menuRef = useRef<HTMLDivElement>(null);
   const isAvailable = table.occupied === 0;
@@ -74,6 +80,18 @@ const TableActionsMenu = ({
     onTransferCaptain?.();
   };
 
+  const handleReserve = (event: ReactMouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    onOpenChange(false);
+    onReserve?.();
+  };
+
+  const handleCancelReservation = (event: ReactMouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    onOpenChange(false);
+    onCancelReservation?.();
+  };
+
   const hasAvailableActions = isAvailable;
   const hasOccupiedActions =
     isOccupied && (onMerge || onTransferTable || (showCaptainTransfer && onTransferCaptain));
@@ -99,6 +117,26 @@ const TableActionsMenu = ({
         <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
           {isAvailable && (
             <>
+              {!isReserved && (
+                <Button
+                  variant="ghost"
+                  className="flex h-auto w-full justify-start gap-2 rounded-none px-4 py-2 text-sm font-normal text-gray-700 hover:bg-gray-100"
+                  onClick={handleReserve}
+                >
+                  📅 Reserve Table
+                </Button>
+              )}
+
+              {isReserved && (
+                <Button
+                  variant="ghost"
+                  className="flex h-auto w-full justify-start gap-2 rounded-none px-4 py-2 text-sm font-normal text-red-600 hover:bg-red-50"
+                  onClick={handleCancelReservation}
+                >
+                  🚫 Cancel Reservation
+                </Button>
+              )}
+
               <Button
                 variant="ghost"
                 className="flex h-auto w-full justify-start gap-2 rounded-none px-4 py-2 text-sm font-normal text-gray-700 hover:bg-gray-100"
@@ -125,6 +163,26 @@ const TableActionsMenu = ({
 
           {isOccupied && (
             <>
+              {!isReserved && (
+                <Button
+                  variant="ghost"
+                  className="flex h-auto w-full justify-start gap-2 rounded-none px-4 py-2 text-sm font-normal text-gray-700 hover:bg-gray-100"
+                  onClick={handleReserve}
+                >
+                  📅 Reserve Table
+                </Button>
+              )}
+
+              {isReserved && (
+                <Button
+                  variant="ghost"
+                  className="flex h-auto w-full justify-start gap-2 rounded-none px-4 py-2 text-sm font-normal text-red-600 hover:bg-red-50"
+                  onClick={handleCancelReservation}
+                >
+                  🚫 Cancel Reservation
+                </Button>
+              )}
+
               <Button
                 variant="ghost"
                 className="flex h-auto w-full justify-start gap-2 rounded-none px-4 py-2 text-sm font-normal text-gray-700 hover:bg-gray-100"
