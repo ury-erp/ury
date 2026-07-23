@@ -29,7 +29,22 @@ create_custom_fields({
         {"fieldname": "custom_reset_order_number_daily", "label": "Reset Order Number Daily", "fieldtype": "Check", "default": "1", "insert_after": "custom_branch_settings_section"},
         {"fieldname": "custom_order_counter", "label": "Order Counter", "fieldtype": "Int", "default": "0", "hidden": 1, "insert_after": "custom_reset_order_number_daily"},
         {"fieldname": "custom_aggregator_order_counter", "label": "Aggregator Order Counter", "fieldtype": "Int", "default": "0", "hidden": 1, "insert_after": "custom_order_counter"},
-        {"fieldname": "custom_last_reset_date", "label": "Last Reset Date", "fieldtype": "Date", "hidden": 1, "insert_after": "custom_aggregator_order_counter"}
+        {"fieldname": "custom_last_reset_date", "label": "Last Reset Date", "fieldtype": "Date", "hidden": 1, "insert_after": "custom_aggregator_order_counter"},
+        {"fieldname": "custom_restaurant_details_section", "label": "Restaurant Details", "fieldtype": "Section Break", "insert_after": "custom_last_reset_date"},
+        {"fieldname": "custom_company", "label": "Company", "fieldtype": "Link", "options": "Company", "insert_after": "custom_restaurant_details_section"},
+        {"fieldname": "custom_invoice_series_prefix", "label": "Invoice Series Prefix", "fieldtype": "Data", "insert_after": "custom_company"},
+        {"fieldname": "custom_aggregator_series_prefix", "label": "Aggregator Series Prefix", "fieldtype": "Data", "insert_after": "custom_invoice_series_prefix"},
+        {"fieldname": "custom_active_menu", "label": "Default Menu", "fieldtype": "Link", "options": "URY Menu", "insert_after": "custom_aggregator_series_prefix"},
+        {"fieldname": "custom_default_tax_template", "label": "Default Tax Template", "fieldtype": "Link", "options": "Sales Taxes and Charges Template", "insert_after": "custom_active_menu"},
+        {"fieldname": "custom_default_room", "label": "Default Room", "fieldtype": "Link", "options": "URY Room", "insert_after": "custom_default_tax_template"},
+        {"fieldname": "custom_room_wise_menu", "label": "Room Wise Menu", "fieldtype": "Check", "default": "0", "insert_after": "custom_default_room"},
+        {"fieldname": "custom_menu_for_room", "label": "Menu For Room", "fieldtype": "Table", "options": "Menu for Room", "depends_on": "eval:doc.custom_room_wise_menu", "insert_after": "custom_room_wise_menu"},
+        {"fieldname": "custom_order_type_wise_menu", "label": "Order Type Wise Menu", "fieldtype": "Check", "default": "0", "insert_after": "custom_menu_for_room"},
+        {"fieldname": "custom_order_type_menu", "label": "Order Type Menu", "fieldtype": "Table", "options": "Order Type Menu", "depends_on": "eval:doc.custom_order_type_wise_menu", "insert_after": "custom_order_type_wise_menu"}
+    ],
+    "POS Profile": [
+        {"fieldname": "custom_cashier_access_to_other_profiles", "label": "Cashier Access to Other Profiles", "fieldtype": "Check"},
+        {"fieldname": "custom_rooms", "label": "Rooms", "fieldtype": "Table MultiSelect", "options": "Multiple Rooms"}
     ]
 }, ignore_validate=True)
 
@@ -221,3 +236,14 @@ class TestRestructure(FrappeTestCase):
     def test_allowed_profiles(self):
         allowed = get_allowed_profiles(frappe.session.user, self.branch.name)
         self.assertIn(self.profile1.name, allowed)
+
+    def test_restaurant_fields_migration_and_fallback(self):
+        frappe.db.set_value("Branch", self.branch.name, {
+            "custom_active_menu": "Test Active Menu",
+            "custom_invoice_series_prefix": "TINV-",
+            "custom_default_tax_template": "Test Tax Template"
+        })
+        
+        from ury.ury.doctype.ury_order.ury_order import get_menu_name
+        menu = get_menu_name("Dine In")
+        self.assertEqual(menu, "Test Active Menu")
