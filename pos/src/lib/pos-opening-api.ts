@@ -1,4 +1,4 @@
-import { call } from './frappe-sdk';
+import { call } from '@ury/core';
 
 export interface POSOpeningResponse {
   message: number;

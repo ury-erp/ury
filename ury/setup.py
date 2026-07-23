@@ -113,6 +113,28 @@ def get_custom_fields():
 					"read_only": 0,
 				},
 				{
+					"fieldname": "custom_merged_tables",
+					"fieldtype": "Data",
+					"insert_after": "restaurant_table",
+					"label": "Merged Tables",
+					"read_only": 1,
+				},
+				{
+					"fieldname": "custom_split_from",
+					"fieldtype": "Link",
+					"insert_after": "custom_merged_tables",
+					"label": "Split From",
+					"options": "POS Invoice",
+					"read_only": 1,
+				},
+				{
+					"fieldname": "custom_split_group",
+					"fieldtype": "Data",
+					"insert_after": "custom_split_from",
+					"label": "Split Group",
+					"read_only": 1,
+				},
+				{
 					"fieldname": "column_break_gd1mq",
 					"fieldtype": "Column Break",
 					"insert_after": "restaurant_table",
@@ -388,6 +410,16 @@ def get_custom_fields():
 				"insert_after": "description",
 				"translatable": 0
 			}
+		],
+
+		"URY KOT": [
+			{
+				"fieldname": "custom_merged_tables",
+				"fieldtype": "Data",
+				"insert_after": "restaurant_table",
+				"label": "Merged Tables",
+				"read_only": 1,
+			},
 		],
      
     }

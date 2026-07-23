@@ -56,6 +56,7 @@ website_route_rules = [
     {"from_route": "/pos/<path:app_path>", "to_route": "pos"},
     {"from_route": "/urypos/<path:app_path>", "to_route": "urypos"},
     {"from_route": "/URYMosaic/<path:app_path>", "to_route": "URYMosaic"},
+    {"from_route": "/ury/<path:app_path>", "to_route": "ury"},
 ]
 # Home Pages
 # ----------
@@ -131,6 +132,8 @@ doc_events = {
         "validate": "ury.ury.hooks.ury_pos_invoice.validate",
         "after_insert":"ury.ury.api.ury_kot_order_number.set_order_number",
         "before_submit": "ury.ury.hooks.ury_pos_invoice.before_submit",
+        "on_submit": "ury.ury.hooks.ury_pos_invoice.on_submit",
+        "on_update": "ury.ury.hooks.ury_pos_invoice.on_update",
         "on_cancel": "ury.ury.hooks.ury_pos_invoice.on_trash",
         "on_trash": "ury.ury.hooks.ury_pos_invoice.on_trash",
     },
@@ -273,6 +276,7 @@ fixtures = [
                     "POS Invoice-branch",
                     "POS Invoice-print",
                     "POS Invoice-restaurant_table",
+                    "POS Invoice-custom_merged_tables",
                     "POS Invoice-custom_restaurant_room",
                     "POS Invoice-column_break_gd1mq",
                     "POS Invoice-arrived_time",
@@ -281,6 +285,10 @@ fixtures = [
                     "POS Invoice-cancel_reason",
                     "POS Invoice Item-comment",
                     "POS Invoice Item-custom_course",
+                    "POS Invoice-custom_merged_total",
+                    "POS Invoice-custom_merged_pos_invoice_details",
+                    "POS Invoice-custom_merged_pos_invoice",
+                    "POS Invoice-custom_bill_merge_details_section",
                     "Sales Invoice-mobile_number",
                     "Sales Invoice-order_info",
                     "Sales Invoice-order_type",
