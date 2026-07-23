@@ -1,5 +1,5 @@
 import { useEffect, useRef, type MouseEvent as ReactMouseEvent } from 'react';
-import { GitMerge, MoreVertical, SplitSquareHorizontal } from 'lucide-react';
+import { GitMerge, MoreVertical, Printer, SplitSquareHorizontal } from 'lucide-react';
 import { Button } from '@ury/ui';
 import { t } from '../i18n';
 
@@ -104,10 +104,11 @@ const OrderActionsMenu = ({
           {showReprintKOT && (
             <Button
               variant="ghost"
-              className="flex h-auto w-full justify-start rounded-none px-4 py-2 text-sm font-normal text-gray-700 hover:bg-gray-100"
+              className="flex h-auto w-full justify-start gap-2 rounded-none px-4 py-2 text-sm font-normal text-gray-700 hover:bg-gray-100"
               onClick={handleReprintKOT}
             >
-              {t('cart.reprint_kot') || 'Reprint KOT'}
+              <Printer className="h-4 w-4 shrink-0" />
+              {t('cart.reprint_kot')}
             </Button>
           )}
         </div>

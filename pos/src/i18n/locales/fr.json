@@ -52,6 +52,7 @@
     "loading_order": "Chargement des détails de la commande...",
     "edit_item": "Modifier l'article",
     "add_comment": "Ajouter un commentaire",
+    "reprint_kot": "Réimprimer le KOT",
     "edit_comment": "Modifier le commentaire"
   },
   "order": {
