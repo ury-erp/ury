@@ -347,6 +347,32 @@ def get_custom_fields():
 			}
 		],
 
+		"URY Printer Settings": [
+			{
+				"fieldname": "custom_block_takeaway_kot",
+				"fieldtype": "Check",
+				"label": "Block Takeaway KOT",
+				"insert_after": "printer",
+				"description": "When enabled, this printer row will be skipped for invoices that have no restaurant table (i.e. takeaway / parcel orders).",
+			},
+			{
+				"fieldname": "custom_kot_reprint",
+				"fieldtype": "Check",
+				"label": "KOT Reprint",
+				"insert_after": "custom_block_takeaway_kot",
+				"description": "Enable this printer row to participate in dynamic KOT reprints. Requires 'KOT Reprint Format' to also be set.",
+			},
+			{
+				"fieldname": "custom_kot_reprint_format",
+				"fieldtype": "Link",
+				"label": "KOT Reprint Format",
+				"options": "Print Format",
+				"insert_after": "custom_kot_reprint",
+				"depends_on": "eval:doc.custom_kot_reprint",
+				"description": "Print format used when reprinting this KOT row. The format should render doc.order_no and doc.custom_production_unit.",
+			},
+		],
+
 		"Price List": [
 			{
 				"fieldname": "restaurant_menu",
