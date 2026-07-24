@@ -51,11 +51,11 @@
    "fieldtype": "Column Break"
   },
   {
+   "description": "DEPRECATED: Will be removed in future. Use Branch instead.",
    "fieldname": "restaurant",
    "fieldtype": "Link",
    "label": "Restaurant",
-   "options": "URY Restaurant",
-   "reqd": 1
+   "options": "URY Restaurant"
   },
   {
    "fieldname": "restaurant_room",
