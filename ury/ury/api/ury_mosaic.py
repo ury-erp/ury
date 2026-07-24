@@ -1,7 +1,7 @@
 import frappe
 
 def get_production_units():
-    return frappe.get_all(
+    return frappe.get_list(
         "URY Production Unit",
         fields=["name", "disable"],
         order_by="name asc",
