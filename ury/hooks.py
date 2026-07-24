@@ -384,6 +384,8 @@ fixtures = [
                     "Branch-custom_menu_for_room",
                     "Branch-custom_order_type_wise_menu",
                     "Branch-custom_order_type_menu",
+                    "Branch-custom_section_break_opagb",
+                    "Branch-custom_column_break_d3cqt",
                     "POS Profile-custom_captains",
                     "POS Profile-custom_rooms",
                     "POS Profile-custom_captain_access_to_other_profiles",

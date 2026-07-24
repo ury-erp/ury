@@ -2,7 +2,7 @@ import frappe
 from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 
 def execute():
-	# Ensure Custom Fields are created on Branch in the database
+	# Ensure Custom Fields are created on Branch and POS Profile in the database
 	create_custom_fields({
 		"Branch": [
 			{"fieldname": "custom_restaurant_details_section", "label": "Restaurant Details", "fieldtype": "Section Break"},
@@ -15,10 +15,37 @@ def execute():
 			{"fieldname": "custom_room_wise_menu", "label": "Room Wise Menu", "fieldtype": "Check", "default": "0", "insert_after": "custom_default_room"},
 			{"fieldname": "custom_menu_for_room", "label": "Menu For Room", "fieldtype": "Table", "options": "Menu for Room", "depends_on": "eval:doc.custom_room_wise_menu", "insert_after": "custom_room_wise_menu"},
 			{"fieldname": "custom_order_type_wise_menu", "label": "Order Type Wise Menu", "fieldtype": "Check", "default": "0", "insert_after": "custom_menu_for_room"},
-			{"fieldname": "custom_order_type_menu", "label": "Order Type Menu", "fieldtype": "Table", "options": "Order Type Menu", "depends_on": "eval:doc.custom_order_type_wise_menu", "insert_after": "custom_order_type_menu"}
+			{"fieldname": "custom_order_type_menu", "label": "Order Type Menu", "fieldtype": "Table", "options": "Order Type Menu", "depends_on": "eval:doc.custom_order_type_wise_menu", "insert_after": "custom_order_type_wise_menu"},
+			{"fieldname": "custom_section_break_opagb", "label": "", "fieldtype": "Section Break", "insert_after": "custom_order_type_menu"},
+			{"fieldname": "custom_column_break_d3cqt", "label": "", "fieldtype": "Column Break", "insert_after": "custom_menu_for_room"}
 		]
-	}, ignore_validate=True)
-	frappe.reload_doc("setup", "doctype", "branch")
+	}, ignore_validate=True)	
+	frappe.reload_doc("accounts", "doctype", "pos_profile")
+	# Update deprecation descriptions for custom fields & doctypes directly in DB to ensure desk updates
+	deprecated_custom_fields = [
+		("POS Profile", "restaurant", "DEPRECATED: Will be removed in future. Use Branch instead."),
+		("POS Opening Entry", "restaurant", "DEPRECATED: Will be removed in future. Use Branch instead."),
+		("POS Invoice", "restaurant", "DEPRECATED: Will be removed in future. Use Branch instead."),
+		("Sales Invoice", "restaurant", "DEPRECATED: Will be removed in future. Use Branch instead."),
+		("POS Profile", "custom_reset_order_number_daily", "DEPRECATED: Will be removed in future. Field moved to Branch.")
+	]
+	for dt, fn, desc in deprecated_custom_fields:
+		cf_name = f"{dt}-{fn}"
+		if frappe.db.exists("Custom Field", cf_name):
+			frappe.db.set_value("Custom Field", cf_name, "description", desc, update_modified=False)
+		frappe.clear_cache(doctype=dt)
+	if frappe.db.exists("DocType", "URY Restaurant"):
+		frappe.db.set_value("DocType", "URY Restaurant", "description", "DEPRECATED: Will be removed in future. Use Branch instead.", update_modified=False)
+		deprecated_fields = {
+			"address": "DEPRECATED: Will be removed in future. Use POS Profile instead.",
+		}
+		default_desc = "DEPRECATED: Will be removed in future. Use Branch instead."
+		docfields = frappe.get_all("DocField", filters={"parent": "URY Restaurant"}, fields=["name", "fieldname"])
+		for df in docfields:
+			if df.fieldname and df.fieldname not in ("image", "menu_info_section", "column_break_4", "column_break_vo5jt"):
+				desc = deprecated_fields.get(df.fieldname, default_desc)
+				frappe.db.set_value("DocField", df.name, "description", desc, update_modified=False)
+		frappe.clear_cache(doctype="URY Restaurant")
 	
 	restaurants = frappe.get_all("URY Restaurant", fields=["*"])
 	branch_meta = frappe.get_meta("Branch")

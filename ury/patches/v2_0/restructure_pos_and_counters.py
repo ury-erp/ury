@@ -9,11 +9,19 @@ def execute():
     from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
     create_custom_fields({
         "Branch": [
-            {"fieldname": "custom_branch_settings_section", "label": "Branch Settings", "fieldtype": "Section Break", "insert_after": "custom_no_taxes"},
+            {"fieldname": "custom_branch_settings_section", "label": "POS Settings", "fieldtype": "Section Break", "insert_after": "custom_no_taxes"},
             {"fieldname": "custom_reset_order_number_daily", "label": "Reset Order Number Daily", "fieldtype": "Check", "default": "1", "insert_after": "custom_branch_settings_section"},
             {"fieldname": "custom_order_counter", "label": "Order Counter", "fieldtype": "Int", "default": "0", "hidden": 1, "insert_after": "custom_reset_order_number_daily"},
             {"fieldname": "custom_aggregator_order_counter", "label": "Aggregator Order Counter", "fieldtype": "Int", "default": "0", "hidden": 1, "insert_after": "custom_order_counter"},
             {"fieldname": "custom_last_reset_date", "label": "Last Reset Date", "fieldtype": "Date", "hidden": 1, "insert_after": "custom_aggregator_order_counter"}
+        ],
+        "POS Profile": [
+            {"fieldname": "custom_captains", "label": "Captains", "fieldtype": "Table", "options": "POS Profile Captain", "insert_after": "applicable_for_users"},
+            {"fieldname": "custom_rooms", "label": "Rooms", "fieldtype": "Table MultiSelect", "options": "Multiple Rooms", "insert_after": "role_restricted_for_table_order", "description": "URY Rooms the POS Profile can access"},
+            {"fieldname": "custom_captain_access_to_other_profiles", "label": "Captain Access to Other Profiles", "fieldtype": "Check", "default": "0", "insert_after": "custom_cashier_accessible_profiles", "description": "Captains of the POS Profile can access the listed POS Profiles"},
+            {"fieldname": "custom_captain_accessible_profiles", "label": "Captain Accessible Profiles", "fieldtype": "Table MultiSelect", "options": "POS Profile Link", "depends_on": "eval:doc.custom_captain_access_to_other_profiles", "insert_after": "custom_captain_access_to_other_profiles"},
+            {"fieldname": "custom_cashier_access_to_other_profiles", "label": "Cashier Access to Other Profiles", "fieldtype": "Check", "default": "0", "insert_after": "paid_limit", "description": "Cashiers of the POS Profile can access the listed POS Profiles"},
+            {"fieldname": "custom_cashier_accessible_profiles", "label": "Cashier Accessible Profiles", "fieldtype": "Table MultiSelect", "options": "POS Profile Link", "depends_on": "eval:doc.custom_cashier_access_to_other_profiles", "insert_after": "custom_cashier_access_to_other_profiles"}
         ]
     }, ignore_validate=True)
 
