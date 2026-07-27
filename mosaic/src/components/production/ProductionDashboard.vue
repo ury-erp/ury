@@ -45,7 +45,7 @@ export default {
     return {
       loading: true,
       dashboard: [],
-      call: frappe.call(),
+      db: frappe.db(),
     };
   },
 
@@ -54,19 +54,48 @@ export default {
   },
 
   methods: {
-    loadDashboard() {
-      this.call
-        .get("ury.ury.api.ury_mosaic.get_production_dashboard")
-        .then((result) => {
-          console.log("Dashboard:", result);
-
-          this.dashboard = result.message || [];
-          this.loading = false;
-        })
-        .catch((error) => {
-          console.error(error);
-          this.loading = false;
+    async loadDashboard() {
+      try {
+        const result = await this.db.getDocList("URY Production Unit", {
+          fields: ["name", "disable"],
+          orderBy: {
+            field: "name",
+            order: "asc",
+          },
         });
+
+        const units = result || [];
+
+        for (let unit of units) {
+          const [active, served, total] = await Promise.all([
+            this.db.getCount("URY KOT", [
+              ["production", "=", unit.name],
+              ["docstatus", "=", 1],
+              ["order_status", "=", "Ready For Prepare"],
+            ]),
+            this.db.getCount("URY KOT", [
+              ["production", "=", unit.name],
+              ["docstatus", "=", 1],
+              ["order_status", "=", "Served"],
+            ]),
+            this.db.getCount("URY KOT", [
+              ["production", "=", unit.name],
+              ["docstatus", "=", 1],
+            ]),
+          ]);
+
+          unit.active_orders = active;
+          unit.served_orders = served;
+          unit.total_orders = total;
+        }
+
+        console.log("Dashboard:", units);
+        this.dashboard = units;
+      } catch (error) {
+        console.error(error);
+      } finally {
+        this.loading = false;
+      }
     },
 
     openProduction(productionName) {
