@@ -599,8 +599,20 @@ def get_select_field_options():
 
 @frappe.whitelist()
 def fav_items(customer):
+    if not frappe.has_permission("Customer", "read", customer):
+        frappe.throw(_("Not permitted to access this Customer"), frappe.PermissionError)
+
+    filters = {"customer": customer}
+    try:
+        branch = getBranch()
+        if branch:
+            filters["branch"] = branch
+    except frappe.exceptions.ValidationError:
+        # Fallback if getBranch() throws (e.g., Administrator with no branch)
+        pass
+
     pos_invoices = frappe.get_all(
-        "POS Invoice", filters={"customer": customer}, fields=["name"]
+        "POS Invoice", filters=filters, fields=["name"]
     )
     item_qty = {}
 
