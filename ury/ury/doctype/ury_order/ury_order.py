@@ -389,6 +389,9 @@ def release_tables_after_print(invoice):
         invoice,
     )
 
+    if not frappe.has_permission("POS Invoice", "write", doc=invoice_doc):
+        frappe.throw(_("Not permitted to release tables for this invoice"), frappe.PermissionError)
+
     tables = _get_table_group(
         invoice_doc.restaurant_table,
         invoice_doc.custom_merged_tables,
