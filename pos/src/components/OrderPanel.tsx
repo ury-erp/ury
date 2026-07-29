@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Trash2, Edit, FrownIcon, Plus, Loader2, MessageSquare } from 'lucide-react';
 import { usePOSStore } from '../store/pos-store';
 import { cn } from '@ury/ui';
-import { formatCurrency, parseFrappeError } from '@ury/core';
+import { formatCurrency, parseFrappeError, flt } from '@ury/core';
 import { CustomerSelect } from './CustomerSelect';
 import ProductDialog from './ProductDialog';
 import OrderTypeSelect from './OrderTypeSelect';
@@ -46,12 +46,15 @@ const OrderPanel = () => {
   const calculateItemTotal = (item: typeof activeOrders[0]) => {
     const basePrice = item.selectedVariant?.price || item.price;
     const addonsTotal = item.selectedAddons?.reduce((sum, addon) => sum + addon.price, 0) || 0;
-    return (basePrice + addonsTotal) * item.quantity;
+    return flt((basePrice + addonsTotal) * item.quantity, 2);
   };
 
-  const total = activeOrders.reduce(
-    (sum, item) => sum + calculateItemTotal(item),
-    0
+  const total = flt(
+    activeOrders.reduce(
+      (sum, item) => sum + calculateItemTotal(item),
+      0
+    ),
+    2
   );
 
   const handleEdit = (item: typeof activeOrders[0]) => {
