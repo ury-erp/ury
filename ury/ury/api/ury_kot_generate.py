@@ -1,6 +1,7 @@
 import json
 
 import frappe
+from frappe.utils import flt
 from ury.ury_pos.api import getBranch
 
 
@@ -308,7 +309,7 @@ def create_cancel_kot_doc(
                     {
                         "item": cancelItem["item_code"],
                         "item_name": cancelItem["item_name"],
-                        "cancelled_qty": abs(int(cancelItem["qty"])),
+                        "cancelled_qty": abs(flt(cancelItem["qty"])),
                         "quantity": item["qty"],
                         "comments": cancelItem["comments"],
                         "course":course
@@ -349,8 +350,8 @@ def kot_execute(
             % pos_profile.name
         )
 
-    positive_qty_items = [item for item in final_array if int(item["qty"]) > 0]
-    negative_qty_items = [item for item in final_array if int(item["qty"]) <= 0]
+    positive_qty_items = [item for item in final_array if flt(item["qty"]) > 0]
+    negative_qty_items = [item for item in final_array if flt(item["qty"]) <= 0]
     total_cancel_items = negative_qty_items + removed_item
     if positive_qty_items:
         process_items_for_kot(
@@ -390,7 +391,7 @@ def compare_two_array(array_1, array_2):
         if len(a) == 0:
             b = list(filter(lambda z: z["item_code"] == x["item_code"], array_2))
             for qtb in b:
-                x["qty"] = int(x["qty"]) - int(qtb["qty"])
+                x["qty"] = flt(x["qty"]) - flt(qtb["qty"])
             finalarray.append(x)
     return finalarray
 
