@@ -1,4 +1,5 @@
 import frappe
+from frappe.utils import flt
 from frappe.utils.print_format import print_by_server
 
 WAITER_PRINT_FORMAT = "URY Waiter Order Slip"
@@ -37,8 +38,8 @@ def _aggregate_kot_items(kot_docs):
 					cancel_items[key] = {
 					"item": row.item,
 					"item_name": row.item_name,
-					"quantity": int(row.quantity or 0),
-					"cancelled_qty": int(row.cancelled_qty or 0),
+					"quantity": flt(row.quantity or 0),
+					"cancelled_qty": flt(row.cancelled_qty or 0),
 					"comments": row.comments,
 					"course": row.course,
 					}
@@ -47,7 +48,7 @@ def _aggregate_kot_items(kot_docs):
 					add_items[key] = {
 					"item": row.item,
 					"item_name": row.item_name,
-					"quantity": int(row.quantity or 0),
+					"quantity": flt(row.quantity or 0),
 					"comments": row.comments,
 					"course": row.course,
 					}
@@ -66,7 +67,7 @@ def _get_invoice_item_qty_map(invoice_id):
 		fields=["item_code", "qty", "comment"],
 	):
 		key = (row["item_code"], row.get("comment") or "")
-		qty_map[key] = int(row.get("qty") or 0)
+		qty_map[key] = flt(row.get("qty") or 0)
 
 	return qty_map
 
@@ -80,14 +81,14 @@ def _enrich_item_display_fields(items, invoice_id):
 		key = (item["item"], item.get("comments") or "")
 
 		if item.get("cancelled_qty"):
-			old_qty = int(item.get("quantity") or 0)
-			cancelled_qty = int(item.get("cancelled_qty") or 0)
+			old_qty = flt(item.get("quantity") or 0)
+			cancelled_qty = flt(item.get("cancelled_qty") or 0)
 			new_qty = max(old_qty - cancelled_qty, 0)
 			item["display_mode"] = "old_new"
 			item["old_qty"] = old_qty
 			item["new_qty"] = new_qty
 		else:
-			delta_qty = int(item.get("quantity") or 0)
+			delta_qty = flt(item.get("quantity") or 0)
 			new_qty = invoice_qty_map.get(key, delta_qty)
 			old_qty = new_qty - delta_qty
 
