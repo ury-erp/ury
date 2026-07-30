@@ -4,7 +4,7 @@ import { useRootStore } from '../store/root-store';
 import { cn } from '../lib/utils';
 import { Button } from './ui';
 import TableSelectionDialog from './TableSelectionDialog';
-import { DEFAULT_ORDER_TYPE, DINE_IN, ORDER_TYPES , type OrderType} from '../data/order-types';
+import { DEFAULT_ORDER_TYPE, DINE_IN, ORDER_TYPES, VISIBLE_ORDER_TYPES, type OrderType } from '../data/order-types';
 import { HandPlatter } from 'lucide-react';
 import { isUserRestrictedFromTableOrders } from '../lib/role-utils';
 import { t } from '../i18n';
@@ -17,6 +17,13 @@ const OrderTypeSelect = ({ disabled }: OrderTypeSelectProps) => {
   const { selectedOrderType, setSelectedOrderType, selectedTable, posProfile, isUpdatingOrder } = usePOSStore();
   const { user } = useRootStore();
   const [showTableDialog, setShowTableDialog] = useState(false);
+
+  // Only the enabled order types are offered (see VISIBLE_ORDER_TYPES). An
+  // order already placed as a hidden type keeps showing its own chip when
+  // reopened, so the cashier can still see what it is.
+  const orderTypes = ORDER_TYPES.filter(
+    ({ value }) => VISIBLE_ORDER_TYPES.includes(value) || value === selectedOrderType
+  );
 
   // Check if user is restricted from table orders
   const isRestrictedFromTableOrders = isUserRestrictedFromTableOrders(user, posProfile);
@@ -47,7 +54,7 @@ const OrderTypeSelect = ({ disabled }: OrderTypeSelectProps) => {
   return (
     <div>
       <div className="flex gap-2 overflow-x-auto pb-2 -mx-2 px-2">
-        {ORDER_TYPES.map(({ value, icon: Icon }) => {
+        {orderTypes.map(({ value, icon: Icon }) => {
           const isDineIn = value === DINE_IN;
           const isDisabled = disabled || (isDineIn && isRestrictedFromTableOrders) || isUpdatingOrder;
           

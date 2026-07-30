@@ -613,16 +613,17 @@ const TableView = () => {
         </div>
       </div>
 
-      {/* Status Legend */}
-      <div className="fixed bottom-[4.5rem] w-full p-4 bg-white border-t border-gray-200">
+      {/* Status Legend — in the column flow, not fixed: as an overlay it hid
+          the bottom row of table cards, which the grid never scrolled past. */}
+      <div className="flex-shrink-0 p-3 bg-white border-t border-gray-200">
         <div className="max-w-screen-xl mx-auto">
           <div className="flex items-center justify-center gap-6 text-sm">
             <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-green-100 border border-green-300 rounded"></div>
+              <div className="w-4 h-4 bg-emerald-50 border border-emerald-300 rounded"></div>
               <span>{t('tables.available')}</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-red-100 border border-red-300 rounded"></div>
+              <div className="w-4 h-4 bg-amber-50 border border-amber-400 rounded"></div>
               <span>{t('tables.occupied')}</span>
             </div>
           </div>

@@ -65,20 +65,21 @@ export function WaiterSelect({ disabled }: WaiterSelectProps) {
   return (
     <div className="relative">
       {selectedWaiter ? (
-        <div className="flex items-center justify-between bg-blue-50 p-3 rounded-lg">
-          <div className="flex items-center gap-3 min-w-0">
-            <WaiterAvatar name={selectedWaiter} image={selectedWaiterInfo?.image} size={40} />
-            <div className="min-w-0">
-              <p className="font-medium text-blue-900 truncate">{selectedWaiter}</p>
-              <p className="text-sm text-blue-700">{t('waiter.label')}</p>
-            </div>
+        // Compact chip: half-width column, so the avatar carries the "waiter"
+        // meaning and the sub-label is dropped.
+        <div className="flex items-center justify-between gap-1 bg-blue-50 px-2 rounded-lg h-12">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <WaiterAvatar name={selectedWaiter} image={selectedWaiterInfo?.image} size={28} />
+            <p className="text-sm font-medium text-blue-900 truncate leading-tight" title={selectedWaiter}>
+              {selectedWaiter}
+            </p>
           </div>
           <Button
             onClick={() => setSelectedWaiter(null)}
             disabled={isUpdatingOrder || disabled}
             variant="ghost"
-            size="sm"
-            className="text-blue-700 hover:text-blue-800 shrink-0"
+            size="xs"
+            className="text-blue-700 hover:text-blue-800 shrink-0 px-1 text-[11px]"
           >
             {t('common.change')}
           </Button>
@@ -99,14 +100,16 @@ export function WaiterSelect({ disabled }: WaiterSelectProps) {
               onBlur={() => setTimeout(() => setIsOpen(false), 150)}
               onKeyDown={handleKeyDown}
               placeholder={t('waiter.search_placeholder')}
-              className="w-full h-10 border border-gray-200 rounded-lg px-4 py-2 text-sm font-medium text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 transition-colors disabled:opacity-50"
+              className="w-full h-12 border border-gray-200 rounded-lg ps-3 pe-7 py-2 text-xs font-medium text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 transition-colors disabled:opacity-50"
               aria-label={t('waiter.search_placeholder')}
               autoComplete="off"
             />
-            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            <ChevronDown className="absolute end-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
           </div>
+          {/* Anchored to the panel edge: the avatar grid needs more width than
+              the half-panel trigger. */}
           {isOpen && (
-            <div className="absolute w-full mt-2 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto p-2">
+            <div className="absolute end-0 mt-2 w-[19rem] max-w-[calc(100vw-2rem)] bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto p-2">
               {isLoading && (
                 <div className="flex items-center justify-center p-4 text-gray-500 text-sm select-none">
                   <Loader className="w-4 h-4 mr-2 animate-spin" /> {t('common.loading')}

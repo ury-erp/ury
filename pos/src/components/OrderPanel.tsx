@@ -196,8 +196,12 @@ const OrderPanel = () => {
     <div className="w-96 bg-white border-s border-gray-200 flex flex-col h-[calc(100vh-4rem)] fixed end-0 z-10">
       <div className="p-4 border-b border-gray-200 flex-shrink-0">
         <OrderTypeSelect disabled={isInteractionDisabled} />
-        <div className="mt-3"><CustomerSelect disabled={isInteractionDisabled} /></div>
-        <div className="mt-3"><WaiterSelect disabled={isInteractionDisabled} /></div>
+        {/* Customer and waiter share one row: two stacked cards ate most of
+            the panel height before the cart even started. */}
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <CustomerSelect disabled={isInteractionDisabled} />
+          <WaiterSelect disabled={isInteractionDisabled} />
+        </div>
       </div>
       
       {orderLoading ? (

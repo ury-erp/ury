@@ -36,6 +36,11 @@ export const ORDER_TYPES: OrderTypes[] = [
     }
 ]
 
+// Order types offered in the cart. ORDER_TYPES stays complete so existing
+// orders of any type keep rendering their label; only the ones listed here are
+// selectable. Add a value back to re-enable it in the picker.
+export const VISIBLE_ORDER_TYPES: OrderType[] = ["Dine In", "Take Away"];
+
 export const DINE_IN="Dine In"
 export const DEFAULT_ORDER_TYPE="Take Away"
 export const DEFAULT_PAYMENT_MODE="Cash"
