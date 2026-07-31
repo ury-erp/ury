@@ -69,6 +69,7 @@
     "discount_placeholder": "Entrer %",
     "payment_methods": "Modes de paiement",
     "amount_placeholder": "Montant",
+    "auto": "auto",
     "total_entered": "Total saisi",
     "order_summary": "Résumé de la commande",
     "subtotal": "Sous-total",

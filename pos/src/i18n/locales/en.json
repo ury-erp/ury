@@ -69,6 +69,7 @@
     "discount_placeholder": "Enter %",
     "payment_methods": "Payment Methods",
     "amount_placeholder": "Amount",
+    "auto": "auto",
     "total_entered": "Total Entered",
     "order_summary": "Order Summary",
     "subtotal": "Subtotal",

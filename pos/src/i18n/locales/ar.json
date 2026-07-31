@@ -76,6 +76,7 @@
     "discount_placeholder": "أدخل نسبة %",
     "payment_methods": "طرق الدفع",
     "amount_placeholder": "المبلغ",
+    "auto": "تلقائي",
     "total_entered": "الإجمالي المدخل",
     "order_summary": "ملخص الطلب",
     "subtotal": "المجموع الفرعي",

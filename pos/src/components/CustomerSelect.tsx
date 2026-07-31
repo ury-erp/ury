@@ -302,17 +302,22 @@ export function CustomerSelect({ disabled }: CustomerSelectProps) {
   return (
     <div className="relative">
       {selectedCustomer ? (
-        <div className="flex items-center justify-between bg-blue-50 p-3 rounded-lg">
-          <div>
-            <p className="font-medium text-blue-900">{selectedCustomer.name}</p>
-            <p className="text-sm text-blue-700">{selectedCustomer.phone}</p>
+        // Compact chip: this sits in a half-width column next to the waiter.
+        <div className="flex items-center justify-between gap-1 bg-blue-50 px-2 rounded-lg h-12">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-blue-900 truncate leading-tight" title={selectedCustomer.name}>
+              {selectedCustomer.name}
+            </p>
+            {selectedCustomer.phone && (
+              <p className="text-[11px] text-blue-700 truncate leading-tight">{selectedCustomer.phone}</p>
+            )}
           </div>
           <Button
             onClick={() => setSelectedCustomer(null)}
             disabled={isUpdatingOrder}
             variant="ghost"
-            size="sm"
-            className="text-blue-700 hover:text-blue-800"
+            size="xs"
+            className="text-blue-700 hover:text-blue-800 shrink-0 px-1 text-[11px]"
           >
             {t('common.change')}
           </Button>
@@ -335,14 +340,16 @@ export function CustomerSelect({ disabled }: CustomerSelectProps) {
               }}
               onKeyDown={handleKeyDown}
               placeholder={t('customer.search_placeholder')}
-              className="w-full h-10 border border-gray-200 rounded-lg px-4 py-2 text-sm font-medium text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 transition-colors"
+              className="w-full h-12 border border-gray-200 rounded-lg ps-3 pe-7 py-2 text-xs font-medium text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 transition-colors"
               aria-label={t('customer.search_placeholder')}
               autoComplete="off"
             />
-            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            <ChevronDown className="absolute end-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
           </div>
+          {/* The trigger is half-panel wide; the list is not, so it can show
+              full customer names without wrapping. */}
           {isOpen && (
-            <div className="absolute w-full mt-2 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-80 overflow-y-auto">
+            <div className="absolute start-0 mt-2 w-[19rem] max-w-[calc(100vw-2rem)] bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-80 overflow-y-auto">
               {searchTerm.trim() === '' && !isSearching && !searchError && (
                 <div className="p-4 text-center text-gray-400 text-sm select-none">{t('customer.type_to_search')}</div>
               )}
