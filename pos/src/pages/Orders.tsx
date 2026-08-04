@@ -13,7 +13,49 @@ import { useNavigate } from 'react-router-dom';
 import PaymentDialog from '../components/PaymentDialog';
 import { printOrder } from '../lib/print';
 import { call } from '../lib/frappe-sdk';
+import { POSInvoice } from '../lib/invoice-api';
 import { t } from '../i18n';
+
+function parsePrintTime(timeStr?: string | null, postingDate?: string): number {
+  if (!timeStr) return NaN;
+  
+  // If timeStr only contains time, prepend the posting date
+  const fullStr = timeStr.includes('-') ? timeStr : `${postingDate} ${timeStr}`;
+  
+  // Strip microseconds and format as ISO 8601 (YYYY-MM-DDTHH:mm:ss)
+  const isoStr = fullStr.split('.')[0].replace(' ', 'T');
+  return new Date(isoStr).getTime();
+}
+
+function isInvoiceLimitExceeded(
+  order: POSInvoice,
+  custom_invoice_warning_time?: number
+): boolean {
+  const warningTime = Number(custom_invoice_warning_time);
+  if (!warningTime || warningTime <= 0 || Number(order.invoice_printed) !== 1) return false;
+  if (order.status !== 'Draft' && order.status !== 'Unbilled') return false;
+
+  const printTime = parsePrintTime(order.custom_printing_time || order.posting_time, order.posting_date);
+  if (isNaN(printTime)) return false;
+
+  return (Date.now() - printTime) / 60000 >= warningTime;
+}
+
+function getElapsedTimeFormatted(
+  printingTimeStr?: string | null,
+  postingDate?: string,
+  postingTime?: string
+): string {
+  const printTime = parsePrintTime(printingTimeStr || postingTime, postingDate);
+  if (isNaN(printTime)) return '';
+  
+  const elapsedMs = Math.max(0, Date.now() - printTime);
+  const totalMinutes = Math.floor(elapsedMs / 60000);
+  const hours = Math.floor(totalMinutes / 60);
+  const mins = totalMinutes % 60;
+  
+  return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+}
 
 export default function Orders() {
   const { 
@@ -47,8 +89,25 @@ export default function Orders() {
   const [isPrinting, setIsPrinting] = React.useState(false);
 
   useEffect(() => {
+    if (!posStore.posProfile) {
+      posStore.fetchPosProfile();
+    }
     fetchOrders();
-  }, [fetchOrders]);
+  }, [fetchOrders, posStore.posProfile]);
+
+  const getWarningTime = () => {
+    if (posStore.posProfile?.custom_invoice_warning_time !== undefined) {
+      return posStore.posProfile.custom_invoice_warning_time;
+    }
+    try {
+      const cached = sessionStorage.getItem('posProfile');
+      if (cached) {
+        const p = JSON.parse(cached);
+        return p.custom_invoice_warning_time;
+      }
+    } catch (e) {}
+    return undefined;
+  };
 
   useEffect(() => {
     if (!mounted.current) {
@@ -171,9 +230,10 @@ export default function Orders() {
         posProfile: posStore.posProfile
       });
       showToast.success(t('success.printed'));
-      // Locally update selectedOrder.invoice_printed to 1
+      // Locally update selectedOrder.invoice_printed to 1 and custom_printing_time to now
       if (selectedOrder && typeof selectedOrder === 'object') {
-        selectOrder({ ...selectedOrder, invoice_printed: 1 });
+        const nowStr = new Date().toISOString().replace('T', ' ').substring(0, 19);
+        selectOrder({ ...selectedOrder, invoice_printed: 1, custom_printing_time: nowStr });
       }
       // If order was Unbilled, set to Draft and reload draft orders
       if (selectedStatus === 'Unbilled') {
@@ -220,7 +280,17 @@ export default function Orders() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-screen-xl mx-auto">
-              {orders.map((order) => (
+              {orders.map((order) => {
+                const limitExceeded = isInvoiceLimitExceeded(
+                  order,
+                  getWarningTime()
+                );
+                const isPrinted = Number(order.invoice_printed) === 1;
+                const elapsedTimeText = isPrinted
+                  ? getElapsedTimeFormatted(order.custom_printing_time, order.posting_date, order.posting_time)
+                  : '';
+
+                return (
                 <Card 
                   key={order.name} 
                   className={`p-0 bg-white hover:shadow-md transition-shadow flex flex-col overflow-hidden cursor-pointer ${
@@ -230,17 +300,23 @@ export default function Orders() {
                 >
                   <CardContent className="p-0 flex flex-col h-full">
                     <div className="p-3 bg-gray-50 border-b">
-                    <h3 className="font-medium text-gray-900 text-sm truncate" title={order.name}>
-                      {order.name}
-                    </h3>
+                    <div className="mb-1 flex items-center justify-between gap-2">
+                      <h3 className="font-medium text-gray-900 text-sm truncate" title={order.name}>
+                        {order.name}
+                      </h3>
+                    </div>
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-xs text-gray-500">
                           {order.restaurant_table ? `Table ${order.restaurant_table} • ` : ''}{t(`order_types.${order.order_type.toLowerCase().replace(/ /g, '_')}`)}
                         </p>
                       </div>
-                      <Badge variant={getBadgeVariant(order.status)} className="ms-2">
+                      <Badge 
+                        variant={limitExceeded ? 'outline' : getBadgeVariant(order.status)} 
+                        className={`ms-2 ${limitExceeded ? 'border-red-500 text-red-600 bg-red-50' : ''}`}
+                      >
                         {t(`order_status_types.${order.status.toLowerCase().replace(/ /g, '_')}`)}
+                        {isPrinted && elapsedTimeText ? ` ${elapsedTimeText}` : ''}
                       </Badge>
                     </div>
                     </div>
@@ -265,7 +341,8 @@ export default function Orders() {
                     </div>
                   </CardContent>
                 </Card>
-              ))}
+                );
+              })}
             </div>
           )}
           {/* Pagination Controls */}

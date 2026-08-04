@@ -196,7 +196,7 @@ def getInvoiceForCashier(status, cashier, limit, limit_start):
         invoices = frappe.db.sql(
             """
             SELECT 
-                name, invoice_printed, grand_total, restaurant_table, 
+                name, invoice_printed, custom_printing_time, grand_total, restaurant_table, 
                 cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number, 
                 posting_date, rounded_total, order_type 
@@ -216,7 +216,7 @@ def getInvoiceForCashier(status, cashier, limit, limit_start):
         invoices = frappe.db.sql(
             """
             SELECT 
-                name, invoice_printed, grand_total, restaurant_table, 
+                name, invoice_printed, custom_printing_time, grand_total, restaurant_table, 
                 cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number, 
                 posting_date, rounded_total, order_type 
@@ -235,7 +235,7 @@ def getInvoiceForCashier(status, cashier, limit, limit_start):
         invoices = frappe.db.sql(
             """
             SELECT 
-                name, invoice_printed, grand_total, restaurant_table, 
+                name, invoice_printed, custom_printing_time, grand_total, restaurant_table, 
                 cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number,
                 posting_date, rounded_total, order_type,additional_discount_percentage,discount_amount 
@@ -253,7 +253,7 @@ def getInvoiceForCashier(status, cashier, limit, limit_start):
         invoices = frappe.db.sql(
             """
             SELECT 
-                name, invoice_printed, grand_total, restaurant_table, 
+                name, invoice_printed, custom_printing_time, grand_total, restaurant_table, 
                 cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number,
                 posting_date, rounded_total, order_type,additional_discount_percentage,discount_amount
@@ -286,7 +286,7 @@ def getPosInvoice(status, limit, limit_start):
         invoices = frappe.db.sql(
             """
             SELECT 
-                name, invoice_printed, grand_total, restaurant_table, 
+                name, invoice_printed, custom_printing_time, grand_total, restaurant_table, 
                 cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number, 
                 posting_date, rounded_total, order_type 
@@ -306,7 +306,7 @@ def getPosInvoice(status, limit, limit_start):
         invoices = frappe.db.sql(
             """
             SELECT 
-                name, invoice_printed, grand_total, restaurant_table, 
+                name, invoice_printed, custom_printing_time, grand_total, restaurant_table, 
                 cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number, 
                 posting_date, rounded_total, order_type 
@@ -325,7 +325,7 @@ def getPosInvoice(status, limit, limit_start):
         invoices = frappe.db.sql(
             """
             SELECT 
-                name, invoice_printed, grand_total, restaurant_table, 
+                name, invoice_printed, custom_printing_time, grand_total, restaurant_table, 
                 cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number,
                 posting_date, rounded_total, order_type,additional_discount_percentage,discount_amount 
@@ -343,7 +343,7 @@ def getPosInvoice(status, limit, limit_start):
         invoices = frappe.db.sql(
             """
             SELECT 
-                name, invoice_printed, grand_total, restaurant_table, 
+                name, invoice_printed, custom_printing_time, grand_total, restaurant_table, 
                 cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number,
                 posting_date, rounded_total, order_type,additional_discount_percentage,discount_amount
@@ -387,7 +387,7 @@ def searchPosInvoice(query,status):
             ["customer", "like", f"%{query}%"],
             ["mobile_number", "like", f"%{query}%"],
         ],
-        fields=["name", "customer", "grand_total", "posting_date", "posting_time", "order_type", "restaurant_table","status","grand_total","rounded_total","net_total","mobile_number"],
+        fields=["name", "customer", "grand_total", "posting_date", "posting_time", "order_type", "restaurant_table","status","grand_total","rounded_total","net_total","mobile_number", "invoice_printed", "custom_printing_time"],
         limit_page_length=10 
     )
     
@@ -474,6 +474,7 @@ def getPosProfile():
         multiple_cashier = pos_profiles.custom_enable_multiple_cashier
         edit_order_type = pos_profiles.custom_edit_order_type
         enable_kot_reprint = pos_profiles.custom_enable_kot_reprint
+        custom_invoice_warning_time = pos_profiles.get("custom_invoice_warning_time")
         if multiple_cashier:
             details = getBranchRoom()
             room = details[0].get('name') 
@@ -547,7 +548,8 @@ def getPosProfile():
         "multiple_cashier":multiple_cashier,
         "owner":owner,
         "edit_order_type":edit_order_type,
-        "enable_kot_reprint":enable_kot_reprint
+        "enable_kot_reprint":enable_kot_reprint,
+        "custom_invoice_warning_time":custom_invoice_warning_time
 
     }
 
