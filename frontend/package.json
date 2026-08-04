@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build --base=/assets/ury/ury/ && yarn copy-html-entry",
-    "copy-html-entry": "cp ../ury/public/ury/index.html ../ury/www/ury.html",
+    "copy-html-entry": "node -e \"require('fs').copyFileSync('../ury/public/ury/index.html', '../ury/www/ury.html')\"",
     "lint": "eslint .",
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit"

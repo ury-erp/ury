@@ -1,22 +1,27 @@
-import { Button, Card, CardContent, CardHeader, CardTitle } from '@ury/ui'
-import { formatInvoiceTime } from '@ury/core'
+import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import SetupPage from './pages/setup/SetupPage';
+import ConfigurePage from './pages/setup/ConfigurePage';
+
+function SetupGuard() {
+  // @ts-ignore
+  const setupComplete = window.frappe?.boot?.setup_complete;
+  if (setupComplete === 1) {
+    window.location.href = '/app';
+    return null;
+  }
+  return <Outlet />;
+}
 
 function App() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>URY Management</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-muted-foreground">
-            Current time: {formatInvoiceTime(new Date().toISOString())}
-          </p>
-          <Button>Get Started</Button>
-        </CardContent>
-      </Card>
-    </div>
-  )
+    <Routes>
+      <Route element={<SetupGuard />}>
+        <Route index element={<SetupPage />} />
+        <Route path="configure" element={<ConfigurePage />} />
+      </Route>
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
 }
 
-export default App
+export default App;
