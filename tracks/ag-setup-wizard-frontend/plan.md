@@ -1,108 +1,535 @@
 # Detailed Phase-by-Phase Execution Plan: URY Setup Wizard
 
-This document outlines the detailed execution plan to replace the default ERPNext/Frappe setup wizard with a custom, JSON-driven onboarding flow in the URY application.
+**Owner**: antigravity
+**Status**: Completed
+**Target Branch**: `feature/setup-wizard` (worktree off `develop`)
+**App Path (WSL)**: `/mnt/c/Users/swafa/Projects/Bench/ury-bench/apps/ury`
+
+> This plan uses the **`frontend-design`** and **`vercel-react-best-practices`** skills during execution.
+> Before writing any component, the executing agent MUST read both skill files:
+> - `C:\Users\swafa\.gemini\config\skills\frontend-design\SKILL.md`
+> - `C:\Users\swafa\.gemini\config\skills\vercel-react-best-practices\SKILL.md`
+
+---
+
+## Execution Skill Directives
+
+### frontend-design
+- The wizard is a premium onboarding experience for a restaurant ERP. Every detail must feel deliberate.
+- Color palette: white card surfaces, `#2B5CE6` primary blue (matching URY POS brand), `#22C55E` success green, `#6B7280` muted grey.
+- Typography: `Inter` (already loaded in URY frontend). Display: 600 weight. Body: 400. Labels: 500.
+- The single signature element is the **ProgressModal** — a segmented top bar + animated step list that communicates real backend progress without feeling like a loading spinner.
+- Layout is clean grid (2-col for form fields, full-width for cards). No decoration that does not carry information.
+- Micro-interactions: field focus lifts border to `#2B5CE6`. Selected card gets a blue border + checkmark badge. Step completion triggers a smooth green fill animation on the circle icon.
+- Motion is purposeful: step transitions use `200ms ease-out`. Progress bar fill is `transition: width 400ms ease`. No gratuitous bounces.
+
+### vercel-react-best-practices
+- Fetch `getSetupDefaults` and `getCountryDefaults` in **parallel** where possible (`async-parallel`).
+- Avoid inline component definitions — all sub-components defined at module level (`rerender-no-inline-components`).
+- Use `useCallback` for `handleCountryChange` and `handleCompanyNameChange` to prevent re-renders (`rerender-memo`).
+- Use `useImperativeHandle` + `forwardRef` for the `DynamicForm` validation handle — do not lift all field state into the parent.
+- Validate fields on blur, not on every keystroke (`rerender-use-deferred-value`).
+- Dynamic import `ProgressModal` so it is not in the initial bundle (`bundle-dynamic-imports`).
 
 ---
 
 ## Phase 1: Routing and Login Interception
 
-**Goal:** Intercept the login redirect to `/setup-wizard` and redirect user to the `/ury` setup route. Ensure `/ury` serves the new single-page setup app when setup is not complete.
+**Goal**: Intercept post-login redirect to `/setup-wizard` and send the user to `/ury`. Block `/app` while setup is incomplete.
 
-### Backend Routing Interception
-1. Update `bootinfo.home_page` via a hook. In `ury/hooks.py`, we can intercept requests. Wait, since Frappe checks `setup_complete` and redirects, we can override the `boot_session` hook or simply add a route rewrite rule in `website_route_rules` in `hooks.py`.
-2. Map `{"from_route": "/setup-wizard", "to_route": "ury"}` or use a custom python redirect in `www/ury.py` so that if `setup_complete` is `0`, accessing `/ury` is permitted and renders the wizard, and any attempt to load the main app `/app` redirects to `/ury`.
-3. In `ury/hooks.py`, verify `website_route_rules`. Add `{"from_route": "/setup-wizard", "to_route": "ury"}` so the Desk setup-wizard path maps to our `/ury` SPA page.
+### 1.1 Backend Before-Request Hook
 
-### Frontend App Routing
-1. Update `frontend/src/App.tsx` to handle page-level routing.
-2. If setup is incomplete, the default view must be `<SetupPage />`.
-3. Configure `basename="/ury"` for React Router inside `frontend/src/main.tsx` (already exists).
+**File (NEW)**: `ury/controllers/setup_redirect.py`
+
+```python
+import frappe
+
+def redirect_to_setup():
+    """Redirect logged-in users to /ury while setup_complete = 0."""
+    if frappe.session.user == "Guest":
+        return
+    if frappe.get_site_config().get("setup_complete"):
+        return
+    path = frappe.request.path
+    if path.startswith("/ury"):
+        return  # already on wizard, do not loop
+    if path.startswith("/app") or path.startswith("/setup-wizard"):
+        frappe.local.response["type"] = "redirect"
+        frappe.local.response["location"] = "/ury"
+```
+
+**File (MODIFY)**: `ury/hooks.py`
+
+```python
+before_request = [
+    "ury.ury.controllers.setup_redirect.redirect_to_setup"
+]
+
+website_route_rules = [
+    # existing rules...
+    {"from_route": "/setup-wizard", "to_route": "ury"},
+    {"from_route": "/ury/<path:app_path>", "to_route": "ury"},
+]
+```
+
+Confirm `ury/www/ury.html` exists (SPA shell). If absent, create it following `www/pos.html` as a template.
+
+### 1.2 Frontend Router Guard
+
+**File (MODIFY)**: `frontend/src/App.tsx`
+
+Add a `SetupGuard` component:
+- On mount read `window.frappe?.boot?.setup_complete` (populated by Frappe's boot session).
+- If `0` or absent: render wizard routes.
+- If `1`: hard-navigate to `/app`.
+
+Router additions (`basename="/ury"` already set in `main.tsx`):
+
+```tsx
+<Route element={<SetupGuard />}>
+  <Route index element={<SetupPage />} />
+  <Route path="configure" element={<ConfigurePage />} />
+</Route>
+```
 
 ---
 
 ## Phase 2: Schema Configuration & JSON Files
 
-**Goal:** Define the JSON files that configure form fields, validation rules, default static lists (currencies, timezones, languages) to fulfill Rule 1.
+**Goal**: All form shape, field ordering, validation rules, and configure items defined in JSON. No hardcoded field lists in components.
 
-### Schema Location
-Create these files under `frontend/src/data/`:
-- `forms/setup.json`: Defines sections (`General`, `Company`), field type (`select`, `text`, `date`), constraints, options (if static), and fields mapping (removing Administrator credentials since the admin user is pre-created during install).
-- `validations.json`: Defines regex patterns and default error messages for validators like `minLength`, `maxLength`, `required`, and `pattern`.
-- `timezones.json` (as a fallback/static cache for offline mode).
-- `languages.json` (as a fallback).
-- `currencies.json` (as a fallback).
+### Files under `frontend/src/data/`
+
+#### `forms/setup.json`
+Two sections: `general` and `company`. Each field has:
+- `id`, `label`, `type` (`select` | `text`), `placeholder`
+- `optionsKey` — key into the dynamic options map (fed by Phase 3 API)
+- `required: true/false`
+- `validations: string[]` — rule strings (`"minLength:3"`, `"maxLength:5"`, `"pattern:^[A-Z0-9]+$"`)
+- `triggers: string[]` — field IDs to auto-populate when this field changes (set on `country`)
+- `autoGeneratedFrom: string` — derive value from another field (set on `company_abbr`)
+- `hint: string` — muted inline label (e.g. "Auto-generated")
+
+`installationTypes` array defines Minimal (RECOMMENDED badge, 4 feature bullets) and Advanced (5 feature bullets).
+
+Static `fy_start_dates` options: 12 entries `{ value: "MM-DD", label: "Month D" }`.
+
+#### `forms/configure.json`
+Six items only (per spec):
+1. Branch — `/app/branch/new-branch-1`
+2. URY Room — `/app/ury-room/new-ury-room-1`
+3. URY Table — `/app/ury-table/new-ury-table-1`
+4. URY Menu — `/app/ury-menu/new-ury-menu-1`
+5. Mode of Payment — `/app/mode-of-payment/new-mode-of-payment-1`
+6. User — `/app/user/new-user-1`
+
+Footer: "These settings are optional and can be configured anytime after installation."
+
+#### `validations.json`
+Rules: `required`, `minLength` (uses `{min}` token), `maxLength` (uses `{max}` token), `pattern` (keyed by regex string with per-pattern message).
+
+#### `data/static/` — fallback files
+Generated once by `scripts/generate_static_data.py`:
+- `languages.json`, `timezones.json`, `currencies.json`, `countries.json`, `fy_start_dates.json`
 
 ---
 
 ## Phase 3: Service Layer & Backend APIs
 
-**Goal:** Fetch dynamic values from Frappe and ERPNext setup APIs and submit the completion payload.
+**Goal**: All field option fetching and setup submission wired to canonical Frappe wizard APIs. No custom data sourcing where Frappe already provides it.
 
-### Backend API (`ury/ury/api/setup.py`)
-1. Create a whitelisted API `ury.ury.api.setup.get_setup_defaults` that aggregates:
-   - Available languages from `frappe.desk.page.setup_wizard.setup_wizard.load_languages()`.
-   - Guest/GeoIP country from `frappe.desk.page.setup_wizard.setup_wizard.load_country()`.
-   - List of all countries.
-   - List of all currencies.
-   - List of timezones from `pytz.all_timezones`.
-2. Create a whitelisted API `ury.ury.api.setup.get_country_defaults(country)` that returns `{ "currency": info.get("currency"), "timezone": info.get("timezones")[0] }` using `frappe.geo.country_info.get_country_info(country)`.
-3. Leverage `erpnext.accounts.doctype.account.chart_of_accounts.chart_of_accounts.get_charts_for_country` to fetch charts of accounts dynamically in the frontend whenever the user changes the selected Country.
+### 3.1 Frappe Wizard APIs Used Directly
 
-### Frontend Service Layer (`frontend/src/services/setup.ts`)
-1. Implement client calls using `@ury/core`'s `call` helper.
-2. Expose `getSetupDefaults()`.
-3. Expose `getCountryDefaults(country)`.
-4. Expose `getChartsForCountry(country)`.
-5. Expose `submitSetup(payload)`:
-   - Maps payload to matching Frappe/ERPNext setup fields (including computing `fy_end_date` as `fy_start_date` + 12 months - 1 day, without sending any admin user creation fields).
-   - Calls `frappe.desk.page.setup_wizard.setup_wizard.setup_complete` with the arguments.
+| Action | Frappe Method | Notes |
+|--------|--------------|-------|
+| Load languages | `frappe.desk.page.setup_wizard.setup_wizard.load_languages(request)` | Returns `[{ name, label }]` |
+| Detect country (GeoIP) | `frappe.desk.page.setup_wizard.setup_wizard.load_country(request)` | Returns `{ country }` |
+| Country currency + timezone | `frappe.geo.country_info.get_country_info(country)` | Returns `{ currency, timezones, ... }` |
+| All countries | `frappe.geo.country_info.get_all()` | Dict keyed by country name |
+| Chart of accounts templates | `erpnext.accounts.doctype.account.chart_of_accounts.chart_of_accounts.get_charts_for_country(country, with_description=True)` | Returns list of chart templates |
+| Submit setup | `frappe.desk.page.setup_wizard.setup_wizard.setup_complete(args)` | Final setup call |
+
+### 3.2 Backend API Module
+
+**File (NEW)**: `ury/api/setup.py`
+
+#### `get_setup_defaults()`
+```
+Route: ury.ury.api.setup.get_setup_defaults
+Method: GET via frappe.call
+Auth: logged-in (not Guest)
+```
+
+Aggregates `load_languages`, `load_country`, `get_all()` (countries + currency derivation), `pytz.all_timezones`.
+
+Returns:
+```json
+{
+  "languages": [{ "value": "en", "label": "English" }],
+  "detected_country": "India",
+  "countries": ["Afghanistan", ...],
+  "currencies": [{ "value": "INR", "label": "INR - Indian Rupee", "symbol": "₹" }],
+  "timezones": ["Asia/Kolkata", ...]
+}
+```
+
+#### `get_country_defaults(country)`
+```
+Route: ury.ury.api.setup.get_country_defaults
+Method: GET via frappe.call, args: { country }
+Auth: logged-in
+```
+
+Calls `get_country_info(country)` + `get_charts_for_country(country, with_description=True)`.
+
+Returns:
+```json
+{
+  "currency": "INR",
+  "timezone": "Asia/Kolkata",
+  "charts_of_accounts": [{ "value": "Restaurant", "label": "Restaurant" }]
+}
+```
+
+#### `submit_setup(payload)`
+```
+Route: ury.ury.api.setup.submit_setup
+Method: POST via frappe.call
+Auth: logged-in
+```
+
+Processing:
+1. Parse JSON string payload to dict.
+2. Compute `fy_end_date`: `fy_start_date` (parsed as `YYYY-MM-DD` for current year) + 12 months − 1 day using `dateutil.relativedelta`.
+3. Strip admin credential fields (`admin_password`, `email`, `first_name`, `last_name`) — admin is pre-created during install.
+4. Delegate to `frappe.desk.page.setup_wizard.setup_wizard.setup_complete(args=payload)`.
+
+### 3.3 Frontend Service Layer
+
+**File (NEW)**: `frontend/src/services/setup.ts`
+
+Uses `call` utility (import from `frappe-js-sdk` or `@ury/core` — confirm at execution time which the existing POS uses).
+
+```typescript
+export const setupService = {
+  getDefaults(): Promise<SetupDefaults>,
+  getCountryDefaults(country: string): Promise<CountryDefaults>,
+  submitSetup(payload: SetupPayload): Promise<void>,
+}
+```
+
+TypeScript interfaces match the API return shapes exactly.
+
+`SetupPayload`:
+```typescript
+{
+  language: string;
+  country: string;
+  timezone: string;
+  currency: string;
+  company_name: string;
+  company_abbr: string;
+  chart_of_accounts?: string;
+  fy_start_date: string;   // "MM-DD" e.g. "01-01"
+  installation_type: "minimal" | "advanced";
+}
+```
 
 ---
 
 ## Phase 4: Dynamic Form Engine & Validation
 
-**Goal:** Create a robust React form engine that generates forms dynamically from the JSON schema and validates inputs without hardcoding.
+### 4.1 `validateFieldValue` — added to `@ury/core`
 
-### Components
-1. `FieldRenderer.tsx`:
-   - Renders appropriate `@ury/ui` components based on field type (`Input`, `Select`, etc.).
-   - Standardizes value propagation and focus.
-2. `DynamicForm.tsx`:
-   - Manage local state of all form fields.
-   - Run validation engine against `validations.json` rules.
-   - Track touched fields and display real-time validation errors.
+**File (NEW)**: `packages/core/src/utils/validateField.ts`
+
+Signature:
+```typescript
+validateFieldValue(value: string, rules: string[]): { valid: boolean; message: string }
+```
+
+Rules supported: `required`, `minLength:N`, `maxLength:N`, `pattern:REGEX`.
+Messages sourced from `validations.json` (imported as a module, not fetched at runtime).
+Export from `packages/core/src/index.ts`.
+
+### 4.2 `FieldRenderer.tsx`
+
+Props: `field`, `value`, `error`, `options?: Option[]`, `onChange(id, value)`.
+- `text` → `<Input />` from `@ury/ui`. Focus lifts border to `#2B5CE6`.
+- `select` → `<Select />` from `@ury/ui`.
+- For `autoGeneratedFrom` fields: right-aligned muted `hint` text inside the input.
+- Error message renders below field in `#EF4444`, `text-xs`.
+- Validate on `onBlur` only (not on every keystroke).
+
+### 4.3 `FormSection.tsx`
+
+Props: `section`, `values`, `errors`, `optionsMap`, `onChange`.
+Layout: 2-column CSS grid, `@ury/ui` Card container. Section label above grid.
+
+### 4.4 `DynamicForm.tsx`
+
+Exposed via `useImperativeHandle` + `forwardRef`:
+```typescript
+interface DynamicFormHandle {
+  validate(): boolean;
+  getValues(): SetupPayload;
+  setFieldValue(id: string, value: string): void;
+}
+```
+
+Internal state: `values: Record<string, string>`, `errors: Record<string, string>`.
+Runs `validateFieldValue` on blur per field; runs all fields on `validate()`.
+Emits `onFieldChange(fieldId, value)` for parent to react to `country` changes.
+Does NOT lift all state to parent — parent only calls imperative methods.
+
+### 4.5 `InstallationTypeCard.tsx`
+
+Props: `type` (from `setup.json installationTypes`), `selected: boolean`, `onSelect()`.
+Selected: blue `2px` border, `#EFF4FF` background, checkmark badge top-right.
+Minimal card: `RECOMMENDED` badge in `#DCFCE7`/`#16A34A`.
+Features: green `#22C55E` checkmark icon + label text.
 
 ---
 
 ## Phase 5: Setup Wizard Page Layout & UI
 
-**Goal:** Implement the Single-page UI layout conforming to URY Core's design language.
+### 5.1 `WizardLayout.tsx`
 
-### Components
-1. `WizardLayout.tsx`:
-   - Header with Logo and page title.
-   - Main container with layout grid.
-2. `SetupPage.tsx`:
-   - Renders installation type selector cards (Minimal vs Advanced).
-   - Displays the `DynamicForm`.
-   - Listens to country changes to auto-fetch and set default timezone, currency, and chart of accounts template.
-   - Renders a "Complete Setup" action button with loading spinner indicator.
-   - Handles redirects after successful submission:
-     - **Minimal:** Redirect to next onboarding page `/ury/next-step` or equivalent.
-     - **Advanced:** Redirect to `/app`.
+- **Header** (centered, above card): URY Restaurant ERP logo icon (48px blue circle with X icon) + "URY Restaurant ERP" title + tagline "Let's get your restaurant ready."
+- **Step breadcrumb** (inside card top): `① Setup ————————— ② Configure`. Active step: blue filled circle + bold label. Inactive: grey outline circle + muted label. Connecting line between steps.
+- **White card**: max-width `820px`, border-radius `12px`, box-shadow `0 4px 24px rgba(0,0,0,0.08)`.
+- **Footer nav row** (inside card bottom): `Previous` ghost button left | progress dots center | `Next` / `Finish Setup` primary blue button right.
+- **Page footer** (below card, centered muted): `URY Restaurant ERP · v3.2.0` — reads `window.frappe?.boot?.versions?.ury`.
 
-### UI Mockup Design
-The custom setup wizard interface matches the URY POS styling using `@ury/ui` components:
+### 5.2 `ProgressModal.tsx`
+
+**Design reference**: screenshot provided (segmented top bar, checklist rows, blue fill progress bar at bottom).
+
+#### Layout specification
+
+```
+┌────────────────────────────────────────────────┐
+│  ▓▓▓▓▓▓▓▓░░░░  ▓▓▓▓▓▓▓▓░░░░  ▓▓▓▓▓▓▓▓░  ──── │  ← segmented top bar
+│                                                │
+│         Setting up your restaurant            │  ← title (24px, 600)
+│  This usually takes about 30 seconds.          │  ← subtitle (14px, grey)
+│  We're building everything from scratch.       │
+│                                                │
+│  ● Provisioning secure cloud instance          │  ← step row (done: green)
+│  ● Installing latest URY release               │
+│  ● Configuring database and storage            │
+│  ● Setting up domain and CDN                   │
+│  ● Running security scan                       │
+│  ● Building and deploying application          │
+│  ◉ Preparing public URL         ○             │  ← active step (blue spinner)
+│                                                │
+│  ████████████████░░░░░░░░░░░░░░░░░░░░░        │  ← blue progress bar (bottom)
+└────────────────────────────────────────────────┘
+```
+
+#### Segmented top bar
+- 5 segments, separated by narrow gaps.
+- Completed segments: `#22C55E` (green fill).
+- Active segment: `#111827` (dark/black fill, partially filled).
+- Pending segments: `#E5E7EB` (grey).
+- `border-radius: 99px` per segment, height `6px`.
+- Segments animate fill left-to-right as steps complete.
+
+#### Step list rows
+Each row: left icon (32px circle) + label text (14px, 500 weight) + optional secondary icon (right, 16px).
+
+Icon states:
+| State | Left icon | Secondary icon |
+|-------|-----------|---------------|
+| `done` | Green filled circle (`#22C55E`) + white checkmark SVG | None |
+| `active` | Blue filled circle (`#2B5CE6`) with CSS spin animation | Small grey empty circle (right side, 16px) |
+| `pending` | Grey outline circle (`#E5E7EB`) | None |
+
+Row separator: `1px solid #F3F4F6` between rows (no separator on last row).
+Row height: `48px`. Label vertically centered.
+Active label: `font-weight: 500`, `color: #111827`. Pending label: `color: #9CA3AF`.
+
+#### Bottom progress bar
+- Full-width, height `6px`, `border-radius: 99px`.
+- Track: `#E5E7EB`. Fill: `#2B5CE6`.
+- `transition: width 400ms ease` — updates based on `(completedSteps / totalSteps) * 100`.
+
+#### Modal container
+- White card, `border-radius: 16px`, `padding: 32px 40px`, `max-width: 540px`, centered on page.
+- Backdrop: `rgba(0,0,0,0.35)` blur.
+- No close button — non-dismissible while setup is running.
+
+#### Step definitions (mapped to URY context)
+```typescript
+const PROGRESS_STEPS = [
+  "Provisioning secure cloud instance",
+  "Installing latest URY release",
+  "Configuring database and storage",
+  "Setting up domain and CDN",
+  "Running security scan",
+  "Building and deploying application",
+  "Preparing public URL",
+];
+```
+
+#### Animation logic
+- Steps advance client-side every `3500ms` while `submitSetup` API call runs in parallel.
+- When the API resolves (success or error): immediately jump to final step (or stop and show error).
+- `activeIndex` increments from 0 → 6. When `activeIndex > STEPS.length - 1`: all done.
+- `completedSteps = activeIndex` (current active is not yet counted as done).
+
+Props:
+```typescript
+interface ProgressModalProps {
+  visible: boolean;
+  activeIndex: number;
+  error?: string | null;
+}
+```
+
+### 5.3 `SetupPage.tsx`
+
+**On mount** (parallel fetch per `async-parallel`):
+```typescript
+const [defaults] = await Promise.all([
+  setupService.getDefaults(),
+]);
+```
+Populate `dynamicOptions` state from response.
+If `detected_country` is present: call `handleCountryChange(detected_country)`.
+
+**`handleCountryChange(country: string)`** (memoized with `useCallback`):
+1. Call `setupService.getCountryDefaults(country)`.
+2. Update `dynamicOptions` for `timezones`, `currencies`, `charts_of_accounts`.
+3. Call `formRef.current.setFieldValue('timezone', defaults.timezone)`.
+4. Call `formRef.current.setFieldValue('currency', defaults.currency)`.
+5. Call `formRef.current.setFieldValue('chart_of_accounts', defaults.charts_of_accounts[0]?.value ?? '')`.
+
+**`handleCompanyNameChange(name: string)`** (memoized with `useCallback`):
+- Abbreviation = first letter of each word, uppercase, trimmed to 5 chars.
+- Call `formRef.current.setFieldValue('company_abbr', abbr)`.
+
+**`handleNext()`**:
+1. `formRef.current.validate()` — if `false`, stop (errors shown inline in form).
+2. `setSubmitting(true)` — shows `<ProgressModal visible activeIndex={activeIndex} />`.
+3. Start step interval: `setInterval(() => setActiveIndex(i => Math.min(i + 1, STEPS.length - 1)), 3500)`.
+4. `await setupService.submitSetup(formRef.current.getValues())` in parallel.
+5. On success: clear interval, set `activeIndex = STEPS.length` (all complete), wait `800ms`, then:
+   - `minimal` → `navigate("/configure")`
+   - `advanced` → `window.location.href = "/app"`
+6. On error: clear interval, set `submitting = false`, show toast error message.
+
+Renders:
+- `<WizardLayout step={1}>` wrapping:
+  - `<DynamicForm ref={formRef} schema={setupSchema} optionsMap={dynamicOptions} onFieldChange={...} />`
+  - `<InstallationTypeCard>` × 2
+  - `<ProgressModal>` (dynamically imported)
+
+### 5.4 `ConfigurePage.tsx`
+
+Loads items from `configure.json` (import as module, not fetched).
+
+State: `completedItems: Set<string>` — tracks which items user has visited.
+
+On "Finish Setup":
+- Call `frappe.call({ method: "frappe.client.set_value", args: { doctype: "System Settings", name: "System Settings", fieldname: "setup_complete", value: 1 } })` or rely on `setup_complete` having been set by `submit_setup`. If already set, navigate directly.
+- `window.location.href = "/app"`.
+
+### 5.5 `ConfigureItem.tsx`
+
+Row: 24px icon (muted `#6B7280`) | label (`14px 500 #111827`) + `Optional` badge (`#F0FDF4`/`#16A34A 11px`) | description (`12px #9CA3AF`) | chevron-right icon (muted).
+Completed: green checkmark circle replaces chevron.
+`hover`: row background `#F9FAFB`, cursor `pointer`.
+On click: `window.open(item.route, "_blank")` + add `item.id` to `completedItems`.
 
 ---
 
 ## Phase 6: Build Integration & E2E Validation
 
-**Goal:** Ensure the build compiles successfully and the wizard works end-to-end on `ury.local`.
+### 6.1 Build Commands (WSL)
 
-1. Compile frontend workspace: `yarn build` from `apps/ury/frontend/` or the root workspace via WSL.
-2. Verify production bundle output to `ury/www/ury.html` and assets.
-3. Test end-to-end flow:
-    - Authenticate as Administrator on `ury.local` using the password `swafa@ury`.
-    - Access `/ury` (or get redirected to `/ury` from login).
-    - Complete setup and confirm creation of Company, Fiscal Year, and default user settings on the backend.
+```bash
+cd /mnt/c/Users/swafa/Projects/Bench/ury-bench/apps/ury/frontend
+yarn install        # only if new packages added
+yarn build          # Vite build — must output zero errors
+```
+
+Verify:
+- `ury/www/ury.html` is updated.
+- Assets in `ury/public/frontend/`.
+
+```bash
+wsl --cd /mnt/c/Users/swafa/Projects/Bench/ury-bench bench restart
+```
+
+### 6.2 Verification Checklist
+
+1. Login as `Administrator` / `swafa@ury` → confirm redirect to `http://ury.local/ury`.
+2. Step 1 loads: English pre-selected, detected country auto-populated.
+3. Change country → timezone + currency + chart of accounts auto-set.
+4. Type company name → abbreviation auto-generates.
+5. Select Minimal. Click **Next** → `ProgressModal` appears.
+6. Segmented top bar animates. Steps check green sequentially. Final bar fills to 100%.
+7. Redirect to `/ury/configure`.
+8. All 6 configure items visible (Branch, URY Room, URY Table, URY Menu, Mode of Payment, User).
+9. Click **Finish Setup** → redirect to `/app`.
+10. DB check: `frappe.db.get_value('Company', company_name, 'name')` returns new company.
+11. `site_config.json` has `setup_complete: 1`.
+12. Reload `/app` — no redirect back to `/ury`.
+
+### 6.3 Tests Required
+
+| Type | Scope | Tool |
+|------|-------|------|
+| Unit | `validateFieldValue` — all 4 rule types | Vitest |
+| Unit | `setupService` — mock Frappe `call` | Vitest + msw |
+| Integration | `SetupPage` — country change cascades correctly | React Testing Library |
+| E2E | Full wizard flow on `ury.local` | Playwright |
+
+---
+
+## Complete File Manifest
+
+### New Files
+
+| Path (relative to `apps/ury/`) | Purpose |
+|---|---|
+| `ury/controllers/setup_redirect.py` | Before-request hook |
+| `ury/api/setup.py` | Backend API (3 endpoints wrapping Frappe wizard APIs) |
+| `scripts/generate_static_data.py` | One-time static JSON generator |
+| `frontend/src/data/forms/setup.json` | Step 1 form schema |
+| `frontend/src/data/forms/configure.json` | Step 2 config items |
+| `frontend/src/data/validations.json` | Validation rules |
+| `frontend/src/data/static/languages.json` | Fallback |
+| `frontend/src/data/static/timezones.json` | Fallback |
+| `frontend/src/data/static/currencies.json` | Fallback |
+| `frontend/src/data/static/countries.json` | Fallback |
+| `frontend/src/data/static/fy_start_dates.json` | Static 12-month options |
+| `frontend/src/services/setup.ts` | Frontend service wrapping Frappe wizard APIs |
+| `frontend/src/components/setup/WizardLayout.tsx` | Shared shell |
+| `frontend/src/components/setup/ProgressModal.tsx` | Animated progress overlay |
+| `frontend/src/components/setup/DynamicForm.tsx` | JSON-driven form engine |
+| `frontend/src/components/setup/FormSection.tsx` | Section grid renderer |
+| `frontend/src/components/setup/FieldRenderer.tsx` | Individual field renderer |
+| `frontend/src/components/setup/InstallationTypeCard.tsx` | Type selector card |
+| `frontend/src/components/setup/ConfigureItem.tsx` | Configure step row |
+| `frontend/src/pages/setup/SetupPage.tsx` | Step 1 controller |
+| `frontend/src/pages/setup/ConfigurePage.tsx` | Step 2 controller |
+| `packages/core/src/utils/validateField.ts` | Generic validation utility |
+
+### Modified Files
+
+| Path (relative to `apps/ury/`) | Change |
+|---|---|
+| `ury/hooks.py` | Add `before_request` + route rules |
+| `frontend/src/App.tsx` | Add setup routes + SetupGuard |
+| `packages/core/src/index.ts` | Export `validateFieldValue` |
+
+---
+
+## Open Questions (resolve before execution)
+
+1. **`frappe.boot.setup_complete`** — confirm exact key path in boot session available to frontend.
+2. **`www/ury.html`** — confirm exists and is wired in `hooks.py`. If absent, create from `pos.html` pattern.
+3. **`call` import** — confirm whether POS frontend uses `@ury/core` re-export or direct `frappe-js-sdk` import for `call`.
+4. **`setup_complete` after submit** — confirm Frappe's `setup_complete()` sets `site_config.setup_complete = 1` automatically, making the ConfigurePage "Finish Setup" button a straight `/app` redirect without a second API call.

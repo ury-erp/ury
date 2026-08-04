@@ -222,3 +222,10 @@ A POS Closing Entry must be created at the end of each day to complete the daily
   
 - **Customizable Branch Timings:**
 	- URY allows you to set varying branch timings in the URY Report settings, including extended hours. This feature ensures that your reports accurately reflect the operational hours of your restaurant.
+
+- **Custom JSON-Driven Setup Wizard:**
+	- Intercepts default Frappe/ERPNext desk setup wizard and replaces it with a unified onboarding single-page app (`/ury`).
+	- Fully schema-driven from standard JSON configurations (labels, placeholders, order, fields, select dropdown options).
+	- Integrated dynamic validation engine using validator rules defined in schemas.
+	- Connects with existing Frappe and ERPNext setup operations (company creation, localization settings, system defaults, user setups).
+	- Supports "Minimal Installation" (guided onboarding redirect) and "Advanced Installation" (direct desk redirect).

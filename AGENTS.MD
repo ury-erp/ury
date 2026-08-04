@@ -73,3 +73,8 @@ All new features and bug fixes MUST include appropriate tests. We strictly enfor
   - `frontend-design`: For aesthetic direction, typography, layout, and visual excellence.
   - `vercel-react-best-practices`: For performance optimization guidelines when writing, reviewing, or refactoring React/Next.js code.
   - `react` (json-render): When working with `@json-render/react`, building React UIs from JSON, creating component catalogs, or rendering AI-generated specs.
+
+## 9. Code Review Guidelines
+- Always use the `quality-code-review` skill to perform a comprehensive code review at the end of any task that modifies or introduces code.
+- Ensure that correctness, security, performance, concurrency, readability, API design, testing, and error observability are explicitly verified.
+

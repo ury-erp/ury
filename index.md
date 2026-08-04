@@ -4,6 +4,12 @@ This file keeps track of all jobs, initiatives, and work tracks for the URY app 
 
 ## Active Tracks
 
+- [sa-pos-validation-errors](./tracks/sa-pos-validation-errors/)
+  - Status: Active
+  - Owner: sa-user (swafaalikkal)
+  - Issue: [#249](https://github.com/ury-erp/ury/issues/249)
+  - Goal: Fix React POS v2 PaymentDialog to display actual Frappe validation errors (e.g. insufficient stock) instead of generic "There was an error" message.
+
 - [sa-create-full-documentation](./tracks/sa-create-full-documentation/)
   - Status: Active
   - Owner: sa-user (swafaalikkal)
