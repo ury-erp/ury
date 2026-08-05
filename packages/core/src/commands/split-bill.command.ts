@@ -4,6 +4,7 @@
  */
 
 import { BaseCommand, type CommandEnvelope } from './command.interface';
+import { apiRegistry } from '../api/api-registry';
 
 export interface SplitBillPayload {
   source_invoice: string;
@@ -12,7 +13,7 @@ export interface SplitBillPayload {
 }
 
 export class SplitBillCommand extends BaseCommand<SplitBillPayload> {
-  static readonly ENDPOINT = 'ury.ury.doctype.ury_order.ury_order.split_bill';
+  static readonly ENDPOINT = apiRegistry.getUrl('SPLIT_BILL');
   static readonly ACTION_NAME = 'SplitBillCommand';
 
   constructor(

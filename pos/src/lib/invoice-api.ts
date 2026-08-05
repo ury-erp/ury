@@ -1,5 +1,5 @@
 import { DOCTYPES } from '../data/doctypes';
-import { call, db } from '@ury/core';
+import { call, db, apiRegistry } from '@ury/core';
 import { OrderStatusType, OrderType } from '../data/order-types';
 import type { Filter } from 'frappe-js-sdk/lib/db/types';
 
@@ -86,9 +86,10 @@ export async function getPOSInvoices({
   try {
     // Use paid_limit as the limit for Recently Paid status
     const actualLimit = status === 'Recently Paid' && paid_limit ? paid_limit : limit;
+    const endpoint = apiRegistry.getUrl('GET_POS_INVOICE');
 
     const response = await call.get<GetPOSInvoicesResponse>(
-      'ury.ury_pos.api.getPosInvoice',
+      endpoint,
       {
         status,
         limit: actualLimit,
@@ -108,8 +109,9 @@ export async function getPOSInvoices({
 
 export async function getPOSInvoiceItems(invoiceId: string) {
   try {
+    const endpoint = apiRegistry.getUrl('GET_POS_INVOICE_ITEMS');
     const response = await call.get<GetPOSInvoiceItemsResponse>(
-      'ury.ury_pos.api.getPosInvoiceItems',
+      endpoint,
       {
         invoice: invoiceId
       }
@@ -142,7 +144,8 @@ export async function updateInvoiceStatus(
 
 export async function searchPosInvoice(query: string, status: string) {
   try {
-    const response = await call.get('ury.ury_pos.api.searchPosInvoice', {
+    const endpoint = apiRegistry.getUrl('SEARCH_POS_INVOICE');
+    const response = await call.get(endpoint, {
       query,
       status,
     });
@@ -154,8 +157,9 @@ export async function searchPosInvoice(query: string, status: string) {
 }
 
 export async function getSplitGroup(invoiceId: string): Promise<SplitGroupResponse> {
+  const endpoint = apiRegistry.getUrl('GET_SPLIT_GROUP');
   const response = await call.get<{ message: SplitGroupResponse }>(
-    'ury.ury_pos.api.get_split_group',
+    endpoint,
     { invoice: invoiceId }
   );
   return response.message;

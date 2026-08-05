@@ -1,4 +1,4 @@
-import { call, repositories } from '@ury/core';
+import { call, repositories, apiRegistry } from '@ury/core';
 
 export interface Aggregator {
   customer: string;
@@ -9,10 +9,9 @@ export interface GetAggregatorsResponse {
 }
 
 export async function getAggregators(): Promise<Aggregator[]> {
+  const endpoint = apiRegistry.getUrl('GET_AGGREGATOR');
   try {
-    const response = await call.get<GetAggregatorsResponse>(
-      'ury.ury_pos.api.getAggregator'
-    );
+    const response = await call.get<GetAggregatorsResponse>(endpoint);
     const aggregators = response.message;
 
     if (aggregators && aggregators.length > 0) {

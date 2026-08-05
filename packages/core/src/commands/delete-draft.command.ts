@@ -4,6 +4,7 @@
  */
 
 import { BaseCommand, type CommandEnvelope } from './command.interface';
+import { apiRegistry } from '../api/api-registry';
 
 export interface DeleteDraftPayload {
   invoice: string;
@@ -12,7 +13,7 @@ export interface DeleteDraftPayload {
 }
 
 export class DeleteDraftCommand extends BaseCommand<DeleteDraftPayload> {
-  static readonly ENDPOINT = 'ury.ury_pos.api.delete_draft_invoice';
+  static readonly ENDPOINT = apiRegistry.getUrl('DELETE_DRAFT_INVOICE');
   static readonly ACTION_NAME = 'DeleteDraftCommand';
 
   constructor(

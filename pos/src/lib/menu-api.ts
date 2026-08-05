@@ -1,4 +1,4 @@
-import { call, repositories } from '@ury/core';
+import { call, repositories, apiRegistry } from '@ury/core';
 
 export interface MenuItem {
   item: string;
@@ -25,9 +25,10 @@ export interface GetAggregatorMenuResponse {
 }
 
 export const getRestaurantMenu = async (posProfile: string, room: string | null, order_type: string | null) => {
+  const endpoint = apiRegistry.getUrl('GET_RESTAURANT_MENU');
   try {
     const response = await call.get<GetMenuResponse>(
-      'ury.ury_pos.api.getRestaurantMenu',
+      endpoint,
       {
         pos_profile: posProfile,
         room: room,
@@ -77,9 +78,10 @@ export const getRestaurantMenu = async (posProfile: string, room: string | null,
 };
 
 export const getAggregatorMenu = async (aggregator: string) => {
+  const endpoint = apiRegistry.getUrl('GET_AGGREGATOR_ITEM');
   try {
     const response = await call.get<GetAggregatorMenuResponse>(
-      'ury.ury_pos.api.getAggregatorItem',
+      endpoint,
       {
         aggregator
       }

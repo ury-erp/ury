@@ -1,4 +1,4 @@
-import { call, repositories } from '@ury/core';
+import { call, repositories, apiRegistry } from '@ury/core';
 
 export interface POSInvoiceItem {
   name: string;
@@ -98,13 +98,14 @@ export async function getTableOrder(table_no: string): Promise<TableOrder> {
           posting_time: new Date().toISOString().split('T')[1].substring(0, 8),
           order_type: cached.order_type,
           restaurant_table: cached.table || table_no,
+          custom_merged_tables: null,
           custom_restaurant_room: cached.room || '',
           status: cached.status,
           total: cached.grand_total,
           grand_total: cached.grand_total,
           rounded_total: cached.grand_total,
-          items: cached.items.map((i, idx) => ({
-            name: `ROW-${idx}`,
+          items: cached.items.map(i => ({
+            name: i.item,
             item_code: i.item,
             item_name: i.item_name,
             description: '',
@@ -113,7 +114,7 @@ export async function getTableOrder(table_no: string): Promise<TableOrder> {
             qty: i.qty,
             comment: i.comment || '',
             rate: i.rate,
-            amount: i.amount,
+            amount: i.amount || i.rate * i.qty,
             discount_percentage: 0,
             discount_amount: 0,
           })),
@@ -122,11 +123,14 @@ export async function getTableOrder(table_no: string): Promise<TableOrder> {
     }
     return { message: null };
   }
-} 
+}
 
-export interface SyncOrderRequest {
+export interface SyncOrderData {
   table?: string;
-  customer?: string;
+  order_type: string;
+  no_of_pax: number;
+  invoice?: string;
+  last_invoice?: string;
   items: Array<{
     item: string;
     item_name: string;
@@ -134,64 +138,58 @@ export interface SyncOrderRequest {
     qty: number;
     comment?: string;
   }>;
-  no_of_pax: number;
-  mode_of_payment?: string;
-  cashier?: string;
-  owner?: string;
   waiter?: string;
+  customer?: string;
+  cashier?: string;
   pos_profile: string;
-  invoice: string | null;
-  aggregator_id?: string | null;
-  order_type: string;
-  last_invoice: string | null;
-  comments?: string | null;
-  room?: string;
+  comments?: string;
 }
 
-export const syncOrder = async (data: SyncOrderRequest) => {
+export const syncOrder = async (data: SyncOrderData) => {
+  const endpoint = apiRegistry.getUrl('SYNC_ORDER');
   try {
-    const res = await call.post('ury.ury.doctype.ury_order.ury_order.sync_order', data);
+    const response = await call.post(endpoint, data);
+    const result = response.message;
 
-    // Save synced order into local repository
-    const totalAmount = data.items.reduce((acc, i) => acc + i.rate * i.qty, 0);
-    const orderId = data.invoice || (res as any)?.name || `ORD-${Date.now()}`;
-    await repositories.orders.put({
-      id: orderId,
-      table: data.table,
-      room: data.room,
-      order_type: data.order_type,
-      status: 'Draft',
-      no_of_pax: data.no_of_pax,
-      customer: data.customer,
-      waiter: data.waiter,
-      cashier: data.cashier,
-      pos_profile: data.pos_profile,
-      items: data.items.map(i => ({
-        item: i.item,
-        item_name: i.item_name,
-        rate: i.rate,
-        qty: i.qty,
-        amount: i.rate * i.qty,
-        comment: i.comment,
-      })),
-      grand_total: totalAmount,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      sync_status: 'synced',
-    });
+    // Cache updated order in local repository
+    if (result && result.name) {
+      const totalAmount = data.items.reduce((sum, i) => sum + i.rate * i.qty, 0);
+      await repositories.orders.put({
+        id: result.name,
+        table: data.table,
+        order_type: data.order_type,
+        status: 'Draft',
+        no_of_pax: data.no_of_pax,
+        customer: data.customer,
+        waiter: data.waiter,
+        cashier: data.cashier,
+        pos_profile: data.pos_profile,
+        items: data.items.map(i => ({
+          item: i.item,
+          item_name: i.item_name,
+          rate: i.rate,
+          qty: i.qty,
+          amount: i.rate * i.qty,
+          comment: i.comment,
+        })),
+        grand_total: totalAmount,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        sync_status: 'synced',
+      });
+    }
 
-    return res;
-  } catch (error) {
-    console.warn('Network syncOrder failed, queueing command & saving locally in orders repository:', error);
+    return result;
+  } catch (error: any) {
+    console.warn('Network syncOrder failed, storing locally in orders repository and queueing sync:', error);
 
     const tempId = data.invoice || `TEMP-ORD-${Date.now()}`;
-    const totalAmount = data.items.reduce((acc, i) => acc + i.rate * i.qty, 0);
+    const totalAmount = data.items.reduce((sum, i) => sum + i.rate * i.qty, 0);
 
-    // 1. Store order locally in IndexedDB orders repository
+    // 1. Store locally in orders repository
     await repositories.orders.put({
       id: tempId,
       table: data.table,
-      room: data.room,
       order_type: data.order_type,
       status: 'Draft',
       no_of_pax: data.no_of_pax,
@@ -217,7 +215,7 @@ export const syncOrder = async (data: SyncOrderRequest) => {
     await repositories.syncQueue.put({
       id: `SYNC-ORDER-${Date.now()}`,
       action: 'sync_order',
-      endpoint: 'ury.ury.doctype.ury_order.ury_order.sync_order',
+      endpoint: endpoint,
       payload: data as unknown as Record<string, unknown>,
       timestamp: new Date().toISOString(),
       status: 'PENDING',
@@ -247,8 +245,9 @@ export async function splitBill(
   itemsToMove: SplitBillItemMove[],
   customer?: string | null
 ): Promise<SplitBillResponse> {
+  const endpoint = apiRegistry.getUrl('SPLIT_BILL');
   try {
-    const res = await call.post('ury.ury.doctype.ury_order.ury_order.split_bill', {
+    const res = await call.post(endpoint, {
       source_invoice: sourceInvoice,
       items_to_move: itemsToMove,
       customer: customer || undefined,
@@ -259,7 +258,7 @@ export async function splitBill(
     await repositories.syncQueue.put({
       id: `SYNC-SPLIT-${Date.now()}`,
       action: 'split_bill',
-      endpoint: 'ury.ury.doctype.ury_order.ury_order.split_bill',
+      endpoint: endpoint,
       payload: { source_invoice: sourceInvoice, items_to_move: itemsToMove, customer },
       timestamp: new Date().toISOString(),
       status: 'PENDING',
@@ -278,8 +277,9 @@ export async function tableTransfer(
   newTable: string,
   invoice: string
 ): Promise<void> {
+  const endpoint = apiRegistry.getUrl('TABLE_TRANSFER');
   try {
-    await call.post('ury.ury.doctype.ury_order.ury_order.table_transfer', {
+    await call.post(endpoint, {
       table,
       newTable,
       invoice,
@@ -289,7 +289,7 @@ export async function tableTransfer(
     await repositories.syncQueue.put({
       id: `SYNC-TRANSFER-${Date.now()}`,
       action: 'table_transfer',
-      endpoint: 'ury.ury.doctype.ury_order.ury_order.table_transfer',
+      endpoint: endpoint,
       payload: { table, newTable, invoice },
       timestamp: new Date().toISOString(),
       status: 'PENDING',
@@ -304,8 +304,9 @@ export async function captainTransfer(
   newCaptain: string,
   invoice: string
 ): Promise<void> {
+  const endpoint = apiRegistry.getUrl('CAPTAIN_TRANSFER');
   try {
-    await call.post('ury.ury.doctype.ury_order.ury_order.captain_transfer', {
+    await call.post(endpoint, {
       currentCaptain,
       newCaptain,
       invoice,
@@ -315,7 +316,7 @@ export async function captainTransfer(
     await repositories.syncQueue.put({
       id: `SYNC-CAPTAIN-${Date.now()}`,
       action: 'captain_transfer',
-      endpoint: 'ury.ury.doctype.ury_order.ury_order.captain_transfer',
+      endpoint: endpoint,
       payload: { currentCaptain, newCaptain, invoice },
       timestamp: new Date().toISOString(),
       status: 'PENDING',

@@ -4,6 +4,7 @@
  */
 
 import { BaseCommand, type CommandEnvelope } from './command.interface';
+import { apiRegistry } from '../api/api-registry';
 
 export interface UpdateOrderPayload {
   invoice: string;
@@ -22,7 +23,7 @@ export interface UpdateOrderPayload {
 }
 
 export class UpdateOrderCommand extends BaseCommand<UpdateOrderPayload> {
-  static readonly ENDPOINT = 'ury.ury.doctype.ury_order.ury_order.sync_order';
+  static readonly ENDPOINT = apiRegistry.getUrl('SYNC_ORDER');
   static readonly ACTION_NAME = 'UpdateOrderCommand';
 
   constructor(

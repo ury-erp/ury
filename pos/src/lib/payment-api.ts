@@ -1,4 +1,4 @@
-import { call, repositories } from '@ury/core';
+import { call, repositories, apiRegistry } from '@ury/core';
 
 interface PaymentMode {
   mode_of_payment: string;
@@ -10,9 +10,9 @@ interface PaymentModeResponse {
 }
 
 export const getPaymentModes = async (): Promise<string[]> => {
-  // Try online API call first
+  const endpoint = apiRegistry.getUrl('GET_MODE_OF_PAYMENT');
   try {
-    const response = await call.get<PaymentModeResponse>("ury.ury_pos.api.getModeOfPayment");
+    const response = await call.get<PaymentModeResponse>(endpoint);
     const paymentModes = response.message.map((mode: PaymentMode) => mode.mode_of_payment);
 
     // Cache in IndexedDB repository

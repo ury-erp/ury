@@ -1,33 +1,33 @@
 import { DOCTYPES } from '../data/doctypes';
-import { db, call, repositories } from '@ury/core';
+import { db, call, repositories, apiRegistry } from '@ury/core';
 
 export interface Customer {
   name: string;
-  owner: string;
-  creation: string;
-  modified: string;
-  modified_by: string;
-  docstatus: number;
-  idx: number;
-  naming_series: string;
+  owner?: string;
+  creation?: string;
+  modified?: string;
+  modified_by?: string;
+  docstatus?: number;
+  idx?: number;
+  naming_series?: string;
   customer_name: string;
-  customer_type: string;
+  customer_type?: string;
   mobile_number: string;
-  customer_group: string;
-  territory: string;
-  is_internal_customer: number;
-  language: string;
-  default_commission_rate: number;
-  so_required: number;
-  dn_required: number;
-  is_frozen: number;
-  disabled: number;
-  doctype: string;
-  companies: any[];
-  credit_limits: any[];
-  accounts: any[];
-  sales_team: any[];
-  portal_users: any[];
+  customer_group?: string;
+  territory?: string;
+  is_internal_customer?: number;
+  language?: string;
+  default_commission_rate?: number;
+  so_required?: number;
+  dn_required?: number;
+  is_frozen?: number;
+  disabled?: number;
+  doctype?: string;
+  companies?: any[];
+  credit_limits?: any[];
+  accounts?: any[];
+  sales_team?: any[];
+  portal_users?: any[];
 }
 
 export interface CreateCustomerData {
@@ -78,8 +78,9 @@ export async function getCustomerTerritories() {
 export async function addCustomer(
   customerData: CreateCustomerData
 ): Promise<CreateCustomerResponse> {
+  const endpoint = apiRegistry.getUrl('CREATE_CUSTOMER');
   try {
-    const response = await call.post('ury.ury_pos.api.create_customer', customerData);
+    const response = await call.post(endpoint, customerData);
     const msg = response.message;
     if (!msg || msg.status !== "success") {
       throw new Error("Failed to create Customer, API Response error");
@@ -119,7 +120,7 @@ export async function addCustomer(
     await repositories.syncQueue.put({
       id: `SYNC-CUST-${Date.now()}`,
       action: 'create_customer',
-      endpoint: 'ury.ury_pos.api.create_customer',
+      endpoint: endpoint,
       payload: customerData as unknown as Record<string, unknown>,
       timestamp: new Date().toISOString(),
       status: 'PENDING',
@@ -139,18 +140,39 @@ export async function addCustomer(
   }
 }
 
-export async function searchCustomers(search: string, limit = 5) {
-  if (!search.trim()) return [];
-  try {
-    const response = await call.get<{ message: Customer[] }>('ury.ury_pos.api.search_customer', {
-      query: search,
-    });
-    const results = response.message || [];
+/**
+ * Searches customers using production Frappe Resource API (/api/resource/Customer)
+ * Supports:
+ * - Online search via Frappe Resource API
+ * - Offline fallback from cached IndexedDB customers
+ * - Graceful handling when customer is not cached offline (returns empty array [])
+ */
+export async function searchCustomers(search: string, limit = 5): Promise<Customer[]> {
+  const trimmed = search.trim();
+  if (!trimmed) return [];
 
-    // Cache search results in local customers repository
-    if (results.length > 0) {
+  try {
+    // Exact production Resource API query matching GET /api/resource/Customer
+    const results = await db.getDocList(DOCTYPES.CUSTOMER, {
+      fields: ['name', 'customer_name', 'mobile_number', 'customer_group', 'territory'],
+      orFilters: [
+        ['customer_name', 'like', `%${trimmed}%`],
+        ['mobile_number', 'like', `%${trimmed}%`],
+      ],
+      orderBy: {
+        field: 'customer_name',
+        order: 'asc',
+      },
+      limit: limit,
+      asDict: true,
+    }) as unknown as Customer[];
+
+    const list = results || [];
+
+    // Cache search results in local customers repository for offline access
+    if (list.length > 0) {
       await repositories.customers.putMany(
-        results.map(c => ({
+        list.map(c => ({
           id: c.name,
           name: c.customer_name || c.name,
           phone: c.mobile_number || '',
@@ -160,17 +182,26 @@ export async function searchCustomers(search: string, limit = 5) {
       );
     }
 
-    return results.slice(0, limit);
+    return list;
   } catch (error) {
-    console.warn('Network searchCustomers failed, falling back to local customers repository:', error);
-    const cached = await repositories.customers.searchByNameOrPhone(search);
-    return cached.slice(0, limit).map(c => ({
-      name: c.id,
-      customer_name: c.name,
-      mobile_number: c.phone,
-      customer_group: c.customer_group || '',
-      territory: c.territory || '',
-      doctype: 'Customer',
-    })) as unknown as Customer[];
+    console.warn('[searchCustomers] Network API call failed. Attempting offline repository fallback:', error);
+    try {
+      const cached = await repositories.customers.searchByNameOrPhone(trimmed);
+      if (cached && cached.length > 0) {
+        return cached.slice(0, limit).map(c => ({
+          name: c.id,
+          customer_name: c.name,
+          mobile_number: c.phone,
+          customer_group: c.customer_group || '',
+          territory: c.territory || '',
+          doctype: 'Customer',
+        })) as Customer[];
+      }
+    } catch (cacheErr) {
+      console.error('[searchCustomers] Error searching local IndexedDB cache:', cacheErr);
+    }
+
+    // Graceful offline fallback when customer is not cached
+    return [];
   }
 }

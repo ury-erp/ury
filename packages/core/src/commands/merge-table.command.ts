@@ -4,6 +4,7 @@
  */
 
 import { BaseCommand, type CommandEnvelope } from './command.interface';
+import { apiRegistry } from '../api/api-registry';
 
 export interface MergeTablePayload {
   anchor_table: string;
@@ -11,7 +12,7 @@ export interface MergeTablePayload {
 }
 
 export class MergeTableCommand extends BaseCommand<MergeTablePayload> {
-  static readonly ENDPOINT = 'ury.ury.doctype.ury_order.ury_order.merge_tables_batch';
+  static readonly ENDPOINT = apiRegistry.getUrl('MERGE_TABLES_BATCH');
   static readonly ACTION_NAME = 'MergeTableCommand';
 
   constructor(

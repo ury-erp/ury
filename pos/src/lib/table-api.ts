@@ -1,5 +1,5 @@
 import { DOCTYPES } from '../data/doctypes';
-import { db, repositories } from '@ury/core';
+import { db, repositories, apiRegistry, call } from '@ury/core';
 
 export interface Room {
   name: string;
@@ -21,12 +21,12 @@ export interface Table {
 }
 
 export async function getRestaurantMenu(posProfile: string, room?: string | null) {
-  const { call } = await import('@ury/core');
+  const endpoint = apiRegistry.getUrl('GET_RESTAURANT_MENU');
   const params: Record<string, string> = { pos_profile: posProfile };
   if (room) {
     params.room = room;
   }
-  const res = await call.get('ury.ury_pos.api.getRestaurantMenu', params);
+  const res = await call.get(endpoint, params);
   return res.message;
 }
 
@@ -194,9 +194,9 @@ export async function updateTableLayout(name: string, data: Partial<Table>) {
 }
 
 export async function mergeTablesBatch(anchor: string, tables: string[]) {
-  const { call } = await import('@ury/core');
+  const endpoint = apiRegistry.getUrl('MERGE_TABLES_BATCH');
   try {
-    return await call.post('ury.ury.doctype.ury_order.ury_order.merge_tables_batch', {
+    return await call.post(endpoint, {
       anchor_table: anchor,
       tables,
     });
@@ -205,7 +205,7 @@ export async function mergeTablesBatch(anchor: string, tables: string[]) {
     await repositories.syncQueue.put({
       id: `SYNC-MERGE-${Date.now()}`,
       action: 'merge_tables_batch',
-      endpoint: 'ury.ury.doctype.ury_order.ury_order.merge_tables_batch',
+      endpoint: endpoint,
       payload: { anchor_table: anchor, tables },
       timestamp: new Date().toISOString(),
       status: 'PENDING',
@@ -217,9 +217,9 @@ export async function mergeTablesBatch(anchor: string, tables: string[]) {
 }
 
 export async function unmergeTables(table: string) {
-  const { call } = await import('@ury/core');
+  const endpoint = apiRegistry.getUrl('UNMERGE_TABLES');
   try {
-    return await call.post('ury.ury.doctype.ury_order.ury_order.unmerge_tables', {
+    return await call.post(endpoint, {
       table,
     });
   } catch (error) {
@@ -227,7 +227,7 @@ export async function unmergeTables(table: string) {
     await repositories.syncQueue.put({
       id: `SYNC-UNMERGE-${Date.now()}`,
       action: 'unmerge_tables',
-      endpoint: 'ury.ury.doctype.ury_order.ury_order.unmerge_tables',
+      endpoint: endpoint,
       payload: { table },
       timestamp: new Date().toISOString(),
       status: 'PENDING',

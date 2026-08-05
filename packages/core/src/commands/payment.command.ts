@@ -4,6 +4,7 @@
  */
 
 import { BaseCommand, type CommandEnvelope } from './command.interface';
+import { apiRegistry } from '../api/api-registry';
 
 export interface PaymentPayload {
   invoice: string;
@@ -15,7 +16,7 @@ export interface PaymentPayload {
 }
 
 export class PaymentCommand extends BaseCommand<PaymentPayload> {
-  static readonly ENDPOINT = 'ury.ury_pos.api.createPaymentEntry';
+  static readonly ENDPOINT = apiRegistry.getUrl('CREATE_PAYMENT_ENTRY');
   static readonly ACTION_NAME = 'PaymentCommand';
 
   constructor(

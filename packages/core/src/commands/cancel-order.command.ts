@@ -4,6 +4,7 @@
  */
 
 import { BaseCommand, type CommandEnvelope } from './command.interface';
+import { apiRegistry } from '../api/api-registry';
 
 export interface CancelOrderPayload {
   invoice: string;
@@ -12,7 +13,7 @@ export interface CancelOrderPayload {
 }
 
 export class CancelOrderCommand extends BaseCommand<CancelOrderPayload> {
-  static readonly ENDPOINT = 'ury.ury_pos.api.cancel_order';
+  static readonly ENDPOINT = apiRegistry.getUrl('CANCEL_ORDER');
   static readonly ACTION_NAME = 'CancelOrderCommand';
 
   constructor(

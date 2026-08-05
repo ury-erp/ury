@@ -1,5 +1,5 @@
 import { DOCTYPES } from '../data/doctypes';
-import { call, db } from '@ury/core';
+import { call, db, apiRegistry } from '@ury/core';
 
 // Limited fields response
 export interface PosProfileLimited {
@@ -101,7 +101,8 @@ export interface PosProfileFullResponse {
 }
 
 export async function getPosProfileLimitedFields(): Promise<PosProfileLimited> {
-  const res = await call.get('ury.ury_pos.api.getPosProfile');
+  const endpoint = apiRegistry.getUrl('GET_POS_PROFILE');
+  const res = await call.get(endpoint);
   return res.message;
 }
 
