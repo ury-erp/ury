@@ -49,7 +49,17 @@ const OrderTypeSelect = ({ disabled }: OrderTypeSelectProps) => {
       <div className="flex gap-2 overflow-x-auto pb-2 -mx-2 px-2">
         {ORDER_TYPES.map(({ value, icon: Icon }) => {
           const isDineIn = value === DINE_IN;
-          const isDisabled = disabled || (isDineIn && isRestrictedFromTableOrders) || isUpdatingOrder;
+          
+          let isUpdatingDisabled = isUpdatingOrder;
+          if (isUpdatingOrder && posProfile?.edit_order_type) {
+            const isCurrentTypeToggleable = selectedOrderType === 'Take Away' || selectedOrderType === 'Delivery';
+            const isValueToggleable = value === 'Take Away' || value === 'Delivery';
+            if (isCurrentTypeToggleable && isValueToggleable) {
+              isUpdatingDisabled = false;
+            }
+          }
+
+          const isDisabled = disabled || (isDineIn && isRestrictedFromTableOrders) || isUpdatingDisabled;
           
           return (
             <Button
