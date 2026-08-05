@@ -6,3 +6,5 @@
 export * from './temp-id-mapper';
 export * from './backoff';
 export * from './sync.engine';
+export * from './conflict.types';
+export * from './conflict.resolver';

@@ -1,7 +1,7 @@
 /**
  * @file sync.engine.ts
  * @description SyncEngine Orchestrator. Sequentially processes command queue, respects dependency
- * chains, remaps Temp IDs to Server IDs, applies exponential backoff, and updates projections.
+ * chains, remaps Temp IDs to Server IDs, applies exponential backoff, resolves conflicts, and updates projections.
  */
 
 import { call } from '../frappe/client';
@@ -9,6 +9,7 @@ import { commandQueue, CommandQueueManager, type CommandEnvelope } from '../comm
 import { tempIDMapper, TempIDMapper } from './temp-id-mapper';
 import { calculateBackoffDelay, isMaxAttemptsReached } from './backoff';
 import { projectionBus, type ProjectionEventType } from '../projections';
+import { conflictResolver, ConflictResolver } from './conflict.resolver';
 
 export interface SyncEngineOptions {
   maxAttempts?: number;
@@ -19,16 +20,19 @@ export interface SyncEngineOptions {
 export class SyncEngine {
   private queueMgr: CommandQueueManager;
   private idMapper: TempIDMapper;
+  private resolver: ConflictResolver;
   private isSyncing = false;
   private options: SyncEngineOptions;
 
   constructor(
     customQueueMgr?: CommandQueueManager,
     customIdMapper?: TempIDMapper,
+    customResolver?: ConflictResolver,
     options?: SyncEngineOptions
   ) {
     this.queueMgr = customQueueMgr || commandQueue;
     this.idMapper = customIdMapper || tempIDMapper;
+    this.resolver = customResolver || conflictResolver;
     this.options = {
       maxAttempts: options?.maxAttempts ?? 5,
       baseBackoffMs: options?.baseBackoffMs ?? 1000,
@@ -65,7 +69,6 @@ export class SyncEngine {
           succeeded++;
         } else {
           failed++;
-          // Halt execution for dependent commands if prerequisite failed
           console.warn(`[SyncEngine] Command ${env.id} failed. Halting current sync batch.`);
           break;
         }
@@ -130,6 +133,23 @@ export class SyncEngine {
       const errorMsg = error?.message || String(error);
       console.error(`[SyncEngine] Command ${env.id} execution failed:`, errorMsg);
 
+      // Evaluate Conflict & Resolution Strategy
+      const conflictResult = await this.resolver.resolveConflict(env, error);
+      console.log(`[SyncEngine] Conflict detected: ${conflictResult.conflictCode} -> Strategy: ${conflictResult.strategy}`);
+
+      if (conflictResult.remedyAction) {
+        try {
+          await conflictResult.remedyAction();
+        } catch (remedyErr) {
+          console.error('[SyncEngine] Remedy action failed:', remedyErr);
+        }
+      }
+
+      if (conflictResult.strategy === 'IGNORE') {
+        await this.queueMgr.markCompleted(env.id);
+        return true;
+      }
+
       // Calculate backoff delay
       const backoffDelay = calculateBackoffDelay(env.retryCount + 1, {
         baseMs: this.options.baseBackoffMs,
@@ -138,7 +158,7 @@ export class SyncEngine {
 
       console.warn(`[SyncEngine] Command ${env.id} scheduled for retry in ${backoffDelay}ms.`);
 
-      await this.queueMgr.markFailed(env.id, errorMsg);
+      await this.queueMgr.markFailed(env.id, `${conflictResult.conflictCode}: ${errorMsg}`);
       return false;
     }
   }
