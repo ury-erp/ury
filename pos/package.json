@@ -33,6 +33,14 @@
     "tailwind-merge": "^3.3.1",
     "tailwindcss": "^3.4.17",
     "uuid": "^11.1.0",
+    "workbox-background-sync": "^7.4.1",
+    "workbox-broadcast-update": "^7.4.1",
+    "workbox-core": "^7.4.1",
+    "workbox-expiration": "^7.4.1",
+    "workbox-precaching": "^7.4.1",
+    "workbox-routing": "^7.4.1",
+    "workbox-strategies": "^7.4.1",
+    "workbox-window": "^7.4.1",
     "zustand": "^5.0.6"
   },
   "devDependencies": {
