@@ -5,4 +5,4 @@
 
 export * from './types';
 export * from './db';
-export * from './repositories';
+export * from './repositories/index';

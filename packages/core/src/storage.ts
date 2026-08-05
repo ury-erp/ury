@@ -19,4 +19,6 @@ export const storage = {
   removeItem: (key: string) => {
     localStorage.removeItem(key);
   }
-}; 
+};
+
+export * from './storage/index';
