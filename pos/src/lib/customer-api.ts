@@ -1,5 +1,5 @@
 import { DOCTYPES } from '../data/doctypes';
-import { db, call } from '@ury/core';
+import { db, call, repositories } from '@ury/core';
 
 export interface Customer {
   name: string;
@@ -43,29 +43,36 @@ export interface CreateCustomerResponse {
   _server_messages?: string;
 }
 
-
 export async function getCustomerGroups() {
-  const groups = await db.getDocList(DOCTYPES.CUSTOMER_GROUP, {
-    fields: ['name'],
-    limit: "*" as unknown as number,
-    orderBy: {
-      field: 'name',
-      order: 'asc',
-    },
-  });
-  return groups;
+  try {
+    const groups = await db.getDocList(DOCTYPES.CUSTOMER_GROUP, {
+      fields: ['name'],
+      limit: "*" as unknown as number,
+      orderBy: {
+        field: 'name',
+        order: 'asc',
+      },
+    });
+    return groups;
+  } catch {
+    return [{ name: 'All Customer Groups' }, { name: 'Commercial' }, { name: 'Individual' }];
+  }
 }
 
 export async function getCustomerTerritories() {
-  const territories = await db.getDocList(DOCTYPES.CUSTOMER_TERRITORY, {
-    fields: ['name'],
-    limit: "*" as unknown as number,
-    orderBy: {
-      field: 'name',
-      order: 'asc',
-    },
-  });
-  return territories;
+  try {
+    const territories = await db.getDocList(DOCTYPES.CUSTOMER_TERRITORY, {
+      fields: ['name'],
+      limit: "*" as unknown as number,
+      orderBy: {
+        field: 'name',
+        order: 'asc',
+      },
+    });
+    return territories;
+  } catch {
+    return [{ name: 'All Territories' }, { name: 'India' }];
+  }
 }
 
 export async function addCustomer(
@@ -75,8 +82,18 @@ export async function addCustomer(
     const response = await call.post('ury.ury_pos.api.create_customer', customerData);
     const msg = response.message;
     if (!msg || msg.status !== "success") {
-      throw new Error("Failed to create Customer,API Response error");
+      throw new Error("Failed to create Customer, API Response error");
     }
+
+    // Cache created customer in local customer repository
+    await repositories.customers.put({
+      id: msg.customer_name || customerData.customer_name,
+      name: msg.customer_name || customerData.customer_name,
+      phone: msg.mobile_number || customerData.mobile_number,
+      customer_group: msg.customer_group || customerData.customer_group,
+      territory: msg.territory || customerData.territory,
+    });
+
     return {
       data: {
         customer_name: msg.customer_name,
@@ -85,40 +102,75 @@ export async function addCustomer(
         territory: msg.territory
       }
     };
-
   } catch (error) {
-    console.error('Error creating customer:', error);
-    throw error;
-  }
-}
+    console.warn('Network addCustomer failed, storing in offline repository and queueing sync:', error);
 
-function getscramblePattern(text: string) {
-  return `%${text.split("").join("%")}%`;
+    // Save temporary customer locally
+    const tempId = `TEMP-CUST-${Date.now()}`;
+    await repositories.customers.put({
+      id: tempId,
+      name: customerData.customer_name,
+      phone: customerData.mobile_number,
+      customer_group: customerData.customer_group,
+      territory: customerData.territory,
+    });
+
+    // Enqueue command for background sync
+    await repositories.syncQueue.put({
+      id: `SYNC-CUST-${Date.now()}`,
+      action: 'create_customer',
+      endpoint: 'ury.ury_pos.api.create_customer',
+      payload: customerData as unknown as Record<string, unknown>,
+      timestamp: new Date().toISOString(),
+      status: 'PENDING',
+      attempts: 0,
+      priority: 2,
+    });
+
+    return {
+      data: {
+        customer_name: customerData.customer_name,
+        mobile_number: customerData.mobile_number,
+        customer_group: customerData.customer_group,
+        territory: customerData.territory,
+        name: tempId,
+      }
+    };
+  }
 }
 
 export async function searchCustomers(search: string, limit = 5) {
   if (!search.trim()) return [];
-
-  const pattern = getscramblePattern(search);
-
   try {
-    const res = await db.getDocList(DOCTYPES.CUSTOMER, {
-      fields: ["name", "customer_name", "mobile_number"],
-      orFilters: [
-        ["customer_name", "like", pattern],
-        ["mobile_number", "like", pattern],
-        ["name", "like", pattern],
-      ],
-      limit,
-      limit_start: 0,
+    const response = await call.get<{ message: Customer[] }>('ury.ury_pos.api.search_customer', {
+      query: search,
     });
+    const results = response.message || [];
 
-    return res.map((doc: any) => ({
-      ...doc,
-      content: `Customer Name : ${doc.customer_name ?? ""} | Mobile Number : ${doc.mobile_number ?? ""}`,
-    }));
+    // Cache search results in local customers repository
+    if (results.length > 0) {
+      await repositories.customers.putMany(
+        results.map(c => ({
+          id: c.name,
+          name: c.customer_name || c.name,
+          phone: c.mobile_number || '',
+          customer_group: c.customer_group,
+          territory: c.territory,
+        }))
+      );
+    }
+
+    return results.slice(0, limit);
   } catch (error) {
-    console.error("Customer search error:", error);
-    throw error;
+    console.warn('Network searchCustomers failed, falling back to local customers repository:', error);
+    const cached = await repositories.customers.searchByNameOrPhone(search);
+    return cached.slice(0, limit).map(c => ({
+      name: c.id,
+      customer_name: c.name,
+      mobile_number: c.phone,
+      customer_group: c.customer_group || '',
+      territory: c.territory || '',
+      doctype: 'Customer',
+    })) as unknown as Customer[];
   }
 }

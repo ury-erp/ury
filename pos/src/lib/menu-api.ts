@@ -1,4 +1,4 @@
-import { call } from '@ury/core';
+import { call, repositories } from '@ury/core';
 
 export interface MenuItem {
   item: string;
@@ -34,8 +34,39 @@ export const getRestaurantMenu = async (posProfile: string, room: string | null,
         order_type: order_type
       }
     );
-    return response.message.items;
+    const items = response.message.items;
+
+    // Cache into local menu repository
+    if (items && items.length > 0) {
+      await repositories.menu.putMany(
+        items.map(i => ({
+          id: i.item,
+          item_name: i.item_name,
+          rate: typeof i.rate === 'number' ? i.rate : parseFloat(i.rate) || 0,
+          category: i.course || 'General',
+          course: i.course || null,
+          special_dish: i.special_dish,
+          image: i.item_image,
+        }))
+      );
+    }
+
+    return items;
   } catch (error: any) {
+    // Offline repository fallback
+    const cachedItems = await repositories.menu.getAll();
+    if (cachedItems && cachedItems.length > 0) {
+      return cachedItems.map(c => ({
+        item: c.id,
+        item_name: c.item_name,
+        item_image: c.image || null,
+        rate: c.rate,
+        course: c.course || '',
+        course_label: c.course || '',
+        special_dish: c.special_dish,
+      }));
+    }
+
     if (error._server_messages) {
       const messages = JSON.parse(error._server_messages);
       const message = JSON.parse(messages[0]);
@@ -53,8 +84,37 @@ export const getAggregatorMenu = async (aggregator: string) => {
         aggregator
       }
     );
-    return response.message;
+    const items = response.message;
+
+    if (items && items.length > 0) {
+      await repositories.menu.putMany(
+        items.map(i => ({
+          id: i.item,
+          item_name: i.item_name,
+          rate: typeof i.rate === 'number' ? i.rate : parseFloat(i.rate) || 0,
+          category: i.course || 'General',
+          course: i.course || null,
+          special_dish: i.special_dish,
+          image: i.item_image,
+        }))
+      );
+    }
+
+    return items;
   } catch (error: any) {
+    const cachedItems = await repositories.menu.getAll();
+    if (cachedItems && cachedItems.length > 0) {
+      return cachedItems.map(c => ({
+        item: c.id,
+        item_name: c.item_name,
+        item_image: c.image || null,
+        rate: c.rate,
+        course: c.course || '',
+        course_label: c.course || '',
+        special_dish: c.special_dish,
+      }));
+    }
+
     if (error._server_messages) {
       const messages = JSON.parse(error._server_messages);
       const message = JSON.parse(messages[0]);
@@ -62,4 +122,4 @@ export const getAggregatorMenu = async (aggregator: string) => {
     }
     throw error;
   }
-}; 
+};

@@ -1,5 +1,5 @@
 import { DOCTYPES } from '../data/doctypes';
-import { db } from '@ury/core';
+import { db, repositories } from '@ury/core';
 
 export interface Room {
   name: string;
@@ -20,7 +20,6 @@ export interface Table {
   minimum_seating?: number;
 }
 
-
 export async function getRestaurantMenu(posProfile: string, room?: string | null) {
   const { call } = await import('@ury/core');
   const params: Record<string, string> = { pos_profile: posProfile };
@@ -32,13 +31,18 @@ export async function getRestaurantMenu(posProfile: string, room?: string | null
 }
 
 export async function getRooms(branch: string): Promise<Room[]> {
-  const rooms = await db.getDocList(DOCTYPES.URY_ROOM, {
-    fields: ['name', 'branch'],
-    filters: [['branch', 'like', branch]],
-    limit: "*" as unknown as number,
-    asDict: true,
-  });
-  return rooms as Room[];
+  try {
+    const rooms = await db.getDocList(DOCTYPES.URY_ROOM, {
+      fields: ['name', 'branch'],
+      filters: [['branch', 'like', branch]],
+      limit: "*" as unknown as number,
+      asDict: true,
+    });
+    return rooms as Room[];
+  } catch (error) {
+    console.warn('Network getRooms failed:', error);
+    return [];
+  }
 }
 
 export async function getTableCount(room: string, branch?: string): Promise<number> {
@@ -46,35 +50,75 @@ export async function getTableCount(room: string, branch?: string): Promise<numb
     ['restaurant_room', '=', room],
     ...(branch ? [['branch', '=', branch]] : []),
   ];
-  const rows = await db.getDocList(DOCTYPES.URY_TABLE, {
-    fields: ['count(name) as count'],
-    filters: filters as any,
-    limit: 1,
-    asDict: true,
-  }) as Array<{ count?: number | string }>;
-  const countValue = rows[0]?.count ?? 0;
-  return typeof countValue === 'number' ? countValue : Number(countValue) || 0;
+  try {
+    const rows = await db.getDocList(DOCTYPES.URY_TABLE, {
+      fields: ['count(name) as count'],
+      filters: filters as any,
+      limit: 1,
+      asDict: true,
+    }) as Array<{ count?: number | string }>;
+    const countValue = rows[0]?.count ?? 0;
+    return typeof countValue === 'number' ? countValue : Number(countValue) || 0;
+  } catch {
+    const cached = await repositories.tables.findByRoom(room);
+    return cached.length;
+  }
 }
-export async function getTables(room: string): Promise<Table[]> {
-  const tables = await db.getDocList(DOCTYPES.URY_TABLE, {
-    fields: [
-      'name',
-      'occupied',
-      'latest_invoice_time',
-      'is_take_away',
-      'restaurant_room',
-      'table_shape',
-      'merged_with',
-      'no_of_seats',
-      'layout_x',
-      'layout_y',
-      'minimum_seating'
-    ],
-    filters: [['restaurant_room', '=', room]],
-    asDict: true,
-  });
 
-  return tables as Table[];
+export async function getTables(room: string): Promise<Table[]> {
+  try {
+    const tables = await db.getDocList(DOCTYPES.URY_TABLE, {
+      fields: [
+        'name',
+        'occupied',
+        'latest_invoice_time',
+        'is_take_away',
+        'restaurant_room',
+        'table_shape',
+        'merged_with',
+        'no_of_seats',
+        'layout_x',
+        'layout_y',
+        'minimum_seating'
+      ],
+      filters: [['restaurant_room', '=', room]],
+      asDict: true,
+    }) as Table[];
+
+    // Cache tables in local repository
+    if (tables && tables.length > 0) {
+      await repositories.tables.putMany(
+        tables.map(t => ({
+          name: t.name,
+          restaurant_room: t.restaurant_room,
+          no_of_seats: t.no_of_seats || 4,
+          occupied: t.occupied || 0,
+          latest_invoice_time: t.latest_invoice_time,
+          merged_with: t.merged_with,
+          layout_x: t.layout_x,
+          layout_y: t.layout_y,
+          table_shape: t.table_shape,
+        }))
+      );
+    }
+
+    return tables;
+  } catch (error) {
+    console.warn('Network getTables failed, falling back to local tables repository:', error);
+    const cachedTables = await repositories.tables.findByRoom(room);
+    return cachedTables.map(ct => ({
+      name: ct.name,
+      occupied: ct.occupied,
+      latest_invoice_time: ct.latest_invoice_time || null,
+      is_take_away: 0,
+      restaurant_room: ct.restaurant_room,
+      table_shape: (ct.table_shape as any) || 'Square',
+      merged_with: ct.merged_with || null,
+      no_of_seats: ct.no_of_seats,
+      layout_x: ct.layout_x,
+      layout_y: ct.layout_y,
+    }));
+  }
 }
 
 const TABLE_LIST_FIELDS = [
@@ -95,45 +139,101 @@ export async function getVacantTablesForBranch(
   branch: string,
   excludeTable?: string
 ): Promise<Table[]> {
-  const filters: Array<[string, string, string | number]> = [
-    ['branch', '=', branch],
-    ['occupied', '=', 0],
-  ];
+  try {
+    const filters: Array<[string, string, string | number]> = [
+      ['branch', '=', branch],
+      ['occupied', '=', 0],
+    ];
 
-  const tables = await db.getDocList(DOCTYPES.URY_TABLE, {
-    fields: [...TABLE_LIST_FIELDS],
-    filters,
-    orderBy: { field: 'restaurant_room', order: 'asc' },
-    limit: '*' as unknown as number,
-    asDict: true,
-  } as unknown as Parameters<typeof db.getDocList>[1]);
+    const tables = await db.getDocList(DOCTYPES.URY_TABLE, {
+      fields: [...TABLE_LIST_FIELDS],
+      filters,
+      orderBy: { field: 'restaurant_room', order: 'asc' },
+      limit: '*' as unknown as number,
+      asDict: true,
+    } as unknown as Parameters<typeof db.getDocList>[1]);
 
-  const rows = tables as Table[];
-  const vacant = excludeTable ? rows.filter((table) => table.name !== excludeTable) : rows;
+    const rows = tables as Table[];
+    const vacant = excludeTable ? rows.filter((table) => table.name !== excludeTable) : rows;
 
-  return vacant.sort(
-    (a, b) =>
-      a.restaurant_room.localeCompare(b.restaurant_room) || a.name.localeCompare(b.name)
-  );
+    return vacant.sort(
+      (a, b) =>
+        a.restaurant_room.localeCompare(b.restaurant_room) || a.name.localeCompare(b.name)
+    );
+  } catch {
+    const cached = await repositories.tables.getAll();
+    const vacant = cached.filter(t => t.occupied === 0 && (!excludeTable || t.name !== excludeTable));
+    return vacant.map(ct => ({
+      name: ct.name,
+      occupied: ct.occupied,
+      latest_invoice_time: ct.latest_invoice_time || null,
+      is_take_away: 0,
+      restaurant_room: ct.restaurant_room,
+      table_shape: (ct.table_shape as any) || 'Square',
+      merged_with: ct.merged_with || null,
+      no_of_seats: ct.no_of_seats,
+      layout_x: ct.layout_x,
+      layout_y: ct.layout_y,
+    }));
+  }
 }
 
-
 export async function updateTableLayout(name: string, data: Partial<Table>) {
-  return db.updateDoc(DOCTYPES.URY_TABLE, name, data);
+  try {
+    await db.updateDoc(DOCTYPES.URY_TABLE, name, data);
+  } catch (err) {
+    console.warn('Network updateTableLayout failed:', err);
+  }
+  const existing = await repositories.tables.getById(name);
+  if (existing) {
+    await repositories.tables.put({
+      ...existing,
+      ...data,
+    } as any);
+  }
 }
 
 export async function mergeTablesBatch(anchor: string, tables: string[]) {
   const { call } = await import('@ury/core');
-  return call.post('ury.ury.doctype.ury_order.ury_order.merge_tables_batch', {
-    anchor_table: anchor,
-    tables,
-  });
+  try {
+    return await call.post('ury.ury.doctype.ury_order.ury_order.merge_tables_batch', {
+      anchor_table: anchor,
+      tables,
+    });
+  } catch (error) {
+    console.warn('Network mergeTablesBatch failed, queuing offline sync command:', error);
+    await repositories.syncQueue.put({
+      id: `SYNC-MERGE-${Date.now()}`,
+      action: 'merge_tables_batch',
+      endpoint: 'ury.ury.doctype.ury_order.ury_order.merge_tables_batch',
+      payload: { anchor_table: anchor, tables },
+      timestamp: new Date().toISOString(),
+      status: 'PENDING',
+      attempts: 0,
+      priority: 1,
+    });
+    return { status: 'Queued Offline' };
+  }
 }
 
 export async function unmergeTables(table: string) {
   const { call } = await import('@ury/core');
-  return call.post('ury.ury.doctype.ury_order.ury_order.unmerge_tables', {
-    table,
-  });
+  try {
+    return await call.post('ury.ury.doctype.ury_order.ury_order.unmerge_tables', {
+      table,
+    });
+  } catch (error) {
+    console.warn('Network unmergeTables failed, queuing offline sync command:', error);
+    await repositories.syncQueue.put({
+      id: `SYNC-UNMERGE-${Date.now()}`,
+      action: 'unmerge_tables',
+      endpoint: 'ury.ury.doctype.ury_order.ury_order.unmerge_tables',
+      payload: { table },
+      timestamp: new Date().toISOString(),
+      status: 'PENDING',
+      attempts: 0,
+      priority: 1,
+    });
+    return { status: 'Queued Offline' };
+  }
 }
-
