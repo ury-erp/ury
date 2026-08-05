@@ -64,10 +64,24 @@ def network_printing(
             )
 
             if restaurant_table and invoice_printed == 0:
-                frappe.db.set_value("POS Invoice", name, "invoice_printed", 1)
+                frappe.db.set_value(
+                    "POS Invoice",
+                    name,
+                    {
+                        "invoice_printed": 1,
+                        "custom_printing_time":frappe.utils.now_datetime()
+                    }
+                )
                 release_merge_cluster_tables(restaurant_table)
             else:
-                frappe.db.set_value("POS Invoice", name, "invoice_printed", 1)
+                frappe.db.set_value(
+                    "POS Invoice",
+                    name,
+                    {
+                        "invoice_printed": 1,
+                        "custom_printing_time":frappe.utils.now_datetime()
+                    }
+                )
 
             return "Success"
         except Exception as e:
@@ -122,7 +136,13 @@ def qz_print_update(invoice):
         if table == None or table == "":
             # Update invoice_printed
             frappe.db.set_value(
-                "POS Invoice", invoice, "invoice_printed", 1, update_modified=False
+                "POS Invoice",
+                invoice,
+                {
+                    "invoice_printed": 1,
+                    "custom_printing_time":frappe.utils.now_datetime()
+                },
+                update_modified=False
             )
             
             # Validate the update
@@ -135,7 +155,13 @@ def qz_print_update(invoice):
             if invoice_printed == 0:
                 # Update invoice_printed
                 frappe.db.set_value(
-                    "POS Invoice", invoice, "invoice_printed", 1, update_modified=False
+                    "POS Invoice",
+                    invoice,
+                    {
+                        "invoice_printed": 1,
+                        "custom_printing_time":frappe.utils.now_datetime()
+                    }, 
+                    update_modified=False
                 )
 
                 release_merge_cluster_tables(table)
@@ -167,7 +193,14 @@ def print_pos_page(doctype, name, print_format):
     invoice_printed = frappe.db.get_value("POS Invoice", name, "invoice_printed")
 
     if invoice_printed == 0:
-        frappe.db.set_value("POS Invoice", name, "invoice_printed", 1)
+        frappe.db.set_value(
+            "POS Invoice",
+            name,
+            {
+                "invoice_printed": 1,
+                "custom_printing_time":frappe.utils.now_datetime()
+            }   
+        )
 
         if restaurant_table:
             release_merge_cluster_tables(restaurant_table)

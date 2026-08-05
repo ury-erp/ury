@@ -372,6 +372,9 @@ fixtures = [
                     "POS Profile-custom_reprint_kot_format",
                     "Employee-payment_amount",
                     "Employee-payment_type",
+                    "POS Invoice-custom_printing_time",
+                    "POS Profile-custom_invoice_warning_time"
+                    "Employee-payment_type",
                     "Branch-custom_branch_settings_section",
                     "Branch-custom_reset_order_number_daily",
                     "Branch-custom_order_counter",

@@ -47,6 +47,46 @@ function isSplitBill(order: Pick<POSInvoice, 'split_total' | 'custom_split_group
     !!order.custom_split_group ||
     !!order.custom_split_from
   );
+
+function parsePrintTime(timeStr?: string | null, postingDate?: string): number {
+  if (!timeStr) return NaN;
+  
+  // If timeStr only contains time, prepend the posting date
+  const fullStr = timeStr.includes('-') ? timeStr : `${postingDate} ${timeStr}`;
+  
+  // Strip microseconds and format as ISO 8601 (YYYY-MM-DDTHH:mm:ss)
+  const isoStr = fullStr.split('.')[0].replace(' ', 'T');
+  return new Date(isoStr).getTime();
+}
+
+function isInvoiceLimitExceeded(
+  order: POSInvoice,
+  custom_invoice_warning_time?: number
+): boolean {
+  const warningTime = Number(custom_invoice_warning_time);
+  if (!warningTime || warningTime <= 0 || Number(order.invoice_printed) !== 1) return false;
+  if (order.status !== 'Draft' && order.status !== 'Unbilled') return false;
+
+  const printTime = parsePrintTime(order.custom_printing_time || order.posting_time, order.posting_date);
+  if (isNaN(printTime)) return false;
+
+  return (Date.now() - printTime) / 60000 >= warningTime;
+}
+
+function getElapsedTimeFormatted(
+  printingTimeStr?: string | null,
+  postingDate?: string,
+  postingTime?: string
+): string {
+  const printTime = parsePrintTime(printingTimeStr || postingTime, postingDate);
+  if (isNaN(printTime)) return '';
+  
+  const elapsedMs = Math.max(0, Date.now() - printTime);
+  const totalMinutes = Math.floor(elapsedMs / 60000);
+  const hours = Math.floor(totalMinutes / 60);
+  const mins = totalMinutes % 60;
+  
+  return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
 }
 
 export default function Orders() {
@@ -122,8 +162,25 @@ export default function Orders() {
   }, [selectedOrder?.name]);
 
   useEffect(() => {
+    if (!posStore.posProfile) {
+      posStore.fetchPosProfile();
+    }
     fetchOrders();
-  }, [fetchOrders]);
+  }, [fetchOrders, posStore.posProfile]);
+
+  const getWarningTime = () => {
+    if (posStore.posProfile?.custom_invoice_warning_time !== undefined) {
+      return posStore.posProfile.custom_invoice_warning_time;
+    }
+    try {
+      const cached = sessionStorage.getItem('posProfile');
+      if (cached) {
+        const p = JSON.parse(cached);
+        return p.custom_invoice_warning_time;
+      }
+    } catch (e) {}
+    return undefined;
+  };
 
   useEffect(() => {
     if (!mounted.current) {
@@ -247,9 +304,10 @@ export default function Orders() {
         printFormat: resolvePrintFormat(selectedOrder, posStore.posProfile.print_format),
       });
       showToast.success(t('success.printed'));
-      // Locally update selectedOrder.invoice_printed to 1
+      // Locally update selectedOrder.invoice_printed to 1 and custom_printing_time to now
       if (selectedOrder && typeof selectedOrder === 'object') {
-        selectOrder({ ...selectedOrder, invoice_printed: 1 });
+        const nowStr = new Date().toISOString().replace('T', ' ').substring(0, 19);
+        selectOrder({ ...selectedOrder, invoice_printed: 1, custom_printing_time: nowStr });
       }
       // If order was Unbilled, set to Draft and reload draft orders
       if (selectedStatus === 'Unbilled') {
@@ -404,6 +462,14 @@ export default function Orders() {
                 const cardTotal = mergedBill
                   ? order.rounded_total + Math.round(order.custom_merged_total ?? 0)
                   : order.rounded_total;
+                const limitExceeded = isInvoiceLimitExceeded(
+                  order,
+                  getWarningTime()
+                );
+                const isPrinted = Number(order.invoice_printed) === 1;
+                const elapsedTimeText = isPrinted
+                  ? getElapsedTimeFormatted(order.custom_printing_time, order.posting_date, order.posting_time)
+                  : '';
 
                 return (
                 <Card 
@@ -454,8 +520,12 @@ export default function Orders() {
                         </p>
                       </div>
                       <div className="flex shrink-0 items-center gap-1">
-                        <Badge variant={getBadgeVariant(order.status)}>
+                        <Badge 
+                          variant={limitExceeded ? 'outline' : getBadgeVariant(order.status)} 
+                          className={`ms-2 ${limitExceeded ? 'border-red-500 text-red-600 bg-red-50' : ''}`}
+                        >
                           {t(`order_status_types.${order.status.toLowerCase().replace(/ /g, '_')}`)}
+                          {isPrinted && elapsedTimeText ? ` ${elapsedTimeText}` : ''}
                         </Badge>
                       </div>
                     </div>

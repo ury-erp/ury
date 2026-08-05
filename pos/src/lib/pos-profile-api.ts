@@ -22,6 +22,7 @@ export interface PosProfileLimited {
   owner?: string;
   edit_order_type?: number;
   enable_kot_reprint?: number;
+  custom_invoice_warning_time?: number;
 }
 
 export interface PosProfileLimitedResponse {
@@ -87,6 +88,7 @@ export interface PosProfileCombined extends PosProfileFull {
   view_all_status?: number;
   custom_daily_pos_close?: number;
   enable_kot_reprint?: number;
+  custom_invoice_warning_time?: number;
 }
 
 export interface Currency {
@@ -138,6 +140,7 @@ export async function getCombinedPosProfile(): Promise<PosProfileCombined> {
     multiple_cashier: limitedProfile.multiple_cashier || 0,
     edit_order_type: limitedProfile.edit_order_type,
     enable_kot_reprint: limitedProfile.enable_kot_reprint,
+    custom_invoice_warning_time: limitedProfile.custom_invoice_warning_time ?? (fullProfile as any).custom_invoice_warning_time,
   };
 
   return combinedProfile;
