@@ -47,6 +47,7 @@ function isSplitBill(order: Pick<POSInvoice, 'split_total' | 'custom_split_group
     !!order.custom_split_group ||
     !!order.custom_split_from
   );
+}
 
 function parsePrintTime(timeStr?: string | null, postingDate?: string): number {
   if (!timeStr) return NaN;
