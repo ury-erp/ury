@@ -42,7 +42,7 @@ export const createAuthSlice: StateCreator<AuthSlice> = (set, _get) => ({
       }
 
       // Get user roles
-      const roles = await getUserRoles(response);
+      const roles = await getUserRoles();
 
       set({
         user: {
