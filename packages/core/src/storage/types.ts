@@ -109,10 +109,16 @@ export interface CustomerEntity {
   name: string;
   /** Mobile phone number */
   phone: string;
+  /** Customer Name explicit field */
+  customer_name?: string;
+  /** Mobile Number explicit field */
+  mobile_number?: string;
   /** Customer Group reference */
   customer_group?: string;
   /** Territory reference */
   territory?: string;
+  /** Content formatted string */
+  content?: string;
 }
 
 /**

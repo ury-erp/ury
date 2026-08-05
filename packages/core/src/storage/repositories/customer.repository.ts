@@ -26,8 +26,11 @@ export class CustomerRepository
     return this.table
       .filter(
         c =>
-          c.name.toLowerCase().includes(q) ||
-          c.phone.toLowerCase().includes(q)
+          Boolean(c.id && c.id.toLowerCase().includes(q)) ||
+          Boolean(c.name && c.name.toLowerCase().includes(q)) ||
+          Boolean(c.customer_name && c.customer_name.toLowerCase().includes(q)) ||
+          Boolean(c.phone && c.phone.toLowerCase().includes(q)) ||
+          Boolean(c.mobile_number && c.mobile_number.toLowerCase().includes(q))
       )
       .toArray();
   }

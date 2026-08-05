@@ -28,6 +28,7 @@ export interface Customer {
   accounts?: any[];
   sales_team?: any[];
   portal_users?: any[];
+  content?: string;
 }
 
 export interface CreateCustomerData {
@@ -86,19 +87,25 @@ export async function addCustomer(
       throw new Error("Failed to create Customer, API Response error");
     }
 
+    const custName = msg.customer_name || customerData.customer_name;
+    const phoneNum = msg.mobile_number || customerData.mobile_number;
+
     // Cache created customer in local customer repository
     await repositories.customers.put({
-      id: msg.customer_name || customerData.customer_name,
-      name: msg.customer_name || customerData.customer_name,
-      phone: msg.mobile_number || customerData.mobile_number,
+      id: custName,
+      name: custName,
+      phone: phoneNum,
+      customer_name: custName,
+      mobile_number: phoneNum,
       customer_group: msg.customer_group || customerData.customer_group,
       territory: msg.territory || customerData.territory,
+      content: `Customer Name : ${custName} | Mobile Number : ${phoneNum}`,
     });
 
     return {
       data: {
-        customer_name: msg.customer_name,
-        mobile_number: msg.mobile_number,
+        customer_name: custName,
+        mobile_number: phoneNum,
         customer_group: msg.customer_group,
         territory: msg.territory
       }
@@ -108,12 +115,18 @@ export async function addCustomer(
 
     // Save temporary customer locally
     const tempId = `TEMP-CUST-${Date.now()}`;
+    const custName = customerData.customer_name;
+    const phoneNum = customerData.mobile_number;
+
     await repositories.customers.put({
       id: tempId,
-      name: customerData.customer_name,
-      phone: customerData.mobile_number,
+      name: custName,
+      phone: phoneNum,
+      customer_name: custName,
+      mobile_number: phoneNum,
       customer_group: customerData.customer_group,
       territory: customerData.territory,
+      content: `Customer Name : ${custName} | Mobile Number : ${phoneNum}`,
     });
 
     // Enqueue command for background sync
@@ -130,8 +143,8 @@ export async function addCustomer(
 
     return {
       data: {
-        customer_name: customerData.customer_name,
-        mobile_number: customerData.mobile_number,
+        customer_name: custName,
+        mobile_number: phoneNum,
         customer_group: customerData.customer_group,
         territory: customerData.territory,
         name: tempId,
@@ -140,32 +153,37 @@ export async function addCustomer(
   }
 }
 
+function getscramblePattern(text: string) {
+  return `%${text.split("").join("%")}%`;
+}
+
 /**
  * Searches customers using production Frappe Resource API (/api/resource/Customer)
  * Supports:
- * - Online search via Frappe Resource API
+ * - Online search via Frappe Resource API (matching develop branch pattern)
  * - Offline fallback from cached IndexedDB customers
+ * - Identical return shape with name, customer_name, mobile_number, customer_group, territory, content
  * - Graceful handling when customer is not cached offline (returns empty array [])
  */
 export async function searchCustomers(search: string, limit = 5): Promise<Customer[]> {
   const trimmed = search.trim();
   if (!trimmed) return [];
 
+  const pattern = getscramblePattern(trimmed);
+
   try {
-    // Exact production Resource API query matching GET /api/resource/Customer
+    // Exact production Resource API query matching develop branch GET /api/resource/Customer
     const results = await db.getDocList(DOCTYPES.CUSTOMER, {
       fields: ['name', 'customer_name', 'mobile_number', 'customer_group', 'territory'],
       orFilters: [
-        ['customer_name', 'like', `%${trimmed}%`],
-        ['mobile_number', 'like', `%${trimmed}%`],
+        ['customer_name', 'like', pattern],
+        ['mobile_number', 'like', pattern],
+        ['name', 'like', pattern],
       ],
-      orderBy: {
-        field: 'customer_name',
-        order: 'asc',
-      },
       limit: limit,
+      limit_start: 0,
       asDict: true,
-    }) as unknown as Customer[];
+    }) as any[];
 
     const list = results || [];
 
@@ -176,13 +194,24 @@ export async function searchCustomers(search: string, limit = 5): Promise<Custom
           id: c.name,
           name: c.customer_name || c.name,
           phone: c.mobile_number || '',
-          customer_group: c.customer_group,
-          territory: c.territory,
+          customer_name: c.customer_name || c.name,
+          mobile_number: c.mobile_number || '',
+          customer_group: c.customer_group || '',
+          territory: c.territory || '',
+          content: `Customer Name : ${c.customer_name ?? c.name ?? ""} | Mobile Number : ${c.mobile_number ?? ""}`,
         }))
       );
     }
 
-    return list;
+    return list.map((doc: any) => ({
+      name: doc.name,
+      customer_name: doc.customer_name ?? doc.name ?? '',
+      mobile_number: doc.mobile_number ?? '',
+      customer_group: doc.customer_group ?? '',
+      territory: doc.territory ?? '',
+      content: `Customer Name : ${doc.customer_name ?? doc.name ?? ""} | Mobile Number : ${doc.mobile_number ?? ""}`,
+      doctype: 'Customer',
+    })) as Customer[];
   } catch (error) {
     console.warn('[searchCustomers] Network API call failed. Attempting offline repository fallback:', error);
     try {
@@ -190,10 +219,11 @@ export async function searchCustomers(search: string, limit = 5): Promise<Custom
       if (cached && cached.length > 0) {
         return cached.slice(0, limit).map(c => ({
           name: c.id,
-          customer_name: c.name,
-          mobile_number: c.phone,
+          customer_name: c.customer_name || c.name || c.id,
+          mobile_number: c.mobile_number || c.phone || '',
           customer_group: c.customer_group || '',
           territory: c.territory || '',
+          content: c.content || `Customer Name : ${c.customer_name || c.name || c.id} | Mobile Number : ${c.mobile_number || c.phone || ""}`,
           doctype: 'Customer',
         })) as Customer[];
       }

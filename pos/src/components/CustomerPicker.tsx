@@ -187,11 +187,22 @@ export function CustomerPicker({ value, onChange, disabled }: CustomerPickerProp
     return () => clearTimeout(handler);
   }, [searchTerm, isOpen]);
 
-  const parseCustomer = (customer: { name: string; content?: string }): Customer => ({
-    id: customer.name,
-    name: customer.content?.match(/Customer Name : ([^|]+)/)?.[1]?.trim() || customer.name,
-    phone: customer.content?.match(/Mobile Number : ([^|]+)/)?.[1]?.trim() || '',
-  });
+  const parseCustomer = (customer: {
+    name: string;
+    customer_name?: string;
+    mobile_number?: string;
+    phone?: string;
+    content?: string;
+  }): Customer => {
+    const nameFromContent = customer.content?.match(/Customer Name : ([^|]+)/)?.[1]?.trim();
+    const phoneFromContent = customer.content?.match(/Mobile Number : ([^|]+)/)?.[1]?.trim();
+
+    return {
+      id: customer.name,
+      name: nameFromContent || customer.customer_name || customer.name,
+      phone: phoneFromContent || customer.mobile_number || customer.phone || '',
+    };
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (!isOpen && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
