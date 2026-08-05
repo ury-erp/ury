@@ -15,8 +15,10 @@ import { usePOSStore } from '../store/pos-store';
 import type { RootState } from '../store/root-store';
 import { logout } from '@ury/core';
 import { showToast } from '@ury/ui';
+import { OfflineStatusWidget } from './OfflineStatusWidget';
 
 const Header = () => {
+
   const [showUserMenu, setShowUserMenu] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const user = useRootStore((state: RootState) => state.user);
@@ -134,7 +136,9 @@ const Header = () => {
 
         {/* Right side actions */}
         <div className="flex items-center gap-4">
+          <OfflineStatusWidget />
           {/* User menu */}
+
           <div className="relative" ref={userMenuRef}>
             <Button
               onClick={handleUserMenuToggle}
