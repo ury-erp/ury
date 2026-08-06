@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import 'fake-indexeddb/auto';
 import { call, repositories, tempIDMapper } from '@ury/core';
 import { getPOSInvoices, getOrderForEdit } from '../invoice-api';
+import { printOrder } from '../print';
 
 const baseOrder = {
   order_type: 'Dine-In',
@@ -277,5 +278,135 @@ test('Scenario 7: Multiple Orders statuses and order types match backend', async
     assert.ok(!paidResult.invoices.some(inv => inv.name === 'POS-INV-POS-SC7-003'));
   } finally {
     (call as any).get = originalGet;
+  }
+});
+
+// ============================================================================
+// Task 3: Table Print Redirect & Offline Print Queue
+// ============================================================================
+
+function setNavigatorOnline(online: boolean) {
+  Object.defineProperty(globalThis, 'navigator', {
+    value: { onLine: online },
+    configurable: true,
+    writable: true,
+  });
+}
+
+function setWindowMock() {
+  Object.defineProperty(globalThis, 'window', {
+    value: { open: () => undefined },
+    configurable: true,
+    writable: true,
+  });
+}
+
+const socketPosProfile = {
+  print_type: 'socket',
+  print_format: 'Standard POS Invoice',
+  name: 'Test POS Profile',
+  cashier: 'cashier@example.com',
+  multiple_cashier: 0,
+} as any;
+
+test('printOrder returns queued and updates local state when navigator is offline', async () => {
+  const tempId = 'TEMP-ORD-PRINT-ORDER-001';
+
+  await repositories.orders.put({
+    ...baseOrder,
+    id: tempId,
+    status: 'Unbilled',
+    invoice_printed: 0,
+    sync_status: 'pending',
+  });
+
+  setNavigatorOnline(false);
+  setWindowMock();
+
+  const originalPost = call.post;
+  (call as any).post = async () => {
+    throw new Error('should not be called while offline');
+  };
+
+  try {
+    const result = await printOrder({ orderId: tempId, posProfile: socketPosProfile });
+
+    assert.equal(result.success, true);
+    assert.equal(result.status, 'queued');
+
+    const queued = await repositories.syncQueue.getById(`QZ-PRINT-${tempId}`);
+    assert.ok(queued, 'QZ_PRINT_UPDATE command should be queued');
+    assert.equal(queued?.action, 'qz_print_update');
+    assert.deepEqual(queued?.dependency_ids, [`SYNC-ORDER-${tempId}`]);
+
+    const local = await repositories.orders.getById(tempId);
+    assert.equal(local?.status, 'Draft');
+    assert.equal(local?.invoice_printed, 1);
+  } finally {
+    (call as any).post = originalPost;
+    setNavigatorOnline(true);
+  }
+});
+
+test('printOrder returns printed when online updatePrintStatus succeeds', async () => {
+  const serverId = 'POS-INV-PRINT-ORDER-002';
+
+  await repositories.orders.put({
+    ...baseOrder,
+    id: serverId,
+    status: 'Unbilled',
+    invoice_printed: 0,
+    sync_status: 'synced',
+  });
+
+  setNavigatorOnline(true);
+  setWindowMock();
+
+  const originalPost = call.post;
+  (call as any).post = async () => ({ message: { status: 'Draft' } });
+
+  try {
+    const result = await printOrder({ orderId: serverId, posProfile: socketPosProfile });
+
+    assert.equal(result.success, true);
+    assert.equal(result.status, 'printed');
+
+    const queued = await repositories.syncQueue.getById(`QZ-PRINT-${serverId}`);
+    assert.equal(queued, undefined);
+  } finally {
+    (call as any).post = originalPost;
+  }
+});
+
+test('printOrder returns queued and updates local state when online call fails', async () => {
+  const tempId = 'TEMP-ORD-PRINT-ORDER-003';
+
+  await repositories.orders.put({
+    ...baseOrder,
+    id: tempId,
+    status: 'Unbilled',
+    invoice_printed: 0,
+    sync_status: 'pending',
+  });
+
+  setNavigatorOnline(true);
+  setWindowMock();
+
+  const originalPost = call.post;
+  (call as any).post = async () => {
+    throw new Error('Server unreachable');
+  };
+
+  try {
+    const result = await printOrder({ orderId: tempId, posProfile: socketPosProfile });
+
+    assert.equal(result.success, true);
+    assert.equal(result.status, 'queued');
+
+    const local = await repositories.orders.getById(tempId);
+    assert.equal(local?.status, 'Draft');
+    assert.equal(local?.invoice_printed, 1);
+  } finally {
+    (call as any).post = originalPost;
   }
 });

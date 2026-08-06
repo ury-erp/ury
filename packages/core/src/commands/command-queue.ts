@@ -325,7 +325,11 @@ export class CommandQueueManager {
     const paymentCmds = all.filter(e =>
       e.status === 'PENDING' &&
       (e.action === 'make_invoice' || e.action === 'PaymentCommand' || e.operation_type === 'PAY_ORDER') &&
-      ((e.payload as any)?.invoice === tempId || e.temporary_id === tempId)
+      (
+        (e.payload as any)?.invoice === tempId ||
+        e.temporary_id === tempId ||
+        e.entity_id === tempId
+      )
     );
 
     return paymentCmds.map(entity => {

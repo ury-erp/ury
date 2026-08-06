@@ -219,11 +219,17 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
           dependencies.push(`SYNC-ORDER-${invoice}`);
         }
 
-        // Store payment with idempotency_key in payload for backend deduplication
+        // Store payment with idempotency_key in payload for backend deduplication.
+        // Also attach sync metadata to the envelope root so the sync engine and
+        // command queue can identify the parent temp order and resolve dependencies.
         const queuePayload = {
           ...paymentPayload,
           idempotency_key: paymentIdempotencyKey,
         };
+
+        const dependencyIds = dependencies.length > 0 ? dependencies : (
+          invoice && invoice.startsWith('TEMP-') ? [`SYNC-ORDER-${invoice}`] : []
+        );
 
         await repositories.syncQueue.put({
           id: cmdId,
@@ -235,6 +241,9 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
           attempts: 0,
           priority: 1,
           dependencies,
+          dependency_ids: dependencyIds,
+          temporary_id: invoice && invoice.startsWith('TEMP-') ? invoice : null,
+          entity_id: invoice || null,
         } as any);
 
         // Mark order as Paid in IndexedDB immediately so the UI reflects payment status

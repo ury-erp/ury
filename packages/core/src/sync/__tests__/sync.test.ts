@@ -718,6 +718,71 @@ test('Scenario 6: Restart Browser -> IndexedDB state remains correct', async () 
   }
 });
 
+test('12. SyncEngine — Payment command matched by entity_id is patched and dependencies cleared', async () => {
+  const TEMP_ID = 'TEMP-ORD-ENTITY-ID-001';
+  const SERVER_ID = 'POS-INV-2026-ENTITY-001';
+
+  // Seed parent sync_order command
+  await repos.syncQueue.put({
+    id: `SYNC-ORDER-${TEMP_ID}`,
+    action: 'sync_order',
+    endpoint: 'ury.ury.doctype.ury_order.ury_order.sync_order',
+    payload: { temp_id: TEMP_ID, items: [] },
+    timestamp: new Date().toISOString(),
+    status: 'PENDING',
+    priority: 1,
+  });
+
+  // Seed a make_invoice command whose payload.invoice is the temp ID but that
+  // also carries entity_id / temporary_id envelope metadata (as PaymentDialog
+  // now writes). It has a hard dependency on the parent sync_order.
+  await repos.syncQueue.put({
+    id: `SYNC-PAYMENT-${TEMP_ID}`,
+    action: 'make_invoice',
+    endpoint: 'ury.ury.doctype.ury_order.ury_order.make_invoice',
+    payload: {
+      invoice: TEMP_ID,
+      payments: [{ mode_of_payment: 'Cash', amount: 500 }],
+    },
+    temporary_id: TEMP_ID,
+    entity_id: TEMP_ID,
+    dependency_ids: [`SYNC-ORDER-${TEMP_ID}`],
+    dependencies: [`SYNC-ORDER-${TEMP_ID}`],
+    timestamp: new Date().toISOString(),
+    status: 'PENDING',
+    priority: 1,
+  });
+
+  const originalPost = call.post;
+  const postedEndpoints: string[] = [];
+  (call as any).post = async (endpoint: string, payload: any) => {
+    postedEndpoints.push(endpoint);
+    if (endpoint.includes('sync_order')) {
+      return { name: SERVER_ID, status: 'Draft' };
+    }
+    if (endpoint.includes('make_invoice')) {
+      assert.equal(payload.invoice, SERVER_ID, 'make_invoice must be called with server ID after patch');
+      return { name: SERVER_ID };
+    }
+    return {};
+  };
+
+  try {
+    const engine = new SyncEngine(queueMgr, idMapper, undefined, { repositories: repos });
+    const result = await engine.triggerSync();
+
+    assert.equal(result.processed, 2, 'Both sync_order and make_invoice should process');
+    assert.equal(result.succeeded, 2, 'Both commands should succeed');
+    assert.ok(postedEndpoints.some(e => e.includes('sync_order')));
+    assert.ok(postedEndpoints.some(e => e.includes('make_invoice')));
+
+    const remaining = await repos.syncQueue.getAll();
+    assert.equal(remaining.length, 0, 'Completed commands should be purged');
+  } finally {
+    (call as any).post = originalPost;
+  }
+});
+
 test('Scenario 7: Multiple Orders statuses and order types match backend', async () => {
   const orders = [
     { tempId: 'TEMP-ORD-SC7-001', serverId: 'POS-INV-2026-SC7-001', status: 'Draft', order_type: 'Dine-In', table: 'T-01' },

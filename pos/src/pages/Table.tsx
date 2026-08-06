@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Layout, Square } from 'lucide-react';
 import { usePOSStore } from '../store/pos-store';
 import { useRootStore } from '../store/root-store';
+
 import { getRooms, getTables, getTableCount, getVacantTablesForBranch, mergeTablesBatch, unmergeTables, type Room, type Table } from '../lib/table-api';
 import { getMergeGroupMembers, formatMergedTableLabelFromGroup, getTableRenderGroups, sortTablesByMergeGroups } from '../lib/table-utils';
 import { Spinner } from '@ury/ui';
@@ -27,6 +28,7 @@ const TableView = () => {
   const navigate = useNavigate();
   const { posProfile, setSelectedTable, setSelectedOrderType } = usePOSStore();
   const user = useRootStore((state) => state.user);
+  const setSelectedStatus = useRootStore((state) => state.setSelectedStatus);
   const showCaptainTransfer = canCaptainTransfer(user, posProfile);
 
   const branch = posProfile?.branch ?? null;
@@ -193,7 +195,7 @@ const TableView = () => {
         return;
       }
 
-      await printOrder({
+      const printResult = await printOrder({
         orderId: invoiceId,
         posProfile,
         printFormat: resolvePrintFormat(
@@ -201,8 +203,17 @@ const TableView = () => {
           posProfile.print_format
         ),
       });
-      showToast.success('Printed successfully');
-      await loadTables(table.restaurant_room, { useCache: false });
+
+      showToast.success(
+        printResult.status === 'queued'
+          ? 'Print queued offline'
+          : 'Printed successfully'
+      );
+
+      // After print (online or queued offline), redirect the cashier to the
+      // Orders page Draft tab where payment is enabled.
+      await setSelectedStatus('Draft');
+      navigate('/pos/orders');
     } catch (error) {
       showToast.error(error instanceof Error ? error.message : 'Failed to print order');
     } finally {

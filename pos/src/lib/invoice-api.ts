@@ -910,8 +910,63 @@ export async function selectNetworkPrinter(orderId: string, posProfile: string, 
   });
 }
 
-export async function updatePrintStatus(orderId: string) {
+export interface UpdatePrintStatusResult {
+  queued: boolean;
+}
+
+async function queuePrintUpdate(orderId: string, endpoint: string, dependencyIds: string[]) {
+  try {
+    await repositories.syncQueue.put({
+      id: `QZ-PRINT-${orderId}`,
+      action: 'qz_print_update',
+      endpoint,
+      payload: { invoice: orderId },
+      timestamp: new Date().toISOString(),
+      status: 'PENDING',
+      attempts: 0,
+      priority: 1,
+      dependency_ids: dependencyIds,
+    });
+  } catch (queueErr) {
+    console.warn('[updatePrintStatus] Failed to queue offline print command:', queueErr);
+  }
+}
+
+async function updateLocalPrintState(orderId: string) {
+  try {
+    const cached = await repositories.orders.getById(orderId);
+    if (cached) {
+      await repositories.orders.put({
+        ...cached,
+        status: 'Draft',
+        invoice_printed: 1,
+        updatedAt: new Date().toISOString(),
+      } as any);
+    }
+  } catch (localErr) {
+    console.warn('[updatePrintStatus] Failed to update local order cache:', localErr);
+  }
+}
+
+export async function updatePrintStatus(orderId: string): Promise<UpdatePrintStatusResult> {
   const endpoint = apiRegistry.getUrl('QZ_PRINT_UPDATE');
+
+  // When offline (or on network failure), queue a QZ_PRINT_UPDATE command so the
+  // print transition is replayed on reconnect. Temp orders must wait for the
+  // parent sync_order to finish so the server invoice exists.
+  const dependencyIds: string[] = [];
+  if (orderId.startsWith('TEMP-')) {
+    dependencyIds.push(`SYNC-ORDER-${orderId}`);
+  }
+
+  // When offline, skip the online call and queue the status update directly.
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    await queuePrintUpdate(orderId, endpoint, dependencyIds);
+    await updateLocalPrintState(orderId);
+    projectionBus.emit('ORDERS_UPDATED');
+    return { queued: true };
+  }
+
   try {
     // NOTE: 'update_print_status' does NOT exist in the backend.
     // The correct endpoint is 'qz_print_update' which sets invoice_printed=1
@@ -919,49 +974,13 @@ export async function updatePrintStatus(orderId: string) {
     await call.post(endpoint, {
       invoice: orderId,
     });
+    return { queued: false };
   } catch (error) {
     console.warn('[updatePrintStatus] Error calling qz_print_update (queueing offline):', error);
 
-    // When offline (or on network failure), queue a QZ_PRINT_UPDATE command so the
-    // print transition is replayed on reconnect. Temp orders must wait for the
-    // parent sync_order to finish so the server invoice exists.
-    const dependencyIds: string[] = [];
-    if (orderId.startsWith('TEMP-')) {
-      dependencyIds.push(`SYNC-ORDER-${orderId}`);
-    }
-
-    try {
-      await repositories.syncQueue.put({
-        id: `QZ-PRINT-${orderId}`,
-        action: 'qz_print_update',
-        endpoint,
-        payload: { invoice: orderId },
-        timestamp: new Date().toISOString(),
-        status: 'PENDING',
-        attempts: 0,
-        priority: 1,
-        dependency_ids: dependencyIds,
-      });
-    } catch (queueErr) {
-      console.warn('[updatePrintStatus] Failed to queue offline print command:', queueErr);
-    }
-
-    // Update local order state so the UI immediately moves the order from
-    // Unbilled to Draft and marks it as printed.
-    try {
-      const cached = await repositories.orders.getById(orderId);
-      if (cached) {
-        await repositories.orders.put({
-          ...cached,
-          status: 'Draft',
-          invoice_printed: 1,
-          updatedAt: new Date().toISOString(),
-        } as any);
-      }
-    } catch (localErr) {
-      console.warn('[updatePrintStatus] Failed to update local order cache:', localErr);
-    }
-
+    await queuePrintUpdate(orderId, endpoint, dependencyIds);
+    await updateLocalPrintState(orderId);
     projectionBus.emit('ORDERS_UPDATED');
+    return { queued: true };
   }
 }
