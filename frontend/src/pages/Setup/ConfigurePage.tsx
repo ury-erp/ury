@@ -1,64 +1,198 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { WizardLayout } from '../../components/setup/WizardLayout';
-import { ConfigureItem } from '../../components/setup/ConfigureItem';
+import { ConfigureSidebar } from '../../components/setup/ConfigureSidebar';
+import { SectionShell } from '../../components/setup/SectionShell';
+import { ConfigureProvider, useConfigure, SECTION_ORDER, SectionId } from '../../context/ConfigureContext';
+import { BranchSection } from '../../components/setup/sections/BranchSection';
+import { RoomSection } from '../../components/setup/sections/RoomSection';
+import { TableSection } from '../../components/setup/sections/TableSection';
+import { MenuSection } from '../../components/setup/sections/MenuSection';
+import { PaymentSection } from '../../components/setup/sections/PaymentSection';
+import { UserSection } from '../../components/setup/sections/UserSection';
+import { setupService } from '../../services/setup';
 import { call } from '@ury/core';
-import configureItems from '../../data/forms/configure.json';
 
-export default function ConfigurePage() {
-  const [completedItems, setCompletedItems] = useState<Set<string>>(new Set());
+const SECTION_CONFIGS: Record<SectionId, { title: string; description: string }> = {
+  branch: {
+    title: 'Branch Details',
+    description: 'Set up your main branch name, invoice series prefixes, and tax details.',
+  },
+  rooms: {
+    title: 'Dining Rooms',
+    description: 'Configure dining areas and room types for your restaurant.',
+  },
+  tables: {
+    title: 'Tables Setup',
+    description: 'Define table numbers, seating capacities, and room assignments.',
+  },
+  menu: {
+    title: 'Menu Configuration',
+    description: 'Add menu items manually or upload a menu file template.',
+  },
+  payment: {
+    title: 'Modes of Payment',
+    description: 'Configure accepted payment methods at checkout.',
+  },
+  users: {
+    title: 'User Accounts',
+    description: 'Set up initial staff accounts and role assignments.',
+  },
+};
+
+function ConfigurePageContent() {
+  const navigate = useNavigate();
   const [finishing, setFinishing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleItemClick = (id: string) => {
-    setCompletedItems(prev => {
-      const newSet = new Set(prev);
-      newSet.add(id);
-      return newSet;
-    });
+  const {
+    activeSection,
+    branch,
+    rooms,
+    tables,
+    menuItems,
+    taxConfig,
+    paymentMethods,
+    users,
+    goToPrevSection,
+    goToNextSection,
+  } = useConfigure();
+
+  const currentIndex = SECTION_ORDER.indexOf(activeSection);
+  const isFirstSection = currentIndex === 0;
+  const isLastSection = currentIndex === SECTION_ORDER.length - 1;
+
+  const handlePrev = () => {
+    if (isFirstSection) {
+      navigate('/setup-wizard/0');
+    } else {
+      goToPrevSection();
+    }
   };
 
   const handleFinish = async () => {
     setFinishing(true);
+    setError(null);
     try {
-      await call('frappe.client.set_value', { 
-        doctype: "System Settings", 
-        name: "System Settings", 
-        fieldname: "setup_complete", 
-        value: 1 
+      const payload = {
+        branch,
+        rooms,
+        tables,
+        menuItems,
+        taxConfig,
+        paymentMethods,
+        users,
+      };
+
+      await setupService.submitConfigureData(payload);
+
+      await call('frappe.client.set_value', {
+        doctype: 'System Settings',
+        name: 'System Settings',
+        fieldname: 'setup_complete',
+        value: 1,
       });
+
       window.location.href = '/app';
-    } catch (err) {
-      console.error("Failed to finish setup", err);
-      // Fallback
-      window.location.href = '/app';
+    } catch (err: any) {
+      console.error('Failed to finish configure setup', err);
+      let msg = 'Failed to configure setup. Check backend logs.';
+      if (typeof err === 'string') {
+        msg = err;
+      } else if (err?.message) {
+        msg = err.message;
+      } else if (err?._server_messages) {
+        try {
+          const parsed = JSON.parse(err._server_messages);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            const inner = typeof parsed[0] === 'string' ? JSON.parse(parsed[0]) : parsed[0];
+            msg = inner.message || msg;
+          }
+        } catch (_) {
+          msg = String(err._server_messages);
+        }
+      } else if (err?.exception) {
+        msg = err.exception;
+      }
+      setError(msg);
+      setFinishing(false);
     }
   };
 
+  const handleNext = () => {
+    if (isLastSection) {
+      handleFinish();
+    } else {
+      goToNextSection();
+    }
+  };
+
+  const renderSection = () => {
+    switch (activeSection) {
+      case 'branch':
+        return <BranchSection />;
+      case 'rooms':
+        return <RoomSection />;
+      case 'tables':
+        return <TableSection />;
+      case 'menu':
+        return <MenuSection />;
+      case 'payment':
+        return <PaymentSection />;
+      case 'users':
+        return <UserSection />;
+      default:
+        return <BranchSection />;
+    }
+  };
+
+  const config = SECTION_CONFIGS[activeSection] || SECTION_CONFIGS.branch;
+
   return (
-    <WizardLayout 
-      step={2} 
-      nextLabel="Finish Setup"
-      onNext={handleFinish} 
+    <WizardLayout
+      step={2}
+      onPrev={handlePrev}
+      onNext={handleNext}
+      nextLabel={isLastSection ? "Launch" : "Next"}
       isNextLoading={finishing}
     >
-      <div className="space-y-6">
-        <div>
-          <h2 className="text-xl font-semibold text-foreground mb-1">Optional Configuration</h2>
-          <p className="text-[#6B7280] text-sm">
-            {configureItems.footer || "These settings are optional and can be configured anytime after installation."}
-          </p>
-        </div>
+      <div className="space-y-4">
+        {error && (
+          <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3 text-red-700">
+            <div className="flex-1 text-sm font-medium">
+              <span className="font-bold block mb-1">Configuration Error:</span>
+              {error}
+            </div>
+            <button
+              onClick={() => setError(null)}
+              className="text-xs text-red-500 hover:text-red-700 font-semibold underline shrink-0"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
 
-        <div className="border border-[#F3F4F6] rounded-xl overflow-hidden bg-white">
-          {configureItems.items?.map((item: any) => (
-            <ConfigureItem 
-              key={item.id} 
-              item={item} 
-              completed={completedItems.has(item.id)} 
-              onClick={handleItemClick}
-            />
-          ))}
+        {/* Two-Column Grid Layout */}
+        <div className="flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-[#E5E7EB] -my-8 -mx-8 min-h-[440px]">
+          <div className="w-full md:w-64 shrink-0 p-6 md:py-8 md:pl-8 md:pr-6">
+            <ConfigureSidebar />
+          </div>
+
+          <div className="flex-1 min-w-0 p-6 md:p-8">
+            <SectionShell title={config.title} description={config.description}>
+              {renderSection()}
+            </SectionShell>
+          </div>
         </div>
       </div>
     </WizardLayout>
+  );
+}
+
+export default function ConfigurePage() {
+  return (
+    <ConfigureProvider>
+      <ConfigurePageContent />
+    </ConfigureProvider>
   );
 }
