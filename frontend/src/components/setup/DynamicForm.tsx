@@ -26,21 +26,27 @@ export const DynamicForm = forwardRef<DynamicFormHandle, DynamicFormProps>(
     }, []);
 
     const allFields = useMemo(() => {
-      return [...(schema.general || []), ...(schema.company || [])];
+      if (Array.isArray(schema.fields) && schema.fields.length > 0) {
+        return schema.fields;
+      }
+      return [...(schema.company || []), ...(schema.general || [])];
     }, [schema]);
 
     const sections = useMemo(() => {
-      const result = [];
-      if (schema.general?.length) {
-        result.push({
-          label: 'General Settings',
-          fields: schema.general
-        });
+      if (Array.isArray(schema.fields) && schema.fields.length > 0) {
+        return [{ fields: schema.fields }];
       }
+      const result = [];
       if (schema.company?.length) {
         result.push({
           label: 'Company Details',
           fields: schema.company
+        });
+      }
+      if (schema.general?.length) {
+        result.push({
+          label: 'General Settings',
+          fields: schema.general
         });
       }
       return result;

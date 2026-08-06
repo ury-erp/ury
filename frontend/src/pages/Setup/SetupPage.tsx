@@ -170,7 +170,7 @@ export default function SetupPage() {
       
       setTimeout(() => {
         if (installationType === 'minimal') {
-          navigate('/configure');
+          navigate('/setup-wizard/1');
         } else {
           window.location.href = '/app';
         }
@@ -186,7 +186,7 @@ export default function SetupPage() {
     <WizardLayout 
       step={1} 
       onNext={handleNext} 
-      nextLabel="Complete Setup"
+      nextLabel="Continue"
       isNextDisabled={submitting}
     >
       <div className="space-y-8">

@@ -43,7 +43,6 @@ export function ProgressModal({ visible, activeIndex, error }: ProgressModalProp
             {PROGRESS_STEPS.map((step, idx) => {
               const isDone = idx < activeIndex;
               const isActive = idx === activeIndex;
-              const isPending = idx > activeIndex;
 
               return (
                 <div key={idx} className="flex items-center gap-4 py-3 border-b border-[#F3F4F6] last:border-0 h-12">

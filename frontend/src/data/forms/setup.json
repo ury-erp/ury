@@ -1,5 +1,22 @@
 {
-  "general": [
+  "fields": [
+    {
+      "id": "company_name",
+      "label": "Company Name",
+      "type": "text",
+      "placeholder": "e.g. URY Restaurant",
+      "required": true,
+      "validations": ["required", "minLength:3"],
+      "triggers": ["company_abbr"]
+    },
+    {
+      "id": "company_abbr",
+      "label": "Company Abbreviation",
+      "type": "text",
+      "placeholder": "e.g. URY",
+      "required": true,
+      "validations": ["required", "maxLength:5"]
+    },
     {
       "id": "language",
       "label": "Your Language",
@@ -32,25 +49,6 @@
       "optionsKey": "currencies",
       "required": true,
       "validations": ["required"]
-    }
-  ],
-  "company": [
-    {
-      "id": "company_name",
-      "label": "Company Name",
-      "type": "text",
-      "placeholder": "e.g. URY Restaurant",
-      "required": true,
-      "validations": ["required", "minLength:3"],
-      "triggers": ["company_abbr"]
-    },
-    {
-      "id": "company_abbr",
-      "label": "Company Abbreviation",
-      "type": "text",
-      "placeholder": "e.g. URY",
-      "required": true,
-      "validations": ["required", "maxLength:5"]
     },
     {
       "id": "chart_of_accounts",
