@@ -450,14 +450,23 @@ export const usePOSStore = create<POSStore>((set, get) => ({
     }
   },
   setSelectedOrderType: (type) => {
-    const { fetchMenuItems } = get();
+    const { fetchMenuItems, isUpdatingOrder, posProfile, selectedOrderType } = get();
     
-    set({ 
-      activeOrders: [],
-      selectedOrderType: type,
-      isUpdatingOrder: false,
-      orderId: null
-    });
+    const isCurrentTypeToggleable = selectedOrderType === 'Take Away' || selectedOrderType === 'Delivery';
+    const isNewTypeToggleable = type === 'Take Away' || type === 'Delivery';
+
+    if (isUpdatingOrder && posProfile?.edit_order_type && isCurrentTypeToggleable && isNewTypeToggleable) {
+      set({ 
+        selectedOrderType: type,
+      });
+    } else {
+      set({ 
+        activeOrders: [],
+        selectedOrderType: type,
+        isUpdatingOrder: false,
+        orderId: null
+      });
+    }
     
     if (type !== 'Aggregators') {
       fetchMenuItems();
