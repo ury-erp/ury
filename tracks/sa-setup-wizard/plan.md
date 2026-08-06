@@ -1,4 +1,4 @@
-# URY Setup Wizard � Implementation Plan
+# URY Setup Wizard — Implementation Plan
 
 **Owner**: sa-user (swafaalikkal)
 **Track**: `sa-setup-wizard`
@@ -11,13 +11,11 @@
 
 ## Objective
 
-Replace the default ERPNext/Frappe setup wizard with a custom, JSON-driven, two-step onboarding flow:
+Replace the default ERPNext/Frappe setup wizard with a custom, JSON-driven, two-step onboarding flow inside the `/ury` React SPA:
 
-- **Step 1 � Setup**: Language, country, timezone, currency, company name, company abbreviation, chart of accounts, fiscal year start, installation type (Minimal / Advanced).
-- **Step 1b � Progress Modal**: Animated step-by-step progress modal displayed while the backend runs `setup_complete`.
-- **Step 2 � Configure**: Optional items: Branch, URY Room, URY Table, URY Menu, Mode of Payment, User. User may skip all and click "Finish Setup".
-
-The wizard renders inside the existing `frontend/` React SPA wired to `/ury`.
+- **Step 1 — Setup**: Language, country, timezone, currency, company name, company abbreviation, chart of accounts, fiscal year start, installation type (Minimal / Advanced).
+- **Step 1b — Progress Modal**: Animated step-by-step progress modal displayed while the backend runs `setup_complete`.
+- **Step 2 — Configure**: Interactive sidebar-navigated configuration covering Branch, URY Room, URY Table, URY Menu (with Menu Upload & Tax settings), Mode of Payment, and User creation. On completion, submits collected data via Frappe CRUD APIs and custom APIs in `business_setup.py`, advancing to the app.
 
 ---
 
@@ -27,26 +25,28 @@ The wizard renders inside the existing `frontend/` React SPA wired to `/ury`.
 Phase 1 (Routing)
   +- enables --> Phase 5 (page renders at /ury)
 
-Phase 2 (JSON Schema)
+Phase 2 (JSON Schema & State Contracts)
   +- consumed by --> Phase 4 (Form Engine)
+  +- consumed by --> Phase 5.5 (Configure Context & Sections)
 
-Phase 3 (Backend APIs)
+Phase 3 (Backend APIs & Submission Engine)
   +- consumed by --> Phase 4 (dynamic select options)
-  +- consumed by --> Phase 5 (submit payload)
+  +- consumed by --> Phase 5.3 (submit setup payload via setup_organization.py)
+  +- consumed by --> Phase 5.5 (configure batch persistence & user creation via business_setup.py)
 
 Phase 4 (Form Engine)
   +- consumed by --> Phase 5 (SetupPage mounts DynamicForm)
 
-Phase 5 (UI Pages)
+Phase 5 (UI Pages & Configure Flow)
   +- depends on --> Phase 1, 2, 3, 4
 
-Phase 6 (Build + E2E)
+Phase 6 (Build + E2E Verification)
   +- depends on --> all prior phases
 ```
 
 ---
 
-## Phase 1 � Routing and Login Interception
+## Phase 1 — Routing and Login Interception
 
 **Goal**: After login, if `setup_complete = 0`, user lands on `/ury`. Any attempt to hit `/app` or `/setup-wizard` is redirected.
 
@@ -110,13 +110,13 @@ Router additions:
 </Route>
 ```
 
-`basename="/ury"` is already set in `main.tsx` � no change needed.
+`basename="/ury"` is already set in `main.tsx` — no change needed.
 
 ---
 
-## Phase 2 � Schema Configuration & JSON Files
+## Phase 2 — Schema Configuration & JSON Files
 
-**Goal**: Form structure and validation defined entirely in JSON. Code changes are not required to modify form fields.
+**Goal**: Form structure and validation defined in JSON, static options cached, configure sections structured cleanly.
 
 ### Schema root
 ```
@@ -125,7 +125,11 @@ apps/ury/frontend/src/data/
 
 ### 2.1 `forms/setup.json`
 
-Sections: `general` (Language, Country, Timezone, Currency) and `company` (Company Name, Company Abbreviation, Chart of Accounts, Financial Year Begins On).
+Form Layout (4 Rows):
+- **Row 1**: Company Name (`company_name`) and Company Abbreviation (`company_abbr`)
+- **Row 2**: Your Language (`language`) and Your Country (`country`)
+- **Row 3**: Timezone (`timezone`) and Currency (`currency`)
+- **Row 4**: Chart of Accounts (`chart_of_accounts`) and Financial Year Begins On (`fy_start_date`)
 
 Key field attributes:
 - `type`: `select` | `text`
@@ -136,130 +140,328 @@ Key field attributes:
 
 Installation types array: `minimal` (RECOMMENDED badge, features: POS Ready / Basic Restaurant Setup / Fastest setup / Best for most restaurants) and `advanced` (features: Multi-branch / Production / Inventory / Manufacturing / Accounting).
 
-Static fiscal year options (12 entries): `{ value: "MM-DD", label: "Month Day" }` � e.g. `{ value: "01-01", label: "January 1" }`.
+Static fiscal year options (12 entries): `{ value: "MM-DD", label: "Month Day" }` — e.g. `{ value: "01-01", label: "January 1" }`.
 
 ### 2.2 `forms/configure.json`
 
-Six optional configuration items (only these, per spec):
-1. Branch � "Add and manage multiple branches"
-2. URY Room � "Define dining areas and seating zones"
-3. URY Table � "Configure table layout and numbering"
-4. URY Menu � "Create and configure your restaurant menu"
-5. Mode of Payment � "Enable cash, card, and digital payments"
-6. User � "Invite team members and assign roles"
-
-Each item: `{ id, label, description, icon, optional: true, route: "/app/..." }`.
-
-Footer text: "These settings are optional and can be configured anytime after installation."
-
-### 2.3 `validations.json`
-
-Rules: `required`, `minLength` (message uses `{min}` token), `maxLength` (message uses `{max}` token), `pattern` (keyed by regex string with per-pattern message).
-
-### 2.4 Static Fallback Files
-
-Location: `frontend/src/data/static/`
-
-| File | Content | Source |
-|------|---------|--------|
-| `languages.json` | `[{ value, label }]` | `frappe.desk.page.setup_wizard.setup_wizard.load_languages()` |
-| `timezones.json` | `string[]` | `pytz.all_timezones` |
-| `currencies.json` | `[{ value, label, symbol }]` | derived from `frappe.geo.country_info.get_all()` |
-| `countries.json` | `string[]` | `frappe.geo.country_info.get_all().keys()` |
-| `fy_start_dates.json` | `[{ value: "MM-DD", label: "Month D" }]` | static 12-entry array |
-
-**Generator script (NEW)**: `apps/ury/scripts/generate_static_data.py`
-
-Run once via:
-```bash
-wsl python3 /mnt/c/Users/swafa/Projects/Bench/ury-bench/apps/ury/scripts/generate_static_data.py
-```
+Config section metadata for sidebar navigation:
+1. Branch — "Configure default branch details"
+2. URY Room — "Define dining areas and seating zones"
+3. URY Table — "Configure table layout and numbering"
+4. URY Menu — "Create menu items, upload file, and tax settings"
+5. Mode of Payment — "Enable cash, card, and digital payment methods"
+6. User — "Create default system users and assign roles"
 
 ---
 
-## Phase 3 � Service Layer & Backend APIs
+## Phase 3 — Service Layer, Backend APIs & DocType Field Contracts
 
-### 3.1 Backend Module
+### 3.1 Step 1 Backend Module (`setup_organization.py`)
 
-**File (NEW)**: `apps/ury/ury/api/setup.py`
+**File (NEW)**: `apps/ury/ury/api/minimal/setup_organization.py`
 
 #### `get_setup_defaults()`
-
-**Route**: `ury.ury.api.setup.get_setup_defaults`
-**Method**: GET via `frappe.call`
-**Auth**: Logged-in (not Guest)
-
-Returns:
-```json
-{
-  "languages": [{ "value": "en", "label": "English" }],
-  "detected_country": "India",
-  "countries": ["Afghanistan", "Albania", ...],
-  "currencies": [{ "value": "INR", "label": "INR - Indian Rupee", "symbol": "?" }],
-  "timezones": ["Africa/Abidjan", ...]
-}
-```
-
-Key internal calls:
-- `frappe.desk.page.setup_wizard.setup_wizard.load_languages(frappe.request)`
-- `frappe.desk.page.setup_wizard.setup_wizard.load_country(frappe.request)` � GeoIP
-- `frappe.geo.country_info.get_all()` � countries + currency derivation
-- `pytz.all_timezones`
+- **Route**: `ury.ury.api.minimal.setup_organization.get_setup_defaults`
+- **Method**: GET via `frappe.call`
 
 #### `get_country_defaults(country)`
-
-**Route**: `ury.ury.api.setup.get_country_defaults`
-**Method**: GET via `frappe.call` with `args: { country }`
-**Auth**: Logged-in
-
-Returns:
-```json
-{
-  "currency": "INR",
-  "timezone": "Asia/Kolkata",
-  "charts_of_accounts": [{ "value": "Restaurant", "label": "Restaurant" }]
-}
-```
-
-Key internal calls:
-- `frappe.geo.country_info.get_country_info(country)` � currency, timezones[0]
-- `erpnext.accounts.doctype.account.chart_of_accounts.chart_of_accounts.get_charts_for_country(country, with_description=True)`
+- **Route**: `ury.ury.api.minimal.setup_organization.get_country_defaults`
+- **Method**: GET via `frappe.call` with `args: { country }`
 
 #### `submit_setup(payload)`
-
-**Route**: `ury.ury.api.setup.submit_setup`
-**Method**: POST via `frappe.call`
-**Auth**: Logged-in
-
-Input: `SetupPayload` JSON string.
-
-Processing:
-1. Parse payload.
-2. Compute `fy_end_date` from `fy_start_date` using `dateutil.relativedelta` (start + 12 months - 1 day).
-3. Strip admin user fields (`admin_password`, `email`, `first_name`, `last_name`) � admin is pre-created.
-4. Delegate to `frappe.desk.page.setup_wizard.setup_wizard.setup_complete(args=payload)`.
-
-Returns: Standard Frappe response from `setup_complete`.
-
-### 3.2 Frontend Service Layer
-
-**File (NEW)**: `apps/ury/frontend/src/services/setup.ts`
-
-Exports `setupService` singleton with:
-- `getDefaults(): Promise<SetupDefaults>`
-- `getCountryDefaults(country: string): Promise<CountryDefaults>`
-- `submitSetup(payload: SetupPayload): Promise<void>`
-
-Uses `call` from `@ury/core` (or `frappe-js-sdk` if `@ury/core` does not re-export it � confirm before implementing).
-
-TypeScript interfaces:
-- `SetupDefaults` � matches API return shape
-- `CountryDefaults` � matches API return shape
-- `SetupPayload` � `{ language, country, timezone, currency, company_name, company_abbr, chart_of_accounts?, fy_start_date, installation_type }`
+- **Route**: `ury.ury.api.minimal.setup_organization.submit_setup`
+- **Method**: POST via `frappe.call`
+- Input: `SetupPayload` JSON string. Delegates to `frappe.desk.page.setup_wizard.setup_wizard.setup_complete(args=payload)`.
 
 ---
 
-## Phase 4 � Dynamic Form Engine & Validation
+### 3.2 DocType Field Contracts & Two-Pass Item Creation Strategy
+
+To ensure execution succeeds without runtime validation or constraint errors, the backend logic strictly enforces **Two-Pass Menu Item Creation** with **Maintain Stock (`is_stock_item`) = 0**:
+
+```
+┌─────────────────┐
+│ 1. Branch       │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ 2. URY Room     │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ 3. URY Restaurant (Company, Branch, Default Room, Invoice Prefix)
+└────────┬────────┘
+         │
+         ├─────────────────────────┐
+         ▼                         ▼
+┌─────────────────┐       ┌────────────────────────────────────────────────────────┐
+│ 4. URY Table    │       │ 5a. Create URY Menu Courses (Starter, Main, etc.)     │
+│ (Restaurant,    │       │ 5b. Pass 1: Create ERPNext `Item` DocType Records      │
+│  Room, Branch)  │       │     (is_stock_item = 0, is_sales_item = 1, rate)       │
+└─────────────────┘       └────────┬───────────────────────────────────────────────┘
+                                   │
+                                   ▼
+                          ┌────────────────────────────────────────────────────────┐
+                          │ 5c. Pass 2: Create `URY Menu` DocType Record           │
+                          │     (branch, items child table linking created Items)  │
+                          └────────┬───────────────────────────────────────────────┘
+                                   │ (Update active_menu on URY Restaurant)
+                                   ▼
+                          ┌─────────────────┐
+                          │ 6. Payment      │
+                          │ Methods & Users │
+                          └─────────────────┘
+```
+
+#### Detailed DocType Mapping Table
+
+| DocType | Key Field / Autoname | Mandatory Fields (`reqd: 1`) | Field Mappings & Values |
+|---------|-----------------------|-------------------------------|-------------------------|
+| **`Branch`** | `branch` | `branch` | `branch`: Name (e.g. `"Main Branch"`), `custom_invoice_series_prefix`: Invoice Prefix, `custom_aggregator_series_prefix`: Aggregator Prefix, `tax_id`: Tax ID |
+| **`URY Room`** | Set by user (`room_name`) | `branch` (Link to `Branch`) | `name`: Room Name (e.g. `"Main Dining"`), `branch`: Branch Name, `room_type`: Select (`"AC"`, `"NON-AC"`, or text) |
+| **`URY Restaurant`** | Set by user | `company`, `branch`, `invoice_series_prefix`, `default_room` | `company`: Company from Step 1, `branch`: Branch Name, `invoice_series_prefix`: Prefix, `default_room`: First URY Room Name |
+| **`URY Table`** | Set by user (`table_name`) | `restaurant`, `restaurant_room`, `branch` | `name`: Table Name (e.g. `"T-01"`), `restaurant`: `URY Restaurant` Name, `restaurant_room`: `URY Room` Name *(note exact fieldname!)*, `branch`: Branch Name, `no_of_seats`: Int, `table_shape`: Select (`"Square"`, `"Rectangle"`, `"Circle"` — map UI `"Round"` -> `"Circle"`) |
+| **`URY Menu Course`** | `course` | `course` | `course`: Course Name (e.g. `"Starter"`, `"Main Course"`, `"Beverage"`, `"Dessert"`). Auto-create if not existing. |
+| **`Item`** | `item_code` | `item_code`, `item_name`, `item_group`, `stock_uom` | **PASS 1 CREATION**: `item_code`: Item Name, `item_name`: Item Name, `item_group`: `"All Item Groups"` (or `"Products"`), `stock_uom`: `"Nos"`, `standard_rate`: Price, **`is_stock_item`: 0** *(Maintain Stock = 0)*, **`is_sales_item`: 1** |
+| **`URY Menu`** | Set by user (`menu_name`) | `branch`, `items` (Child Table `reqd: 1`) | **PASS 2 CREATION**: `name`: `"Main Menu"`, `branch`: Branch Name, `enabled`: 1. Child `items`: `item`: Item Code (from Pass 1), `item_name`: Name, `rate`: Price, `course`: Course Name |
+| **`Mode of Payment`** | `mode_of_payment` | `mode_of_payment` | `mode_of_payment`: Name (e.g. `"Cash"`, `"Card"`, `"UPI"`), `type`: `"General"` |
+| **`User`** | `email` | `email`, `first_name` | `email`: Email, `first_name`: Name, `enabled`: 1, `user_type`: `"System User"`, `roles`: `[{"role": role}]`, `password`: set via `update_password` |
+
+---
+
+### 3.3 Page 2 Business Setup Backend Module (`business_setup.py`)
+
+**File (NEW)**: `apps/ury/ury/api/minimal/business_setup.py`  
+*(Location: `C:\Users\swafa\Projects\Bench\ury-bench\apps\ury\ury\ury\api\minimal\business_setup.py`)*
+
+```python
+import frappe
+from frappe import _
+
+@frappe.whitelist()
+def create_setup_user(email, name, password=None, role="URY Cashier"):
+    if frappe.db.exists("User", email):
+        return {"status": "exists", "email": email}
+    
+    user = frappe.get_doc({
+        "doctype": "User",
+        "email": email,
+        "first_name": name,
+        "enabled": 1,
+        "send_welcome_email": 0,
+        "user_type": "System User",
+        "roles": [{"role": role}]
+    })
+    user.insert(ignore_permissions=True)
+    if password:
+        from frappe.utils.password import update_password
+        update_password(new_password=password, user=email)
+    return {"status": "created", "email": email}
+
+@frappe.whitelist()
+def submit_configure_data(data):
+    if isinstance(data, str):
+        data = frappe.parse_json(data)
+        
+    results = {}
+    
+    # Derive default company from site defaults or latest created company
+    default_company = frappe.defaults.get_user_default("Company") or frappe.db.get_value("Company", {}, "name")
+    
+    # 1. Branch
+    branch_name = "Main Branch"
+    if data.get("branch"):
+        b = data["branch"]
+        branch_name = b.get("branchName") or "Main Branch"
+        if not frappe.db.exists("Branch", branch_name):
+            branch_doc = frappe.get_doc({
+                "doctype": "Branch",
+                "branch": branch_name,
+                "custom_invoice_series_prefix": b.get("invoicePrefix", "INV-"),
+                "custom_aggregator_series_prefix": b.get("aggregatorPrefix", "AGG-"),
+                "tax_id": b.get("taxId")
+            })
+            branch_doc.insert(ignore_permissions=True)
+            results["branch"] = branch_doc.name
+        else:
+            results["branch"] = branch_name
+
+    # 2. URY Rooms
+    results["rooms"] = []
+    first_room_name = None
+    for r in data.get("rooms", []):
+        r_name = r.get("name")
+        if not r_name:
+            continue
+        if not first_room_name:
+            first_room_name = r_name
+            
+        if not frappe.db.exists("URY Room", r_name):
+            room_doc = frappe.get_doc({
+                "doctype": "URY Room",
+                "room_name": r_name,
+                "branch": branch_name,
+                "room_type": r.get("type", "AC")
+            })
+            room_doc.insert(ignore_permissions=True)
+            results["rooms"].append(room_doc.name)
+        else:
+            results["rooms"].append(r_name)
+
+    if not first_room_name:
+        first_room_name = "Main Dining"
+        if not frappe.db.exists("URY Room", first_room_name):
+            room_doc = frappe.get_doc({
+                "doctype": "URY Room",
+                "room_name": first_room_name,
+                "branch": branch_name,
+                "room_type": "AC"
+            })
+            room_doc.insert(ignore_permissions=True)
+            results["rooms"].append(room_doc.name)
+
+    # 3. URY Restaurant (Required dependency for URY Table!)
+    restaurant_name = f"{branch_name} Restaurant"
+    if not frappe.db.exists("URY Restaurant", restaurant_name):
+        rest_doc = frappe.get_doc({
+            "doctype": "URY Restaurant",
+            "name": restaurant_name,
+            "company": default_company,
+            "branch": branch_name,
+            "invoice_series_prefix": data.get("branch", {}).get("invoicePrefix", "INV-"),
+            "aggregator_series_prefix": data.get("branch", {}).get("aggregatorPrefix", "AGG-"),
+            "default_room": first_room_name
+        })
+        rest_doc.insert(ignore_permissions=True)
+        results["restaurant"] = rest_doc.name
+    else:
+        results["restaurant"] = restaurant_name
+
+    # 4. URY Tables (linked to Restaurant & Room!)
+    results["tables"] = []
+    # Shape mapping: UI 'Round' -> DB 'Circle'
+    shape_map = {"Round": "Circle", "Square": "Square", "Rectangle": "Rectangle"}
+    for t in data.get("tables", []):
+        t_name = t.get("name")
+        if not t_name:
+            continue
+        room_link = t.get("room") or first_room_name
+        raw_shape = t.get("shape", "Square")
+        mapped_shape = shape_map.get(raw_shape, "Square")
+        
+        if not frappe.db.exists("URY Table", t_name):
+            table_doc = frappe.get_doc({
+                "doctype": "URY Table",
+                "name": t_name,
+                "table_name": t_name,
+                "restaurant": restaurant_name,
+                "restaurant_room": room_link,
+                "branch": branch_name,
+                "no_of_seats": int(t.get("seats", 4)),
+                "table_shape": mapped_shape
+            })
+            table_doc.insert(ignore_permissions=True)
+            results["tables"].append(table_doc.name)
+        else:
+            results["tables"].append(t_name)
+
+    # 5. URY Menu Courses, ERPNext Item Creation (Pass 1) & URY Menu (Pass 2)
+    menu_items_table = []
+    item_group = frappe.db.get_value("Item Group", {"is_group": 0}, "name") or "All Item Groups"
+    uom = frappe.db.get_value("UOM", {"must_be_whole_number": 0}, "name") or "Nos"
+
+    results["created_items"] = []
+    for m in data.get("menuItems", []):
+        item_title = m.get("name")
+        course_title = m.get("course", "Main Course")
+        item_price = float(m.get("price", 0))
+
+        if not item_title:
+            continue
+
+        # 5a. Ensure URY Menu Course exists
+        if not frappe.db.exists("URY Menu Course", course_title):
+            c_doc = frappe.get_doc({"doctype": "URY Menu Course", "course": course_title})
+            c_doc.insert(ignore_permissions=True)
+
+        # 5b. PASS 1: Create ERPNext Item DocType record with Maintain Stock (is_stock_item) = 0!
+        if not frappe.db.exists("Item", item_title):
+            item_doc = frappe.get_doc({
+                "doctype": "Item",
+                "item_code": item_title,
+                "item_name": item_title,
+                "item_group": item_group,
+                "stock_uom": uom,
+                "standard_rate": item_price,
+                "is_stock_item": 0,  # Maintain Stock == 0
+                "is_sales_item": 1
+            })
+            item_doc.insert(ignore_permissions=True)
+            results["created_items"].append(item_doc.name)
+
+        # Build child table row referencing the created ERPNext Item
+        menu_items_table.append({
+            "item": item_title,
+            "item_name": item_title,
+            "rate": item_price,
+            "course": course_title
+        })
+
+    # 5c. PASS 2: Create URY Menu DocType record with the items
+    menu_name = "Main Menu"
+    if menu_items_table and not frappe.db.exists("URY Menu", menu_name):
+        menu_doc = frappe.get_doc({
+            "doctype": "URY Menu",
+            "name": menu_name,
+            "branch": branch_name,
+            "enabled": 1,
+            "items": menu_items_table
+        })
+        menu_doc.insert(ignore_permissions=True)
+        results["menu"] = menu_doc.name
+        
+        # Link menu to restaurant
+        frappe.db.set_value("URY Restaurant", restaurant_name, "active_menu", menu_name)
+
+    # 6. Mode of Payment
+    results["payment_methods"] = []
+    for p in data.get("paymentMethods", []):
+        p_name = p.get("name")
+        if not p_name:
+            continue
+        if not frappe.db.exists("Mode of Payment", p_name):
+            pm_doc = frappe.get_doc({
+                "doctype": "Mode of Payment",
+                "mode_of_payment": p_name,
+                "type": "General"
+            })
+            pm_doc.insert(ignore_permissions=True)
+            results["payment_methods"].append(pm_doc.name)
+        else:
+            results["payment_methods"].append(p_name)
+
+    # 7. System Users
+    results["users"] = []
+    for u in data.get("users", []):
+        if not u.get("email"):
+            continue
+        res = create_setup_user(
+            email=u.get("email"),
+            name=u.get("name", "Cashier"),
+            password=u.get("passwordPlaceholder"),
+            role=u.get("role", "URY Cashier")
+        )
+        results["users"].append(res)
+
+    frappe.db.commit()
+    return {"status": "success", "results": results}
+```
+
+---
+
+## Phase 4 — Dynamic Form Engine & Validation
 
 **Component root**: `apps/ury/frontend/src/components/setup/`
 
@@ -274,56 +476,24 @@ validateFieldValue(value: string, rules: string[]): { valid: boolean; message: s
 
 Supports rule strings: `"required"`, `"minLength:N"`, `"maxLength:N"`, `"pattern:REGEX"`.
 
-Messages sourced from `validations.json`.
-
-Export via `apps/ury/packages/core/src/index.ts`.
-
 ### 4.2 `FieldRenderer.tsx`
 
-Props: `field` (field definition from JSON), `value: string`, `error: string`, `options?: Option[]`, `onChange(id, value): void`.
+Renders `<Input />` for type `text`, `<Select />` for type `select` — all built with URY core styles and components.
 
-Renders `<Input />` for type `text`, `<Select />` for type `select` � all from `@ury/ui`.
+### 4.3 `DynamicForm.tsx` & `FormSection.tsx`
 
-For `autoGeneratedFrom` fields: show `hint` text inline (right-aligned, muted) when value is auto-populated.
-
-### 4.3 `FormSection.tsx`
-
-Props: `section` (section definition), `values`, `errors`, `optionsMap`, `onChange`.
-
-Layout: 2-column CSS grid using `@ury/ui` Card. Label at top. Fields in grid.
-
-### 4.4 `DynamicForm.tsx`
-
-Exposed via `useImperativeHandle`:
-```typescript
-interface DynamicFormHandle {
-  validate(): boolean;
-  getValues(): SetupPayload;
-}
-```
-
-Internal state: `values: Record<string, string>`, `errors: Record<string, string>`.
-
-Calls `validateFieldValue` on blur (per field) and on full `validate()` call (all fields).
-
-Emits `onFieldChange(fieldId: string, value: string)` for parent (`SetupPage`) to react to country changes.
-
-### 4.5 `InstallationTypeCard.tsx`
-
-Props: `type` (installation type definition from JSON), `selected: boolean`, `onSelect(): void`.
-
-Selected state: blue border + blue checkmark badge in top-right corner.
-Minimal card: "RECOMMENDED" green badge next to label.
-Features list: green checkmark icons.
+JSON-driven renderer for Step 1 Setup form.
 
 ---
 
-## Phase 5 � Page Layout & UI
+## Phase 5 — Page Layout & Configure Flow (Page 2)
 
-### 5.1 Directory Structure
+### 5.1 Directory & Structure
 
 ```
 apps/ury/frontend/src/
+  context/
+    ConfigureContext.tsx
   pages/
     setup/
       SetupPage.tsx
@@ -333,122 +503,126 @@ apps/ury/frontend/src/
       WizardLayout.tsx
       ProgressModal.tsx
       DynamicForm.tsx
-      FormSection.tsx
-      FieldRenderer.tsx
-      InstallationTypeCard.tsx
-      ConfigureItem.tsx
+      ConfigureSidebar.tsx
+      SectionShell.tsx
+      sections/
+        BranchSection.tsx
+        RoomSection.tsx
+        TableSection.tsx
+        MenuSection.tsx
+        PaymentSection.tsx
+        UserSection.tsx
 ```
 
-### 5.2 `WizardLayout.tsx`
+### 5.2 `ConfigureContext.tsx` (React Context Approach)
 
-- Header (centered): URY Restaurant ERP logo icon + name + tagline.
-- Step breadcrumb: `1 Setup ������� 2 Configure`. Active step: blue circle + bold text. Inactive: grey circle + muted text.
-- Main content white card: max-width 820px, centered.
-- Footer nav row inside card: Previous (ghost left) | dots progress indicator (center) | Next / Finish Setup (blue primary right).
-- Page footer: `URY Restaurant ERP � v3.2.0` (reads from `frappe.boot.versions.ury`).
+Centralized state management across all 6 configuration sections.
 
-### 5.3 `SetupPage.tsx`
+State interface:
+```typescript
+export interface BranchData {
+  branchName: string;
+  invoicePrefix: string;
+  aggregatorPrefix: string;
+  taxId: string;
+}
 
-**On mount**:
-1. `setupService.getDefaults()` ? populate `dynamicOptions`.
-2. If `detected_country` present ? trigger `handleCountryChange(detected_country)`.
+export interface RoomData {
+  id: string;
+  name: string;
+  type: string;
+  branch: string;
+}
 
-**`handleCountryChange(country)`**:
-1. `setupService.getCountryDefaults(country)` ? set `currency`, `timezone`, `charts_of_accounts` in options.
-2. Auto-set form values for those fields.
+export interface TableData {
+  id: string;
+  name: string;
+  seats: number;
+  branch: string;
+  room: string;
+  shape: 'Square' | 'Rectangle' | 'Round';
+}
 
-**`handleCompanyNameChange(name)`**:
-- Abbreviation = uppercase first letter of each word, trimmed to 5 chars.
+export interface MenuItemData {
+  id: string;
+  name: string;
+  course: string;
+  price: number;
+}
 
-**`handleNext()`**:
-1. `formRef.current.validate()` � if invalid, stop (errors shown inline).
-2. `setSubmitting(true)` ? show `<ProgressModal />`.
-3. Start step animation (steps advance every ~2.5s independently of API).
-4. `setupService.submitSetup(payload)` in parallel.
-5. On API resolve: advance to final step, then:
-   - `minimal` ? `navigate("/configure")`
-   - `advanced` ? `window.location.href = "/app"`
-6. On API error: hide modal, show toast.
+export interface TaxConfigData {
+  taxType: 'Inclusive' | 'Exclusive';
+  taxPercentage: number;
+}
 
-### 5.4 `ProgressModal.tsx`
+export interface PaymentMethodData {
+  id: string;
+  name: string;
+}
 
-Reference: Image 2 and Image 4 from user-provided screenshots.
+export interface UserData {
+  id: string;
+  email: string;
+  name: string;
+  passwordPlaceholder: string;
+  role: string;
+}
 
-Layout (centered modal, no backdrop close):
-- Top: URY logo icon with circular spinner animation on active step.
-- Title: "Setting up URY"
-- Subtitle: "Please wait while we prepare your workspace..."
-- Progress bar: label `Installing   72%` + blue filled bar.
-- Steps (6):
-  1. Setting up database schema
-  2. Installing core modules
-  3. Configuring system settings
-  4. Building chart of accounts
-  5. Syncing regional data
-  6. Finalizing installation
-- Step states: `pending` (grey empty circle), `active` (blue spinning circle), `done` (green filled circle + checkmark).
+export interface ConfigureState {
+  activeSection: string;
+  visitedSections: Set<string>;
+  completedSections: Set<string>;
+  branch: BranchData;
+  rooms: RoomData[];
+  tables: TableData[];
+  menuItems: MenuItemData[];
+  menuFile: File | null;
+  taxConfig: TaxConfigData;
+  paymentMethods: PaymentMethodData[];
+  users: UserData[];
+}
+```
 
-### 5.5 `ConfigurePage.tsx`
+### 5.3 Step 2 Configure Sections Detail
 
-Loaded from `configure.json`. Renders exactly 6 items:
-1. Branch
-2. URY Room
-3. URY Table
-4. URY Menu
-5. Mode of Payment
-6. User
+#### 1. Branch Section (`BranchSection.tsx`)
+- Fields: **Branch Name** (`Main Branch`), **Invoice Series Prefix** (`INV-`), **Aggregator Series Prefix** (`AGG-`), **Tax ID** placeholder.
 
-Footer info banner: blue info icon + "These settings are optional and can be configured anytime after installation."
+#### 2. URY Room Section (`RoomSection.tsx`)
+- Repeatable room list: **Room Name** (`Main Dining`), **Room Type** (`AC`), **Branch** (pre-filled).
 
-**Finish Setup**: calls `frappe.call('frappe.client.set_value', { doctype: 'System Settings', ... })` or another appropriate mechanism to confirm setup completion, then redirects to `/app`.
+#### 3. URY Table Section (`TableSection.tsx`)
+- Repeatable table list: **Table Name** (`T-01`, `T-02`, `T-03`), **Seats** (`4`, `2`, `6`), **Branch**, **Room** (dynamic selector), **Table Shape** (`Square`, `Rectangle`, `Round`).
 
-### 5.6 `ConfigureItem.tsx`
+#### 4. URY Menu Section (`MenuSection.tsx`)
+- Repeatable menu items (`Chicken Tikka`, `Butter Chicken`, `Mango Lassi`), drag-and-drop menu upload area, Tax settings (`Inclusive`/`Exclusive`, `5%`).
 
-Row: icon (24px, muted) | label (bold) + Optional badge | description (muted) | chevron-right.
-Completed state: green checkmark instead of chevron.
-On click: `window.open(item.route, "_blank")` � opens Frappe desk form in new tab.
+#### 5. Mode of Payment Section (`PaymentSection.tsx`)
+- Repeatable list (`Cash`, `Card`, `UPI`).
+
+#### 6. Users Section (`UserSection.tsx`)
+- User card (`cashier@example.com`, `Cashier`, password generator, `URY Cashier` role).
 
 ---
 
-## Phase 6 � Build Integration & E2E Verification
+## Phase 6 — Build Integration & E2E Verification
 
-### 6.1 Build
+### 6.1 Build Command
 
 ```bash
-# From WSL
-cd /mnt/c/Users/swafa/Projects/Bench/ury-bench/apps/ury/frontend
-yarn install
-yarn build
-
-# Restart bench
+wsl --cd /mnt/c/Users/swafa/Projects/Bench/ury-bench/apps/ury/frontend yarn build
 wsl --cd /mnt/c/Users/swafa/Projects/Bench/ury-bench bench restart
 ```
 
-Verify output: `ury/www/ury.html` updated and assets in `ury/public/frontend/`.
-
 ### 6.2 E2E Verification Checklist
 
-1. `http://ury.local/login` ? login as `Administrator` / `swafa@ury`.
-2. Confirm redirect to `http://ury.local/ury`.
-3. Step 1 loads with English pre-selected. Detected country auto-populated.
-4. Change country ? timezone, currency, chart of accounts auto-populate.
-5. Type company name ? abbreviation auto-generates.
-6. Select Minimal. Click **Next**.
-7. Progress modal appears. Steps animate sequentially.
-8. Redirect to `/ury/configure`.
-9. All 6 configure items render.
-10. Click **Finish Setup** ? redirect to `/app`.
-11. DB check: `frappe.db.get_value('Company', company_name, 'name')` returns value.
-12. `site_config.json`: `setup_complete: 1`.
-
-### 6.3 Tests Required
-
-| Type | Scope | Tool |
-|------|-------|------|
-| Unit | `validateFieldValue` � all rules | Vitest |
-| Unit | `setupService` � mock API responses | Vitest + msw |
-| Integration | `SetupPage` � options render, country change cascade | React Testing Library |
-| E2E | Full wizard flow on ury.local | Playwright |
+1. Open `/ury` while unconfigured.
+2. Step 1 (Setup): Fill details, select Minimal, click Next.
+3. Redirect to `/ury/configure` (Step 2).
+4. Verify 6 module sections in sidebar.
+5. Fill/verify values, click `Continue`.
+6. Verify ERPNext `Item` records are created with `is_stock_item = 0` (Maintain Stock == 0) and `is_sales_item = 1`, followed by `URY Menu` creation.
+7. Redirect to `/app`.
 
 ---
 
@@ -458,25 +632,26 @@ Verify output: `ury/www/ury.html` updated and assets in `ury/public/frontend/`.
 
 | Path (relative to `apps/ury/`) | Purpose |
 |---|---|
-| `ury/controllers/setup_redirect.py` | Before-request hook |
-| `ury/api/setup.py` | Backend API module (3 endpoints) |
-| `scripts/generate_static_data.py` | One-time static JSON generator |
+| `ury/controllers/setup_redirect.py` | Before-request hook for setup redirect |
+| `ury/api/minimal/setup_organization.py` | Backend setup Step 1 API endpoints |
+| `ury/api/minimal/business_setup.py` | Backend configure Step 2 API endpoints (`submit_configure_data`, `create_setup_user`) |
+| `scripts/generate_static_data.py` | Static JSON generator |
+| `frontend/src/context/ConfigureContext.tsx` | Page 2 React Context for configuration state |
 | `frontend/src/data/forms/setup.json` | Step 1 form schema |
-| `frontend/src/data/forms/configure.json` | Step 2 config items schema |
+| `frontend/src/data/forms/configure.json` | Step 2 config metadata |
 | `frontend/src/data/validations.json` | Validation rules |
-| `frontend/src/data/static/languages.json` | Static language fallback |
-| `frontend/src/data/static/timezones.json` | Static timezone fallback |
-| `frontend/src/data/static/currencies.json` | Static currency fallback |
-| `frontend/src/data/static/countries.json` | Static country fallback |
-| `frontend/src/data/static/fy_start_dates.json` | Fiscal year options |
-| `frontend/src/services/setup.ts` | Frontend service layer |
+| `frontend/src/services/setup.ts` | Frontend service layer (Setup + Configure API calls) |
 | `frontend/src/components/setup/WizardLayout.tsx` | Shared wizard shell |
-| `frontend/src/components/setup/ProgressModal.tsx` | Animated progress overlay |
-| `frontend/src/components/setup/DynamicForm.tsx` | JSON-driven form engine |
-| `frontend/src/components/setup/FormSection.tsx` | Section grid renderer |
-| `frontend/src/components/setup/FieldRenderer.tsx` | Individual field renderer |
-| `frontend/src/components/setup/InstallationTypeCard.tsx` | Type selector card |
-| `frontend/src/components/setup/ConfigureItem.tsx` | Configure step row |
+| `frontend/src/components/setup/ProgressModal.tsx` | Animated progress modal overlay |
+| `frontend/src/components/setup/DynamicForm.tsx` | Step 1 form engine |
+| `frontend/src/components/setup/ConfigureSidebar.tsx` | Page 2 sidebar navigation component |
+| `frontend/src/components/setup/SectionShell.tsx` | Page 2 wrapper card with Skip button & header |
+| `frontend/src/components/setup/sections/BranchSection.tsx` | Branch configuration section |
+| `frontend/src/components/setup/sections/RoomSection.tsx` | URY Room configuration section |
+| `frontend/src/components/setup/sections/TableSection.tsx` | URY Table configuration section |
+| `frontend/src/components/setup/sections/MenuSection.tsx` | URY Menu, file upload & tax section |
+| `frontend/src/components/setup/sections/PaymentSection.tsx` | Mode of Payment configuration section |
+| `frontend/src/components/setup/sections/UserSection.tsx` | System user creation section |
 | `frontend/src/pages/setup/SetupPage.tsx` | Step 1 page controller |
 | `frontend/src/pages/setup/ConfigurePage.tsx` | Step 2 page controller |
 | `packages/core/src/utils/validateField.ts` | Generic validation utility |
@@ -486,15 +661,5 @@ Verify output: `ury/www/ury.html` updated and assets in `ury/public/frontend/`.
 | Path (relative to `apps/ury/`) | Change |
 |---|---|
 | `ury/hooks.py` | Add `before_request` + `/setup-wizard` route rule |
-| `frontend/src/App.tsx` | Add setup routes + SetupGuard |
+| `frontend/src/App.tsx` | Add setup routes (`/`, `/configure`) + SetupGuard |
 | `packages/core/src/index.ts` | Export `validateFieldValue` |
-
----
-
-## Open Questions
-
-1. **`frappe.boot.setup_complete`** � confirm exact key available to frontend JS before implementing `SetupGuard`.
-2. **`www/ury.html`** � confirm file exists and is wired in `hooks.py`. If absent, create following `www/pos.html` pattern.
-3. **`@ury/core` call utility** � confirm whether it re-exports `frappe-js-sdk`'s `call` or if `setup.ts` should import from `frappe-js-sdk` directly.
-4. **Progress modal synchrony** � `setup_complete` is synchronous and may take 10�30s. Decision: step animation runs client-side on a timer independently; API response completes the final step. Confirm this approach is acceptable.
-5. **Configure item navigation** � clicking a configure row opens Frappe desk form in a new tab (`window.open`). Confirm this is preferred over in-place navigation.

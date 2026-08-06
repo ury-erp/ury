@@ -101,7 +101,7 @@ Router additions (`basename="/ury"` already set in `main.tsx`):
 ### Files under `frontend/src/data/`
 
 #### `forms/setup.json`
-Two sections: `general` and `company`. Each field has:
+Form Layout (4 Rows): Row 1 (Company Name, Abbreviation), Row 2 (Your Language, Your Country), Row 3 (Timezone, Currency), Row 4 (Chart of Accounts, Financial Year Begins On). Each field has:
 - `id`, `label`, `type` (`select` | `text`), `placeholder`
 - `optionsKey` — key into the dynamic options map (fed by Phase 3 API)
 - `required: true/false`
