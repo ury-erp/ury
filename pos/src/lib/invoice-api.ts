@@ -303,9 +303,6 @@ export function resolvePrintFormat(
   order: Pick<POSInvoice, 'custom_merged_pos_invoice'>,
   defaultFormat: string | null | undefined
 ) {
-  if (order.custom_merged_pos_invoice) {
-    return MERGED_POS_INVOICE_PRINT_FORMAT;
-  }
   return defaultFormat as string;
 }
 
