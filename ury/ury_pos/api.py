@@ -452,7 +452,7 @@ def getPosInvoice(status, limit, limit_start):
             """
             SELECT 
                 name, invoice_printed, grand_total, restaurant_table, custom_merged_tables,
-                cashier, waiter, net_total, posting_time, 
+                custom_restaurant_room, cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number, 
                 posting_date, rounded_total, order_type,
                 custom_split_group, custom_split_from,
@@ -475,7 +475,7 @@ def getPosInvoice(status, limit, limit_start):
             """
             SELECT 
                 name, invoice_printed, grand_total, restaurant_table, custom_merged_tables,
-                cashier, waiter, net_total, posting_time, 
+                custom_restaurant_room, cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number, 
                 posting_date, rounded_total, order_type,
                 custom_split_group, custom_split_from,
@@ -497,7 +497,7 @@ def getPosInvoice(status, limit, limit_start):
             """
             SELECT 
                 name, invoice_printed, grand_total, restaurant_table, custom_merged_tables,
-                cashier, waiter, net_total, posting_time, 
+                custom_restaurant_room, cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number,
                 posting_date, rounded_total, order_type, additional_discount_percentage,
                 discount_amount, custom_split_group, custom_split_from,
@@ -517,7 +517,7 @@ def getPosInvoice(status, limit, limit_start):
             """
             SELECT 
                 name, invoice_printed, grand_total, restaurant_table, custom_merged_tables,
-                cashier, waiter, net_total, posting_time, 
+                custom_restaurant_room, cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number,
                 posting_date, rounded_total, order_type, additional_discount_percentage,
                 discount_amount, custom_split_group, custom_split_from,

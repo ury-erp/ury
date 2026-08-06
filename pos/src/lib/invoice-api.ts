@@ -1,5 +1,5 @@
 import { DOCTYPES } from '../data/doctypes';
-import { call, db, apiRegistry, repositories } from '@ury/core';
+import { call, db, apiRegistry, repositories, tempIDMapper } from '@ury/core';
 import { OrderStatusType, OrderType } from '../data/order-types';
 import type { Filter } from 'frappe-js-sdk/lib/db/types';
 
@@ -21,6 +21,7 @@ export interface POSInvoice {
   rounded_total: number;
   order_type: OrderType;
   custom_merged_tables?: string | null;
+  custom_restaurant_room?: string | null;
   custom_split_group?: string | null;
   custom_split_from?: string | null;
   split_index?: number;
@@ -30,6 +31,12 @@ export interface POSInvoice {
   custom_merged_total?: number | null;
   discount_amount?: number;
   additional_discount_percentage?: number;
+  /**
+   * Local sync state indicator. 'pending' means the order was created or paid
+   * while offline and has not yet synced to the server. 'synced' means it is
+   * backed by a server POS Invoice. Undefined defaults to synced.
+   */
+  sync_status?: 'synced' | 'pending' | 'failed';
 }
 
 export interface SplitGroupInvoice extends POSInvoice {
@@ -93,6 +100,7 @@ export interface MergeBillCandidate {
   status: string;
   invoice_printed: number;
   mobile_number?: string;
+  sync_status?: 'synced' | 'pending' | 'failed';
 }
 
 export interface MergeBillsResponse {
@@ -138,30 +146,145 @@ export async function getPOSInvoices({
       }
     );
 
-    const invoices = response.message?.data || [];
+    const serverInvoices = response.message?.data || [];
 
-    // Cache fetched online invoices into local orders repository
-    if (invoices.length > 0) {
+    // Fetch local pending orders from IndexedDB repository
+    const pendingOrders = await repositories.orders.getAll();
+    const localPending = pendingOrders.filter(o => o.sync_status === 'pending');
+
+    // Resolve any TEMP-* IDs to their real server IDs. If a temp order has already
+    // been synced, it should not be merged as a duplicate under its temp ID.
+    const resolvedPending = await Promise.all(
+      localPending.map(async p => {
+        const resolvedId = p.id.startsWith('TEMP-') ? await tempIDMapper.getServerId(p.id) : p.id;
+        return { pending: p, resolvedId };
+      })
+    );
+
+    // Cache server invoices locally. Preserve existing item details so a server
+    // response that omits line items does not wipe out previously cached items.
+    const syncableInvoices = serverInvoices.filter(inv => !resolvedPending.some(r => r.resolvedId === inv.name));
+    if (syncableInvoices.length > 0) {
       await repositories.orders.putMany(
-        invoices.map(inv => ({
-          id: inv.name,
-          table: inv.restaurant_table || undefined,
-          order_type: inv.order_type,
-          status: inv.status as any,
-          customer: inv.customer,
-          waiter: inv.waiter,
-          cashier: inv.cashier,
-          grand_total: inv.grand_total,
-          createdAt: inv.posting_date && inv.posting_time ? `${inv.posting_date}T${inv.posting_time}` : new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          sync_status: 'synced',
-          items: [],
-        }))
+        await Promise.all(
+          syncableInvoices.map(async inv => {
+            const existing = await repositories.orders.getById(inv.name);
+            return {
+              id: inv.name,
+              table: inv.restaurant_table || undefined,
+              room: inv.custom_restaurant_room || undefined,
+              order_type: inv.order_type,
+              status: inv.status as any,
+              customer: inv.customer,
+              waiter: inv.waiter,
+              cashier: inv.cashier,
+              grand_total: inv.grand_total,
+              createdAt: inv.posting_date && inv.posting_time ? `${inv.posting_date}T${inv.posting_time}` : new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+              sync_status: 'synced' as const,
+              // Preserve cached items if the server response did not include them.
+              items: (existing && existing.items?.length ? existing.items : []) as any,
+            };
+          })
+        )
       );
     }
 
+    // Also update the local copies of any pending orders that have been synced to
+    // a server invoice, so their sync_status flips to 'synced' in the IndexedDB
+    // cache and they are no longer treated as pending offline orders.
+    for (const { pending: p, resolvedId } of resolvedPending) {
+      if (p.id.startsWith('TEMP-') && resolvedId !== p.id) {
+        const existingServer = await repositories.orders.getById(resolvedId);
+        if (existingServer && existingServer.sync_status !== 'synced') {
+          try {
+            await repositories.orders.put({
+              ...existingServer,
+              sync_status: 'synced',
+              updatedAt: new Date().toISOString(),
+            });
+          } catch (syncedUpdateErr) {
+            console.warn(`[getPOSInvoices] Failed to flip ${resolvedId} to synced:`, syncedUpdateErr);
+          }
+        }
+      }
+    }
+
+    // Clean up any TEMP-* local orders that have already been mapped to a server invoice
+    // present in the server response. This prevents stale temp records from resurfacing.
+    for (const { pending, resolvedId } of resolvedPending) {
+      if (pending.id.startsWith('TEMP-') && resolvedId !== pending.id && serverInvoices.some(inv => inv.name === resolvedId)) {
+        try {
+          await repositories.orders.delete(pending.id);
+        } catch (cleanupErr) {
+          console.warn(`[getPOSInvoices] Failed to delete stale temp order ${pending.id}:`, cleanupErr);
+        }
+      }
+    }
+
+    // Merge local pending orders into returned invoices array for UI rendering
+    const invoiceMap = new Map<string, POSInvoice>();
+    serverInvoices.forEach(inv => invoiceMap.set(inv.name, inv));
+
+    resolvedPending.forEach(({ pending: p, resolvedId }) => {
+      // Skip temp orders that have already been synced to a server invoice; the server
+      // version (or the locally cached synced copy) is the source of truth.
+      if (p.id.startsWith('TEMP-') && resolvedId !== p.id) {
+        return;
+      }
+
+      if (
+        (status === 'Draft' && p.status === 'Draft') ||
+        ((status === 'Paid' || status === 'Recently Paid') && p.status === 'Paid') ||
+        (status === 'Unbilled' && p.status === 'Unbilled')
+      ) {
+        const createdDate = new Date(p.createdAt || Date.now());
+        const postDate = isNaN(createdDate.getTime()) ? new Date().toISOString().split('T')[0] : createdDate.toISOString().split('T')[0];
+        const postTime = isNaN(createdDate.getTime()) ? '00:00:00' : createdDate.toISOString().split('T')[1].substring(0, 8);
+
+        invoiceMap.set(p.id, {
+          name: p.id,
+          invoice_printed: 0,
+          grand_total: p.grand_total || 0,
+          restaurant_table: p.table || null,
+          cashier: p.cashier || '',
+          waiter: p.waiter || '',
+          net_total: p.grand_total || 0,
+          posting_time: postTime,
+          total_taxes_and_charges: 0,
+          customer: p.customer || 'Guest',
+          customer_name: p.customer || 'Guest',
+          status: (p.status as any) || 'Draft',
+          mobile_number: '',
+          posting_date: postDate,
+          rounded_total: p.grand_total || 0,
+          order_type: (p.order_type as any) || 'Dine-In',
+          custom_merged_tables: null,
+          custom_split_group: null,
+          custom_split_from: null,
+          sync_status: 'pending',
+          items: (p.items || []).map(i => ({
+            name: i.item,
+            item_code: i.item,
+            item_name: i.item_name,
+            description: '',
+            item_group: '',
+            image: '',
+            qty: i.qty,
+            comment: i.comment || '',
+            rate: i.rate,
+            amount: i.amount || i.rate * i.qty,
+            discount_percentage: 0,
+            discount_amount: 0,
+          })),
+        } as any);
+      }
+    });
+
+    const mergedInvoices = Array.from(invoiceMap.values());
+
     return {
-      invoices,
+      invoices: mergedInvoices,
       hasMore: response.message?.next || false
     };
   } catch (error) {
@@ -169,7 +292,7 @@ export async function getPOSInvoices({
     try {
       const cachedOrders = await repositories.orders.getAll();
       const filtered = cachedOrders.filter(o => {
-        if (status === 'Draft') return o.status === 'Draft' || o.sync_status === 'pending';
+        if (status === 'Draft') return o.status === 'Draft';
         if (status === 'Unbilled') return o.status === 'Unbilled';
         if (status === 'Recently Paid' || status === 'Paid') return o.status === 'Paid';
         return o.status === status;
@@ -201,9 +324,25 @@ export async function getPOSInvoices({
           rounded_total: o.grand_total || 0,
           order_type: (o.order_type as any) || 'Dine-In',
           custom_merged_tables: null,
+          custom_restaurant_room: o.room || null,
           custom_split_group: null,
           custom_split_from: null,
-        };
+          sync_status: o.sync_status || 'pending',
+          items: (o.items || []).map(i => ({
+            name: i.item,
+            item_code: i.item,
+            item_name: i.item_name,
+            description: '',
+            item_group: '',
+            image: '',
+            qty: i.qty,
+            comment: i.comment || '',
+            rate: i.rate,
+            amount: i.amount || i.rate * i.qty,
+            discount_percentage: 0,
+            discount_amount: 0,
+          })),
+        } as any;
       });
 
       return {
@@ -219,6 +358,20 @@ export async function getPOSInvoices({
 
 export async function getPOSInvoiceItems(invoiceId: string) {
   try {
+    const cached = await repositories.orders.getById(invoiceId);
+    if (cached && (cached.sync_status === 'pending' || invoiceId.startsWith('TEMP-'))) {
+      return {
+        items: (cached.items || []).map(i => ({
+          name: i.item,
+          item_name: i.item_name,
+          qty: i.qty,
+          rate: i.rate,
+          amount: i.amount || i.rate * i.qty,
+        })),
+        taxes: [],
+      };
+    }
+
     const endpoint = apiRegistry.getUrl('GET_POS_INVOICE_ITEMS');
     const response = await call.get<GetPOSInvoiceItemsResponse>(
       endpoint,
@@ -258,14 +411,13 @@ export async function updateInvoiceStatus(
   invoice: string,
   status: POSInvoice['status']
 ) {
-  try {
-    await call.post('ury.ury_pos.api.updatePosInvoiceStatus', {
-      invoice,
-      status,
-    });
-  } catch (error) {
-    console.warn('Error updating invoice status, queuing offline:', error);
-  }
+  // NOTE: There is NO 'updatePosInvoiceStatus' API on the backend.
+  // POS Invoice status is server-controlled:
+  //   - Draft: created by sync_order
+  //   - Unbilled: set by qz_print_update (invoice_printed=1 on table orders)
+  //   - Paid: set by make_invoice → invoice.submit()
+  // The only valid client-side operation is updating local IndexedDB state
+  // so the UI reflects the correct status while offline.
   const existing = await repositories.orders.getById(invoice);
   if (existing) {
     await repositories.orders.put({
@@ -311,6 +463,7 @@ export async function searchPosInvoice(query: string, status: string) {
         posting_date: new Date(o.createdAt || Date.now()).toISOString().split('T')[0],
         rounded_total: o.grand_total || 0,
         order_type: (o.order_type as any) || 'Dine-In',
+        sync_status: o.sync_status || 'pending',
       }));
 
       return { data: mapped, next: false };
@@ -441,6 +594,7 @@ export async function getMergeBillCandidates({
         restaurant_table: o.table || null,
         status: o.status,
         invoice_printed: o.sync_status === 'synced' ? 1 : 0,
+        sync_status: o.sync_status || 'pending',
       }));
     return { data: data.slice((page - 1) * pageSize, page * pageSize), hasMore: data.length > page * pageSize };
   }
@@ -586,10 +740,25 @@ export async function selectNetworkPrinter(orderId: string, posProfile: string, 
 
 export async function updatePrintStatus(orderId: string) {
   try {
-    await call.post('ury.ury.api.ury_print.update_print_status', {
-      invoice_id: orderId,
+    // NOTE: 'update_print_status' does NOT exist in the backend.
+    // The correct endpoint is 'qz_print_update' which sets invoice_printed=1
+    // and releases table cluster reservations if applicable.
+    await call.post('ury.ury.api.ury_print.qz_print_update', {
+      invoice: orderId,
     });
   } catch (error) {
-    console.warn('Error updating print status:', error);
+    console.warn('[updatePrintStatus] Error calling qz_print_update:', error);
+    // Update local IndexedDB flag so offline print status is tracked
+    try {
+      const cached = await repositories.orders.getById(orderId);
+      if (cached) {
+        await repositories.orders.put({
+          ...cached,
+          updatedAt: new Date().toISOString(),
+        } as any);
+      }
+    } catch (localErr) {
+      console.warn('[updatePrintStatus] Failed to update local order cache:', localErr);
+    }
   }
 }

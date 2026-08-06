@@ -149,28 +149,31 @@ export interface AggregatorEntity {
   price_list?: string;
 }
 
-/**
- * 7. Sync Queue Item Entity (Collection: 'sync_queue')
- */
 export interface SyncQueueEntity {
-  /** Primary Key: Auto-generated UUID */
-  id: string;
-  /** Operation action name (e.g. sync_order, make_payment) */
-  action: string;
-  /** Target API endpoint or doctype */
-  endpoint: string;
-  /** Command payload data object */
+  id: string; // compatibility mapping
+  action: string; // compatibility mapping
+  endpoint: string; // compatibility mapping
+  priority: number; // compatibility mapping
+  timestamp: string; // compatibility mapping
+
+  command_id?: string;
+  client_request_id?: string;
+  operation_type?: string;
+  entity_type?: string;
+  entity_id?: string;
+  temporary_id?: string | null;
+  server_id?: string | null;
+  dependency_ids?: string[];
+  dependencies?: string[]; // legacy alias used by some enqueue sites
   payload: Record<string, unknown>;
-  /** Creation ISO timestamp */
-  timestamp: string;
-  /** Execution status */
+  payload_hash?: string;
+  retry_count?: number;
   status: 'PENDING' | 'SYNCING' | 'FAILED' | 'COMPLETED';
-  /** Number of failed retry attempts */
-  attempts: number;
-  /** Priority ordering (1 = Highest) */
-  priority: number;
-  /** Error message if execution failed */
+  created_at?: string;
+  updated_at?: string;
+  version?: number;
   last_error?: string | null;
+  attempts?: number;
 }
 
 /**

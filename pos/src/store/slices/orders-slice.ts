@@ -1,6 +1,6 @@
 import { StateCreator } from 'zustand';
 import { OrderType } from '../../data/order-types';
-import { call } from '@ury/core';
+import { projectionBus, syncEngine } from '@ury/core';
 import { getPOSInvoices, getPOSInvoiceItems, getSplitGroup, mapSplitGroupInvoiceToPOSInvoice, POSInvoiceItem, POSInvoiceTax } from '../../lib/invoice-api';
 import { searchPosInvoice } from '../../lib/invoice-api';
 
@@ -208,19 +208,28 @@ export const createOrdersSlice: StateCreator<
     try {
       set({ orderLoading: true, error: null });
 
-      await call.post('ury.ury_pos.api.updatePosInvoiceStatus', {
-        invoice: orderId,
-        status,
-      });
+      // NOTE: There is no 'updatePosInvoiceStatus' backend endpoint.
+      // POS invoice status is server-controlled (sync_order → Draft, make_invoice → Paid).
+      // We only update the local IndexedDB state here to keep UI in sync.
+      // The sync engine handles propagating the correct status to the backend.
+      const { repositories: repos } = await import('@ury/core');
+      const existing = await repos.orders.getById(orderId);
+      if (existing) {
+        await repos.orders.put({
+          ...existing,
+          status: status as any,
+          updatedAt: new Date().toISOString(),
+        });
+      }
 
       // Refresh the orders list after status update
       await get().fetchOrders(get().pagination.currentPage);
-      
+
       set({ orderLoading: false });
     } catch (error) {
-      set({ 
+      set({
         error: error instanceof Error ? error.message : 'Failed to update order status',
-        orderLoading: false 
+        orderLoading: false
       });
     }
   },

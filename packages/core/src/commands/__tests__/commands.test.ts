@@ -124,3 +124,47 @@ test('5. CommandQueueManager — Retry count and error tracking on failure', asy
   assert.equal(failedRecord.attempts, 1);
   assert.equal(failedRecord.last_error, 'Server unavailable 503');
 });
+
+test('6. CommandQueueManager — Payment command with TEMP-* invoice is deferred until parent sync_order completes', async () => {
+  const { PaymentCommand } = await import('../payment.command');
+  const TEMP_ID = 'TEMP-ORD-DEFER-001';
+
+  // Enqueue a payment command that references a TEMP-* invoice without explicit dependency
+  const payCmd = new PaymentCommand(
+    { invoice: TEMP_ID, payments: [{ mode_of_payment: 'Cash', amount: 100 }] },
+    { id: 'CMD-PAY-DEFERRED' }
+  );
+  await queueMgr.enqueue(payCmd);
+
+  // Payment should not be ready because its parent sync_order has not completed
+  let pending = await queueMgr.getPendingCommands();
+  assert.equal(pending.length, 0, 'Payment command must be deferred when parent sync_order is incomplete');
+
+  // Simulate parent sync_order completing
+  await repos.syncQueue.put({
+    id: `SYNC-ORDER-${TEMP_ID}`,
+    action: 'sync_order',
+    endpoint: 'ury.ury.doctype.ury_order.ury_order.sync_order',
+    payload: { temp_id: TEMP_ID },
+    timestamp: new Date().toISOString(),
+    status: 'COMPLETED',
+    priority: 1,
+  });
+
+  // Now payment should be ready
+  pending = await queueMgr.getPendingCommands();
+  assert.equal(pending.length, 1);
+  assert.equal(pending[0].id, 'CMD-PAY-DEFERRED');
+});
+
+test('7. CommandQueueManager — markPending reverts a command to PENDING without incrementing attempts', async () => {
+  const cmd = new DeleteDraftCommand({ invoice: 'DRAFT-PENDING-TEST' });
+  await queueMgr.enqueue(cmd);
+  await queueMgr.markSyncing(cmd.envelope.id);
+  await queueMgr.markPending(cmd.envelope.id);
+
+  const record = await repos.syncQueue.getById(cmd.envelope.id);
+  assert.ok(record);
+  assert.equal(record.status, 'PENDING');
+  assert.equal(record.attempts || record.retry_count || 0, 0);
+});

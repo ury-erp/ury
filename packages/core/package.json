@@ -26,6 +26,7 @@
     "frappe-js-sdk": "^1.10.0",
     "jsrsasign": "^11.1.0",
     "qz-tray": "^2.2.5",
+    "tsx": "^4.23.9",
     "typescript": "~5.7.2"
   },
   "dependencies": {

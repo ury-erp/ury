@@ -70,6 +70,29 @@ export class UryPosDatabase extends Dexie {
           updatedAt: new Date().toISOString(),
         });
       });
+
+    // ==========================================
+    // VERSION 3: REDESIGNED COMMAND QUEUE SCHEMATIC
+    // ==========================================
+    this.version(3)
+      .stores({
+        orders: 'id, table, status, order_type, customer, cashier, sync_status, createdAt, updatedAt',
+        restaurantTables: 'name, restaurant_room, occupied, merged_with',
+        menu: 'id, category, course, special_dish, disabled',
+        customers: 'id, phone, name, customer_group',
+        payment_modes: 'id, name, enabled',
+        aggregators: 'name, customer, enabled',
+        sync_queue: 'id, command_id, status, operation_type, created_at, *dependency_ids',
+        metadata: 'key, updatedAt',
+        settings: 'key, updatedAt',
+      })
+      .upgrade(tx => {
+        return tx.table('metadata').put({
+          key: 'schema_version',
+          value: '3',
+          updatedAt: new Date().toISOString(),
+        });
+      });
   }
 }
 

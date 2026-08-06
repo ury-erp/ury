@@ -24,4 +24,19 @@ export class TableRepository
   async findOccupied(): Promise<TableEntity[]> {
     return this.table.where('occupied').equals(1).toArray();
   }
+
+  /** Mark table occupied or free */
+  async setOccupied(name: string, occupied: boolean): Promise<void> {
+    const existing = await this.getById(name);
+    if (existing) {
+      existing.occupied = occupied ? 1 : 0;
+      await this.put(existing);
+    }
+  }
+
+  /** Update table transfer state */
+  async transferTable(source: string, target: string): Promise<void> {
+    await this.setOccupied(source, false);
+    await this.setOccupied(target, true);
+  }
 }

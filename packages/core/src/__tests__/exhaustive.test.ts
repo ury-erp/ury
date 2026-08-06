@@ -116,7 +116,7 @@ test('Scenario 4: Payment Offline — Enqueue PaymentCommand and execute idempot
   );
 
   const env = cmd.toEnvelope();
-  assert.equal(env.endpoint, 'ury.ury_pos.api.createPaymentEntry');
+  assert.equal(env.endpoint, 'ury.ury.doctype.ury_order.ury_order.make_invoice');
   assert.equal(env.priority, 1);
 
   await queueMgr.enqueue(cmd);

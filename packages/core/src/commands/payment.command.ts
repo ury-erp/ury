@@ -16,7 +16,7 @@ export interface PaymentPayload {
 }
 
 export class PaymentCommand extends BaseCommand<PaymentPayload> {
-  static readonly ENDPOINT = apiRegistry.getUrl('CREATE_PAYMENT_ENTRY');
+  static readonly ENDPOINT = apiRegistry.getUrl('MAKE_INVOICE');
   static readonly ACTION_NAME = 'PaymentCommand';
 
   constructor(

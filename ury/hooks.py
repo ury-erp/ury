@@ -214,7 +214,7 @@ scheduler_events = {
 # Request Events
 # ----------------
 # before_request = ["ury.utils.before_request"]
-# after_request = ["ury.utils.after_request"]
+after_request = ["ury.utils.after_request"]
 
 # Job Events
 # ----------

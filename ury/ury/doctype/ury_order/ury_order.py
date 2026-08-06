@@ -1294,8 +1294,8 @@ def make_invoice(customer, payments, cashier, pos_profile,owner, additionalDisco
             release_invoice.restaurant_table,
             release_invoice.custom_merged_tables,
         )
-        
-        
+
+    return {"status": "success", "name": invoice.name}
 
 # Cancel KOT Doc Creation
 def cancel_kot(invoice_id):

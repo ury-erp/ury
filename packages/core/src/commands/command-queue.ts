@@ -6,6 +6,17 @@
 import { repositories, type SyncQueueRepository } from '../storage';
 import type { CommandEnvelope, ICommand } from './command.interface';
 
+/** Returns true if the envelope targets the make_invoice payment endpoint. */
+function isPaymentEnvelope(env: CommandEnvelope): boolean {
+  const action = env.actionName || '';
+  const endpoint = env.endpoint || '';
+  return (
+    action.includes('make_invoice') ||
+    endpoint.includes('make_invoice') ||
+    env.operation_type === 'PAY_ORDER'
+  );
+}
+
 export class CommandQueueManager {
   private queueRepo: SyncQueueRepository;
 
@@ -19,20 +30,34 @@ export class CommandQueueManager {
   async enqueue<P = any>(command: ICommand<P>): Promise<string> {
     const env = command.toEnvelope();
 
-    await this.queueRepo.put({
+    const dbEntity: any = {
+      command_id: env.command_id || env.id,
+      client_request_id: env.client_request_id || `REQ-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      operation_type: env.operation_type || 'CREATE_ORDER',
+      entity_type: env.entity_type || 'Order',
+      entity_id: env.entity_id || env.id,
+      temporary_id: env.temporary_id || null,
+      server_id: env.server_id || null,
+      dependency_ids: env.dependency_ids || env.dependencies || [],
+      payload: env.payload as Record<string, unknown>,
+      payload_hash: env.payload_hash || '',
+      retry_count: env.retry_count ?? env.retryCount ?? 0,
+      status: env.status || 'PENDING',
+      created_at: env.created_at || env.timestamp || new Date().toISOString(),
+      updated_at: env.updated_at || new Date().toISOString(),
+      version: env.version || 1,
+      last_error: env.lastError || null,
+
+      // Compatibility fields
       id: env.id,
       action: env.actionName || env.endpoint,
       endpoint: env.endpoint,
-      payload: env.payload as Record<string, unknown>,
-      timestamp: env.timestamp,
-      status: env.status,
-      attempts: env.retryCount,
-      priority: env.priority,
-      last_error: env.lastError || null,
-      dependencies: env.dependencies || [],
-    } as any);
+      priority: env.priority ?? 1,
+      timestamp: env.timestamp || new Date().toISOString(),
+    };
 
-    return env.id;
+    await this.queueRepo.put(dbEntity);
+    return dbEntity.command_id;
   }
 
   /**
@@ -41,33 +66,79 @@ export class CommandQueueManager {
   async getPendingCommands(): Promise<CommandEnvelope[]> {
     const rawEntities = await this.queueRepo.findPending();
 
-    const envelopes: CommandEnvelope[] = rawEntities.map(entity => ({
-      id: entity.id,
-      endpoint: entity.endpoint,
-      payload: entity.payload,
-      retryCount: entity.attempts || 0,
-      priority: entity.priority || 1,
-      dependencies: (entity as any).dependencies || [],
-      status: entity.status as any,
-      timestamp: entity.timestamp,
-      version: (entity as any).version || 1,
-      actionName: entity.action,
-      lastError: entity.last_error || null,
-    }));
+    const envelopes: CommandEnvelope[] = rawEntities.map(entity => {
+      const e = entity as any;
+      const cmdId = e.command_id || e.id;
+      return {
+        command_id: cmdId,
+        client_request_id: e.client_request_id || '',
+        operation_type: e.operation_type || 'CREATE_ORDER',
+        entity_type: e.entity_type || '',
+        entity_id: e.entity_id || '',
+        temporary_id: e.temporary_id || null,
+        server_id: e.server_id || null,
+        dependency_ids: e.dependency_ids || e.dependencies || [],
+        payload: e.payload,
+        payload_hash: e.payload_hash || '',
+        retry_count: e.retry_count ?? e.attempts ?? 0,
+        status: e.status || 'PENDING',
+        created_at: e.created_at || e.timestamp,
+        updated_at: e.updated_at || e.timestamp,
+        version: e.version || 1,
+        actionName: e.action,
+        lastError: e.last_error || null,
+
+        // Compatibility
+        id: cmdId,
+        endpoint: e.endpoint || '',
+        priority: e.priority || 1,
+        dependencies: e.dependency_ids || e.dependencies || [],
+        retryCount: e.retry_count ?? e.attempts ?? 0,
+        timestamp: e.created_at || e.timestamp,
+      };
+    });
 
     // Filter out commands whose prerequisite dependencies have not completed yet
+    const allItems = await this.queueRepo.getAll();
     const completedIds = new Set(
-      (await this.queueRepo.getAll())
+      allItems
         .filter(e => e.status === 'COMPLETED')
-        .map(e => e.id)
+        .map(e => e.command_id || e.id)
     );
 
     const readyEnvelopes = envelopes.filter(env => {
-      if (!env.dependencies || env.dependencies.length === 0) return true;
-      return env.dependencies.every(depId => completedIds.has(depId));
+      const deps = env.dependency_ids;
+      if (!deps || deps.length === 0) {
+        // Strict guard: payment commands that still reference a TEMP-* invoice must not
+        // execute until the parent sync_order command has completed and remapped the temp
+        // ID to a real server invoice. This prevents make_invoice from creating empty
+        // paid invoices when the parent order has not synced yet.
+        if (isPaymentEnvelope(env)) {
+          const invoice = (env.payload as any)?.invoice;
+          if (invoice && typeof invoice === 'string' && invoice.startsWith('TEMP-')) {
+            const parentCompleted = allItems.some(item => {
+              if (item.status !== 'COMPLETED') return false;
+              const p = item.payload as any;
+              const itemId = item.command_id || item.id;
+              return (
+                itemId === `SYNC-ORDER-${invoice}` ||
+                itemId === `CMD-CREATE-ORD-${invoice}` ||
+                p?.temp_id === invoice ||
+                p?.invoice === invoice
+              );
+            });
+            if (!parentCompleted) {
+              console.warn(`[CommandQueueManager] Payment command ${env.command_id || env.id} deferred: parent sync_order for ${invoice} has not completed.`);
+              return false;
+            }
+          }
+        }
+        return true;
+      }
+      return deps.every(depId => completedIds.has(depId));
     });
 
-    return readyEnvelopes.sort((a, b) => a.priority - b.priority || a.timestamp.localeCompare(b.timestamp));
+    return readyEnvelopes.sort((a, b) => a.priority - b.priority || (a.created_at || '').localeCompare(b.created_at || ''));
   }
 
   /**
@@ -85,6 +156,19 @@ export class CommandQueueManager {
     const existing = await this.queueRepo.getById(id);
     if (existing) {
       existing.status = 'SYNCING';
+      existing.updated_at = new Date().toISOString();
+      await this.queueRepo.put(existing);
+    }
+  }
+
+  /**
+   * Mark command status as PENDING (used to defer a command without incrementing retry count).
+   */
+  async markPending(id: string): Promise<void> {
+    const existing = await this.queueRepo.getById(id);
+    if (existing) {
+      existing.status = 'PENDING';
+      existing.updated_at = new Date().toISOString();
       await this.queueRepo.put(existing);
     }
   }
@@ -96,6 +180,7 @@ export class CommandQueueManager {
     const existing = await this.queueRepo.getById(id);
     if (existing) {
       existing.status = 'COMPLETED';
+      existing.updated_at = new Date().toISOString();
       await this.queueRepo.put(existing);
     }
   }
@@ -108,7 +193,9 @@ export class CommandQueueManager {
     if (existing) {
       existing.status = 'FAILED';
       existing.attempts = (existing.attempts || 0) + 1;
+      existing.retry_count = (existing.retry_count || 0) + 1;
       existing.last_error = error;
+      existing.updated_at = new Date().toISOString();
       await this.queueRepo.put(existing);
     }
   }
@@ -128,9 +215,85 @@ export class CommandQueueManager {
     const all = await this.queueRepo.getAll();
     for (const item of all) {
       if (item.status === 'COMPLETED') {
-        await this.queueRepo.delete(item.id);
+        const delId = item.id || item.command_id || '';
+        if (delId) {
+          await this.queueRepo.delete(delId);
+        }
       }
     }
+  }
+
+  /**
+   * Update the payload of a queued command in-place.
+   * Used by SyncEngine to patch payment command invoice IDs after temp→server ID resolution.
+   */
+  async updatePayload(id: string, newPayload: Record<string, unknown>): Promise<void> {
+    const existing = await this.queueRepo.getById(id);
+    if (existing) {
+      existing.payload = newPayload;
+      existing.updated_at = new Date().toISOString();
+      await this.queueRepo.put(existing);
+    }
+  }
+
+  /**
+   * Replace a queued command's dependency list. Used once a parent command has
+   * succeeded so that dependent commands are no longer gated on a COMPLETED
+   * queue record that is about to be purged.
+   */
+  async updateDependencies(id: string, newDependencies: string[]): Promise<void> {
+    const existing = await this.queueRepo.getById(id);
+    if (existing) {
+      existing.dependency_ids = newDependencies;
+      existing.dependencies = newDependencies;
+      existing.updated_at = new Date().toISOString();
+      await this.queueRepo.put(existing);
+    }
+  }
+
+  /**
+   * Find all pending MAKE_INVOICE commands whose invoice field matches a given temp ID.
+   * Used to patch payment commands after sync_order resolves the real server invoice ID.
+   */
+  async findPaymentCommandsForTempId(tempId: string): Promise<CommandEnvelope[]> {
+    const all = await this.queueRepo.getAll();
+    const paymentCmds = all.filter(e =>
+      e.status === 'PENDING' &&
+      (e.action === 'make_invoice' || e.action === 'PaymentCommand' || e.operation_type === 'PAY_ORDER') &&
+      ((e.payload as any)?.invoice === tempId || e.temporary_id === tempId)
+    );
+
+    return paymentCmds.map(entity => {
+      const e = entity as any;
+      const cmdId = e.command_id || e.id;
+      return {
+        command_id: cmdId,
+        client_request_id: e.client_request_id || '',
+        operation_type: e.operation_type || 'PAY_ORDER',
+        entity_type: e.entity_type || '',
+        entity_id: e.entity_id || '',
+        temporary_id: e.temporary_id || null,
+        server_id: e.server_id || null,
+        dependency_ids: e.dependency_ids || e.dependencies || [],
+        payload: e.payload,
+        payload_hash: e.payload_hash || '',
+        retry_count: e.retry_count ?? e.attempts ?? 0,
+        status: e.status || 'PENDING',
+        created_at: e.created_at || e.timestamp,
+        updated_at: e.updated_at || e.timestamp,
+        version: e.version || 1,
+        actionName: e.action,
+        lastError: e.last_error || null,
+
+        // Compatibility
+        id: cmdId,
+        endpoint: e.endpoint || '',
+        priority: e.priority || 1,
+        dependencies: e.dependency_ids || e.dependencies || [],
+        retryCount: e.retry_count ?? e.attempts ?? 0,
+        timestamp: e.created_at || e.timestamp,
+      };
+    });
   }
 }
 

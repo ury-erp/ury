@@ -8,29 +8,45 @@ export type CommandStatus = 'PENDING' | 'SYNCING' | 'FAILED' | 'COMPLETED';
 /**
  * 9 Mandatory Fields on CommandEnvelope as specified by system requirements
  */
+export type OperationType =
+  | 'CREATE_ORDER'
+  | 'UPDATE_ORDER'
+  | 'DELETE_ORDER'
+  | 'PAY_ORDER'
+  | 'PRINT_ORDER'
+  | 'MERGE_TABLE'
+  | 'TRANSFER_TABLE'
+  | 'SPLIT_BILL'
+  | 'CREATE_CUSTOMER'
+  | 'UPDATE_CUSTOMER'
+  | 'AGGREGATOR_ORDER';
+
 export interface CommandEnvelope<P = any> {
-  /** 1. Unique UUID */
-  id: string;
-  /** 2. Whitelisted API Endpoint Name */
-  endpoint: string;
-  /** 3. Command payload object */
+  command_id?: string; // matches old 'id'
+  client_request_id?: string;
+  operation_type?: OperationType;
+  entity_type?: string;
+  entity_id?: string;
+  temporary_id?: string | null;
+  server_id?: string | null;
+  dependency_ids?: string[]; // matches old 'dependencies'
   payload: P;
-  /** 4. Retry count for failed attempts */
-  retryCount: number;
-  /** 5. Priority level (1 = Highest) */
-  priority: number;
-  /** 6. Array of prerequisite command UUIDs */
-  dependencies: string[];
-  /** 7. Lifecycle execution status */
+  payload_hash?: string;
+  retry_count?: number; // matches old 'retryCount'
   status: CommandStatus;
-  /** 8. Creation timestamp ISO string */
-  timestamp: string;
-  /** 9. Command schema version */
+  created_at?: string; // matches old 'timestamp'
+  updated_at?: string;
   version: number;
-  /** Optional action name tag */
   actionName?: string;
-  /** Optional last error message */
   lastError?: string | null;
+
+  // Compatibility mapping for existing references
+  id: string;
+  endpoint: string;
+  priority: number;
+  retryCount?: number;
+  dependencies?: string[];
+  timestamp?: string;
 }
 
 export interface ICommand<P = any> {

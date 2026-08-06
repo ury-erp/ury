@@ -28,4 +28,26 @@ export class OrderRepository
       .filter(order => order.status !== 'Paid' && order.status !== 'Cancelled')
       .first();
   }
+
+  /** Update order status to Paid and lock order locally */
+  async markPaid(id: string): Promise<void> {
+    const existing = await this.getById(id);
+    if (existing) {
+      existing.status = 'Paid';
+      (existing as any).is_locked = 1;
+      existing.updatedAt = new Date().toISOString();
+      await this.put(existing);
+    }
+  }
+
+  /** Update order status to Cancelled and lock order locally */
+  async markCancelled(id: string): Promise<void> {
+    const existing = await this.getById(id);
+    if (existing) {
+      existing.status = 'Cancelled';
+      (existing as any).is_locked = 1;
+      existing.updatedAt = new Date().toISOString();
+      await this.put(existing);
+    }
+  }
 }

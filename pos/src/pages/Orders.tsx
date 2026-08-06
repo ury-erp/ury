@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef } from 'react';
-import { Clock, User, UserCheck, Receipt, Printer, Pencil, X, GitBranch, GitMerge } from 'lucide-react';
+import { Clock, User, UserCheck, Receipt, Printer, Pencil, X, GitBranch, GitMerge, CloudOff, RefreshCw } from 'lucide-react';
 import { Badge, Button, Card, CardContent } from '@ury/ui';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@ury/ui';
 import { showToast } from '@ury/ui';
@@ -17,7 +17,7 @@ import OrderActionsMenu from '../components/OrderActionsMenu';
 import SplitGroupPanel from '../components/SplitGroupPanel';
 import MergedBillPanel from '../components/MergedBillPanel';
 import { printOrder } from '../lib/print';
-import { call } from '@ury/core';
+import { call, projectionBus } from '@ury/core';
 import { splitBill } from '../lib/order-api';
 import {
   getOrdersTabForInvoice,
@@ -38,7 +38,11 @@ function getOrderTableLabel(order: Pick<POSInvoice, 'restaurant_table' | 'custom
 }
 
 function isOrderEditable(status: string) {
-  return status === 'Draft' || status === 'Unbilled' || status === 'Recently Paid';
+  return status === 'Draft' || status === 'Unbilled';
+}
+
+function isPendingSync(order: POSInvoice): boolean {
+  return order.sync_status === 'pending' || order.name.startsWith('TEMP-');
 }
 
 function isSplitBill(order: Pick<POSInvoice, 'split_total' | 'custom_split_group' | 'custom_split_from'>) {
@@ -133,6 +137,17 @@ export default function Orders() {
     fetchOrders();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderSearchQuery]);
+
+  // Refresh the orders list automatically when the sync engine emits projection
+  // updates (e.g. after offline orders are synced or temp records are cleared).
+  useEffect(() => {
+    const unsubscribe = projectionBus.subscribe((event) => {
+      if (event === 'ORDERS_UPDATED' || event === 'ALL_UPDATED') {
+        fetchOrders();
+      }
+    });
+    return () => unsubscribe();
+  }, [fetchOrders]);
 
 
   // Function to format the date and time
@@ -394,6 +409,16 @@ export default function Orders() {
                         {order.name}
                       </h3>
                       <div className="flex shrink-0 items-center gap-1">
+                        {isPendingSync(order) && (
+                          <Badge
+                            variant="outline"
+                            className="shrink-0 gap-1 border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-50"
+                            title={t('orders.pending_sync_tooltip') || 'Pending sync — created or paid while offline'}
+                          >
+                            <CloudOff className="h-3 w-3" />
+                            {t('orders.pending_sync') || 'Pending'}
+                          </Badge>
+                        )}
                         {mergedBill && (
                           <Badge
                             variant="outline"
@@ -556,6 +581,16 @@ export default function Orders() {
                         <X className="w-4 h-4" />
                       </button>
                     </>
+                  )}
+                  {isPendingSync(selectedOrder) && (
+                    <Badge
+                      variant="outline"
+                      className="shrink-0 gap-1 border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-50"
+                      title={t('orders.pending_sync_tooltip') || 'Pending sync — created or paid while offline'}
+                    >
+                      <CloudOff className="h-3 w-3" />
+                      {t('orders.pending_sync') || 'Pending Sync'}
+                    </Badge>
                   )}
                   <Badge variant={getBadgeVariant(selectedOrder.status)}>
                     {t(`order_status_types.${selectedOrder.status.toLowerCase().replace(/ /g, '_')}`)}

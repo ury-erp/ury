@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { X, Percent, Coins } from 'lucide-react';
 import { usePOSStore } from '../store/pos-store';
 import { formatCurrency } from '@ury/core';
-import { Button, Input, Dialog, DialogContent } from '@ury/ui';
-import { call } from '@ury/core';
+import { Button, Input, Dialog, DialogContent, showToast } from '@ury/ui';
+import { call, repositories, apiRegistry, projectionBus } from '@ury/core';
 import { DEFAULT_PAYMENT_MODE } from '../data/order-types';
 import { t } from '../i18n';
 
@@ -138,26 +138,97 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   const handlePayment = async () => {
     setIsProcessing(true);
     setError(null);
+    const paymentPayload = {
+      additionalDiscount: discountValue ? parseFloat(discountValue) : null,
+      cashier,
+      customer,
+      invoice,
+      owner,
+      payments,
+      pos_profile: posProfile,
+      table,
+    };
+
     try {
-      await call.post('ury.ury.doctype.ury_order.ury_order.make_invoice', {
-        additionalDiscount: discountValue ? parseFloat(discountValue) : null,
-        cashier,
-        customer,
-        invoice,
-        owner,
-        payments,
-        pos_profile: posProfile,
-        table,
-      });
-      // Show toast and reload orders (assume showToast and reload available globally)
-      if (typeof window !== 'undefined' && (window as any).showToast) {
-        (window as any).showToast.success('Payment successful');
+      await call.post('ury.ury.doctype.ury_order.ury_order.make_invoice', paymentPayload);
+      if (invoice && invoice.startsWith('TEMP-')) {
+        try {
+          await repositories.orders.delete(invoice);
+        } catch (delErr) {
+          console.warn('[handlePayment] Failed to delete temporary offline order after payment:', delErr);
+        }
       }
+      showToast.success(t('payment.payment_success') || 'Payment successful');
       onClose();
       clearSelectedOrder();
       await fetchOrders();
-    } catch (err) {
-      setError((err as Error).message);
+    } catch (err: any) {
+      console.warn('[handlePayment] Network request failed, queueing payment command offline:', err);
+      try {
+        const endpoint = apiRegistry.getUrl('MAKE_INVOICE');
+
+        // Generate a stable idempotency key for this payment so retries don't double-pay
+        const paymentIdempotencyKey = `PAY-${invoice}-${Date.now()}`;
+        const cmdId = `SYNC-PAYMENT-${invoice}-${Date.now()}`;
+
+        // Find the parent sync_order command for this invoice to set dependency ordering.
+        // The parent command stores invoice = null and temp_id = the temp order ID in its payload.
+        // We also check if the current invoice IS a temp ID (offline-created order).
+        // For TEMP-* invoices, always declare a hard dependency on the expected parent
+        // command ID so the queue cannot execute the payment before the order exists on
+        // the server, even if the parent command is not currently in PENDING status.
+        const allCmds = await repositories.syncQueue.getAll();
+        const parentCmd = allCmds.find(c => {
+          const p = c.payload as any;
+          return (
+            // Parent sync_order command whose temp_id matches this invoice
+            p?.temp_id === invoice ||
+            // Or whose command ID contains the invoice ID
+            c.id === `SYNC-ORDER-${invoice}` ||
+            // Legacy: payload.invoice matches (older format)
+            (p?.invoice === invoice && c.action === 'sync_order')
+          );
+        });
+
+        const dependencies: string[] = [];
+        if (parentCmd) {
+          dependencies.push(parentCmd.id);
+        } else if (invoice && invoice.startsWith('TEMP-')) {
+          // Hard dependency on the expected parent sync_order command ID even if it is
+          // not yet enqueued. The CommandQueueManager and SyncEngine will keep the
+          // payment command deferred until this parent completes.
+          dependencies.push(`SYNC-ORDER-${invoice}`);
+        }
+
+        // Store payment with idempotency_key in payload for backend deduplication
+        const queuePayload = {
+          ...paymentPayload,
+          idempotency_key: paymentIdempotencyKey,
+        };
+
+        await repositories.syncQueue.put({
+          id: cmdId,
+          action: 'make_invoice',
+          endpoint: endpoint,
+          payload: queuePayload as unknown as Record<string, unknown>,
+          timestamp: new Date().toISOString(),
+          status: 'PENDING',
+          attempts: 0,
+          priority: 1,
+          dependencies,
+        } as any);
+
+        // Mark order as Paid in IndexedDB immediately so the UI reflects payment status
+        await repositories.orders.markPaid(invoice);
+        projectionBus.emit('ORDERS_UPDATED');
+
+        showToast.success(t('payment.payment_queued_offline') || 'Payment processed offline');
+        onClose();
+        clearSelectedOrder();
+        await fetchOrders();
+      } catch (offlineErr: any) {
+        setError(offlineErr?.message || (err as Error).message || 'Failed to process payment');
+      }
     } finally {
       setIsProcessing(false);
     }

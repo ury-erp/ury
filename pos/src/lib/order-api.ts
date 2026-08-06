@@ -1,4 +1,4 @@
-import { call, repositories, apiRegistry } from '@ury/core';
+import { call, repositories, apiRegistry, projectionBus, type OrderEntity } from '@ury/core';
 
 export interface POSInvoiceItem {
   name: string;
@@ -131,6 +131,9 @@ export interface SyncOrderData {
   no_of_pax: number;
   invoice?: string;
   last_invoice?: string;
+  /** For Aggregator orders — the aggregator partner ID (Swiggy, Zomato, etc.) */
+  aggregator_id?: string | null;
+  room?: string;
   items: Array<{
     item: string;
     item_name: string;
@@ -141,8 +144,15 @@ export interface SyncOrderData {
   waiter?: string;
   customer?: string;
   cashier?: string;
+  owner?: string;
   pos_profile: string;
   comments?: string;
+  /**
+   * Idempotency key for deduplication on retry.
+   * The backend uses this to prevent duplicate POS Invoice creation.
+   * Must be a stable UUID (not timestamp-based) so retries send the same key.
+   */
+  idempotency_key?: string;
 }
 
 export const syncOrder = async (data: SyncOrderData) => {
@@ -153,12 +163,28 @@ export const syncOrder = async (data: SyncOrderData) => {
 
     // Cache updated order in local repository
     if (result && result.name) {
+      // Preserve local lifecycle status when promoting a temp order. If the cashier
+      // already paid the order offline, the local record is 'Paid'; we must not
+      // overwrite it with 'Draft' when the online sync_order returns.
+      let localStatus: OrderEntity['status'] = 'Draft';
+      if (data.invoice && data.invoice.startsWith('TEMP-')) {
+        try {
+          const localTemp = await repositories.orders.getById(data.invoice);
+          if (localTemp && localTemp.status === 'Paid') {
+            localStatus = 'Paid';
+          }
+          await repositories.orders.delete(data.invoice);
+        } catch (delErr) {
+          console.warn('[syncOrder] Failed to delete temporary offline order:', delErr);
+        }
+      }
       const totalAmount = data.items.reduce((sum, i) => sum + i.rate * i.qty, 0);
       await repositories.orders.put({
         id: result.name,
         table: data.table,
+        room: data.room,
         order_type: data.order_type,
-        status: 'Draft',
+        status: localStatus,
         no_of_pax: data.no_of_pax,
         customer: data.customer,
         waiter: data.waiter,
@@ -183,15 +209,34 @@ export const syncOrder = async (data: SyncOrderData) => {
   } catch (error: any) {
     console.warn('Network syncOrder failed, storing locally in orders repository and queueing sync:', error);
 
-    const tempId = data.invoice || `TEMP-ORD-${Date.now()}`;
+    // Generate stable unique temp ID — UUID-based to prevent collisions on retry
+    const tempId = data.invoice && data.invoice.startsWith('TEMP-')
+      ? data.invoice  // reuse existing temp ID for updates
+      : `TEMP-ORD-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+
+    // Stable idempotency key for backend deduplication
+    const idempotencyKey = data.idempotency_key || tempId;
+
     const totalAmount = data.items.reduce((sum, i) => sum + i.rate * i.qty, 0);
+
+    // Preserve local Paid status if the temp order was already paid offline.
+    let offlineStatus: OrderEntity['status'] = 'Draft';
+    try {
+      const existingTemp = await repositories.orders.getById(tempId);
+      if (existingTemp && existingTemp.status === 'Paid') {
+        offlineStatus = 'Paid';
+      }
+    } catch (lookupErr) {
+      console.warn('[syncOrder] Could not read existing temp order status:', lookupErr);
+    }
 
     // 1. Store locally in orders repository
     await repositories.orders.put({
       id: tempId,
       table: data.table,
+      room: data.room,
       order_type: data.order_type,
-      status: 'Draft',
+      status: offlineStatus,
       no_of_pax: data.no_of_pax,
       customer: data.customer,
       waiter: data.waiter,
@@ -211,21 +256,38 @@ export const syncOrder = async (data: SyncOrderData) => {
       sync_status: 'pending',
     });
 
-    // 2. Enqueue command into sync_queue repository
+    // 2. Enqueue command into sync_queue — payload must include:
+    //    - invoice: tempId (for TempIDMapper to remap when replaying)
+    //    - temp_id: tempId (for parent reference by payment commands)
+    //    - idempotency_key: stable UUID (backend deduplication on retry)
+    //    - aggregator_id: forwarded as-is for aggregator orders
+    const queuePayload: Record<string, unknown> = {
+      ...data,
+      invoice: null,      // clear any stale server reference — backend creates new invoice
+      last_invoice: null, // same: prevent lookup of wrong draft
+      temp_id: tempId,
+      idempotency_key: idempotencyKey,
+    };
+
+    const cmdId = `SYNC-ORDER-${tempId}`;
     await repositories.syncQueue.put({
-      id: `SYNC-ORDER-${Date.now()}`,
+      id: cmdId,
       action: 'sync_order',
       endpoint: endpoint,
-      payload: data as unknown as Record<string, unknown>,
+      payload: queuePayload,
       timestamp: new Date().toISOString(),
       status: 'PENDING',
       attempts: 0,
       priority: 1,
     });
 
+    projectionBus.emit('ORDERS_UPDATED');
+
     return {
-      status: 'Queued Offline',
       name: tempId,
+      status: 'Draft',
+      grand_total: totalAmount,
+      items: data.items,
     };
   }
 };
