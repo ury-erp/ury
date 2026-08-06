@@ -43,13 +43,26 @@ export const useAlert = defineStore("alert", {
 
         // Create the modal content
         const modalContent = document.createElement("div");
-        modalContent.innerHTML = `
-          <h2 class="text-base font-semibold mb-4">${title}</h2>
-          <hr class="my-6 border-t border-gray-300" />
 
-          <p class="mb-4 text-justify text-sm">${message}</p>
-          <button class="bg-blue-700 md:ml-96 ml-64 text-white px-4 py-2 rounded-md">${buttonText}</button>
-        `;
+        const heading = document.createElement("h2");
+        heading.className = "text-base font-semibold mb-4";
+        heading.textContent = title;
+        modalContent.appendChild(heading);
+
+        const divider = document.createElement("hr");
+        divider.className = "my-6 border-t border-gray-300";
+        modalContent.appendChild(divider);
+
+        const paragraph = document.createElement("p");
+        paragraph.className = "mb-4 text-justify text-sm";
+        paragraph.textContent = message;
+        modalContent.appendChild(paragraph);
+
+        const button = document.createElement("button");
+        button.className = "bg-blue-700 md:ml-96 ml-64 text-white px-4 py-2 rounded-md";
+        button.textContent = buttonText;
+        modalContent.appendChild(button);
+
         modal.appendChild(modalContent);
 
         // Close the modal and remove the backdrop when the button is clicked
