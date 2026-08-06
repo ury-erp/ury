@@ -38,5 +38,9 @@ export const setupService = {
   async submitSetup(payload: SetupPayload): Promise<void> {
     const res = await call<any>('ury.ury.api.minimal.setup_organization.complete_wizard_setup', payload);
     return res?.message ?? res;
+  },
+  async submitConfigureData(data: any): Promise<any> {
+    const res = await call<any>('ury.ury.api.minimal.business_setup.submit_configure_data', { data });
+    return res?.message ?? res;
   }
 };

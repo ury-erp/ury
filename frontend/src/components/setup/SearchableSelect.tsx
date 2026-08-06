@@ -124,15 +124,15 @@ export function SearchableSelect({
       </div>
 
       {isOpen && (
-        <div className="absolute top-full left-0 right-0 mt-1 z-50 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto py-1 focus:outline-none">
+        <div className="absolute top-full left-0 right-0 mt-2 z-50 bg-white border border-gray-200 rounded-lg shadow-lg max-h-80 overflow-y-auto p-1 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-500">
           {filteredOptions.length > 0 ? (
             filteredOptions.map((opt) => (
               <div
                 key={opt.value}
                 onClick={() => handleSelectOption(opt)}
-                className={`px-4 py-2 text-sm cursor-pointer select-none transition-colors ${
+                className={`px-4 py-2 text-sm rounded-md cursor-pointer select-none transition-colors ${
                   opt.value === value || opt.label === value
-                    ? 'bg-blue-50 text-blue-600 font-medium'
+                    ? 'bg-blue-50 text-blue-700 font-normal'
                     : 'text-gray-800 hover:bg-gray-50'
                 }`}
               >

@@ -7,6 +7,6 @@
 @layer base {
   body {
     @apply bg-background text-foreground;
+    font-family: 'Inter', sans-serif;
   }
 }
-
