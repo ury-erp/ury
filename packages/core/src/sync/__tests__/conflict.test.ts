@@ -146,7 +146,7 @@ test('6. Conflict: PAYMENT_DUPLICATED -> IGNORE', async () => {
 });
 
 test('7. Conflict: PERMISSION_CHANGED -> MANUAL', async () => {
-  const cmd = new CancelOrderCommand({ invoice: 'INV-100', cancel_reason: 'Guest left' });
+  const cmd = new CancelOrderCommand({ invoice_id: 'INV-100', reason: 'Guest left' });
   const res = await resolver.resolveConflict(cmd.envelope, 'Not allowed for billing');
   assert.equal(res.conflictCode, 'PERMISSION_CHANGED');
   assert.equal(res.strategy, 'MANUAL');

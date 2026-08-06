@@ -245,7 +245,7 @@ test('Scenario 11: Role Change — Detect ROLE_CHANGED conflict and flag for man
 // Scenario 12: Permission Change
 test('Scenario 12: Permission Change — Detect PERMISSION_CHANGED and request admin credential override', async () => {
   const cmd = new CancelOrderCommand(
-    { invoice: 'INV-888', cancel_reason: 'Refund' },
+    { invoice_id: 'INV-888', reason: 'Refund' },
     { id: 'CMD-PERM-1' }
   );
 

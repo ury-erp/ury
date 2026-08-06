@@ -60,7 +60,7 @@ test('2. CommandFactory — Instantiate all 7 commands from JSON envelopes', () 
     new SplitBillCommand({ source_invoice: 'POS-001', items_to_move: [] }),
     new PaymentCommand({ invoice: 'POS-001', payments: [{ mode_of_payment: 'Cash', amount: 100 }] }),
     new DeleteDraftCommand({ invoice: 'POS-001' }),
-    new CancelOrderCommand({ invoice: 'POS-001', cancel_reason: 'Customer left' }),
+    new CancelOrderCommand({ invoice_id: 'POS-001', reason: 'Customer left' }),
   ];
 
   for (const cmd of commands) {

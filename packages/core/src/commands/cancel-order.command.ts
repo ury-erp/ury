@@ -7,8 +7,8 @@ import { BaseCommand, type CommandEnvelope } from './command.interface';
 import { apiRegistry } from '../api/api-registry';
 
 export interface CancelOrderPayload {
-  invoice: string;
-  cancel_reason: string;
+  invoice_id: string;
+  reason: string;
   table?: string;
 }
 

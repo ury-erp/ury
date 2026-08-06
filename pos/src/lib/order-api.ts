@@ -155,6 +155,89 @@ export interface SyncOrderData {
   idempotency_key?: string;
 }
 
+export interface CancelOrderInput {
+  name: string;
+  restaurant_table?: string | null;
+}
+
+export interface CancelOrderResult {
+  success: boolean;
+  queued: boolean;
+  error?: string;
+}
+
+/**
+ * Cancels an order. If the online call fails (offline or server error), the order
+ * is marked Cancelled locally, its table is released, and a cancel_order command is
+ * queued for replay on reconnect. This prevents the cancellation modal from crashing
+ * with an unhandled network error and keeps the local state consistent.
+ */
+export async function cancelOrder(
+  order: CancelOrderInput,
+  reason: string
+): Promise<CancelOrderResult> {
+  try {
+    await call.post('ury.ury.doctype.ury_order.ury_order.cancel_order', {
+      invoice_id: order.name,
+      reason,
+    });
+    return { success: true, queued: false };
+  } catch (err) {
+    console.warn('[cancelOrder] Online cancel failed, falling back to offline queue:', err);
+
+    try {
+      await repositories.orders.markCancelled(order.name);
+
+      if (order.restaurant_table) {
+        await repositories.tables.setOccupied(order.restaurant_table, false);
+      }
+
+      const dependencyIds: string[] = [];
+      if (order.name.startsWith('TEMP-')) {
+        dependencyIds.push(`SYNC-ORDER-${order.name}`);
+      }
+
+      await repositories.syncQueue.put({
+        id: `CANCEL-ORDER-${order.name}`,
+        action: 'cancel_order',
+        endpoint: apiRegistry.getUrl('CANCEL_ORDER'),
+        payload: {
+          invoice_id: order.name,
+          reason,
+          table: order.restaurant_table || undefined,
+        },
+        timestamp: new Date().toISOString(),
+        status: 'PENDING',
+        attempts: 0,
+        priority: 5,
+        dependency_ids: dependencyIds,
+      });
+
+      projectionBus.emit('ORDERS_UPDATED');
+      projectionBus.emit('TABLES_UPDATED');
+
+      return { success: true, queued: true };
+    } catch (offlineErr) {
+      const message = offlineErr instanceof Error ? offlineErr.message : String(offlineErr);
+      return { success: false, queued: false, error: message };
+    }
+  }
+}
+
+/**
+ * Releases a table after a successful payment (online or offline). Keeps the table
+ * projection in sync so the Table UI shows Available immediately.
+ */
+export async function releaseTableAfterPayment(table: string | null | undefined): Promise<void> {
+  if (!table) return;
+  try {
+    await repositories.tables.setOccupied(table, false);
+    projectionBus.emit('TABLES_UPDATED');
+  } catch (err) {
+    console.warn('[releaseTableAfterPayment] Failed to release table:', err);
+  }
+}
+
 export const syncOrder = async (data: SyncOrderData) => {
   const endpoint = apiRegistry.getUrl('SYNC_ORDER');
   try {
@@ -163,10 +246,11 @@ export const syncOrder = async (data: SyncOrderData) => {
 
     // Cache updated order in local repository
     if (result && result.name) {
-      // Preserve local lifecycle status when promoting a temp order. If the cashier
-      // already paid the order offline, the local record is 'Paid'; we must not
-      // overwrite it with 'Draft' when the online sync_order returns.
-      let localStatus: OrderEntity['status'] = 'Draft';
+      // Use the backend's actual lifecycle status when available. Preserve a local
+      // Paid status for temp orders that were already paid offline so the cashier
+      // does not see a downgraded Draft snapshot after sync.
+      let localStatus: OrderEntity['status'] =
+        (result.status as OrderEntity['status']) ?? 'Draft';
       if (data.invoice && data.invoice.startsWith('TEMP-')) {
         try {
           const localTemp = await repositories.orders.getById(data.invoice);
@@ -245,15 +329,30 @@ export const syncOrder = async (data: SyncOrderData) => {
       };
     }
 
-    // Preserve local Paid status if this order was already paid offline.
+    // Preserve local lifecycle status. Paid orders stay Paid; existing non-terminal
+    // orders keep their status (e.g. Unbilled preview edits); brand-new table orders
+    // start as Unbilled so they appear in the correct Orders tab offline.
     let offlineStatus: OrderEntity['status'] = 'Draft';
+    let invoicePrinted = 0;
     try {
       const existingLocal = await repositories.orders.getById(localId);
-      if (existingLocal && existingLocal.status === 'Paid') {
-        offlineStatus = 'Paid';
+      if (existingLocal) {
+        invoicePrinted = existingLocal.invoice_printed ?? 0;
+        if (existingLocal.status === 'Paid') {
+          offlineStatus = 'Paid';
+        } else if (existingLocal.status) {
+          offlineStatus = existingLocal.status;
+        }
+      } else if (data.table) {
+        offlineStatus = 'Unbilled';
+        invoicePrinted = 0;
       }
     } catch (lookupErr) {
       console.warn('[syncOrder] Could not read existing local order status:', lookupErr);
+      if (data.table) {
+        offlineStatus = 'Unbilled';
+        invoicePrinted = 0;
+      }
     }
 
     // 1. Store locally in orders repository
@@ -263,6 +362,7 @@ export const syncOrder = async (data: SyncOrderData) => {
       room: data.room,
       order_type: data.order_type,
       status: offlineStatus,
+      invoice_printed: invoicePrinted,
       no_of_pax: data.no_of_pax,
       customer: data.customer,
       waiter: data.waiter,
@@ -282,7 +382,18 @@ export const syncOrder = async (data: SyncOrderData) => {
       sync_status: 'pending',
     });
 
-    // 2. Enqueue command into sync_queue. Stable command IDs ensure repeated
+    // 2. Mark table occupied for active offline table orders and notify the table
+    //    projection so the Table UI reflects Occupied immediately.
+    if (data.table && offlineStatus !== 'Paid' && offlineStatus !== 'Cancelled') {
+      try {
+        await repositories.tables.setOccupied(data.table, true);
+        projectionBus.emit('TABLES_UPDATED');
+      } catch (tableErr) {
+        console.warn('[syncOrder] Failed to update local table occupancy:', tableErr);
+      }
+    }
+
+    // 3. Enqueue command into sync_queue. Stable command IDs ensure repeated
     //    offline edits overwrite the same queue entry instead of creating duplicates.
     await repositories.syncQueue.put({
       id: cmdId,
@@ -299,7 +410,7 @@ export const syncOrder = async (data: SyncOrderData) => {
 
     return {
       name: localId,
-      status: 'Draft',
+      status: offlineStatus,
       grand_total: totalAmount,
       items: data.items,
     };

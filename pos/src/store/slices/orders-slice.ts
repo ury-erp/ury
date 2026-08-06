@@ -103,7 +103,7 @@ export const createOrdersSlice: StateCreator<
         // Use search API
         const res = await searchPosInvoice(orderSearchQuery, selectedStatus);
         set({
-          orders: res.data || [],
+          orders: res?.data || [],
           pagination: {
             currentPage: 1,
             hasNextPage: false,

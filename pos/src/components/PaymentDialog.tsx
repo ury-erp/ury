@@ -5,6 +5,7 @@ import { formatCurrency } from '@ury/core';
 import { Button, Input, Dialog, DialogContent, showToast } from '@ury/ui';
 import { call, repositories, apiRegistry, projectionBus } from '@ury/core';
 import { DEFAULT_PAYMENT_MODE } from '../data/order-types';
+import { releaseTableAfterPayment } from '../lib/order-api';
 import { t } from '../i18n';
 
 
@@ -151,6 +152,11 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
 
     try {
       await call.post('ury.ury.doctype.ury_order.ury_order.make_invoice', paymentPayload);
+
+      // Release the table locally so the Table UI shows Available immediately,
+      // even if the next projection fetch is delayed or fails.
+      await releaseTableAfterPayment(table);
+
       if (invoice && invoice.startsWith('TEMP-')) {
         try {
           await repositories.orders.delete(invoice);
@@ -158,6 +164,19 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
           console.warn('[handlePayment] Failed to delete temporary offline order after payment:', delErr);
         }
       }
+
+      // Optimistically mark the server invoice as Paid in IndexedDB so the UI
+      // reflects the new lifecycle state immediately, even if the next network
+      // fetch fails or returns a status-filtered response.
+      if (invoice && !invoice.startsWith('TEMP-')) {
+        try {
+          await repositories.orders.markPaid(invoice);
+          projectionBus.emit('ORDERS_UPDATED');
+        } catch (paidErr) {
+          console.warn('[handlePayment] Failed to mark server invoice as Paid locally:', paidErr);
+        }
+      }
+
       showToast.success(t('payment.payment_success') || 'Payment successful');
       onClose();
       clearSelectedOrder();
@@ -221,6 +240,9 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
         // Mark order as Paid in IndexedDB immediately so the UI reflects payment status
         await repositories.orders.markPaid(invoice);
         projectionBus.emit('ORDERS_UPDATED');
+
+        // Release the table locally so the Table UI shows Available for offline payments.
+        await releaseTableAfterPayment(table);
 
         showToast.success(t('payment.payment_queued_offline') || 'Payment processed offline');
         onClose();

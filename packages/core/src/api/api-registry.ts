@@ -399,7 +399,7 @@ export class ApiRegistry {
       },
       {
         endpointKey: 'CANCEL_ORDER',
-        url: 'ury.ury_pos.api.cancel_order',
+        url: 'ury.ury.doctype.ury_order.ury_order.cancel_order',
         httpMethod: 'POST',
         category: 'Command',
         cacheStrategy: 'NoCache',

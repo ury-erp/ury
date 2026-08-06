@@ -182,3 +182,29 @@ test('8. Atomic Dexie Transactions', async () => {
   assert.ok(txOrder);
   assert.equal(txOrder.grand_total, 150);
 });
+
+test('9. OrderRepository — upsertStatus updates status and locks terminal states', async () => {
+  await repos.orders.put({
+    id: 'ORD-STATUS-001',
+    order_type: 'Dine-In',
+    status: 'Draft',
+    items: [],
+    grand_total: 300,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    sync_status: 'synced',
+  });
+
+  const updated = await repos.orders.upsertStatus('ORD-STATUS-001', 'Paid');
+  assert.ok(updated);
+  assert.equal(updated.status, 'Paid');
+  assert.equal((updated as any).is_locked, 1);
+
+  const cancelled = await repos.orders.upsertStatus('ORD-STATUS-001', 'Cancelled');
+  assert.ok(cancelled);
+  assert.equal(cancelled.status, 'Cancelled');
+  assert.equal((cancelled as any).is_locked, 1);
+
+  const missing = await repos.orders.upsertStatus('ORD-MISSING', 'Paid');
+  assert.equal(missing, null);
+});

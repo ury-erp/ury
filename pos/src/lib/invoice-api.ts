@@ -1,5 +1,5 @@
 import { DOCTYPES } from '../data/doctypes';
-import { call, db, apiRegistry, repositories, tempIDMapper } from '@ury/core';
+import { call, db, apiRegistry, repositories, tempIDMapper, projectionBus } from '@ury/core';
 import type { OrderEntity } from '@ury/core';
 import { OrderStatusType, OrderType } from '../data/order-types';
 import type { Filter } from 'frappe-js-sdk/lib/db/types';
@@ -132,7 +132,7 @@ function mapOrderEntityToEditShape(order: OrderEntity): any {
     restaurant_table: order.table || null,
     custom_restaurant_room: order.room || null,
     status: order.status,
-    invoice_printed: order.sync_status === 'synced' ? 1 : 0,
+    invoice_printed: order.invoice_printed ?? (order.sync_status === 'synced' ? 1 : 0),
     grand_total: order.grand_total || 0,
     rounded_total: order.grand_total || 0,
     net_total: order.grand_total || 0,
@@ -162,7 +162,7 @@ function mapOrderEntityToPOSInvoice(order: OrderEntity): POSInvoice {
 
   return {
     name: order.id,
-    invoice_printed: order.sync_status === 'synced' ? 1 : 0,
+    invoice_printed: order.invoice_printed ?? (order.sync_status === 'synced' ? 1 : 0),
     grand_total: order.grand_total || 0,
     restaurant_table: order.table || null,
     cashier: order.cashier || '',
@@ -335,6 +335,27 @@ export async function getPOSInvoices({
       }
     }
 
+    // Cross-status reconciliation: the backend returns invoices filtered by the
+    // requested status, so a local Draft snapshot of an invoice that has since
+    // become Paid on the server will not be refreshed by the cache write above.
+    // Update any local record whose status now differs from the server copy,
+    // but never downgrade a locally Paid/Cancelled record.
+    for (const inv of serverInvoices) {
+      const local = await repositories.orders.getById(inv.name);
+      if (
+        local &&
+        local.status !== inv.status &&
+        local.status !== 'Paid' &&
+        local.status !== 'Cancelled'
+      ) {
+        try {
+          await repositories.orders.upsertStatus(inv.name, inv.status as OrderEntity['status']);
+        } catch (reconcileErr) {
+          console.warn(`[getPOSInvoices] Failed to reconcile status for ${inv.name}:`, reconcileErr);
+        }
+      }
+    }
+
     // Merge local pending orders into returned invoices array for UI rendering
     const invoiceMap = new Map<string, POSInvoice>();
     serverInvoices.forEach(inv => invoiceMap.set(inv.name, inv));
@@ -357,7 +378,7 @@ export async function getPOSInvoices({
 
         invoiceMap.set(p.id, {
           name: p.id,
-          invoice_printed: 0,
+          invoice_printed: p.invoice_printed ?? 0,
           grand_total: p.grand_total || 0,
           restaurant_table: p.table || null,
           cashier: p.cashier || '',
@@ -421,7 +442,21 @@ export async function getPOSInvoices({
       const orderMap = new Map<string, OrderEntity>();
       for (const { order, resolvedId } of resolvedOrders) {
         // Drop mapped temp records whose server copy is already cached locally.
+        // If the temp record was Paid offline, promote the server copy to Paid
+        // before deleting the temp so the Paid state is not lost.
         if (order.id.startsWith('TEMP-') && resolvedId !== order.id && cachedOrders.some(o => o.id === resolvedId)) {
+          if (order.status === 'Paid') {
+            try {
+              const promoted = await repositories.orders.upsertStatus(resolvedId, 'Paid');
+              if (promoted) {
+                // Ensure the in-memory map uses the promoted Paid snapshot even
+                // if the server copy was already added as Draft earlier in this loop.
+                orderMap.set(resolvedId, promoted);
+              }
+            } catch (promoteErr) {
+              console.warn(`[getPOSInvoices] Failed to promote ${resolvedId} to Paid from temp record:`, promoteErr);
+            }
+          }
           try {
             await repositories.orders.delete(order.id);
           } catch (cleanupErr) {
@@ -585,7 +620,7 @@ export async function searchPosInvoice(query: string, status: string) {
 
       const mapped: POSInvoice[] = matched.map(o => ({
         name: o.id,
-        invoice_printed: o.sync_status === 'synced' ? 1 : 0,
+        invoice_printed: o.invoice_printed ?? (o.sync_status === 'synced' ? 1 : 0),
         grand_total: o.grand_total || 0,
         restaurant_table: o.table || null,
         cashier: o.cashier || '',
@@ -876,26 +911,57 @@ export async function selectNetworkPrinter(orderId: string, posProfile: string, 
 }
 
 export async function updatePrintStatus(orderId: string) {
+  const endpoint = apiRegistry.getUrl('QZ_PRINT_UPDATE');
   try {
     // NOTE: 'update_print_status' does NOT exist in the backend.
     // The correct endpoint is 'qz_print_update' which sets invoice_printed=1
     // and releases table cluster reservations if applicable.
-    await call.post('ury.ury.api.ury_print.qz_print_update', {
+    await call.post(endpoint, {
       invoice: orderId,
     });
   } catch (error) {
-    console.warn('[updatePrintStatus] Error calling qz_print_update:', error);
-    // Update local IndexedDB flag so offline print status is tracked
+    console.warn('[updatePrintStatus] Error calling qz_print_update (queueing offline):', error);
+
+    // When offline (or on network failure), queue a QZ_PRINT_UPDATE command so the
+    // print transition is replayed on reconnect. Temp orders must wait for the
+    // parent sync_order to finish so the server invoice exists.
+    const dependencyIds: string[] = [];
+    if (orderId.startsWith('TEMP-')) {
+      dependencyIds.push(`SYNC-ORDER-${orderId}`);
+    }
+
+    try {
+      await repositories.syncQueue.put({
+        id: `QZ-PRINT-${orderId}`,
+        action: 'qz_print_update',
+        endpoint,
+        payload: { invoice: orderId },
+        timestamp: new Date().toISOString(),
+        status: 'PENDING',
+        attempts: 0,
+        priority: 1,
+        dependency_ids: dependencyIds,
+      });
+    } catch (queueErr) {
+      console.warn('[updatePrintStatus] Failed to queue offline print command:', queueErr);
+    }
+
+    // Update local order state so the UI immediately moves the order from
+    // Unbilled to Draft and marks it as printed.
     try {
       const cached = await repositories.orders.getById(orderId);
       if (cached) {
         await repositories.orders.put({
           ...cached,
+          status: 'Draft',
+          invoice_printed: 1,
           updatedAt: new Date().toISOString(),
         } as any);
       }
     } catch (localErr) {
       console.warn('[updatePrintStatus] Failed to update local order cache:', localErr);
     }
+
+    projectionBus.emit('ORDERS_UPDATED');
   }
 }

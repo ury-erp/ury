@@ -35,6 +35,7 @@ const ORDER_SYNC_ENDPOINTS = [
   'delete_draft_invoice',
   'split_bill',
   'table_transfer',
+  'qz_print_update',
 ];
 const PAYMENT_ENDPOINTS = ['make_invoice'];
 const TABLE_ENDPOINTS = ['merge_tables_batch', 'unmerge_tables', 'table_transfer'];
@@ -252,8 +253,14 @@ export class SyncEngine {
       if (isOrderSyncCommand(env) || env.operation_type === 'CREATE_ORDER' || env.operation_type === 'UPDATE_ORDER') {
         const tempInvId = (remappedPayload.invoice || remappedPayload.temp_id || env.temporary_id || cmdId) as string;
         if (tempInvId && typeof tempInvId === 'string' && tempInvId.startsWith('TEMP-')) {
+          // Prefer the backend's actual lifecycle status when promoting the temp
+          // record so the local snapshot matches the server invoice state.
+          const backendStatus: OrderEntity['status'] | undefined =
+            response?.status ||
+            response?.message?.status ||
+            response?.data?.status;
           try {
-            await this._promoteTempOrder(tempInvId, serverId);
+            await this._promoteTempOrder(tempInvId, serverId, backendStatus);
           } catch (delErr) {
             console.warn('[SyncEngine] Error promoting temp order to synced state:', delErr);
           }
@@ -325,19 +332,25 @@ export class SyncEngine {
    * Deletes the temp record and inserts a synced record with the server ID, preserving the
    * local lifecycle status (so an offline-paid order remains Paid after promotion).
    */
-  private async _promoteTempOrder(tempId: string, serverId: string | undefined): Promise<void> {
+  private async _promoteTempOrder(
+    tempId: string,
+    serverId: string | undefined,
+    backendStatus?: OrderEntity['status']
+  ): Promise<void> {
     const existing = await this.repos.orders.getById(tempId);
     if (!existing) return;
 
     const targetId = serverId || tempId;
     await this.repos.orders.delete(tempId);
 
-    // Preserve local Paid status; default to Draft for freshly synced orders.
-    const preservedStatus: OrderEntity['status'] = existing.status === 'Paid' ? 'Paid' : existing.status;
+    // Preserve local Paid status; otherwise use the backend's reported status so
+    // the promoted local snapshot matches the server invoice state.
+    const promotedStatus: OrderEntity['status'] =
+      existing.status === 'Paid' ? 'Paid' : backendStatus ?? existing.status;
     const promoted: OrderEntity = {
       ...existing,
       id: targetId,
-      status: preservedStatus,
+      status: promotedStatus,
       sync_status: 'synced',
       updatedAt: new Date().toISOString(),
     };
@@ -359,7 +372,7 @@ export class SyncEngine {
       await this.repos.orders.put(promoted);
     }
 
-    console.log(`[SyncEngine] Promoted temp order ${tempId} -> ${targetId} (status: ${preservedStatus})`);
+    console.log(`[SyncEngine] Promoted temp order ${tempId} -> ${targetId} (status: ${promotedStatus})`);
   }
 
   /**

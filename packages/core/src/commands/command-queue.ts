@@ -17,6 +17,67 @@ function isPaymentEnvelope(env: CommandEnvelope): boolean {
   );
 }
 
+/**
+ * Normalizes command priority so the queue drains in strict lifecycle order:
+ *   1 — Table operations (merge/unmerge/transfer)
+ *   2 — Order creation/update (sync_order)
+ *   3 — Print status (qz_print_update)
+ *   4 — Payment (make_invoice)
+ *   5 — Cancellation (cancel_order)
+ *
+ * Callers may enqueue with legacy priority 1; this guard ensures the dependency
+ * graph is respected regardless of what the caller supplied.
+ */
+function getNormalizedPriority(env: CommandEnvelope): number {
+  const action = env.actionName || '';
+  const endpoint = env.endpoint || '';
+  const op = env.operation_type || '';
+
+  if (
+    endpoint.includes('merge_tables_batch') ||
+    endpoint.includes('unmerge_tables') ||
+    endpoint.includes('table_transfer') ||
+    action.includes('merge_tables_batch') ||
+    action.includes('unmerge_tables') ||
+    action.includes('table_transfer') ||
+    op === 'MERGE_TABLE' ||
+    op === 'TRANSFER_TABLE'
+  ) {
+    return 1;
+  }
+
+  if (
+    endpoint.includes('sync_order') ||
+    action.includes('sync_order') ||
+    op === 'CREATE_ORDER' ||
+    op === 'UPDATE_ORDER'
+  ) {
+    return 2;
+  }
+
+  if (
+    endpoint.includes('qz_print_update') ||
+    action.includes('qz_print_update') ||
+    op === 'PRINT_ORDER'
+  ) {
+    return 3;
+  }
+
+  if (isPaymentEnvelope(env)) {
+    return 4;
+  }
+
+  if (
+    endpoint.includes('cancel_order') ||
+    action.includes('cancel_order') ||
+    op === 'DELETE_ORDER'
+  ) {
+    return 5;
+  }
+
+  return env.priority || 1;
+}
+
 export class CommandQueueManager {
   private queueRepo: SyncQueueRepository;
 
@@ -138,7 +199,11 @@ export class CommandQueueManager {
       return deps.every(depId => completedIds.has(depId));
     });
 
-    return readyEnvelopes.sort((a, b) => a.priority - b.priority || (a.created_at || '').localeCompare(b.created_at || ''));
+    return readyEnvelopes.sort(
+      (a, b) =>
+        getNormalizedPriority(a) - getNormalizedPriority(b) ||
+        (a.created_at || '').localeCompare(b.created_at || '')
+    );
   }
 
   /**

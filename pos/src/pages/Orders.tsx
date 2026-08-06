@@ -18,7 +18,7 @@ import SplitGroupPanel from '../components/SplitGroupPanel';
 import MergedBillPanel from '../components/MergedBillPanel';
 import { printOrder } from '../lib/print';
 import { call, projectionBus } from '@ury/core';
-import { splitBill } from '../lib/order-api';
+import { splitBill, cancelOrder } from '../lib/order-api';
 import {
   getOrdersTabForInvoice,
   getSplitGroup,
@@ -192,15 +192,28 @@ export default function Orders() {
     }
     setCancelLoading(true);
     try {
-      await call.post('ury.ury.doctype.ury_order.ury_order.cancel_order', {
-        invoice_id: selectedOrder.name,
-        reason: cancelReason
-      })
-      showToast.success(t('success.order_cancelled'));
+      const result = await cancelOrder(
+        {
+          name: selectedOrder.name,
+          restaurant_table: selectedOrder.restaurant_table,
+        },
+        cancelReason
+      );
+
+      if (!result.success) {
+        showToast.error(result.error || t('errors.failed_cancel_order'));
+        return;
+      }
+
+      showToast.success(
+        result.queued
+          ? (t('success.order_cancelled_offline') || 'Order cancelled offline')
+          : t('success.order_cancelled')
+      );
       setCancelDialogOpen(false);
       setCancelReason('');
       clearSelectedOrder();
-      fetchOrders();
+      await fetchOrders();
     } catch (err) {
       showToast.error(err instanceof Error ? err.message : t('errors.failed_cancel_order'));
     } finally {

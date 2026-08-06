@@ -22,6 +22,12 @@ export interface OrderEntity {
   order_type: string;
   /** Order lifecycle status e.g., Draft, Paid, Unbilled, Cancelled */
   status: 'Draft' | 'Unbilled' | 'Recently Paid' | 'Paid' | 'Cancelled';
+  /**
+   * Local print-state flag. 0 = unprinted (Unbilled table orders), 1 = printed.
+   * This mirrors the backend POS Invoice `invoice_printed` field for offline
+   * classification between Unbilled and Draft tabs.
+   */
+  invoice_printed?: number;
   /** Total pax count */
   no_of_pax?: number;
   /** Customer ID or phone */
@@ -244,6 +250,10 @@ export interface IBaseRepository<T, K = string> {
 export interface IOrderRepository extends IBaseRepository<OrderEntity, string> {
   findByStatus(status: OrderEntity['status']): Promise<OrderEntity[]>;
   findByTable(table: string): Promise<OrderEntity | undefined>;
+  upsertStatus(
+    id: string,
+    status: OrderEntity['status']
+  ): Promise<OrderEntity | null>;
 }
 
 export interface ITableRepository extends IBaseRepository<TableEntity, string> {

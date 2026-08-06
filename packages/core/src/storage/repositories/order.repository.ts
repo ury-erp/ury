@@ -31,23 +31,32 @@ export class OrderRepository
 
   /** Update order status to Paid and lock order locally */
   async markPaid(id: string): Promise<void> {
-    const existing = await this.getById(id);
-    if (existing) {
-      existing.status = 'Paid';
-      (existing as any).is_locked = 1;
-      existing.updatedAt = new Date().toISOString();
-      await this.put(existing);
-    }
+    await this.upsertStatus(id, 'Paid');
   }
 
   /** Update order status to Cancelled and lock order locally */
   async markCancelled(id: string): Promise<void> {
+    await this.upsertStatus(id, 'Cancelled');
+  }
+
+  /**
+   * Update an order's lifecycle status and lock the record when it reaches a
+   * terminal state (Paid/Cancelled). Returns the updated entity, or null if
+   * no matching record exists.
+   */
+  async upsertStatus(
+    id: string,
+    status: OrderEntity['status']
+  ): Promise<OrderEntity | null> {
     const existing = await this.getById(id);
-    if (existing) {
-      existing.status = 'Cancelled';
+    if (!existing) return null;
+
+    existing.status = status;
+    if (status === 'Paid' || status === 'Cancelled') {
       (existing as any).is_locked = 1;
-      existing.updatedAt = new Date().toISOString();
-      await this.put(existing);
     }
+    existing.updatedAt = new Date().toISOString();
+    await this.put(existing);
+    return existing;
   }
 }
