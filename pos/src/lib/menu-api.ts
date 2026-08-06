@@ -89,31 +89,28 @@ export const getAggregatorMenu = async (aggregator: string) => {
     const items = response.message;
 
     if (items && items.length > 0) {
-      await repositories.menu.putMany(
+      await repositories.aggregatorItems.putManyByAggregator(
+        aggregator,
         items.map(i => ({
-          id: i.item,
+          item: i.item,
           item_name: i.item_name,
           rate: typeof i.rate === 'number' ? i.rate : parseFloat(i.rate) || 0,
-          category: i.course || 'General',
-          course: i.course || null,
-          special_dish: i.special_dish,
-          image: i.item_image,
+          item_image: i.item_image,
         }))
       );
     }
 
     return items;
   } catch (error: any) {
-    const cachedItems = await repositories.menu.getAll();
+    const cachedItems = await repositories.aggregatorItems.findByAggregator(aggregator);
     if (cachedItems && cachedItems.length > 0) {
       return cachedItems.map(c => ({
-        item: c.id,
+        item: c.item,
         item_name: c.item_name,
-        item_image: c.image || null,
+        item_image: c.item_image || null,
         rate: c.rate,
-        course: c.course || '',
-        course_label: c.course || '',
-        special_dish: c.special_dish,
+        course: '',
+        course_label: '',
       }));
     }
 

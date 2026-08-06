@@ -238,6 +238,115 @@ export async function releaseTableAfterPayment(table: string | null | undefined)
   }
 }
 
+export interface QueueOfflinePaymentInput {
+  invoice: string;
+  customer: string;
+  cashier: string;
+  owner: string;
+  pos_profile: string;
+  table: string | null;
+  payments: Array<{ mode_of_payment: string; amount: number }>;
+  additionalDiscount: number | null;
+}
+
+/**
+ * Queues a make_invoice command for offline execution. The API payload is kept
+ * byte-equivalent to the online payment request; sync metadata (idempotency_key,
+ * temporary_id) lives on the envelope so the backend never sees extra keys.
+ */
+export async function queueOfflinePayment(input: QueueOfflinePaymentInput): Promise<void> {
+  const endpoint = apiRegistry.getUrl('MAKE_INVOICE');
+  const paymentIdempotencyKey = `PAY-${input.invoice}-${Date.now()}`;
+  const cmdId = `SYNC-PAYMENT-${input.invoice}-${Date.now()}`;
+
+  const paymentPayload: Record<string, unknown> = {
+    additionalDiscount: input.additionalDiscount,
+    cashier: input.cashier,
+    customer: input.customer,
+    invoice: input.invoice,
+    owner: input.owner,
+    payments: input.payments,
+    pos_profile: input.pos_profile,
+    table: input.table,
+  };
+
+  const dependencies: string[] = [];
+  if (input.invoice.startsWith('TEMP-')) {
+    dependencies.push(`SYNC-ORDER-${input.invoice}`);
+  }
+
+  await repositories.syncQueue.put({
+    id: cmdId,
+    action: 'make_invoice',
+    endpoint: endpoint,
+    payload: paymentPayload,
+    timestamp: new Date().toISOString(),
+    status: 'PENDING',
+    attempts: 0,
+    priority: 1,
+    dependencies,
+    dependency_ids: dependencies,
+    temporary_id: input.invoice.startsWith('TEMP-') ? input.invoice : null,
+    entity_id: input.invoice || null,
+    idempotency_key: paymentIdempotencyKey,
+  });
+
+  // Mark order as Paid locally so the UI reflects payment status immediately.
+  await repositories.orders.markPaid(input.invoice);
+  projectionBus.emit('ORDERS_UPDATED');
+
+  // Release the table locally so the Table UI shows Available for offline payments.
+  await releaseTableAfterPayment(input.table);
+}
+
+/**
+ * Builds the backend API payload for sync_order. For Aggregator orders the payload
+ * is trimmed to the exact key set shown in the reference screenshots so the queued
+ * offline request is byte-equivalent to the online request.
+ */
+function buildSyncOrderPayload(
+  data: SyncOrderData,
+  invoice: string | null,
+  lastInvoice: string | null
+): Record<string, unknown> {
+  if (data.order_type === 'Aggregators') {
+    return {
+      aggregator_id: data.aggregator_id,
+      cashier: data.cashier,
+      customer: data.customer,
+      invoice,
+      items: data.items,
+      last_invoice: lastInvoice,
+      no_of_pax: data.no_of_pax,
+      order_type: data.order_type,
+      owner: data.owner,
+      pos_profile: data.pos_profile,
+      waiter: data.waiter,
+    };
+  }
+
+  const payload: Record<string, unknown> = {
+    items: data.items,
+    no_of_pax: data.no_of_pax,
+    pos_profile: data.pos_profile,
+    order_type: data.order_type,
+    cashier: data.cashier,
+    owner: data.owner,
+    waiter: data.waiter,
+    invoice,
+    last_invoice: lastInvoice,
+  };
+
+  if (data.table !== undefined && data.table !== null) payload.table = data.table;
+  if (data.room !== undefined && data.room !== null) payload.room = data.room;
+  if (data.customer !== undefined && data.customer !== null) payload.customer = data.customer;
+  if (data.aggregator_id !== undefined && data.aggregator_id !== null) payload.aggregator_id = data.aggregator_id;
+  if (data.comments !== undefined && data.comments !== null) payload.comments = data.comments;
+  if (data.mode_of_payment !== undefined && data.mode_of_payment !== null) payload.mode_of_payment = data.mode_of_payment;
+
+  return payload;
+}
+
 export const syncOrder = async (data: SyncOrderData) => {
   const endpoint = apiRegistry.getUrl('SYNC_ORDER');
   try {
@@ -268,6 +377,7 @@ export const syncOrder = async (data: SyncOrderData) => {
         table: data.table,
         room: data.room,
         order_type: data.order_type,
+        custom_aggregator_id: data.aggregator_id || undefined,
         status: localStatus,
         no_of_pax: data.no_of_pax,
         customer: data.customer,
@@ -304,29 +414,23 @@ export const syncOrder = async (data: SyncOrderData) => {
 
     let localId: string;
     let cmdId: string;
-    let queuePayload: Record<string, unknown>;
+    let apiPayload: Record<string, unknown>;
+    let temporaryId: string | null;
+    let envelopeIdempotencyKey: string;
 
     if (isServerUpdate) {
       localId = data.invoice;
       cmdId = `SYNC-ORDER-UPDATE-${data.invoice}`;
-      queuePayload = {
-        ...data,
-        invoice: data.invoice,
-        last_invoice: data.last_invoice || data.invoice,
-        temp_id: undefined,
-        idempotency_key: data.idempotency_key || `UPDATE-${data.invoice}`,
-      };
+      apiPayload = buildSyncOrderPayload(data, data.invoice, data.last_invoice || data.invoice);
+      temporaryId = null;
+      envelopeIdempotencyKey = data.idempotency_key || `UPDATE-${data.invoice}`;
     } else {
       const tempId = data.invoice || `TEMP-ORD-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
       localId = tempId;
       cmdId = `SYNC-ORDER-${tempId}`;
-      queuePayload = {
-        ...data,
-        invoice: null,
-        last_invoice: null,
-        temp_id: tempId,
-        idempotency_key: data.idempotency_key || tempId,
-      };
+      apiPayload = buildSyncOrderPayload(data, null, null);
+      temporaryId = tempId;
+      envelopeIdempotencyKey = data.idempotency_key || tempId;
     }
 
     // Preserve local lifecycle status. Paid orders stay Paid; existing non-terminal
@@ -361,6 +465,7 @@ export const syncOrder = async (data: SyncOrderData) => {
       table: data.table,
       room: data.room,
       order_type: data.order_type,
+      custom_aggregator_id: data.aggregator_id || undefined,
       status: offlineStatus,
       invoice_printed: invoicePrinted,
       no_of_pax: data.no_of_pax,
@@ -399,11 +504,13 @@ export const syncOrder = async (data: SyncOrderData) => {
       id: cmdId,
       action: 'sync_order',
       endpoint: endpoint,
-      payload: queuePayload,
+      payload: apiPayload,
       timestamp: new Date().toISOString(),
       status: 'PENDING',
       attempts: 0,
       priority: 1,
+      temporary_id: temporaryId,
+      idempotency_key: envelopeIdempotencyKey,
     });
 
     projectionBus.emit('ORDERS_UPDATED');

@@ -351,6 +351,10 @@ export class SyncEngine {
       ...existing,
       id: targetId,
       status: promotedStatus,
+      // Preserve Aggregator metadata so the Orders page and projections continue
+      // to render the Aggregator badge after a temp order is promoted.
+      order_type: existing.order_type,
+      custom_aggregator_id: existing.custom_aggregator_id,
       sync_status: 'synced',
       updatedAt: new Date().toISOString(),
     };

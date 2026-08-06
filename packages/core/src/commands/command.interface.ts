@@ -30,6 +30,8 @@ export interface CommandEnvelope<P = any> {
   temporary_id?: string | null;
   server_id?: string | null;
   dependency_ids?: string[]; // matches old 'dependencies'
+  /** Idempotency key stored on the envelope, not in the API payload */
+  idempotency_key?: string;
   payload: P;
   payload_hash?: string;
   retry_count?: number; // matches old 'retryCount'

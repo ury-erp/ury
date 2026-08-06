@@ -3,9 +3,9 @@ import { X, Percent, Coins } from 'lucide-react';
 import { usePOSStore } from '../store/pos-store';
 import { formatCurrency } from '@ury/core';
 import { Button, Input, Dialog, DialogContent, showToast } from '@ury/ui';
-import { call, repositories, apiRegistry, projectionBus } from '@ury/core';
+import { call, repositories, projectionBus } from '@ury/core';
 import { DEFAULT_PAYMENT_MODE } from '../data/order-types';
-import { releaseTableAfterPayment } from '../lib/order-api';
+import { releaseTableAfterPayment, queueOfflinePayment } from '../lib/order-api';
 import { t } from '../i18n';
 
 
@@ -184,74 +184,18 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
     } catch (err: any) {
       console.warn('[handlePayment] Network request failed, queueing payment command offline:', err);
       try {
-        const endpoint = apiRegistry.getUrl('MAKE_INVOICE');
-
-        // Generate a stable idempotency key for this payment so retries don't double-pay
-        const paymentIdempotencyKey = `PAY-${invoice}-${Date.now()}`;
-        const cmdId = `SYNC-PAYMENT-${invoice}-${Date.now()}`;
-
-        // Find the parent sync_order command for this invoice to set dependency ordering.
-        // The parent command stores invoice = null and temp_id = the temp order ID in its payload.
-        // We also check if the current invoice IS a temp ID (offline-created order).
-        // For TEMP-* invoices, always declare a hard dependency on the expected parent
-        // command ID so the queue cannot execute the payment before the order exists on
-        // the server, even if the parent command is not currently in PENDING status.
-        const allCmds = await repositories.syncQueue.getAll();
-        const parentCmd = allCmds.find(c => {
-          const p = c.payload as any;
-          return (
-            // Parent sync_order command whose temp_id matches this invoice
-            p?.temp_id === invoice ||
-            // Or whose command ID contains the invoice ID
-            c.id === `SYNC-ORDER-${invoice}` ||
-            // Legacy: payload.invoice matches (older format)
-            (p?.invoice === invoice && c.action === 'sync_order')
-          );
+        // Queue the offline payment with the API payload separated from sync envelope
+        // metadata. The helper keeps the payload byte-equivalent to the online request.
+        await queueOfflinePayment({
+          invoice,
+          customer,
+          cashier,
+          owner,
+          pos_profile: posProfile,
+          table,
+          payments,
+          additionalDiscount: discountValue ? parseFloat(discountValue) : null,
         });
-
-        const dependencies: string[] = [];
-        if (parentCmd) {
-          dependencies.push(parentCmd.id);
-        } else if (invoice && invoice.startsWith('TEMP-')) {
-          // Hard dependency on the expected parent sync_order command ID even if it is
-          // not yet enqueued. The CommandQueueManager and SyncEngine will keep the
-          // payment command deferred until this parent completes.
-          dependencies.push(`SYNC-ORDER-${invoice}`);
-        }
-
-        // Store payment with idempotency_key in payload for backend deduplication.
-        // Also attach sync metadata to the envelope root so the sync engine and
-        // command queue can identify the parent temp order and resolve dependencies.
-        const queuePayload = {
-          ...paymentPayload,
-          idempotency_key: paymentIdempotencyKey,
-        };
-
-        const dependencyIds = dependencies.length > 0 ? dependencies : (
-          invoice && invoice.startsWith('TEMP-') ? [`SYNC-ORDER-${invoice}`] : []
-        );
-
-        await repositories.syncQueue.put({
-          id: cmdId,
-          action: 'make_invoice',
-          endpoint: endpoint,
-          payload: queuePayload as unknown as Record<string, unknown>,
-          timestamp: new Date().toISOString(),
-          status: 'PENDING',
-          attempts: 0,
-          priority: 1,
-          dependencies,
-          dependency_ids: dependencyIds,
-          temporary_id: invoice && invoice.startsWith('TEMP-') ? invoice : null,
-          entity_id: invoice || null,
-        } as any);
-
-        // Mark order as Paid in IndexedDB immediately so the UI reflects payment status
-        await repositories.orders.markPaid(invoice);
-        projectionBus.emit('ORDERS_UPDATED');
-
-        // Release the table locally so the Table UI shows Available for offline payments.
-        await releaseTableAfterPayment(table);
 
         showToast.success(t('payment.payment_queued_offline') || 'Payment processed offline');
         onClose();

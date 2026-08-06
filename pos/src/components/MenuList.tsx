@@ -29,7 +29,7 @@ const MenuList: React.FC<MenuListProps> = ({ onItemClick }) => {
   const filteredItems = useMemo(() => {
     return menuItems.filter(item => {
       const searchTerm = searchQuery.toLowerCase();
-      const matchesCategory = !selectedCategory || item.course === selectedCategory;
+      const matchesCategory = !selectedCategory || !item.course || item.course === selectedCategory;
       const matchesSearch = !searchQuery || 
         item.name.toLowerCase().includes(searchTerm) ||
         item.item.toLowerCase().includes(searchTerm);

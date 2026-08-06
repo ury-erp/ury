@@ -19,13 +19,14 @@ before(() => {
 });
 
 beforeEach(async () => {
-  // Clear all 9 tables before each test
+  // Clear all 10 tables before each test
   await repos.orders.clear();
   await repos.tables.clear();
   await repos.menu.clear();
   await repos.customers.clear();
   await repos.paymentModes.clear();
   await repos.aggregators.clear();
+  await repos.aggregatorItems.clear();
   await repos.syncQueue.clear();
   await repos.metadata.clear();
   await repos.settings.clear();
@@ -181,6 +182,37 @@ test('8. Atomic Dexie Transactions', async () => {
   const txOrder = await repos.orders.getById('ORD-TX-01');
   assert.ok(txOrder);
   assert.equal(txOrder.grand_total, 150);
+});
+
+test('5a. Aggregator Items Collection — per-aggregator catalog isolation', async () => {
+  await repos.aggregatorItems.putManyByAggregator('Swiggy', [
+    { item: 'SZF', item_name: 'Sizzling Arabian Chicken Full', rate: 530, item_image: null },
+    { item: 'SZC', item_name: 'Sizzling Arabian Chicken Single', rate: 160, item_image: '/swiggy.jpg' },
+  ]);
+
+  await repos.aggregatorItems.putManyByAggregator('Zomato', [
+    { item: 'BIR', item_name: 'Biryani', rate: 250, item_image: null },
+  ]);
+
+  const swiggyItems = await repos.aggregatorItems.findByAggregator('Swiggy');
+  assert.equal(swiggyItems.length, 2);
+  assert.ok(swiggyItems.every(i => i.aggregator === 'Swiggy'));
+  assert.ok(swiggyItems.find(i => i.item === 'SZF'));
+
+  const zomatoItems = await repos.aggregatorItems.findByAggregator('Zomato');
+  assert.equal(zomatoItems.length, 1);
+  assert.equal(zomatoItems[0].item, 'BIR');
+
+  // Replacing Swiggy catalog should not affect Zomato
+  await repos.aggregatorItems.putManyByAggregator('Swiggy', [
+    { item: 'SZF', item_name: 'Sizzling Arabian Chicken Full', rate: 550, item_image: null },
+  ]);
+  const swiggyAfterReplace = await repos.aggregatorItems.findByAggregator('Swiggy');
+  assert.equal(swiggyAfterReplace.length, 1);
+  assert.equal(swiggyAfterReplace[0].rate, 550);
+
+  const zomatoAfterReplace = await repos.aggregatorItems.findByAggregator('Zomato');
+  assert.equal(zomatoAfterReplace.length, 1);
 });
 
 test('9. OrderRepository — upsertStatus updates status and locks terminal states', async () => {

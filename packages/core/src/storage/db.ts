@@ -12,19 +12,21 @@ import type {
   CustomerEntity,
   PaymentModeEntity,
   AggregatorEntity,
+  AggregatorItemEntity,
   SyncQueueEntity,
   MetadataEntity,
   SettingsEntity,
 } from './types';
 
 export class UryPosDatabase extends Dexie {
-  // 9 Dexie Table collections
+  // 10 Dexie Table collections
   orders!: Table<OrderEntity, string>;
   restaurantTables!: Table<TableEntity, string>;
   menu!: Table<MenuItemEntity, string>;
   customers!: Table<CustomerEntity, string>;
   payment_modes!: Table<PaymentModeEntity, string>;
   aggregators!: Table<AggregatorEntity, string>;
+  aggregator_items!: Table<AggregatorItemEntity, string>;
   sync_queue!: Table<SyncQueueEntity, string>;
   metadata!: Table<MetadataEntity, string>;
   settings!: Table<SettingsEntity, string>;
@@ -90,6 +92,30 @@ export class UryPosDatabase extends Dexie {
         return tx.table('metadata').put({
           key: 'schema_version',
           value: '3',
+          updatedAt: new Date().toISOString(),
+        });
+      });
+
+    // ==========================================
+    // VERSION 4: AGGREGATOR ITEM CATALOG STORE
+    // ==========================================
+    this.version(4)
+      .stores({
+        orders: 'id, table, status, order_type, customer, cashier, sync_status, createdAt, updatedAt',
+        restaurantTables: 'name, restaurant_room, occupied, merged_with',
+        menu: 'id, category, course, special_dish, disabled',
+        customers: 'id, phone, name, customer_group',
+        payment_modes: 'id, name, enabled',
+        aggregators: 'name, customer, enabled',
+        aggregator_items: 'id, aggregator, item, [aggregator+item]',
+        sync_queue: 'id, command_id, status, operation_type, created_at, *dependency_ids',
+        metadata: 'key, updatedAt',
+        settings: 'key, updatedAt',
+      })
+      .upgrade(tx => {
+        return tx.table('metadata').put({
+          key: 'schema_version',
+          value: '4',
           updatedAt: new Date().toISOString(),
         });
       });

@@ -837,3 +837,110 @@ test('Scenario 7: Multiple Orders statuses and order types match backend', async
   }
 });
 
+test('Scenario 8: Offline Aggregator create -> offline payment -> sync -> Paid with custom_aggregator_id preserved', async () => {
+  const TEMP_ID = 'TEMP-ORD-AGG-SYNC-001';
+  const SERVER_ID = 'AGURY-2026-2027-00008';
+
+  // Seed local temp Aggregator order as Draft (after OrderPanel submit offline).
+  await repos.orders.put({
+    ...baseOrder,
+    id: TEMP_ID,
+    order_type: 'Aggregators',
+    status: 'Draft',
+    custom_aggregator_id: 'Swiggy',
+    sync_status: 'pending',
+    items: [
+      { item: 'SZF', item_name: 'Sizzling Arabian Chicken Full', rate: 530, qty: 1, amount: 530 },
+      { item: 'SZC', item_name: 'Sizzling Arabian Chicken Single', rate: 160, qty: 1, amount: 160 },
+    ],
+    grand_total: 690,
+  });
+
+  // Queue sync_order using the new envelope format (temporary_id on envelope, clean payload).
+  await repos.syncQueue.put({
+    id: `SYNC-ORDER-${TEMP_ID}`,
+    action: 'sync_order',
+    endpoint: 'ury.ury.doctype.ury_order.ury_order.sync_order',
+    payload: {
+      aggregator_id: 'Swiggy',
+      cashier: 'urycashier@gmail.com',
+      customer: 'Swiggy',
+      invoice: null,
+      items: [
+        { item: 'SZF', item_name: 'Sizzling Arabian Chicken Full', rate: 530, qty: 1 },
+        { item: 'SZC', item_name: 'Sizzling Arabian Chicken Single', rate: 160, qty: 1 },
+      ],
+      last_invoice: null,
+      no_of_pax: 1,
+      order_type: 'Aggregators',
+      owner: 'urycashier@gmail.com',
+      pos_profile: 'URY',
+      waiter: 'urycashier@gmail.com',
+    },
+    temporary_id: TEMP_ID,
+    idempotency_key: TEMP_ID,
+    timestamp: new Date().toISOString(),
+    status: 'PENDING',
+    priority: 1,
+  });
+
+  // Queue make_invoice using the new envelope format.
+  await repos.syncQueue.put({
+    id: `SYNC-PAYMENT-${TEMP_ID}`,
+    action: 'make_invoice',
+    endpoint: 'ury.ury.doctype.ury_order.ury_order.make_invoice',
+    payload: {
+      additionalDiscount: null,
+      cashier: 'urycashier@gmail.com',
+      customer: 'Swiggy',
+      invoice: TEMP_ID,
+      owner: 'urycashier@gmail.com',
+      payments: [{ mode_of_payment: 'Cash', amount: 690 }],
+      pos_profile: 'URY',
+      table: null,
+    },
+    temporary_id: TEMP_ID,
+    entity_id: TEMP_ID,
+    idempotency_key: `PAY-${TEMP_ID}-123456`,
+    dependency_ids: [`SYNC-ORDER-${TEMP_ID}`],
+    dependencies: [`SYNC-ORDER-${TEMP_ID}`],
+    timestamp: new Date().toISOString(),
+    status: 'PENDING',
+    priority: 1,
+  });
+
+  const originalPost = call.post;
+  const postedEndpoints: string[] = [];
+  (call as any).post = async (endpoint: string, payload: any) => {
+    postedEndpoints.push(endpoint);
+    if (endpoint.includes('sync_order')) {
+      return { name: SERVER_ID, status: 'Draft' };
+    }
+    if (endpoint.includes('make_invoice')) {
+      assert.equal(payload.invoice, SERVER_ID, 'make_invoice must be called with server ID after patch');
+      return { name: SERVER_ID };
+    }
+    return {};
+  };
+
+  try {
+    const engine = new SyncEngine(queueMgr, idMapper, undefined, { repositories: repos });
+    const result = await engine.triggerSync();
+
+    assert.equal(result.processed, 2, 'Both sync_order and make_invoice should process');
+    assert.equal(result.succeeded, 2, 'Both commands should succeed');
+
+    const serverOrder = await repos.orders.getById(SERVER_ID);
+    assert.ok(serverOrder, 'Server order should exist after sync');
+    assert.equal(serverOrder.status, 'Paid', 'Offline-paid Aggregator order must sync as Paid');
+    assert.equal(serverOrder.order_type, 'Aggregators', 'Order type must be preserved');
+    assert.equal(serverOrder.custom_aggregator_id, 'Swiggy', 'custom_aggregator_id must be preserved after promotion');
+    assert.equal(serverOrder.sync_status, 'synced');
+
+    const drafts = await repos.orders.findByStatus('Draft');
+    assert.ok(!drafts.some(o => o.id === SERVER_ID), 'Paid Aggregator order must not appear in Draft lookup');
+  } finally {
+    (call as any).post = originalPost;
+  }
+});
+

@@ -327,12 +327,20 @@ export const usePOSStore = create<POSStore>((set, get) => ({
       const items = await getAggregatorMenu(aggregator);
       
       const menuItems: MenuItem[] = items.map((item: any) => ({
-        ...item,
         id: item.item,
+        item: item.item,
+        item_name: item.item_name,
         name: item.item_name,
+        rate: item.rate,
+        item_image: item.item_image || null,
         image: item.item_image || null,
         price: typeof item.rate === 'string' ? parseFloat(item.rate) : item.rate || 0,
-        category: item.course
+        course: item.course || '',
+        course_label: item.course_label || item.course || '',
+        category: item.course || '',
+        description: item.description || '',
+        special_dish: item.special_dish || 0,
+        tax_rate: 0,
       }));
 
       set({ menuItems, menuLoading: false });

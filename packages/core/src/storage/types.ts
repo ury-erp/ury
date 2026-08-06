@@ -20,6 +20,8 @@ export interface OrderEntity {
   room?: string | null;
   /** Order type e.g., Dine-In, Takeaway, Aggregators */
   order_type: string;
+  /** Aggregator partner ID (Swiggy, Zomato, etc.) for Aggregator orders */
+  custom_aggregator_id?: string | null;
   /** Order lifecycle status e.g., Draft, Paid, Unbilled, Cancelled */
   status: 'Draft' | 'Unbilled' | 'Recently Paid' | 'Paid' | 'Cancelled';
   /**
@@ -155,6 +157,26 @@ export interface AggregatorEntity {
   price_list?: string;
 }
 
+/**
+ * 6a. Aggregator Item Entity (Collection: 'aggregator_items')
+ */
+export interface AggregatorItemEntity {
+  /** Composite primary key: `${aggregator}::${item}` */
+  id: string;
+  /** Aggregator partner name (e.g. Swiggy, Zomato) */
+  aggregator: string;
+  /** Item code */
+  item: string;
+  /** Display name */
+  item_name: string;
+  /** Unit rate from aggregator price list */
+  rate: number;
+  /** Image URL or asset path */
+  item_image?: string | null;
+  /** Last sync timestamp */
+  updatedAt: string;
+}
+
 export interface SyncQueueEntity {
   id: string; // compatibility mapping
   action: string; // compatibility mapping
@@ -171,6 +193,8 @@ export interface SyncQueueEntity {
   server_id?: string | null;
   dependency_ids?: string[];
   dependencies?: string[]; // legacy alias used by some enqueue sites
+  /** Idempotency key stored on the envelope, not in the API payload */
+  idempotency_key?: string;
   payload: Record<string, unknown>;
   payload_hash?: string;
   retry_count?: number;
@@ -277,6 +301,16 @@ export interface IPaymentModeRepository extends IBaseRepository<PaymentModeEntit
 
 export interface IAggregatorRepository extends IBaseRepository<AggregatorEntity, string> {
   findEnabled(): Promise<AggregatorEntity[]>;
+}
+
+export interface IAggregatorItemRepository extends IBaseRepository<AggregatorItemEntity, string> {
+  /** Find all cached items for a specific aggregator partner */
+  findByAggregator(aggregator: string): Promise<AggregatorItemEntity[]>;
+  /** Replace the cached catalog for an aggregator partner */
+  putManyByAggregator(
+    aggregator: string,
+    items: Array<Omit<AggregatorItemEntity, 'id' | 'aggregator' | 'updatedAt'>>
+  ): Promise<string[]>;
 }
 
 export interface ISyncQueueRepository extends IBaseRepository<SyncQueueEntity, string> {

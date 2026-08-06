@@ -2,7 +2,7 @@ import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import 'fake-indexeddb/auto';
 import { call, repositories, projectionBus } from '@ury/core';
-import { syncOrder, cancelOrder, releaseTableAfterPayment, type SyncOrderData } from '../order-api';
+import { syncOrder, cancelOrder, releaseTableAfterPayment, queueOfflinePayment, type SyncOrderData } from '../order-api';
 import { updatePrintStatus, getPOSInvoices } from '../invoice-api';
 
 const baseOrderData = (overrides: Partial<SyncOrderData> = {}): SyncOrderData => ({
@@ -371,5 +371,152 @@ test('getPOSInvoices fallback maps Unbilled orders to Unbilled tab and Draft ord
     assert.equal(draft.invoices[0].invoice_printed, 1);
   } finally {
     (call as any).get = originalGet;
+  }
+});
+
+test('offline Aggregator order creation stores Draft with custom_aggregator_id and clean sync_order payload', async () => {
+  const originalPost = call.post;
+  (call as any).post = async () => {
+    throw new Error('Network Disconnected');
+  };
+
+  try {
+    const result = await syncOrder(baseOrderData({
+      order_type: 'Aggregators',
+      customer: 'Swiggy',
+      aggregator_id: 'Swiggy',
+      no_of_pax: 1,
+      invoice: null,
+    }));
+
+    assert.equal(result.status, 'Draft');
+
+    const local = await repositories.orders.getById(result.name);
+    assert.ok(local);
+    assert.equal(local?.status, 'Draft');
+    assert.equal(local?.sync_status, 'pending');
+    assert.equal(local?.order_type, 'Aggregators');
+    assert.equal(local?.custom_aggregator_id, 'Swiggy');
+    assert.equal(local?.table, undefined);
+
+    const queued = await repositories.syncQueue.getById(`SYNC-ORDER-${result.name}`);
+    assert.ok(queued);
+    assert.equal(queued?.action, 'sync_order');
+
+    const payload = queued?.payload as any;
+    assert.deepEqual(Object.keys(payload).sort(), [
+      'aggregator_id', 'cashier', 'customer', 'invoice', 'items', 'last_invoice',
+      'no_of_pax', 'order_type', 'owner', 'pos_profile', 'waiter',
+    ].sort());
+    assert.equal(payload.aggregator_id, 'Swiggy');
+    assert.equal(payload.customer, 'Swiggy');
+    assert.equal(payload.order_type, 'Aggregators');
+    assert.equal(payload.invoice, null);
+    assert.equal(payload.last_invoice, null);
+    assert.equal(payload.no_of_pax, 1);
+
+    assert.equal(queued?.temporary_id, result.name);
+    assert.ok(queued?.idempotency_key);
+    assert.equal((queued?.payload as any)?.idempotency_key, undefined);
+    assert.equal((queued?.payload as any)?.temp_id, undefined);
+  } finally {
+    (call as any).post = originalPost;
+  }
+});
+
+test('queueOfflinePayment stores clean make_invoice payload with envelope metadata', async () => {
+  const tempId = 'TEMP-ORD-AGG-PAY-001';
+
+  await repositories.orders.put({
+    ...baseOrderEntity(),
+    id: tempId,
+    order_type: 'Aggregators',
+    status: 'Draft',
+    custom_aggregator_id: 'Swiggy',
+    sync_status: 'pending',
+    items: [{ item: 'SZF', item_name: 'Sizzling Arabian Chicken Full', rate: 530, qty: 1, amount: 530 }],
+    grand_total: 530,
+  });
+
+  await queueOfflinePayment({
+    invoice: tempId,
+    customer: 'Swiggy',
+    cashier: 'urycashier@gmail.com',
+    owner: 'urycashier@gmail.com',
+    pos_profile: 'URY',
+    table: null,
+    payments: [{ mode_of_payment: 'Cash', amount: 530 }],
+    additionalDiscount: null,
+  });
+
+  const cmds = await repositories.syncQueue.getAll();
+  const paymentCmd = cmds.find(c => c.action === 'make_invoice');
+  assert.ok(paymentCmd);
+
+  const payload = paymentCmd?.payload as any;
+  assert.deepEqual(Object.keys(payload).sort(), [
+    'additionalDiscount', 'cashier', 'customer', 'invoice', 'owner', 'payments', 'pos_profile', 'table',
+  ].sort());
+  assert.equal(payload.invoice, tempId);
+  assert.equal(payload.table, null);
+  assert.deepEqual(payload.payments, [{ mode_of_payment: 'Cash', amount: 530 }]);
+
+  assert.equal(paymentCmd?.temporary_id, tempId);
+  assert.equal(paymentCmd?.entity_id, tempId);
+  assert.ok(paymentCmd?.idempotency_key);
+  assert.equal(payload.idempotency_key, undefined);
+
+  const local = await repositories.orders.getById(tempId);
+  assert.equal(local?.status, 'Paid');
+});
+
+test('online sync of paid temp Aggregator order promotes to Paid server record preserving custom_aggregator_id', async () => {
+  const tempId = 'TEMP-ORD-AGG-SYNC-001';
+  const serverId = 'AGURY-2026-2027-00008';
+
+  await repositories.orders.put({
+    ...baseOrderEntity(),
+    id: tempId,
+    order_type: 'Aggregators',
+    status: 'Paid',
+    custom_aggregator_id: 'Swiggy',
+    sync_status: 'pending',
+    items: [
+      { item: 'SZF', item_name: 'Sizzling Arabian Chicken Full', rate: 530, qty: 1, amount: 530 },
+      { item: 'SZC', item_name: 'Sizzling Arabian Chicken Single', rate: 160, qty: 1, amount: 160 },
+    ],
+    grand_total: 690,
+  });
+
+  const originalPost = call.post;
+  (call as any).post = async () => ({
+    message: {
+      name: serverId,
+      status: 'Draft',
+    },
+  });
+
+  try {
+    const result = await syncOrder(baseOrderData({
+      invoice: tempId,
+      order_type: 'Aggregators',
+      customer: 'Swiggy',
+      aggregator_id: 'Swiggy',
+      no_of_pax: 1,
+    }));
+
+    assert.equal(result.name, serverId);
+
+    const temp = await repositories.orders.getById(tempId);
+    assert.equal(temp, undefined);
+
+    const server = await repositories.orders.getById(serverId);
+    assert.ok(server);
+    assert.equal(server?.status, 'Paid');
+    assert.equal(server?.order_type, 'Aggregators');
+    assert.equal(server?.custom_aggregator_id, 'Swiggy');
+    assert.equal(server?.sync_status, 'synced');
+  } finally {
+    (call as any).post = originalPost;
   }
 });
