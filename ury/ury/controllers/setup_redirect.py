@@ -20,10 +20,10 @@ def redirect_to_setup():
         return  # already on wizard, API, or static asset call, do not loop
     if path.startswith("/app") or path.startswith("/setup-wizard") or path.startswith("/desk") or path == "/" or not path:
         frappe.local.response["type"] = "redirect"
-        frappe.local.response["location"] = "/ury"
+        frappe.local.response["location"] = "/ury/setup-wizard/0"
 
 def on_session_creation(login_manager=None):
-    """Ensure login on a fresh site redirects to /ury instead of /app or /setup-wizard."""
+    """Ensure login on a fresh site redirects to /ury/setup-wizard/0 instead of /app or /setup-wizard."""
     if not is_ury_setup_complete():
         frappe.local.response["type"] = "redirect"
-        frappe.local.response["location"] = "/ury"
+        frappe.local.response["location"] = "/ury/setup-wizard/0"
