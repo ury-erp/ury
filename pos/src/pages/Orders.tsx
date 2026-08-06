@@ -286,7 +286,7 @@ export default function Orders() {
                   getWarningTime()
                 );
                 const isPrinted = Number(order.invoice_printed) === 1;
-                const elapsedTimeText = isPrinted
+                const elapsedTimeText = isPrinted && limitExceeded
                   ? getElapsedTimeFormatted(order.custom_printing_time, order.posting_date, order.posting_time)
                   : '';
 
