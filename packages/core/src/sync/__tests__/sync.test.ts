@@ -296,3 +296,93 @@ test('6. SyncEngine — Offline paid order: payment command is released after pa
   }
 });
 
+test('8. SyncEngine — Offline update of a synced order replays with the real server invoice ID', async () => {
+  const SERVER_ID = 'POS-INV-2026-UPDATE-001';
+
+  await repos.syncQueue.put({
+    id: `SYNC-ORDER-UPDATE-${SERVER_ID}`,
+    action: 'sync_order',
+    endpoint: 'ury.ury.doctype.ury_order.ury_order.sync_order',
+    payload: { invoice: SERVER_ID, last_invoice: SERVER_ID, items: [] },
+    timestamp: new Date().toISOString(),
+    status: 'PENDING',
+    priority: 1,
+  });
+
+  const originalPost = call.post;
+  let postedPayload: any;
+  (call as any).post = async (endpoint: string, payload: any) => {
+    if (endpoint.includes('sync_order')) {
+      postedPayload = payload;
+      return { name: SERVER_ID };
+    }
+    return {};
+  };
+
+  try {
+    const engine = new SyncEngine(queueMgr, idMapper, undefined, { repositories: repos });
+    const result = await engine.triggerSync();
+
+    assert.equal(result.processed, 1, 'Update command should process');
+    assert.equal(result.succeeded, 1, 'Update command should succeed');
+    assert.equal(postedPayload.invoice, SERVER_ID, 'Payload must retain real invoice ID for update');
+    assert.equal(postedPayload.last_invoice, SERVER_ID, 'Payload must retain last_invoice for update');
+  } finally {
+    (call as any).post = originalPost;
+  }
+});
+
+test('9. SyncEngine — Offline update of a pending temp order reuses temp ID and maps to server ID', async () => {
+  const TEMP_ID = 'TEMP-ORD-UPDATE-002';
+  const SERVER_ID = 'POS-INV-2026-UPDATE-002';
+
+  await repos.orders.put({
+    id: TEMP_ID,
+    order_type: 'Dine-In',
+    status: 'Draft',
+    items: [{ item: 'ITEM-001', item_name: 'Test Item', rate: 100, qty: 1, amount: 100 }],
+    grand_total: 100,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    sync_status: 'pending',
+  });
+
+  await repos.syncQueue.put({
+    id: `SYNC-ORDER-${TEMP_ID}`,
+    action: 'sync_order',
+    endpoint: 'ury.ury.doctype.ury_order.ury_order.sync_order',
+    payload: { invoice: null, last_invoice: null, temp_id: TEMP_ID, items: [] },
+    timestamp: new Date().toISOString(),
+    status: 'PENDING',
+    priority: 1,
+  });
+
+  const originalPost = call.post;
+  (call as any).post = async (endpoint: string, _payload: any) => {
+    if (endpoint.includes('sync_order')) {
+      return { name: SERVER_ID };
+    }
+    return {};
+  };
+
+  try {
+    const engine = new SyncEngine(queueMgr, idMapper, undefined, { repositories: repos });
+    const result = await engine.triggerSync();
+
+    assert.equal(result.processed, 1, 'Temp order update should process');
+    assert.equal(result.succeeded, 1, 'Temp order update should succeed');
+
+    const mapping = await idMapper.getServerId(TEMP_ID);
+    assert.equal(mapping, SERVER_ID, 'Temp ID should be mapped to server ID');
+
+    const tempOrder = await repos.orders.getById(TEMP_ID);
+    assert.equal(tempOrder, undefined, 'Temp order record should be promoted/deleted');
+
+    const serverOrder = await repos.orders.getById(SERVER_ID);
+    assert.ok(serverOrder, 'Server order record should exist after promotion');
+    assert.equal(serverOrder.sync_status, 'synced', 'Promoted order should be marked synced');
+  } finally {
+    (call as any).post = originalPost;
+  }
+});
+

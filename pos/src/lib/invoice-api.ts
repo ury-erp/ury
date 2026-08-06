@@ -1,5 +1,6 @@
 import { DOCTYPES } from '../data/doctypes';
 import { call, db, apiRegistry, repositories, tempIDMapper } from '@ury/core';
+import type { OrderEntity } from '@ury/core';
 import { OrderStatusType, OrderType } from '../data/order-types';
 import type { Filter } from 'frappe-js-sdk/lib/db/types';
 
@@ -85,6 +86,118 @@ interface GetPOSInvoiceItemsResponse {
 }
 
 export const MERGED_POS_INVOICE_PRINT_FORMAT = 'Merged POS Invoice Format';
+
+/**
+ * Load a POS Invoice for editing. Online path fetches the latest backend state;
+ * offline path falls back to the local IndexedDB repository. This ensures the
+ * Edit button works for synced server invoices, synced drafts, and pending temp
+ * orders when the network is unavailable.
+ */
+export async function getOrderForEdit(invoiceId: string): Promise<any> {
+  try {
+    const response: any = await call.get('frappe.client.get', {
+      doctype: 'POS Invoice',
+      name: invoiceId,
+    });
+    return response.message;
+  } catch (onlineErr) {
+    console.warn('[getOrderForEdit] Network fetch failed, falling back to local repository:', onlineErr);
+
+    let localOrder = await repositories.orders.getById(invoiceId);
+
+    // If the requested ID is a temp ID that has already been mapped to a server
+    // invoice, load the server-side local copy instead.
+    if (!localOrder && invoiceId.startsWith('TEMP-')) {
+      const resolvedId = await tempIDMapper.getServerId(invoiceId);
+      if (resolvedId && resolvedId !== invoiceId) {
+        localOrder = await repositories.orders.getById(resolvedId);
+      }
+    }
+
+    if (!localOrder) {
+      throw new Error(`Order ${invoiceId} not found locally`);
+    }
+
+    return mapOrderEntityToEditShape(localOrder);
+  }
+}
+
+function mapOrderEntityToEditShape(order: OrderEntity): any {
+  return {
+    name: order.id,
+    customer: order.customer || 'Guest',
+    customer_name: order.customer || 'Guest',
+    mobile_number: '',
+    order_type: order.order_type,
+    restaurant_table: order.table || null,
+    custom_restaurant_room: order.room || null,
+    status: order.status,
+    invoice_printed: order.sync_status === 'synced' ? 1 : 0,
+    grand_total: order.grand_total || 0,
+    rounded_total: order.grand_total || 0,
+    net_total: order.grand_total || 0,
+    total_taxes_and_charges: 0,
+    sync_status: order.sync_status,
+    items: (order.items || []).map(i => ({
+      name: i.item,
+      item_code: i.item,
+      item_name: i.item_name,
+      qty: i.qty,
+      rate: i.rate,
+      amount: i.amount || i.rate * i.qty,
+      comment: i.comment || '',
+      description: '',
+    })),
+  };
+}
+
+function mapOrderEntityToPOSInvoice(order: OrderEntity): POSInvoice {
+  const createdDate = new Date(order.createdAt || Date.now());
+  const postDate = isNaN(createdDate.getTime())
+    ? new Date().toISOString().split('T')[0]
+    : createdDate.toISOString().split('T')[0];
+  const postTime = isNaN(createdDate.getTime())
+    ? '00:00:00'
+    : createdDate.toISOString().split('T')[1].substring(0, 8);
+
+  return {
+    name: order.id,
+    invoice_printed: order.sync_status === 'synced' ? 1 : 0,
+    grand_total: order.grand_total || 0,
+    restaurant_table: order.table || null,
+    cashier: order.cashier || '',
+    waiter: order.waiter || '',
+    net_total: order.grand_total || 0,
+    posting_time: postTime,
+    total_taxes_and_charges: 0,
+    customer: order.customer || 'Guest',
+    customer_name: order.customer || 'Guest',
+    status: (order.status as any) || 'Draft',
+    mobile_number: '',
+    posting_date: postDate,
+    rounded_total: order.grand_total || 0,
+    order_type: (order.order_type as any) || 'Dine-In',
+    custom_merged_tables: null,
+    custom_restaurant_room: order.room || null,
+    custom_split_group: null,
+    custom_split_from: null,
+    sync_status: order.sync_status || 'pending',
+    items: (order.items || []).map(i => ({
+      name: i.item,
+      item_code: i.item,
+      item_name: i.item_name,
+      description: '',
+      item_group: '',
+      image: '',
+      qty: i.qty,
+      comment: i.comment || '',
+      rate: i.rate,
+      amount: i.amount || i.rate * i.qty,
+      discount_percentage: 0,
+      discount_amount: 0,
+    })),
+  } as any;
+}
 
 export interface MergeBillCandidate {
   name: string;
@@ -291,7 +404,49 @@ export async function getPOSInvoices({
     console.warn('[getPOSInvoices] Network call failed. Falling back to local orders repository cache:', error);
     try {
       const cachedOrders = await repositories.orders.getAll();
-      const filtered = cachedOrders.filter(o => {
+
+      // Resolve TEMP-* IDs and build a deduplicated map keyed by effective ID.
+      // A pending update to a synced order shares the same server ID, so pending
+      // records override synced records for the same ID. Stale TEMP-* records
+      // that already have a local server copy are cleaned up.
+      const resolvedOrders = await Promise.all(
+        cachedOrders.map(async order => {
+          const resolvedId = order.id.startsWith('TEMP-')
+            ? await tempIDMapper.getServerId(order.id)
+            : order.id;
+          return { order, resolvedId };
+        })
+      );
+
+      const orderMap = new Map<string, OrderEntity>();
+      for (const { order, resolvedId } of resolvedOrders) {
+        // Drop mapped temp records whose server copy is already cached locally.
+        if (order.id.startsWith('TEMP-') && resolvedId !== order.id && cachedOrders.some(o => o.id === resolvedId)) {
+          try {
+            await repositories.orders.delete(order.id);
+          } catch (cleanupErr) {
+            console.warn(`[getPOSInvoices] Failed to delete stale temp order ${order.id}:`, cleanupErr);
+          }
+          continue;
+        }
+
+        const key = resolvedId;
+        const existing = orderMap.get(key);
+        if (!existing) {
+          orderMap.set(key, order);
+        } else if (order.sync_status === 'pending') {
+          // Local uncommitted changes take precedence over the backend snapshot.
+          orderMap.set(key, order);
+        } else if (
+          order.sync_status === 'pending' &&
+          existing.sync_status === 'pending' &&
+          (order.updatedAt || '') > (existing.updatedAt || '')
+        ) {
+          orderMap.set(key, order);
+        }
+      }
+
+      const filtered = Array.from(orderMap.values()).filter(o => {
         if (status === 'Draft') return o.status === 'Draft';
         if (status === 'Unbilled') return o.status === 'Unbilled';
         if (status === 'Recently Paid' || status === 'Paid') return o.status === 'Paid';
@@ -301,53 +456,9 @@ export async function getPOSInvoices({
       const start = limit_start || 0;
       const sliced = filtered.slice(start, start + (actualLimit || 10));
 
-      const mappedInvoices: POSInvoice[] = sliced.map(o => {
-        const createdDate = new Date(o.createdAt || Date.now());
-        const postDate = isNaN(createdDate.getTime()) ? new Date().toISOString().split('T')[0] : createdDate.toISOString().split('T')[0];
-        const postTime = isNaN(createdDate.getTime()) ? '00:00:00' : createdDate.toISOString().split('T')[1].substring(0, 8);
-
-        return {
-          name: o.id,
-          invoice_printed: o.sync_status === 'synced' ? 1 : 0,
-          grand_total: o.grand_total || 0,
-          restaurant_table: o.table || null,
-          cashier: o.cashier || '',
-          waiter: o.waiter || '',
-          net_total: o.grand_total || 0,
-          posting_time: postTime,
-          total_taxes_and_charges: 0,
-          customer: o.customer || 'Guest',
-          customer_name: o.customer || 'Guest',
-          status: (o.status as any) || 'Draft',
-          mobile_number: '',
-          posting_date: postDate,
-          rounded_total: o.grand_total || 0,
-          order_type: (o.order_type as any) || 'Dine-In',
-          custom_merged_tables: null,
-          custom_restaurant_room: o.room || null,
-          custom_split_group: null,
-          custom_split_from: null,
-          sync_status: o.sync_status || 'pending',
-          items: (o.items || []).map(i => ({
-            name: i.item,
-            item_code: i.item,
-            item_name: i.item_name,
-            description: '',
-            item_group: '',
-            image: '',
-            qty: i.qty,
-            comment: i.comment || '',
-            rate: i.rate,
-            amount: i.amount || i.rate * i.qty,
-            discount_percentage: 0,
-            discount_amount: 0,
-          })),
-        } as any;
-      });
-
       return {
-        invoices: mappedInvoices,
-        hasMore: start + mappedInvoices.length < filtered.length
+        invoices: sliced.map(mapOrderEntityToPOSInvoice),
+        hasMore: start + sliced.length < filtered.length,
       };
     } catch (fallbackErr) {
       console.error('[getPOSInvoices] Local repository fallback error:', fallbackErr);
@@ -380,10 +491,36 @@ export async function getPOSInvoiceItems(invoiceId: string) {
       }
     );
 
-    return {
-      items: response.message[0] || [],
-      taxes: response.message[1] || []
-    };
+    const items = response.message[0] || [];
+    const taxes = response.message[1] || [];
+
+    // Cache full items locally so the detail view works offline.
+    try {
+      const existing = await repositories.orders.getById(invoiceId);
+      const orderPatch: OrderEntity = {
+        ...(existing || {}),
+        id: invoiceId,
+        order_type: existing?.order_type || 'Dine-In',
+        status: existing?.status || 'Draft',
+        items: items.map((i: any) => ({
+          item: i.item_code,
+          item_name: i.item_name,
+          rate: i.rate,
+          qty: i.qty,
+          amount: i.amount || i.rate * i.qty,
+          comment: i.comment || '',
+        })),
+        grand_total: existing?.grand_total || items.reduce((sum: number, i: any) => sum + (i.amount || i.rate * i.qty), 0),
+        createdAt: existing?.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        sync_status: 'synced',
+      } as OrderEntity;
+      await repositories.orders.put(orderPatch);
+    } catch (cacheErr) {
+      console.warn('[getPOSInvoiceItems] Failed to cache items locally:', cacheErr);
+    }
+
+    return { items, taxes };
   } catch (error) {
     console.warn('[getPOSInvoiceItems] Network call failed. Falling back to local order repository cache:', error);
     try {

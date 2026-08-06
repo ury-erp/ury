@@ -209,30 +209,56 @@ export const syncOrder = async (data: SyncOrderData) => {
   } catch (error: any) {
     console.warn('Network syncOrder failed, storing locally in orders repository and queueing sync:', error);
 
-    // Generate stable unique temp ID — UUID-based to prevent collisions on retry
-    const tempId = data.invoice && data.invoice.startsWith('TEMP-')
-      ? data.invoice  // reuse existing temp ID for updates
-      : `TEMP-ORD-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
-
-    // Stable idempotency key for backend deduplication
-    const idempotencyKey = data.idempotency_key || tempId;
-
     const totalAmount = data.items.reduce((sum, i) => sum + i.rate * i.qty, 0);
 
-    // Preserve local Paid status if the temp order was already paid offline.
+    // Determine offline mode:
+    //   - real server ID  => UPDATE existing invoice (keep invoice/last_invoice)
+    //   - TEMP-* ID       => update a pending offline order (reuse temp ID)
+    //   - no invoice      => CREATE new offline order
+    const isTempOrder = data.invoice && data.invoice.startsWith('TEMP-');
+    const isServerUpdate = data.invoice && !isTempOrder;
+
+    let localId: string;
+    let cmdId: string;
+    let queuePayload: Record<string, unknown>;
+
+    if (isServerUpdate) {
+      localId = data.invoice;
+      cmdId = `SYNC-ORDER-UPDATE-${data.invoice}`;
+      queuePayload = {
+        ...data,
+        invoice: data.invoice,
+        last_invoice: data.last_invoice || data.invoice,
+        temp_id: undefined,
+        idempotency_key: data.idempotency_key || `UPDATE-${data.invoice}`,
+      };
+    } else {
+      const tempId = data.invoice || `TEMP-ORD-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+      localId = tempId;
+      cmdId = `SYNC-ORDER-${tempId}`;
+      queuePayload = {
+        ...data,
+        invoice: null,
+        last_invoice: null,
+        temp_id: tempId,
+        idempotency_key: data.idempotency_key || tempId,
+      };
+    }
+
+    // Preserve local Paid status if this order was already paid offline.
     let offlineStatus: OrderEntity['status'] = 'Draft';
     try {
-      const existingTemp = await repositories.orders.getById(tempId);
-      if (existingTemp && existingTemp.status === 'Paid') {
+      const existingLocal = await repositories.orders.getById(localId);
+      if (existingLocal && existingLocal.status === 'Paid') {
         offlineStatus = 'Paid';
       }
     } catch (lookupErr) {
-      console.warn('[syncOrder] Could not read existing temp order status:', lookupErr);
+      console.warn('[syncOrder] Could not read existing local order status:', lookupErr);
     }
 
     // 1. Store locally in orders repository
     await repositories.orders.put({
-      id: tempId,
+      id: localId,
       table: data.table,
       room: data.room,
       order_type: data.order_type,
@@ -256,20 +282,8 @@ export const syncOrder = async (data: SyncOrderData) => {
       sync_status: 'pending',
     });
 
-    // 2. Enqueue command into sync_queue — payload must include:
-    //    - invoice: tempId (for TempIDMapper to remap when replaying)
-    //    - temp_id: tempId (for parent reference by payment commands)
-    //    - idempotency_key: stable UUID (backend deduplication on retry)
-    //    - aggregator_id: forwarded as-is for aggregator orders
-    const queuePayload: Record<string, unknown> = {
-      ...data,
-      invoice: null,      // clear any stale server reference — backend creates new invoice
-      last_invoice: null, // same: prevent lookup of wrong draft
-      temp_id: tempId,
-      idempotency_key: idempotencyKey,
-    };
-
-    const cmdId = `SYNC-ORDER-${tempId}`;
+    // 2. Enqueue command into sync_queue. Stable command IDs ensure repeated
+    //    offline edits overwrite the same queue entry instead of creating duplicates.
     await repositories.syncQueue.put({
       id: cmdId,
       action: 'sync_order',
@@ -284,7 +298,7 @@ export const syncOrder = async (data: SyncOrderData) => {
     projectionBus.emit('ORDERS_UPDATED');
 
     return {
-      name: tempId,
+      name: localId,
       status: 'Draft',
       grand_total: totalAmount,
       items: data.items,

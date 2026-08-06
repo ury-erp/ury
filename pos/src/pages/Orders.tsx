@@ -26,6 +26,7 @@ import {
   isMergedBill,
   resolvePrintFormat,
   mapSplitGroupInvoiceToPOSInvoice,
+  getOrderForEdit,
   type POSInvoice,
   type SplitGroupInvoice,
 } from '../lib/invoice-api';
@@ -211,10 +212,7 @@ export default function Orders() {
     if (!selectedOrder) return;
     setEditLoading(true);
     try {
-      const res = await fetch(`/api/method/frappe.client.get?doctype=POS+Invoice&name=${selectedOrder.name}`);
-      if (!res.ok) throw new Error('Failed to fetch order details');
-      const data = await res.json();
-      const order = data.message;
+      const order = await getOrderForEdit(selectedOrder.name);
       // Fill POS store
       posStore.resetOrderState();
       posStore.setSelectedOrderType(order.order_type);
