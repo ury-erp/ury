@@ -362,24 +362,9 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
           </div>
 
           <div className="mt-6">
-            <h3 className="text-lg font-semibold mb-3">{t('product_dialog.special_instructions')}</h3>
-            <Input
-              placeholder={t('product_dialog.special_instructions_placeholder')}
-              value={comments}
-              onChange={(e: ChangeEvent<HTMLInputElement>) => setComments(e.target.value)}
-              className="resize-none"
-            />
-          </div>
-
-          <div className="mt-6">
             <h3 className="text-lg font-semibold mb-3">{t('product_dialog.quantity')}</h3>
             <div className="flex items-center space-x-2">
-              <Button
-                onClick={handleDecrement}
-                variant="outline"
-                size="icon"
-                className="h-8 w-8 rounded-full"
-              >
+              <Button onClick={handleDecrement} variant="outline" size="icon" className="h-8 w-8 rounded-full">
                 <Minus className="h-4 w-4" />
               </Button>
               <Input
@@ -388,25 +373,16 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
                 max="99"
                 value={quantity}
                 onChange={(e) => handleQuantityChange(e.target.value)}
-                onBlur={() => {
-                  // If empty on blur, set to 0
-                  if (quantity === '') {
-                    setQuantity('0');
-                  }
-                }}
+                onBlur={() => { if (quantity === '') setQuantity('0'); }}
                 className="w-16 text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
-              <Button
-                onClick={handleIncrement}
-                variant="outline"
-                size="icon"
-                className="h-8 w-8 rounded-full"
-              >
+              <Button onClick={handleIncrement} variant="outline" size="icon" className="h-8 w-8 rounded-full">
                 <Plus className="h-4 w-4" />
               </Button>
             </div>
           </div>
-          {/* Variants Section  */}
+
+          {/* Variants */}
           {variantDetails.length > 0 && (
             <div className="mt-6">
               <h3 className="text-lg font-semibold mb-3">{t('product_dialog.variants')}</h3>
@@ -425,13 +401,27 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
                       )}
                     >
                       <div className="font-medium">{variant.name}</div>
-                      <div className="text-sm text-gray-500">{formatCurrency(menuVariant ? Number(menuVariant.price) : 0)}</div>
+                      <div className="text-sm text-gray-500">
+                        {formatCurrency(menuVariant ? Number(menuVariant.price) : 0)}
+                      </div>
                     </button>
                   );
                 })}
               </div>
             </div>
           )}
+
+          {/* Special Instructions + Add Customization (Improvement 3: placed directly below) */}
+          <div className="mt-6">
+            <h3 className="text-lg font-semibold mb-3">{t('product_dialog.special_instructions')}</h3>
+            <Input
+              placeholder={t('product_dialog.special_instructions_placeholder')}
+              value={comments}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setComments(e.target.value)}
+              className="resize-none"
+            />
+            
+          </div>
         </div>
 
 
@@ -469,7 +459,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
               <div className="flex items-center justify-center text-gray-400 text-sm">{t('product_dialog.no_addons')}</div>
             )}
           </div>
-          {/* Always show total section at the end */}
+
           <div className="mt-auto pt-2 border-t border-gray-200">
             <div className="flex justify-between items-center text-lg font-semibold">
               <span>{t('product_dialog.total')}&nbsp;</span>
