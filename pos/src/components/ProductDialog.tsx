@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, ChangeEvent } from 'react';
 import { X, Plus, Minus } from 'lucide-react';
-import { OrderItem, usePOSStore } from '../store/pos-store';
+import type { OrderItem } from '../store/pos-store';
+import { usePOSStore } from '../store/pos-store';
 import { cn } from '@ury/ui';
 import { formatCurrency } from '@ury/core';
 import { Button, Dialog, DialogContent, Input } from '@ury/ui';
@@ -32,31 +33,19 @@ interface ProductDialogProps {
 const ProductDialog: React.FC<ProductDialogProps> = ({
   onClose,
   editMode = false,
-  initialVariant,
   initialAddons = [],
   initialQuantity,
-  itemToReplace
+  itemToReplace,
 }) => {
-  const { 
-    selectedItem, 
-    addToOrder, 
-    removeFromOrder, 
-    setSelectedItem, 
-    getItemQuantityFromCart,
+  const {
+    selectedItem,
+    addToOrder,
+    removeFromOrder,
+    setSelectedItem,
     activeOrders,
-    menuItems
+    menuItems,
   } = usePOSStore();
   
-  // Find existing item in cart
-  const existingCartItem = selectedItem ? activeOrders.find(
-    order => order.id === selectedItem.id &&
-    (!order.selectedVariant || order.selectedVariant.id === initialVariant?.id) &&
-    (!order.selectedAddons || order.selectedAddons.length === initialAddons.length && 
-      order.selectedAddons.every(addon => 
-        initialAddons.some(initAddon => initAddon.id === addon.id)
-      ))
-  ) : null;
-
   // State for the full item doc (used for all dialog content)
   const [itemDoc, setItemDoc] = useState<any | null>(null);
   const [, setIsItemLoading] = useState(false);
@@ -124,9 +113,26 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
         .filter(Boolean)
     : [];
 
-  const [selectedAddons, setSelectedAddons] = useState<Array<{ id: string; name: string; price: number }>>([]);
-  const [quantity, setQuantity] = useState<string>(editMode ? initialQuantity?.toString() || '0' : '0');
-  const [comments, setComments] = useState<string>(itemToReplace?.comment || existingCartItem?.comment || '');
+  // When opened from the menu (not editMode), find the MOST RECENT cart line for this item.
+  // Pre-populate all fields (qty, comment, add-ons) from that line so the cashier
+  // immediately sees the current preparation.
+  const existingLineForItem = !editMode && selectedItem
+    ? ([...activeOrders].reverse().find(order => order.id === selectedItem.id) ?? null)
+    : null;
+
+  const [selectedAddons, setSelectedAddons] = useState<Array<{ id: string; name: string; price: number }>>(
+    editMode ? initialAddons : (existingLineForItem?.selectedAddons ?? [])
+  );
+  const [quantity, setQuantity] = useState<string>(
+    editMode
+      ? (initialQuantity?.toString() || '1')
+      : (existingLineForItem?.quantity?.toString() ?? '1')
+  );
+  const [comments, setComments] = useState<string>(
+    editMode
+      ? (itemToReplace?.comment || '')
+      : (existingLineForItem?.comment || '')
+  );
   const dialogRef = useRef<HTMLDivElement>(null);
 
   const [, setAddonItemCodes] = useState<string[]>([]);
@@ -161,19 +167,6 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
         setIsAddonLoading(false);
       });
   }, [selectedItem]);
-
-  // Initialize quantity and comments from cart if not in edit mode
-  useEffect(() => {
-    if (!editMode && selectedItem) {
-      if (existingCartItem) {
-        setQuantity(existingCartItem.quantity.toString());
-        setComments(existingCartItem.comment || '');
-      } else {
-        const cartQuantity = getItemQuantityFromCart(selectedItem);
-        setQuantity(cartQuantity.toString());
-      }
-    }
-  }, [selectedItem, editMode, getItemQuantityFromCart, existingCartItem]);
 
   // Handle click outside to close dialog
   useEffect(() => {
@@ -471,7 +464,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
               size="lg"
               disabled={numericQuantity === 0}
             >
-              {editMode || existingCartItem ? t('product_dialog.update_order') : t('product_dialog.add_to_order')}
+              {editMode ? t('product_dialog.update_order') : t('product_dialog.add_to_order')}
             </Button>
           </div>
         </div>
