@@ -34,6 +34,44 @@ export class TableRepository
     }
   }
 
+  /**
+   * Computes the full merge cluster for a primary table using the local
+   * `merged_with` CSV cached on the table record. Mirrors the backend
+   * `_get_table_group` behavior used by `cancel_order` to release tables.
+   */
+  async getClusterTables(primary: string): Promise<string[]> {
+    const primaryEntity = await this.getById(primary);
+    if (!primaryEntity) return [primary];
+
+    const partners = (primaryEntity.merged_with || '')
+      .split(',')
+      .map(t => t.trim())
+      .filter(Boolean);
+
+    const cluster = new Set<string>([primary]);
+    for (const partner of partners) {
+      cluster.add(partner);
+    }
+    return Array.from(cluster);
+  }
+
+  /**
+   * Releases every table in a merge cluster: marks them unoccupied and clears
+   * the `merged_with` linkage. This matches the backend `release_merge_cluster_tables`
+   * TABLE_RELEASE_FIELDS update performed during cancellation.
+   */
+  async releaseCluster(tableNames: string[]): Promise<void> {
+    for (const name of tableNames) {
+      const existing = await this.getById(name);
+      if (existing) {
+        existing.occupied = 0;
+        existing.merged_with = null;
+        existing.latest_invoice_time = null;
+        await this.put(existing);
+      }
+    }
+  }
+
   /** Update table transfer state */
   async transferTable(source: string, target: string): Promise<void> {
     await this.setOccupied(source, false);

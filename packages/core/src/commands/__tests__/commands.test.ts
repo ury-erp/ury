@@ -14,6 +14,7 @@ import { CommandFactory } from '../command.factory';
 import { CreateOrderCommand } from '../create-order.command';
 import { UpdateOrderCommand } from '../update-order.command';
 import { MergeTableCommand } from '../merge-table.command';
+import { MergeBillCommand } from '../merge-bill.command';
 import { SplitBillCommand } from '../split-bill.command';
 import { PaymentCommand } from '../payment.command';
 import { DeleteDraftCommand } from '../delete-draft.command';
@@ -52,11 +53,12 @@ test('1. Verify all 7 Command Envelopes contain 9 mandatory fields', () => {
   assert.equal(env.version, 1);
 });
 
-test('2. CommandFactory — Instantiate all 7 commands from JSON envelopes', () => {
+test('2. CommandFactory — Instantiate all 8 commands from JSON envelopes', () => {
   const commands = [
     new CreateOrderCommand({ order_type: 'Dine-In', no_of_pax: 2, pos_profile: 'Standard', items: [] }),
     new UpdateOrderCommand({ invoice: 'POS-001', order_type: 'Dine-In', no_of_pax: 2, items: [] }),
     new MergeTableCommand({ anchor_table: 'T-01', tables: ['T-02'] }),
+    new MergeBillCommand({ primary_invoice: 'POS-001', secondary_invoice: 'POS-002' }),
     new SplitBillCommand({ source_invoice: 'POS-001', items_to_move: [] }),
     new PaymentCommand({ invoice: 'POS-001', payments: [{ mode_of_payment: 'Cash', amount: 100 }] }),
     new DeleteDraftCommand({ invoice: 'POS-001' }),
@@ -68,6 +70,32 @@ test('2. CommandFactory — Instantiate all 7 commands from JSON envelopes', () 
     assert.equal(deserialized.envelope.id, cmd.envelope.id);
     assert.equal(deserialized.envelope.endpoint, cmd.envelope.endpoint);
   }
+});
+
+test('2b. SplitBillCommand envelope carries split metadata and sorts before payment', async () => {
+  const splitCmd = new SplitBillCommand(
+    { source_invoice: 'POS-001', items_to_move: [{ name: 'ITEM-1', qty: 1 }] },
+    {
+      id: 'CMD-SPLIT-META',
+      temporaryId: 'TEMP-SPLIT-001',
+    }
+  );
+  const env = splitCmd.envelope;
+  assert.equal(env.operation_type, 'SPLIT_BILL');
+  assert.equal(env.entity_type, 'Order');
+  assert.equal(env.entity_id, 'POS-001');
+  assert.equal(env.temporary_id, 'TEMP-SPLIT-001');
+  assert.equal(env.priority, 3);
+
+  await queueMgr.enqueue(splitCmd);
+  const payCmd = new PaymentCommand(
+    { invoice: 'POS-002', payments: [{ mode_of_payment: 'Cash', amount: 100 }] },
+    { id: 'CMD-PAY-META' }
+  );
+  await queueMgr.enqueue(payCmd);
+
+  const peeked = await queueMgr.peek();
+  assert.equal(peeked?.id, 'CMD-SPLIT-META', 'Split command should drain before payment');
 });
 
 test('3. CommandQueueManager — Enqueue, Peek & Dequeue IndexedDB storage', async () => {

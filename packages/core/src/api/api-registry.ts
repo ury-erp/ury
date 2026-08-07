@@ -436,6 +436,32 @@ export class ApiRegistry {
         authRequired: true,
         description: 'Resolves network printer and triggers CUPS/PDF print via network_printing',
       },
+      {
+        endpointKey: 'NETWORK_PRINTING',
+        url: 'ury.ury.api.ury_print.network_printing',
+        httpMethod: 'POST',
+        category: 'Command',
+        cacheStrategy: 'NoCache',
+        offlineCapability: false,
+        syncBehavior: 'IMMEDIATE',
+        timeoutMs: 10000,
+        retryPolicy: { maxRetries: 2, backoffBaseMs: 1000 },
+        authRequired: true,
+        description: 'Direct CUPS/PDF network print for a POS Invoice',
+      },
+      {
+        endpointKey: 'KOT_REPRINT',
+        url: 'ury.ury.api.ury_kot_reprint.reprint_kot',
+        httpMethod: 'GET',
+        category: 'Command',
+        cacheStrategy: 'NoCache',
+        offlineCapability: true,
+        syncBehavior: 'QUEUED',
+        timeoutMs: 5000,
+        retryPolicy: { maxRetries: 3, backoffBaseMs: 1000 },
+        authRequired: true,
+        description: 'Reprints Kitchen Order Ticket (KOT) for an invoice',
+      },
     ];
 
     for (const ep of defaultEndpoints) {

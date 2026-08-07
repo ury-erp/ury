@@ -56,8 +56,26 @@ function getNormalizedPriority(env: CommandEnvelope): number {
   }
 
   if (
+    endpoint.includes('merge_bills') ||
+    action.includes('merge_bills') ||
+    op === 'MERGE_BILLS'
+  ) {
+    return 2;
+  }
+
+  if (
+    endpoint.includes('split_bill') ||
+    action.includes('split_bill') ||
+    op === 'SPLIT_BILL'
+  ) {
+    return 3;
+  }
+
+  if (
     endpoint.includes('qz_print_update') ||
     action.includes('qz_print_update') ||
+    endpoint.includes('kot_reprint') ||
+    action.includes('kot_reprint') ||
     op === 'PRINT_ORDER'
   ) {
     return 3;
@@ -94,7 +112,7 @@ export class CommandQueueManager {
     const dbEntity: any = {
       command_id: env.command_id || env.id,
       client_request_id: env.client_request_id || `REQ-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-      operation_type: env.operation_type || 'CREATE_ORDER',
+      operation_type: env.operation_type || null,
       entity_type: env.entity_type || 'Order',
       entity_id: env.entity_id || env.id,
       temporary_id: env.temporary_id || null,
@@ -133,7 +151,7 @@ export class CommandQueueManager {
       return {
         command_id: cmdId,
         client_request_id: e.client_request_id || '',
-        operation_type: e.operation_type || 'CREATE_ORDER',
+        operation_type: e.operation_type || '',
         entity_type: e.entity_type || '',
         entity_id: e.entity_id || '',
         temporary_id: e.temporary_id || null,
@@ -159,11 +177,18 @@ export class CommandQueueManager {
       };
     });
 
-    // Filter out commands whose prerequisite dependencies have not completed yet
+    // Filter out commands whose prerequisite dependencies have not completed yet.
+    // A FAILED or missing parent never satisfies a dependency; dependents wait until
+    // the parent is explicitly COMPLETED or manually resolved.
     const allItems = await this.queueRepo.getAll();
     const completedIds = new Set(
       allItems
         .filter(e => e.status === 'COMPLETED')
+        .map(e => e.command_id || e.id)
+    );
+    const failedIds = new Set(
+      allItems
+        .filter(e => e.status === 'FAILED')
         .map(e => e.command_id || e.id)
     );
 
@@ -195,6 +220,14 @@ export class CommandQueueManager {
           }
         }
         return true;
+      }
+      if (deps.some(depId => failedIds.has(depId))) {
+        console.warn(
+          `[CommandQueueManager] Command ${env.command_id || env.id} blocked: dependency ${deps.find(
+            d => failedIds.has(d)
+          )} has FAILED.`
+        );
+        return false;
       }
       return deps.every(depId => completedIds.has(depId));
     });
@@ -317,6 +350,27 @@ export class CommandQueueManager {
   }
 
   /**
+   * Removes a completed parent command id from the dependency lists of all other
+   * pending commands. This is required because completed commands are purged from
+   * the queue immediately after execution; if dependents still referenced the
+   * purged id they would be stuck waiting for a command that no longer exists.
+   */
+  async clearDependencyId(completedId: string): Promise<void> {
+    const all = await this.queueRepo.getAll();
+    for (const item of all) {
+      if (item.status === 'COMPLETED') continue;
+      const deps = item.dependency_ids || item.dependencies || [];
+      if (deps.includes(completedId)) {
+        const nextDeps = deps.filter(id => id !== completedId);
+        item.dependency_ids = nextDeps;
+        item.dependencies = nextDeps;
+        item.updated_at = new Date().toISOString();
+        await this.queueRepo.put(item);
+      }
+    }
+  }
+
+  /**
    * Find all pending MAKE_INVOICE commands whose invoice field matches a given temp ID.
    * Used to patch payment commands after sync_order resolves the real server invoice ID.
    */
@@ -363,6 +417,31 @@ export class CommandQueueManager {
         timestamp: e.created_at || e.timestamp,
       };
     });
+  }
+
+  /**
+   * Finds the command_id of a pending command that is responsible for creating a
+   * temporary entity (temporary_id/entity_id matches tempId). Falls back to a
+   * command whose payload references the temp id. Returns undefined if no pending
+   * creator is found.
+   */
+  async findPendingCommandIdForTempId(tempId: string): Promise<string | undefined> {
+    const all = await this.queueRepo.getAll();
+    const creator = all.find((e: any) =>
+      e.status === 'PENDING' &&
+      (e.temporary_id === tempId || e.entity_id === tempId)
+    );
+    if (creator) {
+      return (creator.command_id || creator.id) as string;
+    }
+
+    // Fallback: search payload references for commands that do not set temp metadata.
+    const payloadMatch = all.find((e: any) => {
+      if (e.status !== 'PENDING') return false;
+      const payloadStr = JSON.stringify(e.payload || {});
+      return payloadStr.includes(tempId);
+    });
+    return payloadMatch ? ((payloadMatch.command_id || payloadMatch.id) as string) : undefined;
   }
 }
 

@@ -7,6 +7,7 @@ export * from './command.interface';
 export * from './create-order.command';
 export * from './update-order.command';
 export * from './merge-table.command';
+export * from './merge-bill.command';
 export * from './split-bill.command';
 export * from './payment.command';
 export * from './delete-draft.command';

@@ -18,19 +18,28 @@ export class SplitBillCommand extends BaseCommand<SplitBillPayload> {
 
   constructor(
     payload: SplitBillPayload,
-    options?: { id?: string; priority?: number; dependencies?: string[] }
+    options?: {
+      id?: string;
+      priority?: number;
+      dependencies?: string[];
+      temporaryId?: string;
+    }
   ) {
     const envelope: CommandEnvelope<SplitBillPayload> = {
       id: options?.id || `CMD-SPLIT-BILL-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       endpoint: SplitBillCommand.ENDPOINT,
       payload,
       retryCount: 0,
-      priority: options?.priority ?? 1,
+      priority: options?.priority ?? 3,
       dependencies: options?.dependencies || [],
       status: 'PENDING',
       timestamp: new Date().toISOString(),
       version: 1,
       actionName: SplitBillCommand.ACTION_NAME,
+      operation_type: 'SPLIT_BILL',
+      entity_type: 'Order',
+      entity_id: payload.source_invoice,
+      temporary_id: options?.temporaryId || null,
     };
     super(envelope);
   }

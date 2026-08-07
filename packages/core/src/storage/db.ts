@@ -119,6 +119,30 @@ export class UryPosDatabase extends Dexie {
           updatedAt: new Date().toISOString(),
         });
       });
+
+    // ==========================================
+    // VERSION 5: AGGREGATOR ITEM STALENESS INDEX
+    // ==========================================
+    this.version(5)
+      .stores({
+        orders: 'id, table, status, order_type, customer, cashier, sync_status, createdAt, updatedAt',
+        restaurantTables: 'name, restaurant_room, occupied, merged_with',
+        menu: 'id, category, course, special_dish, disabled',
+        customers: 'id, phone, name, customer_group',
+        payment_modes: 'id, name, enabled',
+        aggregators: 'name, customer, enabled',
+        aggregator_items: 'id, aggregator, item, [aggregator+item], updatedAt',
+        sync_queue: 'id, command_id, status, operation_type, created_at, *dependency_ids',
+        metadata: 'key, updatedAt',
+        settings: 'key, updatedAt',
+      })
+      .upgrade(tx => {
+        return tx.table('metadata').put({
+          key: 'schema_version',
+          value: '5',
+          updatedAt: new Date().toISOString(),
+        });
+      });
   }
 }
 

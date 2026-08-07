@@ -135,21 +135,63 @@ export class ConflictResolver {
 
       // 4. Merge Failed -> ROLLBACK
       case 'MERGE_FAILED': {
+        const isTableMerge =
+          command.payload?.anchor_table || command.endpoint?.includes('merge_tables_batch');
+
+        if (isTableMerge) {
+          return {
+            conflictCode: code,
+            strategy: 'ROLLBACK',
+            message: 'Table merge failed on server. Reverting table merge linkages.',
+            shouldRetry: false,
+            shouldNotifyUser: true,
+            remedyAction: async () => {
+              if (command.payload?.anchor_table) {
+                const anchor = await this.repos.tables.getById(command.payload.anchor_table);
+                if (anchor) {
+                  anchor.merged_with = null;
+                  await this.repos.tables.put(anchor);
+                }
+              }
+              projectionBus.emit('TABLES_UPDATED');
+            },
+          };
+        }
+
+        // Bill merge failure: clear the bidirectional merge link on both local orders
         return {
           conflictCode: code,
           strategy: 'ROLLBACK',
-          message: 'Table merge failed on server. Reverting table merge linkages.',
+          message: 'Bill merge failed on server. Reverting merge linkages.',
           shouldRetry: false,
           shouldNotifyUser: true,
           remedyAction: async () => {
-            if (command.payload?.anchor_table) {
-              const anchor = await this.repos.tables.getById(command.payload.anchor_table);
-              if (anchor) {
-                anchor.merged_with = null;
-                await this.repos.tables.put(anchor);
+            const primaryId = command.payload?.primary_invoice as string | undefined;
+            const secondaryId = command.payload?.secondary_invoice as string | undefined;
+
+            if (primaryId) {
+              const primary = await this.repos.orders.getById(primaryId);
+              if (primary) {
+                primary.custom_merged_pos_invoice = null;
+                primary.custom_merged_total = null;
+                primary.custom_merged_pos_invoice_details = null;
+                primary.updatedAt = new Date().toISOString();
+                await this.repos.orders.put(primary);
               }
             }
-            projectionBus.emit('TABLES_UPDATED');
+
+            if (secondaryId) {
+              const secondary = await this.repos.orders.getById(secondaryId);
+              if (secondary) {
+                secondary.custom_merged_pos_invoice = null;
+                secondary.custom_merged_total = null;
+                secondary.custom_merged_pos_invoice_details = null;
+                secondary.updatedAt = new Date().toISOString();
+                await this.repos.orders.put(secondary);
+              }
+            }
+
+            projectionBus.emit('ORDERS_UPDATED');
           },
         };
       }

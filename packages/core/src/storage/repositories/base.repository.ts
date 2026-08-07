@@ -12,7 +12,7 @@ export abstract class BaseRepository<T extends object, K = string>
   implements IBaseRepository<T, K>
 {
   protected table: Table<T, K>;
-  protected dbInstance: UryPosDatabase;
+  readonly dbInstance: UryPosDatabase;
 
   constructor(table: Table<T, K>, dbInstance: UryPosDatabase) {
     this.table = table;

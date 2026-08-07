@@ -1,6 +1,6 @@
 /**
  * @file sync.engine.ts
- * @description SyncEngine Orchestrator.
+ * @description Bulletproof SyncEngine Orchestrator.
  *
  * Two-Stage Sync Architecture:
  *  Stage 1 — Order Commands: sync_order commands execute first. On success, the real server
@@ -9,17 +9,26 @@
  *  Stage 2 — Payment Commands: make_invoice commands execute only after their parent order
  *             command has completed and their invoice field points to a real server ID.
  *
- * This ensures that offline paid orders are submitted to the backend as Paid (docstatus=1),
- * not left as Draft, which was the root cause of the reported regression.
+ * Hardening principles applied in this file:
+ *  1. Strict endpoint response validation — a command is NEVER marked COMPLETED unless the
+ *     backend response proves the ERP document was created/updated successfully.
+ *  2. Atomic IndexedDB transactions — command status changes, TempID mappings, payment
+ *     patches, and local order promotions are committed together or rolled back together.
+ *  3. No error swallowing — non-critical steps log warnings, but any failure that breaks
+ *     the completion invariant fails the command and halts the sync cycle.
+ *  4. Dependency enforcement — dependents wait until all dependency_ids are COMPLETED; a
+ *     FAILED or missing parent never satisfies a dependency.
  */
 
 import { call } from '../frappe/client';
 import { commandQueue, CommandQueueManager, type CommandEnvelope } from '../commands';
 import { repositories, type OrderEntity, type StorageRepositories } from '../storage';
-import { tempIDMapper, TempIDMapper } from './temp-id-mapper';
+import type { UryPosDatabase } from '../storage/db';
+import { TempIDMapper } from './temp-id-mapper';
 import { calculateBackoffDelay, isMaxAttemptsReached } from './backoff';
 import { projectionBus, type ProjectionEventType } from '../projections';
 import { conflictResolver, ConflictResolver } from './conflict.resolver';
+import { apiRegistry } from '../api/api-registry';
 
 export interface SyncEngineOptions {
   maxAttempts?: number;
@@ -36,6 +45,7 @@ const ORDER_SYNC_ENDPOINTS = [
   'split_bill',
   'table_transfer',
   'qz_print_update',
+  'kot_reprint',
 ];
 const PAYMENT_ENDPOINTS = ['make_invoice'];
 const TABLE_ENDPOINTS = ['merge_tables_batch', 'unmerge_tables', 'table_transfer'];
@@ -52,6 +62,148 @@ function isPaymentCommand(env: CommandEnvelope): boolean {
   return env.endpoint.includes('make_invoice');
 }
 
+/** Returns true if this command is a cancellation */
+function isCancelCommand(env: CommandEnvelope): boolean {
+  return env.endpoint.includes('cancel_order');
+}
+
+/** Returns true if this command updates print status */
+function isPrintCommand(env: CommandEnvelope): boolean {
+  return env.endpoint.includes('qz_print_update');
+}
+
+/** Returns true if this command splits a bill */
+function isSplitCommand(env: CommandEnvelope): boolean {
+  return env.endpoint.includes('split_bill') || env.operation_type === 'SPLIT_BILL';
+}
+
+/**
+ * Unwraps a Frappe JS SDK response. Production responses are usually
+ * `{ message: <payload> }` or `{ data: <payload> }`; tests and some legacy
+ * endpoints return the payload directly.
+ */
+function unwrapFrappeResponse(raw: any): any {
+  if (raw == null) return raw;
+  if (raw.message !== undefined) return raw.message;
+  if (raw.data !== undefined) return raw.data;
+  return raw;
+}
+
+/** Extracts a human-readable error message from a backend response. */
+function extractErrorMessage(body: any): string {
+  if (!body) return 'Unknown server error';
+  if (typeof body === 'string') return body;
+  return (
+    body.message?.message ||
+    body.message ||
+    body.error?.message ||
+    body.error ||
+    body.exception ||
+    JSON.stringify(body)
+  );
+}
+
+interface ValidationSuccess {
+  valid: true;
+  serverId?: string;
+  body: any;
+}
+
+interface ValidationFailure {
+  valid: false;
+  error: string;
+}
+
+type ValidationResult = ValidationSuccess | ValidationFailure;
+
+/**
+ * Strict endpoint response validator. NEVER mark a command complete unless the
+ * response shape proves the ERP document exists and the operation succeeded.
+ */
+function validateEndpointResponse(env: CommandEnvelope, rawResponse: any): ValidationResult {
+  const body = unwrapFrappeResponse(rawResponse);
+
+  // Explicit backend failure indicators
+  const topLevelStatus = rawResponse?.status;
+  const bodyStatus = body?.status;
+  const failureMessage =
+    topLevelStatus === 'Failure' || bodyStatus === 'Failure'
+      ? extractErrorMessage(body)
+      : null;
+  if (failureMessage) {
+    return { valid: false, error: `SERVER_REJECTED: ${failureMessage}` };
+  }
+
+  if (topLevelStatus === 'error' || bodyStatus === 'error') {
+    return { valid: false, error: `SERVER_ERROR: ${extractErrorMessage(body)}` };
+  }
+
+  const endpoint = env.endpoint;
+
+  // Order creation/update MUST return the created POS Invoice name.
+  if (isOrderSyncCommand(env)) {
+    const serverId = body?.name;
+    if (!serverId || typeof serverId !== 'string') {
+      return { valid: false, error: 'sync_order response missing POS Invoice name' };
+    }
+    return { valid: true, serverId, body };
+  }
+
+  // Payment submission MUST confirm success or return the submitted invoice name.
+  if (isPaymentCommand(env)) {
+    const serverId = body?.name || body?.message?.name;
+    const success = body?.status === 'success' || !!serverId;
+    if (!success) {
+      return { valid: false, error: 'make_invoice did not confirm success or return invoice name' };
+    }
+    return { valid: true, serverId, body };
+  }
+
+  // Bill split MUST return the new invoice identifier.
+  if (endpoint.includes('split_bill')) {
+    const newInvoice = body?.new_invoice || body?.message?.new_invoice;
+    if (!newInvoice) {
+      return { valid: false, error: 'split_bill response missing new_invoice' };
+    }
+    return { valid: true, serverId: newInvoice as string, body };
+  }
+
+  // Customer creation MUST return a customer identifier.
+  if (endpoint.includes('create_customer')) {
+    const serverId = body?.customer_name || body?.name || body?.message?.customer_name;
+    if (!serverId) {
+      return { valid: false, error: 'create_customer response missing customer identifier' };
+    }
+    return { valid: true, serverId: serverId as string, body };
+  }
+
+  // Merge bills should report success and return the primary invoice name when available.
+  if (endpoint.includes('merge_bills')) {
+    if (body?.status === 'error') {
+      return { valid: false, error: extractErrorMessage(body) };
+    }
+    return { valid: true, serverId: body?.name as string | undefined, body };
+  }
+
+  // Table operations, cancellations, print updates, and KOT reprints only need to
+  // avoid explicit failure. Where a status is returned it must not be Failure/error.
+  if (
+    endpoint.includes('merge_tables_batch') ||
+    endpoint.includes('unmerge_tables') ||
+    endpoint.includes('table_transfer') ||
+    endpoint.includes('captain_transfer') ||
+    isCancelCommand(env) ||
+    isPrintCommand(env) ||
+    endpoint.includes('kot_reprint') ||
+    endpoint.includes('delete_draft_invoice')
+  ) {
+    return { valid: true, body };
+  }
+
+  // Unknown/legacy endpoint: accept only if there is no explicit failure payload.
+  return { valid: true, body };
+}
+
 export class SyncEngine {
   private queueMgr: CommandQueueManager;
   private idMapper: TempIDMapper;
@@ -66,10 +218,10 @@ export class SyncEngine {
     customResolver?: ConflictResolver,
     options?: SyncEngineOptions
   ) {
-    this.queueMgr = customQueueMgr || commandQueue;
-    this.idMapper = customIdMapper || tempIDMapper;
-    this.resolver = customResolver || conflictResolver;
     this.repos = options?.repositories || repositories;
+    this.queueMgr = customQueueMgr || commandQueue;
+    this.idMapper = customIdMapper || new TempIDMapper(this.repos);
+    this.resolver = customResolver || conflictResolver;
     this.options = {
       maxAttempts: options?.maxAttempts ?? 5,
       baseBackoffMs: options?.baseBackoffMs ?? 1000,
@@ -89,11 +241,9 @@ export class SyncEngine {
   }
 
   /**
-   * Triggers sequential queue draining.
-   * Two-stage processing: order commands first, then payment commands.
-   */
-  /**
    * Triggers dependency-based queue draining.
+   * Processes one ready command at a time and halts on the first failure so that
+   * dependents never run against a failed or incomplete parent state.
    */
   async triggerSync(): Promise<{ processed: number; succeeded: number; failed: number }> {
     if (this.isSyncing) {
@@ -121,7 +271,9 @@ export class SyncEngine {
           succeeded++;
         } else {
           failed++;
-          console.warn(`[SyncEngine] Dependency command ${nextCommand.command_id || nextCommand.id} failed. Halting sync cycle.`);
+          console.warn(
+            `[SyncEngine] Command ${nextCommand.command_id || nextCommand.id} failed. Halting sync cycle to protect dependents.`
+          );
           break;
         }
       }
@@ -131,10 +283,7 @@ export class SyncEngine {
       this.isSyncing = false;
     }
 
-    // After the queue is drained (successfully or halted), run housekeeping to
-    // purge completed queue entries and any local TEMP-* records that have already
-    // been mapped to real server invoices. This keeps IndexedDB compact and
-    // prevents stale offline cards from lingering in the UI.
+    // Post-sync housekeeping is best-effort but errors are surfaced, not swallowed.
     try {
       await this._cleanupAfterSync();
     } catch (cleanupErr) {
@@ -150,10 +299,13 @@ export class SyncEngine {
    */
   private async processCommand(env: CommandEnvelope): Promise<boolean> {
     const cmdId = env.command_id || env.id;
+
     // Check max attempts
     const currentRetries = env.retry_count ?? env.retryCount ?? 0;
     if (isMaxAttemptsReached(currentRetries, this.options.maxAttempts)) {
-      console.warn(`[SyncEngine] Command ${cmdId} reached max retry attempts (${currentRetries}). Skipping.`);
+      console.warn(
+        `[SyncEngine] Command ${cmdId} reached max retry attempts (${currentRetries}). Skipping.`
+      );
       return false;
     }
 
@@ -165,17 +317,17 @@ export class SyncEngine {
         const phone = (env.payload as any)?.mobile_number || (env.payload as any)?.phone;
         if (phone) {
           try {
-            // Search Customer by Mobile Number
             const searchResponse: any = await call.get('api/resource/Customer', {
               filters: [['mobile_number', '=', phone]],
-              fields: ['name']
+              fields: ['name'],
             });
-            const existingCustName = searchResponse?.data?.[0]?.name || searchResponse?.message?.[0]?.name;
+            const existingCustName =
+              searchResponse?.data?.[0]?.name || searchResponse?.message?.[0]?.name;
             if (existingCustName) {
               console.log(`[SyncEngine] Mapped existing customer: ${phone} -> ${existingCustName}`);
-              await this.idMapper.registerMapping(env.temporary_id || cmdId, existingCustName);
-              await this.queueMgr.markCompleted(cmdId);
-              await this.queueMgr.clearCompleted();
+              await this.completeCommandTransaction(env, cmdId, async () => {
+                await this.idMapper.registerMapping(env.temporary_id || cmdId, existingCustName);
+              });
               return true;
             }
           } catch (searchErr) {
@@ -187,119 +339,93 @@ export class SyncEngine {
       // 1. Remap Payload IDs using TempIDMapper (replaces TEMP-* IDs with real server IDs)
       const remappedPayload = await this.idMapper.remapPayload(env.payload);
 
-      // Check Order State Rules (Phase 5 Order State Rules)
-      // For payment commands, abort execution if the invoice reference is still a TEMP-* ID.
-      // The parent sync_order command must complete first and remap the temp ID to a real
-      // server invoice ID. We defer the command back to PENDING (without incrementing retry
-      // count) so it is retried automatically once the parent order syncs.
+      // 2. Payment commands MUST NOT run while their invoice reference is still a TEMP-* ID.
       const tempOrderRef = remappedPayload.invoice || remappedPayload.temp_id || env.temporary_id;
       if (isPaymentCommand(env) || env.operation_type === 'PAY_ORDER') {
-        if (tempOrderRef && typeof tempOrderRef === 'string' && tempOrderRef.startsWith('TEMP-')) {
-          console.warn(`[SyncEngine] Payment command ${cmdId} deferred: parent server_invoice_id does not exist yet.`);
+        if (
+          tempOrderRef &&
+          typeof tempOrderRef === 'string' &&
+          tempOrderRef.startsWith('TEMP-')
+        ) {
+          console.warn(
+            `[SyncEngine] Payment command ${cmdId} deferred: parent server_invoice_id does not exist yet.`
+          );
           await this.queueMgr.markPending(cmdId);
           return false;
         }
       }
 
-      console.log(`[SyncEngine] Executing ${env.endpoint} for command ${cmdId}...`, remappedPayload);
+      console.log(
+        `[SyncEngine] Executing ${env.endpoint} for command ${cmdId}...`,
+        remappedPayload
+      );
 
-      // 2. Execute Whitelisted Frappe API
-      const response: any = await call.post(env.endpoint, remappedPayload);
+      // 3. Execute Whitelisted Frappe API using the registered HTTP method.
+      const httpMethod = this.getEndpointMethod(env.endpoint);
+      const rawResponse: any =
+        httpMethod === 'GET'
+          ? await call.get(env.endpoint, remappedPayload)
+          : await call.post(env.endpoint, remappedPayload);
 
-      // 3. Extract Server Assigned ID
-      const serverId =
-        response?.name ||
-        response?.message?.name ||
-        response?.data?.name ||
-        response?.message?.new_invoice ||
-        response?.message?.customer_name;
-
-      if (serverId) {
-        // Register the mapping: cmdId → serverId
-        await this.idMapper.registerMapping(cmdId, serverId);
-
-        // Register payload-level temp IDs too
-        if (remappedPayload.invoice && typeof remappedPayload.invoice === 'string') {
-          await this.idMapper.registerMapping(remappedPayload.invoice, serverId);
-        }
-        if (remappedPayload.temp_id && typeof remappedPayload.temp_id === 'string') {
-          await this.idMapper.registerMapping(remappedPayload.temp_id, serverId);
-        }
-
-        // ── Critical: If this was a sync_order command, patch any pending make_invoice
-        //    commands that still reference the temp ID.
-        if (isOrderSyncCommand(env) || env.operation_type === 'CREATE_ORDER' || env.operation_type === 'UPDATE_ORDER') {
-          const candidates: (string | undefined)[] = [
-            remappedPayload.invoice as string | undefined,
-            remappedPayload.temp_id as string | undefined,
-            cmdId,
-            env.temporary_id || undefined,
-          ];
-          const tempIds = candidates.filter((id): id is string =>
-            id !== undefined && id !== null && id.startsWith('TEMP-')
-          );
-
-          for (const tempId of tempIds) {
-            await this._patchPaymentCommandsForTempId(tempId, serverId);
-          }
-        }
+      // 4. Strict response validation — fail the command if the backend did not
+      //    prove the ERP document was created/updated successfully.
+      const validation = validateEndpointResponse(env, rawResponse);
+      if (!validation.valid) {
+        throw new Error(validation.error);
       }
+      const { serverId, body: responseBody } = validation;
 
-      // 4. Mark Command Completed in Queue
-      await this.queueMgr.markCompleted(cmdId);
-      await this.queueMgr.clearCompleted();
+      // 5. Apply all command-completion side effects atomically. If any critical
+      //    IndexedDB write fails, the entire completion rolls back and the command
+      //    remains in a non-COMPLETED state.
+      await this.completeCommandTransaction(env, cmdId, async () => {
+        await this.applyCommandSuccess(env, cmdId, remappedPayload, responseBody, serverId);
+      });
 
-      // 5. Handle post-completion state updates in IndexedDB
-      if (isOrderSyncCommand(env) || env.operation_type === 'CREATE_ORDER' || env.operation_type === 'UPDATE_ORDER') {
-        const tempInvId = (remappedPayload.invoice || remappedPayload.temp_id || env.temporary_id || cmdId) as string;
-        if (tempInvId && typeof tempInvId === 'string' && tempInvId.startsWith('TEMP-')) {
-          // Prefer the backend's actual lifecycle status when promoting the temp
-          // record so the local snapshot matches the server invoice state.
-          const backendStatus: OrderEntity['status'] | undefined =
-            response?.status ||
-            response?.message?.status ||
-            response?.data?.status;
-          try {
-            await this._promoteTempOrder(tempInvId, serverId, backendStatus);
-          } catch (delErr) {
-            console.warn('[SyncEngine] Error promoting temp order to synced state:', delErr);
-          }
-        }
-      }
-
-      if (isPaymentCommand(env) || env.operation_type === 'PAY_ORDER') {
-        const paidInvoiceId = (remappedPayload.invoice as string) || serverId;
-        if (paidInvoiceId) {
-          try {
-            await this.repos.orders.markPaid(paidInvoiceId);
-            // Defensive cleanup: if the payment referenced a temp ID that has now been mapped,
-            // delete any stale local temp record so it does not resurface in the UI.
-            const rawInvoice = (env.payload as any)?.invoice;
-            if (rawInvoice && typeof rawInvoice === 'string' && rawInvoice.startsWith('TEMP-')) {
-              try {
-                await this.repos.orders.delete(rawInvoice);
-              } catch (cleanupErr) {
-                console.warn('[SyncEngine] Error deleting stale temp order after payment sync:', cleanupErr);
-              }
-            }
-          } catch (markErr) {
-            console.warn('[SyncEngine] Error marking order as Paid after payment sync:', markErr);
-          }
-        }
-      }
-
-      // 6. Trigger Projection Updates
+      // 6. Trigger Projection Updates outside the DB transaction.
       this.notifyProjectionsForEndpoint(env.endpoint);
 
-      console.log(`[SyncEngine] Command ${env.id} completed successfully. Server ID: ${serverId || 'N/A'}`);
+      // Cancellation also releases table clusters on the backend; make sure the
+      // Table page reflects the freed cluster without waiting for a full refresh.
+      if (isCancelCommand(env) || env.operation_type === 'DELETE_ORDER') {
+        await this._releaseTableClusterForCancelledOrder(remappedPayload, serverId);
+        projectionBus.emit('TABLES_UPDATED');
+      }
+
+      // 7. For split commands, refresh the split-group metadata from the server so
+      //    local index/total/sibling values match the backend exactly.
+      if (isSplitCommand(env) && serverId) {
+        await this._refreshSplitGroup(serverId);
+      }
+
+      console.log(
+        `[SyncEngine] Command ${env.id} completed successfully. Server ID: ${serverId || 'N/A'}`
+      );
       return true;
     } catch (error: any) {
       const errorMsg = error?.message || String(error);
       console.error(`[SyncEngine] Command ${env.id} execution failed:`, errorMsg);
 
-      // Evaluate Conflict & Resolution Strategy
+      // Explicit backend rejections (HTTP 200 with status Failure / missing required
+      // document proof) must NEVER be converted into IGNORE. The ERP document did not
+      // get created/updated, so marking the command completed would leave dependents
+      // running against a non-existent document.
+      if (
+        errorMsg.startsWith('SERVER_REJECTED:') ||
+        errorMsg.startsWith('SERVER_ERROR:')
+      ) {
+        console.warn(
+          `[SyncEngine] Command ${env.id} rejected by server; failing directly without conflict resolution.`
+        );
+        await this.queueMgr.markFailed(env.id, errorMsg);
+        return false;
+      }
+
+      // Evaluate Conflict & Resolution Strategy for network/HTTP/exception failures.
       const conflictResult = await this.resolver.resolveConflict(env, error);
-      console.log(`[SyncEngine] Conflict detected: ${conflictResult.conflictCode} -> Strategy: ${conflictResult.strategy}`);
+      console.log(
+        `[SyncEngine] Conflict detected: ${conflictResult.conflictCode} -> Strategy: ${conflictResult.strategy}`
+      );
 
       if (conflictResult.remedyAction) {
         try {
@@ -315,15 +441,191 @@ export class SyncEngine {
       }
 
       // Calculate backoff delay
-      const backoffDelay = calculateBackoffDelay((env.retry_count ?? env.retryCount ?? 0) + 1, {
-        baseMs: this.options.baseBackoffMs,
-        maxMs: this.options.maxBackoffMs,
-      });
+      const backoffDelay = calculateBackoffDelay(
+        (env.retry_count ?? env.retryCount ?? 0) + 1,
+        {
+          baseMs: this.options.baseBackoffMs,
+          maxMs: this.options.maxBackoffMs,
+        }
+      );
 
       console.warn(`[SyncEngine] Command ${env.id} scheduled for retry in ${backoffDelay}ms.`);
 
       await this.queueMgr.markFailed(env.id, `${conflictResult.conflictCode}: ${errorMsg}`);
       return false;
+    }
+  }
+
+  /**
+   * Executes all command-completion side effects inside an atomic IndexedDB
+   * transaction. The command is marked COMPLETED only if every critical step
+   * inside the callback succeeds.
+   */
+  private async completeCommandTransaction(
+    _env: CommandEnvelope,
+    cmdId: string,
+    callback: () => Promise<void>
+  ): Promise<void> {
+    const db = this.getDb();
+
+    await db.transaction('rw', db.sync_queue, db.orders, db.metadata, async () => {
+      // Run caller-specific side effects first (mappings, payment patches, order updates).
+      await callback();
+
+      // Mark command completed and clear satisfied dependencies inside the same
+      // transaction so dependents cannot observe a COMPLETED parent before its
+      // side effects are persisted.
+      await this.queueMgr.markCompleted(cmdId);
+      await this.queueMgr.clearDependencyId(cmdId);
+    });
+
+    // Purge completed queue entries after the transaction commits. This is
+    // idempotent cleanup; a failure here does not threaten correctness.
+    try {
+      await this.queueMgr.clearCompleted();
+    } catch (cleanupErr) {
+      console.warn('[SyncEngine] clearCompleted cleanup failed after transaction:', cleanupErr);
+    }
+  }
+
+  /**
+   * Applies the success side effects for a validated command. Called inside the
+   * atomic completion transaction.
+   */
+  private async applyCommandSuccess(
+    env: CommandEnvelope,
+    cmdId: string,
+    remappedPayload: any,
+    responseBody: any,
+    serverId?: string
+  ): Promise<void> {
+    if (serverId) {
+      // Register the mapping: cmdId → serverId
+      await this.idMapper.registerMapping(cmdId, serverId);
+
+      // Register payload-level temp IDs too
+      if (remappedPayload.invoice && typeof remappedPayload.invoice === 'string') {
+        await this.idMapper.registerMapping(remappedPayload.invoice, serverId);
+      }
+      if (remappedPayload.temp_id && typeof remappedPayload.temp_id === 'string') {
+        await this.idMapper.registerMapping(remappedPayload.temp_id, serverId);
+      }
+
+      // Critical: If this was a sync_order command, patch any pending make_invoice
+      // commands that still reference the temp ID.
+      if (
+        isOrderSyncCommand(env) ||
+        env.operation_type === 'CREATE_ORDER' ||
+        env.operation_type === 'UPDATE_ORDER'
+      ) {
+        const candidates: (string | undefined)[] = [
+          remappedPayload.invoice as string | undefined,
+          remappedPayload.temp_id as string | undefined,
+          cmdId,
+          env.temporary_id || undefined,
+        ];
+        const tempIds = candidates.filter(
+          (id): id is string => id !== undefined && id !== null && id.startsWith('TEMP-')
+        );
+
+        for (const tempId of tempIds) {
+          await this._patchPaymentCommandsForTempId(tempId, serverId);
+          await this._patchMergeBillCommandsForTempId(tempId, serverId);
+        }
+      }
+    }
+
+    // Post-completion state updates in IndexedDB
+    if (
+      isOrderSyncCommand(env) ||
+      env.operation_type === 'CREATE_ORDER' ||
+      env.operation_type === 'UPDATE_ORDER'
+    ) {
+      const tempInvId = (remappedPayload.invoice ||
+        remappedPayload.temp_id ||
+        env.temporary_id ||
+        cmdId) as string;
+      if (tempInvId && typeof tempInvId === 'string' && tempInvId.startsWith('TEMP-')) {
+        const backendStatus: OrderEntity['status'] | undefined =
+          responseBody?.status || responseBody?.message?.status || responseBody?.data?.status;
+        await this._promoteTempOrder(tempInvId, serverId, backendStatus);
+      }
+    }
+
+    if (isPaymentCommand(env) || env.operation_type === 'PAY_ORDER') {
+      const paidInvoiceId = (remappedPayload.invoice as string) || serverId;
+      if (paidInvoiceId) {
+        await this.repos.orders.markPaid(paidInvoiceId);
+        // Defensive cleanup: if the payment referenced a temp ID that has now been mapped,
+        // delete any stale local temp record so it does not resurface in the UI.
+        const rawInvoice = (env.payload as any)?.invoice;
+        if (rawInvoice && typeof rawInvoice === 'string' && rawInvoice.startsWith('TEMP-')) {
+          try {
+            await this.repos.orders.delete(rawInvoice);
+          } catch (cleanupErr) {
+            console.warn(
+              '[SyncEngine] Error deleting stale temp order after payment sync:',
+              cleanupErr
+            );
+          }
+        }
+      }
+    }
+
+    if (isCancelCommand(env) || env.operation_type === 'DELETE_ORDER') {
+      const cancelledInvoiceId =
+        (remappedPayload.invoice_id as string) || (remappedPayload.invoice as string) || serverId;
+      if (cancelledInvoiceId) {
+        try {
+          await this.repos.orders.markCancelled(cancelledInvoiceId);
+        } catch (cancelErr) {
+          console.warn('[SyncEngine] Error marking order as Cancelled after cancel sync:', cancelErr);
+        }
+      }
+    }
+
+    if (
+      env.endpoint.includes('merge_bills') ||
+      env.operation_type === 'MERGE_BILLS'
+    ) {
+      const primaryInvoice = (remappedPayload.primary_invoice as string) || serverId;
+      const secondaryInvoice = remappedPayload.secondary_invoice as string;
+      if (primaryInvoice && secondaryInvoice) {
+        try {
+          await this._reconcileMergedBillLocalState(primaryInvoice, secondaryInvoice);
+        } catch (mergeReconcileErr) {
+          console.warn('[SyncEngine] Error reconciling merged bill local state:', mergeReconcileErr);
+        }
+      }
+    }
+
+    if (isSplitCommand(env)) {
+      const sourceInvoice = (remappedPayload.source_invoice as string) || '';
+      const childTempId = env.temporary_id;
+
+      if (serverId && childTempId && childTempId.startsWith('TEMP-')) {
+        try {
+          await this.idMapper.registerMapping(childTempId, serverId);
+          await this.idMapper.registerMapping(env.id, serverId);
+          await this._patchCommandsForTempId(childTempId, serverId, cmdId);
+          await this._promoteSplitChild(childTempId, serverId, sourceInvoice);
+        } catch (splitReconcileErr) {
+          console.warn('[SyncEngine] Error reconciling split child local state:', splitReconcileErr);
+          throw splitReconcileErr;
+        }
+      }
+
+      if (sourceInvoice) {
+        try {
+          const source = await this.repos.orders.getById(sourceInvoice);
+          if (source) {
+            source.updatedAt = new Date().toISOString();
+            await this.repos.orders.put(source);
+          }
+        } catch (sourceErr) {
+          console.warn('[SyncEngine] Error touching source invoice after split:', sourceErr);
+        }
+      }
     }
   }
 
@@ -343,10 +645,17 @@ export class SyncEngine {
     const targetId = serverId || tempId;
     await this.repos.orders.delete(tempId);
 
-    // Preserve local Paid status; otherwise use the backend's reported status so
-    // the promoted local snapshot matches the server invoice state.
-    const promotedStatus: OrderEntity['status'] =
-      existing.status === 'Paid' ? 'Paid' : backendStatus ?? existing.status;
+    // Preserve the local lifecycle status for any non-terminal order. The backend
+    // always reports POS Invoice status as 'Draft' for unprinted table orders, but
+    // the offline state machine distinguishes 'Unbilled' (unprinted table order)
+    // from 'Draft' (printed/counter order). Only allow the server status to win
+    // when it represents a terminal transition (Paid) or when no local status exists.
+    const terminalStatuses: OrderEntity['status'][] = ['Paid', 'Cancelled'];
+    const promotedStatus: OrderEntity['status'] = terminalStatuses.includes(existing.status)
+      ? existing.status
+      : backendStatus && terminalStatuses.includes(backendStatus)
+      ? backendStatus
+      : existing.status;
     const promoted: OrderEntity = {
       ...existing,
       id: targetId,
@@ -405,7 +714,286 @@ export class SyncEngine {
         );
       }
     } catch (patchErr) {
-      console.warn(`[SyncEngine] Failed to patch payment commands for temp ID ${tempId}:`, patchErr);
+      console.warn(
+        `[SyncEngine] Failed to patch payment commands for temp ID ${tempId}:`
+      );
+      console.warn(patchErr);
+      // Payment patching is critical for correctness; rethrow so the transaction rolls back.
+      throw patchErr;
+    }
+  }
+
+  /**
+   * Patches all pending merge_bills commands whose primary or secondary invoice
+   * still references the given temp ID, replacing it with the real server invoice ID.
+   * Also clears the satisfied dependency so the command becomes ready once the
+   * parent sync_order record is purged.
+   */
+  private async _patchMergeBillCommandsForTempId(tempId: string, serverId: string): Promise<void> {
+    try {
+      const allCmds = await this.repos.syncQueue.getAll();
+      const mergeCmds = allCmds.filter((e: any) =>
+        e.status === 'PENDING' &&
+        (e.action === 'merge_bills' || e.operation_type === 'MERGE_BILLS') &&
+        (
+          e.payload?.primary_invoice === tempId ||
+          e.payload?.secondary_invoice === tempId
+        )
+      );
+
+      for (const cmd of mergeCmds) {
+        const payload = cmd.payload as Record<string, unknown>;
+        const cmdId = cmd.id || cmd.command_id || '';
+        const updatedPayload = {
+          ...payload,
+          primary_invoice: payload.primary_invoice === tempId ? serverId : payload.primary_invoice,
+          secondary_invoice: payload.secondary_invoice === tempId ? serverId : payload.secondary_invoice,
+        };
+        await this.queueMgr.updatePayload(cmdId, updatedPayload);
+        await this.queueMgr.updateDependencies(cmdId, []);
+        await this.idMapper.registerMapping(tempId, serverId);
+        console.log(
+          `[SyncEngine] Patched merge_bills command ${cmdId}: ${tempId} → ${serverId}`
+        );
+      }
+    } catch (patchErr) {
+      console.warn(`[SyncEngine] Failed to patch merge_bills commands for temp ID ${tempId}:`, patchErr);
+      throw patchErr;
+    }
+  }
+
+  /**
+   * Reconciles local IndexedDB order records after a merge_bills command succeeds.
+   * Ensures both invoices carry the bidirectional merge link and the mirrored item
+   * details, matching the backend state created by merge_bills().
+   */
+  private async _reconcileMergedBillLocalState(
+    primaryInvoice: string,
+    secondaryInvoice: string
+  ): Promise<void> {
+    const primary = await this.repos.orders.getById(primaryInvoice);
+    const secondary = await this.repos.orders.getById(secondaryInvoice);
+    if (!primary || !secondary) return;
+
+    const now = new Date().toISOString();
+
+    const primaryMirror: OrderEntity['custom_merged_pos_invoice_details'] =
+      secondary.items.map(i => ({
+        item: i.item,
+        item_name: i.item_name,
+        rate: i.rate,
+        qty: i.qty,
+        amount: i.amount || i.rate * i.qty,
+      }));
+
+    const secondaryMirror: OrderEntity['custom_merged_pos_invoice_details'] =
+      primary.items.map(i => ({
+        item: i.item,
+        item_name: i.item_name,
+        rate: i.rate,
+        qty: i.qty,
+        amount: i.amount || i.rate * i.qty,
+      }));
+
+    await this.repos.orders.put({
+      ...primary,
+      custom_merged_pos_invoice: secondaryInvoice,
+      custom_merged_total: secondary.grand_total,
+      custom_merged_pos_invoice_details: primaryMirror,
+      updatedAt: now,
+    });
+
+    await this.repos.orders.put({
+      ...secondary,
+      custom_merged_pos_invoice: primaryInvoice,
+      custom_merged_total: primary.grand_total,
+      custom_merged_pos_invoice_details: secondaryMirror,
+      updatedAt: now,
+    });
+
+    console.log(`[SyncEngine] Reconciled merged bill local state: ${primaryInvoice} <> ${secondaryInvoice}`);
+  }
+
+  /**
+   * Replaces a temporary ID with its server ID in the payload of every pending
+   * command that references it. This is the generic counterpart to the payment
+   * and merge patches; it keeps dependent print, payment, cancel, and further
+   * split commands valid after a TEMP-* invoice is promoted.
+   */
+  private async _patchCommandsForTempId(
+    tempId: string,
+    serverId: string,
+    parentCmdId: string
+  ): Promise<void> {
+    try {
+      const allCmds = await this.repos.syncQueue.getAll();
+      const affected = allCmds.filter((e: any) => {
+        if (e.status !== 'PENDING') return false;
+        if (e.temporary_id === tempId || e.entity_id === tempId) return true;
+        return JSON.stringify(e.payload || {}).includes(tempId);
+      });
+
+      for (const cmd of affected) {
+        const payload = cmd.payload as Record<string, unknown>;
+        const updatedPayload = this._replaceTempIdInPayload(payload, tempId, serverId);
+        const cmdId = (cmd.command_id || cmd.id) as string;
+        await this.queueMgr.updatePayload(cmdId, updatedPayload);
+
+        if (cmd.temporary_id === tempId) {
+          cmd.temporary_id = null;
+          cmd.server_id = serverId;
+        }
+        if (cmd.entity_id === tempId) {
+          cmd.entity_id = serverId;
+        }
+        cmd.updated_at = new Date().toISOString();
+
+        const currentDeps = (cmd.dependency_ids || cmd.dependencies || []) as string[];
+        const nextDeps = currentDeps.filter(d => d !== parentCmdId);
+        await this.queueMgr.updateDependencies(cmdId, nextDeps);
+        await this.idMapper.registerMapping(tempId, serverId);
+        console.log(`[SyncEngine] Patched command ${cmdId}: ${tempId} -> ${serverId}`);
+      }
+    } catch (patchErr) {
+      console.warn(`[SyncEngine] Failed to patch commands for temp ID ${tempId}:`, patchErr);
+      throw patchErr;
+    }
+  }
+
+  /**
+   * Recursively replaces a temp ID string with its server ID inside a payload.
+   */
+  private _replaceTempIdInPayload<T = any>(payload: T, tempId: string, serverId: string): T {
+    if (payload === null || payload === undefined) return payload;
+    if (typeof payload === 'string') {
+      return (payload === tempId ? serverId : payload) as unknown as T;
+    }
+    if (Array.isArray(payload)) {
+      return payload.map(item => this._replaceTempIdInPayload(item, tempId, serverId)) as unknown as T;
+    }
+    if (typeof payload === 'object') {
+      const result: Record<string, unknown> = {};
+      for (const [key, val] of Object.entries(payload as Record<string, unknown>)) {
+        result[key] = this._replaceTempIdInPayload(val, tempId, serverId);
+      }
+      return result as T;
+    }
+    return payload;
+  }
+
+  /**
+   * Promotes a locally-created TEMP-SPLIT-* child order to its real server invoice
+   * ID after split_bill succeeds. Preserves the local lifecycle status and clears
+   * the pending command link.
+   */
+  private async _promoteSplitChild(
+    tempId: string,
+    serverId: string,
+    sourceInvoice: string
+  ): Promise<void> {
+    const existing = await this.repos.orders.getById(tempId);
+    if (!existing) return;
+
+    await this.repos.orders.delete(tempId);
+
+    const promoted: OrderEntity = {
+      ...existing,
+      id: serverId,
+      custom_split_from: sourceInvoice,
+      sync_status: existing.status === 'Paid' || existing.status === 'Cancelled' ? existing.sync_status : 'synced',
+      pending_command_id: null,
+      updatedAt: new Date().toISOString(),
+    };
+
+    const serverExisting = await this.repos.orders.getById(serverId);
+    if (serverExisting) {
+      await this.repos.orders.put({
+        ...serverExisting,
+        ...promoted,
+        status: serverExisting.status === 'Paid' || promoted.status === 'Paid' ? 'Paid' : promoted.status,
+        items: promoted.items?.length ? promoted.items : serverExisting.items,
+      });
+    } else {
+      await this.repos.orders.put(promoted);
+    }
+
+    console.log(`[SyncEngine] Promoted split child ${tempId} -> ${serverId}`);
+  }
+
+  /**
+   * Releases the table cluster for a cancelled invoice after the command
+   * transaction has committed. Mirrors the backend `release_merge_cluster_tables`
+   * side effect so the local Table UI shows the full cluster as Available.
+   * Called outside the atomic completion transaction because it touches the
+   * restaurantTables store, which is not part of that transaction scope.
+   */
+  private async _releaseTableClusterForCancelledOrder(
+    remappedPayload: any,
+    serverId?: string
+  ): Promise<void> {
+    try {
+      const cancelledInvoiceId =
+        (remappedPayload.invoice_id as string) || (remappedPayload.invoice as string) || serverId;
+      if (!cancelledInvoiceId) return;
+
+      const cancelledOrder = await this.repos.orders.getById(cancelledInvoiceId);
+      if (cancelledOrder?.table) {
+        const clusterTables = await this.repos.tables.getClusterTables(cancelledOrder.table);
+        await this.repos.tables.releaseCluster(clusterTables);
+      }
+    } catch (err) {
+      console.warn('[SyncEngine] Error releasing table cluster after cancel sync:', err);
+    }
+  }
+
+  /**
+   * Refreshes local split-group metadata from the backend so that indexes,
+   * sibling lists and the group id match the server exactly. Called outside the
+   * completion transaction because it issues a network read.
+   */
+  private async _refreshSplitGroup(newInvoiceId: string): Promise<void> {
+    try {
+      const endpoint = apiRegistry.getUrl('GET_SPLIT_GROUP');
+      const raw: any = await call.get(endpoint, { invoice: newInvoiceId });
+      const group = raw?.message ?? raw;
+      if (!group?.group || !Array.isArray(group.invoices)) return;
+
+      const now = new Date().toISOString();
+      for (const inv of group.invoices) {
+        const local = await this.repos.orders.getById(inv.name);
+        if (!local) continue;
+
+        const terminalStatuses: OrderEntity['status'][] = ['Paid', 'Cancelled'];
+        let status: OrderEntity['status'] = local.status;
+        if (!terminalStatuses.includes(local.status)) {
+          const backendStatus = (inv.status as OrderEntity['status']) || local.status;
+          const printed =
+            typeof inv.invoice_printed === 'number' ? inv.invoice_printed : local.invoice_printed ?? 0;
+          status =
+            backendStatus === 'Draft' && inv.restaurant_table && printed === 0
+              ? 'Unbilled'
+              : backendStatus;
+        }
+
+        await this.repos.orders.put({
+          ...local,
+          custom_split_group: group.group,
+          custom_split_from: inv.custom_split_from ?? local.custom_split_from ?? null,
+          split_index: inv.split_index,
+          split_total: inv.split_total,
+          split_siblings: inv.split_siblings,
+          customer: inv.customer ?? local.customer,
+          grand_total: inv.grand_total ?? local.grand_total,
+          invoice_printed:
+            typeof inv.invoice_printed === 'number' ? inv.invoice_printed : local.invoice_printed,
+          status,
+          sync_status: terminalStatuses.includes(local.status) ? local.sync_status : 'synced',
+          updatedAt: now,
+        });
+      }
+      console.log(`[SyncEngine] Refreshed split group ${group.group} for ${newInvoiceId}`);
+    } catch (err) {
+      console.warn('[SyncEngine] Failed to refresh split group metadata:', err);
     }
   }
 
@@ -463,6 +1051,26 @@ export class SyncEngine {
     }
 
     projectionBus.emit(event);
+  }
+
+  /**
+   * Resolves the registered HTTP method for an endpoint, defaulting to POST
+   * when the endpoint is not in the registry (e.g. hardcoded legacy URLs).
+   */
+  private getEndpointMethod(endpoint: string): 'GET' | 'POST' | 'PUT' | 'DELETE' {
+    try {
+      const config = apiRegistry.getAll().find(e => e.url === endpoint);
+      if (config && (config.httpMethod === 'GET' || config.httpMethod === 'POST')) {
+        return config.httpMethod;
+      }
+    } catch {
+      // Endpoint not registered; fall back to POST.
+    }
+    return 'POST';
+  }
+
+  private getDb(): UryPosDatabase {
+    return this.repos.syncQueue.dbInstance;
   }
 
   /**

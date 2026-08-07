@@ -1,4 +1,4 @@
-import { call, repositories, apiRegistry } from '@ury/core';
+import { call, repositories, apiRegistry, notifyAggregatorsProjectionUpdated } from '@ury/core';
 
 export interface Aggregator {
   customer: string;
@@ -22,6 +22,7 @@ export async function getAggregators(): Promise<Aggregator[]> {
           enabled: true,
         }))
       );
+      notifyAggregatorsProjectionUpdated();
     }
 
     return aggregators;

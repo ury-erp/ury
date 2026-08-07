@@ -34,7 +34,7 @@ before(() => {
   testDb = new UryPosDatabase('TestSyncDb');
   repos = createRepositories(testDb);
   queueMgr = new CommandQueueManager(repos.syncQueue);
-  idMapper = new TempIDMapper();
+  idMapper = new TempIDMapper(repos);
 });
 
 beforeEach(async () => {
@@ -798,7 +798,7 @@ test('Scenario 7: Multiple Orders statuses and order types match backend', async
       id: o.tempId,
       table: o.table,
       order_type: o.order_type,
-      status: o.status === 'Paid' ? 'Paid' : 'Draft',
+      status: o.status as any,
       sync_status: 'pending',
     });
     await repos.syncQueue.put({
@@ -871,6 +871,7 @@ test('Scenario 8: Offline Aggregator create -> offline payment -> sync -> Paid w
         { item: 'SZC', item_name: 'Sizzling Arabian Chicken Single', rate: 160, qty: 1 },
       ],
       last_invoice: null,
+      mode_of_payment: 'Cash',
       no_of_pax: 1,
       order_type: 'Aggregators',
       owner: 'urycashier@gmail.com',
@@ -944,3 +945,990 @@ test('Scenario 8: Offline Aggregator create -> offline payment -> sync -> Paid w
   }
 });
 
+test('Scenario 8b: sync_order returns backend status Failure -> command fails and dependent payment is not executed', async () => {
+  const TEMP_ID = 'TEMP-ORD-AGG-FAILURE-001';
+
+  await repos.orders.put({
+    ...baseOrder,
+    id: TEMP_ID,
+    order_type: 'Aggregators',
+    status: 'Draft',
+    custom_aggregator_id: 'Swiggy',
+    sync_status: 'pending',
+    items: [{ item: 'SZF', item_name: 'Sizzling Arabian Chicken Full', rate: 530, qty: 1, amount: 530 }],
+    grand_total: 530,
+  });
+
+  await repos.syncQueue.put({
+    id: `SYNC-ORDER-${TEMP_ID}`,
+    action: 'sync_order',
+    endpoint: 'ury.ury.doctype.ury_order.ury_order.sync_order',
+    payload: {
+      aggregator_id: 'Swiggy',
+      cashier: 'urycashier@gmail.com',
+      customer: 'Swiggy',
+      invoice: null,
+      items: [{ item: 'SZF', item_name: 'Sizzling Arabian Chicken Full', rate: 530, qty: 1 }],
+      last_invoice: null,
+      mode_of_payment: 'Cash',
+      no_of_pax: 1,
+      order_type: 'Aggregators',
+      owner: 'urycashier@gmail.com',
+      pos_profile: 'URY',
+      waiter: 'urycashier@gmail.com',
+    },
+    temporary_id: TEMP_ID,
+    idempotency_key: TEMP_ID,
+    timestamp: new Date().toISOString(),
+    status: 'PENDING',
+    priority: 1,
+  });
+
+  await repos.syncQueue.put({
+    id: `SYNC-PAYMENT-${TEMP_ID}`,
+    action: 'make_invoice',
+    endpoint: 'ury.ury.doctype.ury_order.ury_order.make_invoice',
+    payload: {
+      additionalDiscount: null,
+      cashier: 'urycashier@gmail.com',
+      customer: 'Swiggy',
+      invoice: TEMP_ID,
+      owner: 'urycashier@gmail.com',
+      payments: [{ mode_of_payment: 'Cash', amount: 530 }],
+      pos_profile: 'URY',
+      table: null,
+    },
+    temporary_id: TEMP_ID,
+    entity_id: TEMP_ID,
+    idempotency_key: `PAY-${TEMP_ID}-123456`,
+    dependency_ids: [`SYNC-ORDER-${TEMP_ID}`],
+    timestamp: new Date().toISOString(),
+    status: 'PENDING',
+    priority: 1,
+  });
+
+  const originalPost = call.post;
+  (call as any).post = async (endpoint: string) => {
+    if (endpoint.includes('sync_order')) {
+      // Backend returned HTTP 200 but business-rule failure.
+      return { status: 'Failure', message: 'Invoice Already Billed' };
+    }
+    if (endpoint.includes('make_invoice')) {
+      throw new Error('make_invoice should not be called after sync_order Failure');
+    }
+    return {};
+  };
+
+  try {
+    const engine = new SyncEngine(queueMgr, idMapper, undefined, { repositories: repos });
+    const result = await engine.triggerSync();
+
+    assert.equal(result.processed, 1, 'Only sync_order should be processed');
+    assert.equal(result.succeeded, 0, 'sync_order Failure should not count as success');
+
+    const syncCmd = await repos.syncQueue.getById(`SYNC-ORDER-${TEMP_ID}`);
+    assert.equal(syncCmd?.status, 'FAILED', 'sync_order command must be marked FAILED');
+
+    const payCmd = await repos.syncQueue.getById(`SYNC-PAYMENT-${TEMP_ID}`);
+    assert.equal(payCmd?.status, 'PENDING', 'Dependent payment must remain pending');
+    assert.equal((payCmd?.payload as any)?.invoice, TEMP_ID, 'Payment invoice must not be patched');
+
+    const mapping = await idMapper.getServerId(TEMP_ID);
+    assert.equal(mapping, TEMP_ID, 'No temp->server mapping should be registered');
+  } finally {
+    (call as any).post = originalPost;
+  }
+});
+
+
+
+// ============================================================================
+// Task 5: Kitchen / KOT Print — Sync Engine respects GET HTTP method
+// ============================================================================
+
+test('SyncEngine — KOT reprint command is executed via GET and purged', async () => {
+  const SERVER_ID = 'POS-INV-KOT-SYNC-001';
+
+  await repos.syncQueue.put({
+    id: `KOT-REPRINT-${SERVER_ID}`,
+    action: 'kot_reprint',
+    endpoint: 'ury.ury.api.ury_kot_reprint.reprint_kot',
+    payload: { invoice_number: SERVER_ID },
+    timestamp: new Date().toISOString(),
+    status: 'PENDING',
+    priority: 1,
+  });
+
+  const originalGet = call.get;
+  const originalPost = call.post;
+  const getCalls: { endpoint: string; payload: any }[] = [];
+  const postCalls: { endpoint: string; payload: any }[] = [];
+
+  (call as any).get = async (endpoint: string, payload: any) => {
+    getCalls.push({ endpoint, payload });
+    return { message: 'Success' };
+  };
+  (call as any).post = async (endpoint: string, payload: any) => {
+    postCalls.push({ endpoint, payload });
+    return {};
+  };
+
+  try {
+    const engine = new SyncEngine(queueMgr, idMapper, undefined, { repositories: repos });
+    const result = await engine.triggerSync();
+
+    assert.equal(result.processed, 1, 'KOT reprint command should process');
+    assert.equal(result.succeeded, 1, 'KOT reprint command should succeed');
+    assert.equal(getCalls.length, 1, 'KOT reprint must use GET');
+    assert.equal(getCalls[0].endpoint, 'ury.ury.api.ury_kot_reprint.reprint_kot');
+    assert.equal(getCalls[0].payload.invoice_number, SERVER_ID);
+    assert.equal(postCalls.length, 0, 'KOT reprint must not use POST');
+
+    const remaining = await repos.syncQueue.getAll();
+    assert.equal(remaining.length, 0, 'Completed KOT reprint command should be purged');
+  } finally {
+    (call as any).get = originalGet;
+    (call as any).post = originalPost;
+  }
+});
+
+test('SyncEngine — KOT reprint for temp invoice waits for parent sync_order', async () => {
+  const TEMP_ID = 'TEMP-ORD-KOT-SYNC-002';
+  const SERVER_ID = 'POS-INV-KOT-SYNC-002';
+
+  await repos.syncQueue.put({
+    id: `SYNC-ORDER-${TEMP_ID}`,
+    action: 'sync_order',
+    endpoint: 'ury.ury.doctype.ury_order.ury_order.sync_order',
+    payload: { temp_id: TEMP_ID, items: [] },
+    timestamp: new Date().toISOString(),
+    status: 'PENDING',
+    priority: 1,
+  });
+
+  await repos.syncQueue.put({
+    id: `KOT-REPRINT-${TEMP_ID}`,
+    action: 'kot_reprint',
+    endpoint: 'ury.ury.api.ury_kot_reprint.reprint_kot',
+    payload: { invoice_number: TEMP_ID },
+    dependency_ids: [`SYNC-ORDER-${TEMP_ID}`],
+    timestamp: new Date().toISOString(),
+    status: 'PENDING',
+    priority: 1,
+  });
+
+  const originalGet = call.get;
+  const originalPost = call.post;
+  const getCalls: { endpoint: string; payload: any }[] = [];
+
+  (call as any).get = async (endpoint: string, payload: any) => {
+    getCalls.push({ endpoint, payload });
+    return { message: 'Success' };
+  };
+  (call as any).post = async (endpoint: string, _payload: any) => {
+    if (endpoint.includes('sync_order')) {
+      return { name: SERVER_ID };
+    }
+    return {};
+  };
+
+  try {
+    const engine = new SyncEngine(queueMgr, idMapper, undefined, { repositories: repos });
+    const result = await engine.triggerSync();
+
+    assert.equal(result.processed, 2, 'Both sync_order and KOT reprint should process');
+    assert.equal(result.succeeded, 2, 'Both commands should succeed');
+    assert.equal(getCalls.length, 1, 'KOT reprint should be called once');
+    assert.equal(getCalls[0].payload.invoice_number, SERVER_ID, 'KOT reprint payload should be remapped to server ID');
+
+    const remaining = await repos.syncQueue.getAll();
+    assert.equal(remaining.length, 0, 'Completed commands should be purged');
+  } finally {
+    (call as any).get = originalGet;
+    (call as any).post = originalPost;
+  }
+});
+
+
+// ============================================================================
+// Hardening Validation Scenarios (Task 5)
+// ============================================================================
+
+test('Scenario 8c: sync_order returns no invoice name -> command fails and no mapping registered', async () => {
+  const TEMP_ID = 'TEMP-ORD-HARDEN-001';
+
+  await repos.orders.put({
+    ...baseOrder,
+    id: TEMP_ID,
+    order_type: 'Takeaway',
+    status: 'Draft',
+    sync_status: 'pending',
+    items: [{ item: 'ITEM-001', item_name: 'Test Item', rate: 100, qty: 1, amount: 100 }],
+    grand_total: 100,
+  });
+
+  await repos.syncQueue.put({
+    id: `SYNC-ORDER-${TEMP_ID}`,
+    action: 'sync_order',
+    endpoint: 'ury.ury.doctype.ury_order.ury_order.sync_order',
+    payload: { temp_id: TEMP_ID, items: [] },
+    timestamp: new Date().toISOString(),
+    status: 'PENDING',
+    priority: 1,
+  });
+
+  const originalPost = call.post;
+  (call as any).post = async (endpoint: string, _payload: any) => {
+    if (endpoint.includes('sync_order')) {
+      // Malformed backend response: no name, no explicit Failure, but no proof of creation.
+      return { message: 'Saved' };
+    }
+    return {};
+  };
+
+  try {
+    const engine = new SyncEngine(queueMgr, idMapper, undefined, { repositories: repos });
+    const result = await engine.triggerSync();
+
+    assert.equal(result.processed, 1, 'sync_order should be processed');
+    assert.equal(result.succeeded, 0, 'sync_order without invoice name must not count as success');
+
+    const syncCmd = await repos.syncQueue.getById(`SYNC-ORDER-${TEMP_ID}`);
+    assert.equal(syncCmd?.status, 'FAILED', 'sync_order command must be FAILED');
+
+    const mapping = await idMapper.getServerId(TEMP_ID);
+    assert.equal(mapping, TEMP_ID, 'No temp->server mapping should be registered');
+  } finally {
+    (call as any).post = originalPost;
+  }
+});
+
+test('Scenario 8d: make_invoice returns neither success nor name -> command fails', async () => {
+  const SERVER_ID = 'POS-INV-HARDEN-002';
+
+  await repos.syncQueue.put({
+    id: 'SYNC-PAYMENT-HARDEN-002',
+    action: 'make_invoice',
+    endpoint: 'ury.ury.doctype.ury_order.ury_order.make_invoice',
+    payload: {
+      invoice: SERVER_ID,
+      payments: [{ mode_of_payment: 'Cash', amount: 250 }],
+    },
+    timestamp: new Date().toISOString(),
+    status: 'PENDING',
+    priority: 1,
+  });
+
+  const originalPost = call.post;
+  (call as any).post = async (endpoint: string, _payload: any) => {
+    if (endpoint.includes('make_invoice')) {
+      // Ambiguous response: no success flag, no name.
+      return { message: { ok: true } };
+    }
+    return {};
+  };
+
+  try {
+    const engine = new SyncEngine(queueMgr, idMapper, undefined, { repositories: repos });
+    const result = await engine.triggerSync();
+
+    assert.equal(result.processed, 1, 'make_invoice should be processed');
+    assert.equal(result.succeeded, 0, 'make_invoice without success proof must fail');
+
+    const payCmd = await repos.syncQueue.getById('SYNC-PAYMENT-HARDEN-002');
+    assert.equal(payCmd?.status, 'FAILED', 'make_invoice command must be FAILED');
+  } finally {
+    (call as any).post = originalPost;
+  }
+});
+
+test('Scenario 8e: sync_order failure blocks dependent cancel_order', async () => {
+  const TEMP_ID = 'TEMP-ORD-HARDEN-003';
+
+  await repos.orders.put({
+    ...baseOrder,
+    id: TEMP_ID,
+    order_type: 'Takeaway',
+    status: 'Draft',
+    sync_status: 'pending',
+    items: [{ item: 'ITEM-001', item_name: 'Test Item', rate: 100, qty: 1, amount: 100 }],
+    grand_total: 100,
+  });
+
+  await repos.syncQueue.put({
+    id: `SYNC-ORDER-${TEMP_ID}`,
+    action: 'sync_order',
+    endpoint: 'ury.ury.doctype.ury_order.ury_order.sync_order',
+    payload: { temp_id: TEMP_ID, items: [] },
+    timestamp: new Date().toISOString(),
+    status: 'PENDING',
+    priority: 1,
+  });
+
+  await repos.syncQueue.put({
+    id: `CANCEL-ORDER-${TEMP_ID}`,
+    action: 'cancel_order',
+    endpoint: 'ury.ury.doctype.ury_order.ury_order.cancel_order',
+    payload: { invoice_id: TEMP_ID },
+    dependency_ids: [`SYNC-ORDER-${TEMP_ID}`],
+    timestamp: new Date().toISOString(),
+    status: 'PENDING',
+    priority: 1,
+  });
+
+  const originalPost = call.post;
+  (call as any).post = async (endpoint: string, _payload: any) => {
+    if (endpoint.includes('sync_order')) {
+      return { status: 'Failure', message: 'Table already occupied' };
+    }
+    if (endpoint.includes('cancel_order')) {
+      throw new Error('cancel_order should not run after sync_order failure');
+    }
+    return {};
+  };
+
+  try {
+    const engine = new SyncEngine(queueMgr, idMapper, undefined, { repositories: repos });
+    const result = await engine.triggerSync();
+
+    assert.equal(result.processed, 1, 'Only sync_order should be processed');
+    assert.equal(result.succeeded, 0, 'sync_order failure should not succeed');
+
+    const syncCmd = await repos.syncQueue.getById(`SYNC-ORDER-${TEMP_ID}`);
+    assert.equal(syncCmd?.status, 'FAILED', 'sync_order must be FAILED');
+
+    const cancelCmd = await repos.syncQueue.getById(`CANCEL-ORDER-${TEMP_ID}`);
+    assert.equal(cancelCmd?.status, 'PENDING', 'Dependent cancel_order must remain PENDING');
+  } finally {
+    (call as any).post = originalPost;
+  }
+});
+
+// ============================================================================
+// Offline Cancellation Scenarios
+// ============================================================================
+
+test('Scenario 13: Offline cancel of temp order -> sync_order -> cancel_order drains and matches backend state', async () => {
+  const TEMP_ID = 'TEMP-ORD-CANCEL-SYNC-001';
+  const SERVER_ID = 'POS-INV-CANCEL-SYNC-001';
+
+  await repos.orders.put({
+    ...baseOrder,
+    id: TEMP_ID,
+    order_type: 'Dine-In',
+    status: 'Unbilled',
+    sync_status: 'pending',
+    table: 'T-CANCEL-SYNC-001',
+    items: [{ name: 'ROW-1', item: 'ITEM-A', item_name: 'Item A', rate: 100, qty: 1, amount: 100 }],
+    grand_total: 100,
+  });
+
+  await repos.tables.put({
+    name: 'T-CANCEL-SYNC-001',
+    restaurant_room: 'Main Hall',
+    no_of_seats: 4,
+    occupied: 1,
+    merged_with: 'T-CANCEL-SYNC-002',
+  });
+  await repos.tables.put({
+    name: 'T-CANCEL-SYNC-002',
+    restaurant_room: 'Main Hall',
+    no_of_seats: 4,
+    occupied: 1,
+    merged_with: 'T-CANCEL-SYNC-001',
+  });
+
+  await repos.syncQueue.put({
+    id: `SYNC-ORDER-${TEMP_ID}`,
+    action: 'sync_order',
+    endpoint: 'ury.ury.doctype.ury_order.ury_order.sync_order',
+    payload: { temp_id: TEMP_ID, items: [] },
+    timestamp: new Date().toISOString(),
+    status: 'PENDING',
+    priority: 1,
+  });
+
+  await repos.syncQueue.put({
+    id: `CANCEL-ORDER-${TEMP_ID}`,
+    action: 'cancel_order',
+    operation_type: 'DELETE_ORDER',
+    endpoint: 'ury.ury.doctype.ury_order.ury_order.cancel_order',
+    payload: { invoice_id: TEMP_ID, reason: 'No show' },
+    dependency_ids: [`SYNC-ORDER-${TEMP_ID}`],
+    temporary_id: TEMP_ID,
+    entity_id: TEMP_ID,
+    timestamp: new Date().toISOString(),
+    status: 'PENDING',
+    priority: 5,
+  });
+
+  const originalPost = call.post;
+  const postedPayloads: any[] = [];
+  (call as any).post = async (endpoint: string, payload: any) => {
+    postedPayloads.push({ endpoint, payload });
+    if (endpoint.includes('sync_order')) {
+      return { name: SERVER_ID, status: 'Draft' };
+    }
+    if (endpoint.includes('cancel_order')) {
+      return {};
+    }
+    return {};
+  };
+
+  try {
+    const engine = new SyncEngine(queueMgr, idMapper, undefined, { repositories: repos });
+    const result = await engine.triggerSync();
+
+    assert.equal(result.processed, 2, 'sync_order and cancel_order should process');
+    assert.equal(result.succeeded, 2, 'Both commands should succeed');
+
+    const cancelPosted = postedPayloads.find(p => p.endpoint.includes('cancel_order'));
+    assert.ok(cancelPosted, 'cancel_order endpoint should be called');
+    assert.equal(cancelPosted.payload.invoice_id, SERVER_ID, 'cancel_order payload must be remapped to server ID');
+    assert.equal(cancelPosted.payload.reason, 'No show');
+    assert.equal(cancelPosted.payload.table, undefined, 'cancel_order payload must not include table');
+
+    const serverOrder = await repos.orders.getById(SERVER_ID);
+    assert.ok(serverOrder, 'Server order should exist after promotion');
+    assert.equal(serverOrder.status, 'Cancelled', 'Server order must be Cancelled');
+    assert.equal(serverOrder.sync_status, 'synced');
+
+    const tempOrder = await repos.orders.getById(TEMP_ID);
+    assert.equal(tempOrder, undefined, 'Temp order should be cleaned up after sync');
+
+    for (const tableName of ['T-CANCEL-SYNC-001', 'T-CANCEL-SYNC-002']) {
+      const t = await repos.tables.getById(tableName);
+      assert.equal(t?.occupied, 0, `${tableName} should be released after cancel sync`);
+      assert.equal(t?.merged_with, null, `${tableName} merge link should be cleared after cancel sync`);
+    }
+
+    const remainingQueue = await repos.syncQueue.getAll();
+    assert.equal(remainingQueue.length, 0, 'Completed commands should be purged');
+  } finally {
+    (call as any).post = originalPost;
+  }
+});
+
+test('Scenario 14: Offline cancel of server invoice -> cancel_order releases merge cluster', async () => {
+  const SERVER_ID = 'POS-INV-CANCEL-SERVER-001';
+
+  await repos.orders.put({
+    ...baseOrder,
+    id: SERVER_ID,
+    order_type: 'Dine-In',
+    status: 'Draft',
+    sync_status: 'synced',
+    table: 'T-CANCEL-SERVER-001',
+    items: [{ name: 'ROW-1', item: 'ITEM-A', item_name: 'Item A', rate: 100, qty: 1, amount: 100 }],
+    grand_total: 100,
+  });
+
+  await repos.tables.put({
+    name: 'T-CANCEL-SERVER-001',
+    restaurant_room: 'Main Hall',
+    no_of_seats: 4,
+    occupied: 1,
+    merged_with: 'T-CANCEL-SERVER-002',
+  });
+  await repos.tables.put({
+    name: 'T-CANCEL-SERVER-002',
+    restaurant_room: 'Main Hall',
+    no_of_seats: 4,
+    occupied: 1,
+    merged_with: 'T-CANCEL-SERVER-001',
+  });
+
+  await repos.syncQueue.put({
+    id: `CANCEL-ORDER-${SERVER_ID}`,
+    action: 'cancel_order',
+    operation_type: 'DELETE_ORDER',
+    endpoint: 'ury.ury.doctype.ury_order.ury_order.cancel_order',
+    payload: { invoice_id: SERVER_ID, reason: 'Customer request' },
+    entity_id: SERVER_ID,
+    timestamp: new Date().toISOString(),
+    status: 'PENDING',
+    priority: 5,
+  });
+
+  const originalPost = call.post;
+  (call as any).post = async (endpoint: string, payload: any) => {
+    if (endpoint.includes('cancel_order')) {
+      assert.equal(payload.invoice_id, SERVER_ID);
+      assert.equal(payload.reason, 'Customer request');
+      return {};
+    }
+    return {};
+  };
+
+  try {
+    const engine = new SyncEngine(queueMgr, idMapper, undefined, { repositories: repos });
+    const result = await engine.triggerSync();
+
+    assert.equal(result.processed, 1, 'cancel_order should process');
+    assert.equal(result.succeeded, 1, 'cancel_order should succeed');
+
+    const serverOrder = await repos.orders.getById(SERVER_ID);
+    assert.equal(serverOrder?.status, 'Cancelled');
+
+    for (const tableName of ['T-CANCEL-SERVER-001', 'T-CANCEL-SERVER-002']) {
+      const t = await repos.tables.getById(tableName);
+      assert.equal(t?.occupied, 0, `${tableName} should be released`);
+      assert.equal(t?.merged_with, null, `${tableName} merge link should be cleared`);
+    }
+  } finally {
+    (call as any).post = originalPost;
+  }
+});
+
+test('Scenario 8f: getPendingCommands blocks command whose dependency is FAILED', async () => {
+  const PARENT_ID = 'PARENT-FAILED-001';
+  const CHILD_ID = 'CHILD-BLOCKED-001';
+
+  await repos.syncQueue.put({
+    id: PARENT_ID,
+    action: 'sync_order',
+    endpoint: 'ury.ury.doctype.ury_order.ury_order.sync_order',
+    payload: {},
+    timestamp: new Date().toISOString(),
+    status: 'FAILED',
+    attempts: 5,
+    priority: 1,
+  });
+
+  await repos.syncQueue.put({
+    id: CHILD_ID,
+    action: 'make_invoice',
+    endpoint: 'ury.ury.doctype.ury_order.ury_order.make_invoice',
+    payload: { invoice: 'POS-INV-ANY' },
+    dependency_ids: [PARENT_ID],
+    timestamp: new Date().toISOString(),
+    status: 'PENDING',
+    priority: 1,
+  });
+
+  const ready = await queueMgr.getPendingCommands();
+  const readyIds = ready.map(c => c.command_id || c.id);
+
+  assert.ok(!readyIds.includes(CHILD_ID), 'Child command must not be ready while parent is FAILED');
+});
+
+// ============================================================================
+// Offline Merge Bill Scenarios
+// ============================================================================
+
+test('Scenario 9: Offline merge of two server invoices -> queued and replayed with real IDs', async () => {
+  const PRIMARY_ID = 'POS-INV-MERGE-001';
+  const SECONDARY_ID = 'POS-INV-MERGE-002';
+
+  await repos.orders.put({
+    ...baseOrder,
+    id: PRIMARY_ID,
+    order_type: 'Dine-In',
+    status: 'Draft',
+    sync_status: 'synced',
+    items: [{ item: 'A', item_name: 'Item A', rate: 100, qty: 1, amount: 100 }],
+    grand_total: 100,
+  });
+
+  await repos.orders.put({
+    ...baseOrder,
+    id: SECONDARY_ID,
+    order_type: 'Dine-In',
+    status: 'Draft',
+    sync_status: 'synced',
+    items: [{ item: 'B', item_name: 'Item B', rate: 200, qty: 1, amount: 200 }],
+    grand_total: 200,
+  });
+
+  await repos.syncQueue.put({
+    id: 'SYNC-MERGE-BILL-001',
+    action: 'merge_bills',
+    operation_type: 'MERGE_BILLS',
+    endpoint: 'ury.ury_pos.api.merge_bills',
+    payload: { primary_invoice: PRIMARY_ID, secondary_invoice: SECONDARY_ID },
+    timestamp: new Date().toISOString(),
+    status: 'PENDING',
+    priority: 1,
+  });
+
+  const originalPost = call.post;
+  const postedPayloads: any[] = [];
+  (call as any).post = async (endpoint: string, payload: any) => {
+    postedPayloads.push({ endpoint, payload });
+    if (endpoint.includes('merge_bills')) {
+      return { status: 'success', name: payload.primary_invoice };
+    }
+    return {};
+  };
+
+  try {
+    const engine = new SyncEngine(queueMgr, idMapper, undefined, { repositories: repos });
+    const result = await engine.triggerSync();
+
+    assert.equal(result.processed, 1, 'merge_bills should process');
+    assert.equal(result.succeeded, 1, 'merge_bills should succeed');
+
+    const posted = postedPayloads.find(p => p.endpoint.includes('merge_bills'));
+    assert.ok(posted, 'merge_bills endpoint should be called');
+    assert.equal(posted.payload.primary_invoice, PRIMARY_ID);
+    assert.equal(posted.payload.secondary_invoice, SECONDARY_ID);
+
+    const primary = await repos.orders.getById(PRIMARY_ID);
+    const secondary = await repos.orders.getById(SECONDARY_ID);
+    assert.ok(primary);
+    assert.ok(secondary);
+    assert.equal(primary.custom_merged_pos_invoice, SECONDARY_ID);
+    assert.equal(primary.custom_merged_total, 200);
+    assert.equal(secondary.custom_merged_pos_invoice, PRIMARY_ID);
+    assert.equal(secondary.custom_merged_total, 100);
+  } finally {
+    (call as any).post = originalPost;
+  }
+});
+
+test('Scenario 10: Offline merge with temp primary -> merge command is patched after sync_order resolves', async () => {
+  const TEMP_ID = 'TEMP-ORD-MERGE-003';
+  const SERVER_ID = 'POS-INV-MERGE-003';
+  const SECONDARY_ID = 'POS-INV-MERGE-004';
+
+  await repos.orders.put({
+    ...baseOrder,
+    id: TEMP_ID,
+    order_type: 'Dine-In',
+    status: 'Draft',
+    sync_status: 'pending',
+    items: [{ item: 'A', item_name: 'Item A', rate: 100, qty: 1, amount: 100 }],
+    grand_total: 100,
+  });
+
+  await repos.orders.put({
+    ...baseOrder,
+    id: SECONDARY_ID,
+    order_type: 'Dine-In',
+    status: 'Draft',
+    sync_status: 'synced',
+    items: [{ item: 'B', item_name: 'Item B', rate: 200, qty: 1, amount: 200 }],
+    grand_total: 200,
+  });
+
+  await repos.syncQueue.put({
+    id: `SYNC-ORDER-${TEMP_ID}`,
+    action: 'sync_order',
+    endpoint: 'ury.ury.doctype.ury_order.ury_order.sync_order',
+    payload: { temp_id: TEMP_ID, items: [] },
+    timestamp: new Date().toISOString(),
+    status: 'PENDING',
+    priority: 1,
+  });
+
+  await repos.syncQueue.put({
+    id: 'SYNC-MERGE-BILL-002',
+    action: 'merge_bills',
+    operation_type: 'MERGE_BILLS',
+    endpoint: 'ury.ury_pos.api.merge_bills',
+    payload: { primary_invoice: TEMP_ID, secondary_invoice: SECONDARY_ID },
+    dependency_ids: [`SYNC-ORDER-${TEMP_ID}`],
+    timestamp: new Date().toISOString(),
+    status: 'PENDING',
+    priority: 1,
+  });
+
+  const originalPost = call.post;
+  const postedPayloads: any[] = [];
+  (call as any).post = async (endpoint: string, payload: any) => {
+    postedPayloads.push({ endpoint, payload });
+    if (endpoint.includes('sync_order')) {
+      return { name: SERVER_ID, status: 'Draft' };
+    }
+    if (endpoint.includes('merge_bills')) {
+      return { status: 'success', name: payload.primary_invoice };
+    }
+    return {};
+  };
+
+  try {
+    const engine = new SyncEngine(queueMgr, idMapper, undefined, { repositories: repos });
+    const result = await engine.triggerSync();
+
+    assert.equal(result.processed, 2, 'sync_order and merge_bills should process');
+    assert.equal(result.succeeded, 2, 'Both commands should succeed');
+
+    const posted = postedPayloads.find(p => p.endpoint.includes('merge_bills'));
+    assert.ok(posted, 'merge_bills endpoint should be called');
+    assert.equal(posted.payload.primary_invoice, SERVER_ID, 'merge_bills primary should be patched to server ID');
+    assert.equal(posted.payload.secondary_invoice, SECONDARY_ID);
+
+    const primary = await repos.orders.getById(SERVER_ID);
+    const secondary = await repos.orders.getById(SECONDARY_ID);
+    assert.ok(primary, 'Promoted server order should exist');
+    assert.ok(secondary);
+    assert.equal(primary.custom_merged_pos_invoice, SECONDARY_ID);
+    assert.equal(secondary.custom_merged_pos_invoice, SERVER_ID);
+  } finally {
+    (call as any).post = originalPost;
+  }
+});
+
+// ============================================================================
+// Offline Split Bill Scenarios
+// ============================================================================
+
+test('Scenario 11: Offline split of a server invoice -> child promoted and dependent payment patched', async () => {
+  const SOURCE_ID = 'POS-INV-SPLIT-001';
+  const CHILD_TEMP_ID = 'TEMP-SPLIT-001';
+  const CHILD_SERVER_ID = 'POS-INV-SPLIT-002';
+
+  await repos.orders.put({
+    ...baseOrder,
+    id: SOURCE_ID,
+    order_type: 'Dine-In',
+    status: 'Draft',
+    sync_status: 'synced',
+    table: 'T-01',
+    custom_split_group: 'TEMP-SG-001',
+    items: [
+      { name: 'ROW-1', item: 'ITEM-A', item_name: 'Item A', rate: 100, qty: 1, amount: 100 },
+      { name: 'ROW-2', item: 'ITEM-B', item_name: 'Item B', rate: 50, qty: 1, amount: 50 },
+    ],
+    grand_total: 150,
+  });
+
+  await repos.orders.put({
+    ...baseOrder,
+    id: CHILD_TEMP_ID,
+    order_type: 'Dine-In',
+    status: 'Unbilled',
+    sync_status: 'pending',
+    table: 'T-01',
+    custom_split_group: 'TEMP-SG-001',
+    custom_split_from: SOURCE_ID,
+    pending_command_id: 'SYNC-SPLIT-001',
+    items: [{ name: 'ROW-1', item: 'ITEM-A', item_name: 'Item A', rate: 100, qty: 1, amount: 100 }],
+    grand_total: 100,
+  });
+
+  await repos.syncQueue.put({
+    id: 'SYNC-SPLIT-001',
+    action: 'SplitBillCommand',
+    operation_type: 'SPLIT_BILL',
+    endpoint: 'ury.ury.doctype.ury_order.ury_order.split_bill',
+    payload: {
+      source_invoice: SOURCE_ID,
+      items_to_move: [{ name: 'ROW-1', qty: 1 }],
+    },
+    temporary_id: CHILD_TEMP_ID,
+    entity_id: SOURCE_ID,
+    timestamp: new Date().toISOString(),
+    status: 'PENDING',
+    priority: 1,
+  });
+
+  // A payment on the not-yet-synced child should wait for the split command.
+  await repos.syncQueue.put({
+    id: 'SYNC-PAYMENT-CHILD-001',
+    action: 'make_invoice',
+    endpoint: 'ury.ury.doctype.ury_order.ury_order.make_invoice',
+    payload: {
+      invoice: CHILD_TEMP_ID,
+      payments: [{ mode_of_payment: 'Cash', amount: 100 }],
+    },
+    dependency_ids: ['SYNC-SPLIT-001'],
+    timestamp: new Date().toISOString(),
+    status: 'PENDING',
+    priority: 1,
+  });
+
+  const originalPost = call.post;
+  const postedPayloads: any[] = [];
+  (call as any).post = async (endpoint: string, payload: any) => {
+    postedPayloads.push({ endpoint, payload });
+    if (endpoint.includes('split_bill')) {
+      return { new_invoice: CHILD_SERVER_ID };
+    }
+    if (endpoint.includes('make_invoice')) {
+      return { name: payload.invoice };
+    }
+    return {};
+  };
+
+  const originalGet = call.get;
+  (call as any).get = async () => ({
+    message: {
+      group: 'SG-001',
+      current: CHILD_SERVER_ID,
+      invoices: [
+        {
+          name: SOURCE_ID,
+          custom_split_from: null,
+          split_index: 1,
+          split_total: 2,
+          split_siblings: [CHILD_SERVER_ID],
+          customer: 'Guest',
+          grand_total: 150,
+          invoice_printed: 0,
+          restaurant_table: 'T-01',
+          status: 'Draft',
+        },
+        {
+          name: CHILD_SERVER_ID,
+          custom_split_from: SOURCE_ID,
+          split_index: 2,
+          split_total: 2,
+          split_siblings: [SOURCE_ID],
+          customer: 'Guest',
+          grand_total: 100,
+          invoice_printed: 0,
+          restaurant_table: 'T-01',
+          status: 'Draft',
+        },
+      ],
+    },
+  });
+
+  try {
+    const engine = new SyncEngine(queueMgr, idMapper, undefined, { repositories: repos });
+    const result = await engine.triggerSync();
+
+    assert.equal(result.processed, 2, 'split_bill and dependent make_invoice should process');
+    assert.equal(result.succeeded, 2, 'Both commands should succeed');
+
+    const splitPosted = postedPayloads.find(p => p.endpoint.includes('split_bill'));
+    assert.ok(splitPosted, 'split_bill endpoint should be called');
+    assert.equal(splitPosted.payload.source_invoice, SOURCE_ID);
+    assert.deepEqual(splitPosted.payload.items_to_move, [{ name: 'ROW-1', qty: 1 }]);
+
+    const payPosted = postedPayloads.find(p => p.endpoint.includes('make_invoice'));
+    assert.ok(payPosted, 'make_invoice endpoint should be called');
+    assert.equal(payPosted.payload.invoice, CHILD_SERVER_ID, 'Child payment should use server ID');
+
+    const source = await repos.orders.getById(SOURCE_ID);
+    assert.ok(source);
+    assert.equal(source.custom_split_group, 'SG-001');
+    assert.equal(source.items.length, 2, 'Source should still have both item rows after partial move');
+    const movedRow = source.items.find((i: any) => i.item === 'ITEM-A');
+    assert.equal(movedRow?.qty, 1, 'Source row quantity should be reduced');
+
+    const child = await repos.orders.getById(CHILD_SERVER_ID);
+    assert.ok(child, 'Child should be promoted to server ID');
+    assert.equal(child.custom_split_from, SOURCE_ID);
+    assert.equal(child.custom_split_group, 'SG-001');
+    assert.equal(child.split_index, 2);
+    assert.equal(child.split_total, 2);
+    assert.equal(child.sync_status, 'synced');
+
+    const tempChild = await repos.orders.getById(CHILD_TEMP_ID);
+    assert.equal(tempChild, undefined, 'TEMP-SPLIT child should be removed after promotion');
+
+    const remainingQueue = await repos.syncQueue.getAll();
+    assert.equal(remainingQueue.length, 0, 'Completed commands should be purged');
+  } finally {
+    (call as any).post = originalPost;
+    (call as any).get = originalGet;
+  }
+});
+
+test('Scenario 12: Offline split of a temp source waits for parent sync_order and patches source id', async () => {
+  const TEMP_SOURCE = 'TEMP-ORD-SPLIT-003';
+  const SERVER_SOURCE = 'POS-INV-SPLIT-003';
+  const CHILD_TEMP = 'TEMP-SPLIT-003';
+  const CHILD_SERVER = 'POS-INV-SPLIT-004';
+
+  await repos.orders.put({
+    ...baseOrder,
+    id: TEMP_SOURCE,
+    order_type: 'Dine-In',
+    status: 'Draft',
+    sync_status: 'pending',
+    custom_split_group: 'TEMP-SG-002',
+    items: [{ name: 'ROW-1', item: 'ITEM-A', item_name: 'Item A', rate: 100, qty: 1, amount: 100 }],
+    grand_total: 100,
+  });
+
+  await repos.orders.put({
+    ...baseOrder,
+    id: CHILD_TEMP,
+    order_type: 'Dine-In',
+    status: 'Draft',
+    sync_status: 'pending',
+    custom_split_group: 'TEMP-SG-002',
+    custom_split_from: TEMP_SOURCE,
+    pending_command_id: 'SYNC-SPLIT-TEMP-003',
+    items: [{ name: 'ROW-1', item: 'ITEM-A', item_name: 'Item A', rate: 100, qty: 1, amount: 100 }],
+    grand_total: 100,
+  });
+
+  await repos.syncQueue.put({
+    id: `SYNC-ORDER-${TEMP_SOURCE}`,
+    action: 'sync_order',
+    endpoint: 'ury.ury.doctype.ury_order.ury_order.sync_order',
+    payload: { temp_id: TEMP_SOURCE, items: [] },
+    timestamp: new Date().toISOString(),
+    status: 'PENDING',
+    priority: 1,
+  });
+
+  await repos.syncQueue.put({
+    id: 'SYNC-SPLIT-TEMP-003',
+    action: 'SplitBillCommand',
+    operation_type: 'SPLIT_BILL',
+    endpoint: 'ury.ury.doctype.ury_order.ury_order.split_bill',
+    payload: {
+      source_invoice: TEMP_SOURCE,
+      items_to_move: [{ name: 'ROW-1', qty: 1 }],
+    },
+    temporary_id: CHILD_TEMP,
+    entity_id: TEMP_SOURCE,
+    dependency_ids: [`SYNC-ORDER-${TEMP_SOURCE}`],
+    timestamp: new Date().toISOString(),
+    status: 'PENDING',
+    priority: 1,
+  });
+
+  const originalPost = call.post;
+  const postedPayloads: any[] = [];
+  (call as any).post = async (endpoint: string, payload: any) => {
+    postedPayloads.push({ endpoint, payload });
+    if (endpoint.includes('sync_order')) {
+      return { name: SERVER_SOURCE, status: 'Draft' };
+    }
+    if (endpoint.includes('split_bill')) {
+      return { new_invoice: CHILD_SERVER };
+    }
+    return {};
+  };
+
+  const originalGet = call.get;
+  (call as any).get = async () => ({
+    message: {
+      group: 'SG-002',
+      current: CHILD_SERVER,
+      invoices: [
+        { name: SERVER_SOURCE, custom_split_from: null, split_index: 1, split_total: 2, split_siblings: [CHILD_SERVER], customer: 'Guest', grand_total: 100, invoice_printed: 0, status: 'Draft' },
+        { name: CHILD_SERVER, custom_split_from: SERVER_SOURCE, split_index: 2, split_total: 2, split_siblings: [SERVER_SOURCE], customer: 'Guest', grand_total: 100, invoice_printed: 0, status: 'Draft' },
+      ],
+    },
+  });
+
+  try {
+    const engine = new SyncEngine(queueMgr, idMapper, undefined, { repositories: repos });
+    const result = await engine.triggerSync();
+
+    assert.equal(result.processed, 2, 'sync_order and split_bill should process');
+    assert.equal(result.succeeded, 2);
+
+    const splitPosted = postedPayloads.find(p => p.endpoint.includes('split_bill'));
+    assert.ok(splitPosted);
+    assert.equal(splitPosted.payload.source_invoice, SERVER_SOURCE, 'split_bill should use promoted source ID');
+
+    const source = await repos.orders.getById(SERVER_SOURCE);
+    assert.ok(source);
+    assert.equal(source.custom_split_group, 'SG-002');
+
+    const child = await repos.orders.getById(CHILD_SERVER);
+    assert.ok(child);
+    assert.equal(child.custom_split_from, SERVER_SOURCE);
+  } finally {
+    (call as any).post = originalPost;
+    (call as any).get = originalGet;
+  }
+});

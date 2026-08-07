@@ -22,8 +22,36 @@ export interface OrderEntity {
   order_type: string;
   /** Aggregator partner ID (Swiggy, Zomato, etc.) for Aggregator orders */
   custom_aggregator_id?: string | null;
+  /** Linked merged POS Invoice name (bill-merge feature) */
+  custom_merged_pos_invoice?: string | null;
+  /** Total of the linked merged invoice */
+  custom_merged_total?: number | null;
+  /** Mirror of the linked invoice's item rows for merged print/display */
+  custom_merged_pos_invoice_details?: Array<{
+    item: string;
+    item_name: string;
+    rate: number;
+    qty: number;
+    amount: number;
+  }> | null;
+  /** Shared split-bill group id (backend `custom_split_group`) */
+  custom_split_group?: string | null;
+  /** Parent invoice name when this order was created by a split (backend `custom_split_from`) */
+  custom_split_from?: string | null;
+  /** 1-based position within the split group */
+  split_index?: number;
+  /** Total number of invoices in the split group */
+  split_total?: number;
+  /** Names of the other invoices in the split group */
+  split_siblings?: string[];
   /** Order lifecycle status e.g., Draft, Paid, Unbilled, Cancelled */
   status: 'Draft' | 'Unbilled' | 'Recently Paid' | 'Paid' | 'Cancelled';
+  /**
+   * Id of the pending sync command that created this temporary order (e.g. a
+   * SplitBillCommand for a TEMP-SPLIT-* child). Dependent commands use this to
+   * wait on the correct creator instead of a non-existent SYNC-ORDER-* record.
+   */
+  pending_command_id?: string | null;
   /**
    * Local print-state flag. 0 = unprinted (Unbilled table orders), 1 = printed.
    * This mirrors the backend POS Invoice `invoice_printed` field for offline
@@ -42,6 +70,8 @@ export interface OrderEntity {
   pos_profile?: string;
   /** Order items JSON string or parsed array */
   items: Array<{
+    /** POS Invoice Item row name (server row id); falls back to item code locally */
+    name?: string;
     item: string;
     item_name: string;
     rate: number;
@@ -283,6 +313,10 @@ export interface IOrderRepository extends IBaseRepository<OrderEntity, string> {
 export interface ITableRepository extends IBaseRepository<TableEntity, string> {
   findByRoom(room: string): Promise<TableEntity[]>;
   findOccupied(): Promise<TableEntity[]>;
+  setOccupied(name: string, occupied: boolean): Promise<void>;
+  getClusterTables(primary: string): Promise<string[]>;
+  releaseCluster(tableNames: string[]): Promise<void>;
+  transferTable(source: string, target: string): Promise<void>;
 }
 
 export interface IMenuRepository extends IBaseRepository<MenuItemEntity, string> {

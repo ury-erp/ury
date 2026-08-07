@@ -1,4 +1,4 @@
-import { call, repositories, apiRegistry } from '@ury/core';
+import { call, repositories, apiRegistry, projectionBus } from '@ury/core';
 
 export interface MenuItem {
   item: string;
@@ -50,6 +50,7 @@ export const getRestaurantMenu = async (posProfile: string, room: string | null,
           image: i.item_image,
         }))
       );
+      projectionBus.emit('MENU_UPDATED');
     }
 
     return items;
@@ -98,6 +99,7 @@ export const getAggregatorMenu = async (aggregator: string) => {
           item_image: i.item_image,
         }))
       );
+      projectionBus.emit('MENU_UPDATED');
     }
 
     return items;

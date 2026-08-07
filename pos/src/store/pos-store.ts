@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 import { storage } from '@ury/core';
 import { getRestaurantMenu, getAggregatorMenu, MenuItem as APIMenuItem } from '../lib/menu-api';
+import { getAggregators } from '../lib/aggregator-api';
 import { getCurrencyInfo, PosProfileCombined, getCombinedPosProfile } from '../lib/pos-profile-api';
 import { getMenuCourses } from '../lib/menu-course-api';
 import { getCustomerGroups, getCustomerTerritories } from '../lib/customer-api';
@@ -209,17 +210,19 @@ export const usePOSStore = create<POSStore>((set, get) => ({
     try {
       set({ isInitializing: true, error: null });
       
-      const [profileResult, menuResult, categoriesResult, paymentModesResult] = await Promise.allSettled([
+      const [profileResult, menuResult, categoriesResult, paymentModesResult, aggregatorsResult] = await Promise.allSettled([
         get().fetchPosProfile(),
         get().fetchMenuItems(),
         get().fetchCategories(),
-        get().fetchPaymentModes()
+        get().fetchPaymentModes(),
+        getAggregators()
       ]);
 
-      if (profileResult.status === 'rejected' || 
-          menuResult.status === 'rejected' || 
+      if (profileResult.status === 'rejected' ||
+          menuResult.status === 'rejected' ||
           categoriesResult.status === 'rejected' ||
-          paymentModesResult.status === 'rejected') {
+          paymentModesResult.status === 'rejected' ||
+          aggregatorsResult.status === 'rejected') {
         set({ 
           error: 'Failed to initialize app. Please refresh the page.',
           isInitializing: false 
@@ -472,16 +475,26 @@ export const usePOSStore = create<POSStore>((set, get) => ({
     }
   },
   setSelectedOrderType: (type) => {
-    const { fetchMenuItems } = get();
-    
-    set({ 
+    const { fetchMenuItems, selectedAggregator, fetchAggregatorMenu } = get();
+
+    set({
       activeOrders: [],
       selectedOrderType: type,
       isUpdatingOrder: false,
       orderId: null
     });
-    
-    if (type !== 'Aggregators') {
+
+    if (type === 'Aggregators') {
+      // Warm the aggregator list and, if one is already selected, its catalog
+      // so the menu is available even if the device goes offline before the
+      // cashier opens the aggregator selector.
+      getAggregators().catch((err) => console.warn('Failed to warm aggregator list:', err));
+      if (selectedAggregator?.customer) {
+        fetchAggregatorMenu(selectedAggregator.customer).catch((err) =>
+          console.warn('Failed to warm aggregator menu:', err)
+        );
+      }
+    } else {
       fetchMenuItems();
     }
   },

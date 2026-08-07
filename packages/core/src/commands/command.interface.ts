@@ -15,6 +15,7 @@ export type OperationType =
   | 'PAY_ORDER'
   | 'PRINT_ORDER'
   | 'MERGE_TABLE'
+  | 'MERGE_BILLS'
   | 'TRANSFER_TABLE'
   | 'SPLIT_BILL'
   | 'CREATE_CUSTOMER'

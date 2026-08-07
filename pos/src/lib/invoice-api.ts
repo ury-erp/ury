@@ -1,6 +1,16 @@
 import { DOCTYPES } from '../data/doctypes';
-import { call, db, apiRegistry, repositories, tempIDMapper, projectionBus } from '@ury/core';
-import type { OrderEntity } from '@ury/core';
+import {
+  call,
+  db,
+  apiRegistry,
+  repositories,
+  tempIDMapper,
+  projectionBus,
+  commandQueue,
+  MergeBillCommand,
+  type OrderEntity,
+} from '@ury/core';
+import { resolveTempDependency } from './order-api';
 import { OrderStatusType, OrderType } from '../data/order-types';
 import type { Filter } from 'frappe-js-sdk/lib/db/types';
 
@@ -151,6 +161,15 @@ function mapOrderEntityToEditShape(order: OrderEntity): any {
   };
 }
 
+function deriveLifecycleStatus(order: OrderEntity): POSInvoice['status'] {
+  const status = order.status || 'Draft';
+  const printed = order.invoice_printed ?? (order.sync_status === 'synced' ? 1 : 0);
+  if (order.table && printed === 0 && status === 'Draft') {
+    return 'Unbilled';
+  }
+  return status as POSInvoice['status'];
+}
+
 function mapOrderEntityToPOSInvoice(order: OrderEntity): POSInvoice {
   const createdDate = new Date(order.createdAt || Date.now());
   const postDate = isNaN(createdDate.getTime())
@@ -172,18 +191,23 @@ function mapOrderEntityToPOSInvoice(order: OrderEntity): POSInvoice {
     total_taxes_and_charges: 0,
     customer: order.customer || 'Guest',
     customer_name: order.customer || 'Guest',
-    status: (order.status as any) || 'Draft',
+    status: deriveLifecycleStatus(order),
     mobile_number: '',
     posting_date: postDate,
     rounded_total: order.grand_total || 0,
     order_type: (order.order_type as any) || 'Dine-In',
     custom_merged_tables: null,
     custom_restaurant_room: order.room || null,
-    custom_split_group: null,
-    custom_split_from: null,
+    custom_split_group: order.custom_split_group ?? null,
+    custom_split_from: order.custom_split_from ?? null,
+    split_index: order.split_index,
+    split_total: order.split_total,
+    split_siblings: order.split_siblings,
+    custom_merged_pos_invoice: order.custom_merged_pos_invoice || null,
+    custom_merged_total: order.custom_merged_total || null,
     sync_status: order.sync_status || 'pending',
     items: (order.items || []).map(i => ({
-      name: i.item,
+      name: i.name || i.item,
       item_code: i.item,
       item_name: i.item_name,
       description: '',
@@ -276,18 +300,24 @@ export async function getPOSInvoices({
 
     // Cache server invoices locally. Preserve existing item details so a server
     // response that omits line items does not wipe out previously cached items.
+    // Unprinted table orders are normalised to `Unbilled` so the local cache
+    // matches the offline lifecycle state machine.
     const syncableInvoices = serverInvoices.filter(inv => !resolvedPending.some(r => r.resolvedId === inv.name));
     if (syncableInvoices.length > 0) {
       await repositories.orders.putMany(
         await Promise.all(
           syncableInvoices.map(async inv => {
             const existing = await repositories.orders.getById(inv.name);
+            const invoicePrinted = typeof inv.invoice_printed === 'number' ? inv.invoice_printed : 0;
+            const isUnbilled =
+              inv.restaurant_table && invoicePrinted === 0 && inv.status === 'Draft';
             return {
               id: inv.name,
               table: inv.restaurant_table || undefined,
               room: inv.custom_restaurant_room || undefined,
               order_type: inv.order_type,
-              status: inv.status as any,
+              status: (isUnbilled ? 'Unbilled' : inv.status) as any,
+              invoice_printed: invoicePrinted,
               customer: inv.customer,
               waiter: inv.waiter,
               cashier: inv.cashier,
@@ -297,6 +327,22 @@ export async function getPOSInvoices({
               sync_status: 'synced' as const,
               // Preserve cached items if the server response did not include them.
               items: (existing && existing.items?.length ? existing.items : []) as any,
+              // Preserve merge link state; the server list endpoint does not return
+              // the mirrored item details, so keep any locally cached merge metadata.
+              custom_merged_pos_invoice:
+                inv.custom_merged_pos_invoice ?? existing?.custom_merged_pos_invoice ?? null,
+              custom_merged_total:
+                inv.custom_merged_total ?? existing?.custom_merged_total ?? null,
+              custom_merged_pos_invoice_details:
+                existing?.custom_merged_pos_invoice_details ?? null,
+              // Preserve split metadata; the list endpoint does not return it.
+              custom_split_group:
+                inv.custom_split_group ?? existing?.custom_split_group ?? null,
+              custom_split_from:
+                inv.custom_split_from ?? existing?.custom_split_from ?? null,
+              split_index: inv.split_index ?? existing?.split_index,
+              split_total: inv.split_total ?? existing?.split_total,
+              split_siblings: inv.split_siblings ?? existing?.split_siblings,
             };
           })
         )
@@ -388,7 +434,7 @@ export async function getPOSInvoices({
           total_taxes_and_charges: 0,
           customer: p.customer || 'Guest',
           customer_name: p.customer || 'Guest',
-          status: (p.status as any) || 'Draft',
+          status: deriveLifecycleStatus(p),
           mobile_number: '',
           posting_date: postDate,
           rounded_total: p.grand_total || 0,
@@ -396,6 +442,8 @@ export async function getPOSInvoices({
           custom_merged_tables: null,
           custom_split_group: null,
           custom_split_from: null,
+          custom_merged_pos_invoice: p.custom_merged_pos_invoice || null,
+          custom_merged_total: p.custom_merged_total || null,
           sync_status: 'pending',
           items: (p.items || []).map(i => ({
             name: i.item,
@@ -538,6 +586,7 @@ export async function getPOSInvoiceItems(invoiceId: string) {
         order_type: existing?.order_type || 'Dine-In',
         status: existing?.status || 'Draft',
         items: items.map((i: any) => ({
+          name: i.name || i.item_code,
           item: i.item_code,
           item_name: i.item_name,
           rate: i.rate,
@@ -563,7 +612,7 @@ export async function getPOSInvoiceItems(invoiceId: string) {
       if (cached && cached.items) {
         return {
           items: cached.items.map(i => ({
-            name: i.item,
+            name: i.name || i.item,
             item_name: i.item_name,
             qty: i.qty,
             rate: i.rate,
@@ -613,30 +662,31 @@ export async function searchPosInvoice(query: string, status: string) {
     try {
       const q = query.toLowerCase();
       const cached = await repositories.orders.getAll();
-      const matched = cached.filter(o =>
-        (o.id.toLowerCase().includes(q) || (o.customer && o.customer.toLowerCase().includes(q))) &&
-        (status === 'Paid' ? o.status === 'Paid' : o.status === status)
-      );
+      const mapped: POSInvoice[] = cached
+        .filter(o =>
+          o.id.toLowerCase().includes(q) || (o.customer && o.customer.toLowerCase().includes(q))
+        )
+        .map(o => ({
+          name: o.id,
+          invoice_printed: o.invoice_printed ?? (o.sync_status === 'synced' ? 1 : 0),
+          grand_total: o.grand_total || 0,
+          restaurant_table: o.table || null,
+          cashier: o.cashier || '',
+          waiter: o.waiter || '',
+          net_total: o.grand_total || 0,
+          posting_time: new Date(o.createdAt || Date.now()).toISOString().split('T')[1].substring(0, 8),
+          total_taxes_and_charges: 0,
+          customer: o.customer || 'Guest',
+          customer_name: o.customer || 'Guest',
+          status: deriveLifecycleStatus(o),
+          mobile_number: '',
+          posting_date: new Date(o.createdAt || Date.now()).toISOString().split('T')[0],
+          rounded_total: o.grand_total || 0,
+          order_type: (o.order_type as any) || 'Dine-In',
+          sync_status: o.sync_status || 'pending',
+        }));
 
-      const mapped: POSInvoice[] = matched.map(o => ({
-        name: o.id,
-        invoice_printed: o.invoice_printed ?? (o.sync_status === 'synced' ? 1 : 0),
-        grand_total: o.grand_total || 0,
-        restaurant_table: o.table || null,
-        cashier: o.cashier || '',
-        waiter: o.waiter || '',
-        net_total: o.grand_total || 0,
-        posting_time: new Date(o.createdAt || Date.now()).toISOString().split('T')[1].substring(0, 8),
-        total_taxes_and_charges: 0,
-        customer: o.customer || 'Guest',
-        customer_name: o.customer || 'Guest',
-        status: (o.status as any) || 'Draft',
-        mobile_number: '',
-        posting_date: new Date(o.createdAt || Date.now()).toISOString().split('T')[0],
-        rounded_total: o.grand_total || 0,
-        order_type: (o.order_type as any) || 'Dine-In',
-        sync_status: o.sync_status || 'pending',
-      }));
+      const matched = mapped.filter(inv => inv.status === status);
 
       return { data: mapped, next: false };
     } catch (fallbackErr) {
@@ -646,6 +696,55 @@ export async function searchPosInvoice(query: string, status: string) {
   }
 }
 
+async function cacheSplitGroupMetadata(group: SplitGroupResponse): Promise<void> {
+  if (!group.group || !Array.isArray(group.invoices)) return;
+  const now = new Date().toISOString();
+  for (const inv of group.invoices) {
+    try {
+      const existing = await repositories.orders.getById(inv.name);
+      if (!existing) continue;
+      await repositories.orders.put({
+        ...existing,
+        custom_split_group: group.group,
+        custom_split_from: inv.custom_split_from ?? existing.custom_split_from ?? null,
+        split_index: inv.split_index,
+        split_total: inv.split_total,
+        split_siblings: inv.split_siblings,
+        updatedAt: now,
+      });
+    } catch (err) {
+      console.warn(`[getSplitGroup] Failed to cache split metadata for ${inv.name}:`, err);
+    }
+  }
+}
+
+async function buildLocalSplitGroup(invoiceId: string): Promise<SplitGroupResponse> {
+  const invoice = await repositories.orders.getById(invoiceId);
+  if (!invoice || !invoice.custom_split_group) {
+    return { invoices: [], current: invoiceId, group: null };
+  }
+
+  const all = await repositories.orders.getAll();
+  const members = all.filter(o => o.custom_split_group === invoice.custom_split_group);
+  members.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
+  const group = invoice.custom_split_group;
+
+  const invoices: SplitGroupInvoice[] = members.map((o, idx) => {
+    const base = mapOrderEntityToPOSInvoice(o);
+    const isOriginal = !o.custom_split_from;
+    return {
+      ...base,
+      split_index: idx + 1,
+      split_total: members.length,
+      is_original: isOriginal,
+      docstatus: o.status === 'Paid' ? 1 : 0,
+      split_siblings: members.map(m => m.id).filter(id => id !== o.id),
+    } as SplitGroupInvoice;
+  });
+
+  return { invoices, current: invoiceId, group };
+}
+
 export async function getSplitGroup(invoiceId: string): Promise<SplitGroupResponse> {
   try {
     const endpoint = apiRegistry.getUrl('GET_SPLIT_GROUP');
@@ -653,10 +752,16 @@ export async function getSplitGroup(invoiceId: string): Promise<SplitGroupRespon
       endpoint,
       { invoice: invoiceId }
     );
-    return response.message;
+    const result = response.message;
+    try {
+      await cacheSplitGroupMetadata(result);
+    } catch (cacheErr) {
+      console.warn('[getSplitGroup] Failed to cache server split metadata locally:', cacheErr);
+    }
+    return result;
   } catch (error) {
-    console.warn('[getSplitGroup] Network call failed:', error);
-    return { invoices: [], current: invoiceId, group: null };
+    console.warn('[getSplitGroup] Network call failed, building local split group:', error);
+    return buildLocalSplitGroup(invoiceId);
   }
 }
 
@@ -753,7 +858,12 @@ export async function getMergeBillCandidates({
     console.warn('[getMergeBillCandidates] Network error, searching local repository:', err);
     const cached = await repositories.orders.getAll();
     const data: MergeBillCandidate[] = cached
-      .filter(o => o.id !== primaryInvoice && o.status === 'Draft')
+      .filter(
+        o =>
+          o.id !== primaryInvoice &&
+          (o.status === 'Draft' || o.status === 'Unbilled') &&
+          !o.custom_merged_pos_invoice
+      )
       .map(o => ({
         name: o.id,
         customer: o.customer || 'Guest',
@@ -764,12 +874,61 @@ export async function getMergeBillCandidates({
         posting_time: new Date(o.createdAt || Date.now()).toISOString().split('T')[1].substring(0, 8),
         order_type: (o.order_type as any) || 'Dine-In',
         restaurant_table: o.table || null,
-        status: o.status,
-        invoice_printed: o.sync_status === 'synced' ? 1 : 0,
+        status: deriveLifecycleStatus(o),
+        invoice_printed: o.invoice_printed ?? (o.sync_status === 'synced' ? 1 : 0),
         sync_status: o.sync_status || 'pending',
       }));
     return { data: data.slice((page - 1) * pageSize, page * pageSize), hasMore: data.length > page * pageSize };
   }
+}
+
+function buildMergedItemDetails(
+  items: OrderEntity['items']
+): NonNullable<OrderEntity['custom_merged_pos_invoice_details']> {
+  return (items || []).map(i => ({
+    item: i.item,
+    item_name: i.item_name,
+    rate: i.rate,
+    qty: i.qty,
+    amount: i.amount || i.rate * i.qty,
+  }));
+}
+
+async function updateLocalMergeState(
+  primaryInvoice: string,
+  secondaryInvoice: string
+): Promise<void> {
+  const [primary, secondary] = await Promise.all([
+    repositories.orders.getById(primaryInvoice),
+    repositories.orders.getById(secondaryInvoice),
+  ]);
+
+  if (!primary || !secondary) {
+    console.warn(
+      `[mergeBills] Cannot update local merge state: missing local record for ${
+        primary ? secondaryInvoice : primaryInvoice
+      }`
+    );
+    return;
+  }
+
+  const now = new Date().toISOString();
+
+  await repositories.orders.put({
+    ...primary,
+    custom_merged_pos_invoice: secondaryInvoice,
+    custom_merged_total: secondary.grand_total,
+    custom_merged_pos_invoice_details: buildMergedItemDetails(secondary.items),
+    updatedAt: now,
+  });
+
+  await repositories.orders.put({
+    ...secondary,
+    custom_merged_pos_invoice: primaryInvoice,
+    custom_merged_total: primary.grand_total,
+    custom_merged_pos_invoice_details: buildMergedItemDetails(primary.items),
+    updatedAt: now,
+  });
 }
 
 export async function mergeBills(
@@ -777,6 +936,40 @@ export async function mergeBills(
   secondaryInvoice: string
 ): Promise<MergeBillsResponse> {
   const endpoint = apiRegistry.getUrl('MERGE_BILLS');
+
+  // When offline (or on network failure), update the local IndexedDB state
+  // immediately so the UI shows the merged link, and queue a merge_bills command
+  // that replays the operation when connectivity returns.
+  const queueOfflineMerge = async (): Promise<MergeBillsResponse> => {
+    await updateLocalMergeState(primaryInvoice, secondaryInvoice);
+
+    const dependencies: string[] = [];
+    if (primaryInvoice.startsWith('TEMP-')) {
+      dependencies.push(`SYNC-ORDER-${primaryInvoice}`);
+    }
+    if (secondaryInvoice.startsWith('TEMP-')) {
+      dependencies.push(`SYNC-ORDER-${secondaryInvoice}`);
+    }
+
+    const cmd = new MergeBillCommand(
+      { primary_invoice: primaryInvoice, secondary_invoice: secondaryInvoice },
+      {
+        id: `SYNC-MERGE-BILL-${Date.now()}`,
+        priority: 1,
+        dependencies,
+      }
+    );
+
+    await commandQueue.enqueue(cmd);
+
+    projectionBus.emit('ORDERS_UPDATED');
+    return { status: 'success', message: 'Merge queued offline', name: primaryInvoice };
+  };
+
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    return queueOfflineMerge();
+  }
+
   try {
     const response = await call.post<{ message: MergeBillsResponse }>(
       endpoint,
@@ -789,20 +982,20 @@ export async function mergeBills(
     if (result.status === 'error') {
       throw new Error(result.message || 'Failed to merge bills');
     }
+
+    // Keep the local IndexedDB snapshot consistent with the server so the merged
+    // badge and combined total render correctly on the next offline fetch.
+    try {
+      await updateLocalMergeState(primaryInvoice, secondaryInvoice);
+      projectionBus.emit('ORDERS_UPDATED');
+    } catch (localErr) {
+      console.warn('[mergeBills] Failed to update local merge state after online success:', localErr);
+    }
+
     return result;
   } catch (error) {
     console.warn('Network mergeBills failed, queueing in sync_queue:', error);
-    await repositories.syncQueue.put({
-      id: `SYNC-MERGE-BILL-${Date.now()}`,
-      action: 'merge_bills',
-      endpoint: endpoint,
-      payload: { primary_invoice: primaryInvoice, secondary_invoice: secondaryInvoice },
-      timestamp: new Date().toISOString(),
-      status: 'PENDING',
-      attempts: 0,
-      priority: 1,
-    });
-    return { status: 'success', message: 'Merge queued offline', name: primaryInvoice };
+    return queueOfflineMerge();
   }
 }
 
@@ -894,7 +1087,8 @@ export async function getInvoicePrintHtml(invoiceId: string, printFormat: string
 }
 
 export async function networkPrint(orderId: string, printer: string, printFormat: string) {
-  await call.post('ury.ury.api.ury_print.network_printing', {
+  const endpoint = apiRegistry.getUrl('NETWORK_PRINTING');
+  await call.post(endpoint, {
     doctype: 'POS Invoice',
     name: orderId,
     printer_setting: printer,
@@ -952,12 +1146,10 @@ export async function updatePrintStatus(orderId: string): Promise<UpdatePrintSta
   const endpoint = apiRegistry.getUrl('QZ_PRINT_UPDATE');
 
   // When offline (or on network failure), queue a QZ_PRINT_UPDATE command so the
-  // print transition is replayed on reconnect. Temp orders must wait for the
-  // parent sync_order to finish so the server invoice exists.
-  const dependencyIds: string[] = [];
-  if (orderId.startsWith('TEMP-')) {
-    dependencyIds.push(`SYNC-ORDER-${orderId}`);
-  }
+  // print transition is replayed on reconnect. Temp orders must wait on the
+  // command that created them (sync_order for TEMP-ORD-*, SplitBillCommand for
+  // TEMP-SPLIT-*) so the server invoice exists.
+  const dependencyIds: string[] = await resolveTempDependency(orderId);
 
   // When offline, skip the online call and queue the status update directly.
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
@@ -974,6 +1166,13 @@ export async function updatePrintStatus(orderId: string): Promise<UpdatePrintSta
     await call.post(endpoint, {
       invoice: orderId,
     });
+
+    // Keep the local IndexedDB snapshot consistent with the server so that
+    // offline previews and the Orders page show the printed/Draft state even
+    // when the next projection fetch is skipped or fails.
+    await updateLocalPrintState(orderId);
+    projectionBus.emit('ORDERS_UPDATED');
+
     return { queued: false };
   } catch (error) {
     console.warn('[updatePrintStatus] Error calling qz_print_update (queueing offline):', error);
@@ -982,5 +1181,58 @@ export async function updatePrintStatus(orderId: string): Promise<UpdatePrintSta
     await updateLocalPrintState(orderId);
     projectionBus.emit('ORDERS_UPDATED');
     return { queued: true };
+  }
+}
+
+export interface ReprintKotResult {
+  success: boolean;
+  queued: boolean;
+}
+
+/**
+ * Re-prints the Kitchen Order Ticket (KOT) for an invoice.
+ *
+ * Online: calls the KOT reprint endpoint directly.
+ * Offline: queues a KOT_REPRINT command so the reprint is replayed when
+ * connectivity returns. Temp invoices must wait for their parent sync_order
+ * to complete because the server invoice (and its KOTs) do not exist yet.
+ */
+export async function reprintKot(orderId: string): Promise<ReprintKotResult> {
+  const endpoint = apiRegistry.getUrl('KOT_REPRINT');
+
+  const dependencyIds: string[] = await resolveTempDependency(orderId);
+
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    await repositories.syncQueue.put({
+      id: `KOT-REPRINT-${orderId}-${Date.now()}`,
+      action: 'kot_reprint',
+      endpoint,
+      payload: { invoice_number: orderId },
+      timestamp: new Date().toISOString(),
+      status: 'PENDING',
+      attempts: 0,
+      priority: 1,
+      dependency_ids: dependencyIds,
+    });
+    return { success: true, queued: true };
+  }
+
+  try {
+    await call.get(endpoint, { invoice_number: orderId });
+    return { success: true, queued: false };
+  } catch (error) {
+    console.warn('[reprintKot] Online KOT reprint failed, queueing offline:', error);
+    await repositories.syncQueue.put({
+      id: `KOT-REPRINT-${orderId}-${Date.now()}`,
+      action: 'kot_reprint',
+      endpoint,
+      payload: { invoice_number: orderId },
+      timestamp: new Date().toISOString(),
+      status: 'PENDING',
+      attempts: 0,
+      priority: 1,
+      dependency_ids: dependencyIds,
+    });
+    return { success: true, queued: true };
   }
 }

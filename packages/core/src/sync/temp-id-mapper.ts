@@ -4,12 +4,17 @@
  * UUIDs (e.g., TEMP-ORD-9912) to server document names (e.g., POS-INV-2026-00412) in IndexedDB.
  */
 
-import { repositories } from '../storage';
+import { repositories, type StorageRepositories } from '../storage';
 
 export class TempIDMapper {
   private static readonly METADATA_KEY = 'id_mappings';
   private memoryCache: Map<string, string> = new Map();
   private initialized = false;
+  private repos: StorageRepositories;
+
+  constructor(customRepos?: StorageRepositories) {
+    this.repos = customRepos || repositories;
+  }
 
   /**
    * Hydrates memoryCache from IndexedDB metadata repository
@@ -17,7 +22,7 @@ export class TempIDMapper {
   private async initCache(): Promise<void> {
     if (this.initialized) return;
     try {
-      const rawJson = await repositories.metadata.getValue(TempIDMapper.METADATA_KEY);
+      const rawJson = await this.repos.metadata.getValue(TempIDMapper.METADATA_KEY);
       if (rawJson) {
         const dict = JSON.parse(rawJson);
         Object.entries(dict).forEach(([k, v]) => {
@@ -44,7 +49,7 @@ export class TempIDMapper {
     this.memoryCache.forEach((v, k) => {
       dict[k] = v;
     });
-    await repositories.metadata.setValue(TempIDMapper.METADATA_KEY, JSON.stringify(dict));
+    await this.repos.metadata.setValue(TempIDMapper.METADATA_KEY, JSON.stringify(dict));
   }
 
   /**
@@ -87,7 +92,7 @@ export class TempIDMapper {
   async clear(): Promise<void> {
     this.memoryCache.clear();
     this.initialized = false;
-    await repositories.metadata.setValue(TempIDMapper.METADATA_KEY, JSON.stringify({}));
+    await this.repos.metadata.setValue(TempIDMapper.METADATA_KEY, JSON.stringify({}));
   }
 }
 

@@ -7,6 +7,7 @@ import type { CommandEnvelope, ICommand } from './command.interface';
 import { CreateOrderCommand, type CreateOrderPayload } from './create-order.command';
 import { UpdateOrderCommand, type UpdateOrderPayload } from './update-order.command';
 import { MergeTableCommand, type MergeTablePayload } from './merge-table.command';
+import { MergeBillCommand, type MergeBillPayload } from './merge-bill.command';
 import { SplitBillCommand, type SplitBillPayload } from './split-bill.command';
 import { PaymentCommand, type PaymentPayload } from './payment.command';
 import { DeleteDraftCommand, type DeleteDraftPayload } from './delete-draft.command';
@@ -35,6 +36,10 @@ export class CommandFactory {
       case MergeTableCommand.ACTION_NAME:
       case MergeTableCommand.ENDPOINT:
         return new MergeTableCommand(envelope.payload as unknown as MergeTablePayload, options);
+
+      case MergeBillCommand.ACTION_NAME:
+      case MergeBillCommand.ENDPOINT:
+        return new MergeBillCommand(envelope.payload as unknown as MergeBillPayload, options);
 
       case SplitBillCommand.ACTION_NAME:
       case SplitBillCommand.ENDPOINT:

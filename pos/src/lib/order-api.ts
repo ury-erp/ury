@@ -1,4 +1,4 @@
-import { call, repositories, apiRegistry, projectionBus, type OrderEntity } from '@ury/core';
+import { call, repositories, apiRegistry, projectionBus, commandQueue, SplitBillCommand, type OrderEntity } from '@ury/core';
 
 export interface POSInvoiceItem {
   name: string;
@@ -167,30 +167,79 @@ export interface CancelOrderResult {
 }
 
 /**
- * Cancels an order. If the online call fails (offline or server error), the order
- * is marked Cancelled locally, its table is released, and a cancel_order command is
- * queued for replay on reconnect. This prevents the cancellation modal from crashing
- * with an unhandled network error and keeps the local state consistent.
+ * Releases a table cluster locally after cancellation. Mirrors the backend
+ * `release_merge_cluster_tables` behavior: all tables linked via `merged_with`
+ * are marked available and their merge linkage is cleared.
+ */
+async function releaseTableClusterAfterCancel(table: string | null | undefined): Promise<void> {
+  if (!table) return;
+  try {
+    const clusterTables = await repositories.tables.getClusterTables(table);
+    await repositories.tables.releaseCluster(clusterTables);
+  } catch (err) {
+    console.warn('[releaseTableClusterAfterCancel] Failed to release table cluster:', err);
+  }
+}
+
+/**
+ * Resolves the queue command dependencies for a temporary invoice ID.
+ *   - TEMP-ORD-* depends on the sync_order command that creates it.
+ *   - TEMP-SPLIT-* depends on the split command recorded on its local order entity.
+ *   - Real server IDs have no queue dependency.
+ */
+export async function resolveTempDependency(orderId: string): Promise<string[]> {
+  if (!orderId.startsWith('TEMP-')) return [];
+
+  if (orderId.startsWith('TEMP-ORD-')) {
+    return [`SYNC-ORDER-${orderId}`];
+  }
+
+  if (orderId.startsWith('TEMP-SPLIT-')) {
+    try {
+      const local = await repositories.orders.getById(orderId);
+      if (local?.pending_command_id) {
+        return [local.pending_command_id];
+      }
+    } catch (err) {
+      console.warn('[resolveTempDependency] Failed to read local order:', err);
+    }
+  }
+
+  return [];
+}
+
+/**
+ * Cancels an order. On a successful online call the local order is marked Cancelled
+ * and its table cluster is released so the UI matches the backend state immediately.
+ * If the online call fails (offline or server error), the order is marked Cancelled
+ * locally, its table cluster is released, and a cancel_order command is queued for
+ * replay on reconnect. The queued payload is byte-equivalent to the online API
+ * (invoice_id + reason only) and depends on SYNC-ORDER-${tempId} for un-synced orders.
  */
 export async function cancelOrder(
   order: CancelOrderInput,
   reason: string
 ): Promise<CancelOrderResult> {
   try {
-    await call.post('ury.ury.doctype.ury_order.ury_order.cancel_order', {
+    await call.post(apiRegistry.getUrl('CANCEL_ORDER'), {
       invoice_id: order.name,
       reason,
     });
+
+    // Keep local state in lock-step with the server cancellation.
+    await repositories.orders.markCancelled(order.name);
+    await releaseTableClusterAfterCancel(order.restaurant_table);
+
+    projectionBus.emit('ORDERS_UPDATED');
+    projectionBus.emit('TABLES_UPDATED');
+
     return { success: true, queued: false };
   } catch (err) {
     console.warn('[cancelOrder] Online cancel failed, falling back to offline queue:', err);
 
     try {
       await repositories.orders.markCancelled(order.name);
-
-      if (order.restaurant_table) {
-        await repositories.tables.setOccupied(order.restaurant_table, false);
-      }
+      await releaseTableClusterAfterCancel(order.restaurant_table);
 
       const dependencyIds: string[] = [];
       if (order.name.startsWith('TEMP-')) {
@@ -200,17 +249,20 @@ export async function cancelOrder(
       await repositories.syncQueue.put({
         id: `CANCEL-ORDER-${order.name}`,
         action: 'cancel_order',
+        operation_type: 'DELETE_ORDER',
         endpoint: apiRegistry.getUrl('CANCEL_ORDER'),
         payload: {
           invoice_id: order.name,
           reason,
-          table: order.restaurant_table || undefined,
         },
         timestamp: new Date().toISOString(),
         status: 'PENDING',
         attempts: 0,
         priority: 5,
         dependency_ids: dependencyIds,
+        temporary_id: order.name.startsWith('TEMP-') ? order.name : null,
+        entity_id: order.name,
+        idempotency_key: `CANCEL-${order.name}-${reason}`,
       });
 
       projectionBus.emit('ORDERS_UPDATED');
@@ -534,12 +586,136 @@ export interface SplitBillResponse {
   new_invoice: string;
 }
 
+/**
+ * Performs an offline bill split by mutating local order state and queueing a
+ * SplitBillCommand. The source invoice has the moved items decremented, a new
+ * temporary child invoice is created, and both are linked with split metadata so
+ * the UI can render the group offline. The queued command mirrors the online
+ * payload and depends on SYNC-ORDER-${tempId} when the source is itself pending.
+ */
+async function queueOfflineSplit(
+  sourceInvoice: string,
+  itemsToMove: SplitBillItemMove[],
+  customer?: string | null
+): Promise<SplitBillResponse> {
+  const source = await repositories.orders.getById(sourceInvoice);
+  if (!source) {
+    throw new Error(`Cannot split: source invoice ${sourceInvoice} not found locally`);
+  }
+
+  const childId = `TEMP-SPLIT-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+  const now = new Date().toISOString();
+
+  // Build a map of items to move keyed by item code for deterministic matching.
+  const moveMap = new Map(itemsToMove.map(m => [m.name, m.qty]));
+
+  const remainingItems = source.items
+    .map(item => {
+      const moveQty = moveMap.get(item.item) || 0;
+      const nextQty = item.qty - moveQty;
+      if (nextQty <= 0) return null;
+      return {
+        ...item,
+        qty: nextQty,
+        amount: item.rate * nextQty,
+      };
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null);
+
+  const movedItems = source.items
+    .map(item => {
+      const moveQty = moveMap.get(item.item) || 0;
+      if (moveQty <= 0) return null;
+      return {
+        ...item,
+        name: item.item,
+        qty: moveQty,
+        amount: item.rate * moveQty,
+      };
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null);
+
+  if (movedItems.length === 0) {
+    throw new Error('Cannot split: no matching items found to move');
+  }
+
+  const groupId = source.custom_split_group || `SG-${Date.now()}`;
+
+  const updatedSource: OrderEntity = {
+    ...source,
+    items: remainingItems,
+    grand_total: remainingItems.reduce((sum, i) => sum + i.amount, 0),
+    custom_split_group: groupId,
+    split_index: 1,
+    split_total: 2,
+    split_siblings: [childId],
+    updatedAt: now,
+  };
+
+  const splitPayload: {
+    source_invoice: string;
+    items_to_move: SplitBillItemMove[];
+    customer?: string | null;
+  } = {
+    source_invoice: sourceInvoice,
+    items_to_move: itemsToMove,
+  };
+  if (customer !== undefined && customer !== null) {
+    splitPayload.customer = customer;
+  }
+
+  const dependencies: string[] = [];
+  if (sourceInvoice.startsWith('TEMP-')) {
+    dependencies.push(`SYNC-ORDER-${sourceInvoice}`);
+  }
+
+  const commandId = await commandQueue.enqueue(
+    new SplitBillCommand(splitPayload, {
+      id: `SYNC-SPLIT-${childId}`,
+      priority: 3,
+      dependencies,
+      temporaryId: childId,
+    })
+  );
+
+  const childOrder: OrderEntity = {
+    ...source,
+    id: childId,
+    items: movedItems,
+    grand_total: movedItems.reduce((sum, i) => sum + i.amount, 0),
+    custom_split_group: groupId,
+    custom_split_from: sourceInvoice,
+    split_index: 2,
+    split_total: 2,
+    split_siblings: [sourceInvoice],
+    pending_command_id: commandId,
+    sync_status: 'pending',
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  await repositories.orders.put(updatedSource);
+  await repositories.orders.put(childOrder);
+
+  projectionBus.emit('ORDERS_UPDATED');
+
+  return {
+    source_invoice: sourceInvoice,
+    new_invoice: childId,
+  };
+}
+
 export async function splitBill(
   sourceInvoice: string,
   itemsToMove: SplitBillItemMove[],
   customer?: string | null
 ): Promise<SplitBillResponse> {
   const endpoint = apiRegistry.getUrl('SPLIT_BILL');
+
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    return queueOfflineSplit(sourceInvoice, itemsToMove, customer);
+  }
+
   try {
     const res = await call.post(endpoint, {
       source_invoice: sourceInvoice,
@@ -549,20 +725,7 @@ export async function splitBill(
     return res.message as SplitBillResponse;
   } catch (error) {
     console.warn('Network splitBill failed, queueing command in sync_queue repository:', error);
-    await repositories.syncQueue.put({
-      id: `SYNC-SPLIT-${Date.now()}`,
-      action: 'split_bill',
-      endpoint: endpoint,
-      payload: { source_invoice: sourceInvoice, items_to_move: itemsToMove, customer },
-      timestamp: new Date().toISOString(),
-      status: 'PENDING',
-      attempts: 0,
-      priority: 1,
-    });
-    return {
-      source_invoice: sourceInvoice,
-      new_invoice: `TEMP-SPLIT-${Date.now()}`,
-    };
+    return queueOfflineSplit(sourceInvoice, itemsToMove, customer);
   }
 }
 

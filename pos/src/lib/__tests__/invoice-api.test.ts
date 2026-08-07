@@ -2,7 +2,7 @@ import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import 'fake-indexeddb/auto';
 import { call, repositories, tempIDMapper } from '@ury/core';
-import { getPOSInvoices, getOrderForEdit } from '../invoice-api';
+import { getPOSInvoices, getOrderForEdit, reprintKot, mergeBills } from '../invoice-api';
 import { printOrder } from '../print';
 
 const baseOrder = {
@@ -408,5 +408,259 @@ test('printOrder returns queued and updates local state when online call fails',
     assert.equal(local?.invoice_printed, 1);
   } finally {
     (call as any).post = originalPost;
+  }
+});
+
+
+// ============================================================================
+// Task 5: Kitchen / KOT Print Offline Queue
+// ============================================================================
+
+test('reprintKot online succeeds without queueing', async () => {
+  const serverId = 'POS-INV-KOT-ONLINE-001';
+
+  const originalGet = call.get;
+  (call as any).get = async () => ({ message: 'Success' });
+
+  try {
+    const result = await reprintKot(serverId);
+
+    assert.equal(result.success, true);
+    assert.equal(result.queued, false);
+
+    const cmds = await repositories.syncQueue.getAll();
+    const kotCmds = cmds.filter((c) => c.action === 'kot_reprint');
+    assert.equal(kotCmds.length, 0, 'No KOT reprint command should be queued online');
+  } finally {
+    (call as any).get = originalGet;
+  }
+});
+
+test('reprintKot offline queues KOT_REPRINT command', async () => {
+  const serverId = 'POS-INV-KOT-OFFLINE-001';
+
+  setNavigatorOnline(false);
+
+  const originalGet = call.get;
+  (call as any).get = async () => {
+    throw new Error('should not be called while offline');
+  };
+
+  try {
+    const result = await reprintKot(serverId);
+
+    assert.equal(result.success, true);
+    assert.equal(result.queued, true);
+
+    const cmds = await repositories.syncQueue.getAll();
+    const kotCmds = cmds.filter((c) => c.action === 'kot_reprint');
+    assert.equal(kotCmds.length, 1);
+    assert.equal((kotCmds[0]?.payload as any)?.invoice_number, serverId);
+    assert.deepEqual(kotCmds[0]?.dependency_ids, []);
+  } finally {
+    (call as any).get = originalGet;
+    setNavigatorOnline(true);
+  }
+});
+
+test('reprintKot offline for temp invoice depends on parent sync_order', async () => {
+  const tempId = 'TEMP-ORD-KOT-001';
+
+  setNavigatorOnline(false);
+
+  try {
+    const result = await reprintKot(tempId);
+
+    assert.equal(result.success, true);
+    assert.equal(result.queued, true);
+
+    const cmds = await repositories.syncQueue.getAll();
+    const kotCmds = cmds.filter((c) => c.action === 'kot_reprint');
+    assert.equal(kotCmds.length, 1);
+    assert.deepEqual(kotCmds[0]?.dependency_ids, [`SYNC-ORDER-${tempId}`]);
+  } finally {
+    setNavigatorOnline(true);
+  }
+});
+
+test('reprintKot online failure falls back to offline queue', async () => {
+  const serverId = 'POS-INV-KOT-FAIL-001';
+
+  setNavigatorOnline(true);
+
+  const originalGet = call.get;
+  (call as any).get = async () => {
+    throw new Error('Server unreachable');
+  };
+
+  try {
+    const result = await reprintKot(serverId);
+
+    assert.equal(result.success, true);
+    assert.equal(result.queued, true);
+
+    const cmds = await repositories.syncQueue.getAll();
+    const kotCmds = cmds.filter((c) => c.action === 'kot_reprint');
+    assert.equal(kotCmds.length, 1);
+    assert.equal((kotCmds[0]?.payload as any)?.invoice_number, serverId);
+  } finally {
+    (call as any).get = originalGet;
+  }
+});
+
+// ============================================================================
+// Offline Merge Bill
+// ============================================================================
+
+test('mergeBills offline updates local state and queues merge_bills command', async () => {
+  const primaryId = 'POS-INV-MERGE-LOCAL-001';
+  const secondaryId = 'POS-INV-MERGE-LOCAL-002';
+
+  await repositories.orders.put({
+    ...baseOrder,
+    id: primaryId,
+    status: 'Draft',
+    sync_status: 'synced',
+    items: [{ item: 'A', item_name: 'Item A', rate: 100, qty: 1, amount: 100 }],
+    grand_total: 100,
+  });
+
+  await repositories.orders.put({
+    ...baseOrder,
+    id: secondaryId,
+    status: 'Draft',
+    sync_status: 'synced',
+    items: [{ item: 'B', item_name: 'Item B', rate: 200, qty: 1, amount: 200 }],
+    grand_total: 200,
+  });
+
+  setNavigatorOnline(false);
+
+  try {
+    const result = await mergeBills(primaryId, secondaryId);
+
+    assert.equal(result.status, 'success');
+    assert.equal(result.name, primaryId);
+
+    const primary = await repositories.orders.getById(primaryId);
+    const secondary = await repositories.orders.getById(secondaryId);
+
+    assert.ok(primary);
+    assert.ok(secondary);
+    assert.equal(primary.custom_merged_pos_invoice, secondaryId);
+    assert.equal(primary.custom_merged_total, 200);
+    assert.equal(primary.custom_merged_pos_invoice_details?.length, 1);
+    assert.equal(primary.custom_merged_pos_invoice_details?.[0].item, 'B');
+
+    assert.equal(secondary.custom_merged_pos_invoice, primaryId);
+    assert.equal(secondary.custom_merged_total, 100);
+    assert.equal(secondary.custom_merged_pos_invoice_details?.length, 1);
+    assert.equal(secondary.custom_merged_pos_invoice_details?.[0].item, 'A');
+
+    const cmds = await repositories.syncQueue.getAll();
+    const mergeCmds = cmds.filter(
+      (c) =>
+        c.action === 'MergeBillCommand' ||
+        c.operation_type === 'MERGE_BILLS' ||
+        c.endpoint?.includes('merge_bills')
+    );
+    assert.equal(mergeCmds.length, 1);
+    assert.equal((mergeCmds[0]?.payload as any)?.primary_invoice, primaryId);
+    assert.equal((mergeCmds[0]?.payload as any)?.secondary_invoice, secondaryId);
+  } finally {
+    setNavigatorOnline(true);
+  }
+});
+
+test('mergeBills offline for temp primary depends on parent sync_order', async () => {
+  const tempId = 'TEMP-ORD-MERGE-LOCAL-003';
+  const secondaryId = 'POS-INV-MERGE-LOCAL-004';
+
+  await repositories.orders.put({
+    ...baseOrder,
+    id: tempId,
+    status: 'Draft',
+    sync_status: 'pending',
+    items: [{ item: 'A', item_name: 'Item A', rate: 100, qty: 1, amount: 100 }],
+    grand_total: 100,
+  });
+
+  await repositories.orders.put({
+    ...baseOrder,
+    id: secondaryId,
+    status: 'Draft',
+    sync_status: 'synced',
+    items: [{ item: 'B', item_name: 'Item B', rate: 200, qty: 1, amount: 200 }],
+    grand_total: 200,
+  });
+
+  setNavigatorOnline(false);
+
+  try {
+    await mergeBills(tempId, secondaryId);
+
+    const cmds = await repositories.syncQueue.getAll();
+    const mergeCmds = cmds.filter(
+      (c) =>
+        c.action === 'MergeBillCommand' ||
+        c.operation_type === 'MERGE_BILLS' ||
+        c.endpoint?.includes('merge_bills')
+    );
+    assert.equal(mergeCmds.length, 1);
+    assert.deepEqual(mergeCmds[0]?.dependency_ids, [`SYNC-ORDER-${tempId}`]);
+  } finally {
+    setNavigatorOnline(true);
+  }
+});
+
+test('mergeBills online failure falls back to offline queue and local state', async () => {
+  const primaryId = 'POS-INV-MERGE-FAIL-005';
+  const secondaryId = 'POS-INV-MERGE-FAIL-006';
+
+  await repositories.orders.put({
+    ...baseOrder,
+    id: primaryId,
+    status: 'Draft',
+    sync_status: 'synced',
+    items: [{ item: 'A', item_name: 'Item A', rate: 100, qty: 1, amount: 100 }],
+    grand_total: 100,
+  });
+
+  await repositories.orders.put({
+    ...baseOrder,
+    id: secondaryId,
+    status: 'Draft',
+    sync_status: 'synced',
+    items: [{ item: 'B', item_name: 'Item B', rate: 200, qty: 1, amount: 200 }],
+    grand_total: 200,
+  });
+
+  setNavigatorOnline(true);
+
+  const originalPost = call.post;
+  (call as any).post = async () => {
+    throw new Error('Server unreachable');
+  };
+
+  try {
+    const result = await mergeBills(primaryId, secondaryId);
+
+    assert.equal(result.status, 'success');
+    assert.equal(result.name, primaryId);
+
+    const primary = await repositories.orders.getById(primaryId);
+    assert.equal(primary?.custom_merged_pos_invoice, secondaryId);
+
+    const cmds = await repositories.syncQueue.getAll();
+    const mergeCmds = cmds.filter(
+      (c) =>
+        c.action === 'MergeBillCommand' ||
+        c.operation_type === 'MERGE_BILLS' ||
+        c.endpoint?.includes('merge_bills')
+    );
+    assert.equal(mergeCmds.length, 1);
+  } finally {
+    (call as any).post = originalPost;
+    setNavigatorOnline(true);
   }
 });

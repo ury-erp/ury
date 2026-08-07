@@ -12,6 +12,7 @@ import { createRepositories, type StorageRepositories } from '../../storage/repo
 import { ConflictResolver } from '../conflict.resolver';
 import { CreateOrderCommand } from '../../commands/create-order.command';
 import { MergeTableCommand } from '../../commands/merge-table.command';
+import { MergeBillCommand } from '../../commands/merge-bill.command';
 import { SplitBillCommand } from '../../commands/split-bill.command';
 import { PaymentCommand } from '../../commands/payment.command';
 import { DeleteDraftCommand } from '../../commands/delete-draft.command';
@@ -128,6 +129,54 @@ test('4. Conflict: MERGE_FAILED -> ROLLBACK merged_with pointer', async () => {
   const updatedTbl = await repos.tables.getById('T-01');
   assert.ok(updatedTbl);
   assert.equal(updatedTbl.merged_with, null);
+});
+
+test('4b. Conflict: MERGE_FAILED (bill merge) -> ROLLBACK merge linkages', async () => {
+  const cmd = new MergeBillCommand(
+    { primary_invoice: 'POS-001', secondary_invoice: 'POS-002' },
+    { id: 'CMD-MERGE-BILL-01' }
+  );
+
+  await repos.orders.put({
+    id: 'POS-001',
+    order_type: 'Dine-In',
+    status: 'Draft',
+    items: [{ item: 'A', item_name: 'Item A', rate: 100, qty: 1, amount: 100 }],
+    grand_total: 100,
+    custom_merged_pos_invoice: 'POS-002',
+    custom_merged_total: 200,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    sync_status: 'synced',
+  });
+
+  await repos.orders.put({
+    id: 'POS-002',
+    order_type: 'Dine-In',
+    status: 'Draft',
+    items: [{ item: 'B', item_name: 'Item B', rate: 200, qty: 1, amount: 200 }],
+    grand_total: 200,
+    custom_merged_pos_invoice: 'POS-001',
+    custom_merged_total: 100,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    sync_status: 'synced',
+  });
+
+  const res = await resolver.resolveConflict(cmd.envelope, 'Cannot merge: selected bill already includes another bill.');
+  assert.equal(res.conflictCode, 'MERGE_FAILED');
+  assert.equal(res.strategy, 'ROLLBACK');
+
+  if (res.remedyAction) await res.remedyAction();
+
+  const primary = await repos.orders.getById('POS-001');
+  const secondary = await repos.orders.getById('POS-002');
+  assert.ok(primary);
+  assert.ok(secondary);
+  assert.equal(primary.custom_merged_pos_invoice, null);
+  assert.equal(primary.custom_merged_total, null);
+  assert.equal(secondary.custom_merged_pos_invoice, null);
+  assert.equal(secondary.custom_merged_total, null);
 });
 
 test('5. Conflict: SPLIT_FAILED -> MANUAL cashier prompt', async () => {

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef } from 'react';
-import { Clock, User, UserCheck, Receipt, Printer, Pencil, X, GitBranch, GitMerge, CloudOff, RefreshCw } from 'lucide-react';
+import { Clock, User, UserCheck, Receipt, Printer, Pencil, X, GitBranch, GitMerge, RefreshCw } from 'lucide-react';
 import { Badge, Button, Card, CardContent } from '@ury/ui';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@ury/ui';
 import { showToast } from '@ury/ui';
@@ -17,6 +17,7 @@ import OrderActionsMenu from '../components/OrderActionsMenu';
 import SplitGroupPanel from '../components/SplitGroupPanel';
 import MergedBillPanel from '../components/MergedBillPanel';
 import { printOrder } from '../lib/print';
+import { SyncStatusBadge } from '../components/SyncStatusBadge';
 import { call, projectionBus } from '@ury/core';
 import { splitBill, cancelOrder } from '../lib/order-api';
 import {
@@ -40,10 +41,6 @@ function getOrderTableLabel(order: Pick<POSInvoice, 'restaurant_table' | 'custom
 
 function isOrderEditable(status: string) {
   return status === 'Draft' || status === 'Unbilled';
-}
-
-function isPendingSync(order: POSInvoice): boolean {
-  return order.sync_status === 'pending' || order.name.startsWith('TEMP-');
 }
 
 function isSplitBill(order: Pick<POSInvoice, 'split_total' | 'custom_split_group' | 'custom_split_from'>) {
@@ -420,16 +417,7 @@ export default function Orders() {
                         {order.name}
                       </h3>
                       <div className="flex shrink-0 items-center gap-1">
-                        {isPendingSync(order) && (
-                          <Badge
-                            variant="outline"
-                            className="shrink-0 gap-1 border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-50"
-                            title={t('orders.pending_sync_tooltip') || 'Pending sync — created or paid while offline'}
-                          >
-                            <CloudOff className="h-3 w-3" />
-                            {t('orders.pending_sync') || 'Pending'}
-                          </Badge>
-                        )}
+                        <SyncStatusBadge orderId={order.name} syncStatus={order.sync_status} />
                         {mergedBill && (
                           <Badge
                             variant="outline"
@@ -593,16 +581,7 @@ export default function Orders() {
                       </button>
                     </>
                   )}
-                  {isPendingSync(selectedOrder) && (
-                    <Badge
-                      variant="outline"
-                      className="shrink-0 gap-1 border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-50"
-                      title={t('orders.pending_sync_tooltip') || 'Pending sync — created or paid while offline'}
-                    >
-                      <CloudOff className="h-3 w-3" />
-                      {t('orders.pending_sync') || 'Pending Sync'}
-                    </Badge>
-                  )}
+                  <SyncStatusBadge orderId={selectedOrder.name} syncStatus={selectedOrder.sync_status} />
                   <Badge variant={getBadgeVariant(selectedOrder.status)}>
                     {t(`order_status_types.${selectedOrder.status.toLowerCase().replace(/ /g, '_')}`)}
                   </Badge>

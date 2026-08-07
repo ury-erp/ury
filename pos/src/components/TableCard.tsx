@@ -4,6 +4,7 @@ import { cn } from '@ury/ui';
 import { formatInvoiceTime } from '@ury/core';
 import type { Table } from '../lib/table-api';
 import { Badge } from '@ury/ui';
+import { SyncStatusBadge } from './SyncStatusBadge';
 import { TableShapeIcon } from './TableShapeIcon';
 import TableActionsMenu from './TableActionsMenu';
 import { t } from '../i18n';
@@ -75,6 +76,7 @@ const TableCard = ({
             <Badge variant={isOccupied ? 'warning' : 'success'} className="whitespace-nowrap">
               {isOccupied ? t('tables.occupied') : t('tables.available')}
             </Badge>
+            {isOccupied && <SyncStatusBadge tableName={table.name} />}
             <TableActionsMenu
               table={table}
               isOpen={menuOpen}

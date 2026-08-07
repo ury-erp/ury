@@ -2,14 +2,15 @@ import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import 'fake-indexeddb/auto';
 import { call, repositories, projectionBus } from '@ury/core';
-import { syncOrder, cancelOrder, releaseTableAfterPayment, queueOfflinePayment, type SyncOrderData } from '../order-api';
-import { updatePrintStatus, getPOSInvoices } from '../invoice-api';
+import { syncOrder, cancelOrder, releaseTableAfterPayment, queueOfflinePayment, splitBill, type SyncOrderData } from '../order-api';
+import { updatePrintStatus, getPOSInvoices, getSplitGroup } from '../invoice-api';
 
 const baseOrderData = (overrides: Partial<SyncOrderData> = {}): SyncOrderData => ({
   order_type: 'Dine-In',
   no_of_pax: 2,
   items: [{ item: 'ITEM-001', item_name: 'Test Item', rate: 100, qty: 1 }],
   pos_profile: 'Test Profile',
+  mode_of_payment: 'Cash',
   ...overrides,
 });
 
@@ -86,7 +87,7 @@ test('offline preview of unbilled table order preserves Unbilled status and Occu
     status: 'Unbilled',
     invoice_printed: 0,
     sync_status: 'pending',
-    items: [{ item: 'ITEM-001', item_name: 'Test Item', rate: 100, qty: 1 }],
+    items: [{ item: 'ITEM-001', item_name: 'Test Item', rate: 100, qty: 1, amount: 100 }],
   });
 
   const originalPost = call.post;
@@ -122,7 +123,7 @@ test('offline print queues QZ_PRINT_UPDATE and transitions order to Draft', asyn
     status: 'Unbilled',
     invoice_printed: 0,
     sync_status: 'pending',
-    items: [{ item: 'ITEM-001', item_name: 'Test Item', rate: 100, qty: 1 }],
+    items: [{ item: 'ITEM-001', item_name: 'Test Item', rate: 100, qty: 1, amount: 100 }],
   });
 
   const { events } = captureEvents();
@@ -189,7 +190,7 @@ test('cancelOrder offline marks order Cancelled, releases table, and emits proje
     status: 'Unbilled',
     invoice_printed: 0,
     sync_status: 'pending',
-    items: [{ item: 'ITEM-001', item_name: 'Test Item', rate: 100, qty: 1 }],
+    items: [{ item: 'ITEM-001', item_name: 'Test Item', rate: 100, qty: 1, amount: 100 }],
   });
 
   const { events } = captureEvents();
@@ -221,6 +222,63 @@ test('cancelOrder offline marks order Cancelled, releases table, and emits proje
   }
 });
 
+test('cancelOrder offline releases the full merged table cluster', async () => {
+  await repositories.tables.put({
+    name: 'T-CLUSTER-ANCHOR',
+    restaurant_room: 'Main Hall',
+    no_of_seats: 4,
+    occupied: 1,
+    merged_with: 'T-CLUSTER-P1,T-CLUSTER-P2',
+  });
+  await repositories.tables.put({
+    name: 'T-CLUSTER-P1',
+    restaurant_room: 'Main Hall',
+    no_of_seats: 4,
+    occupied: 1,
+    merged_with: 'T-CLUSTER-ANCHOR',
+  });
+  await repositories.tables.put({
+    name: 'T-CLUSTER-P2',
+    restaurant_room: 'Main Hall',
+    no_of_seats: 4,
+    occupied: 1,
+    merged_with: 'T-CLUSTER-ANCHOR',
+  });
+
+  await repositories.orders.put({
+    ...baseOrderEntity(),
+    id: 'POS-INV-CLUSTER-CANCEL',
+    table: 'T-CLUSTER-ANCHOR',
+    status: 'Unbilled',
+    invoice_printed: 0,
+    sync_status: 'synced',
+    items: [{ item: 'ITEM-001', item_name: 'Test Item', rate: 100, qty: 1, amount: 100 }],
+  });
+
+  const originalPost = call.post;
+  (call as any).post = async () => {
+    throw new Error('Network Disconnected');
+  };
+
+  try {
+    const result = await cancelOrder(
+      { name: 'POS-INV-CLUSTER-CANCEL', restaurant_table: 'T-CLUSTER-ANCHOR' },
+      'Party cancelled'
+    );
+
+    assert.equal(result.success, true);
+    assert.equal(result.queued, true);
+
+    for (const tableName of ['T-CLUSTER-ANCHOR', 'T-CLUSTER-P1', 'T-CLUSTER-P2']) {
+      const t = await repositories.tables.getById(tableName);
+      assert.equal(t?.occupied, 0, `${tableName} should be released`);
+      assert.equal(t?.merged_with, null, `${tableName} merge link should be cleared`);
+    }
+  } finally {
+    (call as any).post = originalPost;
+  }
+});
+
 test('cancelOrder offline enqueues cancel_order command with dependency for temp ID', async () => {
   await seedTable('T-CANCEL-002', 1);
   await repositories.orders.put({
@@ -247,9 +305,17 @@ test('cancelOrder offline enqueues cancel_order command with dependency for temp
     const queued = await repositories.syncQueue.getById('CANCEL-ORDER-TEMP-ORD-CANCEL-002');
     assert.ok(queued);
     assert.equal(queued?.action, 'cancel_order');
+    assert.equal(queued?.operation_type, 'DELETE_ORDER');
     assert.deepEqual(queued?.dependency_ids, ['SYNC-ORDER-TEMP-ORD-CANCEL-002']);
-    assert.equal((queued?.payload as any)?.invoice_id, 'TEMP-ORD-CANCEL-002');
-    assert.equal((queued?.payload as any)?.reason, 'No show');
+    assert.equal(queued?.temporary_id, 'TEMP-ORD-CANCEL-002');
+    assert.equal(queued?.entity_id, 'TEMP-ORD-CANCEL-002');
+    assert.ok(queued?.idempotency_key);
+
+    const payload = queued?.payload as any;
+    assert.equal(payload.invoice_id, 'TEMP-ORD-CANCEL-002');
+    assert.equal(payload.reason, 'No show');
+    assert.equal(payload.table, undefined, 'Payload must not include extra table key');
+    assert.equal(payload.idempotency_key, undefined, 'Idempotency key lives on envelope only');
   } finally {
     (call as any).post = originalPost;
   }
@@ -266,6 +332,8 @@ test('cancelOrder online succeeds without queueing', async () => {
     items: [],
   });
 
+  const { events } = captureEvents();
+
   const originalPost = call.post;
   (call as any).post = async () => ({ message: { status: 'Cancelled' } });
 
@@ -276,6 +344,15 @@ test('cancelOrder online succeeds without queueing', async () => {
     );
     assert.equal(result.success, true);
     assert.equal(result.queued, false);
+
+    const local = await repositories.orders.getById('POS-INV-CANCEL-003');
+    assert.equal(local?.status, 'Cancelled');
+
+    const table = await repositories.tables.getById('T-CANCEL-003');
+    assert.equal(table?.occupied, 0);
+
+    assert.ok(events.includes('ORDERS_UPDATED'));
+    assert.ok(events.includes('TABLES_UPDATED'));
 
     const queued = await repositories.syncQueue.getById('CANCEL-ORDER-POS-INV-CANCEL-003');
     assert.equal(queued, undefined);
@@ -309,6 +386,13 @@ test('cancelOrder offline for server invoice has no temp dependency', async () =
     const queued = await repositories.syncQueue.getById('CANCEL-ORDER-POS-INV-CANCEL-004');
     assert.ok(queued);
     assert.deepEqual(queued?.dependency_ids, []);
+    assert.equal(queued?.temporary_id, null);
+    assert.equal(queued?.entity_id, 'POS-INV-CANCEL-004');
+
+    const payload = queued?.payload as any;
+    assert.equal(payload.invoice_id, 'POS-INV-CANCEL-004');
+    assert.equal(payload.reason, 'Customer request');
+    assert.equal(payload.table, undefined, 'Payload must not include extra table key');
   } finally {
     (call as any).post = originalPost;
   }
@@ -386,7 +470,7 @@ test('offline Aggregator order creation stores Draft with custom_aggregator_id a
       customer: 'Swiggy',
       aggregator_id: 'Swiggy',
       no_of_pax: 1,
-      invoice: null,
+      invoice: undefined,
     }));
 
     assert.equal(result.status, 'Draft');
@@ -518,5 +602,218 @@ test('online sync of paid temp Aggregator order promotes to Paid server record p
     assert.equal(server?.sync_status, 'synced');
   } finally {
     (call as any).post = originalPost;
+  }
+});
+
+
+function setNavigatorOnline(online: boolean) {
+  Object.defineProperty(globalThis, 'navigator', {
+    value: { onLine: online },
+    configurable: true,
+    writable: true,
+  });
+}
+
+test('splitBill offline creates local child, updates source, and queues split_bill command', async () => {
+  const sourceId = 'POS-INV-SPLIT-LOCAL-001';
+
+  await repositories.orders.put({
+    ...baseOrderEntity(),
+    id: sourceId,
+    table: 'T-SPLIT-001',
+    status: 'Draft',
+    sync_status: 'synced',
+    items: [
+      { item: 'A', item_name: 'Item A', rate: 100, qty: 2, amount: 200 },
+      { item: 'B', item_name: 'Item B', rate: 50, qty: 1, amount: 50 },
+    ],
+    grand_total: 250,
+  });
+
+  setNavigatorOnline(false);
+
+  try {
+    const result = await splitBill(sourceId, [{ name: 'A', qty: 1 }]);
+
+    assert.ok(result.new_invoice.startsWith('TEMP-SPLIT-'));
+    assert.equal(result.source_invoice, sourceId);
+
+    const source = await repositories.orders.getById(sourceId);
+    assert.ok(source);
+    assert.equal(source.items.length, 2);
+    assert.equal(source.items[0].qty, 1);
+    assert.equal(source.items[0].amount, 100);
+    assert.equal(source.items[1].qty, 1);
+    assert.equal(source.grand_total, 150);
+    assert.ok(source.custom_split_group);
+    assert.equal(source.split_index, 1);
+    assert.equal(source.split_total, 2);
+
+    const child = await repositories.orders.getById(result.new_invoice);
+    assert.ok(child);
+    assert.equal(child.items.length, 1);
+    assert.equal(child.items[0].qty, 1);
+    assert.equal(child.items[0].amount, 100);
+    assert.equal(child.grand_total, 100);
+    assert.equal(child.custom_split_from, sourceId);
+    assert.equal(child.custom_split_group, source.custom_split_group);
+    assert.equal(child.split_index, 2);
+    assert.equal(child.split_total, 2);
+    assert.equal(child.sync_status, 'pending');
+
+    const cmds = await repositories.syncQueue.getAll();
+    const splitCmds = cmds.filter(
+      c =>
+        c.action === 'SplitBillCommand' ||
+        c.operation_type === 'SPLIT_BILL' ||
+        c.endpoint?.includes('split_bill')
+    );
+    assert.equal(splitCmds.length, 1);
+    assert.equal((splitCmds[0]?.payload as any)?.source_invoice, sourceId);
+    assert.deepEqual((splitCmds[0]?.payload as any)?.items_to_move, [{ name: 'A', qty: 1 }]);
+    assert.equal(splitCmds[0]?.temporary_id, result.new_invoice);
+    assert.equal(splitCmds[0]?.entity_id, sourceId);
+    assert.deepEqual(splitCmds[0]?.dependency_ids, []);
+  } finally {
+    setNavigatorOnline(true);
+  }
+});
+
+test('splitBill offline for temp source depends on parent sync_order', async () => {
+  const tempId = 'TEMP-ORD-SPLIT-LOCAL-002';
+
+  await repositories.orders.put({
+    ...baseOrderEntity(),
+    id: tempId,
+    table: 'T-SPLIT-002',
+    status: 'Unbilled',
+    sync_status: 'pending',
+    items: [{ item: 'A', item_name: 'Item A', rate: 100, qty: 2, amount: 200 }],
+    grand_total: 200,
+  });
+
+  setNavigatorOnline(false);
+
+  try {
+    const result = await splitBill(tempId, [{ name: 'A', qty: 1 }]);
+
+    assert.ok(result.new_invoice.startsWith('TEMP-SPLIT-'));
+
+    const cmds = await repositories.syncQueue.getAll();
+    const splitCmds = cmds.filter(
+      c =>
+        c.action === 'SplitBillCommand' ||
+        c.operation_type === 'SPLIT_BILL' ||
+        c.endpoint?.includes('split_bill')
+    );
+    assert.equal(splitCmds.length, 1);
+    assert.deepEqual(splitCmds[0]?.dependency_ids, [`SYNC-ORDER-${tempId}`]);
+
+    const child = await repositories.orders.getById(result.new_invoice);
+    assert.equal(child?.pending_command_id, splitCmds[0]?.id);
+  } finally {
+    setNavigatorOnline(true);
+  }
+});
+
+test('splitBill online failure falls back to offline split', async () => {
+  const sourceId = 'POS-INV-SPLIT-FAIL-003';
+
+  await repositories.orders.put({
+    ...baseOrderEntity(),
+    id: sourceId,
+    status: 'Draft',
+    sync_status: 'synced',
+    items: [{ item: 'A', item_name: 'Item A', rate: 100, qty: 2, amount: 200 }],
+    grand_total: 200,
+  });
+
+  setNavigatorOnline(true);
+
+  const originalPost = call.post;
+  (call as any).post = async () => {
+    throw new Error('Server unreachable');
+  };
+
+  try {
+    const result = await splitBill(sourceId, [{ name: 'A', qty: 1 }]);
+
+    assert.ok(result.new_invoice.startsWith('TEMP-SPLIT-'));
+
+    const source = await repositories.orders.getById(sourceId);
+    assert.equal(source?.items[0].qty, 1);
+
+    const cmds = await repositories.syncQueue.getAll();
+    const splitCmds = cmds.filter(
+      c =>
+        c.action === 'SplitBillCommand' ||
+        c.operation_type === 'SPLIT_BILL' ||
+        c.endpoint?.includes('split_bill')
+    );
+    assert.equal(splitCmds.length, 1);
+  } finally {
+    (call as any).post = originalPost;
+    setNavigatorOnline(true);
+  }
+});
+
+test('getSplitGroup offline fallback returns local split members', async () => {
+  const sourceId = 'POS-INV-SPLIT-GROUP-001';
+  const childId = 'POS-INV-SPLIT-GROUP-002';
+  const groupId = 'SG-LOCAL-001';
+
+  await repositories.orders.put({
+    ...baseOrderEntity(),
+    id: sourceId,
+    table: 'T-SPLIT-GROUP-001',
+    status: 'Draft',
+    sync_status: 'synced',
+    custom_split_group: groupId,
+    split_index: 1,
+    split_total: 2,
+    split_siblings: [childId],
+    items: [{ item: 'A', item_name: 'Item A', rate: 100, qty: 1, amount: 100 }],
+    grand_total: 100,
+  });
+
+  await repositories.orders.put({
+    ...baseOrderEntity(),
+    id: childId,
+    table: 'T-SPLIT-GROUP-001',
+    status: 'Draft',
+    sync_status: 'synced',
+    custom_split_group: groupId,
+    custom_split_from: sourceId,
+    split_index: 2,
+    split_total: 2,
+    split_siblings: [sourceId],
+    items: [{ item: 'B', item_name: 'Item B', rate: 50, qty: 1, amount: 50 }],
+    grand_total: 50,
+  });
+
+  const originalGet = call.get;
+  (call as any).get = async () => {
+    throw new Error('offline');
+  };
+
+  try {
+    const group = await getSplitGroup(sourceId);
+
+    assert.equal(group.group, groupId);
+    assert.equal(group.current, sourceId);
+    assert.equal(group.invoices.length, 2);
+
+    const original = group.invoices.find(i => i.is_original);
+    assert.ok(original);
+    assert.equal(original?.name, sourceId);
+    assert.equal(original?.split_index, 1);
+    assert.equal(original?.split_total, 2);
+
+    const child = group.invoices.find(i => !i.is_original);
+    assert.ok(child);
+    assert.equal(child?.name, childId);
+    assert.equal(child?.split_index, 2);
+  } finally {
+    (call as any).get = originalGet;
   }
 });
