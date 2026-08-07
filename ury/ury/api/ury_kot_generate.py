@@ -320,7 +320,7 @@ def create_cancel_kot_doc(
 
 
 # Whitelisted function to handle KOT entry
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def kot_execute(
     invoice_id,
     customer,

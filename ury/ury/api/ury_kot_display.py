@@ -6,7 +6,7 @@ from frappe.utils import get_datetime
 
 
 # Function to set order status in a KOT document
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def serve_kot(name, time):
     current_time = get_datetime()
     creation_time = frappe.db.get_value("URY KOT",name,"creation")
@@ -19,7 +19,7 @@ def serve_kot(name, time):
 
 
 # Function to mark it as verified by a user in cancel type KOT
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def confirm_cancel_kot(name, user):
     frappe.db.set_value("URY KOT", name, "verified", 1)
     frappe.db.set_value("URY KOT", name, "verified_by", user)

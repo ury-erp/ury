@@ -850,7 +850,7 @@ def getAggregatorMOP(aggregator):
             {"mode_of_payment": modeOfPayment, "opening_amount": float(0)}
     )
     return modeOfPaymentsList
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def create_customer(customer_name, mobile_number=None, customer_group="Individual", territory="India"):
     if not customer_name:
         frappe.throw("Customer name is required")
@@ -921,7 +921,7 @@ def validate_pos_close(pos_profile):
     return "Success"
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def merge_bills(primary_invoice, secondary_invoice):
 
     try:
