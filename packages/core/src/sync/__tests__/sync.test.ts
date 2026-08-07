@@ -1932,3 +1932,328 @@ test('Scenario 12: Offline split of a temp source waits for parent sync_order an
     (call as any).get = originalGet;
   }
 });
+
+
+test('Scenario 15: SyncEngine clears merged linkages and releases cluster after merged payment', async () => {
+  const PRIMARY_ID = 'POS-INV-MERGE-PAY-SYNC-001';
+  const SECONDARY_ID = 'POS-INV-MERGE-PAY-SYNC-002';
+
+  await repos.tables.put({
+    name: 'T-MERGE-PAY-SYNC-001',
+    restaurant_room: 'Main Hall',
+    no_of_seats: 4,
+    occupied: 1,
+    merged_with: 'T-MERGE-PAY-SYNC-002',
+  });
+  await repos.tables.put({
+    name: 'T-MERGE-PAY-SYNC-002',
+    restaurant_room: 'Main Hall',
+    no_of_seats: 4,
+    occupied: 1,
+    merged_with: 'T-MERGE-PAY-SYNC-001',
+  });
+
+  await repos.orders.put({
+    ...baseOrder,
+    id: PRIMARY_ID,
+    table: 'T-MERGE-PAY-SYNC-001',
+    status: 'Draft',
+    sync_status: 'synced',
+    custom_merged_pos_invoice: SECONDARY_ID,
+    custom_merged_total: 200,
+    custom_merged_pos_invoice_details: [{ item: 'B', item_name: 'Item B', rate: 200, qty: 1, amount: 200 }],
+    items: [{ item: 'A', item_name: 'Item A', rate: 100, qty: 1, amount: 100 }],
+    grand_total: 100,
+  });
+
+  await repos.orders.put({
+    ...baseOrder,
+    id: SECONDARY_ID,
+    table: 'T-MERGE-PAY-SYNC-002',
+    status: 'Draft',
+    sync_status: 'synced',
+    custom_merged_pos_invoice: PRIMARY_ID,
+    custom_merged_total: 100,
+    custom_merged_pos_invoice_details: [{ item: 'A', item_name: 'Item A', rate: 100, qty: 1, amount: 100 }],
+    items: [{ item: 'B', item_name: 'Item B', rate: 200, qty: 1, amount: 200 }],
+    grand_total: 200,
+  });
+
+  await repos.syncQueue.put({
+    id: 'SYNC-PAYMENT-MERGE-001',
+    action: 'make_invoice',
+    endpoint: 'ury.ury.doctype.ury_order.ury_order.make_invoice',
+    payload: { invoice: PRIMARY_ID, payments: [{ mode_of_payment: 'Cash', amount: 100 }] },
+    timestamp: new Date().toISOString(),
+    status: 'PENDING',
+    priority: 1,
+  });
+
+  const originalPost = call.post;
+  (call as any).post = async () => ({ name: PRIMARY_ID });
+
+  const events: string[] = [];
+  const unsubscribe = projectionBus.subscribe(event => events.push(event));
+
+  try {
+    const engine = new SyncEngine(queueMgr, idMapper, undefined, { repositories: repos });
+    const result = await engine.triggerSync();
+
+    assert.equal(result.processed, 1);
+    assert.equal(result.succeeded, 1);
+
+    const primary = await repos.orders.getById(PRIMARY_ID);
+    const secondary = await repos.orders.getById(SECONDARY_ID);
+
+    assert.equal(primary?.status, 'Paid');
+    assert.equal(primary?.custom_merged_pos_invoice, null);
+    assert.equal(primary?.custom_merged_total, null);
+
+    assert.equal(secondary?.status, 'Paid');
+    assert.equal(secondary?.custom_merged_pos_invoice, null);
+    assert.equal(secondary?.custom_merged_total, null);
+
+    for (const tableName of ['T-MERGE-PAY-SYNC-001', 'T-MERGE-PAY-SYNC-002']) {
+      const t = await repos.tables.getById(tableName);
+      assert.equal(t?.occupied, 0, `${tableName} should be released`);
+      assert.equal(t?.merged_with, null, `${tableName} merge link should be cleared`);
+    }
+
+    assert.ok(events.includes('ORDERS_UPDATED'));
+    assert.ok(events.includes('TABLES_UPDATED'));
+  } finally {
+    (call as any).post = originalPost;
+    unsubscribe();
+  }
+});
+
+
+// ============================================================================
+// Post-Sync Reconciliation & Offline Split Parity (Task 7)
+// ============================================================================
+
+test('Scenario 16: Post-sync reconciliation purges temp orders and releases table occupancy', async () => {
+  const TEMP_ID = 'TEMP-ORD-RECON-001';
+  const SERVER_ID = 'POS-INV-RECON-001';
+  const TABLE_NAME = 'T-RECON-001';
+
+  await repos.tables.put({
+    name: TABLE_NAME,
+    restaurant_room: 'Main Hall',
+    no_of_seats: 4,
+    occupied: 1,
+  });
+
+  await repos.orders.put({
+    ...baseOrder,
+    id: TEMP_ID,
+    table: TABLE_NAME,
+    order_type: 'Dine-In',
+    status: 'Paid',
+    sync_status: 'pending',
+    items: [{ item: 'A', item_name: 'Item A', rate: 100, qty: 1, amount: 100 }],
+    grand_total: 100,
+  });
+
+  await repos.syncQueue.put({
+    id: `SYNC-ORDER-${TEMP_ID}`,
+    action: 'sync_order',
+    endpoint: 'ury.ury.doctype.ury_order.ury_order.sync_order',
+    payload: { temp_id: TEMP_ID, items: [] },
+    timestamp: new Date().toISOString(),
+    status: 'COMPLETED',
+    priority: 1,
+  });
+
+  // Register the mapping but leave the temp record and occupied table untouched
+  // to simulate a partial/stale local state.
+  await idMapper.registerMapping(TEMP_ID, SERVER_ID);
+
+  const events: string[] = [];
+  const unsubscribe = projectionBus.subscribe(event => events.push(event));
+
+  const engine = new SyncEngine(queueMgr, idMapper, undefined, { repositories: repos });
+  try {
+    const result = await engine.triggerSync();
+    assert.equal(result.processed, 0, 'No pending commands to process');
+
+    const tempOrder = await repos.orders.getById(TEMP_ID);
+    assert.equal(tempOrder, undefined, 'Stale temp order should be purged by reconcileLocalStateWithServer');
+
+    const table = await repos.tables.getById(TABLE_NAME);
+    assert.equal(table?.occupied, 0, 'Table should be released when no active orders remain');
+    assert.equal(table?.latest_invoice_time, null, 'Table latest_invoice_time should be cleared');
+
+    assert.ok(events.includes('ORDERS_UPDATED'), 'Reconciliation should emit ORDERS_UPDATED');
+    assert.ok(events.includes('TABLES_UPDATED'), 'Reconciliation should emit TABLES_UPDATED');
+  } finally {
+    unsubscribe();
+  }
+});
+
+test('Scenario 17: Offline split sync promotes child temp ID, rewrites split metadata, and leaves zero stale records', async () => {
+  const SOURCE_ID = 'POS-INV-SPLIT-RECON-001';
+  const CHILD_TEMP_ID = 'TEMP-SPLIT-RECON-001';
+  const CHILD_SERVER_ID = 'POS-INV-SPLIT-RECON-002';
+  const TABLE_NAME = 'T-SPLIT-RECON-001';
+
+  await repos.tables.put({
+    name: TABLE_NAME,
+    restaurant_room: 'Main Hall',
+    no_of_seats: 4,
+    occupied: 1,
+  });
+
+  await repos.orders.put({
+    ...baseOrder,
+    id: SOURCE_ID,
+    table: TABLE_NAME,
+    order_type: 'Dine-In',
+    status: 'Draft',
+    sync_status: 'synced',
+    custom_split_group: 'TEMP-SG-RECON-001',
+    split_index: 1,
+    split_total: 2,
+    split_siblings: [SOURCE_ID, CHILD_TEMP_ID],
+    items: [
+      { name: 'ROW-1', item: 'ITEM-A', item_name: 'Item A', rate: 100, qty: 1, amount: 100 },
+      { name: 'ROW-2', item: 'ITEM-B', item_name: 'Item B', rate: 50, qty: 1, amount: 50 },
+    ],
+    grand_total: 150,
+  });
+
+  await repos.orders.put({
+    ...baseOrder,
+    id: CHILD_TEMP_ID,
+    table: TABLE_NAME,
+    order_type: 'Dine-In',
+    status: 'Draft',
+    sync_status: 'pending',
+    custom_split_group: 'TEMP-SG-RECON-001',
+    custom_split_from: SOURCE_ID,
+    split_index: 2,
+    split_total: 2,
+    split_siblings: [SOURCE_ID, CHILD_TEMP_ID],
+    pending_command_id: 'SYNC-SPLIT-RECON-001',
+    items: [{ name: 'ROW-1', item: 'ITEM-A', item_name: 'Item A', rate: 100, qty: 1, amount: 100 }],
+    grand_total: 100,
+  });
+
+  await repos.syncQueue.put({
+    id: 'SYNC-SPLIT-RECON-001',
+    action: 'SplitBillCommand',
+    operation_type: 'SPLIT_BILL',
+    endpoint: 'ury.ury.doctype.ury_order.ury_order.split_bill',
+    payload: {
+      source_invoice: SOURCE_ID,
+      items_to_move: [{ name: 'ROW-1', qty: 1 }],
+    },
+    temporary_id: CHILD_TEMP_ID,
+    entity_id: SOURCE_ID,
+    timestamp: new Date().toISOString(),
+    status: 'PENDING',
+    priority: 1,
+  });
+
+  // A payment queued against the temp child should be patched to the real server ID.
+  await repos.syncQueue.put({
+    id: 'SYNC-PAYMENT-CHILD-RECON-001',
+    action: 'make_invoice',
+    endpoint: 'ury.ury.doctype.ury_order.ury_order.make_invoice',
+    payload: {
+      invoice: CHILD_TEMP_ID,
+      payments: [{ mode_of_payment: 'Cash', amount: 100 }],
+    },
+    dependency_ids: ['SYNC-SPLIT-RECON-001'],
+    timestamp: new Date().toISOString(),
+    status: 'PENDING',
+    priority: 1,
+  });
+
+  const originalPost = call.post;
+  const postedPayloads: any[] = [];
+  (call as any).post = async (endpoint: string, payload: any) => {
+    postedPayloads.push({ endpoint, payload });
+    if (endpoint.includes('split_bill')) {
+      return { new_invoice: CHILD_SERVER_ID };
+    }
+    if (endpoint.includes('make_invoice')) {
+      return { name: payload.invoice };
+    }
+    return {};
+  };
+
+  const originalGet = call.get;
+  (call as any).get = async () => ({
+    message: {
+      group: 'SG-RECON-001',
+      current: CHILD_SERVER_ID,
+      invoices: [
+        {
+          name: SOURCE_ID,
+          custom_split_from: null,
+          split_index: 1,
+          split_total: 2,
+          split_siblings: [CHILD_SERVER_ID],
+          customer: 'Guest',
+          grand_total: 150,
+          invoice_printed: 0,
+          restaurant_table: TABLE_NAME,
+          status: 'Draft',
+        },
+        {
+          name: CHILD_SERVER_ID,
+          custom_split_from: SOURCE_ID,
+          split_index: 2,
+          split_total: 2,
+          split_siblings: [SOURCE_ID],
+          customer: 'Guest',
+          grand_total: 100,
+          invoice_printed: 0,
+          restaurant_table: TABLE_NAME,
+          status: 'Draft',
+        },
+      ],
+    },
+  });
+
+  try {
+    const engine = new SyncEngine(queueMgr, idMapper, undefined, { repositories: repos });
+    const result = await engine.triggerSync();
+
+    assert.equal(result.processed, 2, 'split_bill and dependent make_invoice should process');
+    assert.equal(result.succeeded, 2, 'Both commands should succeed');
+
+    const payPosted = postedPayloads.find(p => p.endpoint.includes('make_invoice'));
+    assert.ok(payPosted);
+    assert.equal(payPosted.payload.invoice, CHILD_SERVER_ID, 'Child payment must use server ID after patch');
+
+    const source = await repos.orders.getById(SOURCE_ID);
+    assert.ok(source);
+    assert.equal(source.custom_split_group, 'SG-RECON-001');
+    assert.ok(source.split_siblings?.includes(CHILD_SERVER_ID), 'Source siblings must reference server child ID');
+    assert.ok(!source.split_siblings?.includes(CHILD_TEMP_ID), 'Source siblings must not reference temp child ID');
+
+    const child = await repos.orders.getById(CHILD_SERVER_ID);
+    assert.ok(child, 'Child should be promoted to server ID');
+    assert.equal(child.custom_split_from, SOURCE_ID);
+    assert.equal(child.custom_split_group, 'SG-RECON-001');
+    assert.equal(child.split_index, 2);
+    assert.equal(child.split_total, 2);
+    assert.equal(child.sync_status, 'synced');
+
+    const tempChild = await repos.orders.getById(CHILD_TEMP_ID);
+    assert.equal(tempChild, undefined, 'TEMP-SPLIT child should be removed after promotion');
+
+    const remainingQueue = await repos.syncQueue.getAll();
+    assert.equal(remainingQueue.length, 0, 'Completed commands should be purged');
+
+    // Simulate going offline again and verify no stale temp records resurface.
+    const orders = await repos.orders.getAll();
+    const staleTempOrders = orders.filter(o => o.id.startsWith('TEMP-'));
+    assert.equal(staleTempOrders.length, 0, 'No stale temp orders should remain after sync');
+  } finally {
+    (call as any).post = originalPost;
+    (call as any).get = originalGet;
+  }
+});

@@ -290,6 +290,15 @@ export class SyncEngine {
       console.error('[SyncEngine] Post-sync cleanup failed:', cleanupErr);
     }
 
+    // Final reconciliation pass: ensure IndexedDB is a 1:1 mirror of server state
+    // by purging any leftover temp records, remapping stale split metadata, and
+    // releasing tables that no longer have active orders.
+    try {
+      await this.reconcileLocalStateWithServer();
+    } catch (reconcileErr) {
+      console.error('[SyncEngine] Post-sync reconciliation failed:', reconcileErr);
+    }
+
     return { processed, succeeded, failed };
   }
 
@@ -375,6 +384,17 @@ export class SyncEngine {
       }
       const { serverId, body: responseBody } = validation;
 
+      // Capture payment invoice id and merge-payment table cluster info before the
+      // transaction clears the order linkage.
+      let paidInvoiceId: string | undefined;
+      let mergedPaymentTables: string[] = [];
+      if (isPaymentCommand(env) || env.operation_type === 'PAY_ORDER') {
+        paidInvoiceId = (remappedPayload.invoice as string) || serverId;
+        if (paidInvoiceId) {
+          mergedPaymentTables = await this._getMergedPaymentTables(paidInvoiceId);
+        }
+      }
+
       // 5. Apply all command-completion side effects atomically. If any critical
       //    IndexedDB write fails, the entire completion rolls back and the command
       //    remains in a non-COMPLETED state.
@@ -389,6 +409,24 @@ export class SyncEngine {
       // Table page reflects the freed cluster without waiting for a full refresh.
       if (isCancelCommand(env) || env.operation_type === 'DELETE_ORDER') {
         await this._releaseTableClusterForCancelledOrder(remappedPayload, serverId);
+        projectionBus.emit('TABLES_UPDATED');
+      }
+
+      // Payment commands release table occupancy when no active orders remain.
+      if (paidInvoiceId) {
+        await this._reconcileTableOccupancyAfterPayment(paidInvoiceId);
+      }
+
+      // Merged bill payments release their cluster after the linkage is cleared.
+      if (mergedPaymentTables.length > 0) {
+        for (const table of mergedPaymentTables) {
+          try {
+            const clusterTables = await this.repos.tables.getClusterTables(table);
+            await this.repos.tables.releaseCluster(clusterTables);
+          } catch (err) {
+            console.warn(`[SyncEngine] Error releasing merge table cluster for ${table}:`, err);
+          }
+        }
         projectionBus.emit('TABLES_UPDATED');
       }
 
@@ -569,6 +607,10 @@ export class SyncEngine {
             );
           }
         }
+        // When a merged bill is paid, the backend `sync_merged_invoice` hook
+        // submits the linked invoice and the linkage is no longer active. Clear
+        // the local merge metadata so the UI stays consistent after sync.
+        await this._clearMergedOrderLinkagesAfterPayment(paidInvoiceId);
       }
     }
 
@@ -882,9 +924,94 @@ export class SyncEngine {
   }
 
   /**
+   * Clears the bidirectional merge linkage on order records after a merged
+   * invoice payment syncs. The partner invoice is marked Paid (matching the
+   * backend `sync_merged_invoice` hook behavior) and both records lose their
+   * merge metadata. This runs inside the atomic completion transaction; table
+   * cluster release happens outside the transaction.
+   */
+  private async _clearMergedOrderLinkagesAfterPayment(invoiceId: string): Promise<void> {
+    const order = await this.repos.orders.getById(invoiceId);
+    if (!order?.custom_merged_pos_invoice) return;
+
+    const partnerId = order.custom_merged_pos_invoice;
+    const partner = await this.repos.orders.getById(partnerId);
+    const now = new Date().toISOString();
+
+    if (partner) {
+      await this.repos.orders.put({
+        ...partner,
+        status: 'Paid',
+        is_locked: 1,
+        custom_merged_pos_invoice: null,
+        custom_merged_total: null,
+        custom_merged_pos_invoice_details: null,
+        updatedAt: now,
+      } as any);
+    }
+
+    await this.repos.orders.put({
+      ...order,
+      custom_merged_pos_invoice: null,
+      custom_merged_total: null,
+      custom_merged_pos_invoice_details: null,
+      updatedAt: now,
+    } as any);
+  }
+
+  /**
+   * Returns the distinct table names belonging to a merged invoice and its
+   * partner, captured before the merge linkage is cleared inside the completion
+   * transaction.
+   */
+  private async _getMergedPaymentTables(invoiceId: string): Promise<string[]> {
+    const order = await this.repos.orders.getById(invoiceId);
+    if (!order?.custom_merged_pos_invoice) return [];
+
+    const partner = await this.repos.orders.getById(order.custom_merged_pos_invoice);
+    const tables = new Set<string>();
+    if (order.table) tables.add(order.table);
+    if (partner?.table) tables.add(partner.table);
+    return Array.from(tables);
+  }
+
+  /**
+   * Releases a table after payment if no active (non-terminal) orders remain
+   * linked to it. This keeps local table occupancy in lock-step with the server
+   * when an invoice is paid offline and later synced.
+   */
+  private async _reconcileTableOccupancyAfterPayment(invoiceId: string): Promise<void> {
+    const order = await this.repos.orders.getById(invoiceId);
+    if (!order?.table) return;
+
+    const table = await this.repos.tables.getById(order.table);
+    if (!table) return;
+
+    // Include the merge cluster so a split/merged payment releases the cluster
+    // when all bills are settled.
+    const clusterTables = await this.repos.tables.getClusterTables(order.table);
+    const allOrders = await this.repos.orders.getAll();
+
+    const hasActiveOrder = clusterTables.some(tableName =>
+      allOrders.some(
+        o =>
+          o.table === tableName &&
+          o.status !== 'Paid' &&
+          o.status !== 'Cancelled'
+      )
+    );
+
+    if (!hasActiveOrder) {
+      await this.repos.tables.releaseCluster(clusterTables);
+      projectionBus.emit('TABLES_UPDATED');
+    }
+  }
+
+  /**
    * Promotes a locally-created TEMP-SPLIT-* child order to its real server invoice
-   * ID after split_bill succeeds. Preserves the local lifecycle status and clears
-   * the pending command link.
+   * ID after split_bill succeeds. Preserves the local lifecycle status, clears the
+   * pending command link, and rewrites split metadata so sibling references point
+   * to real server IDs instead of stale temp IDs.
    */
   private async _promoteSplitChild(
     tempId: string,
@@ -915,6 +1042,26 @@ export class SyncEngine {
       });
     } else {
       await this.repos.orders.put(promoted);
+    }
+
+    // Rewrite sibling references on the source invoice so they use the real server
+    // ID instead of the now-deleted temp child ID. This guarantees the RelatedBills
+    // panel and order cards stay consistent even when offline.
+    if (sourceInvoice) {
+      try {
+        const source = await this.repos.orders.getById(sourceInvoice);
+        if (source && source.split_siblings?.some(id => id === tempId)) {
+          source.split_siblings = Array.from(
+            new Set(
+              source.split_siblings.map(id => (id === tempId ? serverId : id))
+            )
+          );
+          source.updatedAt = new Date().toISOString();
+          await this.repos.orders.put(source);
+        }
+      } catch (sourceErr) {
+        console.warn('[SyncEngine] Error rewriting source split_siblings after child promotion:', sourceErr);
+      }
     }
 
     console.log(`[SyncEngine] Promoted split child ${tempId} -> ${serverId}`);
@@ -1029,6 +1176,103 @@ export class SyncEngine {
 
     // 3. Emit projection update so the UI refreshes and any cleared cards vanish.
     projectionBus.emit('ORDERS_UPDATED');
+  }
+
+  /**
+   * Final post-sync reconciliation pass. Complements the per-command side effects
+   * by ensuring the local IndexedDB snapshot is a 1:1 mirror of server state:
+   *   1. Any remaining TEMP-* order with a registered server mapping is deleted.
+   *   2. Split metadata references are rewritten from TEMP-* IDs to real server IDs.
+   *   3. Tables with no active (non-terminal) orders are released.
+   *
+   * This addresses stale cache regressions where reconnecting, syncing, and then
+   * going offline again surfaces old draft/temp records.
+   */
+  async reconcileLocalStateWithServer(): Promise<void> {
+    const localOrders = await this.repos.orders.getAll();
+    const allTables = await this.repos.tables.getAll();
+    let ordersChanged = false;
+    let tablesChanged = false;
+
+    // Build a map of known temp -> server mappings.
+    const mappings = new Map<string, string>();
+    for (const order of localOrders) {
+      if (order.id.startsWith('TEMP-')) {
+        const serverId = await this.idMapper.getServerId(order.id);
+        if (serverId && serverId !== order.id) {
+          mappings.set(order.id, serverId);
+        }
+      }
+    }
+
+    // 1. Delete any mapped TEMP-* orders that survived per-command cleanup.
+    for (const [tempId, serverId] of mappings) {
+      try {
+        const stillExists = await this.repos.orders.getById(tempId);
+        if (stillExists) {
+          await this.repos.orders.delete(tempId);
+          ordersChanged = true;
+          console.log(`[SyncEngine] Reconcile deleted temp order ${tempId} -> ${serverId}`);
+        }
+      } catch (delErr) {
+        console.warn(`[SyncEngine] Reconcile failed to delete temp order ${tempId}:`, delErr);
+      }
+    }
+
+    // 2. Rewrite split_siblings / custom_split_from references to use real server IDs.
+    for (const order of localOrders) {
+      let patched = false;
+      const patchedOrder = { ...order };
+
+      if (order.split_siblings?.length) {
+        const rewritten = order.split_siblings.map(id => mappings.get(id) || id);
+        if (rewritten.some((id, idx) => id !== order.split_siblings![idx])) {
+          patchedOrder.split_siblings = Array.from(new Set(rewritten));
+          patched = true;
+        }
+      }
+
+      if (order.custom_split_from && mappings.has(order.custom_split_from)) {
+        patchedOrder.custom_split_from = mappings.get(order.custom_split_from)!;
+        patched = true;
+      }
+
+      if (patched) {
+        try {
+          patchedOrder.updatedAt = new Date().toISOString();
+          await this.repos.orders.put(patchedOrder);
+          ordersChanged = true;
+        } catch (patchErr) {
+          console.warn(`[SyncEngine] Reconcile failed to patch split metadata for ${order.id}:`, patchErr);
+        }
+      }
+    }
+
+    // 3. Release table occupancy when no active orders remain on the table/cluster.
+    for (const table of allTables) {
+      if (table.occupied !== 1) continue;
+
+      const clusterTables = await this.repos.tables.getClusterTables(table.name);
+      const hasActiveOrder = localOrders.some(
+        o =>
+          o.table &&
+          clusterTables.includes(o.table) &&
+          o.status !== 'Paid' &&
+          o.status !== 'Cancelled'
+      );
+
+      if (!hasActiveOrder) {
+        try {
+          await this.repos.tables.releaseCluster(clusterTables);
+          tablesChanged = true;
+        } catch (releaseErr) {
+          console.warn(`[SyncEngine] Reconcile failed to release table cluster ${table.name}:`, releaseErr);
+        }
+      }
+    }
+
+    if (ordersChanged) projectionBus.emit('ORDERS_UPDATED');
+    if (tablesChanged) projectionBus.emit('TABLES_UPDATED');
   }
 
   /**

@@ -12,6 +12,7 @@ import {
 } from '@ury/core';
 import { resolveTempDependency } from './order-api';
 import { OrderStatusType, OrderType } from '../data/order-types';
+import { buildTableClusterMap, getMergedTablesCsv } from './table-utils';
 import type { Filter } from 'frappe-js-sdk/lib/db/types';
 
 export interface POSInvoice {
@@ -170,7 +171,10 @@ function deriveLifecycleStatus(order: OrderEntity): POSInvoice['status'] {
   return status as POSInvoice['status'];
 }
 
-function mapOrderEntityToPOSInvoice(order: OrderEntity): POSInvoice {
+function mapOrderEntityToPOSInvoice(
+  order: OrderEntity,
+  clusterMap?: Map<string, string[]>
+): POSInvoice {
   const createdDate = new Date(order.createdAt || Date.now());
   const postDate = isNaN(createdDate.getTime())
     ? new Date().toISOString().split('T')[0]
@@ -196,7 +200,7 @@ function mapOrderEntityToPOSInvoice(order: OrderEntity): POSInvoice {
     posting_date: postDate,
     rounded_total: order.grand_total || 0,
     order_type: (order.order_type as any) || 'Dine-In',
-    custom_merged_tables: null,
+    custom_merged_tables: getMergedTablesCsv(order.table, clusterMap),
     custom_restaurant_room: order.room || null,
     custom_split_group: order.custom_split_group ?? null,
     custom_split_from: order.custom_split_from ?? null,
@@ -288,6 +292,11 @@ export async function getPOSInvoices({
     // Fetch local pending orders from IndexedDB repository
     const pendingOrders = await repositories.orders.getAll();
     const localPending = pendingOrders.filter(o => o.sync_status === 'pending');
+
+    // Build a table-cluster map once so pending orders render the same merged
+    // table badge (`F1 + F5`) as server invoices.
+    const allTables = await repositories.tables.getAll();
+    const tableClusterMap = buildTableClusterMap(allTables as any);
 
     // Resolve any TEMP-* IDs to their real server IDs. If a temp order has already
     // been synced, it should not be merged as a duplicate under its temp ID.
@@ -439,7 +448,7 @@ export async function getPOSInvoices({
           posting_date: postDate,
           rounded_total: p.grand_total || 0,
           order_type: (p.order_type as any) || 'Dine-In',
-          custom_merged_tables: null,
+          custom_merged_tables: getMergedTablesCsv(p.table, tableClusterMap),
           custom_split_group: null,
           custom_split_from: null,
           custom_merged_pos_invoice: p.custom_merged_pos_invoice || null,
@@ -539,8 +548,11 @@ export async function getPOSInvoices({
       const start = limit_start || 0;
       const sliced = filtered.slice(start, start + (actualLimit || 10));
 
+      const allTables = await repositories.tables.getAll();
+      const clusterMap = buildTableClusterMap(allTables as any);
+
       return {
-        invoices: sliced.map(mapOrderEntityToPOSInvoice),
+        invoices: sliced.map(order => mapOrderEntityToPOSInvoice(order, clusterMap)),
         hasMore: start + sliced.length < filtered.length,
       };
     } catch (fallbackErr) {
@@ -720,29 +732,92 @@ async function cacheSplitGroupMetadata(group: SplitGroupResponse): Promise<void>
 
 async function buildLocalSplitGroup(invoiceId: string): Promise<SplitGroupResponse> {
   const invoice = await repositories.orders.getById(invoiceId);
-  if (!invoice || !invoice.custom_split_group) {
+  if (!invoice || (!invoice.custom_split_group && !(invoice.split_siblings?.length))) {
     return { invoices: [], current: invoiceId, group: null };
   }
 
+  const groupId = invoice.custom_split_group || null;
   const all = await repositories.orders.getAll();
-  const members = all.filter(o => o.custom_split_group === invoice.custom_split_group);
-  members.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
-  const group = invoice.custom_split_group;
+  const allTables = await repositories.tables.getAll();
+  const tableClusterMap = buildTableClusterMap(allTables as any);
 
-  const invoices: SplitGroupInvoice[] = members.map((o, idx) => {
-    const base = mapOrderEntityToPOSInvoice(o);
-    const isOriginal = !o.custom_split_from;
+  // Collect member IDs from the group id and from sibling references so
+  // missing server-side siblings are still represented in the group.
+  const memberIds = new Set<string>([invoiceId]);
+  if (groupId) {
+    for (const o of all) {
+      if (o.custom_split_group === groupId) {
+        memberIds.add(o.id);
+      }
+    }
+  }
+  for (const siblingId of invoice.split_siblings || []) {
+    memberIds.add(siblingId);
+  }
+
+  const memberList = Array.from(memberIds);
+  const memberMap = new Map<string, OrderEntity>();
+  for (const o of all) {
+    if (memberIds.has(o.id)) {
+      memberMap.set(o.id, o);
+    }
+  }
+
+  // Preserve server-provided ordering when split_index is stored; otherwise
+  // fall back to creation timestamp so the UI is stable.
+  memberList.sort((a, b) => {
+    const entityA = memberMap.get(a);
+    const entityB = memberMap.get(b);
+    const indexA = entityA?.split_index ?? 0;
+    const indexB = entityB?.split_index ?? 0;
+    if (indexA !== indexB && indexA > 0 && indexB > 0) {
+      return indexA - indexB;
+    }
+    const createdA = entityA?.createdAt || '';
+    const createdB = entityB?.createdAt || '';
+    return createdA.localeCompare(createdB) || a.localeCompare(b);
+  });
+
+  const splitTotal = invoice.split_total || memberList.length;
+
+  const invoices: SplitGroupInvoice[] = memberList.map((id, idx) => {
+    const entity = memberMap.get(id);
+    const base = entity
+      ? mapOrderEntityToPOSInvoice(entity, tableClusterMap)
+      : ({
+          name: id,
+          invoice_printed: 0,
+          grand_total: 0,
+          restaurant_table: null,
+          cashier: '',
+          waiter: '',
+          net_total: 0,
+          posting_time: '00:00:00',
+          total_taxes_and_charges: 0,
+          customer: 'Guest',
+          status: 'Draft',
+          mobile_number: '',
+          posting_date: new Date().toISOString().split('T')[0],
+          rounded_total: 0,
+          order_type: 'Dine-In',
+          custom_split_group: groupId,
+          custom_split_from: null,
+          split_index: idx + 1,
+          split_total: splitTotal,
+          split_siblings: memberList.filter(m => m !== id),
+        } as POSInvoice);
+    const isOriginal = entity ? !entity.custom_split_from : false;
     return {
       ...base,
-      split_index: idx + 1,
-      split_total: members.length,
+      split_index: entity?.split_index ?? idx + 1,
+      split_total: entity?.split_total ?? splitTotal,
       is_original: isOriginal,
-      docstatus: o.status === 'Paid' ? 1 : 0,
-      split_siblings: members.map(m => m.id).filter(id => id !== o.id),
+      docstatus: base.status === 'Paid' ? 1 : 0,
+      split_siblings: memberList.filter(m => m !== id),
     } as SplitGroupInvoice;
   });
 
-  return { invoices, current: invoiceId, group };
+  return { invoices, current: invoiceId, group: groupId };
 }
 
 export async function getSplitGroup(invoiceId: string): Promise<SplitGroupResponse> {

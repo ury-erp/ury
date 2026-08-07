@@ -4,6 +4,8 @@ import 'fake-indexeddb/auto';
 import { call, repositories, projectionBus } from '@ury/core';
 import { syncOrder, cancelOrder, releaseTableAfterPayment, queueOfflinePayment, splitBill, tableTransfer, getTableOrder, type SyncOrderData } from '../order-api';
 import { updatePrintStatus, getPOSInvoices, getSplitGroup } from '../invoice-api';
+import { printOrder } from '../print';
+import { formatMergedTableLabel } from '../table-utils';
 
 const baseOrderData = (overrides: Partial<SyncOrderData> = {}): SyncOrderData => ({
   order_type: 'Dine-In',
@@ -614,6 +616,14 @@ function setNavigatorOnline(online: boolean) {
   });
 }
 
+function setWindowMock() {
+  Object.defineProperty(globalThis, 'window', {
+    value: { open: () => undefined },
+    configurable: true,
+    writable: true,
+  });
+}
+
 test('splitBill offline creates local child, updates source, and queues split_bill command', async () => {
   const sourceId = 'POS-INV-SPLIT-LOCAL-001';
 
@@ -1035,6 +1045,458 @@ test('offline tableTransfer updates getTableOrder and getPOSInvoices fallbacks',
     assert.equal(transferred?.restaurant_table, 'T-DEST-004');
   } finally {
     (call as any).post = originalPost;
+    (call as any).get = originalGet;
+  }
+});
+
+test('offline payment of split child marks target Paid and leaves sibling Draft', async () => {
+  const sourceId = 'POS-INV-SPLIT-PAY-001';
+  const childId = 'POS-INV-SPLIT-PAY-002';
+  const groupId = 'SG-PAY-001';
+
+  await seedTable('T-SPLIT-PAY-001', 1);
+
+  await repositories.orders.put({
+    ...baseOrderEntity(),
+    id: sourceId,
+    table: 'T-SPLIT-PAY-001',
+    status: 'Draft',
+    sync_status: 'synced',
+    custom_split_group: groupId,
+    split_index: 1,
+    split_total: 2,
+    split_siblings: [childId],
+    items: [{ item: 'A', item_name: 'Item A', rate: 100, qty: 1, amount: 100 }],
+    grand_total: 100,
+  });
+
+  await repositories.orders.put({
+    ...baseOrderEntity(),
+    id: childId,
+    table: 'T-SPLIT-PAY-001',
+    status: 'Draft',
+    sync_status: 'synced',
+    custom_split_group: groupId,
+    custom_split_from: sourceId,
+    split_index: 2,
+    split_total: 2,
+    split_siblings: [sourceId],
+    items: [{ item: 'B', item_name: 'Item B', rate: 50, qty: 1, amount: 50 }],
+    grand_total: 50,
+  });
+
+  const { events, unsubscribe } = captureEvents();
+
+  await queueOfflinePayment({
+    invoice: childId,
+    customer: 'Guest',
+    cashier: 'cashier@example.com',
+    owner: 'cashier@example.com',
+    pos_profile: 'Test Profile',
+    table: 'T-SPLIT-PAY-001',
+    payments: [{ mode_of_payment: 'Cash', amount: 50 }],
+    additionalDiscount: null,
+  });
+
+  try {
+    const child = await repositories.orders.getById(childId);
+    assert.equal(child?.status, 'Paid');
+    assert.equal((child as any).is_locked, 1);
+
+    const source = await repositories.orders.getById(sourceId);
+    assert.equal(source?.status, 'Draft');
+
+    const table = await repositories.tables.getById('T-SPLIT-PAY-001');
+    assert.equal(table?.occupied, 1, 'shared table stays occupied while sibling is open');
+
+    assert.ok(events.includes('ORDERS_UPDATED'));
+  } finally {
+    unsubscribe();
+  }
+});
+
+test('offline payment of last split sibling releases shared table', async () => {
+  const sourceId = 'POS-INV-SPLIT-PAY-003';
+  const childId = 'POS-INV-SPLIT-PAY-004';
+  const groupId = 'SG-PAY-002';
+
+  await seedTable('T-SPLIT-PAY-002', 1);
+
+  await repositories.orders.put({
+    ...baseOrderEntity(),
+    id: sourceId,
+    table: 'T-SPLIT-PAY-002',
+    status: 'Paid',
+    sync_status: 'synced',
+    custom_split_group: groupId,
+    split_index: 1,
+    split_total: 2,
+    split_siblings: [childId],
+    items: [],
+    grand_total: 100,
+  });
+
+  await repositories.orders.put({
+    ...baseOrderEntity(),
+    id: childId,
+    table: 'T-SPLIT-PAY-002',
+    status: 'Draft',
+    sync_status: 'synced',
+    custom_split_group: groupId,
+    custom_split_from: sourceId,
+    split_index: 2,
+    split_total: 2,
+    split_siblings: [sourceId],
+    items: [],
+    grand_total: 50,
+  });
+
+  const { events, unsubscribe } = captureEvents();
+
+  await queueOfflinePayment({
+    invoice: childId,
+    customer: 'Guest',
+    cashier: 'cashier@example.com',
+    owner: 'cashier@example.com',
+    pos_profile: 'Test Profile',
+    table: 'T-SPLIT-PAY-002',
+    payments: [{ mode_of_payment: 'Cash', amount: 50 }],
+    additionalDiscount: null,
+  });
+
+  try {
+    const table = await repositories.tables.getById('T-SPLIT-PAY-002');
+    assert.equal(table?.occupied, 0, 'shared table is released when all splits are settled');
+    assert.ok(events.includes('TABLES_UPDATED'));
+  } finally {
+    unsubscribe();
+  }
+});
+
+test('offline payment of merged bill clears merge linkages and releases table cluster', async () => {
+  const primaryId = 'POS-INV-MERGE-PAY-001';
+  const secondaryId = 'POS-INV-MERGE-PAY-002';
+
+  await repositories.tables.put({
+    name: 'T-MERGE-PAY-001',
+    restaurant_room: 'Main Hall',
+    no_of_seats: 4,
+    occupied: 1,
+    merged_with: 'T-MERGE-PAY-002',
+  });
+  await repositories.tables.put({
+    name: 'T-MERGE-PAY-002',
+    restaurant_room: 'Main Hall',
+    no_of_seats: 4,
+    occupied: 1,
+    merged_with: 'T-MERGE-PAY-001',
+  });
+
+  await repositories.orders.put({
+    ...baseOrderEntity(),
+    id: primaryId,
+    table: 'T-MERGE-PAY-001',
+    status: 'Draft',
+    sync_status: 'synced',
+    custom_merged_pos_invoice: secondaryId,
+    custom_merged_total: 200,
+    custom_merged_pos_invoice_details: [{ item: 'B', item_name: 'Item B', rate: 200, qty: 1, amount: 200 }],
+    items: [{ item: 'A', item_name: 'Item A', rate: 100, qty: 1, amount: 100 }],
+    grand_total: 100,
+  });
+
+  await repositories.orders.put({
+    ...baseOrderEntity(),
+    id: secondaryId,
+    table: 'T-MERGE-PAY-002',
+    status: 'Draft',
+    sync_status: 'synced',
+    custom_merged_pos_invoice: primaryId,
+    custom_merged_total: 100,
+    custom_merged_pos_invoice_details: [{ item: 'A', item_name: 'Item A', rate: 100, qty: 1, amount: 100 }],
+    items: [{ item: 'B', item_name: 'Item B', rate: 200, qty: 1, amount: 200 }],
+    grand_total: 200,
+  });
+
+  const { events, unsubscribe } = captureEvents();
+
+  await queueOfflinePayment({
+    invoice: primaryId,
+    customer: 'Guest',
+    cashier: 'cashier@example.com',
+    owner: 'cashier@example.com',
+    pos_profile: 'Test Profile',
+    table: 'T-MERGE-PAY-001',
+    payments: [{ mode_of_payment: 'Cash', amount: 100 }],
+    additionalDiscount: null,
+  });
+
+  try {
+    const primary = await repositories.orders.getById(primaryId);
+    assert.equal(primary?.status, 'Paid');
+    assert.equal(primary?.custom_merged_pos_invoice, null);
+    assert.equal(primary?.custom_merged_total, null);
+
+    const secondary = await repositories.orders.getById(secondaryId);
+    assert.equal(secondary?.status, 'Paid');
+    assert.equal(secondary?.custom_merged_pos_invoice, null);
+    assert.equal(secondary?.custom_merged_total, null);
+
+    for (const tableName of ['T-MERGE-PAY-001', 'T-MERGE-PAY-002']) {
+      const t = await repositories.tables.getById(tableName);
+      assert.equal(t?.occupied, 0, `${tableName} should be released`);
+      assert.equal(t?.merged_with, null, `${tableName} merge link should be cleared`);
+    }
+
+    assert.ok(events.includes('ORDERS_UPDATED'));
+    assert.ok(events.includes('TABLES_UPDATED'));
+  } finally {
+    unsubscribe();
+  }
+});
+
+test('queueOfflinePayment for temp split child depends on split command', async () => {
+  const sourceId = 'POS-INV-SPLIT-PAY-TEMP-001';
+  const childTempId = 'TEMP-SPLIT-PAY-TEMP-002';
+  const splitCmdId = 'SYNC-SPLIT-PAY-TEMP-002';
+
+  await repositories.orders.put({
+    ...baseOrderEntity(),
+    id: sourceId,
+    status: 'Draft',
+    sync_status: 'synced',
+    custom_split_group: 'SG-TEMP-001',
+    split_index: 1,
+    split_total: 2,
+    split_siblings: [childTempId],
+    items: [{ item: 'A', item_name: 'Item A', rate: 100, qty: 2, amount: 200 }],
+    grand_total: 200,
+  });
+
+  await repositories.orders.put({
+    ...baseOrderEntity(),
+    id: childTempId,
+    status: 'Draft',
+    sync_status: 'pending',
+    custom_split_group: 'SG-TEMP-001',
+    custom_split_from: sourceId,
+    split_index: 2,
+    split_total: 2,
+    split_siblings: [sourceId],
+    pending_command_id: splitCmdId,
+    items: [{ item: 'A', item_name: 'Item A', rate: 100, qty: 1, amount: 100 }],
+    grand_total: 100,
+  });
+
+  await queueOfflinePayment({
+    invoice: childTempId,
+    customer: 'Guest',
+    cashier: 'cashier@example.com',
+    owner: 'cashier@example.com',
+    pos_profile: 'Test Profile',
+    table: null,
+    payments: [{ mode_of_payment: 'Cash', amount: 100 }],
+    additionalDiscount: null,
+  });
+
+  const cmds = await repositories.syncQueue.getAll();
+  const paymentCmd = cmds.find(c => c.action === 'make_invoice');
+  assert.ok(paymentCmd);
+  assert.deepEqual(paymentCmd?.dependency_ids, [splitCmdId]);
+  assert.equal(paymentCmd?.temporary_id, childTempId);
+});
+
+// ============================================================================
+// Merged Table Order Lookup & Display Parity (Task 9f)
+// ============================================================================
+
+const socketPosProfile = {
+  print_type: 'socket',
+  print_format: 'Standard POS Invoice',
+  name: 'Test POS Profile',
+  cashier: 'cashier@example.com',
+  multiple_cashier: 0,
+} as any;
+
+async function seedMergedCluster() {
+  await repositories.tables.put({
+    name: 'F1',
+    restaurant_room: 'Main Hall',
+    no_of_seats: 4,
+    occupied: 1,
+    merged_with: 'F5',
+  });
+  await repositories.tables.put({
+    name: 'F5',
+    restaurant_room: 'Main Hall',
+    no_of_seats: 4,
+    occupied: 1,
+    merged_with: 'F1',
+  });
+  await repositories.orders.put({
+    ...baseOrderEntity(),
+    id: 'POS-INV-F1-MASTER',
+    table: 'F1',
+    room: 'Main Hall',
+    status: 'Unbilled',
+    invoice_printed: 0,
+    sync_status: 'synced',
+    items: [{ item: 'ITEM-001', item_name: 'Test Item', rate: 100, qty: 1, amount: 100 }],
+    grand_total: 100,
+  });
+}
+
+test('offline getTableOrder(F5) returns master order for F1 with merged table metadata', async () => {
+  await seedMergedCluster();
+
+  const originalGet = call.get;
+  (call as any).get = async () => {
+    throw new Error('Network Disconnected');
+  };
+
+  try {
+    const master = await getTableOrder('F1');
+    assert.equal(master.message?.name, 'POS-INV-F1-MASTER');
+    assert.equal(master.message?.restaurant_table, 'F1');
+    assert.equal(master.message?.custom_merged_tables, 'F5');
+
+    const child = await getTableOrder('F5');
+    assert.equal(child.message?.name, 'POS-INV-F1-MASTER');
+    assert.equal(child.message?.restaurant_table, 'F1');
+    assert.equal(child.message?.custom_merged_tables, 'F5');
+
+    const tableLabel = formatMergedTableLabel(
+      child.message?.restaurant_table,
+      child.message?.custom_merged_tables
+    );
+    assert.equal(tableLabel, 'F1 + F5');
+  } finally {
+    (call as any).get = originalGet;
+  }
+});
+
+test('offline Print on merged child table F5 queues print for master order without error', async () => {
+  await seedMergedCluster();
+
+  const originalGet = call.get;
+  (call as any).get = async () => {
+    throw new Error('Network Disconnected');
+  };
+  const originalPost = call.post;
+  (call as any).post = async () => {
+    throw new Error('should not be called while offline');
+  };
+
+  setNavigatorOnline(false);
+  setWindowMock();
+
+  try {
+    const orderResponse = await getTableOrder('F5');
+    const invoiceId = orderResponse.message?.name;
+    assert.ok(invoiceId, 'getTableOrder should resolve master invoice from child table');
+
+    const result = await printOrder({ orderId: invoiceId, posProfile: socketPosProfile });
+    assert.equal(result.success, true);
+    assert.equal(result.status, 'queued');
+
+    const queued = await repositories.syncQueue.getById(`QZ-PRINT-${invoiceId}`);
+    assert.ok(queued, 'QZ_PRINT_UPDATE command should be queued for master invoice');
+    assert.equal(queued?.action, 'qz_print_update');
+    assert.deepEqual(queued?.dependency_ids, []);
+
+    const local = await repositories.orders.getById(invoiceId);
+    assert.equal(local?.status, 'Draft');
+    assert.equal(local?.invoice_printed, 1);
+  } finally {
+    (call as any).get = originalGet;
+    (call as any).post = originalPost;
+    setNavigatorOnline(true);
+  }
+});
+
+test('getPOSInvoices offline fallback formats merged table display string as F1 + F5', async () => {
+  await seedMergedCluster();
+
+  const originalGet = call.get;
+  (call as any).get = async () => {
+    throw new Error('offline');
+  };
+
+  try {
+    const result = await getPOSInvoices({ status: 'Unbilled' });
+    assert.equal(result.invoices.length, 1);
+    assert.equal(result.invoices[0].name, 'POS-INV-F1-MASTER');
+    assert.equal(result.invoices[0].restaurant_table, 'F1');
+    assert.equal(result.invoices[0].custom_merged_tables, 'F5');
+
+    const tableLabel = formatMergedTableLabel(
+      result.invoices[0].restaurant_table,
+      result.invoices[0].custom_merged_tables
+    );
+    assert.equal(tableLabel, 'F1 + F5');
+  } finally {
+    (call as any).get = originalGet;
+  }
+});
+
+
+test('offline split creates two distinct order entities and renders two order cards', async () => {
+  const sourceId = 'POS-INV-SPLIT-CARDS-001';
+
+  await repositories.orders.put({
+    ...baseOrderEntity(),
+    id: sourceId,
+    table: 'T-SPLIT-CARDS-001',
+    status: 'Draft',
+    sync_status: 'synced',
+    invoice_printed: 1,
+    items: [
+      { item: 'A', item_name: 'Item A', rate: 100, qty: 2, amount: 200 },
+      { item: 'B', item_name: 'Item B', rate: 50, qty: 1, amount: 50 },
+    ],
+    grand_total: 250,
+  });
+
+  setNavigatorOnline(false);
+  const originalGet = call.get;
+  (call as any).get = async () => {
+    throw new Error('offline');
+  };
+
+  try {
+    const splitResult = await splitBill(sourceId, [{ name: 'A', qty: 1 }]);
+
+    // Both source and child must exist as distinct order entities.
+    const source = await repositories.orders.getById(sourceId);
+    const child = await repositories.orders.getById(splitResult.new_invoice);
+    assert.ok(source);
+    assert.ok(child);
+
+    assert.equal(source.split_index, 1);
+    assert.equal(source.split_total, 2);
+    assert.ok(source.split_siblings?.includes(splitResult.new_invoice));
+
+    assert.equal(child.split_index, 2);
+    assert.equal(child.split_total, 2);
+    assert.ok(child.split_siblings?.includes(sourceId));
+    assert.equal(child.custom_split_from, sourceId);
+    assert.ok(child.pending_command_id, 'Child must store pending split command id');
+
+    // getPOSInvoices fallback must return BOTH split invoices as distinct cards.
+    const drafts = await getPOSInvoices({ status: 'Draft' });
+    const splitCards = drafts.invoices.filter(
+      inv => inv.custom_split_group === source.custom_split_group
+    );
+    assert.equal(splitCards.length, 2, 'Two distinct split cards must be rendered');
+
+    const card1 = splitCards.find(c => c.split_index === 1);
+    const card2 = splitCards.find(c => c.split_index === 2);
+    assert.ok(card1);
+    assert.ok(card2);
+    assert.equal(card1.name, sourceId);
+    assert.equal(card2.name, splitResult.new_invoice);
+  } finally {
+    setNavigatorOnline(true);
     (call as any).get = originalGet;
   }
 });

@@ -1,4 +1,5 @@
 import { call, repositories, apiRegistry, projectionBus, commandQueue, SplitBillCommand, type OrderEntity } from '@ury/core';
+import { buildTableClusterMap, getMergedTablesCsv } from './table-utils';
 
 export interface POSInvoiceItem {
   name: string;
@@ -85,6 +86,9 @@ export async function getTableOrder(table_no: string): Promise<TableOrder> {
     console.warn('Network getTableOrder failed, checking local orders repository:', error);
     const cached = await repositories.orders.findByTable(table_no);
     if (cached) {
+      const allTables = await repositories.tables.getAll();
+      const clusterMap = buildTableClusterMap(allTables as any);
+      const mergedTablesCsv = getMergedTablesCsv(cached.table || table_no, clusterMap);
       return {
         message: {
           name: cached.id,
@@ -98,7 +102,7 @@ export async function getTableOrder(table_no: string): Promise<TableOrder> {
           posting_time: new Date().toISOString().split('T')[1].substring(0, 8),
           order_type: cached.order_type,
           restaurant_table: cached.table || table_no,
-          custom_merged_tables: null,
+          custom_merged_tables: mergedTablesCsv,
           custom_restaurant_room: cached.room || '',
           status: cached.status,
           total: cached.grand_total,
@@ -302,6 +306,75 @@ export interface QueueOfflinePaymentInput {
 }
 
 /**
+ * Returns true if every other member of the invoice's split group has reached a
+ * terminal state (Paid or Cancelled). Used to decide whether the shared table
+ * can be released after one split is paid offline.
+ */
+async function isSplitGroupFullySettled(invoiceId: string): Promise<boolean> {
+  const order = await repositories.orders.getById(invoiceId);
+  if (!order?.custom_split_group) return true;
+
+  const all = await repositories.orders.getAll();
+  const siblings = all.filter(
+    o => o.id !== invoiceId && o.custom_split_group === order.custom_split_group
+  );
+
+  if (siblings.length === 0) return true;
+  return siblings.every(o => o.status === 'Paid' || o.status === 'Cancelled');
+}
+
+/**
+ * Clears the bidirectional merge linkage for a merged bill after one side is
+ * paid offline. The partner invoice is marked Paid (mirroring the backend
+ * `sync_merged_invoice` hook) and both records lose their merge metadata so
+ * the Merged Bill panel and badge disappear immediately.
+ */
+async function clearLocalMergeAfterPayment(invoiceId: string): Promise<void> {
+  const order = await repositories.orders.getById(invoiceId);
+  if (!order?.custom_merged_pos_invoice) return;
+
+  const partnerId = order.custom_merged_pos_invoice;
+  const partner = await repositories.orders.getById(partnerId);
+  const now = new Date().toISOString();
+
+  // Mirror backend behavior: when one merged invoice is paid, the linked
+  // invoice is also submitted/paid.
+  if (partner) {
+    await repositories.orders.put({
+      ...partner,
+      status: 'Paid',
+      is_locked: 1,
+      custom_merged_pos_invoice: null,
+      custom_merged_total: null,
+      custom_merged_pos_invoice_details: null,
+      updatedAt: now,
+    } as any);
+  }
+
+  await repositories.orders.put({
+    ...order,
+    custom_merged_pos_invoice: null,
+    custom_merged_total: null,
+    custom_merged_pos_invoice_details: null,
+    updatedAt: now,
+  } as any);
+
+  // Release the merge cluster table(s) so the Table UI shows Available.
+  const tablesToRelease = new Set<string>();
+  if (order.table) tablesToRelease.add(order.table);
+  if (partner?.table) tablesToRelease.add(partner.table);
+
+  for (const table of tablesToRelease) {
+    try {
+      const clusterTables = await repositories.tables.getClusterTables(table);
+      await repositories.tables.releaseCluster(clusterTables);
+    } catch (err) {
+      console.warn(`[clearLocalMergeAfterPayment] Failed to release table cluster for ${table}:`, err);
+    }
+  }
+}
+
+/**
  * Queues a make_invoice command for offline execution. The API payload is kept
  * byte-equivalent to the online payment request; sync metadata (idempotency_key,
  * temporary_id) lives on the envelope so the backend never sees extra keys.
@@ -322,10 +395,9 @@ export async function queueOfflinePayment(input: QueueOfflinePaymentInput): Prom
     table: input.table,
   };
 
-  const dependencies: string[] = [];
-  if (input.invoice.startsWith('TEMP-')) {
-    dependencies.push(`SYNC-ORDER-${input.invoice}`);
-  }
+  // Use the generic temp dependency resolver so TEMP-SPLIT-* children wait on
+  // their SplitBillCommand instead of a non-existent SYNC-ORDER-* record.
+  const dependencies: string[] = await resolveTempDependency(input.invoice);
 
   await repositories.syncQueue.put({
     id: cmdId,
@@ -345,10 +417,28 @@ export async function queueOfflinePayment(input: QueueOfflinePaymentInput): Prom
 
   // Mark order as Paid locally so the UI reflects payment status immediately.
   await repositories.orders.markPaid(input.invoice);
+
+  const order = await repositories.orders.getById(input.invoice);
+
+  // Merged bill: mark partner Paid, clear linkage, release cluster.
+  if (order?.custom_merged_pos_invoice) {
+    await clearLocalMergeAfterPayment(input.invoice);
+    projectionBus.emit('ORDERS_UPDATED');
+    projectionBus.emit('TABLES_UPDATED');
+    return;
+  }
+
+  // Split bill: only release the shared table once every sibling is settled.
+  let shouldReleaseTable = true;
+  if (order?.custom_split_group) {
+    shouldReleaseTable = await isSplitGroupFullySettled(input.invoice);
+  }
+
   projectionBus.emit('ORDERS_UPDATED');
 
-  // Release the table locally so the Table UI shows Available for offline payments.
-  await releaseTableAfterPayment(input.table);
+  if (shouldReleaseTable) {
+    await releaseTableAfterPayment(input.table);
+  }
 }
 
 /**
@@ -648,7 +738,7 @@ async function queueOfflineSplit(
     custom_split_group: groupId,
     split_index: 1,
     split_total: 2,
-    split_siblings: [childId],
+    split_siblings: [sourceInvoice, childId],
     updatedAt: now,
   };
 
@@ -687,7 +777,7 @@ async function queueOfflineSplit(
     custom_split_from: sourceInvoice,
     split_index: 2,
     split_total: 2,
-    split_siblings: [sourceInvoice],
+    split_siblings: [sourceInvoice, childId],
     pending_command_id: commandId,
     sync_status: 'pending',
     createdAt: now,
@@ -698,6 +788,7 @@ async function queueOfflineSplit(
   await repositories.orders.put(childOrder);
 
   projectionBus.emit('ORDERS_UPDATED');
+  projectionBus.emit('TABLES_UPDATED');
 
   return {
     source_invoice: sourceInvoice,

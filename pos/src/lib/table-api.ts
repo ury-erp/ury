@@ -238,10 +238,13 @@ export async function unmergeTables(table: string) {
     // Apply the unmerge locally: dissolve the cluster and keep any tables with
     // active local orders occupied so the UI matches online behavior.
     const cluster = await repositories.tables.getClusterTables(table);
+    const allOrders = await repositories.orders.getAll();
     const activeOrderTables: string[] = [];
     for (const name of cluster) {
-      const activeOrder = await repositories.orders.findByTable(name);
-      if (activeOrder) {
+      const hasOwnActiveOrder = allOrders.some(
+        o => o.table === name && o.status !== 'Paid' && o.status !== 'Cancelled'
+      );
+      if (hasOwnActiveOrder) {
         activeOrderTables.push(name);
       }
     }

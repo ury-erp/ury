@@ -69,7 +69,7 @@ export function formatMergedTableLabelFromGroup(members: string[]): string {
   return [...members].sort((a, b) => a.localeCompare(b)).join(' + ');
 }
 
-function buildMergeClusters(tables: Table[]): string[][] {
+export function buildMergeClusters(tables: Table[]): string[][] {
   if (tables.length === 0) return [];
 
   const adjacency = buildAdjacency(tables);
@@ -119,4 +119,32 @@ export function getTableRenderGroups(tables: Table[]): Table[][] {
 
 export function sortTablesByMergeGroups(tables: Table[]): Table[] {
   return getTableRenderGroups(tables).flat();
+}
+
+/**
+ * Build a lookup from every table name to its full merge cluster.
+ * Single-table clusters map to themselves so callers can safely look up any
+ * table and distinguish merged vs. unmerged by cluster length.
+ */
+export function buildTableClusterMap(tables: Table[]): Map<string, string[]> {
+  const map = new Map<string, string[]>();
+  for (const cluster of buildMergeClusters(tables)) {
+    for (const name of cluster) {
+      map.set(name, cluster);
+    }
+  }
+  return map;
+}
+
+/** Compute the `custom_merged_tables` CSV for an order given its table cluster. */
+export function getMergedTablesCsv(
+  tableName: string | null | undefined,
+  clusterMap: Map<string, string[]>
+): string | null {
+  if (!tableName) return null;
+  const cluster = clusterMap.get(tableName);
+  if (!cluster || cluster.length <= 1) return null;
+  return cluster
+    .filter(name => name !== tableName)
+    .join(',');
 }

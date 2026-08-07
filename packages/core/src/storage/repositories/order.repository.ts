@@ -22,11 +22,58 @@ export class OrderRepository
 
   /** Find active order for a given table */
   async findByTable(table: string): Promise<OrderEntity | undefined> {
-    return this.table
+    const direct = await this.table
       .where('table')
       .equals(table)
       .filter(order => order.status !== 'Paid' && order.status !== 'Cancelled')
       .first();
+    if (direct) return direct;
+
+    // Table merge parity: if the requested table is a child of a merged
+    // cluster (e.g. F5 merged into F1), the active order lives on the master
+    // table. Resolve the cluster and return the active master order.
+    const tableEntity = await this.dbInstance.restaurantTables.get(table);
+    if (!tableEntity?.merged_with) return undefined;
+
+    const partners = (tableEntity.merged_with || '')
+      .split(',')
+      .map(t => t.trim())
+      .filter(Boolean);
+    const cluster = Array.from(new Set([table, ...partners]));
+
+    const clusterOrders = await this.table
+      .where('table')
+      .anyOf(cluster)
+      .filter(order => order.status !== 'Paid' && order.status !== 'Cancelled')
+      .toArray();
+
+    if (clusterOrders.length === 0) return undefined;
+
+    // If multiple active orders exist, prefer the one whose table is the
+    // cluster anchor (the table whose merged_with lists the most partners).
+    // Otherwise fall back to the earliest-created order, matching the
+    // backend `_sync_active_order_with_merge_cluster` primary selection.
+    const clusterEntities = await this.dbInstance.restaurantTables
+      .where('name')
+      .anyOf(cluster)
+      .toArray();
+    const anchor = clusterEntities
+      .map(t => ({
+        name: t.name,
+        partnerCount: (t.merged_with || '').split(',').filter(Boolean).length,
+      }))
+      .sort((a, b) => b.partnerCount - a.partnerCount)[0]?.name;
+
+    const anchorOrder = anchor
+      ? clusterOrders.find(o => o.table === anchor)
+      : undefined;
+
+    return (
+      anchorOrder ||
+      clusterOrders.sort((a, b) =>
+        (a.createdAt || '').localeCompare(b.createdAt || '')
+      )[0]
+    );
   }
 
   /** Update order status to Paid and lock order locally */

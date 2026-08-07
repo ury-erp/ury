@@ -2,7 +2,7 @@ import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import 'fake-indexeddb/auto';
 import { call, repositories, tempIDMapper } from '@ury/core';
-import { getPOSInvoices, getOrderForEdit, reprintKot, mergeBills } from '../invoice-api';
+import { getPOSInvoices, getOrderForEdit, reprintKot, mergeBills, getSplitGroup } from '../invoice-api';
 import { printOrder } from '../print';
 
 const baseOrder = {
@@ -819,5 +819,100 @@ test('mergeBills online failure falls back to offline queue and local state', as
   } finally {
     (call as any).post = originalPost;
     setNavigatorOnline(true);
+  }
+});
+
+test('getSplitGroup offline fallback reflects Draft/Paid statuses accurately', async () => {
+  const sourceId = 'POS-INV-SPLIT-STATUS-001';
+  const childId = 'POS-INV-SPLIT-STATUS-002';
+  const groupId = 'SG-STATUS-001';
+
+  await repositories.orders.put({
+    ...baseOrder,
+    id: sourceId,
+    status: 'Paid',
+    sync_status: 'synced',
+    custom_split_group: groupId,
+    split_index: 1,
+    split_total: 2,
+    split_siblings: [childId],
+    items: [],
+    grand_total: 100,
+  });
+
+  await repositories.orders.put({
+    ...baseOrder,
+    id: childId,
+    status: 'Draft',
+    sync_status: 'synced',
+    custom_split_group: groupId,
+    custom_split_from: sourceId,
+    split_index: 2,
+    split_total: 2,
+    split_siblings: [sourceId],
+    items: [],
+    grand_total: 50,
+  });
+
+  const originalGet = call.get;
+  (call as any).get = async () => {
+    throw new Error('offline');
+  };
+
+  try {
+    const group = await getSplitGroup(childId);
+
+    assert.equal(group.group, groupId);
+    assert.equal(group.invoices.length, 2);
+
+    const sourceInv = group.invoices.find(i => i.name === sourceId);
+    const childInv = group.invoices.find(i => i.name === childId);
+
+    assert.ok(sourceInv);
+    assert.ok(childInv);
+    assert.equal(sourceInv?.status, 'Paid');
+    assert.equal(sourceInv?.docstatus, 1);
+    assert.equal(childInv?.status, 'Draft');
+    assert.equal(childInv?.docstatus, 0);
+    assert.equal(sourceInv?.split_index, 1);
+    assert.equal(childInv?.split_index, 2);
+    assert.equal(sourceInv?.split_total, 2);
+    assert.equal(childInv?.split_total, 2);
+  } finally {
+    (call as any).get = originalGet;
+  }
+});
+
+test('getSplitGroup offline fallback includes sibling referenced only by split_siblings', async () => {
+  const sourceId = 'POS-INV-SPLIT-SIBLING-001';
+  const childId = 'POS-INV-SPLIT-SIBLING-002';
+
+  await repositories.orders.put({
+    ...baseOrder,
+    id: sourceId,
+    status: 'Draft',
+    sync_status: 'synced',
+    custom_split_group: null,
+    split_index: 1,
+    split_total: 2,
+    split_siblings: [childId],
+    items: [],
+    grand_total: 100,
+  });
+
+  const originalGet = call.get;
+  (call as any).get = async () => {
+    throw new Error('offline');
+  };
+
+  try {
+    const group = await getSplitGroup(sourceId);
+
+    assert.equal(group.invoices.length, 2);
+    assert.ok(group.invoices.some(i => i.name === sourceId));
+    assert.ok(group.invoices.some(i => i.name === childId));
+    assert.equal(group.invoices.every(i => i.split_total === 2), true);
+  } finally {
+    (call as any).get = originalGet;
   }
 });

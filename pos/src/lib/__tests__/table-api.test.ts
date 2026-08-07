@@ -212,6 +212,37 @@ test('getVacantTablesForBranch fallback excludes occupied merged tables', async 
   }
 });
 
+test('OrderRepository.findByTable resolves merged child table to master order', async () => {
+  await seedTable('F1', 1, { merged_with: 'F5' });
+  await seedTable('F5', 1, { merged_with: 'F1' });
+  await repositories.orders.put({
+    id: 'POS-INV-F1-MASTER',
+    order_type: 'Dine-In',
+    table: 'F1',
+    status: 'Unbilled',
+    invoice_printed: 0,
+    sync_status: 'synced',
+    items: [{ item: 'ITEM-001', item_name: 'Test Item', rate: 100, qty: 1, amount: 100 }],
+    grand_total: 100,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  });
+
+  const byMaster = await repositories.orders.findByTable('F1');
+  assert.equal(byMaster?.id, 'POS-INV-F1-MASTER');
+  assert.equal(byMaster?.table, 'F1');
+
+  const byChild = await repositories.orders.findByTable('F5');
+  assert.equal(byChild?.id, 'POS-INV-F1-MASTER');
+  assert.equal(byChild?.table, 'F1');
+});
+
+test('OrderRepository.findByTable returns undefined for unmerged table without order', async () => {
+  await seedTable('F9', 0);
+  const result = await repositories.orders.findByTable('F9');
+  assert.equal(result, undefined);
+});
+
 test('getTables fallback preserves full server schema fields', async () => {
   await repositories.tables.put({
     name: 'F-SCHEMA',
