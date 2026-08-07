@@ -317,12 +317,12 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
         showCloseButton={false}
       >
         {/* Left Column - Image  */}
-        <div className="md:w-1/3 relative">
+        <div className="md:w-1/3 relative min-h-96">
           {itemDoc?.image ? (
             <img
               src={itemDoc.image}
               alt={itemDoc.name}
-              className="w-full min-h-96 h-full object-cover rounded-t-lg md:rounded-l-lg md:rounded-tr-none filter saturate-75 brightness-95"
+              className="absolute inset-0 w-full h-full object-contain rounded-t-lg md:rounded-l-lg md:rounded-tr-none"
               style={{ filter: 'saturate(0.7) brightness(0.95)' }}
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
@@ -330,23 +330,18 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
                 const parent = target.parentElement;
                 if (parent) {
                   const placeholder = document.createElement('div');
-                  placeholder.className = 'w-full h-96 bg-gray-200 flex items-center justify-center text-[8rem] text-gray-400 font-medium rounded-t-lg md:rounded-l-lg md:rounded-tr-none';
+                  placeholder.className = 'absolute inset-0 w-full h-full bg-gray-200 flex items-center justify-center text-[8rem] text-gray-400 font-medium rounded-t-lg md:rounded-l-lg md:rounded-tr-none';
                   placeholder.textContent = itemDoc.name.slice(0, 2).toUpperCase();
                   parent.insertBefore(placeholder, target);
                 }
               }}
             />
           ) : (
-            <div className="w-full min-h-96 h-full bg-gray-200 flex items-center justify-center text-[8rem] text-gray-400 font-medium rounded-t-lg md:rounded-l-lg md:rounded-tr-none">
+            <div className="absolute inset-0 w-full h-full bg-gray-200 flex items-center justify-center text-[8rem] text-gray-400 font-medium rounded-t-lg md:rounded-l-lg md:rounded-tr-none">
               {itemDoc?.name.slice(0, 2).toUpperCase()}
             </div>
           )}
-          <Button
-            onClick={handleClose}
-            variant="outline"
-            size="icon"
-            className="absolute top-4 right-4 bg-white shadow-lg"
-          >
+          <Button onClick={handleClose} variant="outline" size="icon" className="absolute top-4 right-4 bg-white shadow-lg z-10">
             <X className="w-5 h-5" />
           </Button>
         </div>
