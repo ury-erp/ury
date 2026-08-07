@@ -111,6 +111,10 @@ export interface TableEntity {
   layout_y?: number;
   /** Table shape for rendering */
   table_shape?: string;
+  /** Take-away table flag (server API parity) */
+  is_take_away?: number;
+  /** Minimum seating capacity (server API parity) */
+  minimum_seating?: number;
 }
 
 /**
@@ -316,6 +320,8 @@ export interface ITableRepository extends IBaseRepository<TableEntity, string> {
   setOccupied(name: string, occupied: boolean): Promise<void>;
   getClusterTables(primary: string): Promise<string[]>;
   releaseCluster(tableNames: string[]): Promise<void>;
+  mergeCluster(anchor: string, targets: string[]): Promise<void>;
+  unmergeCluster(table: string, activeOrderTables?: string[]): Promise<void>;
   transferTable(source: string, target: string): Promise<void>;
 }
 

@@ -1,5 +1,5 @@
 import { DOCTYPES } from '../data/doctypes';
-import { db, repositories, apiRegistry, call } from '@ury/core';
+import { db, repositories, apiRegistry, call, projectionBus } from '@ury/core';
 
 export interface Room {
   name: string;
@@ -85,7 +85,7 @@ export async function getTables(room: string): Promise<Table[]> {
       asDict: true,
     }) as Table[];
 
-    // Cache tables in local repository
+    // Cache tables in local repository with full server schema parity.
     if (tables && tables.length > 0) {
       await repositories.tables.putMany(
         tables.map(t => ({
@@ -98,6 +98,8 @@ export async function getTables(room: string): Promise<Table[]> {
           layout_x: t.layout_x,
           layout_y: t.layout_y,
           table_shape: t.table_shape,
+          is_take_away: t.is_take_away ?? 0,
+          minimum_seating: t.minimum_seating,
         }))
       );
     }
@@ -110,13 +112,14 @@ export async function getTables(room: string): Promise<Table[]> {
       name: ct.name,
       occupied: ct.occupied,
       latest_invoice_time: ct.latest_invoice_time || null,
-      is_take_away: 0,
+      is_take_away: ct.is_take_away ?? 0,
       restaurant_room: ct.restaurant_room,
       table_shape: (ct.table_shape as any) || 'Square',
       merged_with: ct.merged_with || null,
       no_of_seats: ct.no_of_seats,
       layout_x: ct.layout_x,
       layout_y: ct.layout_y,
+      minimum_seating: ct.minimum_seating,
     }));
   }
 }
@@ -167,13 +170,14 @@ export async function getVacantTablesForBranch(
       name: ct.name,
       occupied: ct.occupied,
       latest_invoice_time: ct.latest_invoice_time || null,
-      is_take_away: 0,
+      is_take_away: ct.is_take_away ?? 0,
       restaurant_room: ct.restaurant_room,
       table_shape: (ct.table_shape as any) || 'Square',
       merged_with: ct.merged_with || null,
       no_of_seats: ct.no_of_seats,
       layout_x: ct.layout_x,
       layout_y: ct.layout_y,
+      minimum_seating: ct.minimum_seating,
     }));
   }
 }
@@ -202,6 +206,12 @@ export async function mergeTablesBatch(anchor: string, tables: string[]) {
     });
   } catch (error) {
     console.warn('Network mergeTablesBatch failed, queuing offline sync command:', error);
+
+    // Apply the merge locally so the Table UI renders the merged cluster
+    // immediately, matching the online API response shape.
+    await repositories.tables.mergeCluster(anchor, tables);
+    projectionBus.emit('TABLES_UPDATED');
+
     await repositories.syncQueue.put({
       id: `SYNC-MERGE-${Date.now()}`,
       action: 'merge_tables_batch',
@@ -224,6 +234,20 @@ export async function unmergeTables(table: string) {
     });
   } catch (error) {
     console.warn('Network unmergeTables failed, queuing offline sync command:', error);
+
+    // Apply the unmerge locally: dissolve the cluster and keep any tables with
+    // active local orders occupied so the UI matches online behavior.
+    const cluster = await repositories.tables.getClusterTables(table);
+    const activeOrderTables: string[] = [];
+    for (const name of cluster) {
+      const activeOrder = await repositories.orders.findByTable(name);
+      if (activeOrder) {
+        activeOrderTables.push(name);
+      }
+    }
+    await repositories.tables.unmergeCluster(table, activeOrderTables);
+    projectionBus.emit('TABLES_UPDATED');
+
     await repositories.syncQueue.put({
       id: `SYNC-UNMERGE-${Date.now()}`,
       action: 'unmerge_tables',

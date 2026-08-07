@@ -40,7 +40,7 @@ function App() {
                   <Routes>
                     <Route path="/" element={<POS/>} />
                     <Route path="/orders" element={<Orders />} />
-                    <Route path="/table" element={<Table />} />
+                    <Route path="/tables" element={<Table />} />
                   </Routes>
                 </div>
                 <Footer />

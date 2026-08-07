@@ -72,6 +72,59 @@ export class TableRepository
     }
   }
 
+  /**
+   * Merges an anchor table with one or more target tables locally.
+   * - Anchor stores the comma-separated list of target names in `merged_with`.
+   * - Each target points back to the anchor.
+   * - Every table in the cluster is marked occupied (1).
+   *
+   * This mirrors the online `merge_tables_batch` response shape so that the
+   * reactive table layout and `TableCard` rendering work identically offline.
+   */
+  async mergeCluster(anchor: string, targets: string[]): Promise<void> {
+    if (targets.length === 0) return;
+
+    const targetCsv = targets.map(t => t.trim()).filter(Boolean).join(',');
+    const anchorEntity = await this.getById(anchor);
+    if (anchorEntity) {
+      anchorEntity.merged_with = targetCsv;
+      anchorEntity.occupied = 1;
+      await this.put(anchorEntity);
+    }
+
+    for (const target of targets) {
+      const targetEntity = await this.getById(target);
+      if (targetEntity) {
+        targetEntity.merged_with = anchor;
+        targetEntity.occupied = 1;
+        await this.put(targetEntity);
+      }
+    }
+  }
+
+  /**
+   * Unmerges the cluster containing the given table.
+   * - Clears `merged_with` for every table in the cluster.
+   * - Marks tables with an active local order as occupied and the rest as free.
+   *
+   * `activeOrderTables` is the set of tables that should remain occupied because
+   * they hold open invoices. When omitted, occupation is preserved as-is.
+   */
+  async unmergeCluster(table: string, activeOrderTables?: string[]): Promise<void> {
+    const cluster = await this.getClusterTables(table);
+    const activeSet = activeOrderTables ? new Set(activeOrderTables) : undefined;
+    for (const name of cluster) {
+      const existing = await this.getById(name);
+      if (existing) {
+        existing.merged_with = null;
+        if (activeSet !== undefined) {
+          existing.occupied = activeSet.has(name) ? 1 : 0;
+        }
+        await this.put(existing);
+      }
+    }
+  }
+
   /** Update table transfer state */
   async transferTable(source: string, target: string): Promise<void> {
     await this.setOccupied(source, false);

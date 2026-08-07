@@ -211,9 +211,10 @@ const TableView = () => {
       );
 
       // After print (online or queued offline), redirect the cashier to the
-      // Orders page Draft tab where payment is enabled.
-      await setSelectedStatus('Draft');
-      navigate('/pos/orders');
+      // Orders page Draft tab where payment is enabled, and auto-select the
+      // printed order so the Order Details panel opens immediately.
+      await setSelectedStatus('Draft', invoiceId);
+      navigate('/orders', { state: { selectedOrderId: invoiceId }, replace: true });
     } catch (error) {
       showToast.error(error instanceof Error ? error.message : 'Failed to print order');
     } finally {

@@ -411,6 +411,163 @@ test('printOrder returns queued and updates local state when online call fails',
   }
 });
 
+// ============================================================================
+// Task 6: Table Order Print Flow Parity
+// ============================================================================
+
+test('Offline Table Print -> order appears in Draft tab for auto-selection', async () => {
+  const tempId = 'TEMP-ORD-TABLE-PRINT-001';
+
+  await repositories.orders.put({
+    ...baseOrder,
+    id: tempId,
+    table: 'T-01',
+    status: 'Unbilled',
+    invoice_printed: 0,
+    sync_status: 'pending',
+  });
+
+  setNavigatorOnline(false);
+  setWindowMock();
+
+  const originalGet = call.get;
+  const originalPost = call.post;
+  (call as any).get = async () => {
+    throw new Error('offline');
+  };
+  (call as any).post = async () => {
+    throw new Error('should not be called while offline');
+  };
+
+  try {
+    const result = await printOrder({ orderId: tempId, posProfile: socketPosProfile });
+
+    assert.equal(result.status, 'queued');
+
+    const local = await repositories.orders.getById(tempId);
+    assert.equal(local?.status, 'Draft');
+    assert.equal(local?.invoice_printed, 1);
+
+    // After printing, the Orders page Draft tab must contain the order so it
+    // can be auto-selected. This mirrors the Online lifecycle.
+    const draftResult = await getPOSInvoices({ status: 'Draft' });
+    assert.equal(draftResult.invoices.length, 1);
+    assert.equal(draftResult.invoices[0].name, tempId);
+    assert.equal(draftResult.invoices[0].status, 'Draft');
+    assert.equal(draftResult.invoices[0].invoice_printed, 1);
+  } finally {
+    (call as any).get = originalGet;
+    (call as any).post = originalPost;
+    setNavigatorOnline(true);
+  }
+});
+
+test('Offline Table Print -> Payment: order is printable/ payable locally', async () => {
+  const tempId = 'TEMP-ORD-TABLE-PRINT-002';
+
+  await repositories.orders.put({
+    ...baseOrder,
+    id: tempId,
+    table: 'T-02',
+    status: 'Unbilled',
+    invoice_printed: 0,
+    sync_status: 'pending',
+  });
+
+  setNavigatorOnline(false);
+  setWindowMock();
+
+  const originalPost = call.post;
+  (call as any).post = async () => {
+    throw new Error('should not be called while offline');
+  };
+
+  try {
+    await printOrder({ orderId: tempId, posProfile: socketPosProfile });
+
+    const local = await repositories.orders.getById(tempId);
+    assert.equal(local?.status, 'Draft');
+    assert.equal(local?.invoice_printed, 1);
+
+    // The POS UI blocks payment while invoice_printed === '0'. After an
+    // offline print the local state must already allow payment.
+    assert.ok(local?.invoice_printed === 1, 'invoice_printed must be 1 to enable payment');
+    assert.ok(local?.status === 'Draft', 'status must be Draft to enable payment');
+  } finally {
+    (call as any).post = originalPost;
+    setNavigatorOnline(true);
+  }
+});
+
+test('Offline Table Print -> Sync: server invoice print update is queued', async () => {
+  const serverId = 'POS-INV-TABLE-PRINT-003';
+
+  await repositories.orders.put({
+    ...baseOrder,
+    id: serverId,
+    table: 'T-03',
+    status: 'Unbilled',
+    invoice_printed: 0,
+    sync_status: 'synced',
+  });
+
+  setNavigatorOnline(false);
+  setWindowMock();
+
+  const originalPost = call.post;
+  (call as any).post = async () => {
+    throw new Error('should not be called while offline');
+  };
+
+  try {
+    await printOrder({ orderId: serverId, posProfile: socketPosProfile });
+
+    const queued = await repositories.syncQueue.getById(`QZ-PRINT-${serverId}`);
+    assert.ok(queued, 'QZ_PRINT_UPDATE command should be queued for server invoice');
+    assert.equal(queued?.action, 'qz_print_update');
+    assert.equal((queued?.payload as any)?.invoice, serverId);
+    // Server invoices do not need to wait for a parent sync_order.
+    assert.deepEqual(queued?.dependency_ids, []);
+  } finally {
+    (call as any).post = originalPost;
+    setNavigatorOnline(true);
+  }
+});
+
+test('Online Table Print -> local order state transitions to Draft and invoice_printed', async () => {
+  const serverId = 'POS-INV-TABLE-PRINT-004';
+
+  await repositories.orders.put({
+    ...baseOrder,
+    id: serverId,
+    table: 'T-04',
+    status: 'Unbilled',
+    invoice_printed: 0,
+    sync_status: 'synced',
+  });
+
+  setNavigatorOnline(true);
+  setWindowMock();
+
+  const originalPost = call.post;
+  (call as any).post = async () => ({ message: { status: 'Draft' } });
+
+  try {
+    const result = await printOrder({ orderId: serverId, posProfile: socketPosProfile });
+
+    assert.equal(result.status, 'printed');
+
+    const local = await repositories.orders.getById(serverId);
+    assert.equal(local?.status, 'Draft');
+    assert.equal(local?.invoice_printed, 1);
+
+    const draftResult = await getPOSInvoices({ status: 'Draft' });
+    assert.ok(draftResult.invoices.some((inv) => inv.name === serverId));
+  } finally {
+    (call as any).post = originalPost;
+  }
+});
+
 
 // ============================================================================
 // Task 5: Kitchen / KOT Print Offline Queue

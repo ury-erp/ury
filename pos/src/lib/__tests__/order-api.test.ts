@@ -2,7 +2,7 @@ import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import 'fake-indexeddb/auto';
 import { call, repositories, projectionBus } from '@ury/core';
-import { syncOrder, cancelOrder, releaseTableAfterPayment, queueOfflinePayment, splitBill, type SyncOrderData } from '../order-api';
+import { syncOrder, cancelOrder, releaseTableAfterPayment, queueOfflinePayment, splitBill, tableTransfer, getTableOrder, type SyncOrderData } from '../order-api';
 import { updatePrintStatus, getPOSInvoices, getSplitGroup } from '../invoice-api';
 
 const baseOrderData = (overrides: Partial<SyncOrderData> = {}): SyncOrderData => ({
@@ -814,6 +814,227 @@ test('getSplitGroup offline fallback returns local split members', async () => {
     assert.equal(child?.name, childId);
     assert.equal(child?.split_index, 2);
   } finally {
+    (call as any).get = originalGet;
+  }
+});
+
+test('offline tableTransfer moves order entity to destination table and releases source', async () => {
+  await seedTable('T-SOURCE-001', 1);
+  await repositories.tables.put({
+    name: 'T-DEST-001',
+    restaurant_room: 'Garden',
+    no_of_seats: 4,
+    occupied: 0,
+  });
+
+  const orderId = 'POS-INV-TRANSFER-001';
+  const createdAt = '2026-08-07T08:00:00.000Z';
+
+  await repositories.orders.put({
+    ...baseOrderEntity(),
+    id: orderId,
+    table: 'T-SOURCE-001',
+    room: 'Main Hall',
+    status: 'Unbilled',
+    invoice_printed: 0,
+    sync_status: 'synced',
+    createdAt,
+    items: [{ item: 'A', item_name: 'Item A', rate: 100, qty: 1, amount: 100 }],
+    grand_total: 100,
+  });
+
+  const { events, unsubscribe } = captureEvents();
+  const originalPost = call.post;
+  (call as any).post = async () => {
+    throw new Error('Network Disconnected');
+  };
+
+  try {
+    await tableTransfer('T-SOURCE-001', 'T-DEST-001', orderId);
+
+    const order = await repositories.orders.getById(orderId);
+    assert.equal(order?.table, 'T-DEST-001');
+    assert.equal(order?.room, 'Garden');
+
+    const source = await repositories.tables.getById('T-SOURCE-001');
+    assert.equal(source?.occupied, 0);
+    assert.equal(source?.latest_invoice_time, null);
+    assert.equal(source?.merged_with, null);
+
+    const dest = await repositories.tables.getById('T-DEST-001');
+    assert.equal(dest?.occupied, 1);
+    assert.equal(dest?.latest_invoice_time, createdAt);
+    assert.equal(dest?.merged_with, null);
+
+    assert.ok(events.includes('ORDERS_UPDATED'));
+    assert.ok(events.includes('TABLES_UPDATED'));
+  } finally {
+    (call as any).post = originalPost;
+    unsubscribe();
+  }
+});
+
+test('offline tableTransfer queues table_transfer command with byte-equivalent payload and temp dependency', async () => {
+  await seedTable('T-SOURCE-002', 1);
+  await seedTable('T-DEST-002', 0);
+
+  const tempId = 'TEMP-ORD-TRANSFER-002';
+  await repositories.orders.put({
+    ...baseOrderEntity(),
+    id: tempId,
+    table: 'T-SOURCE-002',
+    status: 'Unbilled',
+    invoice_printed: 0,
+    sync_status: 'pending',
+    items: [{ item: 'A', item_name: 'Item A', rate: 100, qty: 1, amount: 100 }],
+    grand_total: 100,
+  });
+
+  const originalPost = call.post;
+  (call as any).post = async () => {
+    throw new Error('Network Disconnected');
+  };
+
+  try {
+    await tableTransfer('T-SOURCE-002', 'T-DEST-002', tempId);
+
+    const cmds = await repositories.syncQueue.getAll();
+    const transferCmd = cmds.find(c => c.action === 'table_transfer');
+    assert.ok(transferCmd, 'table_transfer command should be queued');
+
+    const payload = transferCmd?.payload as any;
+    assert.equal(payload.table, 'T-SOURCE-002');
+    assert.equal(payload.newTable, 'T-DEST-002');
+    assert.equal(payload.invoice, tempId);
+    assert.equal(payload.source_table, undefined, 'payload must be byte-equivalent to online API');
+    assert.equal(payload.target_table, undefined, 'payload must be byte-equivalent to online API');
+
+    assert.deepEqual(transferCmd?.dependency_ids, [`SYNC-ORDER-${tempId}`]);
+    assert.equal(transferCmd?.temporary_id, tempId);
+    assert.equal(transferCmd?.entity_id, tempId);
+  } finally {
+    (call as any).post = originalPost;
+  }
+});
+
+test('offline tableTransfer for synced invoice has no temp dependency', async () => {
+  await seedTable('T-SOURCE-003', 1);
+  await seedTable('T-DEST-003', 0);
+
+  const orderId = 'POS-INV-TRANSFER-003';
+  await repositories.orders.put({
+    ...baseOrderEntity(),
+    id: orderId,
+    table: 'T-SOURCE-003',
+    status: 'Draft',
+    sync_status: 'synced',
+    items: [],
+  });
+
+  const originalPost = call.post;
+  (call as any).post = async () => {
+    throw new Error('Network Disconnected');
+  };
+
+  try {
+    await tableTransfer('T-SOURCE-003', 'T-DEST-003', orderId);
+
+    const cmds = await repositories.syncQueue.getAll();
+    const transferCmd = cmds.find(c => c.action === 'table_transfer');
+    assert.ok(transferCmd);
+    assert.deepEqual(transferCmd?.dependency_ids, []);
+    assert.equal(transferCmd?.temporary_id, null);
+    assert.equal(transferCmd?.entity_id, orderId);
+  } finally {
+    (call as any).post = originalPost;
+  }
+});
+
+test('offline tableTransfer clears stale merge linkage on source and destination', async () => {
+  await repositories.tables.put({
+    name: 'T-SOURCE-MERGED',
+    restaurant_room: 'Main Hall',
+    no_of_seats: 4,
+    occupied: 1,
+    merged_with: 'T-PARTNER',
+  });
+  await repositories.tables.put({
+    name: 'T-DEST-MERGED',
+    restaurant_room: 'Main Hall',
+    no_of_seats: 4,
+    occupied: 0,
+    merged_with: 'T-SOURCE-MERGED',
+  });
+
+  const orderId = 'POS-INV-TRANSFER-MERGED';
+  await repositories.orders.put({
+    ...baseOrderEntity(),
+    id: orderId,
+    table: 'T-SOURCE-MERGED',
+    status: 'Unbilled',
+    sync_status: 'synced',
+    items: [],
+  });
+
+  const originalPost = call.post;
+  (call as any).post = async () => {
+    throw new Error('Network Disconnected');
+  };
+
+  try {
+    await tableTransfer('T-SOURCE-MERGED', 'T-DEST-MERGED', orderId);
+
+    const source = await repositories.tables.getById('T-SOURCE-MERGED');
+    const dest = await repositories.tables.getById('T-DEST-MERGED');
+
+    assert.equal(source?.merged_with, null);
+    assert.equal(dest?.merged_with, null);
+  } finally {
+    (call as any).post = originalPost;
+  }
+});
+
+test('offline tableTransfer updates getTableOrder and getPOSInvoices fallbacks', async () => {
+  await seedTable('T-SOURCE-004', 1);
+  await seedTable('T-DEST-004', 0);
+
+  const orderId = 'POS-INV-TRANSFER-004';
+  await repositories.orders.put({
+    ...baseOrderEntity(),
+    id: orderId,
+    table: 'T-SOURCE-004',
+    status: 'Unbilled',
+    invoice_printed: 0,
+    sync_status: 'synced',
+    items: [{ item: 'A', item_name: 'Item A', rate: 100, qty: 1, amount: 100 }],
+    grand_total: 100,
+  });
+
+  const originalPost = call.post;
+  const originalGet = call.get;
+  (call as any).post = async () => {
+    throw new Error('Network Disconnected');
+  };
+  (call as any).get = async () => {
+    throw new Error('Network Disconnected');
+  };
+
+  try {
+    await tableTransfer('T-SOURCE-004', 'T-DEST-004', orderId);
+
+    const sourceOrder = await getTableOrder('T-SOURCE-004');
+    assert.equal(sourceOrder.message, null);
+
+    const destOrder = await getTableOrder('T-DEST-004');
+    assert.equal(destOrder.message?.name, orderId);
+    assert.equal(destOrder.message?.restaurant_table, 'T-DEST-004');
+
+    const unbilled = await getPOSInvoices({ status: 'Unbilled' });
+    const transferred = unbilled.invoices.find(i => i.name === orderId);
+    assert.ok(transferred);
+    assert.equal(transferred?.restaurant_table, 'T-DEST-004');
+  } finally {
+    (call as any).post = originalPost;
     (call as any).get = originalGet;
   }
 });

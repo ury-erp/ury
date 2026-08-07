@@ -55,7 +55,7 @@ export interface OrdersActions {
   updateOrderStatus: (orderId: string, status: POSInvoice['status']) => Promise<void>;
   goToNextPage: () => Promise<void>;
   goToPreviousPage: () => Promise<void>;
-  setSelectedStatus: (status: POSInvoice['status']) => Promise<void>;
+  setSelectedStatus: (status: POSInvoice['status'], selectedOrderId?: string) => Promise<void>;
   selectOrder: (order: POSInvoice) => Promise<void>;
   clearSelectedOrder: () => void;
   setOrderSearchQuery: (query: string) => void;
@@ -153,11 +153,20 @@ export const createOrdersSlice: StateCreator<
     }
   },
 
-  setSelectedStatus: async (status) => {
+  setSelectedStatus: async (status, selectedOrderId) => {
     set({ selectedStatus: status });
     // Clear selected order when status changes
     get().clearSelectedOrder();
     await get().fetchOrders(1); // Reset to first page when status changes
+
+    // If a specific order id was provided (e.g. after printing a table order),
+    // auto-select it once the list for the new status has loaded.
+    if (selectedOrderId) {
+      const order = get().orders.find((o) => o.name === selectedOrderId);
+      if (order) {
+        await get().selectOrder(order);
+      }
+    }
   },
 
   selectOrder: async (order) => {

@@ -742,17 +742,98 @@ export async function tableTransfer(
       invoice,
     });
   } catch (error) {
-    console.warn('Network tableTransfer failed, queueing command in sync_queue repository:', error);
-    await repositories.syncQueue.put({
-      id: `SYNC-TRANSFER-${Date.now()}`,
-      action: 'table_transfer',
-      endpoint: endpoint,
-      payload: { table, newTable, invoice },
-      timestamp: new Date().toISOString(),
-      status: 'PENDING',
-      attempts: 0,
-      priority: 1,
-    });
+    console.warn('Network tableTransfer failed, applying local state and queueing command:', error);
+
+    const now = new Date().toISOString();
+
+    // Load entities required for the local transfer.
+    const [sourceEntity, destinationEntity, orderEntity] = await Promise.all([
+      repositories.tables.getById(table),
+      repositories.tables.getById(newTable),
+      repositories.orders.getById(invoice),
+    ]);
+
+    if (!sourceEntity) {
+      throw new Error(`Source table ${table} not found locally`);
+    }
+    if (!destinationEntity) {
+      throw new Error(`Destination table ${newTable} not found locally`);
+    }
+    if (!orderEntity) {
+      throw new Error(`Invoice ${invoice} not found locally`);
+    }
+
+    // Compute the timestamp shown as "Started at" on the destination table card.
+    const startedAt = orderEntity.createdAt || now;
+
+    // Find every active order still linked to the source table so the transfer
+    // is complete: source becomes available and destination shows the order(s).
+    const activeOrdersOnSource = (await repositories.orders.getAll()).filter(
+      (o) =>
+        o.table === table && o.status !== 'Paid' && o.status !== 'Cancelled'
+    );
+
+    // Atomically persist order and table updates so the UI never observes a
+    // half-transferred state (e.g. order moved but source still occupied).
+    const idb = repositories.tables.dbInstance;
+    await idb.transaction(
+      'rw',
+      idb.orders,
+      idb.restaurantTables,
+      idb.sync_queue,
+      async () => {
+        // 1. Move all active orders from source table to destination table/room.
+        for (const order of activeOrdersOnSource) {
+          await repositories.orders.put({
+            ...order,
+            table: newTable,
+            room: destinationEntity.restaurant_room,
+            updatedAt: now,
+          });
+        }
+
+        // 2. Release source table and clear any stale merge linkage.
+        await repositories.tables.put({
+          ...sourceEntity,
+          occupied: 0,
+          latest_invoice_time: null,
+          merged_with: null,
+        });
+
+        // 3. Occupy destination table and clear any stale merge linkage.
+        await repositories.tables.put({
+          ...destinationEntity,
+          occupied: 1,
+          latest_invoice_time: startedAt,
+          merged_with: null,
+        });
+
+        // 4. Queue the table_transfer command for replay. The payload is kept
+        //    byte-equivalent to the online API call (table, newTable, invoice).
+        const dependencyIds: string[] = [];
+        if (invoice.startsWith('TEMP-')) {
+          dependencyIds.push(`SYNC-ORDER-${invoice}`);
+        }
+
+        await repositories.syncQueue.put({
+          id: `SYNC-TRANSFER-${Date.now()}`,
+          action: 'table_transfer',
+          endpoint: endpoint,
+          payload: { table, newTable, invoice },
+          timestamp: now,
+          status: 'PENDING',
+          attempts: 0,
+          priority: 1,
+          dependency_ids: dependencyIds,
+          dependencies: dependencyIds,
+          temporary_id: invoice.startsWith('TEMP-') ? invoice : null,
+          entity_id: invoice,
+        });
+      }
+    );
+
+    projectionBus.emit('ORDERS_UPDATED');
+    projectionBus.emit('TABLES_UPDATED');
   }
 }
 

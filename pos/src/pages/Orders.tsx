@@ -9,7 +9,7 @@ import { formatCurrency } from '@ury/core';
 import { Spinner } from '@ury/ui';
 import { Textarea } from '@ury/ui';
 import { usePOSStore } from '../store/pos-store';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import PaymentDialog from '../components/PaymentDialog';
 import BillSplitDialog from '../components/BillSplitDialog';
 import BillMergeDialog from '../components/BillMergeDialog';
@@ -74,6 +74,7 @@ export default function Orders() {
 
   const posStore = usePOSStore();
   const navigate = useNavigate();
+  const location = useLocation();
   const mounted = useRef(false);
   const [cancelDialogOpen, setCancelDialogOpen] = React.useState(false);
   const [cancelReason, setCancelReason] = React.useState('');
@@ -146,6 +147,23 @@ export default function Orders() {
     });
     return () => unsubscribe();
   }, [fetchOrders]);
+
+  // Auto-select the order passed via navigation state (e.g. after printing a
+  // table order). This keeps Online and Offline POS indistinguishable: the
+  // cashier lands on the Orders page with the Order Details panel already open.
+  useEffect(() => {
+    const pendingId = (location.state as { selectedOrderId?: string } | null)?.selectedOrderId;
+    if (!pendingId || orderLoading) return;
+
+    const order = orders.find((o) => o.name === pendingId);
+    if (order && selectedOrder?.name !== order.name) {
+      selectOrder(order);
+    }
+
+    // Clear the navigation state so a refresh or later visit does not re-select.
+    navigate(location.pathname + location.search, { replace: true, state: undefined });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state, orderLoading, orders]);
 
 
   // Function to format the date and time

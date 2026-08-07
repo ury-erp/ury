@@ -11,7 +11,7 @@ const Footer = () => {
 
   const navItems = [
     { icon: LayoutGrid, label: t('footer.pos'), path: '/' },
-    {icon: Table, label: t('footer.table'), path: '/table'},
+    {icon: Table, label: t('footer.table'), path: '/tables'},
     { icon: ClipboardList, label: t('footer.orders'), path: '/orders' },
   ];
 
