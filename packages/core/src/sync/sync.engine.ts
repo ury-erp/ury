@@ -569,6 +569,7 @@ export class SyncEngine {
         for (const tempId of tempIds) {
           await this._patchPaymentCommandsForTempId(tempId, serverId);
           await this._patchMergeBillCommandsForTempId(tempId, serverId);
+          await this._patchSplitBillCommandsForTempId(tempId, serverId, responseBody?.items);
         }
       }
     }
@@ -749,6 +750,13 @@ export class SyncEngine {
         // satisfied. Clear it before the COMPLETED parent record is purged,
         // otherwise getPendingCommands will never see the dependency as met.
         await this.queueMgr.updateDependencies(cmd.id, []);
+        // Update envelope metadata so the command no longer references the stale
+        // TEMP-* ID after promotion.
+        await this.queueMgr.updateEnvelopeMetadata(cmd.id, {
+          temporary_id: cmd.temporary_id === tempId ? null : cmd.temporary_id,
+          server_id: cmd.temporary_id === tempId ? serverId : cmd.server_id,
+          entity_id: cmd.entity_id === tempId ? serverId : cmd.entity_id,
+        });
         // Also register the temp→server mapping for the payment's perspective
         await this.idMapper.registerMapping(tempId, serverId);
         console.log(
@@ -800,6 +808,60 @@ export class SyncEngine {
       }
     } catch (patchErr) {
       console.warn(`[SyncEngine] Failed to patch merge_bills commands for temp ID ${tempId}:`, patchErr);
+      throw patchErr;
+    }
+  }
+
+  /**
+   * Patches pending split_bill commands that reference a temporary source_invoice.
+   * Crucially, replaces the offline row identifier (which is just the item_code) 
+   * in items_to_move with the actual server-assigned row hash.
+   */
+  private async _patchSplitBillCommandsForTempId(
+    tempId: string,
+    serverId: string,
+    serverItems: any[] | undefined
+  ): Promise<void> {
+    if (!serverItems || !Array.isArray(serverItems) || serverItems.length === 0) return;
+    try {
+      const allCmds = await this.repos.syncQueue.getAll();
+      const splitCmds = allCmds.filter((e: any) =>
+        e.status === 'PENDING' &&
+        (e.action === 'split_bill' || e.operation_type === 'SPLIT_BILL') &&
+        e.payload?.source_invoice === tempId
+      );
+
+      for (const cmd of splitCmds) {
+        const payload = cmd.payload as Record<string, unknown>;
+        const itemsToMove = payload.items_to_move as Array<{ name: string; qty: number }>;
+        
+        let patched = false;
+        const patchedItems = (itemsToMove || []).map(itm => {
+          // In offline mode, the row name was set to the item_code.
+          // We must map it to the actual server row name (the Hash).
+          const match = serverItems.find(si => si.item_code === itm.name || si.item === itm.name);
+          if (match && match.name && match.name !== itm.name) {
+            patched = true;
+            return { ...itm, name: match.name };
+          }
+          return itm;
+        });
+
+        const cmdId = cmd.id || cmd.command_id || '';
+        const updatedPayload = {
+          ...payload,
+          source_invoice: serverId,
+          items_to_move: patchedItems,
+        };
+        await this.queueMgr.updatePayload(cmdId, updatedPayload);
+        await this.queueMgr.updateDependencies(cmdId, []);
+        await this.idMapper.registerMapping(tempId, serverId);
+        console.log(
+          `[SyncEngine] Patched split_bill command ${cmdId}: ${tempId} → ${serverId} (items patched: ${patched})`
+        );
+      }
+    } catch (patchErr) {
+      console.warn(`[SyncEngine] Failed to patch split_bill commands for temp ID ${tempId}:`, patchErr);
       throw patchErr;
     }
   }
@@ -881,14 +943,14 @@ export class SyncEngine {
         const cmdId = (cmd.command_id || cmd.id) as string;
         await this.queueMgr.updatePayload(cmdId, updatedPayload);
 
-        if (cmd.temporary_id === tempId) {
-          cmd.temporary_id = null;
-          cmd.server_id = serverId;
-        }
-        if (cmd.entity_id === tempId) {
-          cmd.entity_id = serverId;
-        }
-        cmd.updated_at = new Date().toISOString();
+        // Update envelope metadata so the queued command no longer references the
+        // stale TEMP-* ID after promotion. This is essential for split children,
+        // whose dependent payment/print commands carry temporary_id/entity_id.
+        await this.queueMgr.updateEnvelopeMetadata(cmdId, {
+          temporary_id: cmd.temporary_id === tempId ? null : cmd.temporary_id,
+          server_id: cmd.temporary_id === tempId ? serverId : cmd.server_id,
+          entity_id: cmd.entity_id === tempId ? serverId : cmd.entity_id,
+        });
 
         const currentDeps = (cmd.dependency_ids || cmd.dependencies || []) as string[];
         const nextDeps = currentDeps.filter(d => d !== parentCmdId);

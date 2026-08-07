@@ -70,15 +70,23 @@ const TableView = () => {
         const sessionKey = `ury_rooms_${branch}`;
         const cachedRooms = sessionStorage.getItem(sessionKey);
 
+        let parsedRooms: Room[] = [];
         if (cachedRooms) {
-          const parsedRooms = JSON.parse(cachedRooms) as Room[];
+          try {
+            parsedRooms = JSON.parse(cachedRooms) as Room[];
+          } catch (e) {}
+        }
+
+        if (parsedRooms.length > 0) {
           setRooms(parsedRooms);
           setSelectedRoom((prev) => prev ?? (parsedRooms[0]?.name ?? null));
         } else {
           const fetchedRooms = await getRooms(branch);
           setRooms(fetchedRooms);
           setSelectedRoom((prev) => prev ?? (fetchedRooms[0]?.name ?? null));
-          sessionStorage.setItem(sessionKey, JSON.stringify(fetchedRooms));
+          if (fetchedRooms.length > 0) {
+            sessionStorage.setItem(sessionKey, JSON.stringify(fetchedRooms));
+          }
         }
       } catch (e) {
         console.error(e);

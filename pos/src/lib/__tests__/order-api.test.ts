@@ -1483,20 +1483,338 @@ test('offline split creates two distinct order entities and renders two order ca
     assert.ok(child.pending_command_id, 'Child must store pending split command id');
 
     // getPOSInvoices fallback must return BOTH split invoices as distinct cards.
+    // The source stays Draft (already printed); the freshly split child is unprinted
+    // and therefore lands in the Unbilled tab for table orders, matching the backend.
     const drafts = await getPOSInvoices({ status: 'Draft' });
-    const splitCards = drafts.invoices.filter(
-      inv => inv.custom_split_group === source.custom_split_group
-    );
-    assert.equal(splitCards.length, 2, 'Two distinct split cards must be rendered');
+    const unbilled = await getPOSInvoices({ status: 'Unbilled' });
 
-    const card1 = splitCards.find(c => c.split_index === 1);
-    const card2 = splitCards.find(c => c.split_index === 2);
-    assert.ok(card1);
-    assert.ok(card2);
-    assert.equal(card1.name, sourceId);
-    assert.equal(card2.name, splitResult.new_invoice);
+    const sourceCard = drafts.invoices.find(
+      inv => inv.custom_split_group === source.custom_split_group && inv.split_index === 1
+    );
+    const childCard = unbilled.invoices.find(
+      inv => inv.custom_split_group === source.custom_split_group && inv.split_index === 2
+    );
+
+    assert.ok(sourceCard, 'Source split card must render in Draft tab');
+    assert.ok(childCard, 'Child split card must render in Unbilled tab');
+    assert.equal(sourceCard.name, sourceId);
+    assert.equal(childCard.name, splitResult.new_invoice);
   } finally {
     setNavigatorOnline(true);
     (call as any).get = originalGet;
+  }
+});
+
+
+test('offline split matches items by server row name like the backend', async () => {
+  const sourceId = 'POS-INV-SPLIT-ROW-NAME-001';
+
+  await repositories.orders.put({
+    ...baseOrderEntity(),
+    id: sourceId,
+    table: 'T-SPLIT-ROW-001',
+    status: 'Draft',
+    sync_status: 'synced',
+    invoice_printed: 1,
+    items: [
+      // Server POS Invoice Item rows have a row `name` that differs from item_code.
+      { name: 'ROW-A', item: 'A', item_name: 'Item A', rate: 100, qty: 2, amount: 200 },
+      { name: 'ROW-B', item: 'A', item_name: 'Item A duplicate', rate: 100, qty: 1, amount: 100 },
+    ],
+    grand_total: 300,
+  });
+
+  setNavigatorOnline(false);
+
+  try {
+    // Move the specific ROW-A quantity; ROW-B must stay untouched.
+    const result = await splitBill(sourceId, [{ name: 'ROW-A', qty: 1 }]);
+
+    const source = await repositories.orders.getById(sourceId);
+    const child = await repositories.orders.getById(result.new_invoice);
+
+    assert.ok(source);
+    assert.ok(child);
+    assert.equal(source.items.length, 2);
+    assert.equal(source.items.find(i => i.name === 'ROW-A')?.qty, 1);
+    assert.equal(source.items.find(i => i.name === 'ROW-B')?.qty, 1);
+    assert.equal(child.items.length, 1);
+    assert.equal(child.items[0].name, 'ROW-A');
+    assert.equal(child.items[0].qty, 1);
+  } finally {
+    setNavigatorOnline(true);
+  }
+});
+
+test('offline split resets child invoice_printed to 0 and sets Unbilled for table orders', async () => {
+  const sourceId = 'POS-INV-SPLIT-CHILD-STATUS-001';
+
+  await repositories.orders.put({
+    ...baseOrderEntity(),
+    id: sourceId,
+    table: 'T-SPLIT-STATUS-001',
+    status: 'Draft',
+    sync_status: 'synced',
+    invoice_printed: 1,
+    items: [{ item: 'A', item_name: 'Item A', rate: 100, qty: 2, amount: 200 }],
+    grand_total: 200,
+  });
+
+  setNavigatorOnline(false);
+
+  try {
+    const result = await splitBill(sourceId, [{ name: 'A', qty: 1 }]);
+
+    const child = await repositories.orders.getById(result.new_invoice);
+    assert.ok(child);
+    assert.equal(child.invoice_printed, 0);
+    assert.equal(child.status, 'Unbilled');
+
+    const source = await repositories.orders.getById(sourceId);
+    assert.equal(source?.invoice_printed, 1);
+    assert.equal(source?.status, 'Draft');
+  } finally {
+    setNavigatorOnline(true);
+  }
+});
+
+test('offline split applies customer override to child locally', async () => {
+  const sourceId = 'POS-INV-SPLIT-CUSTOMER-001';
+
+  await repositories.orders.put({
+    ...baseOrderEntity(),
+    id: sourceId,
+    table: 'T-SPLIT-CUSTOMER-001',
+    status: 'Draft',
+    sync_status: 'synced',
+    customer: 'Guest',
+    items: [{ item: 'A', item_name: 'Item A', rate: 100, qty: 2, amount: 200 }],
+    grand_total: 200,
+  });
+
+  setNavigatorOnline(false);
+
+  try {
+    const result = await splitBill(sourceId, [{ name: 'A', qty: 1 }], 'CUST-NEW');
+
+    const child = await repositories.orders.getById(result.new_invoice);
+    assert.ok(child);
+    assert.equal(child.customer, 'CUST-NEW');
+
+    const source = await repositories.orders.getById(sourceId);
+    assert.equal(source?.customer, 'Guest');
+
+    const cmds = await repositories.syncQueue.getAll();
+    const splitCmd = cmds.find(
+      c =>
+        c.action === 'SplitBillCommand' ||
+        c.operation_type === 'SPLIT_BILL' ||
+        c.endpoint?.includes('split_bill')
+    );
+    assert.equal((splitCmd?.payload as any)?.customer, 'CUST-NEW');
+  } finally {
+    setNavigatorOnline(true);
+  }
+});
+
+test('offline split for TEMP-SPLIT-* source depends on parent split command', async () => {
+  const parentTempId = 'TEMP-SPLIT-SOURCE-001';
+  const parentCmdId = 'SYNC-SPLIT-PARENT-001';
+
+  await repositories.orders.put({
+    ...baseOrderEntity(),
+    id: parentTempId,
+    table: 'T-SPLIT-NESTED-001',
+    status: 'Unbilled',
+    sync_status: 'pending',
+    pending_command_id: parentCmdId,
+    custom_split_group: 'SG-NESTED-001',
+    split_index: 1,
+    split_total: 2,
+    split_siblings: ['TEMP-SPLIT-SIBLING-001'],
+    custom_split_from: 'POS-INV-SPLIT-NESTED-PARENT',
+    items: [{ item: 'A', item_name: 'Item A', rate: 100, qty: 2, amount: 200 }],
+    grand_total: 200,
+  });
+
+  setNavigatorOnline(false);
+
+  try {
+    const result = await splitBill(parentTempId, [{ name: 'A', qty: 1 }]);
+
+    const cmds = await repositories.syncQueue.getAll();
+    const splitCmds = cmds.filter(
+      c =>
+        c.action === 'SplitBillCommand' ||
+        c.operation_type === 'SPLIT_BILL' ||
+        c.endpoint?.includes('split_bill')
+    );
+    assert.equal(splitCmds.length, 1);
+    assert.deepEqual(splitCmds[0]?.dependency_ids, [parentCmdId]);
+
+    const child = await repositories.orders.getById(result.new_invoice);
+    assert.equal(child?.pending_command_id, splitCmds[0]?.id);
+  } finally {
+    setNavigatorOnline(true);
+  }
+});
+
+test('offline split of an already-split invoice updates all siblings', async () => {
+  const sourceId = 'POS-INV-SPLIT-MULTI-001';
+  const child1Id = 'POS-INV-SPLIT-MULTI-002';
+  const groupId = 'SG-MULTI-001';
+  const createdAtBase = '2026-08-07T10:00:00.000Z';
+
+  await repositories.orders.put({
+    ...baseOrderEntity(),
+    id: sourceId,
+    table: 'T-SPLIT-MULTI-001',
+    status: 'Draft',
+    sync_status: 'synced',
+    invoice_printed: 1,
+    custom_split_group: groupId,
+    split_index: 1,
+    split_total: 2,
+    split_siblings: [child1Id],
+    items: [{ item: 'A', item_name: 'Item A', rate: 100, qty: 3, amount: 300 }],
+    grand_total: 300,
+    createdAt: createdAtBase,
+  });
+
+  await repositories.orders.put({
+    ...baseOrderEntity(),
+    id: child1Id,
+    table: 'T-SPLIT-MULTI-001',
+    status: 'Unbilled',
+    sync_status: 'synced',
+    invoice_printed: 0,
+    custom_split_group: groupId,
+    custom_split_from: sourceId,
+    split_index: 2,
+    split_total: 2,
+    split_siblings: [sourceId],
+    items: [{ item: 'B', item_name: 'Item B', rate: 50, qty: 1, amount: 50 }],
+    grand_total: 50,
+    createdAt: '2026-08-07T10:05:00.000Z',
+  });
+
+  setNavigatorOnline(false);
+
+  try {
+    const result = await splitBill(sourceId, [{ name: 'A', qty: 1 }]);
+
+    const source = await repositories.orders.getById(sourceId);
+    const child1 = await repositories.orders.getById(child1Id);
+    const child2 = await repositories.orders.getById(result.new_invoice);
+
+    assert.ok(source);
+    assert.ok(child1);
+    assert.ok(child2);
+
+    assert.equal(source.split_total, 3);
+    assert.equal(child1.split_total, 3);
+    assert.equal(child2.split_total, 3);
+
+    assert.equal(source.split_index, 1);
+    assert.equal(child1.split_index, 2);
+    assert.equal(child2.split_index, 3);
+
+    assert.deepEqual(source.split_siblings?.sort(), [child1Id, result.new_invoice].sort());
+    assert.deepEqual(child1.split_siblings?.sort(), [sourceId, result.new_invoice].sort());
+    assert.deepEqual(child2.split_siblings?.sort(), [sourceId, child1Id].sort());
+  } finally {
+    setNavigatorOnline(true);
+  }
+});
+
+// ============================================================================
+// Task 12: Offline Split + Payment Queue Dependency Chain
+// ============================================================================
+
+test('offline split of temp order queues payment dependencies on correct creators', async () => {
+  // 1. Create a TEMP order (total 200) while offline.
+  const originalPost = call.post;
+  (call as any).post = async () => {
+    throw new Error('Network Disconnected');
+  };
+
+  let tempId: string;
+  setNavigatorOnline(false);
+
+  try {
+    const order = await syncOrder(baseOrderData({
+      table: 'T-SPLIT-PAY-CHAIN-001',
+      items: [{ item: 'A', item_name: 'Item A', rate: 100, qty: 2 }],
+    }));
+    tempId = order.name;
+
+    // 2. Split the TEMP order moving 1 qty -> TEMP1 (100) + TEMP2 (100).
+    const splitResult = await splitBill(tempId, [{ name: 'A', qty: 1 }]);
+    const childTempId = splitResult.new_invoice;
+
+    // 3. Queue payment on the original (now reduced) invoice.
+    await queueOfflinePayment({
+      invoice: tempId,
+      customer: 'Guest',
+      cashier: 'cashier@example.com',
+      owner: 'cashier@example.com',
+      pos_profile: 'Test Profile',
+      table: 'T-SPLIT-PAY-CHAIN-001',
+      payments: [{ mode_of_payment: 'Cash', amount: 100 }],
+      additionalDiscount: null,
+    });
+
+    // 4. Queue payment on the split child invoice.
+    await queueOfflinePayment({
+      invoice: childTempId,
+      customer: 'Guest',
+      cashier: 'cashier@example.com',
+      owner: 'cashier@example.com',
+      pos_profile: 'Test Profile',
+      table: 'T-SPLIT-PAY-CHAIN-001',
+      payments: [{ mode_of_payment: 'Cash', amount: 100 }],
+      additionalDiscount: null,
+    });
+
+    // Invariant: two independent order entities with independent totals/items/statuses.
+    const source = await repositories.orders.getById(tempId);
+    const child = await repositories.orders.getById(childTempId);
+
+    assert.ok(source);
+    assert.ok(child);
+    assert.equal(source.items.length, 1);
+    assert.equal(source.items[0].qty, 1);
+    assert.equal(source.grand_total, 100);
+    assert.equal(child.items.length, 1);
+    assert.equal(child.items[0].qty, 1);
+    assert.equal(child.grand_total, 100);
+    assert.equal(source.status, 'Paid');
+    assert.equal(child.status, 'Paid');
+
+    // Find the split command that created the child.
+    const cmds = await repositories.syncQueue.getAll();
+    const splitCmd = cmds.find(
+      c =>
+        c.operation_type === 'SPLIT_BILL' &&
+        (c.action === 'SplitBillCommand' || c.endpoint?.includes('split_bill')) &&
+        c.temporary_id === childTempId
+    );
+    assert.ok(splitCmd, 'Split command for child must exist in queue');
+    assert.deepEqual(splitCmd?.dependency_ids, [`SYNC-ORDER-${tempId}`]);
+
+    // Payment commands must depend on the correct creators.
+    const paymentCmds = cmds.filter(c => c.action === 'make_invoice');
+    assert.equal(paymentCmds.length, 2, 'Two independent payment commands must be queued');
+
+    const sourcePayment = paymentCmds.find(c => (c.payload as any).invoice === tempId);
+    const childPayment = paymentCmds.find(c => (c.payload as any).invoice === childTempId);
+
+    assert.ok(sourcePayment, 'Payment for original temp invoice must exist');
+    assert.ok(childPayment, 'Payment for split child temp invoice must exist');
+    assert.deepEqual(sourcePayment?.dependency_ids, [`SYNC-ORDER-${tempId}`]);
+    assert.deepEqual(childPayment?.dependency_ids, [splitCmd?.id]);
+  } finally {
+    (call as any).post = originalPost;
+    setNavigatorOnline(true);
   }
 });

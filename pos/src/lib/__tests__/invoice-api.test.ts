@@ -916,3 +916,95 @@ test('getSplitGroup offline fallback includes sibling referenced only by split_s
     (call as any).get = originalGet;
   }
 });
+
+
+test('getPOSInvoices online fallback preserves split metadata for pending orders', async () => {
+  const sourceId = 'POS-INV-PENDING-SPLIT-001';
+  const childTempId = 'TEMP-SPLIT-PENDING-001';
+  const groupId = 'SG-PENDING-001';
+
+  // Server returns only the source invoice; the child is still pending locally.
+  await repositories.orders.put({
+    ...baseOrder,
+    id: sourceId,
+    table: 'T-PENDING-SPLIT-001',
+    status: 'Draft',
+    sync_status: 'synced',
+    invoice_printed: 1,
+    custom_split_group: groupId,
+    custom_split_from: null,
+    split_index: 1,
+    split_total: 2,
+    split_siblings: [childTempId],
+    items: [{ item: 'A', item_name: 'Item A', rate: 100, qty: 1, amount: 100 }],
+    grand_total: 100,
+  });
+
+  await repositories.orders.put({
+    ...baseOrder,
+    id: childTempId,
+    table: 'T-PENDING-SPLIT-001',
+    status: 'Unbilled',
+    sync_status: 'pending',
+    invoice_printed: 0,
+    custom_split_group: groupId,
+    custom_split_from: sourceId,
+    split_index: 2,
+    split_total: 2,
+    split_siblings: [sourceId],
+    items: [{ item: 'B', item_name: 'Item B', rate: 50, qty: 1, amount: 50 }],
+    grand_total: 50,
+  });
+
+  const originalGet = call.get;
+  (call as any).get = async () => ({
+    message: {
+      data: [
+        {
+          name: sourceId,
+          invoice_printed: 1,
+          grand_total: 100,
+          restaurant_table: 'T-PENDING-SPLIT-001',
+          cashier: '',
+          waiter: '',
+          net_total: 100,
+          posting_time: '12:00:00',
+          total_taxes_and_charges: 0,
+          customer: 'Guest',
+          status: 'Draft',
+          mobile_number: '',
+          posting_date: '2026-08-06',
+          rounded_total: 100,
+          order_type: 'Dine-In',
+          custom_split_group: groupId,
+          custom_split_from: null,
+          split_index: 1,
+          split_total: 2,
+          split_siblings: [childTempId],
+          items: [],
+        },
+      ],
+      next: false,
+    },
+  });
+
+  try {
+    const drafts = await getPOSInvoices({ status: 'Draft' });
+    const sourceCard = drafts.invoices.find(i => i.name === sourceId);
+    assert.ok(sourceCard);
+    assert.equal(sourceCard.custom_split_group, groupId);
+    assert.equal(sourceCard.split_index, 1);
+    assert.equal(sourceCard.split_total, 2);
+    assert.ok(sourceCard.split_siblings?.includes(childTempId));
+
+    const unbilled = await getPOSInvoices({ status: 'Unbilled' });
+    const childCard = unbilled.invoices.find(i => i.name === childTempId);
+    assert.ok(childCard);
+    assert.equal(childCard.custom_split_group, groupId);
+    assert.equal(childCard.custom_split_from, sourceId);
+    assert.equal(childCard.split_index, 2);
+    assert.equal(childCard.split_total, 2);
+  } finally {
+    (call as any).get = originalGet;
+  }
+});

@@ -41,21 +41,27 @@ const TableSelectionDialog: React.FC<Props> = ({ onClose }) => {
         const sessionKey = `ury_rooms_${posProfile.branch}`;
         const cachedRooms = sessionStorage.getItem(sessionKey);
         
+        let parsedRooms: Room[] = [];
         if (cachedRooms) {
-          const parsedRooms = JSON.parse(cachedRooms) as Room[];
+          try {
+            parsedRooms = JSON.parse(cachedRooms) as Room[];
+          } catch (e) {}
+        }
+
+        if (parsedRooms.length > 0) {
           setRooms(parsedRooms);
-          if (parsedRooms.length > 0) {
-            setSelectedRoom(parsedRooms[0].name);
-          }
+          setSelectedRoom(parsedRooms[0].name);
         } else {
-          // If not in session storage, fetch from API
+          // If not in session storage or empty, fetch from API
           const fetchedRooms = await getRooms(posProfile.branch);
           setRooms(fetchedRooms);
           if (fetchedRooms.length > 0) {
             setSelectedRoom(fetchedRooms[0].name);
           }
           // Store in session storage
-          sessionStorage.setItem(sessionKey, JSON.stringify(fetchedRooms));
+          if (fetchedRooms.length > 0) {
+            sessionStorage.setItem(sessionKey, JSON.stringify(fetchedRooms));
+          }
         }
       } catch (e) {
         setError(t('errors.failed_load_rooms') || 'Failed to load rooms');

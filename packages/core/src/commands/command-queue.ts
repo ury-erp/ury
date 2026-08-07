@@ -350,6 +350,31 @@ export class CommandQueueManager {
   }
 
   /**
+   * Update the envelope temp/server/entity metadata for a queued command.
+   * Used after a TEMP-* invoice is promoted to a real server ID so that
+   * dependent commands do not keep stale envelope references.
+   */
+  async updateEnvelopeMetadata(
+    id: string,
+    metadata: {
+      temporary_id?: string | null;
+      server_id?: string | null;
+      entity_id?: string;
+    }
+  ): Promise<void> {
+    const existing = await this.queueRepo.getById(id);
+    if (existing) {
+      if ('temporary_id' in metadata) existing.temporary_id = metadata.temporary_id;
+      if ('server_id' in metadata) existing.server_id = metadata.server_id;
+      if ('entity_id' in metadata && metadata.entity_id !== undefined) {
+        existing.entity_id = metadata.entity_id;
+      }
+      existing.updated_at = new Date().toISOString();
+      await this.queueRepo.put(existing);
+    }
+  }
+
+  /**
    * Removes a completed parent command id from the dependency lists of all other
    * pending commands. This is required because completed commands are purged from
    * the queue immediately after execution; if dependents still referenced the

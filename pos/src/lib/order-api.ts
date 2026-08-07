@@ -681,7 +681,8 @@ export interface SplitBillResponse {
  * SplitBillCommand. The source invoice has the moved items decremented, a new
  * temporary child invoice is created, and both are linked with split metadata so
  * the UI can render the group offline. The queued command mirrors the online
- * payload and depends on SYNC-ORDER-${tempId} when the source is itself pending.
+ * payload and depends on the command that created the source when the source is
+ * itself a temporary invoice (TEMP-ORD-* or TEMP-SPLIT-*).
  */
 async function queueOfflineSplit(
   sourceInvoice: string,
@@ -696,12 +697,14 @@ async function queueOfflineSplit(
   const childId = `TEMP-SPLIT-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
   const now = new Date().toISOString();
 
-  // Build a map of items to move keyed by item code for deterministic matching.
+  // The backend matches items by POS Invoice Item row `name`. Local orders created
+  // offline may not have a server row name, in which case `name` falls back to the
+  // item code, so lookup by `name ?? item` preserves parity in both cases.
   const moveMap = new Map(itemsToMove.map(m => [m.name, m.qty]));
 
   const remainingItems = source.items
     .map(item => {
-      const moveQty = moveMap.get(item.item) || 0;
+      const moveQty = moveMap.get(item.name ?? item.item) || 0;
       const nextQty = item.qty - moveQty;
       if (nextQty <= 0) return null;
       return {
@@ -714,11 +717,10 @@ async function queueOfflineSplit(
 
   const movedItems = source.items
     .map(item => {
-      const moveQty = moveMap.get(item.item) || 0;
+      const moveQty = moveMap.get(item.name ?? item.item) || 0;
       if (moveQty <= 0) return null;
       return {
         ...item,
-        name: item.item,
         qty: moveQty,
         amount: item.rate * moveQty,
       };
@@ -731,14 +733,47 @@ async function queueOfflineSplit(
 
   const groupId = source.custom_split_group || `SG-${Date.now()}`;
 
+  // If the source is already part of a split group, gather the existing siblings
+  // so the new child can be appended and every member's index/total recomputed.
+  const existingSiblingIds = Array.from(
+    new Set(
+      (source.split_siblings || []).filter(id => id !== sourceInvoice && id !== childId)
+    )
+  );
+  const siblingOrders: OrderEntity[] = [];
+  for (const siblingId of existingSiblingIds) {
+    try {
+      const sibling = await repositories.orders.getById(siblingId);
+      if (sibling) siblingOrders.push(sibling);
+    } catch (err) {
+      console.warn(`[queueOfflineSplit] Could not load sibling ${siblingId}:`, err);
+    }
+  }
+
+  // Order members the same way the backend does: by creation timestamp ascending.
+  // The source is always first (it is the original), existing siblings follow in
+  // creation order, and the new child is last.
+  const allMemberIds = [
+    sourceInvoice,
+    ...siblingOrders
+      .sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''))
+      .map(s => s.id),
+    childId,
+  ];
+  const splitTotal = allMemberIds.length;
+
+  const makeSplitMeta = (id: string) => ({
+    custom_split_group: groupId,
+    split_index: allMemberIds.indexOf(id) + 1,
+    split_total: splitTotal,
+    split_siblings: allMemberIds.filter(m => m !== id),
+  });
+
   const updatedSource: OrderEntity = {
     ...source,
     items: remainingItems,
     grand_total: remainingItems.reduce((sum, i) => sum + i.amount, 0),
-    custom_split_group: groupId,
-    split_index: 1,
-    split_total: 2,
-    split_siblings: [sourceInvoice, childId],
+    ...makeSplitMeta(sourceInvoice),
     updatedAt: now,
   };
 
@@ -754,10 +789,7 @@ async function queueOfflineSplit(
     splitPayload.customer = customer;
   }
 
-  const dependencies: string[] = [];
-  if (sourceInvoice.startsWith('TEMP-')) {
-    dependencies.push(`SYNC-ORDER-${sourceInvoice}`);
-  }
+  const dependencies = await resolveTempDependency(sourceInvoice);
 
   const commandId = await commandQueue.enqueue(
     new SplitBillCommand(splitPayload, {
@@ -768,16 +800,20 @@ async function queueOfflineSplit(
     })
   );
 
+  // Mirror the backend: a freshly split child is always unprinted. Table orders
+  // therefore render in the Unbilled tab; counter orders remain Draft.
+  const childStatus: OrderEntity['status'] = source.table ? 'Unbilled' : 'Draft';
+
   const childOrder: OrderEntity = {
     ...source,
     id: childId,
+    customer: customer ?? source.customer,
     items: movedItems,
     grand_total: movedItems.reduce((sum, i) => sum + i.amount, 0),
-    custom_split_group: groupId,
+    invoice_printed: 0,
+    status: childStatus,
+    ...makeSplitMeta(childId),
     custom_split_from: sourceInvoice,
-    split_index: 2,
-    split_total: 2,
-    split_siblings: [sourceInvoice, childId],
     pending_command_id: commandId,
     sync_status: 'pending',
     createdAt: now,
@@ -786,6 +822,19 @@ async function queueOfflineSplit(
 
   await repositories.orders.put(updatedSource);
   await repositories.orders.put(childOrder);
+
+  // Keep any existing siblings' metadata consistent with the new member.
+  for (const sibling of siblingOrders) {
+    const siblingMeta = makeSplitMeta(sibling.id);
+    await repositories.orders.put({
+      ...sibling,
+      custom_split_group: siblingMeta.custom_split_group,
+      split_index: siblingMeta.split_index,
+      split_total: siblingMeta.split_total,
+      split_siblings: siblingMeta.split_siblings,
+      updatedAt: now,
+    });
+  }
 
   projectionBus.emit('ORDERS_UPDATED');
   projectionBus.emit('TABLES_UPDATED');

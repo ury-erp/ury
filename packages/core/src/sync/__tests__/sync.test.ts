@@ -2257,3 +2257,233 @@ test('Scenario 17: Offline split sync promotes child temp ID, rewrites split met
     (call as any).get = originalGet;
   }
 });
+
+// ============================================================================
+// Task 12: Full Offline Split + Both Payments Sync Flow
+// ============================================================================
+
+test('Scenario 18: Offline temp order split -> pay both -> sync resolves in strict order', async () => {
+  const TEMP_SOURCE = 'TEMP-ORD-SPLIT-PAY-FULL-001';
+  const TEMP_CHILD = 'TEMP-SPLIT-PAY-FULL-002';
+  const SERVER_SOURCE = 'POS-INV-SPLIT-PAY-FULL-001';
+  const SERVER_CHILD = 'POS-INV-SPLIT-PAY-FULL-002';
+  const TABLE_NAME = 'T-SPLIT-PAY-FULL-001';
+  const SPLIT_CMD_ID = 'SYNC-SPLIT-PAY-FULL-002';
+  const SOURCE_PAY_CMD_ID = 'SYNC-PAYMENT-SPLIT-PAY-FULL-001';
+  const CHILD_PAY_CMD_ID = 'SYNC-PAYMENT-SPLIT-PAY-FULL-002';
+
+  await repos.tables.put({
+    name: TABLE_NAME,
+    restaurant_room: 'Main Hall',
+    no_of_seats: 4,
+    occupied: 1,
+  });
+
+  // 1. Original TEMP order (200): 2 qty of item A @ 100.
+  await repos.orders.put({
+    ...baseOrder,
+    id: TEMP_SOURCE,
+    table: TABLE_NAME,
+    order_type: 'Dine-In',
+    status: 'Paid',
+    sync_status: 'pending',
+    items: [{ name: 'ROW-A', item: 'A', item_name: 'Item A', rate: 100, qty: 1, amount: 100 }],
+    grand_total: 100,
+  });
+
+  // 2. Split child TEMP order (100): 1 qty of item A @ 100.
+  await repos.orders.put({
+    ...baseOrder,
+    id: TEMP_CHILD,
+    table: TABLE_NAME,
+    order_type: 'Dine-In',
+    status: 'Paid',
+    sync_status: 'pending',
+    custom_split_group: 'SG-SPLIT-PAY-FULL-001',
+    custom_split_from: TEMP_SOURCE,
+    split_index: 2,
+    split_total: 2,
+    split_siblings: [TEMP_SOURCE],
+    pending_command_id: SPLIT_CMD_ID,
+    items: [{ name: 'ROW-A', item: 'A', item_name: 'Item A', rate: 100, qty: 1, amount: 100 }],
+    grand_total: 100,
+  });
+
+  // 3. Queue: sync original -> split child -> pay source -> pay child.
+  await repos.syncQueue.put({
+    id: `SYNC-ORDER-${TEMP_SOURCE}`,
+    action: 'sync_order',
+    endpoint: 'ury.ury.doctype.ury_order.ury_order.sync_order',
+    payload: { temp_id: TEMP_SOURCE, items: [] },
+    timestamp: new Date().toISOString(),
+    status: 'PENDING',
+    priority: 1,
+  });
+
+  await repos.syncQueue.put({
+    id: SPLIT_CMD_ID,
+    action: 'SplitBillCommand',
+    operation_type: 'SPLIT_BILL',
+    endpoint: 'ury.ury.doctype.ury_order.ury_order.split_bill',
+    payload: {
+      source_invoice: TEMP_SOURCE,
+      items_to_move: [{ name: 'ROW-A', qty: 1 }],
+    },
+    temporary_id: TEMP_CHILD,
+    entity_id: TEMP_SOURCE,
+    dependency_ids: [`SYNC-ORDER-${TEMP_SOURCE}`],
+    timestamp: new Date().toISOString(),
+    status: 'PENDING',
+    priority: 1,
+  });
+
+  await repos.syncQueue.put({
+    id: SOURCE_PAY_CMD_ID,
+    action: 'make_invoice',
+    endpoint: 'ury.ury.doctype.ury_order.ury_order.make_invoice',
+    payload: {
+      invoice: TEMP_SOURCE,
+      payments: [{ mode_of_payment: 'Cash', amount: 100 }],
+    },
+    temporary_id: TEMP_SOURCE,
+    entity_id: TEMP_SOURCE,
+    dependency_ids: [`SYNC-ORDER-${TEMP_SOURCE}`],
+    timestamp: new Date().toISOString(),
+    status: 'PENDING',
+    priority: 1,
+  });
+
+  await repos.syncQueue.put({
+    id: CHILD_PAY_CMD_ID,
+    action: 'make_invoice',
+    endpoint: 'ury.ury.doctype.ury_order.ury_order.make_invoice',
+    payload: {
+      invoice: TEMP_CHILD,
+      payments: [{ mode_of_payment: 'Cash', amount: 100 }],
+    },
+    temporary_id: TEMP_CHILD,
+    entity_id: TEMP_CHILD,
+    dependency_ids: [SPLIT_CMD_ID],
+    timestamp: new Date().toISOString(),
+    status: 'PENDING',
+    priority: 1,
+  });
+
+  const originalPost = call.post;
+  const postedPayloads: { endpoint: string; payload: any }[] = [];
+  (call as any).post = async (endpoint: string, payload: any) => {
+    postedPayloads.push({ endpoint, payload });
+    if (endpoint.includes('sync_order')) {
+      return { name: SERVER_SOURCE, status: 'Draft' };
+    }
+    if (endpoint.includes('split_bill')) {
+      return { new_invoice: SERVER_CHILD };
+    }
+    if (endpoint.includes('make_invoice')) {
+      return { name: payload.invoice };
+    }
+    return {};
+  };
+
+  const originalGet = call.get;
+  (call as any).get = async () => ({
+    message: {
+      group: 'SG-SPLIT-PAY-FULL-001',
+      current: SERVER_CHILD,
+      invoices: [
+        {
+          name: SERVER_SOURCE,
+          custom_split_from: null,
+          split_index: 1,
+          split_total: 2,
+          split_siblings: [SERVER_CHILD],
+          customer: 'Guest',
+          grand_total: 100,
+          invoice_printed: 0,
+          restaurant_table: TABLE_NAME,
+          status: 'Draft',
+        },
+        {
+          name: SERVER_CHILD,
+          custom_split_from: SERVER_SOURCE,
+          split_index: 2,
+          split_total: 2,
+          split_siblings: [SERVER_SOURCE],
+          customer: 'Guest',
+          grand_total: 100,
+          invoice_printed: 0,
+          restaurant_table: TABLE_NAME,
+          status: 'Draft',
+        },
+      ],
+    },
+  });
+
+  try {
+    const engine = new SyncEngine(queueMgr, idMapper, undefined, { repositories: repos });
+    const result = await engine.triggerSync();
+
+    // All four commands must process and succeed.
+    assert.equal(result.processed, 4, 'Sync, split, and both payments must process');
+    assert.equal(result.succeeded, 4, 'All four commands must succeed');
+    assert.equal(result.failed, 0, 'No command may fail');
+
+    // Strict execution order: sync_order -> split_bill -> pay source -> pay child.
+    const endpointOrder = postedPayloads.map(p => {
+      if (p.endpoint.includes('sync_order')) return 'sync_order';
+      if (p.endpoint.includes('split_bill')) return 'split_bill';
+      if (p.endpoint.includes('make_invoice')) return 'make_invoice';
+      return 'other';
+    });
+    assert.deepEqual(endpointOrder, ['sync_order', 'split_bill', 'make_invoice', 'make_invoice']);
+
+    // sync_order created the original invoice.
+    const syncPosted = postedPayloads[0];
+    assert.equal(syncPosted.payload.temp_id, TEMP_SOURCE);
+
+    // split_bill ran against the promoted source ID and produced the child server ID.
+    const splitPosted = postedPayloads[1];
+    assert.equal(splitPosted.payload.source_invoice, SERVER_SOURCE);
+
+    // First make_invoice paid the original invoice.
+    const sourcePayPosted = postedPayloads[2];
+    assert.equal(sourcePayPosted.payload.invoice, SERVER_SOURCE);
+    assert.equal(sourcePayPosted.payload.payments[0].amount, 100);
+
+    // Second make_invoice paid the split child invoice.
+    const childPayPosted = postedPayloads[3];
+    assert.equal(childPayPosted.payload.invoice, SERVER_CHILD);
+    assert.equal(childPayPosted.payload.payments[0].amount, 100);
+
+    // Local state: two independent paid server invoices, no stale temp records.
+    const source = await repos.orders.getById(SERVER_SOURCE);
+    const child = await repos.orders.getById(SERVER_CHILD);
+
+    assert.ok(source, 'Source invoice must be promoted locally');
+    assert.ok(child, 'Child invoice must be promoted locally');
+    assert.equal(source.status, 'Paid');
+    assert.equal(child.status, 'Paid');
+    assert.equal(source.grand_total, 100);
+    assert.equal(child.grand_total, 100);
+    assert.equal(source.items.length, 1);
+    assert.equal(child.items.length, 1);
+    assert.equal(source.items[0].qty, 1);
+    assert.equal(child.items[0].qty, 1);
+
+    assert.equal(await repos.orders.getById(TEMP_SOURCE), undefined);
+    assert.equal(await repos.orders.getById(TEMP_CHILD), undefined);
+
+    // Queue must be empty after successful sync.
+    const remainingQueue = await repos.syncQueue.getAll();
+    assert.equal(remainingQueue.length, 0);
+
+    // Envelope metadata on payment commands must be patched to server IDs.
+    const sourcePayCmd = await repos.syncQueue.getById(SOURCE_PAY_CMD_ID);
+    const childPayCmd = await repos.syncQueue.getById(CHILD_PAY_CMD_ID);
+    assert.equal(sourcePayCmd, undefined, 'Completed source payment command should be purged');
+    assert.equal(childPayCmd, undefined, 'Completed child payment command should be purged');
+  } finally {
+    (call as any).post = originalPost;
+    (call as any).get = originalGet;
+  }
+});
