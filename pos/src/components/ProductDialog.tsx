@@ -61,6 +61,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
   } = usePOSStore();
 
   const [itemDoc, setItemDoc] = useState<any | null>(null);
+  const [isLocalEditMode, setIsLocalEditMode] = useState<boolean>(editMode);
   const [, setIsItemLoading] = useState(false);
   const [, setItemError] = useState<string | null>(null);
 
@@ -104,7 +105,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
   // When opened from the menu (not editMode), find the MOST RECENT cart line for this item.
   // Pre-populate all fields (qty, comment, add-ons) from that line so the cashier
   // immediately sees the current preparation.
-  const existingLineForItem = !editMode && selectedItem
+  const existingLineForItem = selectedItem
     ? ([...activeOrders].reverse().find(order => order.id === selectedItem.id) ?? null)
     : null;
 
@@ -202,7 +203,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
     const numQty = typeof quantity === 'string' ? parseFloat(quantity) : quantity;
     if (isNaN(numQty) || numQty <= 0) return;
 
-    if (editMode && itemToReplace?.uniqueId) {
+    if (isLocalEditMode && itemToReplace?.uniqueId) {
       // Cart edit — keep row identity, update content.
       updateCartItem(itemToReplace.uniqueId, {
         ...itemToReplace,
@@ -281,6 +282,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
   // so the cashier can start a fresh preparation without manually erasing each field.
   // No special behaviour beyond resetting the form.
   const handleAddCustomization = () => {
+    setIsLocalEditMode(false);
     setQuantity('1');
     setComments('');
     setSelectedAddons([]);
@@ -415,7 +417,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
               className="resize-none"
             />
             
-            {!editMode && existingLineForItem !== null && (
+            {existingLineForItem !== null && (
               <Button
                 onClick={handleAddCustomization}
                 variant="outline"
@@ -473,7 +475,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
               size="lg"
               disabled={numericQuantity === 0}
             >
-              {editMode ? t('product_dialog.update_order') : t('product_dialog.add_to_order')}
+              {isLocalEditMode ? t('product_dialog.update_order') : t('product_dialog.add_to_order')}
             </Button>
           </div>
         </div>
