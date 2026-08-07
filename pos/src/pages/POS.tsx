@@ -29,6 +29,15 @@ export default function POS() {
   const handleItemClick = (item: any) => {
     if (isMenuInteractionDisabled()) return;
     
+    const activeOrders = usePOSStore.getState().activeOrders;
+    const isItemInCart = activeOrders.some((order) => order.id === item.id);
+
+    if (isItemInCart) {
+      setSelectedItem(item);
+      setIsDialogOpen(true);
+      return;
+    }
+
     clickCountRef.current += 1;
     
     if (clickTimerRef.current) {
@@ -39,7 +48,7 @@ export default function POS() {
       if (clickCountRef.current === 1) {
         // Single click - add to cart
         addToOrder({ ...item, quantity: 1 });
-      } else if (clickCountRef.current === 2) {
+      } else if (clickCountRef.current >= 2) {
         // Double click - open dialog
         setSelectedItem(item);
         setIsDialogOpen(true);
