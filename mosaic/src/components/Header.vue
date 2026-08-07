@@ -1,10 +1,9 @@
 <template>
 
     <header class="bg-white p-4 flex justify-between items-center">
-    <div class="flex items-center">
+    <router-link to="/" class="flex items-center cursor-pointer">
         <img :src="imagePath" alt="Logo" class="ml-20 w-40 h-15 mr-2">
-       
-    </div>
+    </router-link>
     <div class="flex items-center">
 
 
