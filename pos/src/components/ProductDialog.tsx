@@ -30,6 +30,20 @@ interface ProductDialogProps {
   itemToReplace?: OrderItem;
 }
 
+// Build a preparation identity string from the fields that define uniqueness.
+// Mirrors generateUniqueId in pos-store (excluding the customization_uuid path).
+function buildPrepId(
+  itemId: string,
+  variantId: string | undefined,
+  addonIds: string[],
+  comment: string | undefined
+): string {
+  const vId = variantId || 'default';
+  const aIds = [...addonIds].sort().join('-') || 'no-addons';
+  const c = comment ? `comment:${comment}` : 'no-comment';
+  return `${itemId}-${vId}-${aIds}-${c}`;
+}
+
 const ProductDialog: React.FC<ProductDialogProps> = ({
   onClose,
   editMode = false,
@@ -40,18 +54,16 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
   const {
     selectedItem,
     addToOrder,
-    removeFromOrder,
     setSelectedItem,
     activeOrders,
     menuItems,
+    updateCartItem,
   } = usePOSStore();
-  
-  // State for the full item doc (used for all dialog content)
+
   const [itemDoc, setItemDoc] = useState<any | null>(null);
   const [, setIsItemLoading] = useState(false);
   const [, setItemError] = useState<string | null>(null);
 
-  // Fetch Item doc when dialog opens or selectedItem changes
   useEffect(() => {
     if (!selectedItem) {
       setItemDoc(null);
@@ -62,34 +74,18 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
     setIsItemLoading(true);
     setItemError(null);
     db.getDoc('Item', selectedItem.item)
-      .then((doc: any) => {
-        setItemDoc(doc);
-      })
-      .catch(() => {
-        setItemError('Failed to fetch item details');
-        setItemDoc(null);
-      })
-      .finally(() => {
-        setIsItemLoading(false);
-      });
+      .then((doc: any) => { setItemDoc(doc); })
+      .catch(() => { setItemError('Failed to fetch item details'); setItemDoc(null); })
+      .finally(() => { setIsItemLoading(false); });
   }, [selectedItem]);
 
-  
   const addonDetails = Array.isArray(itemDoc?.custom_pos_add_on_items)
     ? itemDoc.custom_pos_add_on_items
         .map((entry: any) => {
           const menuAddon = menuItems.find((menuItem: any) => menuItem.item === entry.item);
           return menuAddon
-            ? {
-                id: menuAddon.item,
-                name: menuAddon.item_name,
-                price: Number(menuAddon.price)
-              }
-            : {
-                id: entry.item,
-                name: entry.item,
-                price: 0
-              };
+            ? { id: menuAddon.item, name: menuAddon.item_name, price: Number(menuAddon.price) }
+            : { id: entry.item, name: entry.item, price: 0 };
         })
         .filter(Boolean)
     : [];
@@ -99,16 +95,8 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
         .map((entry: any) => {
           const menuVariant = menuItems.find((menuItem: any) => menuItem.item === entry.item);
           return menuVariant
-            ? {
-                id: menuVariant.item,
-                name: menuVariant.item_name,
-                price: Number(menuVariant.price)
-              }
-            : {
-                id: entry.item,
-                name: entry.item,
-                price: 0
-              };
+            ? { id: menuVariant.item, name: menuVariant.item_name, price: Number(menuVariant.price) }
+            : { id: entry.item, name: entry.item, price: 0 };
         })
         .filter(Boolean)
     : [];
@@ -133,6 +121,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
       ? (itemToReplace?.comment || '')
       : (existingLineForItem?.comment || '')
   );
+
   const dialogRef = useRef<HTMLDivElement>(null);
 
   const [, setAddonItemCodes] = useState<string[]>([]);
@@ -151,165 +140,174 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
     db.getDoc('Item', selectedItem.item)
       .then((doc: any) => {
         if (Array.isArray(doc.custom_pos_add_on_items)) {
-          const codes = doc.custom_pos_add_on_items
-            .map((entry: any) => entry.item)
-            .filter(Boolean);
-          setAddonItemCodes(codes);
+          setAddonItemCodes(doc.custom_pos_add_on_items.map((e: any) => e.item).filter(Boolean));
         } else {
           setAddonItemCodes([]);
         }
       })
-      .catch((_err: any) => {
-        setAddonError('Failed to fetch add-ons');
-        setAddonItemCodes([]);
-      })
-      .finally(() => {
-        setIsAddonLoading(false);
-      });
+      .catch(() => { setAddonError('Failed to fetch add-ons'); setAddonItemCodes([]); })
+      .finally(() => { setIsAddonLoading(false); });
   }, [selectedItem]);
 
-  // Handle click outside to close dialog
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dialogRef.current && !dialogRef.current.contains(event.target as Node)) {
         handleClose();
       }
     };
-
     document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
+    return () => { document.removeEventListener('mousedown', handleClickOutside); };
   }, []);
 
-  // Handle escape key to close dialog
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        handleClose();
-      }
+      if (event.key === 'Escape') handleClose();
     };
-
     document.addEventListener('keydown', handleEscape);
-    return () => {
-      document.removeEventListener('keydown', handleEscape);
-    };
+    return () => { document.removeEventListener('keydown', handleEscape); };
   }, []);
 
   if (!selectedItem) return null;
 
-  // Always get price from menuItems for the main item
   const basePrice = selectedItem?.price ? Number(selectedItem.price) : 0;
   const numericQuantity = quantity === '' ? 0 : parseFloat(quantity);
   const addonsTotal = selectedAddons.reduce((sum, addon) => sum + addon.price, 0);
   const total = (basePrice + addonsTotal) * numericQuantity;
 
   const handleQuantityChange = (value: string) => {
-    // Only allow valid numbers and one decimal point
-    const isValid = /^\d*\.?\d*$/.test(value);
-    if (!isValid) return;
-
-    if (value === '') {
-      setQuantity('');
-      return;
-    }
-
+    if (!/^\d*\.?\d*$/.test(value)) return;
     setQuantity(value);
   };
 
   const handleIncrement = () => {
-    const currentNum = quantity === '' ? 0 : parseFloat(quantity);
-    if (currentNum < 99) {
-      setQuantity(Math.round((currentNum + 1) * 1000) / 1000 + '');
-    }
+    const n = quantity === '' ? 0 : parseFloat(quantity);
+    if (n < 99) setQuantity(Math.round((n + 1) * 1000) / 1000 + '');
   };
 
   const handleDecrement = () => {
-    const currentNum = quantity === '' ? 0 : parseFloat(quantity);
-    if (currentNum > 0) {
-      setQuantity(Math.round((currentNum - 1) * 1000) / 1000 + '');
-    }
+    const n = quantity === '' ? 0 : parseFloat(quantity);
+    if (n > 0) setQuantity(Math.round((n - 1) * 1000) / 1000 + '');
   };
 
+  // ─── SUBMIT ──────────────────────────────────────────────────────────────────
+  //
+  // Preparation identity = item + variant + add-ons + comment.
+  //
+  //  editMode  → always update the specific row in place (itemToReplace).
+  //  menu mode → compute the final preparation uniqueId.
+  //              If that preparation exists in the cart → increase its quantity.
+  //              Otherwise → create a brand-new cart line.
+  //
   const handleAddToOrder = () => {
-    const numericQuantity = typeof quantity === 'string' ? parseFloat(quantity) : quantity;
-    if (isNaN(numericQuantity) || numericQuantity <= 0) {
-      return; // Don't add to order if quantity is 0 or invalid
-    }
+    const numQty = typeof quantity === 'string' ? parseFloat(quantity) : quantity;
+    if (isNaN(numQty) || numQty <= 0) return;
 
     if (editMode && itemToReplace?.uniqueId) {
-      // Remove the old item first
-      removeFromOrder(itemToReplace.uniqueId);
+      // Cart edit — keep row identity, update content.
+      updateCartItem(itemToReplace.uniqueId, {
+        ...itemToReplace,
+        ...selectedItem,
+        quantity: numQty,
+        price: basePrice,
+        comment: comments || undefined,
+        selectedAddons,
+      });
+    } else {
+      // Compute the final preparation uniqueId (must match pos-store's generateUniqueId).
+      const finalComment = comments || undefined;
+      const finalAddonIds = selectedAddons.map(a => a.id);
+      const finalPrepId = buildPrepId(
+        selectedItem.id,
+        'default',           // no standalone variant model in current UI; matches store default
+        finalAddonIds,
+        finalComment
+      );
+
+      // Look for an existing cart line with the exact same preparation.
+      const matchingLine = activeOrders.find(order => order.uniqueId === finalPrepId);
+
+      if (matchingLine?.uniqueId) {
+        // Same preparation already in cart → increase quantity only.
+        updateCartItem(matchingLine.uniqueId, {
+          ...matchingLine,
+          quantity: matchingLine.quantity + numQty,
+        });
+      } else {
+        // New preparation → create a fresh cart line via addToOrder.
+        // addToOrder will call generateUniqueId internally; if the same id already
+        // exists it merges, otherwise a new row is added.
+        addToOrder({
+          ...selectedItem,
+          quantity: numQty,
+          price: basePrice,
+          comment: finalComment,
+          selectedAddons,
+          customization_uuid: undefined,
+        });
+
+        // Add each selected add-on as its own cart row.
+        selectedAddons.forEach(addon => {
+          const menuAddon = menuItems.find(item => item.item === addon.id);
+          addToOrder(
+            menuAddon
+              ? { ...menuAddon, quantity: numQty, price: addon.price }
+              : ({
+                  id: addon.id,
+                  name: addon.name,
+                  price: addon.price,
+                  quantity: numQty,
+                  image: null,
+                  item: addon.id,
+                  item_name: addon.name,
+                  course: '',
+                  description: '',
+                  special_dish: 0 as 0 | 1,
+                  tax_rate: 0,
+                } as OrderItem)
+          );
+        });
+      }
     }
-
-    // Add main item as a cart line
-    const orderItem: OrderItem = {
-      ...selectedItem,
-      quantity: numericQuantity,
-      price: basePrice,
-      comment: comments || undefined
-    };
-    addToOrder(orderItem);
-
-    // Add each selected add-on as a separate cart line
-    selectedAddons.forEach(addon => {
-      // Find the full menu item details for the add-on
-      const menuAddon = menuItems.find(item => item.item === addon.id);
-      const addonOrderItem: OrderItem = menuAddon
-        ? {
-            ...menuAddon,
-            quantity: numericQuantity,
-            price: addon.price
-          }
-        : {
-            id: addon.id,
-            name: addon.name,
-            price: addon.price,
-            quantity: numericQuantity,
-            image: null,
-            item: addon.id,
-            item_name: addon.name,
-            course: '',
-            description: '',
-            special_dish: 0 as 0 | 1,
-            tax_rate: 0
-          } as OrderItem;
-      addToOrder(addonOrderItem);
-    });
 
     handleClose();
   };
 
-  const handleClose = () => {
+  function handleClose() {
     setSelectedItem(null);
     onClose();
+  }
+
+  // "Add Customization" is a productivity shortcut — it simply clears all fields
+  // so the cashier can start a fresh preparation without manually erasing each field.
+  // No special behaviour beyond resetting the form.
+  const handleAddCustomization = () => {
+    setQuantity('1');
+    setComments('');
+    setSelectedAddons([]);
   };
 
   const handleAddonToggle = (addon: Omit<Addon, 'category'>) => {
-    setSelectedAddons(current => 
+    setSelectedAddons(current =>
       current.some(item => item.id === addon.id)
         ? current.filter(item => item.id !== addon.id)
         : [...current, addon]
     );
   };
 
-  // Handler to switch to a variant item
   const handleVariantClick = (variantId: string) => {
     const menuVariant = menuItems.find((m: any) => m.item === variantId);
-    if (menuVariant) {
-      setSelectedItem(menuVariant);
-    }
+    if (menuVariant) setSelectedItem(menuVariant);
   };
 
   return (
     <Dialog open={true} onOpenChange={handleClose}>
-      <DialogContent 
+      <DialogContent
         ref={dialogRef}
         variant="xlarge"
         className="bg-white w-full max-w-[90rem] max-h-[90vh] overflow-y-auto flex flex-col md:flex-row p-0"
         showCloseButton={false}
       >
-        {/* Left Column - Image  */}
+        {/* Left Column - Image */}
         <div className="md:w-1/3 relative min-h-96">
           {itemDoc?.image ? (
             <img
@@ -339,7 +337,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
           </Button>
         </div>
 
-        {/* Middle Column - Variants and Quantity */}
+        {/* Middle Column */}
         <div className="md:w-1/3 p-6 overflow-y-auto">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">{selectedItem?.item_name}</h2>
@@ -348,12 +346,15 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
               {(selectedItem?.course_label || selectedItem?.course) && (
                 <>
                   <span className="text-gray-300">•</span>
-                  <span className="text-sm font-medium text-blue-600">{selectedItem?.course_label || selectedItem?.course}</span>
+                  <span className="text-sm font-medium text-blue-600">
+                    {selectedItem?.course_label || selectedItem?.course}
+                  </span>
                 </>
               )}
             </div>
           </div>
 
+          {/* Quantity */}
           <div className="mt-6">
             <h3 className="text-lg font-semibold mb-3">{t('product_dialog.quantity')}</h3>
             <div className="flex items-center space-x-2">
@@ -414,9 +415,17 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
               className="resize-none"
             />
             
+            {!editMode && existingLineForItem !== null && (
+              <Button
+                onClick={handleAddCustomization}
+                variant="outline"
+                className="w-full mt-3 text-blue-600 border-blue-600 hover:bg-blue-50"
+              >
+                Add Customization
+              </Button>
+            )}
           </div>
         </div>
-
 
         {/* Right Column - Add-ons and Order Button */}
         <div className="h-auto md:w-1/3 p-6 border-t md:border-t-0 md:border-l border-gray-200 overflow-y-auto flex flex-col">
@@ -473,4 +482,4 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
   );
 };
 
-export default ProductDialog; 
+export default ProductDialog;

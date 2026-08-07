@@ -51,6 +51,7 @@ export interface OrderItem extends MenuItem {
   selectedAddons?: { id: string; name: string; price: number }[];
   uniqueId?: string;
   comment?: string;
+  customization_uuid?: string;
 }
 
 export interface PaymentMode {
@@ -130,6 +131,7 @@ interface POSStore extends POSState {
   addToOrder: (item: OrderItem) => Promise<void>;
   removeFromOrder: (uniqueId: string) => Promise<void>;
   updateQuantity: (uniqueId: string, quantity: number) => Promise<void>;
+  updateCartItem: (uniqueId: string, updatedItem: OrderItem) => Promise<void>;
   clearOrder: () => Promise<void>;
   setSelectedCategory: (category: string) => void;
   setSearchQuery: (query: string) => void;
@@ -162,6 +164,9 @@ interface POSStore extends POSState {
 }
 
 const generateUniqueId = (item: OrderItem): string => {
+  if (item.customization_uuid) {
+    return `${item.id}-${item.customization_uuid}`;
+  }
   const variantId = item.selectedVariant?.id || 'default';
   const addonIds = item.selectedAddons?.map(addon => addon.id).sort().join('-') || 'no-addons';
   // Comments are part of a line's identity: a commented item is a different preparation.
@@ -438,6 +443,28 @@ export const usePOSStore = create<POSStore>((set, get) => ({
         set({ error: error.message });
       } else {
         set({ error: 'Failed to update quantity' });
+      }
+    }
+  },
+
+  updateCartItem: async (uniqueId: string, updatedItem: OrderItem) => {
+    try {
+      if (!get().validateQuantity(updatedItem.quantity)) {
+        throw new CartError(`Quantity must be between ${MIN_QUANTITY} and ${MAX_QUANTITY}`);
+      }
+
+      // Regenerate uniqueId from the updated content so that the preparation
+      // identity stays in sync when fields like comment / addons change.
+      const newUniqueId = generateUniqueId(updatedItem);
+      const newOrders = get().activeOrders.map(item =>
+        item.uniqueId === uniqueId ? { ...updatedItem, uniqueId: newUniqueId } : item
+      );
+      set({ activeOrders: newOrders });
+    } catch (error) {
+      if (error instanceof CartError) {
+        set({ error: error.message });
+      } else {
+        set({ error: 'Failed to update cart item' });
       }
     }
   },
