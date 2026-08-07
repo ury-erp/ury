@@ -164,6 +164,7 @@
     "layout": "Plan",
     "available": "Disponible",
     "occupied": "Occupé",
+    "attention": "Attention",
     "room": "Salle",
     "seats": "Sièges",
     "tap_to_start": "Appuyez pour commencer une nouvelle commande sur place",

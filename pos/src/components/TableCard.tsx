@@ -1,5 +1,5 @@
 import { type MouseEvent } from 'react';
-import { Eye, Loader2, Printer, Users } from 'lucide-react';
+import { AlertTriangle, Eye, Loader2, Printer, Users } from 'lucide-react';
 import { cn } from '@ury/ui';
 import { formatInvoiceTime } from '@ury/core';
 import type { Table } from '../lib/table-api';
@@ -7,6 +7,56 @@ import { Badge } from '@ury/ui';
 import { TableShapeIcon } from './TableShapeIcon';
 import TableActionsMenu from './TableActionsMenu';
 import { t } from '../i18n';
+
+/**
+ * Parses latest_invoice_time into a Date for "today".
+ * Handles full datetimes ("2026-07-21 14:30:00") and time-only values ("14:30:00").
+ * Returns null for missing/invalid timestamps.
+ */
+const parseInvoiceStartTime = (timestamp: string | null, now: Date): Date | null => {
+  if (!timestamp) return null;
+
+  const parsedDate = new Date(timestamp.replace(' ', 'T'));
+  if (!Number.isNaN(parsedDate.getTime())) {
+    return parsedDate;
+  }
+
+  const timeOnlyMatch = timestamp.match(/^(\d{1,2}):(\d{2}):(\d{2})(?:\.(\d+))?$/);
+  if (timeOnlyMatch) {
+    const [, hours, minutes, seconds] = timeOnlyMatch;
+    const date = new Date(now);
+    date.setHours(Number(hours), Number(minutes), Number(seconds), 0);
+    return date;
+  }
+
+  return null;
+};
+
+/**
+ * A table needs attention when it is occupied and the elapsed minutes since its
+ * latest invoice time exceed the POS Profile tableAttention threshold (minutes).
+ * Missing/invalid thresholds or timestamps never trigger attention.
+ */
+export const isTableAttentionNeeded = (
+  table: Table,
+  attentionThresholdMinutes: number | null | undefined,
+  now: Date = new Date()
+): boolean => {
+  if (table.occupied !== 1) return false;
+  if (
+    typeof attentionThresholdMinutes !== 'number' ||
+    !Number.isFinite(attentionThresholdMinutes) ||
+    attentionThresholdMinutes <= 0
+  ) {
+    return false;
+  }
+
+  const startTime = parseInvoiceStartTime(table.latest_invoice_time, now);
+  if (!startTime) return false;
+
+  const elapsedMinutes = (now.getTime() - startTime.getTime()) / 60000;
+  return elapsedMinutes > attentionThresholdMinutes;
+};
 
 interface TableCardProps {
   table: Table;
@@ -23,6 +73,7 @@ interface TableCardProps {
   onPreview: (event: MouseEvent<HTMLButtonElement>) => void;
   onPrint: (event: MouseEvent<HTMLButtonElement>) => void;
   isPrinting: boolean;
+  attentionThresholdMinutes?: number | null;
 }
 
 const TableCard = ({
@@ -40,8 +91,10 @@ const TableCard = ({
   onPreview,
   onPrint,
   isPrinting,
+  attentionThresholdMinutes,
 }: TableCardProps) => {
   const isOccupied = table.occupied === 1;
+  const isAttention = isTableAttentionNeeded(table, attentionThresholdMinutes);
 
   return (
     <div
@@ -54,9 +107,11 @@ const TableCard = ({
       }}
       className={cn(
         'relative flex min-h-[15.5rem] flex-col rounded-lg border-2 bg-white p-4 transition-all',
-        isOccupied
-          ? 'border-amber-400 bg-amber-50 text-amber-900'
-          : 'cursor-pointer border-emerald-300 bg-emerald-50 text-emerald-900 hover:border-emerald-400 hover:shadow-md',
+        isAttention
+          ? 'border-red-400 bg-red-50 text-red-900'
+          : isOccupied
+            ? 'border-amber-400 bg-amber-50 text-amber-900'
+            : 'cursor-pointer border-emerald-300 bg-emerald-50 text-emerald-900 hover:border-emerald-400 hover:shadow-md',
         menuOpen ? 'z-20' : 'z-0',
         className
       )}
@@ -72,8 +127,16 @@ const TableCard = ({
             </span>
           </div>
           <div className="flex shrink-0 items-center gap-1">
-            <Badge variant={isOccupied ? 'warning' : 'success'} className="whitespace-nowrap">
-              {isOccupied ? t('tables.occupied') : t('tables.available')}
+            <Badge
+              variant={isAttention ? 'danger' : isOccupied ? 'warning' : 'success'}
+              className="whitespace-nowrap"
+            >
+              {isAttention && <AlertTriangle className="mr-1 h-3 w-3" />}
+              {isAttention
+                ? t('tables.attention')
+                : isOccupied
+                  ? t('tables.occupied')
+                  : t('tables.available')}
             </Badge>
             <TableActionsMenu
               table={table}
@@ -131,14 +194,17 @@ const TableCard = ({
       <div
         className={cn(
           'mt-auto flex min-h-[2.75rem] gap-2 border-t pt-3',
-          isOccupied ? 'border-amber-200' : 'border-transparent'
+          isAttention ? 'border-red-200' : isOccupied ? 'border-amber-200' : 'border-transparent'
         )}
       >
         {isOccupied ? (
           <>
             <button
               onClick={onPreview}
-              className="flex flex-1 items-center justify-center gap-2 rounded bg-white py-2 text-xs font-semibold transition hover:bg-amber-100"
+              className={cn(
+                'flex flex-1 items-center justify-center gap-2 rounded bg-white py-2 text-xs font-semibold transition',
+                isAttention ? 'hover:bg-red-100' : 'hover:bg-amber-100'
+              )}
             >
               <Eye className="h-3 w-3" />
               Preview
@@ -146,7 +212,10 @@ const TableCard = ({
             <button
               onClick={onPrint}
               disabled={isPrinting}
-              className="flex flex-1 items-center justify-center gap-2 rounded bg-white py-2 text-xs font-semibold transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+              className={cn(
+                'flex flex-1 items-center justify-center gap-2 rounded bg-white py-2 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-60',
+                isAttention ? 'hover:bg-red-100' : 'hover:bg-amber-100'
+              )}
             >
               {isPrinting ? (
                 <>

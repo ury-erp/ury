@@ -14,6 +14,9 @@ export interface PosProfileLimited {
   qz_host: string | null;
   printer: string | null;
   print_type: string;
+  // NOTE: backend may actually return null when table_attention_time is unset;
+  // kept as `number` to match @ury/core's PosProfileCombined — consumers must
+  // validate at runtime (see isTableAttentionNeeded in TableCard).
   tableAttention: number;
   paid_limit: number;
   disable_rounded_total: number;

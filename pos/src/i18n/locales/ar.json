@@ -170,6 +170,7 @@
         "layout": "مخطط",
         "available": "متاح",
         "occupied": "مشغول",
+        "attention": "يتطلب الانتباه",
         "room": "غرفة",
         "seats": "مقاعد",
         "tap_to_start": "انقر لبدء طلب محلي جديد",

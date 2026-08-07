@@ -378,6 +378,7 @@ const TableView = () => {
       onPreview={(event) => handlePreviewTable(table, event)}
       onPrint={(event) => handlePrintTable(table, event)}
       isPrinting={printingTable === table.name}
+      attentionThresholdMinutes={posProfile?.tableAttention ?? null}
     />
     );
   };
@@ -574,8 +575,12 @@ const TableView = () => {
               <span>{t('tables.available')}</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-red-100 border border-red-300 rounded"></div>
+              <div className="w-4 h-4 bg-amber-100 border border-amber-300 rounded"></div>
               <span>{t('tables.occupied')}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 bg-red-100 border border-red-300 rounded"></div>
+              <span>{t('tables.attention')}</span>
             </div>
           </div>
         </div>
