@@ -313,7 +313,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
             <img
               src={itemDoc.image}
               alt={itemDoc.name}
-              className="absolute inset-0 w-full h-full object-contain rounded-t-lg md:rounded-l-lg md:rounded-tr-none"
+              className="absolute inset-0 w-full h-full object-cover rounded-t-lg md:rounded-l-lg md:rounded-tr-none"
               style={{ filter: 'saturate(0.7) brightness(0.95)' }}
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
