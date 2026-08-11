@@ -1,6 +1,22 @@
 [
  {
   "default_value": null,
+  "doc_type": "POS Profile",
+  "docstatus": 0,
+  "doctype": "Property Setter",
+  "doctype_or_field": "DocType",
+  "field_name": null,
+  "is_system_generated": 0,
+  "modified": "2026-08-10 13:15:13.557927",
+  "module": null,
+  "name": "POS Profile-main-field_order",
+  "property": "field_order",
+  "property_type": "Data",
+  "row_name": null,
+  "value": "[\"company\", \"customer\", \"country\", \"disabled\", \"column_break_9\", \"warehouse\", \"campaign\", \"company_address\", \"restaurant_info\", \"restaurant\", \"column_break_c10ag\", \"branch\", \"section_break_14\", \"hide_images\", \"hide_unavailable_items\", \"auto_add_item_to_cart\", \"validate_stock_on_save\", \"print_receipt_on_order_complete\", \"column_break_16\", \"ignore_pricing_rule\", \"allow_rate_change\", \"allow_discount_change\", \"restaurant_prefix\", \"disable_grand_total_to_default_mop\", \"allow_partial_payment\", \"section_break_23\", \"column_break_25\", \"customer_groups\", \"item_groups\", \"custom_ury_pos_configurations\", \"section_break_tjhrm\", \"transfer_role_permissions\", \"role_allowed_for_billing\", \"table_attention_time\", \"paid_limit\", \"column_break_bvzw2\", \"role_restricted_for_table_order\", \"view_all_status\", \"remove_items\", \"show_image\", \"custom_daily_pos_close\", \"custom_enable_discount\", \"custom_edit_order_type\", \"custom_multiple_cashier_configuration\", \"custom_enable_multiple_cashier\", \"custom_user__payment_configurations\", \"section_break_15\", \"applicable_for_users\", \"section_break_11\", \"payments\", \"custom_kot_setup\", \"custom_kot_settings\", \"custom_kot_naming_series\", \"custom_kot_alert\", \"custom_kot_alert_sound\", \"custom_cl\", \"custom_kot_warning_time\", \"custom_notify_kot_delay\", \"custom_recipients\", \"custom_column_break_wwq3q\", \"custom_enable_kot_reprint\", \"custom_parcel_order_printer\", \"custom_table_order_printer\", \"custom_reprint_kot_format\", \"custom_reset_order_number_daily\", \"custom_print_settings\", \"section_break_16\", \"print_format\", \"letter_head\", \"column_break0\", \"tc_name\", \"select_print_heading\", \"printer_info\", \"printer_settings\", \"qz_print\", \"qz_host\", \"custom_accounting_configuration\", \"section_break_19\", \"selling_price_list\", \"currency\", \"write_off_account\", \"write_off_cost_center\", \"write_off_limit\", \"account_for_change_amount\", \"disable_rounded_total\", \"column_break_23\", \"income_account\", \"expense_account\", \"taxes_and_charges\", \"tax_category\", \"apply_discount_on\", \"accounting_dimensions_section\", \"cost_center\", \"dimension_col_break\", \"project\"]"
+ },
+ {
+  "default_value": null,
   "doc_type": "POS Closing Entry Detail",
   "docstatus": 0,
   "doctype": "Property Setter",
