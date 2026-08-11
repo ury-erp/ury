@@ -1,7 +1,7 @@
 import React from 'react';
 import { useConfigure } from '../../../context/ConfigureContext';
 import { Input, Button } from '@ury/ui';
-import { Plus, Trash2, LayoutGrid } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { SearchableSelect } from '../SearchableSelect';
 
 export function TableSection() {
@@ -29,7 +29,7 @@ export function TableSection() {
           {tables.length > 1 && <div className="w-8"></div>}
         </div>
 
-        {tables.map((table, index) => (
+        {tables.map((table) => (
           <div
             key={table.id}
             className="py-2 flex flex-col md:flex-row md:items-center gap-3"

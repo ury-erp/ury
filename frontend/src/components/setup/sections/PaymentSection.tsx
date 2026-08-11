@@ -1,7 +1,7 @@
 import React from 'react';
 import { useConfigure } from '../../../context/ConfigureContext';
 import { Input, Button } from '@ury/ui';
-import { Plus, Trash2, CreditCard } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 
 export function PaymentSection() {
   const { paymentMethods, addPaymentMethod, updatePaymentMethod, deletePaymentMethod } = useConfigure();
@@ -21,7 +21,7 @@ export function PaymentSection() {
           {paymentMethods.length > 1 && <div className="w-8"></div>}
         </div>
 
-        {paymentMethods.map((method, index) => (
+        {paymentMethods.map((method) => (
           <div
             key={method.id}
             className="py-2 flex flex-col md:flex-row md:items-center gap-3"

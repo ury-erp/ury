@@ -1,7 +1,7 @@
 import React, { useState, useRef, DragEvent, ChangeEvent } from 'react';
 import { useConfigure } from '../../../context/ConfigureContext';
 import { Input, Button } from '@ury/ui';
-import { Plus, Trash2, Upload, FileText, X, Percent, Download } from 'lucide-react';
+import { Plus, Trash2, Upload, FileText, X, Download } from 'lucide-react';
 
 export function MenuSection() {
   const {
@@ -11,8 +11,6 @@ export function MenuSection() {
     deleteMenuItem,
     menuFile,
     setMenuFile,
-    taxConfig,
-    updateTaxConfig,
   } = useConfigure();
 
   const [isDragging, setIsDragging] = useState(false);
@@ -67,7 +65,7 @@ export function MenuSection() {
             {menuItems.length > 1 && <div className="w-8"></div>}
           </div>
 
-          {menuItems.map((item, index) => (
+          {menuItems.map((item) => (
             <div
               key={item.id}
               className="py-2 flex flex-col md:flex-row md:items-center gap-3"
