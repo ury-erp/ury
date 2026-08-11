@@ -13,7 +13,7 @@ interface WizardLayoutProps {
   isNextLoading?: boolean;
 }
 
-export function WizardLayout({ step, children, onNext, onPrev, onLaunch, nextLabel = 'Next', isNextDisabled, isNextLoading }: WizardLayoutProps) {
+export function WizardLayout({ step, children, onNext, onPrev, _onLaunch, nextLabel = 'Next', isNextDisabled, isNextLoading }: WizardLayoutProps) {
   const version = (window as any).frappe?.boot?.versions?.ury || 'v3.2.0';
 
   return (

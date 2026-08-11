@@ -6,10 +6,24 @@ interface SectionShellProps {
   title: string;
   description?: string;
   children: ReactNode;
+  onNext?: () => void;
+  onPrev?: () => void;
+  isFirstSection?: boolean;
+  isLastSection?: boolean;
+  skipSection?: () => void;
 }
 
-export function SectionShell({ title, description, children }: SectionShellProps) {
-  const { activeSection, skipSection } = useConfigure();
+export function SectionShell({
+  title,
+  description,
+  children,
+  onNext: _onNext,
+  onPrev: _onPrev,
+  isFirstSection: _isFirstSection = false,
+  isLastSection: _isLastSection = false,
+  skipSection: _skipSection,
+}: SectionShellProps) {
+  const { activeSection } = useConfigure();
   const isLastSection = activeSection === 'users';
 
   return (

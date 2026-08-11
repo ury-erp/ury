@@ -28,7 +28,7 @@ export function ConfigureSidebar() {
         </h2>
 
         <div className="space-y-1">
-          {SIDEBAR_ITEMS.map((item, index) => {
+          {SIDEBAR_ITEMS.map((item) => {
             const isActive = activeSection === item.id;
             const Icon = item.icon;
 

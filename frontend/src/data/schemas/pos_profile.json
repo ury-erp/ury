@@ -1,0 +1,195 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "POS Profile Schema",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "title": "Profile Name",
+      "default": "Main POS Profile"
+    },
+    "branch": {
+      "type": "string",
+      "title": "Branch",
+      "default": "Main Branch"
+    },
+    "restaurant": {
+      "type": "string",
+      "title": "Restaurant",
+      "default": "URY Fine Dining"
+    },
+    "operations": {
+      "type": "object",
+      "properties": {
+        "table_attention_time": {
+          "type": "number",
+          "title": "Table Attention Time (mins)",
+          "default": 15
+        },
+        "paid_invoice_limit": {
+          "type": "number",
+          "title": "Paid Invoice Limit",
+          "default": 50000
+        },
+        "enable_discounts": {
+          "type": "boolean",
+          "title": "Enable Discounts",
+          "default": true
+        },
+        "show_item_images": {
+          "type": "boolean",
+          "title": "Show Item Images",
+          "default": true
+        },
+        "edit_order_type": {
+          "type": "boolean",
+          "title": "Edit Order Type",
+          "default": true
+        },
+        "remove_printed_items": {
+          "type": "boolean",
+          "title": "Remove Printed Items",
+          "default": false
+        },
+        "view_all_status": {
+          "type": "boolean",
+          "title": "View All Status",
+          "default": true
+        },
+        "daily_pos_close_required": {
+          "type": "boolean",
+          "title": "Daily POS Close Required",
+          "default": true
+        }
+      }
+    },
+    "printing": {
+      "type": "object",
+      "properties": {
+        "enable_qz_printing": {
+          "type": "boolean",
+          "title": "Enable QZ Printing",
+          "default": true
+        },
+        "qz_host": {
+          "type": "string",
+          "title": "QZ Host",
+          "default": "localhost"
+        },
+        "printers": {
+          "type": "array",
+          "title": "Printer Configurations",
+          "items": {
+            "type": "object",
+            "properties": {
+              "printer": { "type": "string", "title": "Printer Name" },
+              "bill_printing": { "type": "boolean", "title": "Bill Printing" },
+              "kot_printing": { "type": "boolean", "title": "KOT Printing" }
+            }
+          }
+        }
+      }
+    },
+    "cashiers": {
+      "type": "object",
+      "properties": {
+        "enable_multiple_cashiers": {
+          "type": "boolean",
+          "title": "Enable Multiple Cashiers",
+          "default": true
+        },
+        "authorized_cashiers": {
+          "type": "array",
+          "title": "Authorized Cashiers",
+          "items": {
+            "type": "object",
+            "properties": {
+              "user": { "type": "string", "title": "User" },
+              "main_cashier": { "type": "boolean", "title": "Main Cashier" }
+            }
+          }
+        }
+      }
+    },
+    "kot": {
+      "type": "object",
+      "properties": {
+        "naming_series": {
+          "type": "string",
+          "title": "Naming Series",
+          "default": "KOT-.YYYY.-"
+        },
+        "warning_time": {
+          "type": "number",
+          "title": "Warning Time (mins)",
+          "default": 10
+        },
+        "enable_reprint": {
+          "type": "boolean",
+          "title": "Enable Reprint",
+          "default": true
+        },
+        "alert_sound": {
+          "type": "boolean",
+          "title": "Alert Sound",
+          "default": true
+        },
+        "delay_notifications": {
+          "type": "boolean",
+          "title": "Delay Notifications",
+          "default": false
+        },
+        "reset_order_number_daily": {
+          "type": "boolean",
+          "title": "Reset Order Number Daily",
+          "default": true
+        },
+        "parcel_printer": {
+          "type": "string",
+          "title": "Parcel Printer",
+          "default": "Thermal Printer 1"
+        },
+        "table_printer": {
+          "type": "string",
+          "title": "Table Printer",
+          "default": "Kitchen Thermal Printer"
+        },
+        "reprint_format": {
+          "type": "string",
+          "title": "Reprint Format",
+          "default": "Standard KOT"
+        }
+      }
+    },
+    "advanced": {
+      "type": "object",
+      "properties": {
+        "allow_custom_rates": {
+          "type": "boolean",
+          "title": "Allow Custom Rates",
+          "default": false
+        },
+        "auto_select_table": {
+          "type": "boolean",
+          "title": "Auto Select Table",
+          "default": true
+        },
+        "allow_negative_stock": {
+          "type": "boolean",
+          "title": "Allow Negative Stock",
+          "default": false
+        },
+        "default_customer": {
+          "type": "string",
+          "title": "Default Customer",
+          "default": "Walk-in Customer"
+        },
+        "tax_category": {
+          "type": "string",
+          "title": "Tax Category",
+          "default": "Standard Tax"
+        }
+      }
+    }
+  }
+}
