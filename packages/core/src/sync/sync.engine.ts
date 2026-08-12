@@ -570,6 +570,7 @@ export class SyncEngine {
           await this._patchPaymentCommandsForTempId(tempId, serverId);
           await this._patchMergeBillCommandsForTempId(tempId, serverId);
           await this._patchSplitBillCommandsForTempId(tempId, serverId, responseBody?.items);
+          await this._patchCommandsForTempId(tempId, serverId, cmdId);
         }
       }
     }
