@@ -691,6 +691,13 @@ def get_order_invoice(table=None, invoiceNo=None, order_type=None, is_payment=No
 
         if invoice_name:
             invoice = frappe.get_doc("POS Invoice", invoice_name)
+            
+            if not frappe.has_permission("POS Invoice", "read", doc=invoice):
+                frappe.throw(frappe._("Not permitted to view this order"), frappe.PermissionError)
+            
+            user_branch = getBranch()
+            if invoice.branch and user_branch and invoice.branch != user_branch:
+                frappe.throw(frappe._("Not permitted to view orders outside your active branch"), frappe.PermissionError)
 
         else:
             invoice = frappe.new_doc("POS Invoice")
@@ -735,6 +742,13 @@ def get_order_invoice(table=None, invoiceNo=None, order_type=None, is_payment=No
             
         if invoice_name:
             invoice = frappe.get_doc("POS Invoice", invoice_name)
+            
+            if not frappe.has_permission("POS Invoice", "read", doc=invoice):
+                frappe.throw(frappe._("Not permitted to view this order"), frappe.PermissionError)
+            
+            user_branch = getBranch()
+            if invoice.branch and user_branch and invoice.branch != user_branch:
+                frappe.throw(frappe._("Not permitted to view orders outside your active branch"), frappe.PermissionError)
             
 
         else:
