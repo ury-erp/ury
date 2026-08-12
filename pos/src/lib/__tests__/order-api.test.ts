@@ -492,7 +492,7 @@ test('offline Aggregator order creation stores Draft with custom_aggregator_id a
     const payload = queued?.payload as any;
     assert.deepEqual(Object.keys(payload).sort(), [
       'aggregator_id', 'cashier', 'customer', 'invoice', 'items', 'last_invoice',
-      'no_of_pax', 'order_type', 'owner', 'pos_profile', 'waiter',
+      'mode_of_payment', 'no_of_pax', 'order_type', 'owner', 'pos_profile', 'waiter',
     ].sort());
     assert.equal(payload.aggregator_id, 'Swiggy');
     assert.equal(payload.customer, 'Swiggy');
