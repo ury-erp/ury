@@ -7,20 +7,16 @@ interface AggregatorSelectProps {
 }
 
 export function AggregatorSelect({ disabled }: AggregatorSelectProps) {
-  const { selectedAggregator, setSelectedAggregator, fetchAggregatorMenu } = usePOSStore();
+  const { selectedAggregator, setSelectedAggregator } = usePOSStore();
   const { data: aggregators = [], isLoading: loading } = useAggregators();
 
-  const handleAggregatorChange = async (value: string) => {
+  const handleAggregatorChange = (value: string) => {
     if (!value) {
       setSelectedAggregator(null);
       return;
     }
     const aggregator = aggregators.find(a => a.customer === value) || { customer: value };
     setSelectedAggregator(aggregator);
-    
-    if (aggregator) {
-      await fetchAggregatorMenu(aggregator.customer);
-    }
   };
 
   return (

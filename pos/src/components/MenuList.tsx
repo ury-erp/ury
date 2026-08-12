@@ -69,21 +69,22 @@ const MenuList: React.FC<MenuListProps> = ({ onItemClick }) => {
   }, [filteredItems, visibleCount]);
 
   const hasMore = visibleCount < filteredItems.length;
-  const error = menuError?.message || storeError;
+  const errorMessage = menuError?.message || storeError;
+  const hasMenuData = menuItems.length > 0;
   const isInteractionDisabled = isMenuInteractionDisabled() || isOrderInteractionDisabled();
 
   return (
     <div className="flex-1 overflow-auto bg-gray-50">
       <div className="max-w-screen-xl mx-auto p-4 pb-40">
-        {menuLoading ? (
+        {menuLoading && !hasMenuData ? (
           <div className="h-96">
             <Spinner message={t('common.loading_menu_items')} />
           </div>
-        ) : error ? (
+        ) : errorMessage && !hasMenuData ? (
           <div className="flex items-center justify-center h-96">
             <div className="text-red-600 text-center">
               <p className="text-lg font-medium">{t('common.error_loading_menu_items')}</p>
-              <p className="text-sm mt-2">{error}</p>
+              <p className="text-sm mt-2">{errorMessage}</p>
             </div>
           </div>
         ) : filteredItems.length === 0 ? (
