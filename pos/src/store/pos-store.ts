@@ -377,7 +377,10 @@ export const usePOSStore = create<POSStore>((set, get) => ({
 
   fetchPaymentModes: async () => {
     try {
-      const modes = await getPaymentModes();
+      const modes = await queryClient.fetchQuery({
+        queryKey: ['paymentModes'],
+        queryFn: () => getPaymentModes(),
+      });
       set({ paymentModes: modes });
     } catch (error) {
       console.error('Failed to fetch payment modes:', error);
