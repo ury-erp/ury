@@ -4,13 +4,8 @@ import { cn, Button } from '@ury/ui';
 import { useRef, useEffect } from 'react';
 import { useState } from 'react';
 import { generateCartHash } from '../store/pos-store';
-import { Dialog, DialogContent } from '@ury/ui';
-import { syncOrder } from '../lib/order-api';
-import { useRootStore } from '../store/root-store';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@ury/ui';
 import { t } from '../i18n';
-import { showToast } from '@ury/ui';
-import { DINE_IN } from '../data/order-types';
-import { Loader2 } from 'lucide-react';
 
 
 const TabFlare = ({ position }: { position: 'left' | 'right' }) => (
@@ -39,12 +34,10 @@ const TabFlare = ({ position }: { position: 'left' | 'right' }) => (
 
 const OrderTabs = ({ disabled }: { disabled?: boolean }) => {
   const store = usePOSStore();
-  const { tabOrder, activeTabId, switchTab, addTab, closeTab, heldTabs, orderId, activeOrders, posProfile, selectedOrderType, selectedTable, selectedRoom, selectedCustomer, selectedAggregator, paymentModes, orderComment, isUpdatingOrder } = store;
-  const user = useRootStore(state => state.user);
+  const { tabOrder, activeTabId, switchTab, addTab, closeTab, heldTabs, orderId } = store;
   
   const [confirmCloseTabId, setConfirmCloseTabId] = useState<string | null>(null);
   const [closeActionType, setCloseActionType] = useState<'discard' | 'unsaved'>('discard');
-  const [isSubmitting, setIsSubmitting] = useState(false);
   
   const [draggedTabIndex, setDraggedTabIndex] = useState<number | null>(null);
   const [dragOverTabIndex, setDragOverTabIndex] = useState<number | null>(null);
@@ -72,81 +65,6 @@ const OrderTabs = ({ disabled }: { disabled?: boolean }) => {
       } else {
         closeTab(tabId);
       }
-    }
-  };
-
-  const handleUpdateAndClose = async () => {
-    if (!confirmCloseTabId) return;
-    
-    try {
-      if (!posProfile) throw new Error(t('errors.pos_profile_not_found'));
-      if (!user?.name) throw new Error(t('errors.user_not_logged_in'));
-
-      if (selectedOrderType === 'Aggregators') {
-        if (!selectedAggregator?.customer) {
-          showToast.error(t('errors.select_aggregator'));
-          return;
-        }
-      } else if (!selectedCustomer?.name) {
-        showToast.error(t('errors.select_customer'));
-        return;
-      }
-
-      if (selectedOrderType === DINE_IN && !selectedTable) {
-        showToast.error(t('errors.select_table', { order_type: DINE_IN }));
-        return;
-      }
-
-      setIsSubmitting(true);
-      
-      const orderData = {
-        items: activeOrders.map(item => ({
-          item: item.id,
-          item_name: item.name,
-          rate: item.selectedVariant?.price || item.price,
-          qty: item.quantity,
-          comment: item.comment || undefined
-        })),
-        no_of_pax: 1,
-        pos_profile: posProfile.name,
-        order_type: selectedOrderType,
-        table: selectedTable || undefined,
-        room: selectedRoom || undefined,
-        customer: selectedOrderType === 'Aggregators' ? selectedAggregator?.customer : selectedCustomer?.name,
-        aggregator_id: selectedOrderType === 'Aggregators' ? selectedAggregator?.customer : undefined,
-        cashier: posProfile.cashier,
-        owner: posProfile.owner,
-        mode_of_payment: paymentModes[0],
-        last_invoice: isUpdatingOrder ? orderId : null,
-        invoice: isUpdatingOrder ? orderId : null,
-        waiter: user.name,
-        comments: orderComment || undefined
-      };
-
-      await syncOrder(orderData);
-      showToast.success(t('success.order_updated'));
-      
-      const tabToClose = confirmCloseTabId;
-      setConfirmCloseTabId(null);
-      closeTab(tabToClose);
-      
-    } catch (error: any) {
-      console.error('Failed to sync order:', error);
-      if (error && typeof error === 'object' && '_server_messages' in error && typeof error._server_messages === 'string') {
-        try {
-          const messages = JSON.parse(error._server_messages);
-          const messageObj = JSON.parse(messages[0]);
-          showToast.error(messageObj.message || 'API error');
-        } catch {
-          showToast.error('API error');
-        }
-      } else if (error instanceof Error) {
-        showToast.error(error.message);
-      } else {
-        showToast.error(t('errors.failed_process_order'));
-      }
-    } finally {
-      setIsSubmitting(false);
     }
   };
   
@@ -276,72 +194,42 @@ const OrderTabs = ({ disabled }: { disabled?: boolean }) => {
       </div>
 
       <Dialog open={!!confirmCloseTabId} onOpenChange={(open) => !open && setConfirmCloseTabId(null)}>
-        <DialogContent className="sm:max-w-sm p-0 gap-0 overflow-hidden">
-          {/* Header with title, description, and X close icon */}
-          <div className="flex items-start justify-between gap-4 px-5 pt-5 pb-3">
-            <div>
-              <h2 className="text-sm font-semibold text-gray-900">
-                {closeActionType === 'discard' ? 'Remove Cart' : 'Unsaved Changes'}
-              </h2>
-              <p className="text-sm text-gray-500 mt-1">
-                {closeActionType === 'discard'
-                  ? 'This cart contains items. Do you want to remove it?'
-                  : 'This cart has unsaved changes. What would you like to do?'}
-              </p>
-            </div>
-            <button
-              onClick={() => setConfirmCloseTabId(null)}
-              className="shrink-0 rounded-md p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors focus:outline-none"
-              aria-label="Close"
-              disabled={isSubmitting}
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
+        <DialogContent size="sm" showCloseButton onClose={() => setConfirmCloseTabId(null)}>
+          <DialogHeader>
+            <DialogTitle>
+              {closeActionType === 'discard' ? 'Remove Cart' : 'Unsaved Changes'}
+            </DialogTitle>
+            <DialogDescription>
+              {closeActionType === 'discard'
+                ? 'This cart contains items. Do you want to remove it?'
+                : 'This cart has unsaved changes. Please verify.'}
+            </DialogDescription>
+          </DialogHeader>
 
-          {/* Footer buttons */}
-          <div className="flex items-center justify-end gap-2 px-5 py-4 bg-gray-50 border-t border-gray-100">
+          <DialogFooter>
             {closeActionType === 'discard' ? (
-              <Button
-                variant="danger"
-                size="sm"
-                onClick={() => {
-                  if (confirmCloseTabId) {
-                    closeTab(confirmCloseTabId);
-                    setConfirmCloseTabId(null);
-                  }
-                }}
-                disabled={isSubmitting}
-              >
-                Remove
-              </Button>
-            ) : (
               <>
+                <Button variant="outline" onClick={() => setConfirmCloseTabId(null)}>
+                  {t('common.cancel')}
+                </Button>
                 <Button
                   variant="danger"
-                  size="sm"
                   onClick={() => {
                     if (confirmCloseTabId) {
                       closeTab(confirmCloseTabId);
                       setConfirmCloseTabId(null);
                     }
                   }}
-                  disabled={isSubmitting}
                 >
-                  Discard
-                </Button>
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={handleUpdateAndClose}
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting && <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />}
-                  Update & Close
+                  Remove
                 </Button>
               </>
+            ) : (
+              <Button variant="outline" onClick={() => setConfirmCloseTabId(null)}>
+                {t('common.cancel')}
+              </Button>
             )}
-          </div>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
