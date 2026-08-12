@@ -232,8 +232,12 @@ const getInitialTabsState = () => {
     if (saved) {
       const data = JSON.parse(saved);
       if (data && data.tabOrder && data.tabOrder.length > 0) {
+        const correctedTabOrder = data.tabOrder.map((tab: any) => ({
+          ...tab,
+          name: typeof tab.name === 'string' ? tab.name.replace(/^Order /, 'Tab ') : tab.name
+        }));
         return {
-          tabOrder: data.tabOrder,
+          tabOrder: correctedTabOrder,
           activeTabId: data.activeTabId,
           nextTabNumber: data.nextTabNumber,
           heldTabs: data.heldTabs || {},
@@ -813,7 +817,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
     };
     
     const newTabId = uuidv4();
-    const newTabName = `Order ${state.nextTabNumber}`;
+    const newTabName = `Tab ${state.nextTabNumber}`;
     
     set({
       activeTabId: newTabId,
@@ -1013,7 +1017,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
 
     // Create a new tab for the draft order
     const newTabId = uuidv4();
-    const newTabName = `Order ${state.nextTabNumber}`;
+    const newTabName = `Tab ${state.nextTabNumber}`;
 
     set({
       activeTabId: newTabId,
