@@ -89,6 +89,18 @@ interface Aggregator {
   customer: string;
 }
 
+interface OrderTabState {
+  activeOrders: OrderItem[];
+  selectedCustomer: Customer | null;
+  selectedOrderType: OrderType;
+  selectedTable: string | null;
+  selectedRoom: string | null;
+  selectedAggregator: Aggregator | null;
+  orderId: string | null;
+  isUpdatingOrder: boolean;
+  orderComment: string;
+}
+
 interface POSState {
   menuItems: MenuItem[];
   categories: Category[];
@@ -120,6 +132,11 @@ interface POSState {
   tableOrder: TableOrder | null;
   isInitializing: boolean;
   orderComment: string;
+  
+  tabOrder: { id: string, name: string }[];
+  activeTabId: string;
+  nextTabNumber: number;
+  heldTabs: Record<string, OrderTabState>;
 }
 
 interface POSStore extends POSState {
@@ -159,6 +176,17 @@ interface POSStore extends POSState {
   resetOrderState: () => void;
   setSelectedAggregator: (aggregator: Aggregator | null) => void;
   setOrderComment: (comment: string) => void;
+  addTab: () => void;
+  switchTab: (tabId: string) => void;
+  closeTab: (tabId: string) => void;
+  openDraftOrderInNewTab: (draft: {
+    orderId: string;
+    orderType: OrderType;
+    customer: Customer | null;
+    table: string | null;
+    room: string | null;
+    items: OrderItem[];
+  }) => void;
 }
 
 const generateUniqueId = (item: OrderItem): string => {
@@ -173,16 +201,53 @@ const calculateItemPrice = (item: OrderItem): number => {
   return basePrice + addonsTotal;
 };
 
+
+const getInitialTabsState = () => {
+  try {
+    const saved = localStorage.getItem('posOrderTabsData');
+    if (saved) {
+      const data = JSON.parse(saved);
+      if (data && data.tabOrder && data.tabOrder.length > 0) {
+        return {
+          tabOrder: data.tabOrder,
+          activeTabId: data.activeTabId,
+          nextTabNumber: data.nextTabNumber,
+          heldTabs: data.heldTabs || {},
+          ...data.activeTabState
+        };
+      }
+    }
+  } catch(e) {
+    console.error('Failed to parse order tabs from localStorage', e);
+  }
+  
+  const initialId = uuidv4();
+  return {
+    tabOrder: [{ id: initialId, name: 'Order 1' }],
+    activeTabId: initialId,
+    nextTabNumber: 2,
+    heldTabs: {},
+    activeOrders: [],
+    selectedCustomer: null,
+    selectedOrderType: DEFAULT_ORDER_TYPE as OrderType,
+    selectedTable: null,
+    selectedRoom: null,
+    selectedAggregator: null,
+    orderId: null,
+    isUpdatingOrder: false,
+    orderComment: '',
+  };
+};
+
+const initialTabsState = getInitialTabsState();
+
 export const usePOSStore = create<POSStore>((set, get) => ({
+  ...initialTabsState,
+
   menuItems: [],
   categories: [],
-  activeOrders: [],
   selectedCategory: '',
-  selectedTable: null,
-  selectedRoom: null,
   searchQuery: '',
-  selectedCustomer: null,
-  selectedOrderType: DEFAULT_ORDER_TYPE as OrderType,
   quickFilter: "all",
   selectedItem: null,
   cartId: null,
@@ -196,14 +261,10 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   posProfile: null,
   customerGroups: [],
   territories: [],
-  selectedAggregator: null,
   currency: storage.getItem('currency') || 'INR',
   currencySymbol: storage.getItem('currencySymbol') || null,
   tableOrder: null,
   isInitializing: true,
-  isUpdatingOrder: false,
-  orderId: null,
-  orderComment: '',
 
   initializeApp: async () => {
     try {
@@ -467,10 +528,8 @@ export const usePOSStore = create<POSStore>((set, get) => ({
     const { fetchMenuItems } = get();
     
     set({ 
-      activeOrders: [],
-      selectedOrderType: type,
-      isUpdatingOrder: false,
-      orderId: null
+          selectedOrderType: type,
+          orderId: null
     });
     
     if (type !== 'Aggregators') {
@@ -630,21 +689,13 @@ export const usePOSStore = create<POSStore>((set, get) => ({
       } else {
         set({ 
           tableOrder: null,
-          activeOrders: [],
-          selectedCustomer: null,
-          isUpdatingOrder: false,
-          orderId: null,
-        });
+                                        });
       }
     } catch (error) {
       set({ 
         error: 'Failed to load table order',
         tableOrder: null,
-        activeOrders: [],
-        selectedCustomer: null,
-        isUpdatingOrder: false,
-        orderId: null,
-      });
+                              });
     } finally {
       set({ orderLoading: false });
     }
@@ -653,11 +704,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   clearTableOrder: () => {
     set({ 
       tableOrder: null,
-      activeOrders: [],
-      selectedCustomer: null,
-      isUpdatingOrder: false,
-      orderId: null,
-    });
+                    });
   },
 
   setOrderForUpdate: (orderId: string | null) => {
@@ -668,28 +715,274 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   },
 
   resetOrderState: () => {
-    const { fetchMenuItems } = get();
+    const state = get();
+    const { fetchMenuItems } = state;
     
-    set({
-      selectedCustomer: null,
-      selectedTable: null,
-      selectedRoom: null,
-      selectedAggregator: null,
-      isUpdatingOrder: false,
-      orderId: null,
-      activeOrders: [],
-      selectedItem: null,
-      orderLoading: false,
-      menuItems: [],
-      error: null,
-      selectedOrderType: DEFAULT_ORDER_TYPE,
-      orderComment: '',
-    });
+    const newTabOrder = state.tabOrder.filter(t => t.id !== state.activeTabId);
+    const newHeldTabs = { ...state.heldTabs };
+    delete newHeldTabs[state.activeTabId];
+
+    if (newTabOrder.length > 0) {
+      const targetTab = newTabOrder[newTabOrder.length - 1];
+      const targetTabState = newHeldTabs[targetTab.id];
+      
+      set({
+        tabOrder: newTabOrder,
+        activeTabId: targetTab.id,
+        heldTabs: newHeldTabs,
+        activeOrders: targetTabState.activeOrders,
+        selectedCustomer: targetTabState.selectedCustomer,
+        selectedOrderType: targetTabState.selectedOrderType,
+        selectedTable: targetTabState.selectedTable,
+        selectedRoom: targetTabState.selectedRoom,
+        selectedAggregator: targetTabState.selectedAggregator,
+        orderId: targetTabState.orderId,
+        isUpdatingOrder: targetTabState.isUpdatingOrder,
+        orderComment: targetTabState.orderComment,
+        selectedItem: null,
+        orderLoading: false,
+        error: null,
+      });
+    } else {
+      const newTabId = uuidv4();
+      
+      set({
+        tabOrder: [{ id: newTabId, name: 'Order 1' }],
+        activeTabId: newTabId,
+        heldTabs: {},
+        nextTabNumber: 2,
+        activeOrders: [],
+        selectedCustomer: null,
+        selectedOrderType: DEFAULT_ORDER_TYPE,
+        selectedTable: null,
+        selectedRoom: null,
+        selectedAggregator: null,
+        orderId: null,
+        isUpdatingOrder: false,
+        orderComment: '',
+        selectedItem: null,
+        orderLoading: false,
+        error: null,
+      });
+    }
 
     fetchMenuItems();
   },
 
+  addTab: () => {
+    const state = get();
+    const currentTabState: OrderTabState = {
+      activeOrders: state.activeOrders,
+      selectedCustomer: state.selectedCustomer,
+      selectedOrderType: state.selectedOrderType,
+      selectedTable: state.selectedTable,
+      selectedRoom: state.selectedRoom,
+      selectedAggregator: state.selectedAggregator,
+      orderId: state.orderId,
+      isUpdatingOrder: state.isUpdatingOrder,
+      orderComment: state.orderComment,
+    };
+    
+    const newTabId = uuidv4();
+    const newTabName = `Order ${state.nextTabNumber}`;
+    
+    set({
+      activeTabId: newTabId,
+      tabOrder: [...state.tabOrder, { id: newTabId, name: newTabName }],
+      nextTabNumber: state.nextTabNumber + 1,
+      heldTabs: { ...state.heldTabs, [state.activeTabId]: currentTabState },
+      activeOrders: [],
+      selectedCustomer: null,
+      selectedOrderType: DEFAULT_ORDER_TYPE,
+      selectedTable: null,
+      selectedRoom: null,
+      selectedAggregator: null,
+      orderId: null,
+      isUpdatingOrder: false,
+      orderComment: '',
+    });
+  },
+
+  switchTab: (tabId: string) => {
+    const state = get();
+    if (state.activeTabId === tabId) return;
+
+    const currentTabState: OrderTabState = {
+      activeOrders: state.activeOrders,
+      selectedCustomer: state.selectedCustomer,
+      selectedOrderType: state.selectedOrderType,
+      selectedTable: state.selectedTable,
+      selectedRoom: state.selectedRoom,
+      selectedAggregator: state.selectedAggregator,
+      orderId: state.orderId,
+      isUpdatingOrder: state.isUpdatingOrder,
+      orderComment: state.orderComment,
+    };
+
+    const newHeldTabs = { ...state.heldTabs, [state.activeTabId]: currentTabState };
+    const targetTabState = newHeldTabs[tabId];
+
+    set({
+      activeTabId: tabId,
+      heldTabs: newHeldTabs,
+      activeOrders: targetTabState.activeOrders,
+      selectedCustomer: targetTabState.selectedCustomer,
+      selectedOrderType: targetTabState.selectedOrderType,
+      selectedTable: targetTabState.selectedTable,
+      selectedRoom: targetTabState.selectedRoom,
+      selectedAggregator: targetTabState.selectedAggregator,
+      orderId: targetTabState.orderId,
+      isUpdatingOrder: targetTabState.isUpdatingOrder,
+      orderComment: targetTabState.orderComment,
+    });
+  },
+
+  closeTab: (tabId: string) => {
+    const state = get();
+    const { fetchMenuItems } = state;
+    const newTabOrder = state.tabOrder.filter(t => t.id !== tabId);
+    const newHeldTabs = { ...state.heldTabs };
+    delete newHeldTabs[tabId];
+
+    if (newTabOrder.length === 0) {
+      // No tabs remain — create a fresh Order 1
+      const newTabId = uuidv4();
+      set({
+        tabOrder: [{ id: newTabId, name: 'Order 1' }],
+        activeTabId: newTabId,
+        heldTabs: {},
+        nextTabNumber: 2,
+        activeOrders: [],
+        selectedCustomer: null,
+        selectedOrderType: DEFAULT_ORDER_TYPE,
+        selectedTable: null,
+        selectedRoom: null,
+        selectedAggregator: null,
+        orderId: null,
+        isUpdatingOrder: false,
+        orderComment: '',
+        selectedItem: null,
+        orderLoading: false,
+        error: null,
+      });
+      fetchMenuItems();
+      return;
+    }
+
+    if (state.activeTabId === tabId) {
+      // Closing the active tab — switch to the nearest remaining tab
+      const closedIndex = state.tabOrder.findIndex(t => t.id === tabId);
+      const targetIndex = Math.min(closedIndex, newTabOrder.length - 1);
+      const targetTab = newTabOrder[targetIndex];
+      const targetTabState = newHeldTabs[targetTab.id];
+
+      set({
+        tabOrder: newTabOrder,
+        activeTabId: targetTab.id,
+        heldTabs: newHeldTabs,
+        activeOrders: targetTabState.activeOrders,
+        selectedCustomer: targetTabState.selectedCustomer,
+        selectedOrderType: targetTabState.selectedOrderType,
+        selectedTable: targetTabState.selectedTable,
+        selectedRoom: targetTabState.selectedRoom,
+        selectedAggregator: targetTabState.selectedAggregator,
+        orderId: targetTabState.orderId,
+        isUpdatingOrder: targetTabState.isUpdatingOrder,
+        orderComment: targetTabState.orderComment,
+        selectedItem: null,
+        orderLoading: false,
+        error: null,
+      });
+    } else {
+      // Closing an inactive tab — just remove it
+      set({ tabOrder: newTabOrder, heldTabs: newHeldTabs });
+    }
+  },
+
+  openDraftOrderInNewTab: (draft) => {
+    const state = get();
+
+    // Check if this draft order is already open in any tab
+    // Check active tab first
+    if (state.orderId === draft.orderId) {
+      // Already the active tab — nothing to do
+      return;
+    }
+    // Check held tabs
+    const existingTabEntry = Object.entries(state.heldTabs).find(
+      ([, tabState]) => tabState.orderId === draft.orderId
+    );
+    if (existingTabEntry) {
+      // Switch to the existing tab that already has this draft order
+      const [existingTabId] = existingTabEntry;
+      const currentTabState: OrderTabState = {
+        activeOrders: state.activeOrders,
+        selectedCustomer: state.selectedCustomer,
+        selectedOrderType: state.selectedOrderType,
+        selectedTable: state.selectedTable,
+        selectedRoom: state.selectedRoom,
+        selectedAggregator: state.selectedAggregator,
+        orderId: state.orderId,
+        isUpdatingOrder: state.isUpdatingOrder,
+        orderComment: state.orderComment,
+      };
+      const newHeldTabs = { ...state.heldTabs, [state.activeTabId]: currentTabState };
+      const targetTabState = newHeldTabs[existingTabId];
+      set({
+        activeTabId: existingTabId,
+        heldTabs: newHeldTabs,
+        activeOrders: targetTabState.activeOrders,
+        selectedCustomer: targetTabState.selectedCustomer,
+        selectedOrderType: targetTabState.selectedOrderType,
+        selectedTable: targetTabState.selectedTable,
+        selectedRoom: targetTabState.selectedRoom,
+        selectedAggregator: targetTabState.selectedAggregator,
+        orderId: targetTabState.orderId,
+        isUpdatingOrder: targetTabState.isUpdatingOrder,
+        orderComment: targetTabState.orderComment,
+      });
+      return;
+    }
+
+    // Save the current active tab into heldTabs
+    const currentTabState: OrderTabState = {
+      activeOrders: state.activeOrders,
+      selectedCustomer: state.selectedCustomer,
+      selectedOrderType: state.selectedOrderType,
+      selectedTable: state.selectedTable,
+      selectedRoom: state.selectedRoom,
+      selectedAggregator: state.selectedAggregator,
+      orderId: state.orderId,
+      isUpdatingOrder: state.isUpdatingOrder,
+      orderComment: state.orderComment,
+    };
+
+    // Create a new tab for the draft order
+    const newTabId = uuidv4();
+    const newTabName = `Order ${state.nextTabNumber}`;
+
+    set({
+      activeTabId: newTabId,
+      tabOrder: [...state.tabOrder, { id: newTabId, name: newTabName }],
+      nextTabNumber: state.nextTabNumber + 1,
+      heldTabs: { ...state.heldTabs, [state.activeTabId]: currentTabState },
+      // Populate the new tab with the draft order's data
+      activeOrders: draft.items,
+      selectedCustomer: draft.customer,
+      selectedOrderType: draft.orderType,
+      selectedTable: draft.table,
+      selectedRoom: draft.room,
+      selectedAggregator: null,
+      orderId: draft.orderId,
+      isUpdatingOrder: true,
+      orderComment: '',
+      selectedItem: null,
+      error: null,
+    });
+  },
+
   isMenuInteractionDisabled: () => {
+
     const state = get();
     return state.menuLoading || state.profileLoading;
   },
@@ -699,3 +992,25 @@ export const usePOSStore = create<POSStore>((set, get) => ({
     return state.orderLoading;
   }
 })); 
+usePOSStore.subscribe((state) => {
+  if (state.isInitializing) return;
+
+  const dataToSave = {
+    tabOrder: state.tabOrder,
+    activeTabId: state.activeTabId,
+    nextTabNumber: state.nextTabNumber,
+    heldTabs: state.heldTabs,
+    activeTabState: {
+      activeOrders: state.activeOrders,
+      selectedCustomer: state.selectedCustomer,
+      selectedOrderType: state.selectedOrderType,
+      selectedTable: state.selectedTable,
+      selectedRoom: state.selectedRoom,
+      selectedAggregator: state.selectedAggregator,
+      orderId: state.orderId,
+      isUpdatingOrder: state.isUpdatingOrder,
+      orderComment: state.orderComment,
+    }
+  };
+  localStorage.setItem('posOrderTabsData', JSON.stringify(dataToSave));
+});
