@@ -129,6 +129,7 @@ interface POSStore extends POSState {
   fetchAggregatorMenu: (aggregator: string) => Promise<void>;
   fetchCategories: () => Promise<void>;
   fetchPaymentModes: () => Promise<void>;
+  fetchAggregators: () => Promise<Aggregator[]>;
   addToOrder: (item: OrderItem) => Promise<void>;
   removeFromOrder: (uniqueId: string) => Promise<void>;
   updateQuantity: (uniqueId: string, quantity: number) => Promise<void>;
@@ -216,7 +217,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
         get().fetchMenuItems(),
         get().fetchCategories(),
         get().fetchPaymentModes(),
-        getAggregators()
+        get().fetchAggregators()
       ]);
 
       if (profileResult.status === 'rejected' ||
@@ -387,6 +388,13 @@ export const usePOSStore = create<POSStore>((set, get) => ({
     }
   },
 
+  fetchAggregators: async () => {
+    return queryClient.fetchQuery({
+      queryKey: ['aggregators'],
+      queryFn: () => getAggregators(),
+    });
+  },
+
   initializeCart: async () => {
     set({ cartId: uuidv4() });
   },
@@ -495,7 +503,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
       // Warm the aggregator list and, if one is already selected, its catalog
       // so the menu is available even if the device goes offline before the
       // cashier opens the aggregator selector.
-      getAggregators().catch((err) => console.warn('Failed to warm aggregator list:', err));
+      get().fetchAggregators().catch((err) => console.warn('Failed to warm aggregator list:', err));
       if (selectedAggregator?.customer) {
         fetchAggregatorMenu(selectedAggregator.customer).catch((err) =>
           console.warn('Failed to warm aggregator menu:', err)
