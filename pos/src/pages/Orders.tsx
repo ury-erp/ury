@@ -786,6 +786,8 @@ export default function Orders() {
           owner={posStore.posProfile?.cashier || ''}
           fetchOrders={fetchOrders}
           clearSelectedOrder={clearSelectedOrder}
+          discountPercentage={selectedOrder.additional_discount_percentage}
+          discountAmount={selectedOrder.discount_amount}
         />
       )}
       {selectedOrder && (
