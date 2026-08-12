@@ -55,21 +55,25 @@ def network_printing(
             file_path = os.path.join(
                 "/", "tmp", f"frappe-pdf-{frappe.generate_hash()}.pdf"
             )
-            with open(file_path, "wb") as f:
-                output.write(f)
-            conn.printFile(print_settings.printer_name, file_path, name, {})
+            try:
+                with open(file_path, "wb") as f:
+                    output.write(f)
+                conn.printFile(print_settings.printer_name, file_path, name, {})
 
-            restaurant_table, invoice_printed, name = frappe.db.get_value(
-                "POS Invoice", name, ["restaurant_table", "invoice_printed", "name"]
-            )
+                restaurant_table, invoice_printed, name = frappe.db.get_value(
+                    "POS Invoice", name, ["restaurant_table", "invoice_printed", "name"]
+                )
 
-            if restaurant_table and invoice_printed == 0:
-                frappe.db.set_value("POS Invoice", name, "invoice_printed", 1)
-                release_merge_cluster_tables(restaurant_table)
-            else:
-                frappe.db.set_value("POS Invoice", name, "invoice_printed", 1)
+                if restaurant_table and invoice_printed == 0:
+                    frappe.db.set_value("POS Invoice", name, "invoice_printed", 1)
+                    release_merge_cluster_tables(restaurant_table)
+                else:
+                    frappe.db.set_value("POS Invoice", name, "invoice_printed", 1)
 
-            return "Success"
+                return "Success"
+            finally:
+                if os.path.exists(file_path):
+                    os.remove(file_path)
         except Exception as e:
             return f"Failed to print: {str(e)}"
     except Exception as e:
