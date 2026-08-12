@@ -436,7 +436,8 @@ export const usePOSStore = create<POSStore>((set, get) => ({
       activeOrders: [],
       selectedOrderType: type,
       isUpdatingOrder: false,
-      orderId: null
+      orderId: null,
+      selectedAggregator: type !== 'Aggregators' ? null : selectedAggregator,
     });
 
     if (type === 'Aggregators') {

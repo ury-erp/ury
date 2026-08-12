@@ -9,12 +9,12 @@ export function useMenu() {
   const { posProfile, selectedRoom, selectedOrderType, selectedAggregator } = usePOSStore();
   
   return useQuery({
-    queryKey: ['restaurantMenu', posProfile?.name, selectedRoom, selectedOrderType, selectedAggregator?.customer],
+    queryKey: ['restaurantMenu', posProfile?.name, selectedRoom, selectedOrderType, selectedOrderType === 'Aggregators' ? selectedAggregator?.customer : null],
     queryFn: async () => {
       if (!posProfile?.name) return [];
       
       let items: APIMenuItem[] = [];
-      if (selectedAggregator?.customer) {
+      if (selectedOrderType === 'Aggregators' && selectedAggregator?.customer) {
         items = await getAggregatorMenu(selectedAggregator.customer);
       } else {
         items = await getRestaurantMenu(posProfile.name, selectedRoom, selectedOrderType);
