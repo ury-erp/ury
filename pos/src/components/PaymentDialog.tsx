@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Percent, Coins } from 'lucide-react';
 import { usePOSStore } from '../store/pos-store';
+import { usePaymentModes } from '../hooks/useMasterData';
 import { formatCurrency } from '@ury/core';
 import { Button, Input, Dialog, DialogContent, showToast } from '@ury/ui';
 import { call, repositories, projectionBus } from '@ury/core';
@@ -42,7 +43,8 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   discountPercentage,
   discountAmount
 }) => {
-  const { paymentModes, fetchPaymentModes, posProfile: storePosProfile } = usePOSStore();
+  const { posProfile: storePosProfile } = usePOSStore();
+  const { data: paymentModes = [] } = usePaymentModes();
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [discountType] = useState<'percentage'>('percentage'); // Only percentage now
@@ -57,10 +59,6 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   const [discountValue, setDiscountValue] = useState<string>(effectivePercentage > 0 ? String(effectivePercentage) : '');
   const [appliedDiscount, setAppliedDiscount] = useState<number>(discountAmount || 0); // Only tracking transaction discount!
   const [paymentInputs, setPaymentInputs] = useState<{ [mode: string]: string }>({});
-
-  useEffect(() => {
-    fetchPaymentModes();
-  }, [fetchPaymentModes]);
 
   // Calculate split payment total
   const payments = paymentModes

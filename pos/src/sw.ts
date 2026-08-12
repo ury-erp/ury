@@ -97,7 +97,7 @@ registerRoute(
     cacheName: 'ury-pos-images',
     plugins: [
       new ExpirationPlugin({
-        maxEntries: 100,
+        maxEntries: 1500,
         maxAgeSeconds: 30 * 24 * 60 * 60, // 30 Days
       }),
     ],
@@ -131,6 +131,30 @@ registerRoute(
       url.pathname.includes('/api/method/ury.ury_pos.api.getAggregatorItem') ||
       url.pathname.includes('/api/method/ury.ury_pos.api.getPosProfile') ||
       url.pathname.includes('/api/method/ury.ury_pos.api.getBranchRoom')),
+  new NetworkFirst({
+    cacheName: 'ury-pos-master-data-get',
+    networkTimeoutSeconds: 3,
+    plugins: [
+      new BroadcastUpdatePlugin(),
+      new ExpirationPlugin({
+        maxEntries: 30,
+        maxAgeSeconds: 24 * 60 * 60, // 24 Hours offline fallback
+      }),
+    ],
+  })
+);
+
+// 7. Generic Frappe Resource API GET lists for URY Room / URY Table
+// `getRooms` and `getTables` in `lib/table-api.ts` call `frappe.client.get_list`
+// via `@ury/core`, not the whitelisted Python helpers above. Cache these so the
+// Table page can render offline after the first successful fetch.
+registerRoute(
+  ({ request, url }) => {
+    if (request.method !== 'GET') return false;
+    if (!url.pathname.includes('/api/method/frappe.client.get_list')) return false;
+    const doctype = url.searchParams.get('doctype');
+    return doctype === 'URY Room' || doctype === 'URY Table';
+  },
   new NetworkFirst({
     cacheName: 'ury-pos-master-data-get',
     networkTimeoutSeconds: 3,

@@ -6,6 +6,7 @@ import OrderPanel from '../components/OrderPanel';
 import ProductDialog from '../components/ProductDialog';
 import MenuList from '../components/MenuList';
 import { usePOSStore } from '../store/pos-store';
+import { useMenu } from '../hooks/useMenu';
 import { cn } from '@ury/ui';
 import { Spinner } from '@ury/ui';
 import InitialLoader from '../components/InitialLoader';
@@ -16,11 +17,10 @@ export default function POS() {
     setQuickFilter,
     setSelectedItem,
     addToOrder,
-    loading,
-    error,
     isMenuInteractionDisabled,
     isInitializing,
   } = usePOSStore();
+  const { isLoading: menuLoading, error: menuError } = useMenu();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const clickTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -69,41 +69,22 @@ export default function POS() {
     </button>
   );
 
-  if (isInitializing) {
+  if (isInitializing || menuLoading) {
     return <InitialLoader />;
   }
 
-  if (error) {
+  if (menuError) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-center">
           <p className="text-xl font-semibold text-red-600 mb-2">Failed to load POS</p>
-          <p className="text-gray-600">{error}</p>
+          <p className="text-gray-600">{menuError.message}</p>
           <button 
             onClick={() => window.location.reload()}
             className="mt-4 px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700"
           >
             Retry
           </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (loading) {
-    return (
-      <div className="flex-1 flex items-center justify-center">
-        <Spinner message={t('common.loading_menu_items')} />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-lg font-medium text-red-600">{t('common.error_loading_menu_items')}</p>
-          <p className="text-sm text-gray-500 mt-2">{error}</p>
         </div>
       </div>
     );

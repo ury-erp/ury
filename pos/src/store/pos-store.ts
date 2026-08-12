@@ -5,11 +5,9 @@ import { getRestaurantMenu, getAggregatorMenu, MenuItem as APIMenuItem } from '.
 import { queryClient } from '../lib/query-client';
 import { getAggregators } from '../lib/aggregator-api';
 import { getCurrencyInfo, PosProfileCombined, getCombinedPosProfile } from '../lib/pos-profile-api';
-import { getMenuCourses } from '../lib/menu-course-api';
 import { getCustomerGroups, getCustomerTerritories } from '../lib/customer-api';
 import { DEFAULT_ORDER_TYPE, OrderType } from '../data/order-types';
 import { getTableOrder, TableOrder } from '../lib/order-api';
-import { getPaymentModes } from '../lib/payment-api';
 
 // Constants
 const MAX_QUANTITY = 99;
@@ -127,9 +125,6 @@ interface POSState {
 interface POSStore extends POSState {
   fetchMenuItems: () => Promise<void>;
   fetchAggregatorMenu: (aggregator: string) => Promise<void>;
-  fetchCategories: () => Promise<void>;
-  fetchPaymentModes: () => Promise<void>;
-  fetchAggregators: () => Promise<Aggregator[]>;
   addToOrder: (item: OrderItem) => Promise<void>;
   removeFromOrder: (uniqueId: string) => Promise<void>;
   updateQuantity: (uniqueId: string, quantity: number) => Promise<void>;
@@ -212,25 +207,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
     try {
       set({ isInitializing: true, error: null });
       
-      const [profileResult, menuResult, categoriesResult, paymentModesResult, aggregatorsResult] = await Promise.allSettled([
-        get().fetchPosProfile(),
-        get().fetchMenuItems(),
-        get().fetchCategories(),
-        get().fetchPaymentModes(),
-        get().fetchAggregators()
-      ]);
-
-      if (profileResult.status === 'rejected' ||
-          menuResult.status === 'rejected' ||
-          categoriesResult.status === 'rejected' ||
-          paymentModesResult.status === 'rejected' ||
-          aggregatorsResult.status === 'rejected') {
-        set({ 
-          error: 'Failed to initialize app. Please refresh the page.',
-          isInitializing: false 
-        });
-        return;
-      }
+      await get().fetchPosProfile();
 
       set({ isInitializing: false });
     } catch {
@@ -358,43 +335,6 @@ export const usePOSStore = create<POSStore>((set, get) => ({
     }
   },
 
-  fetchCategories: async () => {
-    try {
-      const cached = sessionStorage.getItem('menuCategories');
-      if (cached) {
-        const categories = JSON.parse(cached);
-        set({ categories });
-        return;
-      }
-
-      const courses = await getMenuCourses();
-      sessionStorage.setItem('menuCategories', JSON.stringify(courses));
-      set({ categories: courses });
-    } catch (error) {
-      set({ error: 'Failed to load menu categories' });
-      throw error;
-    }
-  },
-
-  fetchPaymentModes: async () => {
-    try {
-      const modes = await queryClient.fetchQuery({
-        queryKey: ['paymentModes'],
-        queryFn: () => getPaymentModes(),
-      });
-      set({ paymentModes: modes });
-    } catch (error) {
-      console.error('Failed to fetch payment modes:', error);
-    }
-  },
-
-  fetchAggregators: async () => {
-    return queryClient.fetchQuery({
-      queryKey: ['aggregators'],
-      queryFn: () => getAggregators(),
-    });
-  },
-
   initializeCart: async () => {
     set({ cartId: uuidv4() });
   },
@@ -503,7 +443,13 @@ export const usePOSStore = create<POSStore>((set, get) => ({
       // Warm the aggregator list and, if one is already selected, its catalog
       // so the menu is available even if the device goes offline before the
       // cashier opens the aggregator selector.
-      get().fetchAggregators().catch((err) => console.warn('Failed to warm aggregator list:', err));
+      const { posProfile } = get();
+      if (posProfile?.name) {
+        queryClient.prefetchQuery({
+          queryKey: ['aggregators', posProfile.name],
+          queryFn: () => getAggregators(posProfile.name),
+        }).catch((err) => console.warn('Failed to warm aggregator list:', err));
+      }
       if (selectedAggregator?.customer) {
         fetchAggregatorMenu(selectedAggregator.customer).catch((err) =>
           console.warn('Failed to warm aggregator menu:', err)

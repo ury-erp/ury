@@ -1,5 +1,6 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { usePOSStore } from '../store/pos-store';
+import { useMenu } from '../hooks/useMenu';
 import MenuCard from './MenuCard';
 import { Spinner } from '@ury/ui';
 import { cn } from '@ury/ui';
@@ -9,22 +10,45 @@ interface MenuListProps {
   onItemClick: (item: any) => void;
 }
 
+const INITIAL_RENDER_COUNT = 20;
+const LOAD_MORE_COUNT = 20;
+
 const MenuList: React.FC<MenuListProps> = ({ onItemClick }) => {
   const {
-    menuItems,
-    menuLoading,
-    error,
+    error: storeError,
     selectedCategory,
     searchQuery,
     quickFilter,
-    fetchMenuItems,
     isMenuInteractionDisabled,
     isOrderInteractionDisabled
   } = usePOSStore();
 
+  const { data: menuItems = [], isLoading: menuLoading, error: menuError } = useMenu();
+
+  const [visibleCount, setVisibleCount] = useState(INITIAL_RENDER_COUNT);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
-    fetchMenuItems();
-  }, [fetchMenuItems]);
+    // Reset visible count whenever filters change so a small filtered set
+    // does not retain a previously inflated window.
+    setVisibleCount(INITIAL_RENDER_COUNT);
+  }, [selectedCategory, searchQuery, quickFilter]);
+
+  useEffect(() => {
+    if (!sentinelRef.current) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setVisibleCount((prev) => Math.min(prev + LOAD_MORE_COUNT, filteredItems.length));
+        }
+      },
+      { root: null, rootMargin: '200px', threshold: 0 }
+    );
+
+    observer.observe(sentinelRef.current);
+    return () => observer.disconnect();
+  }, []);
 
   const filteredItems = useMemo(() => {
     return menuItems.filter(item => {
@@ -40,6 +64,12 @@ const MenuList: React.FC<MenuListProps> = ({ onItemClick }) => {
     });
   }, [menuItems, selectedCategory, searchQuery, quickFilter]);
 
+  const visibleItems = useMemo(() => {
+    return filteredItems.slice(0, visibleCount);
+  }, [filteredItems, visibleCount]);
+
+  const hasMore = visibleCount < filteredItems.length;
+  const error = menuError?.message || storeError;
   const isInteractionDisabled = isMenuInteractionDisabled() || isOrderInteractionDisabled();
 
   return (
@@ -68,7 +98,7 @@ const MenuList: React.FC<MenuListProps> = ({ onItemClick }) => {
             "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3",
             isInteractionDisabled && "opacity-50 pointer-events-none"
           )}>
-            {filteredItems.map((item) => (
+            {visibleItems.map((item) => (
               <MenuCard
                 key={item.id}
                 id={item.id}
@@ -81,6 +111,13 @@ const MenuList: React.FC<MenuListProps> = ({ onItemClick }) => {
                 disabled={isInteractionDisabled}
               />
             ))}
+            {hasMore && (
+              <div
+                ref={sentinelRef}
+                className="col-span-full h-8"
+                aria-hidden="true"
+              />
+            )}
           </div>
         )}
       </div>

@@ -3,6 +3,8 @@ import {
   UtensilsCrossed,
 } from 'lucide-react';
 import { usePOSStore } from '../store/pos-store';
+import { useMenu } from '../hooks/useMenu';
+import { useCategories } from '../hooks/useMasterData';
 import { cn } from '@ury/ui';
 import { Button, Badge } from '@ury/ui';
 import CommentDialog from './CommentDialog';
@@ -14,7 +16,9 @@ interface SidebarProps {
 }
 
 const Sidebar = ({ disabled }: SidebarProps) => {
-  const { selectedCategory, setSelectedCategory, menuItems, categories, orderComment, setOrderComment } = usePOSStore();
+  const { selectedCategory, setSelectedCategory, orderComment, setOrderComment } = usePOSStore();
+  const { data: menuItems = [] } = useMenu();
+  const { data: categories = [] } = useCategories();
   const [showCommentDialog, setShowCommentDialog] = useState(false);
 
   // Count items per category

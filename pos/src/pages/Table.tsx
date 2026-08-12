@@ -1,10 +1,10 @@
-import { Fragment, useCallback, useEffect, useMemo, useState, type MouseEvent } from 'react';
+import { Fragment, useEffect, useMemo, useState, type MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Layout, Square } from 'lucide-react';
 import { usePOSStore } from '../store/pos-store';
 import { useRootStore } from '../store/root-store';
 
-import { getRooms, getTables, getTableCount, getVacantTablesForBranch, mergeTablesBatch, unmergeTables, type Room, type Table } from '../lib/table-api';
+import { getVacantTablesForBranch, mergeTablesBatch, unmergeTables, type Room, type Table } from '../lib/table-api';
 import { getMergeGroupMembers, formatMergedTableLabelFromGroup, getTableRenderGroups, sortTablesByMergeGroups } from '../lib/table-utils';
 import { Spinner } from '@ury/ui';
 import { Button } from '@ury/ui';
@@ -23,6 +23,8 @@ import TableTransferDialog from '../components/TableTransferDialog';
 import CaptainTransferDialog from '../components/CaptainTransferDialog';
 import TableCard from '../components/TableCard';
 import MergeLinkConnector from '../components/MergeLinkConnector';
+import { useRooms, useTables, useRoomCounts } from '../hooks/useTables';
+import { queryClient } from '../lib/query-client';
 
 const TableView = () => {
   const navigate = useNavigate();
@@ -32,13 +34,13 @@ const TableView = () => {
   const showCaptainTransfer = canCaptainTransfer(user, posProfile);
 
   const branch = posProfile?.branch ?? null;
-  const [rooms, setRooms] = useState<Room[]>([]);
+  const { data: rooms = [], isLoading: loadingRooms } = useRooms(branch);
   const [selectedRoom, setSelectedRoom] = useState<string | null>(null);
-  const [tables, setTables] = useState<Table[]>([]);
-  const [tablesCache, setTablesCache] = useState<Record<string, Table[]>>({});
-  const [loadingRooms, setLoadingRooms] = useState(false);
-  const [loadingTables, setLoadingTables] = useState(false);
-  const [roomCounts, setRoomCounts] = useState<Record<string, number>>({});
+  const { data: tables = [], isLoading: loadingTables, error: tablesError } = useTables(selectedRoom);
+  const { data: roomCounts = {} } = useRoomCounts(
+    useMemo(() => rooms.map((r) => r.name), [rooms]),
+    branch
+  );
 
   const [error, setError] = useState<string | null>(null);
   const [printingTable, setPrintingTable] = useState<string | null>(null);
@@ -55,123 +57,19 @@ const TableView = () => {
     currentCaptain: string;
   } | null>(null);
 
-  const persistRoomCounts = useCallback((counts: Record<string, number>) => {
-    if (!branch) return;
-    sessionStorage.setItem(`ury_room_counts_${branch}`, JSON.stringify(counts));
-  }, [branch]);
+  useEffect(() => {
+    if (!selectedRoom && rooms.length > 0) {
+      setSelectedRoom(rooms[0].name);
+    }
+  }, [rooms, selectedRoom]);
 
   useEffect(() => {
-    async function fetchRooms() {
-      if (!branch) return;
-      setLoadingRooms(true);
+    if (tablesError) {
+      setError(t('tables.failed_load_tables'));
+    } else {
       setError(null);
-
-      try {
-        const sessionKey = `ury_rooms_${branch}`;
-        const cachedRooms = sessionStorage.getItem(sessionKey);
-
-        let parsedRooms: Room[] = [];
-        if (cachedRooms) {
-          try {
-            parsedRooms = JSON.parse(cachedRooms) as Room[];
-          } catch (e) {}
-        }
-
-        if (parsedRooms.length > 0) {
-          setRooms(parsedRooms);
-          setSelectedRoom((prev) => prev ?? (parsedRooms[0]?.name ?? null));
-        } else {
-          const fetchedRooms = await getRooms(branch);
-          setRooms(fetchedRooms);
-          setSelectedRoom((prev) => prev ?? (fetchedRooms[0]?.name ?? null));
-          if (fetchedRooms.length > 0) {
-            sessionStorage.setItem(sessionKey, JSON.stringify(fetchedRooms));
-          }
-        }
-      } catch (e) {
-        console.error(e);
-        setError('Failed to load rooms');
-      } finally {
-        setLoadingRooms(false);
-      }
     }
-
-    fetchRooms();
-  }, [branch]);
-
-  useEffect(() => {
-    if (!branch || rooms.length === 0) return;
-    const cacheKey = `ury_room_counts_${branch}`;
-    const cachedCounts = sessionStorage.getItem(cacheKey);
-    let shouldFetch = true;
-
-    if (cachedCounts) {
-      try {
-        const parsedCounts = JSON.parse(cachedCounts) as Record<string, number>;
-        setRoomCounts(parsedCounts);
-        const hasAllRooms = rooms.every((room) => typeof parsedCounts[room.name] === 'number');
-        if (hasAllRooms) {
-          shouldFetch = false;
-        }
-      } catch {
-        sessionStorage.removeItem(cacheKey);
-      }
-    }
-
-    if (!shouldFetch) return;
-
-    async function fetchRoomCounts() {
-      try {
-        const counts = await Promise.all(
-          rooms.map((room) => getTableCount(room.name, room.branch))
-        );
-        const nextCounts = rooms.reduce((acc, room, index) => {
-          acc[room.name] = counts[index];
-          return acc;
-        }, {} as Record<string, number>);
-        setRoomCounts(nextCounts);
-        persistRoomCounts(nextCounts);
-      } catch (error) {
-        console.error('Failed to load room counts', error);
-      }
-    }
-
-    fetchRoomCounts();
-  }, [branch, rooms, persistRoomCounts]);
-
-  const loadTables = useCallback(
-    async (roomName: string, options?: { useCache?: boolean }) => {
-      if (!roomName) return;
-      setError(null);
-
-      const shouldUseCache = options?.useCache !== false;
-      if (shouldUseCache && tablesCache[roomName]) {
-        setTables(sortTablesByMergeGroups(tablesCache[roomName]));
-        setLoadingTables(false);
-        return;
-      }
-
-      setLoadingTables(true);
-      try {
-        const fetchedTables = await getTables(roomName);
-        const sortedTables = sortTablesByMergeGroups(fetchedTables);
-        setTables(sortedTables);
-        setTablesCache((prev) => ({ ...prev, [roomName]: sortedTables }));
-      } catch (e) {
-        console.error(e);
-        setError('Failed to load tables');
-        setTables([]);
-      } finally {
-        setLoadingTables(false);
-      }
-    },
-    [tablesCache]
-  );
-
-  useEffect(() => {
-    if (!selectedRoom) return;
-    loadTables(selectedRoom);
-  }, [selectedRoom, loadTables]);
+  }, [tablesError]);
 
   const handleNavigateToPOS = (tableName: string) => {
     if (!selectedRoom) return;
@@ -230,6 +128,12 @@ const TableView = () => {
     }
   };
 
+  const refreshTables = () => {
+    if (!selectedRoom) return;
+    queryClient.invalidateQueries({ queryKey: ['tables', selectedRoom] });
+    queryClient.invalidateQueries({ queryKey: ['roomCounts', branch] });
+  };
+
   const handleMergeConfirm = async (targetNames: string[]) => {
     if (!mergeSourceTable || targetNames.length === 0) return;
 
@@ -237,9 +141,7 @@ const TableView = () => {
 
     try {
       await mergeTablesBatch(sourceName, targetNames);
-      if (selectedRoom) {
-        await loadTables(selectedRoom, { useCache: false });
-      }
+      refreshTables();
       showToast.success(t('tables.merge_success'));
     } catch (error) {
       showToast.error(error instanceof Error ? error.message : t('tables.merge_failed'));
@@ -252,9 +154,7 @@ const TableView = () => {
 
     try {
       await unmergeTables(unmergeSourceTable.name);
-      if (selectedRoom) {
-        await loadTables(selectedRoom, { useCache: false });
-      }
+      refreshTables();
       showToast.success(t('tables.unmerge_success'));
     } catch (error) {
       showToast.error(error instanceof Error ? error.message : t('tables.unmerge_failed'));
@@ -328,9 +228,7 @@ const TableView = () => {
 
     try {
       await tableTransfer(transferSourceTable.name, newTable, transferInvoiceName);
-      if (selectedRoom) {
-        await loadTables(selectedRoom, { useCache: false });
-      }
+      refreshTables();
       showToast.success(t('tables.transfer_success'));
     } catch (error) {
       showToast.error(error instanceof Error ? error.message : t('tables.transfer_failed'));
@@ -345,9 +243,7 @@ const TableView = () => {
 
     try {
       await captainTransfer(currentCaptain, newCaptain, invoiceName);
-      if (selectedRoom) {
-        await loadTables(selectedRoom, { useCache: false });
-      }
+      refreshTables();
       showToast.success(t('tables.captain_transfer_success'));
     } catch (error) {
       showToast.error(error instanceof Error ? error.message : t('tables.transfer_failed'));
@@ -407,26 +303,18 @@ const TableView = () => {
 
   const handleRoomChange = (roomName: string) => {
     if (roomName === selectedRoom) {
-      loadTables(roomName, { useCache: false });
+      queryClient.invalidateQueries({ queryKey: ['tables', roomName] });
       return;
     }
 
     setSelectedRoom(roomName);
-
-    if (tablesCache[roomName]) {
-      setTables(sortTablesByMergeGroups(tablesCache[roomName]));
-      setLoadingTables(false);
-    } else {
-      setLoadingTables(true);
-      setTables([]);
-    }
   };
 
   const [isLayoutView, setIsLayoutView] = useState(false);
 
   const handleLayoutView = () => {
     if (selectedRoom) {
-      loadTables(selectedRoom, { useCache: false });
+      queryClient.invalidateQueries({ queryKey: ['tables', selectedRoom] });
     }
     setIsLayoutView(true);
   };
@@ -437,7 +325,7 @@ const TableView = () => {
         selectedRoom={selectedRoom}
         tables={tablesToDisplay}
         onBackToGrid={() => setIsLayoutView(false)}
-        onRefresh={() => loadTables(selectedRoom, { useCache: false })}
+        onRefresh={refreshTables}
       />
     );
   }

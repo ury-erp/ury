@@ -1,7 +1,6 @@
-import { useEffect, useState } from 'react';
 import { usePOSStore } from '../store/pos-store';
 import { Select, SelectItem } from '@ury/ui';
-import { getAggregators, type Aggregator } from '../lib/aggregator-api';
+import { useAggregators } from '../hooks/useMasterData';
 
 interface AggregatorSelectProps {
   disabled?: boolean;
@@ -9,29 +8,7 @@ interface AggregatorSelectProps {
 
 export function AggregatorSelect({ disabled }: AggregatorSelectProps) {
   const { selectedAggregator, setSelectedAggregator, fetchAggregatorMenu } = usePOSStore();
-  const [aggregators, setAggregators] = useState<Aggregator[]>(
-    selectedAggregator ? [selectedAggregator] : []
-  );
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    const fetchAggregatorsList = async () => {
-      setLoading(true);
-      try {
-        const data = await getAggregators();
-        setAggregators(data);
-      } catch (error) {
-        console.error('Failed to fetch aggregators:', error);
-        if (selectedAggregator) {
-          setAggregators([selectedAggregator]);
-        }
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchAggregatorsList();
-  }, []);
+  const { data: aggregators = [], isLoading: loading } = useAggregators();
 
   const handleAggregatorChange = async (value: string) => {
     if (!value) {
@@ -66,4 +43,4 @@ export function AggregatorSelect({ disabled }: AggregatorSelectProps) {
       </Select>
     </div>
   );
-} 
+}
