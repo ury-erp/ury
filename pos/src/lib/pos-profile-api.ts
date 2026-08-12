@@ -1,5 +1,5 @@
 import { DOCTYPES } from '../data/doctypes';
-import { call, db } from './frappe-sdk';
+import { call, db } from '@ury/core';
 
 // Limited fields response
 export interface PosProfileLimited {
@@ -63,6 +63,7 @@ export interface PosProfileFull {
   currency: string;
   role_allowed_for_billing: RolePermission[];
   role_restricted_for_table_order?: RolePermission[];
+  transfer_role_permissions?: RolePermission[];
   paid_limit?: number;
 }
 

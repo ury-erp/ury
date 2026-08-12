@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { usePOSStore } from '../store/pos-store';
 import { useRootStore } from '../store/root-store';
-import { cn } from '../lib/utils';
-import { Button } from './ui';
+import { cn } from '@ury/ui';
+import { Button } from '@ury/ui';
 import TableSelectionDialog from './TableSelectionDialog';
 import { DEFAULT_ORDER_TYPE, DINE_IN, ORDER_TYPES , type OrderType} from '../data/order-types';
 import { HandPlatter } from 'lucide-react';
-import { isUserRestrictedFromTableOrders } from '../lib/role-utils';
+import { isUserRestrictedFromTableOrders } from '@ury/core';
+import { formatMergedTableLabel } from '../lib/table-utils';
 import { t } from '../i18n';
 
 interface OrderTypeSelectProps {
@@ -14,7 +15,7 @@ interface OrderTypeSelectProps {
 }
 
 const OrderTypeSelect = ({ disabled }: OrderTypeSelectProps) => {
-  const { selectedOrderType, setSelectedOrderType, selectedTable, posProfile, isUpdatingOrder } = usePOSStore();
+  const { selectedOrderType, setSelectedOrderType, selectedTable, tableOrder, posProfile, isUpdatingOrder } = usePOSStore();
   const { user } = useRootStore();
   const [showTableDialog, setShowTableDialog] = useState(false);
 
@@ -43,6 +44,14 @@ const OrderTypeSelect = ({ disabled }: OrderTypeSelectProps) => {
       }
     }, 100);
   };
+
+  const tableDisplayLabel =
+    selectedTable && tableOrder?.message?.restaurant_table
+      ? formatMergedTableLabel(
+          tableOrder.message.restaurant_table,
+          tableOrder.message.custom_merged_tables
+        )
+      : selectedTable;
 
   return (
     <div>
@@ -80,7 +89,7 @@ const OrderTypeSelect = ({ disabled }: OrderTypeSelectProps) => {
           className="h-fit w-fit gap-x-2 mt-2 text-sm text-primary-600 hover:text-primary-700"
           disabled={disabled}
         >
-          <HandPlatter className="w-4 h-4" /> {selectedTable}
+          <HandPlatter className="w-4 h-4" /> {tableDisplayLabel}
         </Button>
       )}
 

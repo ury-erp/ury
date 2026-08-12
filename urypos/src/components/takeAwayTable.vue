@@ -31,7 +31,7 @@
               {{ this.table.getBadgeText(table) }}
             </span>
           </div>
-          <div class="relative" v-if="table.occupied === 1">
+          <div class="relative" v-if="table.occupied !== 1">
             <button
               class="inline-block rounded p-1.5 text-sm text-gray-500 dark:text-gray-400 dark:hover:bg-gray-700 dark:focus:ring-gray-700"
               type="button"
@@ -54,7 +54,15 @@
               v-show="this.table.activeDropdown === table.name"
             >
               <ul class="py-2">
-                <li>
+                <li v-if="table.occupied !== 1">
+                  <a
+                    href="#"
+                    class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-600 dark:hover:text-white"
+                    @click="this.table.openMergeFreeModal(table)"
+                    >Table Merge</a
+                  >
+                </li>
+                <li v-if="table.occupied === 1">
                   <a
                     href="#"
                     class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-600 dark:hover:text-white"
@@ -62,7 +70,7 @@
                     >Table Transfer</a
                   >
                 </li>
-                <li v-if="this.auth.hasAccess">
+                <li v-if="table.occupied === 1 && this.auth.hasAccess">
                   <a
                     href="#"
                     class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-600 dark:hover:text-white"
@@ -84,10 +92,13 @@
             "
           >
             <h5
-              class="mt-2 text-xl font-medium text-gray-900 dark:text-white"
+              class="mt-2 text-xl font-medium text-gray-900 dark:text-white flex justify-center items-center gap-2"
               :class="{ 'mt-3': table.occupied === 0 }"
             >
               {{ table.name }}
+              <svg v-if="table.merged_with" class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" title="Merged Table">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+              </svg>
             </h5>
             <span class="text-sm text-gray-500 dark:text-gray-400">{{
               table.occupied === 1 ? this.table.getTimeDifference(table) : ""

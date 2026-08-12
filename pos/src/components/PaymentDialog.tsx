@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { X, Percent, Coins } from 'lucide-react';
 import { usePOSStore } from '../store/pos-store';
-import { cn, formatCurrency } from '../lib/utils';
-import { Button, Input, Dialog, DialogContent } from './ui';
-import { call } from '../lib/frappe-sdk';
+import { formatCurrency } from '@ury/core';
+import { Button, Input, Dialog, DialogContent } from '@ury/ui';
+import { call } from '@ury/core';
 import { DEFAULT_PAYMENT_MODE } from '../data/order-types';
 import { t } from '../i18n';
 
@@ -16,10 +16,13 @@ interface PaymentDialogProps {
   customer: string;
   posProfile: string;
   table: string | null;
+  tableLabel?: string | null;
   cashier: string;
   owner: string;
   fetchOrders: () => Promise<void>;
   clearSelectedOrder: () => void;
+  discountPercentage?: number;
+  discountAmount?: number;
 }
 
 const PaymentDialog: React.FC<PaymentDialogProps> = ({
@@ -30,17 +33,28 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   customer,
   posProfile,
   table,
+  tableLabel,
   cashier,
   owner,
   fetchOrders,
-  clearSelectedOrder
+  clearSelectedOrder,
+  discountPercentage,
+  discountAmount
 }) => {
   const { paymentModes, fetchPaymentModes, posProfile: storePosProfile } = usePOSStore();
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [discountType] = useState<'percentage'>('percentage'); // Only percentage now
-  const [discountValue, setDiscountValue] = useState<string>('');
-  const [appliedDiscount, setAppliedDiscount] = useState<number>(0);
+  
+  // Calculate effective percentage if only amount is provided (for invoice-level discounts)
+  const effectivePercentage = discountPercentage 
+    ? discountPercentage 
+    : (discountAmount && grandTotal + discountAmount > 0 
+        ? (discountAmount / (grandTotal + discountAmount)) * 100 
+        : 0);
+        
+  const [discountValue, setDiscountValue] = useState<string>(effectivePercentage > 0 ? String(effectivePercentage) : '');
+  const [appliedDiscount, setAppliedDiscount] = useState<number>(discountAmount || 0); // Only tracking transaction discount!
   const [paymentInputs, setPaymentInputs] = useState<{ [mode: string]: string }>({});
 
   useEffect(() => {
@@ -57,6 +71,9 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
     .filter(Boolean);
   const paymentsTotal = payments.reduce((sum, p: any) => sum + p.amount, 0);
 
+  // baseTotal represents the amount before any invoice-level discount (like pricing rule or manual discount)
+  const baseTotal = grandTotal + (discountAmount || 0);
+
   const handleApplyDiscount = () => {
     const value = parseFloat(discountValue);
     if (isNaN(value) || value <= 0) {
@@ -67,13 +84,13 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
       setError(t('errors.discount_exceeds_max'));
       return;
     }
-    const calculatedDiscount = (grandTotal * value) / 100;
+    const calculatedDiscount = (baseTotal * value) / 100;
     setAppliedDiscount(calculatedDiscount);
     setError(null);
   };
 
   // Order summary logic
-  const subtotal = grandTotal;
+  const subtotal = baseTotal;
   const adjustment = roundedTotal - grandTotal;
   const roundedAdjustment = Math.round(adjustment * 100) / 100;
   const showAdjustment = Math.abs(roundedAdjustment) > 0.001;
@@ -123,7 +140,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
     setError(null);
     try {
       await call.post('ury.ury.doctype.ury_order.ury_order.make_invoice', {
-        additionalDiscount: discountValue ? parseInt(discountValue) : null,
+        additionalDiscount: discountValue ? parseFloat(discountValue) : null,
         cashier,
         customer,
         invoice,
@@ -242,6 +259,12 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
           {/* Order Summary */}
           <div className="space-y-3 mb-6">
             <h3 className="text-lg font-semibold">{t('payment.order_summary')}</h3>
+            {tableLabel && (
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">{t('tables.table_name')}</span>
+                <span className="font-medium">{tableLabel}</span>
+              </div>
+            )}
             <div className="space-y-2 text-sm">
               {/* Subtotal (Grand Total) */}
               <div className="flex justify-between">

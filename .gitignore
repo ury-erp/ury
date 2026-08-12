@@ -8,13 +8,15 @@ node_modules/
 
 ury/public/pos
 ury/www/pos.html
+ury/public/ury
+ury/www/ury.html
 ury/public/urypos
-ury/public/URYMosaic
+ury/public/mosaic
 ury/public/node_modules
 urypos/yarn.lock
-URYMosaic/yarn.lock
+mosaic/yarn.lock
 ury/www/urypos.html
-ury/www/URYMosaic.html
+ury/www/mosaic.html
 build
 
 *.lock

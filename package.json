@@ -1,14 +1,20 @@
 {
   "private": true,
+  "workspaces": [
+    "packages/*",
+    "pos",
+    "frontend"
+  ],
   "scripts": {
     "ury-pos-install": "cd urypos && yarn install --check-files",
     "ury-pos-build": "cd urypos && yarn build",
-    "ury-mosaic-install": "cd URYMosaic && yarn install --check-files",
-    "ury-mosaic-build": "cd URYMosaic && yarn build",
+    "ury-mosaic-install": "cd mosaic && yarn install --check-files",
+    "ury-mosaic-build": "cd mosaic && yarn build",
     "ury-posv2-install": "cd pos && yarn install --check-files",
     "ury-posv2-build": "cd pos && yarn build",
-    "postinstall": "yarn ury-pos-install && yarn ury-mosaic-install && yarn ury-posv2-install",
-    "build": "yarn ury-pos-build && yarn ury-mosaic-build && yarn ury-posv2-build"
+    "ury-frontend-build": "cd frontend && yarn build",
+    "postinstall": "yarn ury-pos-install && yarn ury-mosaic-install",
+    "build": "yarn ury-pos-build && yarn ury-mosaic-build && yarn ury-posv2-build && yarn ury-frontend-build"
   },
   "devDependencies": {
     "@types/qz-tray": "^2.2.2"
