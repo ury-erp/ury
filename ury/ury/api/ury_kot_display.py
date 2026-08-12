@@ -24,11 +24,40 @@ def serve_kot(name, time):
 @frappe.whitelist()
 def confirm_cancel_kot(name):
     manager_roles = {"URY Manager", "URY Admin", "System Manager"}
-    if not manager_roles.intersection(frappe.get_roles()):
+    if not manager_roles.intersection(frappe.get_roles()) and frappe.session.user != "Administrator":
         frappe.throw(
             "Only a manager can confirm a cancelled KOT.",
             frappe.PermissionError,
         )
+
+    # Fetch the KOT document
+    try:
+        kot_doc = frappe.get_doc("URY KOT", name)
+    except frappe.DoesNotExistError:
+        frappe.throw(f"URY KOT {name} not found.", frappe.DoesNotExistError)
+
+    # Document-level permission check
+    if not frappe.has_permission("URY KOT", "write", doc=kot_doc):
+        frappe.throw(
+            "You do not have permission to modify this KOT.",
+            frappe.PermissionError
+        )
+
+    # Branch-level permission check
+    try:
+        session_branch = getBranch()
+    except Exception:
+        if frappe.session.user == "Administrator" or "System Manager" in frappe.get_roles():
+            session_branch = None
+        else:
+            raise
+
+    if session_branch and kot_doc.branch != session_branch:
+        frappe.throw(
+            "You do not have permission to modify KOTs from other branches.",
+            frappe.PermissionError
+        )
+
     frappe.db.set_value("URY KOT", name, "verified", 1)
     frappe.db.set_value("URY KOT", name, "verified_by", frappe.session.user)
 
