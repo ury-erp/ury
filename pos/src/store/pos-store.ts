@@ -247,7 +247,7 @@ const getInitialTabsState = () => {
   
   const initialId = uuidv4();
   return {
-    tabOrder: [{ id: initialId, name: 'Order 1' }],
+    tabOrder: [{ id: initialId, name: 'Tab 1' }],
     activeTabId: initialId,
     nextTabNumber: 2,
     heldTabs: {},
@@ -774,7 +774,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
       const newTabId = uuidv4();
       
       set({
-        tabOrder: [{ id: newTabId, name: 'Order 1' }],
+        tabOrder: [{ id: newTabId, name: 'Tab 1' }],
         activeTabId: newTabId,
         heldTabs: {},
         nextTabNumber: 2,
@@ -894,10 +894,10 @@ export const usePOSStore = create<POSStore>((set, get) => ({
     delete newHeldTabs[tabId];
 
     if (newTabOrder.length === 0) {
-      // No tabs remain — create a fresh Order 1
+      // No tabs remain — create a fresh Tab 1
       const newTabId = uuidv4();
       set({
-        tabOrder: [{ id: newTabId, name: 'Order 1' }],
+        tabOrder: [{ id: newTabId, name: 'Tab 1' }],
         activeTabId: newTabId,
         heldTabs: {},
         nextTabNumber: 2,
