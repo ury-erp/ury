@@ -13,6 +13,7 @@
   "dependencies": {
     "@radix-ui/react-select": "^2.2.5",
     "@types/uuid": "^10.0.0",
+    "@tanstack/react-query": "^5.0.0",
     "@ury/core": "*",
     "@ury/ui": "*",
     "autoprefixer": "^10.4.21",

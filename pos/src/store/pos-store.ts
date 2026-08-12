@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 import { storage } from '@ury/core';
 import { getRestaurantMenu, getAggregatorMenu, MenuItem as APIMenuItem } from '../lib/menu-api';
+import { queryClient } from '../lib/query-client';
 import { getAggregators } from '../lib/aggregator-api';
 import { getCurrencyInfo, PosProfileCombined, getCombinedPosProfile } from '../lib/pos-profile-api';
 import { getMenuCourses } from '../lib/menu-course-api';
@@ -231,7 +232,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
       }
 
       set({ isInitializing: false });
-    } catch (error) {
+    } catch {
       set({ 
         error: 'Failed to initialize app. Please refresh the page.',
         isInitializing: false 
@@ -298,9 +299,12 @@ export const usePOSStore = create<POSStore>((set, get) => ({
 
     try {
       set({ menuLoading: true, error: null });
-      const items = await getRestaurantMenu(posProfile.name, selectedRoom, selectedOrderType);
+      const items = await queryClient.fetchQuery({
+        queryKey: ['restaurantMenu', posProfile.name, selectedRoom, selectedOrderType],
+        queryFn: () => getRestaurantMenu(posProfile.name, selectedRoom, selectedOrderType),
+      });
       
-      const menuItems: MenuItem[] = items.map((item: any) => ({
+      const menuItems: MenuItem[] = items.map((item: APIMenuItem) => ({
         id: item.item,
         name: item.item_name,
         image: item.item_image || null,
@@ -329,7 +333,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
       set({ menuLoading: true, error: null });
       const items = await getAggregatorMenu(aggregator);
       
-      const menuItems: MenuItem[] = items.map((item: any) => ({
+      const menuItems: MenuItem[] = items.map((item: APIMenuItem) => ({
         id: item.item,
         item: item.item,
         item_name: item.item_name,
@@ -427,7 +431,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
     try {
       const newOrders = get().activeOrders.filter(item => item.uniqueId !== uniqueId);
       set({ activeOrders: newOrders });
-    } catch (error) {
+    } catch {
       set({ error: 'Failed to remove item from cart' });
     }
   },
@@ -454,7 +458,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   clearOrder: async () => {
     try {
       set({ activeOrders: [] });
-    } catch (error) {
+    } catch {
       set({ error: 'Failed to clear cart' });
     }
   },
@@ -550,7 +554,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
       return;
     }
     const groups = await getCustomerGroups();
-    const names = groups.map((g: any) => g.name);
+    const names = groups.map((g: { name: string }) => g.name);
     set({ customerGroups: names });
     sessionStorage.setItem('customerGroups', JSON.stringify(names));
   },
@@ -562,7 +566,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
       return;
     }
     const terrs = await getCustomerTerritories();
-    const names = terrs.map((t: any) => t.name);
+    const names = terrs.map((t: { name: string }) => t.name);
     set({ territories: names });
     sessionStorage.setItem('territories', JSON.stringify(names));
   },
@@ -657,7 +661,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
           orderId: null,
         });
       }
-    } catch (error) {
+    } catch {
       set({ 
         error: 'Failed to load table order',
         tableOrder: null,
