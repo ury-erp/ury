@@ -1,6 +1,7 @@
 import { Plus, X, FilePlus2 as FilePlusCorner, FilePenLine } from 'lucide-react';
 import { usePOSStore } from '../store/pos-store';
 import { cn, Button } from '@ury/ui';
+import { useRef, useEffect } from 'react';
 
 const TabFlare = ({ position }: { position: 'left' | 'right' }) => (
   <svg 
@@ -28,9 +29,23 @@ const TabFlare = ({ position }: { position: 'left' | 'right' }) => (
 
 const OrderTabs = ({ disabled }: { disabled?: boolean }) => {
   const { tabOrder, activeTabId, switchTab, addTab, closeTab, heldTabs, orderId } = usePOSStore();
+  
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const activeTabRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (activeTabRef.current && scrollContainerRef.current) {
+      activeTabRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+        inline: 'center'
+      });
+    }
+  }, [activeTabId, tabOrder.length]);
 
   return (
     <div 
+      ref={scrollContainerRef}
       className="flex overflow-x-auto mb-3"
     >
       <div className="flex items-center p-1.5 bg-white rounded-xl min-w-max gap-1">
@@ -41,6 +56,7 @@ const OrderTabs = ({ disabled }: { disabled?: boolean }) => {
           return (
             <div
               key={tab.id}
+              ref={isActive ? activeTabRef : null}
               className={cn(
                 'group flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors flex-shrink-0 relative',
                 isActive
