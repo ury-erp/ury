@@ -1088,8 +1088,16 @@ def pos_opening_check():
 
 @frappe.whitelist()
 def table_transfer(table, newTable, invoice):
-    current_table = frappe.get_doc("URY Table", table)
     pos_invoice = frappe.get_doc("POS Invoice", invoice)
+    
+    if not frappe.has_permission("POS Invoice", "write", doc=pos_invoice):
+        frappe.throw(frappe._("Not permitted to modify this order"), frappe.PermissionError)
+        
+    user_roles = frappe.get_roles()
+    if not any(role in user_roles for role in ["URY Cashier", "URY Manager", "System Manager", "Administrator"]):
+        frappe.throw(frappe._("Only Cashiers and Managers can perform table transfers."), frappe.PermissionError)
+
+    current_table = frappe.get_doc("URY Table", table)
     new_table = frappe.get_doc("URY Table", newTable)
 
     merge_members, _ = _get_merge_cluster(table)
@@ -1127,11 +1135,20 @@ def table_transfer(table, newTable, invoice):
 
 @frappe.whitelist()
 def captain_transfer(currentCaptain, newCaptain, invoice):
-    pos_profile=frappe.get_value("POS Invoice", invoice,"pos_profile")
+    pos_invoice = frappe.get_doc("POS Invoice", invoice)
+    
+    if not frappe.has_permission("POS Invoice", "write", doc=pos_invoice):
+        frappe.throw(frappe._("Not permitted to modify this order"), frappe.PermissionError)
+        
+    user_roles = frappe.get_roles()
+    if not any(role in user_roles for role in ["URY Cashier", "URY Manager", "System Manager", "Administrator"]):
+        frappe.throw(frappe._("Only Cashiers and Managers can perform captain transfers."), frappe.PermissionError)
+
+    pos_profile = pos_invoice.pos_profile
     multiple_cashier = frappe.db.get_value("POS Profile",pos_profile,"custom_enable_multiple_cashier")
-    branch=frappe.get_value("POS Invoice", invoice,"branch")
+    branch = pos_invoice.branch
     if multiple_cashier:
-        table=pos_profile=frappe.get_value("POS Invoice", invoice,"restaurant_table")
+        table = pos_invoice.restaurant_table
         current_room = frappe.get_value("URY Table", table,"restaurant_room")
         new_captain_room =  frappe.db.sql("""
                 SELECT room
@@ -1143,7 +1160,6 @@ def captain_transfer(currentCaptain, newCaptain, invoice):
             frappe.throw(_("Captain transfer is not allowed between different rooms"))
         else:
             current_captain_doc = frappe.get_doc("User", currentCaptain)
-            pos_invoice = frappe.get_doc("POS Invoice", invoice)
             new_captain_doc = frappe.get_doc("User", newCaptain)
 
             # Update the waiter field of the POS Invoice
@@ -1152,7 +1168,6 @@ def captain_transfer(currentCaptain, newCaptain, invoice):
 
     else:
         current_captain_doc = frappe.get_doc("User", currentCaptain)
-        pos_invoice = frappe.get_doc("POS Invoice", invoice)
         new_captain_doc = frappe.get_doc("User", newCaptain)
 
         # Update the waiter field of the POS Invoice
