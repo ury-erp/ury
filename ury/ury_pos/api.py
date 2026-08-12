@@ -324,6 +324,8 @@ def get_split_group(invoice):
         "total_taxes_and_charges",
         "creation",
         "branch",
+        "additional_discount_percentage",
+        "discount_amount",
     ]
 
     invoices = frappe.get_all(
@@ -473,7 +475,8 @@ def getPosInvoice(status, limit, limit_start):
                 total_taxes_and_charges, customer, status, mobile_number, 
                 posting_date, rounded_total, order_type,
                 custom_split_group, custom_split_from,
-                custom_merged_pos_invoice, custom_merged_total
+                custom_merged_pos_invoice, custom_merged_total,
+                additional_discount_percentage, discount_amount
             FROM `tabPOS Invoice` 
             WHERE branch = %s AND status = %s 
             AND (invoice_printed = 1 OR (invoice_printed = 0 AND COALESCE(restaurant_table, '') = ''))
@@ -495,7 +498,8 @@ def getPosInvoice(status, limit, limit_start):
                 total_taxes_and_charges, customer, status, mobile_number, 
                 posting_date, rounded_total, order_type,
                 custom_split_group, custom_split_from,
-                custom_merged_pos_invoice, custom_merged_total
+                custom_merged_pos_invoice, custom_merged_total,
+                additional_discount_percentage, discount_amount
             FROM `tabPOS Invoice` 
             WHERE branch = %s AND status = %s 
             AND (invoice_printed = 0 AND restaurant_table IS NOT NULL)
@@ -599,6 +603,8 @@ def searchPosInvoice(query,status):
             "custom_split_from",
             "custom_merged_pos_invoice",
             "custom_merged_total",
+            "additional_discount_percentage",
+            "discount_amount"
         ],
         limit_page_length=10 
     )
