@@ -228,10 +228,16 @@ async function fetchAndSetSiteName() {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json'
-            }
+            },
+            credentials: 'include'
         });
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
         const data = await response.json();
-        window.globalSiteName = data.message.site_name;
+        if (data && data.message) {
+            window.globalSiteName = data.message.site_name;
+        }
         // console.log('Global Site Name:', window.globalSiteName);
     } catch (error) {
         console.error('Failed to fetch site name:', error);
