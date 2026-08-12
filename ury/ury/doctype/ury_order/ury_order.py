@@ -72,7 +72,7 @@ def merge_tables_batch(anchor_table, tables):
                 _("Cannot merge tables from different rooms.")
             )
 
-        target_cluster, _ = _get_merge_cluster(
+        target_cluster, _target_table_map = _get_merge_cluster(
             target
         )
 
@@ -278,7 +278,7 @@ def _get_cluster_table_names(table):
     if not table:
         return []
     try:
-        members, _ = _get_merge_cluster(table)
+        members, _table_map = _get_merge_cluster(table)
         return members
     except Exception:
         return [table]
@@ -1106,7 +1106,7 @@ def table_transfer(table, newTable, invoice):
     pos_invoice = frappe.get_doc("POS Invoice", invoice)
     new_table = frappe.get_doc("URY Table", newTable)
 
-    merge_members, _ = _get_merge_cluster(table)
+    merge_members, _table_map = _get_merge_cluster(table)
     if len(merge_members) > 1:
         frappe.throw(_("Table transfer is not allowed for merged tables. Unmerge first."))
 
