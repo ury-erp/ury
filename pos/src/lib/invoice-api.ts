@@ -33,6 +33,7 @@ export interface POSInvoice {
   rounded_total: number;
   order_type: OrderType;
   custom_merged_tables?: string | null;
+  custom_aggregator_id?: string | null;
   custom_restaurant_room?: string | null;
   custom_split_group?: string | null;
   custom_split_from?: string | null;
@@ -142,6 +143,7 @@ function mapOrderEntityToEditShape(order: OrderEntity): any {
     order_type: order.order_type,
     restaurant_table: order.table || null,
     custom_restaurant_room: order.room || null,
+    custom_aggregator_id: order.custom_aggregator_id || null,
     status: order.status,
     invoice_printed: order.invoice_printed ?? (order.sync_status === 'synced' ? 1 : 0),
     grand_total: order.grand_total || 0,
@@ -342,6 +344,8 @@ export async function getPOSInvoices({
                 inv.custom_merged_pos_invoice ?? existing?.custom_merged_pos_invoice ?? null,
               custom_merged_total:
                 inv.custom_merged_total ?? existing?.custom_merged_total ?? null,
+              custom_aggregator_id:
+                inv.custom_aggregator_id ?? existing?.custom_aggregator_id ?? undefined,
               custom_merged_pos_invoice_details:
                 existing?.custom_merged_pos_invoice_details ?? null,
               // Preserve split metadata; the list endpoint does not return it.

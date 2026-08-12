@@ -9,7 +9,9 @@ interface AggregatorSelectProps {
 
 export function AggregatorSelect({ disabled }: AggregatorSelectProps) {
   const { selectedAggregator, setSelectedAggregator, fetchAggregatorMenu } = usePOSStore();
-  const [aggregators, setAggregators] = useState<Aggregator[]>([]);
+  const [aggregators, setAggregators] = useState<Aggregator[]>(
+    selectedAggregator ? [selectedAggregator] : []
+  );
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -20,6 +22,9 @@ export function AggregatorSelect({ disabled }: AggregatorSelectProps) {
         setAggregators(data);
       } catch (error) {
         console.error('Failed to fetch aggregators:', error);
+        if (selectedAggregator) {
+          setAggregators([selectedAggregator]);
+        }
       } finally {
         setLoading(false);
       }
@@ -29,8 +34,12 @@ export function AggregatorSelect({ disabled }: AggregatorSelectProps) {
   }, []);
 
   const handleAggregatorChange = async (value: string) => {
-    const aggregator = aggregators.find(a => a.customer === value);
-    setSelectedAggregator(aggregator || null);
+    if (!value) {
+      setSelectedAggregator(null);
+      return;
+    }
+    const aggregator = aggregators.find(a => a.customer === value) || { customer: value };
+    setSelectedAggregator(aggregator);
     
     if (aggregator) {
       await fetchAggregatorMenu(aggregator.customer);

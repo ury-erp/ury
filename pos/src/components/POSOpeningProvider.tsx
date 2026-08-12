@@ -48,8 +48,12 @@ const POSOpeningProvider = ({ children }: POSOpeningProviderProps) => {
       setValidationType(null);
     } catch (error) {
       console.error('Failed to check POS opening status:', error);
-      // On error, assume POS is not opened for safety
-      setValidationType('opening');
+      if (!navigator.onLine) {
+        // Assume previously validated POS is still open when offline
+        setValidationType(null);
+      } else {
+        setValidationType('opening');
+      }
     } finally {
       setIsLoading(false);
     }

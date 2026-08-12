@@ -180,6 +180,12 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
       showToast.success(t('payment.payment_success') || 'Payment successful');
       onClose();
       clearSelectedOrder();
+      
+      const posStore = usePOSStore.getState();
+      if (posStore.orderId === invoice || posStore.orderId === invoice.replace('TEMP-', '')) {
+        posStore.resetOrderState();
+      }
+
       await fetchOrders();
     } catch (err: any) {
       console.warn('[handlePayment] Network request failed, queueing payment command offline:', err);
@@ -200,6 +206,12 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
         showToast.success(t('payment.payment_queued_offline') || 'Payment processed offline');
         onClose();
         clearSelectedOrder();
+        
+        const posStore = usePOSStore.getState();
+        if (posStore.orderId === invoice || posStore.orderId === invoice.replace('TEMP-', '')) {
+          posStore.resetOrderState();
+        }
+
         await fetchOrders();
       } catch (offlineErr: any) {
         setError(offlineErr?.message || (err as Error).message || 'Failed to process payment');

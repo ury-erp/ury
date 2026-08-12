@@ -244,6 +244,10 @@ export default function Orders() {
       // Fill POS store
       posStore.resetOrderState();
       posStore.setSelectedOrderType(order.order_type);
+      if (order.order_type === 'Aggregators' && order.custom_aggregator_id) {
+        posStore.setSelectedAggregator({ customer: order.custom_aggregator_id });
+        posStore.fetchAggregatorMenu(order.custom_aggregator_id);
+      }
       posStore.setOrderForUpdate(order.name);
       if (order.restaurant_table) {
         posStore.setSelectedTable(order.restaurant_table, order.custom_restaurant_room || null,true);

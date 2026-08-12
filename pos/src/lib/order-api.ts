@@ -151,6 +151,8 @@ export interface SyncOrderData {
   owner?: string;
   pos_profile: string;
   comments?: string;
+  /** Mode of payment used for the initial dummy payment row (e.g. aggregator orders). */
+  mode_of_payment?: string;
   /**
    * Idempotency key for deduplication on retry.
    * The backend uses this to prevent duplicate POS Invoice creation.
@@ -459,6 +461,7 @@ function buildSyncOrderPayload(
       invoice,
       items: data.items,
       last_invoice: lastInvoice,
+      mode_of_payment: data.mode_of_payment,
       no_of_pax: data.no_of_pax,
       order_type: data.order_type,
       owner: data.owner,
