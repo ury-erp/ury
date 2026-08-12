@@ -189,6 +189,7 @@ interface POSStore extends POSState {
     room: string | null;
     items: OrderItem[];
   }) => void;
+  reorderTabs: (sourceIndex: number, destinationIndex: number) => void;
 }
 
 const generateUniqueId = (item: OrderItem): string => {
@@ -830,6 +831,23 @@ export const usePOSStore = create<POSStore>((set, get) => ({
       orderComment: '',
       originalCartHash: '',
     });
+  },
+
+  reorderTabs: (sourceIndex: number, destinationIndex: number) => {
+    const state = get();
+    if (
+      sourceIndex < 0 ||
+      sourceIndex >= state.tabOrder.length ||
+      destinationIndex < 0 ||
+      destinationIndex >= state.tabOrder.length
+    ) {
+      return;
+    }
+    const newTabOrder = [...state.tabOrder];
+    const [movedTab] = newTabOrder.splice(sourceIndex, 1);
+    newTabOrder.splice(destinationIndex, 0, movedTab);
+    
+    set({ tabOrder: newTabOrder });
   },
 
   switchTab: (tabId: string) => {

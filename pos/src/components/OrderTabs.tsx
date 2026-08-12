@@ -45,6 +45,9 @@ const OrderTabs = ({ disabled }: { disabled?: boolean }) => {
   const [confirmCloseTabId, setConfirmCloseTabId] = useState<string | null>(null);
   const [closeActionType, setCloseActionType] = useState<'discard' | 'unsaved'>('discard');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  const [draggedTabIndex, setDraggedTabIndex] = useState<number | null>(null);
+  const [dragOverTabIndex, setDragOverTabIndex] = useState<number | null>(null);
 
   const handleCloseClick = (e: React.MouseEvent, tabId: string) => {
     e.stopPropagation();
@@ -174,12 +177,50 @@ const OrderTabs = ({ disabled }: { disabled?: boolean }) => {
             <div
               key={tab.id}
               ref={isActive ? activeTabRef : null}
+              draggable={!disabled}
+              onDragStart={(e) => {
+                setDraggedTabIndex(index);
+                e.dataTransfer.effectAllowed = 'move';
+                // Set data so Firefox allows dragging
+                e.dataTransfer.setData('text/plain', tab.id);
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                if (dragOverTabIndex !== index) {
+                  setDragOverTabIndex(index);
+                }
+              }}
+              onDragLeave={() => {
+                if (dragOverTabIndex === index) {
+                  setDragOverTabIndex(null);
+                }
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                if (draggedTabIndex !== null && draggedTabIndex !== index) {
+                  store.reorderTabs(draggedTabIndex, index);
+                }
+                setDraggedTabIndex(null);
+                setDragOverTabIndex(null);
+              }}
+              onDragEnd={() => {
+                setDraggedTabIndex(null);
+                setDragOverTabIndex(null);
+              }}
               className={cn(
-                'group flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors flex-shrink-0 relative',
+                'group flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-all duration-200 flex-shrink-0 relative',
                 isActive
                   ? 'text-primary-700 bg-primary-50 border-t border-x border-primary-600 rounded-t-lg z-10'
                   : 'text-gray-600 bg-transparent hover:text-gray-900 hover:bg-gray-200/50 border border-transparent rounded-lg',
-                disabled && 'opacity-50 cursor-not-allowed'
+                disabled && 'opacity-50 cursor-not-allowed',
+                !disabled && 'cursor-grab active:cursor-grabbing',
+                draggedTabIndex === index && 'opacity-40 scale-95',
+                dragOverTabIndex === index && draggedTabIndex !== index && (
+                  draggedTabIndex !== null && draggedTabIndex > index
+                    ? 'shadow-[-3px_0_0_0_#0ea5e9]' // subtle left highlight
+                    : 'shadow-[3px_0_0_0_#0ea5e9]'  // subtle right highlight
+                )
               )}
             >
               {isActive && (
@@ -202,7 +243,7 @@ const OrderTabs = ({ disabled }: { disabled?: boolean }) => {
                 disabled={disabled}
                 className="focus:outline-none"
               >
-                Order {index + 1}
+                {tab.name}
               </button>
               
               <button
