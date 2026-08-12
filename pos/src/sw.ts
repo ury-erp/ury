@@ -18,7 +18,7 @@
  */
 
 import { clientsClaim } from 'workbox-core';
-import { precacheAndRoute, createHandlerBoundToURL } from 'workbox-precaching';
+import { precacheAndRoute } from 'workbox-precaching';
 import { registerRoute, NavigationRoute } from 'workbox-routing';
 import { StaleWhileRevalidate, CacheFirst, NetworkFirst } from 'workbox-strategies';
 import { ExpirationPlugin } from 'workbox-expiration';
@@ -35,14 +35,24 @@ clientsClaim();
 // 1. App Shell Pre-caching
 precacheAndRoute(self.__WB_MANIFEST || []);
 
-// 2. SPA Navigation Route (Fallback to index.html for client-side routing)
-// The precache manifest emitted by vite-plugin-pwa uses relative URLs, so the
-// fallback entry must match 'index.html' (not '/index.html').
+// 2. SPA Navigation Route (NetworkFirst for dynamic Frappe HTML)
 try {
-  const handler = createHandlerBoundToURL('index.html');
-  const navigationRoute = new NavigationRoute(handler, {
-    denylist: [/^\/api\//, /^\/assets\//],
-  });
+  const navigationRoute = new NavigationRoute(
+    new NetworkFirst({
+      cacheName: 'ury-pos-navigation',
+      networkTimeoutSeconds: 3,
+      plugins: [
+        new ExpirationPlugin({
+          maxEntries: 5,
+          maxAgeSeconds: 30 * 24 * 60 * 60, // 30 Days
+        }),
+      ],
+    }),
+    {
+      allowlist: [/^\/pos/],
+      denylist: [/^\/api\//, /^\/assets\//],
+    }
+  );
   registerRoute(navigationRoute);
 } catch (e) {
   console.warn('[SW] Navigation route registration failed:', e);

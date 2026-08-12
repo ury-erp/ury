@@ -18,7 +18,7 @@ export default defineConfig({
       injectRegister: false, // we register manually in main.tsx for control
       manifest: false, // URY is served inside Frappe; no standalone PWA manifest
       injectManifest: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,woff2}'],
+        globPatterns: ['**/*.{js,css,ico,png,svg,webp,woff2}'],
         globDirectory: resolve(__dirname, '../ury/public/pos'),
         swDest: resolve(__dirname, '../ury/public/pos/sw.js'),
         injectionPoint: 'self.__WB_MANIFEST',
