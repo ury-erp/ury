@@ -19,14 +19,10 @@ before(() => {
 });
 
 beforeEach(async () => {
-  // Clear all 10 tables before each test
+  // Clear all 6 tables before each test
   await repos.orders.clear();
   await repos.tables.clear();
-  await repos.menu.clear();
   await repos.customers.clear();
-  await repos.paymentModes.clear();
-  await repos.aggregators.clear();
-  await repos.aggregatorItems.clear();
   await repos.syncQueue.clear();
   await repos.metadata.clear();
   await repos.settings.clear();
@@ -97,22 +93,7 @@ test('2. Tables Collection — CRUD & Room Query', async () => {
   assert.equal(count, 3);
 });
 
-test('3. Menu Collection — CRUD & Category Query', async () => {
-  await repos.menu.putMany([
-    { id: 'M-01', item_name: 'Biryani', rate: 250, category: 'Main', course: 'Mains', special_dish: 1 },
-    { id: 'M-02', item_name: 'Samosa', rate: 50, category: 'Starters', course: 'Starters', special_dish: 0 },
-  ]);
-
-  const specials = await repos.menu.findSpecials();
-  assert.equal(specials.length, 1);
-  assert.equal(specials[0].item_name, 'Biryani');
-
-  const starters = await repos.menu.findByCategory('Starters');
-  assert.equal(starters.length, 1);
-  assert.equal(starters[0].id, 'M-02');
-});
-
-test('4. Customers Collection — Search by Phone/Name', async () => {
+test('3. Customers Collection — Search by Phone/Name', async () => {
   await repos.customers.putMany([
     { id: 'C-01', name: 'Alice Smith', phone: '9876543210' },
     { id: 'C-02', name: 'Bob Jones', phone: '1234567890' },
@@ -127,20 +108,7 @@ test('4. Customers Collection — Search by Phone/Name', async () => {
   assert.equal(searchResult[0].id, 'C-01');
 });
 
-test('5. Payment Modes & Aggregators Collections', async () => {
-  await repos.paymentModes.put({ id: 'Cash', name: 'Cash Payment', enabled: true });
-  await repos.aggregators.put({ name: 'Zomato', customer: 'Zomato Customer', enabled: true });
-
-  const modes = await repos.paymentModes.findEnabled();
-  assert.equal(modes.length, 1);
-  assert.equal(modes[0].id, 'Cash');
-
-  const aggs = await repos.aggregators.findEnabled();
-  assert.equal(aggs.length, 1);
-  assert.equal(aggs[0].name, 'Zomato');
-});
-
-test('6. Sync Queue Collection — FIFO Batch Processing', async () => {
+test('4. Sync Queue Collection — FIFO Batch Processing', async () => {
   await repos.syncQueue.putMany([
     { id: 'Q-01', action: 'sync_order', endpoint: 'api/sync', payload: {}, timestamp: '2026-08-05T10:00:00Z', status: 'PENDING', attempts: 0, priority: 1 },
     { id: 'Q-02', action: 'make_payment', endpoint: 'api/pay', payload: {}, timestamp: '2026-08-05T10:01:00Z', status: 'PENDING', attempts: 0, priority: 2 },
@@ -154,7 +122,7 @@ test('6. Sync Queue Collection — FIFO Batch Processing', async () => {
   assert.equal(batch[0].id, 'Q-01');
 });
 
-test('7. Metadata & Settings Collections', async () => {
+test('5. Metadata & Settings Collections', async () => {
   await repos.metadata.setValue('last_sync', '2026-08-05T14:00:00Z');
   const val = await repos.metadata.getValue('last_sync');
   assert.equal(val, '2026-08-05T14:00:00Z');
@@ -165,7 +133,7 @@ test('7. Metadata & Settings Collections', async () => {
   assert.equal(theme.mode, 'dark');
 });
 
-test('8. Atomic Dexie Transactions', async () => {
+test('6. Atomic Dexie Transactions', async () => {
   await repos.orders.runTransaction('rw', async () => {
     await repos.orders.put({
       id: 'ORD-TX-01',
@@ -184,38 +152,7 @@ test('8. Atomic Dexie Transactions', async () => {
   assert.equal(txOrder.grand_total, 150);
 });
 
-test('5a. Aggregator Items Collection — per-aggregator catalog isolation', async () => {
-  await repos.aggregatorItems.putManyByAggregator('Swiggy', [
-    { item: 'SZF', item_name: 'Sizzling Arabian Chicken Full', rate: 530, item_image: null },
-    { item: 'SZC', item_name: 'Sizzling Arabian Chicken Single', rate: 160, item_image: '/swiggy.jpg' },
-  ]);
-
-  await repos.aggregatorItems.putManyByAggregator('Zomato', [
-    { item: 'BIR', item_name: 'Biryani', rate: 250, item_image: null },
-  ]);
-
-  const swiggyItems = await repos.aggregatorItems.findByAggregator('Swiggy');
-  assert.equal(swiggyItems.length, 2);
-  assert.ok(swiggyItems.every(i => i.aggregator === 'Swiggy'));
-  assert.ok(swiggyItems.find(i => i.item === 'SZF'));
-
-  const zomatoItems = await repos.aggregatorItems.findByAggregator('Zomato');
-  assert.equal(zomatoItems.length, 1);
-  assert.equal(zomatoItems[0].item, 'BIR');
-
-  // Replacing Swiggy catalog should not affect Zomato
-  await repos.aggregatorItems.putManyByAggregator('Swiggy', [
-    { item: 'SZF', item_name: 'Sizzling Arabian Chicken Full', rate: 550, item_image: null },
-  ]);
-  const swiggyAfterReplace = await repos.aggregatorItems.findByAggregator('Swiggy');
-  assert.equal(swiggyAfterReplace.length, 1);
-  assert.equal(swiggyAfterReplace[0].rate, 550);
-
-  const zomatoAfterReplace = await repos.aggregatorItems.findByAggregator('Zomato');
-  assert.equal(zomatoAfterReplace.length, 1);
-});
-
-test('9. OrderRepository — upsertStatus updates status and locks terminal states', async () => {
+test('7. OrderRepository — upsertStatus updates status and locks terminal states', async () => {
   await repos.orders.put({
     id: 'ORD-STATUS-001',
     order_type: 'Dine-In',

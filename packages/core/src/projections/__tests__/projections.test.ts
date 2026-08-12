@@ -9,10 +9,8 @@ import assert from 'node:assert/strict';
 import 'fake-indexeddb/auto';
 import { UryPosDatabase } from '../../storage/db';
 import { createRepositories, type StorageRepositories } from '../../storage/repositories';
-import { getMenuProjection, updateMenuProjection } from '../menu.projection';
 import { getOrdersProjection } from '../orders.projection';
 import { getTablesProjection } from '../tables.projection';
-import { getAggregatorProjection } from '../aggregator.projection';
 import { getCustomerProjection } from '../customer.projection';
 import { projectionBus } from '../projection.bus';
 
@@ -25,10 +23,8 @@ before(() => {
 });
 
 beforeEach(async () => {
-  await repos.menu.clear();
   await repos.orders.clear();
   await repos.tables.clear();
-  await repos.aggregators.clear();
   await repos.customers.clear();
   projectionBus.clear();
 });
@@ -37,26 +33,7 @@ after(async () => {
   await testDb.delete();
 });
 
-test('1. Menu Projection — Category grouping, special dish count & update notification', async () => {
-  let eventFired = false;
-  projectionBus.subscribe(event => {
-    if (event === 'MENU_UPDATED') eventFired = true;
-  });
-
-  await updateMenuProjection([
-    { id: 'M1', name: 'Garlic Bread', price: 120, category: 'Starters', course: 'Starters', image: null, special_dish: false },
-    { id: 'M2', name: 'Chef Special Pizza', price: 450, category: 'Main Course', course: 'Mains', image: null, special_dish: true },
-  ], repos);
-
-  assert.equal(eventFired, true);
-
-  const proj = await getMenuProjection(undefined, repos);
-  assert.equal(proj.totalCount, 2);
-  assert.equal(proj.specialsCount, 1);
-  assert.deepEqual(proj.categories, ['Main Course', 'Starters']);
-});
-
-test('2. Orders Projection — Status count aggregations and pending sync tracking', async () => {
+test('1. Orders Projection — Status count aggregations and pending sync tracking', async () => {
   await repos.orders.putMany([
     {
       id: 'ORD-1',
@@ -90,7 +67,7 @@ test('2. Orders Projection — Status count aggregations and pending sync tracki
   assert.equal(proj.totalRevenue, 400);
 });
 
-test('3. Tables Projection — Occupancy statistics and room grouping', async () => {
+test('2. Tables Projection — Occupancy statistics and room grouping', async () => {
   await repos.tables.putMany([
     { name: 'T1', restaurant_room: 'Main Room', no_of_seats: 4, occupied: 1 },
     { name: 'T2', restaurant_room: 'Main Room', no_of_seats: 2, occupied: 0 },
@@ -105,18 +82,7 @@ test('3. Tables Projection — Occupancy statistics and room grouping', async ()
   assert.deepEqual(proj.rooms, ['Main Room', 'Patio']);
 });
 
-test('4. Aggregators Projection — Enabled platform metrics', async () => {
-  await repos.aggregators.putMany([
-    { name: 'Zomato', customer: 'Zomato Cust', enabled: true },
-    { name: 'Swiggy', customer: 'Swiggy Cust', enabled: false },
-  ]);
-
-  const proj = await getAggregatorProjection(repos);
-  assert.equal(proj.aggregators.length, 2);
-  assert.equal(proj.enabledCount, 1);
-});
-
-test('5. Customers Projection — Search query filter', async () => {
+test('3. Customers Projection — Search query filter', async () => {
   await repos.customers.putMany([
     { id: 'C1', name: 'John Doe', phone: '9876543210', customer_group: 'Individual' },
     { id: 'C2', name: 'Jane Smith', phone: '1234567890', customer_group: 'Commercial' },

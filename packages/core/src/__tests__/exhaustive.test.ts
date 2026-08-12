@@ -22,10 +22,8 @@ import { TempIDMapper } from '../sync/temp-id-mapper';
 import { calculateBackoffDelay } from '../sync/backoff';
 import { SyncEngine } from '../sync/sync.engine';
 import { ConflictResolver } from '../sync/conflict.resolver';
-import { getMenuProjection } from '../projections/menu.projection';
 import { getOrdersProjection } from '../projections/orders.projection';
 import { getTablesProjection } from '../projections/tables.projection';
-import { getAggregatorProjection } from '../projections/aggregator.projection';
 import { getCustomerProjection } from '../projections/customer.projection';
 import { projectionBus } from '../projections/projection.bus';
 
@@ -48,9 +46,7 @@ before(() => {
 beforeEach(async () => {
   await repos.orders.clear();
   await repos.tables.clear();
-  await repos.menu.clear();
   await repos.customers.clear();
-  await repos.aggregators.clear();
   await repos.syncQueue.clear();
   await repos.metadata.clear();
   await idMapper.clear();
@@ -61,19 +57,7 @@ after(async () => {
   await testDb.delete();
 });
 
-// Scenario 1: Online Mode
-test('Scenario 1: Online Mode — Direct storage cache population and immediate projection updates', async () => {
-  await repos.menu.putMany([
-    { id: 'M-101', item_name: 'Biryani', rate: 250, category: 'Main Course', special_dish: 1 },
-  ]);
-
-  const menuProj = await getMenuProjection(undefined, repos);
-  assert.equal(menuProj.totalCount, 1);
-  assert.equal(menuProj.specialsCount, 1);
-  assert.equal(menuProj.items[0].name, 'Biryani');
-});
-
-// Scenario 2: Offline Mode
+// Scenario 1: Offline Mode
 test('Scenario 2: Offline Mode — IndexedDB storage fallback when network is unavailable', async () => {
   await repos.orders.put({
     id: 'OFFLINE-ORD-1',
@@ -191,19 +175,6 @@ test('Scenario 8: Split Offline — SplitBillCommand creation and manual cashier
   assert.equal(res.conflictCode, 'SPLIT_FAILED');
   assert.equal(res.strategy, 'MANUAL');
   assert.equal(res.shouldNotifyUser, true);
-});
-
-// Scenario 9: Aggregator Offline
-test('Scenario 9: Aggregator Offline — Aggregator delivery channel caching and projection metrics', async () => {
-  await repos.aggregators.putMany([
-    { name: 'Zomato', customer: 'Zomato Customer', enabled: true },
-    { name: 'Swiggy', customer: 'Swiggy Customer', enabled: true },
-    { name: 'UberEats', customer: 'UberEats Customer', enabled: false },
-  ]);
-
-  const aggProj = await getAggregatorProjection(repos);
-  assert.equal(aggProj.aggregators.length, 3);
-  assert.equal(aggProj.enabledCount, 2);
 });
 
 // Scenario 10: Customer Offline
