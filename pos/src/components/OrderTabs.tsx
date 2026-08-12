@@ -39,7 +39,7 @@ const TabFlare = ({ position }: { position: 'left' | 'right' }) => (
 
 const OrderTabs = ({ disabled }: { disabled?: boolean }) => {
   const store = usePOSStore();
-  const { tabOrder, activeTabId, switchTab, addTab, closeTab, heldTabs, orderId, activeOrders, originalCartHash, posProfile, selectedOrderType, selectedTable, selectedRoom, selectedCustomer, selectedAggregator, paymentModes, orderComment, isUpdatingOrder } = store;
+  const { tabOrder, activeTabId, switchTab, addTab, closeTab, heldTabs, orderId, activeOrders, posProfile, selectedOrderType, selectedTable, selectedRoom, selectedCustomer, selectedAggregator, paymentModes, orderComment, isUpdatingOrder } = store;
   const user = useRootStore(state => state.user);
   
   const [confirmCloseTabId, setConfirmCloseTabId] = useState<string | null>(null);
