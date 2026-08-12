@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useRootStore } from '../store/root-store';
-import { Button } from './ui/button';
-import { Spinner } from './ui/spinner';
+import { Button } from '@ury/ui';
+import { Spinner } from '@ury/ui';
 import { RefreshCw } from 'lucide-react';
+import { t } from '../i18n'
 
 interface Props {
   children: React.ReactNode;
@@ -40,7 +41,7 @@ const AuthGuard: React.FC<Props> = ({ children }) => {
   if (authLoading || (user && configLoading) || isRechecking) {
     return (
       <div className="min-h-screen">
-        <Spinner />
+        <Spinner  message={t('common.loading')} />
       </div>
     );
   }

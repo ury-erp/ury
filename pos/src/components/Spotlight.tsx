@@ -2,20 +2,21 @@
 import { useState, useEffect, useRef } from 'react';
 import { Search, Command, X } from 'lucide-react';
 import { usePOSStore } from '../store/pos-store';
-import { cn, formatCurrency } from '../lib/utils';
-import { Button, Input } from './ui';
-import { Dialog, DialogContent } from './ui/dialog';
+import { cn } from '@ury/ui';
+import { formatCurrency } from '@ury/core';
+import { Button, Input } from '@ury/ui';
+import { Dialog, DialogContent } from '@ury/ui';
 
 const Spotlight = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
-  const { menuItems, addToOrder, setSelectedItem } = usePOSStore();
+  const { menuItems, setSelectedItem } = usePOSStore();
 
   const filteredItems = menuItems.filter(item =>
     item.name.toLowerCase().includes(query.toLowerCase()) ||
-    item.category.toLowerCase().includes(query.toLowerCase())
+    item.category?.toLowerCase().includes(query.toLowerCase())
   ).slice(0, 10);
 
   useEffect(() => {
@@ -96,7 +97,7 @@ const Spotlight = () => {
                 )}
               >
                 <img
-                  src={item.image}
+                  src={item.image ?? undefined}
                   alt={item.name}
                   className="w-12 h-12 object-cover rounded me-4"
                 />

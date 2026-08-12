@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { X, Square, AlertTriangle } from 'lucide-react';
 import { usePOSStore } from '../store/pos-store';
-import { Dialog, DialogContent } from './ui/dialog';
-import { Button } from './ui/button';
-import { cn } from '../lib/utils';
+import { Dialog, DialogContent } from '@ury/ui';
+import { Button } from '@ury/ui';
+import { cn } from '@ury/ui';
 import { getRooms, getTables, Room, Table } from '../lib/table-api';
-import { Badge } from './ui/badge';
-import { Spinner } from './ui/spinner';
+import { Badge } from '@ury/ui';
+import { Spinner } from '@ury/ui';
 import { TableShapeIcon } from './TableShapeIcon';
+import { getMergeGroupMembers, formatMergedTableLabelFromGroup } from '../lib/table-utils';
 import { t } from '../i18n';
 
 interface Props {
@@ -184,7 +185,15 @@ const TableSelectionDialog: React.FC<Props> = ({ onClose }) => {
                   />
                   <div className="text-center">
                     <div className="font-medium">{table.name}</div>
-                    <div className="mt-2 h-4"> {/* Height placeholder that matches Badge height */}
+                    {(() => {
+                      const members = getMergeGroupMembers(table, tables);
+                      const label =
+                        members.length > 1 ? formatMergedTableLabelFromGroup(members) : null;
+                      return label && label !== table.name ? (
+                        <div className="mt-0.5 truncate text-xs text-primary-700">{label}</div>
+                      ) : null;
+                    })()}
+                    <div className="mt-2 h-4">
                       {table.occupied === 1 && (
                         <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-700 hover:bg-amber-100">
                           {t('tables.occupied')}

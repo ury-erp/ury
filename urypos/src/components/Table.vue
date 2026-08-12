@@ -128,7 +128,7 @@
                 {{ this.table.getBadgeText(table) }}
               </span>
             </div>
-            <div class="relative" v-if="table.occupied === 1">
+            <div class="relative" v-if="table.occupied !== 1">
               <button
                 class="inline-block rounded p-1.5 text-sm text-gray-500 dark:text-gray-400 dark:hover:bg-gray-700 dark:focus:ring-gray-700"
                 type="button"
@@ -151,7 +151,15 @@
                 v-show="this.table.activeDropdown === table.name"
               >
                 <ul class="py-2">
-                  <li>
+                  <li v-if="table.occupied !== 1">
+                    <a
+                      href="#"
+                      class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-600 dark:hover:text-white"
+                      @click="this.table.openMergeFreeModal(table)"
+                      >Table Merge</a
+                    >
+                  </li>
+                  <li v-if="table.occupied === 1">
                     <a
                       href="#"
                       class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-600 dark:hover:text-white"
@@ -159,7 +167,7 @@
                       >Table Transfer</a
                     >
                   </li>
-                  <li v-if="this.auth.hasAccess">
+                  <li v-if="table.occupied === 1 && this.auth.hasAccess">
                     <a
                       href="#"
                       class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-600 dark:hover:text-white"
@@ -181,10 +189,13 @@
               "
             >
               <h5
-                class="mt-2 text-xl font-medium text-gray-900 dark:text-white"
+                class="mt-2 text-xl font-medium text-gray-900 dark:text-white flex justify-center items-center gap-2"
                 :class="{ 'mt-3': table.occupied === 0 }"
               >
                 {{ table.name }}
+                <svg v-if="table.merged_with" class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" title="Merged Table">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+                </svg>
               </h5>
               <span class="text-sm text-gray-500 dark:text-gray-400">
                 {{
@@ -194,7 +205,7 @@
                 }}</span
               >
             </div>
-            <div class="mt-8 text-center" v-if="table.occupied != 1">
+            <div class="mt-8 flex justify-center gap-2" v-if="table.occupied != 1">
               <button
                 type="button"
                 class="inline-flex items-center rounded px-2 py-2.5 text-center text-sm font-medium text-white hover:bg-[#2557D6]/90 focus:outline-none focus:ring-4 focus:ring-[#2557D6]/50 dark:focus:ring-[#2557D6]/50"
@@ -381,6 +392,52 @@
             class="mt-8 rounded bg-blue-700 px-3 py-2 text-white hover:bg-blue-600"
           >
             Transfer
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div
+    v-if="table.showModalMergeFree"
+    class="fixed inset-0 z-10 overflow-y-auto bg-gray-100"
+  >
+    <div class="mt-20 flex items-center justify-center">
+      <div class="mt-10 w-full rounded bg-white p-6 shadow-lg md:max-w-md">
+        <div class="flex justify-end">
+          <span class="sr-only">Close</span>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-5 w-5 cursor-pointer"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            @click="this.table.showModalMergeFree = false"
+          >
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </div>
+        <h2 class="mt-1 block text-left text-xl font-medium text-gray-900 dark:text-white">
+          Merge with {{ table.mergeSourceTable }}
+        </h2>
+        <div class="mt-4 text-left">
+          <label for="mergeSelect" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Select Table to Merge</label>
+          <select id="mergeSelect" v-model="table.selectedMergedTable" class="mt-1 block w-full rounded border-gray-300 py-2 pl-3 pr-10 text-base focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm dark:bg-gray-700 dark:text-white dark:border-gray-600">
+            <option value="" disabled>Select a table</option>
+            <option v-for="(t, index) in table.transferTable" :key="index" :value="t.name">{{t.name}}</option>
+          </select>
+        </div>
+        <div class="flex justify-end">
+          <button
+            @click="
+              this.table.showModalMergeFree = false;
+              this.table.mergeFreeTablesAction();
+            "
+            class="mt-8 rounded bg-blue-700 px-3 py-2 text-white hover:bg-blue-600"
+            :disabled="!table.selectedMergedTable"
+            :class="{'opacity-50 cursor-not-allowed': !table.selectedMergedTable}"
+          >
+            Merge Tables
           </button>
         </div>
       </div>

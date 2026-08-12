@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
-import { storage } from '../lib/storage';
+import { storage } from '@ury/core';
 import { getRestaurantMenu, getAggregatorMenu, MenuItem as APIMenuItem } from '../lib/menu-api';
 import { getCurrencyInfo, PosProfileCombined, getCombinedPosProfile } from '../lib/pos-profile-api';
 import { getMenuCourses } from '../lib/menu-course-api';
@@ -12,7 +12,6 @@ import { getPaymentModes } from '../lib/payment-api';
 // Constants
 const MAX_QUANTITY = 99;
 const MIN_QUANTITY = 0;
-const ITEMS_PER_PAGE = 10;
 
 // Custom error class for cart operations
 class CartError extends Error {
@@ -31,6 +30,7 @@ export interface MenuItem extends Omit<APIMenuItem, 'rate' | 'item_image'> {
   quantity?: number;
   description?: string;
   special_dish?: 1 | 0;
+  category?: string;
   variants?: Array<{ id: string; name: string; price: number }>;
   addons?: Array<{ id: string; name: string; price: number; category: 'sides' | 'drinks' | 'desserts' }>;
   selectedVariant?: { id: string; name: string; price: number };
@@ -297,7 +297,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
       set({ menuLoading: true, error: null });
       const items = await getRestaurantMenu(posProfile.name, selectedRoom, selectedOrderType);
       
-      const menuItems: MenuItem[] = items.map(item => ({
+      const menuItems: MenuItem[] = items.map((item: any) => ({
         id: item.item,
         name: item.item_name,
         image: item.item_image || null,
@@ -326,7 +326,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
       set({ menuLoading: true, error: null });
       const items = await getAggregatorMenu(aggregator);
       
-      const menuItems: MenuItem[] = items.map(item => ({
+      const menuItems: MenuItem[] = items.map((item: any) => ({
         ...item,
         id: item.item,
         name: item.item_name,
@@ -484,7 +484,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
 
   processPayment: async (paymentMode: string, amount: number) => {
     try {
-      const { activeOrders, cartId, selectedCustomer, selectedOrderType } = get();
+      const { cartId, selectedCustomer, selectedOrderType } = get();
       
       const order: Order = {
         id: uuidv4(),

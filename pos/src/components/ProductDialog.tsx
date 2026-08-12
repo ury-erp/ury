@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef, ChangeEvent } from 'react';
 import { X, Plus, Minus } from 'lucide-react';
 import { OrderItem, usePOSStore } from '../store/pos-store';
-import { cn, formatCurrency } from '../lib/utils';
-import { Button, Dialog, DialogContent, Input } from './ui';
-import { db } from '../lib/frappe-sdk';
+import { cn } from '@ury/ui';
+import { formatCurrency } from '@ury/core';
+import { Button, Dialog, DialogContent, Input } from '@ury/ui';
+import { db } from '@ury/core';
 import { t } from '../i18n';
 
 interface Variant {
@@ -58,8 +59,8 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
 
   // State for the full item doc (used for all dialog content)
   const [itemDoc, setItemDoc] = useState<any | null>(null);
-  const [isItemLoading, setIsItemLoading] = useState(false);
-  const [itemError, setItemError] = useState<string | null>(null);
+  const [, setIsItemLoading] = useState(false);
+  const [, setItemError] = useState<string | null>(null);
 
   // Fetch Item doc when dialog opens or selectedItem changes
   useEffect(() => {
@@ -128,7 +129,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
   const [comments, setComments] = useState<string>(itemToReplace?.comment || existingCartItem?.comment || '');
   const dialogRef = useRef<HTMLDivElement>(null);
 
-  const [addonItemCodes, setAddonItemCodes] = useState<string[]>([]);
+  const [, setAddonItemCodes] = useState<string[]>([]);
   const [isAddonLoading, setIsAddonLoading] = useState(false);
   const [addonError, setAddonError] = useState<string | null>(null);
 
@@ -152,7 +153,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
           setAddonItemCodes([]);
         }
       })
-      .catch((err: any) => {
+      .catch((_err: any) => {
         setAddonError('Failed to fetch add-ons');
         setAddonItemCodes([]);
       })
@@ -206,40 +207,40 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
 
   // Always get price from menuItems for the main item
   const basePrice = selectedItem?.price ? Number(selectedItem.price) : 0;
-  const numericQuantity = quantity === '' ? 0 : parseInt(quantity, 10);
+  const numericQuantity = quantity === '' ? 0 : parseFloat(quantity);
   const addonsTotal = selectedAddons.reduce((sum, addon) => sum + addon.price, 0);
   const total = (basePrice + addonsTotal) * numericQuantity;
 
   const handleQuantityChange = (value: string) => {
-    // Allow empty string or numbers
+    // Only allow valid numbers and one decimal point
+    const isValid = /^\d*\.?\d*$/.test(value);
+    if (!isValid) return;
+
     if (value === '') {
       setQuantity('');
       return;
     }
 
-    const num = parseInt(value, 10);
-    if (!isNaN(num) && num >= 0 && num <= 99) {
-      setQuantity(num.toString());
-    }
+    setQuantity(value);
   };
 
   const handleIncrement = () => {
-    const currentNum = quantity === '' ? 0 : parseInt(quantity, 10);
+    const currentNum = quantity === '' ? 0 : parseFloat(quantity);
     if (currentNum < 99) {
-      setQuantity((currentNum + 1).toString());
+      setQuantity(Math.round((currentNum + 1) * 1000) / 1000 + '');
     }
   };
 
   const handleDecrement = () => {
-    const currentNum = quantity === '' ? 0 : parseInt(quantity, 10);
+    const currentNum = quantity === '' ? 0 : parseFloat(quantity);
     if (currentNum > 0) {
-      setQuantity((currentNum - 1).toString());
+      setQuantity(Math.round((currentNum - 1) * 1000) / 1000 + '');
     }
   };
 
   const handleAddToOrder = () => {
-    const numericQuantity = typeof quantity === 'string' ? parseInt(quantity, 10) : quantity;
-    if (isNaN(numericQuantity) || numericQuantity === 0) {
+    const numericQuantity = typeof quantity === 'string' ? parseFloat(quantity) : quantity;
+    if (isNaN(numericQuantity) || numericQuantity <= 0) {
       return; // Don't add to order if quantity is 0 or invalid
     }
 

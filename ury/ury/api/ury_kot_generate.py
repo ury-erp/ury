@@ -47,6 +47,7 @@ def create_kot_doc(
             "doctype": "URY KOT",
             "invoice": invoice_id,
             "restaurant_table": restaurant_table,
+            "custom_merged_tables": pos_invoice.get("custom_merged_tables"),
             "customer_name": customer,
             "pos_profile": pos_profile_id,
             "comments": comments,

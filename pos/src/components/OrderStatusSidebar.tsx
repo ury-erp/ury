@@ -1,6 +1,6 @@
 import { FileText } from 'lucide-react';
-import { cn } from '../lib/utils';
-import { Button } from './ui';
+import { cn } from '@ury/ui';
+import { Button } from '@ury/ui';
 import { getOrderStatusTypes, OrderStatusType } from '../data/order-types';
 import { usePOSStore } from '../store/pos-store';
 import { t } from '../i18n';
