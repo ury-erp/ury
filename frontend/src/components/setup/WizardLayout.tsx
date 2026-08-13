@@ -13,19 +13,14 @@ interface WizardLayoutProps {
   isNextLoading?: boolean;
 }
 
-export function WizardLayout({ step, children, onNext, onPrev, _onLaunch, nextLabel = 'Next', isNextDisabled, isNextLoading }: WizardLayoutProps) {
+export function WizardLayout({ step, children, onNext, onPrev, nextLabel = 'Next', isNextDisabled, isNextLoading }: WizardLayoutProps) {
   const version = (window as any).frappe?.boot?.versions?.ury || 'v3.2.0';
 
   return (
     <div className="min-h-screen flex flex-col items-center py-12 px-4 bg-[#F9FAFB] relative overflow-hidden">
-      {/* Top Background Image */}
-      <div 
-        className="absolute top-0 left-0 right-0 h-72 bg-cover bg-top bg-no-repeat pointer-events-none z-0" 
-        style={{ backgroundImage: "url('/assets/ury/Images/URY-bg.png')" }} 
-      />
 
       <div className="relative z-10 w-full max-w-[820px] mb-8 flex flex-col items-center">
-        <img src="/assets/ury/Images/ury.png" alt="URY Logo" className="h-16 w-auto object-contain mb-3" />
+        <img src="/assets/ury/Images/URY-bg.png" alt="URY Logo" className="h-16 w-auto object-contain mb-3" />
         <p className="text-[#6B7280]">Let's get your restaurant ready.</p>
       </div>
 
