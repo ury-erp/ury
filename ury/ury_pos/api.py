@@ -284,7 +284,16 @@ def _enrich_split_group_meta(invoices):
 
 @frappe.whitelist()
 def get_split_group(invoice):
-    group = frappe.db.get_value("POS Invoice", invoice, "custom_split_group")
+    pos_invoice = frappe.get_doc("POS Invoice", invoice)
+    
+    if not frappe.has_permission("POS Invoice", "read", doc=pos_invoice):
+        frappe.throw(frappe._("Not permitted to view this order"), frappe.PermissionError)
+        
+    user_branch = getBranch()
+    if pos_invoice.branch and user_branch and pos_invoice.branch != user_branch:
+        frappe.throw(frappe._("Not permitted to view orders outside your active branch"), frappe.PermissionError)
+
+    group = pos_invoice.custom_split_group
     if not group:
         split_from = frappe.db.get_value("POS Invoice", invoice, "custom_split_from")
         if split_from:
@@ -314,6 +323,7 @@ def get_split_group(invoice):
         "net_total",
         "total_taxes_and_charges",
         "creation",
+        "branch",
         "additional_discount_percentage",
         "discount_amount",
     ]
@@ -340,6 +350,15 @@ def get_split_group(invoice):
                 existing.add(child.name)
 
     invoices.sort(key=lambda row: row.get("creation") or row.get("name"))
+
+    valid_invoices = []
+    for inv in invoices:
+        if inv.get("branch") and user_branch and inv.get("branch") != user_branch:
+            continue
+        if not frappe.has_permission("POS Invoice", "read", doc=inv.get("name")):
+            continue
+        valid_invoices.append(inv)
+    invoices = valid_invoices
 
     total = len(invoices)
     for index, inv in enumerate(invoices, start=1):
@@ -775,6 +794,14 @@ def getPosInvoiceItems(invoice):
     itemDetails = []
     taxDetails = []
     orderdItems = frappe.get_doc("POS Invoice", invoice)
+    
+    if not frappe.has_permission("POS Invoice", "read", doc=orderdItems):
+        frappe.throw(frappe._("Not permitted to view this order"), frappe.PermissionError)
+        
+    user_branch = getBranch()
+    if orderdItems.branch and user_branch and orderdItems.branch != user_branch:
+        frappe.throw(frappe._("Not permitted to view orders outside your active branch"), frappe.PermissionError)
+
     posItems = orderdItems.items
     for items in posItems:
         itemDetails.append(
