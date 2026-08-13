@@ -34,9 +34,9 @@ export const KPIGrid: React.FC<KPIGridProps> = ({ summary, loading }) => {
   const todaySales = summary?.today_sales ?? 0;
   const ordersToday = summary?.today_orders ?? 0;
   const occupiedTables = summary?.occupied_tables ?? 0;
-  const totalTables = summary?.total_tables ?? 20;
+  const totalTables = summary?.total_tables ?? 0;
   const aov = summary?.avg_order_value ?? 0;
-  const activeCashiers = summary?.active_cashiers ?? 1;
+  const activeCashiers = summary?.active_cashiers ?? 0;
   const pendingOrders = summary?.pending_kitchen_orders ?? 0;
   const totalMenuItems = summary?.total_menu_items ?? 0;
 
