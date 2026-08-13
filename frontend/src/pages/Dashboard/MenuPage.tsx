@@ -5,6 +5,7 @@ import { Card, Button, Badge, Input, Select, Spinner } from '@ury/ui';
 import { formatCurrency, call } from '@ury/core';
 import { dashboardService } from '../../services/dashboard';
 import SideDrawer from '../../components/layout/SideDrawer';
+import { SearchableSelect } from '../../components/common/SearchableSelect';
 
 interface URYMenuRecord {
   name: string;
@@ -287,30 +288,31 @@ export const MenuPage: React.FC = () => {
 
       {/* Section: Menu Selector — Partition Style */}
       <div className="flex flex-col md:flex-row items-center justify-between gap-4 pb-3 border-b border-gray-200">
-        <div className="flex items-center gap-3">
-          <Select
-            value={selectedMenu}
-            onChange={(e) => setSelectedMenu(e.target.value)}
-            className="w-full sm:w-48 bg-gray-50 border-gray-200 focus:ring-primary/20"
-          >
-            {menus.length === 0 && <option value="">No Menus Found</option>}
-            {menus.map((m) => (
-              <option key={m.name} value={m.name}>{m.menu_name || m.name}</option>
-            ))}
-          </Select>
+        <div className="flex items-center gap-3 w-full md:w-auto">
+          <div className="w-full sm:w-48">
+            <SearchableSelect
+              id="selected-menu"
+              value={selectedMenu}
+              options={menus.map((m) => ({ value: m.name, label: m.menu_name || m.name }))}
+              placeholder="Select Menu..."
+              onChange={(_, val) => setSelectedMenu(val)}
+            />
+          </div>
 
-          <Select
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-            className="w-full sm:w-48 bg-gray-50 border-gray-200 focus:ring-primary/20"
-          >
-            <option value="all">All Courses</option>
-            {categories.map((c) => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </Select>
+          <div className="w-full sm:w-48">
+            <SearchableSelect
+              id="category-filter"
+              value={categoryFilter}
+              options={[
+                { value: 'all', label: 'All Courses' },
+                ...categories.map((c) => ({ value: c, label: c }))
+              ]}
+              placeholder="Select Course..."
+              onChange={(_, val) => setCategoryFilter(val)}
+            />
+          </div>
 
-          <div className="flex items-center bg-gray-100 p-1 rounded-lg">
+          <div className="flex items-center bg-gray-100 p-1 rounded-lg shrink-0">
             <button
               onClick={() => setViewMode('grid')}
               className={`p-1.5 rounded-md transition-all flex items-center justify-center ${viewMode === 'grid' ? 'bg-white shadow-sm text-primary' : 'text-gray-500 hover:text-gray-700'}`}
