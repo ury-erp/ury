@@ -106,7 +106,7 @@ function ConfigurePageContent() {
       setActiveIndex(CONFIGURE_PROGRESS_STEPS.length);
 
       setTimeout(() => {
-        window.location.href = '/app';
+        window.location.href = '/ury/dashboard';
       }, 800);
     } catch (err: any) {
       clearInterval(interval);
