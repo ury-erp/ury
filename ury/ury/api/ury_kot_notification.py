@@ -18,7 +18,11 @@ def get_users_with_role(role_name):
 
 @frappe.whitelist()
 def order_delay_notification(id):
-    table = frappe.db.get_value("URY KOT", id, "restaurant_table")
+    kot_doc = frappe.get_doc("URY KOT", id)
+    if not frappe.has_permission("URY KOT", "write", doc=kot_doc):
+        frappe.throw(frappe._("Not permitted to send notifications for this KOT"), frappe.PermissionError)
+
+    table = kot_doc.restaurant_table
     tableOrTakeaway = "Take Away"
     if table:
         tableOrTakeaway = table
