@@ -6,12 +6,13 @@ interface ProgressModalProps {
   visible: boolean;
   activeIndex: number;
   error?: string | null;
+  steps?: string[];
 }
 
-export function ProgressModal({ visible, activeIndex, error }: ProgressModalProps) {
+export function ProgressModal({ visible, activeIndex, error, steps = PROGRESS_STEPS }: ProgressModalProps) {
   if (!visible) return null;
 
-  const totalSteps = PROGRESS_STEPS.length;
+  const totalSteps = steps.length;
   const progressPercent = Math.min(100, Math.max(0, (activeIndex / totalSteps) * 100));
 
   return (
@@ -40,7 +41,7 @@ export function ProgressModal({ visible, activeIndex, error }: ProgressModalProp
           </p>
           
           <div className="flex flex-col mb-8">
-            {PROGRESS_STEPS.map((step, idx) => {
+            {steps.map((step, idx) => {
               const isDone = idx < activeIndex;
               const isActive = idx === activeIndex;
 

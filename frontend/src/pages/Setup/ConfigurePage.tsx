@@ -12,6 +12,8 @@ import { PaymentSection } from '../../components/setup/sections/PaymentSection';
 import { UserSection } from '../../components/setup/sections/UserSection';
 import { setupService } from '../../services/setup';
 import { call } from '@ury/core';
+import { CONFIGURE_PROGRESS_STEPS } from '../../components/setup/constants';
+import { ProgressModal } from '../../components/setup/ProgressModal';
 
 const SECTION_CONFIGS: Record<SectionId, { title: string; description: string }> = {
   branch: {
@@ -44,6 +46,7 @@ function ConfigurePageContent() {
   const navigate = useNavigate();
   const [finishing, setFinishing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
 
   const {
     activeSection,
@@ -73,6 +76,12 @@ function ConfigurePageContent() {
   const handleFinish = async () => {
     setFinishing(true);
     setError(null);
+    setActiveIndex(0);
+
+    const interval = setInterval(() => {
+      setActiveIndex(i => Math.min(i + 1, CONFIGURE_PROGRESS_STEPS.length - 1));
+    }, 2000);
+
     try {
       const payload = {
         branch,
@@ -93,8 +102,14 @@ function ConfigurePageContent() {
         value: 1,
       });
 
-      window.location.href = '/app';
+      clearInterval(interval);
+      setActiveIndex(CONFIGURE_PROGRESS_STEPS.length);
+
+      setTimeout(() => {
+        window.location.href = '/app';
+      }, 800);
     } catch (err: any) {
+      clearInterval(interval);
       console.error('Failed to finish configure setup', err);
       let msg = 'Failed to configure setup. Check backend logs.';
       if (typeof err === 'string') {
@@ -156,7 +171,7 @@ function ConfigurePageContent() {
       nextLabel={isLastSection ? "Launch" : "Next"}
       isNextLoading={finishing}
     >
-      <div className="space-y-4">
+      <div className="space-y-4 h-full">
         {error && (
           <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3 text-red-700">
             <div className="flex-1 text-sm font-medium">
@@ -173,18 +188,27 @@ function ConfigurePageContent() {
         )}
 
         {/* Two-Column Grid Layout */}
-        <div className="flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-[#E5E7EB] -my-8 -mx-8 min-h-[440px]">
-          <div className="w-full md:w-64 shrink-0 p-6 md:py-8 md:pl-8 md:pr-6">
+        <div className="flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-[#E5E7EB] -my-8 -mx-8 h-full">
+          <div className="w-full md:w-64 shrink-0 p-6 md:py-8 md:pl-8 md:pr-6 h-full overflow-y-auto">
             <ConfigureSidebar />
           </div>
 
-          <div className="flex-1 min-w-0 p-6 md:p-8">
+          <div className="flex-1 min-w-0 p-6 md:p-8 h-full overflow-y-auto">
             <SectionShell title={config.title} description={config.description}>
               {renderSection()}
             </SectionShell>
           </div>
         </div>
       </div>
+
+      {finishing && (
+        <ProgressModal 
+          visible={true} 
+          activeIndex={activeIndex} 
+          error={error} 
+          steps={CONFIGURE_PROGRESS_STEPS} 
+        />
+      )}
     </WizardLayout>
   );
 }
