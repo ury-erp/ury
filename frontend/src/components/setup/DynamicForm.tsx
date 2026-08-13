@@ -3,7 +3,9 @@ import { defineCatalog } from '@json-render/core';
 import { schema } from '@json-render/react/schema';
 import { defineRegistry, Renderer, JSONUIProvider, useBoundProp, createStateStore } from '@json-render/react';
 import { z } from 'zod';
-import { Input, Select, SelectItem } from '@ury/ui';
+import { Input } from '@ury/ui';
+import { SearchableSelect } from '../common/SearchableSelect';
+import { DatePicker } from './DatePicker';
 import { validateFieldValue } from '@ury/core';
 import { SetupPayload } from '../../services/setup';
 
@@ -22,6 +24,10 @@ interface DynamicFormProps {
 // 1. Define the Catalog for our form components
 const formCatalog = defineCatalog(schema, {
   components: {
+    FormRoot: {
+      props: z.object({}),
+      description: "Form root container"
+    },
     FormSection: {
       props: z.object({ label: z.string().optional() }),
       description: "Form section with a label"
@@ -41,12 +47,17 @@ const formCatalog = defineCatalog(schema, {
 // 2. Define the Component Registry
 const { registry } = defineRegistry(formCatalog, {
   components: {
+    FormRoot: ({ children }) => (
+      <div className="w-full space-y-6">
+        {children}
+      </div>
+    ),
     FormSection: ({ props, children }) => (
-      <div className="space-y-4">
+      <div className="w-full space-y-4">
         {props.label && (
           <h3 className="text-md font-semibold text-foreground">{props.label}</h3>
         )}
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-x-6 gap-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-x-6 gap-y-4 w-full">
           {children}
         </div>
       </div>
@@ -84,26 +95,21 @@ const { registry } = defineRegistry(formCatalog, {
                 error={!!props.error}
               />
             ) : field.type === 'select' ? (
-              <Select
+              <SearchableSelect
                 id={field.id}
                 value={val || ''}
-                onValueChange={handleChange}
+                options={props.options || []}
+                placeholder={`Select ${field.label}...`}
                 error={!!props.error}
-              >
-                <SelectItem value="" disabled>Select {field.label}</SelectItem>
-                {props.options?.map((opt: any) => (
-                  <SelectItem key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </SelectItem>
-                ))}
-              </Select>
+                onChange={(_fieldId, newVal) => handleChange(newVal)}
+              />
             ) : field.type === 'date' ? (
-              <Input
+              <DatePicker
                 id={field.id}
-                type="date"
                 value={val || ''}
-                onChange={(e) => handleChange(e.target.value)}
+                placeholder="dd-mm-yyyy"
                 error={!!props.error}
+                onChange={(_fieldId, newVal) => handleChange(newVal)}
               />
             ) : null}
             
@@ -122,6 +128,7 @@ const { registry } = defineRegistry(formCatalog, {
 
 // Convert old schema structure into @json-render/react element tree
 function buildElementTree(oldSchema: any) {
+  const elements: Record<string, any> = {};
   const sections = [];
   
   if (Array.isArray(oldSchema.fields) && oldSchema.fields.length > 0) {
@@ -135,26 +142,47 @@ function buildElementTree(oldSchema: any) {
     }
   }
 
-  return {
-    root: {
+  const rootChildren = sections.map((sec, i) => {
+    const secId = `sec_${i}`;
+    
+    const secChildren = sec.fields.map((f: any) => {
+      const fieldId = `field_${f.id}`;
+      const fieldProps: any = {
+        field: f,
+        value: { "$bindState": `/${f.id}` },
+        error: { "$state": `/errors/${f.id}` }
+      };
+      if (f.optionsKey) {
+        fieldProps.options = { "$state": `/options/${f.optionsKey}` };
+      }
+      
+      elements[fieldId] = {
+        type: "FieldRenderer",
+        props: fieldProps,
+        on: {
+          change: { action: "fieldChange" }
+        }
+      };
+      return fieldId;
+    });
+
+    elements[secId] = {
       type: "FormSection",
-      children: sections.map((sec, i) => ({
-        type: "FormSection",
-        props: { label: sec.label },
-        children: sec.fields.map((f: any) => ({
-          type: "FieldRenderer",
-          props: {
-            field: f,
-            value: { "$bindState": `/${f.id}` },
-            options: f.optionsKey ? { "$state": `/options/${f.optionsKey}` } : undefined,
-            error: { "$state": `/errors/${f.id}` }
-          },
-          on: {
-            change: { action: "fieldChange" }
-          }
-        }))
-      }))
-    }
+      props: { label: sec.label ?? null },
+      children: secChildren
+    };
+    return secId;
+  });
+
+  elements["root"] = {
+    type: "FormRoot",
+    props: {},
+    children: rootChildren
+  };
+
+  return {
+    root: "root",
+    elements
   };
 }
 

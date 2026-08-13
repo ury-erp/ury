@@ -27,7 +27,7 @@ interface JsonFormProps {
 export const JsonForm: React.FC<JsonFormProps> = ({ schema, values, onChange, disabled }) => {
   return (
     <div className="space-y-4 text-xs">
-      {Object.entries(schema.properties).map(([key, prop]) => {
+      {Object.entries(schema?.properties ?? {}).map(([key, prop]) => {
         const isRequired = schema.required?.includes(key) || prop.required;
         const value = values[key] !== undefined ? values[key] : (prop.default || '');
 

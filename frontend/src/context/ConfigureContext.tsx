@@ -145,7 +145,7 @@ export function ConfigureProvider({ children }: { children: ReactNode }) {
     async function loadCompanyDefault() {
       try {
         const res = await call<any>('ury.ury.api.minimal.business_setup.get_business_setup');
-        const companyName = res?.message?.data?.company || res?.data?.company;
+        const companyName = res?.message?.company || res?.company || res?.message?.data?.company || res?.data?.company;
         if (companyName) {
           setBranch(prev => ({
             ...prev,
