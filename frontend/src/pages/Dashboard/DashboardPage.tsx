@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
-import { RefreshCw } from 'lucide-react';
-import { Button } from '@ury/ui';
 import KPIGrid from './KPIGrid';
 import AnalyticsCharts from './AnalyticsCharts';
 import ReportWidgets from './ReportWidgets';
@@ -44,20 +42,6 @@ export const DashboardPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Refresh utility row */}
-      <div className="flex justify-end">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={fetchDashboardData}
-          disabled={loading}
-          className="border-primary/20 text-primary hover:bg-primary/10 flex items-center space-x-1.5"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-          <span>Refresh</span>
-        </Button>
-      </div>
-
       {/* 1. KPI Stat Cards Grid */}
       <KPIGrid summary={summary} loading={loading} />
 

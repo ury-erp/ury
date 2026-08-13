@@ -37,7 +37,7 @@ def get_dashboard_summary(branch=None):
         "occupied_tables": occupied_tables,
         "total_tables": total_tables,
         "avg_order_value": avg_order_value,
-        "active_cashiers": 1,
+        "active_cashiers": 0,
         "pending_kitchen_orders": pending_kitchen_orders,
         "total_menu_items": total_menu_items,
     }
