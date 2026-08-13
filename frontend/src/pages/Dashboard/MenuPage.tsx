@@ -171,7 +171,7 @@ export const MenuPage: React.FC = () => {
         await call('frappe.client.insert', {
           doc: {
             doctype: 'URY Menu Course',
-            course_name: newItem.new_course_name.trim(),
+            course: newItem.new_course_name.trim(),
           },
         });
         resolvedCourse = newItem.new_course_name.trim();
@@ -256,7 +256,7 @@ export const MenuPage: React.FC = () => {
       await call('frappe.client.insert', {
         doc: {
           doctype: 'URY Menu Course',
-          course_name: newCourseName.trim(),
+          course: newCourseName.trim(),
         },
       });
       await fetchCourses();
