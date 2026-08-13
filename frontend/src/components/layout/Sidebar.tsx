@@ -20,18 +20,18 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { label: 'Dashboard', path: '/ury/dashboard', icon: LayoutDashboard },
-  { label: 'URY Menu', path: '/ury/menu', icon: Utensils },
-  { label: 'URY Table', path: '/ury/table', icon: Grid },
-  { label: 'URY Room', path: '/ury/room', icon: Home },
-  { label: 'POS Profile', path: '/ury/pos-profile', icon: SlidersHorizontal },
-  { label: 'User', path: '/ury/user', icon: Users },
-  { label: 'Branch', path: '/ury/branch', icon: Building2 }
+  { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+  { label: 'URY Menu', path: '/menu', icon: Utensils },
+  { label: 'URY Table', path: '/table', icon: Grid },
+  { label: 'URY Room', path: '/room', icon: Home },
+  { label: 'POS Profile', path: '/pos-profile', icon: SlidersHorizontal },
+  { label: 'User', path: '/user', icon: Users },
+  { label: 'Branch', path: '/branch', icon: Building2 }
 ];
 
 export const Sidebar: React.FC = () => {
   const location = useLocation();
-  const isAdvancedPath = location.pathname.startsWith('/ury/report-settings');
+  const isAdvancedPath = location.pathname.startsWith('/report-settings');
   const [isAdvancedOpen, setIsAdvancedOpen] = useState<boolean>(isAdvancedPath);
 
   return (
@@ -82,7 +82,7 @@ export const Sidebar: React.FC = () => {
           {isAdvancedOpen && (
             <div className="mt-1 pl-4 space-y-1">
               <NavLink
-                to="/ury/report-settings"
+                to="/report-settings"
                 className={({ isActive }) =>
                   `flex items-center space-x-3 px-3.5 py-2 rounded-xl text-xs font-medium transition-all ${
                     isActive
