@@ -284,7 +284,16 @@ def _enrich_split_group_meta(invoices):
 
 @frappe.whitelist()
 def get_split_group(invoice):
-    group = frappe.db.get_value("POS Invoice", invoice, "custom_split_group")
+    pos_invoice = frappe.get_doc("POS Invoice", invoice)
+    
+    if not frappe.has_permission("POS Invoice", "read", doc=pos_invoice):
+        frappe.throw(frappe._("Not permitted to view this order"), frappe.PermissionError)
+        
+    user_branch = getBranch()
+    if pos_invoice.branch and user_branch and pos_invoice.branch != user_branch:
+        frappe.throw(frappe._("Not permitted to view orders outside your active branch"), frappe.PermissionError)
+
+    group = pos_invoice.custom_split_group
     if not group:
         split_from = frappe.db.get_value("POS Invoice", invoice, "custom_split_from")
         if split_from:
@@ -314,6 +323,9 @@ def get_split_group(invoice):
         "net_total",
         "total_taxes_and_charges",
         "creation",
+        "branch",
+        "additional_discount_percentage",
+        "discount_amount",
     ]
 
     invoices = frappe.get_all(
@@ -338,6 +350,15 @@ def get_split_group(invoice):
                 existing.add(child.name)
 
     invoices.sort(key=lambda row: row.get("creation") or row.get("name"))
+
+    valid_invoices = []
+    for inv in invoices:
+        if inv.get("branch") and user_branch and inv.get("branch") != user_branch:
+            continue
+        if not frappe.has_permission("POS Invoice", "read", doc=inv.get("name")):
+            continue
+        valid_invoices.append(inv)
+    invoices = valid_invoices
 
     total = len(invoices)
     for index, inv in enumerate(invoices, start=1):
@@ -454,7 +475,8 @@ def getPosInvoice(status, limit, limit_start):
                 total_taxes_and_charges, customer, status, mobile_number, 
                 posting_date, rounded_total, order_type,
                 custom_split_group, custom_split_from,
-                custom_merged_pos_invoice, custom_merged_total
+                custom_merged_pos_invoice, custom_merged_total,
+                additional_discount_percentage, discount_amount
             FROM `tabPOS Invoice` 
             WHERE branch = %s AND status = %s 
             AND (invoice_printed = 1 OR (invoice_printed = 0 AND COALESCE(restaurant_table, '') = ''))
@@ -476,7 +498,8 @@ def getPosInvoice(status, limit, limit_start):
                 total_taxes_and_charges, customer, status, mobile_number, 
                 posting_date, rounded_total, order_type,
                 custom_split_group, custom_split_from,
-                custom_merged_pos_invoice, custom_merged_total
+                custom_merged_pos_invoice, custom_merged_total,
+                additional_discount_percentage, discount_amount
             FROM `tabPOS Invoice` 
             WHERE branch = %s AND status = %s 
             AND (invoice_printed = 0 AND restaurant_table IS NOT NULL)
@@ -544,6 +567,17 @@ def searchPosInvoice(query,status):
     query = query.lower()
     filters = {"status": "Paid" if status == "Recently Paid" else status}
     
+    try:
+        branch = getBranch()
+    except frappe.ValidationError:
+        if frappe.session.user == "Administrator" or "System Manager" in frappe.get_roles():
+            branch = None
+        else:
+            raise
+            
+    if branch:
+        filters["branch"] = branch
+
     # Add additional conditions for Unbilled status
     if status == "Unbilled":
         filters.update({
@@ -580,6 +614,8 @@ def searchPosInvoice(query,status):
             "custom_split_from",
             "custom_merged_pos_invoice",
             "custom_merged_total",
+            "additional_discount_percentage",
+            "discount_amount"
         ],
         limit_page_length=10 
     )
@@ -599,8 +635,20 @@ def get_select_field_options():
 
 @frappe.whitelist()
 def fav_items(customer):
+    if not frappe.has_permission("Customer", "read", customer):
+        frappe.throw(_("Not permitted to access this Customer"), frappe.PermissionError)
+
+    filters = {"customer": customer}
+    try:
+        branch = getBranch()
+        if branch:
+            filters["branch"] = branch
+    except frappe.exceptions.ValidationError:
+        # Fallback if getBranch() throws (e.g., Administrator with no branch)
+        pass
+
     pos_invoices = frappe.get_all(
-        "POS Invoice", filters={"customer": customer}, fields=["name"]
+        "POS Invoice", filters=filters, fields=["name"]
     )
     item_qty = {}
 
@@ -757,6 +805,14 @@ def getPosInvoiceItems(invoice):
     itemDetails = []
     taxDetails = []
     orderdItems = frappe.get_doc("POS Invoice", invoice)
+    
+    if not frappe.has_permission("POS Invoice", "read", doc=orderdItems):
+        frappe.throw(frappe._("Not permitted to view this order"), frappe.PermissionError)
+        
+    user_branch = getBranch()
+    if orderdItems.branch and user_branch and orderdItems.branch != user_branch:
+        frappe.throw(frappe._("Not permitted to view orders outside your active branch"), frappe.PermissionError)
+
     posItems = orderdItems.items
     for items in posItems:
         itemDetails.append(
@@ -852,6 +908,9 @@ def getAggregatorMOP(aggregator):
     return modeOfPaymentsList
 @frappe.whitelist()
 def create_customer(customer_name, mobile_number=None, customer_group="Individual", territory="India"):
+    if not frappe.has_permission("Customer", "create"):
+        frappe.throw("Not permitted to create customers", frappe.PermissionError)
+        
     if not customer_name:
         frappe.throw("Customer name is required")
     if not mobile_number:
@@ -870,7 +929,7 @@ def create_customer(customer_name, mobile_number=None, customer_group="Individua
             "customer_group": customer_group,
             "territory": territory
         })
-        customer.insert(ignore_permissions=True)
+        customer.insert()
         frappe.db.commit()
 
         return {
