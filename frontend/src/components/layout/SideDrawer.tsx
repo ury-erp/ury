@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { Button } from '@ury/ui';
 
@@ -20,7 +21,7 @@ export const SideDrawer: React.FC<SideDrawerProps> = ({ isOpen, onClose, title, 
 
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div 
         className="absolute inset-0 bg-black/40 transition-opacity backdrop-blur-sm" 
@@ -39,7 +40,8 @@ export const SideDrawer: React.FC<SideDrawerProps> = ({ isOpen, onClose, title, 
           {children}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 
