@@ -991,9 +991,25 @@ def merge_bills(primary_invoice, secondary_invoice):
         primary_doc = frappe.get_doc("POS Invoice",primary_invoice,)
         secondary_doc = frappe.get_doc("POS Invoice",secondary_invoice,)
 
+        # Authorization: caller must have write permission on BOTH invoices
+        if not frappe.has_permission("POS Invoice", "write", doc=primary_doc):
+            frappe.throw(
+                "You do not have permission to merge this bill.",
+                frappe.PermissionError,
+            )
+
+        if not frappe.has_permission("POS Invoice", "write", doc=secondary_doc):
+            frappe.throw(
+                "You do not have permission to merge the selected bill.",
+                frappe.PermissionError,
+            )
+
         # Validation
         if (primary_doc.docstatus != 0 or secondary_doc.docstatus != 0):
             frappe.throw("Both invoices must be in Draft state to merge.")
+
+        if primary_doc.branch != secondary_doc.branch:
+            frappe.throw("Cannot merge bills from different branches.")
 
         if primary_doc.custom_merged_pos_invoice:
             frappe.throw("This bill already includes a merged bill.")
@@ -1031,7 +1047,6 @@ def merge_bills(primary_invoice, secondary_invoice):
             doc.flags.ignore_version = True
 
             doc.save(
-                ignore_permissions=True,
                 ignore_version=True,
             )
 
@@ -1068,6 +1083,13 @@ def merge_bills(primary_invoice, secondary_invoice):
             "message": "Bills merged successfully",
             "name": primary_doc.name,
         }
+
+
+    except frappe.PermissionError:
+
+        frappe.db.rollback()
+
+        raise
 
 
     except Exception as e:
