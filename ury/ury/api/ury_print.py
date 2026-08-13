@@ -121,7 +121,7 @@ def select_network_printer(pos_profile, invoice_id):
             return print
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def qz_print_update(invoice):
     try:
         invoice_doc = frappe.get_doc("POS Invoice", invoice)

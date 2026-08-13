@@ -381,7 +381,7 @@ def release_merge_cluster_tables(table_or_tables):
 
     frappe.db.commit()
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def release_tables_after_print(invoice):
 
     invoice_doc = frappe.get_doc(
@@ -540,7 +540,7 @@ def _copy_invoice_item_fields(item_row, qty):
     )
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def split_bill(source_invoice, items_to_move, customer=None):
     """Move selected line items from a printed draft bill to a new sibling POS Invoice."""
     if isinstance(items_to_move, str):
@@ -1121,7 +1121,7 @@ def pos_opening_check():
     return result
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def table_transfer(table, newTable, invoice):
     current_table = frappe.get_doc("URY Table", table)
     pos_invoice = frappe.get_doc("POS Invoice", invoice)
@@ -1230,7 +1230,7 @@ def customer_favourite_item(customer_name):
     return result
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def cancel_order(invoice_id, reason):
     pos_invoice = frappe.get_doc("POS Invoice", invoice_id)
 

@@ -6,6 +6,7 @@ from frappe import _
 
 # Function to set order status in a KOT document
 @frappe.whitelist(methods=["POST"])
+def serve_kot(name, time):
 def serve_kot(name, time=None):
     if frappe.request and frappe.request.method != "POST":
         frappe.throw(_("POST requests only"), frappe.PermissionError)
@@ -28,7 +29,7 @@ def serve_kot(name, time=None):
 
 
 # Function to mark it as verified by a user in cancel type KOT
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def confirm_cancel_kot(name, user):
     frappe.db.set_value("URY KOT", name, "verified", 1)
     frappe.db.set_value("URY KOT", name, "verified_by", user)
