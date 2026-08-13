@@ -1,0 +1,16 @@
+{
+  "subtasks": [
+    {
+      "objective": "Harden the serve_kot endpoint so serving a KOT cannot be forged by arbitrary authenticated users or with caller-supplied production times.",
+      "acceptance": "serve_kot only accepts POST requests, loads the target URY KOT, verifies the session user has an appropriate kitchen/manager role and is authorized for the KOT branch, rejects unauthorized or cross-branch requests, records the served timestamp from the server instead of trusting a request parameter, and existing legitimate KOT serving flow continues to work.",
+      "scope": [
+        "ury/ury/api/ury_kot_display.py"
+      ],
+      "task_type": "impl",
+      "difficulty": 2,
+      "risk": 2,
+      "uncertainty": 2,
+      "priority": 85
+    }
+  ]
+}
