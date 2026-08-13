@@ -152,20 +152,18 @@ export function DatePicker({
 
   return (
     <div ref={containerRef} className="relative w-full">
-      <div className="relative flex items-center">
-        <Input
-          id={id}
-          value={displayText}
-          readOnly
-          onClick={() => setIsOpen((prev) => !prev)}
-          placeholder={placeholder}
-          error={error}
-          className="w-full cursor-pointer bg-white"
-        />
-      </div>
+      <Input
+        id={id}
+        value={displayText}
+        readOnly
+        onClick={() => setIsOpen((prev) => !prev)}
+        placeholder={placeholder}
+        error={error}
+        className="w-full cursor-pointer bg-white"
+      />
 
       {isOpen && (
-        <div className="absolute top-full left-0 mt-2 z-50 bg-white border border-gray-100 rounded-2xl shadow-xl p-4 w-[280px] focus:outline-none">
+        <div className="absolute top-[calc(100%+8px)] left-0 z-[100] bg-white border border-gray-100 rounded-2xl shadow-xl p-4 w-[280px] focus:outline-none">
           {/* Header Month / Year Navigation */}
           <div className="flex items-center justify-between mb-4 px-1">
             <button
