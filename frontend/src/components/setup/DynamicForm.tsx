@@ -90,45 +90,48 @@ const { registry } = defineRegistry(formCatalog, {
 
       return (
         <div className={getColSpanClass(field)}>
-          <div className="space-y-1.5">
-            <label htmlFor={field.id} className="text-sm font-medium text-gray-700">
-              {field.label} {field.required && <span className="text-red-500">*</span>}
-            </label>
+          <div className="relative pb-6">
+            <div className="space-y-1.5">
+              <label htmlFor={field.id} className="text-sm font-medium text-gray-700">
+                {field.label} {field.required && <span className="text-red-500">*</span>}
+              </label>
+              
+              {field.type === 'text' || field.type === 'password' || field.type === 'email' ? (
+                <Input
+                  id={field.id}
+                  type={field.type}
+                  value={val || ''}
+                  placeholder={field.placeholder}
+                  onChange={(e) => handleChange(e.target.value)}
+                  error={!!props.error}
+                />
+              ) : field.type === 'select' ? (
+                <SearchableSelect
+                  id={field.id}
+                  value={val || ''}
+                  options={props.options || []}
+                  placeholder={`Select ${field.label}...`}
+                  error={!!props.error}
+                  onChange={(_fieldId, newVal) => handleChange(newVal)}
+                />
+              ) : field.type === 'date' ? (
+                <DatePicker
+                  id={field.id}
+                  value={val || ''}
+                  placeholder="dd-mm-yyyy"
+                  error={!!props.error}
+                  onChange={(_fieldId, newVal) => handleChange(newVal)}
+                />
+              ) : null}
+            </div>
             
-            {field.type === 'text' || field.type === 'password' || field.type === 'email' ? (
-              <Input
-                id={field.id}
-                type={field.type}
-                value={val || ''}
-                placeholder={field.placeholder}
-                onChange={(e) => handleChange(e.target.value)}
-                error={!!props.error}
-              />
-            ) : field.type === 'select' ? (
-              <SearchableSelect
-                id={field.id}
-                value={val || ''}
-                options={props.options || []}
-                placeholder={`Select ${field.label}...`}
-                error={!!props.error}
-                onChange={(_fieldId, newVal) => handleChange(newVal)}
-              />
-            ) : field.type === 'date' ? (
-              <DatePicker
-                id={field.id}
-                value={val || ''}
-                placeholder="dd-mm-yyyy"
-                error={!!props.error}
-                onChange={(_fieldId, newVal) => handleChange(newVal)}
-              />
-            ) : null}
-            
-            {props.error && (
-              <p className="text-sm text-red-500 mt-1">{props.error}</p>
-            )}
-            {field.description && !props.error && (
-              <p className="text-xs text-gray-500 mt-1">{field.description}</p>
-            )}
+            <div className="absolute bottom-0 left-0 w-full pt-1">
+              {props.error ? (
+                <p className="text-xs text-red-500">{props.error}</p>
+              ) : field.description ? (
+                <p className="text-xs text-gray-500">{field.description}</p>
+              ) : null}
+            </div>
           </div>
         </div>
       );
