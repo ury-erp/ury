@@ -1,20 +1,29 @@
 import json
-
 import frappe
 from ury.ury_pos.api import getBranch
 from frappe.utils import get_datetime
-
+from frappe import _
 
 # Function to set order status in a KOT document
-@frappe.whitelist()
-def serve_kot(name, time):
+@frappe.whitelist(methods=["POST"])
+def serve_kot(name, time=None):
+    if frappe.request and frappe.request.method != "POST":
+        frappe.throw(_("POST requests only"), frappe.PermissionError)
+
+    kot_doc = frappe.get_doc("URY KOT", name)
+    if not frappe.has_permission("URY KOT", "write", doc=kot_doc):
+        frappe.throw(_("Not permitted to serve this KOT"), frappe.PermissionError)
+
     current_time = get_datetime()
-    creation_time = frappe.db.get_value("URY KOT",name,"creation")
+    creation_time = kot_doc.creation
 
     production_time = current_time - creation_time
     production_time_minutes = production_time.total_seconds() / 60
-    frappe.db.set_value("URY KOT", name, "start_time_serv", time)
-    frappe.db.set_value("URY KOT",name,"production_time",production_time_minutes)
+    
+    server_time_str = current_time.strftime("%H:%M:%S")
+    
+    frappe.db.set_value("URY KOT", name, "start_time_serv", server_time_str)
+    frappe.db.set_value("URY KOT", name, "production_time", production_time_minutes)
     frappe.db.set_value("URY KOT", name, "order_status", "Served")
 
 
@@ -28,6 +37,35 @@ def confirm_cancel_kot(name, user):
 @frappe.whitelist(allow_guest=True)
 def get_site_name():
     return {"site_name": frappe.local.site}
+
+def build_dashboard_summary(kot_list):
+    summary = {}
+
+    for kot in kot_list:
+        production = kot.get("production")
+
+        if not production:
+            continue
+
+        if production not in summary:
+            summary[production] = {
+                "name": production,
+                "active_orders": 0,
+                "pending_orders": 0,
+                "ready_orders": 0,
+                "orders": []
+            }
+
+        summary[production]["active_orders"] += 1
+
+        if kot.get("order_status") == "Ready For Prepare":
+            summary[production]["ready_orders"] += 1
+        else:
+            summary[production]["pending_orders"] += 1
+
+        summary[production]["orders"].append(kot)
+
+    return list(summary.values())
 
 @frappe.whitelist()
 def kot_list():
@@ -86,8 +124,10 @@ def kot_list():
 
         kotjson = json.loads(frappe.as_json(kotdoc))
         KOT.append(kotjson)
+    dashboard = build_dashboard_summary(KOT)
     return {
         "KOT": KOT,
+        "Dashboard": dashboard,
         "Branch": branch,
         "kot_alert_time": kot_alert_time,
         "audio_alert": audio_alert,
