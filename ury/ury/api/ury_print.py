@@ -25,6 +25,9 @@ def network_printing(
     no_letterhead=0,
     file_path=None,
 ):
+    if not frappe.has_permission(doctype, "write", doc=frappe.get_doc(doctype, name)):
+        frappe.throw(_("Not permitted to print this document"), frappe.PermissionError)
+
     try:
         print_settings = frappe.get_doc("Network Printer Settings", printer_setting)
 
@@ -81,6 +84,10 @@ def network_printing(
 
 @frappe.whitelist()
 def select_network_printer(pos_profile, invoice_id):
+    invoice_doc = frappe.get_doc("POS Invoice", invoice_id)
+    if not frappe.has_permission("POS Invoice", "write", doc=invoice_doc):
+        frappe.throw(_("Not permitted to print this invoice"), frappe.PermissionError)
+
     table = frappe.db.get_value("POS Invoice", invoice_id, "restaurant_table")
     print_format = frappe.db.get_value("POS Profile", pos_profile, "print_format")
 
@@ -117,6 +124,10 @@ def select_network_printer(pos_profile, invoice_id):
 @frappe.whitelist(methods=["POST"])
 def qz_print_update(invoice):
     try:
+        invoice_doc = frappe.get_doc("POS Invoice", invoice)
+        if not frappe.has_permission("POS Invoice", "write", doc=invoice_doc):
+            frappe.throw(_("Not permitted to print this invoice"), frappe.PermissionError)
+
         table = frappe.db.get_value("POS Invoice", invoice, "restaurant_table")
         
         if table == None or table == "":
@@ -156,6 +167,10 @@ def qz_print_update(invoice):
 
 @frappe.whitelist()
 def print_pos_page(doctype, name, print_format):
+    doc_to_check = frappe.get_doc(doctype, name)
+    if not frappe.has_permission(doctype, "write", doc=doc_to_check):
+        frappe.throw(_("Not permitted to print this document"), frappe.PermissionError)
+
     data = {"name": name, "doctype": doctype, "print_format": print_format}
 
     restaurant_table, branch, name = frappe.db.get_value(

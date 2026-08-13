@@ -1,13 +1,13 @@
 {
-  "name": "urymosaic",
+  "name": "mosaic",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build --base=/assets/ury/URYMosaic/ && yarn copy-html-entry",
+    "build": "vite build --base=/assets/ury/mosaic/ && yarn copy-html-entry",
     "preview": "vite preview",
-    "copy-html-entry": "cp ../ury/public/URYMosaic/index.html ../ury/www/URYMosaic.html"
+    "copy-html-entry": "cp ../ury/public/mosaic/index.html ../ury/www/mosaic.html"
   },
   "dependencies": {
     "socket.io-client": "^4.5.1",

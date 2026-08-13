@@ -72,7 +72,7 @@ def merge_tables_batch(anchor_table, tables):
                 _("Cannot merge tables from different rooms.")
             )
 
-        target_cluster, _ = _get_merge_cluster(
+        target_cluster, _target_table_map = _get_merge_cluster(
             target
         )
 
@@ -278,7 +278,7 @@ def _get_cluster_table_names(table):
     if not table:
         return []
     try:
-        members, _ = _get_merge_cluster(table)
+        members, _table_map = _get_merge_cluster(table)
         return members
     except Exception:
         return [table]
@@ -388,6 +388,9 @@ def release_tables_after_print(invoice):
         "POS Invoice",
         invoice,
     )
+
+    if not frappe.has_permission("POS Invoice", "write", doc=invoice_doc):
+        frappe.throw(_("Not permitted to release tables for this invoice"), frappe.PermissionError)
 
     tables = _get_table_group(
         invoice_doc.restaurant_table,
@@ -803,6 +806,9 @@ def sync_order(
 
     invoice = get_order_invoice(table, invoice,order_type)
 
+    if invoice.name and not frappe.has_permission("POS Invoice", "write", doc=invoice):
+        frappe.throw(_("Not permitted to modify this order"), frappe.PermissionError)
+
     if last_invoice and last_modified_time:
         lastModifiedTime = invoice.modified
         from datetime import datetime
@@ -859,8 +865,38 @@ def sync_order(
         invoice.custom_comments = comments
     invoice.no_of_pax = no_of_pax
     invoice.pos_profile = pos_profile
-    invoice.cashier = cashier
-    invoice.waiter = waiter
+    
+    # Secure server-side attribution of cashier and waiter
+    multiple_cashier = posprofile.custom_enable_multiple_cashier
+    if multiple_cashier:
+        pos_opening_list = frappe.db.sql("""
+            SELECT DISTINCT `tabPOS Opening Entry`.name 
+            FROM `tabPOS Opening Entry`
+            INNER JOIN `tabMultiple Rooms` 
+            ON `tabMultiple Rooms`.parent = `tabPOS Opening Entry`.name
+            WHERE `tabPOS Opening Entry`.branch = %s
+            AND `tabPOS Opening Entry`.status = 'Open'
+            AND `tabPOS Opening Entry`.docstatus = 1
+            AND `tabMultiple Rooms`.room = %s
+        """, (invoice.branch, room), as_dict=True)
+
+        pos_opened_cashier = frappe.db.get_value("POS Opening Entry", pos_opening_list[0].name, "user") if pos_opening_list else None
+
+        main_cashier = None
+        for user_details in posprofile.applicable_for_users:
+            if user_details.custom_main_cashier:
+                main_cashier = user_details.user
+        
+        if frappe.session.user == main_cashier:
+            invoice.cashier = main_cashier
+        else:
+            invoice.cashier = pos_opened_cashier
+    else:
+        invoice.cashier = posprofile.applicable_for_users[0].user if posprofile.applicable_for_users else frappe.session.user
+
+    if not invoice.waiter:
+        invoice.waiter = frappe.session.user
+
     invoice.custom_aggregator_id = aggregator_id
     invoice.custom_restaurant_room =room
     if not invoice.restaurant_table:
@@ -961,7 +997,6 @@ def sync_order(
                     "URY Table", merged_table.strip(), {"occupied": 1, "latest_invoice_time": invoice.creation}
                 )
 
-    invoice.db_set("owner", cashier)
     return invoice.as_dict()
 
 
@@ -1092,7 +1127,7 @@ def table_transfer(table, newTable, invoice):
     pos_invoice = frappe.get_doc("POS Invoice", invoice)
     new_table = frappe.get_doc("URY Table", newTable)
 
-    merge_members, _ = _get_merge_cluster(table)
+    merge_members, _table_map = _get_merge_cluster(table)
     if len(merge_members) > 1:
         frappe.throw(_("Table transfer is not allowed for merged tables. Unmerge first."))
 
@@ -1162,8 +1197,19 @@ def captain_transfer(currentCaptain, newCaptain, invoice):
 
 @frappe.whitelist()
 def customer_favourite_item(customer_name):
+    if not frappe.has_permission("Customer", "read", customer_name):
+        frappe.throw(_("Not permitted to access this Customer"), frappe.PermissionError)
+
+    filters = {"customer": customer_name}
+    try:
+        branch = getBranch()
+        if branch:
+            filters["branch"] = branch
+    except frappe.exceptions.ValidationError:
+        pass
+
     pos = frappe.db.get_list(
-        "POS Invoice", filters={"customer": customer_name}, fields=["name"]
+        "POS Invoice", filters=filters, fields=["name"]
     )
 
     item_qty = {}
