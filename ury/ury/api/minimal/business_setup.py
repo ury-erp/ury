@@ -96,10 +96,6 @@ def create_setup_user(email, name, password=None, role="URY Cashier"):
 
 @frappe.whitelist()
 def submit_configure_data(data):
-    from frappe.utils import cint
-    if cint(frappe.db.get_single_value("System Settings", "setup_complete")):
-        frappe.throw("Setup already completed")
-        
     if isinstance(data, str):
         data = frappe.parse_json(data)
         

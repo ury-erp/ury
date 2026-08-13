@@ -1,7 +1,7 @@
 import React, { forwardRef, useImperativeHandle, useMemo, useEffect } from 'react';
 import { defineCatalog } from '@json-render/core';
 import { schema } from '@json-render/react/schema';
-import { defineRegistry, Renderer, JSONUIProvider, useBoundProp, createStateStore } from '@json-render/react';
+import { defineRegistry, Renderer, JSONUIProvider, useBoundProp, useStateBinding, createStateStore } from '@json-render/react';
 import { z } from 'zod';
 import { Input } from '@ury/ui';
 import { SearchableSelect } from '../common/SearchableSelect';
@@ -20,6 +20,10 @@ interface DynamicFormProps {
   optionsMap: Record<string, { value: string; label: string }[]>;
   onFieldChange?: (fieldId: string, value: string) => void;
 }
+
+const FormCallbackContext = React.createContext<{
+  onFieldChange?: (fieldId: string, value: string) => void;
+}>({});
 
 // 1. Define the Catalog for our form components
 const formCatalog = defineCatalog(schema, {
@@ -63,7 +67,10 @@ const { registry } = defineRegistry(formCatalog, {
       </div>
     ),
     FieldRenderer: ({ props, bindings, emit }) => {
-      const [val, setVal] = useBoundProp<string>(props.value, bindings?.value);
+      const { onFieldChange } = React.useContext(FormCallbackContext);
+      const bindingPath = bindings?.value;
+      const [boundVal, setBoundVal] = useStateBinding<string>(bindingPath || '');
+      const val = bindingPath ? (boundVal ?? '') : (props.value ?? '');
       const field = props.field;
       
       const getColSpanClass = (field: any) => {
@@ -74,8 +81,11 @@ const { registry } = defineRegistry(formCatalog, {
       };
 
       const handleChange = (newVal: string) => {
-        setVal(newVal);
+        if (bindingPath) {
+          setBoundVal(newVal);
+        }
         emit("change", { fieldId: field.id, value: newVal });
+        onFieldChange?.(field.id, newVal);
       };
 
       return (
@@ -237,17 +247,19 @@ export const DynamicForm = forwardRef<DynamicFormHandle, DynamicFormProps>(
 
     const handleAction = (action: string, params: any) => {
       if (action === "fieldChange") {
-        store.set(`/errors/${params.fieldId}`, '');
-        onFieldChange?.(params.fieldId, params.value);
+        store.set(`/errors/${params?.fieldId}`, '');
+        onFieldChange?.(params?.fieldId, params?.value);
       }
     };
 
     return (
-      <JSONUIProvider store={store} onAction={handleAction}>
-        <div className="space-y-6">
-          <Renderer spec={spec} registry={registry} />
-        </div>
-      </JSONUIProvider>
+      <FormCallbackContext.Provider value={{ onFieldChange }}>
+        <JSONUIProvider store={store} onAction={handleAction}>
+          <div className="space-y-6">
+            <Renderer spec={spec} registry={registry} />
+          </div>
+        </JSONUIProvider>
+      </FormCallbackContext.Provider>
     );
   }
 );
