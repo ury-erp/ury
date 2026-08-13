@@ -624,8 +624,20 @@ def get_select_field_options():
 
 @frappe.whitelist()
 def fav_items(customer):
+    if not frappe.has_permission("Customer", "read", customer):
+        frappe.throw(_("Not permitted to access this Customer"), frappe.PermissionError)
+
+    filters = {"customer": customer}
+    try:
+        branch = getBranch()
+        if branch:
+            filters["branch"] = branch
+    except frappe.exceptions.ValidationError:
+        # Fallback if getBranch() throws (e.g., Administrator with no branch)
+        pass
+
     pos_invoices = frappe.get_all(
-        "POS Invoice", filters={"customer": customer}, fields=["name"]
+        "POS Invoice", filters=filters, fields=["name"]
     )
     item_qty = {}
 
@@ -885,6 +897,9 @@ def getAggregatorMOP(aggregator):
     return modeOfPaymentsList
 @frappe.whitelist()
 def create_customer(customer_name, mobile_number=None, customer_group="Individual", territory="India"):
+    if not frappe.has_permission("Customer", "create"):
+        frappe.throw("Not permitted to create customers", frappe.PermissionError)
+        
     if not customer_name:
         frappe.throw("Customer name is required")
     if not mobile_number:
@@ -903,7 +918,7 @@ def create_customer(customer_name, mobile_number=None, customer_group="Individua
             "customer_group": customer_group,
             "territory": territory
         })
-        customer.insert(ignore_permissions=True)
+        customer.insert()
         frappe.db.commit()
 
         return {
