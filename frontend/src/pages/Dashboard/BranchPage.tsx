@@ -190,22 +190,22 @@ export const BranchPage: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6">
 
       {/* Save button */}
       <div className="flex items-center justify-end pb-3 border-b border-gray-200">
         <Button
           onClick={handleSave}
           disabled={saving || !hasBranch}
-          className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center space-x-1.5 shadow-xs"
+          className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center gap-1.5 shadow-xs"
         >
-          {saving ? <Spinner className="w-4 h-4 mr-1.5" /> : <Save className="w-4 h-4 mr-1.5" />}
+          {saving ? <Spinner className="w-4 h-4" /> : <Save className="w-4 h-4" />}
           <span>Save Settings</span>
         </Button>
       </div>
 
       {/* Branch Details */}
-      <Card className="p-6 rounded-lg border-gray-200 bg-white shadow-sm">
+      <Card className="p-6 rounded-lg border border-gray-200 bg-white shadow-sm">
         <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-4">Branch Details</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
