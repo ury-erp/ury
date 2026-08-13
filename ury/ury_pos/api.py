@@ -567,6 +567,17 @@ def searchPosInvoice(query,status):
     query = query.lower()
     filters = {"status": "Paid" if status == "Recently Paid" else status}
     
+    try:
+        branch = getBranch()
+    except frappe.ValidationError:
+        if frappe.session.user == "Administrator" or "System Manager" in frappe.get_roles():
+            branch = None
+        else:
+            raise
+            
+    if branch:
+        filters["branch"] = branch
+
     # Add additional conditions for Unbilled status
     if status == "Unbilled":
         filters.update({
