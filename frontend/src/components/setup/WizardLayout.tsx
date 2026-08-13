@@ -24,7 +24,7 @@ export function WizardLayout({ step, children, onNext, onPrev, nextLabel = 'Next
         <p className="text-[#6B7280]">Let's get your restaurant ready.</p>
       </div>
 
-      <div className="relative z-10 w-full max-w-[820px] bg-white rounded-xl shadow-[0_4px_24px_rgba(0,0,0,0.08)] overflow-hidden flex flex-col">
+      <div className="relative z-10 w-full max-w-[820px] bg-white rounded-xl shadow-[0_4px_24px_rgba(0,0,0,0.08)] flex flex-col h-[700px] overflow-hidden">
         
         {/* Step Breadcrumb */}
         <div className="px-10 py-5 border-b border-[#F3F4F6]">
@@ -80,7 +80,7 @@ export function WizardLayout({ step, children, onNext, onPrev, nextLabel = 'Next
         </div>
 
         {/* Content */}
-        <div className="p-8 flex-1">
+        <div className="p-8 flex-1 overflow-y-auto">
           {children}
         </div>
 
