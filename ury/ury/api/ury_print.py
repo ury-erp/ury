@@ -23,10 +23,8 @@ def network_printing(
     print_format=None,
     doc=None,
     no_letterhead=0,
-    file_path=None,
 ):
-    if not frappe.has_permission(doctype, "write", doc=frappe.get_doc(doctype, name)):
-        frappe.throw(_("Not permitted to print this document"), frappe.PermissionError)
+    validate_print_permission(frappe.get_doc(doctype, name))
 
     try:
         print_settings = frappe.get_doc("Network Printer Settings", printer_setting)
@@ -54,25 +52,28 @@ def network_printing(
                 as_pdf=True,
                 output=output,
             )
-            if not file_path:
-                file_path = os.path.join(
-                    "/", "tmp", f"frappe-pdf-{frappe.generate_hash()}.pdf"
-                )
-            with open(file_path, "wb") as f:
-                output.write(f)
-            conn.printFile(print_settings.printer_name, file_path, name, {})
-
-            restaurant_table, invoice_printed, name = frappe.db.get_value(
-                "POS Invoice", name, ["restaurant_table", "invoice_printed", "name"]
+            file_path = os.path.join(
+                "/", "tmp", f"frappe-pdf-{frappe.generate_hash()}.pdf"
             )
+            try:
+                with open(file_path, "wb") as f:
+                    output.write(f)
+                conn.printFile(print_settings.printer_name, file_path, name, {})
 
-            if restaurant_table and invoice_printed == 0:
-                frappe.db.set_value("POS Invoice", name, "invoice_printed", 1)
-                release_merge_cluster_tables(restaurant_table)
-            else:
-                frappe.db.set_value("POS Invoice", name, "invoice_printed", 1)
+                restaurant_table, invoice_printed, name = frappe.db.get_value(
+                    "POS Invoice", name, ["restaurant_table", "invoice_printed", "name"]
+                )
 
-            return "Success"
+                if restaurant_table and invoice_printed == 0:
+                    frappe.db.set_value("POS Invoice", name, "invoice_printed", 1)
+                    release_merge_cluster_tables(restaurant_table)
+                else:
+                    frappe.db.set_value("POS Invoice", name, "invoice_printed", 1)
+
+                return "Success"
+            finally:
+                if os.path.exists(file_path):
+                    os.remove(file_path)
         except Exception as e:
             return f"Failed to print: {str(e)}"
     except Exception as e:
