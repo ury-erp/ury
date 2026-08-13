@@ -2,6 +2,11 @@ import unittest
 from unittest.mock import patch, MagicMock
 import frappe
 from ury.ury_pos.api import merge_bills
+from ury.ury_pos.api import create_customer
+from frappe.tests.utils import FrappeTestCase
+from unittest.mock import patch, MagicMock
+from ury.ury_pos.api import searchPosInvoice
+from ury.ury_pos.api import get_split_group, getPosInvoiceItems
 
 class TestMergeBillsSEC07(unittest.TestCase):
 
@@ -104,10 +109,6 @@ class TestMergeBillsSEC07(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-import frappe
-from frappe.tests.utils import FrappeTestCase
-from unittest.mock import patch, MagicMock
-from ury.ury_pos.api import searchPosInvoice
 
 class TestSearchPosInvoiceBranchScoping(FrappeTestCase):
 
@@ -191,12 +192,6 @@ class TestSearchPosInvoiceBranchScoping(FrappeTestCase):
         self.assertNotIn("branch", called_args["filters"])
 # Copyright (c) 2023, Tridz Technologies Pvt. Ltd. and contributors
 # See license.txt
-
-import frappe
-from frappe.tests.utils import FrappeTestCase
-from unittest.mock import patch, MagicMock
-
-from ury.ury_pos.api import get_split_group, getPosInvoiceItems
 
 class TestURYPosAPI(FrappeTestCase):
     @patch("ury.ury_pos.api.getBranch")
