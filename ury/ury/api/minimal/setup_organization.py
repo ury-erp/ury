@@ -78,8 +78,12 @@ def get_country_defaults(country):
 
 @frappe.whitelist()
 def submit_setup(payload=None, **kwargs):
+    from frappe.utils import cint
     if frappe.session.user == "Guest":
         frappe.throw("Not permitted")
+        
+    if cint(frappe.db.get_single_value("System Settings", "setup_complete")):
+        frappe.throw("Setup already completed")
         
     if payload is None:
         payload = kwargs.copy()

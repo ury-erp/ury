@@ -1,6 +1,10 @@
-import { forwardRef, useImperativeHandle, useState, useCallback, useMemo } from 'react';
+import React, { forwardRef, useImperativeHandle, useMemo, useEffect } from 'react';
+import { defineCatalog } from '@json-render/core';
+import { schema } from '@json-render/react/schema';
+import { defineRegistry, Renderer, JSONUIProvider, useBoundProp, createStateStore } from '@json-render/react';
+import { z } from 'zod';
+import { Input, Select, SelectItem } from '@ury/ui';
 import { validateFieldValue } from '@ury/core';
-import { FormSection } from './FormSection';
 import { SetupPayload } from '../../services/setup';
 
 export interface DynamicFormHandle {
@@ -15,51 +19,172 @@ interface DynamicFormProps {
   onFieldChange?: (fieldId: string, value: string) => void;
 }
 
+// 1. Define the Catalog for our form components
+const formCatalog = defineCatalog(schema, {
+  components: {
+    FormSection: {
+      props: z.object({ label: z.string().optional() }),
+      description: "Form section with a label"
+    },
+    FieldRenderer: {
+      props: z.object({
+        field: z.any(),
+        value: z.any().optional(),
+        error: z.string().optional(),
+        options: z.array(z.any()).optional()
+      }),
+      description: "Generic field renderer"
+    }
+  }
+});
+
+// 2. Define the Component Registry
+const { registry } = defineRegistry(formCatalog, {
+  components: {
+    FormSection: ({ props, children }) => (
+      <div className="space-y-4">
+        {props.label && (
+          <h3 className="text-md font-semibold text-foreground">{props.label}</h3>
+        )}
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-x-6 gap-y-4">
+          {children}
+        </div>
+      </div>
+    ),
+    FieldRenderer: ({ props, bindings, emit }) => {
+      const [val, setVal] = useBoundProp<string>(props.value, bindings?.value);
+      const field = props.field;
+      
+      const getColSpanClass = (field: any) => {
+        if (field.id === 'company_name') return 'col-span-12 md:col-span-7';
+        if (field.id === 'company_abbr') return 'col-span-12 md:col-span-5';
+        if (field.colSpan === 12) return 'col-span-12';
+        return 'col-span-12 md:col-span-6';
+      };
+
+      const handleChange = (newVal: string) => {
+        setVal(newVal);
+        emit("change", { fieldId: field.id, value: newVal });
+      };
+
+      return (
+        <div className={getColSpanClass(field)}>
+          <div className="space-y-1.5">
+            <label htmlFor={field.id} className="text-sm font-medium text-gray-700">
+              {field.label} {field.required && <span className="text-red-500">*</span>}
+            </label>
+            
+            {field.type === 'text' || field.type === 'password' || field.type === 'email' ? (
+              <Input
+                id={field.id}
+                type={field.type}
+                value={val || ''}
+                placeholder={field.placeholder}
+                onChange={(e) => handleChange(e.target.value)}
+                error={!!props.error}
+              />
+            ) : field.type === 'select' ? (
+              <Select
+                id={field.id}
+                value={val || ''}
+                onValueChange={handleChange}
+                error={!!props.error}
+              >
+                <SelectItem value="" disabled>Select {field.label}</SelectItem>
+                {props.options?.map((opt: any) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </Select>
+            ) : field.type === 'date' ? (
+              <Input
+                id={field.id}
+                type="date"
+                value={val || ''}
+                onChange={(e) => handleChange(e.target.value)}
+                error={!!props.error}
+              />
+            ) : null}
+            
+            {props.error && (
+              <p className="text-sm text-red-500 mt-1">{props.error}</p>
+            )}
+            {field.description && !props.error && (
+              <p className="text-xs text-gray-500 mt-1">{field.description}</p>
+            )}
+          </div>
+        </div>
+      );
+    }
+  }
+});
+
+// Convert old schema structure into @json-render/react element tree
+function buildElementTree(oldSchema: any) {
+  const sections = [];
+  
+  if (Array.isArray(oldSchema.fields) && oldSchema.fields.length > 0) {
+    sections.push({ fields: oldSchema.fields });
+  } else {
+    if (oldSchema.company?.length) {
+      sections.push({ label: 'Company Details', fields: oldSchema.company });
+    }
+    if (oldSchema.general?.length) {
+      sections.push({ label: 'General Settings', fields: oldSchema.general });
+    }
+  }
+
+  return {
+    root: {
+      type: "FormSection",
+      children: sections.map((sec, i) => ({
+        type: "FormSection",
+        props: { label: sec.label },
+        children: sec.fields.map((f: any) => ({
+          type: "FieldRenderer",
+          props: {
+            field: f,
+            value: { "$bindState": `/${f.id}` },
+            options: f.optionsKey ? { "$state": `/options/${f.optionsKey}` } : undefined,
+            error: { "$state": `/errors/${f.id}` }
+          },
+          on: {
+            change: { action: "fieldChange" }
+          }
+        }))
+      }))
+    }
+  };
+}
+
 export const DynamicForm = forwardRef<DynamicFormHandle, DynamicFormProps>(
-  ({ schema, optionsMap, onFieldChange }, ref) => {
-    const [values, setValues] = useState<Record<string, string>>({});
-    const [errors, setErrors] = useState<Record<string, string>>({});
+  ({ schema: rawSchema, optionsMap, onFieldChange }, ref) => {
+    
+    // Manage state internally
+    const store = useMemo(() => createStateStore({
+      options: optionsMap,
+      errors: {}
+    }), []);
 
-    const setFieldValue = useCallback((id: string, value: string) => {
-      setValues((prev) => ({ ...prev, [id]: value }));
-      setErrors((prev) => ({ ...prev, [id]: '' }));
-    }, []);
+    // Keep options updated when they arrive from props
+    useEffect(() => {
+      store.set("/options", optionsMap);
+    }, [optionsMap, store]);
 
-    const allFields = useMemo(() => {
-      if (Array.isArray(schema.fields) && schema.fields.length > 0) {
-        return schema.fields;
-      }
-      return [...(schema.company || []), ...(schema.general || [])];
-    }, [schema]);
-
-    const sections = useMemo(() => {
-      if (Array.isArray(schema.fields) && schema.fields.length > 0) {
-        return [{ fields: schema.fields }];
-      }
-      const result = [];
-      if (schema.company?.length) {
-        result.push({
-          label: 'Company Details',
-          fields: schema.company
-        });
-      }
-      if (schema.general?.length) {
-        result.push({
-          label: 'General Settings',
-          fields: schema.general
-        });
-      }
-      return result;
-    }, [schema]);
-
+    const spec = useMemo(() => buildElementTree(rawSchema), [rawSchema]);
+    
     useImperativeHandle(ref, () => ({
       validate: () => {
         let isValid = true;
         const newErrors: Record<string, string> = {};
+        const values = store.get("/") || {};
 
+        const allFields = Array.isArray(rawSchema.fields) ? rawSchema.fields : [...(rawSchema.company || []), ...(rawSchema.general || [])];
+        
         allFields.forEach((field: any) => {
           if (field.validations) {
-            const { valid, message } = validateFieldValue(values[field.id] || '', field.validations);
+            const { valid, message } = validateFieldValue((values as any)[field.id] || '', field.validations);
             if (!valid) {
               isValid = false;
               newErrors[field.id] = message;
@@ -67,42 +192,34 @@ export const DynamicForm = forwardRef<DynamicFormHandle, DynamicFormProps>(
           }
         });
 
-        setErrors(newErrors);
+        store.set("/errors", newErrors);
         return isValid;
       },
       getValues: () => {
-        return values as unknown as SetupPayload;
+        const fullState = store.get("/") || {};
+        // Strip options/errors
+        const { options, errors, ...values } = fullState as any;
+        return values as SetupPayload;
       },
-      setFieldValue
-    }), [allFields, values, setFieldValue]);
-
-    const handleChange = useCallback((id: string, value: string) => {
-      setFieldValue(id, value);
-      onFieldChange?.(id, value);
-    }, [setFieldValue, onFieldChange]);
-
-    const handleBlur = useCallback((id: string) => {
-      const fieldSchema = allFields.find((f: any) => f.id === id);
-      if (fieldSchema && fieldSchema.validations) {
-        const { valid, message } = validateFieldValue(values[id] || '', fieldSchema.validations);
-        setErrors((prev) => ({ ...prev, [id]: valid ? '' : message }));
+      setFieldValue: (id: string, value: string) => {
+        store.set(`/${id}`, value);
+        store.set(`/errors/${id}`, '');
       }
-    }, [allFields, values]);
+    }), [rawSchema, store]);
+
+    const handleAction = (action: string, params: any) => {
+      if (action === "fieldChange") {
+        store.set(`/errors/${params.fieldId}`, '');
+        onFieldChange?.(params.fieldId, params.value);
+      }
+    };
 
     return (
-      <div className="space-y-6">
-        {sections.map((section: any, idx: number) => (
-          <FormSection 
-            key={`section-${idx}`} 
-            section={section} 
-            values={values} 
-            errors={errors} 
-            optionsMap={optionsMap} 
-            onChange={handleChange}
-            onBlur={handleBlur}
-          />
-        ))}
-      </div>
+      <JSONUIProvider store={store} onAction={handleAction}>
+        <div className="space-y-6">
+          <Renderer spec={spec} registry={registry} />
+        </div>
+      </JSONUIProvider>
     );
   }
 );

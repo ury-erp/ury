@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useBranchContext } from '../../context/BranchContext';
 import { logout } from '@ury/core';
@@ -68,18 +68,19 @@ export const Header: React.FC = () => {
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
+  const handleClickOutside = useCallback((event: MouseEvent) => {
+    if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+      setIsUserMenuOpen(false);
+    }
+    if (branchMenuRef.current && !branchMenuRef.current.contains(event.target as Node)) {
+      setIsBranchDropdownOpen(false);
+    }
+  }, []);
+
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
-        setIsUserMenuOpen(false);
-      }
-      if (branchMenuRef.current && !branchMenuRef.current.contains(event.target as Node)) {
-        setIsBranchDropdownOpen(false);
-      }
-    };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [handleClickOutside]);
 
   const handleMarkAllRead = () => {
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
