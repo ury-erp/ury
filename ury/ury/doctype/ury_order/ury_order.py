@@ -72,7 +72,7 @@ def merge_tables_batch(anchor_table, tables):
                 _("Cannot merge tables from different rooms.")
             )
 
-        target_cluster, _ = _get_merge_cluster(
+        target_cluster, _target_table_map = _get_merge_cluster(
             target
         )
 
@@ -278,7 +278,7 @@ def _get_cluster_table_names(table):
     if not table:
         return []
     try:
-        members, _ = _get_merge_cluster(table)
+        members, _table_map = _get_merge_cluster(table)
         return members
     except Exception:
         return [table]
@@ -388,6 +388,9 @@ def release_tables_after_print(invoice):
         "POS Invoice",
         invoice,
     )
+
+    if not frappe.has_permission("POS Invoice", "write", doc=invoice_doc):
+        frappe.throw(_("Not permitted to release tables for this invoice"), frappe.PermissionError)
 
     tables = _get_table_group(
         invoice_doc.restaurant_table,
@@ -1092,7 +1095,7 @@ def table_transfer(table, newTable, invoice):
     pos_invoice = frappe.get_doc("POS Invoice", invoice)
     new_table = frappe.get_doc("URY Table", newTable)
 
-    merge_members, _ = _get_merge_cluster(table)
+    merge_members, _table_map = _get_merge_cluster(table)
     if len(merge_members) > 1:
         frappe.throw(_("Table transfer is not allowed for merged tables. Unmerge first."))
 
@@ -1162,8 +1165,19 @@ def captain_transfer(currentCaptain, newCaptain, invoice):
 
 @frappe.whitelist()
 def customer_favourite_item(customer_name):
+    if not frappe.has_permission("Customer", "read", customer_name):
+        frappe.throw(_("Not permitted to access this Customer"), frappe.PermissionError)
+
+    filters = {"customer": customer_name}
+    try:
+        branch = getBranch()
+        if branch:
+            filters["branch"] = branch
+    except frappe.exceptions.ValidationError:
+        pass
+
     pos = frappe.db.get_list(
-        "POS Invoice", filters={"customer": customer_name}, fields=["name"]
+        "POS Invoice", filters=filters, fields=["name"]
     )
 
     item_qty = {}
