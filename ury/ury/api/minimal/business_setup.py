@@ -96,6 +96,10 @@ def create_setup_user(email, name, password=None, role="URY Cashier"):
 
 @frappe.whitelist()
 def submit_configure_data(data):
+    from frappe.utils import cint
+    if cint(frappe.db.get_single_value("System Settings", "setup_complete")):
+        frappe.throw("Setup already completed")
+        
     if isinstance(data, str):
         data = frappe.parse_json(data)
         
@@ -225,6 +229,8 @@ def submit_configure_data(data):
     uom = "Unit"
 
     results["created_items"] = []
+    existing_courses = set(frappe.get_all("URY Menu Course", pluck="name"))
+    
     for m in data.get("menuItems", []):
         item_title = m.get("name")
         course_title = m.get("course", "Main Course")
@@ -234,9 +240,10 @@ def submit_configure_data(data):
             continue
 
         # 5a. Ensure URY Menu Course exists
-        if not frappe.db.exists("URY Menu Course", course_title):
+        if course_title not in existing_courses:
             c_doc = frappe.get_doc({"doctype": "URY Menu Course", "course": course_title})
             c_doc.insert(ignore_permissions=True)
+            existing_courses.add(course_title)
 
         # 5b. PASS 1: Create ERPNext Item DocType record with Maintain Stock (is_stock_item) = 0!
         if not frappe.db.exists("Item", item_title):
