@@ -101,7 +101,7 @@ export const Header: React.FC = () => {
       <div className="flex items-center justify-between h-16 px-4 md:px-6">
         {/* Left Section: Logo & Brand */}
         <div className="flex items-center space-x-3">
-          <Link to="/ury/dashboard" className="flex items-center space-x-3 group">
+          <Link to="/dashboard" className="flex items-center space-x-3 group">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#6D28D9] to-[#7C3AED] flex items-center justify-center text-white shadow-md group-hover:scale-105 transition-transform">
               <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
                 <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
@@ -246,7 +246,7 @@ export const Header: React.FC = () => {
                   <button
                     onClick={() => {
                       setIsUserMenuOpen(false);
-                      navigate('/ury/user');
+                      navigate('/user');
                     }}
                     className="w-full flex items-center space-x-2.5 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                   >
@@ -257,7 +257,7 @@ export const Header: React.FC = () => {
                   <button
                     onClick={() => {
                       setIsUserMenuOpen(false);
-                      navigate('/ury/report-settings');
+                      navigate('/report-settings');
                     }}
                     className="w-full flex items-center space-x-2.5 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                   >
