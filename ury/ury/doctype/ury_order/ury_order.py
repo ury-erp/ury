@@ -548,6 +548,20 @@ def split_bill(source_invoice, items_to_move, customer=None):
 
     source = frappe.get_doc("POS Invoice", source_invoice)
 
+    if not frappe.has_permission("POS Invoice", "write", doc=source):
+        frappe.throw(_("Not permitted to split this invoice."), frappe.PermissionError)
+
+    try:
+        user_branch = getBranch()
+    except frappe.ValidationError:
+        if frappe.session.user == "Administrator" or "System Manager" in frappe.get_roles():
+            user_branch = None
+        else:
+            raise
+
+    if user_branch and source.branch != user_branch:
+        frappe.throw(_("Not permitted to split invoices from another branch."), frappe.PermissionError)
+
     if source.docstatus != 0:
         frappe.throw(_("Only draft invoices can be split."))
 
