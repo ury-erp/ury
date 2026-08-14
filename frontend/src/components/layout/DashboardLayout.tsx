@@ -7,7 +7,7 @@ import { Sidebar } from './Sidebar';
 export const DashboardLayout: React.FC = () => {
   return (
     <BranchProvider>
-      <div className="min-h-screen flex flex-col bg-gray-50 text-gray-900 font-sans">
+      <div className="min-h-screen flex flex-col bg-background text-foreground font-inter text-sm">
         <Header />
         <div className="flex flex-1">
           <Sidebar />
