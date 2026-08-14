@@ -23,6 +23,14 @@ def get_business_setup():
     }
 
 @frappe.whitelist(allow_guest=True)
+def get_branches():
+    comp = frappe.defaults.get_user_default("Company") or frappe.db.get_value("Company", {}, "name")
+    tax_id = frappe.db.get_value("Company", comp, "tax_id") if comp else None
+    
+    branches = frappe.get_all("Branch", fields=["name", "branch"])
+    return [{"id": b.name, "name": b.branch, "tax_id": tax_id} for b in branches]
+
+@frappe.whitelist(allow_guest=True)
 def update_business_setup(branch=None, restaurant=None):
     if branch:
         if isinstance(branch, str):
