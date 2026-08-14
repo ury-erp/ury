@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
 import { Grid, Plus, Users, Square, List, Edit2, LayoutTemplate } from 'lucide-react';
-import { Card, Button, Badge, Input, Select, Spinner } from '@ury/ui';
+import { Card, Button, Badge, Input, Spinner } from '@ury/ui';
+import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { dashboardService } from '../../services/dashboard';
 import { call } from '@ury/core';
 import SideDrawer from '../../components/layout/SideDrawer';
@@ -148,7 +149,7 @@ export const TablePage: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Toolbar — Partition Style */}
-      <div className="flex flex-col md:flex-row items-center justify-between gap-4 pb-3 border-b border-gray-200">
+      <div className="flex flex-col md:flex-row items-center justify-between gap-4 pb-3 border-b border-gray-200 -mx-6 px-6 -mt-6 pt-6">
         <div className="flex bg-gray-100 rounded-lg p-1">
           <button
             onClick={() => setViewMode('list')}
@@ -292,7 +293,7 @@ export const TablePage: React.FC = () => {
         <form onSubmit={handleSaveTable} className="space-y-5">
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Table Name *</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Table Name</label>
               <Input
                 value={newTable.table_name}
                 onChange={(e) => setNewTable({ ...newTable, table_name: e.target.value })}
@@ -326,44 +327,43 @@ export const TablePage: React.FC = () => {
             {/* Branch — Select from Branch doctype */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">Branch</label>
-              <Select
+              <SearchableSelect
+                id="branch"
                 value={newTable.branch}
-                onChange={(e) => setNewTable({ ...newTable, branch: e.target.value })}
-                className="w-full"
-              >
-                <option value="">Select Branch</option>
-                {branches.map((b) => (
-                  <option key={b.name} value={b.name}>{b.name}</option>
-                ))}
-              </Select>
+                onChange={(_, value) => setNewTable({ ...newTable, branch: value })}
+                options={[
+                  { value: '', label: 'Select Branch' },
+                  ...branches.map(b => ({ value: b.name, label: b.name }))
+                ]}
+              />
             </div>
 
             {/* Room — Select from URY Room docs */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">Room</label>
-              <Select
+              <SearchableSelect
+                id="restaurant_room"
                 value={newTable.restaurant_room}
-                onChange={(e) => setNewTable({ ...newTable, restaurant_room: e.target.value })}
-                className="w-full"
-              >
-                <option value="">Select Room</option>
-                {rooms.map((r) => (
-                  <option key={r.name} value={r.name}>{r.room_name || r.name}</option>
-                ))}
-              </Select>
+                onChange={(_, value) => setNewTable({ ...newTable, restaurant_room: value })}
+                options={[
+                  { value: '', label: 'Select Room' },
+                  ...rooms.map(r => ({ value: r.name, label: r.room_name || r.name }))
+                ]}
+              />
             </div>
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">Table Shape</label>
-              <Select
+              <SearchableSelect
+                id="table_shape"
                 value={newTable.table_shape}
-                onChange={(e) => setNewTable({ ...newTable, table_shape: e.target.value })}
-                className="w-full"
-              >
-                <option value="Square">Square</option>
-                <option value="Rectangle">Rectangle</option>
-                <option value="Circle">Circle</option>
-              </Select>
+                onChange={(_, value) => setNewTable({ ...newTable, table_shape: value })}
+                options={[
+                  { value: 'Square', label: 'Square' },
+                  { value: 'Rectangle', label: 'Rectangle' },
+                  { value: 'Circle', label: 'Circle' },
+                ]}
+              />
             </div>
 
             <div className="flex items-center space-x-2 pt-2">

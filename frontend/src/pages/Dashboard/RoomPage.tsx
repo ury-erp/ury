@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
 import { Plus, Layers, Edit2 } from 'lucide-react';
-import { Card, Button, Badge, Input, Select, Spinner } from '@ury/ui';
+import { Card, Button, Badge, Input, Spinner } from '@ury/ui';
+import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { dashboardService } from '../../services/dashboard';
 import { call } from '@ury/core';
 import SideDrawer from '../../components/layout/SideDrawer';
@@ -124,7 +125,7 @@ export const RoomPage: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Toolbar — Partition Style, no title */}
-      <div className="flex flex-col md:flex-row items-center justify-end gap-4 pb-3 border-b border-gray-200">
+      <div className="flex flex-col md:flex-row items-center justify-end gap-4 pb-3 border-b border-gray-200 -mx-6 px-6 -mt-6 pt-6">
         <Button
           onClick={openAddDrawer}
           className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center space-x-1.5 shadow-xs"
@@ -207,30 +208,32 @@ export const RoomPage: React.FC = () => {
 
           <div>
             <label className="block font-semibold text-gray-700 mb-1">Room Type</label>
-            <Select
+            <SearchableSelect
+              id="room_type"
               value={newRoom.room_type}
-              onChange={(e) => setNewRoom({ ...newRoom, room_type: e.target.value })}
-            >
-              <option value="AC">AC</option>
-              <option value="Non-AC">Non-AC</option>
-              <option value="Rooftop">Rooftop</option>
-              <option value="Outdoor">Outdoor</option>
-              <option value="Bar">Bar</option>
-            </Select>
+              onChange={(_, value) => setNewRoom({ ...newRoom, room_type: value })}
+              options={[
+                { value: 'AC', label: 'AC' },
+                { value: 'Non-AC', label: 'Non-AC' },
+                { value: 'Rooftop', label: 'Rooftop' },
+                { value: 'Outdoor', label: 'Outdoor' },
+                { value: 'Bar', label: 'Bar' },
+              ]}
+            />
           </div>
 
           {/* Branch field */}
           <div>
             <label className="block font-semibold text-gray-700 mb-1">Branch</label>
-            <Select
+            <SearchableSelect
+              id="branch"
               value={newRoom.branch}
-              onChange={(e) => setNewRoom({ ...newRoom, branch: e.target.value })}
-            >
-              <option value="">Select Branch</option>
-              {branches.map((b) => (
-                <option key={b.name} value={b.name}>{b.name}</option>
-              ))}
-            </Select>
+              onChange={(_, value) => setNewRoom({ ...newRoom, branch: value })}
+              options={[
+                { value: '', label: 'Select Branch' },
+                ...branches.map(b => ({ value: b.name, label: b.name }))
+              ]}
+            />
           </div>
 
           <div className="pt-4 border-t border-gray-100">

@@ -24,13 +24,8 @@ interface ApplicableUser {
   default?: number;
 }
 
-interface ProductionUnitRecord {
-  name: string;
-  production_unit_name?: string;
-  branch?: string;
-}
 
-type ActiveTab = 'general' | 'printing' | 'cashiers' | 'production';
+type ActiveTab = 'general' | 'printing' | 'cashiers';
 
 export const PosProfilePage: React.FC = () => {
   const { activeBranchId, activeBranch } = useBranchContext();
@@ -41,9 +36,6 @@ export const PosProfilePage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<ActiveTab>('general');
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
-  // Production units
-  const [productionUnits, setProductionUnits] = useState<ProductionUnitRecord[]>([]);
-  const [loadingUnits, setLoadingUnits] = useState(false);
 
   // Form state for selected profile editing
   const [profileForm, setProfileForm] = useState<Record<string, any>>({});
@@ -88,21 +80,9 @@ export const PosProfilePage: React.FC = () => {
     }
   };
 
-  const fetchProductionUnits = async () => {
-    setLoadingUnits(true);
-    try {
-      const records = await dashboardService.getModuleRecords<ProductionUnitRecord>('URY Production Unit', activeBranchId);
-      setProductionUnits(records || []);
-    } catch {
-      setProductionUnits([]);
-    } finally {
-      setLoadingUnits(false);
-    }
-  };
 
   useEffect(() => {
     fetchProfiles();
-    fetchProductionUnits();
   }, [activeBranchId]);
 
   const handleProfileSelect = (profile: PosProfileRecord) => {
@@ -139,13 +119,12 @@ export const PosProfilePage: React.FC = () => {
     { id: 'general', label: 'General Operations', icon: <Settings2 className="w-4 h-4" /> },
     { id: 'printing', label: 'Printer Mappings & QZ', icon: <Printer className="w-4 h-4" /> },
     { id: 'cashiers', label: 'Cashiers & Permissions', icon: <Shield className="w-4 h-4" /> },
-    { id: 'production', label: 'Production Unit', icon: <ChevronDown className="w-4 h-4" /> },
   ];
 
   return (
     <div className="space-y-6">
       {/* Toolbar — Partition Style */}
-      <div className="flex flex-col md:flex-row items-center justify-between gap-4 pb-3 border-b border-gray-200">
+      <div className="flex flex-col md:flex-row items-center justify-between gap-4 pb-3 border-b border-gray-200 -mx-6 px-6 -mt-6 pt-6">
         <div className="flex items-center gap-2 font-semibold text-gray-700">
           <SlidersHorizontal className="w-5 h-5 text-primary" />
           POS Profile Settings
@@ -172,42 +151,6 @@ export const PosProfilePage: React.FC = () => {
       {loading ? (
         <div className="py-16 flex items-center justify-center bg-white rounded-lg border border-gray-200">
           <Spinner className="w-8 h-8 text-primary" />
-        </div>
-      ) : activeTab === 'production' ? (
-        /* Production Unit Section */
-        <div className="space-y-4">
-          <div className="flex items-center justify-between pb-2 border-b border-gray-200">
-            <h3 className="text-sm font-semibold text-gray-700">Production Units</h3>
-          </div>
-          {loadingUnits ? (
-            <div className="py-8 flex items-center justify-center">
-              <Spinner className="w-6 h-6 text-primary" />
-            </div>
-          ) : productionUnits.length === 0 ? (
-            <Card className="p-8 text-center rounded-lg border border-gray-200 bg-white">
-              <p className="text-gray-500 text-sm">No production units found for this branch.</p>
-              <p className="text-xs text-gray-400 mt-1">Configure production units from Frappe Desk under URY Production Unit.</p>
-            </Card>
-          ) : (
-            <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-              <table className="w-full text-left text-sm text-gray-600">
-                <thead className="bg-gray-50 border-b border-gray-100 text-xs uppercase text-gray-500 font-semibold">
-                  <tr>
-                    <th className="px-6 py-4">Production Unit</th>
-                    <th className="px-6 py-4">Branch</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {productionUnits.map((unit) => (
-                    <tr key={unit.name} className="hover:bg-primary/10 transition-colors">
-                      <td className="px-6 py-4 font-semibold text-gray-900">{unit.production_unit_name || unit.name}</td>
-                      <td className="px-6 py-4 text-gray-500">{unit.branch || '-'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
         </div>
       ) : (
         /* Profiles list */

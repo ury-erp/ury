@@ -187,7 +187,7 @@ export const AggregatorPage: React.FC = () => {
               <div>
                 <label className="block font-semibold text-gray-700 mb-1">Aggregator Name</label>
                 <Input
-                  placeholder="e.g. Zomato"
+                  placeholder="Zomato"
                   value={newAggregatorName}
                   onChange={(e) => setNewAggregatorName(e.target.value)}
                   required

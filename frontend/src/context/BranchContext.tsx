@@ -29,11 +29,7 @@ export interface BranchContextType {
   refreshDashboard: () => void;
 }
 
-const DEFAULT_BRANCHES: Branch[] = [
-  { id: 'main-branch', name: 'Main Restaurant Branch', code: 'MAIN', is_active: true },
-  { id: 'downtown-branch', name: 'Downtown Outlet', code: 'DTN', is_active: true },
-  { id: 'airport-branch', name: 'Airport Express', code: 'APT', is_active: true }
-];
+
 
 const BranchContext = createContext<BranchContextType | undefined>(undefined);
 
@@ -41,7 +37,7 @@ export const BranchProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [activeBranchId, setActiveBranchIdState] = useState<string>(() => {
     return localStorage.getItem('ury_active_branch_id') || 'all';
   });
-  const [branches, setBranches] = useState<Branch[]>(DEFAULT_BRANCHES);
+  const [branches, setBranches] = useState<Branch[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -67,7 +63,7 @@ export const BranchProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           setBranches(res.message);
         }
       } catch {
-        // Fallback to default branches if API is not available
+        // Handle error without fallback
       } finally {
         setIsLoading(false);
       }

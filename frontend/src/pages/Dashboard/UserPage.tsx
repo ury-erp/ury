@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
 import { Users, Plus, ShieldCheck, Edit2 } from 'lucide-react';
-import { Card, Button, Badge, Input, Select, Spinner, showToast } from '@ury/ui';
+import { Card, Button, Badge, Input, Spinner, showToast } from '@ury/ui';
+import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { dashboardService } from '../../services/dashboard';
 import { call } from '@ury/core';
 import SideDrawer from '../../components/layout/SideDrawer';
@@ -129,7 +130,7 @@ export const UserPage: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Toolbar — no title, partition style */}
-      <div className="flex flex-col md:flex-row items-center justify-end gap-4 pb-3 border-b border-gray-200">
+      <div className="flex flex-col md:flex-row items-center justify-end gap-4 pb-3 border-b border-gray-200 -mx-6 px-6 -mt-6 pt-6">
         <Button
           onClick={openAddDrawer}
           className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center space-x-1.5 shadow-xs"
@@ -166,6 +167,7 @@ export const UserPage: React.FC = () => {
             <thead className="bg-gray-50 border-b border-gray-100 text-xs uppercase text-gray-500 font-semibold">
               <tr>
                 <th className="px-6 py-4">User</th>
+                <th className="px-6 py-4">User ID</th>
                 <th className="px-6 py-4">Role</th>
                 <th className="px-6 py-4 text-right">Actions</th>
               </tr>
@@ -178,13 +180,13 @@ export const UserPage: React.FC = () => {
                       <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-xs uppercase shrink-0">
                         {(user.first_name || user.email).charAt(0)}
                       </div>
-                      <div>
-                        <div className="font-semibold text-gray-900">
-                          {user.first_name || user.full_name || user.name}
-                        </div>
-                        <div className="text-xs text-gray-500 mt-0.5">{user.email}</div>
+                      <div className="font-semibold text-gray-900">
+                        {user.first_name || user.full_name || user.name}
                       </div>
                     </div>
+                  </td>
+                  <td className="px-6 py-4 text-gray-600 font-medium">
+                    {user.email}
                   </td>
                   <td className="px-6 py-4">
                     <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary text-[10px]">
@@ -242,14 +244,16 @@ export const UserPage: React.FC = () => {
 
           <div>
             <label className="block font-semibold text-gray-700 mb-1.5">Role / Access Level</label>
-            <Select
+            <SearchableSelect
+              id="role"
               value={newUser.role}
-              onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
-            >
-              <option value="URY Cashier">URY Cashier</option>
-              <option value="URY Waiter">URY Waiter</option>
-              <option value="URY Manager">URY Manager</option>
-            </Select>
+              onChange={(_, value) => setNewUser({ ...newUser, role: value })}
+              options={[
+                { value: 'URY Cashier', label: 'URY Cashier' },
+                { value: 'URY Waiter', label: 'URY Waiter' },
+                { value: 'URY Manager', label: 'URY Manager' },
+              ]}
+            />
           </div>
 
           <div className="flex items-center gap-2">

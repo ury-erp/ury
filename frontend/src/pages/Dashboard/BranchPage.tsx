@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
 import { Save, ChevronDown, ChevronRight } from 'lucide-react';
-import { Card, Button, Input, Select, Spinner } from '@ury/ui';
+import { Card, Button, Input, Spinner } from '@ury/ui';
+import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { call } from '@ury/core';
 import { dashboardService } from '../../services/dashboard';
 
@@ -193,7 +194,7 @@ export const BranchPage: React.FC = () => {
     <div className="space-y-6">
 
       {/* Save button */}
-      <div className="flex items-center justify-end pb-3 border-b border-gray-200">
+      <div className="flex items-center justify-end pb-3 border-b border-gray-200 -mx-6 px-6 -mt-6 pt-6">
         <Button
           onClick={handleSave}
           disabled={saving || !hasBranch}
@@ -267,15 +268,15 @@ export const BranchPage: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-gray-700">Default Menu (Active Menu)</label>
-                    <Select
+                    <SearchableSelect
+                      id="active_menu"
                       value={restaurantForm.active_menu || ''}
-                      onChange={(e) => setRestaurantForm(p => ({ ...p, active_menu: e.target.value }))}
-                    >
-                      <option value="">None</option>
-                      {menus.map((m) => (
-                        <option key={m.name} value={m.name}>{m.menu_name || m.name}</option>
-                      ))}
-                    </Select>
+                      onChange={(_, value) => setRestaurantForm(p => ({ ...p, active_menu: value }))}
+                      options={[
+                        { value: '', label: 'None' },
+                        ...menus.map(m => ({ value: m.name, label: m.menu_name || m.name }))
+                      ]}
+                    />
                   </div>
                   <div className="flex items-center gap-2 pt-6">
                     <input
@@ -332,15 +333,15 @@ export const BranchPage: React.FC = () => {
             {restaurantData ? (
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-700">Default Room</label>
-                <Select
+                <SearchableSelect
+                  id="default_room"
                   value={restaurantForm.default_room || ''}
-                  onChange={(e) => setRestaurantForm(p => ({ ...p, default_room: e.target.value }))}
-                >
-                  <option value="">None</option>
-                  {rooms.map((r) => (
-                    <option key={r.name} value={r.name}>{r.room_name || r.name}</option>
-                  ))}
-                </Select>
+                  onChange={(_, value) => setRestaurantForm(p => ({ ...p, default_room: value }))}
+                  options={[
+                    { value: '', label: 'None' },
+                    ...rooms.map(r => ({ value: r.name, label: r.room_name || r.name }))
+                  ]}
+                />
               </div>
             ) : (
               <p className="text-sm text-gray-400">No URY Restaurant linked to this branch.</p>

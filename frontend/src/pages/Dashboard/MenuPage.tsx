@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
 import { Utensils, Search, Plus, LayoutGrid, List, Edit2, Check, X } from 'lucide-react';
-import { Card, Button, Badge, Input, Select, Spinner } from '@ury/ui';
+import { Card, Button, Badge, Input, Spinner } from '@ury/ui';
 import { formatCurrency, call } from '@ury/core';
 import { dashboardService } from '../../services/dashboard';
 import SideDrawer from '../../components/layout/SideDrawer';
@@ -287,7 +287,7 @@ export const MenuPage: React.FC = () => {
     <div className="space-y-4 max-w-[1600px] mx-auto">
 
       {/* Section: Menu Selector — Partition Style */}
-      <div className="flex flex-col md:flex-row items-center justify-between gap-4 pb-3 border-b border-gray-200">
+      <div className="flex flex-col md:flex-row items-center justify-between gap-4 pb-3 border-b border-gray-200 -mx-6 px-6 -mt-6 pt-6">
         <div className="flex items-center gap-3 w-full md:w-auto">
           <div className="w-full sm:w-48">
             <SearchableSelect
@@ -491,16 +491,12 @@ export const MenuPage: React.FC = () => {
         <form onSubmit={handleSaveItem} className="space-y-5 text-sm">
           <div>
             <label className="block font-semibold text-gray-700 mb-1.5">Target Menu <span className="text-red-500">*</span></label>
-            <Select
+            <SearchableSelect
+              id="target_menu"
               value={newItem.target_menu}
-              onChange={(e) => setNewItem({ ...newItem, target_menu: e.target.value })}
-              className="font-medium"
-              required
-            >
-              {menus.map((m) => (
-                <option key={m.name} value={m.name}>{m.menu_name || m.name}</option>
-              ))}
-            </Select>
+              onChange={(_, value) => setNewItem({ ...newItem, target_menu: value })}
+              options={menus.map(m => ({ value: m.name, label: m.menu_name || m.name }))}
+            />
           </div>
 
           <div>
@@ -537,15 +533,15 @@ export const MenuPage: React.FC = () => {
                 className="font-medium"
               />
             ) : (
-              <Select
+              <SearchableSelect
+                id="course"
                 value={newItem.course}
-                onChange={(e) => setNewItem({ ...newItem, course: e.target.value })}
-              >
-                <option value="">None</option>
-                {availableCourses.map((c) => (
-                  <option key={c.name} value={c.name}>{c.name}</option>
-                ))}
-              </Select>
+                onChange={(_, value) => setNewItem({ ...newItem, course: value })}
+                options={[
+                  { value: '', label: 'None' },
+                  ...availableCourses.map(c => ({ value: c.name, label: c.name }))
+                ]}
+              />
             )}
           </div>
 
