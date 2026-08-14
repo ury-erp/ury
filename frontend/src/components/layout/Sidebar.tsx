@@ -35,7 +35,7 @@ export const Sidebar: React.FC = () => {
   const [isAdvancedOpen, setIsAdvancedOpen] = useState<boolean>(isAdvancedPath);
 
   return (
-    <aside className="w-64 bg-white border-r border-gray-200 sticky top-16 h-[calc(100vh-4rem)] flex flex-col shrink-0 overflow-y-auto">
+    <aside className="w-64 bg-white border-r border-gray-200 sticky top-16 h-[calc(100vh-4rem)] flex flex-col shrink-0 overflow-y-auto font-inter">
       <div className="p-4 flex-1 space-y-1">
         {/* Main Navigation Links */}
         {NAV_ITEMS.map((item) => {
@@ -45,10 +45,10 @@ export const Sidebar: React.FC = () => {
               key={item.path}
               to={item.path}
               className={({ isActive }) =>
-                `flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                `flex items-center space-x-3 px-3.5 py-2.5 rounded-lg text-sm font-medium transition-all ${
                   isActive
-                    ? 'bg-[#7C3AED] text-white shadow-sm font-semibold'
-                    : 'text-gray-600 hover:bg-purple-50 hover:text-[#7C3AED]'
+                    ? 'bg-[#2563eb] text-white shadow-sm font-semibold'
+                    : 'text-gray-600 hover:bg-blue-50 hover:text-[#2563eb]'
                 }`
               }
             >
@@ -62,10 +62,10 @@ export const Sidebar: React.FC = () => {
         <div className="pt-2">
           <button
             onClick={() => setIsAdvancedOpen(!isAdvancedOpen)}
-            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-sm font-medium transition-colors ${
               isAdvancedPath
-                ? 'text-[#7C3AED] font-semibold bg-purple-50'
-                : 'text-gray-600 hover:bg-purple-50 hover:text-[#7C3AED]'
+                ? 'text-[#2563eb] font-semibold bg-blue-50'
+                : 'text-gray-600 hover:bg-blue-50 hover:text-[#2563eb]'
             }`}
           >
             <div className="flex items-center space-x-3">
@@ -74,7 +74,7 @@ export const Sidebar: React.FC = () => {
             </div>
             <ChevronDown
               className={`w-4 h-4 transition-transform duration-200 ${
-                isAdvancedOpen ? 'rotate-180 text-[#7C3AED]' : 'text-gray-400'
+                isAdvancedOpen ? 'rotate-180 text-[#2563eb]' : 'text-gray-400'
               }`}
             />
           </button>
@@ -84,26 +84,31 @@ export const Sidebar: React.FC = () => {
               <NavLink
                 to="/report-settings"
                 className={({ isActive }) =>
-                  `flex items-center space-x-3 px-3.5 py-2 rounded-xl text-xs font-medium transition-all ${
+                  `flex items-center space-x-3 px-3.5 py-2 rounded-lg text-xs font-medium transition-all ${
                     isActive
-                      ? 'bg-[#7C3AED] text-white shadow-sm font-semibold'
-                      : 'text-gray-600 hover:bg-purple-50 hover:text-[#7C3AED]'
+                      ? 'bg-[#2563eb] text-white shadow-sm font-semibold'
+                      : 'text-gray-600 hover:bg-blue-50 hover:text-[#2563eb]'
                   }`
                 }
               >
                 <FileText className="w-4 h-4 shrink-0" />
                 <span>URY Report Settings</span>
               </NavLink>
+              <NavLink
+                to="/production-unit"
+                className={({ isActive }) =>
+                  `flex items-center space-x-3 px-3.5 py-2 rounded-lg text-xs font-medium transition-all ${
+                    isActive
+                      ? 'bg-[#2563eb] text-white shadow-sm font-semibold'
+                      : 'text-gray-600 hover:bg-blue-50 hover:text-[#2563eb]'
+                  }`
+                }
+              >
+                <Grid className="w-4 h-4 shrink-0" />
+                <span>Production Unit</span>
+              </NavLink>
             </div>
           )}
-        </div>
-      </div>
-
-      {/* Footer info banner */}
-      <div className="p-4 border-t border-gray-100 bg-gray-50/50">
-        <div className="bg-purple-50/60 rounded-xl p-3 border border-purple-100/80">
-          <p className="text-xs font-semibold text-gray-900">URY System Online</p>
-          <p className="text-[11px] text-gray-500 mt-0.5">Version 2.4.0</p>
         </div>
       </div>
     </aside>
