@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, Button, Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, Input, Select } from '@ury/ui';
+import { Card, Button, Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, Input } from '@ury/ui';
+import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { useBranchContext } from '../../context/BranchContext';
 
 type ModalType = 'menu' | 'table' | 'room' | 'branch' | 'user' | null;
@@ -190,7 +191,7 @@ export const QuickActions: React.FC = () => {
         </div>
       )}
 
-      <div className="mb-3 flex items-center justify-between">
+      <div className="mb-3 flex items-center justify-between pb-3 border-b border-gray-200 -mx-6 px-6 -mt-6 pt-6">
         <h2 className="text-lg font-bold text-gray-900">Quick Operations & Setup</h2>
         <span className="text-xs text-gray-500 font-medium">Fast action shortcuts</span>
       </div>
@@ -232,7 +233,7 @@ export const QuickActions: React.FC = () => {
             <div>
               <label className="block font-semibold text-gray-700 mb-1">Item Name</label>
               <Input
-                placeholder="e.g. Paneer Tikka Masala"
+                placeholder="Paneer Tikka Masala"
                 value={menuForm.name}
                 onChange={(e: any) => setMenuForm({ ...menuForm, name: e.target.value })}
                 required
@@ -240,22 +241,24 @@ export const QuickActions: React.FC = () => {
             </div>
             <div>
               <label className="block font-semibold text-gray-700 mb-1">Course / Category</label>
-              <Select
+              <SearchableSelect
+                id="course"
                 value={menuForm.course}
-                onChange={(e: any) => setMenuForm({ ...menuForm, course: e.target.value })}
-              >
-                <option value="Starters">Starters / Appetizers</option>
-                <option value="Main Course">Main Course</option>
-                <option value="Breads">Breads & Naan</option>
-                <option value="Dessert">Dessert</option>
-                <option value="Beverages">Beverages</option>
-              </Select>
+                onChange={(_, value) => setMenuForm({ ...menuForm, course: value })}
+                options={[
+                  { value: 'Starters', label: 'Starters / Appetizers' },
+                  { value: 'Main Course', label: 'Main Course' },
+                  { value: 'Breads', label: 'Breads & Naan' },
+                  { value: 'Dessert', label: 'Dessert' },
+                  { value: 'Beverages', label: 'Beverages' },
+                ]}
+              />
             </div>
             <div>
               <label className="block font-semibold text-gray-700 mb-1">Price (₹)</label>
               <Input
                 type="number"
-                placeholder="e.g. 280"
+                placeholder="280"
                 value={menuForm.price}
                 onChange={(e: any) => setMenuForm({ ...menuForm, price: e.target.value })}
                 required
@@ -281,9 +284,9 @@ export const QuickActions: React.FC = () => {
           </DialogHeader>
           <form onSubmit={handleSubmitTable} className="space-y-4 mt-3 text-xs">
             <div>
-              <label className="block font-semibold text-gray-700 mb-1">Table Name / Number</label>
+              <label className="block font-semibold text-gray-700 mb-1">Table Name</label>
               <Input
-                placeholder="e.g. T-15"
+                placeholder="T-15"
                 value={tableForm.name}
                 onChange={(e: any) => setTableForm({ ...tableForm, name: e.target.value })}
                 required
@@ -293,22 +296,24 @@ export const QuickActions: React.FC = () => {
               <label className="block font-semibold text-gray-700 mb-1">Seating Capacity</label>
               <Input
                 type="number"
-                placeholder="e.g. 4"
+                placeholder="4"
                 value={tableForm.seats}
                 onChange={(e: any) => setTableForm({ ...tableForm, seats: e.target.value })}
               />
             </div>
             <div>
               <label className="block font-semibold text-gray-700 mb-1">Dining Room / Zone</label>
-              <Select
+              <SearchableSelect
+                id="room"
                 value={tableForm.room}
-                onChange={(e: any) => setTableForm({ ...tableForm, room: e.target.value })}
-              >
-                <option value="Main Dining">Main Dining</option>
-                <option value="Terrace Garden">Terrace Garden</option>
-                <option value="AC Family Section">AC Family Section</option>
-                <option value="VIP Lounge">VIP Lounge</option>
-              </Select>
+                onChange={(_, value) => setTableForm({ ...tableForm, room: value })}
+                options={[
+                  { value: 'Main Dining', label: 'Main Dining' },
+                  { value: 'Terrace Garden', label: 'Terrace Garden' },
+                  { value: 'AC Family Section', label: 'AC Family Section' },
+                  { value: 'VIP Lounge', label: 'VIP Lounge' },
+                ]}
+              />
             </div>
             <DialogFooter className="mt-6 flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={handleClose}>
@@ -332,7 +337,7 @@ export const QuickActions: React.FC = () => {
             <div>
               <label className="block font-semibold text-gray-700 mb-1">Zone Name</label>
               <Input
-                placeholder="e.g. Outdoor Deck"
+                placeholder="Outdoor Deck"
                 value={roomForm.name}
                 onChange={(e: any) => setRoomForm({ ...roomForm, name: e.target.value })}
                 required
@@ -340,15 +345,17 @@ export const QuickActions: React.FC = () => {
             </div>
             <div>
               <label className="block font-semibold text-gray-700 mb-1">Zone Type</label>
-              <Select
+              <SearchableSelect
+                id="type"
                 value={roomForm.type}
-                onChange={(e: any) => setRoomForm({ ...roomForm, type: e.target.value })}
-              >
-                <option value="AC">AC Dining</option>
-                <option value="Non-AC">Non-AC Dining</option>
-                <option value="Rooftop">Rooftop / Open Air</option>
-                <option value="Bar">Bar & Lounge</option>
-              </Select>
+                onChange={(_, value) => setRoomForm({ ...roomForm, type: value })}
+                options={[
+                  { value: 'AC', label: 'AC Dining' },
+                  { value: 'Non-AC', label: 'Non-AC Dining' },
+                  { value: 'Rooftop', label: 'Rooftop / Open Air' },
+                  { value: 'Bar', label: 'Bar & Lounge' },
+                ]}
+              />
             </div>
             <DialogFooter className="mt-6 flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={handleClose}>
@@ -372,7 +379,7 @@ export const QuickActions: React.FC = () => {
             <div>
               <label className="block font-semibold text-gray-700 mb-1">Branch Name</label>
               <Input
-                placeholder="e.g. Waterfront Bistro"
+                placeholder="Waterfront Bistro"
                 value={branchForm.name}
                 onChange={(e: any) => setBranchForm({ ...branchForm, name: e.target.value })}
                 required
@@ -381,7 +388,7 @@ export const QuickActions: React.FC = () => {
             <div>
               <label className="block font-semibold text-gray-700 mb-1">Branch Code</label>
               <Input
-                placeholder="e.g. WF-05"
+                placeholder="WF-05"
                 value={branchForm.code}
                 onChange={(e: any) => setBranchForm({ ...branchForm, code: e.target.value })}
               />
@@ -389,7 +396,7 @@ export const QuickActions: React.FC = () => {
             <div>
               <label className="block font-semibold text-gray-700 mb-1">Invoice Prefix</label>
               <Input
-                placeholder="e.g. INV-WF-"
+                placeholder="INV-WF-"
                 value={branchForm.invoicePrefix}
                 onChange={(e: any) => setBranchForm({ ...branchForm, invoicePrefix: e.target.value })}
               />
@@ -416,7 +423,7 @@ export const QuickActions: React.FC = () => {
             <div>
               <label className="block font-semibold text-gray-700 mb-1">Full Name</label>
               <Input
-                placeholder="e.g. Karan Verma"
+                placeholder="Karan Verma"
                 value={userForm.name}
                 onChange={(e: any) => setUserForm({ ...userForm, name: e.target.value })}
                 required
@@ -426,7 +433,7 @@ export const QuickActions: React.FC = () => {
               <label className="block font-semibold text-gray-700 mb-1">Email Address</label>
               <Input
                 type="email"
-                placeholder="e.g. karan@uryrestaurant.com"
+                placeholder="karan@uryrestaurant.com"
                 value={userForm.email}
                 onChange={(e: any) => setUserForm({ ...userForm, email: e.target.value })}
                 required
@@ -434,15 +441,17 @@ export const QuickActions: React.FC = () => {
             </div>
             <div>
               <label className="block font-semibold text-gray-700 mb-1">Role / Permissions</label>
-              <Select
+              <SearchableSelect
+                id="role"
                 value={userForm.role}
-                onChange={(e: any) => setUserForm({ ...userForm, role: e.target.value })}
-              >
-                <option value="URY Cashier">URY Cashier</option>
-                <option value="URY Captain">URY Captain / Waiter</option>
-                <option value="URY Manager">URY Restaurant Manager</option>
-                <option value="URY Kitchen User">Kitchen Display User</option>
-              </Select>
+                onChange={(_, value) => setUserForm({ ...userForm, role: value })}
+                options={[
+                  { value: 'URY Cashier', label: 'URY Cashier' },
+                  { value: 'URY Captain', label: 'URY Captain / Waiter' },
+                  { value: 'URY Manager', label: 'URY Restaurant Manager' },
+                  { value: 'URY Kitchen User', label: 'Kitchen Display User' },
+                ]}
+              />
             </div>
             <DialogFooter className="mt-6 flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={handleClose}>

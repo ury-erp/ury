@@ -149,7 +149,7 @@ export const ProductionUnitPage: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Toolbar — Partition Style, no title */}
-      <div className="-mx-6 px-6 pb-3 border-b border-gray-200 flex flex-col md:flex-row items-center justify-end gap-4">
+      <div className="-mx-6 px-6 -mt-6 pt-6 pb-3 border-b border-gray-200 flex flex-col md:flex-row items-center justify-end gap-4">
         <Button
           onClick={openAddDrawer}
           className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center space-x-1.5 shadow-xs"
@@ -233,7 +233,7 @@ export const ProductionUnitPage: React.FC = () => {
             <Input
               value={newUnit.item_groups}
               onChange={(e) => setNewUnit({ ...newUnit, item_groups: e.target.value })}
-              placeholder="e.g. Beverages, Snacks"
+              placeholder="Beverages, Snacks"
             />
             <p className="text-xs text-gray-500 mt-1">
               Comma separated list of item groups mapped to this unit.
