@@ -33,8 +33,7 @@ export function usePaymentModes() {
     queryKey: ['paymentModes', posProfile?.name],
     queryFn: async () => {
       if (!posProfile?.name) return ['Cash'];
-      const modes = await getPaymentModes();
-      return modes.map((m: any) => m.mode_of_payment);
+      return await getPaymentModes();
     },
     enabled: !!posProfile?.name,
     staleTime: MASTER_DATA_STALE_TIME,

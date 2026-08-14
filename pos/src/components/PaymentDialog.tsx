@@ -57,7 +57,8 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   discountAmount
 }) => {
   const { posProfile: storePosProfile } = usePOSStore();
-  const { data: paymentModes = [] } = usePaymentModes();
+  const { data: paymentModesRaw = [] } = usePaymentModes();
+  const paymentModes = paymentModesRaw.filter(Boolean);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [discountType] = useState<'percentage'>('percentage'); // Only percentage now
