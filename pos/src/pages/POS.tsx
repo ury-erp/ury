@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { t } from '../i18n';
-import { Star, TrendingUp } from 'lucide-react';
+import { Star, TrendingUp, AlertTriangle } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import OrderPanel from '../components/OrderPanel';
 import ProductDialog from '../components/ProductDialog';
@@ -20,7 +20,7 @@ export default function POS() {
     isMenuInteractionDisabled,
     isInitializing,
   } = usePOSStore();
-  const { isLoading: menuLoading, error: menuError } = useMenu();
+  const { isLoading: menuLoading, error: menuError, data: menuData } = useMenu();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const clickTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -73,7 +73,9 @@ export default function POS() {
     return <InitialLoader />;
   }
 
-  if (menuError) {
+  const hasMenuData = menuData && menuData.length > 0;
+
+  if (menuError && !hasMenuData) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-center">
@@ -91,8 +93,15 @@ export default function POS() {
   }
 
   return (
-    <div className="flex flex-1 overflow-hidden">
-      <Sidebar disabled={isMenuInteractionDisabled()} />
+    <>
+      {menuError && hasMenuData && (
+        <div className="fixed top-0 left-0 right-0 z-50 bg-yellow-50 border-b border-yellow-200 px-4 py-2 text-sm text-yellow-800 flex items-center justify-center gap-2">
+          <AlertTriangle className="w-4 h-4" />
+          <span>Working offline. Showing previously cached menu.</span>
+        </div>
+      )}
+      <div className="flex flex-1 overflow-hidden h-[calc(100vh-2.25rem)] pt-9">
+        <Sidebar disabled={isMenuInteractionDisabled()} />
       <div className="flex-1 flex flex-col h-screen overflow-hidden pe-96">
         <div className="p-4 bg-white border-b border-gray-200">
           <div className="max-w-screen-xl mx-auto space-y-3">
@@ -116,5 +125,6 @@ export default function POS() {
       <OrderPanel />
       {isDialogOpen && <ProductDialog onClose={() => setIsDialogOpen(false)} />}
     </div>
+    </>
   );
 }

@@ -48,6 +48,8 @@ export function useMenu() {
     enabled: !!posProfile?.name,
     staleTime: MENU_STALE_TIME,
     gcTime: MENU_GC_TIME,
+    networkMode: 'offlineFirst',
+    refetchOnReconnect: true,
     retry: 3,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });

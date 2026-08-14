@@ -385,7 +385,7 @@ export default function Orders() {
     await selectOrder(inList ?? mapSplitGroupInvoiceToPOSInvoice(sibling));
   }
 
-  if (error) {
+  if (error && (!orders || orders.length === 0)) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-center">
@@ -406,6 +406,12 @@ export default function Orders() {
 
       {/* Middle Section - Order Cards */}
       <div className="flex-1 flex flex-col h-screen overflow-hidden pe-96">
+        {error && orders.length > 0 && (
+          <div className="bg-yellow-50 border-b border-yellow-200 px-4 py-2 text-sm text-yellow-800 flex items-center gap-2 shrink-0">
+            <AlertTriangle className="w-4 h-4" />
+            <span>Working offline. Showing previously cached orders.</span>
+          </div>
+        )}
         <div className="flex-1 overflow-y-auto bg-gray-50 p-4 pb-40">
           {orderLoading ? (
             <div className="flex items-center justify-center h-full">
