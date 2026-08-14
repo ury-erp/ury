@@ -461,7 +461,7 @@ function buildSyncOrderPayload(
       invoice,
       items: data.items,
       last_invoice: lastInvoice,
-      mode_of_payment: data.mode_of_payment,
+      mode_of_payment: data.mode_of_payment ?? null,
       no_of_pax: data.no_of_pax,
       order_type: data.order_type,
       owner: data.owner,
@@ -480,6 +480,7 @@ function buildSyncOrderPayload(
     waiter: data.waiter,
     invoice,
     last_invoice: lastInvoice,
+    mode_of_payment: data.mode_of_payment ?? null,
   };
 
   if (data.table !== undefined && data.table !== null) payload.table = data.table;
@@ -487,7 +488,6 @@ function buildSyncOrderPayload(
   if (data.customer !== undefined && data.customer !== null) payload.customer = data.customer;
   if (data.aggregator_id !== undefined && data.aggregator_id !== null) payload.aggregator_id = data.aggregator_id;
   if (data.comments !== undefined && data.comments !== null) payload.comments = data.comments;
-  if (data.mode_of_payment !== undefined && data.mode_of_payment !== null) payload.mode_of_payment = data.mode_of_payment;
 
   return payload;
 }
@@ -495,7 +495,7 @@ function buildSyncOrderPayload(
 export const syncOrder = async (data: SyncOrderData) => {
   const endpoint = apiRegistry.getUrl('SYNC_ORDER');
   try {
-    const response = await call.post(endpoint, data);
+    const response = await call.post(endpoint, { ...data, mode_of_payment: data.mode_of_payment ?? null });
     const result = response.message;
 
     // Cache updated order in local repository
@@ -546,6 +546,17 @@ export const syncOrder = async (data: SyncOrderData) => {
 
     return result;
   } catch (error: any) {
+    const isNetworkFailure =
+      (typeof navigator !== 'undefined' && !navigator.onLine) ||
+      !error?.response ||
+      error?.code === 'ECONNABORTED' ||
+      error?.code === 'ETIMEDOUT' ||
+      error?.message === 'Network Disconnected';
+
+    if (!isNetworkFailure) {
+      throw error;
+    }
+
     console.warn('Network syncOrder failed, storing locally in orders repository and queueing sync:', error);
 
     const totalAmount = data.items.reduce((sum, i) => sum + i.rate * i.qty, 0);

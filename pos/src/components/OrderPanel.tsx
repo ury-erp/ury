@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Trash2, Edit, FrownIcon, Plus, Loader2, MessageSquare } from 'lucide-react';
 import { usePOSStore } from '../store/pos-store';
-import { usePaymentModes } from '../hooks/useMasterData';
 import { cn } from '@ury/ui';
 import { formatCurrency } from '@ury/core';
 import { CustomerSelect } from './CustomerSelect';
@@ -38,7 +37,6 @@ const OrderPanel = () => {
     orderComment,
     setOrderComment
   } = usePOSStore();
-  const { data: paymentModes = [] } = usePaymentModes();
   const user = useRootStore((state: RootState) => state.user);
   const [editingItem, setEditingItem] = useState<typeof activeOrders[0] | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -115,7 +113,6 @@ const OrderPanel = () => {
         aggregator_id: selectedOrderType === 'Aggregators' ? selectedAggregator?.customer : undefined,
         cashier: posProfile.cashier,
         owner: posProfile.owner,
-        mode_of_payment: paymentModes[0],
         last_invoice: isUpdatingOrder ? orderId : null,
         invoice: isUpdatingOrder ? orderId : null,
         waiter: user.name,

@@ -879,10 +879,23 @@ def sync_order(
 
     # dummy payment
     if invoice.invoice_created == 0:
-        invoice.append(
-            "payments",
-            dict(mode_of_payment=mode_of_payment, amount=invoice.grand_total),
-        )
+        if not mode_of_payment:
+            # POS Invoice requires at least one payment row.
+            # Fetch the default mode of payment from the cashier's POS Profile.
+            for p in posprofile.payments:
+                if p.default:
+                    mode_of_payment = p.mode_of_payment
+                    break
+            
+            # Fallback to the first available if no explicit default is checked
+            if not mode_of_payment and posprofile.payments:
+                mode_of_payment = posprofile.payments[0].mode_of_payment
+
+        if mode_of_payment:
+            invoice.append(
+                "payments",
+                dict(mode_of_payment=mode_of_payment, amount=invoice.grand_total),
+            )
         invoice.invoice_created = 1
 
     past_item = []
@@ -935,6 +948,10 @@ def sync_order(
                         ),
                 ),
             )
+
+    # for payment in invoice.get("payments", []):
+    #     if not payment.mode_of_payment:
+    #         frappe.throw("Mode of payment is required for all payment entries in the POS Invoice.")
 
     try:
         invoice.save()
