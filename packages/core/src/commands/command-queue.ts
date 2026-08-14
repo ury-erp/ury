@@ -192,6 +192,8 @@ export class CommandQueueManager {
         .map(e => e.command_id || e.id)
     );
 
+    const blockedByFailed: { id: string; reason: string }[] = [];
+
     const readyEnvelopes = envelopes.filter(env => {
       const deps = env.dependency_ids;
       if (!deps || deps.length === 0) {
@@ -221,16 +223,21 @@ export class CommandQueueManager {
         }
         return true;
       }
-      if (deps.some(depId => failedIds.has(depId))) {
+      const failedDep = deps.find(depId => failedIds.has(depId));
+      if (failedDep) {
+        const cmdId = env.command_id || env.id;
         console.warn(
-          `[CommandQueueManager] Command ${env.command_id || env.id} blocked: dependency ${deps.find(
-            d => failedIds.has(d)
-          )} has FAILED.`
+          `[CommandQueueManager] Command ${cmdId} blocked: dependency ${failedDep} has FAILED.`
         );
+        blockedByFailed.push({ id: cmdId, reason: `Blocked by failed dependency: ${failedDep}` });
         return false;
       }
       return deps.every(depId => completedIds.has(depId));
     });
+
+    await Promise.all(
+      blockedByFailed.map(({ id, reason }) => this.markFailed(id, reason))
+    );
 
     return readyEnvelopes.sort(
       (a, b) =>

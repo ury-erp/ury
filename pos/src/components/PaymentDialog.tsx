@@ -27,6 +27,19 @@ interface PaymentDialogProps {
   discountAmount?: number;
 }
 
+/** Returns true when an error looks like a transport/network failure rather than
+ *  a deterministic backend/validation error. */
+function isNetworkError(err: any): boolean {
+  if (!err || typeof err.message !== 'string') return false;
+  const msg = err.message.toLowerCase();
+  return (
+    msg.includes('failed to fetch') ||
+    msg.includes('network error') ||
+    msg.includes('networkerror') ||
+    msg.includes('timeout')
+  );
+}
+
 const PaymentDialog: React.FC<PaymentDialogProps> = ({
   onClose,
   grandTotal,
@@ -186,6 +199,12 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
 
       await fetchOrders();
     } catch (err: any) {
+      if (!isNetworkError(err)) {
+        console.error('[handlePayment] Backend/validation error during make_invoice:', err);
+        setError(err?.message || 'Payment failed');
+        throw err;
+      }
+
       console.warn('[handlePayment] Network request failed, queueing payment command offline:', err);
       try {
         // Queue the offline payment with the API payload separated from sync envelope
