@@ -255,27 +255,25 @@ def qz_sign():
     produced by QZ Tray and receives the base64-encoded SHA512withRSA
     signature in return.
     """
-    if frappe.session.user == "Guest" or not QZ_SIGNING_ROLES.intersection(
-        frappe.get_roles()
-    ):
+    if frappe.session.user == "Guest":
+        frappe.throw(_("Not permitted"), frappe.PermissionError)
+
+    if not QZ_SIGNING_ROLES.intersection(frappe.get_roles()):
         frappe.throw(_("Not permitted"), frappe.PermissionError)
 
     to_sign = frappe.form_dict.get("toSign")
     if not to_sign:
         frappe.throw(_("Missing payload to sign"))
 
-    private_key = frappe.get_site_config().get("qz_private_key")
-    if not private_key:
-        frappe.throw(_("QZ private key is not configured in the site config"))
-
-    import base64
-
     from cryptography.hazmat.primitives import hashes, serialization
     from cryptography.hazmat.primitives.asymmetric import padding
+    import base64
 
-    key = serialization.load_pem_private_key(private_key.encode(), password=None)
-    signature = key.sign(
-        to_sign.encode(), padding.PKCS1v15(), hashes.SHA512()
+    private_key = serialization.load_pem_private_key(
+        _get_qz_private_key(), password=None
+    )
+    signature = private_key.sign(
+        to_sign.encode("utf-8"), padding.PKCS1v15(), hashes.SHA512()
     )
 
-    return base64.b64encode(signature).decode()
+    return base64.b64encode(signature).decode("ascii")
