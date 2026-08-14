@@ -69,6 +69,10 @@ export async function getTables(room: string): Promise<Table[]> {
       'minimum_seating'
     ],
     filters: [['restaurant_room', '=', room]],
+    // Without an explicit limit the REST default (20 rows) applies, so any
+    // room with more than 20 tables silently lost the rest.
+    limit: "*" as unknown as number,
+    orderBy: { field: 'name', order: 'asc' },
     asDict: true,
   });
 

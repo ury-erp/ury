@@ -31,22 +31,25 @@ const MenuCard: FC<MenuCardProps> = ({
   const placeholderText = item_code || item || name.slice(0, 2).toUpperCase();
   const placeholderSize =
     placeholderText.length <= 6
-      ? 'text-2xl'
+      ? 'text-xl'
       : placeholderText.length <= 14
-        ? 'text-lg'
-        : 'text-xs';
-  const placeholderClass = `w-full h-full bg-[#0000A0] flex items-center justify-center text-white font-bold font-mono px-2 text-center break-all overflow-hidden ${placeholderSize}`;
+        ? 'text-sm'
+        : 'text-[10px]';
+  const placeholderClass = `w-full h-full bg-[#0000A0] flex items-center justify-center text-white font-bold font-mono px-1 text-center break-all overflow-hidden ${placeholderSize}`;
 
   return (
     <div
       className={cn(
-        "bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow cursor-pointer h-56 flex flex-col",
+        // a denser grid needs a harder card edge: border + real shadow, else the
+        // cards blur into one sheet at this size
+        "bg-white rounded-md border border-gray-200 shadow-md hover:shadow-lg hover:border-primary-300 overflow-hidden transition-shadow cursor-pointer h-[8.5rem] flex flex-col",
         disabled && "opacity-50 cursor-not-allowed pointer-events-none"
       )}
       onClick={disabled ? undefined : onClick}
+      title={course ? `${name} — ${course}` : name}
     >
       {/* Image section - fixed height */}
-      <div className="h-24">
+      <div className="h-14">
         {item_image ? (
           <img
             src={item_image}
@@ -72,43 +75,41 @@ const MenuCard: FC<MenuCardProps> = ({
         )}
       </div>
 
-      {/* Content section - flex grow with fixed padding */}
-      <div className="flex-1 p-3 flex flex-col">
+      {/* Content section.
+          The card is deliberately dense: the cashier has to see as many items
+          as possible in one screen, so the course line was dropped (the course
+          rail already says which course is on screen) and the name/price sit on
+          the smallest readable type. */}
+      <div className="flex-1 px-2 py-1.5 flex flex-col min-h-0">
         {/* Name / item code section.
-            When the POS Profile enables item code, the code becomes the primary
-            (dark, on top) label and the name drops to a lighter secondary line.
-            Otherwise the name stays the primary label. */}
+            When the POS Profile enables item code, the code stays the primary
+            (mono, on top) label and the name follows in blue underneath.
+            Otherwise the blue name is the only label. */}
         {showItemCode && (item_code || item) ? (
-          <div>
-            <p className="font-semibold text-[#333333] text-sm leading-5 font-mono truncate" title={item_code || item}>
+          <>
+            {/* The code is what the staff actually reads to punch an order, so
+                it stays the loudest line on the card: bold, dark, a step larger
+                than the name and price under it. */}
+            <p className="font-bold text-gray-900 text-[13px] leading-[1.05rem] font-mono truncate" title={item_code || item}>
               {item_code || item}
             </p>
-            <h3 className="text-xs text-gray-500 leading-4 line-clamp-2 mt-0.5" title={name}>
+            <h3 className="text-[10px] text-primary-600 font-medium leading-[0.85rem] line-clamp-2" title={name}>
               {name}
             </h3>
-          </div>
+          </>
         ) : (
-          <h3 className="font-medium text-[#333333] text-sm leading-5 line-clamp-2" title={name}>
+          <h3 className="text-xs text-primary-600 font-medium leading-4 line-clamp-3" title={name}>
             {name}
           </h3>
         )}
 
-        {/* Course section - fixed height for 1 line */}
-        <div className="h-5 mt-1">
-          <p className="text-xs text-gray-500 truncate" title={course}>
-            {course || ' '}
-          </p>
-        </div>
-
         {/* Price section - pushed to bottom */}
-        <div className="mt-auto pt-2">
-          <span className="text-sm font-semibold text-[#333333] tabular-nums">
-            {formatCurrency(price)}
-          </span>
-        </div>
+        <span className="mt-auto pt-1 text-[11px] font-semibold text-gray-900 tabular-nums">
+          {formatCurrency(price)}
+        </span>
       </div>
     </div>
   );
 };
 
-export default MenuCard; 
+export default MenuCard;

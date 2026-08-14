@@ -193,12 +193,12 @@ const OrderPanel = () => {
   const isInteractionDisabled = isOrderInteractionDisabled() || isSubmitting;
 
   return (
-    <div className="w-96 bg-white border-s border-gray-200 flex flex-col h-[calc(100vh-4rem)] fixed end-0 z-10">
-      <div className="p-4 border-b border-gray-200 flex-shrink-0">
+    <div className="w-80 bg-white border-s border-gray-200 flex flex-col h-[calc(100vh-4rem)] fixed end-0 z-10">
+      <div className="p-3 border-b border-gray-200 flex-shrink-0">
         <OrderTypeSelect disabled={isInteractionDisabled} />
         {/* Customer and waiter share one row: two stacked cards ate most of
             the panel height before the cart even started. */}
-        <div className="mt-3 grid grid-cols-2 gap-2">
+        <div className="mt-2 grid grid-cols-2 gap-2">
           <CustomerSelect disabled={isInteractionDisabled} />
           <WaiterSelect disabled={isInteractionDisabled} />
         </div>
@@ -210,92 +210,105 @@ const OrderPanel = () => {
         <EmptyCartUI />
       ) : (
         <>
-          <div className="flex-1 overflow-y-auto px-6">
+          {/* Each cart line is its own bordered card: on a 320px panel a plain
+              hairline divider was not enough to tell two items apart at a
+              glance. The old three-line block with full-size icon buttons
+              fitted barely four items on a screen. */}
+          <div className="flex-1 overflow-y-auto px-3 py-2 bg-gray-50">
             {activeOrders.map((item) => (
               <div
                 key={item.uniqueId}
                 className={cn(
-                  "flex flex-col py-4 border-b border-gray-100",
+                  "mb-1.5 rounded-md border border-gray-200 bg-white shadow-sm px-2 py-1.5",
                   isInteractionDisabled && "opacity-50"
                 )}
               >
-                <div className="flex items-center justify-between gap-2">
-                  {/* min-w-0 lets long names/codes truncate instead of pushing
-                      the quantity controls off the panel */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <h3 className="font-medium text-gray-900 text-sm line-clamp-2">{item.name}</h3>
-                    </div>
-                    {posProfile?.show_item_code ? (
-                      <p className="text-xs font-mono text-gray-500 truncate" title={item.id}>
+                {/* min-w-0 lets long names/codes truncate instead of pushing
+                    the quantity controls off the panel.
+                    With item codes on, the code is what the cashier checks
+                    against the KOT, so it leads in bold mono and the name
+                    follows on the same line, separated by a divider and set in
+                    a lighter, smaller face so the two never blur together. */}
+                <div className="min-w-0">
+                  {posProfile?.show_item_code ? (
+                    <div className="flex items-baseline gap-1.5 min-w-0">
+                      <span className="font-mono font-bold text-gray-900 text-sm leading-4 flex-shrink-0" title={item.id}>
                         {item.id}
-                      </p>
-                    ) : null}
-                    {item.comment?.trim() && (
-                      <p className="mt-0.5 flex items-start gap-1 text-xs text-amber-700">
-                        <MessageSquare className="w-3 h-3 mt-0.5 flex-shrink-0" />
-                        <span>{item.comment.trim()}</span>
-                      </p>
-                    )}
-                    {item.selectedVariant && (
-                      <p className="text-sm text-gray-600">{item.selectedVariant.name}</p>
-                    )}
-                    {item.selectedAddons && item.selectedAddons.length > 0 && (
-                      <p className="text-sm text-gray-500">
-                        {item.selectedAddons.map(addon => addon.name).join(', ')}
-                      </p>
-                    )}
-                    <p className="text-gray-600 text-sm">{formatCurrency(calculateItemTotal(item))}</p>
-                  </div>
-                  
-                  <div className="flex items-center gap-2 flex-shrink-0">
+                      </span>
+                      <span className="w-px h-3 bg-gray-200 flex-shrink-0" aria-hidden />
+                      <span className="text-[11px] text-gray-500 leading-4 truncate" title={item.name}>
+                        {item.name}
+                      </span>
+                    </div>
+                  ) : (
+                    <h3 className="font-medium text-gray-900 text-[13px] leading-4 line-clamp-2">{item.name}</h3>
+                  )}
+                  {item.selectedVariant && (
+                    <p className="text-xs text-gray-600 truncate">{item.selectedVariant.name}</p>
+                  )}
+                  {item.selectedAddons && item.selectedAddons.length > 0 && (
+                    <p className="text-xs text-gray-500 truncate">
+                      {item.selectedAddons.map(addon => addon.name).join(', ')}
+                    </p>
+                  )}
+                  {item.comment?.trim() && (
+                    <p className="mt-0.5 flex items-start gap-1 text-[11px] text-amber-700">
+                      <MessageSquare className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                      <span className="line-clamp-2">{item.comment.trim()}</span>
+                    </p>
+                  )}
+                </div>
+
+                <div className="mt-1 flex items-center justify-between gap-1">
+                  <span className="text-xs font-semibold text-gray-700 tabular-nums whitespace-nowrap">
+                    {formatCurrency(calculateItemTotal(item))}
+                  </span>
+
+                  <div className="flex items-center gap-0.5 flex-shrink-0">
                     <Button
                       onClick={() => handleEdit(item)}
                       variant="ghost"
                       size="icon"
-                      className="text-blue-600 hover:text-blue-700"
+                      className="w-7 h-7 text-blue-600 hover:text-blue-700"
                       title={t('cart.edit_item')}
                       disabled={isInteractionDisabled}
                     >
-                      <Edit className="w-4 h-4" />
+                      <Edit className="w-3.5 h-3.5" />
                     </Button>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        onClick={() => {
-                          const newQuantity = Math.max(0, item.quantity - 1);
-                          if (newQuantity === 0) {
-                            removeFromOrder(item.uniqueId!);
-                          } else {
-                            updateQuantity(item.uniqueId!, newQuantity);
-                          }
-                        }}
-                        variant="outline"
-                        size="icon"
-                        className="w-8 h-8 rounded-full"
-                        disabled={isInteractionDisabled}
-                      >
-                        -
-                      </Button>
-                      <span className="w-6 text-center">{item.quantity}</span>
-                      <Button
-                        onClick={() => updateQuantity(item.uniqueId!, item.quantity + 1)}
-                        variant="outline"
-                        size="icon"
-                        className="w-8 h-8 rounded-full"
-                        disabled={isInteractionDisabled}
-                      >
-                        +
-                      </Button>
-                    </div>
-                    
+                    <Button
+                      onClick={() => {
+                        const newQuantity = Math.max(0, item.quantity - 1);
+                        if (newQuantity === 0) {
+                          removeFromOrder(item.uniqueId!);
+                        } else {
+                          updateQuantity(item.uniqueId!, newQuantity);
+                        }
+                      }}
+                      variant="outline"
+                      size="icon"
+                      className="w-7 h-7 rounded-full"
+                      disabled={isInteractionDisabled}
+                    >
+                      -
+                    </Button>
+                    <span className="w-5 text-center text-sm tabular-nums">{item.quantity}</span>
+                    <Button
+                      onClick={() => updateQuantity(item.uniqueId!, item.quantity + 1)}
+                      variant="outline"
+                      size="icon"
+                      className="w-7 h-7 rounded-full"
+                      disabled={isInteractionDisabled}
+                    >
+                      +
+                    </Button>
                     <Button
                       onClick={() => removeFromOrder(item.uniqueId!)}
                       variant="ghost"
                       size="icon"
-                      className="text-red-500 hover:text-red-600"
+                      className="w-7 h-7 text-red-500 hover:text-red-600"
                       disabled={isInteractionDisabled}
                     >
-                      <Trash2 className="w-5 h-5" />
+                      <Trash2 className="w-4 h-4" />
                     </Button>
                   </div>
                 </div>
@@ -306,16 +319,16 @@ const OrderPanel = () => {
                 onClick={clearOrder}
                 variant="ghost"
                 size="sm"
-                className="w-full text-gray-600 hover:text-gray-800 mt-4"
+                className="w-full text-gray-600 hover:text-gray-800 mt-2"
                 disabled={isInteractionDisabled}
               >
                 {t('cart.clear_cart')}
               </Button>
             )}
           </div>
-          
-          <div className="p-4 border-t border-gray-200 flex-shrink-0 bg-white">
-            <div className="flex justify-between items-center mb-4">
+
+          <div className="p-3 border-t border-gray-200 flex-shrink-0 bg-white">
+            <div className="flex justify-between items-center mb-2">
               <div className="flex items-center gap-2">
                 <Button
                   onClick={() => setShowCommentDialog(true)}

@@ -121,11 +121,17 @@ export default function POS() {
   }
 
   return (
-    <div className="flex flex-1 overflow-hidden">
+    // h-full gives this row a definite height, which is what makes the h-full
+    // course rail and the scrolling item grid stop at the footer instead of
+    // running off the bottom of the screen
+    <div className="flex flex-1 h-full overflow-hidden">
       <Sidebar disabled={isMenuInteractionDisabled()} />
-      <div className="flex-1 flex flex-col h-screen overflow-hidden pe-96">
-        <div className="p-4 bg-white border-b border-gray-200">
-          <div className="max-w-screen-xl mx-auto space-y-3">
+      {/* h-full, not h-screen: this column already sits between the header and
+          the footer, so a full-viewport height pushed the last grid row down
+          behind the footer where it could never be scrolled into view */}
+      <div className="flex-1 flex flex-col h-full overflow-hidden pe-80">
+        <div className="px-3 py-2 bg-white border-b border-gray-200">
+          <div className="space-y-3">
             <div className="flex items-center gap-2 overflow-x-auto overflow-y-hidden">
               {/* <SearchBar
                 value={searchQuery}
