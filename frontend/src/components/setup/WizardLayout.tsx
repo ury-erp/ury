@@ -1,6 +1,7 @@
 import { ReactNode } from 'react';
 import { Button } from '@ury/ui';
 import { Check } from 'lucide-react';
+import uryLogo from '../../../Public/URY-bg.png';
 
 interface WizardLayoutProps {
   step: 1 | 2;
@@ -20,7 +21,7 @@ export function WizardLayout({ step, children, onNext, onPrev, nextLabel = 'Next
     <div className="min-h-screen flex flex-col items-center py-12 px-4 bg-[#F9FAFB] relative overflow-hidden">
 
       <div className="relative z-10 w-full max-w-[820px] mb-8 flex flex-col items-center">
-        <img src="/assets/ury/Images/URY-bg.png" alt="URY Logo" className="h-16 w-auto object-contain mb-3" />
+        <img src={uryLogo} alt="URY Logo" className="h-16 w-auto object-contain mb-3" />
         <p className="text-[#6B7280]">Let's get your restaurant ready.</p>
       </div>
 
