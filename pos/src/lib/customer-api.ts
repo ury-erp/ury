@@ -1,5 +1,6 @@
 import { DOCTYPES } from '../data/doctypes';
 import { db, call, repositories, apiRegistry } from '@ury/core';
+import { isNetworkError } from './network-utils';
 
 export interface Customer {
   name: string;
@@ -111,6 +112,9 @@ export async function addCustomer(
       }
     };
   } catch (error) {
+    if (!isNetworkError(error)) {
+      throw error;
+    }
     console.warn('Network addCustomer failed, storing in offline repository and queueing sync:', error);
 
     // Save temporary customer locally

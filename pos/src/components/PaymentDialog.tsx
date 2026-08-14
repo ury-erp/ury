@@ -7,6 +7,7 @@ import { Button, Input, Dialog, DialogContent, showToast } from '@ury/ui';
 import { call, repositories, projectionBus } from '@ury/core';
 import { DEFAULT_PAYMENT_MODE } from '../data/order-types';
 import { releaseTableAfterPayment, queueOfflinePayment } from '../lib/order-api';
+import { isNetworkError } from '../lib/network-utils';
 import { t } from '../i18n';
 
 
@@ -25,19 +26,6 @@ interface PaymentDialogProps {
   clearSelectedOrder: () => void;
   discountPercentage?: number;
   discountAmount?: number;
-}
-
-/** Returns true when an error looks like a transport/network failure rather than
- *  a deterministic backend/validation error. */
-function isNetworkError(err: any): boolean {
-  if (!err || typeof err.message !== 'string') return false;
-  const msg = err.message.toLowerCase();
-  return (
-    msg.includes('failed to fetch') ||
-    msg.includes('network error') ||
-    msg.includes('networkerror') ||
-    msg.includes('timeout')
-  );
 }
 
 const PaymentDialog: React.FC<PaymentDialogProps> = ({

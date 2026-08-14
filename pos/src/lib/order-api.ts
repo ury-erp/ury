@@ -1,5 +1,6 @@
 import { call, repositories, apiRegistry, projectionBus, commandQueue, SplitBillCommand, type OrderEntity } from '@ury/core';
 import { buildTableClusterMap, getMergedTablesCsv } from './table-utils';
+import { isNetworkError } from './network-utils';
 
 export interface POSInvoiceItem {
   name: string;
@@ -242,6 +243,10 @@ export async function cancelOrder(
     return { success: true, queued: false };
   } catch (err) {
     console.warn('[cancelOrder] Online cancel failed, falling back to offline queue:', err);
+
+    if (!isNetworkError(err)) {
+      throw err;
+    }
 
     try {
       await repositories.orders.markCancelled(order.name);
@@ -546,14 +551,7 @@ export const syncOrder = async (data: SyncOrderData) => {
 
     return result;
   } catch (error: any) {
-    const isNetworkFailure =
-      (typeof navigator !== 'undefined' && !navigator.onLine) ||
-      !error?.response ||
-      error?.code === 'ECONNABORTED' ||
-      error?.code === 'ETIMEDOUT' ||
-      error?.message === 'Network Disconnected';
-
-    if (!isNetworkFailure) {
+    if (!isNetworkError(error)) {
       throw error;
     }
 
@@ -878,6 +876,9 @@ export async function splitBill(
     });
     return res.message as SplitBillResponse;
   } catch (error) {
+    if (!isNetworkError(error)) {
+      throw error;
+    }
     console.warn('Network splitBill failed, queueing command in sync_queue repository:', error);
     return queueOfflineSplit(sourceInvoice, itemsToMove, customer);
   }
@@ -896,6 +897,9 @@ export async function tableTransfer(
       invoice,
     });
   } catch (error) {
+    if (!isNetworkError(error)) {
+      throw error;
+    }
     console.warn('Network tableTransfer failed, applying local state and queueing command:', error);
 
     const now = new Date().toISOString();
@@ -1004,6 +1008,9 @@ export async function captainTransfer(
       invoice,
     });
   } catch (error) {
+    if (!isNetworkError(error)) {
+      throw error;
+    }
     console.warn('Network captainTransfer failed, queueing command in sync_queue repository:', error);
     await repositories.syncQueue.put({
       id: `SYNC-CAPTAIN-${Date.now()}`,
