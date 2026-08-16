@@ -1188,6 +1188,15 @@ def customer_favourite_item(customer_name):
 def cancel_order(invoice_id, reason):
     pos_invoice = frappe.get_doc("POS Invoice", invoice_id)
 
+    # 1. Server-side authorization gate
+    if not frappe.has_permission("POS Invoice", "cancel", doc=pos_invoice):
+        frappe.throw(_("Not permitted to cancel this invoice"), frappe.PermissionError)
+
+    # 2. Branch matching validation
+    user_branch = getBranch()
+    if user_branch and pos_invoice.branch != user_branch:
+        frappe.throw(_("Cannot cancel an invoice from a different branch"))
+
     # Release the full merge cluster, not only the primary table and CSV partners.
     if pos_invoice.restaurant_table:
         release_merge_cluster_tables(pos_invoice.restaurant_table)
@@ -1199,16 +1208,9 @@ def cancel_order(invoice_id, reason):
         # If an exception occurs (e.g., "kot" app not found), it will be caught here without effecting execution
         pass
 
-    # Update invoice status
-    frappe.db.sql("""
-        UPDATE `tabPOS Invoice Item`
-        SET docstatus = 2
-        WHERE parent = %s
-    """, (invoice_id,))
-
-    frappe.db.set_value("POS Invoice", invoice_id, "docstatus", 2)
-    frappe.db.set_value("POS Invoice", invoice_id, "status", "Cancelled")
-    frappe.db.set_value("POS Invoice", invoice_id, "cancel_reason", reason)
+    # Use standard Frappe cancel workflow instead of raw SQL
+    pos_invoice.db_set("cancel_reason", reason)
+    pos_invoice.cancel()
 
 # Method for URY POS
 @frappe.whitelist()
