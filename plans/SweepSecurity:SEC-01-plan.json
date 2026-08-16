@@ -19,17 +19,17 @@
     {
       "id": "SEC-01-1",
       "description": "Add frappe.has_permission('POS Invoice', 'cancel') check in cancel_order endpoint.",
-      "status": "pending"
+      "status": "completed"
     },
     {
       "id": "SEC-01-2",
       "description": "Implement branch matching validation for the session user and the target POS Invoice.",
-      "status": "pending"
+      "status": "completed"
     },
     {
       "id": "SEC-01-3",
       "description": "Refactor raw SQL updates for docstatus, status, and cancel_reason to use standard doc.cancel().",
-      "status": "pending"
+      "status": "completed"
     }
   ]
 }
