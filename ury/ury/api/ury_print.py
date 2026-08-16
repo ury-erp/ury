@@ -1,6 +1,7 @@
 import frappe
 from frappe import _
 
+import base64
 import os
 
 from pypdf import PdfWriter
@@ -197,9 +198,98 @@ def qz_certificate():
     return qz_key_value
 
 
-@frappe.whitelist()
-def signature_promise():
-    site_config = frappe.get_site_config()
-    key_value = site_config.get("qz_private_key")
+# Roles allowed to request QZ Tray signatures. The private key never leaves
+# the server; these users may only ask the server to sign a payload.
+QZ_SIGNING_ROLES = {
+    "Administrator",
+    "System Manager",
+    "URY Admin",
+    "URY Manager",
+    "URY Cashier",
+}
 
-    return key_value
+
+def _get_qz_private_key():
+    """Read the QZ private key server-side.
+
+    `qz_private_key` in site_config may hold the PEM contents directly or a
+    path relative to the site's `private` folder.
+    """
+    key_value = (frappe.get_site_config().get("qz_private_key") or "").strip()
+
+    if not key_value:
+        frappe.throw(_("QZ private key is not configured in site config"))
+
+    if key_value.startswith("-----BEGIN"):
+        return key_value.encode()
+
+    private_root = os.path.abspath(frappe.get_site_path("private"))
+    key_path = os.path.abspath(frappe.get_site_path("private", key_value))
+
+    if os.path.commonpath([key_path, private_root]) != private_root:
+        frappe.throw(_("Invalid QZ private key path in site config"))
+
+    with open(key_path, "rb") as key_file:
+        return key_file.read()
+
+
+@frappe.whitelist()
+def signature_promise(toSign=None):
+    """Server-side QZ Tray signing endpoint (sign-only).
+
+    Accepts the `toSign` string from QZ Tray and returns its base64-encoded
+    SHA512withRSA signature. Never returns the private key or its path.
+    """
+    if frappe.session.user == "Guest":
+        frappe.throw(_("Not permitted"), frappe.PermissionError)
+
+    if not QZ_SIGNING_ROLES.intersection(frappe.get_roles()):
+        frappe.throw(_("Not permitted"), frappe.PermissionError)
+
+    if not toSign:
+        frappe.throw(_("Missing payload to sign"))
+
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import padding
+
+    private_key = serialization.load_pem_private_key(
+        _get_qz_private_key(), password=None
+    )
+    signature = private_key.sign(
+        toSign.encode("utf-8"), padding.PKCS1v15(), hashes.SHA512()
+    )
+
+    return base64.b64encode(signature).decode("ascii")
+
+
+@frappe.whitelist()
+def qz_sign():
+    """Sign a QZ Tray payload server-side.
+
+    The RSA private key lives only in the site config (``qz_private_key``) and
+    is never sent to the browser. The client submits each ``toSign`` string
+    produced by QZ Tray and receives the base64-encoded SHA512withRSA
+    signature in return.
+    """
+    if frappe.session.user == "Guest":
+        frappe.throw(_("Not permitted"), frappe.PermissionError)
+
+    if not QZ_SIGNING_ROLES.intersection(frappe.get_roles()):
+        frappe.throw(_("Not permitted"), frappe.PermissionError)
+
+    to_sign = frappe.form_dict.get("toSign")
+    if not to_sign:
+        frappe.throw(_("Missing payload to sign"))
+
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import padding
+    import base64
+
+    private_key = serialization.load_pem_private_key(
+        _get_qz_private_key(), password=None
+    )
+    signature = private_key.sign(
+        to_sign.encode("utf-8"), padding.PKCS1v15(), hashes.SHA512()
+    )
+
+    return base64.b64encode(signature).decode("ascii")
