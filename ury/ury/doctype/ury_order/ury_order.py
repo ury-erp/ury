@@ -1222,7 +1222,25 @@ def make_invoice(customer, payments, cashier, pos_profile,owner, additionalDisco
 
     invoice.customer = customer
     invoice.pos_profile = pos_profile
-    invoice.additional_discount_percentage=additionalDiscount
+    
+    if additionalDiscount:
+        discount_val = frappe.utils.flt(additionalDiscount)
+        if discount_val < 0 or discount_val > 100:
+            frappe.throw(_("Discount percentage must be between 0 and 100"))
+        
+        pos_prof = frappe.get_cached_doc("POS Profile", pos_profile)
+        if not pos_prof.get("allow_discount_change") and not pos_prof.get("custom_enable_discount"):
+            frappe.throw(_("Discount is not allowed for this POS Profile"))
+        
+        allowed_roles = {"Administrator", "System Manager", "URY Admin", "URY Manager", "URY Cashier"}
+        user_roles = set(frappe.get_roles(frappe.session.user))
+        if not allowed_roles.intersection(user_roles):
+            frappe.throw(_("Not permitted to apply discounts"), frappe.PermissionError)
+
+        invoice.additional_discount_percentage = discount_val
+    else:
+        invoice.additional_discount_percentage = 0
+        
     invoice.calculate_taxes_and_totals()
 
     invoice.set("payments", [])
