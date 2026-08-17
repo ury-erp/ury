@@ -59,7 +59,6 @@ export function ProgressModal({ visible, activeIndex, error, steps = PROGRESS_ST
                   <span className={`text-sm ${isActive ? 'font-medium text-[#111827]' : isDone ? 'text-foreground' : 'text-[#9CA3AF]'}`}>
                     {step}
                   </span>
-                  {isActive && <div className="ml-auto w-4 h-4 rounded-full border-2 border-[#E5E7EB]" />}
                 </div>
               );
             })}
