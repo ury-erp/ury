@@ -195,6 +195,7 @@ export const PosProfilePage: React.FC = () => {
         custom_enable_discount: profile.custom_enable_discount || 0,
         custom_enable_kot_reprint: profile.custom_enable_kot_reprint || 0,
         custom_multiple_cashier_configuration: profile.custom_multiple_cashier_configuration || 0,
+        applicable_for_users: profile.applicable_for_users ? [...profile.applicable_for_users] : [],
       });
     } catch {
       setSelectedProfile(null);
@@ -226,6 +227,7 @@ export const PosProfilePage: React.FC = () => {
           custom_enable_discount: profileForm.custom_enable_discount,
           custom_enable_kot_reprint: profileForm.custom_enable_kot_reprint,
           custom_multiple_cashier_configuration: profileForm.custom_multiple_cashier_configuration,
+          applicable_for_users: profileForm.applicable_for_users,
         },
       });
       fetchProfiles();
@@ -567,21 +569,67 @@ export const PosProfilePage: React.FC = () => {
 
         {activeTab === 'cashiers' && (
           <div className="space-y-6 text-sm">
-            <h4 className="font-bold text-gray-700 text-xs uppercase tracking-wider mb-3 pb-2 border-b border-gray-100">Cashier Table (Applicable For Users)</h4>
-            {selectedProfile?.applicable_for_users && selectedProfile.applicable_for_users.length > 0 ? (
+            <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-100">
+              <h4 className="font-bold text-gray-700 text-xs uppercase tracking-wider m-0">Cashier Table (Applicable For Users)</h4>
+              {!isReadOnly && (
+                <Button 
+                  type="button" 
+                  size="sm" 
+                  variant="ghost" 
+                  className="text-primary h-6 px-2 text-xs" 
+                  onClick={() => setProfileForm({ ...profileForm, applicable_for_users: [...(profileForm.applicable_for_users || []), { user: '', default: 0 }] })}
+                >
+                  + Add More
+                </Button>
+              )}
+            </div>
+            {(isReadOnly ? selectedProfile.applicable_for_users : profileForm.applicable_for_users)?.length > 0 ? (
               <div className="rounded-lg border border-gray-200 overflow-hidden">
                 <table className="w-full text-xs text-gray-600">
                   <thead className="bg-gray-50 border-b border-gray-100 font-semibold">
                     <tr>
                       <th className="px-4 py-2 text-left">User</th>
                       <th className="px-4 py-2 text-center">Default</th>
+                      {!isReadOnly && <th className="px-4 py-2 w-10"></th>}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {selectedProfile.applicable_for_users.map((u, idx) => (
+                    {(isReadOnly ? selectedProfile.applicable_for_users : profileForm.applicable_for_users).map((u: any, idx: number) => (
                       <tr key={idx}>
-                        <td className="px-4 py-2 font-medium">{u.user}</td>
-                        <td className="px-4 py-2 text-center">{u.default ? 'Yes' : 'No'}</td>
+                        {isReadOnly ? (
+                          <>
+                            <td className="px-4 py-2 font-medium">{u.user}</td>
+                            <td className="px-4 py-2 text-center">{u.default ? 'Yes' : 'No'}</td>
+                          </>
+                        ) : (
+                          <>
+                            <td className="px-4 py-2">
+                              <Select className="w-full" value={u.user} onChange={(e: any) => {
+                                const newRows = [...profileForm.applicable_for_users];
+                                newRows[idx].user = e.target.value;
+                                setProfileForm({...profileForm, applicable_for_users: newRows});
+                              }}>
+                                <option value="">Select User</option>
+                                {options.users.map((opt: any) => <option key={opt.name} value={opt.name}>{opt.full_name || opt.name}</option>)}
+                              </Select>
+                            </td>
+                            <td className="px-4 py-2 text-center">
+                              <input type="checkbox" checked={u.default === 1} onChange={(e: any) => {
+                                const newRows = [...profileForm.applicable_for_users];
+                                newRows[idx].default = e.target.checked ? 1 : 0;
+                                setProfileForm({...profileForm, applicable_for_users: newRows});
+                              }} />
+                            </td>
+                            <td className="px-4 py-2 text-center">
+                              <button type="button" className="text-gray-400 hover:text-red-500" onClick={() => {
+                                const newRows = profileForm.applicable_for_users.filter((_: any, i: number) => i !== idx);
+                                setProfileForm({...profileForm, applicable_for_users: newRows});
+                              }}>
+                                <X className="w-4 h-4" />
+                              </button>
+                            </td>
+                          </>
+                        )}
                       </tr>
                     ))}
                   </tbody>
