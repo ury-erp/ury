@@ -231,6 +231,8 @@ export const PosProfilePage: React.FC = () => {
         },
       });
       fetchProfiles();
+      fetchProfileDetails(selectedProfile.name);
+      setIsReadOnly(true);
     } catch (err) {
       console.error('Failed to save POS Profile', err);
     } finally {
