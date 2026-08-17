@@ -13,11 +13,6 @@ export function InstallationTypeCard({ type, selected, onSelect }: InstallationT
       className={`relative cursor-pointer transition-all duration-200 ${selected ? 'border-2 border-[#2B5CE6] bg-[#EFF4FF]' : 'border border-border hover:border-[#2B5CE6] bg-card'}`}
       onClick={onSelect}
     >
-      {selected && (
-        <div className="absolute top-3 right-3 text-[#2B5CE6]">
-          <CheckCircle2 className="w-5 h-5 fill-current text-white" />
-        </div>
-      )}
       
       <CardContent className="p-4">
         <h4 className="text-sm font-semibold text-foreground mb-1">{type.title}</h4>
