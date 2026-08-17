@@ -71,6 +71,7 @@ export async function getTables(room: string): Promise<Table[]> {
       'minimum_seating'
     ],
     filters: [['restaurant_room', '=', room]],
+    limit: '*' as unknown as number,
     asDict: true,
   });
 
