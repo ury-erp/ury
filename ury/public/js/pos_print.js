@@ -37,6 +37,12 @@ async function updateMergedInvoicePrint(invoice) {
 frappe.ui.form.on('POS Invoice', {
 
     onload: function (frm) {
+        frappe.realtime.off('invoice_print_completed');
+        frappe.realtime.off('invoice_print_failed');
+        frappe.realtime.off('print_job_status_updated');
+        frappe.realtime.off('invoice_print_long_running');
+        frappe.realtime.off('print_failure_alert');
+
         frappe.realtime.on('invoice_print_completed', (data) => {
             if (data.invoice === frm.doc.name) {
                 frappe.show_alert({

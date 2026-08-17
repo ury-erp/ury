@@ -106,6 +106,12 @@ frappe.ui.form.on('URY Order', {
 			$(this).prop('type', 'number');
 		})
 
+		frappe.realtime.off('reload_ro');
+		frappe.realtime.off('invoice_print_completed');
+		frappe.realtime.off('invoice_print_failed');
+		frappe.realtime.off('invoice_print_long_running');
+		frappe.realtime.off('print_job_status_updated');
+
 		frappe.realtime.on('reload_ro', (data) => {
 			if (frm.doc.last_invoice && data.name === frm.doc.last_invoice) {
 				frappe.dom.freeze(__('Order Completed'));

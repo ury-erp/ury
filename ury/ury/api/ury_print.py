@@ -4,8 +4,6 @@ from frappe.utils import now_datetime
 
 import os
 
-from pypdf import PdfWriter
-
 from ury.ury.doctype.ury_order.ury_order import release_merge_cluster_tables
 from ury.ury.printing.print_job_monitor import register_print_job
 
@@ -56,15 +54,13 @@ def network_printing(
             }
 
         try:
-            output = PdfWriter()
-            output = frappe.get_print(
+            pdf_content = frappe.get_print(
                 doctype,
                 name,
                 print_format,
                 doc=doc,
                 no_letterhead=no_letterhead,
                 as_pdf=True,
-                output=output,
             )
             generated_path = False
             if file_path is None:
@@ -74,7 +70,7 @@ def network_printing(
                 generated_path = True
             try:
                 with open(file_path, "wb") as f:
-                    output.write(f)
+                    f.write(pdf_content)
 
                 cups_job_id = conn.printFile(
                     print_settings.printer_name, file_path, name, {}

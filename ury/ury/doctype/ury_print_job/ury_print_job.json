@@ -156,7 +156,7 @@
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Print Job",
- "naming_rule": "Expression",
+ "naming_rule": "By field 'print_job_id'",
  "owner": "Administrator",
  "permissions": [
   {
@@ -201,5 +201,5 @@
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [],
- "title_field": "print_job_id"
+ "title_field": ""
 }

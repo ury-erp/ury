@@ -48,7 +48,7 @@ class TestURYPrint(FrappeTestCase):
         mock_conn.printFile.return_value = 123
         mock_cups.Connection.return_value = mock_conn
 
-        mock_get_print.return_value = PdfWriter()
+        mock_get_print.return_value = b"%PDF-1.4 test binary pdf data"
         mock_now_datetime.return_value = datetime(2026, 8, 16, 12, 0, 0)
 
         mock_db_get_value.return_value = "T-01"
