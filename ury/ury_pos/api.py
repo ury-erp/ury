@@ -986,12 +986,12 @@ def merge_bills(primary_invoice, secondary_invoice):
     try:
 
         if primary_invoice == secondary_invoice:
-            frappe.throw("Cannot merge an invoice with itself.")
+        frappe.throw("Cannot merge an invoice with itself.")
 
-        primary_doc = frappe.get_doc("POS Invoice",primary_invoice,)
-        secondary_doc = frappe.get_doc("POS Invoice",secondary_invoice,)
+        primary_doc = frappe.get_doc("POS Invoice", primary_invoice)
+        secondary_doc = frappe.get_doc("POS Invoice", secondary_invoice)
 
-        # Authorization: caller must have write permission on BOTH invoices
+        # Authorization: caller must have write permission on both invoices
         if not frappe.has_permission("POS Invoice", "write", doc=primary_doc):
             frappe.throw(
                 "You do not have permission to merge this bill.",
@@ -1001,6 +1001,13 @@ def merge_bills(primary_invoice, secondary_invoice):
         if not frappe.has_permission("POS Invoice", "write", doc=secondary_doc):
             frappe.throw(
                 "You do not have permission to merge the selected bill.",
+                frappe.PermissionError,
+            )
+
+          # Prevent cross-branch merging
+        if primary_doc.branch != secondary_doc.branch:
+            frappe.throw(
+                "Cannot merge bills from different branches.",
                 frappe.PermissionError,
             )
 
