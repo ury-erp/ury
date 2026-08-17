@@ -1,0 +1,31 @@
+{
+  "finding_id": "SEC-03",
+  "objective": "Decompose security finding SEC-03 into structured, trackable implementation subtasks prior to applying code fixes, defining the migration of QZ Tray key signing to a server-side sign-only model in ury_print.py and sign-message.js.",
+  "scope": [
+    "ury/ury/api/ury_print.py",
+    "ury/public/js/sign-message.js"
+  ],
+  "priority": "High",
+  "risk_metrics": {
+    "severity": "High",
+    "impact": "High",
+    "likelihood": "High"
+  },
+  "acceptance_criteria": [
+    "Modify signature_promise in ury_print.py to accept a 'toSign' string from the client, sign it using cryptography (SHA512withRSA), and return the base64-encoded signature.",
+    "Ensure signature_promise enforces role-based access control and blocks Guest access.",
+    "Update sign-message.js to stop exposing and using the raw private key and instead securely delegate signing to the modified signature_promise API."
+  ],
+  "tasks": [
+    {
+      "id": "SEC-03-1",
+      "description": "Refactor signature_promise in ury_print.py to sign the payload server-side using the cryptography module and enforce RBAC.",
+      "status": "completed"
+    },
+    {
+      "id": "SEC-03-2",
+      "description": "Modify sign-message.js to delegate signing directly to the updated signature_promise API.",
+      "status": "completed"
+    }
+  ]
+}
