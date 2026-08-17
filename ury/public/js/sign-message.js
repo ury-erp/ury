@@ -18,11 +18,14 @@
  *     2. Remove or comment out any other references to "setSignaturePromise"
  */
 
+
+// Set the signature algorithm and function
 qz.security.setSignatureAlgorithm("SHA512"); // Since 2.1
+
 qz.security.setSignaturePromise(function (toSign) {
     return function (resolve, reject) {
         frappe.call({
-            method: "ury.ury.api.ury_print.signature_promise",
+            method: 'ury.ury.api.ury_print.signature_promise',
             args: { toSign: toSign },
             callback: function (response) {
                 if (response.message) {

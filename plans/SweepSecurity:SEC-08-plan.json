@@ -1,0 +1,29 @@
+{
+  "finding_id": "SEC-08",
+  "objective": "Decompose security finding SEC-08 into structured, trackable implementation subtasks prior to applying code fixes, ensuring authorization requirements for split_bill in ury_order.py are clearly defined.",
+  "scope": [
+    "ury/ury/doctype/ury_order/ury_order.py"
+  ],
+  "priority": "High",
+  "risk_metrics": {
+    "severity": "High",
+    "impact": "High",
+    "likelihood": "Medium"
+  },
+  "acceptance_criteria": [
+    "Enforce frappe.has_permission(\"POS Invoice\", \"write\", doc=source, throw=True) before splitting the invoice.",
+    "Verify the source invoice branch matches the current user active branch (getBranch())."
+  ],
+  "tasks": [
+    {
+      "id": "SEC-08-1",
+      "description": "Add frappe.has_permission write check in split_bill.",
+      "status": "completed"
+    },
+    {
+      "id": "SEC-08-2",
+      "description": "Add branch-matching validation in split_bill.",
+      "status": "completed"
+    }
+  ]
+}
