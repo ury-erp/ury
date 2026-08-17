@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { Button, Input } from '@ury/ui';
 import { useRootStore } from '../store/root-store';
+import { PrinterStatusButton } from './PrinterWatch';
 import { usePOSStore } from '../store/pos-store';
 import type { RootState } from '../store/root-store';
 import { logout } from '@ury/core';
@@ -134,6 +135,9 @@ const Header = () => {
 
         {/* Right side actions */}
         <div className="flex items-center gap-4">
+          {/* Printer Status */}
+          <PrinterStatusButton />
+
           {/* User menu */}
           <div className="relative" ref={userMenuRef}>
             <Button

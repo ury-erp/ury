@@ -1,7 +1,7 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Footer from './components/Footer';
 import Header from './components/Header';
-import PrinterWatch from './components/PrinterWatch';
+import { PrinterWatchProvider } from './components/PrinterWatch';
 import Orders from './pages/Orders';
 import POS from './pages/POS';
 import Table from './pages/Table';
@@ -29,7 +29,7 @@ function App() {
     document.documentElement.lang = lang || 'en';
   }, []);
   return (
-    <>
+    <PrinterWatchProvider>
       <ToastProvider />
       <ScreenSizeProvider>
         <AuthGuard>
@@ -50,8 +50,7 @@ function App() {
           </POSOpeningProvider>
         </AuthGuard>
       </ScreenSizeProvider>
-      <PrinterWatch />
-    </>
+    </PrinterWatchProvider>
   );
 }
 
