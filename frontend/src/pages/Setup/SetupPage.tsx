@@ -60,9 +60,10 @@ export default function SetupPage() {
           ? defaults.languages
           : (defaults.languages as any)?.languages || [];
 
-        const formattedLangs = rawLangs.map((l: any) =>
-          typeof l === 'string' ? { value: l, label: l } : l
-        );
+        const formattedLangs = rawLangs.map((l: any) => {
+          if (typeof l === 'string') return { value: l, label: l };
+          return { value: l.name || l.value, label: l.label || l.name || l.value };
+        });
 
         const rawCountries = Array.isArray(defaults.countries) ? defaults.countries : [];
         const formattedCountries = rawCountries.map((c: any) =>
