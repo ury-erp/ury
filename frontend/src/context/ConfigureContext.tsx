@@ -1,4 +1,15 @@
 import { createContext, useContext, useState, ReactNode, useCallback, useEffect } from 'react';
+
+function generateSecurePassword(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%';
+  const array = new Uint8Array(8);
+  crypto.getRandomValues(array);
+  let pwd = '';
+  for (let i = 0; i < 8; i++) {
+    pwd += chars[array[i] % chars.length];
+  }
+  return `Pass@${pwd}`;
+}
 import { call } from '@ury/core';
 
 export interface BranchData {
@@ -138,7 +149,7 @@ export function ConfigureProvider({ children }: { children: ReactNode }) {
   ]);
 
   const [users, setUsers] = useState<UserData[]>([
-    { id: '1', email: 'cashier@example.com', name: 'Cashier', passwordPlaceholder: 'Pass@123', role: 'URY Cashier' }
+    { id: '1', email: 'cashier@example.com', name: 'Cashier', passwordPlaceholder: generateSecurePassword(), role: 'URY Cashier' }
   ]);
 
   useEffect(() => {

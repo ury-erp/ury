@@ -6,9 +6,11 @@ import { SearchableSelect } from '../SearchableSelect';
 
 function generateRandomPassword(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%';
+  const array = new Uint8Array(8);
+  crypto.getRandomValues(array);
   let pwd = '';
   for (let i = 0; i < 8; i++) {
-    pwd += chars.charAt(Math.floor(Math.random() * chars.length));
+    pwd += chars[array[i] % chars.length];
   }
   return `Pass@${pwd}`;
 }
