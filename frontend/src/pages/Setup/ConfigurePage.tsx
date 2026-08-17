@@ -12,6 +12,8 @@ import { PaymentSection } from '../../components/setup/sections/PaymentSection';
 import { UserSection } from '../../components/setup/sections/UserSection';
 import { setupService } from '../../services/setup';
 import { call } from '@ury/core';
+// @ts-ignore
+import { showToast } from '@ury/ui';
 import { CONFIGURE_PROGRESS_STEPS } from '../../components/setup/constants';
 import { ProgressModal } from '../../components/setup/ProgressModal';
 
@@ -129,6 +131,7 @@ function ConfigurePageContent() {
       } else if (err?.exception) {
         msg = err.exception;
       }
+      showToast.error(msg);
       setError(msg);
       setFinishing(false);
     }
@@ -172,21 +175,6 @@ function ConfigurePageContent() {
       isNextLoading={finishing}
     >
       <div className="space-y-4 h-full">
-        {error && (
-          <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3 text-red-700">
-            <div className="flex-1 text-sm font-medium">
-              <span className="font-bold block mb-1">Configuration Error:</span>
-              {error}
-            </div>
-            <button
-              onClick={() => setError(null)}
-              className="text-xs text-red-500 hover:text-red-700 font-semibold underline shrink-0"
-            >
-              Dismiss
-            </button>
-          </div>
-        )}
-
         {/* Two-Column Grid Layout */}
         <div className="flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-[#E5E7EB] -my-8 -mx-8 h-full">
           <div className="w-full md:w-64 shrink-0 p-6 md:py-8 md:pl-8 md:pr-6 h-full overflow-y-auto">

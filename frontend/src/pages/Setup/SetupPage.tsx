@@ -6,6 +6,8 @@ import { InstallationTypeCard } from '../../components/setup/InstallationTypeCar
 import { setupService } from '../../services/setup';
 import setupSchema from '../../data/forms/setup.json';
 import { PROGRESS_STEPS } from '../../components/setup/constants';
+// @ts-ignore
+import { showToast } from '@ury/ui';
 
 const ProgressModal = lazy(() => import('../../components/setup/ProgressModal').then(module => ({ default: module.ProgressModal })));
 
@@ -178,7 +180,26 @@ export default function SetupPage() {
       }, 800);
     } catch (err: any) {
       clearInterval(interval);
-      setError(err?.message || 'An error occurred during setup');
+      let msg = 'An error occurred during setup';
+      if (typeof err === 'string') {
+        msg = err;
+      } else if (err?.message) {
+        msg = err.message;
+      } else if (err?._server_messages) {
+        try {
+          const parsed = JSON.parse(err._server_messages);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            const inner = typeof parsed[0] === 'string' ? JSON.parse(parsed[0]) : parsed[0];
+            msg = inner.message || msg;
+          }
+        } catch (_) {
+          msg = String(err._server_messages);
+        }
+      } else if (err?.exception) {
+        msg = err.exception;
+      }
+      showToast.error(msg);
+      setError(msg);
       // Do not close modal on error, allow user to see the error message
     }
   };

@@ -17,6 +17,10 @@
     "moduleDetection": "force",
     "noEmit": true,
     "jsx": "react-jsx",
+    "paths": {
+      "@ury/ui": ["../../packages/ui/src/index.ts"],
+      "@ury/core": ["../../packages/core/src/index.ts"]
+    },
     /* Linting */
     "strict": true,
     "noUnusedLocals": true,
