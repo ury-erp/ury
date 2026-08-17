@@ -163,18 +163,19 @@ doc_events = {
 scheduler_events = {
     "cron":{
 		"* * * * *":[
-			"ury.ury.api.ury_kot_validation.kotValidationThread"
+			"ury.ury.api.ury_kot_validation.kotValidationThread",
+			"ury.ury.printing.print_job_poller.poll_active_print_jobs"
 		]
-	}
+	},
 # 	"all": [
 # 		"ury.tasks.all"
 # 	],
 # 	"daily": [
 # 		"ury.tasks.daily"
 # 	],
-# 	"hourly": [
-# 		"ury.tasks.hourly"
-# 	],
+	"hourly": [
+		"ury.ury.printing.recovery.reconcile_active_print_jobs"
+	],
 # 	"weekly": [
 # 		"ury.tasks.weekly"
 # 	],

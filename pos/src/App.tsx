@@ -11,6 +11,13 @@ import { ToastProvider } from '@ury/ui';
 import { usePOSStore } from './store/pos-store';
 import { useEffect } from 'react';
 import { getActiveLanguage } from './i18n';
+import { usePrintNotifications } from './lib/usePrintNotifications';
+
+
+function PrintNotificationListener() {
+  usePrintNotifications();
+  return null;
+}
 
 function App() {
   const {
@@ -30,6 +37,7 @@ function App() {
   return (
     <>
       <ToastProvider />
+      <PrintNotificationListener />
       <ScreenSizeProvider>
         <AuthGuard>
           <POSOpeningProvider>
@@ -54,3 +62,4 @@ function App() {
 }
 
 export default App;
+

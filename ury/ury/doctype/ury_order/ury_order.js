@@ -113,6 +113,47 @@ frappe.ui.form.on('URY Order', {
 			}
 		});
 
+		frappe.realtime.on('invoice_print_completed', (data) => {
+			if (frm.doc.last_invoice && data.invoice === frm.doc.last_invoice) {
+				frappe.show_alert({
+					message: __("Invoice Printed"),
+					indicator: "green"
+				});
+				cur_frm.reload_doc();
+			}
+		});
+
+		frappe.realtime.on('invoice_print_failed', (data) => {
+			if (frm.doc.last_invoice && data.invoice === frm.doc.last_invoice) {
+				frappe.show_alert({
+					message: __("Printing Failed"),
+					indicator: "red"
+				});
+			}
+		});
+
+		frappe.realtime.on('invoice_print_long_running', (data) => {
+			if (frm.doc.last_invoice && data.invoice === frm.doc.last_invoice) {
+				frappe.show_alert({
+					message: __("Invoice is Printing"),
+					indicator: "orange"
+				});
+			}
+		});
+
+		frappe.realtime.on('print_job_status_updated', (data) => {
+			if (frm.doc.last_invoice && data.invoice === frm.doc.last_invoice) {
+				const statusMap = {
+					'PENDING': __('Printing... Pending'),
+					'PROCESSING': __('Printing... Processing'),
+				};
+				const msg = statusMap[data.status];
+				if (msg) {
+					frappe.show_alert({ message: msg, indicator: 'blue' });
+				}
+			}
+		});
+
 		// disable logo click
 		let logo_nav = document.querySelector('.navbar .navbar-brand')
 		logo_nav.removeAttribute('href');
@@ -919,19 +960,24 @@ frappe.ui.form.on('URY Order', {
 										invoice_id: invoice
 									},
 									callback: function (r) {
-										if (r.message == "Success") {
+										const isSuccess = (typeof r.message === "object" && r.message && r.message.status === "Success") || r.message === "Success";
+										if (isSuccess) {
 											$('.standard-actions').addClass('hidden-xs hidden-md');
-											frappe.show_alert({ message: __('Invoice Printed'), indicator: 'green' });
-											setTimeout(function () {
-												frappe.dom.unfreeze();
-												frappe.ui.toolbar.clear_cache()
-											}, 1500)
+											frappe.show_alert({ message: __('Printing... Job submitted'), indicator: 'blue' });
+											frappe.dom.unfreeze();
+											frappe.ui.toolbar.clear_cache();
 										}
 										else {
+											let errorMessage = __("Printing Failed");
+											if (r.message && typeof r.message === "object" && r.message.message) {
+												errorMessage = r.message.message;
+											} else if (typeof r.message === "string") {
+												errorMessage = r.message;
+											}
 											console.error(r.message);
 											frappe.dom.unfreeze();
 											frappe.throw({
-												message: __("Printing Failed")
+												message: errorMessage
 											});
 										}
 									},

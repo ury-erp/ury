@@ -1,0 +1,205 @@
+{
+ "actions": [],
+ "allow_copy": 1,
+ "creation": "2026-08-16 18:09:38.000000",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "print_job_info_section",
+  "print_job_id",
+  "cups_job_id",
+  "invoice",
+  "printer",
+  "printer_name",
+  "column_break_1",
+  "status",
+  "cups_state",
+  "cups_state_reason",
+  "timeline_section",
+  "created_at",
+  "submitted_at",
+  "processing_at",
+  "completed_at",
+  "last_checked_at",
+  "retry_section",
+  "retry_count",
+  "failure_reason"
+ ],
+ "fields": [
+  {
+   "fieldname": "print_job_info_section",
+   "fieldtype": "Section Break",
+   "label": "Print Job Info"
+  },
+  {
+   "fieldname": "print_job_id",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Print Job ID",
+   "read_only": 1
+  },
+  {
+   "fieldname": "cups_job_id",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "CUPS Job ID",
+   "read_only": 1
+  },
+  {
+   "fieldname": "invoice",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Invoice",
+   "options": "POS Invoice",
+   "read_only": 1
+  },
+  {
+   "fieldname": "printer",
+   "fieldtype": "Link",
+   "label": "Printer",
+   "options": "Network Printer Settings",
+   "read_only": 1
+  },
+  {
+   "fieldname": "printer_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Printer Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Status",
+   "read_only": 1
+  },
+  {
+   "fieldname": "cups_state",
+   "fieldtype": "Data",
+   "label": "CUPS State",
+   "read_only": 1
+  },
+  {
+   "fieldname": "cups_state_reason",
+   "fieldtype": "Data",
+   "label": "CUPS State Reason",
+   "read_only": 1
+  },
+  {
+   "fieldname": "timeline_section",
+   "fieldtype": "Section Break",
+   "label": "Timeline"
+  },
+  {
+   "fieldname": "created_at",
+   "fieldtype": "Datetime",
+   "label": "Created At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "submitted_at",
+   "fieldtype": "Datetime",
+   "label": "Submitted At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "processing_at",
+   "fieldtype": "Datetime",
+   "label": "Processing At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "completed_at",
+   "fieldtype": "Datetime",
+   "label": "Completed At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "last_checked_at",
+   "fieldtype": "Datetime",
+   "label": "Last Checked At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "retry_section",
+   "fieldtype": "Section Break",
+   "label": "Retry / Failure"
+  },
+  {
+   "fieldname": "retry_count",
+   "fieldtype": "Int",
+   "label": "Retry Count",
+   "read_only": 1
+  },
+  {
+   "fieldname": "failure_reason",
+   "fieldtype": "Small Text",
+   "label": "Failure Reason",
+   "read_only": 1
+  }
+ ],
+ "autoname": "field:print_job_id",
+ "hide_toolbar": 1,
+ "is_virtual": 1,
+ "read_only_onload": 1,
+ "issingle": 0,
+ "istable": 0,
+ "links": [],
+ "modified": "2026-08-16 18:09:38.000000",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY Print Job",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "URY Manager",
+   "share": 1
+  },
+  {
+   "read": 1,
+   "role": "URY Cashier",
+   "select": 1
+  },
+  {
+   "read": 1,
+   "role": "URY Captain",
+   "select": 1
+  },
+  {
+   "read": 1,
+   "role": "Cashier",
+   "select": 1
+  },
+  {
+   "read": 1,
+   "role": "Employee",
+   "select": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "print_job_id"
+}

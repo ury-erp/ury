@@ -59,6 +59,16 @@ export interface POSInvoiceTax {
   rate: number;
 }
 
+export interface PrintJobSubmissionResult {
+  status: 'Success' | 'Failure';
+  cups_job_id?: number;
+  print_job_id?: string;
+  printer?: string;
+  invoice?: string;
+  message?: string;
+  print_jobs?: PrintJobSubmissionResult[];
+}
+
 interface GetPOSInvoicesResponse {
   message: {
     data: POSInvoice[];
@@ -229,21 +239,37 @@ export async function getInvoicePrintHtml(invoiceId: string, printFormat: string
   }
 }
 
-export async function networkPrint(orderId: string, printer: string, printFormat: string) {
-  await call.post('ury.ury.api.ury_print.network_printing', {
-    doctype: 'POS Invoice',
-    name: orderId,
-    printer_setting: printer,
-    print_format: printFormat,
-  });
+export async function networkPrint(
+  orderId: string,
+  printer: string,
+  printFormat: string
+): Promise<PrintJobSubmissionResult> {
+  const response = await call.post<{ message: PrintJobSubmissionResult }>(
+    'ury.ury.api.ury_print.network_printing',
+    {
+      doctype: 'POS Invoice',
+      name: orderId,
+      printer_setting: printer,
+      print_format: printFormat,
+    }
+  );
+  return response.message;
 }
 
-export async function selectNetworkPrinter(orderId: string, posProfile: string, printFormat?: string | null) {
-  await call.post('ury.ury.api.ury_print.select_network_printer', {
-    invoice_id: orderId,
-    pos_profile: posProfile,
-    print_format: printFormat,
-  });
+export async function selectNetworkPrinter(
+  orderId: string,
+  posProfile: string,
+  printFormat?: string | null
+): Promise<PrintJobSubmissionResult> {
+  const response = await call.post<{ message: PrintJobSubmissionResult }>(
+    'ury.ury.api.ury_print.select_network_printer',
+    {
+      invoice_id: orderId,
+      pos_profile: posProfile,
+      print_format: printFormat,
+    }
+  );
+  return response.message;
 }
 
 

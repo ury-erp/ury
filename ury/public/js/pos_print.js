@@ -36,6 +36,56 @@ async function updateMergedInvoicePrint(invoice) {
 
 frappe.ui.form.on('POS Invoice', {
 
+    onload: function (frm) {
+        frappe.realtime.on('invoice_print_completed', (data) => {
+            if (data.invoice === frm.doc.name) {
+                frappe.show_alert({
+                    message: __("Invoice Printing Success"),
+                    indicator: "green"
+                });
+                updateMergedInvoicePrint(frm.doc.name);
+            }
+        });
+
+        frappe.realtime.on('invoice_print_failed', (data) => {
+            if (data.invoice === frm.doc.name) {
+                frappe.show_alert({
+                    message: __("Invoice Printing Failed"),
+                    indicator: "red"
+                });
+            }
+        });
+
+        frappe.realtime.on('print_job_status_updated', (data) => {
+            if (data.invoice === frm.doc.name) {
+                const statusMap = {
+                    'PENDING': __('Printing... Pending'),
+                    'PROCESSING': __('Printing... Processing'),
+                };
+                const msg = statusMap[data.status];
+                if (msg) {
+                    frappe.show_alert({ message: msg, indicator: 'blue' });
+                }
+            }
+        });
+
+        frappe.realtime.on('invoice_print_long_running', (data) => {
+            if (data.invoice === frm.doc.name) {
+                frappe.show_alert({
+                    message: __("Invoice is Printing"),
+                    indicator: 'orange'
+                });
+            }
+        });
+
+        frappe.realtime.on('print_failure_alert', (data) => {
+            frappe.show_alert({
+                message: __("Invoice Printing Failed: {0}", [data.reason || "Printer Error"]),
+                indicator: "red"
+            });
+        });
+    },
+
     before_save: function (frm) {
         if (frm.doc.customer_name === null || frm.doc.customer_name === "") {
             frappe.throw({
@@ -160,18 +210,23 @@ frappe.ui.form.on('POS Invoice', {
                                 print_format: profile.print_format
                             },
                             callback: function (r) {
-                                if (r.message == "Success") {
+                                const isSuccess = (typeof r.message === "object" && r.message && r.message.status === "Success") || r.message === "Success";
+                                if (isSuccess) {
                                     $('.standard-actions').addClass('hidden-xs hidden-md');
-                                    frappe.show_alert({ message: __('Invoice Printed'), indicator: 'green' });
-                                    updateMergedInvoicePrint(invoice);
+                                    frappe.show_alert({ message: __('Printing... Job submitted'), indicator: 'blue' });
                                     frappe.dom.unfreeze();
-                                    cur_frm.reload_doc();
                                 }
                                 else {
+                                    let errorMessage = __("Printing Failed");
+                                    if (r.message && typeof r.message === "object" && r.message.message) {
+                                        errorMessage = r.message.message;
+                                    } else if (typeof r.message === "string") {
+                                        errorMessage = r.message;
+                                    }
                                     console.error(r.message);
                                     frappe.dom.unfreeze();
                                     frappe.throw({
-                                        message: __("Printing Failed")
+                                        message: errorMessage
                                     });
                                 }
                             },

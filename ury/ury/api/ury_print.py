@@ -1,11 +1,18 @@
 import frappe
 from frappe import _
+from frappe.utils import now_datetime
 
 import os
 
 from pypdf import PdfWriter
 
 from ury.ury.doctype.ury_order.ury_order import release_merge_cluster_tables
+from ury.ury.printing.print_job_monitor import register_print_job
+
+try:
+    import cups
+except ImportError:
+    cups = None
 
 no_cache = 1
 
@@ -13,6 +20,11 @@ base_template_path = "www/printview.html"
 standard_format = "templates/print_formats/standard.html"
 
 from frappe.www.printview import validate_print_permission
+
+
+def _make_print_job_id():
+    """Generate a unique internal URY Print Job identity."""
+    return f"PJ-{now_datetime().strftime('%Y%m%d%H%M%S')}-{frappe.generate_hash(length=6)}"
 
 
 @frappe.whitelist()
@@ -23,23 +35,25 @@ def network_printing(
     print_format=None,
     doc=None,
     no_letterhead=0,
+    file_path=None,
 ):
     validate_print_permission(frappe.get_doc(doctype, name))
 
     try:
         print_settings = frappe.get_doc("Network Printer Settings", printer_setting)
 
-        try:
-            import cups
-        except ImportError:
-            return "Failed to import cups"
+        if cups is None:
+            return {"status": "Failure", "message": "Failed to import cups"}
 
         try:
             cups.setServer(print_settings.server_ip)
             cups.setPort(print_settings.port)
             conn = cups.Connection()
         except Exception as e:
-            return f"Failed to connect to the printer: {str(e)}"
+            return {
+                "status": "Failure",
+                "message": f"Failed to connect to the printer: {str(e)}",
+            }
 
         try:
             output = PdfWriter()
@@ -52,35 +66,78 @@ def network_printing(
                 as_pdf=True,
                 output=output,
             )
-            file_path = os.path.join(
-                "/", "tmp", f"frappe-pdf-{frappe.generate_hash()}.pdf"
-            )
+            generated_path = False
+            if file_path is None:
+                file_path = os.path.join(
+                    "/", "tmp", f"frappe-pdf-{frappe.generate_hash()}.pdf"
+                )
+                generated_path = True
             try:
                 with open(file_path, "wb") as f:
                     output.write(f)
-                conn.printFile(print_settings.printer_name, file_path, name, {})
 
-                restaurant_table, invoice_printed, name = frappe.db.get_value(
-                    "POS Invoice", name, ["restaurant_table", "invoice_printed", "name"]
+                cups_job_id = conn.printFile(
+                    print_settings.printer_name, file_path, name, {}
+                )
+                print_job_id = _make_print_job_id()
+
+                print_job_metadata = {
+                    "print_job_id": print_job_id,
+                    "cups_job_id": cups_job_id,
+                    "invoice": name,
+                    "printer_setting": printer_setting,
+                    "printer_name": print_settings.printer_name,
+                    "server_ip": print_settings.server_ip,
+                    "port": print_settings.port,
+                    "status": "SUBMITTED",
+                }
+
+                frappe.logger("printing").info(
+                    {
+                        "event": "print_job_submitted",
+                        **print_job_metadata,
+                    }
                 )
 
-                if restaurant_table and invoice_printed == 0:
-                    frappe.db.set_value("POS Invoice", name, "invoice_printed", 1)
-                    release_merge_cluster_tables(restaurant_table)
-                else:
-                    frappe.db.set_value("POS Invoice", name, "invoice_printed", 1)
+                restaurant_table = frappe.db.get_value(
+                    "POS Invoice", name, "restaurant_table"
+                )
+                print_job_metadata["restaurant_table"] = restaurant_table
 
-                return "Success"
+                try:
+                    register_print_job(print_job_metadata)
+                    frappe.enqueue(
+                        "ury.ury.printing.print_job_poller.poll_single_print_job",
+                        print_job_id=print_job_id,
+                        queue="default",
+                        timeout=60,
+                        now=frappe.flags.in_test,
+                    )
+                except Exception:
+                    # Monitoring is best-effort; never fail the physical print.
+                    frappe.logger("printing").warning(
+                        {"event": "print_job_register_failed", "print_job_id": print_job_id},
+                        exc_info=True,
+                    )
+
+                return {
+                    "status": "Success",
+                    "cups_job_id": cups_job_id,
+                    "print_job_id": print_job_id,
+                    "printer": printer_setting,
+                    "invoice": name,
+                }
             finally:
-                if os.path.exists(file_path):
+                if generated_path and os.path.exists(file_path):
                     os.remove(file_path)
         except Exception as e:
-            return f"Failed to print: {str(e)}"
+            return {"status": "Failure", "message": f"Failed to print: {str(e)}"}
     except Exception as e:
-        import traceback
-
-        traceback.print_exc()  # Print the full traceback for debugging
-        return f"An error occurred: {str(e)}"
+        frappe.logger("printing").warning(
+            {"event": "network_printing_unexpected_error", "invoice": name},
+            exc_info=True,
+        )
+        return {"status": "Failure", "message": f"An error occurred: {str(e)}"}
 
 
 @frappe.whitelist()
@@ -92,34 +149,49 @@ def select_network_printer(pos_profile, invoice_id):
     table = frappe.db.get_value("POS Invoice", invoice_id, "restaurant_table")
     print_format = frappe.db.get_value("POS Profile", pos_profile, "print_format")
 
+    print_jobs = []
+    bill_printers = []
+
     if table:
         room = frappe.db.get_value("URY Table", table, "restaurant_room")
-        room_bill_printers = frappe.get_all(
+        bill_printers = frappe.get_all(
             "URY Printer Settings",
             filters={"parent": room, "parenttype": "URY Room", "bill": 1},
             pluck="printer",
             order_by="idx"
         )
-        if room_bill_printers:
-            for printer in room_bill_printers:
-                print = network_printing(
-                    "POS Invoice", invoice_id, printer, print_format
-                )
-            return print
-
     else:
-        pos_bill_printers = frappe.get_all(
+        bill_printers = frappe.get_all(
             "URY Printer Settings",
             filters={"parent": pos_profile, "parenttype": "POS Profile", "bill": 1},
             pluck="printer",
             order_by="idx"
         )
-        if pos_bill_printers:
-            for printer in pos_bill_printers:
-                print = network_printing(
-                    "POS Invoice", invoice_id, printer, print_format
-                )
-            return print
+
+    if bill_printers:
+        for printer in bill_printers:
+            print_result = network_printing(
+                "POS Invoice", invoice_id, printer, print_format
+            )
+            print_jobs.append(print_result)
+
+    any_succeeded = any(
+        isinstance(job, dict) and job.get("status") == "Success"
+        for job in print_jobs
+    )
+
+    if any_succeeded:
+        return {
+            "status": "Success",
+            "print_jobs": print_jobs,
+            "invoice": invoice_id,
+        }
+
+    return {
+        "status": "Failure",
+        "print_jobs": print_jobs,
+        "invoice": invoice_id,
+    }
 
 
 @frappe.whitelist()
@@ -236,3 +308,33 @@ def signature_promise(toSign=None):
         toSign.encode("utf-8"), padding.PKCS1v15(), hashes.SHA512()
     )
     return base64.b64encode(signature).decode("ascii")
+
+
+@frappe.whitelist()
+def get_print_job_status(print_job_id):
+    """Return the current metadata for a URY Print Job.
+
+    The job is a Virtual DocType backed by Redis.  If the job is not found,
+    a structured failure response is returned instead of raising.
+    """
+    if not print_job_id:
+        return {"status": "Failure", "message": "print_job_id is required"}
+
+    try:
+        doc = frappe.get_doc("URY Print Job", print_job_id)
+        return {
+            "status": "Success",
+            "print_job": doc.as_dict(),
+        }
+    except frappe.DoesNotExistError:
+        return {
+            "status": "Failure",
+            "message": f"Print job {print_job_id} not found",
+        }
+    except Exception as e:
+        frappe.logger("printing").warning(
+            {"event": "get_print_job_status_failed", "print_job_id": print_job_id},
+            exc_info=True,
+        )
+        return {"status": "Failure", "message": str(e)}
+
