@@ -5,7 +5,8 @@ import base64
 import os
 
 from pypdf import PdfWriter
-
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import padding
 from ury.ury.doctype.ury_order.ury_order import release_merge_cluster_tables
 
 no_cache = 1
@@ -24,8 +25,9 @@ def network_printing(
     print_format=None,
     doc=None,
     no_letterhead=0,
-    file_path=None,
 ):
+    validate_print_permission(frappe.get_doc(doctype, name))
+
     try:
         print_settings = frappe.get_doc("Network Printer Settings", printer_setting)
 
@@ -52,25 +54,28 @@ def network_printing(
                 as_pdf=True,
                 output=output,
             )
-            if not file_path:
-                file_path = os.path.join(
-                    "/", "tmp", f"frappe-pdf-{frappe.generate_hash()}.pdf"
-                )
-            with open(file_path, "wb") as f:
-                output.write(f)
-            conn.printFile(print_settings.printer_name, file_path, name, {})
-
-            restaurant_table, invoice_printed, name = frappe.db.get_value(
-                "POS Invoice", name, ["restaurant_table", "invoice_printed", "name"]
+            file_path = os.path.join(
+                "/", "tmp", f"frappe-pdf-{frappe.generate_hash()}.pdf"
             )
+            try:
+                with open(file_path, "wb") as f:
+                    output.write(f)
+                conn.printFile(print_settings.printer_name, file_path, name, {})
 
-            if restaurant_table and invoice_printed == 0:
-                frappe.db.set_value("POS Invoice", name, "invoice_printed", 1)
-                release_merge_cluster_tables(restaurant_table)
-            else:
-                frappe.db.set_value("POS Invoice", name, "invoice_printed", 1)
+                restaurant_table, invoice_printed, name = frappe.db.get_value(
+                    "POS Invoice", name, ["restaurant_table", "invoice_printed", "name"]
+                )
 
-            return "Success"
+                if restaurant_table and invoice_printed == 0:
+                    frappe.db.set_value("POS Invoice", name, "invoice_printed", 1)
+                    release_merge_cluster_tables(restaurant_table)
+                else:
+                    frappe.db.set_value("POS Invoice", name, "invoice_printed", 1)
+
+                return "Success"
+            finally:
+                if os.path.exists(file_path):
+                    os.remove(file_path)
         except Exception as e:
             return f"Failed to print: {str(e)}"
     except Exception as e:
@@ -82,6 +87,10 @@ def network_printing(
 
 @frappe.whitelist()
 def select_network_printer(pos_profile, invoice_id):
+    invoice_doc = frappe.get_doc("POS Invoice", invoice_id)
+    if not frappe.has_permission("POS Invoice", "write", doc=invoice_doc):
+        frappe.throw(_("Not permitted to print this invoice"), frappe.PermissionError)
+
     table = frappe.db.get_value("POS Invoice", invoice_id, "restaurant_table")
     print_format = frappe.db.get_value("POS Profile", pos_profile, "print_format")
 
@@ -118,6 +127,10 @@ def select_network_printer(pos_profile, invoice_id):
 @frappe.whitelist()
 def qz_print_update(invoice):
     try:
+        invoice_doc = frappe.get_doc("POS Invoice", invoice)
+        if not frappe.has_permission("POS Invoice", "write", doc=invoice_doc):
+            frappe.throw(_("Not permitted to print this invoice"), frappe.PermissionError)
+
         table = frappe.db.get_value("POS Invoice", invoice, "restaurant_table")
         
         if table == None or table == "":
@@ -157,6 +170,10 @@ def qz_print_update(invoice):
 
 @frappe.whitelist()
 def print_pos_page(doctype, name, print_format):
+    doc_to_check = frappe.get_doc(doctype, name)
+    if not frappe.has_permission(doctype, "write", doc=doc_to_check):
+        frappe.throw(_("Not permitted to print this document"), frappe.PermissionError)
+
     data = {"name": name, "doctype": doctype, "print_format": print_format}
 
     restaurant_table, branch, name = frappe.db.get_value(
@@ -219,11 +236,7 @@ def _get_qz_private_key():
 
 @frappe.whitelist()
 def signature_promise(toSign=None):
-    """Server-side QZ Tray signing endpoint (sign-only).
-
-    Accepts the `toSign` string from QZ Tray and returns its base64-encoded
-    SHA512withRSA signature. Never returns the private key or its path.
-    """
+    """Server-side QZ Tray signing endpoint (sign-only)."""
     if frappe.session.user == "Guest":
         frappe.throw(_("Not permitted"), frappe.PermissionError)
 
@@ -233,14 +246,14 @@ def signature_promise(toSign=None):
     if not toSign:
         frappe.throw(_("Missing payload to sign"))
 
-    from cryptography.hazmat.primitives import hashes, serialization
-    from cryptography.hazmat.primitives.asymmetric import padding
-
     private_key = serialization.load_pem_private_key(
         _get_qz_private_key(), password=None
     )
+
     signature = private_key.sign(
-        toSign.encode("utf-8"), padding.PKCS1v15(), hashes.SHA512()
+        toSign.encode("utf-8"),
+        padding.PKCS1v15(),
+        hashes.SHA512(),
     )
 
     return base64.b64encode(signature).decode("ascii")
