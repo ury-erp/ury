@@ -1,10 +1,5 @@
-import { 
-  Grid3X3,
-  UtensilsCrossed,
-} from 'lucide-react';
 import { usePOSStore } from '../store/pos-store';
 import { cn } from '../lib/utils';
-import { Button, Badge } from './ui';
 import CommentDialog from './CommentDialog';
 import { useState } from 'react';
 import { t } from '../i18n';
@@ -32,81 +27,74 @@ const Sidebar = ({ disabled }: SidebarProps) => {
     setOrderComment(comment);
   };
 
+  // Course tiles, not a list: the staff came from a touch system where every
+  // course was a big labelled button, and a two-column grid of tiles fits the
+  // whole course list on screen in half the width a padded list needed.
+  const CourseTile = ({
+    label,
+    count,
+    active,
+    onClick,
+  }: {
+    label: string;
+    count: number;
+    active: boolean;
+    onClick: () => void;
+  }) => (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={label}
+      className={cn(
+        'relative h-14 w-full rounded-md border px-1.5 pt-1.5 pb-4 flex items-center justify-center text-center',
+        'text-[11.5px] font-bold uppercase leading-[0.85rem] tracking-tight transition-colors',
+        'disabled:opacity-50 disabled:pointer-events-none',
+        active
+          ? 'bg-primary-600 border-primary-600 text-white shadow-sm'
+          : 'bg-white border-gray-200 text-gray-900 hover:bg-primary-50 hover:border-primary-200 hover:text-primary-700'
+      )}
+    >
+      <span className="line-clamp-2 break-words">{label}</span>
+      <span
+        className={cn(
+          'absolute bottom-0.5 end-1 text-[10px] font-medium tabular-nums',
+          active ? 'text-white/80' : 'text-gray-500'
+        )}
+      >
+        {count}
+      </span>
+    </button>
+  );
+
   return (
     <div className={cn(
-      "w-64 bg-white border-e border-gray-200 h-screen flex flex-col",
+      "w-52 flex-shrink-0 bg-white border-e border-gray-200 h-full flex flex-col",
       disabled && "opacity-50 pointer-events-none"
     )}>
-      {/* Categories List */}
-      <nav className="flex-1 p-6 overflow-y-auto">
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-          {/* Section Title */}
-          <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3 px-1">
-            {t('pos_sidebar.categories')}
-          </h2>
-          
-          {/* All Items */}
-          <Button
+      {/* Categories */}
+      <nav className="flex-1 p-2 overflow-y-auto">
+        <h2 className="text-[10px] font-medium text-gray-500 uppercase tracking-wide mb-1.5 px-0.5">
+          {t('pos_sidebar.categories')}
+        </h2>
+
+        <div className="grid grid-cols-2 gap-1.5">
+          <CourseTile
+            label={t('pos_sidebar.all_items')}
+            count={getAllItemsCount()}
+            active={selectedCategory === ''}
             onClick={() => setSelectedCategory('')}
-            variant="ghost"
-            className={cn(
-              'w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium transition-all duration-200 group relative mb-1',
-              selectedCategory === ''
-                ? 'bg-white text-gray-900 shadow-sm font-semibold'
-                : 'text-gray-700 hover:bg-white/60 hover:text-gray-900'
-            )}
-            disabled={disabled}
-          >
-            {/* Active indicator bar */}
-            {selectedCategory === '' && (
-              <div className="absolute start-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-blue-600 rounded-e-full" />
-            )}
-            
-            <div className="flex items-center gap-3 ms-1">
-              <Grid3X3 className="w-4 h-4 text-gray-500" />
-              <span>{t('pos_sidebar.all_items')}</span>
-            </div>
-            
-            <Badge variant="secondary" size="sm" className="text-xs text-gray-500 bg-gray-100 min-w-[24px] text-center">
-              {getAllItemsCount()}
-            </Badge>
-          </Button>
+          />
 
-          {/* Divider */}
-          <div className="h-px bg-gray-200 my-3 mx-1" />
-
-          {/* Category Items */}
-          <div className="space-y-1">
-            {categories.map((category) => {
-              const count = getCategoryCount(category.name);
-              return (
-                <Button
-                  key={category.name}
-                  onClick={() => setSelectedCategory(category.name)}
-                  variant="ghost"
-                  className={cn(
-                    'w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium transition-all duration-200 group relative',
-                    selectedCategory === category.name
-                      ? 'bg-white text-gray-900 shadow-sm font-semibold'
-                      : 'text-gray-700 hover:bg-white/60 hover:text-gray-900'
-                  )}
-                  disabled={disabled}
-                >
-                  {/* Active indicator bar */}
-                  {selectedCategory === category.name && (
-                    <div className="absolute start-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-blue-600 rounded-e-full" />
-                  )}
-                  <div className="flex items-center gap-3 ms-1">
-                    <UtensilsCrossed className="w-4 h-4 text-gray-500 flex-shrink-0" />
-                    <span className="text-start">{category.label}</span>
-                  </div>
-                  <Badge variant="secondary" size="sm" className="text-xs text-gray-500 bg-gray-100 min-w-[24px] text-center">
-                    {count}
-                  </Badge>
-                </Button>
-              );
-            })}
-          </div>
+          {categories.map((category) => (
+            <CourseTile
+              key={category.name}
+              label={category.label}
+              count={getCategoryCount(category.name)}
+              active={selectedCategory === category.name}
+              onClick={() => setSelectedCategory(category.name)}
+            />
+          ))}
         </div>
       </nav>
 
@@ -121,4 +109,4 @@ const Sidebar = ({ disabled }: SidebarProps) => {
   );
 };
 
-export default Sidebar; 
+export default Sidebar;

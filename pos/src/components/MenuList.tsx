@@ -47,7 +47,7 @@ const MenuList: React.FC<MenuListProps> = ({ onItemClick }) => {
 
   return (
     <div className="flex-1 overflow-auto bg-gray-50">
-      <div className="max-w-screen-xl mx-auto p-4 pb-40">
+      <div className="mx-auto p-3 pb-24">
         {menuLoading ? (
           <div className="h-96">
             <Spinner message={t('common.loading_menu_items')} />
@@ -67,8 +67,11 @@ const MenuList: React.FC<MenuListProps> = ({ onItemClick }) => {
             </div>
           </div>
         ) : (
+          // auto-fill instead of fixed breakpoints: every pixel freed by the
+          // narrower course rail / order panel turns into another column
+          // rather than into wider cards
           <div className={cn(
-            "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3",
+            "grid grid-cols-[repeat(auto-fill,minmax(6.5rem,1fr))] gap-2",
             isInteractionDisabled && "opacity-50 pointer-events-none"
           )}>
             {filteredItems.map((item) => (

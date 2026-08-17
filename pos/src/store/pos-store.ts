@@ -358,20 +358,30 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   },
 
   fetchCategories: async () => {
-    try {
-      const cached = sessionStorage.getItem('menuCategories');
-      if (cached) {
-        const categories = JSON.parse(cached);
-        set({ categories });
-        return;
+    // The cache is only there to paint the rail instantly; it is never the
+    // final answer. It used to be returned as-is for the whole browser
+    // session, so a course added on the desk never showed up in POS until the
+    // tab was closed and reopened.
+    const cached = sessionStorage.getItem('menuCategories');
+    if (cached) {
+      try {
+        set({ categories: JSON.parse(cached) });
+      } catch {
+        sessionStorage.removeItem('menuCategories');
       }
+    }
 
+    try {
       const courses = await getMenuCourses();
       sessionStorage.setItem('menuCategories', JSON.stringify(courses));
       set({ categories: courses });
     } catch (error) {
-      set({ error: 'Failed to load menu categories' });
-      throw error;
+      // A stale rail still lets the cashier work; an empty one does not.
+      if (!cached) {
+        set({ error: 'Failed to load menu categories' });
+        throw error;
+      }
+      console.error('Failed to refresh menu categories, keeping cached list:', error);
     }
   },
 

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, ArrowLeftRight, Coins, Eye, Layout, Loader2, Printer, Square, Users } from 'lucide-react';
+import { AlertTriangle, Coins, Layout, Loader2, Square, Users } from 'lucide-react';
 import { cn, formatInvoiceTime } from '../lib/utils';
 import { usePOSStore } from '../store/pos-store';
 import { getRooms, getTables, getTableCount, getTableInvoiceStatus, transferTable, type Room, type Table, type TableInvoiceStatus } from '../lib/table-api';
@@ -8,7 +8,6 @@ import { Spinner } from '../components/ui/spinner';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { DINE_IN } from '../data/order-types';
-import { TableShapeIcon } from '../components/TableShapeIcon';
 import { getTableOrder } from '../lib/order-api';
 import { reprintKot } from '../lib/invoice-api';
 import { printOrder } from '../lib/print';
@@ -462,8 +461,10 @@ const TableView = () => {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto bg-gray-50 p-6">
-        <div className="max-w-screen-xl mx-auto h-full">
+      {/* no max-width cap: the grid should use the whole screen so a wide
+          monitor shows more tables per row, not wider cards */}
+      <div className="flex-1 overflow-auto bg-gray-50 p-3">
+        <div className="h-full">
           {error && !loadingTables ? (
             <div className="h-full flex flex-col items-center justify-center gap-3 text-red-500">
               <AlertTriangle className="w-10 h-10" />
@@ -477,10 +478,15 @@ const TableView = () => {
               <p>{t('tables.no_tables_found')}</p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-2">
               {tablesToDisplay.map(table => {
                 const isOccupied = table.occupied === 1;
                 const isBillPrinted = invoiceStatus[table.name]?.invoice_printed === 1;
+                // Three states, three colours: green free, red running order,
+                // yellow bill printed and waiting to be settled. The old
+                // status badge, room name and shape icon are gone — the colour
+                // carries the status and the room is already the selected tab.
+                const awaitingPayment = isOccupied && isBillPrinted;
 
                 return (
                   <div
@@ -493,118 +499,118 @@ const TableView = () => {
                       }
                     }}
                     className={cn(
-                      'relative bg-white rounded-lg border-2 p-4 transition-all flex flex-col justify-between gap-y-4',
-                      isOccupied
-                        ? 'border-amber-400 bg-amber-50 text-amber-900'
-                        : 'border-emerald-300 bg-emerald-50 text-emerald-900 hover:border-emerald-400 hover:shadow-md cursor-pointer',
+                      // The whole card carries the status colour — that is what
+                      // makes a full room readable in one glance — with a
+                      // saturated top strip on top of the soft body tint.
+                      'relative h-28 flex flex-col overflow-hidden rounded-lg border border-t-4 shadow-sm transition-all',
+                      awaitingPayment
+                        ? 'bg-amber-50 border-amber-200 border-t-amber-400'
+                        : isOccupied
+                          ? 'bg-red-50 border-red-200 border-t-red-500'
+                          : 'bg-emerald-50 border-emerald-200 border-t-emerald-400 hover:shadow-md hover:border-emerald-300 cursor-pointer',
                     )}
                   >
-                    <div>
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <TableShapeIcon shape={table.table_shape || 'Rectangle'} />
-                          <span className="font-semibold text-lg text-gray-900">{table.name}</span>
-                        </div>
-                        <Badge variant={isOccupied ? 'warning' : 'success'}>
-                          {isOccupied ? t('tables.occupied') : t('tables.available')}
-                        </Badge>
-                      </div>
-
-                      <div className="space-y-2 text-sm text-gray-700">
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium">{t('tables.room')}</span>
-                          <span>{table.restaurant_room}</span>
-                        </div>
-                        {isOccupied && (
-                          <div className="flex items-center justify-between">
-                            <span className="font-medium">Started at</span>
-                            <span>{formatInvoiceTime(table.latest_invoice_time)}</span>
-                          </div>
+                    {/* Fixed-height rows, not centred blocks: with a centred
+                        layout the table number sat at a different height on
+                        cards that carry an action strip, so a row of cards
+                        never lined up. */}
+                    <div className="h-5 flex items-center justify-between px-2">
+                      <span
+                        className={cn(
+                          'w-2 h-2 rounded-full flex-shrink-0',
+                          awaitingPayment ? 'bg-amber-400' : isOccupied ? 'bg-red-500' : 'bg-emerald-400'
                         )}
-                        {typeof table.no_of_seats === 'number' && (
-                          <div className="flex items-center justify-between">
-                            <span className="font-medium">{t('tables.seats')}</span>
-                            <span className="flex items-center gap-1">
-                              <Users className="w-3 h-3" />
-                              {table.no_of_seats}
-                            </span>
-                          </div>
-                        )}
-                        {table.is_take_away === 1 && (
-                          <Badge variant="pending" className="mt-2">
-                            Take away
-                          </Badge>
-                        )}
-                      </div>
+                        aria-hidden
+                      />
+                      {typeof table.no_of_seats === 'number' && (
+                        <span className="flex items-center gap-0.5 text-[11px] text-gray-500 flex-shrink-0">
+                          <Users className="w-3 h-3" />
+                          {table.no_of_seats}
+                        </span>
+                      )}
                     </div>
 
-                    {isOccupied && isBillPrinted ? (
+                    <div className="h-7 flex items-center justify-center px-2">
+                      <span className="font-bold text-xl leading-7 text-gray-900 truncate max-w-full" title={table.name}>
+                        {table.name}
+                      </span>
+                    </div>
+
+                    <div className="h-5 flex items-center justify-center gap-1 px-2">
+                      {isOccupied && (
+                        <span className="text-[11px] text-gray-500 tabular-nums leading-4">
+                          {formatInvoiceTime(table.latest_invoice_time)}
+                        </span>
+                      )}
+                      {table.is_take_away === 1 && (
+                        <Badge variant="pending" className="text-[10px] px-1.5 py-0">
+                          Take away
+                        </Badge>
+                      )}
+                    </div>
+
+                    {awaitingPayment ? (
                       // Bill already printed: the only remaining action is
                       // collecting payment (the table frees on settle).
-                      <div className="flex gap-2 pt-3 mt-3 border-t border-amber-200">
-                        {userCanBill ? (
-                          <button
-                            onClick={(event) => handlePayTable(table, event)}
-                            disabled={printingTable === table.name}
-                            className="flex-1 flex items-center justify-center gap-2 py-2 text-xs font-semibold rounded bg-emerald-600 text-white hover:bg-emerald-700 transition disabled:opacity-60 disabled:cursor-not-allowed"
-                          >
-                            {printingTable === table.name ? (
-                              <>
-                                <Loader2 className="w-3 h-3 animate-spin" />
-                                Loading...
-                              </>
-                            ) : (
-                              <>
-                                <Coins className="w-3 h-3" />
-                                Payment
-                              </>
-                            )}
-                          </button>
-                        ) : (
-                          <p className="flex-1 text-center py-2 text-xs font-semibold text-amber-800">
-                            Awaiting payment
-                          </p>
-                        )}
-                      </div>
+                      userCanBill ? (
+                        <button
+                          onClick={(event) => handlePayTable(table, event)}
+                          disabled={printingTable === table.name}
+                          className="mt-auto h-8 flex items-center justify-center gap-1 text-[11px] font-semibold bg-primary-600 text-white hover:bg-primary-700 transition disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                          {printingTable === table.name ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <>
+                              <Coins className="w-3 h-3" />
+                              Payment
+                            </>
+                          )}
+                        </button>
+                      ) : (
+                        <p className="mt-auto h-8 flex items-center justify-center text-[10px] font-semibold text-amber-700 bg-white/70 border-t border-gray-200">
+                          Awaiting payment
+                        </p>
+                      )
                     ) : isOccupied ? (
-                      <div className="flex gap-2 pt-3 mt-3 border-t border-amber-200">
+                      // Segmented action strip. Waiters take and view orders
+                      // only: Transfer and Print belong to whoever may bill.
+                      <div className={cn(
+                        'mt-auto grid divide-x divide-gray-200 border-t border-gray-200 bg-white/70',
+                        userCanBill ? 'grid-cols-3' : 'grid-cols-1'
+                      )}>
                         <button
                           onClick={(event) => handlePreviewTable(table, event)}
-                          className="flex-1 flex items-center justify-center gap-2 py-2 text-xs font-semibold rounded bg-white hover:bg-amber-100 transition"
+                          title="Kot-View"
+                          className="h-8 px-0.5 text-[9.5px] font-semibold tracking-tight whitespace-nowrap text-gray-800 hover:bg-white transition"
                         >
-                          <Eye className="w-3 h-3" />
-                          Preview
+                          Kot-View
                         </button>
-                        <button
-                          onClick={(event) => handleOpenSwitch(table, event)}
-                          className="flex-1 flex items-center justify-center gap-2 py-2 text-xs font-semibold rounded bg-white hover:bg-amber-100 transition"
-                        >
-                          <ArrowLeftRight className="w-3 h-3" />
-                          Switch
-                        </button>
-                        {(userCanBill || kotReprintEnabled) && (
-                          <button
-                            onClick={(event) => handlePrintTable(table, event)}
-                            disabled={printingTable === table.name}
-                            className="flex-1 flex items-center justify-center gap-2 py-2 text-xs font-semibold rounded bg-white hover:bg-amber-100 transition disabled:opacity-60 disabled:cursor-not-allowed"
-                          >
-                            {printingTable === table.name ? (
-                              <>
+                        {userCanBill && (
+                          <>
+                            <button
+                              onClick={(event) => handleOpenSwitch(table, event)}
+                              title="Transfer"
+                              className="h-8 px-0.5 text-[9.5px] font-semibold tracking-tight whitespace-nowrap text-gray-800 hover:bg-white transition"
+                            >
+                              Transfer
+                            </button>
+                            <button
+                              onClick={(event) => handlePrintTable(table, event)}
+                              disabled={printingTable === table.name}
+                              title="Print"
+                              className="h-8 px-0.5 flex items-center justify-center text-[9.5px] font-semibold tracking-tight whitespace-nowrap text-gray-800 hover:bg-white transition disabled:opacity-60 disabled:cursor-not-allowed"
+                            >
+                              {printingTable === table.name ? (
                                 <Loader2 className="w-3 h-3 animate-spin" />
-                                Printing...
-                              </>
-                            ) : (
-                              <>
-                                <Printer className="w-3 h-3" />
-                                {userCanBill ? 'Print' : 'KOT'}
-                              </>
-                            )}
-                          </button>
+                              ) : (
+                                'Print'
+                              )}
+                            </button>
+                          </>
                         )}
                       </div>
-                    ) : (
-                      <p className="text-sm text-gray-500">{t('tables.tap_to_start')}</p>
-                    )}
+                    ) : null}
                   </div>
                 );
               })}
@@ -623,8 +629,12 @@ const TableView = () => {
               <span>{t('tables.available')}</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-amber-50 border border-amber-400 rounded"></div>
+              <div className="w-4 h-4 bg-red-50 border border-red-400 rounded"></div>
               <span>{t('tables.occupied')}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 bg-amber-50 border border-amber-400 rounded"></div>
+              <span>Bill printed — awaiting payment</span>
             </div>
           </div>
         </div>

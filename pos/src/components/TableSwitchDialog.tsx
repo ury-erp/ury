@@ -1,6 +1,5 @@
-import { ArrowRight, Loader2, X } from 'lucide-react';
+import { ArrowRight, Loader2, Users, X } from 'lucide-react';
 import { Button } from './ui';
-import { TableShapeIcon } from './TableShapeIcon';
 import type { Table } from '../lib/table-api';
 
 interface TableSwitchDialogProps {
@@ -42,6 +41,8 @@ const TableSwitchDialog = ({
   const dineInTables = targets.filter((t) => t.is_take_away !== 1);
   const takeAwayTables = targets.filter((t) => t.is_take_away === 1);
 
+  // Same card shape as the table grid: white body, green top strip (every
+  // target here is free by definition), number big, seats small.
   const renderTable = (target: Table) => {
     const isSwitching = switching === target.name;
     return (
@@ -50,17 +51,25 @@ const TableSwitchDialog = ({
         type="button"
         disabled={!!switching}
         onClick={() => onSelect(target)}
-        className="flex flex-col items-center gap-2 rounded-lg border border-gray-200 p-4 hover:border-blue-500 hover:bg-blue-50 disabled:opacity-50 transition-colors"
+        className="relative h-20 flex flex-col overflow-hidden rounded-lg bg-white border border-gray-200 border-t-4 border-t-emerald-400 shadow-sm hover:shadow-md hover:border-emerald-300 disabled:opacity-50 transition-all"
       >
-        {isSwitching ? (
-          <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
-        ) : (
-          <TableShapeIcon shape={target.table_shape} className="w-5 h-5 text-gray-500" />
-        )}
-        <span className="text-sm font-medium text-gray-900">{target.name}</span>
-        {target.no_of_seats ? (
-          <span className="text-xs text-gray-500">{target.no_of_seats} seats</span>
-        ) : null}
+        <div className="flex justify-end px-1.5 pt-1">
+          {target.no_of_seats ? (
+            <span className="flex items-center gap-0.5 text-[11px] text-gray-500">
+              <Users className="w-3 h-3" />
+              {target.no_of_seats}
+            </span>
+          ) : null}
+        </div>
+        <div className="flex-1 min-h-0 flex items-center justify-center px-1.5 -mt-1">
+          {isSwitching ? (
+            <Loader2 className="w-5 h-5 animate-spin text-emerald-600" />
+          ) : (
+            <span className="font-bold text-lg leading-6 text-gray-900 truncate max-w-full" title={target.name}>
+              {target.name}
+            </span>
+          )}
+        </div>
       </button>
     );
   };
@@ -73,16 +82,16 @@ const TableSwitchDialog = ({
           <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">{title}</h3>
           {hint ? <span className="text-xs text-gray-400">{hint}</span> : null}
         </div>
-        <div className="grid grid-cols-3 gap-3">{list.map(renderTable)}</div>
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(5.5rem,1fr))] gap-2">{list.map(renderTable)}</div>
       </div>
     );
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-lg mx-4 shadow-xl">
+      <div className="bg-white rounded-lg p-5 w-full max-w-3xl mx-4 shadow-xl">
         <div className="flex items-start justify-between mb-1">
-          <h2 className="text-lg font-semibold text-gray-900">Switch Table</h2>
+          <h2 className="text-lg font-semibold text-gray-900">Transfer Table</h2>
           <button
             type="button"
             onClick={onClose}
