@@ -986,7 +986,7 @@ def merge_bills(primary_invoice, secondary_invoice):
     try:
 
         if primary_invoice == secondary_invoice:
-        frappe.throw("Cannot merge an invoice with itself.")
+            frappe.throw("Cannot merge an invoice with itself.")
 
         primary_doc = frappe.get_doc("POS Invoice", primary_invoice)
         secondary_doc = frappe.get_doc("POS Invoice", secondary_invoice)
