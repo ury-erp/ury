@@ -40,44 +40,25 @@
  */
 
 
-// Include the necessary libraries
-var qzPrivateKey = null; // Initialize the variable to hold the private key
+// Set the signature algorithm and function
+qz.security.setSignatureAlgorithm("SHA512"); // Since 2.1
 
-// Load the private key path from the site config.json using Frappe API
-frappe.call({
-    method: 'ury.ury.api.ury_print.signature_promise',
-    callback: function (response) {
-        if (response.message) {
-            var privateKeyPath = response.message;
-            // Load the private key from the specified path asynchronously
-            fetch("/private/" + privateKeyPath)
-                .then(response => response.text())
-                .then(privateKey => {
-                    qzPrivateKey = privateKey; // Store the private key in the variable
-
-                    // Set the signature algorithm and function
-                    qz.security.setSignatureAlgorithm("SHA512"); // Since 2.1
-                    qz.security.setSignaturePromise(function (toSign) {
-                        return function (resolve, reject) {
-                            try {
-                                var pk = KEYUTIL.getKey(qzPrivateKey);
-                                var sig = new KJUR.crypto.Signature({ "alg": "SHA512withRSA" });  // Use "SHA1withRSA" for QZ Tray 2.0 and older
-                                sig.init(pk);
-                                sig.updateString(toSign);
-                                var hex = sig.sign();
-                                resolve(stob64(hextorstr(hex)));
-                            } catch (err) {
-                                console.error(err);
-                                reject(err);
-                            }
-                        };
-                    });
-
-                    // Continue with the rest of your code
-                })
-                .catch(error => {
-                    console.error("Failed to load the private key:", error);
-                });
-        }
-    }
+qz.security.setSignaturePromise(function (toSign) {
+    return function (resolve, reject) {
+        frappe.call({
+            method: 'ury.ury.api.ury_print.signature_promise',
+            args: { toSign: toSign },
+            callback: function (response) {
+                if (response.message) {
+                    resolve(response.message);
+                } else {
+                    reject("Signing failed");
+                }
+            },
+            error: function (err) {
+                console.error("Error signing message:", err);
+                reject(err);
+            }
+        });
+    };
 });

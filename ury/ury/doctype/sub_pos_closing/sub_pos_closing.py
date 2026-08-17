@@ -96,12 +96,49 @@ def get_cashiers(doctype, txt, searchfield, start, page_len, filters):
     return [c for c in cashiers_list]
 
 
+SUPERVISOR_ROLES = {"URY Manager", "System Manager"}
+
+
 @frappe.whitelist()
 def get_pos_invoices(start, end, pos_profile, user):
     frappe.has_permission("POS Invoice", "read", throw=True)
-    manager_roles = {"Administrator", "System Manager", "URY Admin", "URY Manager"}
-    if user != frappe.session.user and not manager_roles.intersection(frappe.get_roles(frappe.session.user)):
-        frappe.throw(frappe._("Not permitted to view other cashiers' invoices"), frappe.PermissionError)
+
+    session_user = frappe.session.user
+    is_supervisor = session_user == "Administrator" or bool(
+        set(frappe.get_roles(session_user)) & SUPERVISOR_ROLES
+    )
+
+    # Non-supervisors may only query their own invoices
+    if not is_supervisor:
+        user = session_user
+
+    # Branch scoping: the POS Profile must belong to the session user's branch
+    try:
+        session_branch = getBranch()
+    except Exception:
+        if is_supervisor:
+            # Supervisors may not be mapped to a branch
+            session_branch = None
+        else:
+            raise
+
+    profile_branch = frappe.db.get_value(
+        "POS Profile", pos_profile, "branch"
+    )
+
+    if not profile_branch:
+        frappe.throw(
+            _("POS Profile {0} not found.").format(pos_profile),
+            frappe.DoesNotExistError,
+        )
+
+    if session_branch and profile_branch != session_branch:
+        frappe.throw(
+            _("You do not have permission to access invoices for POS Profile {0}.").format(
+                pos_profile
+            ),
+            frappe.PermissionError,
+        )
 
     data = frappe.db.sql(
         """
