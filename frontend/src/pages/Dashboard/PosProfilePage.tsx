@@ -292,25 +292,24 @@ export const PosProfilePage: React.FC = () => {
                   <th className="px-6 py-4">Company</th>
                   <th className="px-6 py-4">Branch</th>
                   <th className="px-6 py-4">Price List</th>
+                  <th className="px-6 py-4">Status</th>
                   <th className="px-6 py-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {profiles.map((p) => (
                   <tr key={p.name} className="hover:bg-primary/10 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="font-semibold text-gray-900">{p.name}</div>
-                      <div className="mt-1">
-                        {p.disabled ? (
-                          <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-600 border border-gray-200">Inactive</span>
-                        ) : (
-                          <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-green-50 text-green-700 border border-green-200">Active</span>
-                        )}
-                      </div>
-                    </td>
+                    <td className="px-6 py-4 font-semibold text-gray-900">{p.name}</td>
                     <td className="px-6 py-4 text-gray-500">{p.company || '-'}</td>
                     <td className="px-6 py-4 text-gray-500">{p.branch || '-'}</td>
                     <td className="px-6 py-4 font-mono text-xs text-gray-500">{p.selling_price_list || '-'}</td>
+                    <td className="px-6 py-4">
+                      {p.disabled ? (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-600 border border-gray-200">Inactive</span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-green-50 text-green-700 border border-green-200">Active</span>
+                      )}
+                    </td>
                     <td className="px-6 py-4 text-right">
                       <Button variant="ghost" size="sm" onClick={(e: any) => { e.stopPropagation(); setIsReadOnly(true); handleProfileSelect(p); }} className="text-gray-500 hover:text-primary">
                         <Eye className="w-4 h-4" />
