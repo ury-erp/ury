@@ -14,6 +14,7 @@ interface PosProfileRecord {
   custom_enable_discount?: number;
   custom_multiple_cashier_configuration?: number;
   custom_enable_kot_reprint?: number;
+  disabled?: number;
   applicable_for_users?: ApplicableUser[];
 }
 
@@ -195,6 +196,7 @@ export const PosProfilePage: React.FC = () => {
         custom_enable_discount: profile.custom_enable_discount || 0,
         custom_enable_kot_reprint: profile.custom_enable_kot_reprint || 0,
         custom_multiple_cashier_configuration: profile.custom_multiple_cashier_configuration || 0,
+        disabled: profile.disabled || 0,
         applicable_for_users: profile.applicable_for_users ? [...profile.applicable_for_users] : [],
       });
     } catch {
@@ -227,6 +229,7 @@ export const PosProfilePage: React.FC = () => {
           custom_enable_discount: profileForm.custom_enable_discount,
           custom_enable_kot_reprint: profileForm.custom_enable_kot_reprint,
           custom_multiple_cashier_configuration: profileForm.custom_multiple_cashier_configuration,
+          disabled: profileForm.disabled,
           applicable_for_users: profileForm.applicable_for_users,
         },
       });
@@ -295,7 +298,16 @@ export const PosProfilePage: React.FC = () => {
               <tbody className="divide-y divide-gray-100">
                 {profiles.map((p) => (
                   <tr key={p.name} className="hover:bg-primary/10 transition-colors">
-                    <td className="px-6 py-4 font-semibold text-gray-900">{p.name}</td>
+                    <td className="px-6 py-4">
+                      <div className="font-semibold text-gray-900">{p.name}</div>
+                      <div className="mt-1">
+                        {p.disabled ? (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-600 border border-gray-200">Inactive</span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-green-50 text-green-700 border border-green-200">Active</span>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-6 py-4 text-gray-500">{p.company || '-'}</td>
                     <td className="px-6 py-4 text-gray-500">{p.branch || '-'}</td>
                     <td className="px-6 py-4 font-mono text-xs text-gray-500">{p.selling_price_list || '-'}</td>
@@ -497,9 +509,28 @@ export const PosProfilePage: React.FC = () => {
 
       {/* Detail Content */}
       <Card className="p-6 rounded-lg border-gray-200 bg-white shadow-sm">
-        <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-4">
-          {selectedProfile.name}
-        </h2>
+        <div className="flex items-center gap-3 mb-4">
+          <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wider m-0">
+            {selectedProfile.name}
+          </h2>
+          {isReadOnly ? (
+            selectedProfile.disabled ? (
+              <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-600 border border-gray-200">Inactive</span>
+            ) : (
+              <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-green-50 text-green-700 border border-green-200">Active</span>
+            )
+          ) : (
+            <label className="flex items-center gap-2 cursor-pointer text-xs">
+              <input
+                type="checkbox"
+                checked={!profileForm.disabled}
+                onChange={(e) => setProfileForm(p => ({ ...p, disabled: e.target.checked ? 0 : 1 }))}
+                className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
+              />
+              <span className="font-semibold text-gray-700">Active</span>
+            </label>
+          )}
+        </div>
 
         {activeTab === 'general' && (
           <div className="space-y-6 text-sm">
