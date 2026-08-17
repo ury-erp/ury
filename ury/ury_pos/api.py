@@ -932,6 +932,12 @@ def merge_bills(primary_invoice, secondary_invoice):
         primary_doc = frappe.get_doc("POS Invoice",primary_invoice,)
         secondary_doc = frappe.get_doc("POS Invoice",secondary_invoice,)
 
+        frappe.has_permission("POS Invoice", "write", doc=primary_doc, throw=True)
+        frappe.has_permission("POS Invoice", "write", doc=secondary_doc, throw=True)
+
+        if primary_doc.branch != secondary_doc.branch:
+            frappe.throw("Cannot merge bills from different branches.")
+
         # Validation
         if (primary_doc.docstatus != 0 or secondary_doc.docstatus != 0):
             frappe.throw("Both invoices must be in Draft state to merge.")
