@@ -493,3 +493,44 @@ def submit_configure_data(data):
 
     frappe.db.commit()
     return {"status": "success", "results": results}
+
+@frappe.whitelist()
+def create_branch(branch_name, company, invoice_prefix, aggregator_prefix, default_room_name):
+    current_user = frappe.session.user
+    
+    if frappe.db.exists("Branch", branch_name):
+        frappe.throw(_("Branch {0} already exists").format(branch_name))
+        
+    # Create Branch with the current logged-in user
+    branch_doc = frappe.get_doc({
+        "doctype": "Branch",
+        "branch": branch_name,
+        "user": [{
+            "user": current_user
+        }]
+    })
+    branch_doc.insert(ignore_permissions=False)
+    
+    # Create URY Room
+    if not frappe.db.exists("URY Room", default_room_name):
+        frappe.get_doc({
+            "doctype": "URY Room",
+            "name": default_room_name,
+            "room_name": "Main Dining",
+            "branch": branch_name
+        }).insert(ignore_permissions=True)
+        
+    # Create URY Restaurant
+    restaurant_name = branch_name + " Restaurant"
+    if not frappe.db.exists("URY Restaurant", restaurant_name):
+        frappe.get_doc({
+            "doctype": "URY Restaurant",
+            "name": restaurant_name,
+            "company": company,
+            "branch": branch_name,
+            "invoice_series_prefix": invoice_prefix,
+            "aggregator_series_prefix": aggregator_prefix,
+            "default_room": default_room_name
+        }).insert(ignore_permissions=True)
+        
+    return branch_doc.name
