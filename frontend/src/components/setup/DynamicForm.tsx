@@ -210,7 +210,9 @@ export const DynamicForm = forwardRef<DynamicFormHandle, DynamicFormProps>(
 
     // Keep options updated when they arrive from props
     useEffect(() => {
-      store.set("/options", optionsMap);
+      Object.entries(optionsMap).forEach(([key, val]) => {
+        store.set(`/options/${key}`, val);
+      });
     }, [optionsMap, store]);
 
     const spec = useMemo(() => buildElementTree(rawSchema), [rawSchema]);
