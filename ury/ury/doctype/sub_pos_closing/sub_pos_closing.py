@@ -98,6 +98,11 @@ def get_cashiers(doctype, txt, searchfield, start, page_len, filters):
 
 @frappe.whitelist()
 def get_pos_invoices(start, end, pos_profile, user):
+    frappe.has_permission("POS Invoice", "read", throw=True)
+    manager_roles = {"Administrator", "System Manager", "URY Admin", "URY Manager"}
+    if user != frappe.session.user and not manager_roles.intersection(frappe.get_roles(frappe.session.user)):
+        frappe.throw(frappe._("Not permitted to view other cashiers' invoices"), frappe.PermissionError)
+
     data = frappe.db.sql(
         """
         select
