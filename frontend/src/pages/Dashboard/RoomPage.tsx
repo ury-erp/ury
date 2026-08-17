@@ -106,6 +106,7 @@ export const RoomPage: React.FC = () => {
         await call('frappe.client.insert', {
           doc: {
             doctype: 'URY Room',
+            name: newRoom.room_name,
             room_name: newRoom.room_name,
             room_type: newRoom.room_type,
             branch: newRoom.branch || undefined,

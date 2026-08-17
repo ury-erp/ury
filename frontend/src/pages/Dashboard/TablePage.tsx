@@ -126,10 +126,33 @@ export const TablePage: React.FC = () => {
           },
         });
       } else {
+        let restaurantName = '';
+        if (newTable.branch) {
+          try {
+            const resList = await call<any>('frappe.client.get_list', {
+              doctype: 'URY Restaurant',
+              filters: [['branch', '=', newTable.branch]],
+              fields: ['name'],
+              limit: 1
+            });
+            const records = resList.message || resList || [];
+            if (records.length > 0) {
+              restaurantName = records[0].name;
+            }
+          } catch (err) {
+            console.error('Failed to fetch restaurant for branch', err);
+          }
+        }
+        if (!restaurantName) {
+          const branchVal = newTable.branch || activeBranchId;
+          restaurantName = branchVal && branchVal !== 'all' ? `${branchVal} Restaurant` : 'Main Restaurant';
+        }
+
         await call('frappe.client.insert', {
           doc: {
             doctype: 'URY Table',
             name: newTable.table_name,
+            restaurant: restaurantName,
             no_of_seats: parseInt(newTable.no_of_seats),
             minimum_seating: parseInt(newTable.minimum_seating),
             branch: newTable.branch || undefined,

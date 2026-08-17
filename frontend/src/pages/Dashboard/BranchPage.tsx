@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
-import { Save, ChevronDown, ChevronRight } from 'lucide-react';
-import { Card, Button, Input, Spinner } from '@ury/ui';
-import { SearchableSelect } from '../../components/common/SearchableSelect';
+import { Save, ChevronDown, ChevronRight, Plus, X } from 'lucide-react';
+import { Card, Button, Input, Select, Spinner, showToast } from '@ury/ui';
+import SideDrawer from '../../components/layout/SideDrawer';
 import { call } from '@ury/core';
 import { dashboardService } from '../../services/dashboard';
 
@@ -49,6 +49,66 @@ export const BranchPage: React.FC = () => {
   const [menuSectionOpen, setMenuSectionOpen] = useState(true);
   const [roomSectionOpen, setRoomSectionOpen] = useState(true);
   const [orderTypeSectionOpen, setOrderTypeSectionOpen] = useState(true);
+
+  
+  const [isAddDrawerOpen, setIsAddDrawerOpen] = useState(false);
+  const [addForm, setAddForm] = useState({
+    branchName: '', company: '', invoicePrefix: 'INV-', aggregatorPrefix: 'AGG-', taxId: '', address: ''
+  });
+  const [companies, setCompanies] = useState<any[]>([]);
+
+  const fetchCompanies = async () => {
+    try {
+      const res = await call<any>('frappe.client.get_list', { doctype: 'Company', fields: ['name'] });
+      setCompanies(res.message || res || []);
+    } catch (e) {}
+  };
+
+  useEffect(() => {
+    fetchCompanies();
+  }, []);
+
+  const handleAddBranch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await call('frappe.client.insert', {
+        doc: {
+          doctype: 'Branch',
+          branch: addForm.branchName
+        }
+      });
+      const roomName = `Main Dining - ${addForm.branchName}`;
+      await call('frappe.client.insert', {
+        doc: {
+          doctype: 'URY Room',
+          name: roomName,
+          room_name: 'Main Dining',
+          branch: addForm.branchName
+        }
+      });
+      await call('frappe.client.insert', {
+        doc: {
+          doctype: 'URY Restaurant',
+          name: addForm.branchName + ' Restaurant',
+          company: addForm.company,
+          branch: addForm.branchName,
+          invoice_series_prefix: addForm.invoicePrefix,
+          aggregator_series_prefix: addForm.aggregatorPrefix,
+          tax_id: addForm.taxId,
+          address: addForm.address,
+          default_room: roomName
+        }
+      });
+      showToast.success('Branch created successfully');
+      setIsAddDrawerOpen(false);
+      window.location.reload();
+    } catch (err: any) {
+      showToast.error(err.message || 'Failed to create Branch');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const branchToFetch = activeBranchId === 'all' ? branches[0]?.name : activeBranchId;
 
@@ -107,10 +167,15 @@ export const BranchPage: React.FC = () => {
           const restaurant = restaurantRes.message || restaurantRes;
           setRestaurantData(restaurant);
           setRestaurantForm({
+            invoice_series_prefix: restaurant.invoice_series_prefix || '',
+            aggregator_series_prefix: restaurant.aggregator_series_prefix || '',
+            tax_id: restaurant.tax_id || '',
             active_menu: restaurant.active_menu || '',
             default_room: restaurant.default_room || '',
             room_wise_menu: restaurant.room_wise_menu || 0,
             order_type_wise_menu: restaurant.order_type_wise_menu || 0,
+            menu_for_room: restaurant.menu_for_room || [],
+            order_type_menu: restaurant.order_type_menu || [],
           });
         } else {
           setRestaurantData(null);
@@ -140,29 +205,31 @@ export const BranchPage: React.FC = () => {
     if (!branchToFetch) return;
     setSaving(true);
     try {
-      // Save Branch fields
+      // Save Branch fields (address only)
       await call('frappe.client.set_value', {
         doctype: 'Branch',
         name: branchToFetch,
         fieldname: {
-          invoice_series_prefix: branchForm.invoice_series_prefix,
-          aggregator_series_prefix: branchForm.aggregator_series_prefix,
-          tax_id: branchForm.tax_id,
           address: branchForm.address,
         },
       });
 
       // Save URY Restaurant fields if it exists
       if (restaurantData) {
-        await call('frappe.client.set_value', {
-          doctype: 'URY Restaurant',
-          name: restaurantData.name,
-          fieldname: {
-            active_menu: restaurantForm.active_menu,
-            default_room: restaurantForm.default_room,
-            room_wise_menu: restaurantForm.room_wise_menu,
-            order_type_wise_menu: restaurantForm.order_type_wise_menu,
-          },
+        const updatedDoc = {
+          ...restaurantData,
+          invoice_series_prefix: restaurantForm.invoice_series_prefix,
+          aggregator_series_prefix: restaurantForm.aggregator_series_prefix,
+          tax_id: restaurantForm.tax_id,
+          active_menu: restaurantForm.active_menu,
+          default_room: restaurantForm.default_room,
+          room_wise_menu: restaurantForm.room_wise_menu,
+          order_type_wise_menu: restaurantForm.order_type_wise_menu,
+          menu_for_room: restaurantForm.menu_for_room || restaurantData.menu_for_room || [],
+          order_type_menu: restaurantForm.order_type_menu || restaurantData.order_type_menu || [],
+        };
+        await call('frappe.client.save', {
+          doc: updatedDoc
         });
       }
     } catch (err) {
@@ -194,19 +261,26 @@ export const BranchPage: React.FC = () => {
     <div className="space-y-6">
 
       {/* Save button */}
-      <div className="flex items-center justify-end pb-3 border-b border-gray-200 -mx-6 px-6 -mt-6 pt-6">
+      <div className="flex items-center justify-end gap-3 pb-3 border-b border-gray-200 -mx-6 px-6 -mt-6 pt-6">
+        <Button
+          onClick={() => setIsAddDrawerOpen(true)}
+          className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center space-x-1.5 shadow-xs"
+        >
+          <Plus className="w-4 h-4 mr-1.5" />
+          <span>Add Branch</span>
+        </Button>
         <Button
           onClick={handleSave}
           disabled={saving || !hasBranch}
-          className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center gap-1.5 shadow-xs"
+          className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center space-x-1.5 shadow-xs"
         >
-          {saving ? <Spinner className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+          {saving ? <Spinner className="w-4 h-4 mr-1.5" /> : <Save className="w-4 h-4 mr-1.5" />}
           <span>Save Settings</span>
         </Button>
       </div>
 
       {/* Branch Details */}
-      <Card className="p-6 rounded-lg border border-gray-200 bg-white shadow-sm">
+      <Card className="p-6 rounded-lg border-gray-200 bg-white shadow-sm">
         <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-4">Branch Details</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
@@ -220,25 +294,28 @@ export const BranchPage: React.FC = () => {
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-700">Invoice Series Prefix <span className="text-red-500">*</span></label>
             <Input
-              value={branchForm.invoice_series_prefix || ''}
-              onChange={(e) => setBranchForm(p => ({ ...p, invoice_series_prefix: e.target.value }))}
+              value={restaurantForm.invoice_series_prefix || ''}
+              onChange={(e) => setRestaurantForm(p => ({ ...p, invoice_series_prefix: e.target.value }))}
               className="rounded-lg"
+              disabled={!restaurantData}
             />
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-700">Aggregator Series Prefix</label>
             <Input
-              value={branchForm.aggregator_series_prefix || ''}
-              onChange={(e) => setBranchForm(p => ({ ...p, aggregator_series_prefix: e.target.value }))}
+              value={restaurantForm.aggregator_series_prefix || ''}
+              onChange={(e) => setRestaurantForm(p => ({ ...p, aggregator_series_prefix: e.target.value }))}
               className="rounded-lg"
+              disabled={!restaurantData}
             />
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-700">Tax ID</label>
             <Input
-              value={branchForm.tax_id || ''}
-              onChange={(e) => setBranchForm(p => ({ ...p, tax_id: e.target.value }))}
+              value={restaurantForm.tax_id || ''}
+              onChange={(e) => setRestaurantForm(p => ({ ...p, tax_id: e.target.value }))}
               className="rounded-lg"
+              disabled={!restaurantData}
             />
           </div>
           <div className="space-y-2 md:col-span-2">
@@ -268,15 +345,15 @@ export const BranchPage: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-gray-700">Default Menu (Active Menu)</label>
-                    <SearchableSelect
-                      id="active_menu"
+                    <Select
                       value={restaurantForm.active_menu || ''}
-                      onChange={(_, value) => setRestaurantForm(p => ({ ...p, active_menu: value }))}
-                      options={[
-                        { value: '', label: 'None' },
-                        ...menus.map(m => ({ value: m.name, label: m.menu_name || m.name }))
-                      ]}
-                    />
+                      onChange={(e) => setRestaurantForm(p => ({ ...p, active_menu: e.target.value }))}
+                    >
+                      <option value="">None</option>
+                      {menus.map((m) => (
+                        <option key={m.name} value={m.name}>{m.menu_name || m.name}</option>
+                      ))}
+                    </Select>
                   </div>
                   <div className="flex items-center gap-2 pt-6">
                     <input
@@ -291,7 +368,7 @@ export const BranchPage: React.FC = () => {
                     </label>
                   </div>
                 </div>
-                {restaurantData.menu_for_room && restaurantData.menu_for_room.length > 0 && (
+                {true && (
                   <div className="mt-3 rounded-lg border border-gray-200 overflow-hidden">
                     <table className="w-full text-xs text-gray-600">
                       <thead className="bg-gray-50 border-b border-gray-100 font-semibold">
@@ -301,14 +378,48 @@ export const BranchPage: React.FC = () => {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
-                        {restaurantData.menu_for_room.map((row: any, idx: number) => (
+                        {(restaurantForm.menu_for_room || []).map((row: any, idx: number) => (
                           <tr key={idx}>
-                            <td className="px-4 py-2">{row.room || row.ury_room || '-'}</td>
-                            <td className="px-4 py-2">{row.menu || row.ury_menu || '-'}</td>
+                            <td className="px-4 py-2">
+                              <Select className="w-full text-xs" value={row.room || row.ury_room || ''} onChange={e => {
+                                const newRows = [...restaurantForm.menu_for_room];
+                                newRows[idx].room = e.target.value;
+                                newRows[idx].ury_room = e.target.value;
+                                setRestaurantForm({...restaurantForm, menu_for_room: newRows});
+                              }}>
+                                <option value="">Select Room</option>
+                                {rooms.map(r => <option key={r.name} value={r.name}>{r.room_name || r.name}</option>)}
+                              </Select>
+                            </td>
+                            <td className="px-4 py-2 flex items-center gap-2">
+                              <Select className="w-full text-xs" value={row.menu || row.ury_menu || ''} onChange={e => {
+                                const newRows = [...restaurantForm.menu_for_room];
+                                newRows[idx].menu = e.target.value;
+                                newRows[idx].ury_menu = e.target.value;
+                                setRestaurantForm({...restaurantForm, menu_for_room: newRows});
+                              }}>
+                                <option value="">Select Menu</option>
+                                {menus.map(m => <option key={m.name} value={m.name}>{m.menu_name || m.name}</option>)}
+                              </Select>
+                              <button type="button" className="text-gray-400 hover:text-red-500 shrink-0" onClick={() => {
+                                const newRows = restaurantForm.menu_for_room.filter((_:any, i:number) => i !== idx);
+                                setRestaurantForm({...restaurantForm, menu_for_room: newRows});
+                              }}><X className="w-4 h-4" /></button>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
+                    <div className="p-2 border-t border-gray-100 bg-gray-50">
+                      <Button type="button" variant="ghost" size="sm" className="text-primary h-7 text-xs" onClick={() => {
+                        setRestaurantForm({...restaurantForm, order_type_menu: [...(restaurantForm.order_type_menu || []), {order_type: '', menu: ''}]});
+                      }}>+ Add Row</Button>
+                    </div>
+                    <div className="p-2 border-t border-gray-100 bg-gray-50">
+                      <Button type="button" variant="ghost" size="sm" className="text-primary h-7 text-xs" onClick={() => {
+                        setRestaurantForm({...restaurantForm, menu_for_room: [...(restaurantForm.menu_for_room || []), {room: '', menu: ''}]});
+                      }}>+ Add Row</Button>
+                    </div>
                   </div>
                 )}
               </>
@@ -333,15 +444,15 @@ export const BranchPage: React.FC = () => {
             {restaurantData ? (
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-700">Default Room</label>
-                <SearchableSelect
-                  id="default_room"
+                <Select
                   value={restaurantForm.default_room || ''}
-                  onChange={(_, value) => setRestaurantForm(p => ({ ...p, default_room: value }))}
-                  options={[
-                    { value: '', label: 'None' },
-                    ...rooms.map(r => ({ value: r.name, label: r.room_name || r.name }))
-                  ]}
-                />
+                  onChange={(e) => setRestaurantForm(p => ({ ...p, default_room: e.target.value }))}
+                >
+                  <option value="">None</option>
+                  {rooms.map((r) => (
+                    <option key={r.name} value={r.name}>{r.room_name || r.name}</option>
+                  ))}
+                </Select>
               </div>
             ) : (
               <p className="text-sm text-gray-400">No URY Restaurant linked to this branch.</p>
@@ -375,7 +486,7 @@ export const BranchPage: React.FC = () => {
                     Order Type Wise Menu
                   </label>
                 </div>
-                {restaurantData.order_type_menu && restaurantData.order_type_menu.length > 0 && (
+                {true && (
                   <div className="mt-3 rounded-lg border border-gray-200 overflow-hidden">
                     <table className="w-full text-xs text-gray-600">
                       <thead className="bg-gray-50 border-b border-gray-100 font-semibold">
@@ -385,14 +496,44 @@ export const BranchPage: React.FC = () => {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
-                        {restaurantData.order_type_menu.map((row: any, idx: number) => (
+                        {(restaurantForm.order_type_menu || []).map((row: any, idx: number) => (
                           <tr key={idx}>
-                            <td className="px-4 py-2">{row.order_type || '-'}</td>
-                            <td className="px-4 py-2">{row.menu || row.ury_menu || '-'}</td>
+                            <td className="px-4 py-2">
+                              <Input className="w-full text-xs" placeholder="e.g. Dine In" value={row.order_type || ''} onChange={e => {
+                                const newRows = [...restaurantForm.order_type_menu];
+                                newRows[idx].order_type = e.target.value;
+                                setRestaurantForm({...restaurantForm, order_type_menu: newRows});
+                              }} />
+                            </td>
+                            <td className="px-4 py-2 flex items-center gap-2">
+                              <Select className="w-full text-xs" value={row.menu || row.ury_menu || ''} onChange={e => {
+                                const newRows = [...restaurantForm.order_type_menu];
+                                newRows[idx].menu = e.target.value;
+                                newRows[idx].ury_menu = e.target.value;
+                                setRestaurantForm({...restaurantForm, order_type_menu: newRows});
+                              }}>
+                                <option value="">Select Menu</option>
+                                {menus.map(m => <option key={m.name} value={m.name}>{m.menu_name || m.name}</option>)}
+                              </Select>
+                              <button type="button" className="text-gray-400 hover:text-red-500 shrink-0" onClick={() => {
+                                const newRows = restaurantForm.order_type_menu.filter((_:any, i:number) => i !== idx);
+                                setRestaurantForm({...restaurantForm, order_type_menu: newRows});
+                              }}><X className="w-4 h-4" /></button>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
+                    <div className="p-2 border-t border-gray-100 bg-gray-50">
+                      <Button type="button" variant="ghost" size="sm" className="text-primary h-7 text-xs" onClick={() => {
+                        setRestaurantForm({...restaurantForm, order_type_menu: [...(restaurantForm.order_type_menu || []), {order_type: '', menu: ''}]});
+                      }}>+ Add Row</Button>
+                    </div>
+                    <div className="p-2 border-t border-gray-100 bg-gray-50">
+                      <Button type="button" variant="ghost" size="sm" className="text-primary h-7 text-xs" onClick={() => {
+                        setRestaurantForm({...restaurantForm, menu_for_room: [...(restaurantForm.menu_for_room || []), {room: '', menu: ''}]});
+                      }}>+ Add Row</Button>
+                    </div>
                   </div>
                 )}
               </>
@@ -402,6 +543,51 @@ export const BranchPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Add Branch Drawer */}
+      <SideDrawer
+        isOpen={isAddDrawerOpen}
+        onClose={() => setIsAddDrawerOpen(false)}
+        title="Add Branch"
+      >
+        <form onSubmit={handleAddBranch} className="space-y-6 text-sm">
+          <div>
+            <label className="block font-semibold text-gray-700 mb-1.5">Branch Name <span className="text-red-500">*</span></label>
+            <Input required value={addForm.branchName} onChange={e => setAddForm({...addForm, branchName: e.target.value})} placeholder="e.g. Main Branch" />
+          </div>
+          <div>
+            <label className="block font-semibold text-gray-700 mb-1.5">Company <span className="text-red-500">*</span></label>
+            <Select required value={addForm.company} onChange={e => setAddForm({...addForm, company: e.target.value})}>
+              <option value="">Select Company</option>
+              {companies.map((c: any) => <option key={c.name} value={c.name}>{c.name}</option>)}
+            </Select>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block font-semibold text-gray-700 mb-1.5">Invoice Prefix <span className="text-red-500">*</span></label>
+              <Input required value={addForm.invoicePrefix} onChange={e => setAddForm({...addForm, invoicePrefix: e.target.value})} />
+            </div>
+            <div>
+              <label className="block font-semibold text-gray-700 mb-1.5">Aggregator Prefix <span className="text-red-500">*</span></label>
+              <Input required value={addForm.aggregatorPrefix} onChange={e => setAddForm({...addForm, aggregatorPrefix: e.target.value})} />
+            </div>
+          </div>
+          <div>
+            <label className="block font-semibold text-gray-700 mb-1.5">Tax ID (Optional)</label>
+            <Input value={addForm.taxId} onChange={e => setAddForm({...addForm, taxId: e.target.value})} />
+          </div>
+          <div>
+            <label className="block font-semibold text-gray-700 mb-1.5">Address (Optional)</label>
+            <Input value={addForm.address} onChange={e => setAddForm({...addForm, address: e.target.value})} />
+          </div>
+          <div className="pt-6 flex justify-end gap-3 border-t border-gray-100">
+            <Button type="button" variant="outline" onClick={() => setIsAddDrawerOpen(false)}>Cancel</Button>
+            <Button type="submit" disabled={saving} className="bg-primary hover:bg-primary/90 text-white">
+              {saving ? <Spinner className="w-4 h-4 mr-1.5" /> : null} Save
+            </Button>
+          </div>
+        </form>
+      </SideDrawer>
     </div>
   );
 };
