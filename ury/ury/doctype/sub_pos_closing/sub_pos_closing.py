@@ -101,32 +101,37 @@ SUPERVISOR_ROLES = {"URY Manager", "System Manager"}
 
 @frappe.whitelist()
 def get_pos_invoices(start, end, pos_profile, user):
+    frappe.has_permission("POS Invoice", "read", throw=True)
+
     session_user = frappe.session.user
     is_supervisor = session_user == "Administrator" or bool(
         set(frappe.get_roles(session_user)) & SUPERVISOR_ROLES
     )
 
-    # Non-supervisors may only query their own invoices, regardless of the
-    # cashier passed by the caller.
+    # Non-supervisors may only query their own invoices
     if not is_supervisor:
         user = session_user
 
-    # Branch scoping: the POS Profile must belong to the session user's branch.
+    # Branch scoping: the POS Profile must belong to the session user's branch
     try:
         session_branch = getBranch()
     except Exception:
         if is_supervisor:
-            # Supervisors (e.g. Administrator) may not be mapped to a branch.
+            # Supervisors may not be mapped to a branch
             session_branch = None
         else:
             raise
 
-    profile_branch = frappe.db.get_value("POS Profile", pos_profile, "branch")
+    profile_branch = frappe.db.get_value(
+        "POS Profile", pos_profile, "branch"
+    )
+
     if not profile_branch:
         frappe.throw(
             _("POS Profile {0} not found.").format(pos_profile),
             frappe.DoesNotExistError,
         )
+
     if session_branch and profile_branch != session_branch:
         frappe.throw(
             _("You do not have permission to access invoices for POS Profile {0}.").format(

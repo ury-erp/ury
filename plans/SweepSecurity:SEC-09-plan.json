@@ -1,0 +1,29 @@
+{
+  "finding_id": "SEC-09",
+  "objective": "Decompose security finding SEC-09 into structured, trackable implementation subtasks prior to applying code fixes, ensuring security requirements for get_pos_invoices in sub_pos_closing.py are clearly scoped.",
+  "scope": [
+    "ury/ury/doctype/sub_pos_closing/sub_pos_closing.py"
+  ],
+  "priority": "High",
+  "risk_metrics": {
+    "severity": "High",
+    "impact": "High",
+    "likelihood": "Medium"
+  },
+  "acceptance_criteria": [
+    "Enforce frappe.has_permission(\"POS Invoice\", \"read\", throw=True) at the beginning of get_pos_invoices.",
+    "Verify the requested user parameter matches frappe.session.user, unless the session user possesses manager roles."
+  ],
+  "tasks": [
+    {
+      "id": "SEC-09-1",
+      "description": "Add frappe.has_permission(\"POS Invoice\", \"read\") check to get_pos_invoices.",
+      "status": "completed"
+    },
+    {
+      "id": "SEC-09-2",
+      "description": "Restrict the user parameter to frappe.session.user unless the user has elevated roles.",
+      "status": "completed"
+    }
+  ]
+}
