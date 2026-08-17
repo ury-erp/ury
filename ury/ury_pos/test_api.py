@@ -65,7 +65,7 @@ class TestMergeBillsSEC07(unittest.TestCase):
         
         merge_bills("INV-01", "INV-02")
         
-        mock_throw.assert_called_once_with("Cannot merge bills from different branches.")
+        mock_throw.assert_called_once_with("Cannot merge bills from different branches.", frappe.PermissionError)
         mock_rollback.assert_called_once()
 
     @patch("ury.ury_pos.api.frappe.get_doc")
