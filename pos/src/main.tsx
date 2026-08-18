@@ -9,17 +9,33 @@ import { privateKey } from '../privateKey'
 import { registerServiceWorker } from './registerServiceWorker'
 import { queryClient } from './lib/query-client'
 
-initPrinting({ signKey: privateKey })
-registerServiceWorker()
+try {
+  initPrinting({ signKey: privateKey })
+} catch (err) {
+  console.warn('initPrinting notice:', err)
+}
 
-initI18n().then(() => {
-  createRoot(document.getElementById('root')!).render(
+try {
+  registerServiceWorker()
+} catch (err) {
+  console.warn('registerServiceWorker notice:', err)
+}
+
+// Initialize i18n in background without blocking initial React mount
+initI18n().catch((err) => {
+  console.warn('initI18n notice:', err)
+})
+
+const rootEl = document.getElementById('root')
+if (rootEl) {
+  createRoot(rootEl).render(
     <StrictMode>
       <QueryClientProvider client={queryClient}>
         <App />
       </QueryClientProvider>
     </StrictMode>,
   )
-})
+}
+
 
   
