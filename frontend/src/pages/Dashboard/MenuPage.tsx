@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
-import { Utensils, Search, Plus, LayoutGrid, List, Edit2, Check, X, Trash2 } from 'lucide-react';
+import { Utensils, Search, Plus, LayoutGrid, List, Edit2, Check, X, Trash2, Upload, FileText, Download } from 'lucide-react';
 import { Card, Button, Badge, Input, Spinner, showToast } from '@ury/ui';
 import { formatCurrency, call } from '@ury/core';
 import { dashboardService } from '../../services/dashboard';
@@ -88,6 +88,11 @@ export const MenuPage: React.FC = () => {
 
   const [availableItems, setAvailableItems] = useState<{ name: string; item_name?: string; standard_rate?: number; custom_course?: string }[]>([]);
   const [menuItemRowToPopulateId, setMenuItemRowToPopulateId] = useState<string | null>(null);
+
+  // Bulk CSV upload state for Add New Menu
+  const [addMenuCsvFile, setAddMenuCsvFile] = useState<File | null>(null);
+  const [addMenuIsDragging, setAddMenuIsDragging] = useState(false);
+  const addMenuCsvInputRef = React.useRef<HTMLInputElement>(null);
 
   const fetchItems = async () => {
     try {
@@ -234,7 +239,88 @@ export const MenuPage: React.FC = () => {
         },
       ],
     });
+    setAddMenuCsvFile(null);
+    setAddMenuIsDragging(false);
     setDrawerMode('add-menu');
+  };
+
+  /**
+   * Parse an uploaded CSV file and populate the Add New Menu items list.
+   * Expected columns (same format as Setup Wizard MenuSection): item_name, course, price
+   * Reuses availableItems to resolve standard_rate and custom_course where possible.
+   * Deduplicates against items already added.
+   */
+  const handleAddMenuCsvSelect = (file: File) => {
+    setAddMenuCsvFile(file);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      if (!text) return;
+      const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+      if (lines.length < 2) return; // need header + at least one row
+      const headers = lines[0].split(',').map((h) => h.trim().replace(/^"|"$/g, '').toLowerCase());
+      const nameIdx = headers.findIndex((h) => h === 'item_name' || h === 'name');
+      if (nameIdx === -1) return;
+      const courseIdx = headers.findIndex((h) => h === 'course');
+      const priceIdx = headers.findIndex((h) => h === 'price' || h === 'rate');
+
+      const parsedItems: NewMenuItem[] = [];
+      for (let i = 1; i < lines.length; i++) {
+        const cols = lines[i].split(',').map((c) => c.trim().replace(/^"|"$/g, ''));
+        const rawName = cols[nameIdx] || '';
+        if (!rawName) continue;
+
+        const matched = availableItems.find(
+          (it) =>
+            it.name === rawName ||
+            (it.item_name || '').toLowerCase() === rawName.toLowerCase()
+        );
+
+        const id = `csv-item-${Date.now()}-${i}`;
+        // Prefer the CSV's own price column; fall back to standard_rate
+        const csvRate = priceIdx !== -1 ? cols[priceIdx] : '';
+        const rate = csvRate || matched?.standard_rate?.toString() || '';
+        const course =
+          matched?.custom_course ||
+          (courseIdx !== -1 ? cols[courseIdx] : '') ||
+          availableCourses[0]?.name ||
+          '';
+
+        parsedItems.push({
+          id,
+          item_name: matched ? matched.name : rawName,
+          course,
+          rate,
+        });
+      }
+
+      if (parsedItems.length === 0) return;
+
+      setNewMenu((prev) => {
+        const existingNames = new Set(
+          prev.items.map((it) => it.item_name.toLowerCase()).filter(Boolean)
+        );
+        const dedupedNew = parsedItems.filter(
+          (it) => !existingNames.has(it.item_name.toLowerCase())
+        );
+        // Remove trailing empty row before appending
+        const cleanedExisting = prev.items.filter((it) => it.item_name.trim() !== '');
+        return {
+          ...prev,
+          items: [
+            ...cleanedExisting,
+            ...dedupedNew,
+            {
+              id: `item-${Date.now()}`,
+              item_name: '',
+              course: availableCourses[0]?.name || '',
+              rate: '',
+            },
+          ],
+        };
+      });
+    };
+    reader.readAsText(file);
   };
 
   const handleAddNewMenuItem = () => {
@@ -251,6 +337,12 @@ export const MenuPage: React.FC = () => {
       ],
     }));
   };
+
+  /** Returns true if itemName is already used in another row (duplicate guard). */
+  const isItemAlreadySelected = (itemName: string, excludeId: string) =>
+    newMenu.items.some(
+      (it) => it.id !== excludeId && it.item_name.trim() !== '' && it.item_name === itemName
+    );
 
   const handleUpdateNewMenuItem = (id: string, patch: Partial<NewMenuItem>) => {
     setNewMenu((prev) => ({
@@ -738,6 +830,11 @@ export const MenuPage: React.FC = () => {
                     id={`item-select-${item.id}`}
                     value={item.item_name}
                     onChange={(_, value) => {
+                      // Duplicate guard
+                      if (value && isItemAlreadySelected(value, item.id)) {
+                        showToast.error('This item is already added to the menu');
+                        return;
+                      }
                       const matched = availableItems.find(
                         (it) => it.name === value || it.item_name === value
                       );
@@ -806,6 +903,78 @@ export const MenuPage: React.FC = () => {
               <Plus className="w-3.5 h-3.5" />
               Add Item
             </button>
+          </div>
+
+          {/* Bulk CSV Upload — mirrors the Setup Wizard MenuSection upload experience */}
+          <div className="pt-3 border-t border-gray-100 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div>
+                <label className="block font-semibold text-gray-700">
+                  Bulk Upload <span className="text-xs font-normal text-gray-400">(Optional)</span>
+                </label>
+                <p className="text-xs text-gray-500">Import items from a CSV file</p>
+              </div>
+              <a
+                href="/assets/ury/files/menu_template.csv"
+                download
+                className="text-xs font-medium text-primary hover:underline flex items-center gap-1 shrink-0"
+              >
+                <Download className="w-3 h-3" />
+                Download Template
+              </a>
+            </div>
+
+            <input
+              ref={addMenuCsvInputRef}
+              type="file"
+              accept=".csv"
+              onChange={(e) => {
+                if (e.target.files?.[0]) handleAddMenuCsvSelect(e.target.files[0]);
+              }}
+              className="hidden"
+            />
+
+            {addMenuCsvFile ? (
+              <div className="p-3 border border-primary/40 bg-primary/5 rounded-lg flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-primary shrink-0" />
+                  <div>
+                    <p className="text-xs font-medium text-gray-900">{addMenuCsvFile.name}</p>
+                    <p className="text-[10px] text-gray-500">{(addMenuCsvFile.size / 1024).toFixed(1)} KB</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAddMenuCsvFile(null)}
+                  className="text-gray-400 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors"
+                  title="Remove file"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <div
+                onDragOver={(e) => { e.preventDefault(); setAddMenuIsDragging(true); }}
+                onDragLeave={(e) => { e.preventDefault(); setAddMenuIsDragging(false); }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setAddMenuIsDragging(false);
+                  if (e.dataTransfer.files?.[0]) handleAddMenuCsvSelect(e.dataTransfer.files[0]);
+                }}
+                onClick={() => addMenuCsvInputRef.current?.click()}
+                className={`p-4 border border-dashed rounded-lg text-center cursor-pointer transition-colors ${
+                  addMenuIsDragging
+                    ? 'border-primary bg-primary/5'
+                    : 'border-gray-300 hover:border-primary bg-gray-50/50 hover:bg-primary/5'
+                }`}
+              >
+                <Upload className="w-5 h-5 text-gray-400 mx-auto mb-1.5" />
+                <p className="text-xs font-medium text-gray-600">
+                  Drag & drop CSV template here, or <span className="text-primary">browse</span>
+                </p>
+                <p className="text-[10px] text-gray-400 mt-0.5">Supports CSV files only</p>
+              </div>
+            )}
           </div>
 
           <div className="pt-6 flex justify-end gap-3 border-t mt-8 border-gray-100">
