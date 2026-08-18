@@ -26,6 +26,9 @@ import { ItemWisePurchaseHistory } from './pages/Reports/ItemWisePurchaseHistory
 import { CustomerData } from './pages/Reports/CustomerData';
 import { DaywiseCustomerDetails } from './pages/Reports/DaywiseCustomerDetails';
 import { RepeatedCustomers } from './pages/Reports/RepeatedCustomers';
+import { EmployeeSales } from './pages/Reports/EmployeeSales';
+import { EmployeeItemWiseSales } from './pages/Reports/EmployeeItemWiseSales';
+import { CompletedWorkOrders } from './pages/Reports/CompletedWorkOrders';
 
 function SetupGuard() {
   // @ts-ignore
@@ -82,6 +85,9 @@ function App() {
             <Route path="customer-data" element={<CustomerData />} />
             <Route path="daywise-customer-details" element={<DaywiseCustomerDetails />} />
             <Route path="repeated-customers" element={<RepeatedCustomers />} />
+            <Route path="employee-sales" element={<EmployeeSales />} />
+            <Route path="employee-item-wise-sales" element={<EmployeeItemWiseSales />} />
+            <Route path="completed-work-orders" element={<CompletedWorkOrders />} />
           </Route>
         </Route>
       </Route>
