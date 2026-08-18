@@ -13,6 +13,7 @@ import { ReportSettingsPage } from './pages/Dashboard/ReportSettingsPage';
 import { AuthGuard } from './components/AuthGuard';
 import { ReportsLayout } from './pages/Reports/ReportsLayout';
 import { ReportsHome } from './pages/Reports/ReportsHome';
+import { TodaysSales } from './pages/Reports/TodaysSales';
 
 function SetupGuard() {
   // @ts-ignore
@@ -56,6 +57,7 @@ function App() {
             }
           >
             <Route index element={<ReportsHome />} />
+            <Route path="today-sales" element={<TodaysSales />} />
           </Route>
         </Route>
       </Route>
