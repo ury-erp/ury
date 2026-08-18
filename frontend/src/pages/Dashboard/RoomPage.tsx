@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
 import { Plus, Layers, Edit2 } from 'lucide-react';
-import { Card, Button, Badge, Input, Spinner } from '@ury/ui';
+import { Card, Button, Badge, Input, Spinner, showToast } from '@ury/ui';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { dashboardService } from '../../services/dashboard';
 import { call } from '@ury/core';
@@ -102,6 +102,7 @@ export const RoomPage: React.FC = () => {
             block_takeaway: newRoom.block_takeaway ? 1 : 0,
           },
         });
+        showToast.success('Room updated successfully');
       } else {
         await call('frappe.client.insert', {
           doc: {
@@ -115,6 +116,7 @@ export const RoomPage: React.FC = () => {
             block_takeaway: newRoom.block_takeaway ? 1 : 0,
           },
         });
+        showToast.success('Room created successfully');
       }
       fetchRooms();
       setIsDrawerOpen(false);
