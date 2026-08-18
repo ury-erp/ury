@@ -980,6 +980,180 @@ def validate_pos_close(pos_profile):
     return "Success"
 
 
+def _get_allowed_pos_profiles(company: str, user: str) -> list:
+    """Return POS Profiles the user may open for the given company.
+
+    Replicates ``erpnext.accounts.doctype.pos_profile.pos_profile.pos_profile_query``:
+    non-disabled profiles for the company where the user is listed in
+    ``applicable_for_users`` or where ``applicable_for_users`` is empty.
+    """
+    if not company or not user:
+        return []
+
+    profiles = frappe.get_all(
+        "POS Profile",
+        filters={"company": company, "disabled": 0},
+        fields=["name"],
+    )
+    if not profiles:
+        return []
+
+    profile_names = [p["name"] for p in profiles]
+
+    # Bulk-fetch applicable users for all candidate profiles.
+    user_rows = frappe.get_all(
+        "POS Profile User",
+        filters={"parent": ["in", profile_names], "parenttype": "POS Profile"},
+        fields=["parent", "user"],
+    )
+
+    profile_users = {}
+    for row in user_rows:
+        profile_users.setdefault(row["parent"], set()).add(row["user"])
+
+    allowed_names = [
+        name
+        for name in profile_names
+        if not profile_users.get(name) or user in profile_users[name]
+    ]
+
+    if not allowed_names:
+        return []
+
+    return frappe.get_all(
+        "POS Profile",
+        filters={"name": ["in", allowed_names]},
+        fields=[
+            "name",
+            "company",
+            "branch",
+            "restaurant",
+            "custom_enable_multiple_cashier",
+            "custom_daily_pos_close",
+        ],
+        order_by="name",
+    )
+
+
+@frappe.whitelist()
+def get_pos_opening_screen_data() -> dict:
+    """Return the full context needed by the ORI native POS Opening screen.
+
+    This is a read-only, permission-aware context call. It aggregates the
+    current user/company, the POS Profiles the user may open, the active
+    POS Profile data (including branch, restaurant and multi-cashier flags),
+    payment modes seeded with an opening amount of zero, the daily-close
+    pre-check status, create/submit permission flags, and any existing open
+    POS Opening Entry for the current user.
+
+    The method does not create or mutate any document; submit-time
+    validations (payment accounts, duplicate entries, multi-cashier rules)
+    remain on the server.
+    """
+    user = frappe.session.user
+
+    # Company resolution: user default first, then global default.
+    company = frappe.defaults.get_user_default("Company")
+    if not company:
+        company = frappe.db.get_default("Company")
+
+    allowed_profiles = _get_allowed_pos_profiles(company, user)
+
+    # Resolve the active POS Profile. Prefer the existing URY helper; fall
+    # back to the first allowed profile if the helper cannot resolve one.
+    pos_profile_data = None
+    pos_profile_name = None
+    try:
+        pos_profile_data = getPosProfile()
+        pos_profile_name = pos_profile_data.get("pos_profile")
+    except Exception:
+        pos_profile_data = None
+        pos_profile_name = None
+
+    if not pos_profile_name and allowed_profiles:
+        pos_profile_name = allowed_profiles[0]["name"]
+        try:
+            pos_profile_doc = frappe.get_doc("POS Profile", pos_profile_name)
+            pos_profile_data = {
+                "pos_profile": pos_profile_doc.name,
+                "branch": pos_profile_doc.branch,
+                "company": pos_profile_doc.company,
+                "restaurant": pos_profile_doc.restaurant,
+                "warehouse": pos_profile_doc.warehouse,
+                "cashier": user,
+                "multiple_cashier": pos_profile_doc.custom_enable_multiple_cashier,
+                "custom_daily_pos_close": pos_profile_doc.custom_daily_pos_close,
+            }
+        except Exception:
+            pos_profile_data = None
+
+    # Payment modes with opening_amount default 0.
+    payment_modes = []
+    if pos_profile_name:
+        try:
+            pos_profile_doc = frappe.get_doc("POS Profile", pos_profile_name)
+            payment_modes = [
+                {"mode_of_payment": mop.mode_of_payment, "opening_amount": 0.0}
+                for mop in pos_profile_doc.payments
+            ]
+        except Exception:
+            payment_modes = []
+
+    # Daily close pre-check for the selected POS Profile.
+    daily_close_status = "Success"
+    if pos_profile_name:
+        try:
+            daily_close_status = validate_pos_close(pos_profile_name)
+        except Exception:
+            daily_close_status = "Success"
+
+    # DocType permission flags for POS Opening Entry.
+    can_create = bool(frappe.has_permission("POS Opening Entry", "create"))
+    can_submit = bool(frappe.has_permission("POS Opening Entry", "submit"))
+
+    # Existing open entries for the current user (user-wide check).
+    open_entries = frappe.get_all(
+        "POS Opening Entry",
+        filters={
+            "user": user,
+            "docstatus": 1,
+            "pos_closing_entry": ["in", ["", None]],
+        },
+        fields=[
+            "name",
+            "company",
+            "pos_profile",
+            "period_start_date",
+            "branch",
+            "status",
+        ],
+        order_by="period_start_date desc",
+    )
+
+    return {
+        "user": user,
+        "company": company,
+        "allowed_pos_profiles": allowed_profiles,
+        "pos_profile": pos_profile_data,
+        "branch": pos_profile_data.get("branch") if pos_profile_data else None,
+        "restaurant": pos_profile_data.get("restaurant") if pos_profile_data else None,
+        "custom_enable_multiple_cashier": (
+            pos_profile_data.get("multiple_cashier") if pos_profile_data else False
+        ),
+        "custom_main_cashier": (
+            pos_profile_data.get("owner") if pos_profile_data else None
+        ),
+        "custom_daily_pos_close": (
+            pos_profile_data.get("custom_daily_pos_close") if pos_profile_data else False
+        ),
+        "payment_modes": payment_modes,
+        "daily_close_status": daily_close_status,
+        "can_create": can_create,
+        "can_submit": can_submit,
+        "open_entries": open_entries,
+    }
+
+
 @frappe.whitelist()
 def merge_bills(primary_invoice, secondary_invoice):
 
