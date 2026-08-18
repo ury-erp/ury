@@ -20,16 +20,27 @@ from ury.setup.pos_demo import generate_pos_demo
 from erpnext.buying.doctype.purchase_order.purchase_order import make_purchase_receipt
 from frappe.utils.telemetry import capture
 
+demo_cache = {}
+
 def setup_ury_demo_data(company):
+    global demo_cache
+    demo_cache.clear()
     capture("demo_data_creation_started", "ury")
     frappe.flags.mute_messages = True
     try:
+        frappe.publish_realtime("setup_task", {"progress": [1, 7], "stage_status": "Setting up your system..."}, user=frappe.session.user)
         frappe.defaults.set_user_default("Company", company)
         frappe.db.set_single_value("Stock Settings", "allow_negative_stock", 1)
+        
+        frappe.publish_realtime("setup_task", {"progress": [2, 7], "stage_status": "Creating Master Data..."}, user=frappe.session.user)
         process_masters(company)
+        
+        frappe.publish_realtime("setup_task", {"progress": [3, 7], "stage_status": "Generating Transactions..."}, user=frappe.session.user)
         process_transactions(company)
+        
         generate_pos_demo()
 
+        frappe.publish_realtime("setup_task", {"progress": [6, 7], "stage_status": "Finalizing Setup..."}, user=frappe.session.user)
         admin = frappe.get_doc("User", "Administrator")
         admin.add_roles("URY Cashier", "URY Captain", "URY Manager")
 
@@ -39,11 +50,13 @@ def setup_ury_demo_data(company):
         if hasattr(frappe.local, "message_log"):
             frappe.local.message_log = []
             
-        frappe.publish_realtime("demo_data_complete")
-    except Exception:
+        frappe.publish_realtime("setup_task", {"progress": [7, 7], "stage_status": "Completed"}, user=frappe.session.user)
+        # Removed status: ok to prevent early page reload
+    except Exception as e:
         frappe.db.set_single_value("Stock Settings", "allow_negative_stock", 0)
         frappe.log_error("Failed to create demo data")
         capture("demo_data_creation_failed", "ury", properties={"exception": frappe.get_traceback()})
+        frappe.publish_realtime("setup_task", {"status": "fail", "fail_msg": "URY demo data generation failed"}, user=frappe.session.user)
         raise
     finally:
         frappe.flags.mute_messages = False
@@ -52,11 +65,53 @@ def setup_ury_demo_data(company):
 
 
 
+def ensure_master_records_exist():
+    # Avoid N+1 queries by fetching existing records in bulk
+    for uom in ["Nos", "Kg", "Box", "Gram", "Piece"]:
+        if not frappe.db.exists("UOM", uom):
+            try:
+                frappe.get_doc({
+                    "doctype": "UOM",
+                    "uom_name": uom,
+                    "must_be_whole_number": 1 if uom in ["Nos", "Piece", "Box"] else 0
+                }).insert(ignore_permissions=True)
+            except frappe.DuplicateEntryError:
+                pass
+            
+    for pl in ["Standard Buying", "Standard Selling"]:
+        if not frappe.db.exists("Price List", pl):
+            try:
+                frappe.get_doc({
+                    "doctype": "Price List",
+                    "price_list_name": pl,
+                    "enabled": 1,
+                    "buying": 1 if "Buying" in pl else 0,
+                    "selling": 1 if "Selling" in pl else 0,
+                    "currency": frappe.defaults.get_global_default("currency") or "INR"
+                }).insert(ignore_permissions=True)
+            except frappe.DuplicateEntryError:
+                pass
+            
+    for gender in ["Male", "Female", "Other"]:
+        if not frappe.db.exists("Gender", gender):
+            try:
+                frappe.get_doc({
+                    "doctype": "Gender",
+                    "gender": gender
+                }).insert(ignore_permissions=True)
+            except frappe.DuplicateEntryError:
+                pass
+
 def process_masters(company):
+    ensure_master_records_exist()
+    
     for doctype in frappe.get_hooks("ury_demo_master_doctypes"):
         data = read_data_file_using_hooks(doctype)
         if data:
             for item in json.loads(data):
+                if item.get("doctype") == "Employee" and not item.get("company"):
+                    item["company"] = company
+                    
                 replace_placeholders(item, company)
                 try:
                     doc = frappe.get_doc(item)
@@ -181,7 +236,7 @@ def convert_order_to_invoices():
 
                 mode = randint(1, 3)
 
-                # 🟢 CASE 1: Only Purchase Receipt
+                # CASE 1: Only Purchase Receipt
                 if mode == 1:
                     pr = make_purchase_receipt(order.name)
                     pr.set_posting_time = 1
@@ -190,11 +245,11 @@ def convert_order_to_invoices():
                     pr.submit()
                     continue
 
-                # 🔵 CASE 2: Direct Purchase Invoice (no PR)
+                # CASE 2: Direct Purchase Invoice (no PR)
                 elif mode == 2:
                     invoice = make_purchase_invoice(order.name)
 
-                # 🟣 CASE 3: PR → PI flow
+                # CASE 3: PR → PI flow
                 else:
                     pr = make_purchase_receipt(order.name)
                     pr.set_posting_time = 1
@@ -340,80 +395,101 @@ def get_two_warehouses(company):
 
 
 def get_bom_for_item(item_code, company):
-    bom = frappe.db.get_value(
-        "BOM",
-        {
-            "item": item_code,
-            "company": company,
-            "is_default": 1
-        }
-    )
-    if not bom:
-        frappe.throw(f"No default BOM found for Item {item_code}")
-    return bom
+    key = f"bom_{item_code}_{company}"
+    if key not in demo_cache:
+        bom = frappe.db.get_value(
+            "BOM",
+            {
+                "item": item_code,
+                "company": company,
+                "is_default": 1
+            }
+        )
+        if not bom:
+            frappe.throw(f"No default BOM found for Item {item_code}")
+        demo_cache[key] = bom
+    return demo_cache[key]
 
 
 def get_cash_account(company):
-    return frappe.db.get_value(
-        "Account",
-        {"company": company, "account_type": "Cash", "is_group": 0},
-        "name"
-    )
+    key = f"cash_account_{company}"
+    if key not in demo_cache:
+        demo_cache[key] = frappe.db.get_value(
+            "Account",
+            {"company": company, "account_type": "Cash", "is_group": 0},
+            "name"
+        )
+    return demo_cache[key]
 
 
 def get_write_off_account(company):
-    account = frappe.db.get_value(
-        "Account",
-        {
-            "company": company,
-            "root_type": "Expense",
-            "is_group": 0
-        },
-        "name"
-    )
-    if not account:
-        frappe.throw("No Expense Account found for Write Off")
-    return account
+    key = f"write_off_account_{company}"
+    if key not in demo_cache:
+        account = frappe.db.get_value(
+            "Account",
+            {
+                "company": company,
+                "root_type": "Expense",
+                "is_group": 0
+            },
+            "name"
+        )
+        if not account:
+            frappe.throw("No Expense Account found for Write Off")
+        demo_cache[key] = account
+    return demo_cache[key]
 
 def get_cost_center(company):
-    return frappe.db.get_value(
-        "Cost Center",
-        {"company": company, "is_group": 0},
-        "name"
-    )
+    key = f"cost_center_{company}"
+    if key not in demo_cache:
+        demo_cache[key] = frappe.db.get_value(
+            "Cost Center",
+            {"company": company, "is_group": 0},
+            "name"
+        )
+    return demo_cache[key]
 
 def get_receivable_account(company):
-    acc = frappe.db.get_value("Company", company, "default_receivable_account")
-    if not acc:
-        acc = frappe.db.get_value("Account", {"company": company, "account_type": "Receivable", "is_group": 0}, "name")
-    return acc
+    key = f"receivable_account_{company}"
+    if key not in demo_cache:
+        acc = frappe.db.get_value("Company", company, "default_receivable_account")
+        if not acc:
+            acc = frappe.db.get_value("Account", {"company": company, "account_type": "Receivable", "is_group": 0}, "name")
+        demo_cache[key] = acc
+    return demo_cache[key]
 
 def get_payable_account(company):
-    acc = frappe.db.get_value("Company", company, "default_payable_account")
-    if not acc:
-        acc = frappe.db.get_value("Account", {"company": company, "account_type": "Payable", "is_group": 0}, "name")
-    return acc
+    key = f"payable_account_{company}"
+    if key not in demo_cache:
+        acc = frappe.db.get_value("Company", company, "default_payable_account")
+        if not acc:
+            acc = frappe.db.get_value("Account", {"company": company, "account_type": "Payable", "is_group": 0}, "name")
+        demo_cache[key] = acc
+    return demo_cache[key]
 
 def get_bank_account(company):
-    acc = frappe.db.get_value("Company", company, "default_bank_account")
-    if not acc:
-        acc = frappe.db.get_value("Account", {"company": company, "account_type": "Bank", "is_group": 0}, "name")
-    if not acc:
-        parent_bank = frappe.db.get_value("Account", {"company": company, "account_type": "Bank", "is_group": 1}, "name")
-        if parent_bank:
-            doc = frappe.get_doc({
-                "doctype": "Account",
-                "account_name": "Demo Bank",
-                "parent_account": parent_bank,
-                "company": company,
-                "account_type": "Bank",
-                "is_group": 0
-            })
-            doc.insert(ignore_permissions=True, ignore_if_duplicate=True)
-            acc = doc.name
-        else:
-            acc = frappe.db.get_value("Account", {"company": company, "is_group": 0}, "name")
-    return acc
+    key = f"bank_account_{company}"
+    if key not in demo_cache:
+        acc = frappe.db.get_value("Company", company, "default_bank_account")
+        if not acc:
+            acc = frappe.db.get_value("Account", {"company": company, "account_type": "Bank", "is_group": 0}, "name")
+        if not acc:
+            parent_bank = frappe.db.get_value("Account", {"company": company, "account_type": "Bank", "is_group": 1}, "name")
+            if parent_bank:
+                doc = frappe.get_doc({
+                    "doctype": "Account",
+                    "account_name": "Demo Bank",
+                    "parent_account": parent_bank,
+                    "company": company,
+                    "account_type": "Bank",
+                    "is_group": 0
+                })
+                doc.insert(ignore_permissions=True, ignore_if_duplicate=True)
+                acc = doc.name
+            else:
+                acc = frappe.db.get_value("Account", {"company": company, "is_group": 0}, "name")
+        demo_cache[key] = acc
+    return demo_cache[key]
 
 
 def replace_placeholders(data, company):
@@ -446,13 +522,20 @@ def replace_placeholders(data, company):
 
 
 def get_warehouse(company):
-    warehouses = frappe.db.get_all("Warehouse", {"company": company, "is_group": 0})
-    if not warehouses:
-        frappe.throw(_("No warehouses found for the demo company. Please create at least one warehouse."))
+    key = f"warehouses_{company}"
+    if key not in demo_cache:
+        warehouses = frappe.db.get_all("Warehouse", {"company": company, "is_group": 0})
+        if not warehouses:
+            frappe.throw(_("No warehouses found for the demo company. Please create at least one warehouse."))
+        demo_cache[key] = warehouses
+    warehouses = demo_cache[key]
     return warehouses[randint(0, len(warehouses) - 1)].name
 
 def get_supplier():
-    suppliers = frappe.db.get_all("Supplier", pluck="name")
+    key = "suppliers"
+    if key not in demo_cache:
+        demo_cache[key] = frappe.db.get_all("Supplier", pluck="name")
+    suppliers = demo_cache[key]
     return suppliers[randint(0, len(suppliers) - 1)]
 
 @frappe.whitelist()
