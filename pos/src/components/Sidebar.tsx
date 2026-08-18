@@ -1,7 +1,5 @@
-import { 
-  Grid3X3,
-} from 'lucide-react';
-import { getCategoryIcon } from '../lib/category-icons';
+import { Grid3X3 } from 'lucide-react';
+import { CategoryIcon } from '../lib/category-icons';
 import { usePOSStore } from '../store/pos-store';
 import { cn } from '@ury/ui';
 import { Button, Badge } from '@ury/ui';
@@ -79,7 +77,6 @@ const Sidebar = ({ disabled }: SidebarProps) => {
           <div className="space-y-1">
             {categories.map((category) => {
               const count = getCategoryCount(category.name);
-              const CategoryIcon = getCategoryIcon(category.icon);
               return (
                 <Button
                   key={category.name}
@@ -98,7 +95,11 @@ const Sidebar = ({ disabled }: SidebarProps) => {
                     <div className="absolute start-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-blue-600 rounded-e-full" />
                   )}
                   <div className="flex items-center gap-3 ms-1">
-                    <CategoryIcon className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                    <CategoryIcon
+                      name={category.icon}
+                      courseName={category.name}
+                      className="w-4 h-4 text-gray-500 flex-shrink-0"
+                    />
                     <span className="text-start">{category.label}</span>
                   </div>
                   <Badge variant="secondary" size="sm" className="text-xs text-gray-500 bg-gray-100 min-w-[24px] text-center">
