@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { checkPOSOpening, validatePOSClose } from '../lib/pos-opening-api';
+import { getChecklist } from '../lib/checklist-api';
 import { usePOSStore } from '../store/pos-store';
 import POSOpeningDialog from './POSOpeningDialog';
+import ChecklistGateDialog from './ChecklistGateDialog';
 import { t } from '../i18n';
 
 interface POSOpeningProviderProps {
@@ -12,19 +14,43 @@ type ValidationType = 'opening' | 'closing' | null;
 
 const POSOpeningProvider = ({ children }: POSOpeningProviderProps) => {
   const [validationType, setValidationType] = useState<ValidationType>(null);
+  // Set once checkPOSOpening() confirms the POS is open but the Opening
+  // checklist log for today isn't status="Complete" yet. Takes priority over
+  // the daily-close check below -- the cashier must clear the checklist
+  // before we even look at whether a previous session needs closing.
+  const [needsOpeningChecklist, setNeedsOpeningChecklist] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const { posProfile } = usePOSStore();
 
   const checkPOSStatus = async () => {
     try {
       setIsLoading(true);
-      
+      setNeedsOpeningChecklist(false);
+
       // First check if POS is opened
       const openingResponse = await checkPOSOpening();
       if (openingResponse.message === 1) {
         // POS is not opened
         setValidationType('opening');
         return;
+      }
+
+      // POS is opened -- gate on the Opening checklist before the daily
+      // close check. If today's Opening checklist log isn't Complete yet,
+      // block here; checkPOSStatus() re-runs once the cashier submits it.
+      if (posProfile?.name) {
+        try {
+          const { logStatus } = await getChecklist(posProfile.name, 'Opening');
+          if (logStatus !== 'Complete') {
+            setNeedsOpeningChecklist(true);
+            return;
+          }
+        } catch (error) {
+          console.error('Failed to check opening checklist status:', error);
+          // On error, block on the checklist for safety.
+          setNeedsOpeningChecklist(true);
+          return;
+        }
       }
 
       // If POS is opened, check if custom_daily_pos_close is enabled
@@ -81,6 +107,20 @@ const POSOpeningProvider = ({ children }: POSOpeningProviderProps) => {
   // Show dialog if there's a validation issue
   if (validationType) {
     return <POSOpeningDialog onReload={handleReload} type={validationType} />;
+  }
+
+  // Block on the Opening checklist until it's submitted as Complete.
+  if (needsOpeningChecklist && posProfile?.name) {
+    return (
+      <ChecklistGateDialog
+        posProfile={posProfile.name}
+        checklistType="Opening"
+        onComplete={() => {
+          setNeedsOpeningChecklist(false);
+          checkPOSStatus();
+        }}
+      />
+    );
   }
 
   // Render children if all validations passed

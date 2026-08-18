@@ -7,6 +7,7 @@ import Table from './pages/Table';
 import AuthGuard from './components/AuthGuard';
 import POSOpeningProvider from './components/POSOpeningProvider';
 import ScreenSizeProvider from './components/ScreenSizeProvider';
+import KotAlertListener from './components/KotAlertListener';
 import { ToastProvider } from '@ury/ui';
 import { usePOSStore } from './store/pos-store';
 import { useEffect } from 'react';
@@ -30,6 +31,7 @@ function App() {
   return (
     <>
       <ToastProvider />
+      <KotAlertListener />
       <ScreenSizeProvider>
         <AuthGuard>
           <POSOpeningProvider>
