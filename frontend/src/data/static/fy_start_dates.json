@@ -1,0 +1,14 @@
+[
+  { "value": "01-01", "label": "January 1" },
+  { "value": "02-01", "label": "February 1" },
+  { "value": "03-01", "label": "March 1" },
+  { "value": "04-01", "label": "April 1" },
+  { "value": "05-01", "label": "May 1" },
+  { "value": "06-01", "label": "June 1" },
+  { "value": "07-01", "label": "July 1" },
+  { "value": "08-01", "label": "August 1" },
+  { "value": "09-01", "label": "September 1" },
+  { "value": "10-01", "label": "October 1" },
+  { "value": "11-01", "label": "November 1" },
+  { "value": "12-01", "label": "December 1" }
+]
