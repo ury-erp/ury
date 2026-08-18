@@ -337,3 +337,101 @@ def get_month_wise_sales(branch=None, months_back=6):
 			"worst_month": worst["month"] if worst else None,
 		},
 	}
+
+
+def _format_hour_label(hour):
+	"""12-hour clock label for a 0-23 hour, e.g. 0 -> '12 AM', 14 -> '02 PM'."""
+	hour = hour % 24
+	period = "AM" if hour < 12 else "PM"
+	display = hour % 12 or 12
+	return f"{display:02d} {period}"
+
+
+@frappe.whitelist()
+def get_time_wise_sales(branch=None, date=None, bucket_size_hours=2):
+	"""Sales and bill volume by time-of-day bucket for a single day.
+
+	Mirrors the existing "Time Wise Sales" Query Report, but with a
+	configurable bucket size (1/2/4 hours, default 2) instead of a hardcoded
+	set of 12 fixed 2-hour buckets — the main improvement flagged by
+	research. Buckets computed in Python (not dynamic SQL) since row counts
+	for a single day are small and this keeps arbitrary bucket sizes simple.
+	No extended-hours logic — the existing report doesn't apply it here
+	either (single calendar date only), which also means, unlike the other
+	Wave 1 reports, `branch` can genuinely be omitted for an All-Branches
+	aggregate without any simplifying compromise.
+	"""
+	require_manager()
+
+	bucket_size_hours = int(bucket_size_hours)
+	if bucket_size_hours not in (1, 2, 4):
+		frappe.throw("bucket_size_hours must be 1, 2, or 4.")
+
+	target_date = frappe.utils.getdate(date) if date else frappe.utils.today()
+	num_buckets = 24 // bucket_size_hours
+
+	params = {"target_date": target_date}
+	branch_filter = ""
+	if branch:
+		params["branch"] = branch
+		branch_filter = "AND `branch` = %(branch)s"
+
+	rows = frappe.db.sql(
+		f"""
+		SELECT `posting_time` AS posting_time, `grand_total` AS grand_total
+		FROM `tabPOS Invoice`
+		WHERE `posting_date` = %(target_date)s
+			{branch_filter}
+			AND `docstatus` = 1
+			AND `status` IN ("Consolidated", "Paid")
+		""",
+		params,
+		as_dict=True,
+	)
+
+	buckets = [{"sales": 0.0, "bills": 0} for _ in range(num_buckets)]
+	for r in rows:
+		posting_time = r["posting_time"]
+		# frappe.db.sql returns Time-fieldtype columns as datetime.timedelta.
+		hour = int(posting_time.total_seconds() // 3600) if hasattr(posting_time, "total_seconds") else int(
+			str(posting_time).split(":")[0]
+		)
+		bucket_index = min(hour // bucket_size_hours, num_buckets - 1)
+		buckets[bucket_index]["sales"] += float(r["grand_total"] or 0)
+		buckets[bucket_index]["bills"] += 1
+
+	total_sales = round(sum(b["sales"] for b in buckets), 2)
+	total_bills = sum(b["bills"] for b in buckets)
+
+	intervals = []
+	for i, b in enumerate(buckets):
+		start_hour = i * bucket_size_hours
+		end_hour = start_hour + bucket_size_hours
+		sales = round(b["sales"], 2)
+		intervals.append(
+			{
+				"interval_label": f"{_format_hour_label(start_hour)} - {_format_hour_label(end_hour)}",
+				"start_hour": start_hour,
+				"end_hour": end_hour,
+				"sales": sales,
+				"bills": b["bills"],
+				"pct_of_daily_total": round((sales / total_sales) * 100, 1) if total_sales else 0,
+				"avg_transaction_value": round(sales / b["bills"], 2) if b["bills"] else 0,
+			}
+		)
+
+	peak = max(intervals, key=lambda x: x["sales"], default=None)
+
+	return {
+		"branch": branch,
+		"date": str(target_date),
+		"bucket_size_hours": bucket_size_hours,
+		"intervals": intervals,
+		"summary": {
+			"total_sales": total_sales,
+			"total_bills": total_bills,
+			"avg_sale_per_bill": round(total_sales / total_bills, 2) if total_bills else 0,
+			"peak_interval": peak["interval_label"] if peak else None,
+			"peak_interval_sales": peak["sales"] if peak else 0,
+		},
+	}
