@@ -31,22 +31,23 @@ export async function getRestaurantMenu(posProfile: string, room?: string | null
 }
 
 export async function getRooms(branch?: string | null): Promise<Room[]> {
-  const targetBranch = branch || 'Main Branch';
-  try {
-    const rooms = await db.getDocList(DOCTYPES.URY_ROOM, {
-      fields: ['name', 'branch'],
-      filters: [['branch', 'like', targetBranch]],
-      limit: "*" as unknown as number,
-      asDict: true,
-    });
-    if (rooms && rooms.length > 0) {
-      return rooms as Room[];
+  if (branch) {
+    try {
+      const rooms = await db.getDocList(DOCTYPES.URY_ROOM, {
+        fields: ['name', 'branch'],
+        filters: [['branch', '=', branch]],
+        limit: "*" as unknown as number,
+        asDict: true,
+      });
+      if (rooms && rooms.length > 0) {
+        return rooms as Room[];
+      }
+    } catch (error) {
+      console.warn('Network getRooms with branch filter failed:', error);
     }
-  } catch (error) {
-    console.warn('Network getRooms with branch filter failed:', error);
   }
 
-  // Fallback 1: Query without branch filter
+  // Fallback 1: Query all rooms without branch constraint
   try {
     const allRooms = await db.getDocList(DOCTYPES.URY_ROOM, {
       fields: ['name', 'branch'],
@@ -56,19 +57,22 @@ export async function getRooms(branch?: string | null): Promise<Room[]> {
     if (allRooms && allRooms.length > 0) {
       return allRooms as Room[];
     }
-  } catch {}
+  } catch (error) {
+    console.warn('Network getRooms all rooms failed:', error);
+  }
 
   // Fallback 2: Derive unique rooms from cached tables repository in IndexedDB
   try {
     const cachedTables = await repositories.tables.getAll();
     const uniqueRoomNames = Array.from(new Set(cachedTables.map(t => t.restaurant_room).filter(Boolean)));
     if (uniqueRoomNames.length > 0) {
-      return uniqueRoomNames.map(name => ({ name, branch: targetBranch }));
+      return uniqueRoomNames.map(name => ({ name, branch: branch || 'Default' }));
     }
   } catch {}
 
   return [];
 }
+
 
 
 export async function getTableCount(room: string, branch?: string): Promise<number> {

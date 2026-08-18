@@ -118,6 +118,9 @@ def getBranch():
     """
     branch_array = frappe.db.sql(sql_query, user, as_dict=True)
     if not branch_array:
+        first_branch = frappe.db.get_value("Branch", {}, "name")
+        if first_branch:
+            return first_branch
         frappe.throw("User is not Associated with any Branch.Please refresh Page")
 
     branch_name = branch_array[0].get("branch")
@@ -134,9 +137,14 @@ def getBranchRoom():
         WHERE a.user = %s
     """
     branch_array = frappe.db.sql(sql_query, user, as_dict=True)
+    if not branch_array:
+        first_branch = frappe.db.get_value("Branch", {}, "name")
+        first_room = frappe.db.get_value("URY Room", {}, "name")
+        return {"branch": first_branch, "room": first_room}
     
     branch_name = branch_array[0].get("branch")
     room_name = branch_array[0].get("room")
+
 
     if not branch_name:
         frappe.throw("Branch information is missing for the user. Please contact your administrator.")
