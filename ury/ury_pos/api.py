@@ -1086,6 +1086,9 @@ def create_pos_opening_entry(pos_profile: str, company: str, balance_details) ->
     if not frappe.has_permission("POS Opening Entry", "create"):
         frappe.throw(_("Not permitted to create POS Opening Entry"), frappe.PermissionError)
 
+    if not frappe.has_permission("POS Opening Entry", "submit"):
+        frappe.throw(_("Not permitted to submit POS Opening Entry"), frappe.PermissionError)
+
     if isinstance(balance_details, str):
         balance_details = json.loads(balance_details)
 
@@ -1113,9 +1116,6 @@ def create_pos_opening_entry(pos_profile: str, company: str, balance_details) ->
     )
     opening.set("balance_details", balance_details)
     opening.submit()
-
-    if not frappe.has_permission(opening.doctype, "submit", doc=opening):
-        frappe.throw(_("Not permitted to submit POS Opening Entry"), frappe.PermissionError)
 
     return opening.as_dict()
 
