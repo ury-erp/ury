@@ -400,9 +400,18 @@ class TestGetPOSOpeningScreenData(unittest.TestCase):
                 return mock_pos_doc
             return MagicMock()
 
-        with patch("ury.ury_pos.api.frappe.get_doc", side_effect=get_doc_side_effect):
+        with patch(
+            "ury.ury_pos.api._get_main_cashier_status"
+        ) as mock_multi_cashier, patch(
+            "ury.ury_pos.api.frappe.get_doc", side_effect=get_doc_side_effect
+        ):
             mock_validate_close.return_value = "Success"
             mock_has_permission.side_effect = lambda doctype, perm: perm == "create" or perm == "submit"
+            mock_multi_cashier.return_value = {
+                "enabled": True,
+                "main_cashier_configured": True,
+                "main_cashier_open": True,
+            }
             mock_get_all.return_value = [
                 {"name": "POS-OPE-0001", "company": "Test Co", "pos_profile": "POS-Profile-1", "status": "Open"}
             ]
@@ -411,18 +420,19 @@ class TestGetPOSOpeningScreenData(unittest.TestCase):
 
         self.assertEqual(result["user"], "cashier@example.com")
         self.assertEqual(result["company"], "Test Co")
-        self.assertEqual(len(result["allowed_pos_profiles"]), 1)
-        self.assertEqual(result["pos_profile"]["pos_profile"], "POS-Profile-1")
+        self.assertEqual(len(result["allowed_profiles"]), 1)
+        self.assertEqual(result["allowed_profiles"][0]["name"], "POS-Profile-1")
+        self.assertEqual(result["selected_profile"], "POS-Profile-1")
         self.assertEqual(result["branch"], "Branch A")
         self.assertEqual(result["restaurant"], "Rest A")
-        self.assertTrue(result["custom_enable_multiple_cashier"])
-        self.assertEqual(result["custom_main_cashier"], "owner@example.com")
-        self.assertTrue(result["custom_daily_pos_close"])
+        self.assertTrue(result["multi_cashier"]["enabled"])
+        self.assertTrue(result["multi_cashier"]["main_cashier_configured"])
+        self.assertTrue(result["multi_cashier"]["main_cashier_open"])
         self.assertEqual(len(result["payment_modes"]), 2)
         self.assertEqual(result["payment_modes"][0]["opening_amount"], 0.0)
-        self.assertEqual(result["daily_close_status"], "Success")
-        self.assertTrue(result["can_create"])
-        self.assertTrue(result["can_submit"])
+        self.assertFalse(result["daily_close_pending"])
+        self.assertTrue(result["permissions"]["create"])
+        self.assertTrue(result["permissions"]["submit"])
         self.assertEqual(len(result["open_entries"]), 1)
 
     @patch("ury.ury_pos.api.frappe.get_all")
@@ -455,9 +465,9 @@ class TestGetPOSOpeningScreenData(unittest.TestCase):
         result = get_pos_opening_screen_data()
 
         self.assertIsNone(result["company"])
-        self.assertEqual(result["allowed_pos_profiles"], [])
-        self.assertIsNone(result["pos_profile"])
+        self.assertEqual(result["allowed_profiles"], [])
+        self.assertIsNone(result["selected_profile"])
         self.assertEqual(result["payment_modes"], [])
-        self.assertFalse(result["can_create"])
-        self.assertFalse(result["can_submit"])
+        self.assertFalse(result["permissions"]["create"])
+        self.assertFalse(result["permissions"]["submit"])
         self.assertEqual(result["open_entries"], [])
