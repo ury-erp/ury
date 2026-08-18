@@ -203,9 +203,11 @@
         "zoom_pan_hint": "استخدم التمرير للتكبير • اسحب الخلفية للتحريك"
     },
     "footer": {
+        "dashboard": "لوحة التحكم",
         "pos": "نقطة البيع",
-        "table": "طاولة",
-        "orders": "الطلبات"
+        "tables": "الطاولات",
+        "orders": "الطلبات",
+        "settings": "الإعدادات"
     },
     "product_dialog": {
         "special_instructions": "تعليمات خاصة",

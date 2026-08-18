@@ -279,9 +279,11 @@
     "merged_items": "Articles de l'addition fusionnée"
   },
   "footer": {
+    "dashboard": "Tableau de bord",
     "pos": "PDV",
-    "table": "Table",
-    "orders": "Commandes"
+    "tables": "Tables",
+    "orders": "Commandes",
+    "settings": "Paramètres"
   },
   "product_dialog": {
     "special_instructions": "Instructions spéciales",
