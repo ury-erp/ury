@@ -718,25 +718,19 @@ export const MenuPage: React.FC = () => {
 
             <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
               {newMenu.items.map((item, idx) => (
-                <div key={item.id} className="p-3 bg-gray-50/80 rounded-lg border border-gray-200/80 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-gray-600">Item #{idx + 1}</span>
-                    {newMenu.items.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveNewMenuItem(item.id)}
-                        className="text-gray-400 hover:text-red-500 transition-colors p-1"
-                        title="Remove Item"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-                  <div>
+                <div key={item.id} className="flex items-center gap-2">
+                  <div className="flex-1">
                     <SearchableSelect
                       id={`item-select-${item.id}`}
                       value={item.item_name}
-                      onChange={(_, value) => handleUpdateNewMenuItem(item.id, { item_name: value })}
+                      onChange={(_, value) => {
+                        handleUpdateNewMenuItem(item.id, {
+                          item_name: value,
+                        });
+                        if (idx === newMenu.items.length - 1) {
+                          handleAddNewMenuItem();
+                        }
+                      }}
                       options={availableItems.map((it) => ({ value: it.name, label: it.item_name || it.name }))}
                       placeholder="Select Item..."
                       actionText="Create New Item"
@@ -745,7 +739,7 @@ export const MenuPage: React.FC = () => {
                         setNewItem({
                           item_name: '',
                           rate: '',
-                          course: item.course || availableCourses[0]?.name || '',
+                          course: availableCourses[0]?.name || '',
                           new_course_name: '',
                           is_adding_new_course: false,
                           target_menu: '',
@@ -754,29 +748,16 @@ export const MenuPage: React.FC = () => {
                       }}
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <SearchableSelect
-                        id={`item-course-${item.id}`}
-                        value={item.course}
-                        onChange={(_, value) => handleUpdateNewMenuItem(item.id, { course: value })}
-                        options={availableCourses.map((c) => ({ value: c.name, label: c.name }))}
-                        placeholder="Course..."
-                      />
-                    </div>
-                    <div>
-                      <Input
-                        type="number"
-                        placeholder="Rate (₹)"
-                        value={item.rate}
-                        onChange={(e) => handleUpdateNewMenuItem(item.id, { rate: e.target.value })}
-                        required
-                        min="0"
-                        step="any"
-                        className="text-xs h-8 bg-white"
-                      />
-                    </div>
-                  </div>
+                  {newMenu.items.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveNewMenuItem(item.id)}
+                      className="text-gray-400 hover:text-red-500 transition-colors p-1.5 hover:bg-red-50 rounded-md shrink-0"
+                      title="Remove Item"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
