@@ -173,9 +173,15 @@ export function DailyPnl() {
       ) : (
         <>
           {data.remarks && (
-            <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              {data.remarks}
-            </div>
+            // remarks is server-generated (URY's before_submit hook writes
+            // warning text with embedded <br> tags for the original Desk
+            // HTML field), not end-user input at request time — rendering
+            // as HTML here matches its intended display instead of showing
+            // literal "<br>" text.
+            <div
+              className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
+              dangerouslySetInnerHTML={{ __html: data.remarks }}
+            />
           )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
