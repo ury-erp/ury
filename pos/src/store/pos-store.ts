@@ -62,6 +62,7 @@ export interface PaymentMode {
 export interface Category {
   name: string;
   label: string;
+  icon?: string;
 }
 
 export interface Order {

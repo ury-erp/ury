@@ -104,8 +104,8 @@ def getRestaurantMenu(pos_profile, room=None, order_type=None):
 
 @frappe.whitelist()
 def getMenuCourses():
-    courses = frappe.get_all("URY Menu Course", fields=["name"])
-    return [{"name": d.name, "label": _(d.name)} for d in courses]
+    courses = frappe.get_all("URY Menu Course", fields=["name", "icon"])
+    return [{"name": d.name, "label": _(d.name), "icon": d.icon} for d in courses]
 
 @frappe.whitelist()
 def getBranch():
