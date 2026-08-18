@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
 import { Grid, Plus, Users, Square, List, Edit2, LayoutTemplate } from 'lucide-react';
-import { Card, Button, Badge, Input, Spinner } from '@ury/ui';
+import { Card, Button, Badge, Input, Spinner, showToast } from '@ury/ui';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { dashboardService } from '../../services/dashboard';
 import { call } from '@ury/core';
@@ -125,6 +125,7 @@ export const TablePage: React.FC = () => {
             is_take_away: newTable.is_take_away ? 1 : 0,
           },
         });
+        showToast.success('URY Table updated successfully');
       } else {
         let restaurantName = '';
         if (newTable.branch) {
@@ -161,6 +162,7 @@ export const TablePage: React.FC = () => {
             is_take_away: newTable.is_take_away ? 1 : 0,
           },
         });
+        showToast.success('URY Table created successfully');
       }
       fetchTables();
       setIsDrawerOpen(false);
