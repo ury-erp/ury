@@ -16,6 +16,8 @@ interface SearchableSelectProps {
   onBlur?: (id: string) => void;
   actionText?: string;
   onAction?: () => void;
+  dropdownClassName?: string;
+  position?: 'bottom' | 'top' | 'auto';
 }
 
 export function SearchableSelect({
@@ -28,11 +30,29 @@ export function SearchableSelect({
   onBlur,
   actionText,
   onAction,
+  dropdownClassName,
+  position = 'bottom',
 }: SearchableSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [dropdownPosition, setDropdownPosition] = useState<'bottom' | 'top'>('bottom');
   const [searchTerm, setSearchTerm] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const openDropdown = () => {
+    if (position === 'auto' && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      if (spaceBelow < 250 && rect.top > spaceBelow) {
+        setDropdownPosition('top');
+      } else {
+        setDropdownPosition('bottom');
+      }
+    } else {
+      setDropdownPosition(position === 'top' ? 'top' : 'bottom');
+    }
+    setIsOpen(true);
+  };
 
   // Find label of selected value
   const selectedOption = useMemo(() => {
@@ -77,7 +97,7 @@ export function SearchableSelect({
     const val = e.target.value;
     setSearchTerm(val);
     setIsTyping(true);
-    setIsOpen(true);
+    openDropdown();
 
     const matched = options.find(
       (opt) => opt.label.toLowerCase() === val.toLowerCase() || opt.value.toLowerCase() === val.toLowerCase()
@@ -98,7 +118,7 @@ export function SearchableSelect({
   };
 
   const handleFocus = () => {
-    setIsOpen(true);
+    openDropdown();
   };
 
   return (
@@ -116,8 +136,12 @@ export function SearchableSelect({
         />
         <div 
           onClick={() => {
-            setIsOpen((prev) => !prev);
-            if (!isOpen) setIsTyping(false);
+            if (isOpen) {
+              setIsOpen(false);
+              setIsTyping(false);
+            } else {
+              openDropdown();
+            }
           }} 
           className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 cursor-pointer p-1 hover:text-gray-600 transition-colors"
         >
@@ -128,7 +152,7 @@ export function SearchableSelect({
       </div>
 
       {isOpen && (
-        <div className="absolute top-full left-0 right-0 mt-2 z-50 bg-white border border-gray-200 rounded-lg shadow-lg max-h-80 overflow-y-auto p-1 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-500">
+        <div className={`absolute left-0 right-0 z-50 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto p-1 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-500 ${dropdownPosition === 'top' ? 'bottom-full mb-2' : 'top-full mt-2'} ${dropdownClassName || ''}`}>
           {filteredOptions.length > 0 ? (
             filteredOptions.map((opt) => (
               <div

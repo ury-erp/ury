@@ -716,7 +716,7 @@ export const MenuPage: React.FC = () => {
               </div>
             </div>
 
-            <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
+            <div className="space-y-3">
               {newMenu.items.map((item, idx) => (
                 <div key={item.id} className="flex items-center gap-2">
                   <div className="flex-1">
