@@ -14,6 +14,8 @@ interface SearchableSelectProps {
   error?: boolean;
   onChange: (id: string, value: string) => void;
   onBlur?: (id: string) => void;
+  actionText?: string;
+  onAction?: () => void;
 }
 
 export function SearchableSelect({
@@ -24,6 +26,8 @@ export function SearchableSelect({
   error,
   onChange,
   onBlur,
+  actionText,
+  onAction,
 }: SearchableSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -141,6 +145,19 @@ export function SearchableSelect({
             ))
           ) : (
             <div className="px-4 py-2 text-sm text-gray-400">No matching options</div>
+          )}
+          {actionText && onAction && (
+            <div
+              className="mt-1 pt-1 border-t border-gray-100"
+              onClick={() => {
+                setIsOpen(false);
+                onAction();
+              }}
+            >
+              <div className="px-4 py-2 text-sm text-blue-600 font-medium cursor-pointer hover:bg-blue-50 rounded-md transition-colors flex items-center">
+                <span className="mr-2">+</span> {actionText}
+              </div>
+            </div>
           )}
         </div>
       )}

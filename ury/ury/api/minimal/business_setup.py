@@ -279,6 +279,7 @@ def submit_configure_data(data):
             "doctype": "URY Menu",
             "name": menu_name,
             "branch": branch_name,
+            "price_list": "",
             "enabled": 1,
             "items": menu_items_table
         })
