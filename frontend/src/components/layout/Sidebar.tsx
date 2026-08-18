@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -34,9 +34,49 @@ export const Sidebar: React.FC = () => {
   const isAdvancedPath = location.pathname.startsWith('/report-settings');
   const [isAdvancedOpen, setIsAdvancedOpen] = useState<boolean>(isAdvancedPath);
 
+  const [width, setWidth] = useState<number>(256);
+  const isResizing = useRef<boolean>(false);
+
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+    if (!isResizing.current) return;
+    const newWidth = e.clientX;
+    if (newWidth >= 200 && newWidth <= 400) {
+      setWidth(newWidth);
+    }
+  }, []);
+
+  const handleMouseUp = useCallback(() => {
+    isResizing.current = false;
+    document.removeEventListener('mousemove', handleMouseMove);
+    document.removeEventListener('mouseup', handleMouseUp);
+    document.body.style.userSelect = '';
+    document.body.style.cursor = '';
+  }, [handleMouseMove]);
+
+  const startResizing = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isResizing.current = true;
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'col-resize';
+  }, [handleMouseMove, handleMouseUp]);
+
+  useEffect(() => {
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+    };
+  }, [handleMouseMove, handleMouseUp]);
+
   return (
-    <aside className="w-64 bg-white border-r border-gray-200 sticky top-16 h-[calc(100vh-4rem)] flex flex-col shrink-0 overflow-y-auto font-inter">
-      <div className="p-4 flex-1 space-y-1">
+    <aside
+      style={{ width: `${width}px` }}
+      className="bg-white border-r border-gray-200 sticky top-16 h-[calc(100vh-4rem)] flex flex-col shrink-0 font-inter relative"
+    >
+      <div className="p-4 flex-1 space-y-1 overflow-y-auto">
         {/* Main Navigation Links */}
         {NAV_ITEMS.map((item) => {
           const Icon = item.icon;
@@ -111,6 +151,12 @@ export const Sidebar: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Resize Drag Handle */}
+      <div
+        onMouseDown={startResizing}
+        className="absolute top-0 bottom-0 -right-1 w-2 cursor-col-resize hover:bg-blue-500/20 active:bg-blue-500/40 z-50 transition-colors"
+      />
     </aside>
   );
 };
