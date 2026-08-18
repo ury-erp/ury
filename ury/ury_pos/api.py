@@ -1,4 +1,5 @@
 import frappe
+import json
 from frappe import _
 from datetime import date, datetime, timedelta
 from frappe.utils import validate_phone_number
@@ -1069,6 +1070,54 @@ def _get_main_cashier_status(pos_profile_name: str) -> dict:
         }
     except Exception:
         return {"enabled": False, "main_cashier_configured": False, "main_cashier_open": False}
+
+
+@frappe.whitelist()
+def create_pos_opening_entry(pos_profile: str, company: str, balance_details) -> dict:
+    """Create and submit a POS Opening Entry for the ORI native screen.
+
+    Wraps the standard ERPNext flow but fills URY-mandatory fields
+    (branch and restaurant) from the selected POS Profile so ORI users do not
+    need to leave the React app.
+
+    ``balance_details`` may be a JSON string (legacy Desk shape) or a list of
+    ``{"mode_of_payment": ..., "opening_amount": ...}`` dicts.
+    """
+    if not frappe.has_permission("POS Opening Entry", "create"):
+        frappe.throw(_("Not permitted to create POS Opening Entry"), frappe.PermissionError)
+
+    if isinstance(balance_details, str):
+        balance_details = json.loads(balance_details)
+
+    pos_profile_doc = frappe.get_doc("POS Profile", pos_profile)
+
+    if not pos_profile_doc.branch:
+        frappe.throw(_("Selected POS Profile has no Branch."))
+    if not pos_profile_doc.restaurant:
+        frappe.throw(_("Selected POS Profile has no Restaurant."))
+
+    if not frappe.has_permission("POS Profile", "read", doc=pos_profile_doc):
+        frappe.throw(_("Not permitted to use this POS Profile."), frappe.PermissionError)
+
+    opening = frappe.get_doc(
+        {
+            "doctype": "POS Opening Entry",
+            "period_start_date": frappe.utils.get_datetime(),
+            "posting_date": frappe.utils.getdate(),
+            "user": frappe.session.user,
+            "company": company,
+            "pos_profile": pos_profile,
+            "branch": pos_profile_doc.branch,
+            "restaurant": pos_profile_doc.restaurant,
+        }
+    )
+    opening.set("balance_details", balance_details)
+    opening.submit()
+
+    if not frappe.has_permission(opening.doctype, "submit", doc=opening):
+        frappe.throw(_("Not permitted to submit POS Opening Entry"), frappe.PermissionError)
+
+    return opening.as_dict()
 
 
 @frappe.whitelist()

@@ -178,7 +178,7 @@ export const getPOSOpeningContext = async (posProfile?: string): Promise<POSOpen
 export const createPOSOpening = async (data: POSOpeningPayload): Promise<POSOpeningEntry> => {
   try {
     const response = await call.post<POSOpeningCreateResponse>(
-      'erpnext.selling.page.point_of_sale.point_of_sale.create_opening_voucher',
+      'ury.ury_pos.api.create_pos_opening_entry',
       {
         pos_profile: data.pos_profile,
         company: data.company,
