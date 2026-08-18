@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
 import { Save, ChevronDown, ChevronRight, Plus, X, Edit2, Utensils, Eye } from 'lucide-react';
 import { Card, Button, Input, Select, Spinner, showToast, Badge } from '@ury/ui';
@@ -30,7 +30,7 @@ interface RestaurantData {
 }
 
 export const BranchPage: React.FC = () => {
-  const { branches, refreshDashboard } = useBranchContext();
+  const { branches, setBranches } = useBranchContext();
   const [branchData, setBranchData] = useState<BranchData | null>(null);
   const [restaurantData, setRestaurantData] = useState<RestaurantData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -98,7 +98,18 @@ export const BranchPage: React.FC = () => {
       });
       showToast.success('Branch created successfully');
       setIsAddDrawerOpen(false);
-      window.location.reload();
+      try {
+        const branchRes = await call<any>('ury.ury.api.minimal.business_setup.get_branches');
+        if (branchRes) {
+          if (Array.isArray(branchRes)) {
+            setBranches(branchRes);
+          } else if (branchRes.message && Array.isArray(branchRes.message)) {
+            setBranches(branchRes.message);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to refresh branches:', err);
+      }
     } catch (err: any) {
       let errorMsg = 'Failed to create Branch';
       if (err?.messages) {
@@ -116,6 +127,8 @@ export const BranchPage: React.FC = () => {
 
   const branchToFetch = selectedListBranch;
 
+  const lastFetchedBranchRef = useRef<string | null>(null);
+
   const fetchLinkedData = async () => {
     try {
       const [menuRes, roomRes] = await Promise.all([
@@ -129,12 +142,13 @@ export const BranchPage: React.FC = () => {
     }
   };
 
-  const fetchDetails = async () => {
+  const fetchDetails = async (showLoader = true, overrideBranchName?: string) => {
+    const branchToFetch = overrideBranchName || selectedListBranch;
     if (!branchToFetch) {
-      setLoading(false);
+      if (showLoader) setLoading(false);
       return;
     }
-    setLoading(true);
+    if (showLoader) setLoading(true);
     try {
       // Fetch Branch doc
       const branchRes = await call<any>('frappe.client.get', {
@@ -145,10 +159,7 @@ export const BranchPage: React.FC = () => {
       setBranchData(branch);
       setBranchForm({
         branch_name: branch.branch_name || branch.name || '',
-        invoice_series_prefix: branch.invoice_series_prefix || '',
-        aggregator_series_prefix: branch.aggregator_series_prefix || '',
-        tax_id: branch.tax_id || '',
-        address: branch.address || '',
+        address: '',
       });
 
       // Try fetch URY Restaurant linked to this branch
@@ -178,30 +189,41 @@ export const BranchPage: React.FC = () => {
             default_room: restaurant.default_room || '',
             room_wise_menu: restaurant.room_wise_menu || 0,
             order_type_wise_menu: restaurant.order_type_wise_menu || 0,
-            menu_for_room: restaurant.menu_for_room || [],
-            order_type_menu: restaurant.order_type_menu || [],
+            menu_for_room: restaurant.menu_for_room ? [...restaurant.menu_for_room] : [],
+            order_type_menu: restaurant.order_type_menu ? [...restaurant.order_type_menu] : [],
           });
+          setBranchForm(p => ({
+            ...p,
+            address: restaurant.address || '',
+          }));
         } else {
           setRestaurantData(null);
-          setRestaurantForm({});
+          setRestaurantForm({
+            invoice_series_prefix: '', aggregator_series_prefix: '', tax_id: '',
+            active_menu: '', default_room: '', room_wise_menu: 0, order_type_wise_menu: 0,
+            menu_for_room: [], order_type_menu: []
+          });
         }
-      } catch {
-        setRestaurantData(null);
-        setRestaurantForm({});
+      } catch (err) {
+        console.error('Failed to fetch restaurant details:', err);
       }
     } catch (err) {
       console.error('Failed to fetch branch details:', err);
     } finally {
-      setLoading(false);
+      if (showLoader) setLoading(false);
     }
   };
 
   useEffect(() => {
     if (selectedListBranch && branches.length > 0) {
-      fetchLinkedData();
-      fetchDetails();
-    } else {
+      if (lastFetchedBranchRef.current !== selectedListBranch) {
+        fetchLinkedData();
+        fetchDetails();
+        lastFetchedBranchRef.current = selectedListBranch;
+      }
+    } else if (!selectedListBranch) {
       setLoading(false);
+      lastFetchedBranchRef.current = null;
     }
   }, [selectedListBranch, branches]);
 
@@ -220,25 +242,18 @@ export const BranchPage: React.FC = () => {
         });
         updatedBranchName = branchForm.branch_name;
         setSelectedListBranch(updatedBranchName);
-        refreshDashboard();
+        lastFetchedBranchRef.current = updatedBranchName;
       }
-
-      // Save Branch fields (address only)
-      await call('frappe.client.set_value', {
-        doctype: 'Branch',
-        name: updatedBranchName,
-        fieldname: {
-          address: branchForm.address,
-        },
-      });
 
       // Save URY Restaurant fields if it exists
       if (restaurantData) {
         const updatedDoc = {
           ...restaurantData,
+          branch: updatedBranchName, // Fix branch reference after rename
           invoice_series_prefix: restaurantForm.invoice_series_prefix,
           aggregator_series_prefix: restaurantForm.aggregator_series_prefix,
           tax_id: restaurantForm.tax_id,
+          address: branchForm.address, // Save address on restaurant document
           active_menu: restaurantForm.active_menu,
           default_room: restaurantForm.default_room,
           room_wise_menu: restaurantForm.room_wise_menu,
@@ -250,6 +265,24 @@ export const BranchPage: React.FC = () => {
           doc: updatedDoc
         });
       }
+
+      // Update the branch list state silently in background
+      call<any>('ury.ury.api.minimal.business_setup.get_branches')
+        .then(branchRes => {
+          if (branchRes) {
+            if (Array.isArray(branchRes)) setBranches(branchRes);
+            else if (branchRes.message && Array.isArray(branchRes.message)) setBranches(branchRes.message);
+          }
+        })
+        .catch(err => console.error('Failed to refresh branches:', err));
+
+      // Fetch the updated details silently without triggering loading spinner
+      fetchDetails(false, updatedBranchName).catch(err => console.error('Failed to fetch details:', err));
+
+      // Return to View mode immediately after initiating updates
+      setIsReadOnly(true);
+      showToast.success('Branch updated successfully');
+
     } catch (err) {
       console.error('Failed to update branch:', err);
     } finally {
