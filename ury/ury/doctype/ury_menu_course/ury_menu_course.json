@@ -9,7 +9,8 @@
  "document_type": "Setup",
  "engine": "InnoDB",
  "field_order": [
-  "course"
+  "course",
+  "icon"
  ],
  "fields": [
   {
@@ -22,6 +23,12 @@
    "reqd": 1,
    "translatable": 1,
    "unique": 1
+  },
+  {
+   "fieldname": "icon",
+   "fieldtype": "Select",
+   "label": "Icon",
+   "options": "Apple\nBeef\nBeer\nBread\nCake\nCarrot\nCoffee\nCookie\nEgg\nFish\nIceCream\nMilk\nPizza\nSalad\nSandwich\nSoup\nWine"
   }
  ],
  "icon": "fa fa-code-fork",
