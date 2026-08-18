@@ -35,13 +35,46 @@ clientsClaim();
 // 1. App Shell Pre-caching
 precacheAndRoute(self.__WB_MANIFEST || []);
 
-// 2. SPA Navigation Route (NetworkFirst for dynamic Frappe HTML)
+// Custom Workbox plugin to fall back to any matching endpoint response in Cache Storage
+// if an exact URL parameter key lookup misses during NetworkFirst error handling.
+const masterDataFallbackPlugin = {
+  handlerDidError: async ({ request }: { request: Request }) => {
+    try {
+      const cache = await caches.open('ury-pos-master-data-get');
+      const exactMatch = await cache.match(request);
+      if (exactMatch) return exactMatch;
+
+      const requestUrl = new URL(request.url);
+      const keys = await cache.keys();
+      for (const key of keys) {
+        const keyUrl = new URL(key.url);
+        if (keyUrl.pathname === requestUrl.pathname) {
+          const response = await cache.match(key);
+          if (response) return response;
+        }
+      }
+    } catch (e) {
+      console.warn('[SW] Master data fallback search error:', e);
+    }
+    return undefined;
+  },
+};
+
+// 2. SPA Navigation Route (NetworkFirst with offline index.html fallback)
 try {
   const navigationRoute = new NavigationRoute(
     new NetworkFirst({
       cacheName: 'ury-pos-navigation',
       networkTimeoutSeconds: 3,
       plugins: [
+        {
+          handlerDidError: async () => {
+            const match = (await caches.match('/assets/ury/pos/index.html')) ||
+                          (await caches.match('/pos')) ||
+                          (await caches.match('/pos/index.html'));
+            return match || Response.error();
+          }
+        },
         new ExpirationPlugin({
           maxEntries: 5,
           maxAgeSeconds: 30 * 24 * 60 * 60, // 30 Days
@@ -105,22 +138,6 @@ registerRoute(
 );
 
 // 6. Master Data GET Endpoints (NetworkFirst with 24h offline fallback)
-//
-// ONLY real production GET endpoints verified against ury/ury_pos/api.py:
-//   - getRestaurantMenu   → master menu items
-//   - getModeOfPayment    → allowed payment modes
-//   - getMenuCourses      → active menu course list
-//   - getAggregator       → enabled delivery partners (Zomato, Swiggy)
-//   - getAggregatorItem   → partner-specific price list
-//   - getPosProfile       → cashier POS configuration
-//   - getBranchRoom       → restaurant room list
-//
-// NEVER cache:
-//   - getPosInvoice       → live order list (must be fresh; offline handled by IndexedDB)
-//   - getPosInvoiceItems  → live item detail (offline handled by IndexedDB)
-//   - sync_order          → POST command (queued by SyncEngine)
-//   - make_invoice        → POST command (queued by SyncEngine)
-//   - qz_print_update     → POST command (offline queued by SyncEngine)
 registerRoute(
   ({ request, url }) =>
     request.method === 'GET' &&
@@ -135,6 +152,7 @@ registerRoute(
     cacheName: 'ury-pos-master-data-get',
     networkTimeoutSeconds: 3,
     plugins: [
+      masterDataFallbackPlugin,
       new BroadcastUpdatePlugin(),
       new ExpirationPlugin({
         maxEntries: 30,
@@ -145,9 +163,6 @@ registerRoute(
 );
 
 // 7. Generic Frappe Resource API GET lists for URY Room / URY Table
-// `getRooms` and `getTables` in `lib/table-api.ts` call `frappe.client.get_list`
-// via `@ury/core`, not the whitelisted Python helpers above. Cache these so the
-// Table page can render offline after the first successful fetch.
 registerRoute(
   ({ request, url }) => {
     if (request.method !== 'GET') return false;
@@ -159,6 +174,7 @@ registerRoute(
     cacheName: 'ury-pos-master-data-get',
     networkTimeoutSeconds: 3,
     plugins: [
+      masterDataFallbackPlugin,
       new BroadcastUpdatePlugin(),
       new ExpirationPlugin({
         maxEntries: 30,
@@ -167,3 +183,4 @@ registerRoute(
     ],
   })
 );
+

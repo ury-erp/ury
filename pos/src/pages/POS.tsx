@@ -69,13 +69,14 @@ export default function POS() {
     </button>
   );
 
-  if (isInitializing || menuLoading) {
+  const hasMenuData = menuData && menuData.length > 0;
+
+  if (isInitializing || (menuLoading && !hasMenuData)) {
     return <InitialLoader />;
   }
 
-  const hasMenuData = menuData && menuData.length > 0;
-
   if (menuError && !hasMenuData) {
+
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-center">

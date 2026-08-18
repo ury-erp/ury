@@ -11,6 +11,9 @@ export function useRooms(branch: string | null) {
     enabled: !!branch,
     staleTime: MASTER_DATA_STALE_TIME,
     gcTime: MASTER_DATA_GC_TIME,
+    placeholderData: (previousData) => previousData,
+    networkMode: 'offlineFirst',
+    refetchOnReconnect: true,
   });
 }
 
@@ -21,6 +24,9 @@ export function useTables(room: string | null) {
     enabled: !!room,
     staleTime: MASTER_DATA_STALE_TIME,
     gcTime: MASTER_DATA_GC_TIME,
+    placeholderData: (previousData) => previousData,
+    networkMode: 'offlineFirst',
+    refetchOnReconnect: true,
   });
 }
 
@@ -40,5 +46,9 @@ export function useRoomCounts(rooms: string[], branch: string | null) {
     enabled: !!branch && rooms.length > 0,
     staleTime: MASTER_DATA_STALE_TIME,
     gcTime: MASTER_DATA_GC_TIME,
+    placeholderData: (previousData) => previousData,
+    networkMode: 'offlineFirst',
+    refetchOnReconnect: true,
   });
 }
+

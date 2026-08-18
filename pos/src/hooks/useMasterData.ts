@@ -24,6 +24,9 @@ export function useCategories() {
     enabled: !!posProfile?.name,
     staleTime: MASTER_DATA_STALE_TIME,
     gcTime: MASTER_DATA_GC_TIME,
+    placeholderData: (previousData) => previousData,
+    networkMode: 'offlineFirst',
+    refetchOnReconnect: true,
   });
 }
 
@@ -38,6 +41,9 @@ export function usePaymentModes() {
     enabled: !!posProfile?.name,
     staleTime: MASTER_DATA_STALE_TIME,
     gcTime: MASTER_DATA_GC_TIME,
+    placeholderData: (previousData) => previousData,
+    networkMode: 'offlineFirst',
+    refetchOnReconnect: true,
   });
 }
 
@@ -52,5 +58,9 @@ export function useAggregators() {
     enabled: !!posProfile?.name,
     staleTime: MASTER_DATA_STALE_TIME,
     gcTime: MASTER_DATA_GC_TIME,
+    placeholderData: (previousData) => previousData,
+    networkMode: 'offlineFirst',
+    refetchOnReconnect: true,
   });
 }
+
