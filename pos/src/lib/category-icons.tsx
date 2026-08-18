@@ -146,53 +146,112 @@ export function fuzzyMatchIcon(courseName?: string): string | undefined {
   const normalized = courseName.trim().toLowerCase();
   if (!normalized) return undefined;
 
-  // Match from most specific phrases to broad keywords.
-  const rules: Array<[string | RegExp, string]> = [
+  // Split into tokens so compound names like "Chicken Pizza" or "Smash Burger"
+  // are evaluated word-by-word. Rules are ordered from most specific dish type
+  // to broad ingredient/descriptor so the dominant term wins.
+  const tokens = normalized.split(/[^a-z0-9]+/).filter(Boolean);
+  if (tokens.length === 0) return undefined;
+
+  const matches = (pattern: string | RegExp) =>
+    tokens.some((token) =>
+      typeof pattern === 'string' ? token.includes(pattern) : pattern.test(token),
+    );
+
+  const rules: Array<[string | RegExp, string | undefined]> = [
+    // Specific dishes / preparations
     [/\bice[- ]?cream\b/, 'IceCreamCone'],
+    [/\bpizza\b/, 'Pizza'],
+    [/\bburger\b/, 'Hamburger'],
+    [/\bhamburger\b/, 'Hamburger'],
+    [/\bsandwich\b/, 'Sandwich'],
+    [/\bsoups?\b/, 'Soup'],
+    [/\bsalads?\b/, 'Salad'],
+    // Drinks
+    [/\bcoffee\b/, 'Coffee'],
+    [/\btea\b/, 'Coffee'],
+    [/\bmilk[- ]?shake\b/, 'Milk'],
+    [/\bsmoothie\b/, 'Milk'],
+    [/\bmilk\b/, 'Milk'],
     [/\bsoft[- ]?drink\b/, 'CupSoda'],
+    [/\bsoda\b/, 'CupSoda'],
+    [/\bjuice\b/, 'CupSoda'],
+    [/\bwater\b/, 'GlassWater'],
+    [/\bbeer\b/, 'Beer'],
+    [/\bwine\b/, 'Wine'],
+    [/\bcocktail\b/, 'Martini'],
+    [/\bmartini\b/, 'Martini'],
+    [/\bwhisky\b/, 'Wine'],
+    [/\bwhiskey\b/, 'Wine'],
+    [/\brum\b/, 'Wine'],
+    [/\bvodka\b/, 'Wine'],
+    [/\bsake\b/, 'Wine'],
+    [/\bdrink\b/, 'CupSoda'],
+    [/\bbeverage\b/, 'Coffee'],
+    // Desserts / baked goods
+    [/\bcake[- ]?slice\b/, 'CakeSlice'],
+    [/\bcake\b/, 'Cake'],
+    [/\bpie\b/, 'Cake'],
+    [/\bcroissant\b/, 'Croissant'],
+    [/\bbread\b/, 'Croissant'],
+    [/\bdonut\b/, 'Donut'],
+    [/\bcandy[- ]?cane\b/, 'CandyCane'],
+    [/\bcandy\b/, 'Candy'],
+    [/\blollipop\b/, 'Lollipop'],
+    [/\bchocolate\b/, 'Candy'],
+    [/\bcookie\b/, 'Cookie'],
+    [/\bpopcorn\b/, 'Popcorn'],
+    [/\bpopsicle\b/, 'Popsicle'],
+    [/\bdessert\b/, 'Dessert'],
+    // Proteins / ingredients
+    [/\bshrimp\b/, 'Shrimp'],
+    [/\bseafood\b/, 'Fish'],
+    [/\bfish\b/, 'Fish'],
+    [/\bchicken\b/, 'Drumstick'],
+    [/\bpoultry\b/, 'Drumstick'],
+    [/\bsteak\b/, 'Beef'],
+    [/\bbeef\b/, 'Beef'],
+    [/\bpork\b/, 'Beef'],
+    [/\bmeat\b/, 'Beef'],
+    [/\bgrill\b/, 'CookingPot'],
+    [/\bbarbecue\b/, 'CookingPot'],
+    [/\bbbq\b/, 'CookingPot'],
+    [/\bfried\b/, 'CookingPot'],
+    [/\broast\b/, 'CookingPot'],
+    [/\begg\b/, 'EggFried'],
+    [/\bomelette\b/, 'EggFried'],
+    [/\bnut\b/, 'Nut'],
+    // Produce
+    [/\bgrape\b/, 'Grape'],
+    [/\bcherry\b/, 'Cherry'],
+    [/\bapple\b/, 'Apple'],
+    [/\bbanana\b/, 'Banana'],
+    [/\bcitrus\b/, 'Citrus'],
+    [/\blemon\b/, 'Citrus'],
+    [/\borange\b/, 'Citrus'],
+    [/\bcarrot\b/, 'Carrot'],
+    [/\bvegetable\b/, 'LeafyGreen'],
+    [/\bbroccoli\b/, 'LeafyGreen'],
+    [/\bleafy[- ]?green\b/, 'LeafyGreen'],
+    [/\bfruit\b/, 'Apple'],
+    [/\bvegan\b/, 'Vegan'],
+    // Service / course descriptors
     [/\badd[- ]?ons?\b/, 'Cookie'],
     [/\baddon\b/, 'Cookie'],
     [/\bpaper[- ]?bag\b/, 'ShoppingBag'],
     [/\bshopping[- ]?bag\b/, 'ShoppingBag'],
-    [/\bbuffets?\b/, 'HandPlatter'],
+    [/\bbuffet\b/, 'HandPlatter'],
     [/\bstarters?\b/, 'EggFried'],
-    [/\bdesserts?\b/, 'Cake'],
-    [/\bbeverages?\b/, 'Coffee'],
-    [/\bdrink\b/, 'Coffee'],
-    [/\bvegetables?\b/, 'Carrot'],
-    [/\bbroccoli\b/, 'LeafyGreen'],
-    [/\bfruits?\b/, 'Apple'],
-    [/\bchicken\b/, 'Drumstick'],
-    [/\bpoultry\b/, 'Drumstick'],
-    [/\bbeef\b/, 'Beef'],
-    [/\bmeat\b/, 'Beef'],
-    [/\bvegan\b/, 'Vegan'],
-    [/\bshrimp\b/, 'Shrimp'],
-    [/\bfish\b/, 'Fish'],
-    [/\bwine\b/, 'Wine'],
-    [/\bbeer\b/, 'Beer'],
-    [/\bsoda\b/, 'CupSoda'],
-    [/\bmilk\b/, 'Milk'],
-    [/\bcoffee\b/, 'Coffee'],
-    [/\bpizza\b/, 'Pizza'],
-    [/\bsoups?\b/, 'Soup'],
-    [/\bsalads?\b/, 'Salad'],
-    [/\bbread\b/, 'Croissant'],
-    [/\bcroissant\b/, 'Croissant'],
-    [/\bcake\b/, 'Cake'],
-    [/\bburger\b/, 'Hamburger'],
-    [/\bhamburger\b/, 'Hamburger'],
-    [/\bblender\b/, 'Blend'],
     [/\bmain\b/, 'Utensils'],
     [/\bcourses?\b/, 'Utensils'],
-    [/\bbuffet\b/, 'HandPlatter'],
     [/\bseasonal\b/, 'LeafyGreen'],
+    [/\bblender\b/, 'Blend'],
+    [/\bmicrowave\b/, 'Microwave'],
+    [/\brefrigerator\b/, 'Refrigerator'],
+    [/\bcooking[- ]?pot\b/, 'CookingPot'],
   ];
 
   for (const [pattern, iconName] of rules) {
-    if (typeof pattern === 'string') {
-      if (normalized.includes(pattern)) return iconName;
-    } else if (pattern.test(normalized)) {
+    if (matches(pattern) && iconName) {
       return iconName;
     }
   }
