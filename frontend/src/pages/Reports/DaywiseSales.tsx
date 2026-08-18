@@ -6,6 +6,7 @@ import { useBranchContext } from '../../context/BranchContext';
 import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
 import { LineChartCard } from '../../components/reports/charts/LineChartCard';
 import { startOfMonth, endOfDay } from 'date-fns';
+import { toApiDate } from '../../lib/reportDate';
 
 interface DayRow {
   date: string;
@@ -58,8 +59,8 @@ export function DaywiseSales() {
       const branch = activeBranchId === 'all' ? undefined : activeBranchId;
       const res = await call<{ message: DaywiseSalesData }>('ury.ury.report_api.sales.get_daywise_sales', {
         branch,
-        start_date: range.from.toISOString().slice(0, 10),
-        end_date: range.to.toISOString().slice(0, 10),
+        start_date: toApiDate(range.from),
+        end_date: toApiDate(range.to),
       });
       setData(res.message ?? (res as unknown as DaywiseSalesData));
     } catch (err) {

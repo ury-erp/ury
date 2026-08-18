@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useBranchContext } from '../../context/BranchContext';
 import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
 import { startOfMonth, endOfDay } from 'date-fns';
+import { toApiDate } from '../../lib/reportDate';
 
 interface InvoiceRow {
   date: string;
@@ -58,8 +59,8 @@ export function DaywiseInvoices() {
       const branch = activeBranchId === 'all' ? undefined : activeBranchId;
       const res = await call<{ message: DaywiseInvoicesData }>('ury.ury.report_api.sales.get_daywise_invoices', {
         branch,
-        start_date: range.from.toISOString().slice(0, 10),
-        end_date: range.to.toISOString().slice(0, 10),
+        start_date: toApiDate(range.from),
+        end_date: toApiDate(range.to),
         page,
         page_size: PAGE_SIZE,
       });
