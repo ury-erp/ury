@@ -56,6 +56,7 @@ website_route_rules = [
     {"from_route": "/urypos/<path:app_path>", "to_route": "urypos"},
     {"from_route": "/mosaic/<path:app_path>", "to_route": "mosaic"},
     {"from_route": "/ury/<path:app_path>", "to_route": "ury"},
+    {"from_route": "/setup-wizard", "to_route": "ury"},
 ]
 # Home Pages
 # ----------
@@ -210,9 +211,15 @@ scheduler_events = {
 
 # ignore_links_on_delete = ["Communication", "ToDo"]
 
+on_session_creation = [
+    "ury.ury.controllers.setup_redirect.on_session_creation"
+]
+
 # Request Events
 # ----------------
-# before_request = ["ury.utils.before_request"]
+before_request = [
+    "ury.ury.controllers.setup_redirect.redirect_to_setup"
+]
 # after_request = ["ury.utils.after_request"]
 
 # Job Events
