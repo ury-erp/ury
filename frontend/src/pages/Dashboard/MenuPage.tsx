@@ -224,7 +224,7 @@ export const MenuPage: React.FC = () => {
     setNewMenu({
       menu_name: '',
       branch: defaultBranch,
-      price_list: priceLists[0]?.name || '',
+      price_list: '',
       items: [
         {
           id: `item-${Date.now()}`,
@@ -716,18 +716,7 @@ export const MenuPage: React.FC = () => {
             />
           </div>
 
-          <div>
-            <label className="block font-semibold text-gray-700 mb-1.5">Price List</label>
-            <SearchableSelect
-              id="price_list"
-              value={newMenu.price_list}
-              onChange={(_, value) => setNewMenu({ ...newMenu, price_list: value })}
-              options={priceLists.map(p => ({ value: p.name, label: p.name }))}
-              placeholder="Select Price List..."
-              actionText="Create New Price List"
-              onAction={() => setDrawerMode('add-price-list')}
-            />
-          </div>
+
 
           <div className="pt-2 border-t border-gray-100 space-y-3">
             <div className="flex items-center justify-between">
