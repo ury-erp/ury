@@ -67,6 +67,7 @@ All new features and bug fixes MUST include appropriate tests. We strictly enfor
 - **Form Schemas**: Load forms using JSON. Set up form schema, validations, and names in JSON files and load them so that future updates will only require JSON updates instead of code edits. Store these types of data in the `src/data` folder of the respective frontend app.
 - **Core UI**: Always use `@ury/ui` (ury/core ui `apps/ury/packages/core`) for UI components. Do not edit core UI components or utilities without explicit user approval. Instead, use them or add generic utilities to `ury/core` when applicable.
 - **Core Utilities**: Always use core utils packages. If a utility doesn't exist, create it as a generic utility inside the `ury/core` package rather than duplicating logic across apps.
+- **POS Design System**: When working on the `/pos` UI, refer to [POS_DESIGN_SYSTEM.md](file:///c:/Users/swafa/Projects/Workspaces/ury/docs/POS_DESIGN_SYSTEM.md) for design elements, styling conventions, colors, sidebar structure, cards, and other component styles.
 
 ## 8. React Development & Skills Guidelines
 - Always use the following global skills when working on React development inside this workspace:

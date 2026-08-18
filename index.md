@@ -40,6 +40,11 @@ This file keeps track of all jobs, initiatives, and work tracks for the URY app 
   - Owner: antigravity
   - Goal: Build custom setup wizard in URY frontend and intercept default Frappe setup.
 
+- [ag-ury-dashboard](./tracks/ag-ury-dashboard/)
+  - Status: Active
+  - Owner: antigravity
+  - Goal: Build primary post-onboarding URY Dashboard for small restaurant and café management at `<url>/ury` in branch `feat/minimal-installation`.
+
 - [ag-move-reprint-kot](./tracks/ag-move-reprint-kot/)
   - Status: Completed
   - Owner: antigravity
