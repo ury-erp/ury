@@ -1,8 +1,10 @@
 import { NavLink } from 'react-router-dom';
-import { 
-  LayoutGrid, 
-  ClipboardList, 
+import {
+  LayoutDashboard,
+  LayoutGrid,
+  ClipboardList,
   Table,
+  Settings,
 } from 'lucide-react';
 import { cn } from '@ury/ui';
 import { t } from '../i18n';
@@ -10,9 +12,11 @@ import { t } from '../i18n';
 const Footer = () => {
 
   const navItems = [
-    { icon: LayoutGrid, label: t('footer.pos'), path: '/' },
-    {icon: Table, label: t('footer.table'), path: '/table'},
+    { icon: LayoutDashboard, label: t('footer.dashboard'), path: '/dashboard' },
+    { icon: LayoutGrid, label: t('footer.pos'), path: '/pos' },
+    { icon: Table, label: t('footer.tables'), path: '/tables' },
     { icon: ClipboardList, label: t('footer.orders'), path: '/orders' },
+    { icon: Settings, label: t('footer.settings'), path: '/settings' },
   ];
 
   return (
