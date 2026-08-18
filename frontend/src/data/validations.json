@@ -1,0 +1,8 @@
+{
+  "required": "This field is required",
+  "minLength": "Minimum length is {min} characters",
+  "maxLength": "Maximum length is {max} characters",
+  "pattern": {
+    "^[A-Z0-9]+$": "Only uppercase letters and numbers allowed"
+  }
+}
