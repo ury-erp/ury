@@ -233,11 +233,16 @@ def get_baseline(branch=None, weeks=6):
 		b.`docstatus` = 1
 		AND b.`status` IN ('Consolidated', 'Paid')
 		AND WEEKDAY(b.`posting_date`) = %(weekday)s
-		AND HOUR(b.`posting_time`) = %(hour)s
+		AND HOUR(b.`posting_time`) BETWEEN %(hour_low)s AND %(hour_high)s
 		AND b.`posting_date` >= DATE_SUB(CURDATE(), INTERVAL %(weeks)s WEEK)
 		AND b.`posting_date` < CURDATE()
 	"""
-	params = {"weekday": weekday, "hour": hour, "weeks": weeks}
+	params = {
+		"weekday": weekday,
+		"hour_low": max(hour - 1, 0),
+		"hour_high": min(hour + 1, 23),
+		"weeks": weeks,
+	}
 	if branch:
 		conditions += " AND b.`branch` = %(branch)s"
 		params["branch"] = branch

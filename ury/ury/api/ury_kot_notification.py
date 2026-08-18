@@ -1,4 +1,5 @@
 import frappe
+from frappe.utils import add_to_date, now_datetime
 
 
 def get_users_with_role(role_name):
@@ -68,6 +69,17 @@ def order_delay_notification(id):
 
 
 def create_system_notification(message, user, subject):
+    recent_duplicate = frappe.db.exists(
+        "Notification Log",
+        {
+            "for_user": user,
+            "subject": subject,
+            "creation": [">", add_to_date(now_datetime(), minutes=-5)],
+        },
+    )
+    if recent_duplicate:
+        return
+
     communication = frappe.get_doc(
         {
             "doctype": "Notification Log",
