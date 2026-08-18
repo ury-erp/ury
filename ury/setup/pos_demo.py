@@ -6,12 +6,21 @@ from erpnext.accounts.doctype.pos_closing_entry.pos_closing_entry import make_cl
 def generate_pos_demo():
     company = frappe.db.get_single_value("Global Defaults", "demo_company")
     
+    user = frappe.session.user if frappe.session.user else "Administrator"
+    
+    # Check for existing generated data (Idempotency)
+    existing_openings = frappe.get_all("POS Opening Entry", filters={"company": company, "status": "Open"}, pluck="name")
+    if existing_openings:
+        return
+        
+    frappe.publish_realtime("setup_task", {"progress": [4, 7], "stage_status": "Generating Closed POS Session..."}, user=user)
     opening1 = create_pos_opening(company)
     create_pos_invoices(company, opening1, count=5)
     create_pos_closing(company, opening1)
 
+    frappe.publish_realtime("setup_task", {"progress": [5, 7], "stage_status": "Generating Open POS Session..."}, user=user)
     opening2 = create_pos_opening(company)
-    create_pos_invoices(company, opening2, count=3)
+    create_pos_invoices(company, opening2, count=5)
 
 def get_pos_profile(company):
     profiles = frappe.get_all(

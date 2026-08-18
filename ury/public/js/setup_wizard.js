@@ -1,4 +1,4 @@
-console.log("🔥 URY setup_wizard.js loaded");
+console.log("URY setup_wizard.js loaded");
 
 frappe.setup.on("before_load", function () {
     if (!window.erpnext || !erpnext.setup?.slides_settings) return;

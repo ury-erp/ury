@@ -64,7 +64,7 @@ setup_wizard_requires = [
     "assets/ury/js/setup_wizard.js",
 ]
 
-setup_wizard_complete = "ury.setup.setup_wizard.setup_ury_or_erpnext_demo"
+setup_wizard_stages = "ury.setup.setup_wizard.get_setup_stages"
 
 ury_demo_master_doctypes = [
     "Gender",
