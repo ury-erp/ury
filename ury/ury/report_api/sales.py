@@ -261,3 +261,79 @@ def get_daywise_invoices(start_date, end_date, branch=None, page=1, page_size=50
 			"total_pages": (total_count + page_size - 1) // page_size if total_count else 0,
 		},
 	}
+
+
+@frappe.whitelist()
+def get_month_wise_sales(branch=None, months_back=6):
+	"""Monthly sales rollup over a trailing window.
+
+	Mirrors the existing "Month Wise Sales" Query Report, but replaces its
+	hardcoded 4-month lookback with a configurable `months_back` (default 6)
+	— the single biggest improvement flagged by research: a fixed window
+	forced re-running the old report or editing SQL to see more history.
+	"""
+	require_manager()
+	months_back = min(int(months_back), 24)
+
+	start_date = frappe.utils.add_months(frappe.utils.get_first_day(frappe.utils.today()), -months_back)
+	end_date = frappe.utils.today()
+
+	date_list = date_list_cte()
+
+	if branch:
+		condition = get_business_day_condition(date_expr="date_list.`date`")
+		join = report_settings_join()
+		params = {"branch": branch, "start_date": start_date, "end_date": end_date}
+		invoice_join = "b.`branch` = %(branch)s AND b.`status` IN (\"Consolidated\", \"Paid\") AND b.`docstatus` = 1"
+	else:
+		condition = "b.`posting_date` = date_list.`date`"
+		join = ""
+		params = {"start_date": start_date, "end_date": end_date}
+		invoice_join = "b.`status` IN (\"Consolidated\", \"Paid\") AND b.`docstatus` = 1"
+
+	rows = frappe.db.sql(
+		f"""
+		SELECT
+			YEAR(date_list.`date`) AS year,
+			MONTH(date_list.`date`) AS month_number,
+			MONTHNAME(date_list.`date`) AS month_name,
+			ROUND(SUM(b.`net_total`), 2) AS item_total,
+			ROUND(SUM(b.`total_taxes_and_charges`), 2) AS taxes,
+			ROUND(SUM(b.`grand_total`), 2) AS grand_total
+		FROM {date_list}
+		LEFT JOIN `tabPOS Invoice` b ON ({invoice_join})
+		{join}
+		WHERE {condition}
+		GROUP BY YEAR(date_list.`date`), MONTH(date_list.`date`)
+		ORDER BY YEAR(date_list.`date`) ASC, MONTH(date_list.`date`) ASC
+		""",
+		params,
+		as_dict=True,
+	)
+
+	prev_total = None
+	for r in rows:
+		for key in ("item_total", "taxes", "grand_total"):
+			r[key] = r.get(key) or 0
+		r["month"] = f"{r['month_name']} {r['year']}"
+		r["growth_percentage"] = (
+			round(((r["grand_total"] - prev_total) / prev_total) * 100, 1) if prev_total else None
+		)
+		prev_total = r["grand_total"]
+
+	grand_totals = [r["grand_total"] for r in rows]
+	total_revenue = round(sum(grand_totals), 2)
+	best = max(rows, key=lambda r: r["grand_total"], default=None)
+	worst = min(rows, key=lambda r: r["grand_total"], default=None)
+
+	return {
+		"branch": branch,
+		"months_back": months_back,
+		"data": rows,
+		"summary": {
+			"total_revenue": total_revenue,
+			"average_monthly_revenue": round(total_revenue / len(rows), 2) if rows else 0,
+			"best_month": best["month"] if best else None,
+			"worst_month": worst["month"] if worst else None,
+		},
+	}
