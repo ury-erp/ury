@@ -115,10 +115,36 @@ export async function getTables(room: string): Promise<Table[]> {
       asDict: true,
     }) as Table[];
 
+    // Merge server tables with local pending occupancy/merge state so optimistic
+    // local mutations (e.g. offline payment release, merge/unmerge) are not
+    // clobbered by stale server data before they sync.
+    const localTables = await repositories.tables.findByRoom(room);
+    const localMap = new Map(localTables.map(t => [t.name, t]));
+
+    const mergedTables = tables.map(serverTable => {
+      const local = localMap.get(serverTable.name);
+      if (!local) return serverTable;
+
+      const serverOccupied = serverTable.occupied ?? 0;
+      const localMerged = local.merged_with ?? null;
+      const serverMerged = serverTable.merged_with ?? null;
+
+      if (local.occupied !== serverOccupied || localMerged !== serverMerged) {
+        return {
+          ...serverTable,
+          occupied: local.occupied,
+          latest_invoice_time: local.latest_invoice_time ?? null,
+          merged_with: localMerged,
+        };
+      }
+
+      return serverTable;
+    });
+
     // Cache tables in local repository with full server schema parity.
-    if (tables && tables.length > 0) {
+    if (mergedTables && mergedTables.length > 0) {
       await repositories.tables.putMany(
-        tables.map(t => ({
+        mergedTables.map(t => ({
           name: t.name,
           restaurant_room: t.restaurant_room,
           no_of_seats: t.no_of_seats || 4,
@@ -134,7 +160,7 @@ export async function getTables(room: string): Promise<Table[]> {
       );
     }
 
-    return tables;
+    return mergedTables;
   } catch (error) {
     console.warn('Network getTables failed, falling back to local tables repository:', error);
     const cachedTables = await repositories.tables.findByRoom(room);
@@ -243,7 +269,7 @@ export async function mergeTablesBatch(anchor: string, tables: string[]) {
     projectionBus.emit('TABLES_UPDATED');
 
     await repositories.syncQueue.put({
-      id: `SYNC-MERGE-${Date.now()}`,
+      id: `SYNC-MERGE-${anchor}-${[...tables].sort().join('-')}`,
       action: 'merge_tables_batch',
       endpoint: endpoint,
       payload: { anchor_table: anchor, tables },
@@ -282,7 +308,7 @@ export async function unmergeTables(table: string) {
     projectionBus.emit('TABLES_UPDATED');
 
     await repositories.syncQueue.put({
-      id: `SYNC-UNMERGE-${Date.now()}`,
+      id: `SYNC-UNMERGE-${table}`,
       action: 'unmerge_tables',
       endpoint: endpoint,
       payload: { table },

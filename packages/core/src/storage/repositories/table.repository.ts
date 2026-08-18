@@ -67,6 +67,7 @@ export class TableRepository
         existing.occupied = 0;
         existing.merged_with = null;
         existing.latest_invoice_time = null;
+        existing.active_orders = null;
         await this.put(existing);
       }
     }

@@ -298,18 +298,19 @@ export async function cancelOrder(
 }
 
 /**
- * Releases a table after a successful payment (online or offline). Keeps the table
- * projection in sync so the Table UI shows Available immediately.
+ * Releases a table cluster after a successful payment (online or offline). Keeps
+ * the table projection in sync so the Table UI shows Available immediately.
  */
 export async function releaseTableAfterPayment(table: string | null | undefined): Promise<void> {
   if (!table) return;
   try {
-    await repositories.tables.setOccupied(table, false);
+    const clusterTables = await repositories.tables.getClusterTables(table);
+    await repositories.tables.releaseCluster(clusterTables);
     projectionBus.emit('TABLES_UPDATED');
     queryClient.invalidateQueries({ queryKey: ['tables'] });
     queryClient.invalidateQueries({ queryKey: ['roomCounts'] });
   } catch (err) {
-    console.warn('[releaseTableAfterPayment] Failed to release table:', err);
+    console.warn('[releaseTableAfterPayment] Failed to release table cluster:', err);
   }
 }
 
@@ -402,7 +403,8 @@ async function clearLocalMergeAfterPayment(invoiceId: string): Promise<void> {
 export async function queueOfflinePayment(input: QueueOfflinePaymentInput): Promise<void> {
   const endpoint = apiRegistry.getUrl('MAKE_INVOICE');
   const paymentIdempotencyKey = `PAY-${input.invoice}-${Date.now()}`;
-  const cmdId = `SYNC-PAYMENT-${input.invoice}-${Date.now()}`;
+  const paymentModes = input.payments.map(p => p.mode_of_payment).sort().join('-');
+  const cmdId = `SYNC-PAYMENT-${input.invoice}-${paymentModes}`;
 
   const paymentPayload: Record<string, unknown> = {
     additionalDiscount: input.additionalDiscount,
@@ -990,7 +992,7 @@ export async function tableTransfer(
         }
 
         await repositories.syncQueue.put({
-          id: `SYNC-TRANSFER-${Date.now()}`,
+          id: `SYNC-TRANSFER-${table}-${newTable}`,
           action: 'table_transfer',
           endpoint: endpoint,
           payload: { table, newTable, invoice },
@@ -1029,7 +1031,7 @@ export async function captainTransfer(
     }
     console.warn('Network captainTransfer failed, queueing command in sync_queue repository:', error);
     await repositories.syncQueue.put({
-      id: `SYNC-CAPTAIN-${Date.now()}`,
+      id: `SYNC-CAPTAIN-${invoice}-${newCaptain}`,
       action: 'captain_transfer',
       endpoint: endpoint,
       payload: { currentCaptain, newCaptain, invoice },

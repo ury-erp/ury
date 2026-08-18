@@ -115,6 +115,8 @@ export interface TableEntity {
   is_take_away?: number;
   /** Minimum seating capacity (server API parity) */
   minimum_seating?: number;
+  /** Active order identifier(s) cached on the table record */
+  active_orders?: string | null;
 }
 
 /**
