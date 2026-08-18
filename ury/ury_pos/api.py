@@ -986,6 +986,9 @@ def _get_allowed_pos_profiles(company: str, user: str) -> list:
     Replicates ``erpnext.accounts.doctype.pos_profile.pos_profile.pos_profile_query``:
     non-disabled profiles for the company where the user is listed in
     ``applicable_for_users`` or where ``applicable_for_users`` is empty.
+
+    Returns a list of ``{"name": ..., "label": ...}`` dicts suitable for the
+    ORI POS Opening screen.
     """
     if not company or not user:
         return []
@@ -1020,19 +1023,52 @@ def _get_allowed_pos_profiles(company: str, user: str) -> list:
     if not allowed_names:
         return []
 
-    return frappe.get_all(
-        "POS Profile",
-        filters={"name": ["in", allowed_names]},
-        fields=[
-            "name",
-            "company",
-            "branch",
-            "restaurant",
-            "custom_enable_multiple_cashier",
-            "custom_daily_pos_close",
-        ],
-        order_by="name",
-    )
+    return [{"name": name, "label": name} for name in sorted(allowed_names)]
+
+
+def _get_main_cashier_status(pos_profile_name: str) -> dict:
+    """Return multi-cashier status for the given POS Profile.
+
+    Returns ``{"enabled": bool, "main_cashier_configured": bool,
+    "main_cashier_open": bool}``.
+    """
+    if not pos_profile_name:
+        return {"enabled": False, "main_cashier_configured": False, "main_cashier_open": False}
+
+    try:
+        pos_profile_doc = frappe.get_doc("POS Profile", pos_profile_name)
+        enabled = bool(pos_profile_doc.custom_enable_multiple_cashier)
+
+        main_cashier = None
+        for user_row in pos_profile_doc.applicable_for_users:
+            if user_row.custom_main_cashier:
+                main_cashier = user_row.user
+                break
+
+        main_cashier_configured = bool(main_cashier)
+        main_cashier_open = False
+        if main_cashier:
+            today = frappe.utils.today()
+            main_cashier_open = bool(
+                frappe.db.exists(
+                    "POS Opening Entry",
+                    {
+                        "user": main_cashier,
+                        "pos_profile": pos_profile_name,
+                        "posting_date": today,
+                        "status": "Open",
+                        "docstatus": 1,
+                    },
+                )
+            )
+
+        return {
+            "enabled": enabled,
+            "main_cashier_configured": main_cashier_configured,
+            "main_cashier_open": main_cashier_open,
+        }
+    except Exception:
+        return {"enabled": False, "main_cashier_configured": False, "main_cashier_open": False}
 
 
 @frappe.whitelist()
@@ -1100,12 +1136,15 @@ def get_pos_opening_screen_data() -> dict:
             payment_modes = []
 
     # Daily close pre-check for the selected POS Profile.
-    daily_close_status = "Success"
+    daily_close_pending = False
     if pos_profile_name:
         try:
-            daily_close_status = validate_pos_close(pos_profile_name)
+            daily_close_pending = validate_pos_close(pos_profile_name) == "Failed"
         except Exception:
-            daily_close_status = "Success"
+            daily_close_pending = False
+
+    # Multi-cashier status for the selected POS Profile.
+    multi_cashier = _get_main_cashier_status(pos_profile_name)
 
     # DocType permission flags for POS Opening Entry.
     can_create = bool(frappe.has_permission("POS Opening Entry", "create"))
@@ -1130,26 +1169,40 @@ def get_pos_opening_screen_data() -> dict:
         order_by="period_start_date desc",
     )
 
+    # Currency information for display.
+    company_currency = None
+    currency_symbol = None
+    if company:
+        try:
+            company_doc = frappe.get_doc("Company", company)
+            company_currency = company_doc.default_currency
+            currency_symbol = frappe.db.get_value(
+                "Currency", company_currency, "symbol"
+            )
+        except Exception:
+            company_currency = None
+            currency_symbol = None
+
+    user_full_name = None
+    try:
+        user_full_name = frappe.db.get_value("User", user, "full_name")
+    except Exception:
+        user_full_name = None
+
     return {
         "user": user,
+        "user_full_name": user_full_name,
         "company": company,
-        "allowed_pos_profiles": allowed_profiles,
-        "pos_profile": pos_profile_data,
+        "company_currency": company_currency,
+        "currency_symbol": currency_symbol,
+        "allowed_profiles": allowed_profiles,
+        "selected_profile": pos_profile_name,
         "branch": pos_profile_data.get("branch") if pos_profile_data else None,
         "restaurant": pos_profile_data.get("restaurant") if pos_profile_data else None,
-        "custom_enable_multiple_cashier": (
-            pos_profile_data.get("multiple_cashier") if pos_profile_data else False
-        ),
-        "custom_main_cashier": (
-            pos_profile_data.get("owner") if pos_profile_data else None
-        ),
-        "custom_daily_pos_close": (
-            pos_profile_data.get("custom_daily_pos_close") if pos_profile_data else False
-        ),
         "payment_modes": payment_modes,
-        "daily_close_status": daily_close_status,
-        "can_create": can_create,
-        "can_submit": can_submit,
+        "daily_close_pending": daily_close_pending,
+        "multi_cashier": multi_cashier,
+        "permissions": {"create": can_create, "submit": can_submit},
         "open_entries": open_entries,
     }
 
