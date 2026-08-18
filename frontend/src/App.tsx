@@ -14,6 +14,7 @@ import { AuthGuard } from './components/AuthGuard';
 import { ReportsLayout } from './pages/Reports/ReportsLayout';
 import { ReportsHome } from './pages/Reports/ReportsHome';
 import { TodaysSales } from './pages/Reports/TodaysSales';
+import { DaywiseSales } from './pages/Reports/DaywiseSales';
 
 function SetupGuard() {
   // @ts-ignore
@@ -58,6 +59,7 @@ function App() {
           >
             <Route index element={<ReportsHome />} />
             <Route path="today-sales" element={<TodaysSales />} />
+            <Route path="daywise-sales" element={<DaywiseSales />} />
           </Route>
         </Route>
       </Route>

@@ -18,32 +18,57 @@ def require_manager():
 		)
 
 
-def get_business_day_condition(branch_param="branch", date_param=None, prefix="b"):
-	"""Return a (sql_fragment, extra_params) pair implementing URY's
-	extended-business-day boundary logic, shared by every report that needs
-	"today" or a single business day for a branch.
+def get_business_day_condition(date_expr="curdate()", prefix="b"):
+	"""Return a SQL fragment implementing URY's extended-business-day boundary
+	logic, shared by every report that needs "today"/a single business day,
+	or a per-row business day when grouped over a date range.
 
 	Mirrors the logic already duplicated across the existing Query Reports
-	(see e.g. today's_sales.json): if URY Report Settings has extended_hours
-	with hours > 0, the business day runs from `hours`:00:00 on the given
-	date through `hours`:00:00 the next calendar day; otherwise it's the
-	plain calendar date.
+	(see e.g. today's_sales.json / daywise_sales.json): if URY Report
+	Settings has extended_hours with hours > 0, the business day runs from
+	`hours`:00:00 on the given date through `hours`:00:00 the next calendar
+	day; otherwise it's the plain calendar date.
 
-	`date_param` is the bind-parameter name for the target date (defaults to
-	CURDATE() when None). `prefix` is the POS Invoice table alias used in the
-	caller's query (matches existing convention of aliasing tabPOS Invoice
-	as `b`).
+	`date_expr` is a raw SQL expression for "the date to check against" —
+	pass a bind-param placeholder (e.g. "%(target_date)s") for a single-day
+	report, or a column reference (e.g. "date_list.`date`") for a date-range
+	report grouped per day. Defaults to CURDATE(). `prefix` is the POS
+	Invoice table alias used in the caller's query (matches existing
+	convention of aliasing tabPOS Invoice as `b`).
 	"""
-	date_sql = f"%({date_param})s" if date_param else "curdate()"
-	condition = f"""(
-		((rs.`hours` IS NULL OR rs.`hours` = 0) AND {prefix}.`posting_date` = {date_sql})
+	return f"""(
+		((rs.`hours` IS NULL OR rs.`hours` = 0) AND {prefix}.`posting_date` = {date_expr})
 		OR (rs.`hours` > 0 AND TIMESTAMP({prefix}.`posting_date`, {prefix}.`posting_time`)
-			<= TIMESTAMP(DATE_ADD({date_sql}, INTERVAL 1 DAY), CONCAT(LPAD(rs.`hours`, 2, '0'), ':00:00'))
+			<= TIMESTAMP(DATE_ADD({date_expr}, INTERVAL 1 DAY), CONCAT(LPAD(rs.`hours`, 2, '0'), ':00:00'))
 			AND TIMESTAMP({prefix}.`posting_date`, {prefix}.`posting_time`)
-			>= TIMESTAMP({date_sql}, CONCAT(LPAD(rs.`hours`, 2, '0'), ':00:00')))
-		OR (rs.`branch` IS NULL AND {prefix}.`posting_date` = {date_sql})
+			>= TIMESTAMP({date_expr}, CONCAT(LPAD(rs.`hours`, 2, '0'), ':00:00')))
+		OR (rs.`branch` IS NULL AND {prefix}.`posting_date` = {date_expr})
 	)"""
-	return condition
+
+
+def date_list_cte(start_param="start_date", end_param="end_date"):
+	"""Return a derived-table SQL fragment ("date_list") enumerating every
+	calendar date from start_param to end_param inclusive, so date-range
+	reports can LEFT JOIN against it and get a row for every day even when
+	no invoices exist that day. Mirrors the number-generator pattern already
+	used in the existing Query Reports (e.g. daywise_sales.json); supports
+	up to 999 days, well above validate_date_range's default 366-day cap.
+	"""
+	return f"""(
+		SELECT %({start_param})s AS `date`
+		UNION
+		SELECT DATE_ADD(%({start_param})s, INTERVAL n DAY) AS `date`
+		FROM (
+			SELECT a.N + b.N * 10 + c.N * 100 + 1 AS n
+			FROM (SELECT 0 AS N UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5 UNION SELECT 6 UNION SELECT 7 UNION SELECT 8 UNION SELECT 9) AS a
+			CROSS JOIN (SELECT 0 AS N UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5 UNION SELECT 6 UNION SELECT 7 UNION SELECT 8 UNION SELECT 9) AS b
+			CROSS JOIN (SELECT 0 AS N UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5 UNION SELECT 6 UNION SELECT 7 UNION SELECT 8 UNION SELECT 9) AS c
+			ORDER BY n
+		) AS nums
+		WHERE DATE_ADD(%({start_param})s, INTERVAL n DAY) < %({end_param})s
+		UNION
+		SELECT %({end_param})s AS `date`
+	) AS date_list"""
 
 
 def report_settings_join(prefix="b", branch_param="branch"):
