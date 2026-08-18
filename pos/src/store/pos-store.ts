@@ -220,7 +220,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
 
   fetchPosProfile: async () => {
     try {
-      const cached = sessionStorage.getItem('posProfile');
+      const cached = localStorage.getItem('posProfile') || sessionStorage.getItem('posProfile');
       if (cached) {
         const profile = JSON.parse(cached);
         set({ 
@@ -237,6 +237,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
       set({ profileLoading: true, error: null });
       const combinedProfile = await getCombinedPosProfile();
       
+      localStorage.setItem('posProfile', JSON.stringify(combinedProfile));
       sessionStorage.setItem('posProfile', JSON.stringify(combinedProfile));
       set({ 
         posProfile: combinedProfile, 
@@ -248,13 +249,24 @@ export const usePOSStore = create<POSStore>((set, get) => ({
         await get().fetchCurrencySymbol();
       }
     } catch (error) {
-      console.error('Error fetching POS profile:', error);
+      console.warn('Error fetching POS profile from network, checking storage fallback:', error);
+      const cached = localStorage.getItem('posProfile') || sessionStorage.getItem('posProfile');
+      if (cached) {
+        const profile = JSON.parse(cached);
+        set({ 
+          posProfile: profile, 
+          profileLoading: false,
+          currency: profile.currency || 'INR'
+        });
+        return;
+      }
       set({ 
         error: 'Failed to fetch POS profile',
         profileLoading: false 
       });
     }
   },
+
 
   fetchCurrencySymbol: async () => {
     try {

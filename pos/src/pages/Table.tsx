@@ -28,12 +28,14 @@ import { queryClient } from '../lib/query-client';
 
 const TableView = () => {
   const navigate = useNavigate();
-  const { posProfile, setSelectedTable, setSelectedOrderType } = usePOSStore();
+  const { posProfile: posProfileFromPOS, setSelectedTable, setSelectedOrderType } = usePOSStore();
+  const posProfileFromRoot = useRootStore((state) => state.posProfile);
+  const posProfile = posProfileFromPOS || posProfileFromRoot;
   const user = useRootStore((state) => state.user);
   const setSelectedStatus = useRootStore((state) => state.setSelectedStatus);
   const showCaptainTransfer = canCaptainTransfer(user, posProfile);
 
-  const branch = posProfile?.branch ?? null;
+  const branch = posProfile?.branch ?? 'Main Branch';
   const { data: rooms = [], isLoading: loadingRooms } = useRooms(branch);
   const [selectedRoom, setSelectedRoom] = useState<string | null>(null);
   const { data: tables = [], isLoading: loadingTables, error: tablesError } = useTables(selectedRoom);
@@ -41,6 +43,7 @@ const TableView = () => {
     useMemo(() => rooms.map((r) => r.name), [rooms]),
     branch
   );
+
 
   const [error, setError] = useState<string | null>(null);
   const [printingTable, setPrintingTable] = useState<string | null>(null);
@@ -299,7 +302,8 @@ const TableView = () => {
   };
 
   const hasRooms = rooms.length > 0;
-  const showGridSkeleton = loadingTables || !selectedRoom;
+  const showGridSkeleton = loadingRooms || (hasRooms && !selectedRoom) || (hasRooms && loadingTables);
+
 
   const handleRoomChange = (roomName: string) => {
     if (roomName === selectedRoom) {

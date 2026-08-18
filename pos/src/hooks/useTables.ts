@@ -10,9 +10,9 @@ const MASTER_DATA_GC_TIME = 1000 * 60 * 60 * 24; // 24 hours
 
 export function useRooms(branch: string | null) {
   return useQuery({
-    queryKey: ['rooms', branch],
-    queryFn: () => getRooms(branch!),
-    enabled: !!branch,
+    queryKey: ['rooms', branch || 'default'],
+    queryFn: () => getRooms(branch),
+    enabled: true,
     staleTime: MASTER_DATA_STALE_TIME,
     gcTime: MASTER_DATA_GC_TIME,
     placeholderData: (previousData) => previousData,
@@ -20,6 +20,7 @@ export function useRooms(branch: string | null) {
     refetchOnReconnect: true,
   });
 }
+
 
 export function useTables(room: string | null) {
   useEffect(() => {

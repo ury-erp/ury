@@ -30,20 +30,46 @@ export async function getRestaurantMenu(posProfile: string, room?: string | null
   return res.message;
 }
 
-export async function getRooms(branch: string): Promise<Room[]> {
+export async function getRooms(branch?: string | null): Promise<Room[]> {
+  const targetBranch = branch || 'Main Branch';
   try {
     const rooms = await db.getDocList(DOCTYPES.URY_ROOM, {
       fields: ['name', 'branch'],
-      filters: [['branch', 'like', branch]],
+      filters: [['branch', 'like', targetBranch]],
       limit: "*" as unknown as number,
       asDict: true,
     });
-    return rooms as Room[];
+    if (rooms && rooms.length > 0) {
+      return rooms as Room[];
+    }
   } catch (error) {
-    console.warn('Network getRooms failed:', error);
-    return [];
+    console.warn('Network getRooms with branch filter failed:', error);
   }
+
+  // Fallback 1: Query without branch filter
+  try {
+    const allRooms = await db.getDocList(DOCTYPES.URY_ROOM, {
+      fields: ['name', 'branch'],
+      limit: "*" as unknown as number,
+      asDict: true,
+    });
+    if (allRooms && allRooms.length > 0) {
+      return allRooms as Room[];
+    }
+  } catch {}
+
+  // Fallback 2: Derive unique rooms from cached tables repository in IndexedDB
+  try {
+    const cachedTables = await repositories.tables.getAll();
+    const uniqueRoomNames = Array.from(new Set(cachedTables.map(t => t.restaurant_room).filter(Boolean)));
+    if (uniqueRoomNames.length > 0) {
+      return uniqueRoomNames.map(name => ({ name, branch: targetBranch }));
+    }
+  } catch {}
+
+  return [];
 }
+
 
 export async function getTableCount(room: string, branch?: string): Promise<number> {
   const filters = [
