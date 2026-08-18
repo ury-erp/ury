@@ -3,6 +3,7 @@ import { call, formatCurrency } from '@ury/core';
 import { StatCard } from '@ury/ui';
 import { Receipt, IndianRupee, Percent, Sigma, Equal, BadgePercent } from 'lucide-react';
 import { useBranchContext } from '../../context/BranchContext';
+import { toApiDate } from '../../lib/reportDate';
 
 interface TodaySalesData {
   branch: string | null;
@@ -21,7 +22,7 @@ const REFRESH_INTERVAL_MS = 15000;
 
 export function TodaysSales() {
   const { activeBranchId } = useBranchContext();
-  const [date, setDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState<string>(() => toApiDate(new Date()));
   const [data, setData] = useState<TodaySalesData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -48,7 +49,7 @@ export function TodaysSales() {
   }, [fetchData]);
 
   useEffect(() => {
-    const isToday = date === new Date().toISOString().slice(0, 10);
+    const isToday = date === toApiDate(new Date());
     if (!isToday) return;
     const interval = setInterval(fetchData, REFRESH_INTERVAL_MS);
     return () => clearInterval(interval);
@@ -68,7 +69,7 @@ export function TodaysSales() {
           <input
             type="date"
             value={date}
-            max={new Date().toISOString().slice(0, 10)}
+            max={toApiDate(new Date())}
             onChange={(e) => setDate(e.target.value)}
             className="border border-input rounded-md px-3 py-1.5 text-sm"
           />
