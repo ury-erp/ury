@@ -26,6 +26,12 @@ interface PrinterHealth {
   ip_address: string;
   signal_status: string;
   status: PrinterStatus;
+  samples?: number;
+  success?: number;
+  failed?: number;
+  success_rate?: number;
+  summary_timestamp?: string;
+  last_updated?: string;
 }
 
 interface PrinterHealthResponse {
@@ -106,7 +112,7 @@ export function PrinterWatchProvider({ children }: { children: React.ReactNode }
 
       const data = response.message;
       setPrinters(data.printers || []);
-      setLastUpdated(data.timestamp);
+      setLastUpdated(data.timestamp || (data.printers && data.printers[0]?.summary_timestamp) || null);
       setLoadState('success');
       setStaleError(null);
     } catch (err) {
@@ -272,16 +278,30 @@ function PrinterWatchDialog({
                 return (
                   <li
                     key={`${printer.device_name}-${printer.ip_address}-${index}`}
-                    className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 p-3"
+                    className="flex flex-col gap-2 rounded-lg border border-gray-200 bg-gray-50 p-3"
                   >
-                    <div>
-                      <p className="font-medium text-gray-900">{printer.device_name}</p>
-                      <p className="text-sm text-gray-500">{printer.ip_address}</p>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-gray-900">{printer.device_name}</p>
+                        <p className="text-sm text-gray-500">{printer.ip_address}</p>
+                      </div>
+                      <Badge variant={status.badge}>
+                        <span className="mr-1">●</span>
+                        {status.label}
+                      </Badge>
                     </div>
-                    <Badge variant={status.badge}>
-                      <span className="mr-1">●</span>
-                      {status.label}
-                    </Badge>
+
+                    {printer.samples !== undefined && printer.samples > 0 && (
+                      <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-gray-200 pt-2 text-xs text-gray-600">
+                        <span>Success Rate: <strong className="text-gray-900">{Number(printer.success_rate ?? 0).toFixed(2)}%</strong></span>
+                        <span>Samples: <strong className="text-gray-900">{printer.samples}</strong></span>
+                        <span>Success: <strong className="text-emerald-700">{printer.success}</strong></span>
+                        <span>Failed: <strong className="text-rose-700">{printer.failed}</strong></span>
+                        {printer.summary_timestamp && (
+                          <span className="text-gray-400">Time: {printer.summary_timestamp}</span>
+                        )}
+                      </div>
+                    )}
                   </li>
                 );
               })}
