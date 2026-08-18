@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
-import { Utensils, Search, Plus, LayoutGrid, List, Edit2, Check, X } from 'lucide-react';
+import { Utensils, Search, Plus, LayoutGrid, List, Edit2, Check, X, Trash2 } from 'lucide-react';
 import { Card, Button, Badge, Input, Spinner, showToast } from '@ury/ui';
 import { formatCurrency, call } from '@ury/core';
 import { dashboardService } from '../../services/dashboard';
@@ -23,13 +23,21 @@ interface MenuItemRecord {
   disabled?: number;
 }
 
-type DrawerMode = 'none' | 'add-item' | 'edit-item' | 'add-menu' | 'add-course';
+interface NewMenuItem {
+  id: string;
+  item_name: string;
+  course: string;
+  rate: string;
+}
+
+type DrawerMode = 'none' | 'add-item' | 'edit-item' | 'add-menu' | 'add-course' | 'add-price-list';
 
 export const MenuPage: React.FC = () => {
-  const { activeBranchId } = useBranchContext();
+  const { activeBranchId, branches } = useBranchContext();
   const [menus, setMenus] = useState<URYMenuRecord[]>([]);
   const [selectedMenu, setSelectedMenu] = useState<string>('');
   const [availableCourses, setAvailableCourses] = useState<{ name: string }[]>([]);
+  const [priceLists, setPriceLists] = useState<{ name: string }[]>([]);
 
   const [items, setItems] = useState<MenuItemRecord[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -52,14 +60,51 @@ export const MenuPage: React.FC = () => {
   });
 
   // Add new menu form state
-  const [newMenu, setNewMenu] = useState({
+  const [newMenu, setNewMenu] = useState<{
+    menu_name: string;
+    branch: string;
+    price_list: string;
+    items: NewMenuItem[];
+  }>({
     menu_name: '',
     branch: '',
     price_list: '',
+    items: [
+      {
+        id: 'item-1',
+        item_name: '',
+        course: '',
+        rate: '',
+      },
+    ],
   });
 
   // Add course form state
   const [newCourseName, setNewCourseName] = useState('');
+
+  // Add price list form state
+  const [newPriceListName, setNewPriceListName] = useState('');
+
+  const [availableItems, setAvailableItems] = useState<{ name: string; item_name?: string; standard_rate?: number; custom_course?: string }[]>([]);
+  const [menuItemRowToPopulateId, setMenuItemRowToPopulateId] = useState<string | null>(null);
+
+  const fetchItems = async () => {
+    try {
+      const records = await dashboardService.getModuleRecords<any>('Item', 'all');
+      setAvailableItems(records || []);
+    } catch {
+      setAvailableItems([]);
+    }
+  };
+
+  const fetchPriceLists = async () => {
+    try {
+      const records = await dashboardService.getModuleRecords<{ name: string }>('Price List', 'all');
+      setPriceLists(records || []);
+    } catch {
+      setPriceLists([]);
+    }
+  };
 
   const fetchMenus = async () => {
     try {
@@ -110,6 +155,8 @@ export const MenuPage: React.FC = () => {
 
   useEffect(() => {
     fetchMenus();
+    fetchPriceLists();
+    fetchItems();
   }, [activeBranchId]);
 
   useEffect(() => {
@@ -145,12 +192,50 @@ export const MenuPage: React.FC = () => {
   };
 
   const openAddMenuDrawer = () => {
+    const defaultBranch = activeBranchId !== 'all' ? activeBranchId : (branches[0]?.name || '');
     setNewMenu({
       menu_name: '',
-      branch: activeBranchId !== 'all' ? activeBranchId : '',
-      price_list: '',
+      branch: defaultBranch,
+      price_list: priceLists[0]?.name || '',
+      items: [
+        {
+          id: `item-${Date.now()}`,
+          item_name: '',
+          course: availableCourses[0]?.name || 'Main Course',
+          rate: '',
+        },
+      ],
     });
     setDrawerMode('add-menu');
+  };
+
+  const handleAddNewMenuItem = () => {
+    setNewMenu((prev) => ({
+      ...prev,
+      items: [
+        ...prev.items,
+        {
+          id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+          item_name: '',
+          course: availableCourses[0]?.name || 'Main Course',
+          rate: '',
+        },
+      ],
+    }));
+  };
+
+  const handleUpdateNewMenuItem = (id: string, patch: Partial<NewMenuItem>) => {
+    setNewMenu((prev) => ({
+      ...prev,
+      items: prev.items.map((it) => (it.id === id ? { ...it, ...patch } : it)),
+    }));
+  };
+
+  const handleRemoveNewMenuItem = (id: string) => {
+    setNewMenu((prev) => ({
+      ...prev,
+      items: prev.items.filter((it) => it.id !== id),
+    }));
   };
 
   const openAddCourseDrawer = () => {
@@ -158,11 +243,18 @@ export const MenuPage: React.FC = () => {
     setDrawerMode('add-course');
   };
 
-  const closeDrawer = () => setDrawerMode('none');
+  const closeDrawer = () => {
+    if (menuItemRowToPopulateId) {
+      setDrawerMode('add-menu');
+      setMenuItemRowToPopulateId(null);
+    } else {
+      setDrawerMode('none');
+    }
+  };
 
   const handleSaveItem = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newItem.item_name || !newItem.rate || !newItem.target_menu) return;
+    if (!newItem.item_name || !newItem.rate || (!menuItemRowToPopulateId && !newItem.target_menu)) return;
 
     let resolvedCourse = newItem.course;
 
@@ -211,23 +303,54 @@ export const MenuPage: React.FC = () => {
         });
         const createdItem = insertRes.message || insertRes;
 
-        const res = await call<any>('frappe.client.get', { doctype: 'URY Menu', name: newItem.target_menu });
-        const menuDoc = res.message || res;
-        if (!menuDoc.items) menuDoc.items = [];
-        menuDoc.items.push({
-          item: createdItem.name,
-          item_name: newItem.item_name,
-          course: resolvedCourse,
-          rate: parseFloat(newItem.rate),
-        });
-        await call('frappe.client.save', { doc: menuDoc });
-        showToast.success('Item created successfully');
+        if (menuItemRowToPopulateId) {
+          await fetchItems();
+          setNewMenu((prev) => {
+            const updatedItems = prev.items.map((row) =>
+              row.id === menuItemRowToPopulateId
+                ? {
+                    ...row,
+                    item_name: createdItem.name,
+                    course: resolvedCourse || row.course || availableCourses[0]?.name || 'Main Course',
+                    rate: newItem.rate,
+                  }
+                : row
+            );
+            const targetIdx = updatedItems.findIndex((row) => row.id === menuItemRowToPopulateId);
+            if (targetIdx === updatedItems.length - 1) {
+              updatedItems.push({
+                id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+                item_name: '',
+                course: availableCourses[0]?.name || 'Main Course',
+                rate: '',
+              });
+            }
+            return { ...prev, items: updatedItems };
+          });
+          setMenuItemRowToPopulateId(null);
+          setDrawerMode('add-menu');
+          showToast.success('Item created successfully');
+        } else {
+          const res = await call<any>('frappe.client.get', { doctype: 'URY Menu', name: newItem.target_menu });
+          const menuDoc = res.message || res;
+          if (!menuDoc.items) menuDoc.items = [];
+          menuDoc.items.push({
+            item: createdItem.name,
+            item_name: newItem.item_name,
+            course: resolvedCourse,
+            rate: parseFloat(newItem.rate),
+          });
+          await call('frappe.client.save', { doc: menuDoc });
+          showToast.success('Item created successfully');
+        }
       }
 
-      if (selectedMenu === newItem.target_menu) {
+      if (!menuItemRowToPopulateId && selectedMenu === newItem.target_menu) {
         fetchMenuItems(selectedMenu);
       }
-      closeDrawer();
+      if (!menuItemRowToPopulateId) {
+        closeDrawer();
+      }
     } catch (err) {
       console.error('Failed to save Item', err);
     }
@@ -235,22 +358,56 @@ export const MenuPage: React.FC = () => {
 
   const handleSaveMenu = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMenu.menu_name) return;
+    if (!newMenu.menu_name.trim()) {
+      showToast.error('Menu Name is required');
+      return;
+    }
+    const branchToUse = newMenu.branch || (activeBranchId !== 'all' ? activeBranchId : branches[0]?.name);
+    if (!branchToUse) {
+      showToast.error('Branch is required');
+      return;
+    }
+
+    const validItems = newMenu.items.filter((it) => it.item_name.trim());
+    if (validItems.length === 0) {
+      showToast.error('At least one Menu Item is required');
+      return;
+    }
+
     try {
+      const childRows = [];
+      for (const item of validItems) {
+        const itemCode = item.item_name.trim();
+        const matched = availableItems.find((it) => it.name === itemCode || it.item_name === itemCode);
+        const itemRate = matched?.standard_rate || parseFloat(item.rate) || 0;
+        const itemCourse = matched?.custom_course || item.course || '';
+
+        childRows.push({
+          item: matched ? matched.name : itemCode,
+          item_name: matched ? (matched.item_name || matched.name) : itemCode,
+          rate: itemRate,
+          course: itemCourse,
+        });
+      }
+
       await call('frappe.client.insert', {
         doc: {
           doctype: 'URY Menu',
-          menu_name: newMenu.menu_name,
-          branch: newMenu.branch || undefined,
-          price_list: newMenu.price_list || undefined,
-          items: [],
+          name: newMenu.menu_name.trim(),
+          branch: branchToUse,
+          price_list: newMenu.price_list || "",
+          enabled: 1,
+          items: childRows,
         },
       });
+
       await fetchMenus();
+      setSelectedMenu(newMenu.menu_name.trim());
       showToast.success('Menu created successfully');
       closeDrawer();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to create URY Menu', err);
+      showToast.error(err.message || 'Failed to create URY Menu');
     }
   };
 
@@ -269,6 +426,28 @@ export const MenuPage: React.FC = () => {
       closeDrawer();
     } catch (err) {
       console.error('Failed to create Course', err);
+    }
+  };
+
+  const handleSavePriceList = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPriceListName.trim()) return;
+    try {
+      await call('frappe.client.insert', {
+        doc: {
+          doctype: 'Price List',
+          price_list_name: newPriceListName.trim(),
+          enabled: 1,
+          buying: 0,
+          selling: 1,
+        },
+      });
+      await fetchPriceLists();
+      showToast.success('Price List created successfully');
+      setNewMenu(prev => ({ ...prev, price_list: newPriceListName.trim() }));
+      setDrawerMode('add-menu');
+    } catch (err) {
+      console.error('Failed to create Price List', err);
     }
   };
 
@@ -340,7 +519,7 @@ export const MenuPage: React.FC = () => {
               type="text"
               placeholder="Search items..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearch(e.target.value)}
               className="pl-9 bg-gray-50 border-gray-200 w-full"
             />
           </div>
@@ -424,7 +603,7 @@ export const MenuPage: React.FC = () => {
                     {formatCurrency(item.rate || 0)}
                   </span>
                   <button
-                    onClick={(e) => { e.stopPropagation(); openEditItemDrawer(item); }}
+                    onClick={(e: React.MouseEvent) => { e.stopPropagation(); openEditItemDrawer(item); }}
                     className="p-1.5 text-gray-400 hover:text-primary hover:bg-primary/5 rounded-md transition-colors -mr-1.5 -mb-1.5"
                     title="Edit Item"
                   >
@@ -487,6 +666,152 @@ export const MenuPage: React.FC = () => {
         </div>
       )}
 
+      {/* Add New Menu Drawer */}
+      <SideDrawer
+        isOpen={drawerMode === 'add-menu'}
+        onClose={closeDrawer}
+        title="Add New Menu"
+      >
+        <form onSubmit={handleSaveMenu} className="space-y-5 text-sm">
+          <div>
+            <label className="block font-semibold text-gray-700 mb-1.5">Menu Name <span className="text-red-500">*</span></label>
+            <Input
+              value={newMenu.menu_name}
+              onChange={(e) => setNewMenu({ ...newMenu, menu_name: e.target.value })}
+              placeholder="e.g. Sea food menu"
+              required
+              className="font-medium"
+            />
+          </div>
+
+          <div>
+            <label className="block font-semibold text-gray-700 mb-1.5">Branch <span className="text-red-500">*</span></label>
+            <SearchableSelect
+              id="menu_branch"
+              value={newMenu.branch}
+              onChange={(_, value) => setNewMenu({ ...newMenu, branch: value })}
+              options={branches.map((b) => ({ value: b.name, label: b.name }))}
+              placeholder="Select Branch..."
+            />
+          </div>
+
+          <div>
+            <label className="block font-semibold text-gray-700 mb-1.5">Price List</label>
+            <SearchableSelect
+              id="price_list"
+              value={newMenu.price_list}
+              onChange={(_, value) => setNewMenu({ ...newMenu, price_list: value })}
+              options={priceLists.map(p => ({ value: p.name, label: p.name }))}
+              placeholder="Select Price List..."
+              actionText="Create New Price List"
+              onAction={() => setDrawerMode('add-price-list')}
+            />
+          </div>
+
+          <div className="pt-2 border-t border-gray-100 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <label className="block font-semibold text-gray-700">Menu Items <span className="text-red-500">*</span></label>
+                <p className="text-xs text-gray-500">Select initial item(s) to create the menu</p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {newMenu.items.map((item, idx) => (
+                <div key={item.id} className="flex items-center gap-2">
+                  <div className="flex-1">
+                    <SearchableSelect
+                      id={`item-select-${item.id}`}
+                      value={item.item_name}
+                      onChange={(_, value) => {
+                        handleUpdateNewMenuItem(item.id, {
+                          item_name: value,
+                        });
+                        if (idx === newMenu.items.length - 1) {
+                          handleAddNewMenuItem();
+                        }
+                      }}
+                      options={availableItems.map((it) => ({ value: it.name, label: it.item_name || it.name }))}
+                      placeholder="Select Item..."
+
+                    />
+                  </div>
+                  {newMenu.items.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveNewMenuItem(item.id)}
+                      className="text-gray-400 hover:text-red-500 transition-colors p-1.5 hover:bg-red-50 rounded-md shrink-0"
+                      title="Remove Item"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="pt-6 flex justify-end gap-3 border-t mt-8 border-gray-100">
+            <Button type="button" variant="outline" onClick={closeDrawer} className="font-semibold">Cancel</Button>
+            <Button type="submit" className="bg-primary hover:bg-primary/90 text-white font-semibold shadow-xs">
+              Create Menu
+            </Button>
+          </div>
+        </form>
+      </SideDrawer>
+
+      {/* Add New Course Drawer */}
+      <SideDrawer
+        isOpen={drawerMode === 'add-course'}
+        onClose={closeDrawer}
+        title="Add New Course"
+      >
+        <form onSubmit={handleSaveCourse} className="space-y-5 text-sm">
+          <div>
+            <label className="block font-semibold text-gray-700 mb-1.5">Course Name <span className="text-red-500">*</span></label>
+            <Input
+              value={newCourseName}
+              onChange={(e) => setNewCourseName(e.target.value)}
+              required
+              className="font-medium"
+            />
+          </div>
+
+          <div className="pt-6 flex justify-end gap-3 border-t mt-8 border-gray-100">
+            <Button type="button" variant="outline" onClick={closeDrawer} className="font-semibold">Cancel</Button>
+            <Button type="submit" className="bg-primary hover:bg-primary/90 text-white font-semibold shadow-xs">
+              Create Course
+            </Button>
+          </div>
+        </form>
+      </SideDrawer>
+
+      {/* Add New Price List Drawer */}
+      <SideDrawer
+        isOpen={drawerMode === 'add-price-list'}
+        onClose={() => setDrawerMode('add-menu')}
+        title="Add New Price List"
+      >
+        <form onSubmit={handleSavePriceList} className="space-y-5 text-sm">
+          <div>
+            <label className="block font-semibold text-gray-700 mb-1.5">Price List Name <span className="text-red-500">*</span></label>
+            <Input
+              value={newPriceListName}
+              onChange={(e) => setNewPriceListName(e.target.value)}
+              required
+              className="font-medium"
+            />
+          </div>
+
+          <div className="pt-6 flex justify-end gap-3 border-t mt-8 border-gray-100">
+            <Button type="button" variant="outline" onClick={() => setDrawerMode('add-menu')} className="font-semibold">Cancel</Button>
+            <Button type="submit" className="bg-primary hover:bg-primary/90 text-white font-semibold shadow-xs">
+              Create Price List
+            </Button>
+          </div>
+        </form>
+      </SideDrawer>
+
       {/* Add/Edit Item Drawer */}
       <SideDrawer
         isOpen={drawerMode === 'add-item' || drawerMode === 'edit-item'}
@@ -494,21 +819,23 @@ export const MenuPage: React.FC = () => {
         title={drawerTitle}
       >
         <form onSubmit={handleSaveItem} className="space-y-5 text-sm">
-          <div>
-            <label className="block font-semibold text-gray-700 mb-1.5">Target Menu <span className="text-red-500">*</span></label>
-            <SearchableSelect
-              id="target_menu"
-              value={newItem.target_menu}
-              onChange={(_, value) => setNewItem({ ...newItem, target_menu: value })}
-              options={menus.map(m => ({ value: m.name, label: m.menu_name || m.name }))}
-            />
-          </div>
+          <div> /* target_menu */
+            <div>
+              <label className="block font-semibold text-gray-700 mb-1.5">Target Menu <span className="text-red-500">*</span></label>
+              <SearchableSelect
+                id="target_menu"
+                value={newItem.target_menu}
+                onChange={(_, value) => setNewItem({ ...newItem, target_menu: value })}
+                options={menus.map(m => ({ value: m.name, label: m.menu_name || m.name }))}
+              />
+            </div>
+          )}
 
           <div>
             <label className="block font-semibold text-gray-700 mb-1.5">Item Name <span className="text-red-500">*</span></label>
             <Input
               value={newItem.item_name}
-              onChange={(e) => setNewItem({ ...newItem, item_name: e.target.value })}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewItem({ ...newItem, item_name: e.target.value })}
               required
               className="font-medium"
             />
@@ -565,76 +892,6 @@ export const MenuPage: React.FC = () => {
             <Button type="button" variant="outline" onClick={closeDrawer} className="font-semibold">Cancel</Button>
             <Button type="submit" className="bg-primary hover:bg-primary/90 text-white font-semibold shadow-xs">
               {editingItem ? 'Save Changes' : 'Create Item'}
-            </Button>
-          </div>
-        </form>
-      </SideDrawer>
-
-      {/* Add New Menu Drawer */}
-      <SideDrawer
-        isOpen={drawerMode === 'add-menu'}
-        onClose={closeDrawer}
-        title="Add New Menu"
-      >
-        <form onSubmit={handleSaveMenu} className="space-y-5 text-sm">
-          <div>
-            <label className="block font-semibold text-gray-700 mb-1.5">Menu Name <span className="text-red-500">*</span></label>
-            <Input
-              value={newMenu.menu_name}
-              onChange={(e) => setNewMenu({ ...newMenu, menu_name: e.target.value })}
-              required
-              className="font-medium"
-            />
-          </div>
-
-          <div>
-            <label className="block font-semibold text-gray-700 mb-1.5">Branch</label>
-            <Input
-              value={newMenu.branch}
-              onChange={(e) => setNewMenu({ ...newMenu, branch: e.target.value })}
-              className="font-medium"
-            />
-          </div>
-
-          <div>
-            <label className="block font-semibold text-gray-700 mb-1.5">Price List</label>
-            <Input
-              value={newMenu.price_list}
-              onChange={(e) => setNewMenu({ ...newMenu, price_list: e.target.value })}
-              className="font-medium"
-            />
-          </div>
-
-          <div className="pt-6 flex justify-end gap-3 border-t mt-8 border-gray-100">
-            <Button type="button" variant="outline" onClick={closeDrawer} className="font-semibold">Cancel</Button>
-            <Button type="submit" className="bg-primary hover:bg-primary/90 text-white font-semibold shadow-xs">
-              Create Menu
-            </Button>
-          </div>
-        </form>
-      </SideDrawer>
-
-      {/* Add New Course Drawer */}
-      <SideDrawer
-        isOpen={drawerMode === 'add-course'}
-        onClose={closeDrawer}
-        title="Add New Course"
-      >
-        <form onSubmit={handleSaveCourse} className="space-y-5 text-sm">
-          <div>
-            <label className="block font-semibold text-gray-700 mb-1.5">Course Name <span className="text-red-500">*</span></label>
-            <Input
-              value={newCourseName}
-              onChange={(e) => setNewCourseName(e.target.value)}
-              required
-              className="font-medium"
-            />
-          </div>
-
-          <div className="pt-6 flex justify-end gap-3 border-t mt-8 border-gray-100">
-            <Button type="button" variant="outline" onClick={closeDrawer} className="font-semibold">Cancel</Button>
-            <Button type="submit" className="bg-primary hover:bg-primary/90 text-white font-semibold shadow-xs">
-              Create Course
             </Button>
           </div>
         </form>
