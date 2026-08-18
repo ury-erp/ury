@@ -217,10 +217,7 @@ export const RoomPage: React.FC = () => {
               onChange={(_, value) => setNewRoom({ ...newRoom, room_type: value })}
               options={[
                 { value: 'AC', label: 'AC' },
-                { value: 'Non-AC', label: 'Non-AC' },
-                { value: 'Rooftop', label: 'Rooftop' },
-                { value: 'Outdoor', label: 'Outdoor' },
-                { value: 'Bar', label: 'Bar' },
+                { value: 'NON-AC', label: 'NON-AC' }
               ]}
             />
           </div>

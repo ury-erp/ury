@@ -13,8 +13,8 @@
     "room_type": {
       "type": "string",
       "title": "Room Type",
-      "enum": ["Indoor", "Outdoor", "Rooftop", "Private Dining", "Bar Area"],
-      "default": "Indoor"
+      "enum": ["AC", "NON-AC"],
+      "default": "AC"
     },
     "branch": {
       "type": "string",

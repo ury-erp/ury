@@ -81,6 +81,7 @@ export const MenuPage: React.FC = () => {
 
   // Add course form state
   const [newCourseName, setNewCourseName] = useState('');
+  const [courseReturnMode, setCourseReturnMode] = useState<DrawerMode>('none');
 
   // Add price list form state
   const [newPriceListName, setNewPriceListName] = useState('');
@@ -127,16 +128,39 @@ export const MenuPage: React.FC = () => {
     }
   };
 
-  const fetchMenuItems = async (menuName: string) => {
+  // menuList is passed explicitly to avoid stale-closure issues with the `menus` state
+  const fetchMenuItems = async (menuName: string, menuList?: URYMenuRecord[]) => {
     if (!menuName) return;
     setLoading(true);
     try {
-      const res = await call<any>('frappe.client.get', {
-        doctype: 'URY Menu',
-        name: menuName,
-      });
-      const menuDoc = res.message || res;
-      setItems(menuDoc.items || []);
+      if (menuName === 'all-menu-items') {
+        // Aggregate items from all real menus — reuse the same frappe.client.get API
+        const realMenus = menuList ?? menus;
+        if (realMenus.length === 0) {
+          setItems([]);
+          return;
+        }
+        const results = await Promise.all(
+          realMenus.map((m) =>
+            call<any>('frappe.client.get', { doctype: 'URY Menu', name: m.name })
+          )
+        );
+        const aggregated: MenuItemRecord[] = [];
+        for (const res of results) {
+          const menuDoc = res.message || res;
+          if (Array.isArray(menuDoc.items)) {
+            aggregated.push(...menuDoc.items);
+          }
+        }
+        setItems(aggregated);
+      } else {
+        const res = await call<any>('frappe.client.get', {
+          doctype: 'URY Menu',
+          name: menuName,
+        });
+        const menuDoc = res.message || res;
+        setItems(menuDoc.items || []);
+      }
     } catch {
       setItems([]);
     } finally {
@@ -161,9 +185,11 @@ export const MenuPage: React.FC = () => {
 
   useEffect(() => {
     if (selectedMenu) {
-      fetchMenuItems(selectedMenu);
+      // Pass menus explicitly so the fetch never sees a stale empty list
+      fetchMenuItems(selectedMenu, menus);
     }
   }, [selectedMenu]);
+
 
   const openAddItemDrawer = () => {
     setEditingItem(null);
@@ -173,7 +199,8 @@ export const MenuPage: React.FC = () => {
       course: '',
       new_course_name: '',
       is_adding_new_course: false,
-      target_menu: selectedMenu,
+      // Never pre-fill the sentinel 'all-menu-items' — fall back to the first real menu
+      target_menu: selectedMenu === 'all-menu-items' ? (menus[0]?.name || '') : selectedMenu,
     });
     setDrawerMode('add-item');
   };
@@ -190,6 +217,7 @@ export const MenuPage: React.FC = () => {
     });
     setDrawerMode('edit-item');
   };
+
 
   const openAddMenuDrawer = () => {
     const defaultBranch = activeBranchId !== 'all' ? activeBranchId : (branches[0]?.name || '');
@@ -238,8 +266,9 @@ export const MenuPage: React.FC = () => {
     }));
   };
 
-  const openAddCourseDrawer = () => {
+  const openAddCourseDrawer = (returnMode: DrawerMode = 'none') => {
     setNewCourseName('');
+    setCourseReturnMode(returnMode);
     setDrawerMode('add-course');
   };
 
@@ -257,23 +286,6 @@ export const MenuPage: React.FC = () => {
     if (!newItem.item_name || !newItem.rate || (!menuItemRowToPopulateId && !newItem.target_menu)) return;
 
     let resolvedCourse = newItem.course;
-
-    // If adding a new course inline, create it first
-    if (newItem.is_adding_new_course && newItem.new_course_name.trim()) {
-      try {
-        await call('frappe.client.insert', {
-          doc: {
-            doctype: 'URY Menu Course',
-            course: newItem.new_course_name.trim(),
-          },
-        });
-        resolvedCourse = newItem.new_course_name.trim();
-        await fetchCourses();
-        showToast.success('Course created successfully');
-      } catch (err) {
-        console.error('Failed to create course', err);
-      }
-    }
 
     try {
       if (editingItem) {
@@ -309,11 +321,11 @@ export const MenuPage: React.FC = () => {
             const updatedItems = prev.items.map((row) =>
               row.id === menuItemRowToPopulateId
                 ? {
-                    ...row,
-                    item_name: createdItem.name,
-                    course: resolvedCourse || row.course || availableCourses[0]?.name || 'Main Course',
-                    rate: newItem.rate,
-                  }
+                  ...row,
+                  item_name: createdItem.name,
+                  course: resolvedCourse || row.course || availableCourses[0]?.name || 'Main Course',
+                  rate: newItem.rate,
+                }
                 : row
             );
             const targetIdx = updatedItems.findIndex((row) => row.id === menuItemRowToPopulateId);
@@ -345,7 +357,7 @@ export const MenuPage: React.FC = () => {
         }
       }
 
-      if (!menuItemRowToPopulateId && selectedMenu === newItem.target_menu) {
+      if (!menuItemRowToPopulateId && (selectedMenu === 'all-menu-items' || selectedMenu === newItem.target_menu)) {
         fetchMenuItems(selectedMenu);
       }
       if (!menuItemRowToPopulateId) {
@@ -423,7 +435,13 @@ export const MenuPage: React.FC = () => {
       });
       await fetchCourses();
       showToast.success('Course created successfully');
-      closeDrawer();
+      if (courseReturnMode !== 'none') {
+        setNewItem(prev => ({ ...prev, course: newCourseName.trim() }));
+        setDrawerMode(courseReturnMode);
+        setCourseReturnMode('none');
+      } else {
+        closeDrawer();
+      }
     } catch (err) {
       console.error('Failed to create Course', err);
     }
@@ -462,10 +480,10 @@ export const MenuPage: React.FC = () => {
   const isDrawerOpen = drawerMode !== 'none';
   const drawerTitle =
     drawerMode === 'add-item' ? 'Add Menu Item'
-    : drawerMode === 'edit-item' ? 'Edit Menu Item'
-    : drawerMode === 'add-menu' ? 'Add New Menu'
-    : drawerMode === 'add-course' ? 'Add New Course'
-    : '';
+      : drawerMode === 'edit-item' ? 'Edit Menu Item'
+        : drawerMode === 'add-menu' ? 'Add New Menu'
+          : drawerMode === 'add-course' ? 'Add New Course'
+            : '';
 
   return (
     <div className="space-y-4 max-w-[1600px] mx-auto">
@@ -477,7 +495,10 @@ export const MenuPage: React.FC = () => {
             <SearchableSelect
               id="selected-menu"
               value={selectedMenu}
-              options={menus.map((m) => ({ value: m.name, label: m.menu_name || m.name }))}
+              options={[
+                { value: 'all-menu-items', label: 'All Menu Items' },
+                ...menus.map((m) => ({ value: m.name, label: m.menu_name || m.name }))
+              ]}
               placeholder="Select Menu..."
               onChange={(_, val) => setSelectedMenu(val)}
             />
@@ -526,7 +547,7 @@ export const MenuPage: React.FC = () => {
 
           <Button
             variant="outline"
-            onClick={openAddCourseDrawer}
+            onClick={() => openAddCourseDrawer('none')}
             className="border-gray-300 text-gray-700 font-semibold flex items-center gap-1.5 whitespace-nowrap"
           >
             <Plus className="w-4 h-4" />
@@ -678,7 +699,7 @@ export const MenuPage: React.FC = () => {
             <Input
               value={newMenu.menu_name}
               onChange={(e) => setNewMenu({ ...newMenu, menu_name: e.target.value })}
-              placeholder="e.g. Sea food menu"
+              placeholder="e.g. Name your menu"
               required
               className="font-medium"
             />
@@ -775,7 +796,14 @@ export const MenuPage: React.FC = () => {
       {/* Add New Course Drawer */}
       <SideDrawer
         isOpen={drawerMode === 'add-course'}
-        onClose={closeDrawer}
+        onClose={() => {
+          if (courseReturnMode !== 'none') {
+            setDrawerMode(courseReturnMode);
+            setCourseReturnMode('none');
+          } else {
+            closeDrawer();
+          }
+        }}
         title="Add New Course"
       >
         <form onSubmit={handleSaveCourse} className="space-y-5 text-sm">
@@ -790,7 +818,14 @@ export const MenuPage: React.FC = () => {
           </div>
 
           <div className="pt-6 flex justify-end gap-3 border-t mt-8 border-gray-100">
-            <Button type="button" variant="outline" onClick={closeDrawer} className="font-semibold">Cancel</Button>
+            <Button type="button" variant="outline" onClick={() => {
+              if (courseReturnMode !== 'none') {
+                setDrawerMode(courseReturnMode);
+                setCourseReturnMode('none');
+              } else {
+                closeDrawer();
+              }
+            }} className="font-semibold">Cancel</Button>
             <Button type="submit" className="bg-primary hover:bg-primary/90 text-white font-semibold shadow-xs">
               Create Course
             </Button>
@@ -855,38 +890,18 @@ export const MenuPage: React.FC = () => {
 
           {/* Course field with inline add option */}
           <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="block font-semibold text-gray-700">Course</label>
-              <button
-                type="button"
-                onClick={() => setNewItem({ ...newItem, is_adding_new_course: !newItem.is_adding_new_course, course: '' })}
-                className="text-xs text-primary font-semibold hover:underline flex items-center gap-1"
-              >
-                {newItem.is_adding_new_course ? (
-                  'Choose existing'
-                ) : (
-                  <><Plus className="w-3 h-3" /> Add new course</>
-                )}
-              </button>
-            </div>
-            {newItem.is_adding_new_course ? (
-              <Input
-                placeholder="New course name"
-                value={newItem.new_course_name}
-                onChange={(e) => setNewItem({ ...newItem, new_course_name: e.target.value })}
-                className="font-medium"
-              />
-            ) : (
-              <SearchableSelect
-                id="course"
-                value={newItem.course}
-                onChange={(_, value) => setNewItem({ ...newItem, course: value })}
-                options={[
-                  { value: '', label: 'None' },
-                  ...availableCourses.map(c => ({ value: c.name, label: c.name }))
-                ]}
-              />
-            )}
+            <label className="block font-semibold text-gray-700 mb-1.5">Course</label>
+            <SearchableSelect
+              id="course"
+              value={newItem.course}
+              onChange={(_, value) => setNewItem({ ...newItem, course: value })}
+              options={[
+                { value: '', label: 'None' },
+                ...availableCourses.map(c => ({ value: c.name, label: c.name }))
+              ]}
+              actionText="Create New Course"
+              onAction={() => openAddCourseDrawer(drawerMode)}
+            />
           </div>
 
           <div>
