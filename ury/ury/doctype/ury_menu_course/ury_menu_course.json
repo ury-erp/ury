@@ -28,7 +28,7 @@
    "fieldname": "icon",
    "fieldtype": "Select",
    "label": "Icon",
-   "options": "Apple\nBeef\nBeer\nBread\nCake\nCarrot\nCoffee\nCookie\nEgg\nFish\nIceCream\nMilk\nPizza\nSalad\nSandwich\nSoup\nWine"
+   "options": "Apple\nBeef\nBeer\nCroissant\nCake\nCarrot\nCoffee\nCookie\nEgg\nFish\nIceCream\nMilk\nPizza\nSalad\nSandwich\nSoup\nWine"
   }
  ],
  "icon": "fa fa-code-fork",
