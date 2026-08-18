@@ -27,6 +27,7 @@ interface RestaurantData {
   order_type_wise_menu?: number;
   menu_for_room?: any[];
   order_type_menu?: any[];
+  default_tax_template?: string;
 }
 
 export const BranchPage: React.FC = () => {
@@ -37,7 +38,7 @@ export const BranchPage: React.FC = () => {
   const [saving, setSaving] = useState<boolean>(false);
 
   // Branch form fields
-  const [branchForm, setBranchForm] = useState<Record<string, string>>({});
+  const [branchForm, setBranchForm] = useState<Record<string, any>>({});
   // Restaurant form fields
   const [restaurantForm, setRestaurantForm] = useState<Record<string, any>>({});
 
@@ -61,7 +62,9 @@ export const BranchPage: React.FC = () => {
     try {
       const res = await call<any>('frappe.client.get_list', { doctype: 'Company', fields: ['name'] });
       setCompanies(res.message || res || []);
-    } catch (e) {}
+    } catch (e) {
+      console.error('Failed to load companies', e);
+    }
   };
 
   useEffect(() => {
@@ -102,7 +105,8 @@ export const BranchPage: React.FC = () => {
       });
       showToast.success('Branch created successfully');
       setIsAddDrawerOpen(false);
-      window.location.reload();
+      fetchDetails();
+      fetchLinkedData();
     } catch (err: any) {
       showToast.error(err.message || 'Failed to create Branch');
     } finally {
@@ -141,9 +145,6 @@ export const BranchPage: React.FC = () => {
       setBranchData(branch);
       setBranchForm({
         branch_name: branch.branch_name || branch.name || '',
-        invoice_series_prefix: branch.invoice_series_prefix || '',
-        aggregator_series_prefix: branch.aggregator_series_prefix || '',
-        tax_id: branch.tax_id || '',
         address: branch.address || '',
       });
 
@@ -154,7 +155,7 @@ export const BranchPage: React.FC = () => {
           filters: [['branch', '=', branchToFetch]],
           fields: ['name', 'company', 'invoice_series_prefix', 'aggregator_series_prefix',
             'address', 'active_menu', 'default_room', 'room_wise_menu',
-            'order_type_wise_menu', 'menu_for_room', 'order_type_menu'],
+            'order_type_wise_menu', 'menu_for_room', 'order_type_menu', 'default_tax_template'],
           limit: 1,
         });
         const list = restaurantList.message || restaurantList;
@@ -176,6 +177,7 @@ export const BranchPage: React.FC = () => {
             order_type_wise_menu: restaurant.order_type_wise_menu || 0,
             menu_for_room: restaurant.menu_for_room || [],
             order_type_menu: restaurant.order_type_menu || [],
+            default_tax_template: restaurant.default_tax_template || '',
           });
         } else {
           setRestaurantData(null);
@@ -203,14 +205,22 @@ export const BranchPage: React.FC = () => {
 
   const handleSave = async () => {
     if (!branchToFetch) return;
+
+    // Validate invoice series prefix
+    if (!restaurantForm.invoice_series_prefix || !restaurantForm.invoice_series_prefix.trim()) {
+      showToast.error('Invoice Series Prefix is required');
+      return;
+    }
+
     setSaving(true);
     try {
-      // Save Branch fields (address only)
+      // Save Branch fields (address and custom_no_taxes)
       await call('frappe.client.set_value', {
         doctype: 'Branch',
         name: branchToFetch,
         fieldname: {
           address: branchForm.address,
+          custom_no_taxes: branchForm.custom_no_taxes ? 1 : 0,
         },
       });
 
@@ -227,13 +237,15 @@ export const BranchPage: React.FC = () => {
           order_type_wise_menu: restaurantForm.order_type_wise_menu,
           menu_for_room: restaurantForm.menu_for_room || restaurantData.menu_for_room || [],
           order_type_menu: restaurantForm.order_type_menu || restaurantData.order_type_menu || [],
+          default_tax_template: restaurantForm.default_tax_template,
         };
         await call('frappe.client.save', {
           doc: updatedDoc
         });
       }
-    } catch (err) {
-      console.error('Failed to update branch:', err);
+      showToast.success('Settings saved');
+    } catch (err: any) {
+      showToast.error(err.message || 'Failed to update branch settings');
     } finally {
       setSaving(false);
     }
@@ -281,50 +293,81 @@ export const BranchPage: React.FC = () => {
 
       {/* Branch Details */}
       <Card className="p-6 rounded-lg border-gray-200 bg-white shadow-sm">
-        <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-4">Branch Details</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Branch Name</label>
-            <Input
-              value={branchForm.branch_name || ''}
-              disabled
-              className="rounded-lg bg-gray-50"
-            />
+        <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-6">Branch Details</h2>
+
+        {/* Branch Info Section */}
+        <div className="mb-6">
+          <h3 className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-4 pb-2 border-b border-gray-100">Branch Info</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">Branch Name</label>
+              <Input
+                value={branchForm.branch_name || ''}
+                disabled
+                className="rounded-lg bg-gray-50"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">Address</label>
+              <Input
+                value={branchForm.address || ''}
+                onChange={(e) => setBranchForm(p => ({ ...p, address: e.target.value }))}
+                className="rounded-lg"
+              />
+            </div>
           </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Invoice Series Prefix <span className="text-red-500">*</span></label>
-            <Input
-              value={restaurantForm.invoice_series_prefix || ''}
-              onChange={(e) => setRestaurantForm(p => ({ ...p, invoice_series_prefix: e.target.value }))}
-              className="rounded-lg"
-              disabled={!restaurantData}
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Aggregator Series Prefix</label>
-            <Input
-              value={restaurantForm.aggregator_series_prefix || ''}
-              onChange={(e) => setRestaurantForm(p => ({ ...p, aggregator_series_prefix: e.target.value }))}
-              className="rounded-lg"
-              disabled={!restaurantData}
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Tax ID</label>
-            <Input
-              value={restaurantForm.tax_id || ''}
-              onChange={(e) => setRestaurantForm(p => ({ ...p, tax_id: e.target.value }))}
-              className="rounded-lg"
-              disabled={!restaurantData}
-            />
-          </div>
-          <div className="space-y-2 md:col-span-2">
-            <label className="text-sm font-medium text-gray-700">Address</label>
-            <Input
-              value={branchForm.address || ''}
-              onChange={(e) => setBranchForm(p => ({ ...p, address: e.target.value }))}
-              className="rounded-lg"
-            />
+        </div>
+
+        {/* Restaurant Info Section */}
+        <div>
+          <h3 className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-4 pb-2 border-b border-gray-100">Restaurant Info</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">Invoice Series Prefix <span className="text-red-500">*</span></label>
+              <Input
+                value={restaurantForm.invoice_series_prefix || ''}
+                onChange={(e) => setRestaurantForm(p => ({ ...p, invoice_series_prefix: e.target.value }))}
+                className="rounded-lg"
+                disabled={!restaurantData}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">Aggregator Series Prefix</label>
+              <Input
+                value={restaurantForm.aggregator_series_prefix || ''}
+                onChange={(e) => setRestaurantForm(p => ({ ...p, aggregator_series_prefix: e.target.value }))}
+                className="rounded-lg"
+                disabled={!restaurantData}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">Tax ID</label>
+              <Input
+                value={restaurantForm.tax_id || ''}
+                onChange={(e) => setRestaurantForm(p => ({ ...p, tax_id: e.target.value }))}
+                className="rounded-lg"
+                disabled={!restaurantData}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">Create Invoice without Tax</label>
+              <input
+                type="checkbox"
+                checked={!!branchForm.custom_no_taxes}
+                onChange={(e) => setBranchForm(p => ({ ...p, custom_no_taxes: e.target.checked ? 1 : 0 }))}
+                className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">Default Tax Template</label>
+              <Input
+                value={restaurantForm.default_tax_template || ''}
+                onChange={(e) => setRestaurantForm(p => ({ ...p, default_tax_template: e.target.value }))}
+                className="rounded-lg"
+                disabled={!restaurantData}
+                placeholder="e.g. GST 5% - Restaurant"
+              />
+            </div>
           </div>
         </div>
       </Card>
@@ -368,7 +411,7 @@ export const BranchPage: React.FC = () => {
                     </label>
                   </div>
                 </div>
-                {true && (
+                {!!restaurantForm.room_wise_menu && (
                   <div className="mt-3 rounded-lg border border-gray-200 overflow-hidden">
                     <table className="w-full text-xs text-gray-600">
                       <thead className="bg-gray-50 border-b border-gray-100 font-semibold">
@@ -410,11 +453,6 @@ export const BranchPage: React.FC = () => {
                         ))}
                       </tbody>
                     </table>
-                    <div className="p-2 border-t border-gray-100 bg-gray-50">
-                      <Button type="button" variant="ghost" size="sm" className="text-primary h-7 text-xs" onClick={() => {
-                        setRestaurantForm({...restaurantForm, order_type_menu: [...(restaurantForm.order_type_menu || []), {order_type: '', menu: ''}]});
-                      }}>+ Add Row</Button>
-                    </div>
                     <div className="p-2 border-t border-gray-100 bg-gray-50">
                       <Button type="button" variant="ghost" size="sm" className="text-primary h-7 text-xs" onClick={() => {
                         setRestaurantForm({...restaurantForm, menu_for_room: [...(restaurantForm.menu_for_room || []), {room: '', menu: ''}]});
@@ -486,7 +524,7 @@ export const BranchPage: React.FC = () => {
                     Order Type Wise Menu
                   </label>
                 </div>
-                {true && (
+                {!!restaurantForm.order_type_wise_menu && (
                   <div className="mt-3 rounded-lg border border-gray-200 overflow-hidden">
                     <table className="w-full text-xs text-gray-600">
                       <thead className="bg-gray-50 border-b border-gray-100 font-semibold">
@@ -527,11 +565,6 @@ export const BranchPage: React.FC = () => {
                     <div className="p-2 border-t border-gray-100 bg-gray-50">
                       <Button type="button" variant="ghost" size="sm" className="text-primary h-7 text-xs" onClick={() => {
                         setRestaurantForm({...restaurantForm, order_type_menu: [...(restaurantForm.order_type_menu || []), {order_type: '', menu: ''}]});
-                      }}>+ Add Row</Button>
-                    </div>
-                    <div className="p-2 border-t border-gray-100 bg-gray-50">
-                      <Button type="button" variant="ghost" size="sm" className="text-primary h-7 text-xs" onClick={() => {
-                        setRestaurantForm({...restaurantForm, menu_for_room: [...(restaurantForm.menu_for_room || []), {room: '', menu: ''}]});
                       }}>+ Add Row</Button>
                     </div>
                   </div>
