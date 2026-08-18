@@ -21,6 +21,11 @@ import { TimeWiseSales } from './pages/Reports/TimeWiseSales';
 import { ServiceWiseSales } from './pages/Reports/ServiceWiseSales';
 import { CancelledInvoices } from './pages/Reports/CancelledInvoices';
 import { AverageBillValue } from './pages/Reports/AverageBillValue';
+import { ItemWiseSales } from './pages/Reports/ItemWiseSales';
+import { ItemWisePurchaseHistory } from './pages/Reports/ItemWisePurchaseHistory';
+import { CustomerData } from './pages/Reports/CustomerData';
+import { DaywiseCustomerDetails } from './pages/Reports/DaywiseCustomerDetails';
+import { RepeatedCustomers } from './pages/Reports/RepeatedCustomers';
 
 function SetupGuard() {
   // @ts-ignore
@@ -72,6 +77,11 @@ function App() {
             <Route path="service-wise-sales" element={<ServiceWiseSales />} />
             <Route path="cancelled-invoices" element={<CancelledInvoices />} />
             <Route path="average-bill-value" element={<AverageBillValue />} />
+            <Route path="item-wise-sales" element={<ItemWiseSales />} />
+            <Route path="item-wise-purchase-history" element={<ItemWisePurchaseHistory />} />
+            <Route path="customer-data" element={<CustomerData />} />
+            <Route path="daywise-customer-details" element={<DaywiseCustomerDetails />} />
+            <Route path="repeated-customers" element={<RepeatedCustomers />} />
           </Route>
         </Route>
       </Route>

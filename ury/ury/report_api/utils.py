@@ -46,6 +46,27 @@ def get_business_day_condition(date_expr="curdate()", prefix="b"):
 	)"""
 
 
+def get_prior_business_day_condition(date_expr="curdate()", prefix="c"):
+	"""Return a SQL fragment for "this invoice's business day is strictly
+	BEFORE date_expr" — used for lifetime-first-visit checks (e.g. Repeated
+	Customers' "is this the customer's first visit ever" NOT EXISTS clause).
+
+	This is the strict-inequality sibling of get_business_day_condition,
+	not a string transform of it: the legacy Repeated Customers Query
+	Report's equivalent inline SQL has a bug in its first OR-branch
+	(`(rs.hours IS NULL OR rs.hours = 0) IS NULL AND ...` — comparing a
+	boolean expression to NULL is always NULL/false, so that branch never
+	matches for a non-extended-hours branch, silently making almost every
+	visit look "new"). This helper fixes that rather than reproducing it.
+	"""
+	return f"""(
+		((rs.`hours` IS NULL OR rs.`hours` = 0) AND {prefix}.`posting_date` < {date_expr})
+		OR (rs.`hours` > 0 AND TIMESTAMP({prefix}.`posting_date`, {prefix}.`posting_time`)
+			< TIMESTAMP({date_expr}, CONCAT(LPAD(rs.`hours`, 2, '0'), ':00:00')))
+		OR (rs.`branch` IS NULL AND {prefix}.`posting_date` < {date_expr})
+	)"""
+
+
 def date_list_cte(start_param="start_date", end_param="end_date"):
 	"""Return a derived-table SQL fragment ("date_list") enumerating every
 	calendar date from start_param to end_param inclusive, so date-range
