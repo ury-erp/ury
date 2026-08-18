@@ -478,12 +478,22 @@ export const MenuPage: React.FC = () => {
       return;
     }
 
+    // Validate that each item has a valid, non-negative price
+    for (const item of validItems) {
+      const parsedRate = parseFloat(item.rate);
+      if (isNaN(parsedRate) || parsedRate < 0) {
+        showToast.error(`Please enter a valid price for ${item.item_name}`);
+        return;
+      }
+    }
+
     try {
       const childRows = [];
       for (const item of validItems) {
         const itemCode = item.item_name.trim();
         const matched = availableItems.find((it) => it.name === itemCode || it.item_name === itemCode);
-        const itemRate = matched?.standard_rate || parseFloat(item.rate) || 0;
+        // Use the user-entered menu-specific rate — do NOT fall back to standard_rate
+        const itemRate = parseFloat(item.rate) || 0;
         const itemCourse = matched?.custom_course || item.course || '';
 
         childRows.push({
@@ -499,7 +509,6 @@ export const MenuPage: React.FC = () => {
           doctype: 'URY Menu',
           name: newMenu.menu_name.trim(),
           branch: branchToUse,
-          price_list: newMenu.price_list || "",
           enabled: 1,
           items: childRows,
         },
