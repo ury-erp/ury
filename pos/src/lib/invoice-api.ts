@@ -13,6 +13,7 @@ import {
 import { resolveTempDependency } from './order-api';
 import { OrderStatusType, OrderType } from '../data/order-types';
 import { buildTableClusterMap, getMergedTablesCsv } from './table-utils';
+import { unwrapResponse } from './network-utils';
 import type { Filter } from 'frappe-js-sdk/lib/db/types';
 
 export interface POSInvoice {
@@ -111,7 +112,7 @@ export async function getOrderForEdit(invoiceId: string): Promise<any> {
       doctype: 'POS Invoice',
       name: invoiceId,
     });
-    return response.message;
+    return unwrapResponse(response);
   } catch (onlineErr) {
     console.warn('[getOrderForEdit] Network fetch failed, falling back to local repository:', onlineErr);
 
@@ -289,7 +290,8 @@ export async function getPOSInvoices({
       }
     );
 
-    const serverInvoices = response.message?.data || [];
+    const responsePayload = unwrapResponse(response) || {};
+    const serverInvoices = responsePayload.data || [];
 
     // Fetch local pending orders from IndexedDB repository
     const pendingOrders = await repositories.orders.getAll();
@@ -485,7 +487,7 @@ export async function getPOSInvoices({
 
     return {
       invoices: mergedInvoices,
-      hasMore: response.message?.next || false
+      hasMore: responsePayload.next || false
     };
   } catch (error) {
     console.warn('[getPOSInvoices] Network call failed. Falling back to local orders repository cache:', error);
@@ -1079,7 +1081,10 @@ export async function mergeBills(
         secondary_invoice: secondaryInvoice,
       }
     );
-    const result = response.message;
+    const result = unwrapResponse(response) as MergeBillsResponse | undefined;
+    if (!result) {
+      throw new Error('Failed to merge bills: empty response');
+    }
     if (result.status === 'error') {
       throw new Error(result.message || 'Failed to merge bills');
     }

@@ -7,6 +7,16 @@
  * return false so the caller can surface the alert toast to the UI instead of
  * silently queueing the request offline.
  */
+/**
+ * Safely unwraps a Frappe-style response. Production responses are usually
+ * `{ message: <payload> }`; tests and some legacy endpoints return the payload
+ * directly under `data`, `result`, or at the top level.
+ */
+export function unwrapResponse<T = any>(response: any): T | undefined {
+  if (response == null) return undefined;
+  return response.message ?? response.data ?? response.result ?? response;
+}
+
 export function isNetworkError(error: any): boolean {
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
     return true;

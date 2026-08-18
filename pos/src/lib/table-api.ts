@@ -1,5 +1,6 @@
 import { DOCTYPES } from '../data/doctypes';
 import { db, repositories, apiRegistry, call, projectionBus } from '@ury/core';
+import { unwrapResponse } from './network-utils';
 
 export interface Room {
   name: string;
@@ -27,7 +28,7 @@ export async function getRestaurantMenu(posProfile: string, room?: string | null
     params.room = room;
   }
   const res = await call.get(endpoint, params);
-  return res.message;
+  return unwrapResponse(res);
 }
 
 export async function getRooms(branch?: string | null): Promise<Room[]> {

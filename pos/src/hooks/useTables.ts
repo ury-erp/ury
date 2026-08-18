@@ -59,7 +59,7 @@ export function useTables(room: string | null) {
 
 export function useRoomCounts(rooms: string[], branch: string | null) {
   return useQuery({
-    queryKey: ['roomCounts', branch, rooms],
+    queryKey: ['roomCounts', branch || 'default', (rooms || []).slice().sort().join(',')],
     queryFn: async () => {
       if (!branch || rooms.length === 0) return {};
       const counts = await Promise.all(

@@ -256,6 +256,24 @@ export class SyncEngine {
     let succeeded = 0;
     let failed = 0;
 
+    // Recover commands left in SYNCING state from a previous crash or abrupt
+    // disconnect so they are picked up by getPendingCommands() and retried.
+    try {
+      const allCommands = await this.repos.syncQueue.getAll();
+      const stuckCommands = allCommands.filter(
+        (cmd: any) => cmd.status === 'SYNCING'
+      );
+      for (const cmd of stuckCommands) {
+        const cmdId = cmd.command_id || cmd.id;
+        if (cmdId) {
+          console.warn(`[SyncEngine] Recovering stuck SYNCING command ${cmdId} back to PENDING.`);
+          await this.queueMgr.markPending(cmdId);
+        }
+      }
+    } catch (recoverErr) {
+      console.error('[SyncEngine] Failed to recover stuck SYNCING commands:', recoverErr);
+    }
+
     try {
       while (true) {
         const pendingCommands = await this.queueMgr.getPendingCommands();

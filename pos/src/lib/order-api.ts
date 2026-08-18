@@ -1,6 +1,6 @@
 import { call, repositories, apiRegistry, projectionBus, commandQueue, SplitBillCommand, type OrderEntity } from '@ury/core';
 import { buildTableClusterMap, getMergedTablesCsv } from './table-utils';
-import { isNetworkError } from './network-utils';
+import { isNetworkError, unwrapResponse } from './network-utils';
 import { queryClient } from './query-client';
 
 
@@ -219,6 +219,31 @@ export async function resolveTempDependency(orderId: string): Promise<string[]> 
   }
 
   return [];
+}
+
+/**
+ * Finds the pending create_customer command ID responsible for syncing a
+ * temporary customer (TEMP-CUST-*). This lets order commands wait until the
+ * customer exists on the server before attempting sync_order.
+ */
+async function findPendingCustomerCommandId(tempCustomerId: string): Promise<string | undefined> {
+  try {
+    const tempCustomer = await repositories.customers.getById(tempCustomerId);
+    if (!tempCustomer) return undefined;
+
+    const allCmds = await repositories.syncQueue.getAll();
+    const match = allCmds.find((cmd: any) =>
+      cmd.status === 'PENDING' &&
+      (cmd.action === 'create_customer' || cmd.endpoint?.includes('create_customer')) &&
+      ((cmd.payload as any)?.customer_name === tempCustomer.customer_name ||
+       (cmd.payload as any)?.mobile_number === tempCustomer.mobile_number)
+    );
+
+    return match ? ((match.command_id || match.id) as string) : undefined;
+  } catch (err) {
+    console.warn('[findPendingCustomerCommandId] Failed to resolve temp customer command:', err);
+    return undefined;
+  }
 }
 
 /**
@@ -516,7 +541,7 @@ export const syncOrder = async (data: SyncOrderData) => {
   const endpoint = apiRegistry.getUrl('SYNC_ORDER');
   try {
     const response = await call.post(endpoint, { ...data, mode_of_payment: data.mode_of_payment ?? null });
-    const result = response.message;
+    const result = unwrapResponse(response);
 
     // Cache updated order in local repository
     if (result && result.name) {
@@ -672,6 +697,14 @@ export const syncOrder = async (data: SyncOrderData) => {
 
     // 3. Enqueue command into sync_queue. Stable command IDs ensure repeated
     //    offline edits overwrite the same queue entry instead of creating duplicates.
+    const orderDependencies: string[] = [];
+    if (data.customer && data.customer.startsWith('TEMP-CUST-')) {
+      const customerCmdId = await findPendingCustomerCommandId(data.customer);
+      if (customerCmdId) {
+        orderDependencies.push(customerCmdId);
+      }
+    }
+
     await repositories.syncQueue.put({
       id: cmdId,
       action: 'sync_order',
@@ -683,6 +716,8 @@ export const syncOrder = async (data: SyncOrderData) => {
       priority: 1,
       temporary_id: temporaryId,
       idempotency_key: envelopeIdempotencyKey,
+      dependencies: orderDependencies,
+      dependency_ids: orderDependencies,
     });
 
     projectionBus.emit('ORDERS_UPDATED');
@@ -892,7 +927,7 @@ export async function splitBill(
       items_to_move: itemsToMove,
       customer: customer || undefined,
     });
-    return res.message as SplitBillResponse;
+    return unwrapResponse(res) as SplitBillResponse;
   } catch (error) {
     if (!isNetworkError(error)) {
       throw error;
@@ -1025,6 +1060,7 @@ export async function captainTransfer(
       newCaptain,
       invoice,
     });
+    projectionBus.emit('ORDERS_UPDATED');
   } catch (error) {
     if (!isNetworkError(error)) {
       throw error;
@@ -1040,5 +1076,7 @@ export async function captainTransfer(
       attempts: 0,
       priority: 2,
     });
+
+    projectionBus.emit('ORDERS_UPDATED');
   }
 }
