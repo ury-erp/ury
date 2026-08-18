@@ -44,8 +44,7 @@
    "fieldname": "items",
    "fieldtype": "Table",
    "label": "Items",
-   "options": "URY Menu Item",
-   "reqd": 1
+   "options": "URY Menu Item"
   },
   {
    "fieldname": "branch",
