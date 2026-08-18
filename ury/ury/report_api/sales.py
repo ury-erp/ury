@@ -3,6 +3,7 @@ import frappe
 from ury.ury.report_api.utils import (
 	date_list_cte,
 	get_business_day_condition,
+	get_business_day_range_condition,
 	report_settings_join,
 	require_manager,
 	validate_date_range,
@@ -147,5 +148,116 @@ def get_daywise_sales(start_date, end_date, branch=None):
 			"total_invoices": total_invoices,
 			"peak_day": peak["date"] if peak else None,
 			"peak_day_total": peak["grand_total"] if peak else 0,
+		},
+	}
+
+
+@frappe.whitelist()
+def get_daywise_invoices(start_date, end_date, branch=None, page=1, page_size=50):
+	"""Paginated invoice-level detail across a date range.
+
+	Mirrors the existing "Daywise Invoices" Query Report, including its
+	Aggregators handling (received/change amounts zeroed for aggregator
+	orders since the aggregator platform — not the till — holds the cash)
+	and its per-invoice payment-mode breakdown via Sales Invoice Payment.
+	Adds real pagination since this report's row count (one row per invoice)
+	is unbounded across a range, unlike Wave 1's other per-day/per-bucket
+	reports.
+	"""
+	require_manager()
+	validate_date_range(start_date, end_date)
+
+	page = int(page)
+	page_size = min(int(page_size), 200)
+	offset = (page - 1) * page_size
+
+	params = {"start_date": start_date, "end_date": end_date, "limit": page_size, "offset": offset}
+
+	if branch:
+		condition = get_business_day_range_condition()
+		join = report_settings_join()
+		params["branch"] = branch
+		branch_filter = "b.`branch` = %(branch)s AND"
+	else:
+		# All-branches mode: plain calendar-date range, same simplification as
+		# get_today_sales/get_daywise_sales (no single extended-hours offset
+		# applies across multiple branches at once).
+		condition = "b.`posting_date` BETWEEN %(start_date)s AND %(end_date)s"
+		join = ""
+		branch_filter = ""
+
+	base_where = f"""
+		{branch_filter}
+		b.`docstatus` = 1
+		AND b.`status` IN ("Consolidated", "Paid")
+		AND {condition}
+	"""
+
+	total_count = frappe.db.sql(
+		f"""
+		SELECT COUNT(*) AS total
+		FROM `tabPOS Invoice` b
+		{join}
+		WHERE {base_where}
+		""",
+		params,
+		as_dict=True,
+	)[0]["total"]
+
+	rows = frappe.db.sql(
+		f"""
+		SELECT
+			b.`posting_date` AS date,
+			CONCAT(
+				LPAD(IF(HOUR(b.`posting_time`) > 12, HOUR(b.`posting_time`) - 12, HOUR(b.`posting_time`)), 2, '0'),
+				':',
+				SUBSTRING_INDEX(SUBSTRING_INDEX(b.`posting_time`, ':', 2), ':', -1),
+				CASE WHEN HOUR(b.`posting_time`) >= 12 THEN ' PM' ELSE ' AM' END
+			) AS time,
+			b.`name` AS invoice,
+			b.`net_total` AS item_total,
+			b.`total_taxes_and_charges` AS total_taxes,
+			b.`grand_total` AS grand_total,
+			(b.`grand_total` - b.`rounded_total`) AS round_off,
+			b.`rounded_total` AS rounded_total,
+			CASE WHEN b.`customer_group` = 'Aggregators' THEN 0 ELSE b.`paid_amount` END AS received_amount,
+			CASE WHEN b.`customer_group` = 'Aggregators' THEN 0 ELSE b.`change_amount` END AS change_amount,
+			IFNULL(
+				CASE
+					WHEN b.`rounded_total` > 0 THEN (b.`rounded_total` - b.`paid_amount` + b.`change_amount`)
+					ELSE (b.`grand_total` - b.`paid_amount` + b.`change_amount`)
+				END,
+				0
+			) AS cash_discounts,
+			GROUP_CONCAT(
+				CASE WHEN c.`amount` != 0 THEN c.`mode_of_payment` END
+				ORDER BY c.`amount`
+				SEPARATOR ', '
+			) AS payment_mode
+		FROM `tabPOS Invoice` b
+		LEFT JOIN `tabSales Invoice Payment` c ON (c.`parent` = b.`name`)
+		{join}
+		WHERE {base_where}
+		GROUP BY b.`name`
+		ORDER BY b.`posting_date` ASC, b.`posting_time` ASC
+		LIMIT %(limit)s OFFSET %(offset)s
+		""",
+		params,
+		as_dict=True,
+	)
+
+	for r in rows:
+		r["date"] = str(r["date"])
+
+	return {
+		"branch": branch,
+		"start_date": str(start_date),
+		"end_date": str(end_date),
+		"invoices": rows,
+		"pagination": {
+			"page": page,
+			"page_size": page_size,
+			"total": total_count,
+			"total_pages": (total_count + page_size - 1) // page_size if total_count else 0,
 		},
 	}
