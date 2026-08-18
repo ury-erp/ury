@@ -25,6 +25,20 @@ class ProjectionBusClass {
     };
   }
 
+  /** Subscribe to a specific projection event */
+  on(targetEvent: ProjectionEventType, listener: (data?: unknown) => void): () => void {
+    return this.subscribe((event, data) => {
+      if (event === targetEvent || event === 'ALL_UPDATED') {
+        listener(data);
+      }
+    });
+  }
+
+  /** Remove listener */
+  off(listener: ProjectionListener): void {
+    this.listeners.delete(listener);
+  }
+
   /** Emit projection update event to all subscribers */
   emit(event: ProjectionEventType, data?: unknown): void {
     this.listeners.forEach(listener => {
@@ -43,3 +57,4 @@ class ProjectionBusClass {
 }
 
 export const projectionBus = new ProjectionBusClass();
+

@@ -24,14 +24,25 @@ export function useRooms(branch: string | null) {
 
 export function useTables(room: string | null) {
   useEffect(() => {
-    const unsubscribe = projectionBus.on('TABLES_UPDATED', () => {
-      queryClient.invalidateQueries({ queryKey: ['tables'] });
-      queryClient.invalidateQueries({ queryKey: ['roomCounts'] });
-    });
+    const unsubscribe = typeof projectionBus.on === 'function'
+      ? projectionBus.on('TABLES_UPDATED', () => {
+          queryClient.invalidateQueries({ queryKey: ['tables'] });
+          queryClient.invalidateQueries({ queryKey: ['roomCounts'] });
+        })
+      : projectionBus.subscribe((event) => {
+          if (event === 'TABLES_UPDATED' || event === 'ALL_UPDATED') {
+            queryClient.invalidateQueries({ queryKey: ['tables'] });
+            queryClient.invalidateQueries({ queryKey: ['roomCounts'] });
+          }
+        });
+
     return () => {
-      unsubscribe();
+      if (typeof unsubscribe === 'function') {
+        unsubscribe();
+      }
     };
   }, []);
+
 
   return useQuery({
     queryKey: ['tables', room],
