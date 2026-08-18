@@ -216,7 +216,6 @@ export const PosProfilePage: React.FC = () => {
   const handleSaveProfile = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!selectedProfile) return;
-    setSaving(true);
     try {
       await call('frappe.client.set_value', {
         doctype: 'POS Profile',
@@ -236,6 +235,7 @@ export const PosProfilePage: React.FC = () => {
       fetchProfiles();
       fetchProfileDetails(selectedProfile.name);
       setIsReadOnly(true);
+      showToast.success('POS Profile updated successfully');
     } catch (err) {
       console.error('Failed to save POS Profile', err);
     } finally {
