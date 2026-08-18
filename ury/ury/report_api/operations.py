@@ -42,8 +42,11 @@ def get_completed_work_orders(start_date, end_date):
 	)
 
 	for r in rows:
-		r["planned_end_date"] = str(r["planned_end_date"]) if r["planned_end_date"] else None
-		r["actual_end_date"] = str(r["actual_end_date"]) if r["actual_end_date"] else None
+		# planned_end_date is a Date field but actual_end_date is a Datetime
+		# field with microsecond precision — str() on the raw value renders
+		# an ugly "2026-05-05 21:25:46.919153". Format both as plain dates.
+		r["planned_end_date"] = frappe.utils.formatdate(r["planned_end_date"], "yyyy-MM-dd") if r["planned_end_date"] else None
+		r["actual_end_date"] = frappe.utils.formatdate(r["actual_end_date"], "yyyy-MM-dd") if r["actual_end_date"] else None
 		r["qty"] = r["qty"] or 0
 		r["produced_qty"] = r["produced_qty"] or 0
 
