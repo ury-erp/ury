@@ -9,7 +9,7 @@ interface ConfigureItemProps {
 export function ConfigureItem({ item, completed, onClick }: ConfigureItemProps) {
   return (
     <div 
-      className="flex items-center p-4 border-b border-[#F3F4F6] last:border-0 hover:bg-[#F9FAFB] cursor-pointer transition-colors"
+      className="flex items-center p-4 border-b border-gray-100 last:border-0 hover:bg-[#F9FAFB] cursor-pointer transition-colors"
       onClick={() => {
         window.open(item.route, "_blank");
         onClick(item.id);
@@ -17,12 +17,12 @@ export function ConfigureItem({ item, completed, onClick }: ConfigureItemProps) 
     >
       <div className="flex-1">
         <div className="flex items-center gap-3 mb-1">
-          <h4 className="text-sm font-medium text-[#111827]">{item.label}</h4>
+          <h4 className="text-sm font-medium text-gray-900">{item.label}</h4>
           <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-[#F0FDF4] text-[#16A34A]">
             Optional
           </span>
         </div>
-        <p className="text-xs text-[#9CA3AF]">
+        <p className="text-xs text-gray-400">
           {item.description}
         </p>
       </div>
@@ -30,7 +30,7 @@ export function ConfigureItem({ item, completed, onClick }: ConfigureItemProps) 
         {completed ? (
           <CheckCircle2 className="w-5 h-5 text-[#16A34A] fill-current" />
         ) : (
-          <ChevronRight className="w-5 h-5 text-[#9CA3AF]" />
+          <ChevronRight className="w-5 h-5 text-gray-400" />
         )}
       </div>
     </div>

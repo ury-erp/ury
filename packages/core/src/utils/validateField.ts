@@ -1,6 +1,15 @@
-import validations from '../../../../frontend/src/data/validations.json';
+export interface ValidationMessages {
+  required: string;
+  minLength: string;
+  maxLength: string;
+  pattern: Record<string, string>;
+}
 
-export function validateFieldValue(value: string, rules: string[]): { valid: boolean; message: string } {
+export function validateFieldValue(
+  value: string,
+  rules: string[],
+  validations: ValidationMessages
+): { valid: boolean; message: string } {
   for (const rule of rules) {
     if (rule === 'required') {
       if (!value || value.trim() === '') {
@@ -20,7 +29,6 @@ export function validateFieldValue(value: string, rules: string[]): { valid: boo
       const pattern = rule.substring(8);
       const regex = new RegExp(pattern);
       if (value && !regex.test(value)) {
-        // @ts-ignore
         const msg = validations.pattern[pattern] || 'Invalid format';
         return { valid: false, message: msg };
       }

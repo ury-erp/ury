@@ -127,7 +127,7 @@ const CaptainTransferDialog = ({
         variant="large"
         size="lg"
         onClose={() => handleOpenChange(false)}
-        className="max-h-[90vh] overflow-y-auto"
+        className="max-h-dialog-max-h overflow-y-auto"
       >
         <DialogHeader>
           <DialogTitle>{t('tables.transfer_captain')}</DialogTitle>

@@ -47,8 +47,8 @@ export const Sidebar: React.FC = () => {
               className={({ isActive }) =>
                 `flex items-center space-x-3 px-3.5 py-2.5 rounded-lg text-sm font-medium transition-all ${
                   isActive
-                    ? 'bg-[#2563eb] text-white shadow-sm font-semibold'
-                    : 'text-gray-600 hover:bg-blue-50 hover:text-[#2563eb]'
+                    ? 'bg-primary text-white shadow-sm font-semibold'
+                    : 'text-gray-600 hover:bg-blue-50 hover:text-primary'
                 }`
               }
             >
@@ -64,8 +64,8 @@ export const Sidebar: React.FC = () => {
             onClick={() => setIsAdvancedOpen(!isAdvancedOpen)}
             className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-sm font-medium transition-colors ${
               isAdvancedPath
-                ? 'text-[#2563eb] font-semibold bg-blue-50'
-                : 'text-gray-600 hover:bg-blue-50 hover:text-[#2563eb]'
+                ? 'text-primary font-semibold bg-blue-50'
+                : 'text-gray-600 hover:bg-blue-50 hover:text-primary'
             }`}
           >
             <div className="flex items-center space-x-3">
@@ -74,7 +74,7 @@ export const Sidebar: React.FC = () => {
             </div>
             <ChevronDown
               className={`w-4 h-4 transition-transform duration-200 ${
-                isAdvancedOpen ? 'rotate-180 text-[#2563eb]' : 'text-gray-400'
+                isAdvancedOpen ? 'rotate-180 text-primary' : 'text-gray-400'
               }`}
             />
           </button>
@@ -86,8 +86,8 @@ export const Sidebar: React.FC = () => {
                 className={({ isActive }) =>
                   `flex items-center space-x-3 px-3.5 py-2 rounded-lg text-xs font-medium transition-all ${
                     isActive
-                      ? 'bg-[#2563eb] text-white shadow-sm font-semibold'
-                      : 'text-gray-600 hover:bg-blue-50 hover:text-[#2563eb]'
+                      ? 'bg-primary text-white shadow-sm font-semibold'
+                      : 'text-gray-600 hover:bg-blue-50 hover:text-primary'
                   }`
                 }
               >
@@ -99,8 +99,8 @@ export const Sidebar: React.FC = () => {
                 className={({ isActive }) =>
                   `flex items-center space-x-3 px-3.5 py-2 rounded-lg text-xs font-medium transition-all ${
                     isActive
-                      ? 'bg-[#2563eb] text-white shadow-sm font-semibold'
-                      : 'text-gray-600 hover:bg-blue-50 hover:text-[#2563eb]'
+                      ? 'bg-primary text-white shadow-sm font-semibold'
+                      : 'text-gray-600 hover:bg-blue-50 hover:text-primary'
                   }`
                 }
               >
