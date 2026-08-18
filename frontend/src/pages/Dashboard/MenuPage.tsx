@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
 import { Utensils, Search, Plus, LayoutGrid, List, Edit2, Check, X } from 'lucide-react';
-import { Card, Button, Badge, Input, Spinner } from '@ury/ui';
+import { Card, Button, Badge, Input, Spinner, showToast } from '@ury/ui';
 import { formatCurrency, call } from '@ury/core';
 import { dashboardService } from '../../services/dashboard';
 import SideDrawer from '../../components/layout/SideDrawer';
@@ -177,6 +177,7 @@ export const MenuPage: React.FC = () => {
         });
         resolvedCourse = newItem.new_course_name.trim();
         await fetchCourses();
+        showToast.success('Course created successfully');
       } catch (err) {
         console.error('Failed to create course', err);
       }
@@ -192,6 +193,7 @@ export const MenuPage: React.FC = () => {
           menuDoc.items[rowIndex].rate = parseFloat(newItem.rate);
           menuDoc.items[rowIndex].course = resolvedCourse;
           await call('frappe.client.save', { doc: menuDoc });
+          showToast.success('Item updated successfully');
         }
       } else {
         const insertRes = await call<any>('frappe.client.insert', {
@@ -219,6 +221,7 @@ export const MenuPage: React.FC = () => {
           rate: parseFloat(newItem.rate),
         });
         await call('frappe.client.save', { doc: menuDoc });
+        showToast.success('Item created successfully');
       }
 
       if (selectedMenu === newItem.target_menu) {
@@ -244,6 +247,7 @@ export const MenuPage: React.FC = () => {
         },
       });
       await fetchMenus();
+      showToast.success('Menu created successfully');
       closeDrawer();
     } catch (err) {
       console.error('Failed to create URY Menu', err);
@@ -261,6 +265,7 @@ export const MenuPage: React.FC = () => {
         },
       });
       await fetchCourses();
+      showToast.success('Course created successfully');
       closeDrawer();
     } catch (err) {
       console.error('Failed to create Course', err);
