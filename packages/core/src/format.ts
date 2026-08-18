@@ -1,8 +1,9 @@
 import { storage } from './storage';
 
 export function formatCurrency(amount: number): string {
-  const symbol = storage.getItem('currencySymbol');
-  return `${symbol} ${amount}`;
+  const symbol = storage.getItem('currencySymbol') || '₹';
+  const formattedVal = typeof amount === 'number' && !isNaN(amount) ? amount.toLocaleString('en-IN') : amount;
+  return `${symbol} ${formattedVal}`;
 } 
 
 export const formatInvoiceTime = (timestamp: string | null) => {

@@ -34,7 +34,7 @@ const Header = () => {
     searchPlaceholder = t('header.search_placeholder_orders');
     searchValue = orderSearchInput;
     searchOnChange = (e) => setOrderSearchInput(e.target.value);
-  } else if (location.pathname === '/') {
+  } else if (location.pathname === '/pos') {
     searchPlaceholder = t('header.search_placeholder_menu');
     searchValue = searchQuery;
     searchOnChange = (e) => setSearchQuery(e.target.value);
@@ -108,9 +108,9 @@ const Header = () => {
       <div className="flex items-center justify-between h-16 px-6">
         {/* Logo */}
         <div className="flex items-center">
-        <Link to="/" className="flex items-center gap-3">
-            <img 
-              src="/assets/ury/pos/ury_pos.png" 
+        <Link to="/dashboard" className="flex items-center gap-3">
+            <img
+              src="/assets/ury/ury/ury_pos.png"
               alt="URY POS" 
               className="h-10 w-auto"
             />

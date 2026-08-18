@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build --base=/assets/ury/pos/ && yarn copy-html-entry",
-    "copy-html-entry": "cp ../ury/public/pos/index.html ../ury/www/pos.html",
+    "build": "vite build --base=/assets/ury/ury/ && yarn copy-html-entry",
+    "copy-html-entry": "cp ../ury/public/ury/index.html ../ury/www/ury.html",
     "lint": "eslint .",
     "preview": "vite preview"
   },
