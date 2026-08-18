@@ -167,8 +167,8 @@ def get_daywise_invoices(start_date, end_date, branch=None, page=1, page_size=50
 	require_manager()
 	validate_date_range(start_date, end_date)
 
-	page = int(page)
-	page_size = min(int(page_size), 200)
+	page = max(1, int(page))
+	page_size = max(1, min(int(page_size), 200))
 	offset = (page - 1) * page_size
 
 	params = {"start_date": start_date, "end_date": end_date, "limit": page_size, "offset": offset}
@@ -519,8 +519,8 @@ def get_cancelled_invoices(start_date, end_date, branch=None, page=1, page_size=
 	require_manager()
 	validate_date_range(start_date, end_date)
 
-	page = int(page)
-	page_size = min(int(page_size), 200)
+	page = max(1, int(page))
+	page_size = max(1, min(int(page_size), 200))
 	offset = (page - 1) * page_size
 
 	params = {"start_date": start_date, "end_date": end_date, "limit": page_size, "offset": offset}
