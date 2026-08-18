@@ -20,6 +20,7 @@ export const ProductionUnitPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
   const [editingUnit, setEditingUnit] = useState<ProductionUnitRecord | null>(null);
+  const [saving, setSaving] = useState<boolean>(false);
 
   const [branches, setBranches] = useState<{ name: string }[]>([]);
 
@@ -99,6 +100,7 @@ export const ProductionUnitPage: React.FC = () => {
   const handleSaveUnit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newUnit.production_unit_name) return;
+    setSaving(true);
     try {
       const itemGroupsList = newUnit.item_groups.split(',').map(g => g.trim()).filter(g => g);
       const childTableData = itemGroupsList.map(g => ({ item_group: g }));
@@ -106,7 +108,7 @@ export const ProductionUnitPage: React.FC = () => {
       const payload = {
         production_unit_name: newUnit.production_unit_name,
         branch: newUnit.branch,
-        item_groups: childTableData.length > 0 ? childTableData : newUnit.item_groups
+        item_groups: childTableData.length > 0 ? childTableData : []
       };
 
       if (editingUnit) {
@@ -143,6 +145,8 @@ export const ProductionUnitPage: React.FC = () => {
         errorMessage = err.message;
       }
       showToast.error(errorMessage);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -241,11 +245,14 @@ export const ProductionUnitPage: React.FC = () => {
           </div>
 
           <div className="pt-6 flex justify-end gap-2 border-t mt-4 border-gray-100">
-            <Button type="button" variant="outline" onClick={() => setIsDrawerOpen(false)}>
+            <Button type="button" variant="outline" onClick={() => setIsDrawerOpen(false)} disabled={saving}>
               Cancel
             </Button>
-            <Button type="submit" className="bg-primary hover:bg-primary/90 text-white">
-              {editingUnit ? 'Save Changes' : 'Save Unit'}
+            <Button type="submit" className="bg-primary hover:bg-primary/90 text-white disabled:opacity-50 disabled:cursor-not-allowed" disabled={saving}>
+              <div className="flex items-center gap-2">
+                {saving && <Spinner className="w-4 h-4" />}
+                <span>{saving ? 'Saving...' : (editingUnit ? 'Save Changes' : 'Save Unit')}</span>
+              </div>
             </Button>
           </div>
         </form>

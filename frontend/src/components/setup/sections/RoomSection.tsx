@@ -2,7 +2,7 @@ import React from 'react';
 import { useConfigure } from '../../../context/ConfigureContext';
 import { Input, Button } from '@ury/ui';
 import { Plus, Trash2 } from 'lucide-react';
-import { SearchableSelect } from '../SearchableSelect';
+import { SearchableSelect } from '../../common/SearchableSelect';
 
 export function RoomSection() {
   const { rooms, branch, addRoom, updateRoom, deleteRoom } = useConfigure();

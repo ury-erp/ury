@@ -10,7 +10,8 @@ import {
   Building2,
   ChevronDown,
   FileText,
-  Settings
+  Settings,
+  Store
 } from 'lucide-react';
 
 interface NavItem {
@@ -26,7 +27,8 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'URY Room', path: '/room', icon: Home },
   { label: 'POS Profile', path: '/pos-profile', icon: SlidersHorizontal },
   { label: 'User', path: '/user', icon: Users },
-  { label: 'Branch', path: '/branch', icon: Building2 }
+  { label: 'Branch', path: '/branch', icon: Building2 },
+  { label: 'Aggregators', path: '/aggregator', icon: Store }
 ];
 
 export const Sidebar: React.FC = () => {
@@ -47,8 +49,8 @@ export const Sidebar: React.FC = () => {
               className={({ isActive }) =>
                 `flex items-center space-x-3 px-3.5 py-2.5 rounded-lg text-sm font-medium transition-all ${
                   isActive
-                    ? 'bg-[#2563eb] text-white shadow-sm font-semibold'
-                    : 'text-gray-600 hover:bg-blue-50 hover:text-[#2563eb]'
+                    ? 'bg-blue-600 text-white shadow-sm font-semibold'
+                    : 'text-gray-600 hover:bg-blue-50 hover:text-blue-600'
                 }`
               }
             >
@@ -64,8 +66,8 @@ export const Sidebar: React.FC = () => {
             onClick={() => setIsAdvancedOpen(!isAdvancedOpen)}
             className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-sm font-medium transition-colors ${
               isAdvancedPath
-                ? 'text-[#2563eb] font-semibold bg-blue-50'
-                : 'text-gray-600 hover:bg-blue-50 hover:text-[#2563eb]'
+                ? 'text-blue-600 font-semibold bg-blue-50'
+                : 'text-gray-600 hover:bg-blue-50 hover:text-blue-600'
             }`}
           >
             <div className="flex items-center space-x-3">
@@ -74,7 +76,7 @@ export const Sidebar: React.FC = () => {
             </div>
             <ChevronDown
               className={`w-4 h-4 transition-transform duration-200 ${
-                isAdvancedOpen ? 'rotate-180 text-[#2563eb]' : 'text-gray-400'
+                isAdvancedOpen ? 'rotate-180 text-blue-600' : 'text-gray-400'
               }`}
             />
           </button>
@@ -86,8 +88,8 @@ export const Sidebar: React.FC = () => {
                 className={({ isActive }) =>
                   `flex items-center space-x-3 px-3.5 py-2 rounded-lg text-xs font-medium transition-all ${
                     isActive
-                      ? 'bg-[#2563eb] text-white shadow-sm font-semibold'
-                      : 'text-gray-600 hover:bg-blue-50 hover:text-[#2563eb]'
+                      ? 'bg-blue-600 text-white shadow-sm font-semibold'
+                      : 'text-gray-600 hover:bg-blue-50 hover:text-blue-600'
                   }`
                 }
               >
@@ -99,8 +101,8 @@ export const Sidebar: React.FC = () => {
                 className={({ isActive }) =>
                   `flex items-center space-x-3 px-3.5 py-2 rounded-lg text-xs font-medium transition-all ${
                     isActive
-                      ? 'bg-[#2563eb] text-white shadow-sm font-semibold'
-                      : 'text-gray-600 hover:bg-blue-50 hover:text-[#2563eb]'
+                      ? 'bg-blue-600 text-white shadow-sm font-semibold'
+                      : 'text-gray-600 hover:bg-blue-50 hover:text-blue-600'
                   }`
                 }
               >

@@ -15,6 +15,7 @@ interface UserRecord {
   full_name?: string;
   user_type?: string;
   enabled?: number;
+  roles?: Array<{ role: string }>;
 }
 
 export const UserPage: React.FC = () => {
@@ -23,6 +24,7 @@ export const UserPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
   const [editingUser, setEditingUser] = useState<UserRecord | null>(null);
+  const [saving, setSaving] = useState<boolean>(false);
 
   const [newUser, setNewUser] = useState({
     first_name: '',
@@ -31,6 +33,8 @@ export const UserPage: React.FC = () => {
     role: 'URY Cashier',
     enabled: true,
   });
+
+  const URY_ROLES = ['URY Manager', 'URY Waiter', 'URY Cashier'];
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -48,19 +52,54 @@ export const UserPage: React.FC = () => {
     fetchUsers();
   }, [activeBranchId]);
 
+  const getDisplayRole = (user: UserRecord): string => {
+    // Try to extract URY role from user's roles
+    if (user.roles && Array.isArray(user.roles)) {
+      for (const roleObj of user.roles) {
+        if (roleObj.role === 'URY Manager') return 'Manager';
+        if (roleObj.role === 'URY Waiter') return 'Waiter';
+        if (roleObj.role === 'URY Cashier') return 'Cashier';
+      }
+    }
+    return 'User';
+  };
+
   const openAddDrawer = () => {
     setEditingUser(null);
     setNewUser({ first_name: '', last_name: '', email: '', role: 'URY Cashier', enabled: true });
     setIsDrawerOpen(true);
   };
 
-  const openEditDrawer = (user: UserRecord) => {
+  const openEditDrawer = async (user: UserRecord) => {
     setEditingUser(user);
+    let userRole = 'URY Cashier'; // default
+
+    try {
+      // Fetch the full user record with roles
+      const fullUser = await call('frappe.client.get', {
+        doctype: 'User',
+        name: user.name,
+      });
+
+      // Extract the actual URY role from the roles array
+      if (fullUser.roles && Array.isArray(fullUser.roles)) {
+        for (const roleObj of fullUser.roles) {
+          if (URY_ROLES.includes(roleObj.role)) {
+            userRole = roleObj.role;
+            break;
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch user roles', err);
+      // Default to URY Cashier on error
+    }
+
     setNewUser({
       first_name: user.first_name || '',
       last_name: user.last_name || '',
       email: user.email || '',
-      role: 'URY Cashier',
+      role: userRole,
       enabled: user.enabled === 1,
     });
     setIsDrawerOpen(true);
@@ -69,6 +108,7 @@ export const UserPage: React.FC = () => {
   const handleSaveUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newUser.email) return;
+    setSaving(true);
     try {
       if (editingUser) {
         await call('frappe.client.set_value', {
@@ -82,11 +122,27 @@ export const UserPage: React.FC = () => {
         });
 
         if (newUser.role) {
+          // Fetch current roles
+          const fullUser = await call('frappe.client.get', {
+            doctype: 'User',
+            name: editingUser.name,
+          });
+
+          // Start with current roles
+          let updatedRoles = fullUser.roles && Array.isArray(fullUser.roles) ? [...fullUser.roles] : [];
+
+          // Filter out existing URY roles
+          updatedRoles = updatedRoles.filter((roleObj: any) => !URY_ROLES.includes(roleObj.role));
+
+          // Add the new URY role
+          updatedRoles.push({ role: newUser.role });
+
+          // Save the merged roles
           await call('frappe.client.set_value', {
             doctype: 'User',
             name: editingUser.name,
             fieldname: 'roles',
-            value: [{ role: newUser.role }],
+            value: updatedRoles,
           });
         }
       } else {
@@ -124,6 +180,8 @@ export const UserPage: React.FC = () => {
         errorMessage = 'Duplicate entry or server error occurred.';
       }
       showToast.error(errorMessage);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -178,7 +236,7 @@ export const UserPage: React.FC = () => {
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-xs uppercase shrink-0">
-                        {(user.first_name || user.email).charAt(0)}
+                        {(user.first_name || user.email || user.name || '?').charAt(0)}
                       </div>
                       <div className="font-semibold text-gray-900">
                         {user.first_name || user.full_name || user.name}
@@ -191,7 +249,7 @@ export const UserPage: React.FC = () => {
                   <td className="px-6 py-4">
                     <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary text-[10px]">
                       <ShieldCheck className="w-3 h-3 mr-1" />
-                      {user.user_type === 'System User' ? 'Admin' : 'Cashier'}
+                      {getDisplayRole(user)}
                     </Badge>
                   </td>
                   <td className="px-6 py-4 text-right">
@@ -270,10 +328,11 @@ export const UserPage: React.FC = () => {
           </div>
 
           <div className="pt-6 flex justify-end gap-3 border-t mt-4 border-gray-100">
-            <Button type="button" variant="outline" onClick={() => setIsDrawerOpen(false)}>
+            <Button type="button" variant="outline" onClick={() => setIsDrawerOpen(false)} disabled={saving}>
               Cancel
             </Button>
-            <Button type="submit" className="bg-primary hover:bg-primary/90 text-white px-6">
+            <Button type="submit" className="bg-primary hover:bg-primary/90 text-white px-6 flex items-center gap-2" disabled={saving}>
+              {saving && <Spinner className="w-4 h-4" />}
               {editingUser ? 'Save Changes' : 'Create User'}
             </Button>
           </div>

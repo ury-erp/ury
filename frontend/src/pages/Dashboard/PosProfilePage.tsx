@@ -15,6 +15,12 @@ interface PosProfileRecord {
   custom_enable_discount?: number;
   custom_multiple_cashier_configuration?: number;
   custom_enable_kot_reprint?: number;
+  custom_daily_pos_close?: number;
+  custom_edit_order_type?: number;
+  paid_limit?: number;
+  table_attention_time?: number;
+  custom_reset_order_number_daily?: number;
+  disabled?: number;
   applicable_for_users?: ApplicableUser[];
 }
 
@@ -96,7 +102,9 @@ export const PosProfilePage: React.FC = () => {
         users: users.message || users || [],
         payments: payments.message || payments || []
       });
-    } catch (e) {}
+    } catch (e) {
+      console.error('Failed to load options', e);
+    }
   };
 
   const handleAddProfile = async (e: React.FormEvent) => {
@@ -172,7 +180,8 @@ export const PosProfilePage: React.FC = () => {
         filters: activeBranchId !== 'all' ? [['branch', '=', activeBranchId]] : [],
         fields: ['name', 'branch', 'company', 'selling_price_list', 'print_format',
           'custom_enable_discount', 'custom_multiple_cashier_configuration',
-          'custom_enable_kot_reprint'],
+          'custom_enable_kot_reprint', 'custom_daily_pos_close', 'custom_edit_order_type',
+          'paid_limit', 'table_attention_time', 'custom_reset_order_number_daily', 'disabled'],
         limit: 50,
       });
       const records = list.message || list || [];
@@ -200,6 +209,13 @@ export const PosProfilePage: React.FC = () => {
         custom_enable_discount: profile.custom_enable_discount || 0,
         custom_enable_kot_reprint: profile.custom_enable_kot_reprint || 0,
         custom_multiple_cashier_configuration: profile.custom_multiple_cashier_configuration || 0,
+        custom_daily_pos_close: profile.custom_daily_pos_close || 0,
+        custom_edit_order_type: profile.custom_edit_order_type || 0,
+        paid_limit: profile.paid_limit || '',
+        table_attention_time: profile.table_attention_time || '',
+        custom_reset_order_number_daily: profile.custom_reset_order_number_daily || 0,
+        applicable_for_users: profile.applicable_for_users || [],
+        payments: profile.payments || [],
       });
     } catch {
       setSelectedProfile(null);
@@ -245,12 +261,39 @@ export const PosProfilePage: React.FC = () => {
           custom_enable_discount: profileForm.custom_enable_discount,
           custom_enable_kot_reprint: profileForm.custom_enable_kot_reprint,
           custom_multiple_cashier_configuration: profileForm.custom_multiple_cashier_configuration,
+          custom_daily_pos_close: profileForm.custom_daily_pos_close,
+          custom_edit_order_type: profileForm.custom_edit_order_type,
+          paid_limit: profileForm.paid_limit,
+          table_attention_time: profileForm.table_attention_time,
+          custom_reset_order_number_daily: profileForm.custom_reset_order_number_daily,
         },
       });
+
+      // Save applicable_for_users and payments separately as child tables
+      if (profileForm.applicable_for_users && profileForm.applicable_for_users.length > 0) {
+        await call('frappe.client.set_value', {
+          doctype: 'POS Profile',
+          name: selectedProfile.name,
+          fieldname: {
+            applicable_for_users: profileForm.applicable_for_users.filter((u: any) => u.user),
+          },
+        });
+      }
+      if (profileForm.payments && profileForm.payments.length > 0) {
+        await call('frappe.client.set_value', {
+          doctype: 'POS Profile',
+          name: selectedProfile.name,
+          fieldname: {
+            payments: profileForm.payments.filter((p: any) => p.mode_of_payment),
+          },
+        });
+      }
+
+      showToast.success('POS Profile saved');
       fetchProfiles();
       setIsDrawerOpen(false);
-    } catch (err) {
-      console.error('Failed to save POS Profile', err);
+    } catch (err: any) {
+      showToast.error(err.message || 'Failed to save POS Profile');
     } finally {
       setSaving(false);
     }
@@ -356,8 +399,10 @@ export const PosProfilePage: React.FC = () => {
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Badge variant="success" size="sm">Active Register</Badge>
-                    <Button variant="outline" size="sm" className="text-primary border-primary/20">
+                    <Badge variant={!p.disabled ? "success" : "outline"} size="sm">
+                      {!p.disabled ? 'Active' : 'Inactive'}
+                    </Badge>
+                    <Button variant="outline" size="sm" className="text-primary border-primary/20" onClick={(e) => { e.stopPropagation(); handleProfileSelect(p); }}>
                       Edit
                     </Button>
                   </div>
@@ -368,13 +413,13 @@ export const PosProfilePage: React.FC = () => {
                     <div className="p-4 rounded-lg bg-primary/5 border border-primary/10">
                       <span className="font-semibold text-gray-700 block">Item Discounts</span>
                       <span className="text-primary font-bold text-sm mt-1 block">
-                        {p.custom_enable_discount !== 0 ? 'Enabled' : 'Disabled'}
+                        {!!p.custom_enable_discount ? 'Enabled' : 'Disabled'}
                       </span>
                     </div>
                     <div className="p-4 rounded-lg bg-primary/5 border border-primary/10">
                       <span className="font-semibold text-gray-700 block">KOT Reprint Option</span>
                       <span className="text-primary font-bold text-sm mt-1 block">
-                        {p.custom_enable_kot_reprint !== 0 ? 'Enabled' : 'Disabled'}
+                        {!!p.custom_enable_kot_reprint ? 'Enabled' : 'Disabled'}
                       </span>
                     </div>
                     <div className="p-4 rounded-lg bg-primary/5 border border-primary/10">
@@ -609,10 +654,13 @@ export const PosProfilePage: React.FC = () => {
             <h4 className="font-bold text-gray-700 text-xs uppercase tracking-wider mb-3 pb-2 border-b border-gray-100">Features</h4>
             <div className="space-y-3">
               {[
-                { key: 'custom_enable_discount', label: 'Enable Item Discounts' },
-                { key: 'custom_enable_kot_reprint', label: 'Enable KOT Reprint' },
-                { key: 'custom_multiple_cashier_configuration', label: 'Enable Multiple Cashier Configuration' },
-              ].map(({ key, label }) => (
+                { key: 'custom_enable_discount', label: 'Enable Item Discounts', type: 'checkbox' },
+                { key: 'custom_enable_kot_reprint', label: 'Enable KOT Reprint', type: 'checkbox' },
+                { key: 'custom_multiple_cashier_configuration', label: 'Enable Multiple Cashier Configuration', type: 'checkbox' },
+                { key: 'custom_daily_pos_close', label: 'Require Daily POS Closing', type: 'checkbox' },
+                { key: 'custom_edit_order_type', label: 'Enable Order Type Edit', type: 'checkbox' },
+                { key: 'custom_reset_order_number_daily', label: 'Reset Order Number Daily', type: 'checkbox' },
+              ].map(({ key, label, type }) => (
                 <label key={key} className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
@@ -626,31 +674,95 @@ export const PosProfilePage: React.FC = () => {
             </div>
           </div>
 
-          {/* Cashier Table â€” Applicable For Users */}
+          {/* Numeric Settings */}
           <div>
-            <h4 className="font-bold text-gray-700 text-xs uppercase tracking-wider mb-3 pb-2 border-b border-gray-100">Cashier Table (Applicable For Users)</h4>
-            {selectedProfile?.applicable_for_users && selectedProfile.applicable_for_users.length > 0 ? (
-              <div className="rounded-lg border border-gray-200 overflow-hidden">
-                <table className="w-full text-xs text-gray-600">
-                  <thead className="bg-gray-50 border-b border-gray-100 font-semibold">
-                    <tr>
-                      <th className="px-4 py-2 text-left">User</th>
-                      <th className="px-4 py-2 text-center">Default</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {selectedProfile.applicable_for_users.map((u, idx) => (
-                      <tr key={idx}>
-                        <td className="px-4 py-2 font-medium">{u.user}</td>
-                        <td className="px-4 py-2 text-center">{u.default ? 'Yes' : 'No'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            <h4 className="font-bold text-gray-700 text-xs uppercase tracking-wider mb-3 pb-2 border-b border-gray-100">Numeric Settings</h4>
+            <div className="space-y-4">
+              <div>
+                <label className="block font-semibold text-gray-700 mb-1.5">Show Limited Paid Invoices (Number)</label>
+                <Input
+                  type="number"
+                  value={profileForm.paid_limit || ''}
+                  onChange={(e) => setProfileForm(p => ({ ...p, paid_limit: e.target.value }))}
+                  placeholder="e.g. 10"
+                />
               </div>
-            ) : (
-              <p className="text-sm text-gray-400">No users assigned. Configure in Frappe Desk for full access control.</p>
-            )}
+              <div>
+                <label className="block font-semibold text-gray-700 mb-1.5">Table Attention Time (minutes)</label>
+                <Input
+                  type="number"
+                  value={profileForm.table_attention_time || ''}
+                  onChange={(e) => setProfileForm(p => ({ ...p, table_attention_time: e.target.value }))}
+                  placeholder="e.g. 15"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Applicable For Users - Editable */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="font-semibold text-gray-700">Applicable For Users</label>
+              <Button type="button" size="sm" variant="ghost" className="text-primary h-6 px-2 text-xs" onClick={() => setProfileForm({...profileForm, applicable_for_users: [...(profileForm.applicable_for_users || []), {user:'', default:0}]})}>+ Add User</Button>
+            </div>
+            <div className="space-y-2">
+              {(profileForm.applicable_for_users || []).map((row, idx) => (
+                <div key={idx} className="flex gap-2 items-center">
+                  <Select className="flex-1" value={row.user || ''} onChange={e => {
+                    const newRows = [...(profileForm.applicable_for_users || [])];
+                    newRows[idx].user = e.target.value;
+                    setProfileForm({...profileForm, applicable_for_users: newRows});
+                  }}>
+                    <option value="">Select User</option>
+                    {options.users.map((u: any) => <option key={u.name} value={u.name}>{u.full_name || u.name}</option>)}
+                  </Select>
+                  <label className="flex items-center gap-1 text-xs text-gray-600">
+                    <input type="checkbox" checked={row.default === 1} onChange={e => {
+                      const newRows = [...(profileForm.applicable_for_users || [])];
+                      newRows[idx].default = e.target.checked ? 1 : 0;
+                      setProfileForm({...profileForm, applicable_for_users: newRows});
+                    }} /> Default
+                  </label>
+                  <button type="button" className="text-gray-400 hover:text-red-500" onClick={() => {
+                    const newRows = (profileForm.applicable_for_users || []).filter((_, i) => i !== idx);
+                    setProfileForm({...profileForm, applicable_for_users: newRows});
+                  }}><X className="w-4 h-4" /></button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Mode of Payment - Editable */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="font-semibold text-gray-700">Mode of Payment</label>
+              <Button type="button" size="sm" variant="ghost" className="text-primary h-6 px-2 text-xs" onClick={() => setProfileForm({...profileForm, payments: [...(profileForm.payments || []), {mode_of_payment:'', default:0}]})}>+ Add Payment</Button>
+            </div>
+            <div className="space-y-2">
+              {(profileForm.payments || []).map((row, idx) => (
+                <div key={idx} className="flex gap-2 items-center">
+                  <Select className="flex-1" value={row.mode_of_payment || ''} onChange={e => {
+                    const newRows = [...(profileForm.payments || [])];
+                    newRows[idx].mode_of_payment = e.target.value;
+                    setProfileForm({...profileForm, payments: newRows});
+                  }}>
+                    <option value="">Select Payment Mode</option>
+                    {options.payments.map((p: any) => <option key={p.name} value={p.name}>{p.name}</option>)}
+                  </Select>
+                  <label className="flex items-center gap-1 text-xs text-gray-600">
+                    <input type="checkbox" checked={row.default === 1} onChange={e => {
+                      const newRows = [...(profileForm.payments || [])];
+                      newRows[idx].default = e.target.checked ? 1 : 0;
+                      setProfileForm({...profileForm, payments: newRows});
+                    }} /> Default
+                  </label>
+                  <button type="button" className="text-gray-400 hover:text-red-500" onClick={() => {
+                    const newRows = (profileForm.payments || []).filter((_, i) => i !== idx);
+                    setProfileForm({...profileForm, payments: newRows});
+                  }}><X className="w-4 h-4" /></button>
+                </div>
+              ))}
+            </div>
           </div>
 
           <div className="pt-6 flex justify-end gap-3 border-t border-gray-100">
