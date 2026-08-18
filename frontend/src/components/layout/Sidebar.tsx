@@ -40,35 +40,53 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
       : 'text-gray-600 hover:bg-blue-50 hover:text-[#2563eb]'
   }`;
 
+const reportLinkClass = ({ isActive }: { isActive: boolean }) =>
+  `flex items-center space-x-2.5 px-3 py-2 rounded-md text-[13px] font-medium transition-all ${
+    isActive
+      ? 'bg-[#2563eb] text-white shadow-sm font-semibold'
+      : 'text-gray-600 hover:bg-blue-50 hover:text-[#2563eb]'
+  }`;
+
 const reportGroups = groupReports(reportsRegistry);
+const reportGroupEntries = Object.entries(reportGroups);
 
 const ReportsPanel: React.FC = () => (
-  <div className="p-4 flex-1 space-y-6 overflow-y-auto">
-    <Link
-      to="/dashboard"
-      className="flex items-center space-x-2 px-3.5 py-2 rounded-lg text-sm font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors -mt-1 mb-2"
-    >
-      <ArrowLeft className="w-4 h-4 shrink-0" />
-      <span>Back</span>
-    </Link>
-    <div className="flex items-center space-x-2 px-3.5 mb-1">
-      <BarChart3 className="w-5 h-5 text-[#2563eb] shrink-0" />
-      <h2 className="text-sm font-semibold text-gray-900">Reports</h2>
-    </div>
-    {Object.entries(reportGroups).map(([group, reports]) => (
-      <div key={group}>
-        <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 px-3.5">
-          {group}
-        </h3>
-        <div className="space-y-0.5">
-          {reports.map((report) => (
-            <NavLink key={report.id} to={`/reports/${report.path}`} className={navLinkClass}>
-              <span className="pl-8 text-sm">{report.label}</span>
-            </NavLink>
-          ))}
+  <div className="flex-1 overflow-y-auto">
+    <div className="p-4 pb-2 border-b border-gray-100">
+      <Link
+        to="/dashboard"
+        className="flex items-center space-x-2 px-2 py-1.5 -ml-2 rounded-md text-xs font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors mb-3"
+      >
+        <ArrowLeft className="w-3.5 h-3.5 shrink-0" />
+        <span>Back to Dashboard</span>
+      </Link>
+      <div className="flex items-center space-x-2 px-1">
+        <div className="flex items-center justify-center w-7 h-7 rounded-md bg-blue-50 shrink-0">
+          <BarChart3 className="w-4 h-4 text-[#2563eb]" />
         </div>
+        <h2 className="text-sm font-semibold text-gray-900">Reports</h2>
       </div>
-    ))}
+    </div>
+    <div className="p-4 space-y-5">
+      {reportGroupEntries.map(([group, reports], index) => (
+        <div key={group} className={index > 0 ? 'pt-4 border-t border-gray-100' : undefined}>
+          <h3 className="text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-2 px-3">
+            {group}
+          </h3>
+          <div className="space-y-0.5">
+            {reports.map((report) => {
+              const Icon = report.icon;
+              return (
+                <NavLink key={report.id} to={`/reports/${report.path}`} className={reportLinkClass}>
+                  <Icon className="w-4 h-4 shrink-0" />
+                  <span>{report.label}</span>
+                </NavLink>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
   </div>
 );
 
@@ -80,10 +98,13 @@ const MainPanel: React.FC<{ isManager: boolean }> = ({ isManager }) => {
   return (
     <div className="p-4 flex-1 space-y-1">
       {isManager && (
-        <NavLink to="/reports" className={navLinkClass}>
-          <BarChart3 className="w-5 h-5 shrink-0" />
-          <span>Reports</span>
-        </NavLink>
+        <>
+          <NavLink to="/reports" className={navLinkClass}>
+            <BarChart3 className="w-5 h-5 shrink-0" />
+            <span>Reports</span>
+          </NavLink>
+          <div className="!mt-3 !mb-2 border-t border-gray-100" />
+        </>
       )}
       {NAV_ITEMS.map((item) => {
         const Icon = item.icon;

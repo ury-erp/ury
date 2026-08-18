@@ -435,3 +435,70 @@ def get_time_wise_sales(branch=None, date=None, bucket_size_hours=2):
 			"peak_interval_sales": peak["sales"] if peak else 0,
 		},
 	}
+
+
+@frappe.whitelist()
+def get_service_wise_sales(start_date, end_date, branch=None):
+	"""Revenue and order-count breakdown by order type (Dine In, Takeaway,
+	Delivery, etc.) over a date range.
+
+	Mirrors the existing "Service Wise Sales" Query Report, but aggregates
+	directly to one row per order type over the whole range instead of
+	per-day-per-type — the research brief's recommendation: this is a
+	channel-comparison report, not a daily trend, so a simple breakdown +
+	donut chart beats a large per-day table. (Order count is included even
+	though the original report didn't expose it, since "revenue only" makes
+	avg-order-value and % breakdowns impossible to sanity-check.)
+	"""
+	require_manager()
+	validate_date_range(start_date, end_date)
+
+	date_list = date_list_cte()
+
+	if branch:
+		condition = get_business_day_condition(date_expr="date_list.`date`")
+		join = report_settings_join()
+		params = {"branch": branch, "start_date": start_date, "end_date": end_date}
+		invoice_join = "b.`branch` = %(branch)s AND b.`status` IN (\"Consolidated\", \"Paid\") AND b.`docstatus` = 1"
+	else:
+		condition = "b.`posting_date` = date_list.`date`"
+		join = ""
+		params = {"start_date": start_date, "end_date": end_date}
+		invoice_join = "b.`status` IN (\"Consolidated\", \"Paid\") AND b.`docstatus` = 1"
+
+	rows = frappe.db.sql(
+		f"""
+		SELECT
+			b.`order_type` AS order_type,
+			ROUND(SUM(b.`grand_total`), 2) AS revenue,
+			COUNT(b.`name`) AS order_count
+		FROM {date_list}
+		LEFT JOIN `tabPOS Invoice` b ON ({invoice_join})
+		{join}
+		WHERE {condition} AND b.`order_type` IS NOT NULL
+		GROUP BY b.`order_type`
+		ORDER BY revenue DESC
+		""",
+		params,
+		as_dict=True,
+	)
+
+	total_revenue = round(sum(r["revenue"] or 0 for r in rows), 2)
+	total_orders = sum(r["order_count"] for r in rows)
+
+	for r in rows:
+		r["revenue"] = r["revenue"] or 0
+		r["avg_order_value"] = round(r["revenue"] / r["order_count"], 2) if r["order_count"] else 0
+		r["percentage_of_total"] = round((r["revenue"] / total_revenue) * 100, 1) if total_revenue else 0
+
+	return {
+		"branch": branch,
+		"start_date": str(start_date),
+		"end_date": str(end_date),
+		"by_service_type": rows,
+		"summary": {
+			"total_revenue": total_revenue,
+			"total_orders": total_orders,
+			"avg_order_value": round(total_revenue / total_orders, 2) if total_orders else 0,
+		},
+	}
