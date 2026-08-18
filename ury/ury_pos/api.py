@@ -855,6 +855,61 @@ def posOpening():
     return flag
 
 
+POS_OPENING_SUPERVISOR_ROLES = {"URY Manager", "System Manager"}
+
+
+@frappe.whitelist()
+def get_open_pos_opening_entries(pos_profile):
+    session_user = frappe.session.user
+    is_supervisor = session_user == "Administrator" or bool(
+        set(frappe.get_roles(session_user)) & POS_OPENING_SUPERVISOR_ROLES
+    )
+
+    # Branch scoping: the POS Profile must belong to the session user's branch
+    try:
+        session_branch = getBranch()
+    except Exception:
+        if is_supervisor:
+            # Supervisors may not be mapped to a branch
+            session_branch = None
+        else:
+            raise
+
+    profile_branch = frappe.db.get_value("POS Profile", pos_profile, "branch")
+
+    if not profile_branch:
+        frappe.throw(
+            _("POS Profile {0} not found.").format(pos_profile),
+            frappe.DoesNotExistError,
+        )
+
+    if session_branch and profile_branch != session_branch:
+        frappe.throw(
+            _("You do not have permission to access opening entries for POS Profile {0}.").format(
+                pos_profile
+            ),
+            frappe.PermissionError,
+        )
+
+    filters = {
+        "pos_profile": pos_profile,
+        "status": "Open",
+        "docstatus": 1,
+    }
+
+    # Non-supervisors only see their own open entries
+    if not is_supervisor:
+        filters["user"] = session_user
+
+    pos_opening_entries = frappe.get_all(
+        "POS Opening Entry",
+        fields=["name", "period_start_date", "user", "pos_profile"],
+        filters=filters,
+    )
+
+    return pos_opening_entries
+
+
 @frappe.whitelist()
 def getAggregator():
     branchName = getBranch()
@@ -1236,3 +1291,30 @@ def merge_bills(primary_invoice, secondary_invoice):
             "status": "error",
             "message": str(e),
         }
+
+
+@frappe.whitelist()
+def get_production_units_for_branch():
+	"""Fetch all production unit names for the current user's branch.
+
+	Returns a list of production unit names that should be subscribed to for
+	KOT error channels on the POS terminal.
+	"""
+	try:
+		branch = getBranch()
+	except frappe.exceptions.ValidationError:
+		# Fallback if getBranch() throws (e.g., Administrator with no branch)
+		return {"production_units": []}
+
+	if not branch:
+		return {"production_units": []}
+
+	productions = frappe.get_all(
+		"URY Production Unit",
+		filters={"branch": branch},
+		fields=["name"]
+	)
+
+	production_names = [p.name for p in productions]
+
+	return {"production_units": production_names}
