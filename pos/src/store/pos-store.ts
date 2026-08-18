@@ -251,7 +251,9 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   fetchPosProfile: async () => {
     try {
       const cached = sessionStorage.getItem('posProfile');
-      if (cached) {
+      // Profiles cached before a new field shipped lack that key entirely;
+      // treat them as stale so a plain refresh picks the field up.
+      if (cached && JSON.parse(cached).show_item_code !== undefined) {
         const profile = JSON.parse(cached);
         set({
           posProfile: profile,

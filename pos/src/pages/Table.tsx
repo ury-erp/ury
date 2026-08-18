@@ -502,7 +502,7 @@ const TableView = () => {
                       // The whole card carries the status colour — that is what
                       // makes a full room readable in one glance — with a
                       // saturated top strip on top of the soft body tint.
-                      'relative h-28 flex flex-col overflow-hidden rounded-lg border border-t-4 shadow-sm transition-all',
+                      'relative h-28 flex flex-col overflow-hidden rounded-lg border border-t-4 shadow-md shadow-cyan-900/25 transition-all',
                       awaitingPayment
                         ? 'bg-amber-50 border-amber-200 border-t-amber-400'
                         : isOccupied

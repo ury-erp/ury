@@ -219,7 +219,7 @@ const OrderPanel = () => {
               <div
                 key={item.uniqueId}
                 className={cn(
-                  "mb-1.5 rounded-md border border-gray-200 bg-white shadow-sm px-2 py-1.5",
+                  "mb-1.5 rounded-md border border-gray-200 bg-white shadow-md shadow-cyan-900/25 px-2 py-1.5",
                   isInteractionDisabled && "opacity-50"
                 )}
               >

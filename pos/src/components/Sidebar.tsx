@@ -49,9 +49,9 @@ const Sidebar = ({ disabled }: SidebarProps) => {
       className={cn(
         'relative h-14 w-full rounded-md border px-1.5 pt-1.5 pb-4 flex items-center justify-center text-center',
         'text-[11.5px] font-bold uppercase leading-[0.85rem] tracking-tight transition-colors',
-        'disabled:opacity-50 disabled:pointer-events-none',
+        'disabled:opacity-50 disabled:pointer-events-none shadow-md shadow-cyan-900/25',
         active
-          ? 'bg-primary-600 border-primary-600 text-white shadow-sm'
+          ? 'bg-primary-600 border-primary-600 text-white'
           : 'bg-white border-gray-200 text-gray-900 hover:bg-primary-50 hover:border-primary-200 hover:text-primary-700'
       )}
     >
@@ -69,12 +69,12 @@ const Sidebar = ({ disabled }: SidebarProps) => {
 
   return (
     <div className={cn(
-      "w-52 flex-shrink-0 bg-white border-e border-gray-200 h-full flex flex-col",
+      "w-52 flex-shrink-0 bg-cyan-200 border-e border-cyan-300 h-full flex flex-col",
       disabled && "opacity-50 pointer-events-none"
     )}>
       {/* Categories */}
       <nav className="flex-1 p-2 overflow-y-auto">
-        <h2 className="text-[10px] font-medium text-gray-500 uppercase tracking-wide mb-1.5 px-0.5">
+        <h2 className="text-[11px] font-semibold text-cyan-900 uppercase tracking-wider mb-1.5 px-0.5">
           {t('pos_sidebar.categories')}
         </h2>
 

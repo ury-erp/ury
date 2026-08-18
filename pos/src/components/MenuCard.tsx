@@ -42,7 +42,7 @@ const MenuCard: FC<MenuCardProps> = ({
       className={cn(
         // a denser grid needs a harder card edge: border + real shadow, else the
         // cards blur into one sheet at this size
-        "bg-white rounded-md border border-gray-200 shadow-md hover:shadow-lg hover:border-primary-300 overflow-hidden transition-shadow cursor-pointer h-[8.5rem] flex flex-col",
+        "bg-white rounded-md border border-gray-200 shadow-md shadow-cyan-900/25 hover:shadow-lg hover:shadow-cyan-900/25 hover:border-primary-300 overflow-hidden transition-shadow cursor-pointer h-[8.5rem] flex flex-col",
         disabled && "opacity-50 cursor-not-allowed pointer-events-none"
       )}
       onClick={disabled ? undefined : onClick}
