@@ -167,7 +167,7 @@ const TableView = () => {
     if (!selectedRoom) return;
     setSelectedOrderType(DINE_IN);
     setSelectedTable(tableName, selectedRoom);
-    navigate('/');
+    navigate('/pos');
   };
 
   const handlePreviewTable = (table: Table, event?: MouseEvent<HTMLButtonElement>) => {

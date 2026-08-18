@@ -279,9 +279,11 @@
     "merged_items": "Items from merged bill"
   },
   "footer": {
+    "dashboard": "Dashboard",
     "pos": "POS",
-    "table": "Table",
-    "orders": "Orders"
+    "tables": "Tables",
+    "orders": "Orders",
+    "settings": "Settings"
   },
   "product_dialog": {
     "special_instructions": "Special Instructions",
