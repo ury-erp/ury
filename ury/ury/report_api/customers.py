@@ -236,6 +236,11 @@ def get_repeated_customers(start_date, end_date, branch=None):
 
 	if branch:
 		day_condition = get_business_day_condition(date_expr="date_list.`date`", prefix="d")
+		# prior_condition's correlated subquery (alias c) intentionally reuses
+		# `rs` from this outer join rather than joining Report Settings again
+		# inside the subquery — branch is fixed for this whole query (we're
+		# inside `if branch:`), so "this branch's hours setting" is the same
+		# constant for both the day_condition and the prior-visit check.
 		prior_condition = get_prior_business_day_condition(date_expr="date_list.`date`", prefix="c")
 		join = report_settings_join(prefix="d")
 		params = {"branch": branch, "start_date": start_date, "end_date": end_date}
