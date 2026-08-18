@@ -783,7 +783,7 @@ export const MenuPage: React.FC = () => {
       <SideDrawer
         isOpen={drawerMode === 'add-menu' || menuItemRowToPopulateId !== null}
         onClose={closeDrawer}
-        title="Add New Menu"
+        title="Add Menu"
       >
         <form onSubmit={handleSaveMenu} className="space-y-5 text-sm">
           <div>
@@ -791,7 +791,7 @@ export const MenuPage: React.FC = () => {
             <Input
               value={newMenu.menu_name}
               onChange={(e) => setNewMenu({ ...newMenu, menu_name: e.target.value })}
-              placeholder="e.g. Name your menu"
+              placeholder="Name your menu"
               required
               className="font-medium"
             />
@@ -962,11 +962,10 @@ export const MenuPage: React.FC = () => {
                   if (e.dataTransfer.files?.[0]) handleAddMenuCsvSelect(e.dataTransfer.files[0]);
                 }}
                 onClick={() => addMenuCsvInputRef.current?.click()}
-                className={`p-4 border border-dashed rounded-lg text-center cursor-pointer transition-colors ${
-                  addMenuIsDragging
-                    ? 'border-primary bg-primary/5'
-                    : 'border-gray-300 hover:border-primary bg-gray-50/50 hover:bg-primary/5'
-                }`}
+                className={`p-4 border border-dashed rounded-lg text-center cursor-pointer transition-colors ${addMenuIsDragging
+                  ? 'border-primary bg-primary/5'
+                  : 'border-gray-300 hover:border-primary bg-gray-50/50 hover:bg-primary/5'
+                  }`}
               >
                 <Upload className="w-5 h-5 text-gray-400 mx-auto mb-1.5" />
                 <p className="text-xs font-medium text-gray-600">
@@ -977,7 +976,7 @@ export const MenuPage: React.FC = () => {
             )}
           </div>
 
-          <div className="pt-6 flex justify-end gap-3 border-t mt-8 border-gray-100">
+          <div className="pt-6 flex justify-end gap-3 border-t mt-4 border-gray-100">
             <Button type="button" variant="outline" onClick={closeDrawer} className="font-semibold">Cancel</Button>
             <Button type="submit" className="bg-primary hover:bg-primary/90 text-white font-semibold shadow-xs">
               Create Menu
