@@ -1,42 +1,21 @@
 /*
- * JavaScript client-side example using jsrsasign
- */
-
-// #########################################################
-// #             WARNING   WARNING   WARNING               #
-// #########################################################
-// #                                                       #
-// # This file is intended for demonstration purposes      #
-// # only.                                                 #
-// #                                                       #
-// # It is the SOLE responsibility of YOU, the programmer  #
-// # to prevent against unauthorized access to any signing #
-// # functions.                                            #
-// #                                                       #
-// # Organizations that do not protect against un-         #
-// # authorized signing will be black-listed to prevent    #
-// # software piracy.                                      #
-// #                                                       #
-// # -QZ Industries, LLC                                   #
-// #                                                       #
-// #########################################################
-
-/**
+ * QZ Tray signing — server-side sign-only model.
+ *
+ * The QZ private key never leaves the server. For every payload QZ Tray
+ * needs signed, this script asks the whitelisted `signature_promise`
+ * endpoint to sign it server-side and returns the base64 signature.
+ *
+ * Access to the endpoint is restricted to authenticated users holding a
+ * POS role (see QZ_SIGNING_ROLES in ury/ury/api/ury_print.py).
+ *
  * Depends:
- *     - jsrsasign-latest-all-min.js
  *     - qz-tray.js
  *
  * Steps:
- *
- *     1. Include jsrsasign 8.0.4 into your web page
- *        <script src="https://cdn.rawgit.com/kjur/jsrsasign/c057d3447b194fa0a3fdcea110579454898e093d/jsrsasign-all-min.js"></script>
- *
- *     2. Update the privateKey below with contents from private-key.pem
- *
- *     3. Include this script into your web page
+ *     1. Include this script into your web page
  *        <script src="path/to/sign-message.js"></script>
  *
- *     4. Remove or comment out any other references to "setSignaturePromise"
+ *     2. Remove or comment out any other references to "setSignaturePromise"
  */
 
 
@@ -52,13 +31,13 @@ qz.security.setSignaturePromise(function (toSign) {
                 if (response.message) {
                     resolve(response.message);
                 } else {
-                    reject("Signing failed");
+                    reject("No signature returned by the server");
                 }
             },
             error: function (err) {
-                console.error("Error signing message:", err);
+                console.error("QZ signing request failed:", err);
                 reject(err);
-            }
+            },
         });
     };
 });
