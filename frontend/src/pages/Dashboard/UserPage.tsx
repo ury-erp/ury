@@ -104,7 +104,7 @@ export const UserPage: React.FC = () => {
       }
       fetchUsers();
       setIsDrawerOpen(false);
-      showToast.success(`User ${editingUser ? 'updated' : 'added'} successfully`);
+      showToast.success(`User ${editingUser ? 'updated' : 'created'} successfully`);
     } catch (err: any) {
       console.error('Failed to save User', err);
       let errorMessage = 'Failed to save User';
