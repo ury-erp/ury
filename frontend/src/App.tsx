@@ -16,6 +16,7 @@ import { ReportsHome } from './pages/Reports/ReportsHome';
 import { TodaysSales } from './pages/Reports/TodaysSales';
 import { DaywiseSales } from './pages/Reports/DaywiseSales';
 import { DaywiseInvoices } from './pages/Reports/DaywiseInvoices';
+import { MonthWiseSales } from './pages/Reports/MonthWiseSales';
 
 function SetupGuard() {
   // @ts-ignore
@@ -62,6 +63,7 @@ function App() {
             <Route path="today-sales" element={<TodaysSales />} />
             <Route path="daywise-sales" element={<DaywiseSales />} />
             <Route path="daywise-invoices" element={<DaywiseInvoices />} />
+            <Route path="month-wise-sales" element={<MonthWiseSales />} />
           </Route>
         </Route>
       </Route>
