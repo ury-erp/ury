@@ -7,6 +7,7 @@ import { CustomerSelect } from './CustomerSelect';
 import ProductDialog from './ProductDialog';
 import OrderTypeSelect from './OrderTypeSelect';
 import CommentDialog from './CommentDialog';
+import OrderTabs from './OrderTabs';
 import { Button } from '@ury/ui';
 import { Spinner } from '@ury/ui';
 import { syncOrder } from '../lib/order-api';
@@ -183,6 +184,7 @@ const OrderPanel = () => {
   return (
     <div className="w-96 bg-white border-s border-gray-200 flex flex-col h-[calc(100vh-4rem)] fixed end-0 z-10">
       <div className="p-4 border-b border-gray-200 flex-shrink-0">
+        <OrderTabs disabled={isInteractionDisabled} />
         <OrderTypeSelect disabled={isInteractionDisabled} />
         <div className="mt-3"><CustomerSelect disabled={isInteractionDisabled} /></div>
       </div>
