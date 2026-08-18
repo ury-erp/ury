@@ -70,9 +70,12 @@ try {
         {
           handlerDidError: async () => {
             const match = (await caches.match('/assets/ury/pos/index.html')) ||
+                          (await caches.match('/index.html')) ||
                           (await caches.match('/pos')) ||
                           (await caches.match('/pos/index.html'));
-            return match || Response.error();
+            return match || new Response('<!doctype html><html><head><meta http-equiv="refresh" content="3"></head><body>Loading POS...</body></html>', {
+              headers: { 'Content-Type': 'text/html' }
+            });
           }
         },
         new ExpirationPlugin({
@@ -137,11 +140,15 @@ registerRoute(
   })
 );
 
-// 6. Master Data GET Endpoints (NetworkFirst with 24h offline fallback)
+// 6. Master Data & Bootstrap GET Endpoints (NetworkFirst with 24h offline fallback)
+// Includes auth, user roles, POS profile, and master menus
 registerRoute(
   ({ request, url }) =>
     request.method === 'GET' &&
-    (url.pathname.includes('/api/method/ury.ury_pos.api.getRestaurantMenu') ||
+    (url.pathname.includes('/api/method/frappe.auth.get_logged_user') ||
+      url.pathname.includes('/api/method/frappe.client.get_value') ||
+      url.pathname.includes('/api/method/frappe.client.get') ||
+      url.pathname.includes('/api/method/ury.ury_pos.api.getRestaurantMenu') ||
       url.pathname.includes('/api/method/ury.ury_pos.api.getModeOfPayment') ||
       url.pathname.includes('/api/method/ury.ury_pos.api.getMenuCourses') ||
       url.pathname.includes('/api/method/ury.ury_pos.api.getAggregator') ||
@@ -155,7 +162,7 @@ registerRoute(
       masterDataFallbackPlugin,
       new BroadcastUpdatePlugin(),
       new ExpirationPlugin({
-        maxEntries: 30,
+        maxEntries: 50,
         maxAgeSeconds: 24 * 60 * 60, // 24 Hours offline fallback
       }),
     ],
@@ -183,4 +190,5 @@ registerRoute(
     ],
   })
 );
+
 
