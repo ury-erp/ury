@@ -85,11 +85,12 @@ def get_needs_attention(branch=None):
 	items = []
 
 	threshold = add_to_date(get_datetime(), minutes=-15)
+	shift_start = today()
 	pending = frappe.db.sql(
 		"""SELECT name, creation FROM `tabPOS Invoice`
-		   WHERE docstatus = 0 AND creation < %(threshold)s""" +
+		   WHERE docstatus = 0 AND creation < %(threshold)s AND creation >= %(shift_start)s""" +
 		(" AND branch = %(branch)s" if branch else ""),
-		{"threshold": threshold, "branch": branch},
+		{"threshold": threshold, "shift_start": shift_start, "branch": branch},
 		as_dict=True,
 	)
 	if pending:
@@ -141,3 +142,172 @@ def get_needs_attention(branch=None):
 
 	frappe.cache().set_value(cache_key, items, expires_in_sec=30)
 	return items
+
+
+def _business_day_bounds(branch):
+	rs_hours = frappe.db.get_value("URY Report Settings", {"branch": branch}, "hours") if branch else None
+	now = get_datetime()
+	if rs_hours:
+		cutoff_today = get_datetime(f"{today()} {str(rs_hours).zfill(2)}:00:00")
+		if now < cutoff_today:
+			start = add_to_date(cutoff_today, days=-1)
+			end = cutoff_today
+		else:
+			start = cutoff_today
+			end = add_to_date(cutoff_today, days=1)
+	else:
+		start = get_datetime(f"{today()} 00:00:00")
+		end = add_to_date(start, days=1)
+	return start, end
+
+
+@frappe.whitelist(methods=["GET"])
+def get_shift_metrics(branch=None):
+	cache_key = f"ury_dashboard_shift_metrics:{branch}"
+	cached = frappe.cache().get_value(cache_key)
+	if cached:
+		return cached
+
+	start, end = _business_day_bounds(branch)
+
+	conditions = "b.`docstatus` = 1 AND b.`status` IN ('Consolidated', 'Paid') AND TIMESTAMP(b.`posting_date`, b.`posting_time`) BETWEEN %(start)s AND %(end)s"
+	params = {"start": start, "end": end}
+	if branch:
+		conditions += " AND b.`branch` = %(branch)s"
+		params["branch"] = branch
+
+	row = frappe.db.sql(
+		f"""
+		SELECT
+			COUNT(b.`name`) AS invoice_count,
+			ROUND(SUM(b.`grand_total`), 2) AS sales,
+			SUM(b.`no_of_pax`) AS covers
+		FROM `tabPOS Invoice` b
+		WHERE {conditions}
+		""",
+		params,
+		as_dict=True,
+	)[0]
+
+	sales = row.sales or 0
+	covers = row.covers or 0
+	avg_per_cover = round(sales / covers, 2) if covers else 0
+
+	kot_conditions = "k.`start_time_prep` IS NOT NULL AND k.`start_time_serv` IS NOT NULL AND k.`creation` BETWEEN %(start)s AND %(end)s"
+	kot_params = {"start": start, "end": end}
+	if branch:
+		kot_conditions += " AND k.`branch` = %(branch)s"
+		kot_params["branch"] = branch
+
+	ticket_row = frappe.db.sql(
+		f"""
+		SELECT AVG(TIMESTAMPDIFF(MINUTE, k.`start_time_prep`, k.`start_time_serv`)) AS avg_ticket_minutes
+		FROM `tabURY KOT` k
+		WHERE {kot_conditions}
+		""",
+		kot_params,
+		as_dict=True,
+	)[0]
+
+	result = {
+		"sales": sales,
+		"covers": covers,
+		"avg_per_cover": avg_per_cover,
+		"avg_ticket_minutes": round(ticket_row.avg_ticket_minutes, 1) if ticket_row.avg_ticket_minutes else None,
+	}
+
+	frappe.cache().set_value(cache_key, result, expires_in_sec=60)
+	return result
+
+
+@frappe.whitelist(methods=["GET"])
+def get_baseline(branch=None, weeks=6):
+	weekday = get_datetime().weekday()
+	hour = get_datetime().hour
+	cache_key = f"ury_dashboard_baseline:{branch}:{weekday}:{hour}"
+	cached = frappe.cache().get_value(cache_key)
+	if cached:
+		return cached
+
+	conditions = """
+		b.`docstatus` = 1
+		AND b.`status` IN ('Consolidated', 'Paid')
+		AND WEEKDAY(b.`posting_date`) = %(weekday)s
+		AND HOUR(b.`posting_time`) = %(hour)s
+		AND b.`posting_date` >= DATE_SUB(CURDATE(), INTERVAL %(weeks)s WEEK)
+		AND b.`posting_date` < CURDATE()
+	"""
+	params = {"weekday": weekday, "hour": hour, "weeks": weeks}
+	if branch:
+		conditions += " AND b.`branch` = %(branch)s"
+		params["branch"] = branch
+
+	rows = frappe.db.sql(
+		f"""
+		SELECT b.`posting_date` AS d, SUM(b.`grand_total`) AS sales, COUNT(b.`name`) AS covers
+		FROM `tabPOS Invoice` b
+		WHERE {conditions}
+		GROUP BY b.`posting_date`
+		ORDER BY b.`posting_date`
+		""",
+		params,
+		as_dict=True,
+	)
+
+	sales_values = sorted([r.sales or 0 for r in rows])
+	covers_values = sorted([r.covers or 0 for r in rows])
+
+	def median(values):
+		n = len(values)
+		if not n:
+			return 0
+		mid = n // 2
+		if n % 2:
+			return values[mid]
+		return round((values[mid - 1] + values[mid]) / 2, 2)
+
+	result = {
+		"sample_days": len(rows),
+		"median_sales": median(sales_values),
+		"median_covers": median(covers_values),
+	}
+
+	frappe.cache().set_value(cache_key, result, expires_in_sec=300)
+	return result
+
+
+@frappe.whitelist(methods=["GET"])
+def get_floor_load(branch=None):
+	cache_key = f"ury_dashboard_floor_load:{branch}"
+	cached = frappe.cache().get_value(cache_key)
+	if cached:
+		return cached
+
+	conditions = "t.`occupied` = 1 AND i.`waiter` IS NOT NULL AND i.`waiter` != ''"
+	params = {}
+	if branch:
+		conditions += " AND t.`branch` = %(branch)s"
+		params["branch"] = branch
+
+	rows = frappe.db.sql(
+		f"""
+		SELECT i.`waiter` AS waiter, COUNT(DISTINCT t.`name`) AS table_count
+		FROM `tabURY Table` t
+		JOIN `tabPOS Invoice` i ON (
+			i.`restaurant_table` = t.`name`
+			AND i.`docstatus` = 0
+			AND i.`creation` = (
+				SELECT MAX(i2.`creation`) FROM `tabPOS Invoice` i2
+				WHERE i2.`restaurant_table` = t.`name` AND i2.`docstatus` = 0
+			)
+		)
+		WHERE {conditions}
+		GROUP BY i.`waiter`
+		ORDER BY table_count DESC
+		""",
+		params,
+		as_dict=True,
+	)
+
+	frappe.cache().set_value(cache_key, rows, expires_in_sec=30)
+	return rows
