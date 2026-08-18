@@ -1,9 +1,10 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import Footer from './components/Footer';
-import Header from './components/Header';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import AppLayout from './components/AppLayout';
 import Orders from './pages/Orders';
 import POS from './pages/POS';
 import Table from './pages/Table';
+import Dashboard from './pages/Dashboard';
+import Settings from './pages/Settings';
 import AuthGuard from './components/AuthGuard';
 import POSOpeningProvider from './components/POSOpeningProvider';
 import ScreenSizeProvider from './components/ScreenSizeProvider';
@@ -33,18 +34,17 @@ function App() {
       <ScreenSizeProvider>
         <AuthGuard>
           <POSOpeningProvider>
-            <Router basename="/pos">
-              <div className="flex flex-col h-screen bg-gray-100 font-inter">
-                <Header />
-                <div className="flex-1 overflow-hidden">
-                  <Routes>
-                    <Route path="/" element={<POS/>} />
-                    <Route path="/orders" element={<Orders />} />
-                    <Route path="/table" element={<Table />} />
-                  </Routes>
-                </div>
-                <Footer />
-              </div>
+            <Router basename="/ury">
+              <Routes>
+                <Route element={<AppLayout />}>
+                  <Route index element={<Navigate to="/dashboard" replace />} />
+                  <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/pos" element={<POS />} />
+                  <Route path="/tables" element={<Table />} />
+                  <Route path="/orders" element={<Orders />} />
+                  <Route path="/settings" element={<Settings />} />
+                </Route>
+              </Routes>
             </Router>
           </POSOpeningProvider>
         </AuthGuard>
