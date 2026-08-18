@@ -35,8 +35,78 @@ clientsClaim();
 // 1. App Shell Pre-caching
 precacheAndRoute(self.__WB_MANIFEST || []);
 
-// Custom Workbox plugin to fall back to any matching endpoint response in Cache Storage
+// Custom Workbox plugin to fall back to a matching endpoint response in Cache Storage
 // if an exact URL parameter key lookup misses during NetworkFirst error handling.
+// CRITICAL: only return cached responses whose critical query parameters match the
+// request, otherwise wrong-context (wrong pos_profile / room / aggregator / doctype)
+// master data can poison the UI. If no safe match exists, return undefined so the
+// app can fall back to IndexedDB instead.
+const PARAMETERIZED_ENDPOINTS = new Set([
+  'getRestaurantMenu',
+  'getAggregatorItem',
+  'getModeOfPayment',
+  'getMenuCourses',
+  'getPosProfile',
+  'getBranchRoom',
+  'get_list',
+]);
+
+function getEndpointName(pathname: string): string {
+  const parts = pathname.split('/');
+  return parts[parts.length - 1] || '';
+}
+
+function getParam(url: URL, keys: string[]): string | null {
+  for (const key of keys) {
+    const value = url.searchParams.get(key);
+    if (value !== null) return value;
+  }
+  return null;
+}
+
+function isSafeParameterizedMatch(requestUrl: URL, candidateUrl: URL): boolean {
+  const endpoint = getEndpointName(requestUrl.pathname);
+  if (!PARAMETERIZED_ENDPOINTS.has(endpoint)) {
+    // Unknown endpoint: keep the previous pathname-only behavior, but only if the
+    // candidate carries no critical parameters that the request omits.
+    const requestHasParams =
+      requestUrl.searchParams.has('pos_profile') ||
+      requestUrl.searchParams.has('doctype') ||
+      requestUrl.searchParams.has('selectedRoom') ||
+      requestUrl.searchParams.has('room') ||
+      requestUrl.searchParams.has('customer') ||
+      requestUrl.searchParams.has('aggregator');
+    const candidateHasParams =
+      candidateUrl.searchParams.has('pos_profile') ||
+      candidateUrl.searchParams.has('doctype') ||
+      candidateUrl.searchParams.has('selectedRoom') ||
+      candidateUrl.searchParams.has('room') ||
+      candidateUrl.searchParams.has('customer') ||
+      candidateUrl.searchParams.has('aggregator');
+    return !requestHasParams && !candidateHasParams;
+  }
+
+  const requestPosProfile = requestUrl.searchParams.get('pos_profile');
+  const candidatePosProfile = candidateUrl.searchParams.get('pos_profile');
+  if (requestPosProfile !== candidatePosProfile) return false;
+
+  const requestDoctype = requestUrl.searchParams.get('doctype');
+  const candidateDoctype = candidateUrl.searchParams.get('doctype');
+  if (requestDoctype !== candidateDoctype) return false;
+
+  const requestRoom = getParam(requestUrl, ['selectedRoom', 'room']);
+  const candidateRoom = getParam(candidateUrl, ['selectedRoom', 'room']);
+  if (requestRoom !== null && requestRoom !== candidateRoom) return false;
+  if (candidateRoom !== null && requestRoom === null) return false;
+
+  const requestCustomer = getParam(requestUrl, ['customer', 'aggregator']);
+  const candidateCustomer = getParam(candidateUrl, ['customer', 'aggregator']);
+  if (requestCustomer !== null && requestCustomer !== candidateCustomer) return false;
+  if (candidateCustomer !== null && requestCustomer === null) return false;
+
+  return true;
+}
+
 const masterDataFallbackPlugin = {
   handlerDidError: async ({ request }: { request: Request }) => {
     try {
@@ -48,9 +118,22 @@ const masterDataFallbackPlugin = {
       const keys = await cache.keys();
       for (const key of keys) {
         const keyUrl = new URL(key.url);
-        if (keyUrl.pathname === requestUrl.pathname) {
-          const response = await cache.match(key);
-          if (response) return response;
+        if (keyUrl.pathname !== requestUrl.pathname) continue;
+
+        if (!isSafeParameterizedMatch(requestUrl, keyUrl)) continue;
+
+        const response = await cache.match(key);
+        if (response) {
+          console.warn(
+            `[SW] Parameterized master-data fallback used for ${request.url} -> ${key.url}`
+          );
+          const headers = new Headers(response.headers);
+          headers.set('X-SW-Fallback', 'true');
+          return new Response(response.body, {
+            status: response.status,
+            statusText: response.statusText,
+            headers,
+          });
         }
       }
     } catch (e) {

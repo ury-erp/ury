@@ -348,6 +348,13 @@ export class SyncEngine {
       // 1. Remap Payload IDs using TempIDMapper (replaces TEMP-* IDs with real server IDs)
       const remappedPayload = await this.idMapper.remapPayload(env.payload);
 
+      // Inject idempotency key into the API payload so retries cannot create duplicate
+      // server records. Preserve an explicit payload key if one is already present.
+      if (remappedPayload && typeof remappedPayload === 'object' && !Array.isArray(remappedPayload)) {
+        (remappedPayload as Record<string, unknown>).idempotency_key =
+          env.idempotency_key || env.client_request_id || env.command_id || env.id;
+      }
+
       // 2. Payment commands MUST NOT run while their invoice reference is still a TEMP-* ID.
       const tempOrderRef = remappedPayload.invoice || remappedPayload.temp_id || env.temporary_id;
       if (isPaymentCommand(env) || env.operation_type === 'PAY_ORDER') {
