@@ -324,6 +324,7 @@ fixtures = [
                     "POS Profile-restaurant_prefix",
                     "POS Profile-show_image",
                     "POS Profile-custom_daily_pos_close",
+                    "POS Profile-custom_checklist_items",
                     "POS Profile-paid_limit",
                     "POS Profile-table_attention_time",
                     "POS Opening Entry-restaurant_info",
