@@ -374,21 +374,21 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
           <button
             onClick={handleZoomIn}
             className="p-2 bg-white hover:bg-gray-50 rounded-lg shadow-lg border border-gray-200 transition-colors"
-            title="Zoom In"
+            title={t('tables.zoom_in')}
           >
             <ZoomIn className="w-5 h-5 text-gray-700" />
           </button>
           <button
             onClick={handleZoomOut}
             className="p-2 bg-white hover:bg-gray-50 rounded-lg shadow-lg border border-gray-200 transition-colors"
-            title="Zoom Out"
+            title={t('tables.zoom_out')}
           >
             <ZoomOut className="w-5 h-5 text-gray-700" />
           </button>
           <button
             onClick={handleResetZoom}
             className="p-2 bg-white hover:bg-gray-50 rounded-lg shadow-lg border border-gray-200 transition-colors"
-            title="Reset Zoom & Pan"
+            title={t('tables.reset_zoom')}
           >
             <RotateCcw className="w-5 h-5 text-gray-700" />
           </button>

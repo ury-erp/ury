@@ -28,7 +28,8 @@
         "cancelling": "جاري الإلغاء...",
         "confirm_cancel": "تأكيد الإلغاء",
         "loading_ury_pos": "جاري تحميل URY POS...",
-        "please_wait_setup": "يرجى الانتظار بينما نقوم بضبط الأشياء..."
+        "please_wait_setup": "يرجى الانتظار بينما نقوم بضبط الأشياء...",
+        "retry": "إعادة المحاولة"
     },
     "header": {
         "search_placeholder_default": "ابحث عن الطلبات، عناصر القائمة، أو العملاء...",
@@ -39,7 +40,8 @@
         "logout": "تسجيل الخروج"
     },
     "menu": {
-        "special_items": "أصناف مميزة"
+        "special_items": "أصناف مميزة",
+        "search_placeholder": "ابحث في عناصر القائمة..."
     },
     "pos_sidebar": {
         "categories": "فئات",
@@ -68,7 +70,8 @@
         "cancel_order": "إلغاء الطلب",
         "enter_cancel_reason": "أدخل سبب الإلغاء",
         "print": "طباعة",
-        "payment": "الدفع"
+        "payment": "الدفع",
+        "edit_order": "تعديل الطلب"
     },
     "payment": {
         "title": "الدفع",
@@ -92,6 +95,9 @@
         "not_closed_message": "يجب إغلاق وردية نقطة البيع السابقة قبل البدء بوردية جديدة. يرجى إغلاقها للمتابعة.",
         "reload_page": "إعادة تحميل الصفحة",
         "switch_to_desk": "التبديل إلى لوحة التحكم (Desk)"
+    },
+    "pos_page": {
+        "failed_to_load": "فشل تحميل نقطة البيع"
     },
     "customer": {
         "search_placeholder": "ابحث عن عميل...",
@@ -156,6 +162,8 @@
         "no_orders_found": "لم يتم العثور على طلبات",
         "click_to_view": "انقر على أي بطاقة طلب لعرض تفاصيلها",
         "status_title": "حالة الطلب",
+        "failed_to_load": "فشل في تحميل الطلبات",
+        "failed_to_load_details": "فشل في تحميل تفاصيل الطلب",
         "pagination": {
             "previous": "السابق",
             "next": "التالي",
@@ -200,7 +208,10 @@
         "editing_layout_hint_title": "تعديل المخطط",
         "drag_tables_hint": "• اسحب الطاولات لتغيير موضعها",
         "autosave_hint": "• يتم حفظ التغييرات تلقائيًا",
-        "zoom_pan_hint": "استخدم التمرير للتكبير • اسحب الخلفية للتحريك"
+        "zoom_pan_hint": "استخدم التمرير للتكبير • اسحب الخلفية للتحريك",
+        "zoom_in": "تكبير",
+        "zoom_out": "تصغير",
+        "reset_zoom": "إعادة ضبط التكبير والموضع"
     },
     "footer": {
         "pos": "نقطة البيع",
@@ -233,5 +244,14 @@
         "paid": "مدفوع",
         "consolidated": "مجمع",
         "return": "مرتجع"
+    },
+    "auth_guard": {
+        "access_denied": "تم رفض الوصول",
+        "configuration_error": "خطأ في الإعداد",
+        "pos_profile_not_configured": "لم يتم العثور على ملف تعريف نقطة البيع أو لم يتم إعداده.",
+        "permission_required": "الإذن مطلوب",
+        "no_permission_message": "ليس لديك إذن للوصول إلى هذا التطبيق.",
+        "required_roles": "الأدوار المطلوبة: {{roles}}",
+        "recheck_permissions": "إعادة التحقق من الأذونات"
     }
 }

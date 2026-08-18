@@ -21,7 +21,8 @@
     "cancelling": "Cancelando...",
     "confirm_cancel": "Confirmar cancelamento",
     "loading_ury_pos": "Carregando URY POS...",
-    "please_wait_setup": "Aguarde enquanto preparamos tudo"
+    "please_wait_setup": "Aguarde enquanto preparamos tudo",
+    "retry": "Tentar novamente"
   },
   "header": {
     "search_placeholder_default": "Buscar pedidos, itens do cardápio ou clientes...",
@@ -32,7 +33,8 @@
     "logout": "Sair"
   },
   "menu": {
-    "special_items": "Itens especiais"
+    "special_items": "Itens especiais",
+    "search_placeholder": "Buscar itens do cardápio..."
   },
   "pos_sidebar": {
     "categories": "Categorias",
@@ -62,7 +64,8 @@
     "enter_cancel_reason": "Informe o motivo do cancelamento",
     "print": "Imprimir",
     "payment": "Pagamento",
-    "order_actions": "Ações do pedido"
+    "order_actions": "Ações do pedido",
+    "edit_order": "Editar pedido"
   },
   "payment": {
     "title": "Pagamento",
@@ -86,6 +89,9 @@
     "not_closed_message": "Feche a entrada de caixa anterior para continuar.",
     "reload_page": "Recarregar página",
     "switch_to_desk": "Ir para o Desk"
+  },
+  "pos_page": {
+    "failed_to_load": "Falha ao carregar o PDV"
   },
   "customer": {
     "search_placeholder": "Buscar cliente...",
@@ -150,6 +156,8 @@
     "no_orders_found": "Nenhum pedido encontrado",
     "click_to_view": "Clique em um pedido para ver os detalhes",
     "status_title": "Status do pedido",
+    "failed_to_load": "Falha ao carregar os pedidos",
+    "failed_to_load_details": "Falha ao carregar os detalhes do pedido",
     "pagination": {
       "previous": "Anterior",
       "next": "Próxima",
@@ -195,6 +203,9 @@
     "drag_tables_hint": "• Arraste as mesas para reposicionar",
     "autosave_hint": "• As alterações salvam sozinhas",
     "zoom_pan_hint": "Use a rolagem para dar zoom • Arraste o fundo para mover",
+    "zoom_in": "Aumentar zoom",
+    "zoom_out": "Diminuir zoom",
+    "reset_zoom": "Redefinir zoom e posição",
     "table_actions": "Ações da mesa",
     "merge_tables": "Juntar mesas",
     "merge_with": "Juntar com {{table}}",
@@ -309,5 +320,14 @@
     "paid": "Pago",
     "consolidated": "Consolidado",
     "return": "Devolução"
+  },
+  "auth_guard": {
+    "access_denied": "Acesso negado",
+    "configuration_error": "Erro de configuração",
+    "pos_profile_not_configured": "Perfil de PDV não encontrado ou não configurado.",
+    "permission_required": "Permissão necessária",
+    "no_permission_message": "Você não tem permissão para acessar este aplicativo.",
+    "required_roles": "Perfis necessários: {{roles}}",
+    "recheck_permissions": "Verificar novamente"
   }
 }

@@ -1,6 +1,7 @@
 import { useRef, useEffect } from 'react';
 import { Search, X } from 'lucide-react';
 import { cn } from '@ury/ui';
+import { t } from '../i18n';
 
 interface SearchBarProps {
   value: string;
@@ -55,7 +56,7 @@ export default function SearchBar({
           <input
             ref={inputRef}
             type="text"
-            placeholder="Search menu items..."
+            placeholder={t('menu.search_placeholder')}
             className={cn(
               "w-full h-full border border-gray-200 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-primary-100 focus:border-primary-500 px-[12px] py-[8px] transition-all duration-200",
               disabled && "bg-gray-50 cursor-not-allowed"

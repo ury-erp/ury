@@ -21,7 +21,8 @@
     "cancelling": "Cancelling...",
     "confirm_cancel": "Confirm Cancel",
     "loading_ury_pos": "Loading URY POS...",
-    "please_wait_setup": "Please wait while we set things up"
+    "please_wait_setup": "Please wait while we set things up",
+    "retry": "Retry"
   },
   "header": {
     "search_placeholder_default": "Search orders, menu items, or customers...",
@@ -32,7 +33,8 @@
     "logout": "Logout"
   },
   "menu": {
-    "special_items": "Special Items"
+    "special_items": "Special Items",
+    "search_placeholder": "Search menu items..."
   },
   "pos_sidebar": {
     "categories": "Categories",
@@ -62,7 +64,8 @@
     "enter_cancel_reason": "Enter cancel reason",
     "print": "Print",
     "payment": "Payment",
-    "order_actions": "Order actions"
+    "order_actions": "Order actions",
+    "edit_order": "Edit order"
   },
   "payment": {
     "title": "Payment",
@@ -86,6 +89,9 @@
     "not_closed_message": "Please close the previous POS Entry to continue.",
     "reload_page": "Reload Page",
     "switch_to_desk": "Switch to Desk"
+  },
+  "pos_page": {
+    "failed_to_load": "Failed to load POS"
   },
   "customer": {
     "search_placeholder": "Search customer...",
@@ -150,6 +156,8 @@
     "no_orders_found": "No orders found",
     "click_to_view": "Click on any order card to view its details",
     "status_title": "Order Status",
+    "failed_to_load": "Failed to load orders",
+    "failed_to_load_details": "Failed to load order details",
     "pagination": {
       "previous": "Previous",
       "next": "Next",
@@ -195,6 +203,9 @@
     "drag_tables_hint": "• Drag tables to reposition",
     "autosave_hint": "• Changes autosave",
     "zoom_pan_hint": "Use Scroll to zoom • Drag background to pan",
+    "zoom_in": "Zoom In",
+    "zoom_out": "Zoom Out",
+    "reset_zoom": "Reset Zoom & Pan",
     "table_actions": "Table actions",
     "merge_tables": "Merge tables",
     "merge_with": "Merge with {{table}}",
@@ -309,5 +320,14 @@
     "paid": "Paid",
     "consolidated": "Consolidated",
     "return": "Return"
+  },
+  "auth_guard": {
+    "access_denied": "Access Denied",
+    "configuration_error": "Configuration Error",
+    "pos_profile_not_configured": "POS Profile not found or not configured.",
+    "permission_required": "Permission Required",
+    "no_permission_message": "You do not have permission to access this application.",
+    "required_roles": "Required roles: {{roles}}",
+    "recheck_permissions": "Recheck Permissions"
   }
 }

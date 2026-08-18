@@ -21,7 +21,8 @@
     "cancelling": "Annulation en cours...",
     "confirm_cancel": "Confirmer l'annulation",
     "loading_ury_pos": "Chargement de URY POS...",
-    "please_wait_setup": "Veuillez patienter pendant que nous préparons tout"
+    "please_wait_setup": "Veuillez patienter pendant que nous préparons tout",
+    "retry": "Réessayer"
   },
   "header": {
     "search_placeholder_default": "Rechercher commandes, articles ou clients...",
@@ -32,7 +33,8 @@
     "logout": "Déconnexion"
   },
   "menu": {
-    "special_items": "Plats spéciaux"
+    "special_items": "Plats spéciaux",
+    "search_placeholder": "Rechercher des articles du menu..."
   },
   "pos_sidebar": {
     "categories": "Catégories",
@@ -62,7 +64,8 @@
     "enter_cancel_reason": "Saisir le motif d'annulation",
     "print": "Imprimer",
     "payment": "Paiement",
-    "order_actions": "Actions sur la commande"
+    "order_actions": "Actions sur la commande",
+    "edit_order": "Modifier la commande"
   },
   "payment": {
     "title": "Paiement",
@@ -86,6 +89,9 @@
     "not_closed_message": "Veuillez fermer l'entrée PDV précédente pour continuer.",
     "reload_page": "Recharger la page",
     "switch_to_desk": "Accéder au bureau"
+  },
+  "pos_page": {
+    "failed_to_load": "Échec du chargement du PDV"
   },
   "customer": {
     "search_placeholder": "Rechercher un client...",
@@ -150,6 +156,8 @@
     "no_orders_found": "Aucune commande trouvée",
     "click_to_view": "Cliquez sur n'importe quel badge de commande pour voir ses détails",
     "status_title": "Statut de la commande",
+    "failed_to_load": "Échec du chargement des commandes",
+    "failed_to_load_details": "Échec du chargement des détails de la commande",
     "pagination": {
       "previous": "Précédent",
       "next": "Suivant",
@@ -195,6 +203,9 @@
     "drag_tables_hint": "• Faites glisser les tables pour les repositionner",
     "autosave_hint": "• Les modifications sont enregistrées automatiquement",
     "zoom_pan_hint": "Utilisez le défilement pour zoomer • Faites glisser l'arrière-plan pour déplacer",
+    "zoom_in": "Zoomer",
+    "zoom_out": "Dézoomer",
+    "reset_zoom": "Réinitialiser le zoom et la position",
     "table_actions": "Actions de la table",
     "merge_tables": "Fusionner les tables",
     "merge_with": "Fusionner avec {{table}}",
@@ -309,5 +320,14 @@
     "paid": "Payé",
     "consolidated": "Consolidé",
     "return": "Retour"
+  },
+  "auth_guard": {
+    "access_denied": "Accès refusé",
+    "configuration_error": "Erreur de configuration",
+    "pos_profile_not_configured": "Profil PDV introuvable ou non configuré.",
+    "permission_required": "Autorisation requise",
+    "no_permission_message": "Vous n'avez pas l'autorisation d'accéder à cette application.",
+    "required_roles": "Rôles requis : {{roles}}",
+    "recheck_permissions": "Revérifier les autorisations"
   }
 }

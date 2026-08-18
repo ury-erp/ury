@@ -344,7 +344,7 @@ export default function Orders() {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-center">
-          <p className="text-xl font-semibold text-red-600 mb-2">Failed to load orders</p>
+          <p className="text-xl font-semibold text-red-600 mb-2">{t('orders.failed_to_load')}</p>
           <p className="text-gray-600">{error}</p>
         </div>
       </div>
@@ -515,7 +515,7 @@ export default function Orders() {
           </div>
         ) : selectedOrderError ? (
           <div className="text-center h-full flex flex-col items-center justify-center text-red-500 p-6">
-            <p className="text-lg font-medium mb-2">Failed to load order details</p>
+            <p className="text-lg font-medium mb-2">{t('orders.failed_to_load_details')}</p>
             <p className="text-sm">{selectedOrderError}</p>
           </div>
         ) : (
@@ -540,7 +540,7 @@ export default function Orders() {
                       <button
                         type="button"
                         className="inline-flex items-center justify-center rounded-md p-2 bg-gray-100 hover:bg-gray-200 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        aria-label="Edit order"
+                        aria-label={t('order.edit_order')}
                         onClick={handleEditOrder}
                         disabled={editLoading}
                       >
@@ -550,7 +550,7 @@ export default function Orders() {
                       <button
                         type="button"
                         className="inline-flex items-center justify-center rounded-md p-2 bg-gray-100 hover:bg-gray-200 text-red-600 focus:outline-none focus:ring-2 focus:ring-red-500"
-                        aria-label="Cancel order"
+                        aria-label={t('order.cancel_order')}
                         onClick={() => setCancelDialogOpen(true)}
                       >
                         <X className="w-4 h-4" />
