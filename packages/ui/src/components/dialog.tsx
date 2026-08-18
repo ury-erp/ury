@@ -19,7 +19,10 @@ const dialogVariants = cva(
 )
 
 const overlayVariants = cva(
-  "fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity",
+  // The overlay fades in rather than snapping on. `transition-opacity` did
+  // nothing here — the node is mounted at its final opacity — so this needed
+  // to be a keyframe, not a transition.
+  "fixed inset-0 bg-black/50 backdrop-blur-sm animate-overlay-in",
   {
     variants: {
       variant: {
@@ -34,7 +37,14 @@ const overlayVariants = cva(
 )
 
 const contentVariants = cva(
-  "relative bg-white rounded-lg shadow-lg max-h-[90vh] overflow-hidden",
+  [
+    // A modal is the topmost surface in the app, so it takes the top of the
+    // elevation scale (xl) and one radius step above a Card (xl vs lg) — the
+    // two together are what make it read as floating over the page rather
+    // than pasted onto it.
+    "relative bg-card text-card-foreground rounded-xl shadow-xl",
+    "max-h-[90vh] overflow-hidden animate-dialog-in",
+  ],
   {
     variants: {
       variant: {
@@ -108,8 +118,13 @@ const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps>(
     >
       {showCloseButton && onClose && (
         <button
+          type="button"
           onClick={onClose}
-          className="absolute top-4 right-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"
+          aria-label="Close"
+          // Was a bare 16px icon — a ~16px touch target on a tablet. Now a
+          // 36px tappable square with a real hover surface, matching the
+          // ghost button's interaction language.
+          className="absolute top-3 right-3 inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 ease-out hover:bg-accent hover:text-foreground active:bg-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background disabled:pointer-events-none"
         >
           <X className="h-4 w-4" />
           <span className="sr-only">Close</span>
@@ -127,7 +142,7 @@ const DialogHeader = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn("flex flex-col space-y-1.5 text-center sm:text-left p-6", className)}
+    className={cn("flex flex-col space-y-1 text-center sm:text-left p-6", className)}
     {...props}
   />
 ))
@@ -139,7 +154,9 @@ const DialogFooter = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn("flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 p-6 pt-0", className)}
+    // `gap-2` rather than `sm:space-x-2`: the stacked mobile layout previously
+    // had no gap at all between its buttons.
+    className={cn("flex flex-col-reverse gap-2 sm:flex-row sm:justify-end p-6 pt-0", className)}
     {...props}
   />
 ))
@@ -151,7 +168,7 @@ const DialogTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <h2
     ref={ref}
-    className={cn("text-lg font-semibold leading-none tracking-tight", className)}
+    className={cn("text-lg font-semibold leading-tight tracking-tight", className)}
     {...props}
   />
 ))
@@ -163,7 +180,7 @@ const DialogDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <p
     ref={ref}
-    className={cn("text-sm text-muted-foreground", className)}
+    className={cn("text-sm leading-normal text-muted-foreground", className)}
     {...props}
   />
 ))

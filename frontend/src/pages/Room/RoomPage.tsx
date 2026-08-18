@@ -211,7 +211,7 @@ export default function RoomPage() {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
-            <DoorOpen className="w-7 h-7 text-[#7C3AED]" />
+            <DoorOpen className="w-7 h-7 text-primary" />
             Room Management
           </h1>
           <p className="text-sm text-gray-500 mt-1">
@@ -221,7 +221,7 @@ export default function RoomPage() {
 
         <Button
           onClick={openAddDrawer}
-          className="gap-2 bg-[#7C3AED] hover:bg-[#6D28D9] text-white shadow-sm self-start md:self-auto"
+          className="gap-2 bg-primary hover:bg-primary-700 text-white shadow-sm self-start md:self-auto"
         >
           <Plus className="w-4 h-4" />
           Add Room
@@ -237,7 +237,7 @@ export default function RoomPage() {
             placeholder="Search room name or type..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9 bg-gray-50/50 border-gray-200 focus:border-[#7C3AED]"
+            className="pl-9 bg-gray-50/50 border-gray-200 focus:border-primary"
           />
         </div>
 
@@ -245,7 +245,7 @@ export default function RoomPage() {
           <select
             value={selectedBranch}
             onChange={(e) => setSelectedBranch(e.target.value)}
-            className="h-10 px-3 text-sm bg-white border border-gray-200 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#7C3AED]"
+            className="h-10 px-3 text-sm bg-white border border-gray-200 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary"
           >
             {BRANCHES.map((b) => (
               <option key={b} value={b}>
@@ -266,7 +266,7 @@ export default function RoomPage() {
             <CardHeader className="p-5 border-b border-gray-100 bg-gray-50/30 flex flex-row items-start justify-between">
               <div>
                 <div className="flex items-center gap-2">
-                  <DoorOpen className="w-5 h-5 text-[#7C3AED]" />
+                  <DoorOpen className="w-5 h-5 text-primary" />
                   <CardTitle className="text-lg font-bold text-gray-900">
                     {room.room_name}
                   </CardTitle>
@@ -285,10 +285,10 @@ export default function RoomPage() {
               {/* Tables count metric */}
               <div className="p-3 bg-purple-50/60 rounded-lg border border-purple-100 flex items-center justify-between">
                 <span className="text-xs font-semibold text-purple-900 flex items-center gap-1.5">
-                  <Grid className="w-4 h-4 text-[#7C3AED]" />
+                  <Grid className="w-4 h-4 text-primary" />
                   Assigned Tables
                 </span>
-                <span className="text-sm font-extrabold text-[#7C3AED]">
+                <span className="text-sm font-extrabold text-primary">
                   {room.number_of_tables} Tables
                 </span>
               </div>
@@ -329,7 +329,7 @@ export default function RoomPage() {
                 variant="outline"
                 size="sm"
                 onClick={() => openEditDrawer(room)}
-                className="gap-1.5 text-xs border-gray-200 text-gray-700 hover:bg-purple-50 hover:text-[#7C3AED]"
+                className="gap-1.5 text-xs border-gray-200 text-gray-700 hover:bg-purple-50 hover:text-primary"
               >
                 <Edit className="w-3.5 h-3.5" />
                 Edit Room
@@ -362,7 +362,7 @@ export default function RoomPage() {
             </Button>
             <Button
               onClick={handleSaveRoom}
-              className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white"
+              className="bg-primary hover:bg-primary-700 text-white"
             >
               Save Room Configuration
             </Button>
@@ -386,7 +386,7 @@ export default function RoomPage() {
                   placeholder="e.g. Outdoor Patio"
                   value={formRoomName}
                   onChange={(e) => setFormRoomName(e.target.value)}
-                  className="w-full bg-white border-gray-200 focus:border-[#7C3AED]"
+                  className="w-full bg-white border-gray-200 focus:border-primary"
                 />
               </div>
 
@@ -397,7 +397,7 @@ export default function RoomPage() {
                 <select
                   value={formRoomType}
                   onChange={(e) => setFormRoomType(e.target.value as RoomType)}
-                  className="w-full h-10 px-3 text-sm bg-white border border-gray-200 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#7C3AED]"
+                  className="w-full h-10 px-3 text-sm bg-white border border-gray-200 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary"
                 >
                   {ROOM_TYPES.map((type) => (
                     <option key={type} value={type}>
@@ -412,7 +412,7 @@ export default function RoomPage() {
                 <select
                   value={formBranch}
                   onChange={(e) => setFormBranch(e.target.value)}
-                  className="w-full h-10 px-3 text-sm bg-white border border-gray-200 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#7C3AED]"
+                  className="w-full h-10 px-3 text-sm bg-white border border-gray-200 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary"
                 >
                   {BRANCHES.filter((b) => b !== 'All Branches').map((b) => (
                     <option key={b} value={b}>
@@ -431,7 +431,7 @@ export default function RoomPage() {
                   min={0}
                   value={formNumTables}
                   onChange={(e) => setFormNumTables(parseInt(e.target.value) || 0)}
-                  className="w-full bg-white border-gray-200 focus:border-[#7C3AED]"
+                  className="w-full bg-white border-gray-200 focus:border-primary"
                 />
               </div>
             </div>
@@ -445,7 +445,7 @@ export default function RoomPage() {
               className="w-full p-4 flex items-center justify-between bg-gray-50/50 hover:bg-gray-100/60 transition-colors text-left"
             >
               <div className="flex items-center gap-2">
-                <Printer className="w-4 h-4 text-[#7C3AED]" />
+                <Printer className="w-4 h-4 text-primary" />
                 <div>
                   <h4 className="text-xs font-bold text-gray-900">Printer Configuration</h4>
                   <p className="text-[11px] text-gray-500">
@@ -475,7 +475,7 @@ export default function RoomPage() {
                     type="checkbox"
                     checked={formKotPrinting}
                     onChange={(e) => setFormKotPrinting(e.target.checked)}
-                    className="w-4 h-4 text-[#7C3AED] rounded border-gray-300 focus:ring-[#7C3AED]"
+                    className="w-4 h-4 text-primary rounded border-gray-300 focus:ring-primary"
                   />
                 </div>
 
@@ -486,7 +486,7 @@ export default function RoomPage() {
                   <select
                     value={formPrintFormat}
                     onChange={(e) => setFormPrintFormat(e.target.value as PrintFormat)}
-                    className="w-full h-10 px-3 text-sm bg-white border border-gray-200 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#7C3AED]"
+                    className="w-full h-10 px-3 text-sm bg-white border border-gray-200 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary"
                   >
                     {PRINT_FORMATS.map((pf) => (
                       <option key={pf} value={pf}>
@@ -509,7 +509,7 @@ export default function RoomPage() {
                     type="checkbox"
                     checked={formBlockTakeawayPrinting}
                     onChange={(e) => setFormBlockTakeawayPrinting(e.target.checked)}
-                    className="w-4 h-4 text-[#7C3AED] rounded border-gray-300 focus:ring-[#7C3AED]"
+                    className="w-4 h-4 text-primary rounded border-gray-300 focus:ring-primary"
                   />
                 </div>
               </div>

@@ -12,10 +12,10 @@ export const ReportSettingsPage: React.FC = () => {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">URY Report Settings</h1>
           <p className="text-sm text-gray-500 mt-1">
-            Configure automated daily reports, email digests, and sales summary export formats for <span className="font-semibold text-[#7C3AED]">{branchLabel}</span>
+            Configure automated daily reports, email digests, and sales summary export formats for <span className="font-semibold text-primary">{branchLabel}</span>
           </p>
         </div>
-        <div className="w-10 h-10 rounded-xl bg-purple-50 text-[#7C3AED] flex items-center justify-center">
+        <div className="w-10 h-10 rounded-xl bg-purple-50 text-primary flex items-center justify-center">
           <FileText className="w-5 h-5" />
         </div>
       </div>

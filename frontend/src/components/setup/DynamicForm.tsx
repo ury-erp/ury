@@ -8,6 +8,7 @@ import { SearchableSelect } from '../common/SearchableSelect';
 import { DatePicker } from './DatePicker';
 import { validateFieldValue } from '@ury/core';
 import { SetupPayload } from '../../services/setup';
+import validationMessages from '../../data/validations.json';
 
 export interface DynamicFormHandle {
   validate(): boolean;
@@ -227,7 +228,7 @@ export const DynamicForm = forwardRef<DynamicFormHandle, DynamicFormProps>(
         
         allFields.forEach((field: any) => {
           if (field.validations) {
-            const { valid, message } = validateFieldValue((values as any)[field.id] || '', field.validations);
+            const { valid, message } = validateFieldValue((values as any)[field.id] || '', field.validations, validationMessages);
             if (!valid) {
               isValid = false;
               newErrors[field.id] = message;
