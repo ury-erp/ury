@@ -134,7 +134,11 @@ export function ConfigureProvider({ children }: { children: ReactNode }) {
   ]);
 
   const [menuItems, setMenuItems] = useState<MenuItemData[]>([
-    { id: '1', name: 'Chicken Biriyani', course: 'Main Course', price: 250 }
+    { id: '1', name: 'Tomato Soup', course: 'Starter', price: 120 },
+    { id: '2', name: 'Chicken Tikka', course: 'Starter', price: 220 },
+    { id: '3', name: 'Butter Chicken', course: 'Main Course', price: 350 },
+    { id: '4', name: 'Vegetable Fried Rice', course: 'Main Course', price: 180 },
+    { id: '5', name: 'Gulab Jamun', course: 'Dessert', price: 80 }
   ]);
 
   const [menuFile, setMenuFileState] = useState<File | null>(null);
@@ -149,7 +153,8 @@ export function ConfigureProvider({ children }: { children: ReactNode }) {
   ]);
 
   const [users, setUsers] = useState<UserData[]>([
-    { id: '1', email: 'cashier@example.com', name: 'Cashier', passwordPlaceholder: generateSecurePassword(), role: 'URY Cashier' }
+    { id: '1', email: 'cashier@example.com', name: 'Cashier', passwordPlaceholder: generateSecurePassword(), role: 'URY Cashier' },
+    { id: '2', email: 'captain@example.com', name: 'Captain', passwordPlaceholder: generateSecurePassword(), role: 'URY Captain' }
   ]);
 
   useEffect(() => {
