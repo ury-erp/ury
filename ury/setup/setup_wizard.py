@@ -4,28 +4,41 @@
 import frappe
 from frappe import _
 from ury.setup.demo import setup_ury_demo_data
-from ury.setup.demo import setup_ury_demo_data
 from erpnext.setup.setup_wizard.operations.install_fixtures import create_bank_account
+from erpnext.setup.setup_wizard.setup_wizard import get_setup_stages as erpnext_get_setup_stages
 
 
-@frappe.whitelist()
-def setup_ury_or_erpnext_demo(args):
-    setup_ury_demo = args.get("setup_ury_demo")
+def get_setup_stages(args=None):
+    stages = erpnext_get_setup_stages(args)
 
-    if setup_ury_demo:
-        company = create_demo_company()
+    if args and args.get("setup_ury_demo"):
+        stages.append(
+            {
+                "status": _("Generating URY Demo Data"),
+                "fail_msg": _("Failed to generate URY demo data"),
+                "tasks": [
+                    {
+                        "fn": run_ury_demo_stage,
+                        "args": args,
+                        "fail_msg": _("Failed to generate URY demo data"),
+                    }
+                ],
+            }
+        )
 
-        # 🔥 VERY IMPORTANT: switch defaults
-        frappe.defaults.set_user_default("Company", company)
-        frappe.db.set_default("company", company)
-        frappe.db.set_default("demo_data_type", "ury")
+    return stages
 
-        # Removed early setup_complete to avoid breaking Frappe's setup router
-        from ury.setup.demo import setup_ury_demo_data
-        setup_ury_demo_data(company)
 
-        return
+def run_ury_demo_stage(args):
+    company = create_demo_company()
 
+    # Switch default company settings
+    frappe.defaults.set_user_default("Company", company)
+    frappe.db.set_default("company", company)
+    frappe.db.set_default("demo_data_type", "ury")
+
+    # Execute demo data setup
+    setup_ury_demo_data(company)
 
 
 def create_demo_company():
