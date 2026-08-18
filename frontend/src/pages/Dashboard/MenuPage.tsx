@@ -719,58 +719,93 @@ export const MenuPage: React.FC = () => {
 
 
           <div className="pt-2 border-t border-gray-100 space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <label className="block font-semibold text-gray-700">Menu Items <span className="text-red-500">*</span></label>
-                <p className="text-xs text-gray-500">Select initial item(s) to create the menu</p>
-              </div>
+            <div>
+              <label className="block font-semibold text-gray-700">Menu Items <span className="text-red-500">*</span></label>
+              <p className="text-xs text-gray-500">Add items and set custom price for this menu</p>
             </div>
 
-            <div className="space-y-3">
-              {newMenu.items.map((item, idx) => (
-                <div key={item.id} className="flex items-center gap-2">
-                  <div className="flex-1">
-                    <SearchableSelect
-                      id={`item-select-${item.id}`}
-                      value={item.item_name}
-                      onChange={(_, value) => {
-                        handleUpdateNewMenuItem(item.id, {
-                          item_name: value,
-                        });
-                        if (idx === newMenu.items.length - 1) {
-                          handleAddNewMenuItem();
-                        }
-                      }}
-                      options={availableItems.map((it) => ({ value: it.name, label: it.item_name || it.name }))}
-                      placeholder="Select Item..."
-                      actionText="Create New Item"
-                      onAction={() => {
-                        setMenuItemRowToPopulateId(item.id);
-                        setNewItem({
-                          item_name: '',
-                          rate: '',
-                          course: availableCourses[0]?.name || '',
-                          new_course_name: '',
-                          is_adding_new_course: false,
-                          target_menu: '',
-                        });
-                        setDrawerMode('add-item');
-                      }}
-                    />
-                  </div>
-                  {newMenu.items.length > 1 && (
+            {/* Column headers */}
+            <div className="grid grid-cols-[1fr_100px_28px] gap-2 px-0.5">
+              <span className="text-xs font-medium text-gray-500">Item</span>
+              <span className="text-xs font-medium text-gray-500">Price (₹)</span>
+              <span />
+            </div>
+
+            <div className="space-y-2">
+              {newMenu.items.map((item) => (
+                <div key={item.id} className="grid grid-cols-[1fr_100px_28px] gap-2 items-center">
+                  <SearchableSelect
+                    id={`item-select-${item.id}`}
+                    value={item.item_name}
+                    onChange={(_, value) => {
+                      const matched = availableItems.find(
+                        (it) => it.name === value || it.item_name === value
+                      );
+                      const prefillRate =
+                        matched?.standard_rate !== undefined
+                          ? String(matched.standard_rate)
+                          : item.rate;
+                      handleUpdateNewMenuItem(item.id, {
+                        item_name: value,
+                        rate: prefillRate,
+                      });
+                    }}
+                    options={availableItems.map((it) => ({
+                      value: it.name,
+                      label: it.item_name || it.name,
+                    }))}
+                    placeholder="Select Item..."
+                    actionText="Create New Item"
+                    onAction={() => {
+                      setMenuItemRowToPopulateId(item.id);
+                      setNewItem({
+                        item_name: '',
+                        rate: '',
+                        course: availableCourses[0]?.name || '',
+                        new_course_name: '',
+                        is_adding_new_course: false,
+                        target_menu: '',
+                      });
+                      setDrawerMode('add-item');
+                    }}
+                  />
+
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={item.rate}
+                    onChange={(e) =>
+                      handleUpdateNewMenuItem(item.id, { rate: e.target.value })
+                    }
+                    placeholder="0.00"
+                    className="text-sm font-medium"
+                  />
+
+                  {newMenu.items.length > 1 ? (
                     <button
                       type="button"
                       onClick={() => handleRemoveNewMenuItem(item.id)}
-                      className="text-gray-400 hover:text-red-500 transition-colors p-1.5 hover:bg-red-50 rounded-md shrink-0"
+                      className="text-gray-400 hover:text-red-500 transition-colors p-1 hover:bg-red-50 rounded-md"
                       title="Remove Item"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
+                  ) : (
+                    <span />
                   )}
                 </div>
               ))}
             </div>
+
+            <button
+              type="button"
+              onClick={handleAddNewMenuItem}
+              className="flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary/80 transition-colors mt-1"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Add Item
+            </button>
           </div>
 
           <div className="pt-6 flex justify-end gap-3 border-t mt-8 border-gray-100">
