@@ -502,3 +502,179 @@ def get_service_wise_sales(start_date, end_date, branch=None):
 			"avg_order_value": round(total_revenue / total_orders, 2) if total_orders else 0,
 		},
 	}
+
+
+@frappe.whitelist()
+def get_cancelled_invoices(start_date, end_date, branch=None, page=1, page_size=50):
+	"""Paginated audit list of cancelled POS invoices across a date range.
+
+	Mirrors the existing "Cancelled Invoices" Query Report (docstatus=2),
+	extended with `grand_total` — the original report omitted the amount,
+	which the research brief flagged as the single most important field for
+	the report's actual purpose (loss/fraud oversight: a cancelled ₹50 order
+	and a cancelled ₹5,000 order are not equally interesting). Frontend
+	computes high-value highlighting client-side against the returned
+	average, rather than a hardcoded server-side threshold.
+	"""
+	require_manager()
+	validate_date_range(start_date, end_date)
+
+	page = int(page)
+	page_size = min(int(page_size), 200)
+	offset = (page - 1) * page_size
+
+	params = {"start_date": start_date, "end_date": end_date, "limit": page_size, "offset": offset}
+
+	if branch:
+		condition = get_business_day_range_condition()
+		join = report_settings_join()
+		params["branch"] = branch
+		branch_filter = "b.`branch` = %(branch)s AND"
+	else:
+		condition = "b.`posting_date` BETWEEN %(start_date)s AND %(end_date)s"
+		join = ""
+		branch_filter = ""
+
+	base_where = f"""
+		{branch_filter}
+		b.`docstatus` = 2
+		AND {condition}
+	"""
+
+	total_count = frappe.db.sql(
+		f"""
+		SELECT COUNT(*) AS total
+		FROM `tabPOS Invoice` b
+		{join}
+		WHERE {base_where}
+		""",
+		params,
+		as_dict=True,
+	)[0]["total"]
+
+	summary_row = frappe.db.sql(
+		f"""
+		SELECT
+			COUNT(*) AS total_count,
+			ROUND(SUM(b.`grand_total`), 2) AS total_amount,
+			COUNT(DISTINCT b.`modified_by`) AS unique_cancellers,
+			ROUND(AVG(b.`grand_total`), 2) AS avg_amount
+		FROM `tabPOS Invoice` b
+		{join}
+		WHERE {base_where}
+		""",
+		params,
+		as_dict=True,
+	)[0]
+
+	rows = frappe.db.sql(
+		f"""
+		SELECT
+			b.`posting_date` AS date,
+			CONCAT(
+				LPAD(IF(HOUR(b.`posting_time`) > 12, HOUR(b.`posting_time`) - 12, HOUR(b.`posting_time`)), 2, '0'),
+				':',
+				SUBSTRING_INDEX(SUBSTRING_INDEX(b.`posting_time`, ':', 2), ':', -1),
+				CASE WHEN HOUR(b.`posting_time`) >= 12 THEN ' PM' ELSE ' AM' END
+			) AS time,
+			b.`name` AS invoice,
+			b.`grand_total` AS amount,
+			b.`modified_by` AS cancelled_by,
+			b.`cancel_reason` AS cancellation_reason
+		FROM `tabPOS Invoice` b
+		{join}
+		WHERE {base_where}
+		ORDER BY b.`posting_date` DESC, b.`posting_time` DESC
+		LIMIT %(limit)s OFFSET %(offset)s
+		""",
+		params,
+		as_dict=True,
+	)
+
+	for r in rows:
+		r["date"] = str(r["date"])
+		r["amount"] = r["amount"] or 0
+
+	return {
+		"branch": branch,
+		"start_date": str(start_date),
+		"end_date": str(end_date),
+		"invoices": rows,
+		"summary": {
+			"total_count": summary_row["total_count"] or 0,
+			"total_amount": summary_row["total_amount"] or 0,
+			"unique_cancellers": summary_row["unique_cancellers"] or 0,
+			"avg_amount": summary_row["avg_amount"] or 0,
+		},
+		"pagination": {
+			"page": page,
+			"page_size": page_size,
+			"total": total_count,
+			"total_pages": (total_count + page_size - 1) // page_size if total_count else 0,
+		},
+	}
+
+
+@frappe.whitelist()
+def get_average_bill_value(start_date, end_date, branch=None):
+	"""Average Bill Value (ABV) trend across a date range.
+
+	Mirrors the existing "Average Bill Value" Query Report. The period-level
+	summary ABV is computed as total_sales / total_bills across the whole
+	range, NOT as an average of the per-day ABV values — averaging per-day
+	averages would over-weight low-volume days and understate the true
+	period ABV (the classic Simpson's-paradox pitfall for this kind of
+	ratio metric).
+	"""
+	require_manager()
+	validate_date_range(start_date, end_date)
+
+	date_list = date_list_cte()
+
+	if branch:
+		condition = get_business_day_condition(date_expr="date_list.`date`")
+		join = report_settings_join()
+		params = {"branch": branch, "start_date": start_date, "end_date": end_date}
+		invoice_join = "b.`branch` = %(branch)s AND b.`status` IN (\"Consolidated\", \"Paid\") AND b.`docstatus` = 1"
+	else:
+		condition = "b.`posting_date` = date_list.`date`"
+		join = ""
+		params = {"start_date": start_date, "end_date": end_date}
+		invoice_join = "b.`status` IN (\"Consolidated\", \"Paid\") AND b.`docstatus` = 1"
+
+	rows = frappe.db.sql(
+		f"""
+		SELECT
+			date_list.`date` AS date,
+			COUNT(b.`name`) AS bill_count,
+			ROUND(SUM(b.`grand_total`), 2) AS total_sales
+		FROM {date_list}
+		LEFT JOIN `tabPOS Invoice` b ON ({invoice_join})
+		{join}
+		WHERE {condition}
+		GROUP BY date_list.`date`
+		ORDER BY date_list.`date` ASC
+		""",
+		params,
+		as_dict=True,
+	)
+
+	for r in rows:
+		r["date"] = str(r["date"])
+		r["total_sales"] = r["total_sales"] or 0
+		r["abv"] = round(r["total_sales"] / r["bill_count"], 2) if r["bill_count"] else 0
+
+	total_bills = sum(r["bill_count"] for r in rows)
+	total_sales = round(sum(r["total_sales"] for r in rows), 2)
+
+	return {
+		"branch": branch,
+		"start_date": str(start_date),
+		"end_date": str(end_date),
+		"data": rows,
+		"summary": {
+			"total_bills": total_bills,
+			"total_sales": total_sales,
+			"average_abv": round(total_sales / total_bills, 2) if total_bills else 0,
+		},
+	}
