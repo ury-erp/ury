@@ -1,6 +1,8 @@
 import { call, repositories, apiRegistry, projectionBus, commandQueue, SplitBillCommand, type OrderEntity } from '@ury/core';
 import { buildTableClusterMap, getMergedTablesCsv } from './table-utils';
 import { isNetworkError } from './network-utils';
+import { queryClient } from './query-client';
+
 
 export interface POSInvoiceItem {
   name: string;
@@ -52,12 +54,15 @@ export interface TableOrder {
  * Checks online API first, then falls back to local orders repository
  */
 export async function getTableOrder(table_no: string): Promise<TableOrder> {
+  if (!table_no) {
+    return { message: null };
+  }
   try {
     const res = await call.get<{ message: POSInvoice | null }>('ury.ury.doctype.ury_order.ury_order.get_order_invoice', { 
       table: table_no
     });
-    const inv = res.message;
-    if (inv) {
+    const inv = res?.message;
+    if (inv && inv.name) {
       // Store in local order repository cache
       await repositories.orders.put({
         id: inv.name,
@@ -68,7 +73,7 @@ export async function getTableOrder(table_no: string): Promise<TableOrder> {
         no_of_pax: 1,
         customer: inv.customer,
         waiter: inv.waiter,
-        items: inv.items.map(i => ({
+        items: (inv.items || []).map(i => ({
           item: i.item_code,
           item_name: i.item_name,
           rate: i.rate,
@@ -82,9 +87,10 @@ export async function getTableOrder(table_no: string): Promise<TableOrder> {
         sync_status: 'synced',
       });
     }
-    return res as TableOrder;
+    return (res || { message: null }) as TableOrder;
   } catch (error) {
     console.warn('Network getTableOrder failed, checking local orders repository:', error);
+
     const cached = await repositories.orders.findByTable(table_no);
     if (cached) {
       const allTables = await repositories.tables.getAll();
@@ -239,6 +245,8 @@ export async function cancelOrder(
 
     projectionBus.emit('ORDERS_UPDATED');
     projectionBus.emit('TABLES_UPDATED');
+    queryClient.invalidateQueries({ queryKey: ['tables'] });
+    queryClient.invalidateQueries({ queryKey: ['roomCounts'] });
 
     return { success: true, queued: false };
   } catch (err) {
@@ -278,6 +286,8 @@ export async function cancelOrder(
 
       projectionBus.emit('ORDERS_UPDATED');
       projectionBus.emit('TABLES_UPDATED');
+      queryClient.invalidateQueries({ queryKey: ['tables'] });
+      queryClient.invalidateQueries({ queryKey: ['roomCounts'] });
 
       return { success: true, queued: true };
     } catch (offlineErr) {
@@ -296,10 +306,13 @@ export async function releaseTableAfterPayment(table: string | null | undefined)
   try {
     await repositories.tables.setOccupied(table, false);
     projectionBus.emit('TABLES_UPDATED');
+    queryClient.invalidateQueries({ queryKey: ['tables'] });
+    queryClient.invalidateQueries({ queryKey: ['roomCounts'] });
   } catch (err) {
     console.warn('[releaseTableAfterPayment] Failed to release table:', err);
   }
 }
+
 
 export interface QueueOfflinePaymentInput {
   invoice: string;
@@ -647,10 +660,13 @@ export const syncOrder = async (data: SyncOrderData) => {
       try {
         await repositories.tables.setOccupied(data.table, true);
         projectionBus.emit('TABLES_UPDATED');
+        queryClient.invalidateQueries({ queryKey: ['tables'] });
+        queryClient.invalidateQueries({ queryKey: ['roomCounts'] });
       } catch (tableErr) {
         console.warn('[syncOrder] Failed to update local table occupancy:', tableErr);
       }
     }
+
 
     // 3. Enqueue command into sync_queue. Stable command IDs ensure repeated
     //    offline edits overwrite the same queue entry instead of creating duplicates.

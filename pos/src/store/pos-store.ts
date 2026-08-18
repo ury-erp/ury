@@ -437,8 +437,11 @@ export const usePOSStore = create<POSStore>((set, get) => ({
       selectedOrderType: type,
       isUpdatingOrder: false,
       orderId: null,
+      selectedTable: type === 'Dine In' ? get().selectedTable : null,
+      selectedRoom: type === 'Dine In' ? get().selectedRoom : null,
       selectedAggregator: type !== 'Aggregators' ? null : selectedAggregator,
     });
+
 
     if (type === 'Aggregators') {
       // Warm the aggregator list and, if one is already selected, its catalog

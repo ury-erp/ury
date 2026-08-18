@@ -107,9 +107,10 @@ const OrderPanel = () => {
         no_of_pax: 1,
         pos_profile: posProfile.name,
         order_type: selectedOrderType,
-        table: selectedTable || undefined,
-        room: selectedRoom || undefined,
+        table: selectedOrderType === DINE_IN ? (selectedTable || undefined) : undefined,
+        room: selectedOrderType === DINE_IN ? (selectedRoom || undefined) : undefined,
         customer: selectedOrderType === 'Aggregators' ? selectedAggregator?.customer : selectedCustomer?.name,
+
         aggregator_id: selectedOrderType === 'Aggregators' ? selectedAggregator?.customer : undefined,
         cashier: posProfile.cashier,
         owner: posProfile.owner,

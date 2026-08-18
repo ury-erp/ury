@@ -570,6 +570,9 @@ export async function getPOSInvoices({
 }
 
 export async function getPOSInvoiceItems(invoiceId: string) {
+  if (!invoiceId || typeof invoiceId !== 'string') {
+    return { items: [], taxes: [] };
+  }
   try {
     const cached = await repositories.orders.getById(invoiceId);
     if (cached && (cached.sync_status === 'pending' || invoiceId.startsWith('TEMP-'))) {
@@ -593,8 +596,8 @@ export async function getPOSInvoiceItems(invoiceId: string) {
       }
     );
 
-    const items = response.message[0] || [];
-    const taxes = response.message[1] || [];
+    const items = response?.message?.[0] || [];
+    const taxes = response?.message?.[1] || [];
 
     // Cache full items locally so the detail view works offline.
     try {
@@ -618,10 +621,13 @@ export async function getPOSInvoiceItems(invoiceId: string) {
         updatedAt: new Date().toISOString(),
         sync_status: 'synced',
       } as OrderEntity;
-      await repositories.orders.put(orderPatch);
+      if (orderPatch.id) {
+        await repositories.orders.put(orderPatch);
+      }
     } catch (cacheErr) {
       console.warn('[getPOSInvoiceItems] Failed to cache items locally:', cacheErr);
     }
+
 
     return { items, taxes };
   } catch (error) {
@@ -675,7 +681,11 @@ export async function searchPosInvoice(query: string, status: string) {
       query,
       status,
     });
-    return response.message;
+    const msg = response?.message;
+    if (msg && typeof msg === 'object' && 'data' in msg) {
+      return msg;
+    }
+    return { data: Array.isArray(msg) ? msg : [], next: false };
   } catch (error) {
     console.warn('[searchPosInvoice] Network API failed, searching local orders repository:', error);
     try {
@@ -707,7 +717,7 @@ export async function searchPosInvoice(query: string, status: string) {
 
       const matched = mapped.filter(inv => inv.status === status);
 
-      return { data: mapped, next: false };
+      return { data: matched, next: false };
     } catch (fallbackErr) {
       console.error('[searchPosInvoice] Offline fallback error:', fallbackErr);
       return { data: [], next: false };
@@ -716,9 +726,10 @@ export async function searchPosInvoice(query: string, status: string) {
 }
 
 async function cacheSplitGroupMetadata(group: SplitGroupResponse): Promise<void> {
-  if (!group.group || !Array.isArray(group.invoices)) return;
+  if (!group || !group.group || !Array.isArray(group.invoices)) return;
   const now = new Date().toISOString();
   for (const inv of group.invoices) {
+    if (!inv || !inv.name) continue;
     try {
       const existing = await repositories.orders.getById(inv.name);
       if (!existing) continue;
@@ -738,6 +749,7 @@ async function cacheSplitGroupMetadata(group: SplitGroupResponse): Promise<void>
 }
 
 async function buildLocalSplitGroup(invoiceId: string): Promise<SplitGroupResponse> {
+  if (!invoiceId) return { invoices: [], current: '', group: null };
   const invoice = await repositories.orders.getById(invoiceId);
   if (!invoice || (!invoice.custom_split_group && !(invoice.split_siblings?.length))) {
     return { invoices: [], current: invoiceId, group: null };
@@ -828,13 +840,17 @@ async function buildLocalSplitGroup(invoiceId: string): Promise<SplitGroupRespon
 }
 
 export async function getSplitGroup(invoiceId: string): Promise<SplitGroupResponse> {
+  if (!invoiceId) return { invoices: [], current: '', group: null };
   try {
     const endpoint = apiRegistry.getUrl('GET_SPLIT_GROUP');
     const response = await call.get<{ message: SplitGroupResponse }>(
       endpoint,
       { invoice: invoiceId }
     );
-    const result = response.message;
+    const result = response?.message;
+    if (!result || !Array.isArray(result.invoices)) {
+      return buildLocalSplitGroup(invoiceId);
+    }
     try {
       await cacheSplitGroupMetadata(result);
     } catch (cacheErr) {
@@ -846,6 +862,7 @@ export async function getSplitGroup(invoiceId: string): Promise<SplitGroupRespon
     return buildLocalSplitGroup(invoiceId);
   }
 }
+
 
 function getBranchFromSession(): string {
   const raw = sessionStorage.getItem('posProfile');
