@@ -10,13 +10,14 @@ import { Spinner } from '@ury/ui';
 import { TableShapeIcon } from './TableShapeIcon';
 import { getMergeGroupMembers, formatMergedTableLabelFromGroup } from '../lib/table-utils';
 import { t } from '../i18n';
+import { DINE_IN } from '../data/order-types';
 
 interface Props {
   onClose: () => void;
 }
 
 const TableSelectionDialog: React.FC<Props> = ({ onClose }) => {
-  const { selectedTable, setSelectedTable, posProfile } = usePOSStore();
+  const { selectedTable, setSelectedTable, posProfile, selectedOrderType } = usePOSStore();
   const [rooms, setRooms] = useState<Room[]>([]);
   const [tables, setTables] = useState<Table[]>([]);
   const [tablesCache, setTablesCache] = useState<Record<string, Table[]>>({});
@@ -28,6 +29,11 @@ const TableSelectionDialog: React.FC<Props> = ({ onClose }) => {
   const sortTables = (tables: Table[]): Table[] => {
     return [...tables].sort((a, b) => a.name.localeCompare(b.name));
   };
+
+  const isDineIn = selectedOrderType === DINE_IN;
+  const displayTables = isDineIn
+    ? tables.filter(table => table.is_take_away !== 1)
+    : tables;
 
   // Fetch rooms on mount with session storage
   useEffect(() => {
@@ -157,14 +163,14 @@ const TableSelectionDialog: React.FC<Props> = ({ onClose }) => {
               <AlertTriangle className="w-8 h-8 mb-1" />
               <span>{error}</span>
             </div>
-          ) : tables.length === 0 ? (
+          ) : displayTables.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 text-gray-400 mt-8">
               <Square className="w-8 h-8 mb-1" />
               <span>{t('common.no_tables_found')}</span>
             </div>
           ) : (
             <div className="grid grid-cols-3 gap-6">
-              {tables.map(table => (
+              {displayTables.map(table => (
                 <Button
                   key={table.name}
                   onClick={() => {

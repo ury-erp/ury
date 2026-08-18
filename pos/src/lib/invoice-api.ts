@@ -313,7 +313,9 @@ export async function getPOSInvoices({
     // response that omits line items does not wipe out previously cached items.
     // Unprinted table orders are normalised to `Unbilled` so the local cache
     // matches the offline lifecycle state machine.
-    const syncableInvoices = serverInvoices.filter(inv => !resolvedPending.some(r => r.resolvedId === inv.name));
+    const syncableInvoices = serverInvoices
+      .filter(inv => !resolvedPending.some(r => r.resolvedId === inv.name))
+      .filter(inv => inv && typeof inv.name === 'string' && inv.name.trim().length > 0);
     if (syncableInvoices.length > 0) {
       await repositories.orders.putMany(
         await Promise.all(

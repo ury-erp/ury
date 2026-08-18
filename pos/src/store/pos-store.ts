@@ -452,6 +452,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
       selectedTable: type === 'Dine In' ? get().selectedTable : null,
       selectedRoom: type === 'Dine In' ? get().selectedRoom : null,
       selectedAggregator: type !== 'Aggregators' ? null : selectedAggregator,
+      tableOrder: type === 'Dine In' ? get().tableOrder : null,
     });
 
 

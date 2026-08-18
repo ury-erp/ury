@@ -191,10 +191,15 @@ export async function searchCustomers(search: string, limit = 5): Promise<Custom
 
     const list = results || [];
 
-    // Cache search results in local customers repository for offline access
-    if (list.length > 0) {
+    // Cache search results in local customers repository for offline access.
+    // Filter out any records without a valid primary key to avoid IndexedDB
+    // DataError on putMany.
+    const validCustomers = list.filter(
+      c => c && typeof c.name === 'string' && c.name.trim().length > 0
+    );
+    if (validCustomers.length > 0) {
       await repositories.customers.putMany(
-        list.map(c => ({
+        validCustomers.map(c => ({
           id: c.name,
           name: c.customer_name || c.name,
           phone: c.mobile_number || '',

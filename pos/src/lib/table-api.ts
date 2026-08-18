@@ -70,7 +70,7 @@ export async function getRooms(branch?: string | null): Promise<Room[]> {
     }
   } catch {}
 
-  return [];
+  throw new Error(`Offline: no cached rooms available${branch ? ` for branch ${branch}` : ''}. Please check your network connection.`);
 }
 
 
@@ -142,9 +142,14 @@ export async function getTables(room: string): Promise<Table[]> {
     });
 
     // Cache tables in local repository with full server schema parity.
-    if (mergedTables && mergedTables.length > 0) {
+    // Filter out records without a valid primary key to avoid IndexedDB
+    // DataError on putMany.
+    const validTables = mergedTables.filter(
+      t => t && typeof t.name === 'string' && t.name.trim().length > 0
+    );
+    if (validTables.length > 0) {
       await repositories.tables.putMany(
-        mergedTables.map(t => ({
+        validTables.map(t => ({
           name: t.name,
           restaurant_room: t.restaurant_room,
           no_of_seats: t.no_of_seats || 4,
@@ -164,6 +169,9 @@ export async function getTables(room: string): Promise<Table[]> {
   } catch (error) {
     console.warn('Network getTables failed, falling back to local tables repository:', error);
     const cachedTables = await repositories.tables.findByRoom(room);
+    if (cachedTables.length === 0) {
+      throw new Error(`Offline: no cached tables available for room ${room}. Please check your network connection.`);
+    }
     return cachedTables.map(ct => ({
       name: ct.name,
       occupied: ct.occupied,
