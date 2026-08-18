@@ -25,10 +25,10 @@
    "unique": 1
   },
   {
+   "description": "Enter any Lucide icon name in PascalCase (e.g., Pizza, Coffee, Soup). See https://lucide.dev/icons for all available icons. Common choices: Apple, Banana, Beef, Beer, Blender, BottleWine, Broccoli, Burger, Cake, CakeSlice, Candy, CandyCane, Carrot, ChefHat, Cherry, Citrus, Coffee, Cookie, CookingPot, Croissant, CupSoda, Dessert, Donut, Drumstick, Egg, EggFried, Fish, FishSymbol, GlassWater, Grape, Hamburger, HandPlatter, Hop, IceCreamBowl, IceCreamCone, LeafyGreen, Lollipop, Martini, Milk, Microwave, Nut, PaperBag, Pizza, Popcorn, Popsicle, Refrigerator, Salad, Sandwich, Shell, Shrimp, Snail, Soup, Taco, Torus, Utensils, UtensilsCrossed, Vegan, Wheat, Wine.",
    "fieldname": "icon",
-   "fieldtype": "Select",
-   "label": "Icon",
-   "options": "Apple\nBeef\nBeer\nCroissant\nCake\nCarrot\nCoffee\nCookie\nEgg\nFish\nIceCream\nMilk\nPizza\nSalad\nSandwich\nSoup\nWine"
+   "fieldtype": "Data",
+   "label": "Icon"
   }
  ],
  "icon": "fa fa-code-fork",
