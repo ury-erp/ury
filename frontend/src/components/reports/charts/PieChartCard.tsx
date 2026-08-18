@@ -22,7 +22,7 @@ export function PieChartCard({ title, data, dataKey, nameKey, colors }: PieChart
       <CardContent>
         <ResponsiveContainer width="100%" height={300}>
           <PieChart>
-            <Pie data={data} dataKey={dataKey} nameKey={nameKey} outerRadius={100}>
+            <Pie data={data} dataKey={dataKey} nameKey={nameKey} outerRadius={100} startAngle={0} endAngle={360} isAnimationActive={false}>
               {data.map((_, index) => (
                 <Cell key={`cell-${index}`} fill={palette[index % palette.length]} />
               ))}
