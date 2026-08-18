@@ -15,6 +15,7 @@ import { ReportsLayout } from './pages/Reports/ReportsLayout';
 import { ReportsHome } from './pages/Reports/ReportsHome';
 import { TodaysSales } from './pages/Reports/TodaysSales';
 import { DaywiseSales } from './pages/Reports/DaywiseSales';
+import { DaywiseInvoices } from './pages/Reports/DaywiseInvoices';
 
 function SetupGuard() {
   // @ts-ignore
@@ -60,6 +61,7 @@ function App() {
             <Route index element={<ReportsHome />} />
             <Route path="today-sales" element={<TodaysSales />} />
             <Route path="daywise-sales" element={<DaywiseSales />} />
+            <Route path="daywise-invoices" element={<DaywiseInvoices />} />
           </Route>
         </Route>
       </Route>

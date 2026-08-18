@@ -71,6 +71,23 @@ def date_list_cte(start_param="start_date", end_param="end_date"):
 	) AS date_list"""
 
 
+def get_business_day_range_condition(start_param="start_date", end_param="end_date", prefix="b"):
+	"""Return a SQL fragment for "does this invoice's business day fall within
+	[start_param, end_param]" — the range analogue of get_business_day_condition,
+	for invoice-level detail reports (e.g. Daywise Invoices) that filter a
+	range directly rather than grouping via date_list_cte's per-day rows.
+	Same extended-hours semantics as get_business_day_condition.
+	"""
+	return f"""(
+		((rs.`hours` IS NULL OR rs.`hours` = 0) AND {prefix}.`posting_date` BETWEEN %({start_param})s AND %({end_param})s)
+		OR (rs.`hours` > 0 AND TIMESTAMP({prefix}.`posting_date`, {prefix}.`posting_time`)
+			>= TIMESTAMP(%({start_param})s, CONCAT(LPAD(rs.`hours`, 2, '0'), ':00:00'))
+			AND TIMESTAMP({prefix}.`posting_date`, {prefix}.`posting_time`)
+			< TIMESTAMP(DATE_ADD(%({end_param})s, INTERVAL 1 DAY), CONCAT(LPAD(rs.`hours`, 2, '0'), ':00:00')))
+		OR (rs.`branch` IS NULL AND {prefix}.`posting_date` BETWEEN %({start_param})s AND %({end_param})s)
+	)"""
+
+
 def report_settings_join(prefix="b", branch_param="branch"):
 	"""Standard LEFT JOIN to URY Report Settings, matched on the same branch
 	parameter as the caller's WHERE clause."""
