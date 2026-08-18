@@ -29,6 +29,7 @@ import { RepeatedCustomers } from './pages/Reports/RepeatedCustomers';
 import { EmployeeSales } from './pages/Reports/EmployeeSales';
 import { EmployeeItemWiseSales } from './pages/Reports/EmployeeItemWiseSales';
 import { CompletedWorkOrders } from './pages/Reports/CompletedWorkOrders';
+import { DailyPnl } from './pages/Reports/DailyPnl';
 
 function SetupGuard() {
   // @ts-ignore
@@ -88,6 +89,7 @@ function App() {
             <Route path="employee-sales" element={<EmployeeSales />} />
             <Route path="employee-item-wise-sales" element={<EmployeeItemWiseSales />} />
             <Route path="completed-work-orders" element={<CompletedWorkOrders />} />
+            <Route path="daily-pnl" element={<DailyPnl />} />
           </Route>
         </Route>
       </Route>
