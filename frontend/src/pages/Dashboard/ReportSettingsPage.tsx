@@ -49,6 +49,7 @@ interface ReportSettingsData {
   name: string;
   branch: string;
   modified?: string;
+  creation?: string;
   extended_hours?: boolean;
   hours?: number;
   buying_price_list?: string;
@@ -296,6 +297,7 @@ export const ReportSettingsPage: React.FC = () => {
         // Update existing doc
         docToSave.name = reportSettingsData.name;
         docToSave.modified = reportSettingsData.modified;
+        docToSave.creation = reportSettingsData.creation;
         await call('frappe.client.save', { doc: docToSave });
       } else {
         // Insert new doc
