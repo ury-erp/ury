@@ -76,10 +76,11 @@ export const UserPage: React.FC = () => {
 
     try {
       // Fetch the full user record with roles
-      const fullUser = await call('frappe.client.get', {
+      const fullUserRes = await call('frappe.client.get', {
         doctype: 'User',
         name: user.name,
       });
+      const fullUser = (fullUserRes as any).message || fullUserRes;
 
       // Extract the actual URY role from the roles array
       if (fullUser.roles && Array.isArray(fullUser.roles)) {
@@ -123,10 +124,11 @@ export const UserPage: React.FC = () => {
 
         if (newUser.role) {
           // Fetch current roles
-          const fullUser = await call('frappe.client.get', {
+          const fullUserRes = await call('frappe.client.get', {
             doctype: 'User',
             name: editingUser.name,
           });
+          const fullUser = (fullUserRes as any).message || fullUserRes;
 
           // Start with current roles
           let updatedRoles = fullUser.roles && Array.isArray(fullUser.roles) ? [...fullUser.roles] : [];
