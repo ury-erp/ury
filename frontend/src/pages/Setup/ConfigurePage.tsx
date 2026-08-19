@@ -23,25 +23,65 @@ const SECTION_CONFIGS: Record<SectionId, { title: string; description: string }>
   },
   rooms: {
     title: 'Rooms',
-    description: 'Add the seating areas in your restaurant — you\'ll set how many tables each one has.',
+    description: 'Add the seating areas in your restaurant, you\'ll set how many tables each one has.',
   },
   tables: {
     title: 'Tables',
-    description: 'Review and adjust the tables we generated for each room — rename, adjust seats, or add more.',
+    description: 'Review and adjust the tables we generated for each room, rename, adjust seats, or add more.',
   },
   menu: {
     title: 'Menu',
-    description: 'Add a few items to get started — you can bulk-import or add hundreds more anytime later.',
+    description: 'Add a few items to get started, you can bulk-import or add hundreds more anytime later.',
   },
   payment: {
     title: 'Payments',
-    description: 'How your customers will pay. Cash is added by default — add Card, UPI, or others your restaurant accepts.',
+    description: 'How your customers will pay. Cash is added by default, add Card, or others your restaurant accepts.',
   },
   users: {
-    title: 'Staff Accounts',
-    description: 'Add login accounts for your staff now, or skip this and add them later. We\'ve suggested a starting cashier account below.',
+    title: 'User',
+    description: 'Add login accounts for your team now, or skip this and add them later. We\'ve suggested a starting cashier account below.',
   },
 };
+
+function classifyError(err: unknown): { type: 'duplicate' | 'network' | 'validation' | 'unknown'; msg: string } {
+  if (!err) return { type: 'unknown', msg: 'An unknown error occurred.' };
+
+  // Network / fetch failure (TypeError from fetch)
+  if (err instanceof TypeError) {
+    return { type: 'network', msg: 'Network error, check your connection and retry.' };
+  }
+
+  // Parse Frappe _server_messages
+  let serverMsg = '';
+  if (typeof err === 'object' && err !== null && '_server_messages' in err) {
+    try {
+      const parsed = JSON.parse((err as any)._server_messages);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const inner = typeof parsed[0] === 'string' ? JSON.parse(parsed[0]) : parsed[0];
+        serverMsg = inner.message || '';
+      }
+    } catch { /* ignore parse errors */ }
+  }
+
+  // Frappe DuplicateEntryError
+  const excType: string = (err as any)?.exc_type ?? '';
+  if (excType.includes('Duplicate') || serverMsg.toLowerCase().includes('already exists')) {
+    return { type: 'duplicate', msg: 'Some records already exist and have been reused.' };
+  }
+
+  // Validation / mandatory field error
+  if (serverMsg.toLowerCase().includes('mandatory') || serverMsg.toLowerCase().includes('required')) {
+    return { type: 'validation', msg: serverMsg };
+  }
+
+  const msg = serverMsg
+    || (typeof err === 'string' ? err : '')
+    || ((err as any)?.message ?? '')
+    || ((err as any)?.exception ?? '')
+    || 'Failed to configure setup. Check backend logs.';
+
+  return { type: 'unknown', msg };
+}
 
 function ConfigurePageContent() {
   const navigate = useNavigate();
@@ -114,28 +154,27 @@ function ConfigurePageContent() {
       setTimeout(() => {
         window.location.href = '/ury/dashboard';
       }, 800);
-    } catch (err: any) {
+    } catch (err: unknown) {
       clearInterval(interval);
       console.error('Failed to finish configure setup', err);
-      let msg = 'Failed to configure setup. Check backend logs.';
-      if (typeof err === 'string') {
-        msg = err;
-      } else if (err?.message) {
-        msg = err.message;
-      } else if (err?._server_messages) {
-        try {
-          const parsed = JSON.parse(err._server_messages);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            const inner = typeof parsed[0] === 'string' ? JSON.parse(parsed[0]) : parsed[0];
-            msg = inner.message || msg;
-          }
-        } catch (_) {
-          msg = String(err._server_messages);
-        }
-      } else if (err?.exception) {
-        msg = err.exception;
+      const classified = classifyError(err);
+
+      if (classified.type === 'duplicate') {
+        // Duplicate records are non-fatal, they already exist, which is fine.
+        // Continue to dashboard as if setup succeeded.
+        console.warn('Duplicate record warning (non-fatal):', classified.msg);
+        setActiveIndex(CONFIGURE_PROGRESS_STEPS.length);
+        setTimeout(() => { window.location.href = '/ury/dashboard'; }, 800);
+        return;
       }
-      setError(msg);
+
+      if (classified.type === 'network') {
+        setError(
+          'Network error, check your connection. Your data is preserved. Click "Finish with defaults" to retry.'
+        );
+      } else {
+        setError(classified.msg);
+      }
       setFinishing(false);
     }
   };
@@ -177,14 +216,19 @@ function ConfigurePageContent() {
       nextLabel={isLastSection ? "Launch" : "Next"}
       isNextLoading={finishing}
       secondaryAction={
-        <Button
-          type="button"
-          variant="ghost"
-          onClick={handleFinish}
-          disabled={finishing}
-        >
-          Finish with defaults
-        </Button>
+        <div className="flex items-center gap-3">
+          <span className="hidden sm:inline text-xs text-muted-foreground">
+            the data can be changed later
+          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={handleFinish}
+            disabled={finishing}
+          >
+            Finish with defaults
+          </Button>
+        </div>
       }
     >
       <div className="space-y-4 h-full">

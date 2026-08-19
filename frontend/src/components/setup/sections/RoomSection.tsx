@@ -120,7 +120,7 @@ function RoomRow({ room, canDelete, renameRoom, deleteRoom, previewShrink, setRo
       </div>
 
       <p className="text-xs text-muted-foreground">
-        We'll name your tables automatically — you can rename or adjust any of them after.
+        We'll name your tables automatically , you can rename or adjust any of them after.
       </p>
 
       {pendingShrink && (
@@ -151,10 +151,6 @@ export function RoomSection() {
 
   return (
     <div className="space-y-6">
-      <p className="text-sm text-muted-foreground">
-        A room is any distinct seating area — dining hall, rooftop, private room. Most restaurants just need one to
-        start.
-      </p>
 
       <div className="space-y-3">
         {rooms.map((room) => (

@@ -61,9 +61,8 @@ export const SECTION_ORDER: SectionId[] = ['branch', 'rooms', 'tables', 'menu', 
 /** Sections with no safe "use the defaults" floor — an empty payment-methods
  * list or empty menu breaks POS Profile creation, so these can't be skipped,
  * only edited (they always carry at least their seeded default row). */
-export const UNSKIPPABLE_SECTIONS: SectionId[] = ['branch', 'menu', 'payment'];
 
-function generateRandomPassword(): string {
+export function generateRandomPassword(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%';
   let pwd = '';
   for (let i = 0; i < 8; i += 1) {
@@ -175,7 +174,13 @@ export function ConfigureProvider({ children }: { children: ReactNode }) {
   );
 
   const [menuItems, setMenuItems] = useState<MenuItemData[]>(
-    persisted?.menuItems || [{ id: nextId('menu'), name: 'Chicken Biriyani', course: 'Main Course', price: 250 }]
+    persisted?.menuItems || [
+      { id: nextId('menu'), name: 'Pizza',   course: 'Main Course', price: 250 },
+      { id: nextId('menu'), name: 'Burger',  course: 'Main Course', price: 180 },
+      { id: nextId('menu'), name: 'Fries',   course: 'Starters',   price: 80  },
+      { id: nextId('menu'), name: 'Wings',   course: 'Starters',   price: 120 },
+      { id: nextId('menu'), name: 'Coffee',  course: 'Beverages',  price: 60  },
+    ]
   );
 
   const [menuFile, setMenuFileState] = useState<File | null>(null);
