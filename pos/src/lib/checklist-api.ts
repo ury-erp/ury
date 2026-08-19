@@ -36,7 +36,7 @@ export const getChecklist = async (
 }> => {
   try {
     const response = await call.get<ChecklistResponse>(
-      'ury.ury.ury_pos.api.get_checklist',
+      'ury.ury_pos.api.get_checklist',
       {
         pos_profile: posProfile,
         checklist_type: checklistType,
@@ -71,7 +71,7 @@ export const submitChecklist = async (
     }
 
     const response = await call.post<SubmitChecklistResponse>(
-      'ury.ury.ury_pos.api.submit_checklist',
+      'ury.ury_pos.api.submit_checklist',
       payload
     );
 
