@@ -58,6 +58,7 @@ website_route_rules = [
     {"from_route": "/ury/<path:app_path>", "to_route": "ury"},
     {"from_route": "/setup-wizard", "to_route": "ury"},
     {"from_route": "/order/<path:app_path>", "to_route": "order"},
+    {"from_route": "/pos/<path:app_path>", "to_route": "pos"},
 ]
 # Home Pages
 # ----------

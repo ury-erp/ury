@@ -52,7 +52,8 @@
     "loading_order": "Chargement des détails de la commande...",
     "edit_item": "Modifier l'article",
     "add_comment": "Ajouter un commentaire",
-    "edit_comment": "Modifier le commentaire"
+    "edit_comment": "Modifier le commentaire",
+    "pax": "Couverts"
   },
   "order": {
     "select_to_view": "Sélectionnez une commande pour voir les détails",
@@ -136,7 +137,9 @@
     "discount_exceeds_max": "La remise en pourcentage ne peut pas dépasser 100 %",
     "please_print_first": "Veuillez imprimer la facture avant d'effectuer le paiement",
     "enter_cancel_reason": "Veuillez entrer un motif d'annulation.",
-    "dine_in_restricted": "La consommation sur place n'est pas disponible pour votre rôle"
+    "dine_in_restricted": "La consommation sur place n'est pas disponible pour votre rôle",
+    "order_modified": "Cette commande a été modifiée. Veuillez recharger la page pour récupérer les dernières modifications.",
+    "order_sync_failed": "Impossible de synchroniser cette commande. Veuillez recharger la page et réessayer."
   },
   "success": {
     "order_cancelled": "Commande annulée avec succès",
