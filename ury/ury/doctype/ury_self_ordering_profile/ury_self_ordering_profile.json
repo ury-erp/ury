@@ -35,7 +35,8 @@
   "enable_payment_link",
   "enable_pay_at_counter",
   "session_section",
-  "session_idle_timeout_minutes"
+  "session_idle_timeout_minutes",
+  "qr_signing_secret"
  ],
  "fields": [
   {
@@ -197,6 +198,16 @@
    "fieldname": "session_idle_timeout_minutes",
    "fieldtype": "Int",
    "label": "Session Idle Timeout (Minutes)"
+  },
+  {
+   "fieldname": "qr_signing_secret",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "QR Signing Secret",
+   "read_only": 1,
+   "no_copy": 1,
+   "print_hide": 1,
+   "report_hide": 1
   }
  ],
  "index_web_pages_for_search": 1,
