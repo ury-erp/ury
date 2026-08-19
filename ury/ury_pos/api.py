@@ -1112,3 +1112,13 @@ def merge_bills(primary_invoice, secondary_invoice):
             "status": "error",
             "message": str(e),
         }
+
+
+@frappe.whitelist(allow_guest=False)
+def is_printer_watch_installed() -> dict:
+    """Return whether the optional URY Printer Watch app is installed on the current site."""
+    try:
+        installed = "ury_printer_watch" in frappe.get_installed_apps()
+    except Exception:
+        installed = False
+    return {"installed": bool(installed)}
