@@ -1096,7 +1096,7 @@ def get_checklist(pos_profile, checklist_type):
 
     log_name = None
     log_status = None
-    if existing_log and existing_log[0].status == "In Progress":
+    if existing_log:
         log_name = existing_log[0].name
         log_status = existing_log[0].status
 
