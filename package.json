@@ -19,6 +19,7 @@
     "build": "yarn ury-pos-build && yarn ury-mosaic-build && yarn ury-posv2-build && yarn ury-frontend-build && yarn ury-self-order-build"
   },
   "devDependencies": {
+    "@rollup/rollup-win32-x64-msvc": "^4.62.4",
     "@types/qz-tray": "^2.2.2"
   }
 }
