@@ -3,13 +3,13 @@ import { useConfigure, RoomData, TableData } from '../../../context/ConfigureCon
 import { Input, Button } from '@ury/ui';
 import { ChevronDown, ChevronRight, Trash2 } from 'lucide-react';
 
-/** Below this total, there's no real "many tables" problem yet — leave every group open. */
+/** Below this total, there's no real "many tables" problem yet , leave every group open. */
 const COLLAPSE_THRESHOLD = 10;
 
 function computeInitialExpanded(rooms: RoomData[], tables: TableData[]): Set<string> {
   if (rooms.length <= 1) return new Set(rooms.map((r) => r.id));
   if (tables.length < COLLAPSE_THRESHOLD) return new Set(rooms.map((r) => r.id));
-  // Many tables across several rooms — only the first room starts expanded.
+  // Many tables across several rooms , only the first room starts expanded.
   return new Set(rooms[0] ? [rooms[0].id] : []);
 }
 
@@ -176,7 +176,7 @@ function RoomGroup({
         <div className="p-4 pt-2 space-y-1 divide-y divide-border">
           {roomTables.length === 0 ? (
             <p className="text-sm text-muted-foreground py-2">
-              No tables yet — set a table count for this room in the Rooms section to add tables here.
+              No tables yet , set a table count for this room in the Rooms section to add tables here.
             </p>
           ) : (
             roomTables.map((table) => (
@@ -217,8 +217,6 @@ export function TableSection() {
 
   return (
     <div className="space-y-6">
-      <p className="text-sm text-muted-foreground">How many people each table fits — adjust anytime.</p>
-
       <div className="space-y-3">
         {rooms.map((room) => (
           <RoomGroup

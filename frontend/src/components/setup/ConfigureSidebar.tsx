@@ -13,7 +13,7 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
   { id: 'tables', label: 'Tables', icon: Grid3X3 },
   { id: 'menu', label: 'Menu', icon: UtensilsCrossed },
   { id: 'payment', label: 'Payments', icon: CreditCard },
-  { id: 'users', label: 'Staff', icon: Users },
+  { id: 'users', label: 'User', icon: Users },
 ];
 
 export function ConfigureSidebar() {
@@ -24,7 +24,7 @@ export function ConfigureSidebar() {
       <div className="bg-muted border border-border rounded-lg p-4">
         {/* Section Title */}
         <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3 px-1">
-          Configuration Steps
+          Configuration
         </h2>
 
         <div className="space-y-1">
