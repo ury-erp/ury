@@ -71,7 +71,7 @@ export const Drawer: React.FC<DrawerProps> = ({
           <div className="px-6 py-5 border-b border-gray-100 bg-white flex items-center justify-between sticky top-0 z-10">
             <div>
               <div className="flex items-center gap-2">
-                <div className="w-2 h-6 bg-[#7C3AED] rounded-full" />
+                <div className="w-2 h-6 bg-primary rounded-full" />
                 <h2 className="text-xl font-bold text-gray-900 tracking-tight">{title}</h2>
               </div>
               {subtitle && (
@@ -82,7 +82,7 @@ export const Drawer: React.FC<DrawerProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-[#7C3AED]"
+              className="rounded-lg p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-primary"
               aria-label="Close panel"
             >
               <X className="w-5 h-5" />

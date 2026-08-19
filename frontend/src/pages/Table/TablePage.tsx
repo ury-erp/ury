@@ -343,7 +343,7 @@ export default function TablePage() {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
-            <LayoutGrid className="w-7 h-7 text-[#7C3AED]" />
+            <LayoutGrid className="w-7 h-7 text-primary" />
             Table Management
           </h1>
           <p className="text-sm text-gray-500 mt-1">
@@ -355,16 +355,16 @@ export default function TablePage() {
           <Button
             variant="outline"
             onClick={handleLaunchFloorEditor}
-            className="gap-2 border-gray-200 text-gray-700 hover:bg-purple-50 hover:text-[#7C3AED]"
+            className="gap-2 border-gray-200 text-gray-700 hover:bg-purple-50 hover:text-primary"
           >
-            <Sliders className="w-4 h-4 text-[#7C3AED]" />
+            <Sliders className="w-4 h-4 text-primary" />
             Edit Floor Layout
             <ExternalLink className="w-3.5 h-3.5" />
           </Button>
 
           <Button
             onClick={openAddDrawer}
-            className="gap-2 bg-[#7C3AED] hover:bg-[#6D28D9] text-white shadow-sm"
+            className="gap-2 bg-primary hover:bg-primary-700 text-white shadow-sm"
           >
             <Plus className="w-4 h-4" />
             Add Table
@@ -381,7 +381,7 @@ export default function TablePage() {
             placeholder="Search table name or room..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9 bg-gray-50/50 border-gray-200 focus:border-[#7C3AED]"
+            className="pl-9 bg-gray-50/50 border-gray-200 focus:border-primary"
           />
         </div>
 
@@ -390,7 +390,7 @@ export default function TablePage() {
           <select
             value={selectedRoom}
             onChange={(e) => setSelectedRoom(e.target.value)}
-            className="h-10 px-3 text-sm bg-white border border-gray-200 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#7C3AED]"
+            className="h-10 px-3 text-sm bg-white border border-gray-200 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary"
           >
             {ROOMS.map((r) => (
               <option key={r} value={r}>
@@ -403,7 +403,7 @@ export default function TablePage() {
           <select
             value={selectedBranch}
             onChange={(e) => setSelectedBranch(e.target.value)}
-            className="h-10 px-3 text-sm bg-white border border-gray-200 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#7C3AED]"
+            className="h-10 px-3 text-sm bg-white border border-gray-200 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary"
           >
             {BRANCHES.map((b) => (
               <option key={b} value={b}>
@@ -416,7 +416,7 @@ export default function TablePage() {
           <select
             value={selectedStatus}
             onChange={(e) => setSelectedStatus(e.target.value)}
-            className="h-10 px-3 text-sm bg-white border border-gray-200 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#7C3AED]"
+            className="h-10 px-3 text-sm bg-white border border-gray-200 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary"
           >
             <option value="All Statuses">All Statuses</option>
             {STATUS_OPTIONS.map((s) => (
@@ -433,7 +433,7 @@ export default function TablePage() {
               onClick={() => setViewMode('grid')}
               className={`p-1.5 rounded-md transition-colors ${
                 viewMode === 'grid'
-                  ? 'bg-white text-[#7C3AED] shadow-xs'
+                  ? 'bg-white text-primary shadow-xs'
                   : 'text-gray-500 hover:text-gray-700'
               }`}
               title="POS Floor Grid View"
@@ -445,7 +445,7 @@ export default function TablePage() {
               onClick={() => setViewMode('list')}
               className={`p-1.5 rounded-md transition-colors ${
                 viewMode === 'list'
-                  ? 'bg-white text-[#7C3AED] shadow-xs'
+                  ? 'bg-white text-primary shadow-xs'
                   : 'text-gray-500 hover:text-gray-700'
               }`}
               title="Table List View"
@@ -499,7 +499,7 @@ export default function TablePage() {
                           setActiveActionId(null);
                           openEditDrawer(table);
                         }}
-                        className="w-full text-left px-4 py-2 text-xs text-gray-700 hover:bg-purple-50 hover:text-[#7C3AED] flex items-center gap-2"
+                        className="w-full text-left px-4 py-2 text-xs text-gray-700 hover:bg-purple-50 hover:text-primary flex items-center gap-2"
                       >
                         <Edit className="w-3.5 h-3.5" />
                         Edit Table
@@ -515,7 +515,7 @@ export default function TablePage() {
                           onClick={() => handleChangeStatus(table.id, st)}
                           className={`w-full text-left px-4 py-1.5 text-xs flex items-center gap-2 ${
                             table.status === st
-                              ? 'bg-purple-50 text-[#7C3AED] font-semibold'
+                              ? 'bg-purple-50 text-primary font-semibold'
                               : 'text-gray-600 hover:bg-gray-50'
                           }`}
                         >
@@ -556,7 +556,7 @@ export default function TablePage() {
                   variant="ghost"
                   size="sm"
                   onClick={() => openEditDrawer(table)}
-                  className="w-full text-xs text-gray-600 hover:text-[#7C3AED] hover:bg-purple-50"
+                  className="w-full text-xs text-gray-600 hover:text-primary hover:bg-purple-50"
                 >
                   <Edit className="w-3.5 h-3.5 mr-1" />
                   Configure Table
@@ -589,7 +589,7 @@ export default function TablePage() {
                   <tr key={table.id} className="hover:bg-gray-50/80 transition-colors">
                     <td className="p-4 font-bold text-gray-900">
                       <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-[#7C3AED]" />
+                        <span className="w-2 h-2 rounded-full bg-primary" />
                         {table.table_name}
                       </div>
                     </td>
@@ -611,7 +611,7 @@ export default function TablePage() {
                           variant="ghost"
                           size="sm"
                           onClick={() => openEditDrawer(table)}
-                          className="h-8 px-2 text-gray-600 hover:text-[#7C3AED] hover:bg-purple-50"
+                          className="h-8 px-2 text-gray-600 hover:text-primary hover:bg-purple-50"
                           title="Edit Table"
                         >
                           <Edit className="w-4 h-4" />
@@ -649,7 +649,7 @@ export default function TablePage() {
             </Button>
             <Button
               onClick={handleSaveTable}
-              className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white"
+              className="bg-primary hover:bg-primary-700 text-white"
             >
               Save Table Details
             </Button>
@@ -673,7 +673,7 @@ export default function TablePage() {
                   placeholder="e.g. T-01"
                   value={formTableName}
                   onChange={(e) => setFormTableName(e.target.value)}
-                  className="w-full bg-white border-gray-200 focus:border-[#7C3AED]"
+                  className="w-full bg-white border-gray-200 focus:border-primary"
                 />
               </div>
 
@@ -687,7 +687,7 @@ export default function TablePage() {
                   max={30}
                   value={formSeats}
                   onChange={(e) => setFormSeats(parseInt(e.target.value) || 1)}
-                  className="w-full bg-white border-gray-200 focus:border-[#7C3AED]"
+                  className="w-full bg-white border-gray-200 focus:border-primary"
                 />
               </div>
 
@@ -696,7 +696,7 @@ export default function TablePage() {
                 <select
                   value={formRoom}
                   onChange={(e) => setFormRoom(e.target.value)}
-                  className="w-full h-10 px-3 text-sm bg-white border border-gray-200 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#7C3AED]"
+                  className="w-full h-10 px-3 text-sm bg-white border border-gray-200 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary"
                 >
                   {ROOMS.filter((r) => r !== 'All Rooms').map((r) => (
                     <option key={r} value={r}>
@@ -711,7 +711,7 @@ export default function TablePage() {
                 <select
                   value={formBranch}
                   onChange={(e) => setFormBranch(e.target.value)}
-                  className="w-full h-10 px-3 text-sm bg-white border border-gray-200 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#7C3AED]"
+                  className="w-full h-10 px-3 text-sm bg-white border border-gray-200 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary"
                 >
                   {BRANCHES.filter((b) => b !== 'All Branches').map((b) => (
                     <option key={b} value={b}>
@@ -726,7 +726,7 @@ export default function TablePage() {
                 <select
                   value={formShape}
                   onChange={(e) => setFormShape(e.target.value as TableShape)}
-                  className="w-full h-10 px-3 text-sm bg-white border border-gray-200 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#7C3AED]"
+                  className="w-full h-10 px-3 text-sm bg-white border border-gray-200 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary"
                 >
                   {SHAPE_OPTIONS.map((shape) => (
                     <option key={shape} value={shape}>
@@ -741,7 +741,7 @@ export default function TablePage() {
                 <select
                   value={formStatus}
                   onChange={(e) => setFormStatus(e.target.value as TableStatus)}
-                  className="w-full h-10 px-3 text-sm bg-white border border-gray-200 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#7C3AED]"
+                  className="w-full h-10 px-3 text-sm bg-white border border-gray-200 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary"
                 >
                   {STATUS_OPTIONS.map((st) => (
                     <option key={st} value={st}>
@@ -761,7 +761,7 @@ export default function TablePage() {
               className="w-full p-4 flex items-center justify-between bg-gray-50/50 hover:bg-gray-100/60 transition-colors text-left"
             >
               <div className="flex items-center gap-2">
-                <Sliders className="w-4 h-4 text-[#7C3AED]" />
+                <Sliders className="w-4 h-4 text-primary" />
                 <div>
                   <h4 className="text-xs font-bold text-gray-900">Advanced Floor Layout Coordinates</h4>
                   <p className="text-[11px] text-gray-500">Fine-tune X, Y position and table dimensions in POS map</p>

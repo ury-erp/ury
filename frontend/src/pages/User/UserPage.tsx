@@ -182,7 +182,7 @@ export const UserPage: React.FC = () => {
         {/* Header Header & Toolbar */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-xl border border-gray-200 shadow-xs">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-[#7C3AED]/10 text-[#7C3AED] flex items-center justify-center font-semibold shrink-0">
+            <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-semibold shrink-0">
               <Users className="w-6 h-6" />
             </div>
             <div>
@@ -192,7 +192,7 @@ export const UserPage: React.FC = () => {
           </div>
           <Button
             onClick={openCreateDrawer}
-            className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white flex items-center gap-2"
+            className="bg-primary hover:bg-primary-700 text-white flex items-center gap-2"
           >
             <Plus className="w-4 h-4" />
             Add User
@@ -239,7 +239,7 @@ export const UserPage: React.FC = () => {
                         className="w-12 h-12 rounded-full object-cover border border-gray-200"
                       />
                     ) : (
-                      <div className="w-12 h-12 rounded-full bg-[#7C3AED]/10 text-[#7C3AED] flex items-center justify-center font-bold text-lg">
+                      <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-lg">
                         {user.first_name[0]}
                         {user.last_name ? user.last_name[0] : ''}
                       </div>
@@ -258,7 +258,7 @@ export const UserPage: React.FC = () => {
                   <div className="flex items-center gap-1">
                     <button
                       onClick={() => openEditDrawer(user)}
-                      className="p-1.5 text-gray-400 hover:text-[#7C3AED] hover:bg-purple-50 rounded-lg transition-colors"
+                      className="p-1.5 text-gray-400 hover:text-primary hover:bg-purple-50 rounded-lg transition-colors"
                       title="Edit User"
                     >
                       <Edit2 className="w-4 h-4" />
@@ -325,7 +325,7 @@ export const UserPage: React.FC = () => {
                     onChange={() => handleToggleStatus(user.id)}
                     className="sr-only peer"
                   />
-                  <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#7C3AED]"></div>
+                  <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
                 </label>
               </div>
             </Card>
@@ -344,7 +344,7 @@ export const UserPage: React.FC = () => {
             <Button variant="outline" onClick={() => setIsDrawerOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSaveUser} className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white">
+            <Button onClick={handleSaveUser} className="bg-primary hover:bg-primary-700 text-white">
               {editingUserId ? 'Update User' : 'Create User'}
             </Button>
           </>
@@ -401,7 +401,7 @@ export const UserPage: React.FC = () => {
                     type="checkbox"
                     checked={selectedRoles.includes(role)}
                     onChange={() => handleRoleCheckbox(role)}
-                    className="w-4 h-4 text-[#7C3AED] rounded border-gray-300 focus:ring-[#7C3AED]"
+                    className="w-4 h-4 text-primary rounded border-gray-300 focus:ring-primary"
                   />
                   <div>
                     <span className="text-sm font-semibold text-gray-900 block">{role}</span>
@@ -446,7 +446,7 @@ export const UserPage: React.FC = () => {
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEnabled(e.target.checked)}
                 className="sr-only peer"
               />
-              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#7C3AED]"></div>
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
             </label>
           </div>
         </form>

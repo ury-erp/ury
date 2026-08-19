@@ -23,6 +23,23 @@ export default tseslint.config(
         'warn',
         { allowConstantExport: true },
       ],
+      // Design-system enforcement (see tracks/sa-design-system-fix). Kept at 'warn', not
+      // 'error': a backlog of pre-existing raw elements and arbitrary-hex classes remains
+      // (see the audit report's "Explicitly out of scope" list) and shouldn't fail CI until
+      // that backlog is cleared. New code should not add to either pattern.
+      'no-restricted-syntax': [
+        'warn',
+        {
+          selector: 'JSXOpeningElement[name.name=/^(button|input|textarea|select)$/]',
+          message:
+            'Use the @ury/ui Button/Input/Textarea/Select component instead of the raw HTML element, so styling stays on the design system.',
+        },
+        {
+          selector: 'JSXAttribute[name.name="className"] Literal[value=/-\\[#[0-9a-fA-F]{3,8}\\]/]',
+          message:
+            'Arbitrary hex color in a Tailwind class bypasses the design-system tokens in packages/ui/src/styles/theme.css. Use a token class (primary, gray-*, etc.) or extend the shared preset instead.',
+        },
+      ],
     },
   },
 )

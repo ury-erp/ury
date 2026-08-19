@@ -23,10 +23,10 @@ export function ProgressModal({ visible, activeIndex, error, steps = PROGRESS_ST
         <div className="flex px-10 pt-10 pb-6 gap-1">
           {Array.from({ length: totalSteps }).map((_, i) => {
             const segmentProgress = i < activeIndex
-              ? 'bg-[#22C55E]' 
+              ? 'bg-green-500'
               : i === activeIndex
-                ? 'bg-[#111827]' 
-                : 'bg-[#E5E7EB]';
+                ? 'bg-gray-900'
+                : 'bg-gray-200';
             return (
               <div key={i} className={`flex-1 h-1.5 rounded-full ${segmentProgress}`} />
             );
@@ -46,17 +46,17 @@ export function ProgressModal({ visible, activeIndex, error, steps = PROGRESS_ST
               const isActive = idx === activeIndex;
 
               return (
-                <div key={idx} className="flex items-center gap-4 py-3 border-b border-[#F3F4F6] last:border-0 h-12">
+                <div key={idx} className="flex items-center gap-4 py-3 border-b border-gray-100 last:border-0 h-12">
                   <div className="w-6 h-6 flex items-center justify-center shrink-0">
                     {isDone ? (
-                      <CheckCircle2 className="w-6 h-6 text-white fill-[#22C55E]" />
+                      <CheckCircle2 className="w-6 h-6 text-white fill-green-500" />
                     ) : isActive ? (
-                      <Loader2 className="w-6 h-6 text-[#2B5CE6] animate-spin" />
+                      <Loader2 className="w-6 h-6 text-primary animate-spin" />
                     ) : (
-                      <Circle className="w-6 h-6 text-[#E5E7EB]" />
+                      <Circle className="w-6 h-6 text-gray-200" />
                     )}
                   </div>
-                  <span className={`text-sm ${isActive ? 'font-medium text-[#111827]' : isDone ? 'text-foreground' : 'text-[#9CA3AF]'}`}>
+                  <span className={`text-sm ${isActive ? 'font-medium text-gray-900' : isDone ? 'text-foreground' : 'text-gray-400'}`}>
                     {step}
                   </span>
                 </div>
@@ -71,9 +71,9 @@ export function ProgressModal({ visible, activeIndex, error, steps = PROGRESS_ST
           )}
 
           {/* Bottom Progress Bar */}
-          <div className="h-1.5 w-full bg-[#E5E7EB] rounded-full overflow-hidden">
+          <div className="h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
             <div 
-              className="h-full bg-[#2B5CE6] rounded-full transition-all duration-400 ease-in-out" 
+              className="h-full bg-primary rounded-full transition-all duration-400 ease-in-out" 
               style={{ width: `${progressPercent}%` }} 
             />
           </div>
