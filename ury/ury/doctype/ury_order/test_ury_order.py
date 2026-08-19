@@ -215,9 +215,10 @@ class TestPriceItemsForInvoicePhase1(unittest.TestCase):
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.has_permission")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.db.get_value")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_doc")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_roles")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.session")
     def test_sync_order_delegates_pricing(
-        self, mock_session, mock_get_doc, mock_get_value, mock_has_permission,
+        self, mock_session, mock_get_roles, mock_get_doc, mock_get_value, mock_has_permission,
         mock_price_items, mock_get_order_invoice,
     ):
         mock_invoice = MagicMock()
@@ -231,9 +232,15 @@ class TestPriceItemsForInvoicePhase1(unittest.TestCase):
         mock_invoice.selling_price_list = "Standard Selling"
         mock_get_order_invoice.return_value = mock_invoice
 
+        # billing_user must resolve True, or sync_order's early "Table
+        # occupied" guard returns before ever reaching the pricing section.
+        mock_get_roles.return_value = ["URY Cashier"]
+        billing_role = MagicMock()
+        billing_role.role = "URY Cashier"
         mock_pos_profile = MagicMock()
         mock_pos_profile.custom_enable_multiple_cashier = 0
         mock_pos_profile.applicable_for_users = []
+        mock_pos_profile.role_allowed_for_billing = [billing_role]
         mock_get_doc.return_value = mock_pos_profile
 
         mock_session.user = "authorized@example.com"

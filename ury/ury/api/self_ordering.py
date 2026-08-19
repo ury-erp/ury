@@ -446,6 +446,7 @@ def add_customer_items(session, items):
     with _elevated():
         invoice, invoice_name = _resolve_or_create_pos_invoice(
             table=session.table, invoiceNo=session.invoice, order_type=order_type, is_payment=None,
+            check_permission=False, override_branch=profile.branch,
         )
 
         if not invoice.customer:

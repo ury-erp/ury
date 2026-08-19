@@ -88,10 +88,11 @@ class TestAddCustomerItemsAppendOnly(unittest.TestCase):
     @patch(f"{MOD}.resolve_restaurant_menu")
     @patch(f"{MOD}.frappe.get_doc")
     @patch(f"{MOD}._resolve_session")
+    @patch(f"{MOD}.frappe.db.set_value")
     @patch(f"{MOD}.frappe.db.get_value")
     @patch(f"{MOD}.frappe.set_user")
     def test_add_customer_items_appends_without_clearing_existing(
-        self, mock_set_user, mock_db_get_value, mock_resolve_session, mock_get_doc,
+        self, mock_set_user, mock_db_get_value, mock_db_set_value, mock_resolve_session, mock_get_doc,
         mock_resolve_menu, mock_resolve_invoice, mock_price_items, mock_kot,
     ):
         session = self._session_doc(invoice="POS-INV-100")
