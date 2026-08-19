@@ -18,7 +18,7 @@ const POSOpeningPaymentTable = ({
 }: POSOpeningPaymentTableProps) => {
   const handleAmountChange = (mode: string, value: string) => {
     const parsed = value === '' ? 0 : parseFloat(value);
-    const amount = Number.isNaN(parsed) ? 0 : parsed;
+    const amount = Number.isNaN(parsed) ? 0 : Math.max(0, parsed);
 
     const nextPayments = payments.map((payment) =>
       payment.mode_of_payment === mode
@@ -33,6 +33,10 @@ const POSOpeningPaymentTable = ({
 
   return (
     <div className="space-y-3">
+      <p className="text-xs text-gray-500">
+        {t('pos_opening.opening_balance_help')}
+      </p>
+
       <div className="border border-gray-200 rounded-lg overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-gray-50">
@@ -58,6 +62,17 @@ const POSOpeningPaymentTable = ({
                     step="0.01"
                     value={payment.opening_amount || ''}
                     onChange={(e) => handleAmountChange(payment.mode_of_payment, e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === '-' || e.key === 'Minus') {
+                        e.preventDefault();
+                      }
+                    }}
+                    onPaste={(e) => {
+                      const pasted = e.clipboardData.getData('text');
+                      if (/-/.test(pasted)) {
+                        e.preventDefault();
+                      }
+                    }}
                     disabled={disabled || readOnly}
                     className="text-right"
                     size="sm"

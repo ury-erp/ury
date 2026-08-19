@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Store, RefreshCw, AlertTriangle, Lock } from 'lucide-react';
-import { Button, Badge, Select, SelectItem, Spinner } from '@ury/ui';
+import { Button, Badge, Select, SelectItem, Spinner, showToast } from '@ury/ui';
 import { formatCurrency } from '@ury/core';
 import { useRootStore } from '../store/root-store';
 import {
@@ -44,6 +44,7 @@ const POSOpeningScreen = ({ onSuccess, onError }: POSOpeningScreenProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [balances, setBalances] = useState<POSOpeningPayment[]>([]);
+  const [zeroBalanceConfirmed, setZeroBalanceConfirmed] = useState(false);
 
   const sessionStart = useMemo(() => {
     const timestamp = context?.session_start || new Date().toISOString();
@@ -82,6 +83,7 @@ const POSOpeningScreen = ({ onSuccess, onError }: POSOpeningScreenProps) => {
         opening_amount: mode.opening_amount ?? 0,
       }))
     );
+    setZeroBalanceConfirmed(false);
   }, [context]);
 
   const handleProfileChange = async (value: string) => {
@@ -154,6 +156,11 @@ const POSOpeningScreen = ({ onSuccess, onError }: POSOpeningScreenProps) => {
   const handleSubmit = async () => {
     if (!canSubmit || !context?.selected_profile) return;
 
+    if (totalOpeningBalance <= 0 && !zeroBalanceConfirmed) {
+      setZeroBalanceConfirmed(true);
+      return;
+    }
+
     setIsSubmitting(true);
     setError(null);
 
@@ -164,6 +171,7 @@ const POSOpeningScreen = ({ onSuccess, onError }: POSOpeningScreenProps) => {
         balance_details: balances,
       });
 
+      showToast.success(t('pos_opening.session_opened_success'));
       onSuccess?.();
     } catch (err) {
       const serverMessage = parseFrappeError(err);
@@ -337,7 +345,10 @@ const POSOpeningScreen = ({ onSuccess, onError }: POSOpeningScreenProps) => {
 
               <POSOpeningPaymentTable
                 payments={balances}
-                onChange={setBalances}
+                onChange={(next) => {
+                  setBalances(next);
+                  setZeroBalanceConfirmed(false);
+                }}
                 disabled={isSubmitting || blockingError !== BLOCKING_ERROR_NONE}
               />
             </section>
@@ -347,6 +358,13 @@ const POSOpeningScreen = ({ onSuccess, onError }: POSOpeningScreenProps) => {
           {error && (
             <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
               <p className="text-red-700 text-sm">{error}</p>
+            </div>
+          )}
+
+          {zeroBalanceConfirmed && totalOpeningBalance <= 0 && (
+            <div className="flex items-start gap-3 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+              <AlertTriangle className="w-5 h-5 text-orange-600 mt-0.5 shrink-0" />
+              <p className="text-orange-700 text-sm">{t('pos_opening.zero_balance_warning')}</p>
             </div>
           )}
 
@@ -366,6 +384,8 @@ const POSOpeningScreen = ({ onSuccess, onError }: POSOpeningScreenProps) => {
                   <RefreshCw className="w-4 h-4 animate-spin" />
                   {t('pos_opening.opening')}
                 </span>
+              ) : zeroBalanceConfirmed && totalOpeningBalance <= 0 ? (
+                t('pos_opening.confirm_zero_balance')
               ) : (
                 t('pos_opening.open_session')
               )}

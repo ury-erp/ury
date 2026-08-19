@@ -69,7 +69,7 @@ const POSOpeningProvider = ({ children }: POSOpeningProviderProps) => {
   // telling them to contact a manager.
   const [showClosingDialog, setShowClosingDialog] = useState(false);
 
-  const { posProfile } = usePOSStore();
+  const { posProfile, showVoluntaryClosing, setShowVoluntaryClosing } = usePOSStore();
   const { user } = useRootStore();
 
   const canAccessDesk = useMemo(() => hasDeskAccess(user), [user]);
@@ -273,7 +273,31 @@ const POSOpeningProvider = ({ children }: POSOpeningProviderProps) => {
     );
   }
 
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      {/*
+        Voluntary close (Header menu "Close Shift"), distinct from the
+        dailyClosePending forced path above. Rendered as an overlay
+        alongside children -- rather than replacing them, like the forced
+        path does -- since the cashier is choosing to close their own
+        current, non-stale session and should be able to back out without
+        losing their place in the app.
+      */}
+      {showVoluntaryClosing && (
+        <POSClosingDialog
+          open={showVoluntaryClosing}
+          onOpenChange={(open) => {
+            if (!open) setShowVoluntaryClosing(false);
+          }}
+          onClosingSubmitted={() => {
+            setShowVoluntaryClosing(false);
+            checkPOSStatus();
+          }}
+        />
+      )}
+    </>
+  );
 };
 
 export default POSOpeningProvider;

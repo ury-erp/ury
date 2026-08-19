@@ -27,6 +27,7 @@
     "search_placeholder_default": "Rechercher commandes, articles ou clients...",
     "search_placeholder_orders": "Rechercher des commandes",
     "search_placeholder_menu": "Rechercher dans le menu",
+    "close_shift": "Clôturer la session",
     "switch_to_desk": "Accéder au bureau",
     "clear_cache": "Vider le cache",
     "logout": "Déconnexion"
@@ -97,6 +98,8 @@
       "retry": "Réessayer",
       "continue_to_pos": "Continuer vers le PDV",
       "contact_manager": "Contactez votre responsable",
+      "daily_close_pending_actionable": "La session d'hier est toujours ouverte et doit être clôturée avant d'en démarrer une nouvelle.",
+      "close_now": "Clôturer la session précédente",
       "session_exists_title": "Session déjà ouverte",
       "session_exists_message": "Une session est déjà ouverte pour ce terminal.",
       "session_elsewhere_title": "Session ouverte ailleurs",
@@ -133,7 +136,25 @@
     "contact_manager": "Contactez votre responsable",
     "retry": "Réessayer",
     "error_loading": "Échec du chargement des données d'ouverture. Veuillez réessayer.",
-    "error_opening": "Échec de l'ouverture de la session PDV. Veuillez réessayer."
+    "error_opening": "Échec de l'ouverture de la session PDV. Veuillez réessayer.",
+    "opening_balance_help": "Le solde d'ouverture est le montant de départ en espèces/paiement que vous déclarez pour cette équipe. Il sert à rapprocher les ventes à la fermeture.",
+    "zero_balance_warning": "Vous ouvrez avec 0 ₹ sur tous les modes de paiement. Appuyez à nouveau sur « Confirmer et ouvrir » pour continuer quand même.",
+    "confirm_zero_balance": "Confirmer et ouvrir",
+    "session_opened_success": "Session PDV ouverte"
+  },
+  "pos_closing": {
+    "help_expected": "Le montant attendu par le systeme pour ce mode de paiement, base sur les factures du jour.",
+    "help_closing": "Saisissez le montant reel compte pour ce mode de paiement.",
+    "help_difference": "Montant compte moins montant attendu. Positif signifie un excedent, negatif un manque.",
+    "validation_missing_rows": "Saisissez un montant de cloture pour chaque mode de paiement avant de valider.",
+    "validation_all_zero": "Le montant total de cloture ne peut pas etre nul. Saisissez les montants comptes.",
+    "validation_zero_row_warning": "Un ou plusieurs modes de paiement sont restes a 0 alors qu'il y a eu de l'activite aujourd'hui. Verifiez avant de valider.",
+    "confirm_title": "Confirmer la cloture PDV",
+    "confirm_message": "Cette action soumettra l'ecriture de cloture et est irreversible. Voulez-vous vraiment continuer ?",
+    "confirm_submit": "Oui, cloturer le PDV",
+    "confirm_back": "Retour",
+    "checklist_skip": "Ignorer pour l'instant",
+    "checklist_skip_hint": "La cloture PDV a deja ete soumise. Vous pourrez terminer cette liste de controle plus tard."
   },
   "customer": {
     "search_placeholder": "Rechercher un client...",

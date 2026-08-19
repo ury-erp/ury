@@ -632,3 +632,38 @@ class TestSubmitChecklistSEC10(FrappeTestCase):
         self.assertEqual(mock_log_doc.status, "In Progress")
         self.assertEqual(result["name"], "URY-POS-CHECKLIST-LOG-002")
         mock_log_doc.save.assert_called_once()
+
+    @patch("ury.ury_pos.api.frappe.throw")
+    @patch("ury.ury_pos.api.frappe.db.get_value")
+    @patch("ury.ury_pos.api.getBranch")
+    def test_validate_checklist_branch_cross_branch_rejection(
+        self, mock_get_branch, mock_db_get_value, mock_throw
+    ):
+        """Test that submit_checklist raises PermissionError when user's branch doesn't match POS Profile branch."""
+        # Setup mocks for _validate_checklist_branch (no mock of the validation function itself)
+        mock_get_branch.return_value = "Branch A"  # Session user's branch
+
+        # Mock frappe.db.get_value to return the POS Profile's branch (different from session user's)
+        mock_db_get_value.return_value = "Branch B"
+
+        # Make frappe.throw actually raise the exception
+        def throw_side_effect(message, exception_class=None):
+            if exception_class:
+                raise exception_class(message)
+            else:
+                raise frappe.ValidationError(message)
+
+        mock_throw.side_effect = throw_side_effect
+
+        # Prepare minimal checklist items
+        items = json.dumps([
+            {"item_label": "Opening Check", "is_checked": True, "remarks": ""},
+        ])
+
+        # Call the function and expect it to raise PermissionError
+        with self.assertRaises(frappe.PermissionError):
+            submit_checklist(
+                pos_profile="POS-Profile-Branch-B",
+                checklist_type="Opening",
+                items=items
+            )

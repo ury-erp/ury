@@ -1102,6 +1102,11 @@ def create_pos_opening_entry(pos_profile: str, company: str, balance_details) ->
     if not frappe.has_permission("POS Profile", "read", doc=pos_profile_doc):
         frappe.throw(_("Not permitted to use this POS Profile."), frappe.PermissionError)
 
+    for entry in balance_details or []:
+        opening_amount = entry.get("opening_amount") if isinstance(entry, dict) else None
+        if opening_amount is not None and frappe.utils.flt(opening_amount) < 0:
+            frappe.throw(_("Opening amount cannot be negative."))
+
     opening = frappe.get_doc(
         {
             "doctype": "POS Opening Entry",

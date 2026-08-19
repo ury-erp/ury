@@ -1,13 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { t } from '../i18n';
 import { Link, useLocation } from 'react-router-dom';
-import { 
+import {
   Command,
   User,
   ChevronDown,
   Monitor,
   LogOut,
   RefreshCw,
+  Lock,
 } from 'lucide-react';
 import { Button, Input } from '@ury/ui';
 import { useRootStore } from '../store/root-store';
@@ -22,7 +23,7 @@ const Header = () => {
   const user = useRootStore((state: RootState) => state.user);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const location = useLocation();
-  const { searchQuery, setSearchQuery } = usePOSStore();
+  const { searchQuery, setSearchQuery, setShowVoluntaryClosing } = usePOSStore();
   const { orderSearchQuery, setOrderSearchQuery } = useRootStore();
   const [orderSearchInput, setOrderSearchInput] = useState(orderSearchQuery);
 
@@ -103,6 +104,11 @@ const Header = () => {
     window.location.reload();
   };
 
+  const handleCloseShift = () => {
+    setShowUserMenu(false);
+    setShowVoluntaryClosing(true);
+  };
+
   return (
     <header className="bg-white border-b border-gray-200">
       <div className="flex items-center justify-between h-16 px-6">
@@ -156,6 +162,14 @@ const Header = () => {
                   <p className="text-sm text-gray-500">{user?.name || ''}</p>
                 </div>
                 <div className="py-2">
+                  <Button
+                    variant="ghost"
+                    className="flex justify-start items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                    onClick={handleCloseShift}
+                  >
+                    <Lock className="w-4 h-4 me-3" />
+                    {t('header.close_shift')}
+                  </Button>
                   <Button
                     variant="ghost"
                     className="flex justify-start items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"

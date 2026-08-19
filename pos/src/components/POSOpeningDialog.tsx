@@ -8,6 +8,7 @@ import {
   MapPin,
   Monitor,
   ArrowRight,
+  Lock,
 } from 'lucide-react';
 import { Button } from '@ury/ui';
 import { t } from '../i18n';
@@ -21,6 +22,13 @@ interface POSOpeningDialogProps {
   canAccessDesk: boolean;
   onRetry: () => void;
   onContinue: () => void;
+  /**
+   * Only meaningful for state='dailyClosePending'. When provided, this
+   * cashier has POS Closing Entry submit permission on the pending session
+   * (checked server-side, not assumed here) and can close it themselves
+   * instead of just being told to contact a manager.
+   */
+  onCloseNow?: () => void;
 }
 
 interface StateConfig {
@@ -43,6 +51,7 @@ const POSOpeningDialog = ({
   canAccessDesk,
   onRetry,
   onContinue,
+  onCloseNow,
 }: POSOpeningDialogProps) => {
   const handleSwitchToDesk = () => {
     window.open(`${window.location.origin}/app`, '_blank');
@@ -61,7 +70,16 @@ const POSOpeningDialog = ({
       iconBg: 'bg-orange-100',
       iconColor: 'text-orange-600',
       title: t('errors.posOpening.daily_close_pending'),
-      description: t('pos.opening.contact_manager'),
+      description: onCloseNow
+        ? t('pos.opening.daily_close_pending_actionable')
+        : t('pos.opening.contact_manager'),
+      primaryAction: onCloseNow
+        ? {
+            label: t('pos.opening.close_now'),
+            icon: <Lock className="w-5 h-5 mr-2" />,
+            onClick: onCloseNow,
+          }
+        : undefined,
     },
     mainCashierNotOpen: {
       icon: <UserX className="h-8 w-8 text-amber-600" />,
