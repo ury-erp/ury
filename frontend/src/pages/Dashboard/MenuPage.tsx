@@ -359,15 +359,18 @@ export const MenuPage: React.FC = () => {
         };
       });
 
+      const createdMenuName = newMenu.menu_name;
       await call('frappe.client.insert', {
         doc: {
           doctype: 'URY Menu',
-          menu_name: newMenu.menu_name,
+          name: createdMenuName,
+          menu_name: createdMenuName,
           branch: newMenu.branch,
           items: itemsPayload,
         },
       });
       await fetchMenus();
+      setSelectedMenu(createdMenuName);
       showToast.success('Menu saved');
       closeDrawer();
     } catch (err) {
