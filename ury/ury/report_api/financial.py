@@ -1,6 +1,38 @@
+import ast
+import re
+
 import frappe
 
 from ury.ury.report_api.utils import require_manager
+
+# ury_daily_p_and_l.py's before_submit() builds `remarks` as an HTML blob
+# shaped like:
+#   "BUYING PRICE NOT SET<br><br>ITEMS:-<br>['A', 'B']<br><br>BUNDLE SUB ITEMS:-<br>[...]..."
+# i.e. a fixed set of "LABEL:-" headers each followed by a Python list-repr
+# string. Parsing this into {label, items[]} lets the frontend show a
+# compact "N items need pricing" summary instead of dumping the raw blob
+# (which, before this, was also a stored-XSS vector — see remarks_missing_prices
+# docstring below for why we never re-inject the raw HTML).
+_REMARKS_SECTION_RE = re.compile(r"([A-Z ]*ITEMS):-<br>(\[[^\]]*\])")
+
+
+def _parse_missing_price_remarks(remarks):
+	"""Best-effort parse of the known remarks structure into
+	[{"label": "Items", "items": ["A", "B"]}, ...]. Returns [] if the text
+	doesn't match the expected shape (e.g. a future backend change, or a
+	remarks value that was hand-edited) rather than raising — this is
+	display sugar, not something that should ever break the report."""
+	if not remarks:
+		return []
+	sections = []
+	for label, list_repr in _REMARKS_SECTION_RE.findall(remarks):
+		try:
+			items = ast.literal_eval(list_repr)
+		except (ValueError, SyntaxError):
+			continue
+		if isinstance(items, list) and items:
+			sections.append({"label": label.strip().title() or "Items", "items": [str(i) for i in items]})
+	return sections
 
 SUMMARY_FIELDS = [
 	("gross_sales", "gross_sales_percent", "Gross Sales"),
@@ -79,12 +111,21 @@ def get_daily_pnl(date, branch):
 		for r in (doc.get("cost_of_goods") or [])
 	]
 
+	missing_price_sections = _parse_missing_price_remarks(doc.remarks)
+	# If the remarks text matched the known "BUYING PRICE NOT SET" pattern,
+	# the frontend renders the structured summary instead and doesn't need
+	# the raw blob at all. Only fall back to showing raw remarks text
+	# (never as HTML — see DailyPnl.tsx) when it DOESN'T match, e.g. a
+	# manually-typed note via Desk.
+	free_text_remarks = doc.remarks if (doc.remarks and not missing_price_sections) else None
+
 	return {
 		"exists": True,
 		"name": doc.name,
 		"branch": doc.branch,
 		"date": str(doc.date),
-		"remarks": doc.remarks or None,
+		"remarks": free_text_remarks,
+		"missing_prices": missing_price_sections,
 		"summary": summary,
 		"direct_expenses_breakup": breakup_rows("direct_expenses_breakup"),
 		"employee_costs_breakup": breakup_rows("employee_costs_breakup"),
