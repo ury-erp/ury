@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
 import { Utensils, Search, Plus, LayoutGrid, List, Edit2, Check, X } from 'lucide-react';
-import { Card, Button, Badge, Input, Spinner } from '@ury/ui';
+import { Card, Button, Badge, Input, Spinner, showToast, Select } from '@ury/ui';
 import { formatCurrency, call } from '@ury/core';
 import { dashboardService } from '../../services/dashboard';
 import SideDrawer from '../../components/layout/SideDrawer';
@@ -41,6 +41,15 @@ export const MenuPage: React.FC = () => {
   const [drawerMode, setDrawerMode] = useState<DrawerMode>('none');
   const [editingItem, setEditingItem] = useState<MenuItemRecord | null>(null);
 
+  // Saving state for three handlers
+  const [savingItem, setSavingItem] = useState<boolean>(false);
+  const [savingMenu, setSavingMenu] = useState<boolean>(false);
+  const [savingCourse, setSavingCourse] = useState<boolean>(false);
+
+  // Options for Branch and Price List selects
+  const [branchOptions, setBranchOptions] = useState<{ name: string; title?: string }[]>([]);
+  const [priceListOptions, setPriceListOptions] = useState<{ name: string; title?: string }[]>([]);
+
   // Add/Edit item form state
   const [newItem, setNewItem] = useState({
     item_name: '',
@@ -60,6 +69,7 @@ export const MenuPage: React.FC = () => {
 
   // Add course form state
   const [newCourseName, setNewCourseName] = useState('');
+  const [newCourseIcon, setNewCourseIcon] = useState('');
 
   const fetchMenus = async () => {
     try {
@@ -108,8 +118,28 @@ export const MenuPage: React.FC = () => {
     }
   };
 
+  const fetchBranches = async () => {
+    try {
+      const branches = await dashboardService.getModuleRecords<{ name: string; title?: string }>('Branch', activeBranchId);
+      setBranchOptions(branches || []);
+    } catch {
+      setBranchOptions([]);
+    }
+  };
+
+  const fetchPriceLists = async () => {
+    try {
+      const priceLists = await dashboardService.getModuleRecords<{ name: string; title?: string }>('Price List', activeBranchId);
+      setPriceListOptions(priceLists || []);
+    } catch {
+      setPriceListOptions([]);
+    }
+  };
+
   useEffect(() => {
     fetchMenus();
+    fetchBranches();
+    fetchPriceLists();
   }, [activeBranchId]);
 
   useEffect(() => {
@@ -155,6 +185,7 @@ export const MenuPage: React.FC = () => {
 
   const openAddCourseDrawer = () => {
     setNewCourseName('');
+    setNewCourseIcon('');
     setDrawerMode('add-course');
   };
 
@@ -164,35 +195,38 @@ export const MenuPage: React.FC = () => {
     e.preventDefault();
     if (!newItem.item_name || !newItem.rate || !newItem.target_menu) return;
 
+    setSavingItem(true);
     let resolvedCourse = newItem.course;
 
-    // If adding a new course inline, create it first
-    if (newItem.is_adding_new_course && newItem.new_course_name.trim()) {
-      try {
-        await call('frappe.client.insert', {
-          doc: {
-            doctype: 'URY Menu Course',
-            course: newItem.new_course_name.trim(),
-          },
-        });
-        resolvedCourse = newItem.new_course_name.trim();
-        await fetchCourses();
-      } catch (err) {
-        console.error('Failed to create course', err);
-      }
-    }
-
     try {
+      // If adding a new course inline, create it first
+      if (newItem.is_adding_new_course && newItem.new_course_name.trim()) {
+        try {
+          await call('frappe.client.insert', {
+            doc: {
+              doctype: 'URY Menu Course',
+              course: newItem.new_course_name.trim(),
+            },
+          });
+          resolvedCourse = newItem.new_course_name.trim();
+          await fetchCourses();
+        } catch (err) {
+          console.error('Failed to create course', err);
+        }
+      }
+
       if (editingItem) {
         const res = await call<any>('frappe.client.get', { doctype: 'URY Menu', name: newItem.target_menu });
         const menuDoc = res.message || res;
         const rowIndex = menuDoc.items.findIndex((row: any) => row.name === editingItem.name);
-        if (rowIndex !== -1) {
-          menuDoc.items[rowIndex].item_name = newItem.item_name;
-          menuDoc.items[rowIndex].rate = parseFloat(newItem.rate);
-          menuDoc.items[rowIndex].course = resolvedCourse;
-          await call('frappe.client.save', { doc: menuDoc });
+        if (rowIndex === -1) {
+          showToast.error('Could not find the item to update');
+          return;
         }
+        menuDoc.items[rowIndex].item_name = newItem.item_name;
+        menuDoc.items[rowIndex].rate = parseFloat(newItem.rate);
+        menuDoc.items[rowIndex].course = resolvedCourse;
+        await call('frappe.client.save', { doc: menuDoc });
       } else {
         const insertRes = await call<any>('frappe.client.insert', {
           doc: {
@@ -224,15 +258,20 @@ export const MenuPage: React.FC = () => {
       if (selectedMenu === newItem.target_menu) {
         fetchMenuItems(selectedMenu);
       }
+      showToast.success('Item saved');
       closeDrawer();
     } catch (err) {
       console.error('Failed to save Item', err);
+      showToast.error('Failed to save item');
+    } finally {
+      setSavingItem(false);
     }
   };
 
   const handleSaveMenu = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMenu.menu_name) return;
+    setSavingMenu(true);
     try {
       await call('frappe.client.insert', {
         doc: {
@@ -244,26 +283,36 @@ export const MenuPage: React.FC = () => {
         },
       });
       await fetchMenus();
+      showToast.success('Menu saved');
       closeDrawer();
     } catch (err) {
       console.error('Failed to create URY Menu', err);
+      showToast.error('Failed to save menu');
+    } finally {
+      setSavingMenu(false);
     }
   };
 
   const handleSaveCourse = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCourseName.trim()) return;
+    setSavingCourse(true);
     try {
       await call('frappe.client.insert', {
         doc: {
           doctype: 'URY Menu Course',
           course: newCourseName.trim(),
+          icon: newCourseIcon || undefined,
         },
       });
       await fetchCourses();
+      showToast.success('Course saved');
       closeDrawer();
     } catch (err) {
       console.error('Failed to create Course', err);
+      showToast.error('Failed to save course');
+    } finally {
+      setSavingCourse(false);
     }
   };
 
@@ -557,8 +606,9 @@ export const MenuPage: React.FC = () => {
           </div>
 
           <div className="pt-6 flex justify-end gap-3 border-t mt-8 border-gray-100">
-            <Button type="button" variant="outline" onClick={closeDrawer} className="font-semibold">Cancel</Button>
-            <Button type="submit" className="bg-primary hover:bg-primary/90 text-white font-semibold shadow-xs">
+            <Button type="button" variant="outline" onClick={closeDrawer} className="font-semibold" disabled={savingItem}>Cancel</Button>
+            <Button type="submit" disabled={savingItem} className="bg-primary hover:bg-primary/90 text-white font-semibold shadow-xs flex items-center gap-2">
+              {savingItem && <Spinner className="w-4 h-4" />}
               {editingItem ? 'Save Changes' : 'Create Item'}
             </Button>
           </div>
@@ -584,25 +634,36 @@ export const MenuPage: React.FC = () => {
 
           <div>
             <label className="block font-semibold text-gray-700 mb-1.5">Branch</label>
-            <Input
+            <SearchableSelect
+              id="branch"
               value={newMenu.branch}
-              onChange={(e) => setNewMenu({ ...newMenu, branch: e.target.value })}
-              className="font-medium"
+              onChange={(_, value) => setNewMenu({ ...newMenu, branch: value })}
+              options={[
+                { value: '', label: 'None' },
+                ...branchOptions.map(b => ({ value: b.name, label: b.title || b.name }))
+              ]}
+              placeholder="Select Branch..."
             />
           </div>
 
           <div>
             <label className="block font-semibold text-gray-700 mb-1.5">Price List</label>
-            <Input
+            <SearchableSelect
+              id="price_list"
               value={newMenu.price_list}
-              onChange={(e) => setNewMenu({ ...newMenu, price_list: e.target.value })}
-              className="font-medium"
+              onChange={(_, value) => setNewMenu({ ...newMenu, price_list: value })}
+              options={[
+                { value: '', label: 'None' },
+                ...priceListOptions.map(p => ({ value: p.name, label: p.title || p.name }))
+              ]}
+              placeholder="Select Price List..."
             />
           </div>
 
           <div className="pt-6 flex justify-end gap-3 border-t mt-8 border-gray-100">
-            <Button type="button" variant="outline" onClick={closeDrawer} className="font-semibold">Cancel</Button>
-            <Button type="submit" className="bg-primary hover:bg-primary/90 text-white font-semibold shadow-xs">
+            <Button type="button" variant="outline" onClick={closeDrawer} className="font-semibold" disabled={savingMenu}>Cancel</Button>
+            <Button type="submit" disabled={savingMenu} className="bg-primary hover:bg-primary/90 text-white font-semibold shadow-xs flex items-center gap-2">
+              {savingMenu && <Spinner className="w-4 h-4" />}
               Create Menu
             </Button>
           </div>
@@ -626,9 +687,31 @@ export const MenuPage: React.FC = () => {
             />
           </div>
 
+          <div>
+            <label className="block font-semibold text-gray-700 mb-1.5">Icon</label>
+            <Select
+              value={newCourseIcon}
+              onChange={(e) => setNewCourseIcon(e.target.value)}
+              className="font-medium"
+            >
+              <option value="">None</option>
+              <option value="Utensils">Utensils</option>
+              <option value="Coffee">Coffee</option>
+              <option value="IceCream">Ice Cream</option>
+              <option value="Salad">Salad</option>
+              <option value="Pizza">Pizza</option>
+              <option value="Beef">Beef</option>
+              <option value="Fish">Fish</option>
+              <option value="Wine">Wine</option>
+              <option value="Soup">Soup</option>
+              <option value="Sandwich">Sandwich</option>
+            </Select>
+          </div>
+
           <div className="pt-6 flex justify-end gap-3 border-t mt-8 border-gray-100">
-            <Button type="button" variant="outline" onClick={closeDrawer} className="font-semibold">Cancel</Button>
-            <Button type="submit" className="bg-primary hover:bg-primary/90 text-white font-semibold shadow-xs">
+            <Button type="button" variant="outline" onClick={closeDrawer} className="font-semibold" disabled={savingCourse}>Cancel</Button>
+            <Button type="submit" disabled={savingCourse} className="bg-primary hover:bg-primary/90 text-white font-semibold shadow-xs flex items-center gap-2">
+              {savingCourse && <Spinner className="w-4 h-4" />}
               Create Course
             </Button>
           </div>

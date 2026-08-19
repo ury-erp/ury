@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
 import { Plus, Layers, Edit2 } from 'lucide-react';
-import { Card, Button, Badge, Input, Spinner } from '@ury/ui';
+import { Card, Button, Badge, Input, Spinner, showToast } from '@ury/ui';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { dashboardService } from '../../services/dashboard';
 import { call } from '@ury/core';
@@ -20,6 +20,7 @@ export const RoomPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
   const [editingRoom, setEditingRoom] = useState<UryRoomRecord | null>(null);
+  const [saving, setSaving] = useState<boolean>(false);
 
   // Branch options
   const [branches, setBranches] = useState<{ name: string }[]>([]);
@@ -88,6 +89,7 @@ export const RoomPage: React.FC = () => {
   const handleSaveRoom = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newRoom.room_name) return;
+    setSaving(true);
     try {
       if (editingRoom) {
         await call('frappe.client.set_value', {
@@ -106,7 +108,7 @@ export const RoomPage: React.FC = () => {
         await call('frappe.client.insert', {
           doc: {
             doctype: 'URY Room',
-            name: newRoom.room_name,
+            name: `${newRoom.room_name} - ${newRoom.branch}`,
             room_name: newRoom.room_name,
             room_type: newRoom.room_type,
             branch: newRoom.branch || undefined,
@@ -116,10 +118,14 @@ export const RoomPage: React.FC = () => {
           },
         });
       }
+      showToast.success('Room saved');
       fetchRooms();
       setIsDrawerOpen(false);
-    } catch (err) {
+    } catch (err: any) {
+      showToast.error(err.message || 'Failed to save room');
       console.error('Failed to save URY Room', err);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -273,10 +279,11 @@ export const RoomPage: React.FC = () => {
           </div>
 
           <div className="pt-6 flex justify-end gap-2 border-t mt-4 border-gray-100">
-            <Button type="button" variant="outline" onClick={() => setIsDrawerOpen(false)}>
+            <Button type="button" variant="outline" onClick={() => setIsDrawerOpen(false)} disabled={saving}>
               Cancel
             </Button>
-            <Button type="submit" className="bg-primary hover:bg-primary/90 text-white">
+            <Button type="submit" disabled={saving} className="bg-primary hover:bg-primary/90 text-white">
+              {saving ? <Spinner className="w-4 h-4 mr-1.5" /> : null}
               {editingRoom ? 'Save Changes' : 'Save Room'}
             </Button>
           </div>

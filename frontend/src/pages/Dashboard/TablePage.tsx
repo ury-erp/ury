@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
 import { Grid, Plus, Users, Square, List, Edit2, LayoutTemplate } from 'lucide-react';
-import { Card, Button, Badge, Input, Spinner } from '@ury/ui';
+import { Card, Button, Badge, Input, Spinner, showToast } from '@ury/ui';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { dashboardService } from '../../services/dashboard';
 import { call } from '@ury/core';
@@ -28,6 +28,7 @@ export const TablePage: React.FC = () => {
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'layout'>('list');
   const [editingTable, setEditingTable] = useState<UryTableRecord | null>(null);
+  const [saving, setSaving] = useState<boolean>(false);
 
   // Branch options from Branch doctype
   const [branches, setBranches] = useState<{ name: string }[]>([]);
@@ -111,6 +112,8 @@ export const TablePage: React.FC = () => {
   const handleSaveTable = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTable.table_name) return;
+
+    setSaving(true);
     try {
       if (editingTable) {
         await call('frappe.client.set_value', {
@@ -144,14 +147,17 @@ export const TablePage: React.FC = () => {
           }
         }
         if (!restaurantName) {
-          const branchVal = newTable.branch || activeBranchId;
-          restaurantName = branchVal && branchVal !== 'all' ? `${branchVal} Restaurant` : 'Main Restaurant';
+          showToast.error('No URY Restaurant configured for this branch — set one up first');
+          return;
         }
+
+        const branchName = newTable.branch || activeBranchId;
+        const uniqueTableName = `${newTable.table_name} - ${branchName}`;
 
         await call('frappe.client.insert', {
           doc: {
             doctype: 'URY Table',
-            name: newTable.table_name,
+            name: uniqueTableName,
             restaurant: restaurantName,
             no_of_seats: parseInt(newTable.no_of_seats),
             minimum_seating: parseInt(newTable.minimum_seating),
@@ -162,10 +168,14 @@ export const TablePage: React.FC = () => {
           },
         });
       }
+      showToast.success('Table saved');
       fetchTables();
       setIsDrawerOpen(false);
     } catch (err) {
       console.error('Failed to save URY Table', err);
+      showToast.error(`Failed to save table: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -404,11 +414,18 @@ export const TablePage: React.FC = () => {
           </div>
 
           <div className="pt-6 flex justify-end gap-3 border-t border-gray-100">
-            <Button type="button" variant="outline" onClick={() => setIsDrawerOpen(false)}>
+            <Button type="button" variant="outline" onClick={() => setIsDrawerOpen(false)} disabled={saving}>
               Cancel
             </Button>
-            <Button type="submit" className="bg-primary hover:bg-primary/90 text-white shadow-sm">
-              {editingTable ? 'Save Changes' : 'Save Table'}
+            <Button type="submit" className="bg-primary hover:bg-primary/90 text-white shadow-sm" disabled={saving}>
+              {saving ? (
+                <div className="flex items-center gap-2">
+                  <Spinner className="w-4 h-4" />
+                  Saving...
+                </div>
+              ) : (
+                editingTable ? 'Save Changes' : 'Save Table'
+              )}
             </Button>
           </div>
         </form>

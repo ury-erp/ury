@@ -10,6 +10,9 @@ import { PosProfilePage } from './pages/Dashboard/PosProfilePage';
 import { UserPage } from './pages/Dashboard/UserPage';
 import { BranchPage } from './pages/Dashboard/BranchPage';
 import { ReportSettingsPage } from './pages/Dashboard/ReportSettingsPage';
+import ProductionUnitPage from './pages/Dashboard/ProductionUnitPage';
+import AggregatorPage from './pages/Dashboard/AggregatorPage';
+import { RoleGuard } from './components/RoleGuard';
 
 function SetupGuard() {
   // @ts-ignore
@@ -34,7 +37,7 @@ function App() {
         <Route path="setup-wizard/0" element={<SetupPage />} />
         <Route path="setup-wizard/1" element={<ConfigurePage />} />
 
-        <Route path="/" element={<DashboardLayout />}>
+        <Route path="/" element={<RoleGuard><DashboardLayout /></RoleGuard>}>
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="menu" element={<MenuPage />} />
@@ -44,6 +47,8 @@ function App() {
           <Route path="user" element={<UserPage />} />
           <Route path="branch" element={<BranchPage />} />
           <Route path="report-settings" element={<ReportSettingsPage />} />
+          <Route path="production-unit" element={<ProductionUnitPage />} />
+          <Route path="aggregator" element={<AggregatorPage />} />
         </Route>
       </Route>
 
