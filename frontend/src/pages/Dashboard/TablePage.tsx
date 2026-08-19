@@ -3,6 +3,7 @@ import { useBranchContext } from '../../context/BranchContext';
 import { Grid, Plus, Users, Square, List, Edit2, LayoutTemplate } from 'lucide-react';
 import { Card, Button, Badge, Input, Spinner, showToast } from '@ury/ui';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
+import { Switch } from '../../components/ui/switch';
 import { dashboardService } from '../../services/dashboard';
 import { call } from '@ury/core';
 import SideDrawer from '../../components/layout/SideDrawer';
@@ -400,12 +401,10 @@ export const TablePage: React.FC = () => {
             </div>
 
             <div className="flex items-center space-x-2 pt-2">
-              <input
-                type="checkbox"
+              <Switch
                 id="is_take_away"
                 checked={newTable.is_take_away}
-                onChange={(e) => setNewTable({ ...newTable, is_take_away: e.target.checked })}
-                className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
+                onCheckedChange={(checked) => setNewTable({ ...newTable, is_take_away: checked })}
               />
               <label htmlFor="is_take_away" className="text-sm font-medium text-gray-700 cursor-pointer">
                 Is Take Away Table

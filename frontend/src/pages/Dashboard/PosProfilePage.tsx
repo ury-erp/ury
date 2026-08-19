@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
 import { SlidersHorizontal, Printer, Shield, Settings2, ChevronDown, Users, Plus, X } from 'lucide-react';
 import { Card, Button, Badge, Input, Select, Spinner, showToast } from '@ury/ui';
+import { Switch } from '../../components/ui/switch';
 import { dashboardService } from '../../services/dashboard';
 import { call } from '@ury/core';
 import SideDrawer from '../../components/layout/SideDrawer';
@@ -543,13 +544,17 @@ export const PosProfilePage: React.FC = () => {
                     <option value="">Select User</option>
                     {options.users.map((u: any) => <option key={u.name} value={u.name}>{u.full_name || u.name}</option>)}
                   </Select>
-                  <label className="flex items-center gap-1 text-xs text-gray-600">
-                    <input type="checkbox" checked={row.default === 1} onChange={e => {
-                      const newRows = [...addForm.applicable_for_users];
-                      newRows[idx].default = e.target.checked ? 1 : 0;
-                      setAddForm({...addForm, applicable_for_users: newRows});
-                    }} /> Default
-                  </label>
+                  <div className="flex items-center gap-1.5 text-xs text-gray-600">
+                    <Switch
+                      checked={row.default === 1}
+                      onCheckedChange={checked => {
+                        const newRows = [...addForm.applicable_for_users];
+                        newRows[idx].default = checked ? 1 : 0;
+                        setAddForm({...addForm, applicable_for_users: newRows});
+                      }}
+                    />
+                    <span>Default</span>
+                  </div>
                   <button type="button" className="text-gray-400 hover:text-red-500" onClick={() => {
                     const newRows = addForm.applicable_for_users.filter((_, i) => i !== idx);
                     setAddForm({...addForm, applicable_for_users: newRows});
@@ -575,13 +580,17 @@ export const PosProfilePage: React.FC = () => {
                     <option value="">Select Payment Mode</option>
                     {options.payments.map((p: any) => <option key={p.name} value={p.name}>{p.name}</option>)}
                   </Select>
-                  <label className="flex items-center gap-1 text-xs text-gray-600">
-                    <input type="checkbox" checked={row.default === 1} onChange={e => {
-                      const newRows = [...addForm.payments];
-                      newRows[idx].default = e.target.checked ? 1 : 0;
-                      setAddForm({...addForm, payments: newRows});
-                    }} /> Default
-                  </label>
+                  <div className="flex items-center gap-1.5 text-xs text-gray-600">
+                    <Switch
+                      checked={row.default === 1}
+                      onCheckedChange={checked => {
+                        const newRows = [...addForm.payments];
+                        newRows[idx].default = checked ? 1 : 0;
+                        setAddForm({...addForm, payments: newRows});
+                      }}
+                    />
+                    <span>Default</span>
+                  </div>
                   <button type="button" className="text-gray-400 hover:text-red-500" onClick={() => {
                     const newRows = addForm.payments.filter((_, i) => i !== idx);
                     setAddForm({...addForm, payments: newRows});
@@ -661,15 +670,14 @@ export const PosProfilePage: React.FC = () => {
                 { key: 'custom_edit_order_type', label: 'Enable Order Type Edit', type: 'checkbox' },
                 { key: 'custom_reset_order_number_daily', label: 'Reset Order Number Daily', type: 'checkbox' },
               ].map(({ key, label }) => (
-                <label key={key} className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
+                <div key={key} className="flex items-center gap-2">
+                  <Switch
+                    id={key}
                     checked={!!profileForm[key]}
-                    onChange={(e) => setProfileForm(p => ({ ...p, [key]: e.target.checked ? 1 : 0 }))}
-                    className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
+                    onCheckedChange={(checked) => setProfileForm(p => ({ ...p, [key]: checked ? 1 : 0 }))}
                   />
-                  <span className="font-medium text-gray-700">{label}</span>
-                </label>
+                  <label htmlFor={key} className="font-medium text-gray-700 cursor-pointer">{label}</label>
+                </div>
               ))}
             </div>
           </div>
@@ -716,13 +724,17 @@ export const PosProfilePage: React.FC = () => {
                     <option value="">Select User</option>
                     {options.users.map((u: any) => <option key={u.name} value={u.name}>{u.full_name || u.name}</option>)}
                   </Select>
-                  <label className="flex items-center gap-1 text-xs text-gray-600">
-                    <input type="checkbox" checked={row.default === 1} onChange={e => {
-                      const newRows = [...(profileForm.applicable_for_users || [])];
-                      newRows[idx].default = e.target.checked ? 1 : 0;
-                      setProfileForm({...profileForm, applicable_for_users: newRows});
-                    }} /> Default
-                  </label>
+                  <div className="flex items-center gap-1.5 text-xs text-gray-600">
+                    <Switch
+                      checked={row.default === 1}
+                      onCheckedChange={checked => {
+                        const newRows = [...(profileForm.applicable_for_users || [])];
+                        newRows[idx].default = checked ? 1 : 0;
+                        setProfileForm({...profileForm, applicable_for_users: newRows});
+                      }}
+                    />
+                    <span>Default</span>
+                  </div>
                   <button type="button" className="text-gray-400 hover:text-red-500" onClick={() => {
                     const newRows = (profileForm.applicable_for_users || []).filter((_: any, i: number) => i !== idx);
                     setProfileForm({...profileForm, applicable_for_users: newRows});
@@ -749,13 +761,17 @@ export const PosProfilePage: React.FC = () => {
                     <option value="">Select Payment Mode</option>
                     {options.payments.map((p: any) => <option key={p.name} value={p.name}>{p.name}</option>)}
                   </Select>
-                  <label className="flex items-center gap-1 text-xs text-gray-600">
-                    <input type="checkbox" checked={row.default === 1} onChange={e => {
-                      const newRows = [...(profileForm.payments || [])];
-                      newRows[idx].default = e.target.checked ? 1 : 0;
-                      setProfileForm({...profileForm, payments: newRows});
-                    }} /> Default
-                  </label>
+                  <div className="flex items-center gap-1.5 text-xs text-gray-600">
+                    <Switch
+                      checked={row.default === 1}
+                      onCheckedChange={checked => {
+                        const newRows = [...(profileForm.payments || [])];
+                        newRows[idx].default = checked ? 1 : 0;
+                        setProfileForm({...profileForm, payments: newRows});
+                      }}
+                    />
+                    <span>Default</span>
+                  </div>
                   <button type="button" className="text-gray-400 hover:text-red-500" onClick={() => {
                     const newRows = (profileForm.payments || []).filter((_: any, i: number) => i !== idx);
                     setProfileForm({...profileForm, payments: newRows});

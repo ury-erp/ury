@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
 import { Save, ChevronDown, ChevronRight, Plus, X } from 'lucide-react';
 import { Card, Button, Input, Select, Spinner, showToast } from '@ury/ui';
+import { Switch } from '../../components/ui/switch';
 import SideDrawer from '../../components/layout/SideDrawer';
 import { call } from '@ury/core';
 import { dashboardService } from '../../services/dashboard';
@@ -352,14 +353,15 @@ export const BranchPage: React.FC = () => {
                 disabled={!restaurantData}
               />
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">Create Invoice without Tax</label>
-              <input
-                type="checkbox"
+            <div className="flex items-center space-x-2 pt-1">
+              <Switch
+                id="custom_no_taxes"
                 checked={!!branchForm.custom_no_taxes}
-                onChange={(e) => setBranchForm(p => ({ ...p, custom_no_taxes: e.target.checked ? 1 : 0 }))}
-                className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
+                onCheckedChange={(checked) => setBranchForm(p => ({ ...p, custom_no_taxes: checked ? 1 : 0 }))}
               />
+              <label htmlFor="custom_no_taxes" className="text-sm font-medium text-gray-700 cursor-pointer">
+                Create Invoice without Tax
+              </label>
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700">Default Tax Template</label>
@@ -402,12 +404,10 @@ export const BranchPage: React.FC = () => {
                     </Select>
                   </div>
                   <div className="flex items-center gap-2 pt-6">
-                    <input
-                      type="checkbox"
+                    <Switch
                       id="room_wise_menu"
                       checked={!!restaurantForm.room_wise_menu}
-                      onChange={(e) => setRestaurantForm(p => ({ ...p, room_wise_menu: e.target.checked ? 1 : 0 }))}
-                      className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
+                      onCheckedChange={(checked) => setRestaurantForm(p => ({ ...p, room_wise_menu: checked ? 1 : 0 }))}
                     />
                     <label htmlFor="room_wise_menu" className="text-sm font-medium text-gray-700 cursor-pointer">
                       Room Wise Menu
@@ -516,12 +516,10 @@ export const BranchPage: React.FC = () => {
             {restaurantData ? (
               <>
                 <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
+                  <Switch
                     id="order_type_wise_menu"
                     checked={!!restaurantForm.order_type_wise_menu}
-                    onChange={(e) => setRestaurantForm(p => ({ ...p, order_type_wise_menu: e.target.checked ? 1 : 0 }))}
-                    className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
+                    onCheckedChange={(checked) => setRestaurantForm(p => ({ ...p, order_type_wise_menu: checked ? 1 : 0 }))}
                   />
                   <label htmlFor="order_type_wise_menu" className="text-sm font-medium text-gray-700 cursor-pointer">
                     Order Type Wise Menu
