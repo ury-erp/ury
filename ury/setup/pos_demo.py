@@ -13,12 +13,10 @@ def generate_pos_demo():
     if existing_openings:
         return
         
-    frappe.publish_realtime("setup_task", {"progress": [4, 7], "stage_status": "Generating Closed POS Session..."}, user=user)
     opening1 = create_pos_opening(company)
     create_pos_invoices(company, opening1, count=5)
     create_pos_closing(company, opening1)
 
-    frappe.publish_realtime("setup_task", {"progress": [5, 7], "stage_status": "Generating Open POS Session..."}, user=user)
     opening2 = create_pos_opening(company)
     create_pos_invoices(company, opening2, count=5)
 
