@@ -175,7 +175,6 @@ function MobileQRLayout({ initialContext }: LayoutProps) {
           {filteredMenu.map((item) => (
             <div
               key={item.item}
-              onClick={() => handleProductClick(item.item)}
               className="overflow-hidden rounded-lg border transition active:scale-[0.98]"
             >
               <ProductCard
@@ -276,7 +275,10 @@ function MobileQRLayout({ initialContext }: LayoutProps) {
                 if (success) goToStatus()
               })
             }}
-            onPayOnline={payOnline}
+            onPayOnline={async () => {
+              if (cartItems.length > 0 && !(await submitCart())) return
+              payOnline()
+            }}
             onRequestBill={handleRequestBill}
           />
         </div>

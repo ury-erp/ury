@@ -24,7 +24,7 @@ interface CategoryTabsProps {
  *       seen.set(key, item.course_label ?? item.course)
  *     }
  *   }
- *   return Array.from(seen.entries()).map(([course, label]) => ({ course, label }))
+ *   return Array.from(seen.entries()).map(([course, label]) => ({ course, course_label: label }))
  * }, [menu])
  *
  * <CategoryTabs

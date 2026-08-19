@@ -165,7 +165,10 @@ function TabletLayout({ initialContext }: LayoutProps) {
                 if (success) goToStatus()
               })
             }}
-            onPayOnline={payOnline}
+            onPayOnline={async () => {
+              if (cartItems.length > 0 && !(await submitCart())) return
+              payOnline()
+            }}
             onRequestBill={handleRequestBill}
           />
         </div>
@@ -264,7 +267,10 @@ function TabletLayout({ initialContext }: LayoutProps) {
           onDecrement={decrementCart}
           onSubmit={goToCheckout}
           onRequestBill={handleRequestBill}
-          onPayOnline={payOnline}
+          onPayOnline={async () => {
+            if (cartItems.length > 0 && !(await submitCart())) return
+            payOnline()
+          }}
           className="flex w-[32%] flex-col overflow-hidden border-l bg-background p-4"
         />
       </div>

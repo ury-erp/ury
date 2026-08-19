@@ -209,7 +209,10 @@ function LandscapeKioskLayout({ initialContext }: LayoutProps) {
                 if (success) goToStatus()
               })
             }}
-            onPayOnline={payOnline}
+            onPayOnline={async () => {
+              if (cartItems.length > 0 && !(await submitCart())) return
+              payOnline()
+            }}
             onRequestBill={handleRequestBill}
           />
         </div>
@@ -332,7 +335,10 @@ function LandscapeKioskLayout({ initialContext }: LayoutProps) {
           onDecrement={decrementCart}
           onSubmit={goToCart}
           onRequestBill={handleRequestBill}
-          onPayOnline={payOnline}
+          onPayOnline={async () => {
+            if (cartItems.length > 0 && !(await submitCart())) return
+            payOnline()
+          }}
           className="flex w-[420px] shrink-0 flex-col overflow-hidden border-l bg-background p-6 text-base"
         />
       </div>
