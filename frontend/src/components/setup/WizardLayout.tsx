@@ -1,7 +1,7 @@
 import { ReactNode } from 'react';
 import { Button } from '@ury/ui';
 import { Check } from 'lucide-react';
-import uryLogo from '../../../Public/URY-bg.png';
+import uryLogo from '../../../Public/photo_2026-08-19_13-24-09.jpg';
 
 interface WizardLayoutProps {
   step: 1 | 2;
@@ -33,24 +33,17 @@ export function WizardLayout({
     <div className="min-h-screen w-full flex flex-col bg-background">
       {/* Header bar */}
       <header className="w-full border-b border-border bg-card">
-        <div className={`${SHELL_WIDTH} py-5 flex flex-col gap-4`}>
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <img src={uryLogo} alt="URY Logo" className="h-9 w-auto object-contain" />
-              <div>
-                <p className="text-sm font-semibold text-foreground leading-tight">Let's get your restaurant ready</p>
-                <p className="text-xs text-muted-foreground leading-tight">
-                  Nothing here is final — you can change any of this anytime.
-                </p>
-              </div>
-            </div>
+        <div className={`${SHELL_WIDTH} h-16 flex items-center justify-between gap-4`}>
+          <div className="flex items-center gap-3">
+            <img src={uryLogo} alt="URY Logo" className="h-7 w-auto" />
+            <span className="text-sm font-semibold text-foreground leading-none">Let's get your restaurant ready</span>
+          </div>
 
-            {/* 2-step breadcrumb (Setup, Configure) */}
-            <div className="hidden sm:flex items-center gap-2">
-              <BreadcrumbStep label="Setup" state={step === 1 ? 'active' : 'done'} />
-              <div className={`w-8 h-px ${step === 2 ? 'bg-primary' : 'bg-border'}`} />
-              <BreadcrumbStep label="Configure" state={step === 2 ? 'active' : 'upcoming'} />
-            </div>
+          {/* 2-step breadcrumb (Setup, Configure) */}
+          <div className="hidden sm:flex items-center gap-2">
+            <BreadcrumbStep label="Setup" state={step === 1 ? 'active' : 'done'} />
+            <div className={`w-8 h-px ${step === 2 ? 'bg-primary' : 'bg-border'}`} />
+            <BreadcrumbStep label="Configure" state={step === 2 ? 'active' : 'upcoming'} />
           </div>
         </div>
       </header>
