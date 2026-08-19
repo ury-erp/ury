@@ -74,6 +74,24 @@
   color: #1e40af !important;
 }
 
+/* Warning Toast */
+.toast-warning {
+  background-color: #fffbe6 !important;
+  color: #92400e !important;
+}
+
+.toast-warning .Toastify__toast-icon svg {
+  color: #d97706 !important;
+}
+
+.toast-warning .Toastify__progress-bar {
+  background-color: #d97706 !important;
+}
+
+.toast-warning .Toastify__close-button {
+  color: #92400e !important;
+}
+
 /* Common styles for all toasts */
 .Toastify__toast-body {
   font-size: 0.875rem !important;

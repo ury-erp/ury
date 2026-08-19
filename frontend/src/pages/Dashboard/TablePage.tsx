@@ -114,6 +114,11 @@ export const TablePage: React.FC = () => {
     e.preventDefault();
     if (!newTable.table_name) return;
 
+    if (!newTable.restaurant_room || !newTable.restaurant_room.trim()) {
+      showToast.warning('Please select a room for the table');
+      return;
+    }
+
     setSaving(true);
     try {
       if (editingTable) {
