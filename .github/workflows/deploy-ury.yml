@@ -32,6 +32,6 @@ jobs:
           SSH_PORT: ${{ secrets.URY_DEPLOY_PORT }}
         run: |
           ssh -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" \
-            "/home/ubuntu/deploy-ury.sh \
+            "/home/beta/deploy-ury.sh \
             '${GITHUB_REF_NAME}' \
             '${GITHUB_SHA}'"
