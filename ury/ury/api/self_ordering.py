@@ -544,9 +544,30 @@ def add_customer_items(session, items):
         if session.device:
             invoice.custom_ordering_device = session.device
 
+        # Aggregated by item_code, same as current_items_for_kot below (built
+        # after the append). This symmetry matters: add_customer_items()
+        # always appends a NEW row rather than merging into an existing
+        # same-item_code row (simpler, safer for concurrent requests), so a
+        # table's invoice routinely ends up with multiple separate rows for
+        # the same item_code after a few rounds of ordering. kot_execute's
+        # compare_two_array() does an exact-match-then-delta comparison
+        # assuming ONE row per item_code on each side — if `previous_items`
+        # were left as raw per-row entries while `current_items` was
+        # aggregated (as an earlier version of this function had it), a
+        # repeat item_code's several qty=1 previous rows would never
+        # exact-match the aggregated current total, and
+        # compare_two_array's delta loop overwrites (not accumulates)
+        # across multiple matching previous rows -- producing a bogus
+        # cancellation KOT for an item nobody cancelled. Confirmed live via
+        # a real second-order-on-a-multi-round-invoice test.
+        past_qty_by_item = {}
+        past_name_by_item = {}
+        for row in invoice.items:
+            past_qty_by_item[row.item_code] = past_qty_by_item.get(row.item_code, 0) + row.qty
+            past_name_by_item[row.item_code] = row.item_name
         past_item = [
-            {"item_code": row.item_code, "item_name": row.item_name, "qty": row.qty, "comments": ""}
-            for row in invoice.items
+            {"item_code": code, "item_name": past_name_by_item[code], "qty": past_qty_by_item[code], "comments": ""}
+            for code in past_qty_by_item
         ]
 
         menu = frappe.db.get_value("URY Menu", {"branch": invoice.branch}, "name")
@@ -734,6 +755,14 @@ def create_payment_request(session):
             )
         except Exception as e:
             frappe.log_error(f"create_payment_request failed: {e}", "Self-Order Payment")
+            # ERPNext's make_payment_request() queues its own raw msgprint
+            # (e.g. "Payment Entry is already created") via frappe.throw
+            # before we ever get a chance to catch it — that message stays
+            # queued in frappe.local.message_log even after we catch the
+            # exception here, so it would still reach the client's
+            # _server_messages alongside our clean one below. Clear it so
+            # only the customer-appropriate message is ever queued.
+            frappe.clear_messages()
             frappe.throw(
                 _("Online payment isn't set up for this restaurant yet. Please pay at the counter."),
                 frappe.ValidationError,
