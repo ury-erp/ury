@@ -22,6 +22,9 @@ export default defineConfig({
         globDirectory: resolve(__dirname, '../ury/public/pos'),
         swDest: resolve(__dirname, '../ury/public/pos/sw.js'),
         injectionPoint: 'self.__WB_MANIFEST',
+        modifyURLPrefix: {
+          '': '/assets/ury/pos/',
+        },
       },
 
       devOptions: {
