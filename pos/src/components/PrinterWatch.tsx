@@ -235,13 +235,13 @@ export function PrinterStatusButton() {
     <button
       type="button"
       onClick={open}
-      className="relative inline-flex h-10 items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 focus:outline-none"
+      className="inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900 focus:outline-none"
       aria-label="Printer Status"
     >
-      <Printer className="h-4 w-4" />
+      <Printer className="h-4 w-4 text-gray-600" />
       <span>Printer Status</span>
       <span
-        className={`h-2 w-2 rounded-full ${dotClass}`}
+        className={`h-2.5 w-2.5 rounded-full ${dotClass}`}
         aria-hidden="true"
       />
     </button>
