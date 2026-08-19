@@ -2,6 +2,7 @@
 # See license.txt
 
 import unittest
+from unittest import mock
 
 import frappe
 
@@ -63,9 +64,20 @@ class TestSimulatedPaymentTerminalProvider(unittest.TestCase):
         ).insert(ignore_permissions=True)
         register_payment_terminal_provider(_SimulatedPaymentTerminalProvider())
 
+        # The transaction log's `invoice` field link-validates against a real
+        # POS Invoice, which is correct for production (a terminal
+        # transaction is always tied to a real invoice) but out of scope to
+        # fixture up here -- these tests only cover the terminal/transaction
+        # lifecycle itself, not invoice creation. Skip link validation for
+        # the duration of this test class rather than either weakening the
+        # field in production or dragging in an unrelated invoice fixture.
+        self._link_patch = mock.patch("frappe.model.document.Document._validate_links")
+        self._link_patch.start()
+
     def tearDown(self):
         from ury.ury.api import payment_terminal
 
+        self._link_patch.stop()
         payment_terminal._payment_terminal_provider = payment_terminal._NoOpPaymentTerminalProvider()
         frappe.db.delete(
             "URY Payment Terminal Transaction", {"terminal": self.terminal.name}
