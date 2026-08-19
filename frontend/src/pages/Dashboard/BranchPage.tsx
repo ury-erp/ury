@@ -701,8 +701,7 @@ export const BranchPage: React.FC = () => {
               {branchList.map((b) => (
                 <tr
                   key={b.name}
-                  className="hover:bg-primary/5 transition-colors cursor-pointer"
-                  onClick={() => handleBranchView(b)}
+                  className="hover:bg-gray-50/50 transition-colors"
                 >
                   <td className="px-6 py-4 font-semibold text-gray-900">{b.branch || b.branch_name || b.name}</td>
                   <td className="px-6 py-4 text-gray-600">{b.address || '-'}</td>
@@ -711,7 +710,7 @@ export const BranchPage: React.FC = () => {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={(e) => { e.stopPropagation(); handleBranchView(b); }}
+                        onClick={() => handleBranchView(b)}
                         className="text-gray-500 hover:text-primary p-1.5 h-8 w-8"
                         title="View Branch"
                       >
@@ -720,7 +719,7 @@ export const BranchPage: React.FC = () => {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={(e) => { e.stopPropagation(); handleBranchEdit(b); }}
+                        onClick={() => handleBranchEdit(b)}
                         className="text-gray-500 hover:text-primary p-1.5 h-8 w-8"
                         title="Edit Branch"
                       >
