@@ -116,12 +116,26 @@ export const MenuPage: React.FC = () => {
     if (!menuName) return;
     setLoading(true);
     try {
-      const res = await call<any>('frappe.client.get', {
-        doctype: 'URY Menu',
-        name: menuName,
-      });
-      const menuDoc = res.message || res;
-      setItems(menuDoc.items || []);
+      if (menuName === 'all') {
+        const allMenuDocs = await Promise.all(
+          menus.map((m) =>
+            call<any>('frappe.client.get', {
+              doctype: 'URY Menu',
+              name: m.name,
+            })
+              .then((res) => (res.message || res)?.items || [])
+              .catch(() => [])
+          )
+        );
+        setItems(allMenuDocs.flat());
+      } else {
+        const res = await call<any>('frappe.client.get', {
+          doctype: 'URY Menu',
+          name: menuName,
+        });
+        const menuDoc = res.message || res;
+        setItems(menuDoc.items || []);
+      }
     } catch {
       setItems([]);
     } finally {
@@ -166,7 +180,7 @@ export const MenuPage: React.FC = () => {
     if (selectedMenu) {
       fetchMenuItems(selectedMenu);
     }
-  }, [selectedMenu]);
+  }, [selectedMenu, menus.length]);
 
   const openAddItemDrawer = () => {
     setEditingItem(null);
@@ -176,7 +190,7 @@ export const MenuPage: React.FC = () => {
       course: '',
       new_course_name: '',
       is_adding_new_course: false,
-      target_menu: selectedMenu,
+      target_menu: selectedMenu === 'all' ? (menus[0]?.name || '') : selectedMenu,
     });
     setDrawerMode('add-item');
   };
@@ -189,7 +203,7 @@ export const MenuPage: React.FC = () => {
       course: item.course || '',
       new_course_name: '',
       is_adding_new_course: false,
-      target_menu: selectedMenu,
+      target_menu: selectedMenu === 'all' ? (menus[0]?.name || '') : selectedMenu,
     });
     setDrawerMode('edit-item');
   };
@@ -305,7 +319,7 @@ export const MenuPage: React.FC = () => {
         }
       }
 
-      if (creatingItemForRowIndex === null && selectedMenu === newItem.target_menu) {
+      if (creatingItemForRowIndex === null && (selectedMenu === 'all' || selectedMenu === newItem.target_menu)) {
         fetchMenuItems(selectedMenu);
       }
       showToast.success('Item saved');
@@ -518,7 +532,10 @@ export const MenuPage: React.FC = () => {
             <SearchableSelect
               id="selected-menu"
               value={selectedMenu}
-              options={menus.map((m) => ({ value: m.name, label: m.menu_name || m.name }))}
+              options={[
+                { value: 'all', label: 'All Menu Items' },
+                ...menus.map((m) => ({ value: m.name, label: m.menu_name || m.name }))
+              ]}
               placeholder="Select Menu..."
               onChange={(_, val) => setSelectedMenu(val)}
             />
