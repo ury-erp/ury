@@ -21,6 +21,10 @@ from ury.ury.api.self_ordering import (
     _sign,
     add_customer_items,
     request_bill,
+    create_payment_request,
+    get_payment_status,
+    share_payment_link,
+    register_communication_provider,
 )
 
 
@@ -387,3 +391,220 @@ class TestRequestBill(unittest.TestCase):
         result = request_bill("session-token")
         self.assertEqual(result["status"], "Already Requested")
         self.assertEqual(result["request"], "SR-EXISTING")
+
+
+class TestCreatePaymentRequest(unittest.TestCase):
+    @patch("erpnext.accounts.doctype.payment_request.payment_request.make_payment_request")
+    @patch(f"{MOD}.frappe.get_doc")
+    @patch(f"{MOD}._resolve_session")
+    @patch(f"{MOD}.frappe.set_user")
+    def test_create_payment_request_never_trusts_client_amount(
+        self, mock_set_user, mock_resolve_session, mock_get_doc, mock_make_pr,
+    ):
+        """The whitelisted signature is create_payment_request(session) --
+        there is no amount/currency parameter at all, so a client literally
+        cannot influence what gets charged; make_payment_request() derives
+        the amount server-side from the POS Invoice itself."""
+        session = MagicMock()
+        session.invoice = "POS-INV-100"
+        session.ordering_profile = "Profile A"
+        mock_resolve_session.return_value = session
+
+        profile = MagicMock()
+        profile.enable_customer_payment = 1
+        profile.enable_payment_link = 0
+
+        invoice = MagicMock()
+        invoice.docstatus = 0
+        invoice.name = "POS-INV-100"
+
+        def get_doc_side_effect(doctype, name=None):
+            if doctype == "URY Self Ordering Profile":
+                return profile
+            if doctype == "POS Invoice":
+                return invoice
+            return MagicMock()
+
+        mock_get_doc.side_effect = get_doc_side_effect
+
+        pr = MagicMock()
+        pr.name = "PR-001"
+        pr.grand_total = 1293.72
+        pr.currency = "INR"
+        pr.status = "Draft"
+        pr.get_payment_url.return_value = "https://pay.example/PR-001"
+        mock_make_pr.return_value = pr
+
+        result = create_payment_request("session-token")
+
+        # dt/dn/amount all come from the session-resolved invoice, not from
+        # any client-supplied argument (there isn't one to trust).
+        mock_make_pr.assert_called_once_with(
+            dt="POS Invoice", dn="POS-INV-100", submit_doc=1, mute_email=1,
+            order_type="Shopping Cart", return_doc=1,
+        )
+        self.assertEqual(result["payment_request"], "PR-001")
+        self.assertEqual(result["amount"], 1293.72)
+        self.assertEqual(result["payment_url"], "https://pay.example/PR-001")
+
+    @patch(f"{MOD}.frappe.get_doc")
+    @patch(f"{MOD}._resolve_session")
+    def test_create_payment_request_rejects_when_payment_disabled(self, mock_resolve_session, mock_get_doc):
+        session = MagicMock()
+        session.invoice = "POS-INV-100"
+        mock_resolve_session.return_value = session
+
+        profile = MagicMock()
+        profile.enable_customer_payment = 0
+        profile.enable_payment_link = 0
+        mock_get_doc.return_value = profile
+
+        with self.assertRaises(frappe.ValidationError):
+            create_payment_request("session-token")
+
+    @patch("erpnext.accounts.doctype.payment_request.payment_request.make_payment_request")
+    @patch(f"{MOD}.frappe.get_doc")
+    @patch(f"{MOD}._resolve_session")
+    @patch(f"{MOD}.frappe.set_user")
+    def test_create_payment_request_rejects_already_settled_invoice(
+        self, mock_set_user, mock_resolve_session, mock_get_doc, mock_make_pr,
+    ):
+        session = MagicMock()
+        session.invoice = "POS-INV-100"
+        mock_resolve_session.return_value = session
+
+        profile = MagicMock()
+        profile.enable_customer_payment = 1
+        profile.enable_payment_link = 0
+
+        invoice = MagicMock()
+        invoice.docstatus = 1  # already submitted/settled
+
+        def get_doc_side_effect(doctype, name=None):
+            if doctype == "URY Self Ordering Profile":
+                return profile
+            return invoice
+
+        mock_get_doc.side_effect = get_doc_side_effect
+
+        with self.assertRaises(frappe.ValidationError):
+            create_payment_request("session-token")
+        mock_make_pr.assert_not_called()
+
+    @patch("erpnext.accounts.doctype.payment_request.payment_request.make_payment_request")
+    @patch(f"{MOD}.frappe.get_doc")
+    @patch(f"{MOD}._resolve_session")
+    @patch(f"{MOD}.frappe.set_user")
+    def test_create_payment_request_survives_missing_gateway(
+        self, mock_set_user, mock_resolve_session, mock_get_doc, mock_make_pr,
+    ):
+        """No Payment Gateway Account configured -> get_payment_url() raises.
+        The Payment Request itself must still be returned (real, valid, just
+        without a link) rather than the whole call failing."""
+        session = MagicMock()
+        session.invoice = "POS-INV-100"
+        mock_resolve_session.return_value = session
+
+        profile = MagicMock()
+        profile.enable_customer_payment = 1
+        profile.enable_payment_link = 0
+
+        invoice = MagicMock()
+        invoice.docstatus = 0
+        invoice.name = "POS-INV-100"
+
+        def get_doc_side_effect(doctype, name=None):
+            if doctype == "URY Self Ordering Profile":
+                return profile
+            return invoice
+
+        mock_get_doc.side_effect = get_doc_side_effect
+
+        pr = MagicMock()
+        pr.name = "PR-002"
+        pr.grand_total = 500
+        pr.currency = "INR"
+        pr.status = "Draft"
+        pr.get_payment_url.side_effect = Exception("No payment gateway account configured")
+        mock_make_pr.return_value = pr
+
+        result = create_payment_request("session-token")
+        self.assertEqual(result["payment_request"], "PR-002")
+        self.assertIsNone(result["payment_url"])
+
+
+class TestSharePaymentLink(unittest.TestCase):
+    def tearDown(self):
+        # Restore the default provider so other tests aren't affected by a
+        # provider left registered by this test class.
+        from ury.ury.api import self_ordering
+        self_ordering._communication_provider = self_ordering._default_communication_provider
+
+    @patch(f"{MOD}.frappe.get_doc")
+    @patch(f"{MOD}.frappe.db.get_value")
+    @patch(f"{MOD}._resolve_session")
+    @patch(f"{MOD}.frappe.set_user")
+    def test_share_payment_link_calls_registered_provider(
+        self, mock_set_user, mock_resolve_session, mock_db_get_value, mock_get_doc,
+    ):
+        session = MagicMock()
+        session.invoice = "POS-INV-100"
+        session.ordering_profile = "Profile A"
+        mock_resolve_session.return_value = session
+
+        profile = MagicMock()
+        profile.enable_payment_link = 1
+
+        pr_doc = MagicMock()
+        pr_doc.get_payment_url.return_value = "https://pay.example/PR-001"
+
+        def get_doc_side_effect(doctype, name=None):
+            if doctype == "URY Self Ordering Profile":
+                return profile
+            if doctype == "Payment Request":
+                return pr_doc
+            return MagicMock()
+
+        mock_get_doc.side_effect = get_doc_side_effect
+        mock_db_get_value.return_value = {"name": "PR-001", "grand_total": 1293.72}
+
+        sent = {}
+
+        def fake_provider(recipient, message):
+            sent["recipient"] = recipient
+            sent["message"] = message
+
+        register_communication_provider(fake_provider)
+
+        result = share_payment_link("session-token", "+919876543210")
+
+        self.assertEqual(result["status"], "Sent")
+        self.assertEqual(sent["recipient"], "+919876543210")
+        self.assertIn("1293.72", sent["message"])
+        self.assertIn("https://pay.example/PR-001", sent["message"])
+
+    @patch(f"{MOD}.frappe.get_doc")
+    @patch(f"{MOD}._resolve_session")
+    def test_share_payment_link_rejects_empty_recipient(self, mock_resolve_session, mock_get_doc):
+        session = MagicMock()
+        mock_resolve_session.return_value = session
+        profile = MagicMock()
+        profile.enable_payment_link = 1
+        mock_get_doc.return_value = profile
+
+        with self.assertRaises(frappe.ValidationError):
+            share_payment_link("session-token", "")
+
+
+class TestGetPaymentStatus(unittest.TestCase):
+    @patch(f"{MOD}.frappe.db.get_value")
+    @patch(f"{MOD}._resolve_session")
+    @patch(f"{MOD}.frappe.set_user")
+    def test_get_payment_status_no_invoice(self, mock_set_user, mock_resolve_session, mock_db_get_value):
+        session = MagicMock()
+        session.invoice = None
+        mock_resolve_session.return_value = session
+
+        result = get_payment_status("session-token")
+        self.assertIsNone(result["status"])
+        mock_db_get_value.assert_not_called()
