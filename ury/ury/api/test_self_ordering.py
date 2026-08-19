@@ -187,11 +187,12 @@ class TestAddCustomerItemsAppendOnly(unittest.TestCase):
 
 
 class TestRequestBill(unittest.TestCase):
+    @patch(f"{MOD}.now_datetime")
     @patch(f"{MOD}.frappe.get_doc")
     @patch(f"{MOD}.frappe.db.exists")
     @patch(f"{MOD}._resolve_session")
     @patch(f"{MOD}.frappe.set_user")
-    def test_request_bill_creates_service_request(self, mock_set_user, mock_resolve_session, mock_exists, mock_get_doc):
+    def test_request_bill_creates_service_request(self, mock_set_user, mock_resolve_session, mock_exists, mock_get_doc, mock_now):
         session = MagicMock()
         session.table = "Table 7"
         session.invoice = "POS-INV-100"
