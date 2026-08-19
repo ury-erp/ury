@@ -224,13 +224,14 @@ registerRoute(
 );
 
 // 6. Master Data & Bootstrap GET Endpoints (NetworkFirst with 24h offline fallback)
-// Includes auth, user roles, POS profile, and master menus
+// Includes auth, user roles, POS profile, order invoice lookup, Frappe client
+// helpers (get / get_value / get_list), and master menus.
 registerRoute(
   ({ request, url }) =>
     request.method === 'GET' &&
     (url.pathname.includes('/api/method/frappe.auth.get_logged_user') ||
-      url.pathname.includes('/api/method/frappe.client.get_value') ||
       url.pathname.includes('/api/method/frappe.client.get') ||
+      url.pathname.includes('/api/method/ury.ury.doctype.ury_order.ury_order.get_order_invoice') ||
       url.pathname.includes('/api/method/ury.ury_pos.api.getRestaurantMenu') ||
       url.pathname.includes('/api/method/ury.ury_pos.api.getModeOfPayment') ||
       url.pathname.includes('/api/method/ury.ury_pos.api.getMenuCourses') ||
@@ -252,34 +253,19 @@ registerRoute(
   })
 );
 
-// 7. Generic Frappe Resource API GET lists for URY Room / URY Table
-registerRoute(
-  ({ request, url }) => {
-    if (request.method !== 'GET') return false;
-    if (!url.pathname.includes('/api/method/frappe.client.get_list')) return false;
-    const doctype = url.searchParams.get('doctype');
-    return doctype === 'URY Room' || doctype === 'URY Table';
-  },
-  new NetworkFirst({
-    cacheName: 'ury-pos-master-data-get',
-    networkTimeoutSeconds: 3,
-    plugins: [
-      masterDataFallbackPlugin,
-      new BroadcastUpdatePlugin(),
-      new ExpirationPlugin({
-        maxEntries: 30,
-        maxAgeSeconds: 24 * 60 * 60, // 24 Hours offline fallback
-      }),
-    ],
-  })
-);
-
-// 8. Frappe REST resource endpoints for URY Room / URY Table
+// 7. Frappe REST resource endpoints for master data
 registerRoute(
   ({ request, url }) => {
     if (request.method !== 'GET') return false;
     const pathname = decodeURIComponent(url.pathname);
-    return pathname === '/api/resource/URY Table' || pathname === '/api/resource/URY Room';
+    return [
+      '/api/resource/URY Table',
+      '/api/resource/URY Room',
+      '/api/resource/Customer',
+      '/api/resource/Customer Group',
+      '/api/resource/Customer Territory',
+      '/api/resource/POS Invoice',
+    ].includes(pathname);
   },
   new NetworkFirst({
     cacheName: 'ury-pos-master-data-get',

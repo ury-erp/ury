@@ -20,7 +20,7 @@
 import { Workbox } from 'workbox-window';
 
 const isProduction = import.meta.env.PROD;
-const swPath = `${import.meta.env.BASE_URL}sw.js`;
+const swPath = '/api/method/ury.utils.get_service_worker';
 
 async function doRegister(scope?: string): Promise<ServiceWorkerRegistration> {
   const wb = new Workbox(swPath, { scope });
