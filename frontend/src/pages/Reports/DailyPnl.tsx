@@ -1,9 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
 import { Card, CardContent, CardHeader, CardTitle, StatCard } from '@ury/ui';
-import { IndianRupee, TrendingUp, TrendingDown, Percent } from 'lucide-react';
+import { IndianRupee, TrendingUp, TrendingDown, Percent, AlertTriangle, ChevronDown } from 'lucide-react';
 import { useBranchContext } from '../../context/BranchContext';
 import { toApiDate } from '../../lib/reportDate';
+
+interface MissingPriceSection {
+  label: string;
+  items: string[];
+}
 
 interface SummaryRow {
   key: string;
@@ -33,6 +38,7 @@ interface DailyPnlData {
   branch: string;
   date: string;
   remarks?: string | null;
+  missing_prices?: MissingPriceSection[];
   summary?: SummaryRow[];
   direct_expenses_breakup?: BreakupRow[];
   employee_costs_breakup?: BreakupRow[];
@@ -41,6 +47,48 @@ interface DailyPnlData {
 }
 
 const HERO_KEYS = ['gross_sales', 'net_sales', 'gross_profit', 'net_profit'];
+
+function MissingPricesWarning({ sections }: { sections: MissingPriceSection[] }) {
+  const [expanded, setExpanded] = useState(false);
+  const totalItems = sections.reduce((sum, s) => sum + s.items.length, 0);
+
+  return (
+    <div className="rounded-md border border-amber-200 bg-amber-50 text-amber-800 overflow-hidden">
+      <button
+        onClick={() => setExpanded((e) => !e)}
+        className="w-full flex items-center justify-between gap-2 px-4 py-3 text-sm text-left"
+      >
+        <span className="flex items-center gap-2 font-medium">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          Buying price not set for {totalItems} item{totalItems === 1 ? '' : 's'} — Cost of Goods may be
+          understated
+        </span>
+        <ChevronDown className={`w-4 h-4 shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+      </button>
+      {expanded && (
+        <div className="px-4 pb-4 space-y-3 border-t border-amber-200 pt-3">
+          {sections.map((s) => (
+            <div key={s.label}>
+              <p className="text-xs font-semibold uppercase tracking-wide mb-1.5">
+                {s.label} ({s.items.length})
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {s.items.map((item) => (
+                  <span key={item} className="px-2 py-0.5 rounded bg-amber-100 text-xs">
+                    {item}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
+          <p className="text-xs text-amber-700">
+            Update these item prices, then submit the document again for accurate Cost of Goods.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function BreakupTable({ title, rows }: { title: string; rows: BreakupRow[] }) {
   if (rows.length === 0) return null;
@@ -172,20 +220,24 @@ export function DailyPnl() {
         </div>
       ) : (
         <>
-          {data.remarks && (
-            // remarks is built server-side by string-interpolating Item /
-            // Product Bundle names (see ury_daily_p_and_l.py's
-            // unset_item_prices logic) into an HTML blob with <br> tags —
-            // those names are ordinary user-editable fields, so the HTML
-            // itself is NOT trustworthy (a malicious Item Name could inject
-            // markup). Never use dangerouslySetInnerHTML on this. Split on
-            // the one tag we know the backend emits and render each
-            // fragment as plain, auto-escaped React text instead.
-            <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              {data.remarks.split(/<br\s*\/?>/i).map((line, i) => (
-                <div key={i}>{line}</div>
-              ))}
-            </div>
+          {data.missing_prices && data.missing_prices.length > 0 ? (
+            // Structured, collapsed-by-default summary — this is the
+            // common case (the "buying price not set" warning the backend
+            // generates). Rendering item names as plain React children
+            // (never dangerouslySetInnerHTML) keeps this safe even though
+            // the source is user-editable Item/Product Bundle names.
+            <MissingPricesWarning sections={data.missing_prices} />
+          ) : (
+            data.remarks && (
+              // Fallback for genuine free-text remarks (e.g. hand-typed via
+              // Desk) that don't match the known structured warning shape.
+              // Still never HTML-rendered — same rationale as above.
+              <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                {data.remarks.split(/<br\s*\/?>/i).map((line, i) => (
+                  <div key={i}>{line}</div>
+                ))}
+              </div>
+            )
           )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
