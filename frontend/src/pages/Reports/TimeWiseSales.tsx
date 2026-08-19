@@ -32,10 +32,10 @@ interface TimeWiseSalesData {
 
 const columns: DataTableColumn<IntervalRow>[] = [
   { key: 'interval_label', header: 'Time Interval' },
-  { key: 'sales', header: 'Sales', render: (r) => formatCurrency(r.sales) },
-  { key: 'bills', header: 'Bills' },
-  { key: 'pct_of_daily_total', header: '% of Day', render: (r) => `${r.pct_of_daily_total}%` },
-  { key: 'avg_transaction_value', header: 'Avg / Bill', render: (r) => formatCurrency(r.avg_transaction_value) },
+  { key: 'sales', header: 'Sales', render: (r) => formatCurrency(r.sales), align: 'right' },
+  { key: 'bills', header: 'Bills', align: 'right' },
+  { key: 'pct_of_daily_total', header: '% of Day', render: (r) => `${r.pct_of_daily_total}%`, align: 'right' },
+  { key: 'avg_transaction_value', header: 'Avg / Bill', render: (r) => formatCurrency(r.avg_transaction_value), align: 'right' },
 ];
 
 const BUCKET_OPTIONS = [1, 2, 4];
@@ -135,7 +135,13 @@ export function TimeWiseSales() {
             />
           </div>
 
-          <BarChartCard title="Sales by Time of Day" data={data.intervals} xKey="interval_label" yKeys={['sales']} />
+          <BarChartCard
+            title="Sales by Time of Day"
+            data={data.intervals}
+            xKey="interval_label"
+            yKeys={['sales']}
+            labels={{ sales: 'Sales' }}
+          />
 
           <DataTable columns={columns} rows={data.intervals} isLoading={isLoading} />
         </>

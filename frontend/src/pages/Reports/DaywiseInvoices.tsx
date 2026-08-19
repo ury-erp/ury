@@ -31,11 +31,11 @@ const columns: DataTableColumn<InvoiceRow>[] = [
   { key: 'date', header: 'Date' },
   { key: 'time', header: 'Time' },
   { key: 'invoice', header: 'Invoice' },
-  { key: 'item_total', header: 'Item Total', render: (r) => formatCurrency(r.item_total) },
-  { key: 'total_taxes', header: 'Taxes', render: (r) => formatCurrency(r.total_taxes) },
-  { key: 'grand_total', header: 'Grand Total', render: (r) => formatCurrency(r.grand_total) },
-  { key: 'received_amount', header: 'Received', render: (r) => formatCurrency(r.received_amount) },
-  { key: 'cash_discounts', header: 'Cash Discounts', render: (r) => formatCurrency(r.cash_discounts) },
+  { key: 'item_total', header: 'Item Total', render: (r) => formatCurrency(r.item_total), align: 'right' },
+  { key: 'total_taxes', header: 'Taxes', render: (r) => formatCurrency(r.total_taxes), align: 'right' },
+  { key: 'grand_total', header: 'Grand Total', render: (r) => formatCurrency(r.grand_total), align: 'right' },
+  { key: 'received_amount', header: 'Received', render: (r) => formatCurrency(r.received_amount), align: 'right' },
+  { key: 'cash_discounts', header: 'Cash Discounts', render: (r) => formatCurrency(r.cash_discounts), align: 'right' },
   { key: 'payment_mode', header: 'Payment Mode', render: (r) => r.payment_mode || '—' },
 ];
 

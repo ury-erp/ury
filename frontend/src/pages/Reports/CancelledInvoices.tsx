@@ -75,6 +75,7 @@ export function CancelledInvoices() {
     {
       key: 'amount',
       header: 'Amount',
+      align: 'right',
       render: (r) => (
         <span className={r.amount > threshold ? 'flex items-center gap-1 text-red-600 font-semibold' : ''}>
           {r.amount > threshold && <AlertTriangle className="w-3.5 h-3.5" />}

@@ -90,19 +90,30 @@ function MissingPricesWarning({ sections }: { sections: MissingPriceSection[] })
   );
 }
 
-function BreakupTable({ title, rows }: { title: string; rows: BreakupRow[] }) {
+function BreakupTable({
+  title,
+  rows,
+  className,
+  twoColumn,
+}: {
+  title: string;
+  rows: BreakupRow[];
+  className?: string;
+  twoColumn?: boolean;
+}) {
   if (rows.length === 0) return null;
   return (
-    <Card>
+    <Card className={className}>
       <CardHeader>
         <CardTitle className="text-base">{title}</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-1">
+      <CardContent className={twoColumn ? 'grid grid-cols-1 md:grid-cols-2 gap-x-8' : 'space-y-1'}>
         {rows.map((r, i) => (
           <div key={i} className="flex items-center justify-between text-sm py-1 border-b last:border-0">
             <span className="text-muted-foreground">{r.label}</span>
             <span className="font-medium">
-              {formatCurrency(r.amount)} <span className="text-xs text-muted-foreground">({r.percent}%)</span>
+              {formatCurrency(r.amount)}{' '}
+              <span className="text-xs text-muted-foreground">({Number(r.percent).toFixed(1)}%)</span>
             </span>
           </div>
         ))}
@@ -253,17 +264,16 @@ export function DailyPnl() {
             />
             <StatCard
               label="Gross Profit"
-              value={formatCurrency(summaryMap.get('gross_profit')?.amount ?? 0)}
-              delta={{ value: `${summaryMap.get('gross_profit')?.percent ?? 0}%`, direction: 'flat' }}
+              value={`${formatCurrency(summaryMap.get('gross_profit')?.amount ?? 0)} (${Number(
+                summaryMap.get('gross_profit')?.percent ?? 0
+              ).toFixed(1)}%)`}
               icon={<Percent className="w-4 h-4" />}
             />
             <StatCard
               label="Net Profit"
-              value={formatCurrency(summaryMap.get('net_profit')?.amount ?? 0)}
-              delta={{
-                value: `${summaryMap.get('net_profit')?.percent ?? 0}%`,
-                direction: (summaryMap.get('net_profit')?.amount ?? 0) >= 0 ? 'up' : 'down',
-              }}
+              value={`${formatCurrency(summaryMap.get('net_profit')?.amount ?? 0)} (${Number(
+                summaryMap.get('net_profit')?.percent ?? 0
+              ).toFixed(1)}%)`}
               icon={
                 (summaryMap.get('net_profit')?.amount ?? 0) >= 0 ? (
                   <TrendingUp className="w-4 h-4" />
@@ -283,17 +293,23 @@ export function DailyPnl() {
                 <div key={r.key} className="flex items-center justify-between text-sm py-1.5 border-b last:border-0">
                   <span>{r.label}</span>
                   <span className="font-medium">
-                    {formatCurrency(r.amount)} <span className="text-xs text-muted-foreground">({r.percent}%)</span>
+                    {formatCurrency(r.amount)}{' '}
+                    <span className="text-xs text-muted-foreground">({Number(r.percent).toFixed(1)}%)</span>
                   </span>
                 </div>
               ))}
             </CardContent>
           </Card>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <BreakupTable title="Direct Expenses" rows={data.direct_expenses_breakup ?? []} />
-            <BreakupTable title="Employee Costs" rows={data.employee_costs_breakup ?? []} />
-            <BreakupTable title="Indirect Expenses" rows={data.indirect_expenses_breakup ?? []} />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+            <BreakupTable title="Direct Expenses" rows={data.direct_expenses_breakup ?? []} className="self-start" />
+            <BreakupTable title="Employee Costs" rows={data.employee_costs_breakup ?? []} className="self-start" />
+            <BreakupTable
+              title="Indirect Expenses"
+              rows={data.indirect_expenses_breakup ?? []}
+              className="lg:col-span-2"
+              twoColumn
+            />
           </div>
 
           {data.cost_of_goods && data.cost_of_goods.length > 0 && (

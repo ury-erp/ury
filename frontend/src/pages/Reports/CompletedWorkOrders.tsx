@@ -24,8 +24,8 @@ interface CompletedWorkOrdersData {
 const columns: DataTableColumn<WorkOrderRow>[] = [
   { key: 'name', header: 'Work Order' },
   { key: 'item_name', header: 'Item', render: (r) => r.item_name || r.production_item },
-  { key: 'qty', header: 'Planned Qty' },
-  { key: 'produced_qty', header: 'Produced Qty' },
+  { key: 'qty', header: 'Planned Qty', align: 'right' },
+  { key: 'produced_qty', header: 'Produced Qty', align: 'right' },
   { key: 'actual_end_date', header: 'Completed', render: (r) => r.actual_end_date || r.planned_end_date || '—' },
 ];
 

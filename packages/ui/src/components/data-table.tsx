@@ -5,6 +5,7 @@ export interface DataTableColumn<T> {
   key: string;
   header: string;
   render?: (row: T) => React.ReactNode;
+  align?: "left" | "right";
 }
 
 export interface DataTableProps<T> {
@@ -30,7 +31,10 @@ export function DataTable<T>({
             {columns.map((column) => (
               <th
                 key={column.key}
-                className="h-12 px-4 text-left align-middle font-medium text-muted-foreground"
+                className={cn(
+                  "h-12 px-4 align-middle font-medium text-muted-foreground",
+                  column.align === "right" ? "text-right" : "text-left"
+                )}
               >
                 {column.header}
               </th>
@@ -54,7 +58,13 @@ export function DataTable<T>({
             rows.map((row, rowIndex) => (
               <tr key={rowIndex} className="border-b transition-colors hover:bg-muted/50">
                 {columns.map((column) => (
-                  <td key={column.key} className="p-4 align-middle">
+                  <td
+                    key={column.key}
+                    className={cn(
+                      "p-4 align-middle",
+                      column.align === "right" ? "text-right tabular-nums" : "text-left"
+                    )}
+                  >
                     {column.render
                       ? column.render(row)
                       : String((row as Record<string, unknown>)[column.key] ?? "")}

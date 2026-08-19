@@ -24,7 +24,7 @@ interface DaywiseCustomerDetailsData {
 const columns: DataTableColumn<CustomerRow>[] = [
   { key: 'customer_name', header: 'Name' },
   { key: 'mobile_number', header: 'Mobile', render: (r) => r.mobile_number || '—' },
-  { key: 'visit_count', header: 'Visits' },
+  { key: 'visit_count', header: 'Visits', align: 'right' },
   { key: 'first_visit', header: 'First Visit' },
   { key: 'last_visit', header: 'Last Visit' },
 ];

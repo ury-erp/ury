@@ -30,12 +30,13 @@ interface MonthWiseSalesData {
 
 const columns: DataTableColumn<MonthRow>[] = [
   { key: 'month', header: 'Month' },
-  { key: 'item_total', header: 'Item Total', render: (r) => formatCurrency(r.item_total) },
-  { key: 'taxes', header: 'Taxes', render: (r) => formatCurrency(r.taxes) },
-  { key: 'grand_total', header: 'Grand Total', render: (r) => formatCurrency(r.grand_total) },
+  { key: 'item_total', header: 'Item Total', render: (r) => formatCurrency(r.item_total), align: 'right' },
+  { key: 'taxes', header: 'Taxes', render: (r) => formatCurrency(r.taxes), align: 'right' },
+  { key: 'grand_total', header: 'Grand Total', render: (r) => formatCurrency(r.grand_total), align: 'right' },
   {
     key: 'growth_percentage',
     header: 'Growth',
+    align: 'right',
     render: (r) =>
       r.growth_percentage === null ? '—' : `${r.growth_percentage > 0 ? '+' : ''}${r.growth_percentage}%`,
   },
@@ -127,6 +128,7 @@ export function MonthWiseSales() {
             data={data.data}
             xKey="month"
             yKeys={['grand_total']}
+            labels={{ grand_total: 'Grand Total' }}
           />
 
           <DataTable columns={columns} rows={data.data} isLoading={isLoading} />

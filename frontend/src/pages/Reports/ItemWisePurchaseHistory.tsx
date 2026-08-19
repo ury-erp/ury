@@ -24,11 +24,11 @@ interface ItemWisePurchaseHistoryData {
 
 const columns: DataTableColumn<PurchaseItemRow>[] = [
   { key: 'item_name', header: 'Item' },
-  { key: 'qty', header: 'Qty Purchased' },
-  { key: 'avg_rate', header: 'Avg Rate', render: (r) => formatCurrency(r.avg_rate) },
-  { key: 'amount', header: 'Total Spend', render: (r) => formatCurrency(r.amount) },
-  { key: 'purchase_count', header: '# Purchases' },
-  { key: 'supplier_count', header: '# Suppliers' },
+  { key: 'qty', header: 'Qty Purchased', align: 'right' },
+  { key: 'avg_rate', header: 'Avg Rate', render: (r) => formatCurrency(r.avg_rate), align: 'right' },
+  { key: 'amount', header: 'Total Spend', render: (r) => formatCurrency(r.amount), align: 'right' },
+  { key: 'purchase_count', header: '# Purchases', align: 'right' },
+  { key: 'supplier_count', header: '# Suppliers', align: 'right' },
 ];
 
 export function ItemWisePurchaseHistory() {

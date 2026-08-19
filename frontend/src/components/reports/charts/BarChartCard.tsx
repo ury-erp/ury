@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@ury/ui";
+import { formatCompactCurrency } from "@ury/core";
 import {
   Bar,
   BarChart,
@@ -10,7 +11,7 @@ import {
   YAxis,
 } from "recharts";
 
-const DEFAULT_COLORS = ["#3b82f6", "#22c55e", "#f59e0b", "#ef4444", "#a855f7"];
+const DEFAULT_COLORS = ["#3b82f6", "#6366f1", "#8b5cf6", "#a855f7", "#0ea5e9", "#14b8a6"];
 
 export interface BarChartCardProps {
   title: string;
@@ -18,9 +19,10 @@ export interface BarChartCardProps {
   xKey: string;
   yKeys: string[];
   colors?: string[];
+  labels?: Record<string, string>;
 }
 
-export function BarChartCard({ title, data, xKey, yKeys, colors }: BarChartCardProps) {
+export function BarChartCard({ title, data, xKey, yKeys, colors, labels }: BarChartCardProps) {
   const palette = colors ?? DEFAULT_COLORS;
 
   return (
@@ -33,11 +35,17 @@ export function BarChartCard({ title, data, xKey, yKeys, colors }: BarChartCardP
           <BarChart data={data}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey={xKey} />
-            <YAxis />
+            <YAxis tickFormatter={(value) => formatCompactCurrency(Number(value))} width={64} />
             <Tooltip />
-            <Legend />
+            {yKeys.length > 1 && <Legend />}
             {yKeys.map((key, index) => (
-              <Bar key={key} dataKey={key} fill={palette[index % palette.length]} />
+              <Bar
+                key={key}
+                dataKey={key}
+                name={labels?.[key] ?? key}
+                fill={palette[index % palette.length]}
+                maxBarSize={56}
+              />
             ))}
           </BarChart>
         </ResponsiveContainer>
