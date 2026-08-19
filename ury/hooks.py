@@ -60,6 +60,46 @@ website_route_rules = [
     {"from_route": "/order/<path:app_path>", "to_route": "order"},
     {"from_route": "/pos/<path:app_path>", "to_route": "pos"},
 ]
+
+setup_wizard_requires = [
+    "assets/erpnext/js/setup_wizard.js",
+    "assets/ury/js/setup_wizard.js",
+]
+
+setup_wizard_stages = "ury.setup.setup_wizard.get_setup_stages"
+
+ury_demo_master_doctypes = [
+    "Gender",
+    "Item Group",
+    "Item",
+    "Item Price",
+    "Customer Group",
+    "Customer",
+    "User",
+    "Employee",
+    "BOM",
+    "Supplier Group",
+    "Supplier",
+    "Branch",
+    "URY Menu Course",
+    "URY Menu",
+    "URY Room",
+    "URY Restaurant",
+    "URY Table",
+    "Product Bundle",
+    "URY Production Unit",
+    "URY Report Settings",
+    "POS Profile"
+]
+
+ury_demo_transaction_doctypes = [
+    "Production Plan",
+    "Material Request",
+    "Purchase Order",
+    "Sales Order",
+    "Journal Entry",
+    "Payment Entry"
+]
 # Home Pages
 # ----------
 
@@ -193,9 +233,9 @@ scheduler_events = {
 # Overriding Methods
 # ------------------------------
 #
-# override_whitelisted_methods = {
-# 	"frappe.desk.doctype.event.event.get_events": "ury.event.get_events"
-# }
+override_whitelisted_methods = {
+	"erpnext.setup.demo.clear_demo_data": "ury.setup.demo.clear_demo_data"
+}
 #
 # each overriding function accepts a `data` argument;
 # generated from the base implementation of the doctype dashboard,

@@ -1,6 +1,6 @@
 import click
 
-from ury.setup import after_install as setup
+from ury.setup_customizations import after_install as setup
 
 
 def after_install():

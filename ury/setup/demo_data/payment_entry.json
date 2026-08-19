@@ -1,0 +1,67 @@
+[
+    {
+        "doctype": "Payment Entry",
+        "payment_type": "Receive",
+        "party_type": "Customer",
+        "party": "Palmer Foodie Ltd.",
+        "paid_amount": 67000,
+        "received_amount": 67000,
+        "paid_from": "__RECEIVABLE_ACCOUNT__",
+        "paid_to": "__BANK_ACCOUNT__",
+        "reference_no": "#ref0001",
+        "source_exchange_rate": 1,
+        "target_exchange_rate": 1
+    },
+    {
+        "doctype": "Payment Entry",
+        "payment_type": "Receive",
+        "party_type": "Customer",
+        "party": "Grant Foodie Ltd.",
+        "paid_amount": 500000,
+        "received_amount": 500000,
+        "paid_from": "__RECEIVABLE_ACCOUNT__",
+        "paid_to": "__BANK_ACCOUNT__",
+        "reference_no": "#ref0001",
+        "source_exchange_rate": 1,
+        "target_exchange_rate": 1
+    },
+    {
+        "doctype": "Payment Entry",
+        "payment_type": "Receive",
+        "party_type": "Customer",
+        "party": "West View Foodie Ltd.",
+        "paid_amount": 300000,
+        "received_amount": 30000,
+        "paid_from": "__RECEIVABLE_ACCOUNT__",
+        "paid_to": "__BANK_ACCOUNT__",
+        "reference_no": "#ref0001",
+        "source_exchange_rate": 1,
+        "target_exchange_rate": 1
+    },
+    {
+        "doctype": "Payment Entry",
+        "payment_type": "Pay",
+        "party_type": "Supplier",
+        "party": "MA Inc.",
+        "paid_amount": 85000,
+        "received_amount": 85000,
+        "paid_from": "__BANK_ACCOUNT__",
+        "paid_to": "__PAYABLE_ACCOUNT__",
+        "reference_no": "#ref0005",
+        "source_exchange_rate": 1,
+        "target_exchange_rate": 1
+    },
+    {
+        "doctype": "Payment Entry",
+        "payment_type": "Pay",
+        "party_type": "Supplier",
+        "party": "Zuckerman Foodie Ltd.",
+        "paid_amount": 100000,
+        "received_amount": 100000,
+        "paid_from": "__BANK_ACCOUNT__",
+        "paid_to": "__PAYABLE_ACCOUNT__",
+        "reference_no": "#ref0006",
+        "source_exchange_rate": 1,
+        "target_exchange_rate": 1
+    }
+]
