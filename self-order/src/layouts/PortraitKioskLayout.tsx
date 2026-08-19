@@ -231,7 +231,10 @@ function PortraitKioskLayout({ initialContext }: LayoutProps) {
                 if (success) goToStatus()
               })
             }}
-            onPayOnline={payOnline}
+            onPayOnline={async () => {
+              if (cartItems.length > 0 && !(await submitCart())) return
+              payOnline()
+            }}
             onRequestBill={handleRequestBill}
           />
         </div>

@@ -136,11 +136,7 @@ function PortableTabletAssignment() {
                 <button
                   key={idx}
                   onClick={() => (key === '⌫' ? handlePinBackspace() : handlePinDigit(key))}
-                  className={`flex h-16 w-16 items-center justify-center rounded-xl border-2 text-lg font-semibold transition-all active:scale-95 ${
-                    key === '⌫'
-                      ? 'border-input bg-background hover:bg-muted text-foreground'
-                      : 'border-input bg-background hover:bg-muted text-foreground'
-                  }`}
+                  className="flex h-16 w-16 items-center justify-center rounded-xl border-2 border-input bg-background text-lg font-semibold text-foreground transition-all hover:bg-muted active:scale-95"
                 >
                   {key}
                 </button>
