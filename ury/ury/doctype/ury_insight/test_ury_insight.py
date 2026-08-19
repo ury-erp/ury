@@ -4,6 +4,8 @@
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
+from ury.ury.api.ury_insight import get_active_insights
+
 TEST_NON_MANAGER = "_test_ury_insight_non_manager@example.com"
 TEST_MANAGER = "_test_ury_insight_manager@example.com"
 
@@ -63,10 +65,22 @@ class TestURYInsightPermissions(FrappeTestCase):
         frappe.set_user(TEST_NON_MANAGER)
         try:
             self.assertFalse(frappe.has_permission("URY Insight", "read", doc=self.insight))
-            self.assertEqual(
-                frappe.get_all("URY Insight", filters={"name": self.insight.name}),
-                [],
-            )
+            # frappe.get_all() intentionally bypasses permission checks (by design in
+            # Frappe) — use get_list(), which enforces them and raises PermissionError
+            # outright for a doctype the user has no read role for, to test
+            # doctype-level read permission. The real security boundary for this data
+            # is ury.ury.api.ury_insight.get_active_insights()'s require_manager()
+            # gate, which runs before any query and is exercised separately below.
+            with self.assertRaises(frappe.PermissionError):
+                frappe.get_list("URY Insight", filters={"name": self.insight.name})
+        finally:
+            frappe.set_user("Administrator")
+
+    def test_non_manager_cannot_call_get_active_insights(self):
+        frappe.set_user(TEST_NON_MANAGER)
+        try:
+            with self.assertRaises(frappe.PermissionError):
+                get_active_insights()
         finally:
             frappe.set_user("Administrator")
 

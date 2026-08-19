@@ -1,6 +1,7 @@
 import ast
 import inspect
 
+import frappe
 from frappe.tests.utils import FrappeTestCase
 
 from ury.ury.ai_tools import ury_tools
@@ -36,11 +37,28 @@ MUTATING_CALL_NAMES = {
 
 
 def _whitelisted_function_names():
+    # frappe.whitelist() does not stamp a marker attribute on the function (checked
+    # against this Frappe version's source) — it appends the raw function object to
+    # the module-level `frappe.whitelisted` list instead. Membership in that list is
+    # the actual signal frappe.handler.execute_cmd() uses to allow the call through.
     names = set()
     for name, obj in vars(ury_tools).items():
-        if inspect.isfunction(obj) and getattr(obj, "is_whitelisted", False):
+        # Restrict to functions actually defined in this module — `vars()` also
+        # surfaces imported names (e.g. get_service_line, get_needs_attention,
+        # _dashboard_get_shift_metrics pulled in for internal reuse), which aren't
+        # part of this module's own tool surface even though they may themselves be
+        # whitelisted where they're actually defined.
+        if (
+            inspect.isfunction(obj)
+            and obj.__module__ == ury_tools.__name__
+            and obj in frappe.whitelisted
+        ):
             names.add(name)
     return names
+
+
+def _is_whitelisted(func):
+    return func in frappe.whitelisted
 
 
 class TestURYToolsSurface(FrappeTestCase):
@@ -63,8 +81,20 @@ class TestURYToolsSurface(FrappeTestCase):
                 continue
             func = node.func
             call_name = func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", None)
-            if call_name in MUTATING_CALL_NAMES:
-                offending.append(f"{call_name} at line {node.lineno}")
+            if call_name not in MUTATING_CALL_NAMES:
+                continue
+            # frappe.cache().set_value(...) is a Redis cache write, not a DocType
+            # mutation — the name collision with the DB-writing frappe.db.set_value
+            # is coincidental. Only flag set_value when it isn't a .cache() call.
+            if (
+                call_name == "set_value"
+                and isinstance(func, ast.Attribute)
+                and isinstance(func.value, ast.Call)
+                and isinstance(func.value.func, ast.Attribute)
+                and func.value.func.attr == "cache"
+            ):
+                continue
+            offending.append(f"{call_name} at line {node.lineno}")
 
         self.assertEqual(
             offending,
@@ -76,7 +106,7 @@ class TestURYToolsSurface(FrappeTestCase):
         source = inspect.getsource(ury_tools)
         for name in EXPECTED_TOOL_FUNCTIONS:
             func = getattr(ury_tools, name)
-            self.assertTrue(getattr(func, "is_whitelisted", False), f"{name} is not whitelisted")
+            self.assertTrue(_is_whitelisted(func), f"{name} is not whitelisted")
 
             func_source = inspect.getsource(func)
             self.assertIn(
