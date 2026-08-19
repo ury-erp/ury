@@ -14,14 +14,17 @@ import CaptainTables from './captain/pages/CaptainTables';
 import CaptainOrder from './captain/pages/CaptainOrder';
 import { ToastProvider } from '@ury/ui';
 import { usePOSStore } from './store/pos-store';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { getActiveLanguage } from './i18n';
+import { ActiveReportProvider } from './components/chat/ActiveReportContext';
+import ChatWidget, { ChatWidgetRefProvider, type ChatWidgetHandle } from './components/chat/ChatWidget';
 
 function App() {
   const {
     initializeApp
   } = usePOSStore();
-  
+  const chatRef = useRef<ChatWidgetHandle>(null);
+
   useEffect(() => {
     initializeApp();
   }, [initializeApp]);
@@ -39,43 +42,58 @@ function App() {
       <ScreenSizeProvider>
         <AuthGuard>
           <POSOpeningProvider>
-            <Router basename="/pos">
-              <Routes>
-                <Route element={<AppLayout />}>
-                  <Route index element={<Navigate to="/dashboard" replace />} />
-                  <Route path="/dashboard" element={<Dashboard />} />
-                  <Route path="/pos" element={<POS />} />
-                  <Route path="/tables" element={<Table />} />
-                  <Route path="/orders" element={<Orders />} />
-                  <Route path="/settings" element={<Settings />} />
-                </Route>
-                {/*
-                  Captain "Order" module — its own shell, sibling to the
-                  Cashier POS routes above, not nested under AppLayout
-                  (PLAN.md §6/§10: own navigation, mobile-first, not the
-                  desktop Header/Footer shell). This Router (basename
-                  "/ury") is already the outer app-nesting layer that mounts
-                  "/pos" today, so "/order" sits alongside it here rather
-                  than in a separate outer router file.
-                */}
-                <Route
-                  path="/order"
-                  element={
-                    <CaptainRouteGuard>
-                      <CaptainTables />
-                    </CaptainRouteGuard>
-                  }
-                />
-                <Route
-                  path="/order/table/:table"
-                  element={
-                    <CaptainRouteGuard>
-                      <CaptainOrder />
-                    </CaptainRouteGuard>
-                  }
-                />
-              </Routes>
-            </Router>
+            {/*
+              PLAN.md item 4: ActiveReportProvider + the floating ChatWidget
+              are mounted once here, wrapping the whole routed app shell, so
+              every page under both the pos/ dashboard routes and the
+              captain "Order" routes shares one chat instance and one
+              active-report context. ChatWidgetRefProvider hands the same
+              instance's ref down to any page's ⌘K AskBar (see
+              components/chat/AskBar.tsx) without prop-threading it through
+              AppLayout.
+            */}
+            <ActiveReportProvider>
+              <ChatWidgetRefProvider chatRef={chatRef}>
+                <Router basename="/pos">
+                  <Routes>
+                    <Route element={<AppLayout />}>
+                      <Route index element={<Navigate to="/dashboard" replace />} />
+                      <Route path="/dashboard" element={<Dashboard />} />
+                      <Route path="/pos" element={<POS />} />
+                      <Route path="/tables" element={<Table />} />
+                      <Route path="/orders" element={<Orders />} />
+                      <Route path="/settings" element={<Settings />} />
+                    </Route>
+                    {/*
+                      Captain "Order" module — its own shell, sibling to the
+                      Cashier POS routes above, not nested under AppLayout
+                      (PLAN.md §6/§10: own navigation, mobile-first, not the
+                      desktop Header/Footer shell). This Router (basename
+                      "/ury") is already the outer app-nesting layer that mounts
+                      "/pos" today, so "/order" sits alongside it here rather
+                      than in a separate outer router file.
+                    */}
+                    <Route
+                      path="/order"
+                      element={
+                        <CaptainRouteGuard>
+                          <CaptainTables />
+                        </CaptainRouteGuard>
+                      }
+                    />
+                    <Route
+                      path="/order/table/:table"
+                      element={
+                        <CaptainRouteGuard>
+                          <CaptainOrder />
+                        </CaptainRouteGuard>
+                      }
+                    />
+                  </Routes>
+                </Router>
+                <ChatWidget ref={chatRef} />
+              </ChatWidgetRefProvider>
+            </ActiveReportProvider>
           </POSOpeningProvider>
         </AuthGuard>
       </ScreenSizeProvider>

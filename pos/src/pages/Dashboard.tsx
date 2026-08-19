@@ -6,6 +6,7 @@ import { formatCurrency } from '@ury/core';
 import InsightFeed from '../components/dashboard/InsightFeed';
 import FastMovingItems from '../components/dashboard/FastMovingItems';
 import BaselineComparisonStrip from '../components/dashboard/BaselineComparisonStrip';
+import AskBar from '../components/chat/AskBar';
 
 // Helper function to format relative time
 function getRelativeTime(creationDate: string): string {
@@ -229,6 +230,13 @@ export default function Dashboard() {
 
   return (
     <div className="h-full overflow-y-auto p-6 bg-gray-50 font-display">
+      {/* Ask bar (PLAN.md item 6) — opens the shared ChatWidget pre-focused,
+          also reachable via the global ⌘K shortcut. Additive only: does not
+          replace or restructure anything else in this file. */}
+      <div className="mb-4 flex justify-end">
+        <AskBar />
+      </div>
+
       {/* Insight Feed - "Act now" */}
       <div className="mb-6">
         <h2 className="text-2xl font-semibold text-gray-900 mb-4">Dashboard</h2>

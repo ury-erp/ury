@@ -300,6 +300,15 @@ before_request = [
 # 	"ury.auth.validate"
 # ]
 
+# HUF (AI assistant app) tool registration — read only if huf is installed
+# alongside this app. HUF's own `huf.ai.tool_registry.sync_app_tools`
+# (registered under HUF's `after_migrate`) reads this hook across every
+# installed app on `bench migrate` and syncs the listed tools into
+# `Agent Tool`/`Agent Tool Function` records. Safe to define even when huf is
+# not installed — an unused hook value is simply never read.
+# See tracks/sa-ai-reports-dashboard/HUF_API_NOTES.md for how this was confirmed.
+huf_tools = "ury.ury.ai_tools.ury_tools_registry.ALL_URY_TOOLS"
+
 fixtures = [
     {
         "doctype": "Custom Field",
