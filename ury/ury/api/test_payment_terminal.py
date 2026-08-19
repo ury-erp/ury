@@ -50,10 +50,13 @@ class TestSimulatedPaymentTerminalProvider(unittest.TestCase):
     flips it to Cancelled. It is never the default provider in production."""
 
     def setUp(self):
+        terminal_id = frappe.generate_hash(length=8)
         self.terminal = frappe.get_doc(
             {
                 "doctype": "URY Payment Terminal",
-                "terminal_id": frappe.generate_hash(length=8),
+                # autoname is "prompt" on this doctype -- name must be set explicitly.
+                "name": terminal_id,
+                "terminal_id": terminal_id,
                 "provider": "Simulated",
                 "status": "Idle",
             }
