@@ -493,7 +493,12 @@ export const MenuPage: React.FC = () => {
     return matchesSearch && matchesGroup;
   });
 
-  const categories = Array.from(new Set(items.map((i) => i.course).filter(Boolean))) as string[];
+  const categories = Array.from(
+    new Set([
+      ...availableCourses.map((c) => c.name),
+      ...(items.map((i) => i.course).filter(Boolean) as string[])
+    ])
+  );
 
 
   const drawerTitle =
