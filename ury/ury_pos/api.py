@@ -950,7 +950,37 @@ def create_customer(customer_name, mobile_number=None, customer_group="Individua
         }
 
 @frappe.whitelist()
-def validate_pos_close(pos_profile): 
+def get_open_pos_opening_entries(pos_profile):
+    """Currently open (status=Open, submitted) POS Opening Entries for the
+    given POS Profile. Backs the React Closing flow (pos-closing-api.ts's
+    getOpenPosOpeningEntries) so it can find the requesting user's own
+    session -- referenced there since the POSClosingDialog work landed, but
+    never actually implemented until now (found via a live E2E test: the
+    Close Shift dialog failed outright with "no attribute
+    'get_open_pos_opening_entries'").
+
+    Read-only, no cross-branch/company filtering beyond `pos_profile` itself
+    -- matches this file's existing convention for closing-flow helpers
+    (validate_pos_close, _get_main_cashier_status), which likewise scope by
+    pos_profile alone and rely on frappe.has_permission on the returned
+    POS Invoice-adjacent data downstream for anything more granular.
+    """
+    if not frappe.has_permission("POS Opening Entry", "read"):
+        frappe.throw(_("Not permitted to view POS Opening Entries."), frappe.PermissionError)
+
+    return frappe.get_all(
+        "POS Opening Entry",
+        filters={
+            "pos_profile": pos_profile,
+            "status": "Open",
+            "docstatus": 1,
+        },
+        fields=["name", "period_start_date", "user", "pos_profile"],
+    )
+
+
+@frappe.whitelist()
+def validate_pos_close(pos_profile):
     enable_unclosed_pos_check = frappe.db.get_value("POS Profile",pos_profile,"custom_daily_pos_close")
     
     if enable_unclosed_pos_check:
