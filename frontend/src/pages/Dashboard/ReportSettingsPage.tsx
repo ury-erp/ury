@@ -259,6 +259,12 @@ export const ReportSettingsPage: React.FC = () => {
     setSaving(true);
     try {
       const docToSave: any = {
+        // Spread the originally-fetched doc first so standard Frappe metadata
+        // (owner, creation, modified, docstatus, idx, etc.) round-trips correctly —
+        // frappe.client.save's set-once/optimistic-lock checks reject a payload
+        // missing any of these, and whitelisting them one at a time chases each
+        // check in turn instead of fixing the actual problem.
+        ...(reportSettingsData || {}),
         doctype: 'URY Report Settings',
         branch: branchToFetch,
         extended_hours: extendedHours,
