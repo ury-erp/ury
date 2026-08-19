@@ -121,6 +121,8 @@ interface POSState {
   tableOrder: TableOrder | null;
   isInitializing: boolean;
   orderComment: string;
+  noOfPax: number;
+  lastModifiedTime: string | null;
 }
 
 interface POSStore extends POSState {
@@ -160,6 +162,17 @@ interface POSStore extends POSState {
   resetOrderState: () => void;
   setSelectedAggregator: (aggregator: Aggregator | null) => void;
   setOrderComment: (comment: string) => void;
+  setNoOfPax: (pax: number) => void;
+  /**
+   * Updates only the comment/note on an existing cart line, leaving quantity
+   * and everything else untouched. Additive — used by the Captain order
+   * screen (`pos/src/captain`) to support note-only edits on already-sent
+   * items without going through the full `ProductDialog` edit flow (which
+   * removes+re-adds the line and would also expose variant/addon controls
+   * that don't apply to a sent item). Does not affect existing Cashier
+   * `OrderPanel`/`ProductDialog` behavior, which never calls this.
+   */
+  updateItemComment: (uniqueId: string, comment: string) => void;
 }
 
 const generateUniqueId = (item: OrderItem): string => {
@@ -205,6 +218,8 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   isUpdatingOrder: false,
   orderId: null,
   orderComment: '',
+  noOfPax: 1,
+  lastModifiedTime: null,
 
   initializeApp: async () => {
     try {
@@ -441,6 +456,13 @@ export const usePOSStore = create<POSStore>((set, get) => ({
     }
   },
 
+  updateItemComment: (uniqueId: string, comment: string) => {
+    const newOrders = get().activeOrders.map(item =>
+      item.uniqueId === uniqueId ? { ...item, comment } : item
+    );
+    set({ activeOrders: newOrders });
+  },
+
   clearOrder: async () => {
     try {
       set({ activeOrders: [] });
@@ -482,6 +504,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   setSelectedItem: (item) => set({ selectedItem: item }),
   setSelectedAggregator: (aggregator) => set({ selectedAggregator: aggregator }),
   setOrderComment: (comment: string) => set({ orderComment: comment }),
+  setNoOfPax: (pax: number) => set({ noOfPax: pax }),
 
   processPayment: async (paymentMode: string, amount: number) => {
     try {
@@ -617,7 +640,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
           } as OrderItem;
         });
 
-        set({ 
+        set({
           tableOrder: response,
           activeOrders: orderItems,
           selectedCustomer: order.customer ? {
@@ -627,24 +650,33 @@ export const usePOSStore = create<POSStore>((set, get) => ({
           } : null,
           isUpdatingOrder: true,
           orderId: order.name,
+          noOfPax: order.no_of_pax || 1,
+          lastModifiedTime: order.modified || null,
+          orderComment: order.custom_comments || '',
         });
       } else {
-        set({ 
+        set({
           tableOrder: null,
           activeOrders: [],
           selectedCustomer: null,
           isUpdatingOrder: false,
           orderId: null,
+          noOfPax: 1,
+          lastModifiedTime: null,
+          orderComment: '',
         });
       }
     } catch (error) {
-      set({ 
+      set({
         error: 'Failed to load table order',
         tableOrder: null,
         activeOrders: [],
         selectedCustomer: null,
         isUpdatingOrder: false,
         orderId: null,
+        noOfPax: 1,
+        lastModifiedTime: null,
+        orderComment: '',
       });
     } finally {
       set({ orderLoading: false });
@@ -652,12 +684,15 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   },
 
   clearTableOrder: () => {
-    set({ 
+    set({
       tableOrder: null,
       activeOrders: [],
       selectedCustomer: null,
       isUpdatingOrder: false,
       orderId: null,
+      noOfPax: 1,
+      lastModifiedTime: null,
+      orderComment: '',
     });
   },
 
@@ -685,6 +720,8 @@ export const usePOSStore = create<POSStore>((set, get) => ({
       error: null,
       selectedOrderType: DEFAULT_ORDER_TYPE,
       orderComment: '',
+      noOfPax: 1,
+      lastModifiedTime: null,
     });
 
     fetchMenuItems();

@@ -36,7 +36,10 @@ const OrderPanel = () => {
     paymentModes,
     orderId,
     orderComment,
-    setOrderComment
+    setOrderComment,
+    noOfPax,
+    setNoOfPax,
+    lastModifiedTime
   } = usePOSStore();
   const user = useRootStore((state: RootState) => state.user);
   const [editingItem, setEditingItem] = useState<typeof activeOrders[0] | null>(null);
@@ -105,7 +108,7 @@ const OrderPanel = () => {
           qty: item.quantity,
           comment: item.comment || undefined
         })),
-        no_of_pax: 1,
+        no_of_pax: noOfPax,
         pos_profile: posProfile.name,
         order_type: selectedOrderType,
         table: selectedTable || undefined,
@@ -116,13 +119,22 @@ const OrderPanel = () => {
         owner: posProfile.owner,
         mode_of_payment: paymentModes[0],
         last_invoice: isUpdatingOrder ? orderId : null,
+        last_modified_time: isUpdatingOrder ? (lastModifiedTime || undefined) : undefined,
         invoice: isUpdatingOrder ? orderId : null,
         waiter: user.name,
         comments: orderComment || undefined
       };
 
-      await syncOrder(orderData);
-      
+      const result = await syncOrder(orderData);
+
+      // sync_order returns { status: 'Failure' } instead of throwing when the
+      // write is rejected (stale last_modified_time, table already occupied,
+      // or the invoice was already billed by another user).
+      if (result?.message && typeof result.message === 'object' && 'status' in result.message && result.message.status === 'Failure') {
+        showToast.error(isUpdatingOrder ? t('errors.order_modified') : t('errors.order_sync_failed'));
+        return;
+      }
+
       // Reset all states after successful order submission
       resetOrderState();
       showToast.success(isUpdatingOrder ? t('success.order_updated') : t('success.order_created'));
@@ -145,6 +157,17 @@ const OrderPanel = () => {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const MIN_PAX = 1;
+  const MAX_PAX = 50;
+
+  const handlePaxDecrement = () => {
+    setNoOfPax(Math.max(MIN_PAX, noOfPax - 1));
+  };
+
+  const handlePaxIncrement = () => {
+    setNoOfPax(Math.min(MAX_PAX, noOfPax + 1));
   };
 
   const EmptyCartUI = () => (
@@ -185,6 +208,30 @@ const OrderPanel = () => {
       <div className="p-4 border-b border-gray-200 flex-shrink-0">
         <OrderTypeSelect disabled={isInteractionDisabled} />
         <div className="mt-3"><CustomerSelect disabled={isInteractionDisabled} /></div>
+        <div className="mt-3 flex items-center justify-between">
+          <span className="text-sm font-medium text-gray-700">{t('cart.pax')}</span>
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={handlePaxDecrement}
+              variant="outline"
+              size="icon"
+              className="w-8 h-8 rounded-full"
+              disabled={isInteractionDisabled || noOfPax <= MIN_PAX}
+            >
+              -
+            </Button>
+            <span className="w-6 text-center">{noOfPax}</span>
+            <Button
+              onClick={handlePaxIncrement}
+              variant="outline"
+              size="icon"
+              className="w-8 h-8 rounded-full"
+              disabled={isInteractionDisabled || noOfPax >= MAX_PAX}
+            >
+              +
+            </Button>
+          </div>
+        </div>
       </div>
       
       {orderLoading ? (

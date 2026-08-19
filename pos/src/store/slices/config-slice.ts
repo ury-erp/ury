@@ -25,6 +25,36 @@ export interface ConfigState {
   posProfile: PosProfileCombined | null;
 }
 
+/**
+ * Every role the POS Profile references anywhere, across all its
+ * role-permission child tables — not just `role_allowed_for_billing`
+ * (billing/cashier capability). This is the app-entry set: "is this a
+ * recognized POS-adjacent role for this branch at all," distinct from
+ * `role_allowed_for_billing`, which remains the actual billing-capability
+ * check (used separately, e.g. in `@ury/core`'s `derivePOSCapabilities`).
+ *
+ * Fixes a real bug: shipped default POS Profile setup
+ * (`ury/ury/api/minimal/business_setup.py`) only puts "URY Cashier" in
+ * `role_allowed_for_billing`, so a pure Captain role was locked out of the
+ * entire app before this — not just billing actions — by default, out of
+ * the box. This is a strict superset of the previous role set, so no
+ * existing Cashier/Manager access changes.
+ */
+const deriveAllowedRoles = (
+  profile: Pick<
+    PosProfileCombined,
+    'role_allowed_for_billing' | 'transfer_role_permissions' | 'role_restricted_for_table_order'
+  >
+): string[] => {
+  const roleSets = [
+    profile.role_allowed_for_billing,
+    profile.transfer_role_permissions,
+    profile.role_restricted_for_table_order,
+  ];
+  const roles = roleSets.flatMap((rows) => rows?.map((row: RolePermission) => row.role) || []);
+  return Array.from(new Set(roles));
+};
+
 export interface ConfigActions {
   checkAccess: () => void;
   setAllowedRoles: (roles: string[]) => void;
