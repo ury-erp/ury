@@ -36,7 +36,7 @@ function App() {
       <ScreenSizeProvider>
         <AuthGuard>
           <POSOpeningProvider>
-            <Router basename="/ury">
+            <Router basename="/pos">
               <Routes>
                 <Route element={<AppLayout />}>
                   <Route index element={<Navigate to="/dashboard" replace />} />
