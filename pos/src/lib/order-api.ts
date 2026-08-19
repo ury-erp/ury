@@ -587,6 +587,23 @@ export const syncOrder = async (data: SyncOrderData) => {
         updatedAt: new Date().toISOString(),
         sync_status: 'synced',
       });
+
+      if (data.table) {
+        await repositories.tables.setOccupied(data.table, true);
+        const currentTable = await repositories.tables.getById(data.table);
+        if (currentTable) {
+          await repositories.tables.put({
+            ...currentTable,
+            occupied: 1,
+            latest_invoice_time: new Date().toISOString(),
+          });
+        }
+        projectionBus.emit('TABLES_UPDATED');
+        queryClient.invalidateQueries({ queryKey: ['tables'] });
+        queryClient.invalidateQueries({ queryKey: ['roomCounts'] });
+      }
+
+      projectionBus.emit('ORDERS_UPDATED');
     }
 
     return result;

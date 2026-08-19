@@ -14,6 +14,7 @@ import { resolveTempDependency } from './order-api';
 import { OrderStatusType, OrderType } from '../data/order-types';
 import { buildTableClusterMap, getMergedTablesCsv } from './table-utils';
 import { unwrapResponse } from './network-utils';
+import { queryClient } from './query-client';
 import type { Filter } from 'frappe-js-sdk/lib/db/types';
 
 export interface POSInvoice {
@@ -1242,6 +1243,10 @@ async function updateLocalPrintState(orderId: string) {
         invoice_printed: 1,
         updatedAt: new Date().toISOString(),
       } as any);
+      if (cached.table) {
+        const clusterTables = await repositories.tables.getClusterTables(cached.table);
+        await repositories.tables.releaseCluster(clusterTables);
+      }
     }
   } catch (localErr) {
     console.warn('[updatePrintStatus] Failed to update local order cache:', localErr);
@@ -1262,6 +1267,9 @@ export async function updatePrintStatus(orderId: string): Promise<UpdatePrintSta
     await queuePrintUpdate(orderId, endpoint, dependencyIds);
     await updateLocalPrintState(orderId);
     projectionBus.emit('ORDERS_UPDATED');
+    projectionBus.emit('TABLES_UPDATED');
+    queryClient.invalidateQueries({ queryKey: ['tables'] });
+    queryClient.invalidateQueries({ queryKey: ['roomCounts'] });
     return { queued: true };
   }
 
@@ -1278,6 +1286,9 @@ export async function updatePrintStatus(orderId: string): Promise<UpdatePrintSta
     // when the next projection fetch is skipped or fails.
     await updateLocalPrintState(orderId);
     projectionBus.emit('ORDERS_UPDATED');
+    projectionBus.emit('TABLES_UPDATED');
+    queryClient.invalidateQueries({ queryKey: ['tables'] });
+    queryClient.invalidateQueries({ queryKey: ['roomCounts'] });
 
     return { queued: false };
   } catch (error) {
@@ -1286,6 +1297,9 @@ export async function updatePrintStatus(orderId: string): Promise<UpdatePrintSta
     await queuePrintUpdate(orderId, endpoint, dependencyIds);
     await updateLocalPrintState(orderId);
     projectionBus.emit('ORDERS_UPDATED');
+    projectionBus.emit('TABLES_UPDATED');
+    queryClient.invalidateQueries({ queryKey: ['tables'] });
+    queryClient.invalidateQueries({ queryKey: ['roomCounts'] });
     return { queued: true };
   }
 }
