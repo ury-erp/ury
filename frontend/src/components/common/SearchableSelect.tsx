@@ -150,12 +150,12 @@ export function SearchableSelect({
         <div className="absolute top-full left-0 right-0 mt-2 z-50 bg-white border border-gray-200 rounded-lg shadow-lg max-h-80 overflow-y-auto p-1 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-500">
           {filteredOptions.length > 0 ? (
             filteredOptions.map((opt) => {
-              const isCreateNew = opt.value === 'CREATE_NEW_ITEM';
-              const isSelected = !!value && !isCreateNew && (
+              const isActionOption = opt.value === 'CREATE_NEW_ITEM' || opt.value === 'CREATE_NEW_COURSE' || opt.value?.startsWith('CREATE_NEW_');
+              const isSelected = value !== undefined && value !== null && !isActionOption && (
                 opt.value === value || 
                 opt.label === value || 
-                (opt.value && opt.value.toLowerCase() === value.toLowerCase()) || 
-                (opt.label && opt.label.toLowerCase() === value.toLowerCase())
+                (opt.value !== '' && opt.value && value !== '' && value && opt.value.toLowerCase() === value.toLowerCase()) || 
+                (opt.label !== '' && opt.label && value !== '' && value && opt.label.toLowerCase() === value.toLowerCase())
               );
 
               return (
@@ -165,7 +165,7 @@ export function SearchableSelect({
                   className={`px-4 py-2 text-sm rounded-md cursor-pointer select-none transition-colors ${
                     isSelected
                       ? 'bg-blue-50 text-blue-700 font-normal'
-                      : isCreateNew
+                      : isActionOption
                       ? 'text-blue-600 font-medium hover:bg-blue-50/50 border-t border-gray-100 mt-1 pt-2'
                       : 'text-gray-800 hover:bg-gray-50'
                   }`}
