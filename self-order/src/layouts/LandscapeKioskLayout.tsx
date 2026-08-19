@@ -205,9 +205,8 @@ function LandscapeKioskLayout({ initialContext }: LayoutProps) {
             billRequested={billRequested}
             paymentRequest={paymentRequest}
             onSubmitCart={() => {
-              submitCart().then(() => {
-                // Delay navigation to allow order submission to complete
-                setTimeout(() => goToStatus(), 500)
+              submitCart().then((success) => {
+                if (success) goToStatus()
               })
             }}
             onPayOnline={payOnline}

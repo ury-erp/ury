@@ -227,8 +227,9 @@ function PortraitKioskLayout({ initialContext }: LayoutProps) {
             billRequested={billRequested}
             paymentRequest={null}
             onSubmitCart={() => {
-              submitCart()
-              goToStatus()
+              submitCart().then((success) => {
+                if (success) goToStatus()
+              })
             }}
             onPayOnline={payOnline}
             onRequestBill={handleRequestBill}
