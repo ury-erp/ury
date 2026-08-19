@@ -34,7 +34,7 @@ interface CustomerDataResult {
 const columns: DataTableColumn<InvoiceRow>[] = [
   { key: 'date', header: 'Date' },
   { key: 'invoice', header: 'Invoice' },
-  { key: 'amount', header: 'Amount', render: (r) => formatCurrency(r.amount) },
+  { key: 'amount', header: 'Amount', render: (r) => formatCurrency(r.amount), align: 'right' },
 ];
 
 export function CustomerData() {

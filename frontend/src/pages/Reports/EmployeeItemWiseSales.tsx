@@ -29,8 +29,8 @@ interface EmployeeItemWiseSalesData {
 const columns: DataTableColumn<ItemRow>[] = [
   { key: 'item_name', header: 'Item' },
   { key: 'item_group', header: 'Group', render: (r) => r.item_group || '—' },
-  { key: 'qty', header: 'Qty' },
-  { key: 'amount', header: 'Amount', render: (r) => formatCurrency(r.amount) },
+  { key: 'qty', header: 'Qty', align: 'right' },
+  { key: 'amount', header: 'Amount', render: (r) => formatCurrency(r.amount), align: 'right' },
 ];
 
 export function EmployeeItemWiseSales() {

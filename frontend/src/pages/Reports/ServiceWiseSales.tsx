@@ -23,10 +23,10 @@ interface ServiceWiseSalesData {
 
 const columns: DataTableColumn<ServiceRow>[] = [
   { key: 'order_type', header: 'Order Type' },
-  { key: 'order_count', header: '# Orders' },
-  { key: 'revenue', header: 'Revenue', render: (r) => formatCurrency(r.revenue) },
-  { key: 'avg_order_value', header: 'Avg Order Value', render: (r) => formatCurrency(r.avg_order_value) },
-  { key: 'percentage_of_total', header: '% of Total', render: (r) => `${r.percentage_of_total}%` },
+  { key: 'order_count', header: '# Orders', align: 'right' },
+  { key: 'revenue', header: 'Revenue', render: (r) => formatCurrency(r.revenue), align: 'right' },
+  { key: 'avg_order_value', header: 'Avg Order Value', render: (r) => formatCurrency(r.avg_order_value), align: 'right' },
+  { key: 'percentage_of_total', header: '% of Total', render: (r) => `${r.percentage_of_total}%`, align: 'right' },
 ];
 
 export function ServiceWiseSales() {
@@ -97,14 +97,19 @@ export function ServiceWiseSales() {
             />
           </div>
 
-          <PieChartCard
-            title="Revenue by Order Type"
-            data={data.by_service_type}
-            dataKey="revenue"
-            nameKey="order_type"
-          />
-
-          <DataTable columns={columns} rows={data.by_service_type} isLoading={isLoading} />
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+            <div className="lg:col-span-2">
+              <PieChartCard
+                title="Revenue by Order Type"
+                data={data.by_service_type}
+                dataKey="revenue"
+                nameKey="order_type"
+              />
+            </div>
+            <div className="lg:col-span-3">
+              <DataTable columns={columns} rows={data.by_service_type} isLoading={isLoading} />
+            </div>
+          </div>
         </>
       ) : null}
     </div>

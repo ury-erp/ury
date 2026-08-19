@@ -28,10 +28,10 @@ const PAGE_SIZE = 50;
 const columns: DataTableColumn<ItemRow>[] = [
   { key: 'item_name', header: 'Item' },
   { key: 'item_group', header: 'Group', render: (r) => r.item_group || '—' },
-  { key: 'qty', header: 'Qty' },
-  { key: 'amount', header: 'Amount', render: (r) => formatCurrency(r.amount) },
-  { key: 'avg_price', header: 'Avg Price', render: (r) => formatCurrency(r.avg_price) },
-  { key: 'pct_of_total_amount', header: '% of Total', render: (r) => `${r.pct_of_total_amount}%` },
+  { key: 'qty', header: 'Qty', align: 'right' },
+  { key: 'amount', header: 'Amount', render: (r) => formatCurrency(r.amount), align: 'right' },
+  { key: 'avg_price', header: 'Avg Price', render: (r) => formatCurrency(r.avg_price), align: 'right' },
+  { key: 'pct_of_total_amount', header: '% of Total', render: (r) => `${r.pct_of_total_amount}%`, align: 'right' },
 ];
 
 export function ItemWiseSales() {

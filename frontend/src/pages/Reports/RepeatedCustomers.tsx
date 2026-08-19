@@ -28,10 +28,10 @@ interface RepeatedCustomersData {
 
 const columns: DataTableColumn<DayRow>[] = [
   { key: 'date', header: 'Date' },
-  { key: 'total_customers', header: 'Total' },
-  { key: 'new_customers', header: 'New' },
-  { key: 'repeat_customers', header: 'Repeat' },
-  { key: 'repeat_rate_percent', header: 'Repeat Rate', render: (r) => `${r.repeat_rate_percent}%` },
+  { key: 'total_customers', header: 'Total', align: 'right' },
+  { key: 'new_customers', header: 'New', align: 'right' },
+  { key: 'repeat_customers', header: 'Repeat', align: 'right' },
+  { key: 'repeat_rate_percent', header: 'Repeat Rate', render: (r) => `${r.repeat_rate_percent}%`, align: 'right' },
 ];
 
 export function RepeatedCustomers() {
@@ -104,6 +104,7 @@ export function RepeatedCustomers() {
             data={data.rows}
             xKey="date"
             yKeys={['new_customers', 'repeat_customers']}
+            labels={{ new_customers: 'New Customers', repeat_customers: 'Repeat Customers' }}
           />
 
           <DataTable columns={columns} rows={data.rows} isLoading={isLoading} />

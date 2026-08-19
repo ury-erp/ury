@@ -25,9 +25,9 @@ interface EmployeeSalesData {
 const columns: DataTableColumn<EmployeeRow>[] = [
   { key: 'rank', header: '#' },
   { key: 'employee_name', header: 'Employee' },
-  { key: 'total_invoices', header: 'Invoices' },
-  { key: 'sales_amount', header: 'Sales Amount', render: (r) => formatCurrency(r.sales_amount) },
-  { key: 'average_invoice_value', header: 'Avg / Invoice', render: (r) => formatCurrency(r.average_invoice_value) },
+  { key: 'total_invoices', header: 'Invoices', align: 'right' },
+  { key: 'sales_amount', header: 'Sales Amount', render: (r) => formatCurrency(r.sales_amount), align: 'right' },
+  { key: 'average_invoice_value', header: 'Avg / Invoice', render: (r) => formatCurrency(r.average_invoice_value), align: 'right' },
 ];
 
 export function EmployeeSales() {
@@ -98,8 +98,14 @@ export function EmployeeSales() {
             />
           </div>
 
-          {top10.length > 0 && (
-            <BarChartCard title="Top 10 by Sales" data={top10} xKey="employee_name" yKeys={['sales_amount']} />
+          {top10.length >= 2 && (
+            <BarChartCard
+              title={`Top ${Math.min(10, top10.length)} by Sales`}
+              data={top10}
+              xKey="employee_name"
+              yKeys={['sales_amount']}
+              labels={{ sales_amount: 'Sales Amount' }}
+            />
           )}
         </>
       )}

@@ -22,9 +22,9 @@ interface AverageBillValueData {
 
 const columns: DataTableColumn<ABVRow>[] = [
   { key: 'date', header: 'Date' },
-  { key: 'bill_count', header: 'Bills' },
-  { key: 'total_sales', header: 'Total Sales', render: (r) => formatCurrency(r.total_sales) },
-  { key: 'abv', header: 'ABV', render: (r) => formatCurrency(r.abv) },
+  { key: 'bill_count', header: 'Bills', align: 'right' },
+  { key: 'total_sales', header: 'Total Sales', render: (r) => formatCurrency(r.total_sales), align: 'right' },
+  { key: 'abv', header: 'ABV', render: (r) => formatCurrency(r.abv), align: 'right' },
 ];
 
 export function AverageBillValue() {
@@ -95,7 +95,7 @@ export function AverageBillValue() {
             />
           </div>
 
-          <LineChartCard title="ABV Trend" data={data.data} xKey="date" yKeys={['abv']} />
+          <LineChartCard title="ABV Trend" data={data.data} xKey="date" yKeys={['abv']} labels={{ abv: 'Avg Bill Value' }} />
 
           <DataTable columns={columns} rows={data.data} isLoading={isLoading} />
         </>

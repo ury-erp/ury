@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@ury/ui";
 import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 
-const DEFAULT_COLORS = ["#3b82f6", "#22c55e", "#f59e0b", "#ef4444", "#a855f7"];
+const DEFAULT_COLORS = ["#3b82f6", "#6366f1", "#8b5cf6", "#a855f7", "#0ea5e9", "#14b8a6"];
 
 export interface PieChartCardProps {
   title: string;
@@ -22,7 +22,17 @@ export function PieChartCard({ title, data, dataKey, nameKey, colors }: PieChart
       <CardContent>
         <ResponsiveContainer width="100%" height={300}>
           <PieChart>
-            <Pie data={data} dataKey={dataKey} nameKey={nameKey} outerRadius={100} startAngle={0} endAngle={360} isAnimationActive={false}>
+            <Pie
+              data={data}
+              dataKey={dataKey}
+              nameKey={nameKey}
+              innerRadius={65}
+              outerRadius={100}
+              startAngle={0}
+              endAngle={360}
+              isAnimationActive={false}
+              label={({ percent }) => `${((percent ?? 0) * 100).toFixed(0)}%`}
+            >
               {data.map((_, index) => (
                 <Cell key={`cell-${index}`} fill={palette[index % palette.length]} />
               ))}
