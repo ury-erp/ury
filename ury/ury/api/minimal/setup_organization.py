@@ -110,3 +110,13 @@ def complete_wizard_setup(payload=None, **kwargs):
     if payload is None:
         payload = kwargs.copy()
     return submit_setup(payload=payload)
+
+@frappe.whitelist()
+def get_wizard_status():
+    if frappe.session.user == "Guest":
+        frappe.throw("Not permitted")
+
+    return {
+        "step1_complete": bool(frappe.db.exists("Company", {})),
+        "step2_complete": bool(frappe.db.exists("Branch", {}))
+    }

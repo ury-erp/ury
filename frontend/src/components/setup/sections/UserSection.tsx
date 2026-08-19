@@ -27,9 +27,12 @@ export function UserSection() {
 
   return (
     <div className="space-y-6">
+      <p className="text-sm text-muted-foreground">
+        Add login accounts for your staff now, or skip this and add them later. We've suggested a starting cashier account below — feel free to edit or remove it.
+      </p>
       <div className="space-y-3">
         {/* Header Row */}
-        <div className="hidden md:flex gap-3 px-2 text-xs font-medium text-gray-600">
+        <div className="hidden md:flex gap-3 px-2 text-xs font-medium text-muted-foreground">
           <div className="flex-1">User Name</div>
           <div className="flex-1">Email Address</div>
           <div className="flex-1">Password</div>
@@ -44,7 +47,11 @@ export function UserSection() {
           >
             <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-3">
               <div>
+                <label htmlFor={`user-name-${user.id}`} className="sr-only">
+                  User Name
+                </label>
                 <Input
+                  id={`user-name-${user.id}`}
                   type="text"
                   value={user.name}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateUser(user.id, { name: e.target.value })}
@@ -54,7 +61,11 @@ export function UserSection() {
               </div>
 
               <div>
+                <label htmlFor={`user-email-${user.id}`} className="sr-only">
+                  Email Address
+                </label>
                 <Input
+                  id={`user-email-${user.id}`}
                   type="email"
                   value={user.email}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateUser(user.id, { email: e.target.value })}
@@ -64,16 +75,24 @@ export function UserSection() {
               </div>
 
               <div>
+                <label htmlFor={`user-password-${user.id}`} className="sr-only">
+                  Password
+                </label>
                 <Input
+                  id={`user-password-${user.id}`}
                   type="text"
                   value={user.passwordPlaceholder}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateUser(user.id, { passwordPlaceholder: e.target.value })}
                   placeholder="Password"
                   className="w-full text-sm bg-white font-mono"
+                  autoComplete="new-password"
                 />
               </div>
 
               <div>
+                <label htmlFor={`user-role-${user.id}`} className="sr-only">
+                  Role
+                </label>
                 <SearchableSelect
                   id={`user-role-${user.id}`}
                   value={user.role}
@@ -94,6 +113,7 @@ export function UserSection() {
                 onClick={() => deleteUser(user.id)}
                 className="text-red-500 hover:text-red-700 hover:bg-red-50 self-end md:self-center shrink-0 p-2 h-auto"
                 title="Delete User"
+                aria-label="Delete user"
               >
                 <Trash2 className="w-4 h-4" />
               </Button>
@@ -106,7 +126,7 @@ export function UserSection() {
         type="button"
         variant="outline"
         onClick={handleAdd}
-        className="w-full py-2.5 border-dashed border-primary text-primary hover:bg-primary-50 flex items-center justify-center gap-2 text-sm font-medium"
+        className="w-full py-2.5 border-dashed border-primary text-primary hover:bg-primary/10 flex items-center justify-center gap-2 text-sm font-medium"
       >
         <Plus className="w-4 h-4" />
         Add User
