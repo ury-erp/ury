@@ -1,11 +1,12 @@
 # Copyright (c) 2023, Tridz Technologies Pvt. Ltd. and contributors
 # See license.txt
 
+import unittest
 import frappe
 from frappe.tests.utils import FrappeTestCase
 from unittest.mock import patch, MagicMock
 
-from ury.ury.doctype.ury_order.ury_order import sync_order
+from ury.ury.doctype.ury_order.ury_order import sync_order, price_items_for_invoice
 
 from unittest.mock import patch, MagicMock
 from ury.ury.doctype.ury_order.ury_order import get_order_invoice
@@ -161,3 +162,104 @@ class TestURYOrder(FrappeTestCase):
             # Waiter and cashier should be set to session user, ignoring "fake_waiter" and "fake_cashier"
             self.assertEqual(mock_invoice.cashier, "newuser@example.com")
             self.assertEqual(mock_invoice.waiter, "newuser@example.com")
+
+
+class TestPriceItemsForInvoicePhase1(unittest.TestCase):
+    """Phase 1 regression: price_items_for_invoice() must return the same
+    dict shape sync_order() used to build inline, and sync_order() must
+    delegate to it rather than re-deriving prices itself."""
+
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.db.get_list")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.db.get_value")
+    def test_price_items_for_invoice_shape(self, mock_get_value, mock_get_list):
+        def get_value_side_effect(doctype, filters, fieldname=None):
+            if doctype == "URY Menu Item":
+                return "Starters"
+            if doctype == "POS Profile":
+                return "Cost Center A"
+            return None
+
+        mock_get_value.side_effect = get_value_side_effect
+        mock_price = MagicMock()
+        mock_price.price_list_rate = 150
+        mock_get_list.return_value = [mock_price]
+
+        items = [{"item": "Biryani", "item_name": "Biryani", "qty": 2, "comment": "less spicy"}]
+        result = price_items_for_invoice(items, "Standard Selling", "Test Profile", "Branch A", "Menu A")
+
+        self.assertEqual(len(result), 1)
+        row = result[0]
+        self.assertEqual(row["item_code"], "Biryani")
+        self.assertEqual(row["qty"], 2)
+        self.assertEqual(row["comment"], "less spicy")
+        self.assertEqual(row["rate"], 150)
+        self.assertEqual(row["price_list_rate"], 150)
+        self.assertEqual(row["base_price_list_rate"], 150)
+        self.assertEqual(row["custom_course"], "Starters")
+        self.assertEqual(row["cost_center"], "Cost Center A")
+
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.db.get_list")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.db.get_value")
+    def test_price_items_for_invoice_throws_on_missing_price(self, mock_get_value, mock_get_list):
+        mock_get_value.return_value = None
+        mock_get_list.return_value = []
+
+        with self.assertRaises(frappe.ValidationError):
+            price_items_for_invoice(
+                [{"item": "Biryani", "item_name": "Biryani", "qty": 1}],
+                "Standard Selling", "Test Profile", "Branch A", "Menu A",
+            )
+
+    @patch("ury.ury.doctype.ury_order.ury_order.get_order_invoice")
+    @patch("ury.ury.doctype.ury_order.ury_order.price_items_for_invoice")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.has_permission")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.db.get_value")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_doc")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_roles")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.session")
+    def test_sync_order_delegates_pricing(
+        self, mock_session, mock_get_roles, mock_get_doc, mock_get_value, mock_has_permission,
+        mock_price_items, mock_get_order_invoice,
+    ):
+        mock_invoice = MagicMock()
+        mock_invoice.name = "POS-INV-002"
+        mock_invoice.branch = "Test Branch"
+        mock_invoice.restaurant_table = "Table 1"
+        mock_invoice.invoice_printed = 0
+        mock_invoice.invoice_created = 1
+        mock_invoice.items = []
+        mock_invoice.waiter = "existing_waiter"
+        mock_invoice.selling_price_list = "Standard Selling"
+        mock_get_order_invoice.return_value = mock_invoice
+
+        # billing_user must resolve True, or sync_order's early "Table
+        # occupied" guard returns before ever reaching the pricing section.
+        mock_get_roles.return_value = ["URY Cashier"]
+        billing_role = MagicMock()
+        billing_role.role = "URY Cashier"
+        mock_pos_profile = MagicMock()
+        mock_pos_profile.custom_enable_multiple_cashier = 0
+        mock_pos_profile.applicable_for_users = []
+        mock_pos_profile.role_allowed_for_billing = [billing_role]
+        mock_get_doc.return_value = mock_pos_profile
+
+        mock_session.user = "authorized@example.com"
+        mock_has_permission.return_value = True
+
+        priced = [{"item_code": "Biryani", "item_name": "Biryani", "qty": 1, "comment": None,
+                   "rate": 150, "price_list_rate": 150, "base_price_list_rate": 150, "cost_center": "CC-1"}]
+        mock_price_items.return_value = priced
+
+        with patch("ury.ury.doctype.ury_order.ury_order.frappe.db.sql"):
+            try:
+                sync_order(
+                    items=[{"item": "Biryani", "qty": 1}],
+                    cashier="fake_cashier", owner="fake_owner", mode_of_payment="Cash",
+                    customer="Test Customer", no_of_pax=2, last_invoice=None,
+                    waiter="fake_waiter", pos_profile="Test Profile",
+                )
+            except Exception:
+                pass
+
+        mock_price_items.assert_called_once()
+        mock_invoice.append.assert_any_call("items", priced[0])
