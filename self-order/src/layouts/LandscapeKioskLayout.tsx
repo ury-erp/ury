@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useIdleReset } from '../hooks/useIdleReset'
 import { useOrderingSession } from '../hooks/useOrderingSession'
 import type { OrderingContext } from '../lib/api'
 import CartPanel from './shared/CartPanel'
@@ -30,6 +31,7 @@ function LandscapeKioskLayout({ initialContext }: LayoutProps) {
     context,
     menu,
     order,
+    orderStatus,
     cart,
     loading,
     submitting,
@@ -63,6 +65,12 @@ function LandscapeKioskLayout({ initialContext }: LayoutProps) {
       resetSession()
     }
   }
+
+  // Idle-reset: device-bootstrapped kiosks re-bootstrap immediately from the
+  // same device context on idle (resetSession reuses initialContext when
+  // present); there's no separate device-vs-QR branch needed here because
+  // resetSession already encodes that distinction.
+  useIdleReset(resetSession, (context?.session_idle_timeout_minutes ?? 30) * 60000)
 
   // Build unique categories from menu
   const categories = useMemo(() => {
@@ -213,11 +221,6 @@ function LandscapeKioskLayout({ initialContext }: LayoutProps) {
   // Order status screen
   if (screen === 'status') {
     const isPickup = !context?.table
-    // Note: Workaround for type mismatch — OrderStatusScreen expects OrderStatus,
-    // but the hook provides CustomerOrder. Both share invoice/billed fields which
-    // are the essential data this component uses; casting as-is.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const statusData = order as any
     return (
       <div className="flex h-screen flex-col">
         <header className="flex items-center justify-between border-b bg-background/95 px-10 py-6">
@@ -233,7 +236,7 @@ function LandscapeKioskLayout({ initialContext }: LayoutProps) {
         </header>
         <div className="flex-1">
           <OrderStatusScreen
-            status={statusData}
+            status={orderStatus}
             isPickup={isPickup}
             pickupCode={order?.pickup_code ?? undefined}
             canAddMore={context?.capabilities.add_to_running_table_enabled ?? false}

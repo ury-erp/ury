@@ -31,6 +31,11 @@ const DEVICE_CREDENTIAL_KEY = 'ury_device_credential'
  * for this MVP pass. The backend still validates the table exists and
  * belongs to the device's branch, so a bad value is rejected, not silently
  * accepted.
+ *
+ * Deliberately does NOT use `useIdleReset`: this screen is a staff-only PIN
+ * entry / table-assignment step (customers never see it), so a customer
+ * idling here doesn't apply. Idle-reset kicks in once `TabletLayout` takes
+ * over below with the assigned context.
  */
 function PortableTabletAssignment() {
   const [step, setStep] = useState<Step>('pin')

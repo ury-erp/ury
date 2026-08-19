@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useIdleReset } from '../hooks/useIdleReset'
 import { useOrderingSession } from '../hooks/useOrderingSession'
 import type { MenuItem, OrderingContext } from '../lib/api'
 import SearchBar from './shared/SearchBar'
@@ -34,6 +35,7 @@ function PortraitKioskLayout({ initialContext }: LayoutProps) {
     context,
     menu,
     order,
+    orderStatus,
     cart,
     loading,
     submitting,
@@ -66,6 +68,11 @@ function PortraitKioskLayout({ initialContext }: LayoutProps) {
       resetSession()
     }
   }
+
+  // Idle-reset: resetSession already re-bootstraps immediately for
+  // device-bootstrapped kiosks and falls back to the QR "rescan" error state
+  // for link-based sessions, so no separate device/QR branch is needed here.
+  useIdleReset(resetSession, (context?.session_idle_timeout_minutes ?? 30) * 60000)
 
   const categories = useMemo(() => {
     const seen = new Map<string, string>()
@@ -132,19 +139,6 @@ function PortraitKioskLayout({ initialContext }: LayoutProps) {
       addToCart(item)
     }
   }
-
-  // Adapt CustomerOrder to OrderStatus shape for OrderStatusScreen
-  // Workaround: OrderStatusScreen expects OrderStatus from get_order_status(),
-  // but we have CustomerOrder from get_current_order(). Map the available fields.
-  const orderStatusForScreen = order
-    ? {
-        session_status: order.items.length > 0 ? 'submitted' : 'pending',
-        invoice: order.invoice,
-        billed: order.billed,
-        submitted: order.items.length > 0,
-        open_requests: [],
-      }
-    : null
 
   // Render different screens based on state
   if (screen === 'detail' && detailItem) {
@@ -260,7 +254,7 @@ function PortraitKioskLayout({ initialContext }: LayoutProps) {
         </header>
 
         <OrderStatusScreen
-          status={orderStatusForScreen}
+          status={orderStatus}
           isPickup={!context?.table}
           pickupCode={order?.pickup_code}
           canAddMore={context?.capabilities.add_to_running_table_enabled ?? false}

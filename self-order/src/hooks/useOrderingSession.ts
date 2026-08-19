@@ -5,11 +5,13 @@ import {
   createPaymentRequest,
   getCurrentOrder,
   getMenu,
+  getStatus,
   getStoredContext,
   requestBill,
   type CustomerOrder,
   type MenuItem,
   type OrderingContext,
+  type OrderStatus,
   type PaymentRequestResult,
 } from '../lib/api'
 
@@ -67,6 +69,7 @@ export function useOrderingSession(initialContext?: OrderingContext) {
   const [context, setContext] = useState<OrderingContext | null>(null)
   const [menu, setMenu] = useState<MenuItem[]>([])
   const [order, setOrder] = useState<CustomerOrder | null>(null)
+  const [orderStatus, setOrderStatus] = useState<OrderStatus | null>(null)
   const [cart, setCart] = useState<Cart>({})
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -149,6 +152,7 @@ export function useOrderingSession(initialContext?: OrderingContext) {
     sessionStorage.removeItem(CONTEXT_KEY)
     setCart({})
     setOrder(null)
+    setOrderStatus(null)
     setBillRequested(false)
     setPaymentRequest(null)
     setPayingOnline(false)
@@ -199,8 +203,23 @@ export function useOrderingSession(initialContext?: OrderingContext) {
     setScreen('checkout')
   }
 
+  // Order status (session_status/invoice/billed/submitted/open_requests) is
+  // fetched from the real `get_order_status` endpoint rather than derived
+  // from `CustomerOrder` — `open_requests` (service requests) has no
+  // equivalent on `CustomerOrder` and can't be reconstructed client-side.
+  const loadStatus = useCallback(async () => {
+    if (!context) return
+    try {
+      const latest = await getStatus(context.session)
+      setOrderStatus(latest)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not load order status.')
+    }
+  }, [context])
+
   function goToStatus() {
     setScreen('status')
+    loadStatus()
   }
 
   function decrementCart(itemCode: string) {
@@ -273,6 +292,7 @@ export function useOrderingSession(initialContext?: OrderingContext) {
     context,
     menu,
     order,
+    orderStatus,
     cart,
     loading,
     submitting,

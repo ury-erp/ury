@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useIdleReset } from '../hooks/useIdleReset'
 import { useOrderingSession } from '../hooks/useOrderingSession'
 import type { MenuItem, OrderingContext } from '../lib/api'
 import CartPanel from './shared/CartPanel'
@@ -99,6 +100,14 @@ function TabletLayout({ initialContext }: LayoutProps) {
       resetSession()
     }
   }
+
+  // Idle-reset: covers both the fixed-table tablet case (device-bootstrapped,
+  // resetSession re-bootstraps immediately from initialContext) and the
+  // portable-tablet case reached via PortableTabletAssignment (also
+  // device-bootstrapped by the time this layout renders, since assignment
+  // already happened) — either way resetSession's existing device/QR
+  // distinction is the right behavior, no branch needed here.
+  useIdleReset(resetSession, (context?.session_idle_timeout_minutes ?? 30) * 60000)
 
   if (loading) {
     return (
