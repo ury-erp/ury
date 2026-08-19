@@ -523,6 +523,16 @@ def add_customer_items(session, items):
         if session.table and not invoice.restaurant_table:
             invoice.restaurant_table = session.table
 
+        # Same gap for order_type on the pickup (no-table) path:
+        # _resolve_or_create_pos_invoice() only derives order_type from the
+        # table's is_take_away flag in the table branch — the non-table
+        # branch leaves it untouched, expecting the caller to set it
+        # (sync_order() does `if order_type: invoice.order_type =
+        # order_type` itself). Confirmed live: a pickup order's invoice had
+        # an empty order_type instead of "Take Away" before this.
+        if not session.table:
+            invoice.order_type = order_type
+
         if not invoice.customer:
             if not profile.default_customer:
                 frappe.throw(_("Self ordering profile has no default customer configured"), frappe.ValidationError)
