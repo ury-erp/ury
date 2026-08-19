@@ -53,6 +53,7 @@ export function LineChartCard({ title, data, xKey, yKeys, colors, labels }: Line
                 strokeWidth={2}
                 dot={showDots}
                 activeDot={{ r: 5 }}
+                isAnimationActive={false}
               />
             ))}
           </LineChart>
