@@ -30,6 +30,36 @@ function stubCallPostError() {
   };
 }
 
+function stubCallPostServerError(message: string, excType = 'ValidationError') {
+  const originalPost = call.post;
+  (call as any).post = async () => {
+    const err: any = new Error(message);
+    err.exc_type = excType;
+    err.httpStatus = 500;
+    err._server_messages = JSON.stringify([{ message, title: excType }]);
+    throw err;
+  };
+  return () => {
+    (call as any).post = originalPost;
+  };
+}
+
+function stubNavigatorOnline(online: boolean) {
+  const original = Object.getOwnPropertyDescriptor(globalThis.navigator, 'onLine');
+  Object.defineProperty(globalThis.navigator, 'onLine', {
+    value: online,
+    configurable: true,
+    writable: true,
+  });
+  return () => {
+    if (original) {
+      Object.defineProperty(globalThis.navigator, 'onLine', original);
+    } else {
+      delete (globalThis.navigator as any).onLine;
+    }
+  };
+}
+
 beforeEach(async () => {
   await repositories.orders.clear();
   await repositories.syncQueue.clear();
@@ -276,5 +306,55 @@ test('getTables fallback preserves full server schema fields', async () => {
     assert.equal(table?.layout_y, 20);
   } finally {
     restore();
+  }
+});
+
+test('online mergeTablesBatch throws server ValidationError without queueing', async () => {
+  await seedTable('F1', 0);
+  await seedTable('F2', 0);
+  const restorePost = stubCallPostServerError('Cannot merge an already merged table.');
+  const restoreOnline = stubNavigatorOnline(true);
+
+  try {
+    await assert.rejects(
+      async () => mergeTablesBatch('F1', ['F2']),
+      /Cannot merge an already merged table/
+    );
+
+    const queue = await repositories.syncQueue.getAll();
+    assert.equal(queue.length, 0, 'server error should not enqueue sync command');
+
+    const f1 = await repositories.tables.getById('F1');
+    const f2 = await repositories.tables.getById('F2');
+    assert.equal(f1?.merged_with, undefined, 'anchor should not be locally merged');
+    assert.equal(f2?.merged_with, undefined, 'target should not be locally merged');
+  } finally {
+    restorePost();
+    restoreOnline();
+  }
+});
+
+test('online unmergeTables throws server TypeError without queueing', async () => {
+  await seedTable('F1', 1, { merged_with: 'F2' });
+  await seedTable('F2', 1, { merged_with: 'F1' });
+  const restorePost = stubCallPostServerError("'dict' object is not callable", 'TypeError');
+  const restoreOnline = stubNavigatorOnline(true);
+
+  try {
+    await assert.rejects(
+      async () => unmergeTables('F1'),
+      /'dict' object is not callable/
+    );
+
+    const queue = await repositories.syncQueue.getAll();
+    assert.equal(queue.length, 0, 'server error should not enqueue sync command');
+
+    const f1 = await repositories.tables.getById('F1');
+    const f2 = await repositories.tables.getById('F2');
+    assert.equal(f1?.merged_with, 'F2', 'anchor merge state should be unchanged');
+    assert.equal(f2?.merged_with, 'F1', 'target merge state should be unchanged');
+  } finally {
+    restorePost();
+    restoreOnline();
   }
 });
