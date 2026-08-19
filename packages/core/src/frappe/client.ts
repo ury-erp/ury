@@ -7,6 +7,25 @@ export function createFrappeClient(baseUrl: string | undefined = import.meta.env
 const frappe = createFrappeClient();
 const rawCall = frappe.call();
 
+frappe.axios.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (!error?.response) {
+      error.response = {
+        status: 0,
+        statusText: 'Network Error',
+        data: {
+          message: error?.message || 'Network Disconnected',
+          exception: 'NetworkError',
+        },
+        headers: {},
+        config: error?.config,
+      };
+    }
+    return Promise.reject(error);
+  }
+);
+
 function safeCallError(error: any): Error {
   if (!error?.response) {
     return new Error(error?.message || 'Network Disconnected');

@@ -1,6 +1,7 @@
-import { test } from 'node:test';
+import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { call } from '@ury/core';
+import 'fake-indexeddb/auto';
+import { call, repositories } from '@ury/core';
 import { getRestaurantMenu, getAggregatorMenu } from '../menu-api';
 
 type MockableCall = typeof call & {
@@ -15,7 +16,11 @@ const mockGet = (handler: typeof call.get) => {
   };
 };
 
-test('getRestaurantMenu calls endpoint and returns items', async () => {
+beforeEach(async () => {
+  await repositories.menu.clear();
+});
+
+test('getRestaurantMenu calls endpoint, caches items, and returns them', async () => {
   const restore = mockGet(async (_endpoint: string, params: Record<string, unknown>) => {
     assert.equal(params.pos_profile, 'Test Profile');
     assert.equal(params.room, 'Dining');
@@ -34,12 +39,16 @@ test('getRestaurantMenu calls endpoint and returns items', async () => {
     assert.equal(items.length, 1);
     assert.equal(items[0].item, 'BIR');
     assert.equal(items[0].item_name, 'Biryani');
+
+    const cached = await repositories.menu.getById('BIR');
+    assert.ok(cached);
+    assert.equal(cached.item_name, 'Biryani');
   } finally {
     restore();
   }
 });
 
-test('getAggregatorMenu calls endpoint and returns items', async () => {
+test('getAggregatorMenu calls endpoint, caches items, and returns them', async () => {
   const restore = mockGet(async (_endpoint: string, params: Record<string, unknown>) => {
     assert.equal(params.aggregator, 'Swiggy');
     return {
@@ -61,7 +70,32 @@ test('getAggregatorMenu calls endpoint and returns items', async () => {
   }
 });
 
-test('network errors propagate from getAggregatorMenu', async () => {
+test('getAggregatorMenu falls back to cached menu on network error', async () => {
+  await repositories.menu.putMany([
+    {
+      id: 'SZF',
+      item_name: 'Sizzling Arabian Chicken Full',
+      rate: 530,
+      item_image: null,
+      course: 'Main',
+    },
+  ]);
+
+  const restore = mockGet(async () => {
+    throw new Error('Network Disconnected');
+  });
+
+  try {
+    const items = await getAggregatorMenu('Swiggy');
+    assert.equal(items.length, 1);
+    assert.equal(items[0].item, 'SZF');
+    assert.equal(items[0].item_name, 'Sizzling Arabian Chicken Full');
+  } finally {
+    restore();
+  }
+});
+
+test('network errors propagate from getAggregatorMenu when no cache exists', async () => {
   const restore = mockGet(async () => {
     throw new Error('Network Disconnected');
   });

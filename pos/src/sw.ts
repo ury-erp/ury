@@ -274,4 +274,25 @@ registerRoute(
   })
 );
 
+// 8. Frappe REST resource endpoints for URY Room / URY Table
+registerRoute(
+  ({ request, url }) => {
+    if (request.method !== 'GET') return false;
+    const pathname = decodeURIComponent(url.pathname);
+    return pathname === '/api/resource/URY Table' || pathname === '/api/resource/URY Room';
+  },
+  new NetworkFirst({
+    cacheName: 'ury-pos-master-data-get',
+    networkTimeoutSeconds: 3,
+    plugins: [
+      masterDataFallbackPlugin,
+      new BroadcastUpdatePlugin(),
+      new ExpirationPlugin({
+        maxEntries: 30,
+        maxAgeSeconds: 24 * 60 * 60, // 24 Hours offline fallback
+      }),
+    ],
+  })
+);
+
 

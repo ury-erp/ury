@@ -8,6 +8,7 @@ import Dexie, { type Table } from 'dexie';
 import type {
   OrderEntity,
   TableEntity,
+  MenuItemEntity,
   CustomerEntity,
   SyncQueueEntity,
   MetadataEntity,
@@ -15,9 +16,10 @@ import type {
 } from './types';
 
 export class UryPosDatabase extends Dexie {
-  // 6 Dexie Table collections (menu/payment_modes/aggregators/aggregator_items removed in v6)
+  // 7 Dexie Table collections (payment_modes/aggregators/aggregator_items removed in v6, menu restored in v7)
   orders!: Table<OrderEntity, string>;
   restaurantTables!: Table<TableEntity, string>;
+  menu!: Table<MenuItemEntity, string>;
   customers!: Table<CustomerEntity, string>;
   sync_queue!: Table<SyncQueueEntity, string>;
   metadata!: Table<MetadataEntity, string>;
@@ -156,6 +158,27 @@ export class UryPosDatabase extends Dexie {
         return tx.table('metadata').put({
           key: 'schema_version',
           value: '6',
+          updatedAt: new Date().toISOString(),
+        });
+      });
+
+    // ==========================================
+    // VERSION 7: RESTORE MENU COLLECTION FOR OFFLINE FALLBACK
+    // ==========================================
+    this.version(7)
+      .stores({
+        orders: 'id, table, status, order_type, customer, cashier, sync_status, createdAt, updatedAt',
+        restaurantTables: 'name, restaurant_room, occupied, merged_with',
+        menu: 'id, category, course, special_dish, disabled',
+        customers: 'id, phone, name, customer_group',
+        sync_queue: 'id, command_id, status, operation_type, created_at, *dependency_ids',
+        metadata: 'key, updatedAt',
+        settings: 'key, updatedAt',
+      })
+      .upgrade(tx => {
+        return tx.table('metadata').put({
+          key: 'schema_version',
+          value: '7',
           updatedAt: new Date().toISOString(),
         });
       });

@@ -123,24 +123,19 @@ export interface TableEntity {
  * 3. Menu Item Entity (Collection: 'menu')
  */
 export interface MenuItemEntity {
-  /** Primary Key: Item Code */
   id: string;
-  /** Item display name */
   item_name: string;
-  /** Base unit rate */
-  rate: number;
-  /** Category or Item Group */
+  rate: number | string;
   category?: string;
-  /** Course name (Starters, Mains, Desserts) */
   course?: string | null;
-  /** Special dish flag: 1 = Special, 0 = Regular */
+  course_label?: string;
   special_dish?: 1 | 0;
-  /** Disabled flag */
   disabled?: number;
-  /** Image URL or asset path */
+  item_image?: string | null;
   image?: string | null;
-  /** Tax rate percentage */
-  tax_rate?: number;
+  description?: string;
+  variants?: Array<{ name: string; price: number | string }>;
+  addons?: Array<{ name: string; price: number | string; category?: string }>;
 }
 
 /**
@@ -329,7 +324,6 @@ export interface ITableRepository extends IBaseRepository<TableEntity, string> {
 
 export interface IMenuRepository extends IBaseRepository<MenuItemEntity, string> {
   findByCategory(category: string): Promise<MenuItemEntity[]>;
-  findSpecials(): Promise<MenuItemEntity[]>;
 }
 
 export interface ICustomerRepository extends IBaseRepository<CustomerEntity, string> {
