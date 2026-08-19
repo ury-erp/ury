@@ -259,7 +259,8 @@ const TableView = () => {
     return tables.filter((table) => {
       if (table.name === mergeSourceTable.name) return false;
       if (sourceCluster.has(table.name)) return false;
-      if (table.occupied === 1 && mergeSourceTable.occupied === 1) return false;
+      if (table.merged_with) return false;
+      if (table.occupied === 1) return false;
       return true;
     });
   }, [mergeSourceTable, tables]);

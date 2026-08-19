@@ -52,6 +52,7 @@ const TableMergeDialog = ({
     return availableTables.filter((table) => {
       return (
         table.occupied !== 1 &&
+        !table.merged_with &&
         table.name !== sourceTable?.name
       );
     });

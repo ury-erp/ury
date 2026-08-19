@@ -116,31 +116,43 @@ export async function getTables(room: string): Promise<Table[]> {
       asDict: true,
     }) as Table[];
 
-    // Merge server tables with local pending occupancy/merge state so optimistic
-    // local mutations (e.g. offline payment release, merge/unmerge) are not
-    // clobbered by stale server data before they sync.
-    const localTables = await repositories.tables.findByRoom(room);
-    const localMap = new Map(localTables.map(t => [t.name, t]));
+    // When there are queued table mutations still syncing, merge server tables
+    // with local pending occupancy/merge state so optimistic local mutations
+    // (e.g. offline payment release, merge/unmerge, transfer) are not
+    // clobbered by stale server data before they sync. If there are no pending
+    // mutations, trust the server response and avoid overwriting it with stale
+    // IndexedDB fields.
+    const pendingCommands = await repositories.syncQueue.getAll();
+    const hasPendingTableMutations = pendingCommands.some(
+      c => (c.status === 'PENDING' || c.status === 'SYNCING') &&
+           (c.action === 'merge_tables_batch' || c.action === 'unmerge_tables' || c.action === 'table_transfer' || c.action === 'sync_order')
+    );
 
-    const mergedTables = tables.map(serverTable => {
-      const local = localMap.get(serverTable.name);
-      if (!local) return serverTable;
+    let mergedTables = tables;
+    if (hasPendingTableMutations) {
+      const localTables = await repositories.tables.findByRoom(room);
+      const localMap = new Map(localTables.map(t => [t.name, t]));
 
-      const serverOccupied = serverTable.occupied ?? 0;
-      const localMerged = local.merged_with ?? null;
-      const serverMerged = serverTable.merged_with ?? null;
+      mergedTables = tables.map(serverTable => {
+        const local = localMap.get(serverTable.name);
+        if (!local) return serverTable;
 
-      if (local.occupied !== serverOccupied || localMerged !== serverMerged) {
-        return {
-          ...serverTable,
-          occupied: local.occupied,
-          latest_invoice_time: local.latest_invoice_time ?? null,
-          merged_with: localMerged,
-        };
-      }
+        const serverOccupied = serverTable.occupied ?? 0;
+        const localMerged = local.merged_with ?? null;
+        const serverMerged = serverTable.merged_with ?? null;
 
-      return serverTable;
-    });
+        if (local.occupied !== serverOccupied || localMerged !== serverMerged) {
+          return {
+            ...serverTable,
+            occupied: local.occupied,
+            latest_invoice_time: local.latest_invoice_time ?? null,
+            merged_with: localMerged,
+          };
+        }
+
+        return serverTable;
+      });
+    }
 
     // Cache tables in local repository with full server schema parity.
     // Filter out records without a valid primary key to avoid IndexedDB
@@ -265,10 +277,15 @@ export async function updateTableLayout(name: string, data: Partial<Table>) {
 export async function mergeTablesBatch(anchor: string, tables: string[]) {
   const endpoint = apiRegistry.getUrl('MERGE_TABLES_BATCH');
   try {
-    return await call.post(endpoint, {
+    const result = await call.post(endpoint, {
       anchor_table: anchor,
       tables,
     });
+
+    await repositories.tables.mergeCluster(anchor, tables);
+    projectionBus.emit('TABLES_UPDATED');
+
+    return result;
   } catch (error) {
     if (!isNetworkError(error)) {
       throw error;
@@ -297,9 +314,25 @@ export async function mergeTablesBatch(anchor: string, tables: string[]) {
 export async function unmergeTables(table: string) {
   const endpoint = apiRegistry.getUrl('UNMERGE_TABLES');
   try {
-    return await call.post(endpoint, {
+    const result = await call.post(endpoint, {
       table,
     });
+
+    const cluster = await repositories.tables.getClusterTables(table);
+    const allOrders = await repositories.orders.getAll();
+    const activeOrderTables: string[] = [];
+    for (const name of cluster) {
+      const hasOwnActiveOrder = allOrders.some(
+        o => o.table === name && o.status !== 'Paid' && o.status !== 'Cancelled'
+      );
+      if (hasOwnActiveOrder) {
+        activeOrderTables.push(name);
+      }
+    }
+    await repositories.tables.unmergeCluster(table, activeOrderTables);
+    projectionBus.emit('TABLES_UPDATED');
+
+    return result;
   } catch (error) {
     if (!isNetworkError(error)) {
       throw error;
