@@ -132,6 +132,17 @@ class TestAddCustomerItemsAppendOnly(unittest.TestCase):
         invoice.selling_price_list = "Standard Selling"
         invoice.grand_total = 300
         invoice.name = "POS-INV-100"
+
+        # Real Frappe Document.append() mutates the child table list —
+        # mirror that here so the post-append aggregation this test exists
+        # to verify (current_items_for_kot) actually sees the new row,
+        # instead of silently no-op'ing the way a bare MagicMock().append
+        # would.
+        def append_side_effect(fieldname, row_dict):
+            if fieldname == "items":
+                invoice.items.append(MagicMock(item_code=row_dict["item_code"], item_name=row_dict["item_name"], qty=row_dict["qty"]))
+        invoice.append.side_effect = append_side_effect
+
         mock_resolve_invoice.return_value = (invoice, "POS-INV-100")
 
         priced_sandwich = {"item_code": "Sandwich", "item_name": "Sandwich", "qty": 1, "comment": "",
@@ -151,8 +162,18 @@ class TestAddCustomerItemsAppendOnly(unittest.TestCase):
         mock_price_items.assert_called_once()
         called_items = mock_price_items.call_args[0][0]
         self.assertEqual(called_items, [{"item": "Sandwich", "item_name": "Sandwich", "qty": 1.0, "comment": ""}])
-        # KOT still invoked (existing kitchen pipeline untouched).
+        # KOT still invoked (existing kitchen pipeline untouched) — and
+        # crucially, current_items passed to it is the FULL aggregated
+        # per-item state (old Biryani row + new Sandwich row), not just the
+        # newly-added items. kot_execute's own diff (compare_two_array)
+        # treats anything present in previous_items but absent from
+        # current_items as removed/cancelled — passing only the new items
+        # would make it think the pre-existing Biryani was cancelled.
         mock_kot.assert_called_once()
+        kot_args = mock_kot.call_args[0]
+        current_items_arg = kot_args[3]
+        current_by_item = {row["item_code"]: row["qty"] for row in current_items_arg}
+        self.assertEqual(current_by_item, {"Biryani": 2, "Sandwich": 1})
         invoice.save.assert_called_once_with(ignore_permissions=True)
 
     @patch(f"{MOD}._resolve_session")
