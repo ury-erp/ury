@@ -22,58 +22,58 @@ export function WizardLayout({ step, children, onNext, onPrev, nextLabel = 'Next
 
       <div className="relative z-10 w-full max-w-[820px] mb-8 flex flex-col items-center">
         <img src={uryLogo} alt="URY Logo" className="h-16 w-auto object-contain mb-3" />
-        <p className="text-[#6B7280]">Let's get your restaurant ready.</p>
+        <p className="text-gray-500">Let's get your restaurant ready.</p>
       </div>
 
       <div className="relative z-10 w-full max-w-[820px] bg-white rounded-xl shadow-[0_4px_24px_rgba(0,0,0,0.08)] flex flex-col h-[700px] overflow-hidden">
         
         {/* Step Breadcrumb */}
-        <div className="px-10 py-5 border-b border-[#F3F4F6]">
+        <div className="px-10 py-5 border-b border-gray-100">
           <div className="w-full flex items-center justify-between">
             {/* Step 1 */}
             <div className="flex items-center">
               {step === 1 ? (
-                <div className="w-6 h-6 rounded-full bg-[#2B5CE6] text-white font-bold text-xs flex items-center justify-center shadow-sm ring-4 ring-[#EFF4FF]">
+                <div className="w-6 h-6 rounded-full bg-primary text-white font-bold text-xs flex items-center justify-center shadow-sm ring-4 ring-primary-50">
                   1
                 </div>
               ) : (
-                <div className="w-6 h-6 rounded-full bg-[#2B5CE6] text-white font-bold text-xs flex items-center justify-center shadow-sm">
+                <div className="w-6 h-6 rounded-full bg-primary text-white font-bold text-xs flex items-center justify-center shadow-sm">
                   <Check className="w-3.5 h-3.5 stroke-[3]" />
                 </div>
               )}
-              <span className={`ml-2 text-sm ${step === 1 ? 'font-semibold text-[#111827]' : 'font-medium text-[#4B5563]'}`}>
+              <span className={`ml-2 text-sm ${step === 1 ? 'font-semibold text-gray-900' : 'font-medium text-gray-600'}`}>
                 Setup
               </span>
             </div>
 
             {/* Connecting Line */}
-            <div className={`flex-1 mx-4 ${step === 2 ? 'h-0.5 bg-[#2B5CE6]' : 'h-px bg-[#E5E7EB]'}`} />
+            <div className={`flex-1 mx-4 ${step === 2 ? 'h-0.5 bg-primary' : 'h-px bg-gray-200'}`} />
 
             {/* Step 2 */}
             <div className="flex items-center">
               {step === 2 ? (
-                <div className="w-6 h-6 rounded-full bg-[#2B5CE6] text-white font-bold text-xs flex items-center justify-center shadow-sm ring-4 ring-[#EFF4FF]">
+                <div className="w-6 h-6 rounded-full bg-primary text-white font-bold text-xs flex items-center justify-center shadow-sm ring-4 ring-primary-50">
                   2
                 </div>
               ) : (
-                <div className="w-6 h-6 rounded-full bg-[#F3F4F6] text-[#9CA3AF] font-medium text-xs flex items-center justify-center">
+                <div className="w-6 h-6 rounded-full bg-gray-100 text-gray-400 font-medium text-xs flex items-center justify-center">
                   2
                 </div>
               )}
-              <span className={`ml-2 text-sm ${step === 2 ? 'font-bold text-[#111827]' : 'font-medium text-[#9CA3AF]'}`}>
+              <span className={`ml-2 text-sm ${step === 2 ? 'font-bold text-gray-900' : 'font-medium text-gray-400'}`}>
                 Configure
               </span>
             </div>
 
             {/* Connecting Line 2-3 */}
-            <div className="flex-1 mx-4 h-px bg-[#E5E7EB]" />
+            <div className="flex-1 mx-4 h-px bg-gray-200" />
             
             {/* Step 3 */}
             <div className="flex items-center">
-              <div className="w-6 h-6 rounded-full bg-[#F3F4F6] text-[#9CA3AF] font-medium text-xs flex items-center justify-center">
+              <div className="w-6 h-6 rounded-full bg-gray-100 text-gray-400 font-medium text-xs flex items-center justify-center">
                 3
               </div>
-              <span className="ml-2 text-sm font-medium text-[#9CA3AF]">
+              <span className="ml-2 text-sm font-medium text-gray-400">
                 Launch
               </span>
             </div>
@@ -86,7 +86,7 @@ export function WizardLayout({ step, children, onNext, onPrev, nextLabel = 'Next
         </div>
 
         {/* Footer Nav */}
-        <div className="px-8 py-4 bg-[#F9FAFB] border-t border-[#F3F4F6] flex items-center justify-between">
+        <div className="px-8 py-4 bg-[#F9FAFB] border-t border-gray-100 flex items-center justify-between">
           <div className="w-24">
             {step === 2 && onPrev && (
               <Button variant="outline" onClick={onPrev}>
@@ -96,9 +96,9 @@ export function WizardLayout({ step, children, onNext, onPrev, nextLabel = 'Next
           </div>
           
           <div className="flex gap-1.5">
-            <div className={`w-2 h-2 rounded-full ${step === 1 ? 'bg-[#2B5CE6]' : 'bg-[#E5E7EB]'}`} />
-            <div className={`w-2 h-2 rounded-full ${step === 2 ? 'bg-[#2B5CE6]' : 'bg-[#E5E7EB]'}`} />
-            <div className="w-2 h-2 rounded-full bg-[#E5E7EB]" />
+            <div className={`w-2 h-2 rounded-full ${step === 1 ? 'bg-primary' : 'bg-gray-200'}`} />
+            <div className={`w-2 h-2 rounded-full ${step === 2 ? 'bg-primary' : 'bg-gray-200'}`} />
+            <div className="w-2 h-2 rounded-full bg-gray-200" />
           </div>
 
           <div className="min-w-[150px] flex justify-end gap-3">
@@ -114,7 +114,7 @@ export function WizardLayout({ step, children, onNext, onPrev, nextLabel = 'Next
         </div>
       </div>
 
-      <div className="mt-8 text-sm text-[#9CA3AF]">
+      <div className="mt-8 text-sm text-gray-400">
         URY · {version}
       </div>
     </div>

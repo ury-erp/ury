@@ -143,9 +143,9 @@ export const Header: React.FC = () => {
           <div className="relative" ref={branchMenuRef}>
             <button
               onClick={() => setIsBranchDropdownOpen(!isBranchDropdownOpen)}
-              className="flex items-center space-x-2 px-3 py-1.5 bg-blue-50 hover:bg-blue-100/80 border border-blue-200 rounded-md text-sm font-medium text-[#2563eb] transition-colors"
+              className="flex items-center space-x-2 px-3 py-1.5 bg-blue-50 hover:bg-blue-100/80 border border-blue-200 rounded-md text-sm font-medium text-primary transition-colors"
             >
-              <Building2 className="w-4 h-4 text-[#2563eb]" />
+              <Building2 className="w-4 h-4 text-primary" />
               <span className="max-w-[120px] sm:max-w-[160px] truncate">
                 {activeBranchId === 'all' ? 'All Branches' : (activeBranch?.name || 'Select Branch')}
               </span>
@@ -165,7 +165,7 @@ export const Header: React.FC = () => {
                   }}
                   className={`w-full flex items-center justify-between px-3 py-2 text-sm text-left transition-colors ${
                     activeBranchId === 'all'
-                      ? 'bg-blue-50 text-[#2563eb] font-semibold'
+                      ? 'bg-blue-50 text-primary font-semibold'
                       : 'text-gray-700 hover:bg-gray-50'
                   }`}
                 >
@@ -173,7 +173,7 @@ export const Header: React.FC = () => {
                     <Store className="w-4 h-4" />
                     <span>All Branches</span>
                   </div>
-                  {activeBranchId === 'all' && <Check className="w-4 h-4 text-[#2563eb]" />}
+                  {activeBranchId === 'all' && <Check className="w-4 h-4 text-primary" />}
                 </button>
 
                 <div className="my-1 border-t border-gray-100" />
@@ -187,14 +187,14 @@ export const Header: React.FC = () => {
                     }}
                     className={`w-full flex items-center justify-between px-3 py-2 text-sm text-left transition-colors ${
                       activeBranchId === b.id
-                        ? 'bg-blue-50 text-[#2563eb] font-semibold'
+                        ? 'bg-blue-50 text-primary font-semibold'
                         : 'text-gray-700 hover:bg-gray-50'
                     }`}
                   >
                     <div className="flex items-center space-x-2 truncate">
                       <span className="truncate">{b.name}</span>
                     </div>
-                    {activeBranchId === b.id && <Check className="w-4 h-4 text-[#2563eb] shrink-0" />}
+                    {activeBranchId === b.id && <Check className="w-4 h-4 text-primary shrink-0" />}
                   </button>
                 ))}
               </div>
@@ -209,7 +209,7 @@ export const Header: React.FC = () => {
           >
             <Bell className="w-5 h-5" />
             {unreadCount > 0 && (
-              <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-[#2563eb] rounded-full ring-2 ring-white" />
+              <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-primary rounded-full ring-2 ring-white" />
             )}
           </button>
 
@@ -219,7 +219,7 @@ export const Header: React.FC = () => {
               onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
               className="flex items-center gap-2 p-1 rounded-xl hover:bg-gray-100 transition-colors text-gray-600 hover:text-gray-900"
             >
-              <div className="w-8 h-8 bg-[#2563eb] rounded-full flex items-center justify-center">
+              <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
                 <User className="w-4 h-4 text-white" />
               </div>
               <span className="text-sm font-medium">{userInfo.fullName}</span>
@@ -283,10 +283,10 @@ export const Header: React.FC = () => {
               {/* Drawer Header */}
               <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-gray-50">
                 <div className="flex items-center space-x-2">
-                  <Bell className="w-5 h-5 text-[#2563eb]" />
+                  <Bell className="w-5 h-5 text-primary" />
                   <h2 className="text-base font-semibold text-gray-900">Notifications</h2>
                   {unreadCount > 0 && (
-                    <span className="px-2 py-0.5 text-xs font-bold bg-[#2563eb] text-white rounded-full">
+                    <span className="px-2 py-0.5 text-xs font-bold bg-primary text-white rounded-full">
                       {unreadCount}
                     </span>
                   )}
@@ -296,7 +296,7 @@ export const Header: React.FC = () => {
                   {unreadCount > 0 && (
                     <button
                       onClick={handleMarkAllRead}
-                      className="text-xs font-medium text-[#2563eb] hover:underline"
+                      className="text-xs font-medium text-primary hover:underline"
                     >
                       Mark all read
                     </button>
