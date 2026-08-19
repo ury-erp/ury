@@ -562,7 +562,7 @@ export const MenuPage: React.FC = () => {
 
           <Button
             variant="outline"
-            onClick={openAddCourseDrawer}
+            onClick={() => openAddCourseDrawer(false)}
             className="border-gray-300 text-gray-700 font-semibold flex items-center gap-1.5 whitespace-nowrap"
           >
             <Plus className="w-4 h-4" />
