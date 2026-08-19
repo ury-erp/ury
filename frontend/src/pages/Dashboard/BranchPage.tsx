@@ -6,6 +6,7 @@ import { Switch } from '../../components/ui/switch';
 import SideDrawer from '../../components/layout/SideDrawer';
 import { call, getLoggedUser } from '@ury/core';
 import { dashboardService } from '../../services/dashboard';
+import { SearchableSelect } from '../../components/common/SearchableSelect';
 
 interface BranchData {
   name: string;
@@ -467,16 +468,17 @@ export const BranchPage: React.FC = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <label className="text-sm font-medium text-gray-700">Default Menu (Active Menu)</label>
-                      <Select
+                      <SearchableSelect
+                        id="active_menu"
                         value={restaurantForm.active_menu || ''}
-                        onChange={(e) => setRestaurantForm(p => ({ ...p, active_menu: e.target.value }))}
+                        onChange={(_, val) => setRestaurantForm(p => ({ ...p, active_menu: val }))}
+                        options={[
+                          { value: '', label: 'None' },
+                          ...menus.map((m) => ({ value: m.name, label: m.menu_name || m.name }))
+                        ]}
                         disabled={!isEditMode}
-                      >
-                        <option value="">None</option>
-                        {menus.map((m) => (
-                          <option key={m.name} value={m.name}>{m.menu_name || m.name}</option>
-                        ))}
-                      </Select>
+                        placeholder="None"
+                      />
                     </div>
                     <div className="flex items-center gap-2 pt-6">
                       <Switch
@@ -503,26 +505,42 @@ export const BranchPage: React.FC = () => {
                           {(restaurantForm.menu_for_room || []).map((row: any, idx: number) => (
                             <tr key={idx}>
                               <td className="px-4 py-2">
-                                <Select disabled={!isEditMode} className="w-full text-xs" value={row.room || row.ury_room || ''} onChange={e => {
-                                  const newRows = [...restaurantForm.menu_for_room];
-                                  newRows[idx].room = e.target.value;
-                                  newRows[idx].ury_room = e.target.value;
-                                  setRestaurantForm({...restaurantForm, menu_for_room: newRows});
-                                }}>
-                                  <option value="">Select Room</option>
-                                  {rooms.map(r => <option key={r.name} value={r.name}>{r.room_name || r.name}</option>)}
-                                </Select>
+                                <SearchableSelect
+                                  id={`room_${idx}`}
+                                  value={row.room || row.ury_room || ''}
+                                  onChange={(_, val) => {
+                                    const newRows = [...restaurantForm.menu_for_room];
+                                    newRows[idx].room = val;
+                                    newRows[idx].ury_room = val;
+                                    setRestaurantForm({...restaurantForm, menu_for_room: newRows});
+                                  }}
+                                  options={[
+                                    { value: '', label: 'Select Room' },
+                                    ...rooms.map(r => ({ value: r.name, label: r.room_name || r.name }))
+                                  ]}
+                                  disabled={!isEditMode}
+                                  placeholder="Select Room"
+                                />
                               </td>
                               <td className="px-4 py-2 flex items-center gap-2">
-                                <Select disabled={!isEditMode} className="w-full text-xs" value={row.menu || row.ury_menu || ''} onChange={e => {
-                                  const newRows = [...restaurantForm.menu_for_room];
-                                  newRows[idx].menu = e.target.value;
-                                  newRows[idx].ury_menu = e.target.value;
-                                  setRestaurantForm({...restaurantForm, menu_for_room: newRows});
-                                }}>
-                                  <option value="">Select Menu</option>
-                                  {menus.map(m => <option key={m.name} value={m.name}>{m.menu_name || m.name}</option>)}
-                                </Select>
+                                <div className="flex-1">
+                                  <SearchableSelect
+                                    id={`menu_${idx}`}
+                                    value={row.menu || row.ury_menu || ''}
+                                    onChange={(_, val) => {
+                                      const newRows = [...restaurantForm.menu_for_room];
+                                      newRows[idx].menu = val;
+                                      newRows[idx].ury_menu = val;
+                                      setRestaurantForm({...restaurantForm, menu_for_room: newRows});
+                                    }}
+                                    options={[
+                                      { value: '', label: 'Select Menu' },
+                                      ...menus.map(m => ({ value: m.name, label: m.menu_name || m.name }))
+                                    ]}
+                                    disabled={!isEditMode}
+                                    placeholder="Select Menu"
+                                  />
+                                </div>
                                 {isEditMode && (
                                   <button type="button" className="text-gray-400 hover:text-red-500 shrink-0" onClick={() => {
                                     const newRows = restaurantForm.menu_for_room.filter((_:any, i:number) => i !== idx);
@@ -557,16 +575,17 @@ export const BranchPage: React.FC = () => {
               {restaurantData ? (
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-gray-700">Default Room</label>
-                  <Select
+                  <SearchableSelect
+                    id="default_room"
                     value={restaurantForm.default_room || ''}
-                    onChange={(e) => setRestaurantForm(p => ({ ...p, default_room: e.target.value }))}
+                    onChange={(_, val) => setRestaurantForm(p => ({ ...p, default_room: val }))}
+                    options={[
+                      { value: '', label: 'None' },
+                      ...rooms.map((r) => ({ value: r.name, label: r.room_name || r.name }))
+                    ]}
                     disabled={!isEditMode}
-                  >
-                    <option value="">None</option>
-                    {rooms.map((r) => (
-                      <option key={r.name} value={r.name}>{r.room_name || r.name}</option>
-                    ))}
-                  </Select>
+                    placeholder="None"
+                  />
                 </div>
               ) : (
                 <p className="text-sm text-gray-400">No URY Restaurant linked to this branch.</p>
@@ -611,15 +630,24 @@ export const BranchPage: React.FC = () => {
                                 }} />
                               </td>
                               <td className="px-4 py-2 flex items-center gap-2">
-                                <Select disabled={!isEditMode} className="w-full text-xs" value={row.menu || row.ury_menu || ''} onChange={e => {
-                                  const newRows = [...restaurantForm.order_type_menu];
-                                  newRows[idx].menu = e.target.value;
-                                  newRows[idx].ury_menu = e.target.value;
-                                  setRestaurantForm({...restaurantForm, order_type_menu: newRows});
-                                }}>
-                                  <option value="">Select Menu</option>
-                                  {menus.map(m => <option key={m.name} value={m.name}>{m.menu_name || m.name}</option>)}
-                                </Select>
+                                <div className="flex-1">
+                                  <SearchableSelect
+                                    id={`order_type_menu_${idx}`}
+                                    value={row.menu || row.ury_menu || ''}
+                                    onChange={(_, val) => {
+                                      const newRows = [...restaurantForm.order_type_menu];
+                                      newRows[idx].menu = val;
+                                      newRows[idx].ury_menu = val;
+                                      setRestaurantForm({...restaurantForm, order_type_menu: newRows});
+                                    }}
+                                    options={[
+                                      { value: '', label: 'Select Menu' },
+                                      ...menus.map(m => ({ value: m.name, label: m.menu_name || m.name }))
+                                    ]}
+                                    disabled={!isEditMode}
+                                    placeholder="Select Menu"
+                                  />
+                                </div>
                                 {isEditMode && (
                                   <button type="button" className="text-gray-400 hover:text-red-500 shrink-0" onClick={() => {
                                     const newRows = restaurantForm.order_type_menu.filter((_:any, i:number) => i !== idx);
