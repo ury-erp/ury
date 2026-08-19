@@ -286,7 +286,6 @@ export const RoomPage: React.FC = () => {
               Cancel
             </Button>
             <Button type="submit" disabled={saving} className="bg-primary hover:bg-primary/90 text-white">
-              {saving ? <Spinner className="w-4 h-4 mr-1.5" /> : null}
               {editingRoom ? 'Save Changes' : 'Save Room'}
             </Button>
           </div>

@@ -422,14 +422,7 @@ export const TablePage: React.FC = () => {
               Cancel
             </Button>
             <Button type="submit" className="bg-primary hover:bg-primary/90 text-white shadow-sm" disabled={saving}>
-              {saving ? (
-                <div className="flex items-center gap-2">
-                  <Spinner className="w-4 h-4" />
-                  Saving...
-                </div>
-              ) : (
-                editingTable ? 'Save Changes' : 'Save Table'
-              )}
+              {editingTable ? 'Save Changes' : 'Save Table'}
             </Button>
           </div>
         </form>

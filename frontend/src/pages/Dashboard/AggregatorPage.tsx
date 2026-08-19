@@ -225,7 +225,7 @@ export const AggregatorPage: React.FC = () => {
                   Cancel
                 </Button>
                 <Button type="submit" disabled={saving} className="bg-primary hover:bg-primary/90 text-white">
-                  {saving ? 'Creating...' : 'Create Aggregator'}
+                  Create Aggregator
                 </Button>
               </div>
             </form>
