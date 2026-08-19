@@ -117,6 +117,10 @@ def submit_configure_data(data):
         data = frappe.parse_json(data)
         
     results = {}
+    user = frappe.session.user
+
+    # Step 0: Preparing setup
+    frappe.publish_realtime("ury_configure_progress", {"step": 0, "status": "loading"}, user=user)
     
     # Derive default company from site defaults or latest created company
     default_company = frappe.defaults.get_user_default("Company") or frappe.db.get_value("Company", {}, "name")
@@ -129,6 +133,10 @@ def submit_configure_data(data):
                 "default_currency": "INR"
             })
             comp_doc.insert(ignore_permissions=True)
+            
+    # Step 0 complete, Step 1 loading: Creating restaurant configuration
+    frappe.publish_realtime("ury_configure_progress", {"step": 0, "status": "completed"}, user=user)
+    frappe.publish_realtime("ury_configure_progress", {"step": 1, "status": "loading"}, user=user)
     
     # 1. Branch
     branch_name = default_company
@@ -246,6 +254,9 @@ def submit_configure_data(data):
                 results["tables_reused"].append(t_name)
 
     # 5. URY Menu Courses, ERPNext Item Creation (Pass 1) & URY Menu (Pass 2)
+    frappe.publish_realtime("ury_configure_progress", {"step": 1, "status": "completed"}, user=user)
+    frappe.publish_realtime("ury_configure_progress", {"step": 2, "status": "loading"}, user=user)
+
     menu_items_table = []
     item_group = frappe.db.get_value("Item Group", {"is_group": 0}, "name") or "All Item Groups"
     
@@ -350,6 +361,9 @@ def submit_configure_data(data):
             pass
 
     # 8. POS Profile & Warehouse
+    frappe.publish_realtime("ury_configure_progress", {"step": 2, "status": "completed"}, user=user)
+    frappe.publish_realtime("ury_configure_progress", {"step": 3, "status": "loading"}, user=user)
+
     try:
         warehouse_name = f"Finished Goods - {frappe.db.get_value('Company', default_company, 'abbr')}"
         if not frappe.db.exists("Warehouse", warehouse_name):
@@ -514,6 +528,8 @@ def submit_configure_data(data):
         results["pos_profile_error"] = str(e)
 
     frappe.db.set_single_value("System Settings", "setup_complete", 1)
+
+    frappe.publish_realtime("ury_configure_progress", {"step": 3, "status": "completed"}, user=user)
 
     frappe.db.commit()
     return {"status": "success", "results": results}
