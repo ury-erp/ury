@@ -150,22 +150,22 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
                   <svg className="h-full w-full overflow-visible" viewBox="0 0 500 200" preserveAspectRatio="none">
                     <defs>
                       <linearGradient id="salesGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#7C3AED" stopOpacity="0.35" />
-                        <stop offset="100%" stopColor="#7C3AED" stopOpacity="0.0" />
+                        <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity="0.35" />
+                        <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity="0.0" />
                       </linearGradient>
                     </defs>
 
                     {/* Grid Lines */}
-                    <line x1="0" y1="40" x2="500" y2="40" stroke="#F3F4F6" strokeDasharray="4 4" />
-                    <line x1="0" y1="90" x2="500" y2="90" stroke="#F3F4F6" strokeDasharray="4 4" />
-                    <line x1="0" y1="140" x2="500" y2="140" stroke="#F3F4F6" strokeDasharray="4 4" />
-                    <line x1="0" y1="190" x2="500" y2="190" stroke="#E5E7EB" />
+                    <line x1="0" y1="40" x2="500" y2="40" stroke="hsl(var(--gray-100))" strokeDasharray="4 4" />
+                    <line x1="0" y1="90" x2="500" y2="90" stroke="hsl(var(--gray-100))" strokeDasharray="4 4" />
+                    <line x1="0" y1="140" x2="500" y2="140" stroke="hsl(var(--gray-100))" strokeDasharray="4 4" />
+                    <line x1="0" y1="190" x2="500" y2="190" stroke="hsl(var(--gray-200))" />
 
                     {/* Area Gradient Path */}
                     {areaD && <path d={areaD} fill="url(#salesGradient)" />}
 
                     {/* Trend Stroke Line */}
-                    {lineD && <path d={lineD} fill="none" stroke="#7C3AED" strokeWidth="3" />}
+                    {lineD && <path d={lineD} fill="none" stroke="hsl(var(--primary))" strokeWidth="3" />}
 
                     {/* Data Points */}
                     {trendData.map((d, index) => {
@@ -173,8 +173,8 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
                       const cy = 190 - (d.sales / maxTrendSales) * 160;
                       return (
                         <g key={index} className="group cursor-pointer">
-                          <circle cx={cx} cy={cy} r="5" fill="#FFFFFF" stroke="#7C3AED" strokeWidth="2.5" />
-                          <circle cx={cx} cy={cy} r="8" fill="#7C3AED" fillOpacity="0.2" className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                          <circle cx={cx} cy={cy} r="5" fill="#FFFFFF" stroke="hsl(var(--primary))" strokeWidth="2.5" />
+                          <circle cx={cx} cy={cy} r="8" fill="hsl(var(--primary))" fillOpacity="0.2" className="opacity-0 group-hover:opacity-100 transition-opacity" />
                         </g>
                       );
                     })}
@@ -311,7 +311,7 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
               <div className="py-12 flex flex-col items-center justify-center text-gray-400 text-xs gap-2">
                 <div className="relative h-24 w-24">
                   <svg className="h-full w-full" viewBox="0 0 100 100">
-                    <circle cx="50" cy="50" r="38" fill="none" stroke="#F3F4F6" strokeWidth="14" />
+                    <circle cx="50" cy="50" r="38" fill="none" stroke="hsl(var(--gray-100))" strokeWidth="14" />
                   </svg>
                 </div>
                 <span>No data</span>
@@ -321,7 +321,7 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
                 {/* SVG Donut Chart */}
                 <div className="relative h-44 w-44">
                   <svg className="h-full w-full" viewBox="0 0 100 100">
-                    <circle cx="50" cy="50" r="38" fill="none" stroke="#F3F4F6" strokeWidth="14" />
+                    <circle cx="50" cy="50" r="38" fill="none" stroke="hsl(var(--gray-100))" strokeWidth="14" />
                     {paymentMethods.map((pm, i) => (
                       <circle
                         key={i}
@@ -375,7 +375,7 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
               <div className="py-12 flex flex-col items-center justify-center text-gray-400 text-xs gap-2">
                 <div className="relative h-24 w-24">
                   <svg className="h-full w-full" viewBox="0 0 100 100">
-                    <circle cx="50" cy="50" r="38" fill="none" stroke="#F3F4F6" strokeWidth="14" />
+                    <circle cx="50" cy="50" r="38" fill="none" stroke="hsl(var(--gray-100))" strokeWidth="14" />
                   </svg>
                 </div>
                 <span>No data</span>
@@ -385,7 +385,7 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
                 {/* SVG Donut Chart */}
                 <div className="relative h-44 w-44">
                   <svg className="h-full w-full" viewBox="0 0 100 100">
-                    <circle cx="50" cy="50" r="38" fill="none" stroke="#F3F4F6" strokeWidth="14" />
+                    <circle cx="50" cy="50" r="38" fill="none" stroke="hsl(var(--gray-100))" strokeWidth="14" />
                     {orderTypes.map((ot, i) => (
                       <circle
                         key={i}

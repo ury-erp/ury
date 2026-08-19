@@ -17,7 +17,7 @@ export function BranchSection() {
           value={branch.branchName}
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateBranch({ branchName: e.target.value })}
           placeholder="e.g. Main Branch"
-          className="w-full focus-visible:ring-[#2B5CE6]"
+          className="w-full focus-visible:ring-primary"
         />
       </div>
 
@@ -31,7 +31,7 @@ export function BranchSection() {
             value={branch.invoicePrefix}
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateBranch({ invoicePrefix: e.target.value })}
             placeholder="e.g. INV-"
-            className="w-full focus-visible:ring-[#2B5CE6]"
+            className="w-full focus-visible:ring-primary"
           />
         </div>
 
@@ -44,7 +44,7 @@ export function BranchSection() {
             value={branch.aggregatorPrefix}
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateBranch({ aggregatorPrefix: e.target.value })}
             placeholder="e.g. AGG-"
-            className="w-full focus-visible:ring-[#2B5CE6]"
+            className="w-full focus-visible:ring-primary"
           />
         </div>
       </div>
@@ -58,20 +58,20 @@ export function BranchSection() {
           value={branch.taxId}
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateBranch({ taxId: e.target.value })}
           placeholder="e.g. 22AAAAA0000A1Z5"
-          className="w-full focus-visible:ring-[#2B5CE6]"
+          className="w-full focus-visible:ring-primary"
         />
       </div>
 
       {branch.taxId && (
-        <div className="pt-4 border-t border-[#E5E7EB] space-y-3">
-          <h3 className="text-sm font-semibold text-[#111827] flex items-center gap-2">
-            <Percent className="w-4 h-4 text-[#2B5CE6]" />
+        <div className="pt-4 border-t border-gray-200 space-y-3">
+          <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+            <Percent className="w-4 h-4 text-primary" />
             Tax Settings
           </h3>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="text-xs font-medium text-[#4B5563] block mb-1.5">Tax Calculation Type</label>
+              <label className="text-xs font-medium text-gray-600 block mb-1.5">Tax Calculation Type</label>
               <div className="flex gap-4">
                 <label className="flex items-center gap-2 text-sm text-[#374151] cursor-pointer">
                   <input
@@ -80,7 +80,7 @@ export function BranchSection() {
                     value="Inclusive"
                     checked={taxConfig.taxType === 'Inclusive'}
                     onChange={() => updateTaxConfig({ taxType: 'Inclusive' })}
-                    className="text-[#2B5CE6] focus:ring-[#2B5CE6]"
+                    className="text-primary focus:ring-primary"
                   />
                   Inclusive
                 </label>
@@ -91,7 +91,7 @@ export function BranchSection() {
                     value="Exclusive"
                     checked={taxConfig.taxType === 'Exclusive'}
                     onChange={() => updateTaxConfig({ taxType: 'Exclusive' })}
-                    className="text-[#2B5CE6] focus:ring-[#2B5CE6]"
+                    className="text-primary focus:ring-primary"
                   />
                   Exclusive
                 </label>
@@ -99,7 +99,7 @@ export function BranchSection() {
             </div>
 
             <div>
-              <label className="text-xs font-medium text-[#4B5563] block mb-1">Tax Percentage (%)</label>
+              <label className="text-xs font-medium text-gray-600 block mb-1">Tax Percentage (%)</label>
               <Input
                 type="number"
                 min={0}

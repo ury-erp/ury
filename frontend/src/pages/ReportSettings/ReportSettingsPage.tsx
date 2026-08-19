@@ -155,7 +155,7 @@ export const ReportSettingsPage: React.FC = () => {
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-xl border border-gray-200 shadow-xs">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-[#7C3AED]/10 text-[#7C3AED] flex items-center justify-center font-semibold shrink-0">
+            <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-semibold shrink-0">
               <FileSpreadsheet className="w-6 h-6" />
             </div>
             <div>
@@ -165,7 +165,7 @@ export const ReportSettingsPage: React.FC = () => {
           </div>
           <Button
             onClick={handleSave}
-            className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white flex items-center gap-2"
+            className="bg-primary hover:bg-primary-700 text-white flex items-center gap-2"
           >
             <Save className="w-4 h-4" />
             Save Report Settings
@@ -189,7 +189,7 @@ export const ReportSettingsPage: React.FC = () => {
               className="w-full px-6 py-4 bg-white flex items-center justify-between border-b border-gray-100 hover:bg-gray-50/80 transition-colors text-left"
             >
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-lg bg-purple-50 text-[#7C3AED] flex items-center justify-center">
+                <div className="w-9 h-9 rounded-lg bg-purple-50 text-primary flex items-center justify-center">
                   <Clock className="w-5 h-5" />
                 </div>
                 <div>
@@ -219,7 +219,7 @@ export const ReportSettingsPage: React.FC = () => {
                         onChange={(e: React.ChangeEvent<HTMLInputElement>) => setExtendedHours(e.target.checked)}
                         className="sr-only peer"
                       />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#7C3AED]"></div>
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
                     </label>
                   </div>
 
@@ -337,7 +337,7 @@ export const ReportSettingsPage: React.FC = () => {
                       <h3 className="text-sm font-bold text-gray-900">Direct Fixed Expenses</h3>
                       <p className="text-xs text-gray-500">Kitchen gas, raw material logistics, and direct production costs.</p>
                     </div>
-                    <Button size="sm" onClick={addDirectFixed} className="bg-[#7C3AED] text-white hover:bg-[#6D28D9]">
+                    <Button size="sm" onClick={addDirectFixed} className="bg-primary text-white hover:bg-primary-700">
                       <Plus className="w-4 h-4 mr-1" /> Add Row
                     </Button>
                   </div>
@@ -420,7 +420,7 @@ export const ReportSettingsPage: React.FC = () => {
                       <h3 className="text-sm font-bold text-gray-900">Indirect Fixed Expenses</h3>
                       <p className="text-xs text-gray-500">Building leases, software subscriptions, insurance, and administrative fees.</p>
                     </div>
-                    <Button size="sm" onClick={addIndirectFixed} className="bg-[#7C3AED] text-white hover:bg-[#6D28D9]">
+                    <Button size="sm" onClick={addIndirectFixed} className="bg-primary text-white hover:bg-primary-700">
                       <Plus className="w-4 h-4 mr-1" /> Add Row
                     </Button>
                   </div>
@@ -503,7 +503,7 @@ export const ReportSettingsPage: React.FC = () => {
                       <h3 className="text-sm font-bold text-gray-900">Percentage Expenses</h3>
                       <p className="text-xs text-gray-500">Payment processor rates, delivery aggregator cuts, and royalties.</p>
                     </div>
-                    <Button size="sm" onClick={addPercentageExpense} className="bg-[#7C3AED] text-white hover:bg-[#6D28D9]">
+                    <Button size="sm" onClick={addPercentageExpense} className="bg-primary text-white hover:bg-primary-700">
                       <Plus className="w-4 h-4 mr-1" /> Add Row
                     </Button>
                   </div>
@@ -587,7 +587,7 @@ export const ReportSettingsPage: React.FC = () => {
                       <h3 className="text-sm font-bold text-gray-900">Employee Costs</h3>
                       <p className="text-xs text-gray-500">Staff role monthly compensation and headcount count.</p>
                     </div>
-                    <Button size="sm" onClick={addEmployeeCost} className="bg-[#7C3AED] text-white hover:bg-[#6D28D9]">
+                    <Button size="sm" onClick={addEmployeeCost} className="bg-primary text-white hover:bg-primary-700">
                       <Plus className="w-4 h-4 mr-1" /> Add Row
                     </Button>
                   </div>
@@ -667,7 +667,7 @@ export const ReportSettingsPage: React.FC = () => {
                       <h3 className="text-sm font-bold text-gray-900">Monthly Fixed Expenses</h3>
                       <p className="text-xs text-gray-500">Recurring monthly telecom, maintenance, and sanitation overheads.</p>
                     </div>
-                    <Button size="sm" onClick={addMonthlyExpense} className="bg-[#7C3AED] text-white hover:bg-[#6D28D9]">
+                    <Button size="sm" onClick={addMonthlyExpense} className="bg-primary text-white hover:bg-primary-700">
                       <Plus className="w-4 h-4 mr-1" /> Add Row
                     </Button>
                   </div>
@@ -733,7 +733,7 @@ export const ReportSettingsPage: React.FC = () => {
                       <h3 className="text-sm font-bold text-gray-900">Consumables Budget</h3>
                       <p className="text-xs text-gray-500">Thermal paper rolls, take-away packaging, and disposable supplies.</p>
                     </div>
-                    <Button size="sm" onClick={addConsumable} className="bg-[#7C3AED] text-white hover:bg-[#6D28D9]">
+                    <Button size="sm" onClick={addConsumable} className="bg-primary text-white hover:bg-primary-700">
                       <Plus className="w-4 h-4 mr-1" /> Add Row
                     </Button>
                   </div>

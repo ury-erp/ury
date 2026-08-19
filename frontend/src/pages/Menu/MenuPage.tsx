@@ -356,7 +356,7 @@ export default function MenuPage() {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
-            <Utensils className="w-7 h-7 text-[#7C3AED]" />
+            <Utensils className="w-7 h-7 text-primary" />
             Menu Management
           </h1>
           <p className="text-sm text-gray-500 mt-1">
@@ -385,7 +385,7 @@ export default function MenuPage() {
             onClick={() => fileInputRef.current?.click()}
             className="gap-2 border-gray-200 text-gray-700 hover:bg-gray-100"
           >
-            <Upload className="w-4 h-4 text-[#7C3AED]" />
+            <Upload className="w-4 h-4 text-primary" />
             Upload Menu
           </Button>
 
@@ -394,13 +394,13 @@ export default function MenuPage() {
             onClick={() => csvInputRef.current?.click()}
             className="gap-2 border-gray-200 text-gray-700 hover:bg-gray-100"
           >
-            <FileSpreadsheet className="w-4 h-4 text-[#7C3AED]" />
+            <FileSpreadsheet className="w-4 h-4 text-primary" />
             Import CSV
           </Button>
 
           <Button
             onClick={openAddDrawer}
-            className="gap-2 bg-[#7C3AED] hover:bg-[#6D28D9] text-white shadow-sm"
+            className="gap-2 bg-primary hover:bg-primary-700 text-white shadow-sm"
           >
             <Plus className="w-4 h-4" />
             Add Menu
@@ -418,7 +418,7 @@ export default function MenuPage() {
             placeholder="Search menu or dish name..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9 bg-gray-50/50 border-gray-200 focus:border-[#7C3AED] focus:ring-[#7C3AED]"
+            className="pl-9 bg-gray-50/50 border-gray-200 focus:border-primary focus:ring-primary"
           />
         </div>
 
@@ -428,7 +428,7 @@ export default function MenuPage() {
           <select
             value={selectedCourse}
             onChange={(e) => setSelectedCourse(e.target.value)}
-            className="h-10 px-3 text-sm bg-white border border-gray-200 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#7C3AED]"
+            className="h-10 px-3 text-sm bg-white border border-gray-200 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary"
           >
             {COURSES.map((course) => (
               <option key={course} value={course}>
@@ -441,7 +441,7 @@ export default function MenuPage() {
           <select
             value={selectedBranch}
             onChange={(e) => setSelectedBranch(e.target.value)}
-            className="h-10 px-3 text-sm bg-white border border-gray-200 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#7C3AED]"
+            className="h-10 px-3 text-sm bg-white border border-gray-200 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary"
           >
             {BRANCHES.map((b) => (
               <option key={b} value={b}>
@@ -454,7 +454,7 @@ export default function MenuPage() {
           <select
             value={selectedStatus}
             onChange={(e) => setSelectedStatus(e.target.value)}
-            className="h-10 px-3 text-sm bg-white border border-gray-200 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#7C3AED]"
+            className="h-10 px-3 text-sm bg-white border border-gray-200 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary"
           >
             {STATUSES.map((s) => (
               <option key={s} value={s}>
@@ -470,7 +470,7 @@ export default function MenuPage() {
               onClick={() => setViewMode('grid')}
               className={`p-1.5 rounded-md transition-colors ${
                 viewMode === 'grid'
-                  ? 'bg-white text-[#7C3AED] shadow-xs'
+                  ? 'bg-white text-primary shadow-xs'
                   : 'text-gray-500 hover:text-gray-700'
               }`}
               title="Grid View"
@@ -482,7 +482,7 @@ export default function MenuPage() {
               onClick={() => setViewMode('list')}
               className={`p-1.5 rounded-md transition-colors ${
                 viewMode === 'list'
-                  ? 'bg-white text-[#7C3AED] shadow-xs'
+                  ? 'bg-white text-primary shadow-xs'
                   : 'text-gray-500 hover:text-gray-700'
               }`}
               title="List View"
@@ -536,7 +536,7 @@ export default function MenuPage() {
                           setActiveMenuActionId(null);
                           openEditDrawer(menu);
                         }}
-                        className="w-full text-left px-4 py-2 text-xs text-gray-700 hover:bg-purple-50 hover:text-[#7C3AED] flex items-center gap-2"
+                        className="w-full text-left px-4 py-2 text-xs text-gray-700 hover:bg-purple-50 hover:text-primary flex items-center gap-2"
                       >
                         <Edit className="w-3.5 h-3.5" />
                         Edit Menu
@@ -544,7 +544,7 @@ export default function MenuPage() {
                       <button
                         type="button"
                         onClick={() => handleDuplicateMenu(menu)}
-                        className="w-full text-left px-4 py-2 text-xs text-gray-700 hover:bg-purple-50 hover:text-[#7C3AED] flex items-center gap-2"
+                        className="w-full text-left px-4 py-2 text-xs text-gray-700 hover:bg-purple-50 hover:text-primary flex items-center gap-2"
                       >
                         <Copy className="w-3.5 h-3.5" />
                         Duplicate
@@ -552,7 +552,7 @@ export default function MenuPage() {
                       <button
                         type="button"
                         onClick={() => handleToggleMenuStatus(menu.id)}
-                        className="w-full text-left px-4 py-2 text-xs text-gray-700 hover:bg-purple-50 hover:text-[#7C3AED] flex items-center gap-2"
+                        className="w-full text-left px-4 py-2 text-xs text-gray-700 hover:bg-purple-50 hover:text-primary flex items-center gap-2"
                       >
                         {menu.is_enabled ? (
                           <>
@@ -596,7 +596,7 @@ export default function MenuPage() {
                         <div className="flex items-center gap-3">
                           {/* Dish placeholder fallback icon component */}
                           <div className="w-9 h-9 rounded-lg bg-purple-50 border border-purple-100 flex items-center justify-center shrink-0">
-                            <Utensils className="w-4 h-4 text-[#7C3AED]" />
+                            <Utensils className="w-4 h-4 text-primary" />
                           </div>
 
                           <div>
@@ -637,7 +637,7 @@ export default function MenuPage() {
                 {/* Tax Configuration details */}
                 <div className="p-3 bg-purple-50/50 rounded-lg border border-purple-100 flex items-center justify-between text-xs text-purple-900">
                   <span className="font-medium flex items-center gap-1.5">
-                    <Percent className="w-3.5 h-3.5 text-[#7C3AED]" />
+                    <Percent className="w-3.5 h-3.5 text-primary" />
                     Tax ({menu.tax_type})
                   </span>
                   <span className="font-bold">{menu.tax_percentage}%</span>
@@ -649,7 +649,7 @@ export default function MenuPage() {
                   variant="outline"
                   size="sm"
                   onClick={() => openEditDrawer(menu)}
-                  className="w-full text-xs gap-1.5 border-gray-200 text-gray-700 hover:bg-purple-50 hover:text-[#7C3AED]"
+                  className="w-full text-xs gap-1.5 border-gray-200 text-gray-700 hover:bg-purple-50 hover:text-primary"
                 >
                   <Edit className="w-3.5 h-3.5" />
                   Edit Details & Items
@@ -681,7 +681,7 @@ export default function MenuPage() {
                   <tr key={menu.id} className="hover:bg-gray-50/80 transition-colors">
                     <td className="p-4 font-semibold text-gray-900">
                       <div className="flex items-center gap-2">
-                        <Utensils className="w-4 h-4 text-[#7C3AED]" />
+                        <Utensils className="w-4 h-4 text-primary" />
                         {menu.menu_name}
                       </div>
                     </td>
@@ -702,7 +702,7 @@ export default function MenuPage() {
                           variant="ghost"
                           size="sm"
                           onClick={() => openEditDrawer(menu)}
-                          className="h-8 px-2 text-gray-600 hover:text-[#7C3AED] hover:bg-purple-50"
+                          className="h-8 px-2 text-gray-600 hover:text-primary hover:bg-purple-50"
                           title="Edit Menu"
                         >
                           <Edit className="w-4 h-4" />
@@ -711,7 +711,7 @@ export default function MenuPage() {
                           variant="ghost"
                           size="sm"
                           onClick={() => handleDuplicateMenu(menu)}
-                          className="h-8 px-2 text-gray-600 hover:text-[#7C3AED] hover:bg-purple-50"
+                          className="h-8 px-2 text-gray-600 hover:text-primary hover:bg-purple-50"
                           title="Duplicate"
                         >
                           <Copy className="w-4 h-4" />
@@ -762,7 +762,7 @@ export default function MenuPage() {
             </Button>
             <Button
               onClick={handleSaveMenu}
-              className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white"
+              className="bg-primary hover:bg-primary-700 text-white"
             >
               Save Menu Configuration
             </Button>
@@ -773,7 +773,7 @@ export default function MenuPage() {
           {/* Section 1: General */}
           <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-xs space-y-4">
             <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
-              <Layers className="w-4 h-4 text-[#7C3AED]" />
+              <Layers className="w-4 h-4 text-primary" />
               <h3 className="text-base font-bold text-gray-900">1. General Information</h3>
             </div>
 
@@ -787,7 +787,7 @@ export default function MenuPage() {
                   placeholder="e.g. Main Dining Menu"
                   value={formMenuName}
                   onChange={(e) => setFormMenuName(e.target.value)}
-                  className="w-full bg-white border-gray-200 focus:border-[#7C3AED]"
+                  className="w-full bg-white border-gray-200 focus:border-primary"
                 />
               </div>
 
@@ -796,7 +796,7 @@ export default function MenuPage() {
                 <select
                   value={formBranch}
                   onChange={(e) => setFormBranch(e.target.value)}
-                  className="w-full h-10 px-3 text-sm bg-white border border-gray-200 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#7C3AED]"
+                  className="w-full h-10 px-3 text-sm bg-white border border-gray-200 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary"
                 >
                   {BRANCHES.filter((b) => b !== 'All Branches').map((b) => (
                     <option key={b} value={b}>
@@ -813,7 +813,7 @@ export default function MenuPage() {
                 <select
                   value={formPriceList}
                   onChange={(e) => setFormPriceList(e.target.value)}
-                  className="w-full h-10 px-3 text-sm bg-white border border-gray-200 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#7C3AED]"
+                  className="w-full h-10 px-3 text-sm bg-white border border-gray-200 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary"
                 >
                   {PRICE_LISTS.map((pl) => (
                     <option key={pl} value={pl}>
@@ -829,7 +829,7 @@ export default function MenuPage() {
           <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-xs space-y-4">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <div className="flex items-center gap-2">
-                <Utensils className="w-4 h-4 text-[#7C3AED]" />
+                <Utensils className="w-4 h-4 text-primary" />
                 <h3 className="text-base font-bold text-gray-900">2. Menu Items</h3>
               </div>
               <Button
@@ -837,7 +837,7 @@ export default function MenuPage() {
                 size="sm"
                 variant="outline"
                 onClick={handleAddFormItem}
-                className="gap-1.5 text-xs text-[#7C3AED] border-purple-200 hover:bg-purple-50"
+                className="gap-1.5 text-xs text-primary border-purple-200 hover:bg-purple-50"
               >
                 <Plus className="w-3.5 h-3.5" />
                 Add Item
@@ -876,7 +876,7 @@ export default function MenuPage() {
                           onChange={(e) =>
                             handleUpdateFormItem(item.id, { course: e.target.value })
                           }
-                          className="h-8 px-2 text-xs bg-white border border-gray-200 rounded-md text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#7C3AED]"
+                          className="h-8 px-2 text-xs bg-white border border-gray-200 rounded-md text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary"
                         >
                           {COURSES.filter((c) => c !== 'All Courses').map((c) => (
                             <option key={c} value={c}>
@@ -905,7 +905,7 @@ export default function MenuPage() {
                           onChange={(e) =>
                             handleUpdateFormItem(item.id, { enabled: e.target.checked })
                           }
-                          className="w-4 h-4 text-[#7C3AED] rounded border-gray-300 focus:ring-[#7C3AED]"
+                          className="w-4 h-4 text-primary rounded border-gray-300 focus:ring-primary"
                         />
                       </td>
                       <td className="p-2 text-center">
@@ -915,7 +915,7 @@ export default function MenuPage() {
                           onChange={(e) =>
                             handleUpdateFormItem(item.id, { special_dish: e.target.checked })
                           }
-                          className="w-4 h-4 text-[#7C3AED] rounded border-gray-300 focus:ring-[#7C3AED]"
+                          className="w-4 h-4 text-primary rounded border-gray-300 focus:ring-primary"
                         />
                       </td>
                       <td className="p-2 text-right">
@@ -938,7 +938,7 @@ export default function MenuPage() {
           {/* Section 3: Operations */}
           <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-xs space-y-4">
             <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
-              <Sparkles className="w-4 h-4 text-[#7C3AED]" />
+              <Sparkles className="w-4 h-4 text-primary" />
               <h3 className="text-base font-bold text-gray-900">3. Operational Flags</h3>
             </div>
 
@@ -952,7 +952,7 @@ export default function MenuPage() {
                   type="checkbox"
                   checked={formIsEnabled}
                   onChange={(e) => setFormIsEnabled(e.target.checked)}
-                  className="w-4 h-4 text-[#7C3AED] rounded border-gray-300 focus:ring-[#7C3AED]"
+                  className="w-4 h-4 text-primary rounded border-gray-300 focus:ring-primary"
                 />
               </div>
 
@@ -966,7 +966,7 @@ export default function MenuPage() {
                 <input
                   type="checkbox"
                   defaultChecked={true}
-                  className="w-4 h-4 text-[#7C3AED] rounded border-gray-300 focus:ring-[#7C3AED]"
+                  className="w-4 h-4 text-primary rounded border-gray-300 focus:ring-primary"
                 />
               </div>
 
@@ -980,7 +980,7 @@ export default function MenuPage() {
                 <input
                   type="checkbox"
                   defaultChecked={true}
-                  className="w-4 h-4 text-[#7C3AED] rounded border-gray-300 focus:ring-[#7C3AED]"
+                  className="w-4 h-4 text-primary rounded border-gray-300 focus:ring-primary"
                 />
               </div>
             </div>
@@ -989,7 +989,7 @@ export default function MenuPage() {
           {/* Section 4: Tax Configuration */}
           <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-xs space-y-4">
             <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
-              <Percent className="w-4 h-4 text-[#7C3AED]" />
+              <Percent className="w-4 h-4 text-primary" />
               <h3 className="text-base font-bold text-gray-900">4. Tax Configuration</h3>
             </div>
 
@@ -1004,7 +1004,7 @@ export default function MenuPage() {
                       value="Exclusive"
                       checked={formTaxType === 'Exclusive'}
                       onChange={() => setFormTaxType('Exclusive')}
-                      className="text-[#7C3AED] focus:ring-[#7C3AED]"
+                      className="text-primary focus:ring-primary"
                     />
                     Exclusive (Tax added at checkout)
                   </label>
@@ -1015,7 +1015,7 @@ export default function MenuPage() {
                       value="Inclusive"
                       checked={formTaxType === 'Inclusive'}
                       onChange={() => setFormTaxType('Inclusive')}
-                      className="text-[#7C3AED] focus:ring-[#7C3AED]"
+                      className="text-primary focus:ring-primary"
                     />
                     Inclusive (Tax included in item price)
                   </label>
@@ -1033,7 +1033,7 @@ export default function MenuPage() {
                   max={100}
                   value={formTaxPercentage}
                   onChange={(e) => setFormTaxPercentage(parseFloat(e.target.value) || 0)}
-                  className="w-full bg-white border-gray-200 focus:border-[#7C3AED]"
+                  className="w-full bg-white border-gray-200 focus:border-primary"
                 />
                 <p className="text-[11px] text-gray-500 mt-1">Default GST / Local Tax rate: 5.0%</p>
               </div>
