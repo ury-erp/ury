@@ -7,7 +7,6 @@ import {
   Plus,
   Trash2,
   Save,
-  Check,
   Calculator,
   FileSpreadsheet
 } from 'lucide-react';
