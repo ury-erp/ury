@@ -74,6 +74,12 @@ const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: Checklis
 
     try {
       const { items, logName: fetchedLogName } = await getChecklist(posProfile, checklistType);
+      
+      if (!items || items.length === 0) {
+        onComplete();
+        return;
+      }
+
       setRows(toRowState(items));
       setLogName(fetchedLogName);
     } catch (error) {
@@ -82,7 +88,7 @@ const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: Checklis
     } finally {
       setIsLoading(false);
     }
-  }, [posProfile, checklistType]);
+  }, [posProfile, checklistType, onComplete]);
 
   useEffect(() => {
     loadChecklist();

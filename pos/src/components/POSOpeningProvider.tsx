@@ -40,10 +40,14 @@ const POSOpeningProvider = ({ children }: POSOpeningProviderProps) => {
       // block here; checkPOSStatus() re-runs once the cashier submits it.
       if (posProfile?.name) {
         try {
-          const { logStatus } = await getChecklist(posProfile.name, 'Opening');
-          if (logStatus !== 'Complete') {
-            setNeedsOpeningChecklist(true);
-            return;
+          const { logStatus, items } = await getChecklist(posProfile.name, 'Opening');
+          
+          // If no opening checklist items are configured, bypass the gate
+          if (items && items.length > 0) {
+            if (logStatus !== 'Complete') {
+              setNeedsOpeningChecklist(true);
+              return;
+            }
           }
         } catch (error) {
           console.error('Failed to check opening checklist status:', error);
