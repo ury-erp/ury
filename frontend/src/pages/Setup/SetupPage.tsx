@@ -224,9 +224,9 @@ export default function SetupPage() {
       nextLabel="Continue"
       isNextDisabled={submitting}
       secondaryAction={
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 h-full">
           <span className="hidden sm:inline text-xs text-muted-foreground">
-            Creates a working demo restaurant with sample data — you can change or delete any of it afterward.
+            Creates a working demo restaurant with sample data, you can change or delete any of it afterward.
           </span>
           <Button
             type="button"
