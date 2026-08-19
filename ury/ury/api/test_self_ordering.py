@@ -185,6 +185,63 @@ class TestAddCustomerItemsAppendOnly(unittest.TestCase):
             with self.assertRaises(frappe.ValidationError):
                 add_customer_items("session-token", [{"item": "Biryani", "qty": 1}])
 
+    @patch(f"{MOD}.frappe.get_all")
+    @patch(f"{MOD}.frappe.set_user")
+    @patch(f"{MOD}._resolve_session")
+    def test_add_customer_items_rejects_joining_pre_existing_table_order(
+        self, mock_resolve_session, mock_set_user, mock_get_all,
+    ):
+        """session.invoice is None on a session's first call even when the
+        table already has an open invoice from staff or another session —
+        allow_add_to_running_table=False must still block that join, not
+        just block a session's own later calls."""
+        session = self._session_doc(invoice=None)
+        mock_resolve_session.return_value = session
+
+        with patch(f"{MOD}.frappe.get_doc") as mock_get_doc:
+            profile = MagicMock()
+            profile.enabled = 1
+            profile.allow_add_to_running_table = 0
+            mock_get_doc.return_value = profile
+
+            mock_get_all.return_value = [MagicMock(name="POS-INV-EXISTING")]
+
+            with self.assertRaises(frappe.ValidationError):
+                add_customer_items("session-token", [{"item": "Biryani", "qty": 1}])
+
+            mock_get_all.assert_called_once()
+            called_kwargs = mock_get_all.call_args.kwargs
+            self.assertEqual(called_kwargs["or_filters"]["restaurant_table"], "Table 7")
+
+    @patch(f"{MOD}.frappe.get_all")
+    @patch(f"{MOD}._resolve_session")
+    def test_add_customer_items_first_call_proceeds_when_table_free(
+        self, mock_resolve_session, mock_get_all,
+    ):
+        """Same disabled-flag config, but no pre-existing invoice on the
+        table — the new guard must not block a session's own first order."""
+        session = self._session_doc(invoice=None)
+        mock_resolve_session.return_value = session
+        mock_get_all.return_value = []
+
+        with patch(f"{MOD}.frappe.get_doc") as mock_get_doc, \
+             patch(f"{MOD}.resolve_restaurant_menu") as mock_resolve_menu, \
+             patch(f"{MOD}.frappe.set_user"):
+            profile = MagicMock()
+            profile.enabled = 1
+            profile.allow_add_to_running_table = 0
+            profile.branch = "Branch A"
+            mock_get_doc.return_value = profile
+            mock_resolve_menu.return_value = {"items": [{"item": "Biryani"}]}
+
+            # No exception from the pre-existing-order guard itself; it will
+            # fail further down on unmocked invoice-resolution internals,
+            # which is fine — this test only asserts the guard we're fixing
+            # doesn't false-positive on a session's own legitimate first order.
+            with self.assertRaises(Exception) as ctx:
+                add_customer_items("session-token", [{"item": "Biryani", "qty": 1}])
+            self.assertNotIn("already has an order in progress", str(ctx.exception))
+
 
 class TestRequestBill(unittest.TestCase):
     @patch(f"{MOD}.now_datetime")
