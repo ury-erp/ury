@@ -40,6 +40,7 @@ export const getChecklist = async (
       {
         pos_profile: posProfile,
         checklist_type: checklistType,
+        _t: Date.now(),
       }
     );
 

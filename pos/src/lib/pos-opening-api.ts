@@ -11,7 +11,8 @@ export interface POSCloseValidationResponse {
 export const checkPOSOpening = async (): Promise<POSOpeningResponse> => {
   try {
     const response = await call.get<POSOpeningResponse>(
-      'ury.ury_pos.api.posOpening'
+      'ury.ury_pos.api.posOpening',
+      { _t: Date.now() }
     );
     
     return response;
@@ -26,7 +27,8 @@ export const validatePOSClose = async (posProfile: string): Promise<POSCloseVali
     const response = await call.get<POSCloseValidationResponse>(
       'ury.ury_pos.api.validate_pos_close',
       {
-        pos_profile: posProfile
+        pos_profile: posProfile,
+        _t: Date.now(),
       }
     );
     
@@ -35,4 +37,4 @@ export const validatePOSClose = async (posProfile: string): Promise<POSCloseVali
     console.error('Error validating POS close status:', error);
     throw error;
   }
-}; 
+};
