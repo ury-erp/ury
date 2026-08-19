@@ -5,11 +5,14 @@ import {
   validatePOSClose,
   POSOpeningEntryRef,
 } from '../lib/pos-opening-api';
+import { getChecklist } from '../lib/checklist-api';
 import { usePOSStore } from '../store/pos-store';
 import { useRootStore } from '../store/root-store';
 import { User } from '../store/slices/auth-slice';
 import POSOpeningDialog from './POSOpeningDialog';
 import POSOpeningScreen from './POSOpeningScreen';
+import ChecklistGateDialog from './ChecklistGateDialog';
+import POSClosingDialog from './POSClosingDialog';
 import { t } from '../i18n';
 
 interface POSOpeningProviderProps {
@@ -56,6 +59,15 @@ const POSOpeningProvider = ({ children }: POSOpeningProviderProps) => {
   const [blockingState, setBlockingState] = useState<OpeningBlockingState | null>(null);
   const [blockingMessage, setBlockingMessage] = useState<string>('');
   const [existingEntry, setExistingEntry] = useState<POSOpeningEntryRef | null>(null);
+  // Set once checkPOSOpening() confirms the POS is open but today's Opening
+  // checklist log isn't status="Complete" yet. Takes priority over the
+  // daily-close check below -- the cashier must clear the checklist before
+  // we even look at whether a previous session needs closing.
+  const [needsOpeningChecklist, setNeedsOpeningChecklist] = useState(false);
+  // True once the cashier taps "Close Now" from the dailyClosePending
+  // blocking dialog -- renders the real POSClosingDialog instead of just
+  // telling them to contact a manager.
+  const [showClosingDialog, setShowClosingDialog] = useState(false);
 
   const { posProfile } = usePOSStore();
   const { user } = useRootStore();
@@ -65,6 +77,7 @@ const POSOpeningProvider = ({ children }: POSOpeningProviderProps) => {
   const clearBlockingState = useCallback(() => {
     setBlockingState(null);
     setBlockingMessage('');
+    setShowClosingDialog(false);
   }, []);
 
   const handleScreenError = useCallback(
@@ -81,6 +94,7 @@ const POSOpeningProvider = ({ children }: POSOpeningProviderProps) => {
     setIsLoading(true);
     clearBlockingState();
     setExistingEntry(null);
+    setNeedsOpeningChecklist(false);
 
     try {
       const response = await checkPOSOpening(user?.name);
@@ -126,6 +140,26 @@ const POSOpeningProvider = ({ children }: POSOpeningProviderProps) => {
         return;
       }
 
+      // Gate on the Opening checklist before the daily-close check below --
+      // the cashier must clear it before we look at whether a previous
+      // session needs closing.
+      if (posProfile.name) {
+        try {
+          const { logStatus } = await getChecklist(posProfile.name, 'Opening');
+          if (logStatus !== 'Complete') {
+            setNeedsOpeningChecklist(true);
+            setIsLoading(false);
+            return;
+          }
+        } catch (error) {
+          console.error('Failed to check opening checklist status:', error);
+          // On error, block on the checklist for safety.
+          setNeedsOpeningChecklist(true);
+          setIsLoading(false);
+          return;
+        }
+      }
+
       if (posProfile.custom_daily_pos_close === 1) {
         const closeResponse = await validatePOSClose(posProfile.name);
         if (closeResponse.message === 'Failed') {
@@ -164,6 +198,11 @@ const POSOpeningProvider = ({ children }: POSOpeningProviderProps) => {
     checkPOSStatus();
   }, [clearBlockingState, checkPOSStatus]);
 
+  const handleClosingSuccess = useCallback(() => {
+    clearBlockingState();
+    checkPOSStatus();
+  }, [clearBlockingState, checkPOSStatus]);
+
   useEffect(() => {
     if (posProfile) {
       checkPOSStatus();
@@ -181,6 +220,18 @@ const POSOpeningProvider = ({ children }: POSOpeningProviderProps) => {
     );
   }
 
+  if (showClosingDialog && posProfile) {
+    return (
+      <POSClosingDialog
+        open={showClosingDialog}
+        onOpenChange={(open) => {
+          if (!open) setShowClosingDialog(false);
+        }}
+        onClosingSubmitted={handleClosingSuccess}
+      />
+    );
+  }
+
   if (blockingState) {
     return (
       <POSOpeningDialog
@@ -190,6 +241,25 @@ const POSOpeningProvider = ({ children }: POSOpeningProviderProps) => {
         canAccessDesk={canAccessDesk}
         onRetry={checkPOSStatus}
         onContinue={() => setBlockingState(null)}
+        onCloseNow={
+          blockingState === 'dailyClosePending'
+            ? () => setShowClosingDialog(true)
+            : undefined
+        }
+      />
+    );
+  }
+
+  // Block on the Opening checklist until it's submitted as Complete.
+  if (needsOpeningChecklist && posProfile?.name) {
+    return (
+      <ChecklistGateDialog
+        posProfile={posProfile.name}
+        checklistType="Opening"
+        onComplete={() => {
+          setNeedsOpeningChecklist(false);
+          checkPOSStatus();
+        }}
       />
     );
   }

@@ -1257,6 +1257,132 @@ def get_pos_opening_screen_data() -> dict:
 
 
 @frappe.whitelist()
+
+def _validate_checklist_branch(pos_profile):
+    """Ensure the session user's branch matches the given POS Profile's branch."""
+    session_branch = getBranch()
+    profile_branch = frappe.db.get_value("POS Profile", pos_profile, "branch")
+
+    if not profile_branch:
+        frappe.throw(
+            _("POS Profile {0} not found.").format(pos_profile),
+            frappe.DoesNotExistError,
+        )
+
+    if profile_branch != session_branch:
+        frappe.throw(
+            _("You do not have permission to access the checklist for POS Profile {0}.").format(
+                pos_profile
+            ),
+            frappe.PermissionError,
+        )
+
+
+@frappe.whitelist()
+def get_checklist(pos_profile, checklist_type):
+    _validate_checklist_branch(pos_profile)
+
+    configured_items = frappe.get_all(
+        "URY Checklist Item",
+        fields=["item_label", "applies_to", "is_mandatory"],
+        filters={"parent": pos_profile, "applies_to": ["in", [checklist_type, "Both"]]},
+        parent_doctype="POS Profile",
+    )
+
+    existing_log = frappe.get_all(
+        "URY POS Checklist Log",
+        fields=["name", "status"],
+        filters={
+            "pos_profile": pos_profile,
+            "checklist_type": checklist_type,
+            "shift_date": date.today(),
+        },
+        limit=1,
+    )
+
+    log_name = None
+    log_status = None
+    if existing_log:
+        log_name = existing_log[0].name
+        log_status = existing_log[0].status
+
+    return {
+        "items": configured_items,
+        "log_name": log_name,
+        "log_status": log_status,
+    }
+
+
+@frappe.whitelist()
+def submit_checklist(pos_profile, checklist_type, items, pos_opening_entry=None):
+    _validate_checklist_branch(pos_profile)
+
+    items = json.loads(items)
+
+    configured_items = frappe.get_all(
+        "URY Checklist Item",
+        fields=["item_label", "is_mandatory"],
+        filters={"parent": pos_profile, "applies_to": ["in", [checklist_type, "Both"]]},
+        parent_doctype="POS Profile",
+    )
+    mandatory_by_label = {row.item_label: row.is_mandatory for row in configured_items}
+
+    existing_log = frappe.get_all(
+        "URY POS Checklist Log",
+        fields=["name"],
+        filters={
+            "pos_profile": pos_profile,
+            "checklist_type": checklist_type,
+            "shift_date": date.today(),
+        },
+        limit=1,
+    )
+
+    if existing_log:
+        log_doc = frappe.get_doc("URY POS Checklist Log", existing_log[0].name)
+    else:
+        log_doc = frappe.new_doc("URY POS Checklist Log")
+        log_doc.pos_profile = pos_profile
+        log_doc.branch = getBranch()
+        log_doc.checklist_type = checklist_type
+        log_doc.shift_date = date.today()
+
+    if pos_opening_entry:
+        log_doc.pos_opening_entry = pos_opening_entry
+
+    log_doc.set("items", [])
+    for item in items:
+        log_doc.append(
+            "items",
+            {
+                "item_label": item.get("item_label"),
+                "is_mandatory": mandatory_by_label.get(item.get("item_label"), 0),
+                "is_checked": item.get("is_checked"),
+                "remarks": item.get("remarks"),
+            },
+        )
+
+    all_mandatory_checked = all(
+        row.is_checked for row in log_doc.items if row.is_mandatory
+    )
+
+    if all_mandatory_checked:
+        log_doc.status = "Complete"
+        log_doc.completed_by = frappe.session.user
+        log_doc.completed_at = frappe.utils.now()
+    else:
+        log_doc.status = "In Progress"
+
+    log_doc.save()
+
+    return {
+        "status": log_doc.status,
+        "name": log_doc.name,
+    }
+
+
+@frappe.whitelist()
+
 def merge_bills(primary_invoice, secondary_invoice):
 
     try:
