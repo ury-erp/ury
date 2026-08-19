@@ -32,6 +32,10 @@ declare const self: ServiceWorkerGlobalScope & {
 self.skipWaiting();
 clientsClaim();
 
+self.addEventListener('fetch', event => {
+  console.log('[SW FETCH]', event.request.mode, event.request.destination, event.request.url);
+});
+
 // Proactively cache /pos document upon activation so first offline reload succeeds
 self.addEventListener('activate', event => {
   event.waitUntil(
