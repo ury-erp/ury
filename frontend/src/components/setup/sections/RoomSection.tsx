@@ -109,11 +109,10 @@ function RoomRow({ room, canDelete, renameRoom, deleteRoom, previewShrink, setRo
         {canDelete && (
           <Button
             type="button"
-            variant="danger"
-            size="icon"
+            variant="ghost"
             onClick={() => deleteRoom(room.id)}
             aria-label="Delete room"
-            className="shrink-0 justify-self-end"
+            className="text-red-500 hover:text-red-700 hover:bg-red-50 shrink-0 p-2 h-auto justify-self-end"
           >
             <Trash2 className="w-4 h-4" />
           </Button>
@@ -121,7 +120,7 @@ function RoomRow({ room, canDelete, renameRoom, deleteRoom, previewShrink, setRo
       </div>
 
       <p className="text-xs text-muted-foreground">
-        We'll name your tables automatically — you can rename or adjust any of them after.
+        We'll name your tables automatically , you can rename or adjust any of them after.
       </p>
 
       {pendingShrink && (
@@ -152,10 +151,6 @@ export function RoomSection() {
 
   return (
     <div className="space-y-6">
-      <p className="text-sm text-muted-foreground">
-        A room is any distinct seating area — dining hall, rooftop, private room. Most restaurants just need one to
-        start.
-      </p>
 
       <div className="space-y-3">
         {rooms.map((room) => (

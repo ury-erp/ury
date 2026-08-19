@@ -22,10 +22,17 @@ function MobileQRLayout({ initialContext }: LayoutProps) {
     submitCart,
     handleRequestBill,
     payOnline,
+    resetSession,
     cartItems,
     cartCount,
     cartTotal,
   } = useOrderingSession(initialContext)
+
+  function handleStartOver() {
+    if (window.confirm('Start over? Your current cart will be cleared.')) {
+      resetSession()
+    }
+  }
 
   if (loading) {
     return (
@@ -43,12 +50,23 @@ function MobileQRLayout({ initialContext }: LayoutProps) {
     )
   }
 
+  // `source` (not the absence of a table) is the authoritative signal for
+  // pickup mode — set server-side by _verify_qr_token/_resolve_device, never
+  // guessed from context.table being falsy.
+  const isPickup = context?.source === 'QR Pickup'
+
   return (
     <div className="min-h-screen pb-28">
-      <header className="sticky top-0 z-10 border-b bg-background/95 px-4 py-3 backdrop-blur">
+      <header className="sticky top-0 z-10 flex items-center justify-between border-b bg-background/95 px-4 py-3 backdrop-blur">
         <h1 className="text-lg font-semibold">
-          {context?.table ? `Table ${context.table}` : 'Order for Pickup'}
+          {isPickup ? 'Order for Pickup' : context?.table ? `Table ${context.table}` : 'Order'}
         </h1>
+        <button
+          onClick={handleStartOver}
+          className="rounded-md border px-2 py-1 text-xs font-medium text-muted-foreground"
+        >
+          Start Over
+        </button>
       </header>
 
       {error && (
@@ -58,6 +76,11 @@ function MobileQRLayout({ initialContext }: LayoutProps) {
       {order && order.items.length > 0 && (
         <section className="mx-4 mt-4 rounded-lg border p-3">
           <h2 className="mb-2 text-sm font-medium text-muted-foreground">Your order so far</h2>
+          {isPickup && order.pickup_code && (
+            <p className="mb-2 rounded-md bg-muted p-2 text-center text-sm font-semibold">
+              Pickup code: {order.pickup_code}
+            </p>
+          )}
           <ul className="space-y-1 text-sm">
             {order.items.map((row, idx) => (
               <li key={`${row.item_code}-${idx}`} className="flex justify-between">
@@ -85,7 +108,7 @@ function MobileQRLayout({ initialContext }: LayoutProps) {
               member will assist with payment.
             </p>
           )}
-          {context?.capabilities.request_bill_enabled && !order.billed && (
+          {!isPickup && context?.capabilities.request_bill_enabled && !order.billed && (
             <button
               className="mt-3 w-full rounded-md border py-2 text-sm font-medium disabled:opacity-50"
               disabled={billRequested}

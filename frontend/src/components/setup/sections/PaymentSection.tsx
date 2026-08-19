@@ -1,57 +1,72 @@
-import React from 'react';
+import { useEffect, useState } from 'react';
 import { useConfigure } from '../../../context/ConfigureContext';
-import { Input, Button } from '@ury/ui';
+import { call } from '@ury/core';
+import { SearchableSelect, Option } from '../../common/SearchableSelect';
+import { Button } from '@ury/ui';
 import { Plus, Trash2 } from 'lucide-react';
+import { nextId } from '../../../utils/id';
+
+const DEFAULTS = ['Cash', 'Card', 'UPI'];
 
 export function PaymentSection() {
   const { paymentMethods, addPaymentMethod, updatePaymentMethod, deletePaymentMethod } = useConfigure();
+  const [allModes, setAllModes] = useState<Option[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
+  useEffect(() => {
+    call<any>('frappe.client.get_list', {
+      doctype: 'Mode of Payment',
+      fields: ['name'],
+      limit: 100,
+    })
+      .then((res: any) => {
+        const rows: { name: string }[] = res?.message ?? res ?? [];
+        const names = rows.map((r: { name: string }) => r.name);
+        const opts = names.map(n => ({ value: n, label: n }));
+        setAllModes(opts);
+
+        // Pre-select defaults that exist in the list and aren't already selected
+        const currentNames = new Set(paymentMethods.map((m) => m.name));
+        DEFAULTS.forEach((d) => {
+          if (names.includes(d) && !currentNames.has(d)) {
+            addPaymentMethod({ name: d });
+          }
+        });
+      })
+      .catch(() =>
+        setFetchError('Could not load payment methods, check your connection.')
+      )
+      .finally(() => setLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleAdd = () => {
-    addPaymentMethod({
-      name: '',
-    });
+    addPaymentMethod({ name: '' });
   };
 
   return (
     <div className="space-y-6">
-      <p className="text-sm text-muted-foreground">
-        How your customers will pay. Cash is added by default — add Card, UPI, or others your restaurant accepts. You can add more anytime later.
-      </p>
       <div className="space-y-3">
-        {/* Header Row */}
-        <div className="hidden md:flex gap-3 px-2 text-xs font-medium text-muted-foreground">
-          <div className="flex-1">Payment Method Name</div>
-          {paymentMethods.length > 1 && <div className="w-8"></div>}
-        </div>
-
         {paymentMethods.map((method) => (
-          <div
-            key={method.id}
-            className="py-2 flex flex-col md:flex-row md:items-center gap-3"
-          >
+          <div key={method.id} className="flex items-center gap-3">
             <div className="flex-1">
-              <label htmlFor={`payment-method-${method.id}`} className="sr-only">
-                Payment Method Name
-              </label>
-              <Input
-                id={`payment-method-${method.id}`}
-                type="text"
+              <SearchableSelect
+                id={`pm-${method.id}`}
                 value={method.name}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => updatePaymentMethod(method.id, { name: e.target.value })}
-                placeholder="e.g. Cash, Card, UPI"
-                className="w-full text-sm bg-background"
+                options={allModes}
+                onChange={(_id, value) => updatePaymentMethod(method.id, { name: value })}
+                placeholder="Select Mode of Payment"
+                disabled={loading}
               />
             </div>
-
             {paymentMethods.length > 1 && (
               <Button
                 type="button"
-                variant="danger"
-                size="icon"
+                variant="ghost"
                 onClick={() => deletePaymentMethod(method.id)}
-                className="shrink-0 self-end md:self-center"
-                title="Delete Payment Method"
-                aria-label="Delete payment method"
+                className="text-red-500 hover:text-red-700 hover:bg-red-50 shrink-0 p-2 h-auto"
+                title="Delete Method"
               >
                 <Trash2 className="w-4 h-4" />
               </Button>
@@ -59,6 +74,10 @@ export function PaymentSection() {
           </div>
         ))}
       </div>
+
+      {fetchError && (
+        <p className="text-xs font-medium text-red-600">{fetchError}</p>
+      )}
 
       <Button
         type="button"

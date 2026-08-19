@@ -1,28 +1,44 @@
 import { useState } from 'react'
+import { assignDeviceTable, type OrderingContext } from '../lib/api'
+import TabletLayout from './TabletLayout'
 
 type Step = 'pin' | 'table'
 
 const MIN_PIN_LENGTH = 4
 const MAX_PIN_LENGTH = 6
 
+// Same storage keys useDeviceBootstrap.ts uses for a provisioned device's
+// credentials — a portable/shared tablet is still a provisioned
+// URY Ordering Device (device_type "Portable Tablet", table_mode
+// "Selectable"), it just can't bootstrap straight into an ordering context
+// the way a fixed-table/kiosk device does, because it has no table until
+// staff assign one here.
+const DEVICE_ID_KEY = 'ury_device_id'
+const DEVICE_CREDENTIAL_KEY = 'ury_device_credential'
+
 /**
  * Standalone screen for the "portable/shared tablet" scenario: staff enters
- * a PIN and picks a table before handing the tablet to a customer.
+ * a PIN and picks a table before handing the tablet to a customer. Calls
+ * the real `assign_device_table` backend endpoint (device credential +
+ * staff PIN + table -> a bound ordering session), then hands off straight
+ * into the normal ordering view via `TabletLayout`'s `initialContext` prop
+ * — the same pattern `App.tsx` already uses for device-bootstrapped
+ * sessions, so this screen never re-bootstraps once assigned.
  *
- * There is currently NO backend endpoint for "staff PIN + table selection
- * -> customer session" (only QR-token and device-credential bootstrap
- * exist — see `get_ordering_context` in
- * ury/ury/ury/api/self_ordering.py). This is therefore a UI shell only:
- * any PIN of MIN_PIN_LENGTH+ digits is treated as "accepted" (no real
- * verification), and there is no customer-safe "list all tables" endpoint
- * either, so the table picker is a free-text field rather than a real
- * picker. Submitting does not create a session — it surfaces the gap
- * instead of silently pretending to succeed.
+ * There is no customer-safe "list tables for this branch" endpoint yet, so
+ * the table picker stays a free-text field (table name/number) rather than
+ * a real picker — building a new tables-listing endpoint was out of scope
+ * for this MVP pass. The backend still validates the table exists and
+ * belongs to the device's branch, so a bad value is rejected, not silently
+ * accepted.
  */
 function PortableTabletAssignment() {
   const [step, setStep] = useState<Step>('pin')
   const [pin, setPin] = useState('')
   const [table, setTable] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [context, setContext] = useState<OrderingContext | null>(null)
 
   function handlePinDigit(digit: string) {
     if (pin.length >= MAX_PIN_LENGTH) return
@@ -35,22 +51,49 @@ function PortableTabletAssignment() {
 
   function handlePinSubmit() {
     if (pin.length < MIN_PIN_LENGTH) return
-    // UI shell only — any PIN of sufficient length is treated as accepted.
-    // There is no real staff-PIN verification endpoint yet.
+    // The PIN itself is only verified server-side, at assignment time —
+    // this just advances to table entry once enough digits are entered.
+    setError(null)
     setStep('table')
   }
 
-  function handleAssign() {
-    if (!table.trim()) return
-    // TODO(backend): needs a staff-PIN + table-selection endpoint before
-    // this can create a real session. Until then, this screen cannot hand
-    // off a working session to a customer.
-    window.alert('Backend endpoint not yet available — see TODO in this file')
+  async function handleAssign() {
+    if (!table.trim() || submitting) return
+
+    const deviceId = localStorage.getItem(DEVICE_ID_KEY)
+    const deviceCredential = localStorage.getItem(DEVICE_CREDENTIAL_KEY)
+    if (!deviceId || !deviceCredential) {
+      setError('This tablet is not provisioned. Please contact staff.')
+      return
+    }
+
+    setSubmitting(true)
+    setError(null)
+    try {
+      const assigned = await assignDeviceTable(deviceId, deviceCredential, pin, table.trim())
+      setContext(assigned)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not assign this table. Please check the PIN and try again.')
+      setPin('')
+      setStep('pin')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  if (context) {
+    return <TabletLayout initialContext={context} />
   }
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-6 p-6">
       <h1 className="text-xl font-semibold">Assign This Tablet</h1>
+
+      {error && (
+        <div className="w-full max-w-xs rounded-md bg-destructive/10 p-3 text-center text-sm text-destructive">
+          {error}
+        </div>
+      )}
 
       {step === 'pin' && (
         <div className="flex w-full max-w-xs flex-col items-center gap-4">
@@ -103,13 +146,14 @@ function PortableTabletAssignment() {
           />
           <button
             onClick={handleAssign}
-            disabled={!table.trim()}
+            disabled={!table.trim() || submitting}
             className="w-full rounded-md bg-primary py-3 font-medium text-primary-foreground disabled:opacity-50"
           >
-            Assign Table
+            {submitting ? 'Assigning…' : 'Assign Table'}
           </button>
           <button
             onClick={() => setStep('pin')}
+            disabled={submitting}
             className="w-full rounded-md border py-3 text-sm font-medium"
           >
             Back
