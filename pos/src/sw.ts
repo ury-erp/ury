@@ -18,7 +18,7 @@
  */
 
 import { clientsClaim } from 'workbox-core';
-import { precacheAndRoute } from 'workbox-precaching';
+import { precacheAndRoute, matchPrecache } from 'workbox-precaching';
 import { registerRoute, NavigationRoute } from 'workbox-routing';
 import { StaleWhileRevalidate, CacheFirst, NetworkFirst } from 'workbox-strategies';
 import { ExpirationPlugin } from 'workbox-expiration';
@@ -31,6 +31,26 @@ declare const self: ServiceWorkerGlobalScope & {
 // Immediately activate new service worker versions
 self.skipWaiting();
 clientsClaim();
+
+// Proactively cache /pos document upon activation so first offline reload succeeds
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    (async () => {
+      try {
+        const cache = await caches.open('ury-pos-navigation');
+        const match = await cache.match('/pos');
+        if (!match) {
+          const res = await fetch('/pos', { credentials: 'same-origin' });
+          if (res && res.ok) {
+            await cache.put('/pos', res);
+          }
+        }
+      } catch (err) {
+        console.warn('[SW] Proactive /pos cache notice:', err);
+      }
+    })()
+  );
+});
 
 // 1. App Shell Pre-caching
 precacheAndRoute(self.__WB_MANIFEST || []);
@@ -152,10 +172,11 @@ try {
       plugins: [
         {
           handlerDidError: async () => {
-            const match = (await caches.match('/assets/ury/pos/index.html')) ||
-                          (await caches.match('/index.html')) ||
-                          (await caches.match('/pos')) ||
-                          (await caches.match('/pos/index.html'));
+            const match = (await caches.match('/pos')) ||
+                          (await caches.match('/pos/index.html')) ||
+                          (await matchPrecache('index.html')) ||
+                          (await caches.match('/assets/ury/pos/index.html', { ignoreSearch: true })) ||
+                          (await caches.match('/index.html', { ignoreSearch: true }));
             return match || new Response('<!doctype html><html><head><meta http-equiv="refresh" content="3"></head><body>Loading POS...</body></html>', {
               headers: { 'Content-Type': 'text/html' }
             });
