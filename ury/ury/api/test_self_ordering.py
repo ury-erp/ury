@@ -578,7 +578,7 @@ class TestCreatePaymentRequest(unittest.TestCase):
 
         with self.assertRaises(frappe.ValidationError) as ctx:
             create_payment_request("session-token")
-        self.assertIn("not set up", str(ctx.exception))
+        self.assertIn("isn't set up", str(ctx.exception))
         self.assertNotIn("already created", str(ctx.exception))
 
 
