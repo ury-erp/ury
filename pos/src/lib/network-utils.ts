@@ -47,10 +47,13 @@ export function isNetworkError(error: any): boolean {
     msg.includes('networkerror') ||
     msg.includes('network disconnected') ||
     msg.includes('connection refused') ||
+    msg.includes('unreachable') ||
+    msg.includes('offline') ||
     msg.includes('net::err') ||
     msg.includes('timeout') ||
     code === 'econnaborted' ||
     code === 'etimedout' ||
+    code === 'econnrefused' ||
     name === 'TypeError'
   );
 }
