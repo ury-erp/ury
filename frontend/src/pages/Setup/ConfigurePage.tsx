@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Button } from '@ury/ui';
 import { WizardLayout } from '../../components/setup/WizardLayout';
 import { ConfigureSidebar } from '../../components/setup/ConfigureSidebar';
 import { SectionShell } from '../../components/setup/SectionShell';
@@ -18,27 +19,27 @@ import { ProgressModal } from '../../components/setup/ProgressModal';
 const SECTION_CONFIGS: Record<SectionId, { title: string; description: string }> = {
   branch: {
     title: 'Branch Details',
-    description: 'Set up your main branch name, invoice series prefixes, and tax details.',
+    description: 'Set up your main branch name, invoice numbering, and tax details.',
   },
   rooms: {
-    title: 'Dining Rooms',
-    description: 'Configure dining areas and room types for your restaurant.',
+    title: 'Rooms',
+    description: 'Add the seating areas in your restaurant — you\'ll set how many tables each one has.',
   },
   tables: {
-    title: 'Tables Setup',
-    description: 'Define table numbers, seating capacities, and room assignments.',
+    title: 'Tables',
+    description: 'Review and adjust the tables we generated for each room — rename, adjust seats, or add more.',
   },
   menu: {
-    title: 'Menu Configuration',
-    description: 'Add menu items manually or upload a menu file template.',
+    title: 'Menu',
+    description: 'Add a few items to get started — you can bulk-import or add hundreds more anytime later.',
   },
   payment: {
-    title: 'Modes of Payment',
-    description: 'Configure accepted payment methods at checkout.',
+    title: 'Payments',
+    description: 'How your customers will pay. Cash is added by default — add Card, UPI, or others your restaurant accepts.',
   },
   users: {
-    title: 'User Accounts',
-    description: 'Set up initial staff accounts and role assignments.',
+    title: 'Staff Accounts',
+    description: 'Add login accounts for your staff now, or skip this and add them later. We\'ve suggested a starting cashier account below.',
   },
 };
 
@@ -170,6 +171,16 @@ function ConfigurePageContent() {
       onNext={handleNext}
       nextLabel={isLastSection ? "Launch" : "Next"}
       isNextLoading={finishing}
+      secondaryAction={
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={handleFinish}
+          disabled={finishing}
+        >
+          Finish with defaults
+        </Button>
+      }
     >
       <div className="space-y-4 h-full">
         {error && (
@@ -187,13 +198,13 @@ function ConfigurePageContent() {
           </div>
         )}
 
-        {/* Two-Column Grid Layout */}
-        <div className="flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-[#E5E7EB] -my-8 -mx-8 h-full">
-          <div className="w-full md:w-64 shrink-0 p-6 md:py-8 md:pl-8 md:pr-6 h-full overflow-y-auto">
+        {/* Sidebar + content — the page scrolls naturally now, no fixed-height card to bleed into */}
+        <div className="flex flex-col md:flex-row gap-6 md:gap-8">
+          <div className="w-full md:w-64 shrink-0 md:sticky md:top-8 md:self-start">
             <ConfigureSidebar />
           </div>
 
-          <div className="flex-1 min-w-0 p-6 md:p-8 h-full overflow-y-auto">
+          <div className="flex-1 min-w-0">
             <SectionShell title={config.title} description={config.description}>
               {renderSection()}
             </SectionShell>

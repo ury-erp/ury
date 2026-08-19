@@ -3,9 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { WizardLayout } from '../../components/setup/WizardLayout';
 import { DynamicForm, DynamicFormHandle } from '../../components/setup/DynamicForm';
 import { InstallationTypeCard } from '../../components/setup/InstallationTypeCard';
-import { setupService } from '../../services/setup';
+import { setupService, SetupPayload } from '../../services/setup';
 import setupSchema from '../../data/forms/setup.json';
 import { PROGRESS_STEPS } from '../../components/setup/constants';
+import { Button } from '@ury/ui';
 
 const ProgressModal = lazy(() => import('../../components/setup/ProgressModal').then(module => ({ default: module.ProgressModal })));
 
@@ -46,6 +47,7 @@ export default function SetupPage() {
   const [activeIndex, setActiveIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [installationType, setInstallationType] = useState<'minimal' | 'advanced'>('minimal');
+  const [defaultsLoaded, setDefaultsLoaded] = useState(false);
 
   useEffect(() => {
     async function loadDefaults() {
@@ -94,6 +96,7 @@ export default function SetupPage() {
         const countryToUse = defaults.detected_country || 'India';
         formRef.current?.setFieldValue('country', countryToUse);
         await handleCountryChange(countryToUse);
+        setDefaultsLoaded(true);
       } catch (err) {
         console.error("Failed to load setup defaults", err);
       }
@@ -149,28 +152,23 @@ export default function SetupPage() {
     }
   }, [handleCountryChange, handleCompanyNameChange]);
 
-  const handleNext = async () => {
-    if (!formRef.current?.validate()) {
-      return;
-    }
-    
+  const runSubmit = async (payload: SetupPayload, targetInstallationType: 'minimal' | 'advanced') => {
     setSubmitting(true);
     setError(null);
     setActiveIndex(0);
-    
+
     const interval = setInterval(() => {
       setActiveIndex(i => Math.min(i + 1, PROGRESS_STEPS.length - 1));
     }, 3500);
-    
+
     try {
-      const payload = { ...formRef.current.getValues(), installation_type: installationType };
       await setupService.submitSetup(payload);
-      
+
       clearInterval(interval);
       setActiveIndex(PROGRESS_STEPS.length);
-      
+
       setTimeout(() => {
-        if (installationType === 'minimal') {
+        if (targetInstallationType === 'minimal') {
           navigate('/setup-wizard/1');
         } else {
           window.location.href = '/app';
@@ -183,12 +181,58 @@ export default function SetupPage() {
     }
   };
 
+  const handleNext = async () => {
+    if (!formRef.current?.validate()) {
+      return;
+    }
+
+    const payload = { ...formRef.current.getValues(), installation_type: installationType };
+    await runSubmit(payload, installationType);
+  };
+
+  const handleDemo = async () => {
+    if (!defaultsLoaded || submitting) {
+      return;
+    }
+
+    const values = formRef.current?.getValues();
+
+    if (!values?.company_name) {
+      formRef.current?.setFieldValue('company_name', 'My Restaurant');
+      formRef.current?.setFieldValue('company_abbr', 'MR');
+    } else if (!values.company_abbr) {
+      handleCompanyNameChange(values.company_name);
+    }
+
+    // Re-read values after any fallback fills above.
+    const payload: SetupPayload = {
+      ...(formRef.current?.getValues() as SetupPayload),
+      installation_type: 'minimal',
+    };
+    await runSubmit(payload, 'minimal');
+  };
+
   return (
-    <WizardLayout 
-      step={1} 
-      onNext={handleNext} 
+    <WizardLayout
+      step={1}
+      onNext={handleNext}
       nextLabel="Continue"
       isNextDisabled={submitting}
+      secondaryAction={
+        <div className="flex items-center gap-3">
+          <span className="hidden sm:inline text-xs text-muted-foreground">
+            Creates a working demo restaurant with sample data — you can change or delete any of it afterward.
+          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={handleDemo}
+            disabled={!defaultsLoaded || submitting}
+          >
+            Just show me a demo →
+          </Button>
+        </div>
+      }
     >
       <div className="space-y-8">
         <DynamicForm 
