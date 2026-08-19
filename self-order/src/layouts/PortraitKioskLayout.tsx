@@ -40,6 +40,7 @@ function PortraitKioskLayout({ initialContext }: LayoutProps) {
     submitCart,
     handleRequestBill,
     payOnline,
+    resetSession,
     cartItems,
     cartCount,
     cartTotal,
@@ -47,6 +48,12 @@ function PortraitKioskLayout({ initialContext }: LayoutProps) {
 
   const [selectedCategory, setSelectedCategory] = useState<string>(ALL_CATEGORY)
   const [cartExpanded, setCartExpanded] = useState(false)
+
+  function handleReset() {
+    if (window.confirm('Start a new order? Current cart will be cleared.')) {
+      resetSession()
+    }
+  }
 
   const categories = useMemo(() => {
     const seen = new Map<string, string>()
@@ -83,10 +90,16 @@ function PortraitKioskLayout({ initialContext }: LayoutProps) {
 
   return (
     <div className="flex min-h-screen flex-col pb-24">
-      <header className="sticky top-0 z-10 border-b bg-background/95 px-6 py-4 backdrop-blur">
+      <header className="sticky top-0 z-10 flex items-center justify-between border-b bg-background/95 px-6 py-4 backdrop-blur">
         <h1 className="text-2xl font-semibold">
           {context?.table ? `Table ${context.table}` : 'Order for Pickup'}
         </h1>
+        <button
+          onClick={handleReset}
+          className="rounded-md border px-3 py-2 text-sm font-medium text-muted-foreground"
+        >
+          New Order
+        </button>
       </header>
 
       {error && (
