@@ -36,8 +36,7 @@ export function ProgressModal({ visible, activeIndex, error, steps = PROGRESS_ST
         <div className="px-10 pb-8">
           <h2 className="text-2xl font-semibold text-foreground mb-1">Setting up your restaurant</h2>
           <p className="text-sm text-muted-foreground mb-6">
-            This usually takes about 30 seconds.<br/>
-            We're building everything from scratch.
+            Setting things up — this usually takes less than a minute.
           </p>
           
           <div className="flex flex-col mb-8">

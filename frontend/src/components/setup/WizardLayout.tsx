@@ -8,115 +8,102 @@ interface WizardLayoutProps {
   children: ReactNode;
   onNext?: () => void;
   onPrev?: () => void;
-  onLaunch?: () => void;
   nextLabel?: string;
   isNextDisabled?: boolean;
   isNextLoading?: boolean;
+  /** Rendered next to the primary action in the footer — e.g. a de-emphasized "Just show me a demo" link. */
+  secondaryAction?: ReactNode;
 }
 
-export function WizardLayout({ step, children, onNext, onPrev, nextLabel = 'Next', isNextDisabled, isNextLoading }: WizardLayoutProps) {
+const SHELL_WIDTH = 'max-w-[1400px] mx-auto px-6 md:px-10';
+
+export function WizardLayout({
+  step,
+  children,
+  onNext,
+  onPrev,
+  nextLabel = 'Next',
+  isNextDisabled,
+  isNextLoading,
+  secondaryAction,
+}: WizardLayoutProps) {
   const version = (window as any).frappe?.boot?.versions?.ury || 'v3.2.0';
 
   return (
-    <div className="min-h-screen flex flex-col items-center py-12 px-4 bg-[#F9FAFB] relative overflow-hidden">
-
-      <div className="relative z-10 w-full max-w-[820px] mb-8 flex flex-col items-center">
-        <img src={uryLogo} alt="URY Logo" className="h-16 w-auto object-contain mb-3" />
-        <p className="text-gray-500">Let's get your restaurant ready.</p>
-      </div>
-
-      <div className="relative z-10 w-full max-w-[820px] bg-white rounded-xl shadow-[0_4px_24px_rgba(0,0,0,0.08)] flex flex-col h-[700px] overflow-hidden">
-        
-        {/* Step Breadcrumb */}
-        <div className="px-10 py-5 border-b border-gray-100">
-          <div className="w-full flex items-center justify-between">
-            {/* Step 1 */}
-            <div className="flex items-center">
-              {step === 1 ? (
-                <div className="w-6 h-6 rounded-full bg-primary text-white font-bold text-xs flex items-center justify-center shadow-sm ring-4 ring-primary-50">
-                  1
-                </div>
-              ) : (
-                <div className="w-6 h-6 rounded-full bg-primary text-white font-bold text-xs flex items-center justify-center shadow-sm">
-                  <Check className="w-3.5 h-3.5 stroke-[3]" />
-                </div>
-              )}
-              <span className={`ml-2 text-sm ${step === 1 ? 'font-semibold text-gray-900' : 'font-medium text-gray-600'}`}>
-                Setup
-              </span>
-            </div>
-
-            {/* Connecting Line */}
-            <div className={`flex-1 mx-4 ${step === 2 ? 'h-0.5 bg-primary' : 'h-px bg-gray-200'}`} />
-
-            {/* Step 2 */}
-            <div className="flex items-center">
-              {step === 2 ? (
-                <div className="w-6 h-6 rounded-full bg-primary text-white font-bold text-xs flex items-center justify-center shadow-sm ring-4 ring-primary-50">
-                  2
-                </div>
-              ) : (
-                <div className="w-6 h-6 rounded-full bg-gray-100 text-gray-400 font-medium text-xs flex items-center justify-center">
-                  2
-                </div>
-              )}
-              <span className={`ml-2 text-sm ${step === 2 ? 'font-bold text-gray-900' : 'font-medium text-gray-400'}`}>
-                Configure
-              </span>
-            </div>
-
-            {/* Connecting Line 2-3 */}
-            <div className="flex-1 mx-4 h-px bg-gray-200" />
-            
-            {/* Step 3 */}
-            <div className="flex items-center">
-              <div className="w-6 h-6 rounded-full bg-gray-100 text-gray-400 font-medium text-xs flex items-center justify-center">
-                3
+    <div className="min-h-screen w-full flex flex-col bg-background">
+      {/* Header bar */}
+      <header className="w-full border-b border-border bg-card">
+        <div className={`${SHELL_WIDTH} py-5 flex flex-col gap-4`}>
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <img src={uryLogo} alt="URY Logo" className="h-9 w-auto object-contain" />
+              <div>
+                <p className="text-sm font-semibold text-foreground leading-tight">Let's get your restaurant ready</p>
+                <p className="text-xs text-muted-foreground leading-tight">
+                  Nothing here is final — you can change any of this anytime.
+                </p>
               </div>
-              <span className="ml-2 text-sm font-medium text-gray-400">
-                Launch
-              </span>
+            </div>
+
+            {/* 2-step breadcrumb (Setup, Configure) */}
+            <div className="hidden sm:flex items-center gap-2">
+              <BreadcrumbStep label="Setup" state={step === 1 ? 'active' : 'done'} />
+              <div className={`w-8 h-px ${step === 2 ? 'bg-primary' : 'bg-border'}`} />
+              <BreadcrumbStep label="Configure" state={step === 2 ? 'active' : 'upcoming'} />
             </div>
           </div>
         </div>
+      </header>
 
-        {/* Content */}
-        <div className="p-8 flex-1 overflow-y-auto">
-          {children}
-        </div>
+      {/* Content */}
+      <main className={`${SHELL_WIDTH} flex-1 w-full py-8`}>
+        <div className="rounded-xl border border-border bg-card p-6 md:p-8 shadow-sm">{children}</div>
+      </main>
 
-        {/* Footer Nav */}
-        <div className="px-8 py-4 bg-[#F9FAFB] border-t border-gray-100 flex items-center justify-between">
-          <div className="w-24">
+      {/* Footer nav bar */}
+      <footer className="w-full border-t border-border bg-card sticky bottom-0">
+        <div className={`${SHELL_WIDTH} py-4 flex items-center justify-between gap-4`}>
+          <div>
             {step === 2 && onPrev && (
               <Button variant="outline" onClick={onPrev}>
                 Previous
               </Button>
             )}
           </div>
-          
-          <div className="flex gap-1.5">
-            <div className={`w-2 h-2 rounded-full ${step === 1 ? 'bg-primary' : 'bg-gray-200'}`} />
-            <div className={`w-2 h-2 rounded-full ${step === 2 ? 'bg-primary' : 'bg-gray-200'}`} />
-            <div className="w-2 h-2 rounded-full bg-gray-200" />
-          </div>
 
-          <div className="min-w-[150px] flex justify-end gap-3">
-            <Button 
-              variant="default"
-              onClick={onNext} 
-              disabled={isNextDisabled || isNextLoading}
-              className="px-6"
-            >
+          <div className="flex items-center gap-4">
+            {secondaryAction}
+            <Button variant="default" onClick={onNext} disabled={isNextDisabled || isNextLoading} className="px-6">
               {isNextLoading ? 'Working...' : nextLabel}
             </Button>
           </div>
         </div>
-      </div>
+      </footer>
 
-      <div className="mt-8 text-sm text-gray-400">
-        URY · {version}
-      </div>
+      <div className="py-3 text-center text-xs text-muted-foreground">URY · {version}</div>
+    </div>
+  );
+}
+
+function BreadcrumbStep({ label, state }: { label: string; state: 'active' | 'done' | 'upcoming' }) {
+  return (
+    <div className="flex items-center gap-2">
+      {state === 'done' ? (
+        <div className="w-6 h-6 rounded-full bg-primary text-white font-bold text-xs flex items-center justify-center shadow-sm">
+          <Check className="w-3.5 h-3.5 stroke-[3]" />
+        </div>
+      ) : (
+        <div
+          className={`w-6 h-6 rounded-full font-bold text-xs flex items-center justify-center shadow-sm ${
+            state === 'active' ? 'bg-primary text-white ring-4 ring-primary/15' : 'bg-muted text-muted-foreground'
+          }`}
+        >
+          {label === 'Setup' ? 1 : 2}
+        </div>
+      )}
+      <span className={`text-sm ${state === 'active' ? 'font-semibold text-foreground' : 'font-medium text-muted-foreground'}`}>
+        {label}
+      </span>
     </div>
   );
 }
