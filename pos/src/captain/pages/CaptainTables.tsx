@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Square } from 'lucide-react';
 import { Button, Spinner, showToast } from '@ury/ui';
 import { useCaptainContext } from '../hooks/useCaptainContext';
-import { getTables, type Table } from '../../lib/table-api';
+import { getRooms, getTables, type Room, type Table } from '../../lib/table-api';
 import { getMergeGroupMembers, sortTablesByMergeGroups } from '../../lib/table-utils';
 import {
   getActiveTableOrders,
@@ -35,22 +35,54 @@ export default function CaptainTables() {
   const canAccessOtherCaptainsTables = Boolean(capabilities?.canAccessOtherCaptainsTables);
 
   const [selectedRoom, setSelectedRoom] = useState<string | null>(null);
+  const [branchRooms, setBranchRooms] = useState<Room[]>([]);
+  const [roomsLoading, setRoomsLoading] = useState(false);
   const [tables, setTables] = useState<Table[]>([]);
   const [activeOrders, setActiveOrders] = useState<Map<string, ActiveTableOrder>>(new Map());
   const [ownerNames, setOwnerNames] = useState<Map<string, string>>(new Map());
   const [tablesLoading, setTablesLoading] = useState(false);
   const [tablesError, setTablesError] = useState<string | null>(null);
 
-  // Default to the Captain's first accessible room. `rooms` from
-  // `get_captain_context()` is already scoped to the Captain's assigned
-  // room(s) if any, else all branch rooms accessible to them (see
-  // `getRoom()` in `ury/ury_pos/api.py`, backing `get_captain_context`) —
-  // no extra "assigned vs. all" logic is needed client-side.
+  // `get_captain_context()`'s `rooms` field (from `getRoom()` in
+  // `ury/ury_pos/api.py`) reflects the Captain's own room *assignment*, not
+  // "which rooms exist" — a Captain assigned at the branch level (not a
+  // specific room) gets back a row with `name: null`, which is not a usable
+  // room selector value. The Cashier `Table.tsx` doesn't use `getRoom()` for
+  // its room selector at all; it lists ALL branch rooms via `getRooms(branch)`
+  // and lets the user pick. Match that pattern here — every table needs to be
+  // reachable regardless of whether this Captain has a narrow room
+  // assignment, since room-level restriction (if any) is enforced
+  // server-side (captain_transfer's room-match, table_transfer's branch
+  // check), not by hiding rooms from the picker.
   useEffect(() => {
-    if (!selectedRoom && rooms.length > 0) {
-      setSelectedRoom(rooms[0].name);
-    }
-  }, [rooms, selectedRoom]);
+    if (!branch) return;
+    let cancelled = false;
+    setRoomsLoading(true);
+    getRooms(branch)
+      .then((fetched) => {
+        if (cancelled) return;
+        setBranchRooms(fetched);
+      })
+      .catch(() => {
+        if (!cancelled) setBranchRooms([]);
+      })
+      .finally(() => {
+        if (!cancelled) setRoomsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [branch]);
+
+  // Default the selected tab to the Captain's own assigned room if they have
+  // one (a real, non-null room name from get_captain_context), else the
+  // first branch room.
+  useEffect(() => {
+    if (selectedRoom || branchRooms.length === 0) return;
+    const assignedRoomName = rooms.find((r) => r.name)?.name;
+    const defaultRoom = branchRooms.find((r) => r.name === assignedRoomName) ?? branchRooms[0];
+    setSelectedRoom(defaultRoom.name);
+  }, [branchRooms, rooms, selectedRoom]);
 
   const loadTables = useCallback(async (roomName: string) => {
     setTablesLoading(true);
@@ -129,7 +161,7 @@ export default function CaptainTables() {
     showToast.error(ownerName ? `Assigned to ${ownerName}` : 'This table is occupied');
   };
 
-  const isLoading = contextLoading;
+  const isLoading = contextLoading || (roomsLoading && branchRooms.length === 0);
   const error = contextError;
 
   if (isLoading) {
@@ -162,9 +194,9 @@ export default function CaptainTables() {
           </Button>
         </div>
 
-        {rooms.length > 0 && (
+        {branchRooms.length > 0 && (
           <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
-            {rooms.map((room) => (
+            {branchRooms.map((room) => (
               <Button
                 key={room.name}
                 variant="tab"
@@ -181,7 +213,7 @@ export default function CaptainTables() {
       </div>
 
       <div className="flex-1 p-3">
-        {rooms.length === 0 ? (
+        {branchRooms.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 py-16 text-gray-500">
             <AlertTriangle className="h-8 w-8" />
             <p className="text-sm">No rooms available for your account.</p>
