@@ -88,9 +88,10 @@ export const createConfigSlice: StateCreator<
       if (cached && !forceRefresh) {
         const profile = JSON.parse(cached);
         set({ posProfile: profile });
-        // Extract and set allowed roles from the profile
-        const allowedRoles = profile.role_allowed_for_billing?.map((role: RolePermission) => role.role) || [];
-        console.log("allowedRoles", allowedRoles);
+        // Allowed to enter the app: any role this POS Profile references
+        // anywhere (billing, transfer, table-order-restricted) — see
+        // deriveAllowedRoles for why this isn't billing-role-only.
+        const allowedRoles = deriveAllowedRoles(profile);
         get().setAllowedRoles(allowedRoles);
         set({ isLoading: false });
         return;
@@ -98,13 +99,13 @@ export const createConfigSlice: StateCreator<
 
       // If not in cache or forcing refresh, fetch from API
       const profile = await getCombinedPosProfile();
-      
+
       // Cache the profile
       sessionStorage.setItem('posProfile', JSON.stringify(profile));
       set({ posProfile: profile });
 
-      // Extract and set allowed roles from the profile
-      const allowedRoles = profile.role_allowed_for_billing?.map((role: RolePermission) => role.role) || [];
+      // Allowed to enter the app: see deriveAllowedRoles.
+      const allowedRoles = deriveAllowedRoles(profile);
       get().setAllowedRoles(allowedRoles);
       set({ isLoading: false });
     } catch (error) {
