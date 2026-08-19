@@ -240,6 +240,7 @@ class TestGetTableOrderContext(FrappeTestCase):
         pos_profile,
         user_branch="Test Branch",
         user_roles=None,
+        assigned_room="Main Hall",
     ):
         def get_doc_side_effect(doctype, name=None):
             if doctype == "URY Table":
@@ -275,6 +276,17 @@ class TestGetTableOrderContext(FrappeTestCase):
         ), patch(
             "ury.ury.doctype.ury_order.ury_order.frappe.session",
             SimpleNamespace(user=session_user),
+        ), patch(
+            # get_table_order_context's room-scoping check (added to match
+            # _enforce_order_access's existing room gate) calls getRoom()
+            # for real if unmocked — defaults to the same room as
+            # _table_doc()'s default so is-mine/own-order tests aren't
+            # incidentally denied by a room mismatch they aren't testing.
+            # Pass assigned_room=None to simulate a branch-level (not
+            # room-specific) assignment, or a different room name to
+            # exercise the room-mismatch denial path.
+            "ury.ury.doctype.ury_order.ury_order.getRoom",
+            return_value=[{"name": assigned_room, "branch": user_branch}],
         ):
             return get_table_order_context("T1")
 
@@ -681,6 +693,11 @@ class TestSyncOrderHardening(FrappeTestCase):
         mock_invoice.invoice_printed = 0
         mock_invoice.items = [existing_item]
         mock_invoice.waiter = "captain@example.com"
+        # Matches last_modified_time below exactly (same string, both
+        # parsed identically) so the pre-existing stale-write guard
+        # (last_invoice + last_modified_time branch, not Phase-3 code)
+        # doesn't short-circuit before reaching the item-reduction check.
+        mock_invoice.modified = "2024-01-01 10:00:00.123456"
         mock_get_order_invoice.return_value = mock_invoice
 
         mock_pos_profile = _make_pos_profile(remove_items=0)
@@ -700,7 +717,16 @@ class TestSyncOrderHardening(FrappeTestCase):
                     mode_of_payment="Cash",
                     customer="Test Customer",
                     no_of_pax=2,
-                    last_invoice=None,
+                    # Must match mock_invoice.name/.modified — without a
+                    # matching last_invoice + last_modified_time pair,
+                    # sync_order's pre-existing (not Phase-3-added)
+                    # stale-write/"table occupied" guards return
+                    # {"status": "Failure"} before ever reaching the
+                    # item-reduction check this test is targeting, silently
+                    # short-circuiting this test regardless of the
+                    # reduction logic under test.
+                    last_invoice="POS-INV-001",
+                    last_modified_time="2024-01-01 10:00:00.123456",
                     waiter="fake_waiter",
                     pos_profile="Test Profile",
                 )
