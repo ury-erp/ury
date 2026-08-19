@@ -24,6 +24,7 @@ import ProductDialog from '../../components/ProductDialog';
 import CommentDialog from '../../components/CommentDialog';
 import TableTransferDialog from '../../components/TableTransferDialog';
 import CaptainTransferDialog from '../../components/CaptainTransferDialog';
+import { CustomerSelect } from '../../components/CustomerSelect';
 
 type Mode = 'menu' | 'order';
 
@@ -70,6 +71,7 @@ export default function CaptainOrder() {
     setNoOfPax,
     lastModifiedTime,
     selectedRoom,
+    selectedCustomer,
     clearTableOrder,
     isOrderInteractionDisabled,
   } = usePOSStore();
@@ -185,6 +187,14 @@ export default function CaptainOrder() {
         showToast.error('Add at least one item before sending the order.');
         return;
       }
+      // sync_order requires `customer` as a hard backend parameter (found via
+      // live E2E test — a 500 "missing 1 required positional argument:
+      // 'customer'" — not just a Cashier-UI convention). Match OrderPanel's
+      // exact validate-before-submit gate rather than only omitting the field.
+      if (!selectedCustomer?.name) {
+        showToast.error('Please select a customer before sending the order.');
+        return;
+      }
 
       setIsSubmitting(true);
 
@@ -201,6 +211,7 @@ export default function CaptainOrder() {
         order_type: DINE_IN,
         table,
         room: selectedRoom || undefined,
+        customer: selectedCustomer.name,
         cashier: posProfile.cashier,
         owner: posProfile.owner,
         mode_of_payment: paymentModes[0],
@@ -355,6 +366,13 @@ export default function CaptainOrder() {
   // Render order list content — shared between mobile toggle view and tablet side pane
   const OrderListContent = () => (
     <div className="flex-1 overflow-y-auto p-3 space-y-5 pb-32">
+      {canModify && (
+        // sync_order requires customer server-side (§handleSend) — surfaced
+        // here so a Captain can satisfy it before hitting the send-time
+        // validation error. Reused as-is from the Cashier OrderPanel.
+        <CustomerSelect disabled={isInteractionDisabled} />
+      )}
+
       {!canModify && (
         <div className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-3">
           <span className="text-sm font-medium text-gray-700">Pax</span>
