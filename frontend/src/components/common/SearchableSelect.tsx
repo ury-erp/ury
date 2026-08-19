@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { Input } from '@ury/ui';
 
 export interface Option {
@@ -37,15 +38,28 @@ export function SearchableSelect({
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [portalStyle, setPortalStyle] = useState<{
+    top: number;
+    left: number;
+    width: number;
+    maxHeight?: number;
+  }>({
+    top: 0,
+    left: 0,
+    width: 0,
+  });
+
   const containerRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Find label of selected value
   const selectedOption = useMemo(() => {
     if (!value) return null;
     const valLower = value.toLowerCase();
-    return options.find((opt) => 
-      (opt.value && opt.value.toLowerCase() === valLower) || 
-      (opt.label && opt.label.toLowerCase() === valLower)
+    return options.find(
+      (opt) =>
+        (opt.value && opt.value.toLowerCase() === valLower) ||
+        (opt.label && opt.label.toLowerCase() === valLower)
     );
   }, [options, value]);
 
@@ -67,15 +81,50 @@ export function SearchableSelect({
     );
   }, [options, searchTerm, isTyping]);
 
+  // Position dropdown panel directly below trigger (opening DOWNWARD) with compact maxHeight
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const updatePosition = () => {
+      if (!containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const gap = 6;
+      const boundaryMargin = 16;
+      const spaceBelow = window.innerHeight - rect.bottom - gap - boundaryMargin;
+      const compactMaxHeight = 260; // Compact max height showing ~8 options cleanly
+
+      setPortalStyle({
+        top: rect.bottom + gap,
+        left: rect.left,
+        width: rect.width,
+        maxHeight: Math.min(compactMaxHeight, Math.max(120, spaceBelow)),
+      });
+    };
+
+    updatePosition();
+
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [isOpen]);
+
   // Close dropdown on click outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(target) &&
+        dropdownRef.current &&
+        !dropdownRef.current.contains(target)
+      ) {
         setIsOpen(false);
         setIsTyping(false);
         if (strict) {
-          // Revert any unmatched typed text back to the last valid
-          // selection rather than leaving an invalid string displayed.
           setSearchTerm(selectedOption ? selectedOption.label : '');
         } else {
           setSearchTerm(selectedOption ? selectedOption.label : value || '');
@@ -103,9 +152,6 @@ export function SearchableSelect({
     } else if (!strict) {
       onChange(id, val);
     }
-    // strict mode: leave the typed text visible in `searchTerm` (state
-    // above) without propagating it via onChange until a real option is
-    // selected — the last valid committed value stays in form state.
   };
 
   const handleSelectOption = (opt: Option) => {
@@ -120,6 +166,57 @@ export function SearchableSelect({
     setIsOpen(true);
   };
 
+  const dropdownContent = isOpen ? (
+    <div
+      ref={dropdownRef}
+      style={{
+        position: 'fixed',
+        top: `${portalStyle.top}px`,
+        left: `${portalStyle.left}px`,
+        width: `${portalStyle.width}px`,
+        maxHeight: portalStyle.maxHeight ? `${portalStyle.maxHeight}px` : undefined,
+        scrollbarWidth: 'none',
+        msOverflowStyle: 'none',
+      }}
+      className="z-[9999] bg-white border border-gray-200 rounded-lg shadow-xl overflow-y-auto p-1 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-500 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+    >
+      {filteredOptions.length > 0 ? (
+        filteredOptions.map((opt) => {
+          const isActionOption =
+            opt.value === 'CREATE_NEW_ITEM' ||
+            opt.value === 'CREATE_NEW_COURSE' ||
+            opt.value?.startsWith('CREATE_NEW_');
+          const isSelected =
+            value !== undefined &&
+            value !== null &&
+            !isActionOption &&
+            (opt.value === value ||
+              opt.label === value ||
+              (opt.value !== '' && opt.value && value !== '' && value && opt.value.toLowerCase() === value.toLowerCase()) ||
+              (opt.label !== '' && opt.label && value !== '' && value && opt.label.toLowerCase() === value.toLowerCase()));
+
+          return (
+            <div
+              key={opt.value}
+              onClick={() => handleSelectOption(opt)}
+              className={`px-4 py-2 text-sm rounded-md cursor-pointer select-none transition-colors ${
+                isSelected
+                  ? 'bg-blue-50 text-blue-700 font-normal'
+                  : isActionOption
+                  ? 'text-blue-600 font-medium hover:bg-blue-50/50 border-t border-gray-100 mt-1 pt-2'
+                  : 'text-gray-800 hover:bg-gray-50'
+              }`}
+            >
+              {opt.label}
+            </div>
+          );
+        })
+      ) : (
+        <div className="px-4 py-2 text-sm text-gray-400">No matching options</div>
+      )}
+    </div>
+  ) : null;
+
   return (
     <div ref={containerRef} className="relative w-full">
       <div className="relative flex items-center">
@@ -133,52 +230,25 @@ export function SearchableSelect({
           autoComplete="off"
           className="w-full pr-9 cursor-text"
         />
-        <div 
+        <div
           onClick={() => {
             setIsOpen((prev) => !prev);
             if (!isOpen) setIsTyping(false);
-          }} 
+          }}
           className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 cursor-pointer p-1 hover:text-gray-600 transition-colors"
         >
-          <svg className={`w-4 h-4 transform transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg
+            className={`w-4 h-4 transform transition-transform ${isOpen ? 'rotate-180' : ''}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
           </svg>
         </div>
       </div>
 
-      {isOpen && (
-        <div className="absolute top-full left-0 right-0 mt-2 z-50 bg-white border border-gray-200 rounded-lg shadow-lg max-h-80 overflow-y-auto p-1 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-500">
-          {filteredOptions.length > 0 ? (
-            filteredOptions.map((opt) => {
-              const isActionOption = opt.value === 'CREATE_NEW_ITEM' || opt.value === 'CREATE_NEW_COURSE' || opt.value?.startsWith('CREATE_NEW_');
-              const isSelected = value !== undefined && value !== null && !isActionOption && (
-                opt.value === value || 
-                opt.label === value || 
-                (opt.value !== '' && opt.value && value !== '' && value && opt.value.toLowerCase() === value.toLowerCase()) || 
-                (opt.label !== '' && opt.label && value !== '' && value && opt.label.toLowerCase() === value.toLowerCase())
-              );
-
-              return (
-                <div
-                  key={opt.value}
-                  onClick={() => handleSelectOption(opt)}
-                  className={`px-4 py-2 text-sm rounded-md cursor-pointer select-none transition-colors ${
-                    isSelected
-                      ? 'bg-blue-50 text-blue-700 font-normal'
-                      : isActionOption
-                      ? 'text-blue-600 font-medium hover:bg-blue-50/50 border-t border-gray-100 mt-1 pt-2'
-                      : 'text-gray-800 hover:bg-gray-50'
-                  }`}
-                >
-                  {opt.label}
-                </div>
-              );
-            })
-          ) : (
-            <div className="px-4 py-2 text-sm text-gray-400">No matching options</div>
-          )}
-        </div>
-      )}
+      {typeof document !== 'undefined' && createPortal(dropdownContent, document.body)}
     </div>
   );
 }
