@@ -244,6 +244,9 @@ export const BranchPage: React.FC = () => {
         });
       }
       showToast.success('Settings saved');
+      // Refresh local state so its `modified` timestamp is current — otherwise a
+      // second save in a row fails with TimestampMismatchError (stale doc snapshot).
+      await fetchDetails();
     } catch (err: any) {
       showToast.error(err.message || 'Failed to update branch settings');
     } finally {
