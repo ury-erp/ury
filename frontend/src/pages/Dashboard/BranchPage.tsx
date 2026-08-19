@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
 import { Save, Plus, X, Eye, Edit2, ArrowLeft, Building2 } from 'lucide-react';
-import { Card, Button, Input, Select, Spinner, showToast } from '@ury/ui';
+import { Card, Button, Input, Spinner, showToast } from '@ury/ui';
 import { Switch } from '../../components/ui/switch';
 import SideDrawer from '../../components/layout/SideDrawer';
 import { call, getLoggedUser } from '@ury/core';
@@ -775,10 +775,16 @@ export const BranchPage: React.FC = () => {
           </div>
           <div>
             <label className="block font-semibold text-gray-700 mb-1.5">Company <span className="text-red-500">*</span></label>
-            <Select required value={addForm.company} onChange={e => setAddForm({...addForm, company: e.target.value})}>
-              <option value="">Select Company</option>
-              {companies.map((c: any) => <option key={c.name} value={c.name}>{c.name}</option>)}
-            </Select>
+            <SearchableSelect
+              id="add_branch_company"
+              value={addForm.company}
+              onChange={(_, val) => setAddForm({...addForm, company: val})}
+              options={[
+                { value: '', label: 'Select Company' },
+                ...companies.map((c: any) => ({ value: c.name, label: c.name }))
+              ]}
+              placeholder="Select Company"
+            />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>

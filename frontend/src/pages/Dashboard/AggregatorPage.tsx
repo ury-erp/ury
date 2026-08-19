@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
-import { Plus, Store, Edit2, X } from 'lucide-react';
-import { Card, Button, Input, Select, Spinner, showToast } from '@ury/ui';
+import { Plus, Store, Edit2 } from 'lucide-react';
+import { Card, Button, Input, Spinner, showToast, Dialog, DialogContent, DialogHeader, DialogTitle } from '@ury/ui';
 import { call } from '@ury/core';
+import { SearchableSelect } from '../../components/common/SearchableSelect';
 
 interface AggregatorSetting {
   name?: string;
@@ -301,120 +302,92 @@ export const AggregatorPage: React.FC = () => {
       )}
 
       {/* Add Modal */}
-      {isAddOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <Card className="w-full max-w-md bg-white rounded-lg shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-gray-900">Add Aggregator</h2>
-              <button
-                onClick={() => setIsAddOpen(false)}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
+      <Dialog open={isAddOpen} onOpenChange={(open) => !open && setIsAddOpen(false)}>
+        <DialogContent className="max-w-md bg-white p-6 rounded-xl border border-gray-200 shadow-xl" onClose={() => setIsAddOpen(false)}>
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold text-gray-900">Add Aggregator</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleCreateAggregator} className="space-y-4 text-sm mt-4">
+            <div>
+              <label className="block font-semibold text-gray-700 mb-1">Aggregator Name <span className="text-red-500">*</span></label>
+              <Input
+                placeholder="e.g. Swiggy, Zomato"
+                value={newAggregatorName}
+                onChange={(e) => setNewAggregatorName(e.target.value)}
+                required
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                This will automatically create a Customer, Price List, and Mode of Payment with this name.
+              </p>
             </div>
-            <form onSubmit={handleCreateAggregator} className="p-6 space-y-4 text-sm">
-              <div>
-                <label className="block font-semibold text-gray-700 mb-1">Aggregator Name <span className="text-red-500">*</span></label>
-                <Input
-                  placeholder="e.g. Swiggy, Zomato"
-                  value={newAggregatorName}
-                  onChange={(e) => setNewAggregatorName(e.target.value)}
-                  required
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  This will automatically create a Customer, Price List, and Mode of Payment with this name.
-                </p>
-              </div>
-              
-              <div className="pt-6 flex justify-end gap-2 border-t mt-4 border-gray-100">
-                <Button type="button" variant="outline" onClick={() => setIsAddOpen(false)}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={saving} className="bg-primary hover:bg-primary/90 text-white">
-                  Create Aggregator
-                </Button>
-              </div>
-            </form>
-          </Card>
-        </div>
-      )}
+            
+            <div className="pt-6 flex justify-end gap-2 border-t mt-4 border-gray-100">
+              <Button type="button" variant="outline" onClick={() => setIsAddOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={saving} className="bg-primary hover:bg-primary/90 text-white w-24 h-9">
+                Save
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Modal */}
-      {editingIndex !== null && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <Card className="w-full max-w-md bg-white rounded-lg shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-gray-900">Edit Aggregator</h2>
-              <button
-                onClick={() => setEditingIndex(null)}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
+      <Dialog open={editingIndex !== null} onOpenChange={(open) => !open && setEditingIndex(null)}>
+        <DialogContent className="max-w-md bg-white p-6 rounded-xl border border-gray-200 shadow-xl" onClose={() => setEditingIndex(null)}>
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold text-gray-900">Edit Aggregator</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSaveEdit} className="space-y-4 text-sm mt-4">
+            <div>
+              <label className="block font-semibold text-gray-700 mb-1">Aggregator Name <span className="text-red-500">*</span></label>
+              <Input
+                value={editForm.aggregator}
+                onChange={(e) => setEditForm(p => ({ ...p, aggregator: e.target.value }))}
+                required
+              />
             </div>
-            <form onSubmit={handleSaveEdit} className="p-6 space-y-4 text-sm">
-              <div>
-                <label className="block font-semibold text-gray-700 mb-1">Aggregator Name <span className="text-red-500">*</span></label>
-                <Input
-                  value={editForm.aggregator}
-                  onChange={(e) => setEditForm(p => ({ ...p, aggregator: e.target.value }))}
-                  required
-                />
-              </div>
 
-              <div>
-                <label className="block font-semibold text-gray-700 mb-1">Price List</label>
-                {priceLists.length > 0 ? (
-                  <Select
-                    value={editForm.price_list}
-                    onChange={(e) => setEditForm(p => ({ ...p, price_list: e.target.value }))}
-                  >
-                    <option value="">Select Price List</option>
-                    {priceLists.map(pl => (
-                      <option key={pl.name} value={pl.name}>{pl.name}</option>
-                    ))}
-                  </Select>
-                ) : (
-                  <Input
-                    value={editForm.price_list}
-                    onChange={(e) => setEditForm(p => ({ ...p, price_list: e.target.value }))}
-                  />
-                )}
-              </div>
+            <div>
+              <label className="block font-semibold text-gray-700 mb-1">Price List</label>
+              <SearchableSelect
+                id="edit_price_list"
+                value={editForm.price_list}
+                onChange={(_, val) => setEditForm(p => ({ ...p, price_list: val }))}
+                options={[
+                  { value: '', label: 'Select Price List' },
+                  ...priceLists.map(pl => ({ value: pl.name, label: pl.name }))
+                ]}
+                placeholder="Select Price List"
+              />
+            </div>
 
-              <div>
-                <label className="block font-semibold text-gray-700 mb-1">Mode of Payment</label>
-                {modesOfPayment.length > 0 ? (
-                  <Select
-                    value={editForm.mode_of_payment}
-                    onChange={(e) => setEditForm(p => ({ ...p, mode_of_payment: e.target.value }))}
-                  >
-                    <option value="">Select Mode of Payment</option>
-                    {modesOfPayment.map(mop => (
-                      <option key={mop.name} value={mop.name}>{mop.name}</option>
-                    ))}
-                  </Select>
-                ) : (
-                  <Input
-                    value={editForm.mode_of_payment}
-                    onChange={(e) => setEditForm(p => ({ ...p, mode_of_payment: e.target.value }))}
-                  />
-                )}
-              </div>
-              
-              <div className="pt-6 flex justify-end gap-2 border-t mt-4 border-gray-100">
-                <Button type="button" variant="outline" onClick={() => setEditingIndex(null)}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={saving} className="bg-primary hover:bg-primary/90 text-white">
-                  Save
-                </Button>
-              </div>
-            </form>
-          </Card>
-        </div>
-      )}
+            <div>
+              <label className="block font-semibold text-gray-700 mb-1">Mode of Payment</label>
+              <SearchableSelect
+                id="edit_mode_of_payment"
+                value={editForm.mode_of_payment}
+                onChange={(_, val) => setEditForm(p => ({ ...p, mode_of_payment: val }))}
+                options={[
+                  { value: '', label: 'Select Mode of Payment' },
+                  ...modesOfPayment.map(mop => ({ value: mop.name, label: mop.name }))
+                ]}
+                placeholder="Select Mode of Payment"
+              />
+            </div>
+            
+            <div className="pt-6 flex justify-end gap-2 border-t mt-4 border-gray-100">
+              <Button type="button" variant="outline" onClick={() => setEditingIndex(null)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={saving} className="bg-primary hover:bg-primary/90 text-white w-24 h-9">
+                Save
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

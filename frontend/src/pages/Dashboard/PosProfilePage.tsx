@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
 import { Printer, Shield, Settings2, Plus, X, ArrowLeft, Edit2, Eye, Layers, Save } from 'lucide-react';
-import { Card, Button, Badge, Input, Select, Spinner, showToast } from '@ury/ui';
+import { Card, Button, Badge, Input, Spinner, showToast } from '@ury/ui';
 import { Switch } from '../../components/ui/switch';
 import { call } from '@ury/core';
 import SideDrawer from '../../components/layout/SideDrawer';
+import { SearchableSelect } from '../../components/common/SearchableSelect';
 
 interface PosProfileRecord {
   name: string;
@@ -376,25 +377,31 @@ export const PosProfilePage: React.FC = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
                       <label className="block font-semibold text-gray-700 mb-1.5">Company</label>
-                      <Select
+                      <SearchableSelect
+                        id="profile_company"
                         disabled={!isEditMode}
                         value={profileForm.company || ''}
-                        onChange={e => setProfileForm(p => ({ ...p, company: e.target.value }))}
-                      >
-                        <option value="">Select Company</option>
-                        {options.companies.map((c: any) => <option key={c.name} value={c.name}>{c.name}</option>)}
-                      </Select>
+                        onChange={(_, val) => setProfileForm(p => ({ ...p, company: val }))}
+                        options={[
+                          { value: '', label: 'Select Company' },
+                          ...options.companies.map((c: any) => ({ value: c.name, label: c.name }))
+                        ]}
+                        placeholder="Select Company"
+                      />
                     </div>
                     <div>
                       <label className="block font-semibold text-gray-700 mb-1.5">Warehouse</label>
-                      <Select
+                      <SearchableSelect
+                        id="profile_warehouse"
                         disabled={!isEditMode}
                         value={profileForm.warehouse || ''}
-                        onChange={e => setProfileForm(p => ({ ...p, warehouse: e.target.value }))}
-                      >
-                        <option value="">Select Warehouse</option>
-                        {options.warehouses.map((w: any) => <option key={w.name} value={w.name}>{w.name}</option>)}
-                      </Select>
+                        onChange={(_, val) => setProfileForm(p => ({ ...p, warehouse: val }))}
+                        options={[
+                          { value: '', label: 'Select Warehouse' },
+                          ...options.warehouses.map((w: any) => ({ value: w.name, label: w.name }))
+                        ]}
+                        placeholder="Select Warehouse"
+                      />
                     </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -523,19 +530,23 @@ export const PosProfilePage: React.FC = () => {
                   <div className="space-y-2 mb-3">
                     {(profileForm.applicable_for_users || []).map((row: any, idx: number) => (
                       <div key={idx} className="flex gap-2 items-center">
-                        <Select
-                          className="flex-1"
-                          disabled={!isEditMode}
-                          value={row.user || ''}
-                          onChange={e => {
-                            const newRows = [...(profileForm.applicable_for_users || [])];
-                            newRows[idx].user = e.target.value;
-                            setProfileForm({...profileForm, applicable_for_users: newRows});
-                          }}
-                        >
-                          <option value="">Select User</option>
-                          {options.users.map((u: any) => <option key={u.name} value={u.name}>{u.full_name || u.name}</option>)}
-                        </Select>
+                        <div className="flex-1">
+                          <SearchableSelect
+                            id={`user_${idx}`}
+                            disabled={!isEditMode}
+                            value={row.user || ''}
+                            onChange={(_, val) => {
+                              const newRows = [...(profileForm.applicable_for_users || [])];
+                              newRows[idx].user = val;
+                              setProfileForm({...profileForm, applicable_for_users: newRows});
+                            }}
+                            options={[
+                              { value: '', label: 'Select User' },
+                              ...options.users.map((u: any) => ({ value: u.name, label: u.full_name || u.name }))
+                            ]}
+                            placeholder="Select User"
+                          />
+                        </div>
                         <div className="flex items-center gap-1.5 text-xs text-gray-600">
                           <Switch
                             disabled={!isEditMode}
@@ -581,19 +592,23 @@ export const PosProfilePage: React.FC = () => {
                   <div className="space-y-2 mb-3">
                     {(profileForm.payments || []).map((row: any, idx: number) => (
                       <div key={idx} className="flex gap-2 items-center">
-                        <Select
-                          className="flex-1"
-                          disabled={!isEditMode}
-                          value={row.mode_of_payment || ''}
-                          onChange={e => {
-                            const newRows = [...(profileForm.payments || [])];
-                            newRows[idx].mode_of_payment = e.target.value;
-                            setProfileForm({...profileForm, payments: newRows});
-                          }}
-                        >
-                          <option value="">Select Payment Mode</option>
-                          {options.payments.map((p: any) => <option key={p.name} value={p.name}>{p.name}</option>)}
-                        </Select>
+                        <div className="flex-1">
+                          <SearchableSelect
+                            id={`payment_${idx}`}
+                            disabled={!isEditMode}
+                            value={row.mode_of_payment || ''}
+                            onChange={(_, val) => {
+                              const newRows = [...(profileForm.payments || [])];
+                              newRows[idx].mode_of_payment = val;
+                              setProfileForm({...profileForm, payments: newRows});
+                            }}
+                            options={[
+                              { value: '', label: 'Select Payment Mode' },
+                              ...options.payments.map((p: any) => ({ value: p.name, label: p.name }))
+                            ]}
+                            placeholder="Select Payment Mode"
+                          />
+                        </div>
                         <div className="flex items-center gap-1.5 text-xs text-gray-600">
                           <Switch
                             disabled={!isEditMode}
@@ -743,18 +758,30 @@ export const PosProfilePage: React.FC = () => {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block font-semibold text-gray-700 mb-1.5">Company <span className="text-red-500">*</span></label>
-              <Select required value={addForm.company} onChange={e => setAddForm({...addForm, company: e.target.value})}>
-                <option value="">Select Company</option>
-                {options.companies.map((c: any) => <option key={c.name} value={c.name}>{c.name}</option>)}
-              </Select>
+              <SearchableSelect
+                id="add_profile_company"
+                value={addForm.company}
+                onChange={(_, val) => setAddForm({...addForm, company: val})}
+                options={[
+                  { value: '', label: 'Select Company' },
+                  ...options.companies.map((c: any) => ({ value: c.name, label: c.name }))
+                ]}
+                placeholder="Select Company"
+              />
             </div>
             <div>
               <label className="block font-semibold text-gray-700 mb-1.5">Branch</label>
               {activeBranchId === 'all' ? (
-                <Select value={addForm.branch} onChange={e => setAddForm({...addForm, branch: e.target.value})}>
-                  <option value="">Select Branch</option>
-                  {branches.map((b: any) => <option key={b.name} value={b.name}>{b.name}</option>)}
-                </Select>
+                <SearchableSelect
+                  id="add_profile_branch"
+                  value={addForm.branch}
+                  onChange={(_, val) => setAddForm({...addForm, branch: val})}
+                  options={[
+                    { value: '', label: 'Select Branch' },
+                    ...branches.map((b: any) => ({ value: b.name, label: b.name }))
+                  ]}
+                  placeholder="Select Branch"
+                />
               ) : (
                 <Input value={addForm.branch} disabled />
               )}
@@ -763,10 +790,16 @@ export const PosProfilePage: React.FC = () => {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block font-semibold text-gray-700 mb-1.5">Warehouse</label>
-              <Select value={addForm.warehouse} onChange={e => setAddForm({...addForm, warehouse: e.target.value})}>
-                <option value="">Select Warehouse</option>
-                {options.warehouses.map((w: any) => <option key={w.name} value={w.name}>{w.name}</option>)}
-              </Select>
+              <SearchableSelect
+                id="add_profile_warehouse"
+                value={addForm.warehouse}
+                onChange={(_, val) => setAddForm({...addForm, warehouse: val})}
+                options={[
+                  { value: '', label: 'Select Warehouse' },
+                  ...options.warehouses.map((w: any) => ({ value: w.name, label: w.name }))
+                ]}
+                placeholder="Select Warehouse"
+              />
             </div>
             <div>
               <label className="block font-semibold text-gray-700 mb-1.5">KOT Naming Series</label>
@@ -791,14 +824,22 @@ export const PosProfilePage: React.FC = () => {
             <div className="space-y-2 mb-3">
               {addForm.applicable_for_users.map((row, idx) => (
                 <div key={idx} className="flex gap-2 items-center">
-                  <Select className="flex-1" value={row.user} onChange={e => {
-                    const newRows = [...addForm.applicable_for_users];
-                    newRows[idx].user = e.target.value;
-                    setAddForm({...addForm, applicable_for_users: newRows});
-                  }}>
-                    <option value="">Select User</option>
-                    {options.users.map((u: any) => <option key={u.name} value={u.name}>{u.full_name || u.name}</option>)}
-                  </Select>
+                  <div className="flex-1">
+                    <SearchableSelect
+                      id={`add_user_${idx}`}
+                      value={row.user}
+                      onChange={(_, val) => {
+                        const newRows = [...addForm.applicable_for_users];
+                        newRows[idx].user = val;
+                        setAddForm({...addForm, applicable_for_users: newRows});
+                      }}
+                      options={[
+                        { value: '', label: 'Select User' },
+                        ...options.users.map((u: any) => ({ value: u.name, label: u.full_name || u.name }))
+                      ]}
+                      placeholder="Select User"
+                    />
+                  </div>
                   <div className="flex items-center gap-1.5 text-xs text-gray-600">
                     <Switch
                       checked={row.default === 1}
@@ -836,14 +877,22 @@ export const PosProfilePage: React.FC = () => {
             <div className="space-y-2 mb-3">
               {addForm.payments.map((row, idx) => (
                 <div key={idx} className="flex gap-2 items-center">
-                  <Select className="flex-1" value={row.mode_of_payment} onChange={e => {
-                    const newRows = [...addForm.payments];
-                    newRows[idx].mode_of_payment = e.target.value;
-                    setAddForm({...addForm, payments: newRows});
-                  }}>
-                    <option value="">Select Payment Mode</option>
-                    {options.payments.map((p: any) => <option key={p.name} value={p.name}>{p.name}</option>)}
-                  </Select>
+                  <div className="flex-1">
+                    <SearchableSelect
+                      id={`add_payment_${idx}`}
+                      value={row.mode_of_payment}
+                      onChange={(_, val) => {
+                        const newRows = [...addForm.payments];
+                        newRows[idx].mode_of_payment = val;
+                        setAddForm({...addForm, payments: newRows});
+                      }}
+                      options={[
+                        { value: '', label: 'Select Payment Mode' },
+                        ...options.payments.map((p: any) => ({ value: p.name, label: p.name }))
+                      ]}
+                      placeholder="Select Payment Mode"
+                    />
+                  </div>
                   <div className="flex items-center gap-1.5 text-xs text-gray-600">
                     <Switch
                       checked={row.default === 1}
