@@ -188,7 +188,7 @@ function ConfigurePageContent() {
         )}
 
         {/* Two-Column Grid Layout */}
-        <div className="flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-[#E5E7EB] -my-8 -mx-8 h-full">
+        <div className="flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-gray-200 -my-8 -mx-8 h-full">
           <div className="w-full md:w-64 shrink-0 p-6 md:py-8 md:pl-8 md:pr-6 h-full overflow-y-auto">
             <ConfigureSidebar />
           </div>

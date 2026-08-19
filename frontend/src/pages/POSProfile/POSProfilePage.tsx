@@ -207,7 +207,7 @@ export const POSProfilePage: React.FC = () => {
       <div className="max-w-7xl mx-auto space-y-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-xl border border-gray-200 shadow-xs">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-[#7C3AED]/10 text-[#7C3AED] flex items-center justify-center font-semibold shrink-0">
+            <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-semibold shrink-0">
               <SlidersHorizontal className="w-6 h-6" />
             </div>
             <div>
@@ -220,7 +220,7 @@ export const POSProfilePage: React.FC = () => {
               Discard Changes
             </Button>
             <Button
-              className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white flex items-center gap-2"
+              className="bg-primary hover:bg-primary-700 text-white flex items-center gap-2"
               onClick={handleSave}
             >
               <Save className="w-4 h-4" />
@@ -248,7 +248,7 @@ export const POSProfilePage: React.FC = () => {
                   onClick={() => setActiveTab(tab.id)}
                   className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
                     isActive
-                      ? 'bg-[#7C3AED] text-white shadow-xs'
+                      ? 'bg-primary text-white shadow-xs'
                       : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                   }`}
                 >
@@ -388,7 +388,7 @@ export const POSProfilePage: React.FC = () => {
                         onChange={(e: React.ChangeEvent<HTMLInputElement>) => item.set(e.target.checked)}
                         className="sr-only peer"
                       />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#7C3AED]"></div>
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
                     </label>
                   </div>
                 ))}
@@ -416,7 +416,7 @@ export const POSProfilePage: React.FC = () => {
                       onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEnableQzPrinting(e.target.checked)}
                       className="sr-only peer"
                     />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#7C3AED]"></div>
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
                   </label>
                 </div>
 
@@ -435,7 +435,7 @@ export const POSProfilePage: React.FC = () => {
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h4 className="text-sm font-semibold text-gray-900">Printer Configuration Table</h4>
-                  <Button size="sm" onClick={addPrinter} className="bg-[#7C3AED] text-white hover:bg-[#6D28D9]">
+                  <Button size="sm" onClick={addPrinter} className="bg-primary text-white hover:bg-primary-700">
                     <Plus className="w-4 h-4 mr-1" /> Add Printer
                   </Button>
                 </div>
@@ -470,7 +470,7 @@ export const POSProfilePage: React.FC = () => {
                               type="checkbox"
                               checked={p.bill_printing}
                               onChange={() => togglePrinterBill(p.id)}
-                              className="w-4 h-4 text-[#7C3AED] rounded border-gray-300 focus:ring-[#7C3AED]"
+                              className="w-4 h-4 text-primary rounded border-gray-300 focus:ring-primary"
                             />
                           </td>
                           <td className="p-3.5 text-center">
@@ -478,7 +478,7 @@ export const POSProfilePage: React.FC = () => {
                               type="checkbox"
                               checked={p.kot_printing}
                               onChange={() => togglePrinterKOT(p.id)}
-                              className="w-4 h-4 text-[#7C3AED] rounded border-gray-300 focus:ring-[#7C3AED]"
+                              className="w-4 h-4 text-primary rounded border-gray-300 focus:ring-primary"
                             />
                           </td>
                           <td className="p-3.5 text-right">
@@ -517,14 +517,14 @@ export const POSProfilePage: React.FC = () => {
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEnableMultipleCashiers(e.target.checked)}
                     className="sr-only peer"
                   />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#7C3AED]"></div>
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
                 </label>
               </div>
 
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h4 className="text-sm font-semibold text-gray-900">Authorized Cashiers Table</h4>
-                  <Button size="sm" onClick={addCashier} className="bg-[#7C3AED] text-white hover:bg-[#6D28D9]">
+                  <Button size="sm" onClick={addCashier} className="bg-primary text-white hover:bg-primary-700">
                     <Plus className="w-4 h-4 mr-1" /> Add Authorized Cashier
                   </Button>
                 </div>
@@ -559,7 +559,7 @@ export const POSProfilePage: React.FC = () => {
                               name="main_cashier"
                               checked={c.main_cashier}
                               onChange={() => setMainCashier(c.id)}
-                              className="w-4 h-4 text-[#7C3AED] border-gray-300 focus:ring-[#7C3AED]"
+                              className="w-4 h-4 text-primary border-gray-300 focus:ring-primary"
                             />
                           </td>
                           <td className="p-3.5 text-right">
@@ -681,7 +681,7 @@ export const POSProfilePage: React.FC = () => {
                         onChange={(e: React.ChangeEvent<HTMLInputElement>) => item.set(e.target.checked)}
                         className="sr-only peer"
                       />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#7C3AED]"></div>
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
                     </label>
                   </div>
                 ))}
@@ -752,7 +752,7 @@ export const POSProfilePage: React.FC = () => {
                         onChange={(e: React.ChangeEvent<HTMLInputElement>) => item.set(e.target.checked)}
                         className="sr-only peer"
                       />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#7C3AED]"></div>
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
                     </label>
                   </div>
                 ))}
