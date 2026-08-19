@@ -61,6 +61,34 @@ class _elevated:
         return False
 
 
+def _ensure_admin_branch_mapping(branch):
+    """`getBranch()` (ury/ury_pos/api.py) — used deep inside the shared KOT
+    pipeline (`create_kot_doc`) that `kot_execute()` calls — resolves branch
+    from a `URY User` child-table row on `Branch` matching
+    `frappe.session.user`. Under `_elevated()` that user is "Administrator",
+    which has no such row by default, so KOT creation for a self-ordered
+    item fails with "User is not Associated with any Branch" even though
+    the invoice itself saves fine (kot_execute's caller already tolerates
+    KOT failure without surfacing it to the customer, which is exactly why
+    this was silent instead of loud — caught only by an actual end-to-end
+    order placement, not by the mocked unit tests).
+
+    Idempotently register Administrator against `branch` so `getBranch()`
+    resolves during elevation, without touching the shared KOT/getBranch
+    code itself. Administrator is used (not a new technical user) because
+    kot_execute()/create_kot_doc() also perform frappe.has_permission()
+    checks that a fresh no-role user would fail.
+    """
+    if not branch:
+        return
+    already_mapped = frappe.db.exists("URY User", {"parent": branch, "parenttype": "Branch", "user": "Administrator"})
+    if already_mapped:
+        return
+    branch_doc = frappe.get_doc("Branch", branch)
+    branch_doc.append("user", {"user": "Administrator"})
+    branch_doc.save(ignore_permissions=True)
+
+
 # ---------------------------------------------------------------------------
 # Stateless QR token (table / pickup) — signed, not stored per-table
 # ---------------------------------------------------------------------------
@@ -467,6 +495,8 @@ def add_customer_items(session, items):
     order_type = "Dine In" if session.table else "Take Away"
 
     with _elevated():
+        _ensure_admin_branch_mapping(profile.branch)
+
         invoice, invoice_name = _resolve_or_create_pos_invoice(
             table=session.table, invoiceNo=session.invoice, order_type=order_type, is_payment=None,
             check_permission=False, override_branch=profile.branch,
