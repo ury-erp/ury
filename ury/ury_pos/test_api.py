@@ -8,6 +8,9 @@ from unittest.mock import patch, MagicMock
 from ury.ury_pos.api import searchPosInvoice
 from ury.ury_pos.api import get_split_group, getPosInvoiceItems
 from ury.ury_pos.api import getRestaurantMenu, resolve_restaurant_menu
+from ury.ury_pos.api import submit_checklist
+import json
+from datetime import date
 
 
 class TestGetRestaurantMenuPhase1(unittest.TestCase):
@@ -52,6 +55,7 @@ class TestGetRestaurantMenuPhase1(unittest.TestCase):
             mock_resolve.return_value = {"items": [], "modified_time": None, "name": "Menu A"}
             getRestaurantMenu("Test POS Profile")
             mock_resolve.assert_called_once_with("Branch A", None, None, False)
+
 
 class TestMergeBillsSEC07(unittest.TestCase):
 
@@ -327,8 +331,166 @@ class TestUryPosApi(unittest.TestCase):
 
     def test_authorized_create_customer(self):
         frappe.set_user("Administrator")
-        
+
         result = create_customer("Test Auth Customer", "+919876543210")
-        
+
         self.assertEqual(result.get("status"), "success")
         self.assertTrue(frappe.db.exists("Customer", "Test Auth Customer"))
+
+
+class TestSubmitChecklistSEC10(FrappeTestCase):
+    """Test cases for submit_checklist function."""
+
+    def _create_mock_log_doc(self):
+        """Create a properly-configured MagicMock for log_doc that maintains an items list."""
+        # Create a real list to hold items
+        items_list = []
+
+        # Create the mock document
+        mock_log_doc = MagicMock()
+        mock_log_doc.name = "URY-POS-CHECKLIST-LOG-001"
+        mock_log_doc.status = None  # Will be set by submit_checklist
+        mock_log_doc.completed_by = None
+        mock_log_doc.completed_at = None
+
+        # Configure the items property to return the real list
+        mock_log_doc.items = items_list
+
+        # Mock the set() method to reset items when called with "items"
+        def mock_set(key, value):
+            if key == "items":
+                items_list.clear()
+                mock_log_doc.items = items_list
+
+        mock_log_doc.set = mock_set
+
+        # Mock the append() method to actually append to the items list
+        def mock_append(key, value):
+            if key == "items":
+                items_list.append(MagicMock(**value))
+
+        mock_log_doc.append = mock_append
+
+        return mock_log_doc
+
+    @patch("ury.ury_pos.api.frappe.get_all")
+    @patch("ury.ury_pos.api.frappe.new_doc")
+    @patch("ury.ury_pos.api.frappe.utils.now")
+    @patch("ury.ury_pos.api.frappe.session")
+    @patch("ury.ury_pos.api.getBranch")
+    @patch("ury.ury_pos.api._validate_checklist_branch")
+    def test_submit_checklist_all_mandatory_checked(
+        self, mock_validate_branch, mock_get_branch, mock_session, mock_now, mock_new_doc, mock_get_all
+    ):
+        """Test that submit_checklist returns status='Complete' when all mandatory items are checked."""
+        # Setup mocks
+        mock_session.user = "test_user@example.com"
+        mock_get_branch.return_value = "Branch A"
+        mock_now.return_value = "2025-01-15 10:30:00"
+
+        # Mock configured items - all mandatory
+        mock_configured_items = [
+            MagicMock(item_label="Opening Check", is_mandatory=True),
+            MagicMock(item_label="Stock Count", is_mandatory=True),
+        ]
+
+        # Mock existing log query returns empty (no existing log)
+        mock_get_all.side_effect = [mock_configured_items, []]
+
+        # Mock new document creation with properly-configured mock
+        mock_log_doc = self._create_mock_log_doc()
+        mock_log_doc.name = "URY-POS-CHECKLIST-LOG-001"
+        mock_new_doc.return_value = mock_log_doc
+
+        # Prepare checklist items - all checked
+        items = json.dumps([
+            {"item_label": "Opening Check", "is_checked": True, "remarks": ""},
+            {"item_label": "Stock Count", "is_checked": True, "remarks": ""},
+        ])
+
+        # Call the function
+        result = submit_checklist(
+            pos_profile="POS-Profile-001",
+            checklist_type="Opening",
+            items=items
+        )
+
+        # Assertions
+        # Verify that all mandatory items were appended
+        self.assertEqual(len(mock_log_doc.items), 2)
+        # Verify that both items have is_mandatory=True and is_checked=True
+        for item in mock_log_doc.items:
+            self.assertTrue(item.is_mandatory)
+            self.assertTrue(item.is_checked)
+        # Verify status is "Complete" because all mandatory items are checked
+        self.assertEqual(result["status"], "Complete")
+        self.assertEqual(mock_log_doc.status, "Complete")
+        self.assertEqual(result["name"], "URY-POS-CHECKLIST-LOG-001")
+        mock_log_doc.save.assert_called_once()
+
+    @patch("ury.ury_pos.api.frappe.get_all")
+    @patch("ury.ury_pos.api.frappe.new_doc")
+    @patch("ury.ury_pos.api.frappe.utils.now")
+    @patch("ury.ury_pos.api.frappe.session")
+    @patch("ury.ury_pos.api.getBranch")
+    @patch("ury.ury_pos.api._validate_checklist_branch")
+    def test_submit_checklist_mandatory_unchecked(
+        self, mock_validate_branch, mock_get_branch, mock_session, mock_now, mock_new_doc, mock_get_all
+    ):
+        """Test that submit_checklist returns status='In Progress' when at least one mandatory item is unchecked."""
+        # Setup mocks
+        mock_session.user = "test_user@example.com"
+        mock_get_branch.return_value = "Branch A"
+        mock_now.return_value = "2025-01-15 10:30:00"
+
+        # Mock configured items - mix of mandatory and optional
+        mock_configured_items = [
+            MagicMock(item_label="Opening Check", is_mandatory=True),
+            MagicMock(item_label="Stock Count", is_mandatory=True),
+            MagicMock(item_label="Optional Verification", is_mandatory=False),
+        ]
+
+        # Mock existing log query returns empty (no existing log)
+        mock_get_all.side_effect = [mock_configured_items, []]
+
+        # Mock new document creation with properly-configured mock
+        mock_log_doc = self._create_mock_log_doc()
+        mock_log_doc.name = "URY-POS-CHECKLIST-LOG-002"
+        mock_new_doc.return_value = mock_log_doc
+
+        # Prepare checklist items - one mandatory unchecked
+        items = json.dumps([
+            {"item_label": "Opening Check", "is_checked": True, "remarks": ""},
+            {"item_label": "Stock Count", "is_checked": False, "remarks": "Pending"},
+            {"item_label": "Optional Verification", "is_checked": False, "remarks": ""},
+        ])
+
+        # Call the function
+        result = submit_checklist(
+            pos_profile="POS-Profile-001",
+            checklist_type="Opening",
+            items=items
+        )
+
+        # Assertions
+        # Verify that all items were appended
+        self.assertEqual(len(mock_log_doc.items), 3)
+        # Verify that mandatory items have correct is_mandatory flag
+        opening_check = mock_log_doc.items[0]
+        stock_count = mock_log_doc.items[1]
+        optional_verification = mock_log_doc.items[2]
+
+        self.assertTrue(opening_check.is_mandatory)
+        self.assertTrue(opening_check.is_checked)
+
+        self.assertTrue(stock_count.is_mandatory)
+        self.assertFalse(stock_count.is_checked)  # This one is unchecked
+
+        self.assertFalse(optional_verification.is_mandatory)
+        self.assertFalse(optional_verification.is_checked)
+
+        # Verify status is "In Progress" because at least one mandatory item is unchecked
+        self.assertEqual(result["status"], "In Progress")
+        self.assertEqual(mock_log_doc.status, "In Progress")
+        self.assertEqual(result["name"], "URY-POS-CHECKLIST-LOG-002")
+        mock_log_doc.save.assert_called_once()
