@@ -61,6 +61,34 @@ class _elevated:
         return False
 
 
+def _ensure_admin_branch_mapping(branch):
+    """`getBranch()` (ury/ury_pos/api.py) — used deep inside the shared KOT
+    pipeline (`create_kot_doc`) that `kot_execute()` calls — resolves branch
+    from a `URY User` child-table row on `Branch` matching
+    `frappe.session.user`. Under `_elevated()` that user is "Administrator",
+    which has no such row by default, so KOT creation for a self-ordered
+    item fails with "User is not Associated with any Branch" even though
+    the invoice itself saves fine (kot_execute's caller already tolerates
+    KOT failure without surfacing it to the customer, which is exactly why
+    this was silent instead of loud — caught only by an actual end-to-end
+    order placement, not by the mocked unit tests).
+
+    Idempotently register Administrator against `branch` so `getBranch()`
+    resolves during elevation, without touching the shared KOT/getBranch
+    code itself. Administrator is used (not a new technical user) because
+    kot_execute()/create_kot_doc() also perform frappe.has_permission()
+    checks that a fresh no-role user would fail.
+    """
+    if not branch:
+        return
+    already_mapped = frappe.db.exists("URY User", {"parent": branch, "parenttype": "Branch", "user": "Administrator"})
+    if already_mapped:
+        return
+    branch_doc = frappe.get_doc("Branch", branch)
+    branch_doc.append("user", {"user": "Administrator"})
+    branch_doc.save(ignore_permissions=True)
+
+
 # ---------------------------------------------------------------------------
 # Stateless QR token (table / pickup) — signed, not stored per-table
 # ---------------------------------------------------------------------------
@@ -166,7 +194,7 @@ def _resolve_device(device_id, credential):
     with _elevated():
         frappe.db.set_value("URY Ordering Device", device.name, "last_seen", now_datetime())
 
-    return profile, table, source, device.name
+    return profile, table, source, device.name, device.layout
 
 
 # ---------------------------------------------------------------------------
@@ -192,6 +220,20 @@ def _open_session(profile, source, table, device=None):
             "last_activity": now_datetime(),
         })
         session.insert(ignore_permissions=True)
+        # Explicit commit rather than relying on Frappe's implicit
+        # end-of-request commit. Found live: a client that immediately
+        # uses the returned session token in its very next request (the
+        # real customer flow -- bootstrap then menu fetch, back-to-back
+        # with no human-scale delay) could get "session expired or
+        # invalid" because that next request's own transaction didn't yet
+        # see this insert. Manual sequential curl calls (with real-world
+        # latency between them) never showed this; an atomic
+        # bootstrap-then-fetch promise chain in the browser reproduced it
+        # reliably. This session is the customer's ONLY handle on their
+        # ordering context — every subsequent call depends on it existing
+        # the instant it's returned, so it must be durably committed
+        # before the response is, not just eventually consistent.
+        frappe.db.commit()
 
     return raw_session_token, session
 
@@ -239,11 +281,12 @@ def get_ordering_context(token=None, device_id=None, device_credential=None):
     customer-safe channel configuration — never raw branch/table names the
     client didn't already have a right to see."""
 
+    layout = "Mobile"
     if token:
         profile, table, source = _verify_qr_token(token)
         device_name = None
     elif device_id and device_credential:
-        profile, table, source, device_name = _resolve_device(device_id, device_credential)
+        profile, table, source, device_name, layout = _resolve_device(device_id, device_credential)
     else:
         frappe.throw(_("Missing ordering token or device credentials"), frappe.PermissionError)
 
@@ -254,6 +297,11 @@ def get_ordering_context(token=None, device_id=None, device_credential=None):
         "source": source,
         "restaurant": profile.restaurant,
         "table": table,
+        # "Mobile" for QR sessions (no device involved); otherwise the
+        # provisioned URY Ordering Device's configured layout (Tablet /
+        # Landscape Kiosk / Portrait Kiosk) — the frontend layout shell
+        # selector uses this, never a client-guessed value.
+        "layout": layout,
         "capabilities": {
             "product_detail_enabled": bool(profile.enable_product_detail_page),
             "show_item_images": bool(profile.show_item_images),
@@ -467,10 +515,37 @@ def add_customer_items(session, items):
     order_type = "Dine In" if session.table else "Take Away"
 
     with _elevated():
+        _ensure_admin_branch_mapping(profile.branch)
+
         invoice, invoice_name = _resolve_or_create_pos_invoice(
             table=session.table, invoiceNo=session.invoice, order_type=order_type, is_payment=None,
             check_permission=False, override_branch=profile.branch,
         )
+
+        # _resolve_or_create_pos_invoice() never sets restaurant_table on a
+        # brand-new invoice — sync_order() does that itself after the call
+        # (its own caller-side responsibility, same pattern here). Missing
+        # this meant the SECOND add_customer_items() call for the same
+        # table couldn't find the first call's invoice by name at all:
+        # _resolve_or_create_pos_invoice's table-path query AND-combines an
+        # exact `name` match with an OR-group requiring restaurant_table (or
+        # custom_merged_tables) to equal the table — with restaurant_table
+        # still null, that OR-group is false and the whole query returns
+        # nothing, so a second invoice got created instead of the running
+        # order being updated. Confirmed live: two separate invoices for
+        # the same table/session instead of one.
+        if session.table and not invoice.restaurant_table:
+            invoice.restaurant_table = session.table
+
+        # Same gap for order_type on the pickup (no-table) path:
+        # _resolve_or_create_pos_invoice() only derives order_type from the
+        # table's is_take_away flag in the table branch — the non-table
+        # branch leaves it untouched, expecting the caller to set it
+        # (sync_order() does `if order_type: invoice.order_type =
+        # order_type` itself). Confirmed live: a pickup order's invoice had
+        # an empty order_type instead of "Take Away" before this.
+        if not session.table:
+            invoice.order_type = order_type
 
         if not invoice.customer:
             if not profile.default_customer:
@@ -483,9 +558,30 @@ def add_customer_items(session, items):
         if session.device:
             invoice.custom_ordering_device = session.device
 
+        # Aggregated by item_code, same as current_items_for_kot below (built
+        # after the append). This symmetry matters: add_customer_items()
+        # always appends a NEW row rather than merging into an existing
+        # same-item_code row (simpler, safer for concurrent requests), so a
+        # table's invoice routinely ends up with multiple separate rows for
+        # the same item_code after a few rounds of ordering. kot_execute's
+        # compare_two_array() does an exact-match-then-delta comparison
+        # assuming ONE row per item_code on each side — if `previous_items`
+        # were left as raw per-row entries while `current_items` was
+        # aggregated (as an earlier version of this function had it), a
+        # repeat item_code's several qty=1 previous rows would never
+        # exact-match the aggregated current total, and
+        # compare_two_array's delta loop overwrites (not accumulates)
+        # across multiple matching previous rows -- producing a bogus
+        # cancellation KOT for an item nobody cancelled. Confirmed live via
+        # a real second-order-on-a-multi-round-invoice test.
+        past_qty_by_item = {}
+        past_name_by_item = {}
+        for row in invoice.items:
+            past_qty_by_item[row.item_code] = past_qty_by_item.get(row.item_code, 0) + row.qty
+            past_name_by_item[row.item_code] = row.item_name
         past_item = [
-            {"item_code": row.item_code, "item_name": row.item_name, "qty": row.qty, "comments": ""}
-            for row in invoice.items
+            {"item_code": code, "item_name": past_name_by_item[code], "qty": past_qty_by_item[code], "comments": ""}
+            for code in past_qty_by_item
         ]
 
         menu = frappe.db.get_value("URY Menu", {"branch": invoice.branch}, "name")
@@ -519,7 +615,25 @@ def add_customer_items(session, items):
             )
 
         try:
-            kot_execute(invoice.name, invoice.customer, invoice.restaurant_table, clean_items, past_item, None)
+            # kot_execute()'s diff (compare_two_array) expects `current_items`
+            # to be the COMPLETE desired per-item-code quantity state, one
+            # row per item_code — not just the newly-added rows. Passing
+            # clean_items alone here made every pre-existing item look
+            # "removed" (present in previous_items, absent from current),
+            # generating spurious cancellation KOTs for food nobody
+            # cancelled. Aggregate invoice.items (which now includes both
+            # the untouched old rows and the just-appended new ones) by
+            # item_code to build the correct current-state view.
+            qty_by_item = {}
+            name_by_item = {}
+            for row in invoice.items:
+                qty_by_item[row.item_code] = qty_by_item.get(row.item_code, 0) + row.qty
+                name_by_item[row.item_code] = row.item_name
+            current_items_for_kot = [
+                {"item_code": code, "item_name": name_by_item[code], "qty": qty_by_item[code], "comments": ""}
+                for code in qty_by_item
+            ]
+            kot_execute(invoice.name, invoice.customer, invoice.restaurant_table, current_items_for_kot, past_item, None)
         except Exception as e:
             frappe.log_error(f"Self-order KOT creation failed: {e}", "KOT Error")
 
@@ -586,3 +700,188 @@ def get_order_status(session):
         result["open_requests"] = open_requests
 
     return result
+
+
+# ---------------------------------------------------------------------------
+# Payment (Phase 6)
+#
+# Reuses ERPNext's own Payment Request doctype/flow rather than building a
+# parallel payments implementation — "POS Invoice" is already in its
+# ALLOWED_DOCTYPES_FOR_PAYMENT_REQUEST list. A gateway-redirect checkout and
+# a shareable/QR "payment link" are the SAME Payment Request underneath;
+# they only differ in how the frontend presents payment_url (auto-redirect
+# vs. copyable/QR link) — no need for two backend code paths.
+#
+# Settlement-on-payment (webhook -> Payment Entry -> invoice submit) is
+# ERPNext core's own responsibility once a real Payment Gateway Account is
+# configured (PaymentRequest.set_as_paid() / its gateway callbacks) — this
+# module does not reimplement or verify gateway webhooks itself. Without a
+# configured gateway (true for this track's dev/test bench — no real
+# Razorpay/Stripe credentials available), get_payment_url() has nothing to
+# return; create_payment_request() still creates a real, correctly-priced
+# Payment Request against the invoice, which is what's actually verifiable
+# without live gateway credentials.
+# ---------------------------------------------------------------------------
+
+@frappe.whitelist(allow_guest=True)
+def create_payment_request(session):
+    session = _resolve_session(session)
+    profile = frappe.get_doc("URY Self Ordering Profile", session.ordering_profile)
+
+    if not (profile.enable_customer_payment or profile.enable_payment_link):
+        frappe.throw(_("Online payment is not enabled"), frappe.ValidationError)
+    if not session.invoice:
+        frappe.throw(_("No active order for this session"), frappe.ValidationError)
+
+    with _elevated():
+        from erpnext.accounts.doctype.payment_request.payment_request import make_payment_request
+
+        invoice = frappe.get_doc("POS Invoice", session.invoice)
+        if invoice.docstatus == 1:
+            frappe.throw(_("This order is already settled"), frappe.ValidationError)
+
+        # make_payment_request() derives its own amount from the reference
+        # doc server-side (get_amount()) — the client never supplies one.
+        #
+        # ERPNext quirk (found via live testing, not documented anywhere
+        # obvious): for dt="POS Invoice" specifically, get_amount() does
+        # NOT fall back to outstanding_amount the way it does for Sales/
+        # Purchase Invoice — it only sums payments rows with
+        # type="Phone" matching the configured gateway account, and
+        # throws "Payment Entry is already created" if none exist (reads
+        # as if the invoice were already paid, even on a fresh unpaid
+        # draft — a confusing message for what's really "no online
+        # payment method configured"). This requires the branch's POS
+        # Profile to have a Mode of Payment with Payment Type "Phone"
+        # linked to a real Payment Gateway Account — neither exists on
+        # this dev/test bench, so this is the actual, expected failure
+        # mode here, not a bug in this function. Surface it as a clear,
+        # honest "not configured yet" rather than ERPNext's confusing
+        # raw message.
+        try:
+            pr = make_payment_request(
+                dt="POS Invoice",
+                dn=invoice.name,
+                submit_doc=1,
+                mute_email=1,
+                order_type="Shopping Cart",
+                return_doc=1,
+            )
+        except Exception as e:
+            frappe.log_error(f"create_payment_request failed: {e}", "Self-Order Payment")
+            # ERPNext's make_payment_request() queues its own raw msgprint
+            # (e.g. "Payment Entry is already created") via frappe.throw
+            # before we ever get a chance to catch it — that message stays
+            # queued in frappe.local.message_log even after we catch the
+            # exception here, so it would still reach the client's
+            # _server_messages alongside our clean one below. Clear it so
+            # only the customer-appropriate message is ever queued.
+            frappe.clear_messages()
+            frappe.throw(
+                _("Online payment isn't set up for this restaurant yet. Please pay at the counter."),
+                frappe.ValidationError,
+            )
+
+        payment_url = None
+        try:
+            payment_url = pr.get_payment_url()
+        except Exception as e:
+            # A Payment Request was created but the configured gateway
+            # rejected the URL request — the Payment Request itself is
+            # still real and valid; only the redirect/link URL is
+            # unavailable. Surface this plainly instead of fabricating a
+            # fake link.
+            frappe.log_error(f"Payment Request created but no payment URL available: {e}", "Self-Order Payment")
+
+    return {
+        "payment_request": pr.name,
+        "amount": pr.grand_total,
+        "currency": pr.currency,
+        "payment_url": payment_url,
+        "status": pr.status,
+    }
+
+
+@frappe.whitelist(allow_guest=True)
+def get_payment_status(session):
+    session = _resolve_session(session)
+    if not session.invoice:
+        return {"status": None}
+
+    with _elevated():
+        pr = frappe.db.get_value(
+            "Payment Request",
+            {"reference_doctype": "POS Invoice", "reference_name": session.invoice},
+            ["name", "status", "grand_total"],
+            as_dict=True,
+            order_by="creation desc",
+        )
+
+    if not pr:
+        return {"status": None}
+    return {"payment_request": pr.name, "status": pr.status, "amount": pr.grand_total}
+
+
+# ---------------------------------------------------------------------------
+# Communication provider (Phase 6.5) — extensible, not hardcoded to any one
+# channel. No messaging integration (WhatsApp/SMS/email) is installed in
+# this app today, so the default provider only logs; a future installed
+# app/plugin can register a real one instead of this module hardcoding it.
+# ---------------------------------------------------------------------------
+
+def _default_communication_provider(recipient, message):
+    frappe.log_error(f"[self-ordering communication stub] to={recipient}: {message}", "Self-Order Notify")
+
+
+_communication_provider = _default_communication_provider
+
+
+def register_communication_provider(fn):
+    """Install a real communication provider: fn(recipient: str, message: str) -> None.
+    Call this from a future installed app's hooks.py (e.g. a WhatsApp
+    integration) rather than editing this module directly."""
+    global _communication_provider
+    _communication_provider = fn
+
+
+@frappe.whitelist(allow_guest=True)
+def share_payment_link(session, recipient):
+    """Send the current Payment Request's link to `recipient` (whatever
+    format the active communication provider expects — a phone number for
+    an SMS/WhatsApp provider, an email address for an email provider) via
+    the registered provider. The default provider only logs — this is a
+    genuine extension point (register_communication_provider), not a
+    real send, since no messaging integration is installed in this app.
+    `recipient` is customer-supplied input, not derived from the session,
+    so validate it's at least non-empty before handing it to the provider.
+    """
+    session = _resolve_session(session)
+    profile = frappe.get_doc("URY Self Ordering Profile", session.ordering_profile)
+    if not profile.enable_payment_link:
+        frappe.throw(_("Payment links are not enabled"), frappe.ValidationError)
+    if not recipient or not isinstance(recipient, str):
+        frappe.throw(_("A valid recipient is required"), frappe.ValidationError)
+
+    with _elevated():
+        pr = frappe.db.get_value(
+            "Payment Request",
+            {"reference_doctype": "POS Invoice", "reference_name": session.invoice},
+            ["name", "grand_total"],
+            as_dict=True,
+            order_by="creation desc",
+        )
+        if not pr:
+            frappe.throw(_("No payment request found for this order — create one first"), frappe.ValidationError)
+
+        pr_doc = frappe.get_doc("Payment Request", pr.name)
+        try:
+            payment_url = pr_doc.get_payment_url()
+        except Exception:
+            payment_url = None
+
+    message = _(
+        "Your order total is {0}. {1}"
+    ).format(pr.grand_total, payment_url or _("A staff member will assist with payment shortly."))
+    _communication_provider(recipient, message)
+
+    return {"status": "Sent", "payment_request": pr.name}
