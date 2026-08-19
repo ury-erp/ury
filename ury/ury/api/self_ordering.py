@@ -194,7 +194,7 @@ def _resolve_device(device_id, credential):
     with _elevated():
         frappe.db.set_value("URY Ordering Device", device.name, "last_seen", now_datetime())
 
-    return profile, table, source, device.name
+    return profile, table, source, device.name, device.layout
 
 
 # ---------------------------------------------------------------------------
@@ -267,11 +267,12 @@ def get_ordering_context(token=None, device_id=None, device_credential=None):
     customer-safe channel configuration — never raw branch/table names the
     client didn't already have a right to see."""
 
+    layout = "Mobile"
     if token:
         profile, table, source = _verify_qr_token(token)
         device_name = None
     elif device_id and device_credential:
-        profile, table, source, device_name = _resolve_device(device_id, device_credential)
+        profile, table, source, device_name, layout = _resolve_device(device_id, device_credential)
     else:
         frappe.throw(_("Missing ordering token or device credentials"), frappe.PermissionError)
 
@@ -282,6 +283,11 @@ def get_ordering_context(token=None, device_id=None, device_credential=None):
         "source": source,
         "restaurant": profile.restaurant,
         "table": table,
+        # "Mobile" for QR sessions (no device involved); otherwise the
+        # provisioned URY Ordering Device's configured layout (Tablet /
+        # Landscape Kiosk / Portrait Kiosk) — the frontend layout shell
+        # selector uses this, never a client-guessed value.
+        "layout": layout,
         "capabilities": {
             "product_detail_enabled": bool(profile.enable_product_detail_page),
             "show_item_images": bool(profile.show_item_images),
@@ -549,7 +555,25 @@ def add_customer_items(session, items):
             )
 
         try:
-            kot_execute(invoice.name, invoice.customer, invoice.restaurant_table, clean_items, past_item, None)
+            # kot_execute()'s diff (compare_two_array) expects `current_items`
+            # to be the COMPLETE desired per-item-code quantity state, one
+            # row per item_code — not just the newly-added rows. Passing
+            # clean_items alone here made every pre-existing item look
+            # "removed" (present in previous_items, absent from current),
+            # generating spurious cancellation KOTs for food nobody
+            # cancelled. Aggregate invoice.items (which now includes both
+            # the untouched old rows and the just-appended new ones) by
+            # item_code to build the correct current-state view.
+            qty_by_item = {}
+            name_by_item = {}
+            for row in invoice.items:
+                qty_by_item[row.item_code] = qty_by_item.get(row.item_code, 0) + row.qty
+                name_by_item[row.item_code] = row.item_name
+            current_items_for_kot = [
+                {"item_code": code, "item_name": name_by_item[code], "qty": qty_by_item[code], "comments": ""}
+                for code in qty_by_item
+            ]
+            kot_execute(invoice.name, invoice.customer, invoice.restaurant_table, current_items_for_kot, past_item, None)
         except Exception as e:
             frappe.log_error(f"Self-order KOT creation failed: {e}", "KOT Error")
 

@@ -14,11 +14,14 @@ export interface OrderingCapabilities {
   add_to_running_table_enabled: boolean
 }
 
+export type OrderingLayout = 'Mobile' | 'Tablet' | 'Landscape Kiosk' | 'Portrait Kiosk'
+
 export interface OrderingContext {
   session: string
   source: string
   restaurant: string
   table: string | null
+  layout: OrderingLayout
   capabilities: OrderingCapabilities
 }
 
@@ -65,21 +68,45 @@ export interface OrderStatus {
   open_requests?: { name: string; request_type: string; status: string }[]
 }
 
-// Persist the opaque, single-use-per-scan session token across the mobile
-// browser session — a page refresh must not force a customer to rescan.
+// Persist the full ordering context (not just the opaque session token)
+// across the browser session — a page refresh/resume must not force a
+// customer to rescan, and must not lose capabilities/table/layout either
+// (a session-token-only resume can't reconstruct those without another
+// round trip the backend doesn't offer for an already-open session).
 const SESSION_KEY = 'ury_order_session'
+const CONTEXT_KEY = 'ury_order_context'
 
 export function getStoredSession(): string | null {
   return sessionStorage.getItem(SESSION_KEY)
 }
 
-function storeSession(token: string) {
-  sessionStorage.setItem(SESSION_KEY, token)
+export function getStoredContext(): OrderingContext | null {
+  const raw = sessionStorage.getItem(CONTEXT_KEY)
+  if (!raw) return null
+  try {
+    return JSON.parse(raw) as OrderingContext
+  } catch {
+    return null
+  }
+}
+
+function storeContext(context: OrderingContext) {
+  sessionStorage.setItem(SESSION_KEY, context.session)
+  sessionStorage.setItem(CONTEXT_KEY, JSON.stringify(context))
 }
 
 export async function bootstrap(token: string): Promise<OrderingContext> {
   const context = await call.get<OrderingContext>(`${M}.get_ordering_context`, { token })
-  storeSession(context.session)
+  storeContext(context)
+  return context
+}
+
+export async function bootstrapDevice(deviceId: string, deviceCredential: string): Promise<OrderingContext> {
+  const context = await call.get<OrderingContext>(`${M}.get_ordering_context`, {
+    device_id: deviceId,
+    device_credential: deviceCredential,
+  })
+  storeContext(context)
   return context
 }
 

@@ -4,7 +4,7 @@ import {
   bootstrap,
   getCurrentOrder,
   getMenu,
-  getStoredSession,
+  getStoredContext,
   requestBill,
   type CustomerOrder,
   type MenuItem,
@@ -23,8 +23,14 @@ function useQueryToken(): string | null {
  * bootstrap, menu/order loading, cart management, order submission, and
  * bill requests. Layout components consume this hook and are responsible
  * only for rendering.
+ *
+ * Pass `initialContext` when the caller has already resolved a context
+ * through some other bootstrap path (e.g. device-credential bootstrap for
+ * a kiosk/tablet, done once in App.tsx before a layout is chosen) — this
+ * skips the QR-token/session-resume bootstrap entirely and loads menu/order
+ * directly against the given context, so a device only ever bootstraps once.
  */
-export function useOrderingSession() {
+export function useOrderingSession(initialContext?: OrderingContext) {
   const token = useQueryToken()
   const [context, setContext] = useState<OrderingContext | null>(null)
   const [menu, setMenu] = useState<MenuItem[]>([])
@@ -43,19 +49,25 @@ export function useOrderingSession() {
   useEffect(() => {
     async function init() {
       try {
-        const existingSession = getStoredSession()
         let ctx: OrderingContext
-        if (token) {
+        if (initialContext) {
+          ctx = initialContext
+        } else if (token) {
           ctx = await bootstrap(token)
-        } else if (existingSession) {
-          // No fresh token in the URL (e.g. a bookmarked/refreshed page) —
-          // reuse whatever session is still active; the backend will reject
-          // it once it actually expires.
-          ctx = { session: existingSession } as OrderingContext
         } else {
-          setError('This link is missing an ordering code. Please rescan the QR code on your table.')
-          setLoading(false)
-          return
+          const storedContext = getStoredContext()
+          if (storedContext) {
+            // No fresh token in the URL (e.g. a bookmarked/refreshed page)
+            // — reuse the full context saved at bootstrap time, not just
+            // the session token, so capabilities/table/layout survive a
+            // refresh too. The backend still rejects the session once it
+            // actually expires.
+            ctx = storedContext
+          } else {
+            setError('This link is missing an ordering code. Please rescan the QR code on your table.')
+            setLoading(false)
+            return
+          }
         }
         setContext(ctx)
         const menuResponse = await getMenu(ctx.session)

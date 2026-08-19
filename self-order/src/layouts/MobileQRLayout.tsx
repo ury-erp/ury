@@ -1,6 +1,11 @@
 import { useOrderingSession } from '../hooks/useOrderingSession'
+import type { OrderingContext } from '../lib/api'
 
-function MobileQRLayout() {
+interface LayoutProps {
+  initialContext?: OrderingContext
+}
+
+function MobileQRLayout({ initialContext }: LayoutProps) {
   const {
     context,
     menu,
@@ -17,7 +22,7 @@ function MobileQRLayout() {
     cartItems,
     cartCount,
     cartTotal,
-  } = useOrderingSession()
+  } = useOrderingSession(initialContext)
 
   if (loading) {
     return (
