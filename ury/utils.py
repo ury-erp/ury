@@ -21,7 +21,7 @@ def get_service_worker():
 
 
 def after_request(response):
-    if frappe.request and (
+    if response and frappe.request and (
         frappe.request.path == SERVICE_WORKER_PATH
         or "get_service_worker" in frappe.request.path
     ):
