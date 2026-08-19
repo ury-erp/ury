@@ -184,7 +184,7 @@ export const RoomPage: React.FC = () => {
                   <td className="px-6 py-4">
                     <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary text-[10px]">
                       <Layers className="w-3 h-3 mr-1" />
-                      {room.room_type || 'General'}
+                      {room.room_type === 'NON-AC' ? 'Non-AC' : (room.room_type || 'General')}
                     </Badge>
                   </td>
                   <td className="px-6 py-4">{room.branch || 'Main'}</td>
@@ -228,10 +228,7 @@ export const RoomPage: React.FC = () => {
               onChange={(_, value) => setNewRoom({ ...newRoom, room_type: value })}
               options={[
                 { value: 'AC', label: 'AC' },
-                { value: 'Non-AC', label: 'Non-AC' },
-                { value: 'Rooftop', label: 'Rooftop' },
-                { value: 'Outdoor', label: 'Outdoor' },
-                { value: 'Bar', label: 'Bar' },
+                { value: 'NON-AC', label: 'Non-AC' },
               ]}
             />
           </div>
