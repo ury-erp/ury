@@ -36,7 +36,7 @@ export const StatCard = React.forwardRef<HTMLDivElement, StatCardProps>(
         </span>
         {icon ? <span className="text-muted-foreground/70">{icon}</span> : null}
       </div>
-      <div className="mt-2 text-3xl font-bold tracking-tight tabular-nums">{value}</div>
+      <div className="mt-2 font-mono text-3xl font-semibold tracking-tight tabular-nums">{value}</div>
       {delta ? (
         <div className={cn("mt-1 flex items-center gap-1 text-xs font-medium", deltaColor[delta.direction])}>
           <span aria-hidden="true">{deltaIcon[delta.direction]}</span>

@@ -85,12 +85,13 @@ def get_needs_attention(branch=None):
 	items = []
 
 	threshold = add_to_date(get_datetime(), minutes=-15)
-	shift_start = today()
+	shift_start, shift_end = _business_day_bounds(branch)
 	pending = frappe.db.sql(
 		"""SELECT name, creation FROM `tabPOS Invoice`
-		   WHERE docstatus = 0 AND creation < %(threshold)s AND creation >= %(shift_start)s""" +
+		   WHERE docstatus = 0 AND creation < %(threshold)s
+		   AND creation >= %(shift_start)s AND creation < %(shift_end)s""" +
 		(" AND branch = %(branch)s" if branch else ""),
-		{"threshold": threshold, "shift_start": shift_start, "branch": branch},
+		{"threshold": threshold, "shift_start": shift_start, "shift_end": shift_end, "branch": branch},
 		as_dict=True,
 	)
 	if pending:
@@ -275,6 +276,118 @@ def get_baseline(branch=None, weeks=6):
 		"sample_days": len(rows),
 		"median_sales": median(sales_values),
 		"median_covers": median(covers_values),
+	}
+
+	frappe.cache().set_value(cache_key, result, expires_in_sec=300)
+	return result
+
+
+@frappe.whitelist(methods=["GET"])
+def get_baseline_comparison(branch=None, window="today", weeks=6):
+	"""Compare the current business-day-so-far sales/covers against a 6-week
+	rolling baseline for the same weekday and time-of-day window (the
+	"tonight vs a normal Tuesday" dashboard strip). `window` is currently
+	informational (always compares business-day-start through now); accepted
+	as a param so the frontend contract doesn't need to change if narrower
+	windows are added later.
+	"""
+	weeks = int(weeks)
+	cache_key = f"ury_dashboard_baseline_comparison:{branch}:{window}:{weeks}"
+	cached = frappe.cache().get_value(cache_key)
+	if cached:
+		return cached
+
+	start, end = _business_day_bounds(branch)
+	now = get_datetime()
+	elapsed_end = min(now, end)
+
+	conditions = "b.`docstatus` = 1 AND b.`status` IN ('Consolidated', 'Paid') AND TIMESTAMP(b.`posting_date`, b.`posting_time`) BETWEEN %(start)s AND %(end)s"
+	params = {"start": start, "end": elapsed_end}
+	if branch:
+		conditions += " AND b.`branch` = %(branch)s"
+		params["branch"] = branch
+
+	current_row = frappe.db.sql(
+		f"""
+		SELECT ROUND(SUM(b.`grand_total`), 2) AS sales, SUM(b.`no_of_pax`) AS covers
+		FROM `tabPOS Invoice` b
+		WHERE {conditions}
+		""",
+		params,
+		as_dict=True,
+	)[0]
+
+	current_sales = current_row.sales or 0
+	current_covers = current_row.covers or 0
+
+	# The comparison must be business-day aligned, not calendar-date aligned:
+	# with extended hours the business day starts at e.g. 06:00, so a single
+	# trading night spans two `posting_date` values and "now" can be 01:30 on
+	# the following calendar date. Shifting every invoice timestamp back by
+	# the business-day start offset gives (a) the business date it belongs to
+	# and (b) how many seconds into the shift it happened — both of which are
+	# then directly comparable to today's elapsed window. Grouping on raw
+	# posting_date instead would split each historical night in two and drop
+	# the after-midnight half entirely (its calendar weekday differs).
+	business_date = start.date()
+	weekday = start.weekday()
+	offset_seconds = start.hour * 3600 + start.minute * 60 + start.second
+	elapsed_seconds = max(int((elapsed_end - start).total_seconds()), 0)
+
+	shifted = "(TIMESTAMP(b.`posting_date`, b.`posting_time`) - INTERVAL %(offset_seconds)s SECOND)"
+
+	baseline_conditions = f"""
+		b.`docstatus` = 1
+		AND b.`status` IN ('Consolidated', 'Paid')
+		AND WEEKDAY(DATE({shifted})) = %(weekday)s
+		AND DATE({shifted}) >= DATE_SUB(%(business_date)s, INTERVAL %(weeks)s WEEK)
+		AND DATE({shifted}) < %(business_date)s
+		AND TIME_TO_SEC(TIME({shifted})) <= %(elapsed_seconds)s
+	"""
+	baseline_params = {
+		"weekday": weekday,
+		"business_date": business_date,
+		"weeks": weeks,
+		"offset_seconds": offset_seconds,
+		"elapsed_seconds": elapsed_seconds,
+	}
+	if branch:
+		baseline_conditions += " AND b.`branch` = %(branch)s"
+		baseline_params["branch"] = branch
+
+	rows = frappe.db.sql(
+		f"""
+		SELECT DATE({shifted}) AS d, SUM(b.`grand_total`) AS sales, SUM(b.`no_of_pax`) AS covers
+		FROM `tabPOS Invoice` b
+		WHERE {baseline_conditions}
+		GROUP BY d
+		ORDER BY d DESC
+		LIMIT %(weeks)s
+		""",
+		baseline_params,
+		as_dict=True,
+	)
+
+	sample_days = len(rows)
+	avg_sales = round(sum(r.sales or 0 for r in rows) / sample_days, 2) if sample_days else 0
+	avg_covers = round(sum(r.covers or 0 for r in rows) / sample_days, 1) if sample_days else 0
+
+	def pct_delta(current, baseline):
+		if not baseline:
+			return None
+		return round((current - baseline) / baseline * 100, 1)
+
+	result = {
+		"window": window,
+		"sample_days": sample_days,
+		"current": {"sales": current_sales, "covers": current_covers},
+		"baseline": {"sales": avg_sales, "covers": avg_covers},
+		"delta": {
+			"sales": round(current_sales - avg_sales, 2),
+			"covers": round(current_covers - avg_covers, 1),
+			"sales_pct": pct_delta(current_sales, avg_sales),
+			"covers_pct": pct_delta(current_covers, avg_covers),
+		},
 	}
 
 	frappe.cache().set_value(cache_key, result, expires_in_sec=300)

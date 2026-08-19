@@ -1,5 +1,11 @@
+/* IBM Plex Mono backs the shared --font-mono token below, used wherever a
+   value needs to read as data (report stat numbers, table figures, chart
+   axis ticks) rather than prose — see tailwind-preset.js `fontFamily.mono`. */
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
 @layer base {
   :root {
+    --font-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
     --card: 0 0% 100%;

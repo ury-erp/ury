@@ -76,6 +76,10 @@ export default {
       },
       fontFamily: {
         inter: ['Inter', 'sans-serif'],
+        // Tabular/numeric data (stat-card values, table figures, chart axis
+        // ticks) — `font-mono` opts a value into IBM Plex Mono, loaded via
+        // theme.css, instead of Tailwind's default system-monospace stack.
+        mono: ['var(--font-mono)'],
       },
       borderRadius: {
         xl: "calc(var(--radius) + 4px)",
