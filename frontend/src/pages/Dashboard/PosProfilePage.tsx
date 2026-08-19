@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
-import { Printer, Shield, Settings2, Plus, X, ArrowLeft, Edit2, Eye, Layers } from 'lucide-react';
+import { Printer, Shield, Settings2, Plus, X, ArrowLeft, Edit2, Eye, Layers, Save } from 'lucide-react';
 import { Card, Button, Badge, Input, Select, Spinner, showToast } from '@ury/ui';
 import { Switch } from '../../components/ui/switch';
 import { call } from '@ury/core';
@@ -312,19 +312,21 @@ export const PosProfilePage: React.FC = () => {
           </div>
           {isEditMode ? (
             <Button
+              type="button"
               onClick={() => handleSaveProfile()}
               disabled={saving}
-              className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center space-x-1.5 shadow-xs"
+              className="w-24 h-9 bg-primary hover:bg-primary/90 text-white font-semibold flex items-center justify-center shadow-xs shrink-0 rounded-md"
             >
-              {saving ? <Spinner className="w-4 h-4 mr-1.5" /> : null}
+              <Save className="w-4 h-4 mr-1.5 shrink-0" />
               <span>Save</span>
             </Button>
           ) : (
             <Button
+              type="button"
               onClick={() => setIsEditMode(true)}
-              className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center space-x-1.5 shadow-xs"
+              className="w-24 h-9 bg-primary hover:bg-primary/90 text-white font-semibold flex items-center justify-center shadow-xs shrink-0 rounded-md"
             >
-              <Edit2 className="w-4 h-4 mr-1.5" />
+              <Edit2 className="w-4 h-4 mr-1.5 shrink-0" />
               <span>Edit</span>
             </Button>
           )}
