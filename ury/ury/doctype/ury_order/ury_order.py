@@ -687,35 +687,34 @@ def split_bill(source_invoice, items_to_move, customer=None):
 
 
 
-@frappe.whitelist()
-def get_order_invoice(table=None, invoiceNo=None, order_type=None, is_payment=None):
-    """returns the active invoice linked to the given table"""
+def _resolve_or_create_pos_invoice(table, invoiceNo, order_type, is_payment):
+    """Find an existing draft POS Invoice or build a new (unsaved) one.
 
+    Contains the same lookup/creation logic that used to live inline in
+    `get_order_invoice`, minus the permission checks (those stay in
+    `get_order_invoice`, applied only when an existing invoice was found).
+
+    Returns (invoice, invoice_name) where invoice_name is None when a new,
+    unsaved invoice was created.
+    """
     if table:
         filters = {"docstatus": 0}
         if invoiceNo:
             filters["name"] = invoiceNo
         elif is_payment != "Payments":
             filters["invoice_printed"] = 0
-            
+
         or_filters = {
             "restaurant_table": table,
             "custom_merged_tables": ["like", f"%{table}%"]
         }
-        
+
         invoices = frappe.get_all("POS Invoice", filters=filters, or_filters=or_filters, limit=1)
         invoice_name = invoices[0].name if invoices else None
         branch, menu_name, restaurant = get_restaurant_and_menu_name(table)
 
         if invoice_name:
             invoice = frappe.get_doc("POS Invoice", invoice_name)
-            
-            if not frappe.has_permission("POS Invoice", "read", doc=invoice):
-                frappe.throw(frappe._("Not permitted to view this order"), frappe.PermissionError)
-            
-            user_branch = getBranch()
-            if invoice.branch and user_branch and invoice.branch != user_branch:
-                frappe.throw(frappe._("Not permitted to view orders outside your active branch"), frappe.PermissionError)
 
         else:
             invoice = frappe.new_doc("POS Invoice")
@@ -752,36 +751,28 @@ def get_order_invoice(table=None, invoiceNo=None, order_type=None, is_payment=No
             invoice_name = frappe.get_value(
                 "POS Invoice", dict(restaurant_table=table, docstatus=0, name=invoiceNo)
             )
-            
+
         else:
             invoice_name = frappe.get_value(
                 "POS Invoice", dict(docstatus=0, name=invoiceNo)
             )
-            
+
         if invoice_name:
             invoice = frappe.get_doc("POS Invoice", invoice_name)
-            
-            if not frappe.has_permission("POS Invoice", "read", doc=invoice):
-                frappe.throw(frappe._("Not permitted to view this order"), frappe.PermissionError)
-            
-            user_branch = getBranch()
-            if invoice.branch and user_branch and invoice.branch != user_branch:
-                frappe.throw(frappe._("Not permitted to view orders outside your active branch"), frappe.PermissionError)
-            
 
         else:
             invoice = frappe.new_doc("POS Invoice")
             invoice.is_pos = 1
             invoice.update_stock = 1
-        
+
         branch = getBranch()
         restaurant = frappe.db.get_value("URY Restaurant", {"branch": branch}, "name")
-   
+
         menu=get_menu_name(order_type)
- 
+
         if (order_type == "Aggregators" and frappe.db.get_value("Branch", branch, "custom_no_taxes") == 0) or order_type != "Aggregators":
             invoice.taxes_and_charges = frappe.db.get_value("URY Restaurant", restaurant, "default_tax_template")
-        
+
         invoice.selling_price_list = frappe.db.get_value(
             "Price List", dict(restaurant_menu=menu, enabled=1)
         )
@@ -789,7 +780,66 @@ def get_order_invoice(table=None, invoiceNo=None, order_type=None, is_payment=No
         if invoice_name and invoice.restaurant_table:
             _reconcile_invoice_merged_tables(invoice, persist=True)
 
+    return invoice, invoice_name
+
+
+@frappe.whitelist()
+def get_order_invoice(table=None, invoiceNo=None, order_type=None, is_payment=None):
+    """returns the active invoice linked to the given table"""
+
+    invoice, invoice_name = _resolve_or_create_pos_invoice(table, invoiceNo, order_type, is_payment)
+
+    if invoice_name:
+        if not frappe.has_permission("POS Invoice", "read", doc=invoice):
+            frappe.throw(frappe._("Not permitted to view this order"), frappe.PermissionError)
+
+        user_branch = getBranch()
+        if invoice.branch and user_branch and invoice.branch != user_branch:
+            frappe.throw(frappe._("Not permitted to view orders outside your active branch"), frappe.PermissionError)
+
     return invoice
+
+
+def price_items_for_invoice(items, price_list, pos_profile, branch, menu):
+    """Resolve course and price for each item and build the invoice item dicts.
+
+    Returns a list of dicts in the same shape previously passed directly to
+    `invoice.append("items", ...)` inside `sync_order`. Does not append to
+    the invoice itself.
+    """
+    priced_items = []
+
+    for d in items:
+
+        course = frappe.db.get_value("URY Menu Item", {"item": d.get("item"), "parent": menu}, "course")
+
+        item_prices = frappe.db.get_list(
+            "Item Price",
+            filters={"item_code": d.get("item"), "price_list": price_list},
+            fields=["price_list_rate"],
+        )
+
+        if not item_prices:
+            frappe.throw(_("No item price found for Item: {0} in Price List: {1}. Please check the price list settings.").format(d.get("item"), price_list))
+
+        else:
+            priced_items.append(
+                dict(
+                    item_code=d.get("item"),
+                    item_name=d.get("item_name"),
+                    qty=d.get("qty"),
+                    **({"custom_course": course} if course else {}),
+                    comment=d.get("comment"),
+                    rate = item_prices[0].price_list_rate,
+                    price_list_rate = item_prices[0].price_list_rate,
+                    base_price_list_rate = item_prices[0].price_list_rate,
+                    cost_center = frappe.db.get_value(
+                        "POS Profile", pos_profile, "cost_center"
+                        ),
+                )
+            )
+
+    return priced_items
 
 
 @frappe.whitelist()
@@ -969,37 +1019,10 @@ def sync_order(
     invoice.items = []
     
     menu = frappe.db.get_value("URY Menu", {"branch": invoice.branch}, "name")
-   
-    for d in items:
-        
-        course = frappe.db.get_value("URY Menu Item", {"item": d.get("item"),"parent":menu}, "course")
-        
-        item_prices = frappe.db.get_list(
-            "Item Price",
-            filters={"item_code": d.get("item"), "price_list": price_list},
-            fields=["price_list_rate"],
-        )
 
-        if not item_prices:
-            frappe.throw(_("No item price found for Item: {0} in Price List: {1}. Please check the price list settings.").format(d.get("item"), price_list))
-
-        else:
-            invoice.append(
-                "items",
-                dict(
-                    item_code=d.get("item"),
-                    item_name=d.get("item_name"),
-                    qty=d.get("qty"),
-                    **({"custom_course": course} if course else {}),
-                    comment=d.get("comment"),
-                    rate = item_prices[0].price_list_rate,
-                    price_list_rate = item_prices[0].price_list_rate,
-                    base_price_list_rate = item_prices[0].price_list_rate,
-                    cost_center = frappe.db.get_value(
-                        "POS Profile", pos_profile, "cost_center"
-                        ),
-                ),
-            )
+    priced_items = price_items_for_invoice(items, price_list, pos_profile, invoice.branch, menu)
+    for item_dict in priced_items:
+        invoice.append("items", item_dict)
 
     try:
         invoice.save()

@@ -7,35 +7,38 @@ from frappe.utils import validate_phone_number
 #GetTable  decripted temporarily
 # @frappe.whitelist()
 # def getTable(room):
-#     branch_name = getBranch()   
+#     branch_name = getBranch()
 #     tables = frappe.get_all(
 #         "URY Table",
 #         fields=["name", "occupied", "latest_invoice_time", "is_take_away", "restaurant_room","table_shape","no_of_seats","layout_x","layout_y"],
 #         filters={"branch": branch_name,"restaurant_room":room,}
-#     )    
+#     )
 #     return tables
 
-@frappe.whitelist()
-def getRestaurantMenu(pos_profile, room=None, order_type=None):
+def resolve_restaurant_menu(branch, room=None, order_type=None, cashier=False):
+    """
+    Resolve and return menu for a given branch, room, and order type.
+
+    Args:
+        branch: Branch name string (already resolved)
+        room: Optional room name
+        order_type: Optional order type
+        cashier: Boolean indicating if user is a cashier
+
+    Returns:
+        Dict with keys: items, modified_time, name
+    """
     menu_items = []
     menu_items_with_image = []
 
-    user_role = frappe.get_roles()
+    restaurant = frappe.db.get_value("URY Restaurant", {"branch": branch}, "name")
 
-    pos_profile = frappe.get_doc("POS Profile", pos_profile)
-
-    cashier = any(
-        role.role in user_role for role in pos_profile.role_allowed_for_billing
-    )
-    branch_name = getBranch()
-    restaurant = frappe.db.get_value("URY Restaurant", {"branch": branch_name}, "name")
-    
     if room:
-    
+
         room_wise_menu = frappe.db.get_value(
             "URY Restaurant", restaurant, "room_wise_menu"
         )
-        
+
         if room_wise_menu:
             menu = frappe.db.get_value(
                 "Menu for Room",
@@ -51,7 +54,7 @@ def getRestaurantMenu(pos_profile, room=None, order_type=None):
         order_type_wise_menu = frappe.db.get_value(
             "URY Restaurant", restaurant, "order_type_wise_menu"
         )
-    
+
         if order_type_wise_menu:
             menu = frappe.db.get_value(
                 "Order Type Menu",
@@ -60,18 +63,18 @@ def getRestaurantMenu(pos_profile, room=None, order_type=None):
             )
             if not menu:
                  menu = frappe.db.get_value("URY Restaurant", restaurant, "active_menu")
-    
+
         else:
             menu = frappe.db.get_value("URY Restaurant", restaurant, "active_menu")
 
     # Default menu if nothing is selected
     else:
         menu = frappe.db.get_value("URY Restaurant", restaurant, "active_menu")
-    
+
     if not menu:
         frappe.throw(_("Please set an active menu for Restaurant {0}").format(restaurant))
-    
-    
+
+
     # Get menu items (your existing code)
     menu_items = frappe.get_all(
         "URY Menu Item",
@@ -79,7 +82,7 @@ def getRestaurantMenu(pos_profile, room=None, order_type=None):
         fields=["item", "item_name", "rate", "special_dish", "disabled", "course"],
         order_by="item_name asc"
     )
-    
+
     menu_items_with_image = [
         {
             "item": item.item,
@@ -94,13 +97,26 @@ def getRestaurantMenu(pos_profile, room=None, order_type=None):
         for item in menu_items
     ]
     modified = frappe.db.get_value("URY Menu", menu, "modified")
-    
-    
+
+
     return {
         "items": menu_items_with_image,
         "modified_time": modified,
         "name": menu
     }
+
+@frappe.whitelist()
+def getRestaurantMenu(pos_profile, room=None, order_type=None):
+    user_role = frappe.get_roles()
+
+    pos_profile = frappe.get_doc("POS Profile", pos_profile)
+
+    cashier = any(
+        role.role in user_role for role in pos_profile.role_allowed_for_billing
+    )
+    branch_name = getBranch()
+
+    return resolve_restaurant_menu(branch_name, room, order_type, cashier)
 
 @frappe.whitelist()
 def getMenuCourses():

@@ -1,0 +1,251 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "prompt",
+ "creation": "2026-08-19 00:00:00.000000",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "profile_info_tab",
+  "profile_name",
+  "restaurant",
+  "branch",
+  "column_break_profile_info",
+  "pos_profile",
+  "default_customer",
+  "enabled",
+  "ordering_modes_section",
+  "enable_qr_table_ordering",
+  "enable_qr_pickup_ordering",
+  "column_break_ordering_modes",
+  "enable_kiosk_ordering",
+  "allow_add_to_running_table",
+  "product_display_section",
+  "enable_product_detail_page",
+  "show_item_images",
+  "column_break_product_display",
+  "show_item_descriptions",
+  "enable_item_notes",
+  "billing_payment_section",
+  "enable_request_bill",
+  "enable_customer_payment",
+  "column_break_billing_payment",
+  "enable_payment_link",
+  "enable_pay_at_counter",
+  "session_section",
+  "session_idle_timeout_minutes"
+ ],
+ "fields": [
+  {
+   "fieldname": "profile_info_tab",
+   "fieldtype": "Tab Break",
+   "label": "Profile Info"
+  },
+  {
+   "fieldname": "profile_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Profile Name",
+   "reqd": 1
+  },
+  {
+   "fieldname": "restaurant",
+   "fieldtype": "Link",
+   "label": "Restaurant",
+   "options": "URY Restaurant",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "restaurant.branch",
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "label": "Branch",
+   "options": "Branch",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_profile_info",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "pos_profile",
+   "fieldtype": "Link",
+   "label": "POS Profile",
+   "options": "POS Profile",
+   "reqd": 1
+  },
+  {
+   "fieldname": "default_customer",
+   "fieldtype": "Link",
+   "label": "Default Customer",
+   "options": "Customer"
+  },
+  {
+   "default": "1",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enabled"
+  },
+  {
+   "fieldname": "ordering_modes_section",
+   "fieldtype": "Section Break",
+   "label": "Ordering Modes"
+  },
+  {
+   "default": "1",
+   "fieldname": "enable_qr_table_ordering",
+   "fieldtype": "Check",
+   "label": "Enable QR Table Ordering"
+  },
+  {
+   "default": "1",
+   "fieldname": "enable_qr_pickup_ordering",
+   "fieldtype": "Check",
+   "label": "Enable QR Pickup Ordering"
+  },
+  {
+   "fieldname": "column_break_ordering_modes",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "enable_kiosk_ordering",
+   "fieldtype": "Check",
+   "label": "Enable Kiosk Ordering"
+  },
+  {
+   "default": "1",
+   "fieldname": "allow_add_to_running_table",
+   "fieldtype": "Check",
+   "label": "Allow Add to Running Table"
+  },
+  {
+   "fieldname": "product_display_section",
+   "fieldtype": "Section Break",
+   "label": "Product Display"
+  },
+  {
+   "default": "1",
+   "fieldname": "enable_product_detail_page",
+   "fieldtype": "Check",
+   "label": "Enable Product Detail Page"
+  },
+  {
+   "default": "1",
+   "fieldname": "show_item_images",
+   "fieldtype": "Check",
+   "label": "Show Item Images"
+  },
+  {
+   "fieldname": "column_break_product_display",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "fieldname": "show_item_descriptions",
+   "fieldtype": "Check",
+   "label": "Show Item Descriptions"
+  },
+  {
+   "default": "1",
+   "fieldname": "enable_item_notes",
+   "fieldtype": "Check",
+   "label": "Enable Item Notes"
+  },
+  {
+   "fieldname": "billing_payment_section",
+   "fieldtype": "Section Break",
+   "label": "Billing & Payment"
+  },
+  {
+   "default": "1",
+   "fieldname": "enable_request_bill",
+   "fieldtype": "Check",
+   "label": "Enable Request Bill"
+  },
+  {
+   "default": "0",
+   "fieldname": "enable_customer_payment",
+   "fieldtype": "Check",
+   "label": "Enable Customer Payment"
+  },
+  {
+   "fieldname": "column_break_billing_payment",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "enable_payment_link",
+   "fieldtype": "Check",
+   "label": "Enable Payment Link"
+  },
+  {
+   "default": "1",
+   "fieldname": "enable_pay_at_counter",
+   "fieldtype": "Check",
+   "label": "Enable Pay at Counter"
+  },
+  {
+   "fieldname": "session_section",
+   "fieldtype": "Section Break",
+   "label": "Session"
+  },
+  {
+   "default": "30",
+   "fieldname": "session_idle_timeout_minutes",
+   "fieldtype": "Int",
+   "label": "Session Idle Timeout (Minutes)"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-19 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY Self Ordering Profile",
+ "naming_rule": "Set by user",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "select": 1,
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "URY Manager",
+   "select": 1,
+   "share": 1,
+   "write": 1
+  },
+  {
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "URY Cashier",
+   "select": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}
