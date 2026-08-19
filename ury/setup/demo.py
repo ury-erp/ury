@@ -28,19 +28,15 @@ def setup_ury_demo_data(company):
     capture("demo_data_creation_started", "ury")
     frappe.flags.mute_messages = True
     try:
-        frappe.publish_realtime("setup_task", {"progress": [1, 7], "stage_status": "Setting up your system..."}, user=frappe.session.user)
         frappe.defaults.set_user_default("Company", company)
         frappe.db.set_single_value("Stock Settings", "allow_negative_stock", 1)
         
-        frappe.publish_realtime("setup_task", {"progress": [2, 7], "stage_status": "Creating Master Data..."}, user=frappe.session.user)
         process_masters(company)
         
-        frappe.publish_realtime("setup_task", {"progress": [3, 7], "stage_status": "Generating Transactions..."}, user=frappe.session.user)
         process_transactions(company)
         
         generate_pos_demo()
 
-        frappe.publish_realtime("setup_task", {"progress": [6, 7], "stage_status": "Finalizing Setup..."}, user=frappe.session.user)
         admin = frappe.get_doc("User", "Administrator")
         admin.add_roles("URY Cashier", "URY Captain", "URY Manager")
 
@@ -50,13 +46,11 @@ def setup_ury_demo_data(company):
         if hasattr(frappe.local, "message_log"):
             frappe.local.message_log = []
             
-        frappe.publish_realtime("setup_task", {"progress": [7, 7], "stage_status": "Completed"}, user=frappe.session.user)
         # Removed status: ok to prevent early page reload
     except Exception as e:
         frappe.db.set_single_value("Stock Settings", "allow_negative_stock", 0)
         frappe.log_error("Failed to create demo data")
         capture("demo_data_creation_failed", "ury", properties={"exception": frappe.get_traceback()})
-        frappe.publish_realtime("setup_task", {"status": "fail", "fail_msg": "URY demo data generation failed"}, user=frappe.session.user)
         raise
     finally:
         frappe.flags.mute_messages = False
