@@ -23,6 +23,7 @@ interface SearchableSelectProps {
    * behavior for existing consumers (Dashboard pages, Menu course field).
    */
   strict?: boolean;
+  disabled?: boolean;
 }
 
 export function SearchableSelect({
@@ -34,6 +35,7 @@ export function SearchableSelect({
   onChange,
   onBlur,
   strict = false,
+  disabled = false,
 }: SearchableSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -163,10 +165,12 @@ export function SearchableSelect({
   };
 
   const handleFocus = () => {
-    setIsOpen(true);
+    if (!disabled) {
+      setIsOpen(true);
+    }
   };
 
-  const dropdownContent = isOpen ? (
+  const dropdownContent = (isOpen && !disabled) ? (
     <div
       ref={dropdownRef}
       style={{
@@ -227,15 +231,20 @@ export function SearchableSelect({
           onFocus={handleFocus}
           placeholder={placeholder}
           error={error}
+          disabled={disabled}
           autoComplete="off"
           className="w-full pr-9 cursor-text"
         />
         <div
           onClick={() => {
-            setIsOpen((prev) => !prev);
-            if (!isOpen) setIsTyping(false);
+            if (!disabled) {
+              setIsOpen((prev) => !prev);
+              if (!isOpen) setIsTyping(false);
+            }
           }}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 cursor-pointer p-1 hover:text-gray-600 transition-colors"
+          className={`absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 p-1 transition-colors ${
+            disabled ? 'pointer-events-none opacity-50' : 'cursor-pointer hover:text-gray-600'
+          }`}
         >
           <svg
             className={`w-4 h-4 transform transition-transform ${isOpen ? 'rotate-180' : ''}`}
