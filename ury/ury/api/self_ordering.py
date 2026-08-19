@@ -406,6 +406,29 @@ def add_customer_items(session, items):
     if session.invoice and not profile.allow_add_to_running_table:
         frappe.throw(_("Adding further items to this order is not allowed"), frappe.ValidationError)
 
+    # session.invoice is only set after THIS session has placed an order —
+    # it's None on a session's very first call even when the table already
+    # has an open invoice from staff (POS/Captain) or an earlier customer
+    # session. Without this check, allow_add_to_running_table=False could
+    # be silently bypassed by a customer's first request attaching to (and
+    # mutating pos_profile/order_source on) an order they didn't start.
+    if session.table and not session.invoice and not profile.allow_add_to_running_table:
+        with _elevated():
+            existing_invoice = frappe.get_all(
+                "POS Invoice",
+                filters={"docstatus": 0, "invoice_printed": 0},
+                or_filters={
+                    "restaurant_table": session.table,
+                    "custom_merged_tables": ["like", f"%{session.table}%"],
+                },
+                limit=1,
+            )
+        if existing_invoice:
+            frappe.throw(
+                _("This table already has an order in progress. Please ask staff for assistance."),
+                frappe.ValidationError,
+            )
+
     if isinstance(items, str):
         items = json.loads(items)
     if not items or not isinstance(items, list):
