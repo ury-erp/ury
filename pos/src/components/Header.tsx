@@ -89,6 +89,10 @@ const Header = () => {
 
   const handleLogout = async () => {
     try {
+      localStorage.removeItem('ury_auth_user');
+      sessionStorage.removeItem('ury_auth_user');
+      localStorage.removeItem('posProfile');
+      sessionStorage.removeItem('posProfile');
       await logout();
       window.location.href = '/login?redirect-to=%2Fpos';
     } catch (error) {
