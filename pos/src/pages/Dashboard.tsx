@@ -3,6 +3,9 @@ import { Card, CardContent } from '@ury/ui';
 import { useState, useEffect } from 'react';
 import { usePOSStore } from '../store/pos-store';
 import { formatCurrency } from '@ury/core';
+import InsightFeed from '../components/dashboard/InsightFeed';
+import FastMovingItems from '../components/dashboard/FastMovingItems';
+import BaselineComparisonStrip from '../components/dashboard/BaselineComparisonStrip';
 
 // Helper function to format relative time
 function getRelativeTime(creationDate: string): string {
@@ -33,21 +36,20 @@ export default function Dashboard() {
   const [stats, setStats] = useState<any[]>([]);
   const [serviceLine, setServiceLine] = useState<any[]>([]);
   const [shiftMetrics, setShiftMetrics] = useState<any>(null);
-  const [baseline, setBaseline] = useState<any>(null);
+  const [shiftMetricsLoading, setShiftMetricsLoading] = useState(true);
+  const [shiftMetricsError, setShiftMetricsError] = useState<string | null>(null);
   const [floorLoad, setFloorLoad] = useState<any[]>([]);
   const [runningLow, setRunningLow] = useState<any[]>([]);
   const [needsAttention, setNeedsAttention] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [statsLoading, setStatsLoading] = useState(false);
   const [serviceLineLoading, setServiceLineLoading] = useState(false);
-  const [metricsLoading, setMetricsLoading] = useState(false);
   const [floorLoadLoading, setFloorLoadLoading] = useState(false);
   const [runningLowLoading, setRunningLowLoading] = useState(false);
   const [needsAttentionLoading, setNeedsAttentionLoading] = useState(false);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [statsError, setStatsError] = useState<string | null>(null);
   const [serviceLineError, setServiceLineError] = useState<string | null>(null);
-  const [metricsError, setMetricsError] = useState<string | null>(null);
   const [floorLoadError, setFloorLoadError] = useState<string | null>(null);
   const [runningLowError, setRunningLowError] = useState<string | null>(null);
   const [needsAttentionError, setNeedsAttentionError] = useState<string | null>(null);
@@ -116,24 +118,19 @@ export default function Dashboard() {
         setServiceLineLoading(false);
       }
 
-      // Fetch shift metrics and baseline
-      setMetricsLoading(true);
-      setMetricsError(null);
+      // Fetch shift metrics (avg per cover / avg ticket time — not covered by BaselineComparisonStrip)
+      setShiftMetricsLoading(true);
+      setShiftMetricsError(null);
       try {
-        const metricsRes = await call.get('ury.ury.api.ury_dashboard.get_shift_metrics', {
+        const shiftRes = await call.get('ury.ury.api.ury_dashboard.get_shift_metrics', {
           branch: posProfile.branch
         });
-        setShiftMetrics(metricsRes.message);
-
-        const baselineRes = await call.get('ury.ury.api.ury_dashboard.get_baseline', {
-          branch: posProfile.branch
-        });
-        setBaseline(baselineRes.message);
+        setShiftMetrics(shiftRes.message);
       } catch (err) {
-        setMetricsError('Failed to load metrics');
-        console.error('Error fetching metrics:', err);
+        setShiftMetricsError('Failed to load shift metrics');
+        console.error('Error fetching shift metrics:', err);
       } finally {
-        setMetricsLoading(false);
+        setShiftMetricsLoading(false);
       }
 
       // Fetch floor load
@@ -231,10 +228,15 @@ export default function Dashboard() {
   const maxTableCount = Math.max(...floorLoad.map((f: any) => f.table_count), 1);
 
   return (
-    <div className="h-full overflow-y-auto p-6 bg-gray-50">
-      {/* Stat Cards Row */}
+    <div className="h-full overflow-y-auto p-6 bg-gray-50 font-display">
+      {/* Insight Feed - "Act now" */}
       <div className="mb-6">
         <h2 className="text-2xl font-semibold text-gray-900 mb-4">Dashboard</h2>
+        <InsightFeed branch={posProfile?.branch} />
+      </div>
+
+      {/* Stat Cards Row */}
+      <div className="mb-6">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {statsError ? (
             <div className="col-span-full text-red-600 text-sm">Failed to load stats</div>
@@ -250,7 +252,7 @@ export default function Dashboard() {
                       <h3 className="text-sm font-medium text-gray-600">{stat.label}</h3>
                       <IconComponent className={`w-5 h-5 ${stat.color}`} />
                     </div>
-                    <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
+                    <p className="font-mono text-2xl font-bold text-gray-900">{stat.value}</p>
                   </CardContent>
                 </Card>
               );
@@ -311,7 +313,7 @@ export default function Dashboard() {
                     return (
                       <div key={idx} className="flex flex-col items-center flex-shrink-0">
                         {table.minutes !== null && (
-                          <span className="text-xs text-gray-600 mb-1 h-4">{table.minutes}</span>
+                          <span className="font-mono text-xs text-gray-600 mb-1 h-4">{table.minutes}</span>
                         )}
                         <div
                           className={`w-8 ${barColor} rounded-t transition-all`}
@@ -373,63 +375,39 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          {/* Tonight vs Baseline */}
+          {/* Baseline comparison strip (item 9) */}
+          <BaselineComparisonStrip branch={posProfile?.branch} />
+
+          {/* Shift metrics not covered by the baseline strip (avg per cover / avg ticket time) */}
           <Card className="bg-white border border-gray-200">
             <CardContent className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Tonight vs Baseline</h3>
-              {metricsError ? (
+              {shiftMetricsError ? (
                 <p className="text-red-600 text-sm">Failed to load metrics</p>
-              ) : metricsLoading ? (
+              ) : shiftMetricsLoading ? (
                 <p className="text-gray-600 text-sm">Loading...</p>
-              ) : !shiftMetrics || !baseline ? (
+              ) : !shiftMetrics ? (
                 <p className="text-gray-600 text-sm">No data available</p>
               ) : (
                 <div className="grid grid-cols-2 gap-4">
-                  {/* Sales */}
-                  <div className="p-3 bg-gray-50 rounded-lg">
-                    <p className="text-xs text-gray-600 mb-1">Sales</p>
-                    <p className="text-lg font-bold text-gray-900">{formatCurrency(shiftMetrics.sales)}</p>
-                    {baseline.sample_days > 0 && (
-                      <p className="text-xs mt-1">
-                        <span className={shiftMetrics.sales >= baseline.median_sales ? 'text-green-600' : 'text-red-600'}>
-                          {shiftMetrics.sales >= baseline.median_sales ? '+' : ''}{((shiftMetrics.sales - baseline.median_sales) / baseline.median_sales * 100).toFixed(0)}%
-                        </span>
-                        <span className="text-gray-600"> vs {formatCurrency(baseline.median_sales)}</span>
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Covers */}
-                  <div className="p-3 bg-gray-50 rounded-lg">
-                    <p className="text-xs text-gray-600 mb-1">Covers</p>
-                    <p className="text-lg font-bold text-gray-900">{shiftMetrics.covers}</p>
-                    {baseline.sample_days > 0 && (
-                      <p className="text-xs mt-1">
-                        <span className={shiftMetrics.covers >= baseline.median_covers ? 'text-green-600' : 'text-red-600'}>
-                          {shiftMetrics.covers >= baseline.median_covers ? '+' : ''}{shiftMetrics.covers - baseline.median_covers}
-                        </span>
-                        <span className="text-gray-600"> vs {baseline.median_covers}</span>
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Avg per Cover */}
                   <div className="p-3 bg-gray-50 rounded-lg">
                     <p className="text-xs text-gray-600 mb-1">Avg per Cover</p>
                     <p className="text-lg font-bold text-gray-900">{formatCurrency(shiftMetrics.avg_per_cover)}</p>
                   </div>
-
-                  {/* Avg Ticket Time */}
                   <div className="p-3 bg-gray-50 rounded-lg">
                     <p className="text-xs text-gray-600 mb-1">Avg Ticket Time</p>
                     <p className="text-lg font-bold text-gray-900">
-                      {shiftMetrics.avg_ticket_minutes !== null ? `${shiftMetrics.avg_ticket_minutes} min` : '—'}
+                      {shiftMetrics.avg_ticket_minutes !== null && shiftMetrics.avg_ticket_minutes !== undefined
+                        ? `${Math.round(shiftMetrics.avg_ticket_minutes)} min`
+                        : '—'}
                     </p>
                   </div>
                 </div>
               )}
             </CardContent>
           </Card>
+
+          {/* Fast-moving items (item 7) */}
+          <FastMovingItems branch={posProfile?.branch} />
 
           {/* Running Low Section */}
           <Card className="bg-white border border-gray-200">

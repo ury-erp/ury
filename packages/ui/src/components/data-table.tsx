@@ -32,7 +32,7 @@ export function DataTable<T>({
               <th
                 key={column.key}
                 className={cn(
-                  "h-12 px-4 align-middle font-medium text-muted-foreground",
+                  "h-10 px-4 align-middle text-xs font-semibold uppercase tracking-wide text-muted-foreground",
                   column.align === "right" ? "text-right" : "text-left"
                 )}
               >
@@ -61,8 +61,10 @@ export function DataTable<T>({
                   <td
                     key={column.key}
                     className={cn(
-                      "p-4 align-middle",
-                      column.align === "right" ? "text-right tabular-nums" : "text-left"
+                      "px-4 py-2.5 align-middle",
+                      column.align === "right"
+                        ? "text-right font-mono tabular-nums"
+                        : "text-left"
                     )}
                   >
                     {column.render
