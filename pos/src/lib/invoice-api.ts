@@ -13,7 +13,7 @@ import {
 import { resolveTempDependency } from './order-api';
 import { OrderStatusType, OrderType } from '../data/order-types';
 import { buildTableClusterMap, getMergedTablesCsv } from './table-utils';
-import { unwrapResponse } from './network-utils';
+import { isNetworkError, unwrapResponse } from './network-utils';
 import { queryClient } from './query-client';
 import type { Filter } from 'frappe-js-sdk/lib/db/types';
 
@@ -1292,6 +1292,9 @@ export async function updatePrintStatus(orderId: string): Promise<UpdatePrintSta
 
     return { queued: false };
   } catch (error) {
+    if (!isNetworkError(error)) {
+      throw error;
+    }
     console.warn('[updatePrintStatus] Error calling qz_print_update (queueing offline):', error);
 
     await queuePrintUpdate(orderId, endpoint, dependencyIds);
@@ -1341,6 +1344,9 @@ export async function reprintKot(orderId: string): Promise<ReprintKotResult> {
     await call.get(endpoint, { invoice_number: orderId });
     return { success: true, queued: false };
   } catch (error) {
+    if (!isNetworkError(error)) {
+      throw error;
+    }
     console.warn('[reprintKot] Online KOT reprint failed, queueing offline:', error);
     await repositories.syncQueue.put({
       id: `KOT-REPRINT-${orderId}-${Date.now()}`,

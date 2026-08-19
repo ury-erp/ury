@@ -1,6 +1,6 @@
 import { DOCTYPES } from '../data/doctypes';
 import { db, repositories, apiRegistry, call, projectionBus } from '@ury/core';
-import { unwrapResponse } from './network-utils';
+import { isNetworkError, unwrapResponse } from './network-utils';
 
 export interface Room {
   name: string;
@@ -270,6 +270,9 @@ export async function mergeTablesBatch(anchor: string, tables: string[]) {
       tables,
     });
   } catch (error) {
+    if (!isNetworkError(error)) {
+      throw error;
+    }
     console.warn('Network mergeTablesBatch failed, queuing offline sync command:', error);
 
     // Apply the merge locally so the Table UI renders the merged cluster
@@ -298,6 +301,9 @@ export async function unmergeTables(table: string) {
       table,
     });
   } catch (error) {
+    if (!isNetworkError(error)) {
+      throw error;
+    }
     console.warn('Network unmergeTables failed, queuing offline sync command:', error);
 
     // Apply the unmerge locally: dissolve the cluster and keep any tables with
