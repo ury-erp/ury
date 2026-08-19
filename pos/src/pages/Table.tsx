@@ -12,7 +12,7 @@ import { DINE_IN } from '../data/order-types';
 import { captainTransfer, getTableOrder, tableTransfer } from '../lib/order-api';
 import { printOrder } from '../lib/print';
 import { resolvePrintFormat } from '../lib/invoice-api';
-import { canCaptainTransfer } from '@ury/core';
+import { canCaptainTransfer, isUserRestrictedFromTableOrders } from '@ury/core';
 import { showToast } from '@ury/ui';
 import { t } from '../i18n';
 import LayoutView from '../components/LayoutView';
@@ -165,6 +165,13 @@ const TableView = () => {
 
   const handleNavigateToPOS = (tableName: string) => {
     if (!selectedRoom) return;
+
+    // Check if user is restricted from taking table orders
+    if (isUserRestrictedFromTableOrders(user, posProfile)) {
+      showToast.error(t('errors.dine_in_restricted') || 'Dine In is not available for your role');
+      return;
+    }
+
     setSelectedOrderType(DINE_IN);
     setSelectedTable(tableName, selectedRoom);
     navigate('/pos');

@@ -39,6 +39,9 @@ export interface POSInvoice {
   waiter?: string;
   invoice_printed?: number;
   docstatus?: number;
+  no_of_pax?: number;
+  custom_comments?: string | null;
+  modified?: string;
 }
 
 export interface TableOrder {
@@ -83,12 +86,20 @@ export interface SyncOrderRequest {
   aggregator_id?: string | null;
   order_type: string;
   last_invoice: string | null;
+  last_modified_time?: string;
   comments?: string | null;
   room?: string;
 }
 
+/**
+ * sync_order returns the synced POS Invoice on success, or `{ status: 'Failure' }`
+ * when the backend rejects the write (e.g. stale last_modified_time, table already
+ * occupied, or an already-billed invoice).
+ */
+export type SyncOrderResponse = POSInvoice | { status: 'Failure' };
+
 export const syncOrder = async (data: SyncOrderRequest) => {
-  return call.post( 'ury.ury.doctype.ury_order.ury_order.sync_order',data);
+  return call.post('ury.ury.doctype.ury_order.ury_order.sync_order', data) as Promise<{ message: SyncOrderResponse }>;
 };
 
 export interface SplitBillItemMove {
@@ -135,5 +146,17 @@ export async function captainTransfer(
     currentCaptain,
     newCaptain,
     invoice,
+  });
+}
+
+/**
+ * Reprints the KOT for an invoice via the hardened `reprint_kot` endpoint
+ * (`ury/ury/api/ury_kot_reprint.py`), which already enforces branch and
+ * Captain-ownership/elevated-access authorization server-side — this is a
+ * thin wrapper only, no reprint logic lives on the frontend.
+ */
+export async function reprintKot(invoiceNumber: string): Promise<void> {
+  await call.post('ury.ury.api.ury_kot_reprint.reprint_kot', {
+    invoice_number: invoiceNumber,
   });
 }

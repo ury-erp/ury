@@ -55,4 +55,7 @@ export interface PosProfileCombined {
   edit_order_type?: number;
   view_all_status?: number;
   custom_daily_pos_close?: number;
+  remove_items?: number;
+  show_image?: number;
+  custom_enable_kot_reprint?: number;
 }
