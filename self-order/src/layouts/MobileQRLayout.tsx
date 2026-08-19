@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useIdleReset } from '../hooks/useIdleReset'
 import { useOrderingSession } from '../hooks/useOrderingSession'
 import type { OrderingContext } from '../lib/api'
 import CategoryTabs from './shared/CategoryTabs'
@@ -18,6 +19,7 @@ function MobileQRLayout({ initialContext }: LayoutProps) {
     context,
     menu,
     order,
+    orderStatus,
     cart,
     loading,
     submitting,
@@ -77,6 +79,12 @@ function MobileQRLayout({ initialContext }: LayoutProps) {
       resetSession()
     }
   }
+
+  // Idle-reset: for a QR/link session (no device credential) resetSession
+  // clears storage and falls back to the "missing ordering code" error,
+  // requiring a fresh scan — resetSession already encodes that distinction,
+  // so no separate device/QR branch is needed here.
+  useIdleReset(resetSession, (context?.session_idle_timeout_minutes ?? 30) * 60000)
 
   // Handle product card click — check if detail is enabled
   function handleProductClick(itemCode: string) {
@@ -281,7 +289,7 @@ function MobileQRLayout({ initialContext }: LayoutProps) {
     const canAddMore = context?.capabilities.add_to_running_table_enabled ?? false
     return (
       <OrderStatusScreen
-        status={order ? { session_status: 'confirmed', invoice: order.invoice, billed: order.billed } : null}
+        status={orderStatus}
         isPickup={isPickup}
         pickupCode={isPickup ? order?.pickup_code : undefined}
         canAddMore={canAddMore && !isPickup}
