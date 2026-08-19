@@ -5,31 +5,36 @@ import frappe
 from frappe import _
 from ury.setup.demo import setup_ury_demo_data
 from erpnext.setup.setup_wizard.operations.install_fixtures import create_bank_account
-from erpnext.setup.setup_wizard.setup_wizard import get_setup_stages as erpnext_get_setup_stages
 
 
 def get_setup_stages(args=None):
-    stages = erpnext_get_setup_stages(args)
+    return [
+        {
+            "status": _("Generating URY Demo Data"),
+            "fail_msg": _("Failed to generate URY demo data"),
+            "tasks": [
+                {
+                    "fn": enqueue_ury_demo_data,
+                    "args": args,
+                    "fail_msg": _("Failed to start background demo generation")
+                }
+            ]
+        }
+    ]
 
+
+def enqueue_ury_demo_data(args=None):
     if args and args.get("setup_ury_demo"):
-        stages.append(
-            {
-                "status": _("Generating URY Demo Data"),
-                "fail_msg": _("Failed to generate URY demo data"),
-                "tasks": [
-                    {
-                        "fn": run_ury_demo_stage,
-                        "args": args,
-                        "fail_msg": _("Failed to generate URY demo data"),
-                    }
-                ],
-            }
+        frappe.enqueue(
+            "ury.setup.setup_wizard.generate_actual_demo_data",
+            queue="default",
+            timeout=1500,
+            enqueue_after_commit=True,
+            at_front=True,
+            args=args
         )
 
-    return stages
-
-
-def run_ury_demo_stage(args):
+def generate_actual_demo_data(args=None):
     company = create_demo_company()
 
     # Switch default company settings
