@@ -193,6 +193,32 @@
       Audio notifications disabled. Click anywhere to enable.
     </div>
 
+    <!-- KOT Delay Error Alert Banner -->
+    <div
+      v-if="showKotErrorAlert && kotErrorAlert"
+      class="fixed top-0 left-0 right-0 mx-auto p-4 bg-red-50 border-b-4 border-red-500 shadow-lg z-40 flex justify-between items-center"
+    >
+      <div class="flex items-center gap-3">
+        <div class="flex-shrink-0">
+          <span class="text-3xl">⚠️</span>
+        </div>
+        <div class="flex-1">
+          <p class="font-bold text-red-700">Order Delayed</p>
+          <p class="text-red-600 text-sm mt-1">
+            <span v-if="!daily_order_number">Invoice: {{ kotErrorAlert.invoice.slice(-4) }}</span>
+            <span v-else>Order #: {{ kotErrorAlert.order_no }}</span>
+            | Table: {{ kotErrorAlert.tableortakeaway }} | Time: {{ kotErrorAlert.timestamp }}
+          </p>
+        </div>
+      </div>
+      <button
+        @click="hideKotErrorAlert"
+        class="ml-4 text-red-700 hover:text-red-900 font-bold text-xl flex-shrink-0"
+      >
+        ✕
+      </button>
+    </div>
+
     <div
       v-if="statusMessage"
       :class="[
@@ -274,6 +300,7 @@ export default {
       call: frappe.call(),
       branch: "",
       kot_channel: "",
+      kot_error_channel: "",
       clickedItems: new Set(),
       struckThroughItems: {},
       loggeduser: "",
@@ -284,7 +311,9 @@ export default {
       isOnline: navigator.onLine,
       statusMessage: "",
       daily_order_number:0,
-      loadingKots: true
+      loadingKots: true,
+      kotErrorAlert: null,
+      showKotErrorAlert: false
     };
   },
   methods: {
@@ -321,6 +350,7 @@ export default {
               this.audio_alert = result.message.audio_alert;
               this.daily_order_number = result.message.daily_order_number;
               this.kot_channel = `kot_update_${this.branch}_${this.production}`;
+              this.kot_error_channel = `kot_error_${this.branch}_${this.production}`;
               this.kot = result.message.KOT;
               this.loadingKots = false;
               this.updateQtyColorTable();
@@ -544,6 +574,10 @@ export default {
     hideAudioAlertMessage() {
       this.showAudioAlertMessage = false;
     },
+    hideKotErrorAlert() {
+      this.showKotErrorAlert = false;
+      this.kotErrorAlert = null;
+    },
     handleOnline() {
       this.isOnline = true;
       this.setStatusMessage("You are online");
@@ -609,6 +643,24 @@ export default {
               }
             },1500)
             localStorage.setItem("kot_time", doc.kot.time);
+          });
+
+          // New socket listener for KOT error alerts (delayed orders)
+          socket.on(this.kot_error_channel, (doc) => {
+            // Look up the matching KOT in the local array to get table/order info
+            const matchingKot = this.kot.find(k => k.name === doc.kot);
+
+            this.kotErrorAlert = {
+              invoice: doc.invoice,
+              tableortakeaway: matchingKot?.tableortakeaway || 'Table/Takeaway info unavailable',
+              order_no: matchingKot?.order_no || 'N/A',
+              timestamp: new Date().toLocaleTimeString()
+            };
+            this.showKotErrorAlert = true;
+            // Auto-hide after 8 seconds
+            setTimeout(() => {
+              this.hideKotErrorAlert();
+            }, 8000);
           });
         });
       })
