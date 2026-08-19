@@ -892,7 +892,11 @@ def _enforce_order_access(invoice, pos_profile_name=None, require_modify=False, 
             return flags
         raise
 
-    if table_room not in assigned_rooms:
+    # getRoom() returns room=None for a branch-level (not room-specific)
+    # `URY User` assignment — that's "access to every room in the branch",
+    # not "assigned to a room named None". Found via live E2E test: a real
+    # branch-assigned Captain was wrongly denied here before this check.
+    if None not in assigned_rooms and table_room not in assigned_rooms:
         frappe.throw(
             _("Not permitted to access orders outside your assigned room"),
             frappe.PermissionError,
@@ -1047,7 +1051,10 @@ def get_table_order_context(table):
                 assigned_rooms = set() if not (
                     frappe.session.user == "Administrator" or "System Manager" in user_roles
                 ) else None
-            if assigned_rooms is not None and table_room not in assigned_rooms:
+            # getRoom() returns room=None for a branch-level assignment —
+            # that means access to every room in the branch, not "assigned
+            # to a room named None" (found via live E2E test).
+            if assigned_rooms is not None and None not in assigned_rooms and table_room not in assigned_rooms:
                 can_view = False
 
     invoice_billed = bool(order) and order.get("invoice_printed") == 1
@@ -1296,7 +1303,11 @@ def sync_order(
                 else:
                     raise
 
-            if assigned_rooms is not None and table_room not in assigned_rooms:
+            # getRoom() returns room=None for a branch-level assignment —
+            # that means access to every room in the branch, not "assigned
+            # to a room named None" (found via live E2E test: this exact
+            # throw wrongly blocked a real branch-assigned Captain).
+            if assigned_rooms is not None and None not in assigned_rooms and table_room not in assigned_rooms:
                 frappe.throw(
                     _("Not permitted to take orders for a table outside your assigned room."),
                     frappe.PermissionError,
