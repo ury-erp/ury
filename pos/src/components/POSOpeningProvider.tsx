@@ -119,20 +119,28 @@ const POSOpeningProvider = ({ children }: POSOpeningProviderProps) => {
         return;
       }
 
+      // `branch` is intentionally NOT part of this comparison: the backing
+      // API here (ERPNext's standard `check_opening_entry`) never returns a
+      // `branch` field at all -- confirmed live, its response only ever
+      // carries `name`/`company`/`pos_profile`/`period_start_date`. Requiring
+      // it to match meant `entry.branch === posProfile.branch` was
+      // `undefined === "<real branch>"`, always false, so this fired a false
+      // "Open Session Elsewhere" block for every single cashier immediately
+      // after every successful open. `company` + `pos_profile` alone is a
+      // correct match in this app's data model (one POS Profile always
+      // belongs to exactly one branch).
       const matchingEntry =
         entries.find(
           (entry) =>
             entry.pos_profile === posProfile.name &&
-            entry.company === posProfile.company &&
-            entry.branch === posProfile.branch
+            entry.company === posProfile.company
         ) || entries[0];
 
       setExistingEntry(matchingEntry);
 
       const isSameContext =
         matchingEntry.company === posProfile.company &&
-        matchingEntry.pos_profile === posProfile.name &&
-        matchingEntry.branch === posProfile.branch;
+        matchingEntry.pos_profile === posProfile.name;
 
       if (!isSameContext) {
         setBlockingState('crossCompanyOpen');
