@@ -45,6 +45,7 @@ export function BarChartCard({ title, data, xKey, yKeys, colors, labels }: BarCh
                 name={labels?.[key] ?? key}
                 fill={palette[index % palette.length]}
                 maxBarSize={56}
+                isAnimationActive={false}
               />
             ))}
           </BarChart>
