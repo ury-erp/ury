@@ -27,6 +27,7 @@
     "search_placeholder_default": "Search orders, menu items, or customers...",
     "search_placeholder_orders": "Search Orders",
     "search_placeholder_menu": "Search Menu",
+    "close_shift": "Close Shift",
     "switch_to_desk": "Switch To Desk",
     "clear_cache": "Clear Cache",
     "logout": "Logout"
@@ -97,6 +98,8 @@
       "retry": "Retry",
       "continue_to_pos": "Continue to POS",
       "contact_manager": "Contact your manager",
+      "daily_close_pending_actionable": "Yesterday's session is still open and must be closed before you can start a new one.",
+      "close_now": "Close Previous Session",
       "session_exists_title": "Session Already Open",
       "session_exists_message": "A session is already open for this terminal.",
       "session_elsewhere_title": "Open Session Elsewhere",
@@ -133,7 +136,11 @@
     "contact_manager": "Contact your manager",
     "retry": "Retry",
     "error_loading": "Failed to load opening data. Please try again.",
-    "error_opening": "Failed to open POS session. Please try again."
+    "error_opening": "Failed to open POS session. Please try again.",
+    "opening_balance_help": "Opening Balance is the starting cash/payment amount you're declaring for this shift. It's used to reconcile against sales when you close out.",
+    "zero_balance_warning": "You're opening with ₹0 across all payment modes. Tap \"Confirm & Open\" again to continue anyway.",
+    "confirm_zero_balance": "Confirm & Open",
+    "session_opened_success": "POS session opened"
   },
   "pos_closing": {
     "title": "Close POS",
@@ -150,7 +157,19 @@
     "submitting": "Closing POS...",
     "submit": "Close POS",
     "submit_failed": "Failed to close POS",
-    "load_failed": "Failed to load closing details"
+    "load_failed": "Failed to load closing details",
+    "help_expected": "The amount the system expects for this payment mode, based on today's invoices.",
+    "help_closing": "Enter the actual amount you counted for this payment mode.",
+    "help_difference": "Counted amount minus expected amount. Positive means an overage, negative means a shortage.",
+    "validation_missing_rows": "Enter a closing amount for every payment mode before submitting.",
+    "validation_all_zero": "Total closing amount can't be zero. Enter the amounts you counted.",
+    "validation_zero_row_warning": "One or more payment modes were left at 0 despite having activity today. Double-check before submitting.",
+    "confirm_title": "Confirm POS Close",
+    "confirm_message": "This will submit the closing entry and cannot be undone. Are you sure you want to continue?",
+    "confirm_submit": "Yes, Close POS",
+    "confirm_back": "Go Back",
+    "checklist_skip": "Skip for now",
+    "checklist_skip_hint": "The POS close was already submitted. You can finish this checklist later."
   },
   "checklist": {
     "title_opening": "Opening Checklist",
