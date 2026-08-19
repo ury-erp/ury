@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react';
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { call } from '@ury/core';
 import SetupPage from './pages/Setup/SetupPage';
 import ConfigurePage from './pages/Setup/ConfigurePage';
 import DashboardLayout from './components/layout/DashboardLayout';
@@ -11,16 +13,43 @@ import { UserPage } from './pages/Dashboard/UserPage';
 import { BranchPage } from './pages/Dashboard/BranchPage';
 import { ReportSettingsPage } from './pages/Dashboard/ReportSettingsPage';
 
-function SetupGuard() {
-  // @ts-ignore
-  const setupComplete = Number(window.frappe?.boot?.setup_complete || 0);
-  const isSetupRoute = window.location.pathname.startsWith('/ury/setup-wizard/');
+interface WizardStatus {
+  step1_complete: boolean;
+  step2_complete: boolean;
+}
 
-  if (setupComplete !== 1 && !isSetupRoute) {
-    return <Navigate to="/setup-wizard/0" replace />;
+function SetupGuard() {
+  const [status, setStatus] = useState<WizardStatus | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await call<any>('ury.ury.api.minimal.setup_organization.get_wizard_status');
+        const wizardStatus: WizardStatus = res?.message ?? res;
+        if (!cancelled) setStatus(wizardStatus);
+      } catch {
+        // If the status fetch fails, fall back to treating setup as incomplete
+        // rather than flashing a redirect to the dashboard on bad data.
+        if (!cancelled) setStatus({ step1_complete: false, step2_complete: false });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (!status) {
+    return null;
   }
 
-  if (setupComplete === 1 && isSetupRoute) {
+  const isSetupRoute = window.location.pathname.startsWith('/ury/setup-wizard/');
+
+  if (!status.step2_complete && !isSetupRoute) {
+    return <Navigate to={status.step1_complete ? '/setup-wizard/1' : '/setup-wizard/0'} replace />;
+  }
+
+  if (status.step2_complete && isSetupRoute) {
     return <Navigate to="/dashboard" replace />;
   }
 
