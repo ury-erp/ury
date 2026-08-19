@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { call } from '@ury/core';
 import SetupPage from './pages/Setup/SetupPage';
@@ -17,6 +17,8 @@ import AggregatorPage from './pages/Dashboard/AggregatorPage';
 import { RoleGuard } from './components/RoleGuard';
 import { AuthGuard } from './components/AuthGuard';
 import { ReportsLayout } from './pages/Reports/ReportsLayout';
+import { ActiveReportProvider } from './components/chat/ActiveReportContext';
+import ChatWidget, { ChatWidgetRefProvider, type ChatWidgetHandle } from './components/chat/ChatWidget';
 import { ReportsHome } from './pages/Reports/ReportsHome';
 import { TodaysSales } from './pages/Reports/TodaysSales';
 import { DaywiseSales } from './pages/Reports/DaywiseSales';
@@ -106,6 +108,19 @@ function SetupGuard() {
 }
 
 function App() {
+  const chatRef = useRef<ChatWidgetHandle>(null);
+
+  return (
+    <ActiveReportProvider>
+      <ChatWidgetRefProvider chatRef={chatRef}>
+        <AppRoutes />
+        <ChatWidget ref={chatRef} />
+      </ChatWidgetRefProvider>
+    </ActiveReportProvider>
+  );
+}
+
+function AppRoutes() {
   return (
     <Routes>
       <Route element={<SetupGuard />}>

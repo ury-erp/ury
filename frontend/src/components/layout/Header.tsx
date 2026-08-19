@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useBranchContext } from '../../context/BranchContext';
 import { logout, call, getLoggedUser, getUserRoles } from '@ury/core';
 import uryLogo from '../../../Public/URY-bg.png';
+import AskBar from '../chat/AskBar';
 import {
   Bell,
   User,
@@ -139,6 +140,12 @@ export const Header: React.FC = () => {
 
         {/* Right Section: Actions, Notifications, Branch Selector, User Profile */}
         <div className="flex items-center space-x-3">
+          {/* Ask HUF bar (PLAN.md item 6) — opens the shared ChatWidget
+              pre-focused, also reachable via the global ⌘K shortcut. */}
+          <div className="hidden md:block w-56 lg:w-72">
+            <AskBar />
+          </div>
+
           {/* Branch Selector Dropdown */}
           <div className="relative" ref={branchMenuRef}>
             <button
