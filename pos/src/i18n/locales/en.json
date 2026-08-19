@@ -87,6 +87,35 @@
     "reload_page": "Reload Page",
     "switch_to_desk": "Switch to Desk"
   },
+  "pos_closing": {
+    "title": "Close POS",
+    "description": "Review sales for your session and enter the actual closing amounts.",
+    "loading": "Loading closing details...",
+    "no_open_entry": "No open POS Opening Entry was found for your session.",
+    "period_start": "Period Start",
+    "period_end": "Period End",
+    "grand_total": "Grand Total",
+    "net_total": "Net Total",
+    "total_qty": "Total Quantity",
+    "total_invoices": "Total Invoices",
+    "no_invoices": "No invoices were found for this period.",
+    "submitting": "Closing POS...",
+    "submit": "Close POS",
+    "submit_failed": "Failed to close POS",
+    "load_failed": "Failed to load closing details"
+  },
+  "checklist": {
+    "title_opening": "Opening Checklist",
+    "title_closing": "Closing Checklist",
+    "description": "Please complete the checklist below before you continue.",
+    "loading": "Loading checklist...",
+    "remarks_placeholder": "Remarks (optional)",
+    "submit": "Submit Checklist",
+    "submitting": "Submitting...",
+    "load_failed": "Failed to load checklist",
+    "submit_failed": "Failed to submit checklist",
+    "incomplete_error": "All mandatory items must be checked before this checklist can be completed."
+  },
   "customer": {
     "search_placeholder": "Search customer...",
     "type_to_search": "Please type to search...",

@@ -1,4 +1,5 @@
 import frappe
+import json
 from frappe import _
 from datetime import date, datetime, timedelta
 from frappe.utils import validate_phone_number
@@ -870,6 +871,61 @@ def posOpening():
     return flag
 
 
+POS_OPENING_SUPERVISOR_ROLES = {"URY Manager", "System Manager"}
+
+
+@frappe.whitelist()
+def get_open_pos_opening_entries(pos_profile):
+    session_user = frappe.session.user
+    is_supervisor = session_user == "Administrator" or bool(
+        set(frappe.get_roles(session_user)) & POS_OPENING_SUPERVISOR_ROLES
+    )
+
+    # Branch scoping: the POS Profile must belong to the session user's branch
+    try:
+        session_branch = getBranch()
+    except Exception:
+        if is_supervisor:
+            # Supervisors may not be mapped to a branch
+            session_branch = None
+        else:
+            raise
+
+    profile_branch = frappe.db.get_value("POS Profile", pos_profile, "branch")
+
+    if not profile_branch:
+        frappe.throw(
+            _("POS Profile {0} not found.").format(pos_profile),
+            frappe.DoesNotExistError,
+        )
+
+    if session_branch and profile_branch != session_branch:
+        frappe.throw(
+            _("You do not have permission to access opening entries for POS Profile {0}.").format(
+                pos_profile
+            ),
+            frappe.PermissionError,
+        )
+
+    filters = {
+        "pos_profile": pos_profile,
+        "status": "Open",
+        "docstatus": 1,
+    }
+
+    # Non-supervisors only see their own open entries
+    if not is_supervisor:
+        filters["user"] = session_user
+
+    pos_opening_entries = frappe.get_all(
+        "POS Opening Entry",
+        fields=["name", "period_start_date", "user", "pos_profile"],
+        filters=filters,
+    )
+
+    return pos_opening_entries
+
+
 @frappe.whitelist()
 def getAggregator():
     branchName = getBranch()
@@ -992,8 +1048,131 @@ def validate_pos_close(pos_profile):
             return "Failed"
         
         return "Success"
-    
+
     return "Success"
+
+
+def _validate_checklist_branch(pos_profile):
+    """Ensure the session user's branch matches the given POS Profile's branch."""
+    session_branch = getBranch()
+    profile_branch = frappe.db.get_value("POS Profile", pos_profile, "branch")
+
+    if not profile_branch:
+        frappe.throw(
+            _("POS Profile {0} not found.").format(pos_profile),
+            frappe.DoesNotExistError,
+        )
+
+    if profile_branch != session_branch:
+        frappe.throw(
+            _("You do not have permission to access the checklist for POS Profile {0}.").format(
+                pos_profile
+            ),
+            frappe.PermissionError,
+        )
+
+
+@frappe.whitelist()
+def get_checklist(pos_profile, checklist_type):
+    _validate_checklist_branch(pos_profile)
+
+    configured_items = frappe.get_all(
+        "URY Checklist Item",
+        fields=["item_label", "applies_to", "is_mandatory"],
+        filters={"parent": pos_profile, "applies_to": ["in", [checklist_type, "Both"]]},
+        parent_doctype="POS Profile",
+    )
+
+    existing_log = frappe.get_all(
+        "URY POS Checklist Log",
+        fields=["name", "status"],
+        filters={
+            "pos_profile": pos_profile,
+            "checklist_type": checklist_type,
+            "shift_date": date.today(),
+        },
+        limit=1,
+    )
+
+    log_name = None
+    log_status = None
+    if existing_log and existing_log[0].status == "In Progress":
+        log_name = existing_log[0].name
+        log_status = existing_log[0].status
+
+    return {
+        "items": configured_items,
+        "log_name": log_name,
+        "log_status": log_status,
+    }
+
+
+@frappe.whitelist()
+def submit_checklist(pos_profile, checklist_type, items, pos_opening_entry=None):
+    _validate_checklist_branch(pos_profile)
+
+    items = json.loads(items)
+
+    configured_items = frappe.get_all(
+        "URY Checklist Item",
+        fields=["item_label", "is_mandatory"],
+        filters={"parent": pos_profile, "applies_to": ["in", [checklist_type, "Both"]]},
+        parent_doctype="POS Profile",
+    )
+    mandatory_by_label = {row.item_label: row.is_mandatory for row in configured_items}
+
+    existing_log = frappe.get_all(
+        "URY POS Checklist Log",
+        fields=["name"],
+        filters={
+            "pos_profile": pos_profile,
+            "checklist_type": checklist_type,
+            "shift_date": date.today(),
+        },
+        limit=1,
+    )
+
+    if existing_log:
+        log_doc = frappe.get_doc("URY POS Checklist Log", existing_log[0].name)
+    else:
+        log_doc = frappe.new_doc("URY POS Checklist Log")
+        log_doc.pos_profile = pos_profile
+        log_doc.branch = getBranch()
+        log_doc.checklist_type = checklist_type
+        log_doc.shift_date = date.today()
+
+    if pos_opening_entry:
+        log_doc.pos_opening_entry = pos_opening_entry
+
+    log_doc.set("items", [])
+    for item in items:
+        log_doc.append(
+            "items",
+            {
+                "item_label": item.get("item_label"),
+                "is_mandatory": mandatory_by_label.get(item.get("item_label"), 0),
+                "is_checked": item.get("is_checked"),
+                "remarks": item.get("remarks"),
+            },
+        )
+
+    all_mandatory_checked = all(
+        row.is_checked for row in log_doc.items if row.is_mandatory
+    )
+
+    if all_mandatory_checked:
+        log_doc.status = "Complete"
+        log_doc.completed_by = frappe.session.user
+        log_doc.completed_at = frappe.utils.now()
+    else:
+        log_doc.status = "In Progress"
+
+    log_doc.save()
+
+    return {
+        "status": log_doc.status,
+        "name": log_doc.name,
+    }
 
 
 @frappe.whitelist()
@@ -1128,3 +1307,30 @@ def merge_bills(primary_invoice, secondary_invoice):
             "status": "error",
             "message": str(e),
         }
+
+
+@frappe.whitelist()
+def get_production_units_for_branch():
+	"""Fetch all production unit names for the current user's branch.
+
+	Returns a list of production unit names that should be subscribed to for
+	KOT error channels on the POS terminal.
+	"""
+	try:
+		branch = getBranch()
+	except frappe.exceptions.ValidationError:
+		# Fallback if getBranch() throws (e.g., Administrator with no branch)
+		return {"production_units": []}
+
+	if not branch:
+		return {"production_units": []}
+
+	productions = frappe.get_all(
+		"URY Production Unit",
+		filters={"branch": branch},
+		fields=["name"]
+	)
+
+	production_names = [p.name for p in productions]
+
+	return {"production_units": production_names}
