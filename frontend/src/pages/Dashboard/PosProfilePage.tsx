@@ -37,12 +37,13 @@ interface ApplicableUser {
   default?: number;
 }
 
-type DetailTab = 'details' | 'print_settings' | 'users_permissions';
+type DetailTab = 'details' | 'print_settings' | 'users_payments';
 
 export const PosProfilePage: React.FC = () => {
   const { activeBranchId, branches = [] } = useBranchContext();
   const [profiles, setProfiles] = useState<PosProfileRecord[]>([]);
   const [selectedProfile, setSelectedProfile] = useState<PosProfileRecord | null>(null);
+  const [isEditMode, setIsEditMode] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
   const [saving, setSaving] = useState<boolean>(false);
   const [activeDetailTab, setActiveDetailTab] = useState<DetailTab>('details');
@@ -217,12 +218,16 @@ export const PosProfilePage: React.FC = () => {
     fetchOptions();
   }, [activeBranchId]);
 
+  // View Mode: Open read-only detail view
   const handleProfileView = (profile: PosProfileRecord) => {
+    setIsEditMode(false);
     setActiveDetailTab('details');
     fetchProfileDetails(profile.name);
   };
 
+  // Direct Edit Mode: Open editable detail view
   const handleProfileEdit = (profile: PosProfileRecord) => {
+    setIsEditMode(true);
     setActiveDetailTab('details');
     fetchProfileDetails(profile.name);
   };
@@ -272,8 +277,10 @@ export const PosProfilePage: React.FC = () => {
 
       showToast.success('POS Profile saved successfully');
       fetchProfiles();
+      setIsEditMode(false); // Return to read-only View Mode after successful save
     } catch (err: any) {
       showToast.error(err.message || 'Failed to save POS Profile');
+      // Remains in Edit Mode if save fails
     } finally {
       setSaving(false);
     }
@@ -293,7 +300,7 @@ export const PosProfilePage: React.FC = () => {
               className="text-gray-700 hover:text-primary flex items-center gap-1.5 shadow-2xs"
             >
               <ArrowLeft className="w-4 h-4" />
-              <span>Back to POS Profiles</span>
+              <span>Back</span>
             </Button>
             <div className="h-5 w-px bg-gray-200" />
             <div>
@@ -303,14 +310,24 @@ export const PosProfilePage: React.FC = () => {
               </p>
             </div>
           </div>
-          <Button
-            onClick={() => handleSaveProfile()}
-            disabled={saving}
-            className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center space-x-1.5 shadow-xs"
-          >
-            {saving ? <Spinner className="w-4 h-4 mr-1.5" /> : null}
-            <span>Save Changes</span>
-          </Button>
+          {isEditMode ? (
+            <Button
+              onClick={() => handleSaveProfile()}
+              disabled={saving}
+              className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center space-x-1.5 shadow-xs"
+            >
+              {saving ? <Spinner className="w-4 h-4 mr-1.5" /> : null}
+              <span>Save</span>
+            </Button>
+          ) : (
+            <Button
+              onClick={() => setIsEditMode(true)}
+              className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center space-x-1.5 shadow-xs"
+            >
+              <Edit2 className="w-4 h-4 mr-1.5" />
+              <span>Edit</span>
+            </Button>
+          )}
         </div>
 
         {/* Detail Tabs */}
@@ -334,13 +351,13 @@ export const PosProfilePage: React.FC = () => {
             <span>Print Settings</span>
           </button>
           <button
-            onClick={() => setActiveDetailTab('users_permissions')}
+            onClick={() => setActiveDetailTab('users_payments')}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
-              activeDetailTab === 'users_permissions' ? 'bg-white text-primary shadow-xs font-bold' : 'text-gray-600 hover:bg-gray-200/60'
+              activeDetailTab === 'users_payments' ? 'bg-white text-primary shadow-xs font-bold' : 'text-gray-600 hover:bg-gray-200/60'
             }`}
           >
             <Shield className="w-4 h-4" />
-            <span>Users & Permissions</span>
+            <span>Users & Payments</span>
           </button>
         </div>
 
@@ -357,14 +374,22 @@ export const PosProfilePage: React.FC = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
                       <label className="block font-semibold text-gray-700 mb-1.5">Company</label>
-                      <Select value={profileForm.company || ''} onChange={e => setProfileForm(p => ({ ...p, company: e.target.value }))}>
+                      <Select
+                        disabled={!isEditMode}
+                        value={profileForm.company || ''}
+                        onChange={e => setProfileForm(p => ({ ...p, company: e.target.value }))}
+                      >
                         <option value="">Select Company</option>
                         {options.companies.map((c: any) => <option key={c.name} value={c.name}>{c.name}</option>)}
                       </Select>
                     </div>
                     <div>
                       <label className="block font-semibold text-gray-700 mb-1.5">Warehouse</label>
-                      <Select value={profileForm.warehouse || ''} onChange={e => setProfileForm(p => ({ ...p, warehouse: e.target.value }))}>
+                      <Select
+                        disabled={!isEditMode}
+                        value={profileForm.warehouse || ''}
+                        onChange={e => setProfileForm(p => ({ ...p, warehouse: e.target.value }))}
+                      >
                         <option value="">Select Warehouse</option>
                         {options.warehouses.map((w: any) => <option key={w.name} value={w.name}>{w.name}</option>)}
                       </Select>
@@ -374,6 +399,7 @@ export const PosProfilePage: React.FC = () => {
                     <div>
                       <label className="block font-semibold text-gray-700 mb-1.5">Price List</label>
                       <Input
+                        disabled={!isEditMode}
                         value={profileForm.selling_price_list || ''}
                         onChange={(e) => setProfileForm(p => ({ ...p, selling_price_list: e.target.value }))}
                         placeholder="Standard Selling"
@@ -382,6 +408,7 @@ export const PosProfilePage: React.FC = () => {
                     <div>
                       <label className="block font-semibold text-gray-700 mb-1.5">Print Format</label>
                       <Input
+                        disabled={!isEditMode}
                         value={profileForm.print_format || ''}
                         onChange={(e) => setProfileForm(p => ({ ...p, print_format: e.target.value }))}
                         placeholder="Default"
@@ -406,6 +433,7 @@ export const PosProfilePage: React.FC = () => {
                       <div key={key} className="flex items-center gap-2 p-3 rounded-lg border border-gray-100 bg-gray-50/50">
                         <Switch
                           id={key}
+                          disabled={!isEditMode}
                           checked={!!profileForm[key]}
                           onCheckedChange={(checked) => setProfileForm(p => ({ ...p, [key]: checked ? 1 : 0 }))}
                         />
@@ -424,6 +452,7 @@ export const PosProfilePage: React.FC = () => {
                       <label className="block font-semibold text-gray-700 mb-1.5">Show Limited Paid Invoices (Number)</label>
                       <Input
                         type="number"
+                        disabled={!isEditMode}
                         value={profileForm.paid_limit || ''}
                         onChange={(e) => setProfileForm(p => ({ ...p, paid_limit: e.target.value }))}
                         placeholder="e.g. 10"
@@ -433,6 +462,7 @@ export const PosProfilePage: React.FC = () => {
                       <label className="block font-semibold text-gray-700 mb-1.5">Table Attention Time (minutes)</label>
                       <Input
                         type="number"
+                        disabled={!isEditMode}
                         value={profileForm.table_attention_time || ''}
                         onChange={(e) => setProfileForm(p => ({ ...p, table_attention_time: e.target.value }))}
                         placeholder="e.g. 15"
@@ -454,6 +484,7 @@ export const PosProfilePage: React.FC = () => {
                     <div>
                       <label className="block font-semibold text-gray-700 mb-1.5">Default Print Format</label>
                       <Input
+                        disabled={!isEditMode}
                         value={profileForm.print_format || ''}
                         onChange={(e) => setProfileForm(p => ({ ...p, print_format: e.target.value }))}
                         placeholder="Default"
@@ -479,30 +510,33 @@ export const PosProfilePage: React.FC = () => {
               </div>
             )}
 
-            {/* USERS & PERMISSIONS TAB */}
-            {activeDetailTab === 'users_permissions' && (
+            {/* USERS & PAYMENTS TAB */}
+            {activeDetailTab === 'users_payments' && (
               <div className="space-y-6">
                 {/* Applicable For Users */}
                 <div>
-                  <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-100">
-                    <h4 className="font-bold text-gray-700 text-xs uppercase tracking-wider">
-                      Applicable For Users
-                    </h4>
-                    <Button type="button" size="sm" variant="ghost" className="text-primary h-6 px-2 text-xs" onClick={() => setProfileForm({...profileForm, applicable_for_users: [...(profileForm.applicable_for_users || []), {user:'', default:0}]})}>+ Add User</Button>
-                  </div>
-                  <div className="space-y-2">
+                  <h4 className="font-bold text-gray-700 text-xs uppercase tracking-wider mb-3 pb-2 border-b border-gray-100">
+                    Applicable For Users
+                  </h4>
+                  <div className="space-y-2 mb-3">
                     {(profileForm.applicable_for_users || []).map((row: any, idx: number) => (
                       <div key={idx} className="flex gap-2 items-center">
-                        <Select className="flex-1" value={row.user || ''} onChange={e => {
-                          const newRows = [...(profileForm.applicable_for_users || [])];
-                          newRows[idx].user = e.target.value;
-                          setProfileForm({...profileForm, applicable_for_users: newRows});
-                        }}>
+                        <Select
+                          className="flex-1"
+                          disabled={!isEditMode}
+                          value={row.user || ''}
+                          onChange={e => {
+                            const newRows = [...(profileForm.applicable_for_users || [])];
+                            newRows[idx].user = e.target.value;
+                            setProfileForm({...profileForm, applicable_for_users: newRows});
+                          }}
+                        >
                           <option value="">Select User</option>
                           {options.users.map((u: any) => <option key={u.name} value={u.name}>{u.full_name || u.name}</option>)}
                         </Select>
                         <div className="flex items-center gap-1.5 text-xs text-gray-600">
                           <Switch
+                            disabled={!isEditMode}
                             checked={row.default === 1}
                             onCheckedChange={checked => {
                               const newRows = [...(profileForm.applicable_for_users || [])];
@@ -512,36 +546,55 @@ export const PosProfilePage: React.FC = () => {
                           />
                           <span>Default</span>
                         </div>
-                        <button type="button" className="text-gray-400 hover:text-red-500" onClick={() => {
-                          const newRows = (profileForm.applicable_for_users || []).filter((_: any, i: number) => i !== idx);
-                          setProfileForm({...profileForm, applicable_for_users: newRows});
-                        }}><X className="w-4 h-4" /></button>
+                        {isEditMode && (
+                          <button type="button" className="text-gray-400 hover:text-red-500 p-1" onClick={() => {
+                            const newRows = (profileForm.applicable_for_users || []).filter((_: any, i: number) => i !== idx);
+                            setProfileForm({...profileForm, applicable_for_users: newRows});
+                          }}>
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     ))}
                   </div>
+                  {isEditMode && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="text-primary border-primary/20 hover:bg-primary/5 text-xs flex items-center gap-1"
+                      onClick={() => setProfileForm({...profileForm, applicable_for_users: [...(profileForm.applicable_for_users || []), {user:'', default:0}]})}
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Add User</span>
+                    </Button>
+                  )}
                 </div>
 
                 {/* Mode of Payment */}
                 <div>
-                  <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-100">
-                    <h4 className="font-bold text-gray-700 text-xs uppercase tracking-wider">
-                      Mode of Payment
-                    </h4>
-                    <Button type="button" size="sm" variant="ghost" className="text-primary h-6 px-2 text-xs" onClick={() => setProfileForm({...profileForm, payments: [...(profileForm.payments || []), {mode_of_payment:'', default:0}]})}>+ Add Payment</Button>
-                  </div>
-                  <div className="space-y-2">
+                  <h4 className="font-bold text-gray-700 text-xs uppercase tracking-wider mb-3 pb-2 border-b border-gray-100">
+                    Mode of Payment
+                  </h4>
+                  <div className="space-y-2 mb-3">
                     {(profileForm.payments || []).map((row: any, idx: number) => (
                       <div key={idx} className="flex gap-2 items-center">
-                        <Select className="flex-1" value={row.mode_of_payment || ''} onChange={e => {
-                          const newRows = [...(profileForm.payments || [])];
-                          newRows[idx].mode_of_payment = e.target.value;
-                          setProfileForm({...profileForm, payments: newRows});
-                        }}>
+                        <Select
+                          className="flex-1"
+                          disabled={!isEditMode}
+                          value={row.mode_of_payment || ''}
+                          onChange={e => {
+                            const newRows = [...(profileForm.payments || [])];
+                            newRows[idx].mode_of_payment = e.target.value;
+                            setProfileForm({...profileForm, payments: newRows});
+                          }}
+                        >
                           <option value="">Select Payment Mode</option>
                           {options.payments.map((p: any) => <option key={p.name} value={p.name}>{p.name}</option>)}
                         </Select>
                         <div className="flex items-center gap-1.5 text-xs text-gray-600">
                           <Switch
+                            disabled={!isEditMode}
                             checked={row.default === 1}
                             onCheckedChange={checked => {
                               const newRows = [...(profileForm.payments || [])];
@@ -551,13 +604,29 @@ export const PosProfilePage: React.FC = () => {
                           />
                           <span>Default</span>
                         </div>
-                        <button type="button" className="text-gray-400 hover:text-red-500" onClick={() => {
-                          const newRows = (profileForm.payments || []).filter((_: any, i: number) => i !== idx);
-                          setProfileForm({...profileForm, payments: newRows});
-                        }}><X className="w-4 h-4" /></button>
+                        {isEditMode && (
+                          <button type="button" className="text-gray-400 hover:text-red-500 p-1" onClick={() => {
+                            const newRows = (profileForm.payments || []).filter((_: any, i: number) => i !== idx);
+                            setProfileForm({...profileForm, payments: newRows});
+                          }}>
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     ))}
                   </div>
+                  {isEditMode && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="text-primary border-primary/20 hover:bg-primary/5 text-xs flex items-center gap-1"
+                      onClick={() => setProfileForm({...profileForm, payments: [...(profileForm.payments || []), {mode_of_payment:'', default:0}]})}
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Add Payment</span>
+                    </Button>
+                  )}
                 </div>
               </div>
             )}
@@ -717,9 +786,8 @@ export const PosProfilePage: React.FC = () => {
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="font-semibold text-gray-700">Applicable For Users</label>
-              <Button type="button" size="sm" variant="ghost" className="text-primary h-6 px-2 text-xs" onClick={() => setAddForm({...addForm, applicable_for_users: [...addForm.applicable_for_users, {user:'', default:0}]})}>+ Add User</Button>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 mb-3">
               {addForm.applicable_for_users.map((row, idx) => (
                 <div key={idx} className="flex gap-2 items-center">
                   <Select className="flex-1" value={row.user} onChange={e => {
@@ -741,21 +809,30 @@ export const PosProfilePage: React.FC = () => {
                     />
                     <span>Default</span>
                   </div>
-                  <button type="button" className="text-gray-400 hover:text-red-500" onClick={() => {
+                  <button type="button" className="text-gray-400 hover:text-red-500 p-1" onClick={() => {
                     const newRows = addForm.applicable_for_users.filter((_, i) => i !== idx);
                     setAddForm({...addForm, applicable_for_users: newRows});
                   }}><X className="w-4 h-4" /></button>
                 </div>
               ))}
             </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="text-primary border-primary/20 hover:bg-primary/5 text-xs flex items-center gap-1"
+              onClick={() => setAddForm({...addForm, applicable_for_users: [...addForm.applicable_for_users, {user:'', default:0}]})}
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Add User</span>
+            </Button>
           </div>
 
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="font-semibold text-gray-700">Mode of Payment</label>
-              <Button type="button" size="sm" variant="ghost" className="text-primary h-6 px-2 text-xs" onClick={() => setAddForm({...addForm, payments: [...addForm.payments, {mode_of_payment:'', default:0}]})}>+ Add Payment</Button>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 mb-3">
               {addForm.payments.map((row, idx) => (
                 <div key={idx} className="flex gap-2 items-center">
                   <Select className="flex-1" value={row.mode_of_payment} onChange={e => {
@@ -777,13 +854,23 @@ export const PosProfilePage: React.FC = () => {
                     />
                     <span>Default</span>
                   </div>
-                  <button type="button" className="text-gray-400 hover:text-red-500" onClick={() => {
+                  <button type="button" className="text-gray-400 hover:text-red-500 p-1" onClick={() => {
                     const newRows = addForm.payments.filter((_, i) => i !== idx);
                     setAddForm({...addForm, payments: newRows});
                   }}><X className="w-4 h-4" /></button>
                 </div>
               ))}
             </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="text-primary border-primary/20 hover:bg-primary/5 text-xs flex items-center gap-1"
+              onClick={() => setAddForm({...addForm, payments: [...addForm.payments, {mode_of_payment:'', default:0}]})}
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Add Payment</span>
+            </Button>
           </div>
 
           <div className="pt-6 flex justify-end gap-3 border-t border-gray-100">
