@@ -55,7 +55,12 @@ class TestGetServiceLine(FrappeTestCase):
         mock_cache_instance.get_value.return_value = None
 
         now = datetime(2026, 8, 19, 14, 30, 0)
-        mock_get_datetime.return_value = now
+        # get_datetime() is called twice in source with different args: once
+        # bare for "now", once with t.latest_invoice_time to normalize it.
+        # A plain return_value would collapse both calls to the same value
+        # and always yield a zero minute delta, so use side_effect to mimic
+        # real get_datetime's passthrough-on-datetime-arg behavior.
+        mock_get_datetime.side_effect = lambda *args: now if not args else args[0]
 
         mock_get_all.return_value = [
             frappe._dict({
@@ -170,7 +175,7 @@ class TestGetServiceLine(FrappeTestCase):
         mock_cache_instance.get_value.return_value = None
 
         now = datetime(2026, 8, 19, 15, 45, 0)
-        mock_get_datetime.return_value = now
+        mock_get_datetime.side_effect = lambda *args: now if not args else args[0]
 
         mock_get_all.return_value = [
             frappe._dict({
@@ -302,7 +307,11 @@ class TestGetRunningLow(FrappeTestCase):
         result = get_running_low(branch="URY Branch")
 
         self.assertEqual(result, [])
-        mock_get_value.assert_not_called()
+        # The POS Profile warehouse lookup is gated only on `branch` being
+        # truthy, not on whether any items sold — it always fires once here
+        # since branch="URY Branch". The per-item Bin lookup inside the sold
+        # items loop is what's skipped when there's nothing sold.
+        mock_get_value.assert_called_once_with("POS Profile", {"branch": "URY Branch"}, "warehouse")
 
     @patch("ury.ury.api.ury_service_line.frappe.cache")
     @patch("ury.ury.api.ury_service_line.frappe.db.get_value")
