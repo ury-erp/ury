@@ -72,9 +72,11 @@ function App() {
           <Route
             path="reports/*"
             element={
-              <AuthGuard>
-                <ReportsLayout />
-              </AuthGuard>
+              <RoleGuard>
+                <AuthGuard>
+                  <ReportsLayout />
+                </AuthGuard>
+              </RoleGuard>
             }
           >
             <Route index element={<ReportsHome />} />
