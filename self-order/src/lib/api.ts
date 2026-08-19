@@ -95,42 +95,64 @@ function storeContext(context: OrderingContext) {
   sessionStorage.setItem(CONTEXT_KEY, JSON.stringify(context))
 }
 
+// Every whitelisted Frappe method response is wrapped as {"message": <actual
+// return value>} — call.get/call.post return that whole envelope as-is
+// (frappe-js-sdk does not unwrap it; see pos/src/lib/menu-api.ts's
+// GetMenuResponse for the same established pattern in this codebase). Every
+// function below must unwrap `.message` itself. Missing this doesn't throw —
+// it silently produces `undefined` fields (e.g. `context.session` would be
+// undefined instead of a string), which cascades into every subsequent call
+// silently sending no value for that parameter at all. Confirmed live via
+// browser network capture: get_customer_menu was called with an entirely
+// empty query string because the "session" it was given was undefined.
+interface FrappeResponse<T> {
+  message: T
+}
+
 export async function bootstrap(token: string): Promise<OrderingContext> {
-  const context = await call.get<OrderingContext>(`${M}.get_ordering_context`, { token })
-  storeContext(context)
-  return context
+  const response = await call.get<FrappeResponse<OrderingContext>>(`${M}.get_ordering_context`, { token })
+  storeContext(response.message)
+  return response.message
 }
 
 export async function bootstrapDevice(deviceId: string, deviceCredential: string): Promise<OrderingContext> {
-  const context = await call.get<OrderingContext>(`${M}.get_ordering_context`, {
+  const response = await call.get<FrappeResponse<OrderingContext>>(`${M}.get_ordering_context`, {
     device_id: deviceId,
     device_credential: deviceCredential,
   })
-  storeContext(context)
-  return context
+  storeContext(response.message)
+  return response.message
 }
 
 export async function getMenu(session: string): Promise<MenuResponse> {
-  return call.get<MenuResponse>(`${M}.get_customer_menu`, { session })
+  const response = await call.get<FrappeResponse<MenuResponse>>(`${M}.get_customer_menu`, { session })
+  return response.message
 }
 
 export async function getCurrentOrder(session: string): Promise<CustomerOrder> {
-  return call.get<CustomerOrder>(`${M}.get_customer_order`, { session })
+  const response = await call.get<FrappeResponse<CustomerOrder>>(`${M}.get_customer_order`, { session })
+  return response.message
 }
 
 export async function addItems(
   session: string,
   items: { item: string; qty: number; comment?: string }[],
 ): Promise<CustomerOrder> {
-  return call.post<CustomerOrder>(`${M}.add_customer_items`, { session, items: JSON.stringify(items) })
+  const response = await call.post<FrappeResponse<CustomerOrder>>(`${M}.add_customer_items`, {
+    session,
+    items: JSON.stringify(items),
+  })
+  return response.message
 }
 
 export async function requestBill(session: string): Promise<{ status: string; request: string }> {
-  return call.post(`${M}.request_bill`, { session })
+  const response = await call.post<FrappeResponse<{ status: string; request: string }>>(`${M}.request_bill`, { session })
+  return response.message
 }
 
 export async function getStatus(session: string): Promise<OrderStatus> {
-  return call.get<OrderStatus>(`${M}.get_order_status`, { session })
+  const response = await call.get<FrappeResponse<OrderStatus>>(`${M}.get_order_status`, { session })
+  return response.message
 }
 
 export interface PaymentRequestResult {
@@ -148,16 +170,22 @@ export interface PaymentStatusResult {
 }
 
 export async function createPaymentRequest(session: string): Promise<PaymentRequestResult> {
-  return call.post<PaymentRequestResult>(`${M}.create_payment_request`, { session })
+  const response = await call.post<FrappeResponse<PaymentRequestResult>>(`${M}.create_payment_request`, { session })
+  return response.message
 }
 
 export async function getPaymentStatus(session: string): Promise<PaymentStatusResult> {
-  return call.get<PaymentStatusResult>(`${M}.get_payment_status`, { session })
+  const response = await call.get<FrappeResponse<PaymentStatusResult>>(`${M}.get_payment_status`, { session })
+  return response.message
 }
 
 export async function sharePaymentLink(
   session: string,
   recipient: string,
 ): Promise<{ status: string; payment_request: string }> {
-  return call.post(`${M}.share_payment_link`, { session, recipient })
+  const response = await call.post<FrappeResponse<{ status: string; payment_request: string }>>(
+    `${M}.share_payment_link`,
+    { session, recipient },
+  )
+  return response.message
 }
