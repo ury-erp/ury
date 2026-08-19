@@ -4,11 +4,12 @@ import { Save, Plus, X, Eye, Edit2, ArrowLeft, Building2 } from 'lucide-react';
 import { Card, Button, Input, Select, Spinner, showToast } from '@ury/ui';
 import { Switch } from '../../components/ui/switch';
 import SideDrawer from '../../components/layout/SideDrawer';
-import { call } from '@ury/core';
+import { call, getLoggedUser } from '@ury/core';
 import { dashboardService } from '../../services/dashboard';
 
 interface BranchData {
   name: string;
+  branch?: string;
   branch_name?: string;
   invoice_series_prefix?: string;
   aggregator_series_prefix?: string;
@@ -72,13 +73,26 @@ export const BranchPage: React.FC = () => {
     try {
       const res = await call<any>('frappe.client.get_list', {
         doctype: 'Branch',
-        fields: ['name', 'branch_name', 'address'],
+        fields: ['name', 'branch', 'address', 'custom_no_taxes'],
         limit_page_length: 100
       });
-      const list = res.message || res || [];
+      const list = Array.isArray(res) ? res : (res?.message || []);
       setBranchList(list);
     } catch (e) {
       console.error('Failed to load branch list', e);
+      try {
+        const fallbackRes = await call<any>('ury.ury.api.minimal.business_setup.get_branches');
+        const fallbackList = Array.isArray(fallbackRes) ? fallbackRes : (fallbackRes?.message || []);
+        if (Array.isArray(fallbackList) && fallbackList.length > 0) {
+          setBranchList(fallbackList.map((b: any) => ({
+            name: b.id || b.name,
+            branch: b.name || b.branch,
+            address: b.address || ''
+          })));
+        }
+      } catch (fallbackErr) {
+        console.error('Fallback fetch branches failed', fallbackErr);
+      }
     } finally {
       setLoading(false);
     }
@@ -179,12 +193,47 @@ export const BranchPage: React.FC = () => {
 
   const handleAddBranch = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!addForm.branchName || !addForm.branchName.trim()) {
+      showToast.error('Branch Name is required');
+      return;
+    }
     setSaving(true);
     try {
+      // Determine valid user reference for mandatory Branch.user child table
+      let currentUser = (window as any).frappe?.session?.user;
+      if (!currentUser || currentUser === 'Guest') {
+        try {
+          currentUser = await getLoggedUser();
+        } catch {
+          // ignore
+        }
+      }
+      if (!currentUser || currentUser === 'Guest') {
+        const userList = await call<any>('frappe.client.get_list', {
+          doctype: 'User',
+          filters: [['enabled', '=', 1], ['name', 'not in', ['Guest']]],
+          fields: ['name'],
+          limit_page_length: 1
+        });
+        const list = userList.message || userList;
+        if (list && list.length > 0) {
+          currentUser = list[0].name;
+        } else {
+          currentUser = 'Administrator';
+        }
+      }
+
+      if (!currentUser) {
+        showToast.error('Could not determine a valid user for Branch creation');
+        setSaving(false);
+        return;
+      }
+
       await call('frappe.client.insert', {
         doc: {
           doctype: 'Branch',
-          branch: addForm.branchName
+          branch: addForm.branchName,
+          user: [{ user: currentUser }]
         }
       });
       const roomName = `Main Dining - ${addForm.branchName}`;
@@ -655,7 +704,7 @@ export const BranchPage: React.FC = () => {
                   className="hover:bg-primary/5 transition-colors cursor-pointer"
                   onClick={() => handleBranchView(b)}
                 >
-                  <td className="px-6 py-4 font-semibold text-gray-900">{b.branch_name || b.name}</td>
+                  <td className="px-6 py-4 font-semibold text-gray-900">{b.branch || b.branch_name || b.name}</td>
                   <td className="px-6 py-4 text-gray-600">{b.address || '-'}</td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-1">
