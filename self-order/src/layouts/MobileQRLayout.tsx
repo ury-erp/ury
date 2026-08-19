@@ -272,8 +272,8 @@ function MobileQRLayout({ initialContext }: LayoutProps) {
             billRequested={billRequested}
             paymentRequest={paymentRequest}
             onSubmitCart={() => {
-              submitCart().then(() => {
-                goToStatus()
+              submitCart().then((success) => {
+                if (success) goToStatus()
               })
             }}
             onPayOnline={payOnline}

@@ -239,8 +239,15 @@ export function useOrderingSession(initialContext?: OrderingContext) {
   const cartCount = cartItems.reduce((sum, entry) => sum + entry.qty, 0)
   const cartTotal = cartItems.reduce((sum, entry) => sum + entry.qty * entry.item.rate, 0)
 
-  async function submitCart() {
-    if (!context || cartItems.length === 0) return
+  // Returns whether the order actually reached the backend, so callers can
+  // gate post-submit navigation (e.g. to the status screen) on real success
+  // instead of on the promise merely settling — this function intentionally
+  // never rethrows (errors are surfaced via `error` state for the checkout
+  // screen to render inline), so a caller doing `submitCart().then(...)`
+  // without checking this return value would navigate to "Order confirmed"
+  // even when submission failed.
+  async function submitCart(): Promise<boolean> {
+    if (!context || cartItems.length === 0) return false
     setSubmitting(true)
     setError(null)
     try {
@@ -252,8 +259,10 @@ export function useOrderingSession(initialContext?: OrderingContext) {
       const updated = await addItems(context.session, payload)
       setOrder(updated)
       setCart({})
+      return true
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not place the order. Please try again.')
+      return false
     } finally {
       setSubmitting(false)
     }
