@@ -75,8 +75,13 @@ export const RoomPage: React.FC = () => {
 
   const openEditDrawer = (room: any) => {
     setEditingRoom(room);
+    // Derive display name from room.name, stripping branch suffix if present
+    let displayName = room.name;
+    if (room.branch && displayName.endsWith(` - ${room.branch}`)) {
+      displayName = displayName.substring(0, displayName.length - (` - ${room.branch}`).length);
+    }
     setNewRoom({
-      room_name: room.room_name || '',
+      room_name: displayName,
       room_type: room.room_type || 'AC',
       branch: room.branch || '',
       kot_printing: room.kot_printing === 1,
@@ -88,7 +93,7 @@ export const RoomPage: React.FC = () => {
 
   const handleSaveRoom = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newRoom.room_name) return;
+    if (!editingRoom && !newRoom.room_name) return;
     setSaving(true);
     try {
       if (editingRoom) {
@@ -96,7 +101,6 @@ export const RoomPage: React.FC = () => {
           doctype: 'URY Room',
           name: editingRoom.name,
           fieldname: {
-            room_name: newRoom.room_name,
             room_type: newRoom.room_type,
             branch: newRoom.branch,
             kot_printing: newRoom.kot_printing ? 1 : 0,
@@ -109,7 +113,6 @@ export const RoomPage: React.FC = () => {
           doc: {
             doctype: 'URY Room',
             name: `${newRoom.room_name} - ${newRoom.branch}`,
-            room_name: newRoom.room_name,
             room_type: newRoom.room_type,
             branch: newRoom.branch || undefined,
             kot_printing: newRoom.kot_printing ? 1 : 0,
@@ -177,7 +180,7 @@ export const RoomPage: React.FC = () => {
             <tbody className="divide-y divide-gray-100">
               {rooms.map((room) => (
                 <tr key={room.name} className="hover:bg-primary/10 transition-colors">
-                  <td className="px-6 py-4 font-semibold text-gray-900">{room.room_name || room.name}</td>
+                  <td className="px-6 py-4 font-semibold text-gray-900">{room.name}</td>
                   <td className="px-6 py-4">
                     <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary text-[10px]">
                       <Layers className="w-3 h-3 mr-1" />
@@ -209,8 +212,12 @@ export const RoomPage: React.FC = () => {
             <Input
               value={newRoom.room_name}
               onChange={(e) => setNewRoom({ ...newRoom, room_name: e.target.value })}
-              required
+              disabled={!!editingRoom}
+              required={!editingRoom}
             />
+            {editingRoom && (
+              <p className="text-xs text-gray-500 mt-1">Room name cannot be changed after creation</p>
+            )}
           </div>
 
           <div>
