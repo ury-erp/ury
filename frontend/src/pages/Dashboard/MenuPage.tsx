@@ -77,6 +77,7 @@ export const MenuPage: React.FC = () => {
   // Add course form state
   const [newCourseName, setNewCourseName] = useState('');
   const [newCourseIcon, setNewCourseIcon] = useState('');
+  const [returnToAddItemFromCourse, setReturnToAddItemFromCourse] = useState(false);
 
   // Add new menu item rows & global item options
   const [allItems, setAllItems] = useState<{ name: string; item_name: string; standard_rate?: number; custom_course?: string }[]>([]);
@@ -204,14 +205,18 @@ export const MenuPage: React.FC = () => {
     setDrawerMode('add-menu');
   };
 
-  const openAddCourseDrawer = () => {
+  const openAddCourseDrawer = (fromAddItem = false) => {
     setNewCourseName('');
     setNewCourseIcon('');
+    setReturnToAddItemFromCourse(fromAddItem);
     setDrawerMode('add-course');
   };
 
   const closeDrawer = () => {
-    if (creatingItemForRowIndex !== null) {
+    if (returnToAddItemFromCourse) {
+      setReturnToAddItemFromCourse(false);
+      setDrawerMode('add-item');
+    } else if (creatingItemForRowIndex !== null) {
       setCreatingItemForRowIndex(null);
       setDrawerMode('add-menu');
     } else {
@@ -455,18 +460,25 @@ export const MenuPage: React.FC = () => {
   const handleSaveCourse = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCourseName.trim()) return;
+    const createdCourse = newCourseName.trim();
     setSavingCourse(true);
     try {
       await call('frappe.client.insert', {
         doc: {
           doctype: 'URY Menu Course',
-          course: newCourseName.trim(),
+          course: createdCourse,
           icon: newCourseIcon || undefined,
         },
       });
       await fetchCourses();
       showToast.success('Course saved');
-      closeDrawer();
+      if (returnToAddItemFromCourse) {
+        setNewItem(prev => ({ ...prev, course: createdCourse }));
+        setReturnToAddItemFromCourse(false);
+        setDrawerMode('add-item');
+      } else {
+        closeDrawer();
+      }
     } catch (err) {
       console.error('Failed to create Course', err);
       showToast.error('Failed to save course');
@@ -719,40 +731,25 @@ export const MenuPage: React.FC = () => {
             />
           </div>
 
-          {/* Course field with inline add option */}
+          {/* Course field */}
           <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="block font-semibold text-gray-700">Course</label>
-              <button
-                type="button"
-                onClick={() => setNewItem({ ...newItem, is_adding_new_course: !newItem.is_adding_new_course, course: '' })}
-                className="text-xs text-primary font-semibold hover:underline flex items-center gap-1"
-              >
-                {newItem.is_adding_new_course ? (
-                  'Choose existing'
-                ) : (
-                  <><Plus className="w-3 h-3" /> Add new course</>
-                )}
-              </button>
-            </div>
-            {newItem.is_adding_new_course ? (
-              <Input
-                placeholder="New course name"
-                value={newItem.new_course_name}
-                onChange={(e) => setNewItem({ ...newItem, new_course_name: e.target.value })}
-                className="font-medium"
-              />
-            ) : (
-              <SearchableSelect
-                id="course"
-                value={newItem.course}
-                onChange={(_, value) => setNewItem({ ...newItem, course: value })}
-                options={[
-                  { value: '', label: 'None' },
-                  ...availableCourses.map(c => ({ value: c.name, label: c.name }))
-                ]}
-              />
-            )}
+            <label className="block font-semibold text-gray-700 mb-1.5">Course</label>
+            <SearchableSelect
+              id="course"
+              value={newItem.course}
+              onChange={(_, value) => {
+                if (value === 'CREATE_NEW_COURSE') {
+                  openAddCourseDrawer(true);
+                } else {
+                  setNewItem({ ...newItem, course: value });
+                }
+              }}
+              options={[
+                { value: '', label: 'None' },
+                ...availableCourses.map(c => ({ value: c.name, label: c.name })),
+                { value: 'CREATE_NEW_COURSE', label: '+ Create New Course' }
+              ]}
+            />
           </div>
 
           <div>
