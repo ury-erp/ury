@@ -187,7 +187,7 @@ function ConfigurePageContent() {
         </Button>
       }
     >
-      <div className="space-y-4 h-full">
+      <div className="space-y-4">
         {error && (
           <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3 text-red-700">
             <div className="flex-1 text-sm font-medium">

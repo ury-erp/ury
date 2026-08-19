@@ -54,9 +54,9 @@ export function WizardLayout({
       </main>
 
       {/* Footer nav bar */}
-      <footer className="w-full border-t border-border bg-card sticky bottom-0">
-        <div className={`${SHELL_WIDTH} py-4 flex items-center justify-between gap-4`}>
-          <div>
+      <footer className="w-full border-t border-border bg-card sticky bottom-0 h-12 flex items-center">
+        <div className={`${SHELL_WIDTH} w-full h-full flex items-center justify-between gap-4`}>
+          <div className="flex items-center h-full">
             {step === 2 && onPrev && (
               <Button variant="outline" onClick={onPrev}>
                 Previous
@@ -64,7 +64,7 @@ export function WizardLayout({
             )}
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 h-full">
             {secondaryAction}
             <Button variant="default" onClick={onNext} disabled={isNextDisabled || isNextLoading} className="px-6">
               {isNextLoading ? 'Working...' : nextLabel}
