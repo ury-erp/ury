@@ -62,10 +62,15 @@ export default function SetupPage() {
           ? defaults.languages
           : (defaults.languages as any)?.languages || [];
 
-        const formattedLangs = rawLangs.map((l: any) => {
-          if (typeof l === 'string') return { value: l, label: l };
-          return { value: l.name || l.value, label: l.label || l.name || l.value };
-        });
+        const formattedLangs = rawLangs
+          .map((l: any) => {
+            const val = typeof l === 'string' ? l : (l.name || l.value || l.label);
+            if (val === 'English') return { value: 'English', label: 'English' };
+            if (val === 'العربية' || val === 'Arabic') return { value: 'Arabic', label: 'عربي' };
+            if (val === 'Français' || val === 'French') return { value: 'French', label: 'français' };
+            return null;
+          })
+          .filter(Boolean) as { value: string; label: string }[];
 
         const rawCountries = Array.isArray(defaults.countries) ? defaults.countries : [];
         const formattedCountries = rawCountries.map((c: any) =>
