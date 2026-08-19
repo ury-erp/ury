@@ -16,6 +16,7 @@ jobs:
         env:
           SSH_PRIVATE_KEY: ${{ secrets.URY_DEPLOY_SSH_KEY }}
           SSH_HOST: ${{ secrets.URY_DEPLOY_HOST }}
+          SSH_PORT: ${{ secrets.URY_DEPLOY_PORT }}
         run: |
           mkdir -p ~/.ssh
 
