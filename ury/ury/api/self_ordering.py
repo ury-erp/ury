@@ -508,6 +508,21 @@ def add_customer_items(session, items):
             check_permission=False, override_branch=profile.branch,
         )
 
+        # _resolve_or_create_pos_invoice() never sets restaurant_table on a
+        # brand-new invoice — sync_order() does that itself after the call
+        # (its own caller-side responsibility, same pattern here). Missing
+        # this meant the SECOND add_customer_items() call for the same
+        # table couldn't find the first call's invoice by name at all:
+        # _resolve_or_create_pos_invoice's table-path query AND-combines an
+        # exact `name` match with an OR-group requiring restaurant_table (or
+        # custom_merged_tables) to equal the table — with restaurant_table
+        # still null, that OR-group is false and the whole query returns
+        # nothing, so a second invoice got created instead of the running
+        # order being updated. Confirmed live: two separate invoices for
+        # the same table/session instead of one.
+        if session.table and not invoice.restaurant_table:
+            invoice.restaurant_table = session.table
+
         if not invoice.customer:
             if not profile.default_customer:
                 frappe.throw(_("Self ordering profile has no default customer configured"), frappe.ValidationError)

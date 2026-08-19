@@ -176,6 +176,74 @@ class TestAddCustomerItemsAppendOnly(unittest.TestCase):
         self.assertEqual(current_by_item, {"Biryani": 2, "Sandwich": 1})
         invoice.save.assert_called_once_with(ignore_permissions=True)
 
+    @patch(f"{MOD}.kot_execute")
+    @patch(f"{MOD}.price_items_for_invoice")
+    @patch(f"{MOD}._resolve_or_create_pos_invoice")
+    @patch(f"{MOD}.resolve_restaurant_menu")
+    @patch(f"{MOD}.frappe.get_doc")
+    @patch(f"{MOD}._resolve_session")
+    @patch(f"{MOD}.frappe.db.exists")
+    @patch(f"{MOD}.frappe.db.set_value")
+    @patch(f"{MOD}.frappe.db.get_value")
+    @patch(f"{MOD}.frappe.set_user")
+    def test_add_customer_items_sets_restaurant_table_on_new_invoice(
+        self, mock_set_user, mock_db_get_value, mock_db_set_value, mock_db_exists, mock_resolve_session, mock_get_doc,
+        mock_resolve_menu, mock_resolve_invoice, mock_price_items, mock_kot,
+    ):
+        """_resolve_or_create_pos_invoice() never sets restaurant_table on a
+        brand-new invoice (that's the caller's job, same as sync_order()
+        does it). Without add_customer_items() also doing it, a SECOND call
+        for the same table can't find the first call's invoice by name --
+        confirmed live: two invoices got created for one table/session
+        instead of the running order being updated once."""
+        mock_db_exists.return_value = True
+        session = self._session_doc(table="Table 9", invoice=None)
+        mock_resolve_session.return_value = session
+
+        profile = MagicMock()
+        profile.enabled = 1
+        profile.allow_add_to_running_table = 1
+        profile.branch = "Branch A"
+        profile.pos_profile = "POS Profile A"
+        profile.default_customer = "Walk-in Customer"
+
+        pos_profile_doc = MagicMock()
+        pos_profile_doc.payments = [MagicMock(mode_of_payment="Cash")]
+
+        def get_doc_side_effect(doctype, name=None):
+            if doctype == "URY Self Ordering Profile":
+                return profile
+            if doctype == "POS Profile":
+                return pos_profile_doc
+            return MagicMock()
+
+        mock_get_doc.side_effect = get_doc_side_effect
+        mock_resolve_menu.return_value = {"items": [{"item": "Biryani"}]}
+        mock_get_all_patch = patch(f"{MOD}.frappe.get_all", return_value=[])
+        mock_get_all_patch.start()
+        self.addCleanup(mock_get_all_patch.stop)
+
+        # Brand-new invoice: restaurant_table starts unset, exactly as
+        # _resolve_or_create_pos_invoice() actually leaves it.
+        new_invoice = MagicMock()
+        new_invoice.customer = None
+        new_invoice.items = []
+        new_invoice.invoice_created = 0
+        new_invoice.invoice_printed = 0
+        new_invoice.restaurant_table = None
+        new_invoice.branch = "Branch A"
+        new_invoice.selling_price_list = "Standard Selling"
+        new_invoice.grand_total = 100
+        new_invoice.name = "POS-INV-NEW"
+        mock_resolve_invoice.return_value = (new_invoice, None)
+        mock_price_items.return_value = [{"item_code": "Biryani", "item_name": "Biryani", "qty": 1,
+                                           "comment": "", "rate": 100, "price_list_rate": 100,
+                                           "base_price_list_rate": 100, "cost_center": "CC"}]
+
+        add_customer_items("session-token", [{"item": "Biryani", "qty": 1}])
+
+        self.assertEqual(new_invoice.restaurant_table, "Table 9")
+
     @patch(f"{MOD}._resolve_session")
     def test_add_customer_items_rejects_item_not_on_menu(self, mock_resolve_session):
         session = self._session_doc(invoice="POS-INV-100")
