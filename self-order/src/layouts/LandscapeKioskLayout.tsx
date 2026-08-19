@@ -32,10 +32,17 @@ function LandscapeKioskLayout({ initialContext }: LayoutProps) {
     submitCart,
     handleRequestBill,
     payOnline,
+    resetSession,
     cartItems,
     cartCount,
     cartTotal,
   } = useOrderingSession(initialContext)
+
+  function handleReset() {
+    if (window.confirm('Start a new order? Current cart will be cleared.')) {
+      resetSession()
+    }
+  }
 
   if (loading) {
     return (
@@ -55,10 +62,16 @@ function LandscapeKioskLayout({ initialContext }: LayoutProps) {
 
   return (
     <div className="flex h-screen flex-col overflow-hidden text-lg">
-      <header className="border-b bg-background/95 px-10 py-6">
+      <header className="flex items-center justify-between border-b bg-background/95 px-10 py-6">
         <h1 className="text-3xl font-semibold">
           {context?.table ? `Table ${context.table}` : 'Order for Pickup'}
         </h1>
+        <button
+          onClick={handleReset}
+          className="rounded-md border px-4 py-2 text-base font-medium text-muted-foreground"
+        >
+          New Order
+        </button>
       </header>
 
       {error && (
