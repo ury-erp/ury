@@ -492,11 +492,12 @@ class TestCreatePaymentRequest(unittest.TestCase):
         mock_make_pr.assert_not_called()
 
     @patch("erpnext.accounts.doctype.payment_request.payment_request.make_payment_request")
+    @patch(f"{MOD}.frappe.log_error")
     @patch(f"{MOD}.frappe.get_doc")
     @patch(f"{MOD}._resolve_session")
     @patch(f"{MOD}.frappe.set_user")
     def test_create_payment_request_survives_missing_gateway(
-        self, mock_set_user, mock_resolve_session, mock_get_doc, mock_make_pr,
+        self, mock_set_user, mock_resolve_session, mock_get_doc, mock_log_error, mock_make_pr,
     ):
         """No Payment Gateway Account configured -> get_payment_url() raises.
         The Payment Request itself must still be returned (real, valid, just
