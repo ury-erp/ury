@@ -687,16 +687,43 @@ def split_bill(source_invoice, items_to_move, customer=None):
 
 
 
-def _resolve_or_create_pos_invoice(table, invoiceNo, order_type, is_payment):
+def _resolve_or_create_pos_invoice(table, invoiceNo, order_type, is_payment, check_permission=True, override_branch=None):
     """Find an existing draft POS Invoice or build a new (unsaved) one.
 
     Contains the same lookup/creation logic that used to live inline in
-    `get_order_invoice`, minus the permission checks (those stay in
-    `get_order_invoice`, applied only when an existing invoice was found).
+    `get_order_invoice`. When `check_permission` is True (the default, used
+    by the staff-facing `get_order_invoice`), the same read-permission and
+    branch-match checks `get_order_invoice` used to perform run at the exact
+    same point they used to — immediately after an existing invoice is
+    loaded, BEFORE any of the unconditional branch/restaurant/price-list
+    resolution below — so an unauthorized caller still gets rejected before
+    any of that extra work happens, not after.
+
+    Pass `check_permission=False` for a customer-safe caller that has
+    already authorized the request through its own mechanism (e.g. a
+    verified ordering-session token) rather than a Frappe user session —
+    `frappe.has_permission`/`getBranch()` assume a real staff session and
+    are not meaningful for an elevated/technical caller.
+
+    `override_branch` lets such a caller supply the branch directly for the
+    no-`table` (pickup) path instead of relying on `getBranch()`, which
+    resolves branch from `frappe.session.user`'s `URY User` assignment —
+    meaningless for an elevated technical user with no such assignment.
+    Ignored for the `table` path, which always derives branch from the table.
 
     Returns (invoice, invoice_name) where invoice_name is None when a new,
     unsaved invoice was created.
     """
+
+    def _enforce_read_permission(invoice):
+        if not check_permission:
+            return
+        if not frappe.has_permission("POS Invoice", "read", doc=invoice):
+            frappe.throw(frappe._("Not permitted to view this order"), frappe.PermissionError)
+        user_branch = getBranch()
+        if invoice.branch and user_branch and invoice.branch != user_branch:
+            frappe.throw(frappe._("Not permitted to view orders outside your active branch"), frappe.PermissionError)
+
     if table:
         filters = {"docstatus": 0}
         if invoiceNo:
@@ -715,6 +742,7 @@ def _resolve_or_create_pos_invoice(table, invoiceNo, order_type, is_payment):
 
         if invoice_name:
             invoice = frappe.get_doc("POS Invoice", invoice_name)
+            _enforce_read_permission(invoice)
 
         else:
             invoice = frappe.new_doc("POS Invoice")
@@ -759,13 +787,14 @@ def _resolve_or_create_pos_invoice(table, invoiceNo, order_type, is_payment):
 
         if invoice_name:
             invoice = frappe.get_doc("POS Invoice", invoice_name)
+            _enforce_read_permission(invoice)
 
         else:
             invoice = frappe.new_doc("POS Invoice")
             invoice.is_pos = 1
             invoice.update_stock = 1
 
-        branch = getBranch()
+        branch = override_branch or getBranch()
         restaurant = frappe.db.get_value("URY Restaurant", {"branch": branch}, "name")
 
         menu=get_menu_name(order_type)
@@ -787,16 +816,10 @@ def _resolve_or_create_pos_invoice(table, invoiceNo, order_type, is_payment):
 def get_order_invoice(table=None, invoiceNo=None, order_type=None, is_payment=None):
     """returns the active invoice linked to the given table"""
 
+    # check_permission defaults to True: read-permission and branch-match
+    # checks run inside the helper, immediately after an existing invoice is
+    # loaded — the same point they ran at before this function was split.
     invoice, invoice_name = _resolve_or_create_pos_invoice(table, invoiceNo, order_type, is_payment)
-
-    if invoice_name:
-        if not frappe.has_permission("POS Invoice", "read", doc=invoice):
-            frappe.throw(frappe._("Not permitted to view this order"), frappe.PermissionError)
-
-        user_branch = getBranch()
-        if invoice.branch and user_branch and invoice.branch != user_branch:
-            frappe.throw(frappe._("Not permitted to view orders outside your active branch"), frappe.PermissionError)
-
     return invoice
 
 
