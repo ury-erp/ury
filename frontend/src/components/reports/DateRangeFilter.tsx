@@ -74,7 +74,7 @@ export function DateRangeFilter({ value, onChange }: DateRangeFilterProps) {
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
-        className="inline-flex items-center justify-between gap-2 rounded-md border border-input bg-muted px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted/80"
+        className="inline-flex items-center justify-between gap-2 rounded-md border border-input bg-muted px-3.5 py-2 text-sm font-medium text-muted-foreground hover:bg-muted/80"
       >
         <span>{label}</span>
         <span aria-hidden="true">▾</span>

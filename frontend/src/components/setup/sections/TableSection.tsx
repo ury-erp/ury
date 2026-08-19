@@ -76,10 +76,11 @@ function TableRow({ table, renameTable, updateTableSeats, deleteTable, canDelete
       {canDelete && (
         <Button
           type="button"
-          variant="ghost"
+          variant="danger"
+          size="icon"
           onClick={() => deleteTable(table.id)}
           aria-label="Delete table"
-          className="text-red-500 hover:text-red-700 hover:bg-red-50 self-end md:self-center shrink-0 p-2 h-auto"
+          className="self-end md:self-center shrink-0"
         >
           <Trash2 className="w-4 h-4" />
         </Button>

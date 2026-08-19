@@ -208,7 +208,7 @@ export function MenuSection() {
                     value={item.name}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateMenuItem(item.id, { name: e.target.value })}
                     placeholder="e.g. Chicken Biriyani"
-                    className="w-full text-sm bg-white"
+                    className="w-full text-sm bg-background"
                   />
                 </div>
 
@@ -229,7 +229,7 @@ export function MenuSection() {
                     value={item.price}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateMenuItem(item.id, { price: parseFloat(e.target.value) || 0 })}
                     placeholder="0.00"
-                    className="w-full text-sm bg-white"
+                    className="w-full text-sm bg-background"
                   />
                 </div>
               </div>
@@ -237,9 +237,10 @@ export function MenuSection() {
               {menuItems.length > 1 && (
                 <Button
                   type="button"
-                  variant="ghost"
+                  variant="danger"
+                  size="icon"
                   onClick={() => deleteMenuItem(item.id)}
-                  className="text-red-500 hover:text-red-700 hover:bg-red-50 self-end md:self-center shrink-0 p-2 h-auto"
+                  className="self-end md:self-center shrink-0"
                   title="Delete Item"
                 >
                   <Trash2 className="w-4 h-4" />

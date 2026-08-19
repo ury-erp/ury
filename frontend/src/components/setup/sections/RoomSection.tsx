@@ -109,10 +109,11 @@ function RoomRow({ room, canDelete, renameRoom, deleteRoom, previewShrink, setRo
         {canDelete && (
           <Button
             type="button"
-            variant="ghost"
+            variant="danger"
+            size="icon"
             onClick={() => deleteRoom(room.id)}
             aria-label="Delete room"
-            className="text-red-500 hover:text-red-700 hover:bg-red-50 shrink-0 p-2 h-auto justify-self-end"
+            className="shrink-0 justify-self-end"
           >
             <Trash2 className="w-4 h-4" />
           </Button>

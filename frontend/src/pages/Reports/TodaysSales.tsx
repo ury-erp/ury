@@ -88,7 +88,7 @@ export function TodaysSales() {
       )}
 
       {isLoading && !data ? (
-        <div className="text-sm text-muted-foreground">Loading...</div>
+        <div className="text-sm text-muted-foreground">Loading…</div>
       ) : data ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <StatCard label="Total Invoices" value={data.total_invoices} icon={<Receipt className="w-4 h-4" />} />

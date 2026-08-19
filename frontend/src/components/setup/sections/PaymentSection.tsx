@@ -39,16 +39,17 @@ export function PaymentSection() {
                 value={method.name}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => updatePaymentMethod(method.id, { name: e.target.value })}
                 placeholder="e.g. Cash, Card, UPI"
-                className="w-full text-sm bg-white"
+                className="w-full text-sm bg-background"
               />
             </div>
 
             {paymentMethods.length > 1 && (
               <Button
                 type="button"
-                variant="ghost"
+                variant="danger"
+                size="icon"
                 onClick={() => deletePaymentMethod(method.id)}
-                className="text-red-500 hover:text-red-700 hover:bg-red-50 shrink-0 p-2 h-auto self-end md:self-center"
+                className="shrink-0 self-end md:self-center"
                 title="Delete Payment Method"
                 aria-label="Delete payment method"
               >

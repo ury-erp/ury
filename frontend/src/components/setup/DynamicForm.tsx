@@ -60,7 +60,7 @@ const { registry } = defineRegistry(formCatalog, {
     FormSection: ({ props, children }) => (
       <div className="w-full space-y-4">
         {props.label && (
-          <h3 className="text-md font-semibold text-foreground">{props.label}</h3>
+          <h3 className="text-sm font-semibold text-foreground">{props.label}</h3>
         )}
         <div className="grid grid-cols-1 md:grid-cols-12 gap-x-6 gap-y-4 w-full">
           {children}
@@ -92,7 +92,7 @@ const { registry } = defineRegistry(formCatalog, {
       return (
         <div className={getColSpanClass(field)}>
           <div className="space-y-1.5">
-            <label htmlFor={field.id} className="text-sm font-medium text-gray-700">
+            <label htmlFor={field.id} className="text-sm font-medium text-foreground">
               {field.label} {field.required && <span className="text-red-500">*</span>}
             </label>
 
@@ -128,7 +128,7 @@ const { registry } = defineRegistry(formCatalog, {
             {props.error ? (
               <p className="text-xs text-red-500 pt-1">{props.error}</p>
             ) : field.description ? (
-              <p className="text-xs text-gray-500 pt-1">{field.description}</p>
+              <p className="text-xs text-muted-foreground pt-1">{field.description}</p>
             ) : null}
           </div>
         </div>

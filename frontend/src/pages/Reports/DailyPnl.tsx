@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
-import { Card, CardContent, CardHeader, CardTitle, StatCard } from '@ury/ui';
+import { Card, CardContent, CardHeader, CardTitle, StatCard, DataTable, type DataTableColumn } from '@ury/ui';
 import { IndianRupee, TrendingUp, TrendingDown, Percent, AlertTriangle, ChevronDown } from 'lucide-react';
 import { useBranchContext } from '../../context/BranchContext';
 import { toApiDate } from '../../lib/reportDate';
@@ -47,6 +47,14 @@ interface DailyPnlData {
 }
 
 const HERO_KEYS = ['gross_sales', 'net_sales', 'gross_profit', 'net_profit'];
+
+const costOfGoodsColumns: DataTableColumn<CostOfGoodsRow>[] = [
+  { key: 'item_name', header: 'Item', render: (r) => r.item_name || r.item_code },
+  { key: 'item_group', header: 'Group', render: (r) => r.item_group || '—' },
+  { key: 'qty', header: 'Qty' },
+  { key: 'buying_price', header: 'Buying Price', render: (r) => formatCurrency(r.buying_price), align: 'right' },
+  { key: 'amount', header: 'Amount', render: (r) => formatCurrency(r.amount), align: 'right' },
+];
 
 function MissingPricesWarning({ sections }: { sections: MissingPriceSection[] }) {
   const [expanded, setExpanded] = useState(false);
@@ -186,7 +194,7 @@ export function DailyPnl() {
           <select
             value={branch}
             onChange={(e) => setBranch(e.target.value)}
-            className="border border-input rounded-md px-3 py-1.5 text-sm"
+            className="border border-input rounded-md px-3.5 py-2 text-sm"
           >
             {branches.map((b) => (
               <option key={b.id} value={b.id}>
@@ -198,7 +206,7 @@ export function DailyPnl() {
             <select
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className="border border-input rounded-md px-3 py-1.5 text-sm"
+              className="border border-input rounded-md px-3.5 py-2 text-sm"
             >
               {availableDates.map((d) => (
                 <option key={d} value={d}>
@@ -211,7 +219,7 @@ export function DailyPnl() {
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className="border border-input rounded-md px-3 py-1.5 text-sm"
+              className="border border-input rounded-md px-3.5 py-2 text-sm"
             />
           )}
         </div>
@@ -224,7 +232,7 @@ export function DailyPnl() {
       )}
 
       {isLoading ? (
-        <div className="text-sm text-muted-foreground">Loading...</div>
+        <div className="text-sm text-muted-foreground">Loading…</div>
       ) : !data?.exists ? (
         <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           No submitted Daily P&amp;L exists for this branch/date. It must be created and submitted in Desk first.
@@ -317,29 +325,8 @@ export function DailyPnl() {
               <CardHeader>
                 <CardTitle className="text-base">Cost of Goods Sold</CardTitle>
               </CardHeader>
-              <CardContent className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-left text-muted-foreground border-b">
-                      <th className="py-1.5 pr-4">Item</th>
-                      <th className="py-1.5 pr-4">Group</th>
-                      <th className="py-1.5 pr-4">Qty</th>
-                      <th className="py-1.5 pr-4">Buying Price</th>
-                      <th className="py-1.5">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.cost_of_goods.map((r, i) => (
-                      <tr key={i} className="border-b last:border-0">
-                        <td className="py-1.5 pr-4">{r.item_name || r.item_code}</td>
-                        <td className="py-1.5 pr-4">{r.item_group || '—'}</td>
-                        <td className="py-1.5 pr-4">{r.qty}</td>
-                        <td className="py-1.5 pr-4">{formatCurrency(r.buying_price)}</td>
-                        <td className="py-1.5">{formatCurrency(r.amount)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <CardContent>
+                <DataTable columns={costOfGoodsColumns} rows={data.cost_of_goods} />
               </CardContent>
             </Card>
           )}

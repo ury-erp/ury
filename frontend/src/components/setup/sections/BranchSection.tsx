@@ -135,7 +135,7 @@ export function BranchSection() {
                 value={taxConfig.taxPercentage}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateTaxConfig({ taxPercentage: parseFloat(e.target.value) || 0 })}
                 placeholder="e.g. 5"
-                className="w-full text-sm bg-white"
+                className="w-full text-sm bg-background"
               />
             </div>
           </div>
