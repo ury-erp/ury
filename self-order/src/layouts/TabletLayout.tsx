@@ -4,7 +4,9 @@ import { useOrderingSession } from '../hooks/useOrderingSession'
 import type { MenuItem, OrderingContext } from '../lib/api'
 import CartPanel from './shared/CartPanel'
 import CategoryTabs from './shared/CategoryTabs'
+import CheckoutScreen from './shared/CheckoutScreen'
 import MenuGrid from './shared/MenuGrid'
+import OrderStatusScreen from './shared/OrderStatusScreen'
 import ProductDetail from './shared/ProductDetail'
 import SearchBar from './shared/SearchBar'
 
@@ -19,20 +21,22 @@ interface LayoutProps {
  * Right pane is a persistent order summary + cart (not a bottom sheet like
  * MobileQRLayout — always visible, no toggle).
  *
- * Checkout and status remain inline in the CartPanel (persistent side panel
- * retains the two-pane advantage, rather than swapping to full-screen flows).
+ * When screen === 'checkout' or 'status', the two-pane layout gives way to
+ * full-screen checkout and status screens, matching MobileQRLayout's pattern.
  */
 function TabletLayout({ initialContext }: LayoutProps) {
   const {
     context,
     menu,
     order,
+    orderStatus,
     cart,
     loading,
     submitting,
     error,
     billRequested,
     payingOnline,
+    paymentRequest,
     screen,
     detailItemCode,
     addToCart,
@@ -46,6 +50,8 @@ function TabletLayout({ initialContext }: LayoutProps) {
     cartTotal,
     goToMenu,
     goToDetail,
+    goToCheckout,
+    goToStatus,
   } = useOrderingSession(initialContext)
 
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
@@ -125,6 +131,68 @@ function TabletLayout({ initialContext }: LayoutProps) {
     )
   }
 
+  // Checkout screen
+  if (screen === 'checkout') {
+    return (
+      <div className="flex h-screen flex-col overflow-hidden">
+        <header className="flex items-center gap-2 border-b p-4">
+          <button
+            onClick={goToMenu}
+            className="rounded-md border px-3 py-2 text-sm font-medium"
+            aria-label="Back to menu"
+          >
+            ← Back to menu
+          </button>
+          <h1 className="flex-1 text-center text-lg font-semibold">Checkout</h1>
+          <span className="w-[92px]" aria-hidden="true" />
+        </header>
+        <div className="flex-1 overflow-y-auto pb-4">
+          <CheckoutScreen
+            capabilities={{
+              customer_payment_enabled: context?.capabilities.customer_payment_enabled ?? false,
+              pay_at_counter_enabled: context?.capabilities.pay_at_counter_enabled ?? false,
+              request_bill_enabled: context?.capabilities.request_bill_enabled ?? false,
+            }}
+            cartItems={cartItems}
+            cartCount={cartCount}
+            cartTotal={cartTotal}
+            submitting={submitting}
+            payingOnline={payingOnline}
+            billRequested={billRequested}
+            paymentRequest={paymentRequest}
+            onSubmitCart={() => {
+              submitCart().then((success) => {
+                if (success) goToStatus()
+              })
+            }}
+            onPayOnline={payOnline}
+            onRequestBill={handleRequestBill}
+          />
+        </div>
+      </div>
+    )
+  }
+
+  // Status screen
+  if (screen === 'status') {
+    const canAddMore = context?.capabilities.add_to_running_table_enabled ?? false
+    const isPickup = context?.source === 'QR Pickup'
+    return (
+      <OrderStatusScreen
+        status={orderStatus}
+        isPickup={isPickup}
+        pickupCode={isPickup ? order?.pickup_code : undefined}
+        canAddMore={canAddMore && !isPickup}
+        onAddMore={() => {
+          goToMenu()
+          setSelectedCategory(null)
+          setSearchTerm('')
+        }}
+        onDone={resetSession}
+      />
+    )
+  }
+
   // Find the menu item being displayed in detail view
   const currentMenuItem = detailItemCode
     ? menu.find((m) => m.item === detailItemCode)
@@ -194,7 +262,7 @@ function TabletLayout({ initialContext }: LayoutProps) {
           payingOnline={payingOnline}
           onIncrement={addToCart}
           onDecrement={decrementCart}
-          onSubmit={submitCart}
+          onSubmit={goToCheckout}
           onRequestBill={handleRequestBill}
           onPayOnline={payOnline}
           className="flex w-[32%] flex-col overflow-hidden border-l bg-background p-4"
