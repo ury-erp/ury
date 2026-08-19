@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   addItems,
   bootstrap,
+  createPaymentRequest,
   getCurrentOrder,
   getMenu,
   getStoredContext,
@@ -9,6 +10,7 @@ import {
   type CustomerOrder,
   type MenuItem,
   type OrderingContext,
+  type PaymentRequestResult,
 } from '../lib/api'
 
 type Cart = Record<string, { item: MenuItem; qty: number }>
@@ -40,6 +42,8 @@ export function useOrderingSession(initialContext?: OrderingContext) {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [billRequested, setBillRequested] = useState(false)
+  const [paymentRequest, setPaymentRequest] = useState<PaymentRequestResult | null>(null)
+  const [payingOnline, setPayingOnline] = useState(false)
 
   const loadOrder = useCallback(async (session: string) => {
     const current = await getCurrentOrder(session)
@@ -133,6 +137,25 @@ export function useOrderingSession(initialContext?: OrderingContext) {
     }
   }
 
+  async function payOnline() {
+    if (!context) return
+    setPayingOnline(true)
+    setError(null)
+    try {
+      const result = await createPaymentRequest(context.session)
+      setPaymentRequest(result)
+      if (result.payment_url) {
+        window.location.href = result.payment_url
+      }
+    } catch (err) {
+      // Includes the graceful "online payment isn't set up yet" case from
+      // the backend — surfaced as a normal error message, not a crash.
+      setError(err instanceof Error ? err.message : 'Could not start online payment. Please pay at the counter.')
+    } finally {
+      setPayingOnline(false)
+    }
+  }
+
   return {
     context,
     menu,
@@ -142,10 +165,13 @@ export function useOrderingSession(initialContext?: OrderingContext) {
     submitting,
     error,
     billRequested,
+    paymentRequest,
+    payingOnline,
     addToCart,
     decrementCart,
     submitCart,
     handleRequestBill,
+    payOnline,
     cartItems,
     cartCount,
     cartTotal,
