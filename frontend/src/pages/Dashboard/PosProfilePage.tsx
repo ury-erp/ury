@@ -630,10 +630,10 @@ export const PosProfilePage: React.FC = () => {
                       variant="ghost"
                       size="sm"
                       onClick={(e) => { e.stopPropagation(); handleProfileSelect(p); }}
-                      className="text-gray-500 hover:text-primary"
+                      className="text-gray-500 hover:text-primary p-1.5 h-8 w-8"
+                      title="Edit Profile"
                     >
-                      <Edit2 className="w-4 h-4 mr-1" />
-                      Edit
+                      <Edit2 className="w-4 h-4" />
                     </Button>
                   </td>
                 </tr>
