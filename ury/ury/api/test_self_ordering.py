@@ -540,6 +540,47 @@ class TestCreatePaymentRequest(unittest.TestCase):
         self.assertEqual(result["payment_request"], "PR-002")
         self.assertIsNone(result["payment_url"])
 
+    @patch("erpnext.accounts.doctype.payment_request.payment_request.make_payment_request")
+    @patch(f"{MOD}.frappe.log_error")
+    @patch(f"{MOD}.frappe.get_doc")
+    @patch(f"{MOD}._resolve_session")
+    @patch(f"{MOD}.frappe.set_user")
+    def test_create_payment_request_reports_unconfigured_gateway_clearly(
+        self, mock_set_user, mock_resolve_session, mock_get_doc, mock_log_error, mock_make_pr,
+    ):
+        """Live-testing finding: for dt="POS Invoice", ERPNext's
+        get_amount() only recognizes payments rows with type="Phone"
+        matching a configured gateway account -- with none configured (true
+        on a fresh bench with no real Payment Gateway Account set up),
+        make_payment_request() itself throws "Payment Entry is already
+        created", which reads as if the order were already paid. This must
+        surface as a clear "not configured yet" message, not that
+        confusing raw error."""
+        session = MagicMock()
+        session.invoice = "POS-INV-100"
+        mock_resolve_session.return_value = session
+
+        profile = MagicMock()
+        profile.enable_customer_payment = 1
+        profile.enable_payment_link = 0
+
+        invoice = MagicMock()
+        invoice.docstatus = 0
+        invoice.name = "POS-INV-100"
+
+        def get_doc_side_effect(doctype, name=None, **kwargs):
+            if doctype == "URY Self Ordering Profile":
+                return profile
+            return invoice
+
+        mock_get_doc.side_effect = get_doc_side_effect
+        mock_make_pr.side_effect = frappe.ValidationError("Payment Entry is already created")
+
+        with self.assertRaises(frappe.ValidationError) as ctx:
+            create_payment_request("session-token")
+        self.assertIn("not set up", str(ctx.exception))
+        self.assertNotIn("already created", str(ctx.exception))
+
 
 class TestSharePaymentLink(unittest.TestCase):
     def tearDown(self):

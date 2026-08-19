@@ -707,24 +707,47 @@ def create_payment_request(session):
 
         # make_payment_request() derives its own amount from the reference
         # doc server-side (get_amount()) — the client never supplies one.
-        pr = make_payment_request(
-            dt="POS Invoice",
-            dn=invoice.name,
-            submit_doc=1,
-            mute_email=1,
-            order_type="Shopping Cart",
-            return_doc=1,
-        )
+        #
+        # ERPNext quirk (found via live testing, not documented anywhere
+        # obvious): for dt="POS Invoice" specifically, get_amount() does
+        # NOT fall back to outstanding_amount the way it does for Sales/
+        # Purchase Invoice — it only sums payments rows with
+        # type="Phone" matching the configured gateway account, and
+        # throws "Payment Entry is already created" if none exist (reads
+        # as if the invoice were already paid, even on a fresh unpaid
+        # draft — a confusing message for what's really "no online
+        # payment method configured"). This requires the branch's POS
+        # Profile to have a Mode of Payment with Payment Type "Phone"
+        # linked to a real Payment Gateway Account — neither exists on
+        # this dev/test bench, so this is the actual, expected failure
+        # mode here, not a bug in this function. Surface it as a clear,
+        # honest "not configured yet" rather than ERPNext's confusing
+        # raw message.
+        try:
+            pr = make_payment_request(
+                dt="POS Invoice",
+                dn=invoice.name,
+                submit_doc=1,
+                mute_email=1,
+                order_type="Shopping Cart",
+                return_doc=1,
+            )
+        except Exception as e:
+            frappe.log_error(f"create_payment_request failed: {e}", "Self-Order Payment")
+            frappe.throw(
+                _("Online payment isn't set up for this restaurant yet. Please pay at the counter."),
+                frappe.ValidationError,
+            )
 
         payment_url = None
         try:
             payment_url = pr.get_payment_url()
         except Exception as e:
-            # No Payment Gateway Account configured for this branch/profile
-            # (or the configured gateway rejected the request) — the
-            # Payment Request itself is still real and valid; only the
-            # redirect/link URL is unavailable. Surface this plainly
-            # instead of fabricating a fake link.
+            # A Payment Request was created but the configured gateway
+            # rejected the URL request — the Payment Request itself is
+            # still real and valid; only the redirect/link URL is
+            # unavailable. Surface this plainly instead of fabricating a
+            # fake link.
             frappe.log_error(f"Payment Request created but no payment URL available: {e}", "Self-Order Payment")
 
     return {
