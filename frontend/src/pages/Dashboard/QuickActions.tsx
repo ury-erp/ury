@@ -97,7 +97,7 @@ export const QuickActions: React.FC = () => {
       description: 'Create new dishes, pricing, or course categories',
       actionText: '+ Add Menu',
       color: 'bg-white hover:bg-purple-50 text-purple-700',
-      border: 'border-gray-200 hover:border-purple-300',
+      border: 'border-border hover:border-purple-300',
       icon: (
         <svg className="h-6 w-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
@@ -115,7 +115,7 @@ export const QuickActions: React.FC = () => {
       description: 'Configure new dining table layout & seat capacity',
       actionText: '+ Add Table',
       color: 'bg-white hover:bg-purple-50 text-purple-700',
-      border: 'border-gray-200 hover:border-purple-300',
+      border: 'border-border hover:border-purple-300',
       icon: (
         <svg className="h-6 w-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
@@ -128,7 +128,7 @@ export const QuickActions: React.FC = () => {
       description: 'Set up AC Hall, Terrace, VIP, or Bar dining sections',
       actionText: '+ Add Zone',
       color: 'bg-white hover:bg-purple-50 text-purple-700',
-      border: 'border-gray-200 hover:border-purple-300',
+      border: 'border-border hover:border-purple-300',
       icon: (
         <svg className="h-6 w-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
@@ -146,7 +146,7 @@ export const QuickActions: React.FC = () => {
       description: 'Configure multi-outlet restaurant profiles & prefixes',
       actionText: '+ Add Branch',
       color: 'bg-white hover:bg-purple-50 text-purple-700',
-      border: 'border-gray-200 hover:border-purple-300',
+      border: 'border-border hover:border-purple-300',
       icon: (
         <svg className="h-6 w-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
@@ -164,7 +164,7 @@ export const QuickActions: React.FC = () => {
       description: 'Grant cashier, captain, or manager POS permissions',
       actionText: '+ Add User',
       color: 'bg-white hover:bg-purple-50 text-purple-700',
-      border: 'border-gray-200 hover:border-purple-300',
+      border: 'border-border hover:border-purple-300',
       icon: (
         <svg className="h-6 w-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
@@ -191,9 +191,9 @@ export const QuickActions: React.FC = () => {
         </div>
       )}
 
-      <div className="mb-3 flex items-center justify-between pb-3 border-b border-gray-200 -mx-6 px-6 -mt-6 pt-6">
-        <h2 className="text-lg font-bold text-gray-900">Quick Operations & Setup</h2>
-        <span className="text-xs text-gray-500 font-medium">Fast action shortcuts</span>
+      <div className="mb-3 flex items-center justify-between pb-3 border-b border-border -mx-6 px-6 -mt-6 pt-6">
+        <h2 className="text-lg font-bold text-foreground">Quick Operations & Setup</h2>
+        <span className="text-xs text-muted-foreground font-medium">Fast action shortcuts</span>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
@@ -207,8 +207,8 @@ export const QuickActions: React.FC = () => {
               <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-purple-50">
                 {card.icon}
               </div>
-              <h3 className="font-bold text-sm text-gray-900">{card.title}</h3>
-              <p className="mt-1 text-xs text-gray-500 line-clamp-2">{card.description}</p>
+              <h3 className="font-bold text-sm text-foreground">{card.title}</h3>
+              <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{card.description}</p>
             </div>
             <div className="mt-4">
               <Button
@@ -225,13 +225,13 @@ export const QuickActions: React.FC = () => {
 
       {/* 1. Add Menu Drawer/Dialog */}
       <Dialog open={activeModal === 'menu'} onOpenChange={handleClose}>
-        <DialogContent className="max-w-md bg-white p-6 rounded-xl border border-gray-200 shadow-xl">
+        <DialogContent className="max-w-md bg-card p-6 rounded-xl border border-border shadow-xl">
           <DialogHeader>
-            <DialogTitle className="text-lg font-bold text-gray-900">Add Menu Item</DialogTitle>
+            <DialogTitle className="text-lg font-bold text-foreground">Add Menu Item</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmitMenu} className="space-y-4 mt-3 text-xs">
             <div>
-              <label className="block font-semibold text-gray-700 mb-1">Item Name</label>
+              <label className="block font-semibold text-foreground mb-1">Item Name</label>
               <Input
                 placeholder="Paneer Tikka Masala"
                 value={menuForm.name}
@@ -240,7 +240,7 @@ export const QuickActions: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block font-semibold text-gray-700 mb-1">Course / Category</label>
+              <label className="block font-semibold text-foreground mb-1">Course / Category</label>
               <SearchableSelect
                 id="course"
                 value={menuForm.course}
@@ -255,7 +255,7 @@ export const QuickActions: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block font-semibold text-gray-700 mb-1">Price (₹)</label>
+              <label className="block font-semibold text-foreground mb-1">Price (₹)</label>
               <Input
                 type="number"
                 placeholder="280"
@@ -278,13 +278,13 @@ export const QuickActions: React.FC = () => {
 
       {/* 2. Add Table Drawer/Dialog */}
       <Dialog open={activeModal === 'table'} onOpenChange={handleClose}>
-        <DialogContent className="max-w-md bg-white p-6 rounded-xl border border-gray-200 shadow-xl">
+        <DialogContent className="max-w-md bg-card p-6 rounded-xl border border-border shadow-xl">
           <DialogHeader>
-            <DialogTitle className="text-lg font-bold text-gray-900">Add Table</DialogTitle>
+            <DialogTitle className="text-lg font-bold text-foreground">Add Table</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmitTable} className="space-y-4 mt-3 text-xs">
             <div>
-              <label className="block font-semibold text-gray-700 mb-1">Table Name</label>
+              <label className="block font-semibold text-foreground mb-1">Table Name</label>
               <Input
                 placeholder="T-15"
                 value={tableForm.name}
@@ -293,7 +293,7 @@ export const QuickActions: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block font-semibold text-gray-700 mb-1">Seating Capacity</label>
+              <label className="block font-semibold text-foreground mb-1">Seating Capacity</label>
               <Input
                 type="number"
                 placeholder="4"
@@ -302,7 +302,7 @@ export const QuickActions: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block font-semibold text-gray-700 mb-1">Dining Room / Zone</label>
+              <label className="block font-semibold text-foreground mb-1">Dining Room / Zone</label>
               <SearchableSelect
                 id="room"
                 value={tableForm.room}
@@ -329,13 +329,13 @@ export const QuickActions: React.FC = () => {
 
       {/* 3. Add Room / Zone Dialog */}
       <Dialog open={activeModal === 'room'} onOpenChange={handleClose}>
-        <DialogContent className="max-w-md bg-white p-6 rounded-xl border border-gray-200 shadow-xl">
+        <DialogContent className="max-w-md bg-card p-6 rounded-xl border border-border shadow-xl">
           <DialogHeader>
-            <DialogTitle className="text-lg font-bold text-gray-900">Add Dining Zone / Room</DialogTitle>
+            <DialogTitle className="text-lg font-bold text-foreground">Add Dining Zone / Room</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmitRoom} className="space-y-4 mt-3 text-xs">
             <div>
-              <label className="block font-semibold text-gray-700 mb-1">Zone Name</label>
+              <label className="block font-semibold text-foreground mb-1">Zone Name</label>
               <Input
                 placeholder="Outdoor Deck"
                 value={roomForm.name}
@@ -344,7 +344,7 @@ export const QuickActions: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block font-semibold text-gray-700 mb-1">Zone Type</label>
+              <label className="block font-semibold text-foreground mb-1">Zone Type</label>
               <SearchableSelect
                 id="type"
                 value={roomForm.type}
@@ -371,13 +371,13 @@ export const QuickActions: React.FC = () => {
 
       {/* 4. Add Branch Dialog */}
       <Dialog open={activeModal === 'branch'} onOpenChange={handleClose}>
-        <DialogContent className="max-w-md bg-white p-6 rounded-xl border border-gray-200 shadow-xl">
+        <DialogContent className="max-w-md bg-card p-6 rounded-xl border border-border shadow-xl">
           <DialogHeader>
-            <DialogTitle className="text-lg font-bold text-gray-900">Add Restaurant Branch</DialogTitle>
+            <DialogTitle className="text-lg font-bold text-foreground">Add Restaurant Branch</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmitBranch} className="space-y-4 mt-3 text-xs">
             <div>
-              <label className="block font-semibold text-gray-700 mb-1">Branch Name</label>
+              <label className="block font-semibold text-foreground mb-1">Branch Name</label>
               <Input
                 placeholder="Waterfront Bistro"
                 value={branchForm.name}
@@ -386,7 +386,7 @@ export const QuickActions: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block font-semibold text-gray-700 mb-1">Branch Code</label>
+              <label className="block font-semibold text-foreground mb-1">Branch Code</label>
               <Input
                 placeholder="WF-05"
                 value={branchForm.code}
@@ -394,7 +394,7 @@ export const QuickActions: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block font-semibold text-gray-700 mb-1">Invoice Prefix</label>
+              <label className="block font-semibold text-foreground mb-1">Invoice Prefix</label>
               <Input
                 placeholder="INV-WF-"
                 value={branchForm.invoicePrefix}
@@ -415,13 +415,13 @@ export const QuickActions: React.FC = () => {
 
       {/* 5. Add User Dialog */}
       <Dialog open={activeModal === 'user'} onOpenChange={handleClose}>
-        <DialogContent className="max-w-md bg-white p-6 rounded-xl border border-gray-200 shadow-xl">
+        <DialogContent className="max-w-md bg-card p-6 rounded-xl border border-border shadow-xl">
           <DialogHeader>
-            <DialogTitle className="text-lg font-bold text-gray-900">Add Staff User</DialogTitle>
+            <DialogTitle className="text-lg font-bold text-foreground">Add Staff User</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmitUser} className="space-y-4 mt-3 text-xs">
             <div>
-              <label className="block font-semibold text-gray-700 mb-1">Full Name</label>
+              <label className="block font-semibold text-foreground mb-1">Full Name</label>
               <Input
                 placeholder="Karan Verma"
                 value={userForm.name}
@@ -430,7 +430,7 @@ export const QuickActions: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block font-semibold text-gray-700 mb-1">Email Address</label>
+              <label className="block font-semibold text-foreground mb-1">Email Address</label>
               <Input
                 type="email"
                 placeholder="karan@uryrestaurant.com"
@@ -440,7 +440,7 @@ export const QuickActions: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block font-semibold text-gray-700 mb-1">Role / Permissions</label>
+              <label className="block font-semibold text-foreground mb-1">Role / Permissions</label>
               <SearchableSelect
                 id="role"
                 value={userForm.role}

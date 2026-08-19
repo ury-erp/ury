@@ -35,19 +35,24 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Aggregators', path: '/aggregator', icon: Store }
 ];
 
-const navLinkClass = ({ isActive }: { isActive: boolean }) =>
-  `flex items-center space-x-3 px-3.5 py-2.5 rounded-lg text-sm font-medium transition-all ${
-    isActive
-      ? 'bg-[#2563eb] text-white shadow-sm font-semibold'
-      : 'text-gray-600 hover:bg-blue-50 hover:text-[#2563eb]'
-  }`;
+// Shared active/hover color treatment for sidebar nav links. `navLinkClass` (main nav, top-level
+// items) and `reportLinkClass` (Reports panel, denser nested list) intentionally keep different
+// spacing/radius — main nav rows are larger tap targets for a short top-level list, report rows
+// are more compact to fit a longer drill-down list — but both now share the same base builder so
+// the active/hover color logic isn't duplicated.
+const sidebarLinkClass =
+  (density: 'default' | 'compact') =>
+  ({ isActive }: { isActive: boolean }) =>
+    `flex items-center ${
+      density === 'compact' ? 'space-x-2.5 px-3 py-2 rounded-md' : 'space-x-3 px-3.5 py-2.5 rounded-lg'
+    } text-sm font-medium transition-all ${
+      isActive
+        ? 'bg-primary text-white shadow-sm font-semibold'
+        : 'text-gray-600 hover:bg-blue-50 hover:text-primary'
+    }`;
 
-const reportLinkClass = ({ isActive }: { isActive: boolean }) =>
-  `flex items-center space-x-2.5 px-3 py-2 rounded-md text-[13px] font-medium transition-all ${
-    isActive
-      ? 'bg-[#2563eb] text-white shadow-sm font-semibold'
-      : 'text-gray-600 hover:bg-blue-50 hover:text-[#2563eb]'
-  }`;
+const navLinkClass = sidebarLinkClass('default');
+const reportLinkClass = sidebarLinkClass('compact');
 
 const reportGroups = groupReports(reportsRegistry);
 const reportGroupEntries = Object.entries(reportGroups);
@@ -64,7 +69,7 @@ const ReportsPanel: React.FC = () => (
       </Link>
       <div className="flex items-center space-x-2 px-1">
         <div className="flex items-center justify-center w-7 h-7 rounded-md bg-blue-50 shrink-0">
-          <BarChart3 className="w-4 h-4 text-[#2563eb]" />
+          <BarChart3 className="w-4 h-4 text-primary" />
         </div>
         <h2 className="text-sm font-semibold text-gray-900">Reports</h2>
       </div>
@@ -72,7 +77,7 @@ const ReportsPanel: React.FC = () => (
     <div className="p-4 space-y-5">
       {reportGroupEntries.map(([group, reports], index) => (
         <div key={group} className={index > 0 ? 'pt-4 border-t border-gray-100' : undefined}>
-          <h3 className="text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-2 px-3">
+          <h3 className="text-sm font-bold uppercase tracking-wider text-gray-400 mb-2 px-3">
             {group}
           </h3>
           <div className="space-y-0.5">
@@ -123,8 +128,8 @@ const MainPanel: React.FC<{ isManager: boolean }> = ({ isManager }) => {
           onClick={() => setIsAdvancedOpen(!isAdvancedOpen)}
           className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-sm font-medium transition-colors ${
             isAdvancedPath
-              ? 'text-[#2563eb] font-semibold bg-blue-50'
-              : 'text-gray-600 hover:bg-blue-50 hover:text-[#2563eb]'
+              ? 'text-primary font-semibold bg-blue-50'
+              : 'text-gray-600 hover:bg-blue-50 hover:text-primary'
           }`}
         >
           <div className="flex items-center space-x-3">
@@ -133,7 +138,7 @@ const MainPanel: React.FC<{ isManager: boolean }> = ({ isManager }) => {
           </div>
           <ChevronDown
             className={`w-4 h-4 transition-transform duration-200 ${
-              isAdvancedOpen ? 'rotate-180 text-[#2563eb]' : 'text-gray-400'
+              isAdvancedOpen ? 'rotate-180 text-primary' : 'text-gray-400'
             }`}
           />
         </button>
@@ -158,8 +163,8 @@ const MainPanel: React.FC<{ isManager: boolean }> = ({ isManager }) => {
               className={({ isActive }) =>
                 `flex items-center space-x-3 px-3.5 py-2 rounded-lg text-xs font-medium transition-all ${
                   isActive
-                    ? 'bg-[#2563eb] text-white shadow-sm font-semibold'
-                    : 'text-gray-600 hover:bg-blue-50 hover:text-[#2563eb]'
+                    ? 'bg-primary text-white shadow-sm font-semibold'
+                    : 'text-gray-600 hover:bg-blue-50 hover:text-primary'
                 }`
               }
             >

@@ -56,7 +56,7 @@ export function UserSection() {
                   value={user.name}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateUser(user.id, { name: e.target.value })}
                   placeholder="Full Name"
-                  className="w-full text-sm bg-white"
+                  className="w-full text-sm bg-background"
                 />
               </div>
 
@@ -70,7 +70,7 @@ export function UserSection() {
                   value={user.email}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateUser(user.id, { email: e.target.value })}
                   placeholder="user@example.com"
-                  className="w-full text-sm bg-white"
+                  className="w-full text-sm bg-background"
                 />
               </div>
 
@@ -84,7 +84,7 @@ export function UserSection() {
                   value={user.passwordPlaceholder}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateUser(user.id, { passwordPlaceholder: e.target.value })}
                   placeholder="Password"
-                  className="w-full text-sm bg-white font-mono"
+                  className="w-full text-sm bg-background font-mono"
                   autoComplete="new-password"
                 />
               </div>
@@ -109,9 +109,10 @@ export function UserSection() {
             {users.length > 1 && (
               <Button
                 type="button"
-                variant="ghost"
+                variant="danger"
+                size="icon"
                 onClick={() => deleteUser(user.id)}
-                className="text-red-500 hover:text-red-700 hover:bg-red-50 self-end md:self-center shrink-0 p-2 h-auto"
+                className="self-end md:self-center shrink-0"
                 title="Delete User"
                 aria-label="Delete user"
               >

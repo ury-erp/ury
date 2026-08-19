@@ -28,7 +28,7 @@ export const StatCard = React.forwardRef<HTMLDivElement, StatCardProps>(
   ({ label, value, delta, icon, className }, ref) => (
     <div
       ref={ref}
-      className={cn("rounded-lg border border-gray-200 bg-white shadow-sm p-5", className)}
+      className={cn("rounded-lg border border-border bg-card shadow-sm p-5", className)}
     >
       <div className="flex items-center justify-between">
         <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
