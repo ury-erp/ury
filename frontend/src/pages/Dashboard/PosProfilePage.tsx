@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
-import { Printer, Shield, Settings2, Plus, X, ArrowLeft, Edit2, Layers } from 'lucide-react';
+import { Printer, Shield, Settings2, Plus, X, ArrowLeft, Edit2, Eye, Layers } from 'lucide-react';
 import { Card, Button, Badge, Input, Select, Spinner, showToast } from '@ury/ui';
 import { Switch } from '../../components/ui/switch';
 import { call } from '@ury/core';
@@ -217,7 +217,12 @@ export const PosProfilePage: React.FC = () => {
     fetchOptions();
   }, [activeBranchId]);
 
-  const handleProfileSelect = (profile: PosProfileRecord) => {
+  const handleProfileView = (profile: PosProfileRecord) => {
+    setActiveDetailTab('details');
+    fetchProfileDetails(profile.name);
+  };
+
+  const handleProfileEdit = (profile: PosProfileRecord) => {
     setActiveDetailTab('details');
     fetchProfileDetails(profile.name);
   };
@@ -615,7 +620,7 @@ export const PosProfilePage: React.FC = () => {
                 <tr
                   key={p.name}
                   className="hover:bg-primary/5 transition-colors cursor-pointer"
-                  onClick={() => handleProfileSelect(p)}
+                  onClick={() => handleProfileView(p)}
                 >
                   <td className="px-6 py-4 font-semibold text-gray-900">{p.name}</td>
                   <td className="px-6 py-4 text-gray-600">{p.warehouse || p.company || '-'}</td>
@@ -626,15 +631,26 @@ export const PosProfilePage: React.FC = () => {
                     </Badge>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={(e) => { e.stopPropagation(); handleProfileSelect(p); }}
-                      className="text-gray-500 hover:text-primary p-1.5 h-8 w-8"
-                      title="Edit Profile"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </Button>
+                    <div className="flex items-center justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => { e.stopPropagation(); handleProfileView(p); }}
+                        className="text-gray-500 hover:text-primary p-1.5 h-8 w-8"
+                        title="View Profile"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => { e.stopPropagation(); handleProfileEdit(p); }}
+                        className="text-gray-500 hover:text-primary p-1.5 h-8 w-8"
+                        title="Edit Profile"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))}
