@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
-import { Utensils, Search, Plus, LayoutGrid, List, Edit2, Check, X } from 'lucide-react';
+import { Utensils, Search, Plus, LayoutGrid, List, Edit2, Check, X, Trash2 } from 'lucide-react';
 import { Card, Button, Badge, Input, Spinner, showToast, Select } from '@ury/ui';
 import { formatCurrency, call } from '@ury/core';
 import { dashboardService } from '../../services/dashboard';
 import SideDrawer from '../../components/layout/SideDrawer';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
+import { MenuBulkUpload } from '../../components/common/MenuBulkUpload';
 
 interface URYMenuRecord {
   name: string;
@@ -21,6 +22,13 @@ interface MenuItemRecord {
   image?: string;
   special_dish?: number;
   disabled?: number;
+}
+
+interface MenuItemRow {
+  id: string;
+  item: string;
+  item_name: string;
+  price: number | '';
 }
 
 type DrawerMode = 'none' | 'add-item' | 'edit-item' | 'add-menu' | 'add-course';
@@ -48,7 +56,6 @@ export const MenuPage: React.FC = () => {
 
   // Options for Branch and Price List selects
   const [branchOptions, setBranchOptions] = useState<{ name: string; title?: string }[]>([]);
-  const [priceListOptions, setPriceListOptions] = useState<{ name: string; title?: string }[]>([]);
 
   // Add/Edit item form state
   const [newItem, setNewItem] = useState({
@@ -70,6 +77,18 @@ export const MenuPage: React.FC = () => {
   // Add course form state
   const [newCourseName, setNewCourseName] = useState('');
   const [newCourseIcon, setNewCourseIcon] = useState('');
+
+  // Add new menu item rows & global item options
+  const [allItems, setAllItems] = useState<{ name: string; item_name: string; standard_rate?: number; custom_course?: string }[]>([]);
+  const [newMenuRows, setNewMenuRows] = useState<MenuItemRow[]>([]);
+  const [creatingItemForRowIndex, setCreatingItemForRowIndex] = useState<number | null>(null);
+
+  const createEmptyRow = (): MenuItemRow => ({
+    id: `row-${Math.random().toString(36).substr(2, 9)}`,
+    item: '',
+    item_name: '',
+    price: '',
+  });
 
   const fetchMenus = async () => {
     try {
@@ -127,19 +146,19 @@ export const MenuPage: React.FC = () => {
     }
   };
 
-  const fetchPriceLists = async () => {
+  const fetchAllItems = async () => {
     try {
-      const priceLists = await dashboardService.getModuleRecords<{ name: string; title?: string }>('Price List', activeBranchId);
-      setPriceListOptions(priceLists || []);
+      const items = await dashboardService.getModuleRecords<{ name: string; item_name: string; standard_rate?: number; custom_course?: string }>('Item', 'all');
+      setAllItems(items || []);
     } catch {
-      setPriceListOptions([]);
+      setAllItems([]);
     }
   };
 
   useEffect(() => {
     fetchMenus();
     fetchBranches();
-    fetchPriceLists();
+    fetchAllItems();
   }, [activeBranchId]);
 
   useEffect(() => {
@@ -180,6 +199,8 @@ export const MenuPage: React.FC = () => {
       branch: activeBranchId !== 'all' ? activeBranchId : '',
       price_list: '',
     });
+    setNewMenuRows([createEmptyRow()]);
+    setCreatingItemForRowIndex(null);
     setDrawerMode('add-menu');
   };
 
@@ -189,11 +210,19 @@ export const MenuPage: React.FC = () => {
     setDrawerMode('add-course');
   };
 
-  const closeDrawer = () => setDrawerMode('none');
+  const closeDrawer = () => {
+    if (creatingItemForRowIndex !== null) {
+      setCreatingItemForRowIndex(null);
+      setDrawerMode('add-menu');
+    } else {
+      setDrawerMode('none');
+    }
+  };
 
   const handleSaveItem = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newItem.item_name || !newItem.rate || !newItem.target_menu) return;
+    if (!newItem.item_name || !newItem.rate) return;
+    if (creatingItemForRowIndex === null && !newItem.target_menu) return;
 
     setSavingItem(true);
     let resolvedCourse = newItem.course;
@@ -243,23 +272,41 @@ export const MenuPage: React.FC = () => {
         });
         const createdItem = insertRes.message || insertRes;
 
-        const res = await call<any>('frappe.client.get', { doctype: 'URY Menu', name: newItem.target_menu });
-        const menuDoc = res.message || res;
-        if (!menuDoc.items) menuDoc.items = [];
-        menuDoc.items.push({
-          item: createdItem.name,
-          item_name: newItem.item_name,
-          course: resolvedCourse,
-          rate: parseFloat(newItem.rate),
-        });
-        await call('frappe.client.save', { doc: menuDoc });
+        await fetchAllItems();
+
+        if (creatingItemForRowIndex !== null) {
+          const updatedRows = [...newMenuRows];
+          updatedRows[creatingItemForRowIndex] = {
+            ...updatedRows[creatingItemForRowIndex],
+            item: createdItem.name,
+            item_name: newItem.item_name,
+            price: parseFloat(newItem.rate) || 0,
+          };
+          setNewMenuRows(updatedRows);
+          
+          setCreatingItemForRowIndex(null);
+          setDrawerMode('add-menu');
+        } else {
+          const res = await call<any>('frappe.client.get', { doctype: 'URY Menu', name: newItem.target_menu });
+          const menuDoc = res.message || res;
+          if (!menuDoc.items) menuDoc.items = [];
+          menuDoc.items.push({
+            item: createdItem.name,
+            item_name: newItem.item_name,
+            course: resolvedCourse,
+            rate: parseFloat(newItem.rate),
+          });
+          await call('frappe.client.save', { doc: menuDoc });
+        }
       }
 
-      if (selectedMenu === newItem.target_menu) {
+      if (creatingItemForRowIndex === null && selectedMenu === newItem.target_menu) {
         fetchMenuItems(selectedMenu);
       }
       showToast.success('Item saved');
-      closeDrawer();
+      if (creatingItemForRowIndex === null) {
+        closeDrawer();
+      }
     } catch (err) {
       console.error('Failed to save Item', err);
       showToast.error('Failed to save item');
@@ -270,16 +317,35 @@ export const MenuPage: React.FC = () => {
 
   const handleSaveMenu = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMenu.menu_name) return;
+    if (!newMenu.menu_name || !newMenu.branch) {
+      showToast.error('Menu Name and Branch are required fields');
+      return;
+    }
+
+    const validRows = newMenuRows.filter(r => r.item);
+    if (validRows.length === 0) {
+      showToast.error('Please add at least one item to the menu');
+      return;
+    }
+
     setSavingMenu(true);
     try {
+      const itemsPayload = validRows.map(row => {
+        const matchedItem = allItems.find(i => i.name === row.item);
+        return {
+          item: row.item,
+          item_name: row.item_name || (matchedItem ? matchedItem.item_name : ''),
+          rate: parseFloat(row.price as any) || 0,
+          course: matchedItem?.custom_course || undefined,
+        };
+      });
+
       await call('frappe.client.insert', {
         doc: {
           doctype: 'URY Menu',
           menu_name: newMenu.menu_name,
-          branch: newMenu.branch || undefined,
-          price_list: newMenu.price_list || undefined,
-          items: [],
+          branch: newMenu.branch,
+          items: itemsPayload,
         },
       });
       await fetchMenus();
@@ -290,6 +356,99 @@ export const MenuPage: React.FC = () => {
       showToast.error('Failed to save menu');
     } finally {
       setSavingMenu(false);
+    }
+  };
+
+  const handleBulkUploadParsed = async (parsedRows: { name: string; course: string; price: number }[]) => {
+    showToast.info('Processing uploaded items...');
+    const resolvedRows: MenuItemRow[] = [];
+    let updatedAllItems = [...allItems];
+    let createdCount = 0;
+    
+    try {
+      for (const row of parsedRows) {
+        if (!row.name) continue;
+        
+        const isDuplicateInSelection = resolvedRows.some(r => r.item_name.toLowerCase() === row.name.toLowerCase());
+        if (isDuplicateInSelection) continue;
+
+        const isDuplicateInForm = newMenuRows.some(r => r.item_name.toLowerCase() === row.name.toLowerCase());
+        if (isDuplicateInForm) continue;
+
+        let matched = updatedAllItems.find(i => i.name.toLowerCase() === row.name.toLowerCase() || i.item_name.toLowerCase() === row.name.toLowerCase());
+        
+        let itemCode = '';
+        let itemName = '';
+        
+        if (matched) {
+          itemCode = matched.name;
+          itemName = matched.item_name || matched.name;
+        } else {
+          let resolvedCourse = row.course;
+          if (resolvedCourse) {
+            const courseExists = availableCourses.some(c => c.name.toLowerCase() === resolvedCourse.toLowerCase());
+            if (!courseExists) {
+              try {
+                await call('frappe.client.insert', {
+                  doc: {
+                    doctype: 'URY Menu Course',
+                    course: resolvedCourse,
+                  },
+                });
+                await fetchCourses();
+              } catch (err) {
+                console.error('Failed to create course', err);
+              }
+            }
+          }
+
+          const insertRes = await call<any>('frappe.client.insert', {
+            doc: {
+              doctype: 'Item',
+              item_code: row.name,
+              item_name: row.name,
+              item_group: 'All Item Groups',
+              stock_uom: 'Nos',
+              standard_rate: row.price || 0,
+              is_sales_item: 1,
+              is_stock_item: 0,
+              custom_course: resolvedCourse || undefined,
+            },
+          });
+          const createdItem = insertRes.message || insertRes;
+          itemCode = createdItem.name;
+          itemName = createdItem.item_name || row.name;
+          
+          updatedAllItems.push({
+            name: itemCode,
+            item_name: itemName,
+            standard_rate: row.price,
+            custom_course: resolvedCourse,
+          });
+          createdCount++;
+        }
+        
+        resolvedRows.push({
+          id: `row-${Math.random().toString(36).substr(2, 9)}`,
+          item: itemCode,
+          item_name: itemName,
+          price: row.price || '',
+        });
+      }
+
+      await fetchAllItems();
+
+      const cleanedInitialRows = newMenuRows.filter(r => r.item);
+      setNewMenuRows([...cleanedInitialRows, ...resolvedRows]);
+      
+      if (createdCount > 0) {
+        showToast.success(`Successfully processed ${parsedRows.length} items (${createdCount} new items created).`);
+      } else {
+        showToast.success(`Successfully processed ${parsedRows.length} items.`);
+      }
+    } catch (err) {
+      console.error('Error processing bulk upload', err);
+      showToast.error('Failed to process some uploaded items');
     }
   };
 
@@ -324,7 +483,7 @@ export const MenuPage: React.FC = () => {
 
   const categories = Array.from(new Set(items.map((i) => i.course).filter(Boolean))) as string[];
 
-  const isDrawerOpen = drawerMode !== 'none';
+
   const drawerTitle =
     drawerMode === 'add-item' ? 'Add Menu Item'
     : drawerMode === 'edit-item' ? 'Edit Menu Item'
@@ -538,15 +697,17 @@ export const MenuPage: React.FC = () => {
         title={drawerTitle}
       >
         <form onSubmit={handleSaveItem} className="space-y-5 text-sm">
-          <div>
-            <label className="block font-semibold text-gray-700 mb-1.5">Target Menu <span className="text-red-500">*</span></label>
-            <SearchableSelect
-              id="target_menu"
-              value={newItem.target_menu}
-              onChange={(_, value) => setNewItem({ ...newItem, target_menu: value })}
-              options={menus.map(m => ({ value: m.name, label: m.menu_name || m.name }))}
-            />
-          </div>
+          {creatingItemForRowIndex === null && (
+            <div>
+              <label className="block font-semibold text-gray-700 mb-1.5">Target Menu <span className="text-red-500">*</span></label>
+              <SearchableSelect
+                id="target_menu"
+                value={newItem.target_menu}
+                onChange={(_, value) => setNewItem({ ...newItem, target_menu: value })}
+                options={menus.map(m => ({ value: m.name, label: m.menu_name || m.name }))}
+              />
+            </div>
+          )}
 
           <div>
             <label className="block font-semibold text-gray-700 mb-1.5">Item Name <span className="text-red-500">*</span></label>
@@ -633,30 +794,136 @@ export const MenuPage: React.FC = () => {
           </div>
 
           <div>
-            <label className="block font-semibold text-gray-700 mb-1.5">Branch</label>
+            <label className="block font-semibold text-gray-700 mb-1.5">Branch <span className="text-red-500">*</span></label>
             <SearchableSelect
               id="branch"
               value={newMenu.branch}
               onChange={(_, value) => setNewMenu({ ...newMenu, branch: value })}
-              options={[
-                { value: '', label: 'None' },
-                ...branchOptions.map(b => ({ value: b.name, label: b.title || b.name }))
-              ]}
+              options={branchOptions.map(b => ({ value: b.name, label: b.title || b.name }))}
               placeholder="Select Branch..."
             />
           </div>
 
-          <div>
-            <label className="block font-semibold text-gray-700 mb-1.5">Price List</label>
-            <SearchableSelect
-              id="price_list"
-              value={newMenu.price_list}
-              onChange={(_, value) => setNewMenu({ ...newMenu, price_list: value })}
-              options={[
-                { value: '', label: 'None' },
-                ...priceListOptions.map(p => ({ value: p.name, label: p.title || p.name }))
-              ]}
-              placeholder="Select Price List..."
+          {/* Menu Items Section */}
+          <div className="space-y-4 pt-2">
+            <div className="flex flex-col">
+              <label className="block font-semibold text-gray-700 text-sm">
+                Menu Items <span className="text-red-500">*</span>
+              </label>
+              <span className="text-xs text-gray-500 mt-0.5">
+                Add items and set custom price for this menu
+              </span>
+            </div>
+
+            <div className="space-y-3">
+              {/* Header Row */}
+              <div className="flex gap-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                <div className="flex-[3]">Item</div>
+                <div className="flex-[1.5]">Price (₹)</div>
+                {newMenuRows.length > 1 && <div className="w-9 shrink-0"></div>}
+              </div>
+
+              {newMenuRows.map((row, index) => {
+                const options = [
+                  ...allItems.map(i => ({ value: i.name, label: i.item_name || i.name })),
+                  { value: 'CREATE_NEW_ITEM', label: '+ Create New Item' }
+                ];
+
+                return (
+                  <div key={row.id} className="flex items-center gap-3 relative" style={{ zIndex: 50 - index }}>
+                    <div className="flex-[3]">
+                      <SearchableSelect
+                        id={`row-item-${index}`}
+                        value={row.item}
+                        options={options}
+                        placeholder="Select Item..."
+                        onChange={(_, value) => {
+                          if (value === 'CREATE_NEW_ITEM') {
+                            setCreatingItemForRowIndex(index);
+                            setNewItem({
+                              item_name: '',
+                              rate: '',
+                              course: '',
+                              new_course_name: '',
+                              is_adding_new_course: false,
+                              target_menu: '',
+                            });
+                            setDrawerMode('add-item');
+                          } else {
+                            const isDup = newMenuRows.some((r, rIdx) => r.item === value && rIdx !== index);
+                            if (isDup) {
+                              showToast.error("This item is already added to this menu");
+                              return;
+                            }
+                            
+                            const selectedItem = allItems.find(i => i.name === value);
+                            const updatedRows = [...newMenuRows];
+                            updatedRows[index] = {
+                              ...updatedRows[index],
+                              item: value,
+                              item_name: selectedItem ? selectedItem.item_name : '',
+                              price: selectedItem?.standard_rate || '',
+                            };
+                            setNewMenuRows(updatedRows);
+                          }
+                        }}
+                      />
+                    </div>
+
+                    <div className="flex-[1.5]">
+                      <Input
+                        type="number"
+                        min={0}
+                        value={row.price}
+                        placeholder="0.00"
+                        onChange={(e) => {
+                          const updatedRows = [...newMenuRows];
+                          updatedRows[index] = {
+                            ...updatedRows[index],
+                            price: e.target.value === '' ? '' : parseFloat(e.target.value) || 0,
+                          };
+                          setNewMenuRows(updatedRows);
+                        }}
+                        required
+                        className="w-full text-sm bg-white"
+                      />
+                    </div>
+
+                    {newMenuRows.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => {
+                          setNewMenuRows(newMenuRows.filter((_, idx) => idx !== index));
+                        }}
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 h-auto shrink-0"
+                        title="Delete Row"
+                      >
+                        <Trash2 className="w-5 h-5" />
+                      </Button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setNewMenuRows([...newMenuRows, createEmptyRow()])}
+              className="w-full py-2 border-dashed border-primary text-primary hover:bg-primary/5 flex items-center justify-center gap-1.5 text-xs font-semibold"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Item</span>
+            </Button>
+          </div>
+
+          {/* Bulk Upload Section */}
+          <div className="pt-4 border-t border-gray-100">
+            <MenuBulkUpload
+              onItemsParsed={handleBulkUploadParsed}
+              title="Bulk Upload (Optional)"
+              subtitle="Import items from a CSV file"
             />
           </div>
 
