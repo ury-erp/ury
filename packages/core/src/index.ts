@@ -7,3 +7,4 @@ export { storage } from './storage';
 export { formatCurrency, formatInvoiceTime } from './format';
 export { initPrinting, loadQzPrinter, disconnectQzPrinter, printWithQz } from './print/qz';
 export { validateFieldValue } from './utils/validateField';
+export type { ValidationMessages } from './utils/validateField';

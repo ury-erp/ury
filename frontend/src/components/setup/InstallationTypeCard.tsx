@@ -10,7 +10,7 @@ interface InstallationTypeCardProps {
 export function InstallationTypeCard({ type, selected, onSelect }: InstallationTypeCardProps) {
   return (
     <Card 
-      className={`relative cursor-pointer transition-all duration-200 ${selected ? 'border-2 border-[#2B5CE6] bg-[#EFF4FF]' : 'border border-border hover:border-[#2B5CE6] bg-card'}`}
+      className={`relative cursor-pointer transition-all duration-200 ${selected ? 'border-2 border-primary bg-primary-50' : 'border border-border hover:border-primary bg-card'}`}
       onClick={onSelect}
     >
       

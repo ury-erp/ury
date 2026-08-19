@@ -2,7 +2,7 @@ import React from 'react';
 import { useConfigure } from '../../../context/ConfigureContext';
 import { Input, Button } from '@ury/ui';
 import { Plus, Trash2 } from 'lucide-react';
-import { SearchableSelect } from '../SearchableSelect';
+import { SearchableSelect } from '../../common/SearchableSelect';
 
 export function TableSection() {
   const { tables, rooms, branch, addTable, updateTable, deleteTable } = useConfigure();
@@ -21,7 +21,7 @@ export function TableSection() {
     <div className="space-y-6">
       <div className="space-y-3">
         {/* Header Row */}
-        <div className="hidden md:flex gap-3 px-2 text-xs font-medium text-[#4B5563]">
+        <div className="hidden md:flex gap-3 px-2 text-xs font-medium text-gray-600">
           <div className="flex-1">Table Name</div>
           <div className="flex-1">Seats</div>
           <div className="flex-1">Room</div>
@@ -102,7 +102,7 @@ export function TableSection() {
         type="button"
         variant="outline"
         onClick={handleAdd}
-        className="w-full py-2.5 border-dashed border-[#2B5CE6] text-[#2B5CE6] hover:bg-[#EFF4FF] flex items-center justify-center gap-2 text-sm font-medium"
+        className="w-full py-2.5 border-dashed border-primary text-primary hover:bg-primary-50 flex items-center justify-center gap-2 text-sm font-medium"
       >
         <Plus className="w-4 h-4" />
         Add Table
