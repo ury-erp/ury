@@ -96,6 +96,11 @@ function ConfigurePageContent() {
 
       await setupService.submitConfigureData(payload);
 
+      // Setup is complete — the in-progress wizard snapshot must not survive
+      // to a later setup attempt in the same tab/session (bug: stale rooms,
+      // tables, and company name were bleeding into a fresh wizard run).
+      sessionStorage.removeItem('ury.setup.configureState');
+
       await call('frappe.client.set_value', {
         doctype: 'System Settings',
         name: 'System Settings',

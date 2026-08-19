@@ -183,10 +183,6 @@ export function MenuSection() {
 
   return (
     <div className="space-y-8">
-      <p className="text-sm text-muted-foreground">
-        Add a few items to get started — you can bulk-import or add hundreds more anytime later.
-      </p>
-
       {/* 2. Menu Items List */}
       <div className="space-y-4">
         <h3 className="text-sm font-semibold text-foreground">Menu Items</h3>
