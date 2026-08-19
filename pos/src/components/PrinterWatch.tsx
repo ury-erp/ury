@@ -55,6 +55,7 @@ const STATUS_VARIANTS: Record<
 };
 
 interface PrinterWatchContextValue {
+  isInstalled: boolean;
   isOpen: boolean;
   open: () => void;
   close: () => void;
@@ -77,15 +78,45 @@ function formatTime(isoTimestamp: string): string {
 }
 
 export function PrinterWatchProvider({ children }: { children: React.ReactNode }) {
+  const [isInstalled, setIsInstalled] = useState<boolean>(false);
   const [isOpen, setIsOpen] = useState(false);
   const [printers, setPrinters] = useState<PrinterHealth[]>([]);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [loadState, setLoadState] = useState<LoadState>('idle');
   const [staleError, setStaleError] = useState<string | null>(null);
 
+  const isCheckedRef = useRef(false);
   const latestSeq = useRef(0);
   const loadStateRef = useRef<LoadState>('idle');
   const lastUpdatedRef = useRef<string | null>(null);
+
+  // Check app installation status once on mount
+  useEffect(() => {
+    if (isCheckedRef.current) return;
+    isCheckedRef.current = true;
+
+    let isMounted = true;
+    const checkInstallation = async () => {
+      try {
+        const response = await call.get<{ message: { installed: boolean } }>(
+          'ury.ury_pos.api.is_printer_watch_installed'
+        );
+        if (isMounted) {
+          setIsInstalled(Boolean(response?.message?.installed));
+        }
+      } catch {
+        // Fail closed: if check fails, do not initialize feature
+        if (isMounted) {
+          setIsInstalled(false);
+        }
+      }
+    };
+
+    checkInstallation();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     loadStateRef.current = loadState;
@@ -101,6 +132,7 @@ export function PrinterWatchProvider({ children }: { children: React.ReactNode }
   }, [printers]);
 
   const fetchHealth = useCallback(async () => {
+    if (!isInstalled) return;
     const seq = ++latestSeq.current;
 
     try {
@@ -111,8 +143,8 @@ export function PrinterWatchProvider({ children }: { children: React.ReactNode }
       if (seq < latestSeq.current) return;
 
       const data = response.message;
-      setPrinters(data.printers || []);
-      setLastUpdated(data.timestamp || (data.printers && data.printers[0]?.summary_timestamp) || null);
+      setPrinters(data?.printers || []);
+      setLastUpdated(data?.timestamp || (data?.printers && data?.printers[0]?.summary_timestamp) || null);
       setLoadState('success');
       setStaleError(null);
     } catch (err) {
@@ -127,10 +159,10 @@ export function PrinterWatchProvider({ children }: { children: React.ReactNode }
         setStaleError(`Unable to refresh. Displaying last status from ${timeLabel}.`);
       }
     }
-  }, []);
+  }, [isInstalled]);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isInstalled || !isOpen) return;
 
     setStaleError(null);
     setLoadState('loading');
@@ -139,9 +171,10 @@ export function PrinterWatchProvider({ children }: { children: React.ReactNode }
 
     const intervalId = setInterval(fetchHealth, 30000);
     return () => clearInterval(intervalId);
-  }, [isOpen, fetchHealth]);
+  }, [isInstalled, isOpen, fetchHealth]);
 
   const handleRetry = () => {
+    if (!isInstalled) return;
     setStaleError(null);
     setLoadState('loading');
     loadStateRef.current = 'loading';
@@ -152,6 +185,7 @@ export function PrinterWatchProvider({ children }: { children: React.ReactNode }
   const close = useCallback(() => setIsOpen(false), []);
 
   const value: PrinterWatchContextValue = {
+    isInstalled,
     isOpen,
     open,
     close,
@@ -165,15 +199,17 @@ export function PrinterWatchProvider({ children }: { children: React.ReactNode }
   return (
     <PrinterWatchContext.Provider value={value}>
       {children}
-      <PrinterWatchDialog
-        isOpen={isOpen}
-        onOpenChange={setIsOpen}
-        printers={printers}
-        loadState={loadState}
-        lastUpdated={lastUpdated}
-        staleError={staleError}
-        onRetry={handleRetry}
-      />
+      {isInstalled && (
+        <PrinterWatchDialog
+          isOpen={isOpen}
+          onOpenChange={setIsOpen}
+          printers={printers}
+          loadState={loadState}
+          lastUpdated={lastUpdated}
+          staleError={staleError}
+          onRetry={handleRetry}
+        />
+      )}
     </PrinterWatchContext.Provider>
   );
 }
@@ -187,7 +223,11 @@ export function usePrinterWatch(): PrinterWatchContextValue {
 }
 
 export function PrinterStatusButton() {
-  const { open, hasIssue } = usePrinterWatch();
+  const { open, hasIssue, isInstalled } = usePrinterWatch();
+
+  if (!isInstalled) {
+    return null;
+  }
 
   const dotClass = hasIssue ? 'bg-rose-500' : 'bg-emerald-500';
 
