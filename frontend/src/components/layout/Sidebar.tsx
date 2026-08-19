@@ -10,7 +10,8 @@ import {
   Building2,
   ChevronDown,
   FileText,
-  Settings
+  Settings,
+  Store
 } from 'lucide-react';
 
 interface NavItem {
@@ -26,7 +27,8 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'URY Room', path: '/room', icon: Home },
   { label: 'POS Profile', path: '/pos-profile', icon: SlidersHorizontal },
   { label: 'User', path: '/user', icon: Users },
-  { label: 'Branch', path: '/branch', icon: Building2 }
+  { label: 'Branch', path: '/branch', icon: Building2 },
+  { label: 'Aggregators', path: '/aggregator', icon: Store }
 ];
 
 export const Sidebar: React.FC = () => {

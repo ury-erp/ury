@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
 import { RefreshCw, Plus, Store } from 'lucide-react';
-import { Card, Button, Input, Spinner } from '@ury/ui';
+import { Card, Button, Input, Spinner, showToast } from '@ury/ui';
 import { call } from '@ury/core';
 
 interface AggregatorSetting {
@@ -66,11 +66,31 @@ export const AggregatorPage: React.FC = () => {
       // 2. Create Price List
       await call('frappe.client.insert', {
         doc: { doctype: 'Price List', price_list_name: newAggregatorName, selling: 1, currency: 'INR' } // assume INR for now
-      }).catch(e => console.log('Price List might already exist', e));
+      }).catch((e: any) => {
+        const errorMessage = e?.message || e?.responseJSON?.message || String(e);
+        const errorType = e?.exc_type || e?.responseJSON?.exc_type;
+
+        // Only silently continue if this is a duplicate-entry error
+        if (errorType === 'DuplicateEntryError' || errorMessage.includes('already exists')) {
+          console.log('Price List might already exist', e);
+        } else {
+          throw e; // Re-throw non-duplicate errors
+        }
+      });
       // 3. Create Mode of Payment
       await call('frappe.client.insert', {
         doc: { doctype: 'Mode of Payment', mode_of_payment: newAggregatorName, type: 'Bank' }
-      }).catch(e => console.log('Mode of Payment might already exist', e));
+      }).catch((e: any) => {
+        const errorMessage = e?.message || e?.responseJSON?.message || String(e);
+        const errorType = e?.exc_type || e?.responseJSON?.exc_type;
+
+        // Only silently continue if this is a duplicate-entry error
+        if (errorType === 'DuplicateEntryError' || errorMessage.includes('already exists')) {
+          console.log('Mode of Payment might already exist', e);
+        } else {
+          throw e; // Re-throw non-duplicate errors
+        }
+      });
 
       // 4. Update Branch child table
       const res = await call<any>('frappe.client.get', {
@@ -100,8 +120,11 @@ export const AggregatorPage: React.FC = () => {
       fetchBranchAggregators();
       setIsDialogOpen(false);
       setNewAggregatorName('');
-    } catch (err) {
+      showToast.success('Aggregator created');
+    } catch (err: any) {
       console.error('Failed to create aggregator setup:', err);
+      const errorMessage = err?.message || err?.responseJSON?.message || String(err);
+      showToast.error(`Failed to create aggregator: ${errorMessage}`);
     } finally {
       setSaving(false);
     }
