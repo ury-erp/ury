@@ -665,3 +665,157 @@ def get_order_status(session):
         result["open_requests"] = open_requests
 
     return result
+
+
+# ---------------------------------------------------------------------------
+# Payment (Phase 6)
+#
+# Reuses ERPNext's own Payment Request doctype/flow rather than building a
+# parallel payments implementation — "POS Invoice" is already in its
+# ALLOWED_DOCTYPES_FOR_PAYMENT_REQUEST list. A gateway-redirect checkout and
+# a shareable/QR "payment link" are the SAME Payment Request underneath;
+# they only differ in how the frontend presents payment_url (auto-redirect
+# vs. copyable/QR link) — no need for two backend code paths.
+#
+# Settlement-on-payment (webhook -> Payment Entry -> invoice submit) is
+# ERPNext core's own responsibility once a real Payment Gateway Account is
+# configured (PaymentRequest.set_as_paid() / its gateway callbacks) — this
+# module does not reimplement or verify gateway webhooks itself. Without a
+# configured gateway (true for this track's dev/test bench — no real
+# Razorpay/Stripe credentials available), get_payment_url() has nothing to
+# return; create_payment_request() still creates a real, correctly-priced
+# Payment Request against the invoice, which is what's actually verifiable
+# without live gateway credentials.
+# ---------------------------------------------------------------------------
+
+@frappe.whitelist(allow_guest=True)
+def create_payment_request(session):
+    session = _resolve_session(session)
+    profile = frappe.get_doc("URY Self Ordering Profile", session.ordering_profile)
+
+    if not (profile.enable_customer_payment or profile.enable_payment_link):
+        frappe.throw(_("Online payment is not enabled"), frappe.ValidationError)
+    if not session.invoice:
+        frappe.throw(_("No active order for this session"), frappe.ValidationError)
+
+    with _elevated():
+        from erpnext.accounts.doctype.payment_request.payment_request import make_payment_request
+
+        invoice = frappe.get_doc("POS Invoice", session.invoice)
+        if invoice.docstatus == 1:
+            frappe.throw(_("This order is already settled"), frappe.ValidationError)
+
+        # make_payment_request() derives its own amount from the reference
+        # doc server-side (get_amount()) — the client never supplies one.
+        pr = make_payment_request(
+            dt="POS Invoice",
+            dn=invoice.name,
+            submit_doc=1,
+            mute_email=1,
+            order_type="Shopping Cart",
+            return_doc=1,
+        )
+
+        payment_url = None
+        try:
+            payment_url = pr.get_payment_url()
+        except Exception as e:
+            # No Payment Gateway Account configured for this branch/profile
+            # (or the configured gateway rejected the request) — the
+            # Payment Request itself is still real and valid; only the
+            # redirect/link URL is unavailable. Surface this plainly
+            # instead of fabricating a fake link.
+            frappe.log_error(f"Payment Request created but no payment URL available: {e}", "Self-Order Payment")
+
+    return {
+        "payment_request": pr.name,
+        "amount": pr.grand_total,
+        "currency": pr.currency,
+        "payment_url": payment_url,
+        "status": pr.status,
+    }
+
+
+@frappe.whitelist(allow_guest=True)
+def get_payment_status(session):
+    session = _resolve_session(session)
+    if not session.invoice:
+        return {"status": None}
+
+    with _elevated():
+        pr = frappe.db.get_value(
+            "Payment Request",
+            {"reference_doctype": "POS Invoice", "reference_name": session.invoice},
+            ["name", "status", "grand_total"],
+            as_dict=True,
+            order_by="creation desc",
+        )
+
+    if not pr:
+        return {"status": None}
+    return {"payment_request": pr.name, "status": pr.status, "amount": pr.grand_total}
+
+
+# ---------------------------------------------------------------------------
+# Communication provider (Phase 6.5) — extensible, not hardcoded to any one
+# channel. No messaging integration (WhatsApp/SMS/email) is installed in
+# this app today, so the default provider only logs; a future installed
+# app/plugin can register a real one instead of this module hardcoding it.
+# ---------------------------------------------------------------------------
+
+def _default_communication_provider(recipient, message):
+    frappe.log_error(f"[self-ordering communication stub] to={recipient}: {message}", "Self-Order Notify")
+
+
+_communication_provider = _default_communication_provider
+
+
+def register_communication_provider(fn):
+    """Install a real communication provider: fn(recipient: str, message: str) -> None.
+    Call this from a future installed app's hooks.py (e.g. a WhatsApp
+    integration) rather than editing this module directly."""
+    global _communication_provider
+    _communication_provider = fn
+
+
+@frappe.whitelist(allow_guest=True)
+def share_payment_link(session, recipient):
+    """Send the current Payment Request's link to `recipient` (whatever
+    format the active communication provider expects — a phone number for
+    an SMS/WhatsApp provider, an email address for an email provider) via
+    the registered provider. The default provider only logs — this is a
+    genuine extension point (register_communication_provider), not a
+    real send, since no messaging integration is installed in this app.
+    `recipient` is customer-supplied input, not derived from the session,
+    so validate it's at least non-empty before handing it to the provider.
+    """
+    session = _resolve_session(session)
+    profile = frappe.get_doc("URY Self Ordering Profile", session.ordering_profile)
+    if not profile.enable_payment_link:
+        frappe.throw(_("Payment links are not enabled"), frappe.ValidationError)
+    if not recipient or not isinstance(recipient, str):
+        frappe.throw(_("A valid recipient is required"), frappe.ValidationError)
+
+    with _elevated():
+        pr = frappe.db.get_value(
+            "Payment Request",
+            {"reference_doctype": "POS Invoice", "reference_name": session.invoice},
+            ["name", "grand_total"],
+            as_dict=True,
+            order_by="creation desc",
+        )
+        if not pr:
+            frappe.throw(_("No payment request found for this order — create one first"), frappe.ValidationError)
+
+        pr_doc = frappe.get_doc("Payment Request", pr.name)
+        try:
+            payment_url = pr_doc.get_payment_url()
+        except Exception:
+            payment_url = None
+
+    message = _(
+        "Your order total is {0}. {1}"
+    ).format(pr.grand_total, payment_url or _("A staff member will assist with payment shortly."))
+    _communication_provider(recipient, message)
+
+    return {"status": "Sent", "payment_request": pr.name}
