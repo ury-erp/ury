@@ -7,6 +7,51 @@ from frappe.tests.utils import FrappeTestCase
 from unittest.mock import patch, MagicMock
 from ury.ury_pos.api import searchPosInvoice
 from ury.ury_pos.api import get_split_group, getPosInvoiceItems
+from ury.ury_pos.api import getRestaurantMenu, resolve_restaurant_menu
+
+
+class TestGetRestaurantMenuPhase1(unittest.TestCase):
+    """Phase 1 regression: getRestaurantMenu() must remain a thin wrapper
+    around resolve_restaurant_menu() with byte-identical behavior for
+    existing (staff) callers."""
+
+    @patch("ury.ury_pos.api.getBranch")
+    @patch("ury.ury_pos.api.resolve_restaurant_menu")
+    @patch("ury.ury_pos.api.frappe.get_doc")
+    @patch("ury.ury_pos.api.frappe.get_roles")
+    def test_getRestaurantMenu_delegates_with_resolved_branch_and_cashier(
+        self, mock_get_roles, mock_get_doc, mock_resolve, mock_getBranch
+    ):
+        mock_get_roles.return_value = ["URY Cashier"]
+
+        mock_role = MagicMock()
+        mock_role.role = "URY Cashier"
+        mock_pos_profile = MagicMock()
+        mock_pos_profile.role_allowed_for_billing = [mock_role]
+        mock_get_doc.return_value = mock_pos_profile
+
+        mock_getBranch.return_value = "Branch A"
+        mock_resolve.return_value = {"items": [], "modified_time": None, "name": "Menu A"}
+
+        result = getRestaurantMenu("Test POS Profile", room="Room 1", order_type="Dine In")
+
+        mock_resolve.assert_called_once_with("Branch A", "Room 1", "Dine In", True)
+        self.assertEqual(result, {"items": [], "modified_time": None, "name": "Menu A"})
+
+    @patch("ury.ury_pos.api.getBranch")
+    @patch("ury.ury_pos.api.frappe.get_doc")
+    @patch("ury.ury_pos.api.frappe.get_roles")
+    def test_getRestaurantMenu_non_cashier_role(self, mock_get_roles, mock_get_doc, mock_getBranch):
+        mock_get_roles.return_value = ["Some Other Role"]
+        mock_pos_profile = MagicMock()
+        mock_pos_profile.role_allowed_for_billing = []
+        mock_get_doc.return_value = mock_pos_profile
+        mock_getBranch.return_value = "Branch A"
+
+        with patch("ury.ury_pos.api.resolve_restaurant_menu") as mock_resolve:
+            mock_resolve.return_value = {"items": [], "modified_time": None, "name": "Menu A"}
+            getRestaurantMenu("Test POS Profile")
+            mock_resolve.assert_called_once_with("Branch A", None, None, False)
 
 class TestMergeBillsSEC07(unittest.TestCase):
 
