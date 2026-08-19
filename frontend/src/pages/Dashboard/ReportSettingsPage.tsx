@@ -48,6 +48,7 @@ interface ConsumableItem {
 interface ReportSettingsData {
   name: string;
   branch: string;
+  modified?: string;
   extended_hours?: boolean;
   hours?: number;
   buying_price_list?: string;
@@ -294,6 +295,7 @@ export const ReportSettingsPage: React.FC = () => {
       if (reportSettingsData) {
         // Update existing doc
         docToSave.name = reportSettingsData.name;
+        docToSave.modified = reportSettingsData.modified;
         await call('frappe.client.save', { doc: docToSave });
       } else {
         // Insert new doc
@@ -301,7 +303,7 @@ export const ReportSettingsPage: React.FC = () => {
       }
 
       showToast.success('Report settings saved successfully');
-      fetchReportSettings();
+      await fetchReportSettings();
     } catch (err: any) {
       showToast.error(err.message || 'Failed to save report settings');
     } finally {
