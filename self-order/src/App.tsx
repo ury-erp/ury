@@ -77,7 +77,8 @@ function App() {
       const existing = prev[itemCode]
       if (!existing) return prev
       if (existing.qty <= 1) {
-        const { [itemCode]: _removed, ...rest } = prev
+        const rest = { ...prev }
+        delete rest[itemCode]
         return rest
       }
       return { ...prev, [itemCode]: { ...existing, qty: existing.qty - 1 } }
