@@ -220,6 +220,20 @@ def _open_session(profile, source, table, device=None):
             "last_activity": now_datetime(),
         })
         session.insert(ignore_permissions=True)
+        # Explicit commit rather than relying on Frappe's implicit
+        # end-of-request commit. Found live: a client that immediately
+        # uses the returned session token in its very next request (the
+        # real customer flow -- bootstrap then menu fetch, back-to-back
+        # with no human-scale delay) could get "session expired or
+        # invalid" because that next request's own transaction didn't yet
+        # see this insert. Manual sequential curl calls (with real-world
+        # latency between them) never showed this; an atomic
+        # bootstrap-then-fetch promise chain in the browser reproduced it
+        # reliably. This session is the customer's ONLY handle on their
+        # ordering context — every subsequent call depends on it existing
+        # the instant it's returned, so it must be durably committed
+        # before the response is, not just eventually consistent.
+        frappe.db.commit()
 
     return raw_session_token, session
 
