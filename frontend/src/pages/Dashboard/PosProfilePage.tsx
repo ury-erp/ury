@@ -690,8 +690,7 @@ export const PosProfilePage: React.FC = () => {
               {profiles.map((p) => (
                 <tr
                   key={p.name}
-                  className="hover:bg-primary/5 transition-colors cursor-pointer"
-                  onClick={() => handleProfileView(p)}
+                  className="hover:bg-gray-50/50 transition-colors"
                 >
                   <td className="px-6 py-4 font-semibold text-gray-900">{p.name}</td>
                   <td className="px-6 py-4 text-gray-600">{p.warehouse || p.company || '-'}</td>
@@ -706,7 +705,7 @@ export const PosProfilePage: React.FC = () => {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={(e) => { e.stopPropagation(); handleProfileView(p); }}
+                        onClick={() => handleProfileView(p)}
                         className="text-gray-500 hover:text-primary p-1.5 h-8 w-8"
                         title="View Profile"
                       >
@@ -715,7 +714,7 @@ export const PosProfilePage: React.FC = () => {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={(e) => { e.stopPropagation(); handleProfileEdit(p); }}
+                        onClick={() => handleProfileEdit(p)}
                         className="text-gray-500 hover:text-primary p-1.5 h-8 w-8"
                         title="Edit Profile"
                       >
