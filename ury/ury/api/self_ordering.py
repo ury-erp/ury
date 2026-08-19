@@ -299,6 +299,11 @@ def _ordering_context_response(raw_session_token, source, profile, table, layout
             "pay_at_counter_enabled": bool(profile.enable_pay_at_counter),
             "add_to_running_table_enabled": bool(profile.allow_add_to_running_table),
         },
+        # Surfaced so the frontend's idle-reset timer (Phase 3) reads the
+        # real per-profile value instead of hardcoding one — same field
+        # _open_session()/_resolve_session() already use server-side to
+        # expire the session itself, so the two can't drift.
+        "session_idle_timeout_minutes": profile.session_idle_timeout_minutes or 30,
     }
 
 
@@ -397,13 +402,28 @@ def get_customer_product(session, item_code):
         if not item:
             frappe.throw(_("Item not found"), frappe.DoesNotExistError)
 
+        # Resolve the same price list add_customer_items()/price_items_for_invoice()
+        # would end up using for this session, so variant/add-on rates aren't
+        # null: resolve_restaurant_menu() picks the active menu the same way
+        # get_customer_menu() does, then "Price List" is looked up the same
+        # way ury_order.py resolves invoice.selling_price_list (a Price List
+        # doc linked to that menu via restaurant_menu). No client input
+        # involved — same server-side resolution path, just done ahead of an
+        # invoice existing yet.
+        order_type = "Dine In" if session.table else "Take Away"
+        branch = frappe.db.get_value("URY Self Ordering Profile", session.ordering_profile, "branch")
+        menu = resolve_restaurant_menu(branch=branch, room=None, order_type=order_type, cashier=False)
+        price_list = frappe.db.get_value(
+            "Price List", {"restaurant_menu": menu["name"], "enabled": 1}, "name"
+        )
+
         # Both `POS Item Variants` and `Item Add On` are child-table doctypes
         # whose only field is a Link to another Item (the variant/add-on is
         # itself a priced Item) — see ury/ury/doctype/{pos_item_variants,
         # item_add_on}/*.json. Resolve each linked item's own price rather
         # than trusting any client-supplied amount.
-        variants = _linked_item_options("POS Item Variants", item_code, invoice_price_list=None)
-        addons = _linked_item_options("Item Add On", item_code, invoice_price_list=None)
+        variants = _linked_item_options("POS Item Variants", item_code, invoice_price_list=price_list)
+        addons = _linked_item_options("Item Add On", item_code, invoice_price_list=price_list)
 
     return {
         "item_code": item.item_code,
