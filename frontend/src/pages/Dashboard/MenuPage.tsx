@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
 import { Utensils, Search, Plus, LayoutGrid, List, Edit2, Check, X, Trash2 } from 'lucide-react';
-import { Card, Button, Badge, Input, Spinner, showToast, Select } from '@ury/ui';
+import { Card, Button, Badge, Input, Spinner, showToast } from '@ury/ui';
 import { formatCurrency, call } from '@ury/core';
 import { dashboardService } from '../../services/dashboard';
 import SideDrawer from '../../components/layout/SideDrawer';
@@ -953,23 +953,25 @@ export const MenuPage: React.FC = () => {
 
           <div>
             <label className="block font-semibold text-gray-700 mb-1.5">Icon</label>
-            <Select
+            <SearchableSelect
+              id="course-icon"
               value={newCourseIcon}
-              onChange={(e) => setNewCourseIcon(e.target.value)}
-              className="font-medium"
-            >
-              <option value="">None</option>
-              <option value="Utensils">Utensils</option>
-              <option value="Coffee">Coffee</option>
-              <option value="IceCream">Ice Cream</option>
-              <option value="Salad">Salad</option>
-              <option value="Pizza">Pizza</option>
-              <option value="Beef">Beef</option>
-              <option value="Fish">Fish</option>
-              <option value="Wine">Wine</option>
-              <option value="Soup">Soup</option>
-              <option value="Sandwich">Sandwich</option>
-            </Select>
+              onChange={(_, value) => setNewCourseIcon(value)}
+              placeholder="Select Icon..."
+              options={[
+                { value: '', label: 'None' },
+                { value: 'Utensils', label: 'Utensils' },
+                { value: 'Coffee', label: 'Coffee' },
+                { value: 'IceCream', label: 'Ice Cream' },
+                { value: 'Salad', label: 'Salad' },
+                { value: 'Pizza', label: 'Pizza' },
+                { value: 'Beef', label: 'Beef' },
+                { value: 'Fish', label: 'Fish' },
+                { value: 'Wine', label: 'Wine' },
+                { value: 'Soup', label: 'Soup' },
+                { value: 'Sandwich', label: 'Sandwich' },
+              ]}
+            />
           </div>
 
           <div className="pt-6 flex justify-end gap-3 border-t mt-8 border-gray-100">
