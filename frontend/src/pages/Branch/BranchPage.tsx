@@ -157,7 +157,7 @@ export const BranchPage: React.FC = () => {
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-xl border border-gray-200 shadow-xs">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-[#7C3AED]/10 text-[#7C3AED] flex items-center justify-center font-semibold shrink-0">
+            <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-semibold shrink-0">
               <Building2 className="w-6 h-6" />
             </div>
             <div>
@@ -167,7 +167,7 @@ export const BranchPage: React.FC = () => {
           </div>
           <Button
             onClick={openCreateDrawer}
-            className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white flex items-center gap-2"
+            className="bg-primary hover:bg-primary-700 text-white flex items-center gap-2"
           >
             <Plus className="w-4 h-4" />
             Add Branch
@@ -253,7 +253,7 @@ export const BranchPage: React.FC = () => {
                   onClick={() => openEditDrawer(branch)}
                   className="flex items-center gap-1.5 text-xs"
                 >
-                  <Edit2 className="w-3.5 h-3.5 text-[#7C3AED]" />
+                  <Edit2 className="w-3.5 h-3.5 text-primary" />
                   Edit
                 </Button>
 
@@ -296,7 +296,7 @@ export const BranchPage: React.FC = () => {
             <Button variant="outline" onClick={() => setIsDrawerOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSaveBranch} className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white">
+            <Button onClick={handleSaveBranch} className="bg-primary hover:bg-primary-700 text-white">
               {editingBranchId ? 'Update Branch' : 'Create Branch'}
             </Button>
           </>
@@ -349,7 +349,7 @@ export const BranchPage: React.FC = () => {
               value={address}
               onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setAddress(e.target.value)}
               placeholder="Full street address, city, and zip code"
-              className="w-full rounded-md border border-gray-200 p-3 text-sm focus:border-[#7C3AED] focus:ring-[#7C3AED] focus:outline-none"
+              className="w-full rounded-md border border-gray-200 p-3 text-sm focus:border-primary focus:ring-primary focus:outline-none"
             />
           </div>
         </form>

@@ -54,11 +54,11 @@ export function MenuSection() {
 
       {/* 2. Menu Items List */}
       <div className="space-y-4">
-        <h3 className="text-sm font-semibold text-[#111827]">Menu Items</h3>
+        <h3 className="text-sm font-semibold text-gray-900">Menu Items</h3>
         
         <div className="space-y-3">
           {/* Header Row */}
-          <div className="hidden md:flex gap-3 px-2 text-xs font-medium text-[#4B5563]">
+          <div className="hidden md:flex gap-3 px-2 text-xs font-medium text-gray-600">
             <div className="flex-1">Item Name</div>
             <div className="flex-1">Course</div>
             <div className="flex-1">Price (₹)</div>
@@ -122,7 +122,7 @@ export function MenuSection() {
           type="button"
           variant="outline"
           onClick={handleAdd}
-          className="w-full py-2.5 border-dashed border-[#2B5CE6] text-[#2B5CE6] hover:bg-[#EFF4FF] flex items-center justify-center gap-2 text-sm font-medium"
+          className="w-full py-2.5 border-dashed border-primary text-primary hover:bg-primary-50 flex items-center justify-center gap-2 text-sm font-medium"
         >
           <Plus className="w-4 h-4" />
           Add Menu Item
@@ -132,8 +132,8 @@ export function MenuSection() {
       {/* 3. Drag-and-Drop Menu File Uploader */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-[#111827]">Bulk Menu Upload (Optional)</h3>
-          <a href="/assets/ury/files/menu_template.csv" download className="text-xs font-medium text-[#2B5CE6] hover:underline flex items-center gap-1">
+          <h3 className="text-sm font-semibold text-gray-900">Bulk Menu Upload (Optional)</h3>
+          <a href="/assets/ury/files/menu_template.csv" download className="text-xs font-medium text-primary hover:underline flex items-center gap-1">
             <Download className="w-3 h-3" /> Download Template
           </a>
         </div>
@@ -147,19 +147,19 @@ export function MenuSection() {
         />
 
         {menuFile ? (
-          <div className="p-3 border border-[#2B5CE6] bg-[#EFF4FF] rounded-lg flex items-center justify-between">
+          <div className="p-3 border border-primary bg-primary-50 rounded-lg flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <FileText className="w-4 h-4 text-[#2B5CE6]" />
+              <FileText className="w-4 h-4 text-primary" />
               <div>
-                <p className="text-xs font-medium text-[#111827]">{menuFile.name}</p>
-                <p className="text-[10px] text-[#6B7280]">{(menuFile.size / 1024).toFixed(1)} KB</p>
+                <p className="text-xs font-medium text-gray-900">{menuFile.name}</p>
+                <p className="text-[10px] text-gray-500">{(menuFile.size / 1024).toFixed(1)} KB</p>
               </div>
             </div>
             <Button
               type="button"
               variant="ghost"
               onClick={() => setMenuFile(null)}
-              className="text-[#6B7280] hover:text-red-600 p-1 h-auto"
+              className="text-gray-500 hover:text-red-600 p-1 h-auto"
               title="Remove File"
             >
               <X className="w-4 h-4" />
@@ -173,15 +173,15 @@ export function MenuSection() {
             onClick={() => fileInputRef.current?.click()}
             className={`p-4 border border-dashed rounded-lg text-center cursor-pointer transition-colors ${
               isDragging
-                ? 'border-[#2B5CE6] bg-[#EFF4FF]'
-                : 'border-[#D1D5DB] hover:border-[#2B5CE6] bg-[#F9FAFB]'
+                ? 'border-primary bg-primary-50'
+                : 'border-[#D1D5DB] hover:border-primary bg-[#F9FAFB]'
             }`}
           >
-            <Upload className="w-5 h-5 text-[#6B7280] mx-auto mb-1.5" />
+            <Upload className="w-5 h-5 text-gray-500 mx-auto mb-1.5" />
             <p className="text-xs font-medium text-[#374151]">
-              Drag & drop CSV template here, or <span className="text-[#2B5CE6]">browse</span>
+              Drag & drop CSV template here, or <span className="text-primary">browse</span>
             </p>
-            <p className="text-[10px] text-[#9CA3AF] mt-0.5">Supports CSV files only</p>
+            <p className="text-[10px] text-gray-400 mt-0.5">Supports CSV files only</p>
           </div>
         )}
       </div>

@@ -2,7 +2,7 @@ import React from 'react';
 import { useConfigure } from '../../../context/ConfigureContext';
 import { Input, Button } from '@ury/ui';
 import { Plus, Trash2 } from 'lucide-react';
-import { SearchableSelect } from '../SearchableSelect';
+import { SearchableSelect } from '../../common/SearchableSelect';
 
 export function RoomSection() {
   const { rooms, branch, addRoom, updateRoom, deleteRoom } = useConfigure();
@@ -19,7 +19,7 @@ export function RoomSection() {
     <div className="space-y-6">
       <div className="space-y-3">
         {/* Header Row */}
-        <div className="hidden md:flex gap-3 px-2 text-xs font-medium text-[#4B5563]">
+        <div className="hidden md:flex gap-3 px-2 text-xs font-medium text-gray-600">
           <div className="flex-1">Room Name</div>
           <div className="flex-1">Room Type</div>
           <div className="flex-1">Branch</div>
@@ -84,7 +84,7 @@ export function RoomSection() {
         type="button"
         variant="outline"
         onClick={handleAdd}
-        className="w-full py-2.5 border-dashed border-[#2B5CE6] text-[#2B5CE6] hover:bg-[#EFF4FF] flex items-center justify-center gap-2 text-sm font-medium"
+        className="w-full py-2.5 border-dashed border-primary text-primary hover:bg-primary-50 flex items-center justify-center gap-2 text-sm font-medium"
       >
         <Plus className="w-4 h-4" />
         Add Room
