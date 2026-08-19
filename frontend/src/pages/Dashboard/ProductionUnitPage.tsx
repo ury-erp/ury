@@ -249,10 +249,7 @@ export const ProductionUnitPage: React.FC = () => {
               Cancel
             </Button>
             <Button type="submit" className="bg-primary hover:bg-primary/90 text-white disabled:opacity-50 disabled:cursor-not-allowed" disabled={saving}>
-              <div className="flex items-center gap-2">
-                {saving && <Spinner className="w-4 h-4" />}
-                <span>{saving ? 'Saving...' : (editingUnit ? 'Save Changes' : 'Save Unit')}</span>
-              </div>
+              <span>{editingUnit ? 'Save Changes' : 'Save Unit'}</span>
             </Button>
           </div>
         </form>

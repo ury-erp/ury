@@ -333,7 +333,6 @@ export const UserPage: React.FC = () => {
               Cancel
             </Button>
             <Button type="submit" className="bg-primary hover:bg-primary/90 text-white px-6 flex items-center gap-2" disabled={saving}>
-              {saving && <Spinner className="w-4 h-4" />}
               {editingUser ? 'Save Changes' : 'Create User'}
             </Button>
           </div>

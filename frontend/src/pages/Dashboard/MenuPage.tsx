@@ -791,7 +791,6 @@ export const MenuPage: React.FC = () => {
           <div className="pt-6 flex justify-end gap-3 border-t mt-8 border-gray-100">
             <Button type="button" variant="outline" onClick={closeDrawer} className="font-semibold" disabled={savingItem}>Cancel</Button>
             <Button type="submit" disabled={savingItem} className="bg-primary hover:bg-primary/90 text-white font-semibold shadow-xs flex items-center gap-2">
-              {savingItem && <Spinner className="w-4 h-4" />}
               {editingItem ? 'Save Changes' : 'Create Item'}
             </Button>
           </div>
@@ -952,7 +951,6 @@ export const MenuPage: React.FC = () => {
           <div className="pt-6 flex justify-end gap-3 border-t mt-8 border-gray-100">
             <Button type="button" variant="outline" onClick={closeDrawer} className="font-semibold" disabled={savingMenu}>Cancel</Button>
             <Button type="submit" disabled={savingMenu} className="bg-primary hover:bg-primary/90 text-white font-semibold shadow-xs flex items-center gap-2">
-              {savingMenu && <Spinner className="w-4 h-4" />}
               Create Menu
             </Button>
           </div>
@@ -1002,7 +1000,6 @@ export const MenuPage: React.FC = () => {
           <div className="pt-6 flex justify-end gap-3 border-t mt-8 border-gray-100">
             <Button type="button" variant="outline" onClick={closeDrawer} className="font-semibold" disabled={savingCourse}>Cancel</Button>
             <Button type="submit" disabled={savingCourse} className="bg-primary hover:bg-primary/90 text-white font-semibold shadow-xs flex items-center gap-2">
-              {savingCourse && <Spinner className="w-4 h-4" />}
               Create Course
             </Button>
           </div>
