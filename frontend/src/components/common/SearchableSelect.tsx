@@ -41,7 +41,12 @@ export function SearchableSelect({
 
   // Find label of selected value
   const selectedOption = useMemo(() => {
-    return options.find((opt) => opt.value === value || opt.label === value);
+    if (!value) return null;
+    const valLower = value.toLowerCase();
+    return options.find((opt) => 
+      (opt.value && opt.value.toLowerCase() === valLower) || 
+      (opt.label && opt.label.toLowerCase() === valLower)
+    );
   }, [options, value]);
 
   // Sync display text when value or options change
@@ -144,19 +149,31 @@ export function SearchableSelect({
       {isOpen && (
         <div className="absolute top-full left-0 right-0 mt-2 z-50 bg-white border border-gray-200 rounded-lg shadow-lg max-h-80 overflow-y-auto p-1 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-500">
           {filteredOptions.length > 0 ? (
-            filteredOptions.map((opt) => (
-              <div
-                key={opt.value}
-                onClick={() => handleSelectOption(opt)}
-                className={`px-4 py-2 text-sm rounded-md cursor-pointer select-none transition-colors ${
-                  opt.value === value || opt.label === value
-                    ? 'bg-blue-50 text-blue-700 font-normal'
-                    : 'text-gray-800 hover:bg-gray-50'
-                }`}
-              >
-                {opt.label}
-              </div>
-            ))
+            filteredOptions.map((opt) => {
+              const isCreateNew = opt.value === 'CREATE_NEW_ITEM';
+              const isSelected = !!value && !isCreateNew && (
+                opt.value === value || 
+                opt.label === value || 
+                (opt.value && opt.value.toLowerCase() === value.toLowerCase()) || 
+                (opt.label && opt.label.toLowerCase() === value.toLowerCase())
+              );
+
+              return (
+                <div
+                  key={opt.value}
+                  onClick={() => handleSelectOption(opt)}
+                  className={`px-4 py-2 text-sm rounded-md cursor-pointer select-none transition-colors ${
+                    isSelected
+                      ? 'bg-blue-50 text-blue-700 font-normal'
+                      : isCreateNew
+                      ? 'text-blue-600 font-medium hover:bg-blue-50/50 border-t border-gray-100 mt-1 pt-2'
+                      : 'text-gray-800 hover:bg-gray-50'
+                  }`}
+                >
+                  {opt.label}
+                </div>
+              );
+            })
           ) : (
             <div className="px-4 py-2 text-sm text-gray-400">No matching options</div>
           )}
