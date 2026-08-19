@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { WizardLayout } from '../../components/setup/WizardLayout';
 import { DynamicForm, DynamicFormHandle } from '../../components/setup/DynamicForm';
@@ -6,9 +6,8 @@ import { InstallationTypeCard } from '../../components/setup/InstallationTypeCar
 import { setupService, SetupPayload } from '../../services/setup';
 import setupSchema from '../../data/forms/setup.json';
 import { PROGRESS_STEPS } from '../../components/setup/constants';
+import { ProgressModal } from '../../components/setup/ProgressModal';
 import { Button } from '@ury/ui';
-
-const ProgressModal = lazy(() => import('../../components/setup/ProgressModal').then(module => ({ default: module.ProgressModal })));
 
 const FISCAL_YEARS: Record<string, string> = {
   Afghanistan: '12-21',
@@ -48,6 +47,9 @@ export default function SetupPage() {
   const [error, setError] = useState<string | null>(null);
   const [installationType, setInstallationType] = useState<'minimal' | 'advanced'>('minimal');
   const [defaultsLoaded, setDefaultsLoaded] = useState(false);
+  // pendingSubmit holds the args for the actual API call until the realtime
+  // listener is confirmed attached (via ProgressModal's onReady callback).
+  const pendingSubmit = useRef<{ payload: SetupPayload; installationType: 'minimal' | 'advanced' } | null>(null);
 
   useEffect(() => {
     async function loadDefaults() {
@@ -62,10 +64,15 @@ export default function SetupPage() {
           ? defaults.languages
           : (defaults.languages as any)?.languages || [];
 
-        const formattedLangs = rawLangs.map((l: any) => {
-          if (typeof l === 'string') return { value: l, label: l };
-          return { value: l.name || l.value, label: l.label || l.name || l.value };
-        });
+        const formattedLangs = rawLangs
+          .map((l: any) => {
+            const val = typeof l === 'string' ? l : (l.name || l.value || l.label);
+            if (val === 'English') return { value: 'English', label: 'English' };
+            if (val === 'العربية' || val === 'Arabic') return { value: 'Arabic', label: 'عربي' };
+            if (val === 'Français' || val === 'French') return { value: 'French', label: 'français' };
+            return null;
+          })
+          .filter(Boolean) as { value: string; label: string }[];
 
         const rawCountries = Array.isArray(defaults.countries) ? defaults.countries : [];
         const formattedCountries = rawCountries.map((c: any) =>
@@ -152,33 +159,40 @@ export default function SetupPage() {
     }
   }, [handleCountryChange, handleCompanyNameChange]);
 
-  const runSubmit = async (payload: SetupPayload, targetInstallationType: 'minimal' | 'advanced') => {
-    setSubmitting(true);
-    setError(null);
-    setActiveIndex(0);
-
-    const interval = setInterval(() => {
-      setActiveIndex(i => Math.min(i + 1, PROGRESS_STEPS.length - 1));
-    }, 3500);
+  // Runs the actual API call — only invoked after the realtime socket
+  // listener is attached (called from ProgressModal's onReady).
+  const doApiCall = useCallback(async () => {
+    const pending = pendingSubmit.current;
+    if (!pending) return;
+    pendingSubmit.current = null;
 
     try {
-      await setupService.submitSetup(payload);
-
-      clearInterval(interval);
+      await setupService.submitSetup(pending.payload);
+      // Backend has finished and published its final completed event.
+      // Mark all steps done so the top stepper fills completely.
       setActiveIndex(PROGRESS_STEPS.length);
 
       setTimeout(() => {
-        if (targetInstallationType === 'minimal') {
+        if (pending.installationType === 'minimal') {
           navigate('/setup-wizard/1');
         } else {
           window.location.href = '/app';
         }
       }, 800);
     } catch (err: any) {
-      clearInterval(interval);
       setError(err?.message || 'An error occurred during setup');
-      // Do not close modal on error, allow user to see the error message
+      setSubmitting(false);
     }
+  }, [navigate]);
+
+  const runSubmit = (payload: SetupPayload, targetInstallationType: 'minimal' | 'advanced') => {
+    // Store payload for doApiCall (invoked when onReady fires).
+    pendingSubmit.current = { payload, installationType: targetInstallationType };
+    setSubmitting(true);
+    setError(null);
+    setActiveIndex(0);
+    // doApiCall() will be triggered by ProgressModal's onReady callback once
+    // the realtime listener is confirmed attached.
   };
 
   const handleNext = async () => {
@@ -219,9 +233,9 @@ export default function SetupPage() {
       nextLabel="Continue"
       isNextDisabled={submitting}
       secondaryAction={
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 h-full">
           <span className="hidden sm:inline text-xs text-muted-foreground">
-            Creates a working demo restaurant with sample data — you can change or delete any of it afterward.
+            Creates a working demo restaurant with sample data, you can change or delete any of it afterward.
           </span>
           <Button
             type="button"
@@ -258,9 +272,14 @@ export default function SetupPage() {
       </div>
       
       {submitting && (
-        <Suspense fallback={null}>
-          <ProgressModal visible={true} activeIndex={activeIndex} error={error} />
-        </Suspense>
+        <ProgressModal 
+          visible={true} 
+          activeIndex={activeIndex} 
+          error={error} 
+          eventName="ury_setup_progress"
+          onStepChange={setActiveIndex}
+          onReady={doApiCall}
+        />
       )}
     </WizardLayout>
   );

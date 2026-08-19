@@ -25,6 +25,7 @@
     "react-day-picker": "^9.6.4",
     "react-dom": "^19.0.0",
     "react-router-dom": "^6.30.1",
+    "socket.io-client": "4.8.3",
     "recharts": "^2.15.2",
     "zod": "^4.4.3"
   },

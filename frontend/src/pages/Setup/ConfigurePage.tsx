@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@ury/ui';
 import { WizardLayout } from '../../components/setup/WizardLayout';
@@ -12,7 +12,6 @@ import { MenuSection } from '../../components/setup/sections/MenuSection';
 import { PaymentSection } from '../../components/setup/sections/PaymentSection';
 import { UserSection } from '../../components/setup/sections/UserSection';
 import { setupService } from '../../services/setup';
-import { call } from '@ury/core';
 import { CONFIGURE_PROGRESS_STEPS } from '../../components/setup/constants';
 import { ProgressModal } from '../../components/setup/ProgressModal';
 
@@ -48,6 +47,8 @@ function ConfigurePageContent() {
   const [finishing, setFinishing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
+  // pendingFinish holds the data until the realtime listener is ready
+  const pendingFinish = useRef<object | null>(null);
 
   const {
     activeSection,
@@ -74,48 +75,24 @@ function ConfigurePageContent() {
     }
   };
 
-  const handleFinish = async () => {
-    setFinishing(true);
-    setError(null);
-    setActiveIndex(0);
-
-    const interval = setInterval(() => {
-      setActiveIndex(i => Math.min(i + 1, CONFIGURE_PROGRESS_STEPS.length - 1));
-    }, 2000);
+  const doConfigureApiCall = useCallback(async () => {
+    const payload = pendingFinish.current;
+    if (!payload) return;
+    pendingFinish.current = null;
 
     try {
-      const payload = {
-        branch,
-        rooms,
-        tables,
-        menuItems,
-        taxConfig,
-        paymentMethods,
-        users,
-      };
-
       await setupService.submitConfigureData(payload);
 
-      // Setup is complete — the in-progress wizard snapshot must not survive
-      // to a later setup attempt in the same tab/session (bug: stale rooms,
-      // tables, and company name were bleeding into a fresh wizard run).
+      // Clear stale session snapshot so a fresh wizard run starts clean.
       sessionStorage.removeItem('ury.setup.configureState');
 
-      await call('frappe.client.set_value', {
-        doctype: 'System Settings',
-        name: 'System Settings',
-        fieldname: 'setup_complete',
-        value: 1,
-      });
-
-      clearInterval(interval);
+      // Mark all steps done
       setActiveIndex(CONFIGURE_PROGRESS_STEPS.length);
 
       setTimeout(() => {
         window.location.href = '/ury/dashboard';
       }, 800);
     } catch (err: any) {
-      clearInterval(interval);
       console.error('Failed to finish configure setup', err);
       let msg = 'Failed to configure setup. Check backend logs.';
       if (typeof err === 'string') {
@@ -138,6 +115,24 @@ function ConfigurePageContent() {
       setError(msg);
       setFinishing(false);
     }
+  }, []);
+
+  const handleFinish = () => {
+    const payload = {
+      branch,
+      rooms,
+      tables,
+      menuItems,
+      taxConfig,
+      paymentMethods,
+      users,
+    };
+    pendingFinish.current = payload;
+    setFinishing(true);
+    setError(null);
+    setActiveIndex(0);
+    // doConfigureApiCall() is triggered by ProgressModal's onReady once
+    // the realtime listener is confirmed attached.
   };
 
   const handleNext = () => {
@@ -187,7 +182,7 @@ function ConfigurePageContent() {
         </Button>
       }
     >
-      <div className="space-y-4 h-full">
+      <div className="space-y-4">
         {error && (
           <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3 text-red-700">
             <div className="flex-1 text-sm font-medium">
@@ -223,6 +218,9 @@ function ConfigurePageContent() {
           activeIndex={activeIndex} 
           error={error} 
           steps={CONFIGURE_PROGRESS_STEPS} 
+          eventName="ury_configure_progress"
+          onStepChange={setActiveIndex}
+          onReady={doConfigureApiCall}
         />
       )}
     </WizardLayout>
