@@ -23,10 +23,12 @@ function TabletLayout({ initialContext }: LayoutProps) {
     submitting,
     error,
     billRequested,
+    payingOnline,
     addToCart,
     decrementCart,
     submitCart,
     handleRequestBill,
+    payOnline,
     cartItems,
     cartCount,
     cartTotal,
@@ -81,10 +83,12 @@ function TabletLayout({ initialContext }: LayoutProps) {
           cartTotal={cartTotal}
           submitting={submitting}
           billRequested={billRequested}
+          payingOnline={payingOnline}
           onIncrement={addToCart}
           onDecrement={decrementCart}
           onSubmit={submitCart}
           onRequestBill={handleRequestBill}
+          onPayOnline={payOnline}
           className="flex w-[32%] flex-col overflow-hidden border-l bg-background p-4"
         />
       </div>

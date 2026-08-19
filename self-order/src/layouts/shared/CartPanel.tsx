@@ -10,10 +10,12 @@ interface CartPanelProps {
   cartTotal: number
   submitting: boolean
   billRequested: boolean
+  payingOnline: boolean
   onIncrement: (item: MenuItem) => void
   onDecrement: (itemCode: string) => void
   onSubmit: () => void
   onRequestBill: () => void
+  onPayOnline: () => void
   className?: string
 }
 
@@ -30,10 +32,12 @@ function CartPanel({
   cartTotal,
   submitting,
   billRequested,
+  payingOnline,
   onIncrement,
   onDecrement,
   onSubmit,
   onRequestBill,
+  onPayOnline,
   className,
 }: CartPanelProps) {
   return (
@@ -106,6 +110,15 @@ function CartPanel({
         >
           {submitting ? 'Placing order…' : 'Place Order'}
         </button>
+        {context?.capabilities.customer_payment_enabled && order && !order.billed && (
+          <button
+            className="mt-2 w-full rounded-md bg-primary py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+            disabled={payingOnline}
+            onClick={onPayOnline}
+          >
+            {payingOnline ? 'Starting payment…' : 'Pay Online'}
+          </button>
+        )}
         {context?.capabilities.request_bill_enabled && order && !order.billed && (
           <button
             className="mt-2 w-full rounded-md border py-2 text-sm font-medium disabled:opacity-50"

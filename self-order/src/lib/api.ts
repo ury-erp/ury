@@ -132,3 +132,32 @@ export async function requestBill(session: string): Promise<{ status: string; re
 export async function getStatus(session: string): Promise<OrderStatus> {
   return call.get<OrderStatus>(`${M}.get_order_status`, { session })
 }
+
+export interface PaymentRequestResult {
+  payment_request: string
+  amount: number
+  currency: string
+  payment_url: string | null
+  status: string
+}
+
+export interface PaymentStatusResult {
+  status: string | null
+  payment_request?: string
+  amount?: number
+}
+
+export async function createPaymentRequest(session: string): Promise<PaymentRequestResult> {
+  return call.post<PaymentRequestResult>(`${M}.create_payment_request`, { session })
+}
+
+export async function getPaymentStatus(session: string): Promise<PaymentStatusResult> {
+  return call.get<PaymentStatusResult>(`${M}.get_payment_status`, { session })
+}
+
+export async function sharePaymentLink(
+  session: string,
+  recipient: string,
+): Promise<{ status: string; payment_request: string }> {
+  return call.post(`${M}.share_payment_link`, { session, recipient })
+}

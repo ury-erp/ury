@@ -15,10 +15,13 @@ function MobileQRLayout({ initialContext }: LayoutProps) {
     submitting,
     error,
     billRequested,
+    paymentRequest,
+    payingOnline,
     addToCart,
     decrementCart,
     submitCart,
     handleRequestBill,
+    payOnline,
     cartItems,
     cartCount,
     cartTotal,
@@ -67,6 +70,21 @@ function MobileQRLayout({ initialContext }: LayoutProps) {
             <span>Total</span>
             <span>{order.grand_total}</span>
           </div>
+          {context?.capabilities.customer_payment_enabled && !order.billed && (
+            <button
+              className="mt-3 w-full rounded-md bg-primary py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+              disabled={payingOnline}
+              onClick={payOnline}
+            >
+              {payingOnline ? 'Starting payment…' : 'Pay Online'}
+            </button>
+          )}
+          {paymentRequest && !paymentRequest.payment_url && (
+            <p className="mt-2 text-xs text-muted-foreground">
+              Payment request created ({paymentRequest.amount} {paymentRequest.currency}) — a staff
+              member will assist with payment.
+            </p>
+          )}
           {context?.capabilities.request_bill_enabled && !order.billed && (
             <button
               className="mt-3 w-full rounded-md border py-2 text-sm font-medium disabled:opacity-50"
