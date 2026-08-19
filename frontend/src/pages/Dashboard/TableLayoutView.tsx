@@ -11,6 +11,8 @@ export interface Table {
   table_name?: string;
   room?: string;
   capacity?: number;
+  no_of_seats?: number;
+  minimum_seating?: number;
   table_shape?: string;
   layout_x?: number;
   layout_y?: number;
@@ -33,8 +35,8 @@ const updateTableLayout = async (name: string, updates: any) => {
 };
 
 type POSInvoice = any;
-const getTableOrder = async (name: string) => null;
-const getCombinedOrderTotals = (order: any) => ({ roundedTotal: 0 });
+const getTableOrder = async (_name: string): Promise<any> => null;
+const getCombinedOrderTotals = (_order: any) => ({ roundedTotal: 0 });
 
 const t = (key: string) => {
   const parts = key.split('.');
@@ -71,21 +73,122 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
   // Save to local storage effect removed
 
 
-  // Merge props.tables with saved positions
-  const tablesWithPosition = useMemo(() => {
-    return tables.map((table, index) => {
-      const local = localLayouts[table.name] || {};
+  // Calculate table dimensions based on capacity and shape
+  const getTableDimensions = (shape?: string, capacity: number = 4) => {
+    // Dynamic sizing: minimum 60px, scales up by 10px per person, max 250px
+    const size = Math.max(60, Math.min(250, 60 + (capacity * 10)));
 
-      // Use local overrides, then backend fields, then grid defaults
-      const x = local.layout_x ?? table.layout_x ?? (100 + (index % 5) * 150);
-      const y = local.layout_y ?? table.layout_y ?? (100 + Math.floor(index / 5) * 150);
+    const normalizedShape = shape?.toLowerCase() || 'rectangle';
+
+    switch (normalizedShape) {
+      case 'circle':
+      case 'square':
+        return { width: size, height: size };
+      case 'rectangle':
+      default:
+        return { width: size * 1.5, height: size };
+    }
+  };
+
+  // Merge props.tables with saved positions or dynamically auto-arrange unpositioned tables
+  const tablesWithPosition = useMemo(() => {
+    const canvasWidth = canvasRef.current ? canvasRef.current.clientWidth : (typeof window !== 'undefined' ? Math.max(800, window.innerWidth - 320) : 1200);
+    const startMarginX = 60;
+    const startMarginY = 60;
+    const gapX = 40;
+    const gapY = 40;
+    const maxRowWidth = Math.max(600, canvasWidth - startMarginX * 2);
+
+    // Track occupied bounding boxes to guarantee 0 overlaps
+    const occupiedBoxes: Array<{ x: number; y: number; width: number; height: number }> = [];
+
+    // Pass 1: Collect explicit saved/local positions
+    tables.forEach((table) => {
+      const local = localLayouts[table.name] || {};
+      const shape = local.table_shape ?? table.table_shape ?? 'rectangle';
+      const seats = local.no_of_seats ?? table.no_of_seats ?? table.capacity ?? 4;
+      const { width, height } = getTableDimensions(shape, seats);
+
+      const hasLocalPos = local.layout_x !== undefined && local.layout_y !== undefined;
+      const hasSavedPos =
+        table.layout_x !== undefined &&
+        table.layout_x !== null &&
+        table.layout_x > 0 &&
+        table.layout_y !== undefined &&
+        table.layout_y !== null &&
+        table.layout_y > 0;
+
+      if (hasLocalPos) {
+        occupiedBoxes.push({ x: local.layout_x!, y: local.layout_y!, width, height });
+      } else if (hasSavedPos) {
+        occupiedBoxes.push({ x: table.layout_x!, y: table.layout_y!, width, height });
+      }
+    });
+
+    const isColliding = (candX: number, candY: number, w: number, h: number) => {
+      return occupiedBoxes.some(box =>
+        candX < box.x + box.width + 10 &&
+        candX + w + 10 > box.x &&
+        candY < box.y + box.height + 10 &&
+        candY + h + 10 > box.y
+      );
+    };
+
+    let currentX = startMarginX;
+    let currentY = startMarginY;
+    let maxRowHeight = 0;
+
+    // Pass 2: Position tables (preserving saved, dynamically placing unpositioned)
+    return tables.map((table) => {
+      const local = localLayouts[table.name] || {};
+      const shape = local.table_shape ?? table.table_shape ?? 'rectangle';
+      const seats = local.no_of_seats ?? table.no_of_seats ?? table.capacity ?? 4;
+      const { width, height } = getTableDimensions(shape, seats);
+
+      const hasLocalPos = local.layout_x !== undefined && local.layout_y !== undefined;
+      const hasSavedPos =
+        table.layout_x !== undefined &&
+        table.layout_x !== null &&
+        table.layout_x > 0 &&
+        table.layout_y !== undefined &&
+        table.layout_y !== null &&
+        table.layout_y > 0;
+
+      let x: number;
+      let y: number;
+
+      if (hasLocalPos) {
+        x = local.layout_x!;
+        y = local.layout_y!;
+      } else if (hasSavedPos) {
+        x = table.layout_x!;
+        y = table.layout_y!;
+      } else {
+        // Find next open collision-free position in the grid
+        while (isColliding(currentX, currentY, width, height) || (currentX + width > maxRowWidth && currentX > startMarginX)) {
+          if (currentX + width > maxRowWidth && currentX > startMarginX) {
+            currentX = startMarginX;
+            currentY = currentY + (maxRowHeight > 0 ? maxRowHeight : 100) + gapY;
+            maxRowHeight = 0;
+          } else {
+            currentX += width + gapX;
+          }
+        }
+
+        x = currentX;
+        y = currentY;
+
+        occupiedBoxes.push({ x, y, width, height });
+        currentX += width + gapX;
+        maxRowHeight = Math.max(maxRowHeight, height);
+      }
 
       return {
         ...table,
         x,
         y,
-        table_shape: local.table_shape ?? table.table_shape,
-        no_of_seats: local.no_of_seats ?? table.no_of_seats,
+        table_shape: shape,
+        no_of_seats: seats,
       };
     });
   }, [tables, localLayouts]);
@@ -97,24 +200,6 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
       setCapacityInput(table?.no_of_seats?.toString() ?? '');
     }
   }, [selectedTable, tablesWithPosition]);
-
-  // Calculate table dimensions based on capacity and shape
-  const getTableDimensions = (shape: string, capacity: number = 4) => {
-    // Dynamic sizing: minimum 60px, scales up by 10px per person, max 250px
-    const size = Math.max(60, Math.min(250, 60 + (capacity * 10)));
-
-    const normalizedShape = shape?.toLowerCase() || 'rectangle';
-
-    switch (normalizedShape) {
-      case 'circle':
-        return { width: size, height: size };
-      case 'square':
-        return { width: size, height: size };
-      case 'rectangle':
-      default:
-        return { width: size * 1.5, height: size };
-    }
-  };
 
   // Zoom functionality (simple scale)
   const handleZoomIn = () => setZoom(prev => Math.min(prev + 0.1, 3));
@@ -227,7 +312,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
 
     if (table.occupied) {
       getTableOrder(table.name).then(res => {
-        setSelectedTableOrder(res.message);
+        if (res) setSelectedTableOrder(res.message);
       }).catch(console.error);
     } else {
       setSelectedTableOrder(null);
@@ -268,7 +353,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
 
     const baseClasses = cn(
       'absolute border-2 flex items-center justify-center text-sm font-semibold cursor-pointer transition-all select-none',
-      getTableStatusColor(table.occupied),
+      getTableStatusColor(table.occupied || 0),
       isEditMode && 'hover:ring-2 hover:ring-blue-400 cursor-move',
       draggedTable === table.name && 'shadow-xl scale-105 z-20',
       selectedTable === table.name && 'ring-2 ring-blue-600 z-10'
