@@ -274,24 +274,10 @@ def _resolve_session(session_token):
 # Bootstrap
 # ---------------------------------------------------------------------------
 
-@frappe.whitelist(allow_guest=True)
-def get_ordering_context(token=None, device_id=None, device_credential=None):
-    """Entry point for every customer-facing surface. Resolves a QR token
-    or a device credential into a fresh ordering session and returns only
-    customer-safe channel configuration — never raw branch/table names the
-    client didn't already have a right to see."""
-
-    layout = "Mobile"
-    if token:
-        profile, table, source = _verify_qr_token(token)
-        device_name = None
-    elif device_id and device_credential:
-        profile, table, source, device_name, layout = _resolve_device(device_id, device_credential)
-    else:
-        frappe.throw(_("Missing ordering token or device credentials"), frappe.PermissionError)
-
-    raw_session_token, session = _open_session(profile, source, table, device_name)
-
+def _ordering_context_response(raw_session_token, source, profile, table, layout):
+    """Shared response shape for every bootstrap-style entry point
+    (get_ordering_context, assign_device_table) — never raw branch/table
+    names the client didn't already have a right to see."""
     return {
         "session": raw_session_token,
         "source": source,
@@ -314,6 +300,65 @@ def get_ordering_context(token=None, device_id=None, device_credential=None):
             "add_to_running_table_enabled": bool(profile.allow_add_to_running_table),
         },
     }
+
+
+@frappe.whitelist(allow_guest=True)
+def get_ordering_context(token=None, device_id=None, device_credential=None):
+    """Entry point for every customer-facing surface. Resolves a QR token
+    or a device credential into a fresh ordering session and returns only
+    customer-safe channel configuration — never raw branch/table names the
+    client didn't already have a right to see."""
+
+    layout = "Mobile"
+    if token:
+        profile, table, source = _verify_qr_token(token)
+        device_name = None
+    elif device_id and device_credential:
+        profile, table, source, device_name, layout = _resolve_device(device_id, device_credential)
+    else:
+        frappe.throw(_("Missing ordering token or device credentials"), frappe.PermissionError)
+
+    raw_session_token, session = _open_session(profile, source, table, device_name)
+
+    return _ordering_context_response(raw_session_token, source, profile, table, layout)
+
+
+@frappe.whitelist(allow_guest=True)
+def assign_device_table(device_id, device_credential, staff_pin, table):
+    """Bind a shared/portable tablet (`table_mode = "Selectable"`) to a
+    table for the duration of a session. Used by `PortableTabletAssignment`
+    when staff hand the tablet to a table — the tablet has no fixed table
+    of its own, so a staff member authorizes the binding with a shared PIN
+    rather than a full desk login on a customer-facing device.
+
+    MVP note: `staff_pin` is one shared PIN per ordering profile (see
+    `URY Self Ordering Profile.staff_pin`), not per-staff-member. A natural
+    next iteration would link PINs to individual `Employee` records for
+    per-staff attribution/audit — out of scope for this pass.
+    """
+    profile, existing_table, source, device_name, layout = _resolve_device(device_id, device_credential)
+
+    table_mode = frappe.db.get_value("URY Ordering Device", device_name, "table_mode")
+    if table_mode != "Selectable":
+        frappe.throw(_("This device is not configured for table selection"), frappe.ValidationError)
+
+    configured_pin = frappe.db.get_value("URY Self Ordering Profile", profile.name, "staff_pin")
+    # Shared-secret equality check, not a password hash — acceptable for
+    # this MVP (see class/module docstring conventions elsewhere in this
+    # file for the same "don't over-engineer" bar). hmac.compare_digest
+    # avoids trivial short-circuit timing leaks at negligible cost.
+    if not configured_pin or not hmac.compare_digest(str(configured_pin), str(staff_pin or "")):
+        frappe.throw(_("Incorrect staff PIN"), frappe.PermissionError)
+
+    if not frappe.db.exists("URY Table", table):
+        frappe.throw(_("Invalid table"), frappe.ValidationError)
+    table_branch = frappe.db.get_value("URY Table", table, "branch")
+    if table_branch != profile.branch:
+        frappe.throw(_("Invalid table"), frappe.ValidationError)
+
+    raw_session_token, session = _open_session(profile, source, table, device_name)
+
+    return _ordering_context_response(raw_session_token, source, profile, table, layout)
 
 
 # ---------------------------------------------------------------------------
@@ -408,6 +453,10 @@ def _sanitize_invoice_for_customer(invoice):
         "invoice": invoice.name,
         "table": invoice.restaurant_table,
         "order_type": invoice.order_type,
+        # No table-specific bill to hand a pickup customer, so the invoice
+        # name itself doubles as their pickup reference — reusing the
+        # existing invoice identity rather than minting a new field/value.
+        "pickup_code": invoice.name,
         "items": [
             {
                 "item_code": row.item_code,
@@ -428,7 +477,7 @@ def _sanitize_invoice_for_customer(invoice):
 def get_customer_order(session):
     session = _resolve_session(session)
     if not session.invoice:
-        return {"invoice": None, "items": [], "grand_total": 0, "billed": False}
+        return {"invoice": None, "pickup_code": None, "items": [], "grand_total": 0, "billed": False}
 
     with _elevated():
         invoice = frappe.get_doc("POS Invoice", session.invoice)

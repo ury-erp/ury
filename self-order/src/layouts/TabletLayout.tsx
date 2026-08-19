@@ -29,10 +29,17 @@ function TabletLayout({ initialContext }: LayoutProps) {
     submitCart,
     handleRequestBill,
     payOnline,
+    resetSession,
     cartItems,
     cartCount,
     cartTotal,
   } = useOrderingSession(initialContext)
+
+  function handleReset() {
+    if (window.confirm('Start a new order? Current cart will be cleared.')) {
+      resetSession()
+    }
+  }
 
   if (loading) {
     return (
@@ -52,10 +59,16 @@ function TabletLayout({ initialContext }: LayoutProps) {
 
   return (
     <div className="flex h-screen flex-col overflow-hidden">
-      <header className="border-b bg-background/95 px-6 py-4">
+      <header className="flex items-center justify-between border-b bg-background/95 px-6 py-4">
         <h1 className="text-xl font-semibold">
           {context?.table ? `Table ${context.table}` : 'Order for Pickup'}
         </h1>
+        <button
+          onClick={handleReset}
+          className="rounded-md border px-3 py-2 text-sm font-medium text-muted-foreground"
+        >
+          New Order
+        </button>
       </header>
 
       {error && (
