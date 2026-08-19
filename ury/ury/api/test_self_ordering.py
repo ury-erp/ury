@@ -513,9 +513,16 @@ class TestCreatePaymentRequest(unittest.TestCase):
         invoice.docstatus = 0
         invoice.name = "POS-INV-100"
 
-        def get_doc_side_effect(doctype, name=None):
+        def get_doc_side_effect(doctype, name=None, **kwargs):
+            # frappe.log_error()'s own internal frappe.get_doc(doctype="Error
+            # Log", ...) call also passes through this same mocked
+            # frappe.get_doc (it's patched at the module level) since the
+            # missing-gateway path exercises that call — absorb its extra
+            # kwargs (error=..., etc.) rather than modeling Error Log too.
             if doctype == "URY Self Ordering Profile":
                 return profile
+            if doctype == "Error Log":
+                return MagicMock()
             return invoice
 
         mock_get_doc.side_effect = get_doc_side_effect
@@ -566,7 +573,10 @@ class TestSharePaymentLink(unittest.TestCase):
             return MagicMock()
 
         mock_get_doc.side_effect = get_doc_side_effect
-        mock_db_get_value.return_value = {"name": "PR-001", "grand_total": 1293.72}
+        # frappe.db.get_value(..., as_dict=True) returns a dot-accessible
+        # frappe._dict in production (production code reads pr.name,
+        # pr.grand_total) -- a plain dict would silently not exercise that.
+        mock_db_get_value.return_value = frappe._dict({"name": "PR-001", "grand_total": 1293.72})
 
         sent = {}
 
