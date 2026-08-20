@@ -1,3 +1,4 @@
+import { formatCurrency } from '@ury/core'
 import { useOrderingSession } from '../hooks/useOrderingSession'
 import type { OrderingContext } from '../lib/api'
 
@@ -132,7 +133,7 @@ function MobileQRLayout({ initialContext }: LayoutProps) {
             )}
             <div className="p-2">
               <div className="text-sm font-medium">{item.item_name}</div>
-              <div className="text-sm text-muted-foreground">{item.rate}</div>
+              <div className="text-sm text-muted-foreground tabular-nums">{formatCurrency(item.rate)}</div>
               {cart[item.item] && (
                 <div className="mt-1 text-xs font-semibold text-primary">In cart: {cart[item.item].qty}</div>
               )}
@@ -169,7 +170,7 @@ function MobileQRLayout({ initialContext }: LayoutProps) {
           </ul>
           <div className="mb-2 flex items-center justify-between text-sm font-semibold">
             <span>{cartCount} item{cartCount > 1 ? 's' : ''}</span>
-            <span>{cartTotal}</span>
+            <span className="tabular-nums">{formatCurrency(cartTotal)}</span>
           </div>
           <button
             onClick={submitCart}

@@ -1,7 +1,13 @@
+import { useRef, useState } from 'react'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@ury/ui'
+import { useIdleReset } from '../hooks/useIdleReset'
 import { useOrderingSession } from '../hooks/useOrderingSession'
 import type { OrderingContext } from '../lib/api'
 import CartPanel from './shared/CartPanel'
 import MenuGrid from './shared/MenuGrid'
+
+const IDLE_WARN_MS = 60000
+const IDLE_RESET_GRACE_MS = 15000
 
 interface LayoutProps {
   initialContext?: OrderingContext
@@ -35,10 +41,33 @@ function TabletLayout({ initialContext }: LayoutProps) {
     cartTotal,
   } = useOrderingSession(initialContext)
 
+  const [showIdleWarning, setShowIdleWarning] = useState(false)
+  const idleResetTimerRef = useRef<ReturnType<typeof setTimeout>>()
+
   function handleReset() {
     if (window.confirm('Start a new order? Current cart will be cleared.')) {
       resetSession()
     }
+  }
+
+  // Unattended-kiosk protection: warn after IDLE_WARN_MS of no interaction,
+  // then reset after an additional IDLE_RESET_GRACE_MS if the guest doesn't
+  // respond. Never fires mid-checkout — submitting/payingOnline gate both
+  // the warning and the reset itself.
+  useIdleReset(() => {
+    if (submitting || payingOnline) return
+    setShowIdleWarning(true)
+    idleResetTimerRef.current = setTimeout(() => {
+      setShowIdleWarning(false)
+      if (!submitting && !payingOnline) {
+        resetSession()
+      }
+    }, IDLE_RESET_GRACE_MS)
+  }, IDLE_WARN_MS)
+
+  function handleStillHere() {
+    clearTimeout(idleResetTimerRef.current)
+    setShowIdleWarning(false)
   }
 
   if (loading) {
@@ -105,6 +134,22 @@ function TabletLayout({ initialContext }: LayoutProps) {
           className="flex w-[32%] flex-col overflow-hidden border-l bg-background p-4"
         />
       </div>
+
+      <Dialog open={showIdleWarning} onOpenChange={(open) => !open && handleStillHere()}>
+        <DialogContent onClose={handleStillHere}>
+          <DialogHeader>
+            <DialogTitle>Still there?</DialogTitle>
+          </DialogHeader>
+          <DialogFooter>
+            <button
+              onClick={handleStillHere}
+              className="w-full rounded-md bg-primary py-3 text-base font-medium text-primary-foreground"
+            >
+              I'm still here
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
