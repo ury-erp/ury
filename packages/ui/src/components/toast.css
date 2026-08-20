@@ -94,8 +94,8 @@
 
 /* Common styles for all toasts */
 .Toastify__toast-body {
-  font-size: 0.875rem !important;
-  line-height: 1.25rem !important;
+  font-size: 0.8rem !important;
+  line-height: 1.15rem !important;
   font-weight: 500 !important;
 }
 
