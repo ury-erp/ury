@@ -124,7 +124,8 @@ const Header = () => {
         </div>
 
         {/* Search Bar */}
-        <div className="px-4 py-2 flex-1 flex items-center max-w-2xl mx-8  bg-gray-50 hover:bg-gray-100 border border-input rounded-md">
+        {location.pathname !== '/dashboard' ? (
+          <div className="px-4 py-2 flex-1 flex items-center max-w-2xl mx-8 bg-gray-50 hover:bg-gray-100 border border-input rounded-md">
             <Input
               ref={searchInputRef}
               placeholder={searchPlaceholder}
@@ -136,7 +137,10 @@ const Header = () => {
               <Command className="w-4 h-4" />
               <span>K</span>
             </div>
-        </div>
+          </div>
+        ) : (
+          <div className="flex-1" />
+        )}
 
         {/* Right side actions */}
         <div className="flex items-center gap-4">
