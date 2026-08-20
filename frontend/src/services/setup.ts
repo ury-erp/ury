@@ -24,6 +24,12 @@ export interface SetupPayload {
   chart_of_accounts?: string;
   fy_start_date: string;
   installation_type: 'minimal' | 'advanced';
+  setup_ury_demo: boolean;
+}
+
+export interface SetupProgressStep {
+  status: string;
+  app: string;
 }
 
 export const setupService = {
@@ -35,7 +41,14 @@ export const setupService = {
     const res = await call<any>('ury.ury.api.minimal.setup_organization.get_country_defaults', { country });
     return res?.message ?? res;
   },
-  async submitSetup(payload: SetupPayload): Promise<void> {
+  async getProgressSteps(setupUryDemo: boolean): Promise<SetupProgressStep[]> {
+    const res = await call<any>('ury.ury.api.minimal.setup_organization.get_setup_progress_steps', {
+      setup_ury_demo: setupUryDemo ? 1 : 0,
+    });
+    const steps = res?.message ?? res;
+    return Array.isArray(steps) ? steps : [];
+  },
+  async submitSetup(payload: SetupPayload): Promise<{ status?: string } | void> {
     const res = await call<any>('ury.ury.api.minimal.setup_organization.complete_wizard_setup', payload);
     return res?.message ?? res;
   },
