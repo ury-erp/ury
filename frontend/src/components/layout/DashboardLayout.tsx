@@ -3,7 +3,7 @@ import { Outlet } from 'react-router-dom';
 import { BranchProvider } from '../../context/BranchContext';
 import { Header } from './Header';
 import { Sidebar } from './Sidebar';
-import { Footer } from './Footer';
+// import { Footer } from './Footer';
 
 export const DashboardLayout: React.FC = () => {
   return (
@@ -16,7 +16,7 @@ export const DashboardLayout: React.FC = () => {
             <Outlet />
           </main>
         </div>
-        <Footer />
+        {/* <Footer /> */}
       </div>
     </BranchProvider>
   );
