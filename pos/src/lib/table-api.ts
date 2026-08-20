@@ -35,7 +35,7 @@ export async function getRooms(branch: string): Promise<Room[]> {
   const rooms = await db.getDocList(DOCTYPES.URY_ROOM, {
     fields: ['name', 'branch'],
     filters: [['branch', 'like', branch]],
-    limit: "*" as unknown as number,
+    limit: 0,
     asDict: true,
   });
   return rooms as Room[];
@@ -71,7 +71,7 @@ export async function getTables(room: string): Promise<Table[]> {
       'minimum_seating'
     ],
     filters: [['restaurant_room', '=', room]],
-    limit: '*' as unknown as number,
+    limit: 0,
     asDict: true,
   });
 
@@ -105,7 +105,7 @@ export async function getVacantTablesForBranch(
     fields: [...TABLE_LIST_FIELDS],
     filters,
     orderBy: { field: 'restaurant_room', order: 'asc' },
-    limit: '*' as unknown as number,
+    limit: 0,
     asDict: true,
   } as unknown as Parameters<typeof db.getDocList>[1]);
 
