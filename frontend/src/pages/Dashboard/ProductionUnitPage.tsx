@@ -305,7 +305,7 @@ export const ProductionUnitPage: React.FC = () => {
             <SearchableSelect
               id="branch"
               value={newUnit.branch}
-              onChange={(id, val) => setNewUnit({ ...newUnit, branch: val })}
+              onChange={(_, val) => setNewUnit({ ...newUnit, branch: val })}
               options={branches.map(b => ({ value: b.name, label: b.name }))}
               placeholder="Select Branch..."
             />
@@ -321,18 +321,21 @@ export const ProductionUnitPage: React.FC = () => {
 
             <div className="space-y-3">
               {itemGroupRows.map((row, index) => {
-                const filteredOptions = itemGroupOptions
-                  .filter(ig => {
-                    const igName = ig.name;
-                    return (
-                      row.item_group === igName ||
-                      !itemGroupRows.some((r, rIdx) => rIdx !== index && r.item_group === igName)
-                    );
-                  })
-                  .map(ig => ({
-                    value: ig.name,
-                    label: ig.item_group_name || ig.name,
-                  }));
+                const filteredOptions = [
+                  ...itemGroupOptions
+                    .filter(ig => {
+                      const igName = ig.name;
+                      return (
+                        row.item_group === igName ||
+                        !itemGroupRows.some((r, rIdx) => rIdx !== index && r.item_group === igName)
+                      );
+                    })
+                    .map(ig => ({
+                      value: ig.name,
+                      label: ig.item_group_name || ig.name,
+                    })),
+                  { value: 'ADD_ANOTHER_ITEM_GROUP', label: '+ Add Another Item Group' }
+                ];
 
                 return (
                   <div key={row.id} className="flex items-center gap-3 relative" style={{ zIndex: 50 - index }}>
@@ -343,6 +346,10 @@ export const ProductionUnitPage: React.FC = () => {
                         options={filteredOptions}
                         placeholder="Select Item Group..."
                         onChange={(_, value) => {
+                          if (value === 'ADD_ANOTHER_ITEM_GROUP') {
+                            setItemGroupRows((prev) => [...prev, createEmptyItemGroupRow()]);
+                            return;
+                          }
                           const isDup = itemGroupRows.some((r, rIdx) => r.item_group === value && rIdx !== index);
                           if (isDup) {
                             showToast.error('This Item Group is already selected');
@@ -372,18 +379,6 @@ export const ProductionUnitPage: React.FC = () => {
                 );
               })}
             </div>
-
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                setItemGroupRows([...itemGroupRows, createEmptyItemGroupRow()]);
-              }}
-              className="w-full mt-2 text-primary border-primary/30 hover:bg-primary/5 flex items-center justify-center gap-1.5 font-medium"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Add Another Item Group</span>
-            </Button>
           </div>
 
           <div className="pt-6 flex justify-end gap-3 border-t mt-6 border-gray-100">
