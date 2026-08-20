@@ -343,16 +343,6 @@ export const Header: React.FC = () => {
                   ))
                 )}
               </div>
-
-              {/* Drawer Footer */}
-              <div className="p-4 border-t border-gray-200 bg-gray-50 text-center">
-                <button
-                  onClick={() => setIsNotificationOpen(false)}
-                  className="w-full py-2 text-sm font-medium text-gray-600 hover:text-gray-900 border border-gray-300 rounded-xl bg-white hover:bg-gray-50 transition-colors"
-                >
-                  Close
-                </button>
-              </div>
             </div>
           </div>
         </div>

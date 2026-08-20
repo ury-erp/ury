@@ -13,3 +13,4 @@ export * from './components/card';
 export * from './components/stat-card';
 export * from './components/data-table';
 export * from './components/toast';
+export * from './components/sidebar';
