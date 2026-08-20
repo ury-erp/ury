@@ -1,15 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../../store/useAuth';
 import { reportsRegistry, groupReports } from '../../pages/Reports/reportsRegistry';
+import { SidebarContainer, SidebarActiveIndicator, sidebarItemVariants, cn } from '@ury/ui';
 import {
   LayoutDashboard,
   UtensilsCrossed,
   Grid3X3,
   Map,
+  Building2,
   SlidersHorizontal,
   Users,
-  Building2,
   ChevronDown,
   FileText,
   Settings,
@@ -27,197 +28,166 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-  { label: 'Branch', path: '/branch', icon: Building2 },
-  { label: 'Room', path: '/room', icon: Map },
-  { label: 'Table', path: '/table', icon: Grid3X3 },
   { label: 'Menu', path: '/menu', icon: UtensilsCrossed },
+  { label: 'Table', path: '/table', icon: Grid3X3 },
+  { label: 'Room', path: '/room', icon: Map },
+  { label: 'Branch', path: '/branch', icon: Building2 },
 ];
 
 const SETTINGS_ITEMS: NavItem[] = [
   { label: 'POS Profile', path: '/pos-profile', icon: SlidersHorizontal },
   { label: 'User', path: '/user', icon: Users },
   { label: 'Aggregators', path: '/aggregator', icon: Store },
-  { label: 'URY Report Settings', path: '/report-settings', icon: FileText },
+  { label: 'Daily P&L Settings', path: '/report-settings', icon: FileText },
   { label: 'Production Unit', path: '/production-unit', icon: Grid }
 ];
-
-const reportLinkClass = ({ isActive }: { isActive: boolean }) =>
-  `flex items-center space-x-2.5 px-3 py-2 rounded-md text-[13px] font-medium transition-all ${
-    isActive
-      ? 'bg-white text-gray-900 shadow-sm font-semibold relative'
-      : 'text-gray-700 hover:bg-white/60 hover:text-gray-900'
-  }`;
 
 const reportGroups = groupReports(reportsRegistry);
 const reportGroupEntries = Object.entries(reportGroups);
 
 const ReportsPanel: React.FC = () => (
-  <div className="flex-1 overflow-y-auto p-4">
-    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-      <Link
-        to="/dashboard"
-        className="flex items-center space-x-2 px-2 py-1.5 -ml-2 rounded-md text-xs font-medium text-gray-500 hover:bg-gray-200/60 hover:text-gray-700 transition-colors mb-3"
-      >
-        <ArrowLeft className="w-3.5 h-3.5 shrink-0" />
-        <span>Back to Dashboard</span>
-      </Link>
-      <div className="flex items-center space-x-2 px-1 mb-4">
-        <div className="flex items-center justify-center w-7 h-7 rounded-md bg-blue-50 shrink-0">
-          <BarChart3 className="w-4 h-4 text-blue-600" />
-        </div>
-        <h2 className="text-sm font-semibold text-gray-900">Reports</h2>
+  <nav className="flex-1 px-3 py-4 overflow-y-auto">
+    <Link
+      to="/dashboard"
+      className={cn(sidebarItemVariants({ active: false }), 'mb-4')}
+    >
+      <div className="flex items-center gap-3 ms-1">
+        <ArrowLeft className="w-4 h-4 text-gray-500 shrink-0" />
+        <span>Back</span>
       </div>
+    </Link>
 
-      <div className="space-y-4">
-        {reportGroupEntries.map(([group, reports], index) => (
-          <div key={group} className={index > 0 ? 'pt-3 border-t border-gray-200' : undefined}>
-            <h3 className="text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-2 px-2">
-              {group}
-            </h3>
-            <div className="space-y-1">
-              {reports.map((report) => {
-                const Icon = report.icon;
-                return (
-                  <NavLink key={report.id} to={`/reports/${report.path}`} className={reportLinkClass}>
-                    <Icon className="w-4 h-4 shrink-0 text-gray-500" />
-                    <span>{report.label}</span>
-                  </NavLink>
-                );
-              })}
-            </div>
+    <div className="space-y-4">
+      {reportGroupEntries.map(([group, reports], index) => (
+        <div key={group} className={index > 0 ? 'pt-3 border-t border-gray-200' : undefined}>
+          <h3 className="text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-2 px-2">
+            {group}
+          </h3>
+          <div className="space-y-1">
+            {reports.map((report) => {
+              const Icon = report.icon;
+              return (
+                <NavLink
+                  key={report.id}
+                  to={`/reports/${report.path}`}
+                  className={({ isActive }) => sidebarItemVariants({ active: isActive })}
+                >
+                  {({ isActive }) => (
+                    <>
+                      {isActive && <SidebarActiveIndicator />}
+                      <div className="flex items-center gap-3 ms-1">
+                        <Icon className="w-4 h-4 text-gray-500 shrink-0" />
+                        <span>{report.label}</span>
+                      </div>
+                    </>
+                  )}
+                </NavLink>
+              );
+            })}
           </div>
-        ))}
-      </div>
+        </div>
+      ))}
     </div>
-  </div>
+  </nav>
 );
 
 const MainPanel: React.FC<{ isManager: boolean }> = ({ isManager }) => {
   const location = useLocation();
-  const isAdvancedPath = SETTINGS_ITEMS.some((item) => location.pathname.startsWith(item.path));
-  const [isAdvancedOpen, setIsAdvancedOpen] = useState<boolean>(isAdvancedPath);
+  const isSettingsPath = SETTINGS_ITEMS.some((item) => location.pathname.startsWith(item.path));
+  const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(isSettingsPath);
+
+  useEffect(() => {
+    if (isSettingsPath) {
+      setIsSettingsOpen(true);
+    }
+  }, [isSettingsPath]);
 
   return (
-    <div className="flex-1 overflow-y-auto p-4">
-      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-        <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3 px-1">
-          Navigation
-        </h2>
-
-        <div className="space-y-1">
-          {isManager && (
+    <nav className="flex-1 px-3 py-4 overflow-y-auto space-y-1">
+      {isManager && (
+        <NavLink
+          to="/reports"
+          className={({ isActive }) => sidebarItemVariants({ active: isActive })}
+        >
+          {({ isActive }) => (
             <>
-              <NavLink
-                to="/reports"
-                className={({ isActive }) =>
-                  `w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium transition-all duration-200 group relative rounded-md ${
-                    isActive
-                      ? 'bg-white text-gray-900 shadow-sm font-semibold'
-                      : 'text-gray-700 hover:bg-white/60 hover:text-gray-900'
-                  }`
-                }
-              >
-                {({ isActive }) => (
-                  <>
-                    {isActive && (
-                      <div className="absolute start-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-blue-600 rounded-e-full" />
-                    )}
-                    <div className="flex items-center gap-3 ms-1">
-                      <BarChart3 className="w-4 h-4 text-gray-500 flex-shrink-0" />
-                      <span>Reports</span>
-                    </div>
-                  </>
-                )}
-              </NavLink>
-              <div className="h-px bg-gray-200 my-2 mx-1" />
+              {isActive && <SidebarActiveIndicator />}
+              <div className="flex items-center gap-3 ms-1">
+                <BarChart3 className="w-4 h-4 text-gray-500 shrink-0" />
+                <span>Reports</span>
+              </div>
             </>
           )}
+        </NavLink>
+      )}
 
-          {NAV_ITEMS.map((item) => {
-            const Icon = item.icon;
-            return (
-              <NavLink
-                key={item.path}
-                to={item.path}
-                className={({ isActive }) =>
-                  `w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium transition-all duration-200 group relative rounded-md ${
-                    isActive
-                      ? 'bg-white text-gray-900 shadow-sm font-semibold'
-                      : 'text-gray-700 hover:bg-white/60 hover:text-gray-900'
-                  }`
-                }
-              >
-                {({ isActive }) => (
-                  <>
-                    {isActive && (
-                      <div className="absolute start-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-blue-600 rounded-e-full" />
-                    )}
-                    <div className="flex items-center gap-3 ms-1">
-                      <Icon className="w-4 h-4 text-gray-500 flex-shrink-0" />
-                      <span>{item.label}</span>
-                    </div>
-                  </>
-                )}
-              </NavLink>
-            );
-          })}
-
-          <div className="pt-2">
-            <button
-              onClick={() => setIsAdvancedOpen(!isAdvancedOpen)}
-              className={`w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium transition-all duration-200 group relative rounded-md ${
-                isAdvancedPath
-                  ? 'bg-white text-gray-900 shadow-sm font-semibold'
-                  : 'text-gray-700 hover:bg-white/60 hover:text-gray-900'
-              }`}
-            >
-              <div className="flex items-center gap-3 ms-1">
-                <Settings className="w-4 h-4 text-gray-500 flex-shrink-0" />
-                <span>Advanced Settings</span>
-              </div>
-              <ChevronDown
-                className={`w-4 h-4 transition-transform duration-200 ${
-                  isAdvancedOpen ? 'rotate-180 text-blue-600' : 'text-gray-400'
-                }`}
-              />
-            </button>
-
-            {isAdvancedOpen && (
-              <div className="mt-1 pl-4 space-y-1">
-                {SETTINGS_ITEMS.map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <NavLink
-                      key={item.path}
-                      to={item.path}
-                      className={({ isActive }) =>
-                        `w-full flex items-center justify-between px-3 py-2 text-xs font-medium transition-all duration-200 group relative rounded-md ${
-                          isActive
-                            ? 'bg-white text-gray-900 shadow-sm font-semibold'
-                            : 'text-gray-700 hover:bg-white/60 hover:text-gray-900'
-                        }`
-                      }
-                    >
-                      {({ isActive }) => (
-                        <>
-                          {isActive && (
-                            <div className="absolute start-0 top-1/2 -translate-y-1/2 w-1 h-4 bg-blue-600 rounded-e-full" />
-                          )}
-                          <div className="flex items-center gap-2.5 ms-1">
-                            <Icon className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
-                            <span>{item.label}</span>
-                          </div>
-                        </>
-                      )}
-                    </NavLink>
-                  );
-                })}
-              </div>
+      {NAV_ITEMS.map((item) => {
+        const Icon = item.icon;
+        return (
+          <NavLink
+            key={item.path}
+            to={item.path}
+            className={({ isActive }) => sidebarItemVariants({ active: isActive })}
+          >
+            {({ isActive }) => (
+              <>
+                {isActive && <SidebarActiveIndicator />}
+                <div className="flex items-center gap-3 ms-1">
+                  <Icon className="w-4 h-4 text-gray-500 shrink-0" />
+                  <span>{item.label}</span>
+                </div>
+              </>
             )}
+          </NavLink>
+        );
+      })}
+
+      <div>
+        <button
+          onClick={() => setIsSettingsOpen(!isSettingsOpen)}
+          className={sidebarItemVariants({ active: isSettingsPath })}
+        >
+          {isSettingsPath && <SidebarActiveIndicator />}
+          <div className="flex items-center gap-3 ms-1">
+            <Settings className="w-4 h-4 text-gray-500 shrink-0" />
+            <span>Settings</span>
           </div>
-        </div>
+          <ChevronDown
+            className={cn(
+              "w-4 h-4 transition-transform duration-200",
+              isSettingsOpen ? "rotate-180 text-blue-600" : "text-gray-400"
+            )}
+          />
+        </button>
+
+        {isSettingsOpen && (
+          <div className="mt-1 pl-4 space-y-1">
+            {SETTINGS_ITEMS.map((item) => {
+              const Icon = item.icon;
+              return (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  className={({ isActive }) =>
+                    cn(sidebarItemVariants({ active: isActive }), 'py-2 text-xs')
+                  }
+                >
+                  {({ isActive }) => (
+                    <>
+                      {isActive && <SidebarActiveIndicator />}
+                      <div className="flex items-center gap-2.5 ms-1">
+                        <Icon className="w-3.5 h-3.5 text-gray-500 shrink-0" />
+                        <span>{item.label}</span>
+                      </div>
+                    </>
+                  )}
+                </NavLink>
+              );
+            })}
+          </div>
+        )}
       </div>
-    </div>
+    </nav>
   );
 };
 
@@ -227,9 +197,9 @@ export const Sidebar: React.FC = () => {
   const inReports = location.pathname.startsWith('/reports');
 
   return (
-    <aside className="w-64 bg-white border-e border-gray-200 h-full flex flex-col shrink-0 font-inter">
+    <SidebarContainer>
       {inReports ? <ReportsPanel /> : <MainPanel isManager={isManager} />}
-    </aside>
+    </SidebarContainer>
   );
 };
 
