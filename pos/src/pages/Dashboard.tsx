@@ -2,7 +2,7 @@ import { TrendingUp, AlertTriangle, Bell, Users, ShoppingCart, Clock } from 'luc
 import { Card, CardContent } from '@ury/ui';
 import { useState, useEffect } from 'react';
 import { usePOSStore } from '../store/pos-store';
-import { formatCurrency } from '@ury/core';
+import { formatCurrency, call } from '@ury/core';
 
 // Helper function to format relative time
 function getRelativeTime(creationDate: string): string {
@@ -57,7 +57,6 @@ export default function Dashboard() {
     if (!posProfile?.branch) return;
 
     const fetchDashboardData = async () => {
-      const { call } = await import('@ury/core');
 
       // Fetch dashboard stats
       setStatsLoading(true);
