@@ -349,7 +349,7 @@ export const ReportSettingsPage: React.FC = () => {
             className="bg-primary hover:bg-primary/90 text-white flex items-center gap-2"
           >
             <Save className="w-4 h-4" />
-            Save Report Settings
+            Save
           </Button>
         </div>
 
