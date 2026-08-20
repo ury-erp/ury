@@ -42,6 +42,16 @@ def redirect_to_setup():
 
 def on_session_creation(login_manager=None):
     """Ensure login on a fresh site redirects to the correct wizard step instead of /app or /setup-wizard."""
-    if not is_ury_setup_complete():
-        frappe.local.response["type"] = "redirect"
-        frappe.local.response["location"] = _setup_wizard_target()
+    setup_complete = frappe.db.get_single_value("System Settings", "setup_complete")
+    if not setup_complete:
+        frappe.local.response["message"] = "Logged In"
+        frappe.local.response["home_page"] = "/ury/setup-wizard/0"
+
+def extend_bootinfo(bootinfo):
+    """
+    Override the boot dictionary to prevent the Frappe frontend router from kicking in.
+    By setting setup_complete = 1 in the bootinfo, the Frappe JS router will not force a redirect to /app/setup-wizard/0
+    """
+    setup_complete = frappe.db.get_single_value("System Settings", "setup_complete")
+    if not setup_complete:
+        bootinfo.setup_complete = 1
