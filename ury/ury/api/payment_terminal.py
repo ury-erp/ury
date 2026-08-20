@@ -89,7 +89,73 @@ class _NoOpPaymentTerminalProvider(PaymentTerminalProvider):
 		frappe.throw(_("No payment terminal is configured for this kiosk."), frappe.ValidationError)
 
 
+class _SimulatedPaymentTerminalProvider(PaymentTerminalProvider):
+	"""Stub provider for testing/demo purposes only. It does NOT talk to any
+	physical hardware -- it simply logs a URY Payment Terminal Transaction
+	and marks it "Approved" instantly, so the rest of the kiosk payment flow
+	(and its tests) has something real to exercise end-to-end while no real
+	vendor adapter exists. Never registered by default -- opt in explicitly
+	via register_simulated_terminal_provider() for testing/demo, never for
+	production use."""
+
+	def start_transaction(self, invoice_name, amount, currency):
+		terminal_name = frappe.db.get_value(
+			"URY Payment Terminal", {"provider": "Simulated"}, "name"
+		)
+
+		txn = frappe.new_doc("URY Payment Terminal Transaction")
+		txn.terminal = terminal_name
+		txn.invoice = invoice_name
+		txn.amount = amount
+		txn.currency = currency
+		txn.transaction_id = frappe.generate_hash(length=12)
+		txn.status = "Approved"
+		txn.created_at = frappe.utils.now_datetime()
+		txn.insert(ignore_permissions=True)
+
+		if terminal_name:
+			frappe.db.set_value(
+				"URY Payment Terminal",
+				terminal_name,
+				{
+					"last_transaction_id": txn.transaction_id,
+					"last_seen": frappe.utils.now_datetime(),
+				},
+			)
+
+		return {"transaction_id": txn.transaction_id, "status": txn.status}
+
+	def get_transaction_status(self, transaction_id):
+		txn_name = frappe.db.get_value(
+			"URY Payment Terminal Transaction", {"transaction_id": transaction_id}, "name"
+		)
+		if not txn_name:
+			frappe.throw(_("No such simulated terminal transaction."), frappe.ValidationError)
+
+		status = frappe.db.get_value("URY Payment Terminal Transaction", txn_name, "status")
+		return {"status": status, "reference": transaction_id}
+
+	def cancel_transaction(self, transaction_id):
+		txn_name = frappe.db.get_value(
+			"URY Payment Terminal Transaction", {"transaction_id": transaction_id}, "name"
+		)
+		if not txn_name:
+			frappe.throw(_("No such simulated terminal transaction."), frappe.ValidationError)
+
+		frappe.db.set_value("URY Payment Terminal Transaction", txn_name, "status", "Cancelled")
+		return {"status": "Cancelled"}
+
+
 _payment_terminal_provider = _NoOpPaymentTerminalProvider()
+
+
+@frappe.whitelist()
+def register_simulated_terminal_provider():
+	"""Opt-in helper for testing/demo: installs _SimulatedPaymentTerminalProvider
+	as the active provider. Never called automatically -- the default stays
+	_NoOpPaymentTerminalProvider so production kiosks fail honestly until a
+	real vendor adapter is registered."""
+	register_payment_terminal_provider(_SimulatedPaymentTerminalProvider())
 
 
 def register_payment_terminal_provider(provider):

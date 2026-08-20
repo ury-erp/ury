@@ -58,8 +58,8 @@ export const KPIGrid: React.FC<KPIGridProps> = ({ summary, loading }) => {
         />
 
         <KPICard
-          title="Active Tables"
-          value={`${totalTables} Tables`}
+          title="Table Occupancy"
+          value={`${occupancyRate}%`}
           loading={loading}
         />
 

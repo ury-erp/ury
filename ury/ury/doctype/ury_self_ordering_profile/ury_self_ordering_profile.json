@@ -36,7 +36,8 @@
   "enable_pay_at_counter",
   "session_section",
   "session_idle_timeout_minutes",
-  "qr_signing_secret"
+  "qr_signing_secret",
+  "staff_pin"
  ],
  "fields": [
   {
@@ -208,6 +209,15 @@
    "no_copy": 1,
    "print_hide": 1,
    "report_hide": 1
+  },
+  {
+   "description": "Shared 4-6 digit PIN staff use to authorize a portable/shared tablet's table assignment (assign_device_table). One PIN per profile for this MVP, not per-staff-member.",
+   "fieldname": "staff_pin",
+   "fieldtype": "Data",
+   "label": "Staff PIN",
+   "no_copy": 1,
+   "print_hide": 1,
+   "report_hide": 1
   }
  ],
  "index_web_pages_for_search": 1,
@@ -252,6 +262,18 @@
    "report": 1,
    "role": "URY Cashier",
    "select": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Self Ordering Manager",
+   "select": 1,
+   "share": 1,
+   "write": 1
   }
  ],
  "row_format": "Dynamic",

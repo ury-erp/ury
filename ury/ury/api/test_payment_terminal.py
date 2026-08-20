@@ -2,11 +2,13 @@
 # See license.txt
 
 import unittest
+from unittest import mock
 
 import frappe
 
 from ury.ury.api.payment_terminal import (
     PaymentTerminalProvider,
+    _SimulatedPaymentTerminalProvider,
     get_payment_terminal_provider,
     register_payment_terminal_provider,
 )
@@ -41,3 +43,66 @@ class TestPaymentTerminalInterface(unittest.TestCase):
         provider = get_payment_terminal_provider()
         result = provider.start_transaction("POS-INV-100", 100, "INR")
         self.assertEqual(result["status"], "Pending")
+
+
+class TestSimulatedPaymentTerminalProvider(unittest.TestCase):
+    """Covers the demo/testing stub provider -- it must behave like a real
+    (if instant) terminal: start -> Approved, status reflects it, cancel
+    flips it to Cancelled. It is never the default provider in production."""
+
+    def setUp(self):
+        terminal_id = frappe.generate_hash(length=8)
+        self.terminal = frappe.get_doc(
+            {
+                "doctype": "URY Payment Terminal",
+                # autoname is "prompt" on this doctype -- name must be set explicitly.
+                "name": terminal_id,
+                "terminal_id": terminal_id,
+                "provider": "Simulated",
+                "status": "Idle",
+            }
+        ).insert(ignore_permissions=True)
+        register_payment_terminal_provider(_SimulatedPaymentTerminalProvider())
+
+        # The transaction log's `invoice` field link-validates against a real
+        # POS Invoice, which is correct for production (a terminal
+        # transaction is always tied to a real invoice) but out of scope to
+        # fixture up here -- these tests only cover the terminal/transaction
+        # lifecycle itself, not invoice creation. Skip link validation for
+        # the duration of this test class rather than either weakening the
+        # field in production or dragging in an unrelated invoice fixture.
+        self._link_patch = mock.patch("frappe.model.document.Document._validate_links")
+        self._link_patch.start()
+
+    def tearDown(self):
+        from ury.ury.api import payment_terminal
+
+        self._link_patch.stop()
+        payment_terminal._payment_terminal_provider = payment_terminal._NoOpPaymentTerminalProvider()
+        frappe.db.delete(
+            "URY Payment Terminal Transaction", {"terminal": self.terminal.name}
+        )
+        frappe.delete_doc(
+            "URY Payment Terminal", self.terminal.name, force=1, ignore_permissions=True
+        )
+
+    def test_start_transaction_is_instantly_approved(self):
+        provider = get_payment_terminal_provider()
+        result = provider.start_transaction("POS-INV-SIM-1", 250, "INR")
+        self.assertEqual(result["status"], "Approved")
+        self.assertTrue(result["transaction_id"])
+
+    def test_get_transaction_status_reflects_approval(self):
+        provider = get_payment_terminal_provider()
+        started = provider.start_transaction("POS-INV-SIM-2", 100, "INR")
+        status = provider.get_transaction_status(started["transaction_id"])
+        self.assertEqual(status["status"], "Approved")
+
+    def test_cancel_transaction_marks_cancelled(self):
+        provider = get_payment_terminal_provider()
+        started = provider.start_transaction("POS-INV-SIM-3", 100, "INR")
+        result = provider.cancel_transaction(started["transaction_id"])
+        self.assertEqual(result["status"], "Cancelled")
+
+        status = provider.get_transaction_status(started["transaction_id"])
+        self.assertEqual(status["status"], "Cancelled")

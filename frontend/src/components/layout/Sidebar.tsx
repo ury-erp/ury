@@ -28,12 +28,18 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
   { label: 'Branch', path: '/branch', icon: Building2 },
-  { label: 'URY Room', path: '/room', icon: Map },
-  { label: 'URY Table', path: '/table', icon: Grid3X3 },
-  { label: 'URY Menu', path: '/menu', icon: UtensilsCrossed },
+  { label: 'Room', path: '/room', icon: Map },
+  { label: 'Table', path: '/table', icon: Grid3X3 },
+  { label: 'Menu', path: '/menu', icon: UtensilsCrossed },
+];
+
+const SETTINGS_ITEMS: NavItem[] = [
   { label: 'POS Profile', path: '/pos-profile', icon: SlidersHorizontal },
   { label: 'User', path: '/user', icon: Users },
-  { label: 'Aggregators', path: '/aggregator', icon: CreditCard }
+  { label: 'Branch', path: '/branch', icon: Building2 },
+  { label: 'Aggregators', path: '/aggregator', icon: Store },
+  { label: 'URY Report Settings', path: '/report-settings', icon: FileText },
+  { label: 'Production Unit', path: '/production-unit', icon: Grid }
 ];
 
 const reportLinkClass = ({ isActive }: { isActive: boolean }) =>
@@ -89,7 +95,7 @@ const ReportsPanel: React.FC = () => (
 
 const MainPanel: React.FC<{ isManager: boolean }> = ({ isManager }) => {
   const location = useLocation();
-  const isAdvancedPath = location.pathname.startsWith('/report-settings') || location.pathname.startsWith('/production-unit');
+  const isAdvancedPath = SETTINGS_ITEMS.some((item) => location.pathname.startsWith(item.path));
   const [isAdvancedOpen, setIsAdvancedOpen] = useState<boolean>(isAdvancedPath);
 
   return (
@@ -225,6 +231,47 @@ const MainPanel: React.FC<{ isManager: boolean }> = ({ isManager }) => {
                 </NavLink>
               </div>
             )}
+      <div className="pt-2">
+        <button
+          onClick={() => setIsAdvancedOpen(!isAdvancedOpen)}
+          className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+            isAdvancedPath
+              ? 'text-[#2563eb] font-semibold bg-blue-50'
+              : 'text-gray-600 hover:bg-blue-50 hover:text-[#2563eb]'
+          }`}
+        >
+          <div className="flex items-center space-x-3">
+            <Settings className="w-5 h-5 shrink-0" />
+            <span>Settings</span>
+          </div>
+          <ChevronDown
+            className={`w-4 h-4 transition-transform duration-200 ${
+              isAdvancedOpen ? 'rotate-180 text-[#2563eb]' : 'text-gray-400'
+            }`}
+          />
+        </button>
+
+        {isAdvancedOpen && (
+          <div className="mt-1 pl-4 space-y-1">
+            {SETTINGS_ITEMS.map((item) => {
+              const Icon = item.icon;
+              return (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  className={({ isActive }) =>
+                    `flex items-center space-x-3 px-3.5 py-2 rounded-lg text-xs font-medium transition-all ${
+                      isActive
+                        ? 'bg-[#2563eb] text-white shadow-sm font-semibold'
+                        : 'text-gray-600 hover:bg-blue-50 hover:text-[#2563eb]'
+                    }`
+                  }
+                >
+                  <Icon className="w-4 h-4 shrink-0" />
+                  <span>{item.label}</span>
+                </NavLink>
+              );
+            })}
           </div>
         </div>
       </div>
