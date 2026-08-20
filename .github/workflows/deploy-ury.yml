@@ -3,7 +3,7 @@ name: Deploy URY V3
 on:
   push:
     branches:
-      - v3-test
+      - version-3
 
 permissions: {}
 
