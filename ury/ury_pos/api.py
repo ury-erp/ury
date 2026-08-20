@@ -1333,6 +1333,14 @@ def _validate_checklist_branch(pos_profile):
 def get_checklist(pos_profile, checklist_type):
     _validate_checklist_branch(pos_profile)
 
+    has_checklist = frappe.db.exists("URY Checklist Item", {"parent": pos_profile})
+    if not has_checklist:
+        return {
+            "items": [],
+            "log_name": None,
+            "log_status": "Complete",
+        }
+
     configured_items = frappe.get_all(
         "URY Checklist Item",
         fields=["item_label", "applies_to", "is_mandatory"],
@@ -1356,6 +1364,8 @@ def get_checklist(pos_profile, checklist_type):
     if existing_log:
         log_name = existing_log[0].name
         log_status = existing_log[0].status
+    elif not configured_items:
+        log_status = "Complete"
 
     return {
         "items": configured_items,
@@ -1368,6 +1378,13 @@ def get_checklist(pos_profile, checklist_type):
 def submit_checklist(pos_profile, checklist_type, items, pos_opening_entry=None):
     _validate_checklist_branch(pos_profile)
 
+    has_checklist = frappe.db.exists("URY Checklist Item", {"parent": pos_profile})
+    if not has_checklist:
+        return {
+            "status": "Complete",
+            "name": None,
+        }
+
     items = json.loads(items)
 
     configured_items = frappe.get_all(
@@ -1376,6 +1393,12 @@ def submit_checklist(pos_profile, checklist_type, items, pos_opening_entry=None)
         filters={"parent": pos_profile, "applies_to": ["in", [checklist_type, "Both"]]},
         parent_doctype="POS Profile",
     )
+    
+    if not configured_items:
+        return {
+            "status": "Complete",
+            "name": None,
+        }
     mandatory_by_label = {row.item_label: row.is_mandatory for row in configured_items}
 
     existing_log = frappe.get_all(
