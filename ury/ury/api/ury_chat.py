@@ -87,7 +87,13 @@ def get_or_create_conversation(report_context=None):
 	cache_key = _conversation_cache_key()
 	cached_id = frappe.cache().get_value(cache_key)
 	if cached_id:
-		return {"available": True, "conversation_id": cached_id}
+		if frappe.db.exists("Agent Conversation", cached_id):
+			return {"available": True, "conversation_id": cached_id}
+		# Stale cache entry pointing at a conversation that no longer exists
+		# (e.g. cleared/reset on the HUF side) -- drop it and create a fresh
+		# one below instead of failing every send with "Conversation not
+		# found".
+		frappe.cache().delete_value(cache_key)
 
 	try:
 		agent_chat = _get_agent_chat_module()
