@@ -8,9 +8,9 @@ import { SearchableSelect } from '../../components/common/SearchableSelect';
 interface AggregatorSetting {
   name?: string;
   aggregator: string;
-  customer: string;
-  price_list: string;
-  mode_of_payment: string;
+  customer?: string;
+  price_list?: string;
+  mode_of_payment?: string;
 }
 
 export const AggregatorPage: React.FC = () => {
@@ -23,7 +23,6 @@ export const AggregatorPage: React.FC = () => {
   const [saving, setSaving] = useState<boolean>(false);
 
   const [newAggregatorName, setNewAggregatorName] = useState('');
-  const [selectedModeOfPayment, setSelectedModeOfPayment] = useState('');
 
   const [editForm, setEditForm] = useState<AggregatorSetting>({
     aggregator: '',
@@ -82,7 +81,6 @@ export const AggregatorPage: React.FC = () => {
 
   const handleOpenAddModal = () => {
     setNewAggregatorName('');
-    setSelectedModeOfPayment('');
     setIsAddOpen(true);
   };
 
@@ -93,50 +91,6 @@ export const AggregatorPage: React.FC = () => {
     
     setSaving(true);
     try {
-      const mopToUse = selectedModeOfPayment || newAggregatorName;
-
-      // 1. Create Customer
-      await call('frappe.client.insert', {
-        doc: { doctype: 'Customer', customer_name: newAggregatorName, customer_group: 'Commercial', territory: 'All Territories' }
-      }).catch((e: any) => {
-        const errorMessage = e?.message || e?.responseJSON?.message || String(e);
-        const errorType = e?.exc_type || e?.responseJSON?.exc_type;
-        if (errorType === 'DuplicateEntryError' || errorMessage.includes('already exists')) {
-          console.log('Customer might already exist', e);
-        } else {
-          throw e;
-        }
-      });
-
-      // 2. Create Price List
-      await call('frappe.client.insert', {
-        doc: { doctype: 'Price List', price_list_name: newAggregatorName, selling: 1, currency: 'INR' }
-      }).catch((e: any) => {
-        const errorMessage = e?.message || e?.responseJSON?.message || String(e);
-        const errorType = e?.exc_type || e?.responseJSON?.exc_type;
-        if (errorType === 'DuplicateEntryError' || errorMessage.includes('already exists')) {
-          console.log('Price List might already exist', e);
-        } else {
-          throw e;
-        }
-      });
-
-      // 3. Create Mode of Payment if using newAggregatorName
-      if (!selectedModeOfPayment) {
-        await call('frappe.client.insert', {
-          doc: { doctype: 'Mode of Payment', mode_of_payment: newAggregatorName, type: 'Bank' }
-        }).catch((e: any) => {
-          const errorMessage = e?.message || e?.responseJSON?.message || String(e);
-          const errorType = e?.exc_type || e?.responseJSON?.exc_type;
-          if (errorType === 'DuplicateEntryError' || errorMessage.includes('already exists')) {
-            console.log('Mode of Payment might already exist', e);
-          } else {
-            throw e;
-          }
-        });
-      }
-
-      // 4. Update Branch child table
       const res = await call<any>('frappe.client.get', {
         doctype: 'Branch',
         name: branchToUpdate
@@ -147,9 +101,9 @@ export const AggregatorPage: React.FC = () => {
         ...(record.custom_aggregator_settings || []),
         {
           aggregator: newAggregatorName,
-          customer: newAggregatorName,
-          price_list: newAggregatorName,
-          mode_of_payment: mopToUse
+          customer: '',
+          price_list: '',
+          mode_of_payment: ''
         }
       ];
 
@@ -162,13 +116,11 @@ export const AggregatorPage: React.FC = () => {
       });
 
       fetchBranchAggregators();
-      fetchDropdownOptions();
       setIsAddOpen(false);
       setNewAggregatorName('');
-      setSelectedModeOfPayment('');
       showToast.success('Aggregator created');
     } catch (err: any) {
-      console.error('Failed to create aggregator setup:', err);
+      console.error('Failed to create aggregator:', err);
       const errorMessage = err?.message || err?.responseJSON?.message || String(err);
       showToast.error(`Failed to create aggregator: ${errorMessage}`);
     } finally {
@@ -179,10 +131,10 @@ export const AggregatorPage: React.FC = () => {
   const handleEditAggregator = (item: AggregatorSetting, idx: number) => {
     setEditingIndex(idx);
     setEditForm({
-      aggregator: item.aggregator || item.customer || item.price_list || '',
-      customer: item.customer || item.aggregator || '',
-      price_list: item.price_list || item.aggregator || '',
-      mode_of_payment: item.mode_of_payment || item.aggregator || ''
+      aggregator: item.aggregator || '',
+      customer: item.customer || '',
+      price_list: item.price_list || '',
+      mode_of_payment: item.mode_of_payment || ''
     });
   };
 
@@ -209,9 +161,9 @@ export const AggregatorPage: React.FC = () => {
       currentList[editingIndex] = {
         ...currentList[editingIndex],
         aggregator: editForm.aggregator,
-        customer: editForm.customer || editForm.aggregator,
-        price_list: editForm.price_list || editForm.aggregator,
-        mode_of_payment: editForm.mode_of_payment || editForm.aggregator
+        customer: editForm.customer || '',
+        price_list: editForm.price_list || '',
+        mode_of_payment: editForm.mode_of_payment || ''
       };
 
       await call('frappe.client.set_value', {
@@ -261,7 +213,7 @@ export const AggregatorPage: React.FC = () => {
           </div>
           <h3 className="text-lg font-semibold text-gray-900 mb-1">No Aggregators Found</h3>
           <p className="text-gray-500 mb-6 max-w-sm">
-            Add aggregators like Zomato, Swiggy to automatically create customer, pricelist, and payment modes.
+            Add aggregators like Zomato, Swiggy to configure aggregator settings.
           </p>
           <Button
             onClick={handleOpenAddModal}
@@ -287,7 +239,7 @@ export const AggregatorPage: React.FC = () => {
               {aggregators.map((item, idx) => (
                 <tr key={idx} className="hover:bg-gray-50/50 transition-colors">
                   <td className="px-6 py-4 font-semibold text-gray-900">
-                    {item.aggregator || item.customer || item.price_list || '-'}
+                    {item.aggregator || item.customer || '-'}
                   </td>
                   <td className="px-6 py-4">{item.price_list || '-'}</td>
                   <td className="px-6 py-4">{item.mode_of_payment || '-'}</td>
@@ -328,20 +280,6 @@ export const AggregatorPage: React.FC = () => {
               />
             </div>
 
-            <div>
-              <label className="block font-semibold text-gray-700 mb-1.5">Mode of Payment</label>
-              <SearchableSelect
-                id="add_mode_of_payment"
-                value={selectedModeOfPayment}
-                onChange={(_, val) => setSelectedModeOfPayment(val)}
-                options={[
-                  { value: '', label: 'Select Mode of Payment...' },
-                  ...modesOfPayment.map(mop => ({ value: mop.name, label: mop.name }))
-                ]}
-                placeholder="Select Mode of Payment..."
-              />
-            </div>
-            
             <div className="pt-6 flex justify-end gap-3 border-t mt-6 border-gray-100">
               <Button type="button" variant="outline" onClick={() => setIsAddOpen(false)} disabled={saving} className="font-semibold">
                 Cancel
@@ -376,7 +314,7 @@ export const AggregatorPage: React.FC = () => {
               <label className="block font-semibold text-gray-700 mb-1.5">Price List</label>
               <SearchableSelect
                 id="edit_price_list"
-                value={editForm.price_list}
+                value={editForm.price_list || ''}
                 onChange={(_, val) => setEditForm(p => ({ ...p, price_list: val }))}
                 options={[
                   { value: '', label: 'Select Price List...' },
@@ -390,7 +328,7 @@ export const AggregatorPage: React.FC = () => {
               <label className="block font-semibold text-gray-700 mb-1.5">Mode of Payment</label>
               <SearchableSelect
                 id="edit_mode_of_payment"
-                value={editForm.mode_of_payment}
+                value={editForm.mode_of_payment || ''}
                 onChange={(_, val) => setEditForm(p => ({ ...p, mode_of_payment: val }))}
                 options={[
                   { value: '', label: 'Select Mode of Payment...' },
@@ -399,7 +337,7 @@ export const AggregatorPage: React.FC = () => {
                 placeholder="Select Mode of Payment..."
               />
             </div>
-            
+
             <div className="pt-6 flex justify-end gap-3 border-t mt-6 border-gray-100">
               <Button type="button" variant="outline" onClick={() => setEditingIndex(null)} disabled={saving} className="font-semibold">
                 Cancel
