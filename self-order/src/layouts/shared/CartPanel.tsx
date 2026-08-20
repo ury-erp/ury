@@ -1,3 +1,4 @@
+import { formatCurrency } from '@ury/core'
 import type { CustomerOrder, MenuItem, OrderingContext } from '../../lib/api'
 
 type CartEntry = { item: MenuItem; qty: number }
@@ -101,7 +102,7 @@ function CartPanel({
           <span>
             {cartCount} item{cartCount !== 1 ? 's' : ''}
           </span>
-          <span>{cartTotal}</span>
+          <span className="tabular-nums">{formatCurrency(cartTotal)}</span>
         </div>
         <button
           onClick={onSubmit}
