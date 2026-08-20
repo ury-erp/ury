@@ -33,6 +33,7 @@ interface RestaurantData {
   menu_for_room?: any[];
   order_type_menu?: any[];
   default_tax_template?: string;
+  tax_id?: string;
 }
 
 export const BranchPage: React.FC = () => {
@@ -305,6 +306,7 @@ export const BranchPage: React.FC = () => {
     }
 
     const original = {
+      branch_name: (selectedBranch.branch_name || selectedBranch.name || '').trim(),
       address: (branchData?.address || '').trim(),
       custom_no_taxes: branchData?.custom_no_taxes ? 1 : 0,
       invoice_series_prefix: (restaurantData?.invoice_series_prefix || '').trim(),
@@ -329,6 +331,7 @@ export const BranchPage: React.FC = () => {
     };
 
     const current = {
+      branch_name: (branchForm.branch_name || '').trim(),
       address: (branchForm.address || '').trim(),
       custom_no_taxes: branchForm.custom_no_taxes ? 1 : 0,
       invoice_series_prefix: (restaurantForm.invoice_series_prefix || '').trim(),
@@ -359,11 +362,23 @@ export const BranchPage: React.FC = () => {
 
     setSaving(true);
     try {
+      let currentBranchName = selectedBranch.name;
+      if (branchForm.branch_name && branchForm.branch_name.trim() !== selectedBranch.name) {
+        const newBranchName = branchForm.branch_name.trim();
+        await call('frappe.client.rename_doc', {
+          doctype: 'Branch',
+          old_name: selectedBranch.name,
+          new_name: newBranchName,
+        });
+        currentBranchName = newBranchName;
+      }
+
       // Save Branch fields (address and custom_no_taxes)
       await call('frappe.client.set_value', {
         doctype: 'Branch',
-        name: selectedBranch.name,
+        name: currentBranchName,
         fieldname: {
+          branch: branchForm.branch_name,
           address: branchForm.address,
           custom_no_taxes: branchForm.custom_no_taxes ? 1 : 0,
         },
@@ -371,8 +386,21 @@ export const BranchPage: React.FC = () => {
 
       // Save URY Restaurant fields if it exists
       if (restaurantData) {
+        let currentRestaurantName = restaurantData.name;
+        const newRestaurantName = `${branchForm.branch_name.trim()} Restaurant`;
+        if (newRestaurantName !== restaurantData.name) {
+          await call('frappe.client.rename_doc', {
+            doctype: 'URY Restaurant',
+            old_name: restaurantData.name,
+            new_name: newRestaurantName,
+          });
+          currentRestaurantName = newRestaurantName;
+        }
+
         const updatedDoc = {
           ...restaurantData,
+          name: currentRestaurantName,
+          branch: branchForm.branch_name.trim(),
           invoice_series_prefix: restaurantForm.invoice_series_prefix,
           aggregator_series_prefix: restaurantForm.aggregator_series_prefix,
           tax_id: restaurantForm.tax_id,
@@ -389,7 +417,7 @@ export const BranchPage: React.FC = () => {
         });
       }
       showToast.success('Branch saved successfully');
-      await fetchDetails(selectedBranch.name);
+      await fetchDetails(currentBranchName);
       await fetchBranchList();
       setIsEditMode(false); // Return to read-only View Mode after successful save
     } catch (err: any) {
@@ -468,8 +496,9 @@ export const BranchPage: React.FC = () => {
                   <label className="text-sm font-medium text-gray-700">Branch Name</label>
                   <Input
                     value={branchForm.branch_name || ''}
-                    disabled
-                    className="rounded-lg bg-gray-50"
+                    onChange={(e) => setBranchForm(p => ({ ...p, branch_name: e.target.value }))}
+                    disabled={!isEditMode}
+                    className="rounded-lg"
                   />
                 </div>
                 <div className="space-y-2">
