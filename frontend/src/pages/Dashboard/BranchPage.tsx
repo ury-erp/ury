@@ -627,9 +627,6 @@ export const BranchPage: React.FC = () => {
 
             {/* ORDER TYPE MENU SUBSECTION */}
             <div>
-              <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-4 pb-2 border-b border-gray-100">
-                Order Type Menu
-              </h3>
               {restaurantData ? (
                 <div className="space-y-4">
                   {!!restaurantForm.order_type_wise_menu && (
