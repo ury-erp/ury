@@ -5,6 +5,8 @@ import { IndianRupee, Receipt, TrendingUp, Trophy } from 'lucide-react';
 import { useBranchContext } from '../../context/BranchContext';
 import { BarChartCard } from '../../components/reports/charts/BarChartCard';
 import { toApiDate } from '../../lib/reportDate';
+import { DatePicker } from '../../components/setup/DatePicker';
+import { SearchableSelect } from '../../components/common/SearchableSelect';
 
 interface IntervalRow {
   interval_label: string;
@@ -80,23 +82,24 @@ export function TimeWiseSales() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <select
-            value={bucketSize}
-            onChange={(e) => setBucketSize(Number(e.target.value))}
-            className="border border-input rounded-md px-3 py-1.5 text-sm"
-          >
-            {BUCKET_OPTIONS.map((b) => (
-              <option key={b} value={b}>
-                {b}-hour buckets
-              </option>
-            ))}
-          </select>
-          <input
-            type="date"
+          <div className="w-40">
+            <SearchableSelect
+              id="bucket-size"
+              value={String(bucketSize)}
+              onChange={(_, val) => setBucketSize(Number(val))}
+              options={BUCKET_OPTIONS.map((b) => ({
+                value: String(b),
+                label: `${b}-hour buckets`,
+              }))}
+              strict
+            />
+          </div>
+          <DatePicker
+            id="timewise-sales-date"
             value={date}
-            max={toApiDate(new Date())}
-            onChange={(e) => setDate(e.target.value)}
-            className="border border-input rounded-md px-3 py-1.5 text-sm"
+            maxDate={toApiDate(new Date())}
+            onChange={(_id, val) => setDate(val)}
+            className="w-36"
           />
         </div>
       </div>
