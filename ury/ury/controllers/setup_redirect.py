@@ -1,5 +1,13 @@
 import frappe
 
+# Paths that must keep working during setup (wizard SPA, APIs, static files, login).
+_SKIP_PREFIXES = ("ury", "api", "assets", "files", "private", "login")
+
+# Desk / default landing paths that should send an incomplete site to the URY wizard.
+# PathResolver strips leading slashes, so these are first-segment matches.
+_REDIRECT_PREFIXES = ("", "app", "desk", "apps", "setup-wizard")
+
+
 def is_ury_setup_complete():
     """Return True only once both Frappe's own setup wizard AND URY's Step 2
     (branch/rooms/tables/menu/payment/users) have completed.
@@ -16,6 +24,7 @@ def is_ury_setup_complete():
         return False
     return bool(frappe.db.exists("Branch", {}))
 
+
 def _setup_wizard_target():
     """Which wizard step to send the user back to.
 
@@ -27,31 +36,62 @@ def _setup_wizard_target():
         return "/ury/setup-wizard/1"
     return "/ury/setup-wizard/0"
 
-def redirect_to_setup():
-    """Redirect logged-in users to /ury while setup is not complete."""
+
+def _normalize_path(path):
+    return (path or "").strip("/")
+
+
+def _first_segment(path):
+    normalized = _normalize_path(path)
+    return normalized.split("/")[0] if normalized else ""
+
+
+def _should_redirect_to_ury_setup(path):
+    """True when a logged-in user on a Desk/landing path should be sent to the URY wizard."""
     if frappe.session.user == "Guest":
-        return
+        return False
     if is_ury_setup_complete():
-        return
-    path = getattr(frappe.request, "path", "")
-    if path.startswith("/ury") or path.startswith("/api") or path.startswith("/assets"):
-        return  # already on wizard, API, or static asset call, do not loop
-    if path.startswith("/app") or path.startswith("/setup-wizard") or path.startswith("/desk") or path == "/" or not path:
-        frappe.local.response["type"] = "redirect"
-        frappe.local.response["location"] = _setup_wizard_target()
+        return False
+
+    first = _first_segment(path)
+    if first in _SKIP_PREFIXES:
+        return False
+    return first in _REDIRECT_PREFIXES
+
+
+def website_path_resolver(path):
+    """Send incomplete sites to the URY wizard before Desk is rendered.
+
+    Used as the `website_path_resolver` hook so the redirect happens inside
+    PathResolver (which handles frappe.Redirect) rather than before_request
+    (which ignores frappe.local.response type=redirect on page GETs).
+    """
+    from frappe.website.path_resolver import resolve_path
+
+    if _should_redirect_to_ury_setup(path):
+        frappe.local.flags.redirect_location = _setup_wizard_target()
+        raise frappe.Redirect(302)
+
+    return resolve_path(path)
+
 
 def on_session_creation(login_manager=None):
-    """Ensure login on a fresh site redirects to the correct wizard step instead of /app or /setup-wizard."""
-    setup_complete = frappe.db.get_single_value("System Settings", "setup_complete")
-    if not setup_complete:
-        frappe.local.response["message"] = "Logged In"
-        frappe.local.response["home_page"] = "/ury/setup-wizard/0"
+    """Hint login toward the wizard. LoginManager.set_user_info may overwrite
+    home_page afterwards; website_path_resolver is the real intercept.
+    """
+    if is_ury_setup_complete():
+        return
+    frappe.local.response["message"] = "Logged In"
+    frappe.local.response["home_page"] = _setup_wizard_target()
+
 
 def extend_bootinfo(bootinfo):
+    """Expose URY setup status for the Desk JS fallback redirect.
+
+    Do not fake bootinfo.setup_complete — sessions.py overwrites that flag
+    after extend_bootinfo runs.
     """
-    Override the boot dictionary to prevent the Frappe frontend router from kicking in.
-    By setting setup_complete = 1 in the bootinfo, the Frappe JS router will not force a redirect to /app/setup-wizard/0
-    """
-    setup_complete = frappe.db.get_single_value("System Settings", "setup_complete")
-    if not setup_complete:
-        bootinfo.setup_complete = 1
+    complete = is_ury_setup_complete()
+    bootinfo.ury_setup_complete = complete
+    if not complete:
+        bootinfo.ury_setup_wizard_target = _setup_wizard_target()
