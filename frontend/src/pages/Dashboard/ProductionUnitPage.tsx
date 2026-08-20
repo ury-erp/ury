@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
-import { Factory, Plus, Edit2 } from 'lucide-react';
-import { Card, Button, Input, Select, Spinner, showToast } from '@ury/ui';
+import { Factory, Plus, Trash2, Edit2 } from 'lucide-react';
+import { Card, Button, Input, Spinner, showToast } from '@ury/ui';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { dashboardService } from '../../services/dashboard';
 import { call } from '@ury/core';
@@ -9,10 +9,21 @@ import SideDrawer from '../../components/layout/SideDrawer';
 
 interface ProductionUnitRecord {
   name: string;
+  production?: string;
   production_unit_name?: string;
   branch?: string;
-  item_groups?: string;
+  item_groups?: any;
 }
+
+interface ItemGroupRow {
+  id: string;
+  item_group: string;
+}
+
+const createEmptyItemGroupRow = (): ItemGroupRow => ({
+  id: `ig-row-${Math.random().toString(36).substring(2, 9)}`,
+  item_group: '',
+});
 
 export const ProductionUnitPage: React.FC = () => {
   const { activeBranchId } = useBranchContext();
@@ -23,12 +34,14 @@ export const ProductionUnitPage: React.FC = () => {
   const [saving, setSaving] = useState<boolean>(false);
 
   const [branches, setBranches] = useState<{ name: string }[]>([]);
+  const [itemGroupOptions, setItemGroupOptions] = useState<{ name: string; item_group_name?: string }[]>([]);
 
   const [newUnit, setNewUnit] = useState({
     production_unit_name: '',
     branch: '',
-    item_groups: ''
   });
+
+  const [itemGroupRows, setItemGroupRows] = useState<ItemGroupRow[]>([createEmptyItemGroupRow()]);
 
   const fetchBranches = async () => {
     try {
@@ -39,11 +52,27 @@ export const ProductionUnitPage: React.FC = () => {
     }
   };
 
+  const fetchItemGroupOptions = async () => {
+    try {
+      let groups = await dashboardService.getModuleRecords<{ name: string; item_group_name?: string }>('Item Group', 'all');
+      if (!groups || groups.length === 0) {
+        const res = await call<any>('frappe.client.get_list', {
+          doctype: 'Item Group',
+          fields: ['name', 'item_group_name'],
+          limit_page_length: 1000,
+        });
+        groups = (res as any)?.message || res || [];
+      }
+      setItemGroupOptions(groups || []);
+    } catch {
+      setItemGroupOptions([]);
+    }
+  };
+
   const fetchUnits = async () => {
     setLoading(true);
     try {
       const records = await dashboardService.getModuleRecords<ProductionUnitRecord>('URY Production Unit', activeBranchId);
-      
       setUnits(records || []);
     } catch {
       setUnits([]);
@@ -54,6 +83,7 @@ export const ProductionUnitPage: React.FC = () => {
 
   useEffect(() => {
     fetchBranches();
+    fetchItemGroupOptions();
     fetchUnits();
   }, [activeBranchId]);
 
@@ -62,8 +92,8 @@ export const ProductionUnitPage: React.FC = () => {
     setNewUnit({
       production_unit_name: '',
       branch: activeBranchId !== 'all' ? activeBranchId : (branches[0]?.name || ''),
-      item_groups: ''
     });
+    setItemGroupRows([createEmptyItemGroupRow()]);
     setIsDrawerOpen(true);
   };
 
@@ -76,22 +106,34 @@ export const ProductionUnitPage: React.FC = () => {
       });
       const data = doc.message || doc;
       
-      let itemGroupsStr = data.item_groups || '';
-      if (Array.isArray(data.item_groups)) {
-        itemGroupsStr = data.item_groups.map((ig: any) => ig.item_group).join(', ');
+      let rows: ItemGroupRow[] = [];
+      if (Array.isArray(data.item_groups) && data.item_groups.length > 0) {
+        rows = data.item_groups.map((ig: any) => ({
+          id: `ig-row-${Math.random().toString(36).substring(2, 9)}`,
+          item_group: ig.item_group || '',
+        }));
+      } else if (typeof data.item_groups === 'string' && data.item_groups) {
+        rows = data.item_groups.split(',').map((g: string) => ({
+          id: `ig-row-${Math.random().toString(36).substring(2, 9)}`,
+          item_group: g.trim(),
+        })).filter((r: ItemGroupRow) => r.item_group);
+      }
+      
+      if (rows.length === 0) {
+        rows = [createEmptyItemGroupRow()];
       }
       
       setNewUnit({
-        production_unit_name: data.production_unit_name || data.name,
+        production_unit_name: data.production || data.production_unit_name || data.name,
         branch: data.branch || '',
-        item_groups: itemGroupsStr
       });
+      setItemGroupRows(rows);
     } catch (err) {
       setNewUnit({
-        production_unit_name: unit.production_unit_name || unit.name,
+        production_unit_name: unit.production || unit.production_unit_name || unit.name,
         branch: unit.branch || '',
-        item_groups: unit.item_groups || ''
       });
+      setItemGroupRows([createEmptyItemGroupRow()]);
     }
     
     setIsDrawerOpen(true);
@@ -99,16 +141,38 @@ export const ProductionUnitPage: React.FC = () => {
 
   const handleSaveUnit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newUnit.production_unit_name) return;
+    const prodName = newUnit.production_unit_name.trim();
+    if (!prodName) {
+      showToast.error('Production Unit Name is required');
+      return;
+    }
+
+    const selectedGroups = itemGroupRows
+      .map(r => r.item_group.trim())
+      .filter(g => g);
+
+    if (selectedGroups.length === 0) {
+      showToast.error('Please select at least one Item Group');
+      return;
+    }
+
+    const hasDup = selectedGroups.some((group, idx) => selectedGroups.indexOf(group) !== idx);
+    if (hasDup) {
+      showToast.error('Duplicate Item Groups are not allowed');
+      return;
+    }
+
     setSaving(true);
     try {
-      const itemGroupsList = newUnit.item_groups.split(',').map(g => g.trim()).filter(g => g);
-      const childTableData = itemGroupsList.map(g => ({ item_group: g }));
+      const childTableData = selectedGroups.map(group => ({
+        doctype: 'URY Production Item Groups',
+        item_group: group
+      }));
 
       const payload = {
-        production_unit_name: newUnit.production_unit_name,
+        production: prodName,
         branch: newUnit.branch,
-        item_groups: childTableData.length > 0 ? childTableData : []
+        item_groups: childTableData
       };
 
       if (editingUnit) {
@@ -152,7 +216,7 @@ export const ProductionUnitPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Toolbar — Partition Style, no title */}
+      {/* Toolbar */}
       <div className="-mx-6 px-6 -mt-6 pt-6 pb-3 border-b border-gray-200 flex flex-col md:flex-row items-center justify-end gap-4">
         <Button
           onClick={openAddDrawer}
@@ -191,15 +255,37 @@ export const ProductionUnitPage: React.FC = () => {
               <tr>
                 <th className="px-6 py-4">Production Unit</th>
                 <th className="px-6 py-4">Branch</th>
+                <th className="px-6 py-4">Item Groups</th>
+                <th className="px-6 py-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {units.map((unit) => (
-                <tr key={unit.name} className="transition-colors cursor-pointer hover:bg-gray-50" onClick={() => openEditDrawer(unit)}>
-                  <td className="px-6 py-4 font-semibold text-gray-900">{unit.production_unit_name || unit.name}</td>
-                  <td className="px-6 py-4">{unit.branch || 'Main'}</td>
-                </tr>
-              ))}
+              {units.map((unit) => {
+                let itemGroupsStr = '';
+                if (Array.isArray(unit.item_groups)) {
+                  itemGroupsStr = unit.item_groups.map((ig: any) => ig.item_group).join(', ');
+                } else if (typeof unit.item_groups === 'string') {
+                  itemGroupsStr = unit.item_groups;
+                }
+                return (
+                  <tr key={unit.name} className="transition-colors hover:bg-gray-50/50">
+                    <td className="px-6 py-4 font-semibold text-gray-900">{unit.production || unit.production_unit_name || unit.name}</td>
+                    <td className="px-6 py-4">{unit.branch || 'Main'}</td>
+                    <td className="px-6 py-4">{itemGroupsStr || '-'}</td>
+                    <td className="px-6 py-4 text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openEditDrawer(unit)}
+                        className="text-gray-500 hover:text-primary"
+                        title="Edit Production Unit"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </Button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -211,44 +297,122 @@ export const ProductionUnitPage: React.FC = () => {
         onClose={() => setIsDrawerOpen(false)}
         title={editingUnit ? 'Edit Production Unit' : 'Add Production Unit'}
       >
-        <form onSubmit={handleSaveUnit} className="space-y-4 text-sm">
+        <form onSubmit={handleSaveUnit} className="space-y-5 text-sm">
           <div>
-            <label className="block font-semibold text-gray-700 mb-1">Production Unit Name</label>
+            <label className="block font-semibold text-gray-700 mb-1.5">
+              Production Unit Name <span className="text-red-500">*</span>
+            </label>
             <Input
               value={newUnit.production_unit_name}
               onChange={(e) => setNewUnit({ ...newUnit, production_unit_name: e.target.value })}
               required
+              placeholder="e.g. Main Kitchen, Bar"
             />
           </div>
 
           <div>
-            <label className="block font-semibold text-gray-700 mb-1">Branch</label>
+            <label className="block font-semibold text-gray-700 mb-1.5">
+              Branch <span className="text-red-500">*</span>
+            </label>
             <SearchableSelect
               id="branch"
               value={newUnit.branch}
-              onChange={(id, val) => setNewUnit({ ...newUnit, branch: val })}
+              onChange={(_, val) => setNewUnit({ ...newUnit, branch: val })}
               options={branches.map(b => ({ value: b.name, label: b.name }))}
-              placeholder="Select Branch"
+              placeholder="Select Branch..."
             />
           </div>
 
-          <div>
-            <label className="block font-semibold text-gray-700 mb-1">Item Groups (comma separated)</label>
-            <Input
-              value={newUnit.item_groups}
-              onChange={(e) => setNewUnit({ ...newUnit, item_groups: e.target.value })}
-              placeholder="Beverages, Snacks"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Comma separated list of item groups mapped to this unit.
-            </p>
+          {/* Item Groups Section */}
+          <div className="space-y-3 pt-2">
+            <div className="flex items-center justify-between">
+              <label className="block font-semibold text-gray-700 text-sm">
+                Item Groups <span className="text-red-500">*</span>
+              </label>
+            </div>
+
+            <div className="space-y-3">
+              {itemGroupRows.map((row, index) => {
+                const filteredOptions = itemGroupOptions
+                  .filter(ig => {
+                    const igName = ig.name;
+                    return (
+                      row.item_group === igName ||
+                      !itemGroupRows.some((r, rIdx) => rIdx !== index && r.item_group === igName)
+                    );
+                  })
+                  .map(ig => ({
+                    value: ig.name,
+                    label: ig.item_group_name || ig.name,
+                  }));
+
+                return (
+                  <div key={row.id} className="flex items-center gap-3 relative" style={{ zIndex: 50 - index }}>
+                    <div className="flex-1">
+                      <SearchableSelect
+                        id={`item-group-${index}`}
+                        value={row.item_group}
+                        options={filteredOptions}
+                        placeholder="Select Item Group..."
+                        onChange={(_, value) => {
+                          const isDup = itemGroupRows.some((r, rIdx) => r.item_group === value && rIdx !== index);
+                          if (isDup) {
+                            showToast.error('This Item Group is already selected');
+                            return;
+                          }
+                          const updatedRows = [...itemGroupRows];
+                          updatedRows[index] = { ...updatedRows[index], item_group: value };
+                          setItemGroupRows(updatedRows);
+                        }}
+                      />
+                    </div>
+
+                    {itemGroupRows.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => {
+                          setItemGroupRows(itemGroupRows.filter((_, idx) => idx !== index));
+                        }}
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 h-auto shrink-0"
+                        title="Delete Row"
+                      >
+                        <Trash2 className="w-5 h-5" />
+                      </Button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setItemGroupRows((prev) => [...prev, createEmptyItemGroupRow()]);
+              }}
+              className="w-full py-2 border-dashed border-primary text-primary hover:bg-primary/5 flex items-center justify-center gap-1.5 text-xs font-semibold mt-2"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Item Group</span>
+            </Button>
           </div>
 
-          <div className="pt-6 flex justify-end gap-2 border-t mt-4 border-gray-100">
-            <Button type="button" variant="outline" onClick={() => setIsDrawerOpen(false)} disabled={saving}>
+          <div className="pt-6 flex justify-end gap-3 border-t mt-6 border-gray-100">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsDrawerOpen(false)}
+              disabled={saving}
+              className="font-semibold"
+            >
               Cancel
             </Button>
-            <Button type="submit" className="bg-primary hover:bg-primary/90 text-white disabled:opacity-50 disabled:cursor-not-allowed" disabled={saving}>
+            <Button
+              type="submit"
+              disabled={saving}
+              className="bg-primary hover:bg-primary/90 text-white font-semibold shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
+            >
               <span>{editingUnit ? 'Save Changes' : 'Save Unit'}</span>
             </Button>
           </div>

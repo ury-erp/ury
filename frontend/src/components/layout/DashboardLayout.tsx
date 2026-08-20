@@ -3,12 +3,12 @@ import { Outlet } from 'react-router-dom';
 import { BranchProvider } from '../../context/BranchContext';
 import { Header } from './Header';
 import { Sidebar } from './Sidebar';
-import { Footer } from './Footer';
+// import { Footer } from './Footer';
 
 export const DashboardLayout: React.FC = () => {
   return (
     <BranchProvider>
-      <div className="min-h-screen flex flex-col bg-background text-foreground font-inter text-sm">
+      <div className="h-screen flex flex-col bg-background text-foreground font-inter text-sm overflow-hidden">
         <Header />
         <div className="flex flex-1 min-h-0 overflow-hidden">
           <Sidebar />
@@ -16,7 +16,7 @@ export const DashboardLayout: React.FC = () => {
             <Outlet />
           </main>
         </div>
-        <Footer />
+        {/* <Footer /> */}
       </div>
     </BranchProvider>
   );
