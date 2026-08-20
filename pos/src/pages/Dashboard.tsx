@@ -1,4 +1,4 @@
-import { AlertTriangle, Bell } from 'lucide-react';
+import { TrendingUp, ShoppingCart, Clock, Users, AlertTriangle, Bell } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, Badge, Spinner } from '@ury/ui';
 import { useState, useEffect } from 'react';
 import { usePOSStore } from '../store/pos-store';
@@ -70,20 +70,28 @@ export default function Dashboard() {
         const statsData = statsRes.message;
         setStats([
           {
-            label: "TODAY'S SALES",
+            label: "Today's Sales",
             value: formatCurrency(statsData.todays_sales),
+            icon: TrendingUp,
+            color: 'text-green-600'
           },
           {
-            label: 'ORDERS TODAY',
+            label: 'Orders Today',
             value: String(statsData.orders_today),
+            icon: ShoppingCart,
+            color: 'text-blue-600'
           },
           {
-            label: 'AVG. ORDER VALUE',
+            label: 'Avg. Order Value',
             value: formatCurrency(statsData.avg_order_value),
+            icon: Clock,
+            color: 'text-purple-600'
           },
           {
-            label: 'ACTIVE TABLES',
+            label: 'Active Tables',
             value: `${statsData.active_tables} / ${statsData.total_tables}`,
+            icon: Users,
+            color: 'text-orange-600'
           }
         ]);
       } catch (err) {
@@ -235,15 +243,21 @@ export default function Dashboard() {
               <Spinner className="w-4 h-4 text-primary" /> Loading stats...
             </div>
           ) : (
-            stats.map((stat, index) => (
-              <Card
-                key={index}
-                className="rounded-lg border border-gray-200 bg-white p-5 shadow-xs transition-all duration-200 hover:shadow-md hover:border-primary/20"
-              >
-                <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">{stat.label}</p>
-                <h3 className="mt-2 text-2xl font-bold text-gray-900 tracking-tight">{stat.value}</h3>
-              </Card>
-            ))
+            stats.map((stat, index) => {
+              const IconComponent = stat.icon;
+              return (
+                <Card
+                  key={index}
+                  className="rounded-lg border border-gray-200 bg-white p-5 shadow-xs transition-all duration-200 hover:shadow-md hover:border-primary/20"
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-sm font-medium text-gray-600">{stat.label}</span>
+                    {IconComponent && <IconComponent className={`w-5 h-5 ${stat.color}`} />}
+                  </div>
+                  <p className="text-2xl font-bold text-gray-900 tracking-tight">{stat.value}</p>
+                </Card>
+              );
+            })
           )}
         </div>
       </section>
