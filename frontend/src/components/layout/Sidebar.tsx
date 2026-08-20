@@ -13,7 +13,7 @@ import {
   ChevronDown,
   FileText,
   Settings,
-  CreditCard,
+  Store,
   BarChart3,
   ArrowLeft,
   Grid
@@ -36,7 +36,6 @@ const NAV_ITEMS: NavItem[] = [
 const SETTINGS_ITEMS: NavItem[] = [
   { label: 'POS Profile', path: '/pos-profile', icon: SlidersHorizontal },
   { label: 'User', path: '/user', icon: Users },
-  { label: 'Branch', path: '/branch', icon: Building2 },
   { label: 'Aggregators', path: '/aggregator', icon: Store },
   { label: 'URY Report Settings', path: '/report-settings', icon: FileText },
   { label: 'Production Unit', path: '/production-unit', icon: Grid }
@@ -185,93 +184,36 @@ const MainPanel: React.FC<{ isManager: boolean }> = ({ isManager }) => {
 
             {isAdvancedOpen && (
               <div className="mt-1 pl-4 space-y-1">
-                <NavLink
-                  to="/report-settings"
-                  className={({ isActive }) =>
-                    `w-full flex items-center justify-between px-3 py-2 text-xs font-medium transition-all duration-200 group relative rounded-md ${
-                      isActive
-                        ? 'bg-white text-gray-900 shadow-sm font-semibold'
-                        : 'text-gray-700 hover:bg-white/60 hover:text-gray-900'
-                    }`
-                  }
-                >
-                  {({ isActive }) => (
-                    <>
-                      {isActive && (
-                        <div className="absolute start-0 top-1/2 -translate-y-1/2 w-1 h-4 bg-blue-600 rounded-e-full" />
+                {SETTINGS_ITEMS.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <NavLink
+                      key={item.path}
+                      to={item.path}
+                      className={({ isActive }) =>
+                        `w-full flex items-center justify-between px-3 py-2 text-xs font-medium transition-all duration-200 group relative rounded-md ${
+                          isActive
+                            ? 'bg-white text-gray-900 shadow-sm font-semibold'
+                            : 'text-gray-700 hover:bg-white/60 hover:text-gray-900'
+                        }`
+                      }
+                    >
+                      {({ isActive }) => (
+                        <>
+                          {isActive && (
+                            <div className="absolute start-0 top-1/2 -translate-y-1/2 w-1 h-4 bg-blue-600 rounded-e-full" />
+                          )}
+                          <div className="flex items-center gap-2.5 ms-1">
+                            <Icon className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
+                            <span>{item.label}</span>
+                          </div>
+                        </>
                       )}
-                      <div className="flex items-center gap-2.5 ms-1">
-                        <FileText className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
-                        <span>Report Settings</span>
-                      </div>
-                    </>
-                  )}
-                </NavLink>
-                <NavLink
-                  to="/production-unit"
-                  className={({ isActive }) =>
-                    `w-full flex items-center justify-between px-3 py-2 text-xs font-medium transition-all duration-200 group relative rounded-md ${
-                      isActive
-                        ? 'bg-white text-gray-900 shadow-sm font-semibold'
-                        : 'text-gray-700 hover:bg-white/60 hover:text-gray-900'
-                    }`
-                  }
-                >
-                  {({ isActive }) => (
-                    <>
-                      {isActive && (
-                        <div className="absolute start-0 top-1/2 -translate-y-1/2 w-1 h-4 bg-blue-600 rounded-e-full" />
-                      )}
-                      <div className="flex items-center gap-2.5 ms-1">
-                        <Grid className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
-                        <span>Production Unit</span>
-                      </div>
-                    </>
-                  )}
-                </NavLink>
+                    </NavLink>
+                  );
+                })}
               </div>
             )}
-      <div className="pt-2">
-        <button
-          onClick={() => setIsAdvancedOpen(!isAdvancedOpen)}
-          className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-            isAdvancedPath
-              ? 'text-[#2563eb] font-semibold bg-blue-50'
-              : 'text-gray-600 hover:bg-blue-50 hover:text-[#2563eb]'
-          }`}
-        >
-          <div className="flex items-center space-x-3">
-            <Settings className="w-5 h-5 shrink-0" />
-            <span>Settings</span>
-          </div>
-          <ChevronDown
-            className={`w-4 h-4 transition-transform duration-200 ${
-              isAdvancedOpen ? 'rotate-180 text-[#2563eb]' : 'text-gray-400'
-            }`}
-          />
-        </button>
-
-        {isAdvancedOpen && (
-          <div className="mt-1 pl-4 space-y-1">
-            {SETTINGS_ITEMS.map((item) => {
-              const Icon = item.icon;
-              return (
-                <NavLink
-                  key={item.path}
-                  to={item.path}
-                  className={({ isActive }) =>
-                    `flex items-center space-x-3 px-3.5 py-2 rounded-lg text-xs font-medium transition-all ${
-                      isActive
-                        ? 'bg-[#2563eb] text-white shadow-sm font-semibold'
-                        : 'text-gray-600 hover:bg-blue-50 hover:text-[#2563eb]'
-                    }`
-                  }
-                >
-                  <Icon className="w-4 h-4 shrink-0" />
-                  <span>{item.label}</span>
-                </NavLink>
-              );
-            })}
           </div>
         </div>
       </div>
