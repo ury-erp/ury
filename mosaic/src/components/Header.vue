@@ -4,11 +4,10 @@
       <img :src="imagePath" alt="Logo" class="ml-20 w-40 h-15 mr-2">
     </router-link>
     <div class="flex items-center gap-4">
-      <button class="hover:bg-slate-300 text-blue font-semibold px-6 py-1 rounded-md flex items-center gap-2" @click="reloadKOT">
-        <svg class="w-6 h-6 text-blue-800" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 18 20">
-          <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 1v5h-5M2 19v-5h5m10-4a8 8 0 0 1-14.947 3.97M1 10a8 8 0 0 1 14.947-3.97"/>
+      <button class=" hover:bg-slate-300 text-blue font-semibold px-6 py-1 rounded-md" @click="reloadKOT">
+        <svg class="w-6 h-6 text-blue-800 dark:text-blue" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 18 20">
+          <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 1v5h-5M2 19v-5h5m10-4a8 8 0 0 1-14.947 3.97M1 10a8 8 0 0 1 14.947-3.97"/> Refresh
         </svg> 
-        Refresh
       </button>
 
       <!-- Reused POS User Dropdown -->
@@ -31,6 +30,7 @@
         <div v-if="showUserMenu" class="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
           <div class="p-4 border-b border-gray-200">
             <p class="text-sm font-medium text-gray-900">{{ userName }}</p>
+            <p class="text-sm text-gray-500">{{ userId }}</p>
           </div>
           <div class="py-2">
             <button
@@ -45,7 +45,7 @@
             
             <button
               @click="logout"
-              class="flex justify-start items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+              class="flex justify-start items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 hover:text-red-700 transition-colors"
             >
               <svg class="w-4 h-4 mr-3 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -68,7 +68,8 @@ export default {
     return {
       imagePath: urimosaicImage,
       showUserMenu: false,
-      userName: "User" // Update with actual API call if required
+      userName: "User", // Update with actual API call if required
+      userId: "user@example.com" // Update with actual API call if required
     };
   },
   methods: {
