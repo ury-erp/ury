@@ -264,6 +264,14 @@ before_request = [
 ]
 # after_request = ["ury.utils.after_request"]
 
+website_redirects = [
+    {"source": "/setup-wizard", "target": "/ury/setup-wizard/0"}
+]
+
+extend_bootinfo = [
+    "ury.ury.controllers.setup_redirect.extend_bootinfo"
+]
+
 # Job Events
 # ----------
 # before_job = ["ury.utils.before_job"]
