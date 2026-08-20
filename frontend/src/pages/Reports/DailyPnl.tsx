@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, StatCard } from '@ury/ui';
 import { IndianRupee, TrendingUp, TrendingDown, Percent, AlertTriangle, ChevronDown } from 'lucide-react';
 import { useBranchContext } from '../../context/BranchContext';
 import { toApiDate } from '../../lib/reportDate';
+import { DatePicker } from '../../components/setup/DatePicker';
 
 interface MissingPriceSection {
   label: string;
@@ -207,11 +208,11 @@ export function DailyPnl() {
               ))}
             </select>
           ) : (
-            <input
-              type="date"
+            <DatePicker
+              id="daily-pnl-date"
               value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="border border-input rounded-md px-3 py-1.5 text-sm"
+              onChange={(_id, val) => setDate(val)}
+              className="w-36"
             />
           )}
         </div>
