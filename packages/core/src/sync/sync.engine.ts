@@ -1262,7 +1262,17 @@ export class SyncEngine {
       }
     }
 
-    // 3. Emit projection update so the UI refreshes and any cleared cards vanish.
+    // 3. Purge fully paid/synced orders to enforce minimal storage footprint.
+    try {
+      const purged = await this.repos.orders.purgeSyncedPaidOrders();
+      if (purged > 0) {
+        console.log(`[SyncEngine] Purged ${purged} synced paid order(s) from local IndexedDB.`);
+      }
+    } catch (purgeErr) {
+      console.warn('[SyncEngine] Failed to purge synced paid orders:', purgeErr);
+    }
+
+    // 4. Emit projection update so the UI refreshes and any cleared cards vanish.
     projectionBus.emit('ORDERS_UPDATED');
   }
 

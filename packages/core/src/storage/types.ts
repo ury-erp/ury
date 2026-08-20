@@ -309,6 +309,7 @@ export interface IOrderRepository extends IBaseRepository<OrderEntity, string> {
     id: string,
     status: OrderEntity['status']
   ): Promise<OrderEntity | null>;
+  purgeSyncedPaidOrders(): Promise<number>;
 }
 
 export interface ITableRepository extends IBaseRepository<TableEntity, string> {

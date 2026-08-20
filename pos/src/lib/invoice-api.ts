@@ -312,13 +312,13 @@ export async function getPOSInvoices({
       })
     );
 
-    // Cache server invoices locally. Preserve existing item details so a server
-    // response that omits line items does not wipe out previously cached items.
-    // Unprinted table orders are normalised to `Unbilled` so the local cache
-    // matches the offline lifecycle state machine.
+    // Minimal storage footprint: only cache active open/unbilled orders locally.
+    // Historical Paid, Consolidated, or Return invoices are served directly from API
+    // and do not pollute local browser IndexedDB.
     const syncableInvoices = serverInvoices
       .filter(inv => !resolvedPending.some(r => r.resolvedId === inv.name))
-      .filter(inv => inv && typeof inv.name === 'string' && inv.name.trim().length > 0);
+      .filter(inv => inv && typeof inv.name === 'string' && inv.name.trim().length > 0)
+      .filter(inv => inv.status !== 'Paid' && inv.status !== 'Recently Paid' && inv.status !== 'Consolidated' && inv.status !== 'Return');
     if (syncableInvoices.length > 0) {
       await repositories.orders.putMany(
         await Promise.all(
@@ -366,6 +366,11 @@ export async function getPOSInvoices({
         )
       );
     }
+
+    // Maintain minimal local storage footprint by purging any synced paid orders.
+    await repositories.orders.purgeSyncedPaidOrders().catch(err => {
+      console.warn('[getPOSInvoices] Failed to purge synced paid orders:', err);
+    });
 
     // Also update the local copies of any pending orders that have been synced to
     // a server invoice, so their sync_status flips to 'synced' in the IndexedDB
@@ -583,7 +588,8 @@ export async function getPOSInvoiceItems(invoiceId: string) {
     if (cached && (cached.sync_status === 'pending' || invoiceId.startsWith('TEMP-'))) {
       return {
         items: (cached.items || []).map(i => ({
-          name: i.item,
+          name: i.name || i.id || i.item,
+          item_code: i.item,
           item_name: i.item_name,
           qty: i.qty,
           rate: i.rate,
@@ -614,7 +620,7 @@ export async function getPOSInvoiceItems(invoiceId: string) {
         status: existing?.status || 'Draft',
         items: items.map((i: any) => ({
           name: i.name || i.item_code,
-          item: i.item_code,
+          item: i.item_code || i.name,
           item_name: i.item_name,
           rate: i.rate,
           qty: i.qty,

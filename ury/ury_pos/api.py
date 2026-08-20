@@ -776,6 +776,7 @@ def getPosInvoiceItems(invoice):
         itemDetails.append(
             {
                 "name": items.name,
+                "item_code": items.item_code,
                 "item_name": items.item_name,
                 "qty": items.qty,
                 "rate": items.rate,

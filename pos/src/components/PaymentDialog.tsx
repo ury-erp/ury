@@ -165,15 +165,15 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
         }
       }
 
-      // Optimistically mark the server invoice as Paid in IndexedDB so the UI
-      // reflects the new lifecycle state immediately, even if the next network
-      // fetch fails or returns a status-filtered response.
-      if (invoice && !invoice.startsWith('TEMP-')) {
+      // Minimal storage approach: once paid and submitted to backend, remove the
+      // completed invoice from local IndexedDB orders store to avoid storage bloat.
+      if (invoice) {
         try {
-          await repositories.orders.markPaid(invoice);
+          await repositories.orders.delete(invoice);
+          await repositories.orders.purgeSyncedPaidOrders();
           projectionBus.emit('ORDERS_UPDATED');
         } catch (paidErr) {
-          console.warn('[handlePayment] Failed to mark server invoice as Paid locally:', paidErr);
+          console.warn('[handlePayment] Failed to purge paid invoice from local storage:', paidErr);
         }
       }
 

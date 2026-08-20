@@ -89,45 +89,9 @@ function getParam(url: URL, keys: string[]): string | null {
 }
 
 function isSafeParameterizedMatch(requestUrl: URL, candidateUrl: URL): boolean {
-  const endpoint = getEndpointName(requestUrl.pathname);
-  if (!PARAMETERIZED_ENDPOINTS.has(endpoint)) {
-    // Unknown endpoint: keep the previous pathname-only behavior, but only if the
-    // candidate carries no critical parameters that the request omits.
-    const requestHasParams =
-      requestUrl.searchParams.has('pos_profile') ||
-      requestUrl.searchParams.has('doctype') ||
-      requestUrl.searchParams.has('selectedRoom') ||
-      requestUrl.searchParams.has('room') ||
-      requestUrl.searchParams.has('customer') ||
-      requestUrl.searchParams.has('aggregator');
-    const candidateHasParams =
-      candidateUrl.searchParams.has('pos_profile') ||
-      candidateUrl.searchParams.has('doctype') ||
-      candidateUrl.searchParams.has('selectedRoom') ||
-      candidateUrl.searchParams.has('room') ||
-      candidateUrl.searchParams.has('customer') ||
-      candidateUrl.searchParams.has('aggregator');
-    return !requestHasParams && !candidateHasParams;
-  }
-
-  const requestPosProfile = requestUrl.searchParams.get('pos_profile');
-  const candidatePosProfile = candidateUrl.searchParams.get('pos_profile');
-  if (requestPosProfile !== candidatePosProfile) return false;
-
-  const requestDoctype = requestUrl.searchParams.get('doctype');
-  const candidateDoctype = candidateUrl.searchParams.get('doctype');
-  if (requestDoctype !== candidateDoctype) return false;
-
-  const requestRoom = getParam(requestUrl, ['selectedRoom', 'room']);
-  const candidateRoom = getParam(candidateUrl, ['selectedRoom', 'room']);
-  if (requestRoom !== null && requestRoom !== candidateRoom) return false;
-  if (candidateRoom !== null && requestRoom === null) return false;
-
-  const requestCustomer = getParam(requestUrl, ['customer', 'aggregator']);
-  const candidateCustomer = getParam(candidateUrl, ['customer', 'aggregator']);
-  if (requestCustomer !== null && requestCustomer !== candidateCustomer) return false;
-  if (candidateCustomer !== null && requestCustomer === null) return false;
-
+  if (requestUrl.pathname !== candidateUrl.pathname) return false;
+  // Require exact search parameter match so different rooms, profiles, or filters never cross-contaminate cache
+  if (requestUrl.search !== candidateUrl.search) return false;
   return true;
 }
 

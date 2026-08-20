@@ -559,7 +559,22 @@ def split_bill(source_invoice, items_to_move, customer=None):
     total_moving_qty = 0.0
     total_remaining_qty = 0.0
     for item in source.items:
-        move_qty = move_map.get(item.name, 0)
+        item_name_str = getattr(item, "name", None)
+        move_qty = move_map.get(item_name_str) if isinstance(item_name_str, str) else None
+
+        if move_qty is None:
+            item_code_str = getattr(item, "item_code", None)
+            if isinstance(item_code_str, str):
+                move_qty = move_map.get(item_code_str)
+
+        if move_qty is None:
+            item_label_str = getattr(item, "item_name", None)
+            if isinstance(item_label_str, str):
+                move_qty = move_map.get(item_label_str)
+
+        if move_qty is None:
+            move_qty = 0.0
+
         if move_qty > item.qty:
             frappe.throw(
                 _("Cannot move more than available quantity for {0}.").format(item.item_name)

@@ -106,4 +106,27 @@ export class OrderRepository
     await this.put(existing);
     return existing;
   }
+
+  /**
+   * Purges fully paid/synced orders from IndexedDB to maintain minimal storage footprint.
+   * Only active draft/unbilled orders and pending offline orders remain stored locally.
+   */
+  async purgeSyncedPaidOrders(): Promise<number> {
+    const syncedPaid = await this.table
+      .filter(
+        order =>
+          (order.status === 'Paid' ||
+            order.status === 'Cancelled' ||
+            order.status === 'Consolidated' ||
+            order.status === 'Return') &&
+          (order.sync_status === 'synced' || !order.sync_status)
+      )
+      .toArray();
+
+    if (syncedPaid.length === 0) return 0;
+
+    const idsToDelete = syncedPaid.map(o => o.id);
+    await this.table.bulkDelete(idsToDelete);
+    return idsToDelete.length;
+  }
 }
