@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { Sparkles } from 'lucide-react';
-import { useChatWidgetRef } from './ChatWidget';
+import { useChatWidgetRef, useAiEnabled } from './ChatWidget';
 
 /**
  * Top-bar "Ask HUF" input (PLAN.md item 6), matching the mockup's `.ask`
@@ -12,8 +12,10 @@ import { useChatWidgetRef } from './ChatWidget';
  */
 export default function AskBar() {
   const chatRef = useChatWidgetRef();
+  const aiEnabled = useAiEnabled();
 
   useEffect(() => {
+    if (!aiEnabled) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       const isCmdK = (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k';
       if (isCmdK) {
@@ -23,7 +25,9 @@ export default function AskBar() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [chatRef]);
+  }, [chatRef, aiEnabled]);
+
+  if (!aiEnabled) return null;
 
   return (
     <button

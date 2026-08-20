@@ -12,13 +12,18 @@ import { PosProfilePage } from './pages/Dashboard/PosProfilePage';
 import { UserPage } from './pages/Dashboard/UserPage';
 import { BranchPage } from './pages/Dashboard/BranchPage';
 import { ReportSettingsPage } from './pages/Dashboard/ReportSettingsPage';
+import { AiAssistantSettingsPage } from './pages/Dashboard/AiAssistantSettingsPage';
 import ProductionUnitPage from './pages/Dashboard/ProductionUnitPage';
 import AggregatorPage from './pages/Dashboard/AggregatorPage';
 import { RoleGuard } from './components/RoleGuard';
 import { AuthGuard } from './components/AuthGuard';
 import { ReportsLayout } from './pages/Reports/ReportsLayout';
 import { ActiveReportProvider } from './components/chat/ActiveReportContext';
-import ChatWidget, { ChatWidgetRefProvider, type ChatWidgetHandle } from './components/chat/ChatWidget';
+import ChatWidget, {
+  ChatWidgetRefProvider,
+  AiEnabledProvider,
+  type ChatWidgetHandle,
+} from './components/chat/ChatWidget';
 import { ReportsHome } from './pages/Reports/ReportsHome';
 import { TodaysSales } from './pages/Reports/TodaysSales';
 import { DaywiseSales } from './pages/Reports/DaywiseSales';
@@ -107,15 +112,48 @@ function SetupGuard() {
   return <Outlet />;
 }
 
+function useAiSettings() {
+  // Fail-closed: no AI surface renders until the backend explicitly says
+  // {enabled: true}. Any fetch failure (network, permissions, etc.) leaves
+  // this false rather than defaulting open.
+  const [aiEnabled, setAiEnabled] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const { call } = await import('@ury/core');
+        const res = await call.get('ury.ury.api.ury_ai_settings.get_ai_settings');
+        const data = res?.message ?? res;
+        if (!cancelled && data?.enabled === true) {
+          setAiEnabled(true);
+        }
+      } catch (err) {
+        console.error('Error fetching AI settings:', err);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return aiEnabled;
+}
+
 function App() {
   const chatRef = useRef<ChatWidgetHandle>(null);
+  const aiEnabled = useAiSettings();
 
   return (
     <ActiveReportProvider>
-      <ChatWidgetRefProvider chatRef={chatRef}>
-        <AppRoutes />
-        <ChatWidget ref={chatRef} />
-      </ChatWidgetRefProvider>
+      <AiEnabledProvider enabled={aiEnabled}>
+        <ChatWidgetRefProvider chatRef={chatRef}>
+          <AppRoutes />
+          {aiEnabled && <ChatWidget ref={chatRef} />}
+        </ChatWidgetRefProvider>
+      </AiEnabledProvider>
     </ActiveReportProvider>
   );
 }
@@ -144,6 +182,7 @@ function AppRoutes() {
           <Route path="user" element={<UserPage />} />
           <Route path="branch" element={<BranchPage />} />
           <Route path="report-settings" element={<ReportSettingsPage />} />
+          <Route path="ai-settings" element={<AiAssistantSettingsPage />} />
           <Route path="production-unit" element={<ProductionUnitPage />} />
           <Route path="aggregator" element={<AggregatorPage />} />
 

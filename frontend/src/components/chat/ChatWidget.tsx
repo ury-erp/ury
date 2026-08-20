@@ -40,6 +40,30 @@ export function useChatWidgetRef() {
   return ctx;
 }
 
+/**
+ * Whether the AI assistant is enabled for this org (see
+ * `ury.ury.api.ury_ai_settings.get_ai_settings`, fetched once in App.tsx).
+ * `ChatWidgetRefProvider` always mounts so `useChatWidgetRef()` never
+ * throws, but visible entry points (AskBar, the floating ChatWidget) must
+ * check this and render nothing when it's false. Defaults to `false`
+ * (fail-closed) when read outside the provider.
+ */
+const AiEnabledContext = createContext(false);
+
+export function AiEnabledProvider({
+  enabled,
+  children,
+}: {
+  enabled: boolean;
+  children: ReactNode;
+}) {
+  return <AiEnabledContext.Provider value={enabled}>{children}</AiEnabledContext.Provider>;
+}
+
+export function useAiEnabled() {
+  return useContext(AiEnabledContext);
+}
+
 interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
