@@ -100,6 +100,14 @@ const ChatWidget = forwardRef<ChatWidgetHandle>(function ChatWidget(_props, ref)
   const [initializing, setInitializing] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
+  // Guards against double-starting the init fetch. Deliberately a ref, not
+  // the `initializing` state: putting `initializing` in the effect's own
+  // dependency array below causes the state update it makes to retrigger
+  // the effect, which cancels the in-flight fetch via its own cleanup
+  // before that fetch's `finally` ever runs — the request completes but
+  // `cancelled` is already true by then, so `available`/`initializing` are
+  // never reset and the widget is stuck showing "Connecting…" forever.
+  const initStartedRef = useRef(false);
 
   useImperativeHandle(ref, () => ({
     openAndFocus: () => {
@@ -113,7 +121,8 @@ const ChatWidget = forwardRef<ChatWidgetHandle>(function ChatWidget(_props, ref)
   // Lazy init: only talk to the backend once the panel has actually been
   // opened for the first time, and only once (conversation id is reused).
   useEffect(() => {
-    if (!hasMounted || conversationId || initializing) return;
+    if (!hasMounted || conversationId || initStartedRef.current) return;
+    initStartedRef.current = true;
 
     let cancelled = false;
     const init = async () => {
@@ -151,7 +160,7 @@ const ChatWidget = forwardRef<ChatWidgetHandle>(function ChatWidget(_props, ref)
     return () => {
       cancelled = true;
     };
-  }, [hasMounted, conversationId, initializing, activeReport]);
+  }, [hasMounted, conversationId, activeReport]);
 
   const handleOpen = () => {
     setOpen(true);
