@@ -146,7 +146,7 @@ def send_chat_message(conversation_id, message, report_context=None):
 		full_message = _format_report_context(report_context) + message
 
 		response = agent_chat.send_message_to_conversation(
-			conversation_id=conversation_id,
+			conversation=conversation_id,
 			message=full_message,
 		)
 		return {"available": True, "response": response}
