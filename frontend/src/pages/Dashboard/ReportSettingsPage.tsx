@@ -412,7 +412,7 @@ export const ReportSettingsPage: React.FC = () => {
               <FileSpreadsheet className="w-6 h-6" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900 tracking-tight">URY Report Settings</h1>
+              <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Daily P&L Settings</h1>
               <p className="text-sm text-gray-500">Configure financial parameters, overhead cost basis, and operational shifts for <span className="font-semibold text-primary">{branchLabel}</span></p>
             </div>
           </div>

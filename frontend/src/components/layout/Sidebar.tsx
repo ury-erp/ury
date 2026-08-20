@@ -38,7 +38,7 @@ const SETTINGS_ITEMS: NavItem[] = [
   { label: 'POS Profile', path: '/pos-profile', icon: SlidersHorizontal },
   { label: 'User', path: '/user', icon: Users },
   { label: 'Aggregators', path: '/aggregator', icon: Store },
-  { label: 'URY Report Settings', path: '/report-settings', icon: FileText },
+  { label: 'Daily P&L Settings', path: '/report-settings', icon: FileText },
   { label: 'Production Unit', path: '/production-unit', icon: Grid }
 ];
 
