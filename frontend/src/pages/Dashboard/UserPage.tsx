@@ -3,6 +3,7 @@ import { useBranchContext } from '../../context/BranchContext';
 import { Users, Plus, ShieldCheck, Edit2 } from 'lucide-react';
 import { Card, Button, Badge, Input, Spinner, showToast } from '@ury/ui';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
+import { Switch } from '../../components/ui/switch';
 import { dashboardService } from '../../services/dashboard';
 import { call } from '@ury/core';
 import SideDrawer from '../../components/layout/SideDrawer';
@@ -317,14 +318,12 @@ export const UserPage: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
+            <Switch
               id="user-enabled"
               checked={newUser.enabled}
-              onChange={(e) => setNewUser({ ...newUser, enabled: e.target.checked })}
-              className="w-4 h-4 text-primary bg-gray-100 border-gray-300 rounded focus:ring-primary focus:ring-2"
+              onCheckedChange={(checked) => setNewUser({ ...newUser, enabled: checked })}
             />
-            <label htmlFor="user-enabled" className="font-semibold text-gray-700">
+            <label htmlFor="user-enabled" className="font-semibold text-gray-700 cursor-pointer">
               Enabled (Active User)
             </label>
           </div>
@@ -334,7 +333,6 @@ export const UserPage: React.FC = () => {
               Cancel
             </Button>
             <Button type="submit" className="bg-primary hover:bg-primary/90 text-white px-6 flex items-center gap-2" disabled={saving}>
-              {saving && <Spinner className="w-4 h-4" />}
               {editingUser ? 'Save Changes' : 'Create User'}
             </Button>
           </div>

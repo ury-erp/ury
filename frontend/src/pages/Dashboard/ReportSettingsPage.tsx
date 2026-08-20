@@ -348,7 +348,7 @@ export const ReportSettingsPage: React.FC = () => {
             disabled={saving}
             className="bg-primary hover:bg-primary/90 text-white flex items-center gap-2"
           >
-            {saving ? <Spinner className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+            <Save className="w-4 h-4" />
             Save Report Settings
           </Button>
         </div>

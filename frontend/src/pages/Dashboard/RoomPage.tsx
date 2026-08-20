@@ -3,6 +3,7 @@ import { useBranchContext } from '../../context/BranchContext';
 import { Plus, Layers, Edit2 } from 'lucide-react';
 import { Card, Button, Badge, Input, Spinner, showToast } from '@ury/ui';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
+import { Switch } from '../../components/ui/switch';
 import { dashboardService } from '../../services/dashboard';
 import { call } from '@ury/core';
 import SideDrawer from '../../components/layout/SideDrawer';
@@ -184,7 +185,7 @@ export const RoomPage: React.FC = () => {
                   <td className="px-6 py-4">
                     <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary text-[10px]">
                       <Layers className="w-3 h-3 mr-1" />
-                      {room.room_type || 'General'}
+                      {room.room_type === 'NON-AC' ? 'Non-AC' : (room.room_type || 'General')}
                     </Badge>
                   </td>
                   <td className="px-6 py-4">{room.branch || 'Main'}</td>
@@ -228,10 +229,7 @@ export const RoomPage: React.FC = () => {
               onChange={(_, value) => setNewRoom({ ...newRoom, room_type: value })}
               options={[
                 { value: 'AC', label: 'AC' },
-                { value: 'Non-AC', label: 'Non-AC' },
-                { value: 'Rooftop', label: 'Rooftop' },
-                { value: 'Outdoor', label: 'Outdoor' },
-                { value: 'Bar', label: 'Bar' },
+                { value: 'NON-AC', label: 'Non-AC' },
               ]}
             />
           </div>
@@ -253,15 +251,14 @@ export const RoomPage: React.FC = () => {
           <div className="pt-4 border-t border-gray-100">
             <h3 className="font-semibold text-gray-900 mb-3">Printer Configuration</h3>
             <div className="space-y-3">
-              <label className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="kot_printing"
                   checked={newRoom.kot_printing}
-                  onChange={(e) => setNewRoom({ ...newRoom, kot_printing: e.target.checked })}
-                  className="rounded text-primary border-gray-300 focus:ring-primary"
+                  onCheckedChange={(checked) => setNewRoom({ ...newRoom, kot_printing: checked })}
                 />
-                <span className="text-gray-700">Enable KOT Printing for this room</span>
-              </label>
+                <label htmlFor="kot_printing" className="text-gray-700 cursor-pointer">Enable KOT Printing for this room</label>
+              </div>
 
               {newRoom.kot_printing && (
                 <div>
@@ -273,15 +270,14 @@ export const RoomPage: React.FC = () => {
                 </div>
               )}
 
-              <label className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="block_takeaway"
                   checked={newRoom.block_takeaway}
-                  onChange={(e) => setNewRoom({ ...newRoom, block_takeaway: e.target.checked })}
-                  className="rounded text-primary border-gray-300 focus:ring-primary"
+                  onCheckedChange={(checked) => setNewRoom({ ...newRoom, block_takeaway: checked })}
                 />
-                <span className="text-gray-700">Block Takeaway / Delivery Printing</span>
-              </label>
+                <label htmlFor="block_takeaway" className="text-gray-700 cursor-pointer">Block Takeaway / Delivery Printing</label>
+              </div>
             </div>
           </div>
 
@@ -290,7 +286,6 @@ export const RoomPage: React.FC = () => {
               Cancel
             </Button>
             <Button type="submit" disabled={saving} className="bg-primary hover:bg-primary/90 text-white">
-              {saving ? <Spinner className="w-4 h-4 mr-1.5" /> : null}
               {editingRoom ? 'Save Changes' : 'Save Room'}
             </Button>
           </div>
