@@ -491,8 +491,8 @@ def submit_configure_data(data):
             pos_doc = frappe.get_doc(pos_dict)
             
             if tax_template_name:
-                if frappe.db.exists("URY Restaurant", f"{branch_name} Restaurant"):
-                    frappe.db.set_value("URY Restaurant", f"{branch_name} Restaurant", "default_tax_template", tax_template_name)
+                if frappe.db.exists("URY Restaurant", restaurant_name):
+                    frappe.db.set_value("URY Restaurant", restaurant_name, "default_tax_template", tax_template_name)
                 
             pos_doc.insert(ignore_permissions=True)
             results["pos_profile"] = pos_doc.name
@@ -523,6 +523,21 @@ def submit_configure_data(data):
                     setattr(p_doc, k, v)
             p_doc.save(ignore_permissions=True)
             results["pos_profile"] = pos_profile_name
+
+        # Create URY Production Unit
+        production_unit_name = f"Kitchen - {branch_name}"
+        if not frappe.db.exists("URY Production Unit", production_unit_name):
+            prod_doc = frappe.get_doc({
+                "doctype": "URY Production Unit",
+                "production": production_unit_name,
+                "pos_profile": pos_profile_name,
+                "branch": branch_name,
+                "warehouse": warehouse_name,
+                "item_groups": [{"item_group": item_group}]
+            })
+            prod_doc.insert(ignore_permissions=True)
+            results["production_unit"] = prod_doc.name
+
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "Failed to create POS Profile")
         results["pos_profile_error"] = str(e)
