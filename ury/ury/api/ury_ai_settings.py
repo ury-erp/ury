@@ -30,15 +30,6 @@ def _coerce_bool(value):
 	return bool(value)
 
 
-def _provider_has_key(provider_name):
-	"""True only if the AI Provider exists and has an api_key set. Never
-	returns the value itself."""
-	try:
-		return bool(frappe.get_doc("AI Provider", provider_name).get_password("api_key", raise_exception=False))
-	except frappe.ValidationError:
-		return False
-
-
 @frappe.whitelist(methods=["GET"])
 def get_ai_settings():
 	require_manager()
@@ -96,9 +87,13 @@ def update_agent_config(provider=None, model=None, temperature=None, top_p=None,
 
 	doc = frappe.get_doc("Agent", agent_name)
 
-	if provider is not None:
+	# Treat an empty string the same as "not provided" -- the frontend's
+	# provider/model selects reset to '' while their options are (re)loading,
+	# and blindly writing that through breaks Agent.validate() (a blank
+	# model trips HUF's own prompt-caching check with a confusing 417).
+	if provider:
 		doc.provider = provider
-	if model is not None:
+	if model:
 		doc.model = model
 	if temperature is not None:
 		doc.temperature = float(temperature)
@@ -128,13 +123,15 @@ def list_ai_providers():
 	if not _huf_installed():
 		return {"available": False, "providers": []}
 
+	# Deliberately does not check whether a key is already set: that would
+	# mean one get_password() call per provider on every settings-page load,
+	# for a status the settings UI no longer needs (setting a key is just a
+	# name + a value, not a checklist against HUF's full provider catalog).
 	rows = frappe.get_all(
 		"AI Provider",
-		fields=["name", "provider_brand", "is_local_llm"],
+		fields=["name", "provider_brand"],
 		order_by="provider_brand asc",
 	)
-	for row in rows:
-		row["has_key"] = _provider_has_key(row["name"])
 
 	return {"available": True, "providers": rows}
 

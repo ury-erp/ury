@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Bot, Sparkles, KeyRound, Save } from 'lucide-react';
+import { Bot, Sparkles, KeyRound, Save, Plus } from 'lucide-react';
 import {
   Button,
   Input,
@@ -7,12 +7,6 @@ import {
   SelectItem,
   Card,
   Spinner,
-  Badge,
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
   showToast,
 } from '@ury/ui';
 import { call } from '@ury/core';
@@ -32,8 +26,26 @@ interface AgentConfig {
 interface AiProvider {
   name: string;
   provider_brand: string;
-  is_local_llm: boolean;
-  has_key: boolean;
+}
+
+/** Frappe/frappe-js-sdk error objects carry the real message inside
+ * `_server_messages` (a JSON-encoded array of JSON-encoded {message} objects)
+ * or `.exception`, not in `.message` (which is often just "417"/"400"). */
+function getErrorMessage(err: any, fallback: string): string {
+  try {
+    const serverMessages = err?._server_messages ? JSON.parse(err._server_messages) : null;
+    if (serverMessages?.length) {
+      const first = JSON.parse(serverMessages[0]);
+      if (first?.message) return first.message;
+    }
+  } catch {
+    // fall through to other shapes below
+  }
+  if (typeof err?.exception === 'string') {
+    const lastLine = err.exception.trim().split('\n').pop();
+    if (lastLine) return lastLine.replace(/^\w+(\.\w+)*Error:\s*/, '');
+  }
+  return err?.message || fallback;
 }
 
 export const AiAssistantSettingsPage: React.FC = () => {
@@ -55,8 +67,9 @@ export const AiAssistantSettingsPage: React.FC = () => {
   const [temperature, setTemperature] = useState<number>(0.7);
   const [enableCaching, setEnableCaching] = useState<boolean>(false);
 
-  // API key modal
-  const [keyModalProvider, setKeyModalProvider] = useState<string | null>(null);
+  // API key -- a single compact "add key" row, not a per-provider table.
+  const [addingKey, setAddingKey] = useState<boolean>(false);
+  const [keyProvider, setKeyProvider] = useState<string>('');
   const [apiKeyInput, setApiKeyInput] = useState<string>('');
   const [savingKey, setSavingKey] = useState<boolean>(false);
 
@@ -70,19 +83,25 @@ export const AiAssistantSettingsPage: React.FC = () => {
     }
   };
 
-  const fetchModels = async (provider: string) => {
+  /** Returns the fetched model list so callers can auto-select the first
+   * one -- Save must never fire with an empty model (HUF rejects a blank
+   * model on an agent with caching enabled). */
+  const fetchModels = async (provider: string): Promise<string[]> => {
     if (!provider) {
       setModels([]);
-      return;
+      return [];
     }
     setLoadingModels(true);
     try {
       const res = await call.get<any>('ury.ury.api.ury_ai_settings.list_ai_models', { provider });
       const data = res.message ?? res;
-      setModels(data?.models || []);
+      const list = data?.models || [];
+      setModels(list);
+      return list;
     } catch (err) {
       console.error('Failed to fetch AI models:', err);
       setModels([]);
+      return [];
     } finally {
       setLoadingModels(false);
     }
@@ -141,12 +160,19 @@ export const AiAssistantSettingsPage: React.FC = () => {
 
   const handleProviderChange = async (val: string) => {
     setSelectedProvider(val);
-    setSelectedModel('');
-    await fetchModels(val);
+    const list = await fetchModels(val);
+    // Auto-select a model immediately -- an empty model can't be saved, and
+    // leaving the picker blank is how a save used to silently blank out the
+    // agent's model and fail HUF's own caching validation.
+    setSelectedModel(list[0] || '');
   };
 
   const handleSaveConfig = async () => {
     if (!agentConfig?.available) return;
+    if (!selectedModel) {
+      showToast.error('Choose a model before saving.');
+      return;
+    }
     setSaving(true);
     try {
       const payload: Record<string, any> = {};
@@ -164,35 +190,36 @@ export const AiAssistantSettingsPage: React.FC = () => {
       setEnableCaching(!!data.enable_prompt_caching);
       showToast.success('Assistant configuration saved');
     } catch (err: any) {
-      showToast.error(err?.message || 'Failed to save assistant configuration');
+      showToast.error(getErrorMessage(err, 'Failed to save assistant configuration'));
     } finally {
       setSaving(false);
     }
   };
 
-  const openKeyModal = (provider: string) => {
-    setKeyModalProvider(provider);
+  const openAddKey = () => {
+    setAddingKey(true);
+    setKeyProvider(providers[0]?.name || '');
     setApiKeyInput('');
   };
 
-  const closeKeyModal = () => {
-    setKeyModalProvider(null);
+  const closeAddKey = () => {
+    setAddingKey(false);
+    setKeyProvider('');
     setApiKeyInput('');
   };
 
   const handleSaveKey = async () => {
-    if (!keyModalProvider || !apiKeyInput.trim()) return;
+    if (!keyProvider || !apiKeyInput.trim()) return;
     setSavingKey(true);
     try {
       await call.post('ury.ury.api.ury_ai_settings.set_provider_api_key', {
-        provider: keyModalProvider,
+        provider: keyProvider,
         api_key: apiKeyInput,
       });
-      closeKeyModal();
-      showToast.success('API key saved');
-      await fetchProviders();
+      showToast.success(`API key saved for ${keyProvider}`);
+      closeAddKey();
     } catch (err: any) {
-      showToast.error(err?.message || 'Failed to save API key');
+      showToast.error(getErrorMessage(err, 'Failed to save API key'));
     } finally {
       setSavingKey(false);
       setApiKeyInput('');
@@ -332,7 +359,7 @@ export const AiAssistantSettingsPage: React.FC = () => {
               <div className="flex justify-end">
                 <Button
                   onClick={handleSaveConfig}
-                  disabled={saving}
+                  disabled={saving || !selectedModel}
                   className="bg-primary hover:bg-primary/90 text-white flex items-center gap-2"
                 >
                   {saving ? <Spinner className="w-4 h-4" /> : <Save className="w-4 h-4" />}
@@ -340,79 +367,69 @@ export const AiAssistantSettingsPage: React.FC = () => {
                 </Button>
               </div>
 
-              {/* Providers & API keys */}
+              {/* API key -- a single compact add-key row, not a status table
+                  for every provider HUF ships (that's HUF's master data, not
+                  ury's, and checking each one's key status on every load is
+                  wasted work for information this page doesn't need). */}
               <div className="pt-4 border-t border-border space-y-3">
-                <h3 className="text-sm font-bold text-foreground">Providers</h3>
-                <div className="border border-border rounded-xl overflow-hidden">
-                  <table className="w-full text-left text-sm text-muted-foreground">
-                    <thead className="bg-card text-foreground font-medium border-b border-border">
-                      <tr>
-                        <th className="p-3.5">Provider</th>
-                        <th className="p-3.5">Key Status</th>
-                        <th className="p-3.5 text-right">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {providers.map((p) => (
-                        <tr key={p.name} className="hover:bg-card/50">
-                          <td className="p-3.5 text-foreground font-medium">{p.provider_brand}</td>
-                          <td className="p-3.5">
-                            {p.has_key ? (
-                              <Badge variant="success" size="sm">key set</Badge>
-                            ) : (
-                              <Badge variant="secondary" size="sm">no key</Badge>
-                            )}
-                          </td>
-                          <td className="p-3.5 text-right">
-                            <Button size="sm" variant="outline" onClick={() => openKeyModal(p.name)} className="inline-flex items-center gap-1.5">
-                              <KeyRound className="w-3.5 h-3.5" />
-                              Set API Key
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-bold text-foreground">API Key</h3>
+                    <p className="text-xs text-muted-foreground">
+                      Add or update a provider's key. Existing keys aren't shown here.
+                    </p>
+                  </div>
+                  {!addingKey && (
+                    <Button size="sm" variant="outline" onClick={openAddKey} className="inline-flex items-center gap-1.5">
+                      <Plus className="w-3.5 h-3.5" />
+                      Add API Key
+                    </Button>
+                  )}
                 </div>
+
+                {addingKey && (
+                  <div className="flex flex-col md:flex-row gap-3 md:items-end p-4 bg-card rounded-xl border border-border">
+                    <div className="flex-1">
+                      <label className="block text-sm font-medium text-foreground mb-1.5">Provider</label>
+                      <Select value={keyProvider} onValueChange={setKeyProvider}>
+                        {providers.map((p) => (
+                          <SelectItem key={p.name} value={p.name}>
+                            {p.provider_brand}
+                          </SelectItem>
+                        ))}
+                      </Select>
+                    </div>
+                    <div className="flex-1">
+                      <label className="block text-sm font-medium text-foreground mb-1.5">API Key</label>
+                      <Input
+                        type="password"
+                        value={apiKeyInput}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setApiKeyInput(e.target.value)}
+                        placeholder="Paste API key"
+                        autoComplete="off"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button type="button" variant="outline" onClick={closeAddKey}>
+                        Cancel
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={handleSaveKey}
+                        disabled={savingKey || !keyProvider || !apiKeyInput.trim()}
+                        className="bg-primary hover:bg-primary/90 text-white inline-flex items-center gap-1.5"
+                      >
+                        {savingKey ? <Spinner className="w-4 h-4" /> : <KeyRound className="w-3.5 h-3.5" />}
+                        Save
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
         </Card>
       </div>
-
-      {/* Set API Key modal */}
-      <Dialog open={!!keyModalProvider} onOpenChange={(open: boolean) => !open && closeKeyModal()}>
-        <DialogContent className="max-w-md bg-card p-6 rounded-xl border border-border shadow-xl" onClose={closeKeyModal}>
-          <DialogHeader>
-            <DialogTitle className="text-lg font-bold text-foreground">Set API Key</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <label className="block text-sm font-medium text-foreground mb-1.5">
-              API Key for {keyModalProvider}
-            </label>
-            <Input
-              type="password"
-              value={apiKeyInput}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setApiKeyInput(e.target.value)}
-              placeholder="Paste API key"
-              autoComplete="off"
-            />
-          </div>
-          <DialogFooter className="mt-6 flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={closeKeyModal}>
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              onClick={handleSaveKey}
-              disabled={savingKey || !apiKeyInput.trim()}
-              className="bg-primary hover:bg-primary/90 text-white"
-            >
-              {savingKey ? <Spinner className="w-4 h-4" /> : 'Save'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };

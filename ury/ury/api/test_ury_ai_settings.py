@@ -25,7 +25,6 @@ class TestURYAISettingsRoundTrip(FrappeTestCase):
         result = ury_ai_settings.list_ai_providers()
         for row in result.get("providers", []):
             self.assertNotIn("api_key", row)
-            self.assertIn("has_key", row)
 
 
 class TestURYAISettingsUpdateAgentConfig(FrappeTestCase):

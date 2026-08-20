@@ -105,9 +105,19 @@ def get_or_create_conversation(report_context=None):
 			return _huf_unavailable(f"HUF Agent {agent_name!r} has no provider/model configured")
 
 		conversation = agent_chat.create_conversation(agent=agent_name, channel="Chat")
-		conversation_id = (
-			conversation.get("name") if isinstance(conversation, dict) else conversation
-		)
+		if isinstance(conversation, dict):
+			# HUF's create_conversation() returns
+			# {"success": True, "conversation_id": "..."} — not a "name" key.
+			# Falling back to "name" covers the (unconfirmed) case that a
+			# differently-versioned HUF returns a full Document dict instead.
+			conversation_id = conversation.get("conversation_id") or conversation.get("name")
+		else:
+			conversation_id = conversation
+
+		if not conversation_id:
+			return _huf_unavailable(
+				f"HUF create_conversation() returned no conversation id: {conversation!r}"
+			)
 
 		frappe.cache().set_value(cache_key, conversation_id, expires_in_sec=3600)
 		return {"available": True, "conversation_id": conversation_id}
