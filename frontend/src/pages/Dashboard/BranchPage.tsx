@@ -304,6 +304,59 @@ export const BranchPage: React.FC = () => {
       return;
     }
 
+    const original = {
+      address: (branchData?.address || '').trim(),
+      custom_no_taxes: branchData?.custom_no_taxes ? 1 : 0,
+      invoice_series_prefix: (restaurantData?.invoice_series_prefix || '').trim(),
+      aggregator_series_prefix: (restaurantData?.aggregator_series_prefix || '').trim(),
+      tax_id: (restaurantData?.tax_id || '').trim(),
+      active_menu: restaurantData?.active_menu || '',
+      default_room: restaurantData?.default_room || '',
+      room_wise_menu: restaurantData?.room_wise_menu ? 1 : 0,
+      menu_for_room: (restaurantData?.menu_for_room || []).map((row: any) => ({
+        room: row.room || row.ury_room || '',
+        ury_room: row.room || row.ury_room || '',
+        menu: row.menu || row.ury_menu || '',
+        ury_menu: row.menu || row.ury_menu || '',
+      })),
+      order_type_wise_menu: restaurantData?.order_type_wise_menu ? 1 : 0,
+      order_type_menu: (restaurantData?.order_type_menu || []).map((row: any) => ({
+        order_type: row.order_type || '',
+        menu: row.menu || row.ury_menu || '',
+        ury_menu: row.menu || row.ury_menu || '',
+      })),
+      default_tax_template: (restaurantData?.default_tax_template || '').trim(),
+    };
+
+    const current = {
+      address: (branchForm.address || '').trim(),
+      custom_no_taxes: branchForm.custom_no_taxes ? 1 : 0,
+      invoice_series_prefix: (restaurantForm.invoice_series_prefix || '').trim(),
+      aggregator_series_prefix: (restaurantForm.aggregator_series_prefix || '').trim(),
+      tax_id: (restaurantForm.tax_id || '').trim(),
+      active_menu: restaurantForm.active_menu || '',
+      default_room: restaurantForm.default_room || '',
+      room_wise_menu: restaurantForm.room_wise_menu ? 1 : 0,
+      menu_for_room: (restaurantForm.menu_for_room || []).map((row: any) => ({
+        room: row.room || row.ury_room || '',
+        ury_room: row.room || row.ury_room || '',
+        menu: row.menu || row.ury_menu || '',
+        ury_menu: row.menu || row.ury_menu || '',
+      })),
+      order_type_wise_menu: restaurantForm.order_type_wise_menu ? 1 : 0,
+      order_type_menu: (restaurantForm.order_type_menu || []).map((row: any) => ({
+        order_type: row.order_type || '',
+        menu: row.menu || row.ury_menu || '',
+        ury_menu: row.menu || row.ury_menu || '',
+      })),
+      default_tax_template: (restaurantForm.default_tax_template || '').trim(),
+    };
+
+    if (JSON.stringify(original) === JSON.stringify(current)) {
+      showToast.warning('No changes in document');
+      return;
+    }
+
     setSaving(true);
     try {
       // Save Branch fields (address and custom_no_taxes)

@@ -40,6 +40,7 @@ export const ProductionUnitPage: React.FC = () => {
     production_unit_name: '',
     branch: '',
   });
+  const [originalUnit, setOriginalUnit] = useState<any>(null);
 
   const [itemGroupRows, setItemGroupRows] = useState<ItemGroupRow[]>([createEmptyItemGroupRow()]);
 
@@ -123,17 +124,29 @@ export const ProductionUnitPage: React.FC = () => {
         rows = [createEmptyItemGroupRow()];
       }
       
-      setNewUnit({
+      const initialForm = {
         production_unit_name: data.production || data.production_unit_name || data.name,
         branch: data.branch || '',
+        item_groups: rows.map(r => r.item_group.trim()).filter(g => g).sort(),
+      };
+      setNewUnit({
+        production_unit_name: initialForm.production_unit_name,
+        branch: initialForm.branch,
       });
       setItemGroupRows(rows);
+      setOriginalUnit(initialForm);
     } catch (err) {
-      setNewUnit({
+      const initialForm = {
         production_unit_name: unit.production || unit.production_unit_name || unit.name,
         branch: unit.branch || '',
+        item_groups: [],
+      };
+      setNewUnit({
+        production_unit_name: initialForm.production_unit_name,
+        branch: initialForm.branch,
       });
       setItemGroupRows([createEmptyItemGroupRow()]);
+      setOriginalUnit(initialForm);
     }
     
     setIsDrawerOpen(true);
@@ -160,6 +173,23 @@ export const ProductionUnitPage: React.FC = () => {
     if (hasDup) {
       showToast.error('Duplicate Item Groups are not allowed');
       return;
+    }
+
+    if (editingUnit && originalUnit) {
+      const original = {
+        production_unit_name: (originalUnit.production_unit_name || '').trim(),
+        branch: originalUnit.branch || '',
+        item_groups: originalUnit.item_groups || [],
+      };
+      const current = {
+        production_unit_name: prodName,
+        branch: newUnit.branch || '',
+        item_groups: [...selectedGroups].sort(),
+      };
+      if (JSON.stringify(original) === JSON.stringify(current)) {
+        showToast.warning('No changes in document');
+        return;
+      }
     }
 
     setSaving(true);
