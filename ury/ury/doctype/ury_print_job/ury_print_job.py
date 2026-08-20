@@ -145,6 +145,12 @@ def _parse_requested_fields(fields):
     if not fields:
         return []
 
+    if isinstance(fields, str):
+        try:
+            fields = frappe.parse_json(fields)
+        except Exception:
+            fields = [fields]
+
     parsed = []
     for field in fields:
         if not isinstance(field, str):
@@ -156,3 +162,4 @@ def _parse_requested_fields(fields):
             parsed.append(cleaned)
 
     return parsed
+

@@ -273,3 +273,19 @@ class TestURYPrintJob(FrappeTestCase):
         self.assertNotIn("PJ-DEAD-001", names)
         for name in names:
             self.assertTrue(name.startswith("PJ-PAGE-"))
+
+    def test_get_list_with_json_string_fields_parameter(self):
+        """get_list parses fields properly when passed as a JSON-encoded string from HTTP form_dict."""
+        job_id = "PJ-JSON-FIELDS-001"
+        register_print_job(self._sample_metadata(job_id))
+
+        # Simulate HTTP form_dict fields parameter (JSON string)
+        json_fields = '["`tabURY Print Job`.`name`", "`tabURY Print Job`.`status`", "`tabURY Print Job`.`cups_job_id`", "`tabURY Print Job`.`invoice`"]'
+        results = URYPrintJob.get_list({"fields": json_fields})
+
+        self.assertGreaterEqual(len(results), 1)
+        job = next(r for r in results if r["name"] == job_id)
+        self.assertEqual(job["status"], "SUBMITTED")
+        self.assertEqual(job["cups_job_id"], 42)
+        self.assertEqual(job["invoice"], "INV-TEST-001")
+
