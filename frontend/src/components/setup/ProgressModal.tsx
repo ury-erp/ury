@@ -9,9 +9,33 @@ interface ProgressModalProps {
   error?: string | null;
   steps?: string[];
   eventName?: string;
+  description?: string;
   onStepChange?: (index: number) => void;
   /** Called after the realtime subscription is attached — start the API call here */
   onReady?: () => void;
+  /** Frappe setup_task status === "ok" (background setup) */
+  onComplete?: () => void;
+  onFail?: (message: string) => void;
+}
+
+type SetupTaskPayload = {
+  step?: number;
+  status?: string;
+  progress?: [number, number];
+  stage_status?: string;
+  fail_msg?: string;
+  message?: SetupTaskPayload;
+};
+
+function unwrapPayload(data: unknown): SetupTaskPayload {
+  if (!data || typeof data !== 'object') {
+    return {};
+  }
+  const obj = data as SetupTaskPayload;
+  if (obj.message && typeof obj.message === 'object') {
+    return obj.message;
+  }
+  return obj;
 }
 
 export function ProgressModal({
@@ -19,25 +43,46 @@ export function ProgressModal({
   activeIndex,
   error,
   steps = PROGRESS_STEPS,
-  eventName = 'ury_setup_progress',
+  eventName = 'setup_task',
+  description = 'Setting things up, this usually takes less than a minute.',
   onStepChange,
   onReady,
+  onComplete,
+  onFail,
 }: ProgressModalProps) {
-  // Keep onStepChange stable in a ref so the socket handler closure doesn't
-  // capture a stale version on every render.
   const onStepChangeRef = useRef(onStepChange);
   const onReadyRef = useRef(onReady);
+  const onCompleteRef = useRef(onComplete);
+  const onFailRef = useRef(onFail);
   useEffect(() => {
     onStepChangeRef.current = onStepChange;
     onReadyRef.current = onReady;
+    onCompleteRef.current = onComplete;
+    onFailRef.current = onFail;
   });
 
   useEffect(() => {
     if (!visible) return;
 
     const handler = (data: unknown) => {
-      const payload = data as { step?: number; status?: string };
-      if (typeof payload?.step !== 'number') return;
+      const payload = unwrapPayload(data);
+
+      if (payload.fail_msg || payload.status === 'fail') {
+        onFailRef.current?.(payload.fail_msg || 'Setup failed');
+        return;
+      }
+
+      if (payload.status === 'ok') {
+        onCompleteRef.current?.();
+        return;
+      }
+
+      if (Array.isArray(payload.progress) && typeof payload.progress[0] === 'number') {
+        onStepChangeRef.current?.(payload.progress[0]);
+        return;
+      }
+
+      if (typeof payload.step !== 'number') return;
 
       if (payload.status === 'loading') {
         onStepChangeRef.current?.(payload.step);
@@ -46,17 +91,11 @@ export function ProgressModal({
       }
     };
 
-    // Subscribe first, then signal the parent that it is safe to start the
-    // backend API call.  subscribeRealtimeEvent is async internally (connects
-    // the socket then calls .on()), but it registers the handler synchronously
-    // on the socket once the connection resolves.  We call onReady() after
-    // kicking off the subscription so the caller can await the socket before
-    // starting the API.  subscribeRealtimeEvent returns a cleanup fn.
     const unsubscribe = subscribeRealtimeEvent(eventName, handler, () => {
       onReadyRef.current?.();
     });
+
     return unsubscribe;
-    // Re-subscribe only if the event name changes or visibility toggles
   }, [visible, eventName]);
 
   if (!visible) return null;
@@ -69,7 +108,7 @@ export function ProgressModal({
         
         {/* Segmented Top Bar */}
         <div className="flex px-10 pt-10 pb-6 gap-1">
-          {Array.from({ length: totalSteps }).map((_, i) => {
+          {Array.from({ length: Math.max(totalSteps, 1) }).map((_, i) => {
             const segmentProgress = i <= activeIndex ? 'bg-primary' : 'bg-gray-200';
             return (
               <div key={i} className={`flex-1 h-1.5 rounded-full ${segmentProgress}`} />
@@ -80,16 +119,16 @@ export function ProgressModal({
         <div className="px-10 pb-8">
           <h2 className="text-2xl font-semibold text-foreground mb-1">Setting up your restaurant</h2>
           <p className="text-sm text-muted-foreground mb-6">
-            Setting things up ,this usually takes less than a minute.
+            {description}
           </p>
           
-          <div className="flex flex-col mb-4">
+          <div className="flex flex-col mb-4 max-h-[50vh] overflow-y-auto">
             {steps.map((step, idx) => {
               const isDone = idx < activeIndex;
               const isActive = idx === activeIndex;
 
               return (
-                <div key={idx} className="flex items-center gap-4 py-3 border-b border-gray-100 last:border-0 h-12">
+                <div key={idx} className="flex items-center gap-4 py-3 border-b border-gray-100 last:border-0 min-h-12">
                   <div className="w-6 h-6 flex items-center justify-center shrink-0">
                     {isDone ? (
                       <CheckCircle2 className="w-6 h-6 text-white fill-green-500" />

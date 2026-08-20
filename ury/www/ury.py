@@ -40,8 +40,15 @@ def get_context(context):
 	boot_json = CLOSING_SCRIPT_TAG_PATTERN.sub("", boot_json)
 	boot_json = json.dumps(boot_json)
 
+	from frappe.utils import cint
+
 	context.update(
-		{"build_version": frappe.utils.get_build_version(), "boot": boot_json, "csrf_token": csrf_token}
+		{
+			"build_version": frappe.utils.get_build_version(),
+			"boot": boot_json,
+			"csrf_token": csrf_token,
+			"dev_server": cint(getattr(frappe.local, "dev_server", 0)),
+		}
 	)
 	return context
 
