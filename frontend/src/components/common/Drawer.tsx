@@ -50,11 +50,15 @@ export const Drawer: React.FC<DrawerProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden">
+    <div className="fixed inset-0 z-50 overflow-hidden" onClick={(e) => e.stopPropagation()}>
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-black/40 backdrop-blur-xs transition-opacity duration-300 ease-in-out"
-        onClick={onClose}
+        onClick={(e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          onClose();
+        }}
         aria-hidden="true"
       />
 
