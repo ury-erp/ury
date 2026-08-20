@@ -78,7 +78,10 @@
     "adjustment": "Adjustment",
     "total": "Total",
     "pay_button": "Pay {{amount}}",
-    "processing": "Processing..."
+    "processing": "Processing...",
+    "short_by": "Short by {{amount}}",
+    "change_due": "Change due: {{amount}}",
+    "success": "Payment successful: {{amount}} received"
   },
   "pos": {
     "not_opened_title": "POS Not Opened",
