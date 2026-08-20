@@ -56,17 +56,11 @@ const ReportsPanel: React.FC = () => (
     <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
       <Link
         to="/dashboard"
-        className="flex items-center space-x-2 px-2 py-1.5 -ml-2 rounded-md text-xs font-medium text-gray-500 hover:bg-gray-200/60 hover:text-gray-700 transition-colors mb-3"
+        className="flex items-center space-x-2 px-2 py-1.5 -ml-2 rounded-md text-xs font-medium text-gray-500 hover:bg-gray-200/60 hover:text-gray-700 transition-colors mb-4"
       >
         <ArrowLeft className="w-3.5 h-3.5 shrink-0" />
-        <span>Back to Dashboard</span>
+        <span>Back</span>
       </Link>
-      <div className="flex items-center space-x-2 px-1 mb-4">
-        <div className="flex items-center justify-center w-7 h-7 rounded-md bg-blue-50 shrink-0">
-          <BarChart3 className="w-4 h-4 text-blue-600" />
-        </div>
-        <h2 className="text-sm font-semibold text-gray-900">Reports</h2>
-      </div>
 
       <div className="space-y-4">
         {reportGroupEntries.map(([group, reports], index) => (
