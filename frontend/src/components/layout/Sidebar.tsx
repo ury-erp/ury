@@ -28,10 +28,10 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-  { label: 'Branch', path: '/branch', icon: Building2 },
   { label: 'Menu', path: '/menu', icon: UtensilsCrossed },
   { label: 'Table', path: '/table', icon: Grid3X3 },
   { label: 'Room', path: '/room', icon: Map },
+  { label: 'Branch', path: '/branch', icon: Building2 },
 ];
 
 const SETTINGS_ITEMS: NavItem[] = [
