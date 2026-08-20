@@ -164,6 +164,11 @@ before_uninstall = "ury.uninstall.uninstall"
 # 	"ToDo": "custom_app.overrides.CustomToDo"
 # }
 
+# HUF-optional: seeds/self-heals the "URY Dashboard Assistant" Agent record
+# on every migrate. Safe to define even when huf is not installed — the
+# function itself no-ops when "huf" isn't in the installed apps list.
+after_migrate = ["ury.ury.ai_tools.agent_seeding.after_migrate"]
+
 # Document Events
 # ---------------
 # Hook on document methods and events
@@ -196,7 +201,8 @@ doc_events = {
         },
     "URY Menu Course": {
 		"validate": "ury.ury.api.ury_menu_course_validation.validate_priority",
-	}    
+	},
+    "AI Provider": {"on_update": "ury.ury.ai_tools.agent_seeding.on_ai_provider_update"},
 }
 
 # Scheduled Tasks

@@ -15,7 +15,8 @@ import {
   Settings,
   Store,
   BarChart3,
-  ArrowLeft
+  ArrowLeft,
+  Bot
 } from 'lucide-react';
 
 interface NavItem {
@@ -99,7 +100,7 @@ const ReportsPanel: React.FC = () => (
 
 const MainPanel: React.FC<{ isManager: boolean }> = ({ isManager }) => {
   const location = useLocation();
-  const isAdvancedPath = location.pathname.startsWith('/report-settings') || location.pathname.startsWith('/production-unit');
+  const isAdvancedPath = location.pathname.startsWith('/report-settings') || location.pathname.startsWith('/ai-settings') || location.pathname.startsWith('/production-unit');
   const [isAdvancedOpen, setIsAdvancedOpen] = useState<boolean>(isAdvancedPath);
 
   return (
@@ -157,6 +158,19 @@ const MainPanel: React.FC<{ isManager: boolean }> = ({ isManager }) => {
             >
               <FileText className="w-4 h-4 shrink-0" />
               <span>URY Report Settings</span>
+            </NavLink>
+            <NavLink
+              to="/ai-settings"
+              className={({ isActive }) =>
+                `flex items-center space-x-3 px-3.5 py-2 rounded-lg text-xs font-medium transition-all ${
+                  isActive
+                    ? 'bg-primary text-white shadow-sm font-semibold'
+                    : 'text-gray-600 hover:bg-blue-50 hover:text-primary'
+                }`
+              }
+            >
+              <Bot className="w-4 h-4 shrink-0" />
+              <span>AI Assistant</span>
             </NavLink>
             <NavLink
               to="/production-unit"
