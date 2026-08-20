@@ -28,11 +28,16 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
   { label: 'URY Menu', path: '/menu', icon: Utensils },
   { label: 'URY Table', path: '/table', icon: Grid },
-  { label: 'URY Room', path: '/room', icon: Home },
+  { label: 'URY Room', path: '/room', icon: Home }
+];
+
+const SETTINGS_ITEMS: NavItem[] = [
   { label: 'POS Profile', path: '/pos-profile', icon: SlidersHorizontal },
   { label: 'User', path: '/user', icon: Users },
   { label: 'Branch', path: '/branch', icon: Building2 },
-  { label: 'Aggregators', path: '/aggregator', icon: Store }
+  { label: 'Aggregators', path: '/aggregator', icon: Store },
+  { label: 'URY Report Settings', path: '/report-settings', icon: FileText },
+  { label: 'Production Unit', path: '/production-unit', icon: Grid }
 ];
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
@@ -94,7 +99,7 @@ const ReportsPanel: React.FC = () => (
 
 const MainPanel: React.FC<{ isManager: boolean }> = ({ isManager }) => {
   const location = useLocation();
-  const isAdvancedPath = location.pathname.startsWith('/report-settings') || location.pathname.startsWith('/production-unit');
+  const isAdvancedPath = SETTINGS_ITEMS.some((item) => location.pathname.startsWith(item.path));
   const [isAdvancedOpen, setIsAdvancedOpen] = useState<boolean>(isAdvancedPath);
 
   return (
@@ -129,7 +134,7 @@ const MainPanel: React.FC<{ isManager: boolean }> = ({ isManager }) => {
         >
           <div className="flex items-center space-x-3">
             <Settings className="w-5 h-5 shrink-0" />
-            <span>Advanced Settings</span>
+            <span>Settings</span>
           </div>
           <ChevronDown
             className={`w-4 h-4 transition-transform duration-200 ${
@@ -140,32 +145,25 @@ const MainPanel: React.FC<{ isManager: boolean }> = ({ isManager }) => {
 
         {isAdvancedOpen && (
           <div className="mt-1 pl-4 space-y-1">
-            <NavLink
-              to="/report-settings"
-              className={({ isActive }) =>
-                `flex items-center space-x-3 px-3.5 py-2 rounded-lg text-xs font-medium transition-all ${
-                  isActive
-                    ? 'bg-primary text-white shadow-sm font-semibold'
-                    : 'text-gray-600 hover:bg-blue-50 hover:text-primary'
-                }`
-              }
-            >
-              <FileText className="w-4 h-4 shrink-0" />
-              <span>URY Report Settings</span>
-            </NavLink>
-            <NavLink
-              to="/production-unit"
-              className={({ isActive }) =>
-                `flex items-center space-x-3 px-3.5 py-2 rounded-lg text-xs font-medium transition-all ${
-                  isActive
-                    ? 'bg-[#2563eb] text-white shadow-sm font-semibold'
-                    : 'text-gray-600 hover:bg-blue-50 hover:text-[#2563eb]'
-                }`
-              }
-            >
-              <Grid className="w-4 h-4 shrink-0" />
-              <span>Production Unit</span>
-            </NavLink>
+            {SETTINGS_ITEMS.map((item) => {
+              const Icon = item.icon;
+              return (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  className={({ isActive }) =>
+                    `flex items-center space-x-3 px-3.5 py-2 rounded-lg text-xs font-medium transition-all ${
+                      isActive
+                        ? 'bg-[#2563eb] text-white shadow-sm font-semibold'
+                        : 'text-gray-600 hover:bg-blue-50 hover:text-[#2563eb]'
+                    }`
+                  }
+                >
+                  <Icon className="w-4 h-4 shrink-0" />
+                  <span>{item.label}</span>
+                </NavLink>
+              );
+            })}
           </div>
         )}
       </div>
