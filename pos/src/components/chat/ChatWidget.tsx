@@ -127,7 +127,9 @@ const ChatWidget = forwardRef<ChatWidgetHandle>(function ChatWidget(_props, ref)
       setInitializing(true);
       try {
         const { call } = await import('@ury/core');
-        const res = await call.get('ury.ury.api.ury_chat.get_or_create_conversation', {
+        // POST, not GET: this can create a new Agent Conversation record,
+        // and a GET request's DB transaction is never committed by Frappe.
+        const res = await call.post('ury.ury.api.ury_chat.get_or_create_conversation', {
           report_context: activeReport ? JSON.stringify(activeReport) : undefined,
         });
         const data = res.message;

@@ -70,10 +70,17 @@ def _format_report_context(report_context):
 	return f"[report_context]\n{lines}\n[/report_context]\n\n"
 
 
-@frappe.whitelist(methods=["GET", "POST"])
+@frappe.whitelist(methods=["POST"])
 def get_or_create_conversation(report_context=None):
 	"""Return an existing (cached) or newly-created HUF Agent Conversation id
 	for the current user + the URY Dashboard Assistant agent.
+
+	POST-only, deliberately: this can *write* a new Agent Conversation
+	record, and Frappe does not commit the database transaction at the end
+	of a GET request. A GET here would let create_conversation() report
+	success with a freshly allocated id that then never actually persists
+	-- every subsequent send fails with "Conversation not found" even
+	though the very first response looked fine.
 
 	Returns `{"available": True, "conversation_id": ...}` on success, or
 	`{"available": False, "reason": ...}` if HUF is not installed, the Agent
