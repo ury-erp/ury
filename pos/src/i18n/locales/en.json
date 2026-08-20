@@ -180,7 +180,7 @@
     "title_closing": "Closing Checklist",
     "description": "Please complete the checklist below before you continue.",
     "loading": "Loading checklist...",
-    "remarks_placeholder": "Remarks (optional)",
+    "remarks_placeholder": "Remarks",
     "submit": "Submit Checklist",
     "submitting": "Submitting...",
     "load_failed": "Failed to load checklist",
