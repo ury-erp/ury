@@ -1,8 +1,9 @@
 import { TrendingUp, AlertTriangle, Bell, Users, ShoppingCart, Clock } from 'lucide-react';
-import { Card, CardContent } from '@ury/ui';
+import { Card, CardHeader, CardTitle, CardContent, Badge } from '@ury/ui';
 import { useState, useEffect } from 'react';
 import { usePOSStore } from '../store/pos-store';
 import { formatCurrency } from '@ury/core';
+import HufLogo from '../components/HufLogo';
 
 // Helper function to format relative time
 function getRelativeTime(creationDate: string): string {
@@ -231,10 +232,9 @@ export default function Dashboard() {
   const maxTableCount = Math.max(...floorLoad.map((f: any) => f.table_count), 1);
 
   return (
-    <div className="h-full overflow-y-auto p-6 bg-gray-50">
+    <div className="h-full overflow-y-auto p-6 bg-gray-50 space-y-6">
       {/* Stat Cards Row */}
-      <div className="mb-6">
-        <h2 className="text-2xl font-semibold text-gray-900 mb-4">Dashboard</h2>
+      <div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {statsError ? (
             <div className="col-span-full text-red-600 text-sm">Failed to load stats</div>
@@ -502,16 +502,20 @@ export default function Dashboard() {
           </Card>
 
           {/* Shift Brief Section */}
-          <Card className="bg-white border border-gray-200">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between gap-2 mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">Shift Brief</h3>
-                <span className="inline-block text-xs font-semibold px-2 py-1 bg-purple-50 text-purple-700 border border-purple-200 rounded">
-                  HUF
-                </span>
+          <Card className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+            <CardHeader className="p-0 pb-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-lg font-bold text-gray-900">Shift Brief</CardTitle>
+                </div>
+                <Badge variant="outline" className="border-purple-200 bg-purple-50 px-2.5 py-1 flex items-center justify-center">
+                  <HufLogo className="h-3.5 w-auto" />
+                </Badge>
               </div>
-              <p className="text-sm text-gray-600">
-                AI-written shift summaries are not yet connected. This panel will show HUF's shift observations once integrated.
+            </CardHeader>
+            <CardContent className="p-0 pt-2">
+              <p className="text-sm text-gray-600 leading-relaxed">
+                AI-written shift summaries are not yet connected. This panel will show HUF&apos;s shift observations once integrated.
               </p>
             </CardContent>
           </Card>
