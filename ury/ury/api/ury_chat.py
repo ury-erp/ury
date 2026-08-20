@@ -96,6 +96,14 @@ def get_or_create_conversation(report_context=None):
 		if not frappe.db.exists("Agent", agent_name):
 			return _huf_unavailable(f"HUF Agent {agent_name!r} does not exist")
 
+		agent_doc = frappe.db.get_value(
+			"Agent", agent_name, ["disabled", "provider", "model"], as_dict=True
+		)
+		if agent_doc.disabled:
+			return _huf_unavailable(f"HUF Agent {agent_name!r} is disabled")
+		if not (agent_doc.provider and agent_doc.model):
+			return _huf_unavailable(f"HUF Agent {agent_name!r} has no provider/model configured")
+
 		conversation = agent_chat.create_conversation(agent=agent_name, channel="Chat")
 		conversation_id = (
 			conversation.get("name") if isinstance(conversation, dict) else conversation
