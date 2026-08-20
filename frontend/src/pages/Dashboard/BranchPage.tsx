@@ -600,20 +600,7 @@ export const BranchPage: React.FC = () => {
                       placeholder="None"
                     />
                   </div>
-                </div>
-              ) : (
-                <p className="text-sm text-gray-400">No URY Restaurant linked to this branch.</p>
-              )}
-            </div>
-
-            {/* ORDER TYPE MENU SUBSECTION */}
-            <div>
-              <div className="flex items-center justify-between gap-4 mb-4 pb-2 border-b border-gray-100">
-                <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider">
-                  Order Type Menu
-                </h3>
-                {restaurantData && (
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 pt-6">
                     <Switch
                       id="order_type_wise_menu"
                       checked={!!restaurantForm.order_type_wise_menu}
@@ -632,8 +619,17 @@ export const BranchPage: React.FC = () => {
                       Order Type Wise Menu
                     </label>
                   </div>
-                )}
-              </div>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-400">No URY Restaurant linked to this branch.</p>
+              )}
+            </div>
+
+            {/* ORDER TYPE MENU SUBSECTION */}
+            <div>
+              <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-4 pb-2 border-b border-gray-100">
+                Order Type Menu
+              </h3>
               {restaurantData ? (
                 <div className="space-y-4">
                   {!!restaurantForm.order_type_wise_menu && (
