@@ -123,6 +123,7 @@ export const TablePage: React.FC = () => {
     try {
       if (editingTable) {
         const original = {
+          table_name: editingTable.table_name || editingTable.name || '',
           no_of_seats: parseInt(editingTable.no_of_seats as any) || 0,
           minimum_seating: parseInt(editingTable.minimum_seating as any) || 0,
           branch: editingTable.branch || '',
@@ -131,6 +132,7 @@ export const TablePage: React.FC = () => {
           is_take_away: editingTable.is_take_away ? 1 : 0,
         };
         const current = {
+          table_name: newTable.table_name || '',
           no_of_seats: parseInt(newTable.no_of_seats as any) || 0,
           minimum_seating: parseInt(newTable.minimum_seating as any) || 0,
           branch: newTable.branch || '',
@@ -144,10 +146,23 @@ export const TablePage: React.FC = () => {
           return;
         }
 
+        let currentName = editingTable.name;
+        const branchName = newTable.branch || activeBranchId;
+        const uniqueTableName = `${newTable.table_name} - ${branchName}`;
+        if (uniqueTableName !== editingTable.name) {
+          await call('frappe.client.rename_doc', {
+            doctype: 'URY Table',
+            old_name: editingTable.name,
+            new_name: uniqueTableName,
+          });
+          currentName = uniqueTableName;
+        }
+
         await call('frappe.client.set_value', {
           doctype: 'URY Table',
-          name: editingTable.name,
+          name: currentName,
           fieldname: {
+            table_name: newTable.table_name,
             no_of_seats: parseInt(newTable.no_of_seats),
             minimum_seating: parseInt(newTable.minimum_seating),
             branch: newTable.branch,
@@ -186,6 +201,7 @@ export const TablePage: React.FC = () => {
           doc: {
             doctype: 'URY Table',
             name: uniqueTableName,
+            table_name: newTable.table_name,
             restaurant: restaurantName,
             no_of_seats: parseInt(newTable.no_of_seats),
             minimum_seating: parseInt(newTable.minimum_seating),
@@ -359,7 +375,6 @@ export const TablePage: React.FC = () => {
                 value={newTable.table_name}
                 onChange={(e) => setNewTable({ ...newTable, table_name: e.target.value })}
                 required
-                disabled={!!editingTable}
                 className="w-full"
               />
             </div>
