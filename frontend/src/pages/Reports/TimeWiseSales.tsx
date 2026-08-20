@@ -5,6 +5,7 @@ import { IndianRupee, Receipt, TrendingUp, Trophy } from 'lucide-react';
 import { useBranchContext } from '../../context/BranchContext';
 import { BarChartCard } from '../../components/reports/charts/BarChartCard';
 import { toApiDate } from '../../lib/reportDate';
+import { DatePicker } from '../../components/setup/DatePicker';
 
 interface IntervalRow {
   interval_label: string;
@@ -91,12 +92,12 @@ export function TimeWiseSales() {
               </option>
             ))}
           </select>
-          <input
-            type="date"
+          <DatePicker
+            id="timewise-sales-date"
             value={date}
-            max={toApiDate(new Date())}
-            onChange={(e) => setDate(e.target.value)}
-            className="border border-input rounded-md px-3 py-1.5 text-sm"
+            maxDate={toApiDate(new Date())}
+            onChange={(_id, val) => setDate(val)}
+            className="w-36"
           />
         </div>
       </div>
