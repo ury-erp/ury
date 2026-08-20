@@ -5,20 +5,19 @@
     </router-link>
     <div class="flex items-center gap-4">
       <button 
-        class="flex items-center gap-2 px-4 py-2 rounded-xl hover:bg-slate-200 transition-colors text-blue-800 font-semibold" 
+        class="flex justify-center items-center h-12 w-12 rounded-xl hover:bg-slate-200 transition-colors text-blue-800" 
         @click="reloadKOT"
       >
         <svg class="w-6 h-6" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 18 20">
           <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 1v5h-5M2 19v-5h5m10-4a8 8 0 0 1-14.947 3.97M1 10a8 8 0 0 1 14.947-3.97"/>
         </svg> 
-        Refresh
       </button>
 
       <!-- Reused POS User Dropdown -->
       <div class="relative" ref="userMenuRef">
         <button
           @click="toggleUserMenu"
-          class="flex items-center gap-2 px-4 py-2 rounded-xl hover:bg-slate-200 transition-colors text-gray-700 hover:text-gray-900"
+          class="flex items-center gap-2 px-4 h-12 rounded-xl hover:bg-slate-200 transition-colors text-gray-700 hover:text-gray-900"
         >
           <div class="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
             <svg class="w-4 h-4 text-white" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
