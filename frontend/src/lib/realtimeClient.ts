@@ -4,14 +4,12 @@
  * The /ury SPA is a standalone Vite bundle that does NOT load Frappe's own
  * socketio_client.js, so `window.frappe.realtime` is never initialised here.
  * Instead we create a Socket.IO connection directly to the Frappe realtime
- * server, mirroring the pattern used in the URY POS (pos/src/lib/realtime.ts).
+ * server, mirroring Frappe desk's get_host() (including the dedicated
+ * socketio_port used by `bench start`).
  *
  * The site name is taken from `frappe.boot.sitename` which is injected into
  * index.html at request time:
  *   frappe.boot = JSON.parse({{ boot }});
- *
- * Socket events published via `frappe.publish_realtime(event, payload, user=…)`
- * on the backend are delivered directly as socket.io events with the same name.
  */
 
 import { io, type Socket } from 'socket.io-client';
@@ -19,20 +17,38 @@ import { io, type Socket } from 'socket.io-client';
 let socket: Socket | null = null;
 let connectPromise: Promise<Socket> | null = null;
 
-function getSiteName(): string {
+function getBoot(): Record<string, any> {
   try {
-    return (window as any).frappe?.boot?.sitename ?? '';
+    return (window as any).frappe?.boot ?? {};
   } catch {
-    return '';
+    return {};
   }
 }
 
+function getSiteName(): string {
+  return getBoot().sitename ?? '';
+}
+
+/**
+ * Same rules as frappe/public/js/frappe/socketio_client.js get_host():
+ * on the dev server, socket.io listens on boot.socketio_port (usually 9000),
+ * not on the web port.
+ */
 function buildSocketUrl(): string {
+  const boot = getBoot();
   const siteName = getSiteName();
-  const { protocol, hostname, port } = window.location;
-  const base = port ? `${protocol}//${hostname}:${port}` : `${protocol}//${hostname}`;
-  // Frappe namespaces the socket per-site
-  return siteName ? `${base}/${siteName}` : base;
+  const { protocol, hostname } = window.location;
+  const devServer = Boolean((window as any).dev_server);
+  const socketioPort = boot.socketio_port;
+
+  let host = `${protocol}//${hostname}`;
+  if (devServer && socketioPort) {
+    host = `${protocol}//${hostname}:${socketioPort}`;
+  } else if (window.location.port) {
+    host = `${protocol}//${hostname}:${window.location.port}`;
+  }
+
+  return siteName ? `${host}/${siteName}` : host;
 }
 
 /**
@@ -116,4 +132,3 @@ export function subscribeRealtimeEvent(
     activeSocket?.off(eventName, handler);
   };
 }
-

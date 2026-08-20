@@ -5,9 +5,8 @@ import { DynamicForm, DynamicFormHandle } from '../../components/setup/DynamicFo
 import { InstallationTypeCard } from '../../components/setup/InstallationTypeCard';
 import { setupService, SetupPayload } from '../../services/setup';
 import setupSchema from '../../data/forms/setup.json';
-import { PROGRESS_STEPS } from '../../components/setup/constants';
 import { ProgressModal } from '../../components/setup/ProgressModal';
-import { Button } from '@ury/ui';
+import { Switch } from '../../components/ui/switch';
 
 const FISCAL_YEARS: Record<string, string> = {
   Afghanistan: '12-21',
@@ -37,6 +36,11 @@ function calculateFyStartDate(country: string): string {
   return `${currentYear}-${mmdd}`;
 }
 
+type PendingSubmit = {
+  payload: SetupPayload;
+  installationType: 'minimal' | 'advanced';
+};
+
 export default function SetupPage() {
   const navigate = useNavigate();
   const formRef = useRef<DynamicFormHandle>(null);
@@ -46,10 +50,10 @@ export default function SetupPage() {
   const [activeIndex, setActiveIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [installationType, setInstallationType] = useState<'minimal' | 'advanced'>('minimal');
-  const [defaultsLoaded, setDefaultsLoaded] = useState(false);
-  // pendingSubmit holds the args for the actual API call until the realtime
-  // listener is confirmed attached (via ProgressModal's onReady callback).
-  const pendingSubmit = useRef<{ payload: SetupPayload; installationType: 'minimal' | 'advanced' } | null>(null);
+  const [setupUryDemo, setSetupUryDemo] = useState(false);
+  const [progressSteps, setProgressSteps] = useState<string[]>([]);
+  const pendingSubmit = useRef<PendingSubmit | null>(null);
+  const finishedRef = useRef(false);
 
   useEffect(() => {
     async function loadDefaults() {
@@ -103,7 +107,6 @@ export default function SetupPage() {
         const countryToUse = defaults.detected_country || 'India';
         formRef.current?.setFieldValue('country', countryToUse);
         await handleCountryChange(countryToUse);
-        setDefaultsLoaded(true);
       } catch (err) {
         console.error("Failed to load setup defaults", err);
       }
@@ -159,71 +162,79 @@ export default function SetupPage() {
     }
   }, [handleCountryChange, handleCompanyNameChange]);
 
-  // Runs the actual API call — only invoked after the realtime socket
-  // listener is attached (called from ProgressModal's onReady).
+  const finishSetup = useCallback((pending: PendingSubmit) => {
+    if (finishedRef.current) return;
+    finishedRef.current = true;
+
+    setActiveIndex((current) => Math.max(current, progressSteps.length));
+
+    setTimeout(() => {
+      if (pending.payload.setup_ury_demo) {
+        window.location.href = '/ury/dashboard';
+      } else if (pending.installationType === 'minimal') {
+        navigate('/setup-wizard/1');
+      } else {
+        window.location.href = '/app';
+      }
+    }, 800);
+  }, [navigate, progressSteps.length]);
+
   const doApiCall = useCallback(async () => {
     const pending = pendingSubmit.current;
     if (!pending) return;
-    pendingSubmit.current = null;
 
     try {
-      await setupService.submitSetup(pending.payload);
-      // Backend has finished and published its final completed event.
-      // Mark all steps done so the top stepper fills completely.
-      setActiveIndex(PROGRESS_STEPS.length);
-
-      setTimeout(() => {
-        if (pending.installationType === 'minimal') {
-          navigate('/setup-wizard/1');
-        } else {
-          window.location.href = '/app';
-        }
-      }, 800);
+      const result = await setupService.submitSetup(pending.payload);
+      // Background setup returns "registered" and finishes via setup_task.
+      if (result && typeof result === 'object' && result.status === 'registered') {
+        return;
+      }
+      finishSetup(pending);
     } catch (err: any) {
       setError(err?.message || 'An error occurred during setup');
       setSubmitting(false);
     }
-  }, [navigate]);
+  }, [finishSetup]);
 
-  const runSubmit = (payload: SetupPayload, targetInstallationType: 'minimal' | 'advanced') => {
-    // Store payload for doApiCall (invoked when onReady fires).
-    pendingSubmit.current = { payload, installationType: targetInstallationType };
-    setSubmitting(true);
-    setError(null);
-    setActiveIndex(0);
-    // doApiCall() will be triggered by ProgressModal's onReady callback once
-    // the realtime listener is confirmed attached.
-  };
+  const handleSetupComplete = useCallback(() => {
+    if (pendingSubmit.current) {
+      finishSetup(pendingSubmit.current);
+    }
+  }, [finishSetup]);
+
+  const handleSetupFail = useCallback((message: string) => {
+    setError(message);
+    setSubmitting(false);
+  }, []);
 
   const handleNext = async () => {
     if (!formRef.current?.validate()) {
       return;
     }
 
-    const payload = { ...formRef.current.getValues(), installation_type: installationType };
-    await runSubmit(payload, installationType);
-  };
-
-  const handleDemo = async () => {
-    if (!defaultsLoaded || submitting) {
-      return;
-    }
-
-    const values = formRef.current?.getValues();
-
-    if (!values?.company_name) {
-      formRef.current?.setFieldValue('company_name', 'My Restaurant');
-      formRef.current?.setFieldValue('company_abbr', 'MR');
-    } else if (!values.company_abbr) {
-      handleCompanyNameChange(values.company_name);
-    }
-
-    // Re-read values after any fallback fills above.
     const payload: SetupPayload = {
-      ...(formRef.current?.getValues() as SetupPayload),
-      installation_type: 'minimal',
+      ...formRef.current.getValues(),
+      installation_type: installationType,
+      setup_ury_demo: setupUryDemo,
     };
-    await runSubmit(payload, 'minimal');
+
+    try {
+      const steps = await setupService.getProgressSteps(setupUryDemo);
+      setProgressSteps(
+        steps.length
+          ? steps.map((step) => step.status)
+          : ['Setting up your restaurant']
+      );
+    } catch (err) {
+      console.error('Failed to load setup stages', err);
+      setProgressSteps(['Setting up your restaurant']);
+    }
+
+    finishedRef.current = false;
+    pendingSubmit.current = { payload, installationType };
+    setSubmitting(true);
+    setError(null);
+    setActiveIndex(0);
   };
 
   return (
@@ -232,21 +243,6 @@ export default function SetupPage() {
       onNext={handleNext}
       nextLabel="Continue"
       isNextDisabled={submitting}
-      secondaryAction={
-        <div className="flex items-center gap-3 h-full">
-          <span className="hidden sm:inline text-xs text-muted-foreground">
-            Creates a working demo restaurant with sample data, you can change or delete any of it afterward.
-          </span>
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={handleDemo}
-            disabled={!defaultsLoaded || submitting}
-          >
-            Just show me a demo →
-          </Button>
-        </div>
-      }
     >
       <div className="space-y-8">
         <DynamicForm 
@@ -269,16 +265,41 @@ export default function SetupPage() {
             ))}
           </div>
         </div>
+
+        <div className="rounded-lg border border-border p-4 flex items-start justify-between gap-4">
+          <div className="space-y-1">
+            <label htmlFor="setup-ury-demo" className="text-sm font-semibold text-foreground cursor-pointer">
+              Set up with demo data
+            </label>
+            <p className="text-sm text-muted-foreground">
+              Adds a sample branch, rooms, tables, menu, and POS you can change or delete later.
+            </p>
+          </div>
+          <Switch
+            id="setup-ury-demo"
+            checked={setupUryDemo}
+            onCheckedChange={(checked) => setSetupUryDemo(checked === true)}
+            disabled={submitting}
+          />
+        </div>
       </div>
       
       {submitting && (
         <ProgressModal 
           visible={true} 
-          activeIndex={activeIndex} 
-          error={error} 
-          eventName="ury_setup_progress"
+          activeIndex={activeIndex}
+          error={error}
+          steps={progressSteps}
+          eventName="setup_task"
+          description={
+            setupUryDemo
+              ? 'This can take a few minutes if demo data is on.'
+              : 'Setting things up, this usually takes less than a minute.'
+          }
           onStepChange={setActiveIndex}
           onReady={doApiCall}
+          onComplete={handleSetupComplete}
+          onFail={handleSetupFail}
         />
       )}
     </WizardLayout>
