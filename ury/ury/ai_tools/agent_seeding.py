@@ -201,9 +201,15 @@ def create_ury_dashboard_agent():
 
 	provider, model, reason = _resolve_default_provider_model()
 	is_placeholder = reason.startswith("resolved via: fallback placeholder")
+	if not (provider and model):
+		# _resolve_default_provider_model() reported nothing available at
+		# all (not even a placeholder) -- fall back directly so the record
+		# is still saveable with a valid Link, same as the placeholder path.
+		provider, model = _fallback_provider_model()
+		is_placeholder = True
 	doc.provider = provider
 	doc.model = model
-	doc.disabled = 1 if (is_placeholder or not (provider and model)) else 0
+	doc.disabled = 1 if is_placeholder else 0
 
 	doc.source_app = "ury"
 	doc.source_file = "ury/ai_tools/agent_seeds/ury_dashboard_assistant.json"
