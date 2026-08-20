@@ -17,6 +17,7 @@ interface BranchData {
   tax_id?: string;
   address?: string;
   custom_no_taxes?: number;
+  default_menu?: string;
 }
 
 interface RestaurantData {
@@ -71,32 +72,56 @@ export const BranchPage: React.FC = () => {
 
   const fetchBranchList = async () => {
     setLoading(true);
+    let list: BranchData[] = [];
     try {
       const res = await call<any>('frappe.client.get_list', {
         doctype: 'Branch',
         fields: ['name', 'branch', 'address', 'custom_no_taxes'],
         limit_page_length: 100
       });
-      const list = Array.isArray(res) ? res : (res?.message || []);
-      setBranchList(list);
+      list = Array.isArray(res) ? res : (res?.message || []);
     } catch (e) {
       console.error('Failed to load branch list', e);
       try {
         const fallbackRes = await call<any>('ury.ury.api.minimal.business_setup.get_branches');
         const fallbackList = Array.isArray(fallbackRes) ? fallbackRes : (fallbackRes?.message || []);
         if (Array.isArray(fallbackList) && fallbackList.length > 0) {
-          setBranchList(fallbackList.map((b: any) => ({
+          list = fallbackList.map((b: any) => ({
             name: b.id || b.name,
             branch: b.name || b.branch,
             address: b.address || ''
-          })));
+          }));
         }
       } catch (fallbackErr) {
         console.error('Fallback fetch branches failed', fallbackErr);
       }
-    } finally {
-      setLoading(false);
     }
+
+    if (list.length > 0) {
+      try {
+        const restRes = await call<any>('frappe.client.get_list', {
+          doctype: 'URY Restaurant',
+          fields: ['branch', 'active_menu'],
+          limit_page_length: 100
+        });
+        const restaurantList = Array.isArray(restRes) ? restRes : (restRes?.message || []);
+        const menuMap: Record<string, string> = {};
+        restaurantList.forEach((r: any) => {
+          if (r.branch && r.active_menu) {
+            menuMap[r.branch] = r.active_menu;
+          }
+        });
+        list = list.map((b) => ({
+          ...b,
+          default_menu: menuMap[b.name] || (b.branch ? menuMap[b.branch] : '') || ''
+        }));
+      } catch (err) {
+        console.error('Failed to map default menu names', err);
+      }
+    }
+
+    setBranchList(list);
+    setLoading(false);
   };
 
   const fetchLinkedData = async () => {
@@ -740,7 +765,7 @@ export const BranchPage: React.FC = () => {
             <thead className="bg-gray-50 border-b border-gray-100 text-xs uppercase text-gray-500 font-semibold">
               <tr>
                 <th className="px-6 py-4">Branch</th>
-                <th className="px-6 py-4">Address</th>
+                <th className="px-6 py-4">Default Menu</th>
                 <th className="px-6 py-4 text-right">Actions</th>
               </tr>
             </thead>
@@ -751,7 +776,7 @@ export const BranchPage: React.FC = () => {
                   className="hover:bg-gray-50/50 transition-colors"
                 >
                   <td className="px-6 py-4 font-semibold text-gray-900">{b.branch || b.branch_name || b.name}</td>
-                  <td className="px-6 py-4 text-gray-600">{b.address || '-'}</td>
+                  <td className="px-6 py-4 text-gray-600">{b.default_menu || '-'}</td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-1">
                       <Button
