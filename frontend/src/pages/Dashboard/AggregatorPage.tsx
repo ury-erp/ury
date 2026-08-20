@@ -23,6 +23,8 @@ export const AggregatorPage: React.FC = () => {
   const [saving, setSaving] = useState<boolean>(false);
 
   const [newAggregatorName, setNewAggregatorName] = useState('');
+  const [selectedModeOfPayment, setSelectedModeOfPayment] = useState('');
+
   const [editForm, setEditForm] = useState<AggregatorSetting>({
     aggregator: '',
     customer: '',
@@ -78,6 +80,12 @@ export const AggregatorPage: React.FC = () => {
     }
   }, [activeBranchId, branches]);
 
+  const handleOpenAddModal = () => {
+    setNewAggregatorName('');
+    setSelectedModeOfPayment('');
+    setIsAddOpen(true);
+  };
+
   const handleCreateAggregator = async (e: React.FormEvent) => {
     e.preventDefault();
     const branchToUpdate = activeBranchId === 'all' ? branches[0]?.name : activeBranchId;
@@ -85,6 +93,8 @@ export const AggregatorPage: React.FC = () => {
     
     setSaving(true);
     try {
+      const mopToUse = selectedModeOfPayment || newAggregatorName;
+
       // 1. Create Customer
       await call('frappe.client.insert', {
         doc: { doctype: 'Customer', customer_name: newAggregatorName, customer_group: 'Commercial', territory: 'All Territories' }
@@ -111,18 +121,20 @@ export const AggregatorPage: React.FC = () => {
         }
       });
 
-      // 3. Create Mode of Payment
-      await call('frappe.client.insert', {
-        doc: { doctype: 'Mode of Payment', mode_of_payment: newAggregatorName, type: 'Bank' }
-      }).catch((e: any) => {
-        const errorMessage = e?.message || e?.responseJSON?.message || String(e);
-        const errorType = e?.exc_type || e?.responseJSON?.exc_type;
-        if (errorType === 'DuplicateEntryError' || errorMessage.includes('already exists')) {
-          console.log('Mode of Payment might already exist', e);
-        } else {
-          throw e;
-        }
-      });
+      // 3. Create Mode of Payment if using newAggregatorName
+      if (!selectedModeOfPayment) {
+        await call('frappe.client.insert', {
+          doc: { doctype: 'Mode of Payment', mode_of_payment: newAggregatorName, type: 'Bank' }
+        }).catch((e: any) => {
+          const errorMessage = e?.message || e?.responseJSON?.message || String(e);
+          const errorType = e?.exc_type || e?.responseJSON?.exc_type;
+          if (errorType === 'DuplicateEntryError' || errorMessage.includes('already exists')) {
+            console.log('Mode of Payment might already exist', e);
+          } else {
+            throw e;
+          }
+        });
+      }
 
       // 4. Update Branch child table
       const res = await call<any>('frappe.client.get', {
@@ -137,7 +149,7 @@ export const AggregatorPage: React.FC = () => {
           aggregator: newAggregatorName,
           customer: newAggregatorName,
           price_list: newAggregatorName,
-          mode_of_payment: newAggregatorName
+          mode_of_payment: mopToUse
         }
       ];
 
@@ -153,6 +165,7 @@ export const AggregatorPage: React.FC = () => {
       fetchDropdownOptions();
       setIsAddOpen(false);
       setNewAggregatorName('');
+      setSelectedModeOfPayment('');
       showToast.success('Aggregator created');
     } catch (err: any) {
       console.error('Failed to create aggregator setup:', err);
@@ -224,22 +237,17 @@ export const AggregatorPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Toolbar & Filters */}
-      <Card className="p-4 rounded-lg border border-gray-200 bg-white shadow-xs">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="font-semibold text-gray-700">Aggregator Settings</div>
-          <div className="flex items-center space-x-3 w-full md:w-auto">
-            <Button
-              onClick={() => setIsAddOpen(true)}
-              className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center space-x-1.5 shadow-xs"
-              disabled={!hasBranch}
-            >
-              <Plus className="w-4 h-4" />
-              <span>Add Aggregator</span>
-            </Button>
-          </div>
-        </div>
-      </Card>
+      {/* Toolbar */}
+      <div className="-mx-6 px-6 -mt-6 pt-6 pb-3 border-b border-gray-200 flex flex-col md:flex-row items-center justify-end gap-4">
+        <Button
+          onClick={handleOpenAddModal}
+          className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center space-x-1.5 shadow-xs"
+          disabled={!hasBranch}
+        >
+          <Plus className="w-4 h-4" />
+          <span>Add Aggregator</span>
+        </Button>
+      </div>
 
       {/* List View */}
       {loading ? (
@@ -256,7 +264,7 @@ export const AggregatorPage: React.FC = () => {
             Add aggregators like Zomato, Swiggy to automatically create customer, pricelist, and payment modes.
           </p>
           <Button
-            onClick={() => setIsAddOpen(true)}
+            onClick={handleOpenAddModal}
             className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center space-x-1.5 shadow-xs"
             disabled={!hasBranch}
           >
@@ -309,24 +317,37 @@ export const AggregatorPage: React.FC = () => {
           </DialogHeader>
           <form onSubmit={handleCreateAggregator} className="space-y-4 text-sm mt-4">
             <div>
-              <label className="block font-semibold text-gray-700 mb-1">Aggregator Name <span className="text-red-500">*</span></label>
+              <label className="block font-semibold text-gray-700 mb-1.5">
+                Aggregator Name <span className="text-red-500">*</span>
+              </label>
               <Input
                 placeholder="e.g. Swiggy, Zomato"
                 value={newAggregatorName}
                 onChange={(e) => setNewAggregatorName(e.target.value)}
                 required
               />
-              <p className="text-xs text-gray-500 mt-1">
-                This will automatically create a Customer, Price List, and Mode of Payment with this name.
-              </p>
+            </div>
+
+            <div>
+              <label className="block font-semibold text-gray-700 mb-1.5">Mode of Payment</label>
+              <SearchableSelect
+                id="add_mode_of_payment"
+                value={selectedModeOfPayment}
+                onChange={(_, val) => setSelectedModeOfPayment(val)}
+                options={[
+                  { value: '', label: 'Select Mode of Payment...' },
+                  ...modesOfPayment.map(mop => ({ value: mop.name, label: mop.name }))
+                ]}
+                placeholder="Select Mode of Payment..."
+              />
             </div>
             
-            <div className="pt-6 flex justify-end gap-2 border-t mt-4 border-gray-100">
-              <Button type="button" variant="outline" onClick={() => setIsAddOpen(false)}>
+            <div className="pt-6 flex justify-end gap-3 border-t mt-6 border-gray-100">
+              <Button type="button" variant="outline" onClick={() => setIsAddOpen(false)} disabled={saving} className="font-semibold">
                 Cancel
               </Button>
-              <Button type="submit" disabled={saving} className="bg-primary hover:bg-primary/90 text-white w-24 h-9">
-                Save
+              <Button type="submit" disabled={saving} className="bg-primary hover:bg-primary/90 text-white font-semibold shadow-xs disabled:opacity-50 disabled:cursor-not-allowed">
+                <span>Save</span>
               </Button>
             </div>
           </form>
@@ -341,7 +362,9 @@ export const AggregatorPage: React.FC = () => {
           </DialogHeader>
           <form onSubmit={handleSaveEdit} className="space-y-4 text-sm mt-4">
             <div>
-              <label className="block font-semibold text-gray-700 mb-1">Aggregator Name <span className="text-red-500">*</span></label>
+              <label className="block font-semibold text-gray-700 mb-1.5">
+                Aggregator Name <span className="text-red-500">*</span>
+              </label>
               <Input
                 value={editForm.aggregator}
                 onChange={(e) => setEditForm(p => ({ ...p, aggregator: e.target.value }))}
@@ -350,39 +373,39 @@ export const AggregatorPage: React.FC = () => {
             </div>
 
             <div>
-              <label className="block font-semibold text-gray-700 mb-1">Price List</label>
+              <label className="block font-semibold text-gray-700 mb-1.5">Price List</label>
               <SearchableSelect
                 id="edit_price_list"
                 value={editForm.price_list}
                 onChange={(_, val) => setEditForm(p => ({ ...p, price_list: val }))}
                 options={[
-                  { value: '', label: 'Select Price List' },
+                  { value: '', label: 'Select Price List...' },
                   ...priceLists.map(pl => ({ value: pl.name, label: pl.name }))
                 ]}
-                placeholder="Select Price List"
+                placeholder="Select Price List..."
               />
             </div>
 
             <div>
-              <label className="block font-semibold text-gray-700 mb-1">Mode of Payment</label>
+              <label className="block font-semibold text-gray-700 mb-1.5">Mode of Payment</label>
               <SearchableSelect
                 id="edit_mode_of_payment"
                 value={editForm.mode_of_payment}
                 onChange={(_, val) => setEditForm(p => ({ ...p, mode_of_payment: val }))}
                 options={[
-                  { value: '', label: 'Select Mode of Payment' },
+                  { value: '', label: 'Select Mode of Payment...' },
                   ...modesOfPayment.map(mop => ({ value: mop.name, label: mop.name }))
                 ]}
-                placeholder="Select Mode of Payment"
+                placeholder="Select Mode of Payment..."
               />
             </div>
             
-            <div className="pt-6 flex justify-end gap-2 border-t mt-4 border-gray-100">
-              <Button type="button" variant="outline" onClick={() => setEditingIndex(null)}>
+            <div className="pt-6 flex justify-end gap-3 border-t mt-6 border-gray-100">
+              <Button type="button" variant="outline" onClick={() => setEditingIndex(null)} disabled={saving} className="font-semibold">
                 Cancel
               </Button>
-              <Button type="submit" disabled={saving} className="bg-primary hover:bg-primary/90 text-white w-24 h-9">
-                Save
+              <Button type="submit" disabled={saving} className="bg-primary hover:bg-primary/90 text-white font-semibold shadow-xs disabled:opacity-50 disabled:cursor-not-allowed">
+                <span>Save</span>
               </Button>
             </div>
           </form>
