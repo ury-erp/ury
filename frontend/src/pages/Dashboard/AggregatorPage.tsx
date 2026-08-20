@@ -7,10 +7,11 @@ import { SearchableSelect } from '../../components/common/SearchableSelect';
 
 interface AggregatorSetting {
   name?: string;
-  aggregator: string;
+  aggregator?: string;
   customer?: string;
   price_list?: string;
   mode_of_payment?: string;
+  mode_of_payments?: string;
 }
 
 export const AggregatorPage: React.FC = () => {
@@ -28,7 +29,8 @@ export const AggregatorPage: React.FC = () => {
     aggregator: '',
     customer: '',
     price_list: '',
-    mode_of_payment: ''
+    mode_of_payment: '',
+    mode_of_payments: ''
   });
 
   const [priceLists, setPriceLists] = useState<{ name: string }[]>([]);
@@ -101,8 +103,9 @@ export const AggregatorPage: React.FC = () => {
         ...(record.custom_aggregator_settings || []),
         {
           aggregator: newAggregatorName,
-          customer: '',
+          customer: newAggregatorName,
           price_list: '',
+          mode_of_payments: '',
           mode_of_payment: ''
         }
       ];
@@ -129,12 +132,17 @@ export const AggregatorPage: React.FC = () => {
   };
 
   const handleEditAggregator = (item: AggregatorSetting, idx: number) => {
+    const aggName = item.aggregator || item.customer || item.name || '';
+    const mop = item.mode_of_payments || item.mode_of_payment || '';
+    const pl = item.price_list || '';
+
     setEditingIndex(idx);
     setEditForm({
-      aggregator: item.aggregator || '',
-      customer: item.customer || '',
-      price_list: item.price_list || '',
-      mode_of_payment: item.mode_of_payment || ''
+      aggregator: aggName,
+      customer: aggName,
+      price_list: pl,
+      mode_of_payment: mop,
+      mode_of_payments: mop
     });
   };
 
@@ -161,8 +169,9 @@ export const AggregatorPage: React.FC = () => {
       currentList[editingIndex] = {
         ...currentList[editingIndex],
         aggregator: editForm.aggregator,
-        customer: editForm.customer || '',
+        customer: editForm.aggregator,
         price_list: editForm.price_list || '',
+        mode_of_payments: editForm.mode_of_payment || '',
         mode_of_payment: editForm.mode_of_payment || ''
       };
 
@@ -236,26 +245,29 @@ export const AggregatorPage: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {aggregators.map((item, idx) => (
-                <tr key={idx} className="hover:bg-gray-50/50 transition-colors">
-                  <td className="px-6 py-4 font-semibold text-gray-900">
-                    {item.aggregator || item.customer || '-'}
-                  </td>
-                  <td className="px-6 py-4">{item.price_list || '-'}</td>
-                  <td className="px-6 py-4">{item.mode_of_payment || '-'}</td>
-                  <td className="px-6 py-4 text-right">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleEditAggregator(item, idx)}
-                      className="text-gray-500 hover:text-primary p-1.5 h-8 w-8"
-                      title="Edit Aggregator"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </Button>
-                  </td>
-                </tr>
-              ))}
+              {aggregators.map((item, idx) => {
+                const name = item.aggregator || item.customer || item.name || '-';
+                const pl = item.price_list || '-';
+                const mop = item.mode_of_payments || item.mode_of_payment || '-';
+                return (
+                  <tr key={idx} className="hover:bg-gray-50/50 transition-colors">
+                    <td className="px-6 py-4 font-semibold text-gray-900">{name}</td>
+                    <td className="px-6 py-4">{pl}</td>
+                    <td className="px-6 py-4">{mop}</td>
+                    <td className="px-6 py-4 text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEditAggregator(item, idx)}
+                        className="text-gray-500 hover:text-primary p-1.5 h-8 w-8"
+                        title="Edit Aggregator"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </Button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -305,7 +317,7 @@ export const AggregatorPage: React.FC = () => {
               </label>
               <Input
                 value={editForm.aggregator}
-                onChange={(e) => setEditForm(p => ({ ...p, aggregator: e.target.value }))}
+                onChange={(e) => setEditForm(p => ({ ...p, aggregator: e.target.value, customer: e.target.value }))}
                 required
               />
             </div>
@@ -329,7 +341,7 @@ export const AggregatorPage: React.FC = () => {
               <SearchableSelect
                 id="edit_mode_of_payment"
                 value={editForm.mode_of_payment || ''}
-                onChange={(_, val) => setEditForm(p => ({ ...p, mode_of_payment: val }))}
+                onChange={(_, val) => setEditForm(p => ({ ...p, mode_of_payment: val, mode_of_payments: val }))}
                 options={[
                   { value: '', label: 'Select Mode of Payment...' },
                   ...modesOfPayment.map(mop => ({ value: mop.name, label: mop.name }))
