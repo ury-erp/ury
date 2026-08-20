@@ -200,15 +200,10 @@ def create_ury_dashboard_agent():
 	doc = frappe.get_doc({"doctype": "Agent", **seed})
 
 	provider, model, reason = _resolve_default_provider_model()
-	if provider and model:
-		doc.provider = provider
-		doc.model = model
-		doc.disabled = 0
-	else:
-		provider, model = _fallback_provider_model()
-		doc.provider = provider
-		doc.model = model
-		doc.disabled = 1
+	is_placeholder = reason.startswith("resolved via: fallback placeholder")
+	doc.provider = provider
+	doc.model = model
+	doc.disabled = 1 if (is_placeholder or not (provider and model)) else 0
 
 	doc.source_app = "ury"
 	doc.source_file = "ury/ai_tools/agent_seeds/ury_dashboard_assistant.json"
@@ -246,12 +241,18 @@ def provision_ury_agent(provider_doc=None):
 		return False
 
 	agent_doc = frappe.get_doc("Agent", agent_name)
-	if agent_doc.provider and agent_doc.model:
+	if agent_doc.provider and agent_doc.model and not agent_doc.disabled:
+		# Already has a usable (enabled) provider/model — e.g. manually
+		# configured via the settings UI, or an Agent Settings default
+		# pointing at a keyless local LLM. A still-disabled placeholder
+		# (provider/model set but disabled=1) falls through so it can be
+		# promoted once a real key shows up.
 		return False
 
 	preferred_provider = provider_doc.name if provider_doc else None
 	provider, model, reason = _resolve_default_provider_model(preferred_provider=preferred_provider)
-	if not (provider and model):
+	is_placeholder = reason.startswith("resolved via: fallback placeholder")
+	if not (provider and model) or is_placeholder:
 		return False
 
 	agent_doc.provider = provider
