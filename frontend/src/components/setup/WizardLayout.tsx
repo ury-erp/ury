@@ -54,7 +54,7 @@ export function WizardLayout({
       </main>
 
       {/* Footer nav bar */}
-      <footer className="w-full border-t border-border bg-card sticky bottom-0 h-12 flex items-center">
+      <footer className="py-6 w-full border-t border-border bg-card sticky bottom-0 flex items-center">
         <div className={`${SHELL_WIDTH} w-full h-full flex items-center justify-between gap-4`}>
           <div className="flex items-center h-full">
             {step === 2 && onPrev && (
