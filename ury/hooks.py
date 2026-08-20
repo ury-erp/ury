@@ -259,13 +259,19 @@ on_session_creation = [
 
 # Request Events
 # ----------------
-before_request = [
-    "ury.ury.controllers.setup_redirect.redirect_to_setup"
+# before_request cannot issue a real HTTP redirect for Desk page GETs.
+# website_path_resolver runs inside PathResolver, which handles frappe.Redirect.
+website_path_resolver = [
+    "ury.ury.controllers.setup_redirect.website_path_resolver"
 ]
 # after_request = ["ury.utils.after_request"]
 
 website_redirects = [
-    {"source": "/setup-wizard", "target": "/ury/setup-wizard/0"}
+    {
+        "source": "/setup-wizard",
+        "target": "/ury/setup-wizard/0",
+        "redirect_http_status": 302,
+    }
 ]
 
 extend_bootinfo = [
