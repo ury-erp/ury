@@ -8,8 +8,8 @@ export interface ChecklistItem {
 export interface ChecklistResponse {
   message: {
     items: ChecklistItem[];
-    logName: string | null;
-    logStatus: string | null;
+    log_name: string | null;
+    log_status: string | null;
   };
 }
 
@@ -43,7 +43,12 @@ export const getChecklist = async (
       }
     );
 
-    return response.message;
+    // Map backend's snake_case keys to camelCase for consumer compatibility
+    return {
+      items: response.message.items,
+      logName: response.message.log_name,
+      logStatus: response.message.log_status,
+    };
   } catch (error) {
     console.error('Error fetching checklist:', error);
     throw error;

@@ -84,7 +84,10 @@
         "adjustment": "التسوية",
         "total": "الإجمالي",
         "pay_button": "دفع {{amount}}",
-        "processing": "جاري المعالجة..."
+        "processing": "جاري المعالجة...",
+        "short_by": "ناقص {{amount}}",
+        "change_due": "الباقي: {{amount}}",
+        "success": "تم الدفع بنجاح: تم استلام {{amount}}"
     },
     "pos": {
         "not_opened_title": "نقطة البيع غير مفتوحة",

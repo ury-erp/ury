@@ -9,7 +9,7 @@ import {
 } from '@ury/ui';
 import { Button } from '@ury/ui';
 import { Spinner } from '@ury/ui';
-import { db, formatCurrency } from '@ury/core';
+import { call, db, formatCurrency } from '@ury/core';
 import { t } from '../i18n';
 import { usePOSStore } from '../store/pos-store';
 import { useRootStore } from '../store/root-store';
@@ -182,6 +182,20 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
   // this success -- not off validatePOSClose() -- so it renders in place of
   // the closing form until the cashier clears it.
   const [showClosingChecklist, setShowClosingChecklist] = useState(false);
+  // Modes the cashier has explicitly entered a closing amount for (Fix 2:
+  // a blank input must not silently count as "reviewed and zero").
+  const [touchedModes, setTouchedModes] = useState<Set<string>>(new Set());
+  // Tracks a create-but-not-yet-submitted Sub POS Closing / POS Closing
+  // Entry doc name so a retry after a failed submit re-submits the same
+  // doc instead of creating a duplicate draft (Fix 3). Cleared only on
+  // final success or explicit cancel/dismiss of the dialog.
+  const [pendingCloseDoc, setPendingCloseDoc] = useState<{
+    name: string;
+    kind: 'sub' | 'main';
+  } | null>(null);
+  // Lightweight "Are you sure?" step before the irreversible submit call
+  // actually fires (Fix 6).
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const loadClosingDetails = useCallback(async () => {
     if (!posProfile || !user) return;
@@ -202,9 +216,32 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
       setOpeningEntry(ownEntry);
 
       // Multi-cashier mode + current user is not the POS Profile's main
-      // cashier (custom_main_cashier on applicable_for_users, surfaced here
-      // as posProfile.owner) => this session closes via Sub POS Closing.
-      const subCashier = posProfile.multiple_cashier === 1 && posProfile.owner !== user.name;
+      // cashier => this session closes via Sub POS Closing.
+      //
+      // Fix 4: do NOT trust the cached posProfile.owner from the store for
+      // this decision. `ury.ury_pos.api.getPosProfile` (already whitelisted,
+      // already used elsewhere -- see lib/pos-profile-api.ts) is the
+      // authoritative source: it derives `owner` from the POS Profile's
+      // `applicable_for_users` child table row with `custom_main_cashier`
+      // set, which is the same signal the Opening flow's
+      // `_get_main_cashier_status` helper uses. Calling it fresh here (it
+      // takes no args and resolves the profile from the user's own branch,
+      // same as the store's cached copy) avoids relying on a POS Profile
+      // snapshot that may have been cached in sessionStorage since session
+      // start and could be stale if main-cashier assignment changed since.
+      let subCashier = false;
+      if (posProfile.multiple_cashier === 1) {
+        try {
+          const profileStatus = await call.get<{
+            message: { owner: string; multiple_cashier: number };
+          }>('ury.ury_pos.api.getPosProfile');
+          subCashier = profileStatus.message.multiple_cashier === 1
+            && profileStatus.message.owner !== user.name;
+        } catch (statusError) {
+          console.error('Failed to resolve main-cashier status, falling back to cached profile:', statusError);
+          subCashier = posProfile.owner !== user.name;
+        }
+      }
       setIsSubCashier(subCashier);
 
       const now = new Date();
@@ -222,6 +259,7 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
       const { totals: aggregatedTotals, expectedByMode } = aggregateInvoices(invoices);
       setTotals(aggregatedTotals);
       setRows(buildRows(openingDoc?.balance_details ?? [], expectedByMode));
+      setTouchedModes(new Set());
     } catch (error) {
       console.error('Failed to load POS closing details:', error);
       setLoadError(extractServerErrorMessage(error, t('pos_closing.load_failed')));
@@ -242,16 +280,69 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
         row.mode_of_payment === modeOfPayment ? { ...row, closing_amount: closingAmount } : row
       )
     );
+    setTouchedModes((prev) => {
+      if (prev.has(modeOfPayment)) return prev;
+      const next = new Set(prev);
+      next.add(modeOfPayment);
+      return next;
+    });
   };
 
   const handleOpenChange = (next: boolean) => {
     if (isSubmitting) return;
+    if (!next) {
+      // Explicit cancel/dismiss (Fix 3): a create-but-not-submitted draft
+      // is intentionally left as-is server-side, but we stop tracking it
+      // here since the user is walking away from this attempt.
+      setPendingCloseDoc(null);
+      setShowConfirm(false);
+    }
     onOpenChange(next);
   };
 
-  const handleSubmit = async () => {
+  // Fix 2: submission-blocking validation. Every row must be explicitly
+  // touched (not just numerically non-zero, since a blank input silently
+  // becomes 0), and the total closing amount across all rows must be
+  // non-zero so an all-zero close can't slip through unnoticed.
+  const validation = useMemo(() => {
+    if (rows.length === 0) {
+      return { isValid: false, blockingMessage: null as string | null, warningMessage: null as string | null };
+    }
+
+    const untouchedCount = rows.filter((row) => !touchedModes.has(row.mode_of_payment)).length;
+    const totalClosing = rows.reduce((sum, row) => sum + row.closing_amount, 0);
+
+    const zeroRowsWithActivity = rows.filter(
+      (row) =>
+        touchedModes.has(row.mode_of_payment) &&
+        row.closing_amount === 0 &&
+        (row.opening_amount !== 0 || row.expected_amount !== 0)
+    );
+
+    let blockingMessage: string | null = null;
+    if (untouchedCount > 0) {
+      blockingMessage = t('pos_closing.validation_missing_rows');
+    } else if (totalClosing === 0) {
+      blockingMessage = t('pos_closing.validation_all_zero');
+    }
+
+    const warningMessage =
+      !blockingMessage && zeroRowsWithActivity.length > 0
+        ? t('pos_closing.validation_zero_row_warning')
+        : null;
+
+    return { isValid: !blockingMessage, blockingMessage, warningMessage };
+  }, [rows, touchedModes]);
+
+  const handleRequestSubmit = () => {
+    if (!validation.isValid) return;
+    setShowConfirm(true);
+  };
+
+  const handleConfirmSubmit = async () => {
     if (!openingEntry || !posProfile || !user) return;
 
+    setShowConfirm(false);
     setIsSubmitting(true);
     setSubmitError(null);
 
@@ -260,40 +351,64 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
       opening_amount: row.opening_amount,
       expected_amount: row.expected_amount,
       closing_amount: row.closing_amount,
+      // Positive = overage, negative = shortage. Must match the display
+      // convention in ClosingPaymentTable (Fix 1).
       difference: row.closing_amount - row.expected_amount,
     }));
 
+    // Fix 3: if a previous attempt already created the draft doc but the
+    // submit call then failed, reuse that doc instead of creating another
+    // draft on retry.
+    const kind: 'sub' | 'main' = pendingCloseDoc?.kind ?? (isSubCashier ? 'sub' : 'main');
+
     try {
-      if (isSubCashier) {
-        const doc = await createSubPosClosing({
-          pos_profile: posProfile.name,
-          pos_opening_entry: openingEntry.name,
-          user: user.name,
-          period_start_date: openingEntry.period_start_date,
-          period_end_date: formatDateTime(periodEndDate),
-          payment_reconciliation: paymentReconciliation,
-          grand_total: totals.grandTotal,
-          net_total: totals.netTotal,
-          total_quantity: totals.totalQty,
-        });
-        await submitSubPosClosing(doc.name);
-      } else {
-        const doc = await createPosClosingEntry({
-          pos_profile: posProfile.name,
-          pos_opening_entry: openingEntry.name,
-          user: user.name,
-          company: posProfile.company,
-          period_start_date: openingEntry.period_start_date,
-          period_end_date: formatDateTime(periodEndDate),
-          posting_date: formatDate(periodEndDate),
-          posting_time: formatTime(periodEndDate),
-          payment_reconciliation: paymentReconciliation,
-          grand_total: totals.grandTotal,
-          net_total: totals.netTotal,
-          total_quantity: totals.totalQty,
-        });
-        await submitPosClosingEntry(doc.name);
+      let docName = pendingCloseDoc?.name;
+
+      if (!docName) {
+        if (kind === 'sub') {
+          const doc = await createSubPosClosing({
+            pos_profile: posProfile.name,
+            pos_opening_entry: openingEntry.name,
+            user: user.name,
+            period_start_date: openingEntry.period_start_date,
+            period_end_date: formatDateTime(periodEndDate),
+            payment_reconciliation: paymentReconciliation,
+            grand_total: totals.grandTotal,
+            net_total: totals.netTotal,
+            total_quantity: totals.totalQty,
+          });
+          docName = doc.name;
+        } else {
+          const doc = await createPosClosingEntry({
+            pos_profile: posProfile.name,
+            pos_opening_entry: openingEntry.name,
+            user: user.name,
+            company: posProfile.company,
+            period_start_date: openingEntry.period_start_date,
+            period_end_date: formatDateTime(periodEndDate),
+            posting_date: formatDate(periodEndDate),
+            posting_time: formatTime(periodEndDate),
+            payment_reconciliation: paymentReconciliation,
+            grand_total: totals.grandTotal,
+            net_total: totals.netTotal,
+            total_quantity: totals.totalQty,
+          });
+          docName = doc.name;
+        }
+        // Persist immediately -- if the submit call below throws, a retry
+        // must skip straight to submitting this doc rather than creating
+        // a second draft.
+        setPendingCloseDoc({ name: docName, kind });
       }
+
+      if (kind === 'sub') {
+        await submitSubPosClosing(docName);
+      } else {
+        await submitPosClosingEntry(docName);
+      }
+
+      // Final success -- stop tracking the draft.
+      setPendingCloseDoc(null);
 
       // Close submission succeeded -- gate on the Closing checklist before
       // notifying the parent and dismissing the dialog.
@@ -317,15 +432,42 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
     onOpenChange(false);
   };
 
+  // Fix 5: the underlying POS Closing doc is already submitted by the time
+  // the checklist gate renders -- completing the checklist itself is just
+  // post-close housekeeping, so give the cashier a way out instead of
+  // trapping them if they can't finish it right now.
+  const handleSkipClosingChecklist = async () => {
+    setShowClosingChecklist(false);
+    await onClosingSubmitted?.();
+    onOpenChange(false);
+  };
+
   const hasRows = useMemo(() => rows.length > 0, [rows]);
 
   if (showClosingChecklist && posProfile?.name) {
     return (
-      <ChecklistGateDialog
-        posProfile={posProfile.name}
-        checklistType="Closing"
-        onComplete={handleClosingChecklistComplete}
-      />
+      <>
+        <ChecklistGateDialog
+          posProfile={posProfile.name}
+          checklistType="Closing"
+          onComplete={handleClosingChecklistComplete}
+        />
+        {/*
+          Fix 5: the POS Closing doc is already submitted at this point --
+          ChecklistGateDialog is otherwise a non-dismissible full-screen
+          overlay (z-50) with no way out except finishing every mandatory
+          item. Render an escape hatch above it so the cashier isn't
+          stranded if they can't complete the checklist right now.
+        */}
+        <div className="fixed inset-x-0 bottom-6 z-[60] flex justify-center px-4">
+          <div className="flex flex-wrap items-center justify-center gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-xl">
+            <p className="text-sm text-gray-700">{t('pos_closing.checklist_skip_hint')}</p>
+            <Button variant="outline" size="sm" onClick={handleSkipClosingChecklist}>
+              {t('pos_closing.checklist_skip')}
+            </Button>
+          </div>
+        </div>
+      </>
     );
   }
 
@@ -375,10 +517,25 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
               </div>
 
               {hasRows ? (
-                <ClosingPaymentTable rows={rows} onChange={handleRowChange} />
+                <ClosingPaymentTable
+                  rows={rows}
+                  touchedModes={touchedModes}
+                  onChange={handleRowChange}
+                />
               ) : (
                 <p className="py-8 text-center text-sm text-gray-500">
                   {t('pos_closing.no_invoices')}
+                </p>
+              )}
+
+              {hasRows && validation.blockingMessage && (
+                <p className="mt-3 text-sm font-medium text-amber-700">
+                  {validation.blockingMessage}
+                </p>
+              )}
+              {hasRows && !validation.blockingMessage && validation.warningMessage && (
+                <p className="mt-3 text-sm font-medium text-amber-700">
+                  {validation.warningMessage}
                 </p>
               )}
             </>
@@ -394,13 +551,36 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
             {t('common.cancel')}
           </Button>
           <Button
-            onClick={handleSubmit}
-            disabled={isSubmitting || isLoading || !!loadError || !openingEntry}
+            onClick={handleRequestSubmit}
+            disabled={isSubmitting || isLoading || !!loadError || !openingEntry || !hasRows || !validation.isValid}
           >
             {isSubmitting ? t('pos_closing.submitting') : t('pos_closing.submit')}
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      {showConfirm && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl">
+            <h3 className="text-lg font-semibold text-gray-900">
+              {t('pos_closing.confirm_title')}
+            </h3>
+            <p className="mt-2 text-sm text-gray-600">{t('pos_closing.confirm_message')}</p>
+            <div className="mt-6 flex justify-end gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setShowConfirm(false)}
+                disabled={isSubmitting}
+              >
+                {t('pos_closing.confirm_back')}
+              </Button>
+              <Button onClick={handleConfirmSubmit} disabled={isSubmitting}>
+                {isSubmitting ? t('pos_closing.submitting') : t('pos_closing.confirm_submit')}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </Dialog>
   );
 };
