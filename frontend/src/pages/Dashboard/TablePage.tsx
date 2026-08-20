@@ -122,6 +122,28 @@ export const TablePage: React.FC = () => {
     setSaving(true);
     try {
       if (editingTable) {
+        const original = {
+          no_of_seats: parseInt(editingTable.no_of_seats as any) || 0,
+          minimum_seating: parseInt(editingTable.minimum_seating as any) || 0,
+          branch: editingTable.branch || '',
+          restaurant_room: editingTable.restaurant_room || '',
+          table_shape: editingTable.table_shape || 'Square',
+          is_take_away: editingTable.is_take_away ? 1 : 0,
+        };
+        const current = {
+          no_of_seats: parseInt(newTable.no_of_seats as any) || 0,
+          minimum_seating: parseInt(newTable.minimum_seating as any) || 0,
+          branch: newTable.branch || '',
+          restaurant_room: newTable.restaurant_room || '',
+          table_shape: newTable.table_shape || 'Square',
+          is_take_away: newTable.is_take_away ? 1 : 0,
+        };
+        if (JSON.stringify(original) === JSON.stringify(current)) {
+          showToast.warning('No changes in document');
+          setSaving(false);
+          return;
+        }
+
         await call('frappe.client.set_value', {
           doctype: 'URY Table',
           name: editingTable.name,

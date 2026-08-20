@@ -98,6 +98,26 @@ export const RoomPage: React.FC = () => {
     setSaving(true);
     try {
       if (editingRoom) {
+        const original = {
+          room_type: editingRoom.room_type || 'AC',
+          branch: editingRoom.branch || '',
+          kot_printing: editingRoom.kot_printing === 1 ? 1 : 0,
+          print_format: editingRoom.print_format || '',
+          block_takeaway: editingRoom.block_takeaway === 1 ? 1 : 0,
+        };
+        const current = {
+          room_type: newRoom.room_type || 'AC',
+          branch: newRoom.branch || '',
+          kot_printing: newRoom.kot_printing ? 1 : 0,
+          print_format: newRoom.print_format || '',
+          block_takeaway: newRoom.block_takeaway ? 1 : 0,
+        };
+        if (JSON.stringify(original) === JSON.stringify(current)) {
+          showToast.warning('No changes in document');
+          setSaving(false);
+          return;
+        }
+
         await call('frappe.client.set_value', {
           doctype: 'URY Room',
           name: editingRoom.name,

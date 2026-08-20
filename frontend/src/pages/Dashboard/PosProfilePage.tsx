@@ -51,6 +51,7 @@ export const PosProfilePage: React.FC = () => {
 
   // Form state for selected profile editing
   const [profileForm, setProfileForm] = useState<Record<string, any>>({});
+  const [originalProfileForm, setOriginalProfileForm] = useState<Record<string, any>>({});
   const [isAddDrawerOpen, setIsAddDrawerOpen] = useState(false);
   const [addForm, setAddForm] = useState({
     name: '', company: '', warehouse: '', branch: activeBranchId === 'all' ? '' : activeBranchId, custom_kot_naming_series: '',
@@ -193,7 +194,7 @@ export const PosProfilePage: React.FC = () => {
       });
       const profile = res.message || res;
       setSelectedProfile(profile);
-      setProfileForm({
+      const initialForm = {
         company: profile.company || '',
         warehouse: profile.warehouse || '',
         selling_price_list: profile.selling_price_list || '',
@@ -208,7 +209,9 @@ export const PosProfilePage: React.FC = () => {
         custom_reset_order_number_daily: profile.custom_reset_order_number_daily || 0,
         applicable_for_users: profile.applicable_for_users || [],
         payments: profile.payments || [],
-      });
+      };
+      setProfileForm(initialForm);
+      setOriginalProfileForm(initialForm);
     } catch {
       setSelectedProfile(null);
     }
@@ -236,6 +239,38 @@ export const PosProfilePage: React.FC = () => {
   const handleSaveProfile = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!selectedProfile) return;
+
+    const getNormalizedProfileData = (form: Record<string, any>) => {
+      return {
+        company: form.company || '',
+        warehouse: form.warehouse || '',
+        selling_price_list: form.selling_price_list || '',
+        print_format: form.print_format || '',
+        custom_enable_discount: form.custom_enable_discount ? 1 : 0,
+        custom_enable_kot_reprint: form.custom_enable_kot_reprint ? 1 : 0,
+        custom_multiple_cashier_configuration: form.custom_multiple_cashier_configuration ? 1 : 0,
+        custom_daily_pos_close: form.custom_daily_pos_close ? 1 : 0,
+        custom_edit_order_type: form.custom_edit_order_type ? 1 : 0,
+        paid_limit: form.paid_limit || '',
+        table_attention_time: form.table_attention_time || '',
+        custom_reset_order_number_daily: form.custom_reset_order_number_daily ? 1 : 0,
+        applicable_for_users: (form.applicable_for_users || [])
+          .filter((u: any) => u.user)
+          .map((u: any) => ({ user: u.user, default: u.default ? 1 : 0 })),
+        payments: (form.payments || [])
+          .filter((p: any) => p.mode_of_payment)
+          .map((p: any) => ({ mode_of_payment: p.mode_of_payment, default: p.default ? 1 : 0 })),
+      };
+    };
+
+    const originalNorm = getNormalizedProfileData(originalProfileForm);
+    const currentNorm = getNormalizedProfileData(profileForm);
+
+    if (JSON.stringify(originalNorm) === JSON.stringify(currentNorm)) {
+      showToast.warning('No changes in document');
+      return;
+    }
+
     setSaving(true);
     try {
       await call('frappe.client.set_value', {

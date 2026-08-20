@@ -34,6 +34,7 @@ export const UserPage: React.FC = () => {
     role: 'URY Cashier',
     enabled: true,
   });
+  const [originalUser, setOriginalUser] = useState<any>(null);
 
   const URY_ROLES = ['URY Manager', 'URY Waiter', 'URY Cashier'];
 
@@ -97,19 +98,41 @@ export const UserPage: React.FC = () => {
       // Default to URY Cashier on error
     }
 
-    setNewUser({
+    const initialForm = {
       first_name: user.first_name || '',
       last_name: user.last_name || '',
       email: user.email || '',
       role: userRole,
       enabled: user.enabled === 1,
-    });
+    };
+    setNewUser(initialForm);
+    setOriginalUser(initialForm);
     setIsDrawerOpen(true);
   };
 
   const handleSaveUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newUser.email) return;
+
+    if (editingUser && originalUser) {
+      const original = {
+        first_name: (originalUser.first_name || '').trim(),
+        last_name: (originalUser.last_name || '').trim(),
+        role: originalUser.role,
+        enabled: originalUser.enabled ? 1 : 0,
+      };
+      const current = {
+        first_name: (newUser.first_name || '').trim(),
+        last_name: (newUser.last_name || '').trim(),
+        role: newUser.role,
+        enabled: newUser.enabled ? 1 : 0,
+      };
+      if (JSON.stringify(original) === JSON.stringify(current)) {
+        showToast.warning('No changes in document');
+        return;
+      }
+    }
+
     setSaving(true);
     try {
       if (editingUser) {

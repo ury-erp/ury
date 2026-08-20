@@ -256,6 +256,79 @@ export const ReportSettingsPage: React.FC = () => {
       return;
     }
 
+    if (reportSettingsData) {
+      const original = {
+        extended_hours: reportSettingsData.extended_hours ? 1 : 0,
+        hours: reportSettingsData.hours || 4,
+        buying_price_list: reportSettingsData.buying_price_list || 'Standard Buying',
+        depreciation: parseFloat(reportSettingsData.depreciation as any) || 0,
+        electricity_charges: parseFloat(reportSettingsData.electricity_charges as any) || 0,
+        direct_fixed_expenses: (reportSettingsData.direct_fixed_expenses || []).map((item: any) => ({
+          expense: (item.expense || '').trim(),
+          amount: parseFloat(item.amount as any) || 0,
+        })),
+        indirect_fixed_expenses: (reportSettingsData.indirect_fixed_expenses || []).map((item: any) => ({
+          expense: (item.expense || '').trim(),
+          amount: parseFloat(item.amount as any) || 0,
+        })),
+        percentage_expenses: (reportSettingsData.percentage_expenses || []).map((item: any) => ({
+          expense: (item.expense || '').trim(),
+          percent: parseFloat(item.percent as any) || 0,
+          percentage_type: item.percentage_type || 'Gross Sales',
+        })),
+        employee_costs: (reportSettingsData.employee_costs || []).map((item: any) => ({
+          expense: (item.expense || '').trim(),
+          amount: parseFloat(item.amount as any) || 0,
+        })),
+        monthly_fixed_expenses: (reportSettingsData.monthly_fixed_expenses || []).map((item: any) => ({
+          expense: (item.expense || '').trim(),
+          amount: parseFloat(item.amount as any) || 0,
+        })),
+        consumables: (reportSettingsData.consumables || []).map((item: any) => ({
+          material: (item.material || '').trim(),
+          cost_per_unit: parseFloat(item.cost_per_unit as any) || 0,
+        })),
+      };
+
+      const current = {
+        extended_hours: extendedHours ? 1 : 0,
+        hours: hoursOffset,
+        buying_price_list: buyingPriceList,
+        depreciation: parseFloat(depreciation as any) || 0,
+        electricity_charges: parseFloat(electricityCharges as any) || 0,
+        direct_fixed_expenses: directFixedExpenses.map((item) => ({
+          expense: (item.expense || '').trim(),
+          amount: parseFloat(item.amount as any) || 0,
+        })),
+        indirect_fixed_expenses: indirectFixedExpenses.map((item) => ({
+          expense: (item.expense || '').trim(),
+          amount: parseFloat(item.amount as any) || 0,
+        })),
+        percentage_expenses: percentageExpenses.map((item) => ({
+          expense: (item.expense || '').trim(),
+          percent: parseFloat(item.percent as any) || 0,
+          percentage_type: item.percentage_type || 'Gross Sales',
+        })),
+        employee_costs: employeeCosts.map((item) => ({
+          expense: (item.expense || '').trim(),
+          amount: parseFloat(item.amount as any) || 0,
+        })),
+        monthly_fixed_expenses: monthlyFixedExpenses.map((item) => ({
+          expense: (item.expense || '').trim(),
+          amount: parseFloat(item.amount as any) || 0,
+        })),
+        consumables: consumables.map((item) => ({
+          material: (item.material || '').trim(),
+          cost_per_unit: parseFloat(item.cost_per_unit as any) || 0,
+        })),
+      };
+
+      if (JSON.stringify(original) === JSON.stringify(current)) {
+        showToast.warning('No changes in document');
+        return;
+      }
+    }
+
     setSaving(true);
     try {
       const docToSave: any = {
