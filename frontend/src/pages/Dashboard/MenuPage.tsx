@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useBranchContext } from '../../context/BranchContext';
 import { Utensils, Search, Plus, LayoutGrid, List, Edit2, Check, X, Trash2 } from 'lucide-react';
 import { Card, Button, Badge, Input, Spinner, showToast } from '@ury/ui';
@@ -53,6 +54,7 @@ export const MenuPage: React.FC = () => {
   const [savingItem, setSavingItem] = useState<boolean>(false);
   const [savingMenu, setSavingMenu] = useState<boolean>(false);
   const [savingCourse, setSavingCourse] = useState<boolean>(false);
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
 
   // Options for Branch and Price List selects
   const [branchOptions, setBranchOptions] = useState<{ name: string; title?: string }[]>([]);
@@ -186,6 +188,7 @@ export const MenuPage: React.FC = () => {
 
   const openAddItemDrawer = () => {
     setEditingItem(null);
+    setPreviewImageUrl(null);
     setNewItem({
       item_name: '',
       rate: '',
@@ -201,6 +204,7 @@ export const MenuPage: React.FC = () => {
 
   const openEditItemDrawer = (item: MenuItemRecord) => {
     setEditingItem(item);
+    setPreviewImageUrl(null);
     const matchedItem = allItems.find(i => i.name === item.item);
     const initialImage = item.image || matchedItem?.image || '';
     let initialImageName = '';
@@ -353,6 +357,7 @@ export const MenuPage: React.FC = () => {
   };
 
   const closeDrawer = () => {
+    setPreviewImageUrl(null);
     if (returnToAddItemFromCourse) {
       setReturnToAddItemFromCourse(false);
       setDrawerMode('add-item');
@@ -471,9 +476,12 @@ export const MenuPage: React.FC = () => {
         }
       }
 
-      if (creatingItemForRowIndex === null && (selectedMenu === 'all' || selectedMenu === newItem.target_menu)) {
-        fetchMenuItems(selectedMenu);
-      }
+      // Refresh both allItems and menu items so list view updates immediately with new/replaced/removed image
+      await Promise.all([
+        fetchAllItems(),
+        creatingItemForRowIndex === null ? fetchMenuItems(selectedMenu) : Promise.resolve(),
+      ]);
+
       showToast.success('Item saved');
       if (creatingItemForRowIndex === null) {
         closeDrawer();
@@ -797,7 +805,13 @@ export const MenuPage: React.FC = () => {
             <div key={item.name || idx} className="bg-white rounded-lg shadow-sm overflow-hidden transition-shadow relative h-56 flex flex-col group">
               <div className="h-24 w-full shrink-0">
                 {getItemImage(item) ? (
-                  <img src={getItemImage(item)} alt={item.item_name} className="w-full h-full object-cover" />
+                  <img
+                    src={getItemImage(item)}
+                    alt={item.item_name}
+                    className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                    onClick={() => setPreviewImageUrl(getItemImage(item) || null)}
+                    title="Click to preview image"
+                  />
                 ) : (
                   <div className="w-full h-full bg-gray-200 flex items-center justify-center text-2xl text-gray-400 font-medium select-none">
                     {(item.item_name || 'IT').slice(0, 2).toUpperCase()}
@@ -850,7 +864,9 @@ export const MenuPage: React.FC = () => {
                           <img
                             src={getItemImage(item)}
                             alt={item.item_name}
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                            onClick={() => setPreviewImageUrl(getItemImage(item) || null)}
+                            title="Click to preview image"
                           />
                         ) : (
                           <Utensils className="w-4 h-4 text-gray-400" />
@@ -924,9 +940,13 @@ export const MenuPage: React.FC = () => {
               {newItem.image ? (
                 <div
                   className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-md text-xs font-medium text-gray-700 max-w-[170px]"
-                  title={newItem.image_name || newItem.image}
                 >
-                  <span className="truncate">{newItem.image_name || (newItem.image.split('/').pop()?.split('?')[0] || 'attached_image.png')}</span>
+                  <span
+                    className="truncate font-medium text-gray-700 select-none"
+                    title={newItem.image_name || newItem.image}
+                  >
+                    {newItem.image_name || (newItem.image.split('/').pop()?.split('?')[0] || 'attached_image.png')}
+                  </span>
                   <button
                     type="button"
                     onClick={() => setNewItem(prev => ({ ...prev, image: '', image_name: '' }))}
@@ -1223,6 +1243,34 @@ export const MenuPage: React.FC = () => {
           </div>
         </form>
       </SideDrawer>
+
+      {/* Reusable Image Preview Modal */}
+      {previewImageUrl && createPortal(
+        <div
+          className="fixed inset-0 bg-black/80 backdrop-blur-xs z-[9999] flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={() => setPreviewImageUrl(null)}
+        >
+          <div
+            className="relative max-w-4xl max-h-[85vh] flex items-center justify-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setPreviewImageUrl(null)}
+              className="absolute top-3 right-3 p-1.5 bg-black/60 hover:bg-black/80 text-white rounded-full transition-colors shadow-md z-10 cursor-pointer"
+              title="Close preview"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <img
+              src={previewImageUrl}
+              alt="Image Preview"
+              className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl select-none"
+            />
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 };
