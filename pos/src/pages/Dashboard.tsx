@@ -2,7 +2,7 @@ import { TrendingUp, ShoppingCart, Clock, Users, AlertTriangle, Bell } from 'luc
 import { Card, CardContent } from '@ury/ui';
 import { useState, useEffect } from 'react';
 import { usePOSStore } from '../store/pos-store';
-import { formatCurrency } from '@ury/core';
+import { formatCurrency, call } from '@ury/core';
 import HufLogo from '../components/HufLogo';
 
 // Helper function to format relative time
@@ -58,7 +58,6 @@ export default function Dashboard() {
     if (!posProfile?.branch) return;
 
     const fetchDashboardData = async () => {
-      const { call } = await import('@ury/core');
 
       // Fetch dashboard stats
       setStatsLoading(true);
