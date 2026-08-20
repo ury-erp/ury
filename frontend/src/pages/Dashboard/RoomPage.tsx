@@ -13,6 +13,9 @@ interface UryRoomRecord {
   room_name?: string;
   room_type?: string;
   branch?: string;
+  kot_printing?: number;
+  print_format?: string;
+  block_takeaway?: number;
 }
 
 export const RoomPage: React.FC = () => {
@@ -98,7 +101,14 @@ export const RoomPage: React.FC = () => {
     setSaving(true);
     try {
       if (editingRoom) {
+        // Derive display name from room.name, stripping branch suffix if present
+        let originalDisplayName = editingRoom.name;
+        if (editingRoom.branch && originalDisplayName.endsWith(` - ${editingRoom.branch}`)) {
+          originalDisplayName = originalDisplayName.substring(0, originalDisplayName.length - (` - ${editingRoom.branch}`).length);
+        }
+
         const original = {
+          room_name: originalDisplayName || '',
           room_type: editingRoom.room_type || 'AC',
           branch: editingRoom.branch || '',
           kot_printing: editingRoom.kot_printing === 1 ? 1 : 0,
@@ -106,6 +116,7 @@ export const RoomPage: React.FC = () => {
           block_takeaway: editingRoom.block_takeaway === 1 ? 1 : 0,
         };
         const current = {
+          room_name: newRoom.room_name || '',
           room_type: newRoom.room_type || 'AC',
           branch: newRoom.branch || '',
           kot_printing: newRoom.kot_printing ? 1 : 0,
@@ -118,9 +129,20 @@ export const RoomPage: React.FC = () => {
           return;
         }
 
+        let currentName = editingRoom.name;
+        const newDocName = newRoom.branch ? `${newRoom.room_name} - ${newRoom.branch}` : newRoom.room_name;
+        if (newDocName !== editingRoom.name) {
+          await call('frappe.client.rename_doc', {
+            doctype: 'URY Room',
+            old_name: editingRoom.name,
+            new_name: newDocName,
+          });
+          currentName = newDocName;
+        }
+
         await call('frappe.client.set_value', {
           doctype: 'URY Room',
-          name: editingRoom.name,
+          name: currentName,
           fieldname: {
             room_type: newRoom.room_type,
             branch: newRoom.branch,
@@ -233,12 +255,8 @@ export const RoomPage: React.FC = () => {
             <Input
               value={newRoom.room_name}
               onChange={(e) => setNewRoom({ ...newRoom, room_name: e.target.value })}
-              disabled={!!editingRoom}
-              required={!editingRoom}
+              required
             />
-            {editingRoom && (
-              <p className="text-xs text-gray-500 mt-1">Room name cannot be changed after creation</p>
-            )}
           </div>
 
           <div>
