@@ -189,7 +189,8 @@ export function SearchableSelect({
           const isActionOption =
             opt.value === 'CREATE_NEW_ITEM' ||
             opt.value === 'CREATE_NEW_COURSE' ||
-            opt.value?.startsWith('CREATE_NEW_');
+            opt.value?.startsWith('CREATE_NEW_') ||
+            opt.value?.startsWith('ADD_ANOTHER_');
           const isSelected =
             value !== undefined &&
             value !== null &&
