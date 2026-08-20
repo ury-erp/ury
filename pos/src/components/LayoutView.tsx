@@ -1,7 +1,7 @@
 import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import { CreditCard as Edit3, Save, Users, Move, X, Grid3x3 as Grid3X3, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 import { cn, formatInvoiceTime } from '../lib/utils';
-import { Table, updateTableLayout } from '../lib/table-api';
+import { Table, updateTableLayout, type TableInvoiceStatus } from '../lib/table-api';
 import { getTableOrder, POSInvoice } from '../lib/order-api';
 import { Button } from './ui';
 import { t } from '../i18n';
@@ -11,11 +11,12 @@ import { t } from '../i18n';
 interface Props {
   selectedRoom: string;
   tables: Table[];
+  invoiceStatus?: Record<string, TableInvoiceStatus>;
   onBackToGrid: () => void;
   onRefresh?: () => void; // Add refresh callback
 }
 
-const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRefresh }) => {
+const LayoutView: React.FC<Props> = ({ selectedRoom, tables, invoiceStatus, onBackToGrid, onRefresh }) => {
   const isRTL = document.dir === 'rtl';
   const [isEditMode, setIsEditMode] = useState(false);
 
@@ -178,7 +179,13 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
     setDragOffset({ x: 0, y: 0 });
   };
 
-  const getTableStatusColor = (occupied: number) => {
+  // The `occupied` flag can be stale (older builds freed the table when the
+  // bill was printed), so an open draft invoice also counts as occupied —
+  // otherwise a table with a live order renders free and opens that order.
+  const isTableOccupied = (table: Pick<Table, 'name' | 'occupied'>) =>
+    table.occupied === 1 || !!invoiceStatus?.[table.name]?.invoice;
+
+  const getTableStatusColor = (occupied: boolean) => {
     return occupied
       ? 'bg-amber-100 border-amber-300 text-amber-900 shadow-sm'
       : 'bg-emerald-50 border-emerald-200 text-emerald-800 hover:shadow-md';
@@ -189,7 +196,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
 
     setSelectedTable(table.name);
 
-    if (table.occupied) {
+    if (isTableOccupied(table)) {
       getTableOrder(table.name).then(res => {
         setSelectedTableOrder(res.message);
       }).catch(console.error);
@@ -232,7 +239,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
 
     const baseClasses = cn(
       'absolute border-2 flex items-center justify-center text-sm font-semibold cursor-pointer transition-all select-none',
-      getTableStatusColor(table.occupied),
+      getTableStatusColor(isTableOccupied(table)),
       isEditMode && 'hover:ring-2 hover:ring-blue-400 cursor-move',
       draggedTable === table.name && 'shadow-xl scale-105 z-20',
       selectedTable === table.name && 'ring-2 ring-blue-600 z-10'
@@ -509,7 +516,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
             <div>
               <label className="block text-sm font-medium mb-1">{t('tables.status')}</label>
               <div className="w-full px-3 py-2 border border-gray-200 bg-gray-50 rounded-md text-sm cursor-not-allowed capitalize">
-                {selectedTableData.occupied ? t('tables.occupied') : t('tables.available')}
+                {isTableOccupied(selectedTableData) ? t('tables.occupied') : t('tables.available')}
               </div>
             </div>
 

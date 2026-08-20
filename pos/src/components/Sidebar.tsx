@@ -47,8 +47,8 @@ const Sidebar = ({ disabled }: SidebarProps) => {
       disabled={disabled}
       title={label}
       className={cn(
-        'relative h-14 w-full rounded-md border px-1.5 pt-1.5 pb-4 flex items-center justify-center text-center',
-        'text-[11.5px] font-bold uppercase leading-[0.85rem] tracking-tight transition-colors',
+        'relative h-16 w-full rounded-md border px-2 pt-2 pb-4 flex items-center justify-center text-center',
+        'text-[13px] font-bold uppercase leading-[0.95rem] tracking-tight transition-colors',
         'disabled:opacity-50 disabled:pointer-events-none shadow-md shadow-cyan-900/25',
         active
           ? 'bg-primary-600 border-primary-600 text-white'
@@ -58,7 +58,7 @@ const Sidebar = ({ disabled }: SidebarProps) => {
       <span className="line-clamp-2 break-words">{label}</span>
       <span
         className={cn(
-          'absolute bottom-0.5 end-1 text-[10px] font-medium tabular-nums',
+          'absolute bottom-0.5 end-1.5 text-[11px] font-medium tabular-nums',
           active ? 'text-white/80' : 'text-gray-500'
         )}
       >
@@ -69,16 +69,16 @@ const Sidebar = ({ disabled }: SidebarProps) => {
 
   return (
     <div className={cn(
-      "w-52 flex-shrink-0 bg-cyan-200 border-e border-cyan-300 h-full flex flex-col",
+      "w-64 flex-shrink-0 bg-cyan-200 border-e border-cyan-300 h-full flex flex-col",
       disabled && "opacity-50 pointer-events-none"
     )}>
       {/* Categories */}
-      <nav className="flex-1 p-2 overflow-y-auto">
-        <h2 className="text-[11px] font-semibold text-cyan-900 uppercase tracking-wider mb-1.5 px-0.5">
+      <nav className="flex-1 py-4 pe-4 ps-5 overflow-y-auto">
+        <h2 className="text-xs font-semibold text-cyan-900 uppercase tracking-wider mb-2">
           {t('pos_sidebar.categories')}
         </h2>
 
-        <div className="grid grid-cols-2 gap-1.5">
+        <div className="grid grid-cols-2 gap-2">
           <CourseTile
             label={t('pos_sidebar.all_items')}
             count={getAllItemsCount()}

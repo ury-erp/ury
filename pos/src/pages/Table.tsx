@@ -31,7 +31,10 @@ interface PendingPayment {
   roundedTotal: number;
 }
 
-const sortTables = (tables: Table[]) => [...tables].sort((a, b) => a.name.localeCompare(b.name));
+// Natural order, not plain lexicographic: without `numeric` the list reads
+// T1, T10, T11, T2 — table numbers must count up like numbers.
+const sortTables = (tables: Table[]) =>
+  [...tables].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
 
 const TableView = () => {
   const navigate = useNavigate();
@@ -402,6 +405,7 @@ const TableView = () => {
       <LayoutView
         selectedRoom={selectedRoom}
         tables={tablesToDisplay}
+        invoiceStatus={invoiceStatus}
         onBackToGrid={() => setIsLayoutView(false)}
         onRefresh={() => loadTables(selectedRoom, { useCache: false })}
       />
@@ -480,8 +484,15 @@ const TableView = () => {
           ) : (
             <div className="grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-2">
               {tablesToDisplay.map(table => {
-                const isOccupied = table.occupied === 1;
+                // An open draft invoice is the real proof the table is in use.
+                // The `occupied` flag alone lied whenever it was left stale
+                // (older builds freed the table on bill print), so the card
+                // showed green while the order was still open — and clicking it
+                // dropped the cashier into that order's update screen.
+                const hasOpenInvoice = !!invoiceStatus[table.name]?.invoice;
+                const isOccupied = table.occupied === 1 || hasOpenInvoice;
                 const isBillPrinted = invoiceStatus[table.name]?.invoice_printed === 1;
+                const waiter = invoiceStatus[table.name]?.waiter;
                 // Three states, three colours: green free, red running order,
                 // yellow bill printed and waiting to be settled. The old
                 // status badge, room name and shape icon are gone — the colour
@@ -502,7 +513,7 @@ const TableView = () => {
                       // The whole card carries the status colour — that is what
                       // makes a full room readable in one glance — with a
                       // saturated top strip on top of the soft body tint.
-                      'relative h-28 flex flex-col overflow-hidden rounded-lg border border-t-4 shadow-md shadow-cyan-900/25 transition-all',
+                      'relative h-32 flex flex-col overflow-hidden rounded-lg border border-t-4 shadow-md shadow-cyan-900/25 transition-all',
                       awaitingPayment
                         ? 'bg-amber-50 border-amber-200 border-t-amber-400'
                         : isOccupied
@@ -546,6 +557,19 @@ const TableView = () => {
                         <Badge variant="pending" className="text-[10px] px-1.5 py-0">
                           Take away
                         </Badge>
+                      )}
+                    </div>
+
+                    {/* Who is serving the table. Its own fixed row so cards
+                        keep lining up whether or not a waiter is tagged. */}
+                    <div className="h-5 flex items-center justify-center px-2">
+                      {isOccupied && waiter && (
+                        <span
+                          className="text-xs font-bold leading-5 text-gray-800 truncate max-w-full"
+                          title={waiter}
+                        >
+                          {waiter}
+                        </span>
                       )}
                     </div>
 

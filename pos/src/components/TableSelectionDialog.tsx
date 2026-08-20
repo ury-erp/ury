@@ -25,7 +25,9 @@ const TableSelectionDialog: React.FC<Props> = ({ onClose }) => {
   const [error, setError] = useState<string | null>(null);
 
   const sortTables = (tables: Table[]): Table[] => {
-    return [...tables].sort((a, b) => a.name.localeCompare(b.name));
+    return [...tables].sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
+    );
   };
 
   // Fetch rooms on mount with session storage

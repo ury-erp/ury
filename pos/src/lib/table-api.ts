@@ -83,6 +83,8 @@ export async function getTables(room: string): Promise<Table[]> {
 export interface TableInvoiceStatus {
   invoice: string;
   invoice_printed: number;
+  /** Waiter tagged on the open order (falls back to the order's creator). */
+  waiter?: string | null;
 }
 
 /** Open-invoice state per occupied table: printed bill ⇒ Payment action. */

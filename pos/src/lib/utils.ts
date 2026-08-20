@@ -14,26 +14,26 @@ export function formatCurrency(amount: number): string {
 export const formatInvoiceTime = (timestamp: string | null) => {
     if (!timestamp) return 'No bill activity yet';
 
+    // Always 24-hour HH:MM, whatever the shape of the stored value — the card
+    // reserves one short row for it.
     const parsedDate = new Date(timestamp);
     if (!Number.isNaN(parsedDate.getTime())) {
-      return parsedDate.toLocaleTimeString(undefined, { hour: 'numeric', minute: 'numeric' });
+      const hours = String(parsedDate.getHours()).padStart(2, '0');
+      const minutes = String(parsedDate.getMinutes()).padStart(2, '0');
+      return `${hours}:${minutes}`;
     }
 
-    const timeOnlyMatch = timestamp.match(/^(\d{1,2}):(\d{2}):(\d{2})(?:\.(\d+))?$/);
+    // A Time field comes back as a duration string, and Frappe drops the
+    // zero-padding on the seconds once they carry microseconds: 16:45:01.323333
+    // is serialised as "16:45:1.323333". Seconds are optional and may be one
+    // digit or fractional — only the hour and minute are ever shown.
+    const timeOnlyMatch = timestamp.match(/^(\d{1,2}):(\d{1,2})(?::(\d{1,2})(?:\.\d+)?)?$/);
     if (timeOnlyMatch) {
-      const [, hours, minutes, seconds] = timeOnlyMatch;
-      const date = new Date();
-      date.setHours(Number(hours), Number(minutes), Number(seconds), 0);
-      const formatted = date.toLocaleTimeString(undefined, {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-      });
-      if (/^\d{1,2}:\d{2}$/.test(formatted)) {
-        return formatted;
-      }
+      const [, hours, minutes] = timeOnlyMatch;
       return `${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}`;
     }
 
-    return timestamp;
+    // Anything unrecognised is dropped rather than printed raw: a stray
+    // duration string blows the card layout apart.
+    return '';
   };

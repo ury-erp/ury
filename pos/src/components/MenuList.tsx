@@ -29,17 +29,48 @@ const MenuList: React.FC<MenuListProps> = ({ onItemClick }) => {
     fetchMenuItems();
   }, [fetchMenuItems]);
 
+  // Search relevance, not document order: typing "6" has to put item 6 first,
+  // then the codes that start with 6 (60PAM, 61, 62...), and only then the
+  // items that merely contain a 6 somewhere. Lower score = better match.
+  const matchScore = (item: { name: string; item: string; item_code?: string }, term: string) => {
+    const code = (item.item_code || item.item || '').toLowerCase();
+    const name = item.name.toLowerCase();
+
+    if (code === term) return 0;
+    if (name === term) return 1;
+    if (code.startsWith(term)) return 2;
+    if (name.startsWith(term)) return 3;
+    // A word start inside the name ("fried" in "Chicken Fried Rice") still beats
+    // a match buried mid-word.
+    if (name.split(/\s+/).some(word => word.startsWith(term))) return 4;
+    if (code.includes(term)) return 5;
+    if (name.includes(term)) return 6;
+    return -1;
+  };
+
   const filteredItems = useMemo(() => {
-    return menuItems.filter(item => {
-      const searchTerm = searchQuery.toLowerCase();
+    const searchTerm = searchQuery.trim().toLowerCase();
+
+    const matched = menuItems.filter(item => {
       const matchesCategory = !selectedCategory || item.course === selectedCategory;
-      const matchesSearch = !searchQuery || 
-        item.name.toLowerCase().includes(searchTerm) ||
-        item.item.toLowerCase().includes(searchTerm);
-      const matchesFilter = quickFilter === 'all' || 
+      const matchesSearch = !searchTerm || matchScore(item, searchTerm) >= 0;
+      const matchesFilter = quickFilter === 'all' ||
         (quickFilter === 'special' && item.special_dish === 1);
-      
+
       return matchesCategory && matchesSearch && matchesFilter;
+    });
+
+    if (!searchTerm) return matched;
+
+    return [...matched].sort((a, b) => {
+      const scoreDiff = matchScore(a, searchTerm) - matchScore(b, searchTerm);
+      if (scoreDiff !== 0) return scoreDiff;
+
+      // Same bucket: the shorter code is the closer match ("6" before "60PAM").
+      const codeA = a.item_code || a.item || '';
+      const codeB = b.item_code || b.item || '';
+      if (codeA.length !== codeB.length) return codeA.length - codeB.length;
+      return a.name.localeCompare(b.name);
     });
   }, [menuItems, selectedCategory, searchQuery, quickFilter]);
 
@@ -71,7 +102,7 @@ const MenuList: React.FC<MenuListProps> = ({ onItemClick }) => {
           // narrower course rail / order panel turns into another column
           // rather than into wider cards
           <div className={cn(
-            "grid grid-cols-[repeat(auto-fill,minmax(6.5rem,1fr))] gap-2",
+            "grid grid-cols-[repeat(auto-fill,minmax(5.5rem,1fr))] gap-1.5",
             isInteractionDisabled && "opacity-50 pointer-events-none"
           )}>
             {filteredItems.map((item) => (

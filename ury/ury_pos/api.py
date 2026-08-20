@@ -191,12 +191,36 @@ def getTableInvoiceStatus(room):
     invoices = frappe.get_all(
         "POS Invoice",
         filters={"docstatus": 0, "restaurant_table": ["in", tables]},
-        fields=["name", "restaurant_table", "invoice_printed"],
+        fields=["name", "restaurant_table", "invoice_printed", "waiter", "owner"],
     )
+
+    # `waiter` may hold an employee display name (tagged in POS) or a user id
+    # (older orders / untagged) — resolve a user id to its full name, else show
+    # the stored value as-is. Same rule the KOT print uses. Resolved in one
+    # query: this runs on every table-view refresh.
+    tagged = {inv.waiter or inv.owner for inv in invoices if (inv.waiter or inv.owner)}
+    full_names = (
+        {
+            user.name: user.full_name
+            for user in frappe.get_all(
+                "User", filters={"name": ["in", list(tagged)]}, fields=["name", "full_name"]
+            )
+        }
+        if tagged
+        else {}
+    )
+
+    def waiter_name(inv):
+        waiter = inv.waiter or inv.owner
+        if not waiter:
+            return None
+        return full_names.get(waiter) or waiter
+
     return {
         inv.restaurant_table: {
             "invoice": inv.name,
             "invoice_printed": inv.invoice_printed,
+            "waiter": waiter_name(inv),
         }
         for inv in invoices
     }
