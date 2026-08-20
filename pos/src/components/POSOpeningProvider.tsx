@@ -1,98 +1,222 @@
-import { useEffect, useState } from 'react';
-import { checkPOSOpening, validatePOSClose } from '../lib/pos-opening-api';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  checkPOSOpening,
+  parseFrappeError,
+  validatePOSClose,
+  POSOpeningEntryRef,
+} from '../lib/pos-opening-api';
 import { getChecklist } from '../lib/checklist-api';
 import { usePOSStore } from '../store/pos-store';
+import { useRootStore } from '../store/root-store';
+import { User } from '../store/slices/auth-slice';
 import POSOpeningDialog from './POSOpeningDialog';
+import POSOpeningScreen from './POSOpeningScreen';
 import ChecklistGateDialog from './ChecklistGateDialog';
+import POSClosingDialog from './POSClosingDialog';
 import { t } from '../i18n';
 
 interface POSOpeningProviderProps {
   children: React.ReactNode;
 }
 
-type ValidationType = 'opening' | 'closing' | null;
+export type OpeningBlockingState =
+  | 'permissionDenied'
+  | 'dailyClosePending'
+  | 'mainCashierNotOpen'
+  | 'crossCompanyOpen'
+  | 'genericError';
+
+const DESK_ROLES = ['System Manager', 'Desk User'];
+
+function hasDeskAccess(user: User | null): boolean {
+  if (!user) return false;
+  if (user.name === 'Administrator') return true;
+  return user.roles.some((role) => DESK_ROLES.includes(role));
+}
+
+function normalizeOpenEntries(
+  message: number | POSOpeningEntryRef[]
+): POSOpeningEntryRef[] | null {
+  if (message === 1) return null;
+  if (!Array.isArray(message)) return null;
+  return message.filter(
+    (entry): entry is POSOpeningEntryRef =>
+      !!entry && typeof entry === 'object' && 'name' in entry
+  );
+}
+
+function getHttpStatus(error: unknown): number | undefined {
+  if (!error || typeof error !== 'object') return undefined;
+  const e = error as Record<string, unknown>;
+  if (typeof e.httpStatus === 'number') return e.httpStatus;
+  if (typeof e.status === 'number') return e.status;
+  if (typeof e.statusCode === 'number') return e.statusCode;
+  return undefined;
+}
 
 const POSOpeningProvider = ({ children }: POSOpeningProviderProps) => {
-  const [validationType, setValidationType] = useState<ValidationType>(null);
-  // Set once checkPOSOpening() confirms the POS is open but the Opening
-  // checklist log for today isn't status="Complete" yet. Takes priority over
-  // the daily-close check below -- the cashier must clear the checklist
-  // before we even look at whether a previous session needs closing.
-  const [needsOpeningChecklist, setNeedsOpeningChecklist] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const { posProfile } = usePOSStore();
+  const [blockingState, setBlockingState] = useState<OpeningBlockingState | null>(null);
+  const [blockingMessage, setBlockingMessage] = useState<string>('');
+  const [existingEntry, setExistingEntry] = useState<POSOpeningEntryRef | null>(null);
+  // Set once checkPOSOpening() confirms the POS is open but today's Opening
+  // checklist log isn't status="Complete" yet. Takes priority over the
+  // daily-close check below -- the cashier must clear the checklist before
+  // we even look at whether a previous session needs closing.
+  const [needsOpeningChecklist, setNeedsOpeningChecklist] = useState(false);
+  // True once the cashier taps "Close Now" from the dailyClosePending
+  // blocking dialog -- renders the real POSClosingDialog instead of just
+  // telling them to contact a manager.
+  const [showClosingDialog, setShowClosingDialog] = useState(false);
 
-  const checkPOSStatus = async () => {
+  const { posProfile, showVoluntaryClosing, setShowVoluntaryClosing } = usePOSStore();
+  const { user } = useRootStore();
+
+  const canAccessDesk = useMemo(() => hasDeskAccess(user), [user]);
+
+  const clearBlockingState = useCallback(() => {
+    setBlockingState(null);
+    setBlockingMessage('');
+    setShowClosingDialog(false);
+  }, []);
+
+  const handleScreenError = useCallback(
+    (state: OpeningBlockingState, message?: string) => {
+      setBlockingState(state);
+      setBlockingMessage(message || '');
+    },
+    []
+  );
+
+  const checkPOSStatus = useCallback(async () => {
+    if (!posProfile) return;
+
+    setIsLoading(true);
+    clearBlockingState();
+    setExistingEntry(null);
+    setNeedsOpeningChecklist(false);
+
     try {
-      setIsLoading(true);
-      setNeedsOpeningChecklist(false);
+      const response = await checkPOSOpening(user?.name);
 
-      // First check if POS is opened
-      const openingResponse = await checkPOSOpening();
-      if (openingResponse.message === 1) {
-        // POS is not opened
-        setValidationType('opening');
+      // No open entry for this user -> show the native opening screen.
+      if (response.message === 1) {
+        if (posProfile.custom_daily_pos_close === 1) {
+          const closeResponse = await validatePOSClose(posProfile.name);
+          if (closeResponse.message === 'Failed') {
+            setBlockingState('dailyClosePending');
+            setIsLoading(false);
+            return;
+          }
+        }
+        setIsLoading(false);
         return;
       }
 
-      // POS is opened -- gate on the Opening checklist before the daily
-      // close check. If today's Opening checklist log isn't Complete yet,
-      // block here; checkPOSStatus() re-runs once the cashier submits it.
-      if (posProfile?.name) {
+      const entries = normalizeOpenEntries(response.message);
+      if (!entries || entries.length === 0) {
+        setIsLoading(false);
+        return;
+      }
+
+      // `branch` is intentionally NOT part of this comparison: the backing
+      // API here (ERPNext's standard `check_opening_entry`) never returns a
+      // `branch` field at all -- confirmed live, its response only ever
+      // carries `name`/`company`/`pos_profile`/`period_start_date`. Requiring
+      // it to match meant `entry.branch === posProfile.branch` was
+      // `undefined === "<real branch>"`, always false, so this fired a false
+      // "Open Session Elsewhere" block for every single cashier immediately
+      // after every successful open. `company` + `pos_profile` alone is a
+      // correct match in this app's data model (one POS Profile always
+      // belongs to exactly one branch).
+      const matchingEntry =
+        entries.find(
+          (entry) =>
+            entry.pos_profile === posProfile.name &&
+            entry.company === posProfile.company
+        ) || entries[0];
+
+      setExistingEntry(matchingEntry);
+
+      const isSameContext =
+        matchingEntry.company === posProfile.company &&
+        matchingEntry.pos_profile === posProfile.name;
+
+      if (!isSameContext) {
+        setBlockingState('crossCompanyOpen');
+        setIsLoading(false);
+        return;
+      }
+
+      // Gate on the Opening checklist before the daily-close check below --
+      // the cashier must clear it before we look at whether a previous
+      // session needs closing.
+      if (posProfile.name) {
         try {
           const { logStatus } = await getChecklist(posProfile.name, 'Opening');
           if (logStatus !== 'Complete') {
             setNeedsOpeningChecklist(true);
+            setIsLoading(false);
             return;
           }
         } catch (error) {
           console.error('Failed to check opening checklist status:', error);
           // On error, block on the checklist for safety.
           setNeedsOpeningChecklist(true);
+          setIsLoading(false);
           return;
         }
       }
 
-      // If POS is opened, check if custom_daily_pos_close is enabled
-      if (posProfile?.custom_daily_pos_close === 1) {
-        try {
-          const closeResponse = await validatePOSClose(posProfile.name);
-          if (closeResponse.message === 'Failed') {
-            // Previous POS is not closed
-            setValidationType('closing');
-            return;
-          }
-        } catch (error) {
-          console.error('Failed to validate POS close status:', error);
-          // On error, assume POS is not closed for safety
-          setValidationType('closing');
+      if (posProfile.custom_daily_pos_close === 1) {
+        const closeResponse = await validatePOSClose(posProfile.name);
+        if (closeResponse.message === 'Failed') {
+          setBlockingState('dailyClosePending');
+          setIsLoading(false);
           return;
         }
       }
 
-      // All validations passed
-      setValidationType(null);
+      setIsLoading(false);
     } catch (error) {
       console.error('Failed to check POS opening status:', error);
-      // On error, assume POS is not opened for safety
-      setValidationType('opening');
-    } finally {
+
+      const serverMessage = parseFrappeError(error);
+      const status = getHttpStatus(error);
+      const fallbackMessage =
+        error instanceof Error ? error.message : t('errors.posOpening.load_failed');
+      const message = serverMessage || fallbackMessage;
+
+      if (status === 403 || /permission/i.test(message)) {
+        setBlockingState('permissionDenied');
+      } else if (/main cashier/i.test(message)) {
+        setBlockingState('mainCashierNotOpen');
+        setBlockingMessage(message);
+      } else {
+        setBlockingState('genericError');
+        setBlockingMessage(message);
+      }
+
       setIsLoading(false);
     }
-  };
+  }, [posProfile, user?.name, clearBlockingState]);
 
-  const handleReload = () => {
-    window.location.reload();
-  };
+  const handleOpeningSuccess = useCallback(() => {
+    clearBlockingState();
+    checkPOSStatus();
+  }, [clearBlockingState, checkPOSStatus]);
+
+  const handleClosingSuccess = useCallback(() => {
+    clearBlockingState();
+    checkPOSStatus();
+  }, [clearBlockingState, checkPOSStatus]);
 
   useEffect(() => {
-    // Only check if we have the POS profile loaded
     if (posProfile) {
       checkPOSStatus();
     }
-  }, [posProfile]);
+  }, [posProfile, checkPOSStatus]);
 
-  // Show loading state while checking
   if (isLoading) {
     return (
       <div className="fixed inset-0 bg-white flex items-center justify-center z-50">
@@ -104,9 +228,34 @@ const POSOpeningProvider = ({ children }: POSOpeningProviderProps) => {
     );
   }
 
-  // Show dialog if there's a validation issue
-  if (validationType) {
-    return <POSOpeningDialog onReload={handleReload} type={validationType} />;
+  if (showClosingDialog && posProfile) {
+    return (
+      <POSClosingDialog
+        open={showClosingDialog}
+        onOpenChange={(open) => {
+          if (!open) setShowClosingDialog(false);
+        }}
+        onClosingSubmitted={handleClosingSuccess}
+      />
+    );
+  }
+
+  if (blockingState) {
+    return (
+      <POSOpeningDialog
+        state={blockingState}
+        message={blockingMessage}
+        existingEntry={existingEntry}
+        canAccessDesk={canAccessDesk}
+        onRetry={checkPOSStatus}
+        onContinue={() => setBlockingState(null)}
+        onCloseNow={
+          blockingState === 'dailyClosePending'
+            ? () => setShowClosingDialog(true)
+            : undefined
+        }
+      />
+    );
   }
 
   // Block on the Opening checklist until it's submitted as Complete.
@@ -123,8 +272,40 @@ const POSOpeningProvider = ({ children }: POSOpeningProviderProps) => {
     );
   }
 
-  // Render children if all validations passed
-  return <>{children}</>;
+  if (!existingEntry) {
+    return (
+      <POSOpeningScreen
+        onSuccess={handleOpeningSuccess}
+        onError={handleScreenError}
+      />
+    );
+  }
+
+  return (
+    <>
+      {children}
+      {/*
+        Voluntary close (Header menu "Close Shift"), distinct from the
+        dailyClosePending forced path above. Rendered as an overlay
+        alongside children -- rather than replacing them, like the forced
+        path does -- since the cashier is choosing to close their own
+        current, non-stale session and should be able to back out without
+        losing their place in the app.
+      */}
+      {showVoluntaryClosing && (
+        <POSClosingDialog
+          open={showVoluntaryClosing}
+          onOpenChange={(open) => {
+            if (!open) setShowVoluntaryClosing(false);
+          }}
+          onClosingSubmitted={() => {
+            setShowVoluntaryClosing(false);
+            checkPOSStatus();
+          }}
+        />
+      )}
+    </>
+  );
 };
 
-export default POSOpeningProvider; 
+export default POSOpeningProvider;
