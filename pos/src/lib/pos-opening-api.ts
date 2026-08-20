@@ -122,28 +122,13 @@ export const parseFrappeError = (error: unknown): string | null => {
  */
 export const checkPOSOpening = async (user?: string): Promise<POSOpeningResponse> => {
   try {
-    const filters: any = {
-      docstatus: 1,
-      status: 'Open'
-    };
-    if (user) {
-      filters.user = user;
-    }
-
-    const response = await call.post<{ message: POSOpeningEntryRef[] }>(
-      'frappe.client.get_list',
-      {
-        doctype: 'POS Opening Entry',
-        filters,
-        fields: ['name', 'company', 'pos_profile', 'period_start_date', 'branch', 'status'],
-        order_by: 'period_start_date desc'
-      }
+    const params = user ? { user } : undefined;
+    const response = await call.get<POSOpeningResponse>(
+      'erpnext.selling.page.point_of_sale.point_of_sale.check_opening_entry',
+      params
     );
 
-    // Mimic the expected response format where 1 means no entries
-    return {
-      message: response.message && response.message.length > 0 ? response.message : 1
-    };
+    return response;
   } catch (error) {
     console.error('Error checking POS opening status:', error);
     throw error;
