@@ -8,6 +8,11 @@ import { TableShapeIcon } from './TableShapeIcon';
 import TableActionsMenu from './TableActionsMenu';
 import { t } from '../i18n';
 
+export const TABLE_STATE_STYLES = {
+  available: 'border-emerald-300 bg-emerald-50 text-emerald-900 hover:border-emerald-400',
+  occupied: 'border-amber-400 bg-amber-50 text-amber-900',
+} as const;
+
 interface TableCardProps {
   table: Table;
   mergeGroupLabel?: string;
@@ -54,9 +59,7 @@ const TableCard = ({
       }}
       className={cn(
         'relative flex min-h-[15.5rem] flex-col rounded-lg border-2 bg-white p-4 transition-all',
-        isOccupied
-          ? 'border-amber-400 bg-amber-50 text-amber-900'
-          : 'cursor-pointer border-emerald-300 bg-emerald-50 text-emerald-900 hover:border-emerald-400 hover:shadow-md',
+        isOccupied ? TABLE_STATE_STYLES.occupied : cn(TABLE_STATE_STYLES.available, 'cursor-pointer hover:shadow-md'),
         menuOpen ? 'z-20' : 'z-0',
         className
       )}

@@ -1,6 +1,12 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
+import { formatCurrency } from '@ury/core'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@ury/ui'
+import { useIdleReset } from '../hooks/useIdleReset'
 import { useOrderingSession } from '../hooks/useOrderingSession'
 import type { MenuItem, OrderingContext } from '../lib/api'
+
+const IDLE_WARN_MS = 60000
+const IDLE_RESET_GRACE_MS = 15000
 
 const ALL_CATEGORY = '__all__'
 
@@ -48,11 +54,33 @@ function PortraitKioskLayout({ initialContext }: LayoutProps) {
 
   const [selectedCategory, setSelectedCategory] = useState<string>(ALL_CATEGORY)
   const [cartExpanded, setCartExpanded] = useState(false)
+  const [showIdleWarning, setShowIdleWarning] = useState(false)
+  const idleResetTimerRef = useRef<ReturnType<typeof setTimeout>>()
 
   function handleReset() {
     if (window.confirm('Start a new order? Current cart will be cleared.')) {
       resetSession()
     }
+  }
+
+  // Unattended-kiosk protection: warn after IDLE_WARN_MS of no interaction,
+  // then reset after an additional IDLE_RESET_GRACE_MS if the guest doesn't
+  // respond. Never fires mid-checkout — submitting/payingOnline gate both
+  // the warning and the reset itself.
+  useIdleReset(() => {
+    if (submitting || payingOnline) return
+    setShowIdleWarning(true)
+    idleResetTimerRef.current = setTimeout(() => {
+      setShowIdleWarning(false)
+      if (!submitting && !payingOnline) {
+        resetSession()
+      }
+    }, IDLE_RESET_GRACE_MS)
+  }, IDLE_WARN_MS)
+
+  function handleStillHere() {
+    clearTimeout(idleResetTimerRef.current)
+    setShowIdleWarning(false)
   }
 
   const categories = useMemo(() => {
@@ -225,7 +253,7 @@ function PortraitKioskLayout({ initialContext }: LayoutProps) {
               <span className="text-base font-semibold">
                 {cartCount} item{cartCount > 1 ? 's' : ''}
               </span>
-              <span className="text-base font-semibold">{cartTotal}</span>
+              <span className="text-base font-semibold tabular-nums">{formatCurrency(cartTotal)}</span>
             </button>
             <button
               onClick={submitCart}
@@ -237,6 +265,22 @@ function PortraitKioskLayout({ initialContext }: LayoutProps) {
           </div>
         </div>
       )}
+
+      <Dialog open={showIdleWarning} onOpenChange={(open) => !open && handleStillHere()}>
+        <DialogContent onClose={handleStillHere}>
+          <DialogHeader>
+            <DialogTitle>Still there?</DialogTitle>
+          </DialogHeader>
+          <DialogFooter>
+            <button
+              onClick={handleStillHere}
+              className="w-full rounded-md bg-primary py-3 text-base font-medium text-primary-foreground"
+            >
+              I'm still here
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
@@ -262,7 +306,7 @@ function MenuCard({
       )}
       <div className="p-4">
         <div className="text-lg font-medium">{item.item_name}</div>
-        <div className="mt-1 text-base text-muted-foreground">{item.rate}</div>
+        <div className="mt-1 text-base text-muted-foreground tabular-nums">{formatCurrency(item.rate)}</div>
         {qtyInCart > 0 && (
           <div className="mt-2 text-sm font-semibold text-primary">In cart: {qtyInCart}</div>
         )}

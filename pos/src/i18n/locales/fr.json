@@ -78,7 +78,10 @@
     "adjustment": "Ajustement",
     "total": "Total",
     "pay_button": "Payer {{amount}}",
-    "processing": "Traitement..."
+    "processing": "Traitement...",
+    "short_by": "Manque {{amount}}",
+    "change_due": "Monnaie à rendre : {{amount}}",
+    "success": "Paiement réussi : {{amount}} reçu"
   },
   "pos": {
     "not_opened_title": "PDV non ouvert",
