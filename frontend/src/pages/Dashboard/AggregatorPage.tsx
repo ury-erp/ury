@@ -32,6 +32,13 @@ export const AggregatorPage: React.FC = () => {
     mode_of_payment: '',
     mode_of_payments: ''
   });
+  const [originalEditForm, setOriginalEditForm] = useState<AggregatorSetting>({
+    aggregator: '',
+    customer: '',
+    price_list: '',
+    mode_of_payment: '',
+    mode_of_payments: ''
+  });
 
   const [priceLists, setPriceLists] = useState<{ name: string }[]>([]);
   const [modesOfPayment, setModesOfPayment] = useState<{ name: string }[]>([]);
@@ -192,13 +199,15 @@ export const AggregatorPage: React.FC = () => {
     const pl = item.price_list || '';
 
     setEditingIndex(idx);
-    setEditForm({
+    const initialForm = {
       aggregator: aggName,
       customer: aggName,
       price_list: pl,
       mode_of_payment: mop,
       mode_of_payments: mop
-    });
+    };
+    setEditForm(initialForm);
+    setOriginalEditForm(initialForm);
   };
 
   const handleSaveEdit = async (e: React.FormEvent) => {
@@ -209,6 +218,21 @@ export const AggregatorPage: React.FC = () => {
 
     if (!editForm.aggregator || !editForm.aggregator.trim()) {
       showToast.error('Aggregator Name is required');
+      return;
+    }
+
+    const original = {
+      aggregator: (originalEditForm.aggregator || '').trim(),
+      price_list: originalEditForm.price_list || '',
+      mode_of_payment: originalEditForm.mode_of_payment || '',
+    };
+    const current = {
+      aggregator: (editForm.aggregator || '').trim(),
+      price_list: editForm.price_list || '',
+      mode_of_payment: editForm.mode_of_payment || '',
+    };
+    if (JSON.stringify(original) === JSON.stringify(current)) {
+      showToast.warning('No changes in document');
       return;
     }
 
