@@ -93,6 +93,25 @@ export const AggregatorPage: React.FC = () => {
     
     setSaving(true);
     try {
+      // 1. Ensure Customer document exists for the Aggregator Link field
+      await call('frappe.client.insert', {
+        doc: {
+          doctype: 'Customer',
+          customer_name: newAggregatorName,
+          customer_group: 'Commercial',
+          territory: 'All Territories'
+        }
+      }).catch((e: any) => {
+        const errorMessage = e?.message || e?.responseJSON?.message || String(e);
+        const errorType = e?.exc_type || e?.responseJSON?.exc_type;
+        if (errorType === 'DuplicateEntryError' || errorMessage.includes('already exists')) {
+          console.log('Customer record already exists:', newAggregatorName);
+        } else {
+          throw e;
+        }
+      });
+
+      // 2. Fetch current Branch record and append custom_aggregator_settings row
       const res = await call<any>('frappe.client.get', {
         doctype: 'Branch',
         name: branchToUpdate
@@ -121,7 +140,7 @@ export const AggregatorPage: React.FC = () => {
       fetchBranchAggregators();
       setIsAddOpen(false);
       setNewAggregatorName('');
-      showToast.success('Aggregator created');
+      showToast.success('Aggregator created successfully');
     } catch (err: any) {
       console.error('Failed to create aggregator:', err);
       const errorMessage = err?.message || err?.responseJSON?.message || String(err);
@@ -159,6 +178,24 @@ export const AggregatorPage: React.FC = () => {
 
     setSaving(true);
     try {
+      // Ensure Customer exists if aggregator name changed
+      await call('frappe.client.insert', {
+        doc: {
+          doctype: 'Customer',
+          customer_name: editForm.aggregator,
+          customer_group: 'Commercial',
+          territory: 'All Territories'
+        }
+      }).catch((e: any) => {
+        const errorMessage = e?.message || e?.responseJSON?.message || String(e);
+        const errorType = e?.exc_type || e?.responseJSON?.exc_type;
+        if (errorType === 'DuplicateEntryError' || errorMessage.includes('already exists')) {
+          console.log('Customer record already exists:', editForm.aggregator);
+        } else {
+          throw e;
+        }
+      });
+
       const res = await call<any>('frappe.client.get', {
         doctype: 'Branch',
         name: branchToUpdate
@@ -183,7 +220,7 @@ export const AggregatorPage: React.FC = () => {
         }
       });
 
-      showToast.success('Aggregator updated');
+      showToast.success('Aggregator updated successfully');
       setEditingIndex(null);
       fetchBranchAggregators();
     } catch (err: any) {
