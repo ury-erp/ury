@@ -1256,7 +1256,7 @@ def get_pos_opening_screen_data() -> dict:
         filters={
             "user": user,
             "docstatus": 1,
-            "pos_closing_entry": ["in", ["", None]],
+            "status": "Open",
         },
         fields=[
             "name",
