@@ -3,15 +3,25 @@ import { ClosingPaymentSummary } from '../lib/pos-closing-api';
 import { Input } from '@ury/ui';
 import { formatCurrency } from '@ury/core';
 import { cn } from '@ury/ui';
+import { t } from '../i18n';
 
 interface ClosingPaymentTableProps {
   rows: ClosingPaymentSummary[];
+  /** Modes the cashier has explicitly entered a closing amount for (see Fix 2). */
+  touchedModes: Set<string>;
   onChange: (modeOfPayment: string, closingAmount: number) => void;
 }
 
-const ClosingPaymentTable: React.FC<ClosingPaymentTableProps> = ({ rows, onChange }) => {
+const ClosingPaymentTable: React.FC<ClosingPaymentTableProps> = ({
+  rows,
+  touchedModes,
+  onChange,
+}) => {
   const handleClosingAmountChange = (modeOfPayment: string, value: string) => {
-    const closingAmount = parseFloat(value) || 0;
+    const parsed = parseFloat(value);
+    // Clamp to non-negative in JS -- the HTML `min="0"` attribute alone does
+    // not stop programmatic or pasted negative input.
+    const closingAmount = Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
     onChange(modeOfPayment, closingAmount);
   };
 
@@ -27,25 +37,65 @@ const ClosingPaymentTable: React.FC<ClosingPaymentTableProps> = ({ rows, onChang
               Opening
             </th>
             <th className="text-right py-3 px-4 font-semibold text-gray-900">
-              Expected
+              <span
+                title={t('pos_closing.help_expected')}
+                className="inline-flex items-center gap-1 cursor-help"
+              >
+                Expected
+                <span
+                  aria-hidden="true"
+                  className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-gray-400 text-[10px] leading-none text-gray-500"
+                >
+                  i
+                </span>
+              </span>
             </th>
             <th className="text-center py-3 px-4 font-semibold text-gray-900">
-              Closing
+              <span
+                title={t('pos_closing.help_closing')}
+                className="inline-flex items-center gap-1 cursor-help"
+              >
+                Closing
+                <span
+                  aria-hidden="true"
+                  className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-gray-400 text-[10px] leading-none text-gray-500"
+                >
+                  i
+                </span>
+              </span>
             </th>
             <th className="text-right py-3 px-4 font-semibold text-gray-900">
-              Difference
+              <span
+                title={t('pos_closing.help_difference')}
+                className="inline-flex items-center gap-1 cursor-help"
+              >
+                Difference
+                <span
+                  aria-hidden="true"
+                  className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-gray-400 text-[10px] leading-none text-gray-500"
+                >
+                  i
+                </span>
+              </span>
             </th>
           </tr>
         </thead>
         <tbody>
           {rows.map((row) => {
-            const difference = row.expected_amount - row.closing_amount;
+            // Positive = overage (cashier has more than expected), negative
+            // = shortage. Must match the sign convention used in the submit
+            // payload built by POSClosingDialog.handleSubmit.
+            const difference = row.closing_amount - row.expected_amount;
             const hasDifference = Math.abs(difference) > 0.001;
+            const isTouched = touchedModes.has(row.mode_of_payment);
 
             return (
               <tr
                 key={row.mode_of_payment}
-                className="border-b border-gray-200 hover:bg-gray-50 transition-colors"
+                className={cn(
+                  'border-b border-gray-200 hover:bg-gray-50 transition-colors',
+                  !isTouched && 'bg-amber-50/60'
+                )}
               >
                 <td className="py-3 px-4 text-gray-900 font-medium">
                   {row.mode_of_payment}
@@ -66,7 +116,7 @@ const ClosingPaymentTable: React.FC<ClosingPaymentTableProps> = ({ rows, onChang
                       handleClosingAmountChange(row.mode_of_payment, e.target.value)
                     }
                     placeholder="0.00"
-                    className="w-full text-center"
+                    className={cn('w-full text-center', !isTouched && 'border-amber-400')}
                     size="sm"
                   />
                 </td>

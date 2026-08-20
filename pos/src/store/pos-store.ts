@@ -123,6 +123,13 @@ interface POSState {
   orderComment: string;
   noOfPax: number;
   lastModifiedTime: string | null;
+  /**
+   * Voluntarily-triggered POS Closing dialog (Header menu "Close Shift"),
+   * distinct from POSOpeningProvider's own forced-closure blocking states.
+   * Read by POSOpeningProvider's normal-render branch so the dialog can be
+   * shown as an overlay without unmounting the app underneath it.
+   */
+  showVoluntaryClosing: boolean;
 }
 
 interface POSStore extends POSState {
@@ -173,6 +180,7 @@ interface POSStore extends POSState {
    * `OrderPanel`/`ProductDialog` behavior, which never calls this.
    */
   updateItemComment: (uniqueId: string, comment: string) => void;
+  setShowVoluntaryClosing: (show: boolean) => void;
 }
 
 const generateUniqueId = (item: OrderItem): string => {
@@ -217,6 +225,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   isInitializing: true,
   isUpdatingOrder: false,
   orderId: null,
+  showVoluntaryClosing: false,
   orderComment: '',
   noOfPax: 1,
   lastModifiedTime: null,
@@ -505,6 +514,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   setSelectedAggregator: (aggregator) => set({ selectedAggregator: aggregator }),
   setOrderComment: (comment: string) => set({ orderComment: comment }),
   setNoOfPax: (pax: number) => set({ noOfPax: pax }),
+  setShowVoluntaryClosing: (show: boolean) => set({ showVoluntaryClosing: show }),
 
   processPayment: async (paymentMode: string, amount: number) => {
     try {
