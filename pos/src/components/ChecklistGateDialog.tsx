@@ -73,7 +73,13 @@ const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: Checklis
     setLoadError(null);
 
     try {
-      const { items, logName: fetchedLogName } = await getChecklist(posProfile, checklistType);
+      const { items, logName: fetchedLogName, logStatus } = await getChecklist(posProfile, checklistType);
+      
+      if (items.length === 0 || logStatus === 'Complete') {
+        onComplete();
+        return;
+      }
+
       setRows(toRowState(items));
       setLogName(fetchedLogName);
     } catch (error) {
@@ -82,7 +88,7 @@ const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: Checklis
     } finally {
       setIsLoading(false);
     }
-  }, [posProfile, checklistType]);
+  }, [posProfile, checklistType, onComplete]);
 
   useEffect(() => {
     loadChecklist();
@@ -149,7 +155,7 @@ const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: Checklis
           <>
             <div className="flex-1 overflow-y-auto space-y-4 mb-6 pr-1">
               {rows.map((row, index) => (
-                <div key={`${row.item_label}-${index}`} className="border border-gray-200 rounded-lg p-3">
+                <div key={`${row.item_label}-${index}`}>
                   <label className="flex items-start gap-3 cursor-pointer">
                     <input
                       type="checkbox"

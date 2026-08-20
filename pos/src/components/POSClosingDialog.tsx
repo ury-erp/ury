@@ -15,6 +15,7 @@ import { usePOSStore } from '../store/pos-store';
 import { useRootStore } from '../store/root-store';
 import ClosingPaymentTable from './ClosingPaymentTable';
 import ChecklistGateDialog from './ChecklistGateDialog';
+import { getChecklist } from '../lib/checklist-api';
 import {
   getOpenPosOpeningEntries,
   getSubCashierPosInvoices,
@@ -413,7 +414,18 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
       // Close submission succeeded -- gate on the Closing checklist before
       // notifying the parent and dismissing the dialog.
       if (posProfile?.name) {
-        setShowClosingChecklist(true);
+        try {
+          const { logStatus } = await getChecklist(posProfile.name, 'Closing');
+          if (logStatus !== 'Complete') {
+            setShowClosingChecklist(true);
+          } else {
+            await onClosingSubmitted?.();
+            onOpenChange(false);
+          }
+        } catch (error) {
+          console.error('Failed to check closing checklist status:', error);
+          setShowClosingChecklist(true);
+        }
       } else {
         await onClosingSubmitted?.();
         onOpenChange(false);
