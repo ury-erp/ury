@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
-import { Factory, Plus, Trash2 } from 'lucide-react';
+import { Factory, Plus, Trash2, Edit2 } from 'lucide-react';
 import { Card, Button, Input, Spinner, showToast } from '@ury/ui';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { dashboardService } from '../../services/dashboard';
@@ -256,6 +256,7 @@ export const ProductionUnitPage: React.FC = () => {
                 <th className="px-6 py-4">Production Unit</th>
                 <th className="px-6 py-4">Branch</th>
                 <th className="px-6 py-4">Item Groups</th>
+                <th className="px-6 py-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -267,10 +268,21 @@ export const ProductionUnitPage: React.FC = () => {
                   itemGroupsStr = unit.item_groups;
                 }
                 return (
-                  <tr key={unit.name} className="transition-colors cursor-pointer hover:bg-gray-50" onClick={() => openEditDrawer(unit)}>
+                  <tr key={unit.name} className="transition-colors hover:bg-gray-50/50">
                     <td className="px-6 py-4 font-semibold text-gray-900">{unit.production || unit.production_unit_name || unit.name}</td>
                     <td className="px-6 py-4">{unit.branch || 'Main'}</td>
                     <td className="px-6 py-4">{itemGroupsStr || '-'}</td>
+                    <td className="px-6 py-4 text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openEditDrawer(unit)}
+                        className="text-gray-500 hover:text-primary"
+                        title="Edit Production Unit"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </Button>
+                    </td>
                   </tr>
                 );
               })}
