@@ -196,7 +196,14 @@ const ChatWidget = forwardRef<ChatWidgetHandle>(function ChatWidget(_props, ref)
       const responseText =
         typeof data.response === 'string'
           ? data.response
-          : (data.response?.message ?? data.response?.text ?? JSON.stringify(data.response));
+          : // HUF's send_message_to_conversation() returns
+            // {"success": true, "response": "<reply text>"} -- check that
+            // nested `.response` before falling back to `.message`/`.text`
+            // (other HUF response shapes) or a last-resort JSON dump.
+            (data.response?.response ??
+              data.response?.message ??
+              data.response?.text ??
+              JSON.stringify(data.response));
 
       setMessages((prev) => [
         ...prev,
