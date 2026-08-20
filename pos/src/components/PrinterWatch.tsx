@@ -248,6 +248,20 @@ export function PrinterStatusButton() {
   );
 }
 
+function formatLogTime(timestamp?: string): string {
+  if (!timestamp) return '--:--:--';
+  const match = timestamp.match(/(\d{2}:\d{2}:\d{2})/);
+  if (match) return match[1];
+  try {
+    const d = new Date(timestamp);
+    if (!isNaN(d.getTime())) {
+      const parts = d.toTimeString().split(' ');
+      if (parts[0]) return parts[0];
+    }
+  } catch {}
+  return timestamp;
+}
+
 interface PrinterWatchDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
@@ -263,7 +277,6 @@ function PrinterWatchDialog({
   onOpenChange,
   printers,
   loadState,
-  lastUpdated,
   staleError,
   onRetry,
 }: PrinterWatchDialogProps) {
@@ -315,42 +328,45 @@ function PrinterWatchDialog({
             <ul className="space-y-3">
               {printers.map((printer, index) => {
                 const status = STATUS_VARIANTS[printer.status] || STATUS_VARIANTS.critical;
+                const successCount = printer.success ?? 0;
+                const failedCount = printer.failed ?? 0;
+                const timeStr = formatLogTime(printer.summary_timestamp || printer.last_updated);
+
                 return (
                   <li
-                    key={`${printer.device_name}-${printer.ip_address}-${index}`}
-                    className="flex flex-col gap-2 rounded-lg border border-gray-200 bg-gray-50 p-3"
+                    key={`${printer.device_name}-${printer.ip_address || index}-${index}`}
+                    className="flex flex-col gap-2 rounded-lg border border-gray-200 bg-gray-50/80 p-3.5 transition-colors"
                   >
+                    {/* Top Row: Printer Name (left) & Health Status (right) */}
                     <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium text-gray-900">{printer.device_name}</p>
-                        <p className="text-sm text-gray-500">{printer.ip_address}</p>
-                      </div>
-                      <Badge variant={status.badge}>
+                      <h3 className="font-semibold text-gray-900 text-base leading-tight">
+                        {printer.device_name}
+                      </h3>
+                      <Badge variant={status.badge} className="px-2.5 py-0.5 text-xs font-medium">
                         <span className="mr-1">●</span>
                         {status.label}
                       </Badge>
                     </div>
 
-                    {printer.samples !== undefined && printer.samples > 0 && (
-                      <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-gray-200 pt-2 text-xs text-gray-600">
-                        <span>Success Rate: <strong className="text-gray-900">{Number(printer.success_rate ?? 0).toFixed(2)}%</strong></span>
-                        <span>Samples: <strong className="text-gray-900">{printer.samples}</strong></span>
-                        <span>Success: <strong className="text-emerald-700">{printer.success}</strong></span>
-                        <span>Failed: <strong className="text-rose-700">{printer.failed}</strong></span>
-                        {printer.summary_timestamp && (
-                          <span className="text-gray-400">Time: {printer.summary_timestamp}</span>
-                        )}
+                    {/* Bottom Row: Success / Failed (left) & Timestamp HH:MM:SS (right) */}
+                    <div className="flex items-center justify-between text-xs text-gray-600">
+                      <div className="flex items-center gap-4">
+                        <span>
+                          Success: <strong className="text-gray-900 font-semibold">{successCount}</strong>
+                        </span>
+                        <span>
+                          Failed: <strong className={failedCount > 0 ? "text-rose-600 font-semibold" : "text-gray-900 font-semibold"}>{failedCount}</strong>
+                        </span>
                       </div>
-                    )}
+                      <span className="text-gray-500 font-mono text-xs">
+                        {timeStr}
+                      </span>
+                    </div>
                   </li>
                 );
               })}
             </ul>
           )}
-        </div>
-
-        <div className="border-t border-gray-200 p-4 text-right text-sm text-gray-500">
-          {lastUpdated ? `Last updated: ${formatTime(lastUpdated)}` : 'Last updated: --'}
         </div>
       </DialogContent>
     </Dialog>
@@ -362,3 +378,4 @@ function PrinterWatch() {
 }
 
 export default PrinterWatch;
+
