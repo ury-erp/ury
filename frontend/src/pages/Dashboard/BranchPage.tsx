@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
-import { Save, Plus, X, Eye, Edit2, ArrowLeft, Building2 } from 'lucide-react';
+import { Save, Plus, X, Eye, Edit2, ArrowLeft, Building2, UtensilsCrossed, Map } from 'lucide-react';
 import { Card, Button, Input, Spinner, showToast } from '@ury/ui';
 import { Switch } from '../../components/ui/switch';
 import SideDrawer from '../../components/layout/SideDrawer';
@@ -377,9 +377,14 @@ export const BranchPage: React.FC = () => {
           <Card className="p-6 rounded-lg border border-gray-200 bg-white shadow-sm space-y-8">
             {/* BRANCH INFO SUBSECTION */}
             <div>
-              <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-4 pb-2 border-b border-gray-100">
-                Branch Info
-              </h3>
+              <div className="flex items-center gap-2.5 pb-2 border-b border-gray-100 mb-4">
+                <div className="w-7 h-7 rounded-md bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                  <Building2 className="w-4 h-4" />
+                </div>
+                <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider">
+                  Branch Info
+                </h3>
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-gray-700">Branch Name</label>
@@ -460,9 +465,14 @@ export const BranchPage: React.FC = () => {
 
             {/* MENU SUBSECTION */}
             <div>
-              <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-4 pb-2 border-b border-gray-100">
-                Menu
-              </h3>
+              <div className="flex items-center gap-2.5 pb-2 border-b border-gray-100 mb-4">
+                <div className="w-7 h-7 rounded-md bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                  <UtensilsCrossed className="w-4 h-4" />
+                </div>
+                <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider">
+                  Menu
+                </h3>
+              </div>
               {restaurantData ? (
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -569,9 +579,14 @@ export const BranchPage: React.FC = () => {
 
             {/* ROOM SUBSECTION */}
             <div>
-              <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-4 pb-2 border-b border-gray-100">
-                Room
-              </h3>
+              <div className="flex items-center gap-2.5 pb-2 border-b border-gray-100 mb-4">
+                <div className="w-7 h-7 rounded-md bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                  <Map className="w-4 h-4" />
+                </div>
+                <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider">
+                  Room
+                </h3>
+              </div>
               {restaurantData ? (
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-gray-700">Default Room</label>
