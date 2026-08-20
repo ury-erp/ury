@@ -439,17 +439,6 @@ export const BranchPage: React.FC = () => {
                     disabled={!isEditMode || !restaurantData}
                   />
                 </div>
-                <div className="flex items-center space-x-2 pt-1">
-                  <Switch
-                    id="custom_no_taxes"
-                    checked={!!branchForm.custom_no_taxes}
-                    onCheckedChange={(checked) => setBranchForm(p => ({ ...p, custom_no_taxes: checked ? 1 : 0 }))}
-                    disabled={!isEditMode}
-                  />
-                  <label htmlFor="custom_no_taxes" className="text-sm font-medium text-gray-700 cursor-pointer">
-                    Create Invoice without Tax
-                  </label>
-                </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-gray-700">Default Tax Template</label>
                   <Input
@@ -494,7 +483,15 @@ export const BranchPage: React.FC = () => {
                       <Switch
                         id="room_wise_menu"
                         checked={!!restaurantForm.room_wise_menu}
-                        onCheckedChange={(checked) => setRestaurantForm(p => ({ ...p, room_wise_menu: checked ? 1 : 0 }))}
+                        onCheckedChange={(checked) => {
+                          setRestaurantForm((p: Record<string, any>) => {
+                            const updated: Record<string, any> = { ...p, room_wise_menu: checked ? 1 : 0 };
+                            if (checked && (!updated.menu_for_room || updated.menu_for_room.length === 0)) {
+                              updated.menu_for_room = [{ room: '', menu: '' }];
+                            }
+                            return updated;
+                          });
+                        }}
                         disabled={!isEditMode}
                       />
                       <label htmlFor="room_wise_menu" className="text-sm font-medium text-gray-700 cursor-pointer">
@@ -618,7 +615,15 @@ export const BranchPage: React.FC = () => {
                     <Switch
                       id="order_type_wise_menu"
                       checked={!!restaurantForm.order_type_wise_menu}
-                      onCheckedChange={(checked) => setRestaurantForm(p => ({ ...p, order_type_wise_menu: checked ? 1 : 0 }))}
+                      onCheckedChange={(checked) => {
+                        setRestaurantForm((p: Record<string, any>) => {
+                          const updated: Record<string, any> = { ...p, order_type_wise_menu: checked ? 1 : 0 };
+                          if (checked && (!updated.order_type_menu || updated.order_type_menu.length === 0)) {
+                            updated.order_type_menu = [{ order_type: '', menu: '' }];
+                          }
+                          return updated;
+                        });
+                      }}
                       disabled={!isEditMode}
                     />
                     <label htmlFor="order_type_wise_menu" className="text-sm font-medium text-gray-700 cursor-pointer">
