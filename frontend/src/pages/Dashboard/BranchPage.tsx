@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
-import { Save, Plus, X, Eye, Edit2, ArrowLeft, Building2 } from 'lucide-react';
+import { Save, Plus, X, Eye, Edit2, ArrowLeft, Building2, UtensilsCrossed, Map } from 'lucide-react';
 import { Card, Button, Input, Spinner, showToast } from '@ury/ui';
 import { Switch } from '../../components/ui/switch';
 import SideDrawer from '../../components/layout/SideDrawer';
@@ -17,6 +17,7 @@ interface BranchData {
   tax_id?: string;
   address?: string;
   custom_no_taxes?: number;
+  default_menu?: string;
 }
 
 interface RestaurantData {
@@ -32,6 +33,7 @@ interface RestaurantData {
   menu_for_room?: any[];
   order_type_menu?: any[];
   default_tax_template?: string;
+  tax_id?: string;
 }
 
 export const BranchPage: React.FC = () => {
@@ -71,32 +73,56 @@ export const BranchPage: React.FC = () => {
 
   const fetchBranchList = async () => {
     setLoading(true);
+    let list: BranchData[] = [];
     try {
       const res = await call<any>('frappe.client.get_list', {
         doctype: 'Branch',
         fields: ['name', 'branch', 'address', 'custom_no_taxes'],
         limit_page_length: 100
       });
-      const list = Array.isArray(res) ? res : (res?.message || []);
-      setBranchList(list);
+      list = Array.isArray(res) ? res : (res?.message || []);
     } catch (e) {
       console.error('Failed to load branch list', e);
       try {
         const fallbackRes = await call<any>('ury.ury.api.minimal.business_setup.get_branches');
         const fallbackList = Array.isArray(fallbackRes) ? fallbackRes : (fallbackRes?.message || []);
         if (Array.isArray(fallbackList) && fallbackList.length > 0) {
-          setBranchList(fallbackList.map((b: any) => ({
+          list = fallbackList.map((b: any) => ({
             name: b.id || b.name,
             branch: b.name || b.branch,
             address: b.address || ''
-          })));
+          }));
         }
       } catch (fallbackErr) {
         console.error('Fallback fetch branches failed', fallbackErr);
       }
-    } finally {
-      setLoading(false);
     }
+
+    if (list.length > 0) {
+      try {
+        const restRes = await call<any>('frappe.client.get_list', {
+          doctype: 'URY Restaurant',
+          fields: ['branch', 'active_menu'],
+          limit_page_length: 100
+        });
+        const restaurantList = Array.isArray(restRes) ? restRes : (restRes?.message || []);
+        const menuMap: Record<string, string> = {};
+        restaurantList.forEach((r: any) => {
+          if (r.branch && r.active_menu) {
+            menuMap[r.branch] = r.active_menu;
+          }
+        });
+        list = list.map((b) => ({
+          ...b,
+          default_menu: menuMap[b.name] || (b.branch ? menuMap[b.branch] : '') || ''
+        }));
+      } catch (err) {
+        console.error('Failed to map default menu names', err);
+      }
+    }
+
+    setBranchList(list);
+    setLoading(false);
   };
 
   const fetchLinkedData = async () => {
@@ -279,13 +305,80 @@ export const BranchPage: React.FC = () => {
       return;
     }
 
+    const original = {
+      branch_name: (selectedBranch.branch_name || selectedBranch.name || '').trim(),
+      address: (branchData?.address || '').trim(),
+      custom_no_taxes: branchData?.custom_no_taxes ? 1 : 0,
+      invoice_series_prefix: (restaurantData?.invoice_series_prefix || '').trim(),
+      aggregator_series_prefix: (restaurantData?.aggregator_series_prefix || '').trim(),
+      tax_id: (restaurantData?.tax_id || '').trim(),
+      active_menu: restaurantData?.active_menu || '',
+      default_room: restaurantData?.default_room || '',
+      room_wise_menu: restaurantData?.room_wise_menu ? 1 : 0,
+      menu_for_room: (restaurantData?.menu_for_room || []).map((row: any) => ({
+        room: row.room || row.ury_room || '',
+        ury_room: row.room || row.ury_room || '',
+        menu: row.menu || row.ury_menu || '',
+        ury_menu: row.menu || row.ury_menu || '',
+      })),
+      order_type_wise_menu: restaurantData?.order_type_wise_menu ? 1 : 0,
+      order_type_menu: (restaurantData?.order_type_menu || []).map((row: any) => ({
+        order_type: row.order_type || '',
+        menu: row.menu || row.ury_menu || '',
+        ury_menu: row.menu || row.ury_menu || '',
+      })),
+      default_tax_template: (restaurantData?.default_tax_template || '').trim(),
+    };
+
+    const current = {
+      branch_name: (branchForm.branch_name || '').trim(),
+      address: (branchForm.address || '').trim(),
+      custom_no_taxes: branchForm.custom_no_taxes ? 1 : 0,
+      invoice_series_prefix: (restaurantForm.invoice_series_prefix || '').trim(),
+      aggregator_series_prefix: (restaurantForm.aggregator_series_prefix || '').trim(),
+      tax_id: (restaurantForm.tax_id || '').trim(),
+      active_menu: restaurantForm.active_menu || '',
+      default_room: restaurantForm.default_room || '',
+      room_wise_menu: restaurantForm.room_wise_menu ? 1 : 0,
+      menu_for_room: (restaurantForm.menu_for_room || []).map((row: any) => ({
+        room: row.room || row.ury_room || '',
+        ury_room: row.room || row.ury_room || '',
+        menu: row.menu || row.ury_menu || '',
+        ury_menu: row.menu || row.ury_menu || '',
+      })),
+      order_type_wise_menu: restaurantForm.order_type_wise_menu ? 1 : 0,
+      order_type_menu: (restaurantForm.order_type_menu || []).map((row: any) => ({
+        order_type: row.order_type || '',
+        menu: row.menu || row.ury_menu || '',
+        ury_menu: row.menu || row.ury_menu || '',
+      })),
+      default_tax_template: (restaurantForm.default_tax_template || '').trim(),
+    };
+
+    if (JSON.stringify(original) === JSON.stringify(current)) {
+      showToast.warning('No changes in document');
+      return;
+    }
+
     setSaving(true);
     try {
+      let currentBranchName = selectedBranch.name;
+      if (branchForm.branch_name && branchForm.branch_name.trim() !== selectedBranch.name) {
+        const newBranchName = branchForm.branch_name.trim();
+        await call('frappe.client.rename_doc', {
+          doctype: 'Branch',
+          old_name: selectedBranch.name,
+          new_name: newBranchName,
+        });
+        currentBranchName = newBranchName;
+      }
+
       // Save Branch fields (address and custom_no_taxes)
       await call('frappe.client.set_value', {
         doctype: 'Branch',
-        name: selectedBranch.name,
+        name: currentBranchName,
         fieldname: {
+          branch: branchForm.branch_name,
           address: branchForm.address,
           custom_no_taxes: branchForm.custom_no_taxes ? 1 : 0,
         },
@@ -293,8 +386,21 @@ export const BranchPage: React.FC = () => {
 
       // Save URY Restaurant fields if it exists
       if (restaurantData) {
+        let currentRestaurantName = restaurantData.name;
+        const newRestaurantName = `${branchForm.branch_name.trim()} Restaurant`;
+        if (newRestaurantName !== restaurantData.name) {
+          await call('frappe.client.rename_doc', {
+            doctype: 'URY Restaurant',
+            old_name: restaurantData.name,
+            new_name: newRestaurantName,
+          });
+          currentRestaurantName = newRestaurantName;
+        }
+
         const updatedDoc = {
           ...restaurantData,
+          name: currentRestaurantName,
+          branch: branchForm.branch_name.trim(),
           invoice_series_prefix: restaurantForm.invoice_series_prefix,
           aggregator_series_prefix: restaurantForm.aggregator_series_prefix,
           tax_id: restaurantForm.tax_id,
@@ -311,7 +417,7 @@ export const BranchPage: React.FC = () => {
         });
       }
       showToast.success('Branch saved successfully');
-      await fetchDetails(selectedBranch.name);
+      await fetchDetails(currentBranchName);
       await fetchBranchList();
       setIsEditMode(false); // Return to read-only View Mode after successful save
     } catch (err: any) {
@@ -377,16 +483,22 @@ export const BranchPage: React.FC = () => {
           <Card className="p-6 rounded-lg border border-gray-200 bg-white shadow-sm space-y-8">
             {/* BRANCH INFO SUBSECTION */}
             <div>
-              <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-4 pb-2 border-b border-gray-100">
-                Branch Info
-              </h3>
+              <div className="flex items-center gap-2.5 pb-2 border-b border-gray-100 mb-4">
+                <div className="w-7 h-7 rounded-md bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                  <Building2 className="w-4 h-4" />
+                </div>
+                <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider">
+                  Branch Info
+                </h3>
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-gray-700">Branch Name</label>
                   <Input
                     value={branchForm.branch_name || ''}
-                    disabled
-                    className="rounded-lg bg-gray-50"
+                    onChange={(e) => setBranchForm(p => ({ ...p, branch_name: e.target.value }))}
+                    disabled={!isEditMode}
+                    className="rounded-lg"
                   />
                 </div>
                 <div className="space-y-2">
@@ -434,17 +546,6 @@ export const BranchPage: React.FC = () => {
                     disabled={!isEditMode || !restaurantData}
                   />
                 </div>
-                <div className="flex items-center space-x-2 pt-1">
-                  <Switch
-                    id="custom_no_taxes"
-                    checked={!!branchForm.custom_no_taxes}
-                    onCheckedChange={(checked) => setBranchForm(p => ({ ...p, custom_no_taxes: checked ? 1 : 0 }))}
-                    disabled={!isEditMode}
-                  />
-                  <label htmlFor="custom_no_taxes" className="text-sm font-medium text-gray-700 cursor-pointer">
-                    Create Invoice without Tax
-                  </label>
-                </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-gray-700">Default Tax Template</label>
                   <Input
@@ -460,9 +561,14 @@ export const BranchPage: React.FC = () => {
 
             {/* MENU SUBSECTION */}
             <div>
-              <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-4 pb-2 border-b border-gray-100">
-                Menu
-              </h3>
+              <div className="flex items-center gap-2.5 pb-2 border-b border-gray-100 mb-4">
+                <div className="w-7 h-7 rounded-md bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                  <UtensilsCrossed className="w-4 h-4" />
+                </div>
+                <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider">
+                  Menu
+                </h3>
+              </div>
               {restaurantData ? (
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -484,7 +590,15 @@ export const BranchPage: React.FC = () => {
                       <Switch
                         id="room_wise_menu"
                         checked={!!restaurantForm.room_wise_menu}
-                        onCheckedChange={(checked) => setRestaurantForm(p => ({ ...p, room_wise_menu: checked ? 1 : 0 }))}
+                        onCheckedChange={(checked) => {
+                          setRestaurantForm((p: Record<string, any>) => {
+                            const updated: Record<string, any> = { ...p, room_wise_menu: checked ? 1 : 0 };
+                            if (checked && (!updated.menu_for_room || updated.menu_for_room.length === 0)) {
+                              updated.menu_for_room = [{ room: '', menu: '' }];
+                            }
+                            return updated;
+                          });
+                        }}
                         disabled={!isEditMode}
                       />
                       <label htmlFor="room_wise_menu" className="text-sm font-medium text-gray-700 cursor-pointer">
@@ -569,23 +683,49 @@ export const BranchPage: React.FC = () => {
 
             {/* ROOM SUBSECTION */}
             <div>
-              <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-4 pb-2 border-b border-gray-100">
-                Room
-              </h3>
+              <div className="flex items-center gap-2.5 pb-2 border-b border-gray-100 mb-4">
+                <div className="w-7 h-7 rounded-md bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                  <Map className="w-4 h-4" />
+                </div>
+                <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider">
+                  Room
+                </h3>
+              </div>
               {restaurantData ? (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">Default Room</label>
-                  <SearchableSelect
-                    id="default_room"
-                    value={restaurantForm.default_room || ''}
-                    onChange={(_, val) => setRestaurantForm(p => ({ ...p, default_room: val }))}
-                    options={[
-                      { value: '', label: 'None' },
-                      ...rooms.map((r) => ({ value: r.name, label: r.room_name || r.name }))
-                    ]}
-                    disabled={!isEditMode}
-                    placeholder="None"
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">Default Room</label>
+                    <SearchableSelect
+                      id="default_room"
+                      value={restaurantForm.default_room || ''}
+                      onChange={(_, val) => setRestaurantForm(p => ({ ...p, default_room: val }))}
+                      options={[
+                        { value: '', label: 'None' },
+                        ...rooms.map((r) => ({ value: r.name, label: r.room_name || r.name }))
+                      ]}
+                      disabled={!isEditMode}
+                      placeholder="None"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 pt-6">
+                    <Switch
+                      id="order_type_wise_menu"
+                      checked={!!restaurantForm.order_type_wise_menu}
+                      onCheckedChange={(checked) => {
+                        setRestaurantForm((p: Record<string, any>) => {
+                          const updated: Record<string, any> = { ...p, order_type_wise_menu: checked ? 1 : 0 };
+                          if (checked && (!updated.order_type_menu || updated.order_type_menu.length === 0)) {
+                            updated.order_type_menu = [{ order_type: '', menu: '' }];
+                          }
+                          return updated;
+                        });
+                      }}
+                      disabled={!isEditMode}
+                    />
+                    <label htmlFor="order_type_wise_menu" className="text-sm font-medium text-gray-700 cursor-pointer">
+                      Order Type Wise Menu
+                    </label>
+                  </div>
                 </div>
               ) : (
                 <p className="text-sm text-gray-400">No URY Restaurant linked to this branch.</p>
@@ -594,22 +734,8 @@ export const BranchPage: React.FC = () => {
 
             {/* ORDER TYPE MENU SUBSECTION */}
             <div>
-              <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-4 pb-2 border-b border-gray-100">
-                Order Type Menu
-              </h3>
               {restaurantData ? (
                 <div className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <Switch
-                      id="order_type_wise_menu"
-                      checked={!!restaurantForm.order_type_wise_menu}
-                      onCheckedChange={(checked) => setRestaurantForm(p => ({ ...p, order_type_wise_menu: checked ? 1 : 0 }))}
-                      disabled={!isEditMode}
-                    />
-                    <label htmlFor="order_type_wise_menu" className="text-sm font-medium text-gray-700 cursor-pointer">
-                      Order Type Wise Menu
-                    </label>
-                  </div>
                   {!!restaurantForm.order_type_wise_menu && (
                     <div className="mt-3 rounded-lg border border-gray-200 overflow-hidden">
                       <table className="w-full text-xs text-gray-600">
@@ -721,7 +847,7 @@ export const BranchPage: React.FC = () => {
             <thead className="bg-gray-50 border-b border-gray-100 text-xs uppercase text-gray-500 font-semibold">
               <tr>
                 <th className="px-6 py-4">Branch</th>
-                <th className="px-6 py-4">Address</th>
+                <th className="px-6 py-4">Default Menu</th>
                 <th className="px-6 py-4 text-right">Actions</th>
               </tr>
             </thead>
@@ -732,7 +858,7 @@ export const BranchPage: React.FC = () => {
                   className="hover:bg-gray-50/50 transition-colors"
                 >
                   <td className="px-6 py-4 font-semibold text-gray-900">{b.branch || b.branch_name || b.name}</td>
-                  <td className="px-6 py-4 text-gray-600">{b.address || '-'}</td>
+                  <td className="px-6 py-4 text-gray-600">{b.default_menu || '-'}</td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-1">
                       <Button
