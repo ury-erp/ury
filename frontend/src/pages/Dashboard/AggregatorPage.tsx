@@ -93,7 +93,7 @@ export const AggregatorPage: React.FC = () => {
     
     setSaving(true);
     try {
-      // 1. Ensure Customer document exists for the Aggregator Link field
+      // 1. Automatically create/ensure Customer document exists
       await call('frappe.client.insert', {
         doc: {
           doctype: 'Customer',
@@ -111,7 +111,42 @@ export const AggregatorPage: React.FC = () => {
         }
       });
 
-      // 2. Fetch current Branch record and append custom_aggregator_settings row
+      // 2. Automatically create/ensure Price List document exists
+      await call('frappe.client.insert', {
+        doc: {
+          doctype: 'Price List',
+          price_list_name: newAggregatorName,
+          selling: 1,
+          currency: 'INR'
+        }
+      }).catch((e: any) => {
+        const errorMessage = e?.message || e?.responseJSON?.message || String(e);
+        const errorType = e?.exc_type || e?.responseJSON?.exc_type;
+        if (errorType === 'DuplicateEntryError' || errorMessage.includes('already exists')) {
+          console.log('Price List already exists:', newAggregatorName);
+        } else {
+          throw e;
+        }
+      });
+
+      // 3. Automatically create/ensure Mode of Payment document exists
+      await call('frappe.client.insert', {
+        doc: {
+          doctype: 'Mode of Payment',
+          mode_of_payment: newAggregatorName,
+          type: 'Bank'
+        }
+      }).catch((e: any) => {
+        const errorMessage = e?.message || e?.responseJSON?.message || String(e);
+        const errorType = e?.exc_type || e?.responseJSON?.exc_type;
+        if (errorType === 'DuplicateEntryError' || errorMessage.includes('already exists')) {
+          console.log('Mode of Payment already exists:', newAggregatorName);
+        } else {
+          throw e;
+        }
+      });
+
+      // 4. Update Branch custom_aggregator_settings row with linked records
       const res = await call<any>('frappe.client.get', {
         doctype: 'Branch',
         name: branchToUpdate
@@ -123,9 +158,9 @@ export const AggregatorPage: React.FC = () => {
         {
           aggregator: newAggregatorName,
           customer: newAggregatorName,
-          price_list: '',
-          mode_of_payments: '',
-          mode_of_payment: ''
+          price_list: newAggregatorName,
+          mode_of_payments: newAggregatorName,
+          mode_of_payment: newAggregatorName
         }
       ];
 
@@ -137,7 +172,8 @@ export const AggregatorPage: React.FC = () => {
         }
       });
 
-      fetchBranchAggregators();
+      await fetchBranchAggregators();
+      await fetchDropdownOptions();
       setIsAddOpen(false);
       setNewAggregatorName('');
       showToast.success('Aggregator created successfully');
@@ -222,7 +258,8 @@ export const AggregatorPage: React.FC = () => {
 
       showToast.success('Aggregator updated successfully');
       setEditingIndex(null);
-      fetchBranchAggregators();
+      await fetchBranchAggregators();
+      await fetchDropdownOptions();
     } catch (err: any) {
       console.error('Failed to update aggregator:', err);
       showToast.error(err?.message || 'Failed to update aggregator');
