@@ -585,19 +585,21 @@ export const BranchPage: React.FC = () => {
                 </h3>
               </div>
               {restaurantData ? (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">Default Room</label>
-                  <SearchableSelect
-                    id="default_room"
-                    value={restaurantForm.default_room || ''}
-                    onChange={(_, val) => setRestaurantForm(p => ({ ...p, default_room: val }))}
-                    options={[
-                      { value: '', label: 'None' },
-                      ...rooms.map((r) => ({ value: r.name, label: r.room_name || r.name }))
-                    ]}
-                    disabled={!isEditMode}
-                    placeholder="None"
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">Default Room</label>
+                    <SearchableSelect
+                      id="default_room"
+                      value={restaurantForm.default_room || ''}
+                      onChange={(_, val) => setRestaurantForm(p => ({ ...p, default_room: val }))}
+                      options={[
+                        { value: '', label: 'None' },
+                        ...rooms.map((r) => ({ value: r.name, label: r.room_name || r.name }))
+                      ]}
+                      disabled={!isEditMode}
+                      placeholder="None"
+                    />
+                  </div>
                 </div>
               ) : (
                 <p className="text-sm text-gray-400">No URY Restaurant linked to this branch.</p>
@@ -606,11 +608,11 @@ export const BranchPage: React.FC = () => {
 
             {/* ORDER TYPE MENU SUBSECTION */}
             <div>
-              <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-4 pb-2 border-b border-gray-100">
-                Order Type Menu
-              </h3>
-              {restaurantData ? (
-                <div className="space-y-4">
+              <div className="flex items-center justify-between gap-4 mb-4 pb-2 border-b border-gray-100">
+                <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider">
+                  Order Type Menu
+                </h3>
+                {restaurantData && (
                   <div className="flex items-center gap-2">
                     <Switch
                       id="order_type_wise_menu"
@@ -630,6 +632,10 @@ export const BranchPage: React.FC = () => {
                       Order Type Wise Menu
                     </label>
                   </div>
+                )}
+              </div>
+              {restaurantData ? (
+                <div className="space-y-4">
                   {!!restaurantForm.order_type_wise_menu && (
                     <div className="mt-3 rounded-lg border border-gray-200 overflow-hidden">
                       <table className="w-full text-xs text-gray-600">
