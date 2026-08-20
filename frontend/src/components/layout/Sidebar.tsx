@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { NavLink, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../../store/useAuth';
 import { reportsRegistry, groupReports } from '../../pages/Reports/reportsRegistry';
+import { SidebarContainer, SidebarCard, SidebarActiveIndicator, sidebarItemVariants, cn } from '@ury/ui';
 import {
   LayoutDashboard,
   UtensilsCrossed,
@@ -41,25 +42,20 @@ const SETTINGS_ITEMS: NavItem[] = [
   { label: 'Production Unit', path: '/production-unit', icon: Grid }
 ];
 
-const reportLinkClass = ({ isActive }: { isActive: boolean }) =>
-  `flex items-center space-x-2.5 px-3 py-2 rounded-md text-[13px] font-medium transition-all ${
-    isActive
-      ? 'bg-white text-gray-900 shadow-sm font-semibold relative'
-      : 'text-gray-700 hover:bg-white/60 hover:text-gray-900'
-  }`;
-
 const reportGroups = groupReports(reportsRegistry);
 const reportGroupEntries = Object.entries(reportGroups);
 
 const ReportsPanel: React.FC = () => (
-  <div className="flex-1 overflow-y-auto p-4">
-    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+  <nav className="flex-1 p-4 overflow-y-auto">
+    <SidebarCard>
       <Link
         to="/dashboard"
-        className="flex items-center space-x-2 px-2 py-1.5 -ml-2 rounded-md text-xs font-medium text-gray-500 hover:bg-gray-200/60 hover:text-gray-700 transition-colors mb-4"
+        className={cn(sidebarItemVariants({ active: false }), 'mb-4')}
       >
-        <ArrowLeft className="w-3.5 h-3.5 shrink-0" />
-        <span>Back</span>
+        <div className="flex items-center gap-3 ms-1">
+          <ArrowLeft className="w-4 h-4 text-gray-500 shrink-0" />
+          <span>Back</span>
+        </div>
       </Link>
 
       <div className="space-y-4">
@@ -72,9 +68,20 @@ const ReportsPanel: React.FC = () => (
               {reports.map((report) => {
                 const Icon = report.icon;
                 return (
-                  <NavLink key={report.id} to={`/reports/${report.path}`} className={reportLinkClass}>
-                    <Icon className="w-4 h-4 shrink-0 text-gray-500" />
-                    <span>{report.label}</span>
+                  <NavLink
+                    key={report.id}
+                    to={`/reports/${report.path}`}
+                    className={({ isActive }) => sidebarItemVariants({ active: isActive })}
+                  >
+                    {({ isActive }) => (
+                      <>
+                        {isActive && <SidebarActiveIndicator />}
+                        <div className="flex items-center gap-3 ms-1">
+                          <Icon className="w-4 h-4 text-gray-500 shrink-0" />
+                          <span>{report.label}</span>
+                        </div>
+                      </>
+                    )}
                   </NavLink>
                 );
               })}
@@ -82,8 +89,8 @@ const ReportsPanel: React.FC = () => (
           </div>
         ))}
       </div>
-    </div>
-  </div>
+    </SidebarCard>
+  </nav>
 );
 
 const MainPanel: React.FC<{ isManager: boolean }> = ({ isManager }) => {
@@ -92,8 +99,8 @@ const MainPanel: React.FC<{ isManager: boolean }> = ({ isManager }) => {
   const [isAdvancedOpen, setIsAdvancedOpen] = useState<boolean>(isAdvancedPath);
 
   return (
-    <div className="flex-1 overflow-y-auto p-4">
-      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+    <nav className="flex-1 p-4 overflow-y-auto">
+      <SidebarCard>
         <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3 px-1">
           Navigation
         </h2>
@@ -103,21 +110,13 @@ const MainPanel: React.FC<{ isManager: boolean }> = ({ isManager }) => {
             <>
               <NavLink
                 to="/reports"
-                className={({ isActive }) =>
-                  `w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium transition-all duration-200 group relative rounded-md ${
-                    isActive
-                      ? 'bg-white text-gray-900 shadow-sm font-semibold'
-                      : 'text-gray-700 hover:bg-white/60 hover:text-gray-900'
-                  }`
-                }
+                className={({ isActive }) => sidebarItemVariants({ active: isActive })}
               >
                 {({ isActive }) => (
                   <>
-                    {isActive && (
-                      <div className="absolute start-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-blue-600 rounded-e-full" />
-                    )}
+                    {isActive && <SidebarActiveIndicator />}
                     <div className="flex items-center gap-3 ms-1">
-                      <BarChart3 className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                      <BarChart3 className="w-4 h-4 text-gray-500 shrink-0" />
                       <span>Reports</span>
                     </div>
                   </>
@@ -133,21 +132,13 @@ const MainPanel: React.FC<{ isManager: boolean }> = ({ isManager }) => {
               <NavLink
                 key={item.path}
                 to={item.path}
-                className={({ isActive }) =>
-                  `w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium transition-all duration-200 group relative rounded-md ${
-                    isActive
-                      ? 'bg-white text-gray-900 shadow-sm font-semibold'
-                      : 'text-gray-700 hover:bg-white/60 hover:text-gray-900'
-                  }`
-                }
+                className={({ isActive }) => sidebarItemVariants({ active: isActive })}
               >
                 {({ isActive }) => (
                   <>
-                    {isActive && (
-                      <div className="absolute start-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-blue-600 rounded-e-full" />
-                    )}
+                    {isActive && <SidebarActiveIndicator />}
                     <div className="flex items-center gap-3 ms-1">
-                      <Icon className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                      <Icon className="w-4 h-4 text-gray-500 shrink-0" />
                       <span>{item.label}</span>
                     </div>
                   </>
@@ -159,15 +150,12 @@ const MainPanel: React.FC<{ isManager: boolean }> = ({ isManager }) => {
           <div className="pt-2">
             <button
               onClick={() => setIsAdvancedOpen(!isAdvancedOpen)}
-              className={`w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium transition-all duration-200 group relative rounded-md ${
-                isAdvancedPath
-                  ? 'bg-white text-gray-900 shadow-sm font-semibold'
-                  : 'text-gray-700 hover:bg-white/60 hover:text-gray-900'
-              }`}
+              className={sidebarItemVariants({ active: isAdvancedPath })}
             >
+              {isAdvancedPath && <SidebarActiveIndicator />}
               <div className="flex items-center gap-3 ms-1">
-                <Settings className="w-4 h-4 text-gray-500 flex-shrink-0" />
-                <span>Advanced Settings</span>
+                <Settings className="w-4 h-4 text-gray-500 shrink-0" />
+                <span>Settings</span>
               </div>
               <ChevronDown
                 className={`w-4 h-4 transition-transform duration-200 ${
@@ -185,20 +173,14 @@ const MainPanel: React.FC<{ isManager: boolean }> = ({ isManager }) => {
                       key={item.path}
                       to={item.path}
                       className={({ isActive }) =>
-                        `w-full flex items-center justify-between px-3 py-2 text-xs font-medium transition-all duration-200 group relative rounded-md ${
-                          isActive
-                            ? 'bg-white text-gray-900 shadow-sm font-semibold'
-                            : 'text-gray-700 hover:bg-white/60 hover:text-gray-900'
-                        }`
+                        cn(sidebarItemVariants({ active: isActive }), 'py-2 text-xs')
                       }
                     >
                       {({ isActive }) => (
                         <>
-                          {isActive && (
-                            <div className="absolute start-0 top-1/2 -translate-y-1/2 w-1 h-4 bg-blue-600 rounded-e-full" />
-                          )}
+                          {isActive && <SidebarActiveIndicator />}
                           <div className="flex items-center gap-2.5 ms-1">
-                            <Icon className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
+                            <Icon className="w-3.5 h-3.5 text-gray-500 shrink-0" />
                             <span>{item.label}</span>
                           </div>
                         </>
@@ -210,8 +192,8 @@ const MainPanel: React.FC<{ isManager: boolean }> = ({ isManager }) => {
             )}
           </div>
         </div>
-      </div>
-    </div>
+      </SidebarCard>
+    </nav>
   );
 };
 
@@ -221,9 +203,9 @@ export const Sidebar: React.FC = () => {
   const inReports = location.pathname.startsWith('/reports');
 
   return (
-    <aside className="w-64 bg-white border-e border-gray-200 h-full flex flex-col shrink-0 font-inter">
+    <SidebarContainer>
       {inReports ? <ReportsPanel /> : <MainPanel isManager={isManager} />}
-    </aside>
+    </SidebarContainer>
   );
 };
 
