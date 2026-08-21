@@ -136,13 +136,13 @@ export function PrinterWatchProvider({ children }: { children: React.ReactNode }
     const seq = ++latestSeq.current;
 
     try {
-      const response = await call.get<{ message: PrinterHealthResponse }>(
+bench --site ury.localhost clear-cache      const response = await call.get<any>(
         'ury_printer_watch.api.printer_health.get_printer_health'
       );
 
       if (seq < latestSeq.current) return;
 
-      const data = response.message;
+      const data: PrinterHealthResponse = response?.message ?? response;
       setPrinters(data?.printers || []);
       setLastUpdated(data?.timestamp || (data?.printers && data?.printers[0]?.summary_timestamp) || null);
       setLoadState('success');
