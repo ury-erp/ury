@@ -1771,7 +1771,16 @@ def table_transfer(table, newTable, invoice):
             pos_invoice.name, new_table.name, pos_invoice.branch
         )
     except Exception:
-        pass
+        # The invoice has already moved; if the KOT didn't follow, the kitchen
+        # is still looking at the old table. Don't fail the transfer over it,
+        # but leave a record rather than dropping the error.
+        frappe.log_error(
+            title=f"URY table transfer: KOT not updated for {pos_invoice.name}",
+            message=(
+                f"New table: {new_table.name}\nBranch: {pos_invoice.branch}\n\n"
+                f"{frappe.get_traceback()}"
+            ),
+        )
 
 
 @frappe.whitelist()

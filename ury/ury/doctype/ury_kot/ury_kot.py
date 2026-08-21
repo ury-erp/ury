@@ -23,8 +23,26 @@ class URYKOT(Document):
             try:
                 # Print KOT using a server function (print_by_server)
                 print_by_server("URY KOT", self.name, printer, kot_print_format)
-            except:
-                pass
+            except Exception:
+                # A KOT that fails to print means the kitchen never receives the
+                # order, so this must not stay silent. Submission still proceeds
+                # (one dead printer shouldn't block the sale) but the failure is
+                # recorded and surfaced to whoever is on the floor.
+                frappe.log_error(
+                    title=f"URY KOT print failed: {self.name}",
+                    message=(
+                        f"Printer: {printer}\nPrint format: {kot_print_format}\n\n"
+                        f"{frappe.get_traceback()}"
+                    ),
+                )
+                frappe.msgprint(
+                    frappe._("KOT {0} could not be printed on {1}. Please print it manually.").format(
+                        self.name, printer
+                    ),
+                    title=frappe._("Kitchen ticket not printed"),
+                    indicator="orange",
+                    alert=True,
+                )
 
         
         pos_kot_printers = frappe.db.get_all(
