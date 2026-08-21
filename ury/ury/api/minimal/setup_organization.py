@@ -1,5 +1,5 @@
 import frappe
-from frappe.desk.page.setup_wizard.setup_wizard import load_languages, load_country, setup_complete
+from frappe.desk.page.setup_wizard.setup_wizard import load_languages, setup_complete
 from frappe.geo.country_info import get_country_info, get_all
 from erpnext.accounts.doctype.account.chart_of_accounts.chart_of_accounts import get_charts_for_country
 import pytz
@@ -13,16 +13,10 @@ def get_setup_defaults():
         frappe.throw("Not permitted")
         
     languages = load_languages()
-    country_data = load_country()
-    if isinstance(country_data, str):
-        detected_country = country_data
-    elif isinstance(country_data, dict):
-        detected_country = country_data.get("country", "")
-    else:
-        detected_country = ""
-        
-    if not detected_country:
-        detected_country = frappe.db.get_single_value("System Settings", "country") or "India"
+    # frappe v16 removed setup_wizard.load_country() (the geo-IP country guess)
+    # with no replacement, so the site's configured country is now the primary
+    # source rather than the fallback it used to be.
+    detected_country = frappe.db.get_single_value("System Settings", "country") or "India"
     
     countries_dict = get_all()
     countries = list(countries_dict.keys())
