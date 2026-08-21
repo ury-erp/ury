@@ -19,7 +19,7 @@ import {
   DialogDescription,
 } from '@ury/ui';
 
-type PrinterStatus = 'excellent' | 'fair' | 'critical';
+type PrinterStatus = 'excellent' | 'fair' | 'critical' | 'no_data';
 
 interface PrinterHealth {
   device_name: string;
@@ -47,11 +47,12 @@ type LoadState = 'idle' | 'loading' | 'error' | 'success';
 
 const STATUS_VARIANTS: Record<
   PrinterStatus,
-  { badge: 'success' | 'warning' | 'danger'; dot: string; label: string }
+  { badge: 'success' | 'warning' | 'danger' | 'secondary'; dot: string; label: string }
 > = {
   excellent: { badge: 'success', dot: 'bg-green-500', label: 'Excellent' },
   fair: { badge: 'warning', dot: 'bg-orange-500', label: 'Fair' },
   critical: { badge: 'danger', dot: 'bg-red-500', label: 'Critical' },
+  no_data: { badge: 'secondary', dot: 'bg-gray-400', label: 'No Data' },
 };
 
 interface PrinterWatchContextValue {
@@ -127,8 +128,8 @@ export function PrinterWatchProvider({ children }: { children: React.ReactNode }
   }, [lastUpdated]);
 
   const hasIssue = useMemo(() => {
-    if (!printers.length) return true;
-    return printers.some((p) => p.status === 'fair' || p.status === 'critical');
+    if (!printers.length) return false;
+    return printers.some((p) => p.status === 'critical' || p.status === 'fair');
   }, [printers]);
 
   const fetchHealth = useCallback(async () => {
@@ -161,15 +162,30 @@ export function PrinterWatchProvider({ children }: { children: React.ReactNode }
     }
   }, [isInstalled]);
 
+  // Initial fetch on POS load as soon as app is confirmed installed, plus background polling
+  useEffect(() => {
+    if (!isInstalled) return;
+
+    // Fetch immediately on initial POS page load
+    fetchHealth();
+
+    // Background polling every 30s to keep status pointer updated
+    const intervalId = setInterval(fetchHealth, 30000);
+    return () => clearInterval(intervalId);
+  }, [isInstalled, fetchHealth]);
+
+  // Active polling while the modal dialog is open
   useEffect(() => {
     if (!isInstalled || !isOpen) return;
 
     setStaleError(null);
-    setLoadState('loading');
-    loadStateRef.current = 'loading';
+    if (loadStateRef.current !== 'success') {
+      setLoadState('loading');
+      loadStateRef.current = 'loading';
+    }
     fetchHealth();
 
-    const intervalId = setInterval(fetchHealth, 30000);
+    const intervalId = setInterval(fetchHealth, 10000);
     return () => clearInterval(intervalId);
   }, [isInstalled, isOpen, fetchHealth]);
 
@@ -223,13 +239,25 @@ export function usePrinterWatch(): PrinterWatchContextValue {
 }
 
 export function PrinterStatusButton() {
-  const { open, hasIssue, isInstalled } = usePrinterWatch();
+  const { open, printers, isInstalled } = usePrinterWatch();
 
   if (!isInstalled) {
     return null;
   }
 
-  const dotClass = hasIssue ? 'bg-rose-500' : 'bg-emerald-500';
+  // Calculate status pointer color based on printer health
+  let dotClass = 'bg-emerald-500';
+  if (printers.length > 0) {
+    const hasCritical = printers.some((p) => p.status === 'critical');
+    const hasWarning = printers.some((p) => p.status === 'fair' || p.status === 'no_data');
+    if (hasCritical) {
+      dotClass = 'bg-rose-500';
+    } else if (hasWarning) {
+      dotClass = 'bg-amber-500';
+    } else {
+      dotClass = 'bg-emerald-500';
+    }
+  }
 
   return (
     <button
@@ -378,4 +406,3 @@ function PrinterWatch() {
 }
 
 export default PrinterWatch;
-
