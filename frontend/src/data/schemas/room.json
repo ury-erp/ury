@@ -1,0 +1,56 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "URY Room Schema",
+  "description": "Form and data schema for URY Restaurant Room management",
+  "type": "object",
+  "properties": {
+    "room_name": {
+      "type": "string",
+      "title": "Room Name",
+      "placeholder": "e.g. VIP Lounge",
+      "minLength": 2
+    },
+    "room_type": {
+      "type": "string",
+      "title": "Room Type",
+      "enum": ["Indoor", "Outdoor", "Rooftop", "Private Dining", "Bar Area"],
+      "default": "Indoor"
+    },
+    "branch": {
+      "type": "string",
+      "title": "Branch",
+      "enum": ["Main Branch", "Downtown Branch", "Beachfront Outpost", "Express Outlet"],
+      "default": "Main Branch"
+    },
+    "number_of_tables": {
+      "type": "integer",
+      "title": "Number of Tables",
+      "default": 0,
+      "minimum": 0
+    },
+    "printer_config": {
+      "type": "object",
+      "title": "Printer Configuration",
+      "properties": {
+        "kot_printing": {
+          "type": "boolean",
+          "title": "Enable KOT Printing",
+          "default": true
+        },
+        "print_format": {
+          "type": "string",
+          "title": "Print Format",
+          "enum": ["Standard KOT", "Detailed KOT", "Bar Ticket", "Kitchen Display"],
+          "default": "Standard KOT"
+        },
+        "block_takeaway_printing": {
+          "type": "boolean",
+          "title": "Block Takeaway Printing",
+          "default": false
+        }
+      },
+      "required": ["kot_printing", "print_format"]
+    }
+  },
+  "required": ["room_name", "room_type", "branch"]
+}

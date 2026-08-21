@@ -1,13 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { t } from '../i18n';
 import { Link, useLocation } from 'react-router-dom';
-import { 
+import {
   Command,
   User,
   ChevronDown,
   Monitor,
   LogOut,
   RefreshCw,
+  Lock,
 } from 'lucide-react';
 import { Button, Input } from '@ury/ui';
 import { useRootStore } from '../store/root-store';
@@ -22,7 +23,7 @@ const Header = () => {
   const user = useRootStore((state: RootState) => state.user);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const location = useLocation();
-  const { searchQuery, setSearchQuery } = usePOSStore();
+  const { searchQuery, setSearchQuery, setShowVoluntaryClosing } = usePOSStore();
   const { orderSearchQuery, setOrderSearchQuery } = useRootStore();
   const [orderSearchInput, setOrderSearchInput] = useState(orderSearchQuery);
 
@@ -34,7 +35,7 @@ const Header = () => {
     searchPlaceholder = t('header.search_placeholder_orders');
     searchValue = orderSearchInput;
     searchOnChange = (e) => setOrderSearchInput(e.target.value);
-  } else if (location.pathname === '/') {
+  } else if (location.pathname === '/pos') {
     searchPlaceholder = t('header.search_placeholder_menu');
     searchValue = searchQuery;
     searchOnChange = (e) => setSearchQuery(e.target.value);
@@ -103,14 +104,19 @@ const Header = () => {
     window.location.reload();
   };
 
+  const handleCloseShift = () => {
+    setShowUserMenu(false);
+    setShowVoluntaryClosing(true);
+  };
+
   return (
     <header className="bg-white border-b border-gray-200">
       <div className="flex items-center justify-between h-16 px-6">
         {/* Logo */}
         <div className="flex items-center">
-        <Link to="/" className="flex items-center gap-3">
-            <img 
-              src="/assets/ury/pos/ury_pos.png" 
+        <Link to="/dashboard" className="flex items-center gap-3">
+            <img
+              src="/assets/ury/pos/ury_pos.png"
               alt="URY POS" 
               className="h-10 w-auto"
             />
@@ -118,7 +124,8 @@ const Header = () => {
         </div>
 
         {/* Search Bar */}
-        <div className="px-4 py-2 flex-1 flex items-center max-w-2xl mx-8  bg-gray-50 hover:bg-gray-100 border border-input rounded-md">
+        {location.pathname !== '/dashboard' ? (
+          <div className="px-4 py-2 flex-1 flex items-center max-w-2xl mx-8 bg-gray-50 hover:bg-gray-100 border border-input rounded-md">
             <Input
               ref={searchInputRef}
               placeholder={searchPlaceholder}
@@ -130,7 +137,10 @@ const Header = () => {
               <Command className="w-4 h-4" />
               <span>K</span>
             </div>
-        </div>
+          </div>
+        ) : (
+          <div className="flex-1" />
+        )}
 
         {/* Right side actions */}
         <div className="flex items-center gap-4">
@@ -156,6 +166,22 @@ const Header = () => {
                   <p className="text-sm text-gray-500">{user?.name || ''}</p>
                 </div>
                 <div className="py-2">
+                  <Button
+                    variant="ghost"
+                    className="flex justify-start items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                    onClick={handleCloseShift}
+                  >
+                    <Lock className="w-4 h-4 me-3" />
+                    {t('header.close_shift')}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="flex justify-start items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                    onClick={() => window.location.href = '/ury/dashboard'}
+                  >
+                    <Monitor className="w-4 h-4 me-3" />
+                    Switch to Dashboard
+                  </Button>
                   <Button
                     variant="ghost"
                     className="flex justify-start items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"

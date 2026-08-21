@@ -11,7 +11,10 @@
   "date",
   "time",
   "invoice",
-  "invoice_creation_time"
+  "invoice_creation_time",
+  "branch",
+  "production",
+  "pos_profile"
  ],
  "fields": [
   {
@@ -44,6 +47,23 @@
    "fieldtype": "Data",
    "label": "Invoice Creation Time",
    "read_only": 1
+  },
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "label": "Branch",
+   "options": "Branch"
+  },
+  {
+   "fieldname": "production",
+   "fieldtype": "Data",
+   "label": "Production"
+  },
+  {
+   "fieldname": "pos_profile",
+   "fieldtype": "Link",
+   "label": "POS Profile",
+   "options": "POS Profile"
   }
  ],
  "index_web_pages_for_search": 1,

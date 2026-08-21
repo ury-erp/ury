@@ -1,0 +1,196 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "prompt",
+ "creation": "2026-08-19 00:00:00.000000",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "device_info_tab",
+  "device_name",
+  "device_id",
+  "ordering_profile",
+  "column_break_device_info",
+  "branch",
+  "device_config_section",
+  "device_type",
+  "layout",
+  "column_break_device_config",
+  "table_mode",
+  "fixed_table",
+  "auth_status_section",
+  "enabled",
+  "credential_hash",
+  "column_break_auth_status",
+  "last_seen"
+ ],
+ "fields": [
+  {
+   "fieldname": "device_info_tab",
+   "fieldtype": "Tab Break",
+   "label": "Device Info"
+  },
+  {
+   "fieldname": "device_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Device Name",
+   "reqd": 1
+  },
+  {
+   "fieldname": "device_id",
+   "fieldtype": "Data",
+   "label": "Device ID",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "ordering_profile",
+   "fieldtype": "Link",
+   "label": "Ordering Profile",
+   "options": "URY Self Ordering Profile",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_device_info",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fetch_from": "ordering_profile.branch",
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "label": "Branch",
+   "options": "Branch",
+   "read_only": 1
+  },
+  {
+   "fieldname": "device_config_section",
+   "fieldtype": "Section Break",
+   "label": "Device Config"
+  },
+  {
+   "fieldname": "device_type",
+   "fieldtype": "Select",
+   "label": "Device Type",
+   "options": "\nKiosk\nTable Tablet\nPortable Tablet",
+   "reqd": 1
+  },
+  {
+   "fieldname": "layout",
+   "fieldtype": "Select",
+   "label": "Layout",
+   "options": "\nTablet\nLandscape Kiosk\nPortrait Kiosk",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_device_config",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "None",
+   "fieldname": "table_mode",
+   "fieldtype": "Select",
+   "label": "Table Mode",
+   "options": "\nNone\nFixed\nSelectable"
+  },
+  {
+   "depends_on": "eval:doc.table_mode==\"Fixed\"",
+   "fieldname": "fixed_table",
+   "fieldtype": "Link",
+   "label": "Fixed Table",
+   "options": "URY Table"
+  },
+  {
+   "fieldname": "auth_status_section",
+   "fieldtype": "Section Break",
+   "label": "Auth & Status"
+  },
+  {
+   "default": "1",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enabled"
+  },
+  {
+   "fieldname": "credential_hash",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Credential Hash",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_auth_status",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "last_seen",
+   "fieldtype": "Datetime",
+   "label": "Last Seen",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-19 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY Ordering Device",
+ "naming_rule": "Set by user",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "select": 1,
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "URY Manager",
+   "select": 1,
+   "share": 1,
+   "write": 1
+  },
+  {
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "URY Cashier",
+   "select": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Self Ordering Manager",
+   "select": 1,
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

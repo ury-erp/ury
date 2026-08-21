@@ -1,0 +1,84 @@
+{
+  "fields": [
+    {
+      "id": "company_name",
+      "label": "Company Name",
+      "type": "text",
+      "placeholder": "e.g. URY Restaurant",
+      "required": true,
+      "validations": ["required", "minLength:3"],
+      "triggers": ["company_abbr"]
+    },
+    {
+      "id": "company_abbr",
+      "label": "Company Abbreviation",
+      "type": "text",
+      "placeholder": "e.g. URY",
+      "required": true,
+      "validations": ["required", "maxLength:5"],
+      "description": "Used as a short prefix for your invoice numbers. Auto-filled from your company name — edit if you'd like something different."
+    },
+    {
+      "id": "language",
+      "label": "Your Language",
+      "type": "select",
+      "optionsKey": "languages",
+      "required": true,
+      "validations": ["required"]
+    },
+    {
+      "id": "country",
+      "label": "Your Country",
+      "type": "select",
+      "optionsKey": "countries",
+      "required": true,
+      "validations": ["required"],
+      "triggers": ["timezone", "currency", "chart_of_accounts"]
+    },
+    {
+      "id": "timezone",
+      "label": "Timezone",
+      "type": "select",
+      "optionsKey": "timezones",
+      "required": true,
+      "validations": ["required"]
+    },
+    {
+      "id": "currency",
+      "label": "Currency",
+      "type": "select",
+      "optionsKey": "currencies",
+      "required": true,
+      "validations": ["required"]
+    },
+    {
+      "id": "chart_of_accounts",
+      "label": "Chart of Accounts",
+      "type": "select",
+      "optionsKey": "charts_of_accounts",
+      "required": false,
+      "validations": [],
+      "description": "A template for how your income and expenses get categorized. We've picked one for your country — you usually don't need to change this."
+    },
+    {
+      "id": "fy_start_date",
+      "label": "Financial Year Begins On",
+      "type": "date",
+      "required": true,
+      "validations": ["required"],
+      "description": "When your financial year starts. Most businesses use the default for their country — change this only if your accountant asks you to."
+    }
+  ],
+  "installationTypes": [
+    {
+      "id": "minimal",
+      "title": "Minimal Installation",
+      "description": "We'll walk you through setting up your branch, tables, menu and user in a moment. (Recommended for first-time setup)."
+    },
+    {
+      "id": "advanced",
+      "title": "Advanced Installation",
+      "description": "Skip the walkthrough and configure everything yourself in the full admin panel."
+    }
+  ]
+}

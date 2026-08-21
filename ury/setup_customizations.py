@@ -7,7 +7,15 @@ from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 
 def after_install():
     create_custom_fields(get_custom_fields())
-    
+    add_roles_to_administrator()
+
+def add_roles_to_administrator():
+    try:
+        user = frappe.get_doc("User", "Administrator")
+        user.add_roles("URY Cashier", "URY Manager", "URY Captain")
+    except Exception as e:
+        frappe.log_error(f"Failed to add URY roles to Administrator: {e}", "URY Setup Error")
+        
 def before_uninstall():
 	delete_custom_fields(get_custom_fields())
  
@@ -150,9 +158,47 @@ def get_custom_fields():
 					"fieldtype": "Time",
 					"insert_after": "arrived_time",
 					"label": "Total Spend Time"
+				},
+				{
+					"fieldname": "self_ordering_info",
+					"fieldtype": "Section Break",
+					"label": "Self Ordering Info",
+					"insert_after": "total_spend_time",
+					"collapsible": 1,
+				},
+				{
+					"fieldname": "custom_order_source",
+					"fieldtype": "Select",
+					"default": "POS",
+					"options": "\nPOS\nCaptain\nQR Table\nQR Pickup\nKiosk\nTable Tablet",
+					"label": "Order Source",
+					"insert_after": "self_ordering_info",
+					"read_only": 1,
+					"translatable": 0,
+				},
+				{
+					"fieldname": "column_break_selford",
+					"fieldtype": "Column Break",
+					"insert_after": "custom_order_source",
+				},
+				{
+					"fieldname": "custom_ordering_device",
+					"fieldtype": "Link",
+					"options": "URY Ordering Device",
+					"label": "Ordering Device",
+					"insert_after": "column_break_selford",
+					"read_only": 1,
+				},
+				{
+					"fieldname": "custom_ordering_session",
+					"fieldtype": "Link",
+					"options": "URY Ordering Session",
+					"label": "Ordering Session",
+					"insert_after": "custom_ordering_device",
+					"read_only": 1,
 				}
 				],
-      
+
 		"Sales Invoice": [
 					{
 					"fieldname": "mobile_number",

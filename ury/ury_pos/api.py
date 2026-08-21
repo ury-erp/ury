@@ -1,4 +1,5 @@
 import frappe
+import json
 from frappe import _
 from datetime import date, datetime, timedelta
 from frappe.utils import validate_phone_number
@@ -7,35 +8,38 @@ from frappe.utils import validate_phone_number
 #GetTable  decripted temporarily
 # @frappe.whitelist()
 # def getTable(room):
-#     branch_name = getBranch()   
+#     branch_name = getBranch()
 #     tables = frappe.get_all(
 #         "URY Table",
 #         fields=["name", "occupied", "latest_invoice_time", "is_take_away", "restaurant_room","table_shape","no_of_seats","layout_x","layout_y"],
 #         filters={"branch": branch_name,"restaurant_room":room,}
-#     )    
+#     )
 #     return tables
 
-@frappe.whitelist()
-def getRestaurantMenu(pos_profile, room=None, order_type=None):
+def resolve_restaurant_menu(branch, room=None, order_type=None, cashier=False):
+    """
+    Resolve and return menu for a given branch, room, and order type.
+
+    Args:
+        branch: Branch name string (already resolved)
+        room: Optional room name
+        order_type: Optional order type
+        cashier: Boolean indicating if user is a cashier
+
+    Returns:
+        Dict with keys: items, modified_time, name
+    """
     menu_items = []
     menu_items_with_image = []
 
-    user_role = frappe.get_roles()
+    restaurant = frappe.db.get_value("URY Restaurant", {"branch": branch}, "name")
 
-    pos_profile = frappe.get_doc("POS Profile", pos_profile)
-
-    cashier = any(
-        role.role in user_role for role in pos_profile.role_allowed_for_billing
-    )
-    branch_name = getBranch()
-    restaurant = frappe.db.get_value("URY Restaurant", {"branch": branch_name}, "name")
-    
     if room:
-    
+
         room_wise_menu = frappe.db.get_value(
             "URY Restaurant", restaurant, "room_wise_menu"
         )
-        
+
         if room_wise_menu:
             menu = frappe.db.get_value(
                 "Menu for Room",
@@ -51,7 +55,7 @@ def getRestaurantMenu(pos_profile, room=None, order_type=None):
         order_type_wise_menu = frappe.db.get_value(
             "URY Restaurant", restaurant, "order_type_wise_menu"
         )
-    
+
         if order_type_wise_menu:
             menu = frappe.db.get_value(
                 "Order Type Menu",
@@ -60,18 +64,18 @@ def getRestaurantMenu(pos_profile, room=None, order_type=None):
             )
             if not menu:
                  menu = frappe.db.get_value("URY Restaurant", restaurant, "active_menu")
-    
+
         else:
             menu = frappe.db.get_value("URY Restaurant", restaurant, "active_menu")
 
     # Default menu if nothing is selected
     else:
         menu = frappe.db.get_value("URY Restaurant", restaurant, "active_menu")
-    
+
     if not menu:
         frappe.throw(_("Please set an active menu for Restaurant {0}").format(restaurant))
-    
-    
+
+
     # Get menu items (your existing code)
     menu_items = frappe.get_all(
         "URY Menu Item",
@@ -79,7 +83,7 @@ def getRestaurantMenu(pos_profile, room=None, order_type=None):
         fields=["item", "item_name", "rate", "special_dish", "disabled", "course"],
         order_by="item_name asc"
     )
-    
+
     menu_items_with_image = [
         {
             "item": item.item,
@@ -94,8 +98,8 @@ def getRestaurantMenu(pos_profile, room=None, order_type=None):
         for item in menu_items
     ]
     modified = frappe.db.get_value("URY Menu", menu, "modified")
-    
-    
+
+
     return {
         "items": menu_items_with_image,
         "modified_time": modified,
@@ -103,9 +107,22 @@ def getRestaurantMenu(pos_profile, room=None, order_type=None):
     }
 
 @frappe.whitelist()
+def getRestaurantMenu(pos_profile, room=None, order_type=None):
+    user_role = frappe.get_roles()
+
+    pos_profile = frappe.get_doc("POS Profile", pos_profile)
+
+    cashier = any(
+        role.role in user_role for role in pos_profile.role_allowed_for_billing
+    )
+    branch_name = getBranch()
+
+    return resolve_restaurant_menu(branch_name, room, order_type, cashier)
+
+@frappe.whitelist()
 def getMenuCourses():
-    courses = frappe.get_all("URY Menu Course", fields=["name"])
-    return [{"name": d.name, "label": _(d.name)} for d in courses]
+    courses = frappe.get_all("URY Menu Course", fields=["name", "icon"])
+    return [{"name": d.name, "label": _(d.name), "icon": d.icon} for d in courses]
 
 @frappe.whitelist()
 def getBranch():
@@ -949,7 +966,37 @@ def create_customer(customer_name, mobile_number=None, customer_group="Individua
         }
 
 @frappe.whitelist()
-def validate_pos_close(pos_profile): 
+def get_open_pos_opening_entries(pos_profile):
+    """Currently open (status=Open, submitted) POS Opening Entries for the
+    given POS Profile. Backs the React Closing flow (pos-closing-api.ts's
+    getOpenPosOpeningEntries) so it can find the requesting user's own
+    session -- referenced there since the POSClosingDialog work landed, but
+    never actually implemented until now (found via a live E2E test: the
+    Close Shift dialog failed outright with "no attribute
+    'get_open_pos_opening_entries'").
+
+    Read-only, no cross-branch/company filtering beyond `pos_profile` itself
+    -- matches this file's existing convention for closing-flow helpers
+    (validate_pos_close, _get_main_cashier_status), which likewise scope by
+    pos_profile alone and rely on frappe.has_permission on the returned
+    POS Invoice-adjacent data downstream for anything more granular.
+    """
+    if not frappe.has_permission("POS Opening Entry", "read"):
+        frappe.throw(_("Not permitted to view POS Opening Entries."), frappe.PermissionError)
+
+    return frappe.get_all(
+        "POS Opening Entry",
+        filters={
+            "pos_profile": pos_profile,
+            "status": "Open",
+            "docstatus": 1,
+        },
+        fields=["name", "period_start_date", "user", "pos_profile"],
+    )
+
+
+@frappe.whitelist()
+def validate_pos_close(pos_profile):
     enable_unclosed_pos_check = frappe.db.get_value("POS Profile",pos_profile,"custom_daily_pos_close")
     
     if enable_unclosed_pos_check:
@@ -980,7 +1027,436 @@ def validate_pos_close(pos_profile):
     return "Success"
 
 
+def _get_allowed_pos_profiles(company: str, user: str) -> list:
+    """Return POS Profiles the user may open for the given company.
+
+    Replicates ``erpnext.accounts.doctype.pos_profile.pos_profile.pos_profile_query``:
+    non-disabled profiles for the company where the user is listed in
+    ``applicable_for_users`` or where ``applicable_for_users`` is empty.
+
+    Returns a list of ``{"name": ..., "label": ...}`` dicts suitable for the
+    ORI POS Opening screen.
+    """
+    if not company or not user:
+        return []
+
+    profiles = frappe.get_all(
+        "POS Profile",
+        filters={"company": company, "disabled": 0},
+        fields=["name"],
+    )
+    if not profiles:
+        return []
+
+    profile_names = [p["name"] for p in profiles]
+
+    # Bulk-fetch applicable users for all candidate profiles.
+    user_rows = frappe.get_all(
+        "POS Profile User",
+        filters={"parent": ["in", profile_names], "parenttype": "POS Profile"},
+        fields=["parent", "user"],
+    )
+
+    profile_users = {}
+    for row in user_rows:
+        profile_users.setdefault(row["parent"], set()).add(row["user"])
+
+    allowed_names = [
+        name
+        for name in profile_names
+        if not profile_users.get(name) or user in profile_users[name]
+    ]
+
+    if not allowed_names:
+        return []
+
+    return [{"name": name, "label": name} for name in sorted(allowed_names)]
+
+
+def _get_main_cashier_status(pos_profile_name: str) -> dict:
+    """Return multi-cashier status for the given POS Profile.
+
+    Returns ``{"enabled": bool, "main_cashier_configured": bool,
+    "main_cashier_open": bool}``.
+    """
+    if not pos_profile_name:
+        return {"enabled": False, "main_cashier_configured": False, "main_cashier_open": False}
+
+    try:
+        pos_profile_doc = frappe.get_doc("POS Profile", pos_profile_name)
+        enabled = bool(pos_profile_doc.custom_enable_multiple_cashier)
+
+        main_cashier = None
+        for user_row in pos_profile_doc.applicable_for_users:
+            if user_row.custom_main_cashier:
+                main_cashier = user_row.user
+                break
+
+        main_cashier_configured = bool(main_cashier)
+        main_cashier_open = False
+        if main_cashier:
+            today = frappe.utils.today()
+            main_cashier_open = bool(
+                frappe.db.exists(
+                    "POS Opening Entry",
+                    {
+                        "user": main_cashier,
+                        "pos_profile": pos_profile_name,
+                        "posting_date": today,
+                        "status": "Open",
+                        "docstatus": 1,
+                    },
+                )
+            )
+
+        return {
+            "enabled": enabled,
+            "main_cashier_configured": main_cashier_configured,
+            "main_cashier_open": main_cashier_open,
+        }
+    except Exception:
+        return {"enabled": False, "main_cashier_configured": False, "main_cashier_open": False}
+
+
 @frappe.whitelist()
+def create_pos_opening_entry(pos_profile: str, company: str, balance_details) -> dict:
+    """Create and submit a POS Opening Entry for the ORI native screen.
+
+    Wraps the standard ERPNext flow but fills URY-mandatory fields
+    (branch and restaurant) from the selected POS Profile so ORI users do not
+    need to leave the React app.
+
+    ``balance_details`` may be a JSON string (legacy Desk shape) or a list of
+    ``{"mode_of_payment": ..., "opening_amount": ...}`` dicts.
+    """
+    if not frappe.has_permission("POS Opening Entry", "create"):
+        frappe.throw(_("Not permitted to create POS Opening Entry"), frappe.PermissionError)
+
+    if not frappe.has_permission("POS Opening Entry", "submit"):
+        frappe.throw(_("Not permitted to submit POS Opening Entry"), frappe.PermissionError)
+
+    if isinstance(balance_details, str):
+        balance_details = json.loads(balance_details)
+
+    pos_profile_doc = frappe.get_doc("POS Profile", pos_profile)
+
+    if not pos_profile_doc.branch:
+        frappe.throw(_("Selected POS Profile has no Branch."))
+    if not pos_profile_doc.restaurant:
+        frappe.throw(_("Selected POS Profile has no Restaurant."))
+
+    if not frappe.has_permission("POS Profile", "read", doc=pos_profile_doc):
+        frappe.throw(_("Not permitted to use this POS Profile."), frappe.PermissionError)
+
+    for entry in balance_details or []:
+        opening_amount = entry.get("opening_amount") if isinstance(entry, dict) else None
+        if opening_amount is not None and frappe.utils.flt(opening_amount) < 0:
+            frappe.throw(_("Opening amount cannot be negative."))
+
+    opening = frappe.get_doc(
+        {
+            "doctype": "POS Opening Entry",
+            "period_start_date": frappe.utils.get_datetime(),
+            "posting_date": frappe.utils.getdate(),
+            "user": frappe.session.user,
+            "company": company,
+            "pos_profile": pos_profile,
+            "branch": pos_profile_doc.branch,
+            "restaurant": pos_profile_doc.restaurant,
+        }
+    )
+    opening.set("balance_details", balance_details)
+    opening.submit()
+
+    return opening.as_dict()
+
+
+@frappe.whitelist()
+def get_pos_opening_screen_data() -> dict:
+    """Return the full context needed by the ORI native POS Opening screen.
+
+    This is a read-only, permission-aware context call. It aggregates the
+    current user/company, the POS Profiles the user may open, the active
+    POS Profile data (including branch, restaurant and multi-cashier flags),
+    payment modes seeded with an opening amount of zero, the daily-close
+    pre-check status, create/submit permission flags, and any existing open
+    POS Opening Entry for the current user.
+
+    The method does not create or mutate any document; submit-time
+    validations (payment accounts, duplicate entries, multi-cashier rules)
+    remain on the server.
+    """
+    user = frappe.session.user
+
+    # Company resolution: user default first, then global default.
+    company = frappe.defaults.get_user_default("Company")
+    if not company:
+        company = frappe.db.get_default("Company")
+
+    allowed_profiles = _get_allowed_pos_profiles(company, user)
+
+    # Resolve the active POS Profile. Prefer the existing URY helper; fall
+    # back to the first allowed profile if the helper cannot resolve one.
+    pos_profile_data = None
+    pos_profile_name = None
+    try:
+        pos_profile_data = getPosProfile()
+        pos_profile_name = pos_profile_data.get("pos_profile")
+    except Exception:
+        pos_profile_data = None
+        pos_profile_name = None
+
+    if not pos_profile_name and allowed_profiles:
+        pos_profile_name = allowed_profiles[0]["name"]
+        try:
+            pos_profile_doc = frappe.get_doc("POS Profile", pos_profile_name)
+            pos_profile_data = {
+                "pos_profile": pos_profile_doc.name,
+                "branch": pos_profile_doc.branch,
+                "company": pos_profile_doc.company,
+                "restaurant": pos_profile_doc.restaurant,
+                "warehouse": pos_profile_doc.warehouse,
+                "cashier": user,
+                "multiple_cashier": pos_profile_doc.custom_enable_multiple_cashier,
+                "custom_daily_pos_close": pos_profile_doc.custom_daily_pos_close,
+            }
+        except Exception:
+            pos_profile_data = None
+
+    # Payment modes with opening_amount default 0.
+    payment_modes = []
+    if pos_profile_name:
+        try:
+            pos_profile_doc = frappe.get_doc("POS Profile", pos_profile_name)
+            payment_modes = [
+                {"mode_of_payment": mop.mode_of_payment, "opening_amount": 0.0}
+                for mop in pos_profile_doc.payments
+            ]
+        except Exception:
+            payment_modes = []
+
+    # Daily close pre-check for the selected POS Profile.
+    daily_close_pending = False
+    if pos_profile_name:
+        try:
+            daily_close_pending = validate_pos_close(pos_profile_name) == "Failed"
+        except Exception:
+            daily_close_pending = False
+
+    # Multi-cashier status for the selected POS Profile.
+    multi_cashier = _get_main_cashier_status(pos_profile_name)
+
+    # DocType permission flags for POS Opening Entry.
+    can_create = bool(frappe.has_permission("POS Opening Entry", "create"))
+    can_submit = bool(frappe.has_permission("POS Opening Entry", "submit"))
+
+    # Existing open entries for the current user (user-wide check).
+    open_entries = frappe.get_all(
+        "POS Opening Entry",
+        filters={
+            "user": user,
+            "docstatus": 1,
+            "status": "Open",
+        },
+        fields=[
+            "name",
+            "company",
+            "pos_profile",
+            "period_start_date",
+            "branch",
+            "status",
+        ],
+        order_by="period_start_date desc",
+    )
+
+    # Currency information for display.
+    company_currency = None
+    currency_symbol = None
+    if company:
+        try:
+            company_doc = frappe.get_doc("Company", company)
+            company_currency = company_doc.default_currency
+            currency_symbol = frappe.db.get_value(
+                "Currency", company_currency, "symbol"
+            )
+        except Exception:
+            company_currency = None
+            currency_symbol = None
+
+    user_full_name = None
+    try:
+        user_full_name = frappe.db.get_value("User", user, "full_name")
+    except Exception:
+        user_full_name = None
+
+    return {
+        "user": user,
+        "user_full_name": user_full_name,
+        "company": company,
+        "company_currency": company_currency,
+        "currency_symbol": currency_symbol,
+        "allowed_profiles": allowed_profiles,
+        "selected_profile": pos_profile_name,
+        "branch": pos_profile_data.get("branch") if pos_profile_data else None,
+        "restaurant": pos_profile_data.get("restaurant") if pos_profile_data else None,
+        "payment_modes": payment_modes,
+        "daily_close_pending": daily_close_pending,
+        "multi_cashier": multi_cashier,
+        "permissions": {"create": can_create, "submit": can_submit},
+        "open_entries": open_entries,
+    }
+
+
+@frappe.whitelist()
+
+def _validate_checklist_branch(pos_profile):
+    """Ensure the session user's branch matches the given POS Profile's branch."""
+    session_branch = getBranch()
+    profile_branch = frappe.db.get_value("POS Profile", pos_profile, "branch")
+
+    if not profile_branch:
+        frappe.throw(
+            _("POS Profile {0} not found.").format(pos_profile),
+            frappe.DoesNotExistError,
+        )
+
+    if profile_branch != session_branch:
+        frappe.throw(
+            _("You do not have permission to access the checklist for POS Profile {0}.").format(
+                pos_profile
+            ),
+            frappe.PermissionError,
+        )
+
+
+@frappe.whitelist()
+def get_checklist(pos_profile, checklist_type):
+    _validate_checklist_branch(pos_profile)
+
+    has_checklist = frappe.db.exists("URY Checklist Item", {"parent": pos_profile})
+    if not has_checklist:
+        return {
+            "items": [],
+            "log_name": None,
+            "log_status": "Complete",
+        }
+
+    configured_items = frappe.get_all(
+        "URY Checklist Item",
+        fields=["item_label", "applies_to", "is_mandatory"],
+        filters={"parent": pos_profile, "applies_to": ["in", [checklist_type, "Both"]]},
+        parent_doctype="POS Profile",
+    )
+
+    existing_log = frappe.get_all(
+        "URY POS Checklist Log",
+        fields=["name", "status"],
+        filters={
+            "pos_profile": pos_profile,
+            "checklist_type": checklist_type,
+            "shift_date": date.today(),
+        },
+        limit=1,
+    )
+
+    log_name = None
+    log_status = None
+    if existing_log:
+        log_name = existing_log[0].name
+        log_status = existing_log[0].status
+    elif not configured_items:
+        log_status = "Complete"
+
+    return {
+        "items": configured_items,
+        "log_name": log_name,
+        "log_status": log_status,
+    }
+
+
+@frappe.whitelist()
+def submit_checklist(pos_profile, checklist_type, items, pos_opening_entry=None):
+    _validate_checklist_branch(pos_profile)
+
+    has_checklist = frappe.db.exists("URY Checklist Item", {"parent": pos_profile})
+    if not has_checklist:
+        return {
+            "status": "Complete",
+            "name": None,
+        }
+
+    items = json.loads(items)
+
+    configured_items = frappe.get_all(
+        "URY Checklist Item",
+        fields=["item_label", "is_mandatory"],
+        filters={"parent": pos_profile, "applies_to": ["in", [checklist_type, "Both"]]},
+        parent_doctype="POS Profile",
+    )
+    
+    if not configured_items:
+        return {
+            "status": "Complete",
+            "name": None,
+        }
+    mandatory_by_label = {row.item_label: row.is_mandatory for row in configured_items}
+
+    existing_log = frappe.get_all(
+        "URY POS Checklist Log",
+        fields=["name"],
+        filters={
+            "pos_profile": pos_profile,
+            "checklist_type": checklist_type,
+            "shift_date": date.today(),
+        },
+        limit=1,
+    )
+
+    if existing_log:
+        log_doc = frappe.get_doc("URY POS Checklist Log", existing_log[0].name)
+    else:
+        log_doc = frappe.new_doc("URY POS Checklist Log")
+        log_doc.pos_profile = pos_profile
+        log_doc.branch = getBranch()
+        log_doc.checklist_type = checklist_type
+        log_doc.shift_date = date.today()
+
+    if pos_opening_entry:
+        log_doc.pos_opening_entry = pos_opening_entry
+
+    log_doc.set("items", [])
+    for item in items:
+        log_doc.append(
+            "items",
+            {
+                "item_label": item.get("item_label"),
+                "is_mandatory": mandatory_by_label.get(item.get("item_label"), 0),
+                "is_checked": item.get("is_checked"),
+                "remarks": item.get("remarks"),
+            },
+        )
+
+    all_mandatory_checked = all(
+        row.is_checked for row in log_doc.items if row.is_mandatory
+    )
+
+    if all_mandatory_checked:
+        log_doc.status = "Complete"
+        log_doc.completed_by = frappe.session.user
+        log_doc.completed_at = frappe.utils.now()
+    else:
+        log_doc.status = "In Progress"
+
+    log_doc.save()
+
+    return {
+        "status": log_doc.status,
+        "name": log_doc.name,
+    }
+
+
+@frappe.whitelist()
+
 def merge_bills(primary_invoice, secondary_invoice):
 
     try:
