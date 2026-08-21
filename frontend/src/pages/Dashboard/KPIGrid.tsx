@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { formatCurrency } from '@ury/core';
 import { Card, Spinner } from '@ury/ui';
 import { DashboardSummary } from '../../services/dashboard';
@@ -36,13 +37,14 @@ interface KPICardProps {
 }
 
 const KPICard: React.FC<KPICardProps> = ({ title, value, loading }) => {
+  const { t } = useTranslation();
   return (
     <Card className="rounded-lg border border-gray-200 bg-white p-5 shadow-xs transition-all duration-200 hover:shadow-md hover:border-primary/20">
       <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">{title}</p>
       {loading ? (
-        <div className="mt-2 flex items-center space-x-2">
+        <div className="mt-2 flex items-center gap-2">
           <Spinner className="w-4 h-4 text-primary" />
-          <span className="text-sm text-gray-400">Loading...</span>
+          <span className="text-sm text-gray-400">{t('kpi.loading')}</span>
         </div>
       ) : (
         <h3 className="mt-2 text-2xl font-bold text-gray-900 tracking-tight">{value}</h3>
@@ -52,14 +54,14 @@ const KPICard: React.FC<KPICardProps> = ({ title, value, loading }) => {
 };
 
 export const KPIGrid: React.FC<KPIGridProps> = ({ summary, loading }) => {
+  const { t } = useTranslation();
+
   const todaySales = summary?.today_sales ?? 0;
   const ordersToday = summary?.today_orders ?? 0;
   const occupiedTables = summary?.occupied_tables ?? 0;
   const totalTables = summary?.total_tables ?? 0;
-  const aov = summary?.avg_order_value ?? 0;
-  const activeCashiers = summary?.active_cashiers ?? 0;
   const pendingOrders = summary?.pending_kitchen_orders ?? 0;
-  const totalMenuItems = summary?.total_menu_items ?? 0;
+  const aov = summary?.avg_order_value ?? 0;
 
   const occupancyRate = totalTables > 0 ? Math.round((occupiedTables / totalTables) * 100) : 0;
 
@@ -79,38 +81,38 @@ export const KPIGrid: React.FC<KPIGridProps> = ({ summary, loading }) => {
         />
 
         <KPICard
-          title="Today's Sales"
+          title={t('kpi.today_sales')}
           value={formatCurrency(todaySales)}
           loading={loading}
         />
 
         <KPICard
-          title="Orders Today"
+          title={t('kpi.orders_today')}
           value={ordersToday.toString()}
           loading={loading}
         />
 
         <KPICard
-          title="Table Occupancy"
+          title={t('kpi.table_occupancy')}
           value={`${occupancyRate}%`}
           loading={loading}
         />
 
         <KPICard
-          title="Occupied Tables"
+          title={t('kpi.occupied_tables')}
           value={`${occupiedTables} / ${totalTables}`}
           loading={loading}
         />
 
         <KPICard
-          title="Average Order Value"
+          title={t('kpi.avg_order_value')}
           value={formatCurrency(aov)}
           loading={loading}
         />
 
         <KPICard
-          title="Pending Kitchen Orders"
-          value={`${pendingOrders} KOTs`}
+          title={t('kpi.pending_kitchen')}
+          value={`${pendingOrders} ${t('common.kots')}`}
           loading={loading}
         />
       </div>

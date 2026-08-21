@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@ury/ui';
 import { WizardLayout } from '../../components/setup/WizardLayout';
 import { ConfigureSidebar } from '../../components/setup/ConfigureSidebar';
@@ -20,42 +21,6 @@ import { setupService } from '../../services/setup';
 import { call } from '@ury/core';
 import { CONFIGURE_PROGRESS_STEPS } from '../../components/setup/constants';
 import { ProgressModal } from '../../components/setup/ProgressModal';
-
-const SECTION_CONFIGS: Record<
-  SectionId,
-  { title: string; description: string }
-> = {
-  branch: {
-    title: 'Branch Details',
-    description:
-      'Set up your main branch name, invoice numbering, and tax details.',
-  },
-  rooms: {
-    title: 'Rooms',
-    description:
-      "Add the seating areas in your restaurant — you'll set how many tables each one has.",
-  },
-  tables: {
-    title: 'Tables',
-    description:
-      'Review and adjust the tables we generated for each room — rename, adjust seats, or add more.',
-  },
-  menu: {
-    title: 'Menu',
-    description:
-      'Add a few items to get started — you can bulk-import or add hundreds more anytime later.',
-  },
-  payment: {
-    title: 'Payments',
-    description:
-      'How your customers will pay. Cash is added by default — add Card, UPI, or others your restaurant accepts.',
-  },
-  users: {
-    title: 'Staff Accounts',
-    description:
-      "Add login accounts for your staff now, or skip this and add them later. We've suggested a starting cashier account below.",
-  },
-};
 
 function classifyError(err: unknown): {
   type: 'duplicate' | 'network' | 'validation' | 'unknown';
@@ -139,6 +104,7 @@ function classifyError(err: unknown): {
 
 function ConfigurePageContent() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   const [finishing, setFinishing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -160,6 +126,33 @@ function ConfigurePageContent() {
     goToPrevSection,
     goToNextSection,
   } = useConfigure();
+
+  const SECTION_CONFIGS: Record<SectionId, { title: string; description: string }> = {
+    branch: {
+      title: t('configure.branch'),
+      description: t('configure.branch_description'),
+    },
+    rooms: {
+      title: t('configure.rooms'),
+      description: t('configure.rooms_description'),
+    },
+    tables: {
+      title: t('configure.tables'),
+      description: t('configure.tables_description'),
+    },
+    menu: {
+      title: t('configure.menu'),
+      description: t('configure.menu_description'),
+    },
+    payment: {
+      title: t('configure.payment'),
+      description: t('configure.payment_description'),
+    },
+    users: {
+      title: t('configure.users'),
+      description: t('configure.users_description'),
+    },
+  };
 
   const currentIndex = SECTION_ORDER.indexOf(activeSection);
   const isFirstSection = currentIndex === 0;
@@ -227,7 +220,7 @@ function ConfigurePageContent() {
 
       if (classified.type === 'network') {
         setError(
-          'Network error, check your connection. Your data is preserved. Click "Finish with defaults" to retry.'
+          `Network error, check your connection. Your data is preserved. Click "${t('configure.finish_with_defaults')}" to retry.`
         );
       } else {
         setError(classified.msg);
@@ -235,7 +228,7 @@ function ConfigurePageContent() {
 
       setFinishing(false);
     }
-  }, []);
+  }, [t]);
 
   const handleFinish = () => {
     const payload = {
@@ -293,12 +286,12 @@ function ConfigurePageContent() {
       step={2}
       onPrev={handlePrev}
       onNext={handleNext}
-      nextLabel={isLastSection ? 'Launch' : 'Next'}
+      nextLabel={isLastSection ? t('configure.launch') : t('configure.next')}
       isNextLoading={finishing}
       secondaryAction={
         <div className="flex items-center gap-3">
           <span className="hidden sm:inline text-xs text-muted-foreground">
-            the data can be changed later
+            {t('configure.data_can_be_changed')}
           </span>
 
           <Button
@@ -307,7 +300,7 @@ function ConfigurePageContent() {
             onClick={handleFinish}
             disabled={finishing}
           >
-            Finish with defaults
+            {t('configure.finish_with_defaults')}
           </Button>
         </div>
       }
@@ -317,7 +310,7 @@ function ConfigurePageContent() {
           <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3 text-red-700">
             <div className="flex-1 text-sm font-medium">
               <span className="font-bold block mb-1">
-                Configuration Error:
+                {t('configure.configuration_error')}
               </span>
               {error}
             </div>
@@ -326,7 +319,7 @@ function ConfigurePageContent() {
               onClick={() => setError(null)}
               className="text-xs text-red-500 hover:text-red-700 font-semibold underline shrink-0"
             >
-              Dismiss
+              {t('configure.dismiss')}
             </button>
           </div>
         )}

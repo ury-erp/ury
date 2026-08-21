@@ -1,22 +1,24 @@
+import { useTranslation } from 'react-i18next';
 import { useConfigure, SectionId } from '../../context/ConfigureContext';
 import { Building2, Map, Grid3X3, UtensilsCrossed, CreditCard, Users, Check } from 'lucide-react';
 
 interface SidebarItem {
   id: SectionId;
-  label: string;
+  labelKey: string;
   icon: React.ElementType;
 }
 
 const SIDEBAR_ITEMS: SidebarItem[] = [
-  { id: 'branch', label: 'Branch', icon: Building2 },
-  { id: 'rooms', label: 'Rooms', icon: Map },
-  { id: 'tables', label: 'Tables', icon: Grid3X3 },
-  { id: 'menu', label: 'Menu', icon: UtensilsCrossed },
-  { id: 'payment', label: 'Payments', icon: CreditCard },
-  { id: 'users', label: 'User', icon: Users },
+  { id: 'branch', labelKey: 'configure.branch', icon: Building2 },
+  { id: 'rooms', labelKey: 'configure.rooms', icon: Map },
+  { id: 'tables', labelKey: 'configure.tables', icon: Grid3X3 },
+  { id: 'menu', labelKey: 'configure.menu', icon: UtensilsCrossed },
+  { id: 'payment', labelKey: 'configure.payment', icon: CreditCard },
+  { id: 'users', labelKey: 'configure.users', icon: Users },
 ];
 
 export function ConfigureSidebar() {
+  const { t } = useTranslation();
   const { activeSection, setActiveSection, completedSections } = useConfigure();
 
   return (
@@ -48,9 +50,9 @@ export function ConfigureSidebar() {
                   {isActive && (
                     <div className="absolute start-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-blue-600 rounded-e-full" />
                   )}
-                  <div className="flex items-center gap-3 ms-1">
+                  <div className="flex items-center gap-3 ms-1 min-w-0">
                     <Icon className="w-4 h-4 text-gray-500 flex-shrink-0" />
-                    <span className="text-start">{item.label}</span>
+                    <span className="text-start truncate">{t(item.labelKey)}</span>
                   </div>
                   {isCompleted && !isActive && (
                     <Check className="w-4 h-4 text-green-600 flex-shrink-0" />

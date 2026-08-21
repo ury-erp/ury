@@ -7,6 +7,7 @@ import { setupService, SetupPayload } from '../../services/setup';
 import setupSchema from '../../data/forms/setup.json';
 import { ProgressModal } from '../../components/setup/ProgressModal';
 import { Switch } from '../../components/ui/switch';
+import { changeAppLanguage } from '../../i18n';
 
 const FISCAL_YEARS: Record<string, string> = {
   Afghanistan: '12-21',
@@ -159,6 +160,9 @@ export default function SetupPage() {
       handleCountryChange(value);
     } else if (fieldId === 'company_name') {
       handleCompanyNameChange(value);
+    } else if (fieldId === 'language') {
+      // Immediately apply the selected language across the entire app
+      changeAppLanguage(value);
     }
   }, [handleCountryChange, handleCompanyNameChange]);
 

@@ -1,7 +1,8 @@
 import React, { forwardRef, useImperativeHandle, useMemo, useEffect } from 'react';
 import { defineCatalog } from '@json-render/core';
 import { schema } from '@json-render/react/schema';
-import { defineRegistry, Renderer, JSONUIProvider, useBoundProp, useStateBinding, createStateStore } from '@json-render/react';
+import { defineRegistry, Renderer, JSONUIProvider, useStateBinding, createStateStore } from '@json-render/react';
+import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { Input } from '@ury/ui';
 import { SearchableSelect } from '../common/SearchableSelect';
@@ -46,18 +47,19 @@ const formCatalog = defineCatalog(schema, {
       }),
       description: "Generic field renderer"
     }
-  }
-});
+  },
+  actions: {}
+} as any);
 
 // 2. Define the Component Registry
 const { registry } = defineRegistry(formCatalog, {
   components: {
-    FormRoot: ({ children }) => (
+    FormRoot: ({ children }: any) => (
       <div className="w-full space-y-6">
         {children}
       </div>
     ),
-    FormSection: ({ props, children }) => (
+    FormSection: ({ props, children }: any) => (
       <div className="w-full space-y-4">
         {props.label && (
           <h3 className="text-md font-semibold text-foreground">{props.label}</h3>
@@ -67,7 +69,8 @@ const { registry } = defineRegistry(formCatalog, {
         </div>
       </div>
     ),
-    FieldRenderer: ({ props, bindings, emit }) => {
+    FieldRenderer: ({ props, bindings, emit }: any) => {
+      const { t } = useTranslation();
       const { onFieldChange } = React.useContext(FormCallbackContext);
       const bindingPath = bindings?.value;
       const [boundVal, setBoundVal] = useStateBinding<string>(bindingPath || '');
@@ -89,11 +92,23 @@ const { registry } = defineRegistry(formCatalog, {
         onFieldChange?.(field.id, newVal);
       };
 
+      const getFieldTranslationKey = (id: string) => {
+        if (id === 'language') return 'your_language';
+        if (id === 'country') return 'your_country';
+        if (id === 'fy_start_date') return 'fy_start';
+        return id;
+      };
+
+      const key = getFieldTranslationKey(field.id);
+      const labelText = t(`setup.${key}`, field.label) as any;
+      const descText = t(`setup.${key}_description`, field.description) as any;
+      const placeholderText = t(`setup.${key}_placeholder`, field.placeholder) as any;
+
       return (
         <div className={getColSpanClass(field)}>
           <div className="space-y-1.5">
             <label htmlFor={field.id} className="text-sm font-medium text-gray-700">
-              {field.label} {field.required && <span className="text-red-500">*</span>}
+              {labelText} {field.required && <span className="text-red-500">*</span>}
             </label>
 
             {field.type === 'text' || field.type === 'password' || field.type === 'email' ? (
@@ -101,7 +116,7 @@ const { registry } = defineRegistry(formCatalog, {
                 id={field.id}
                 type={field.type}
                 value={val || ''}
-                placeholder={field.placeholder}
+                placeholder={placeholderText}
                 onChange={(e) => handleChange(e.target.value)}
                 error={!!props.error}
               />
@@ -110,7 +125,7 @@ const { registry } = defineRegistry(formCatalog, {
                 id={field.id}
                 value={val || ''}
                 options={props.options || []}
-                placeholder={`Select ${field.label}...`}
+                placeholder={placeholderText || `Select ${labelText}...`}
                 error={!!props.error}
                 onChange={(_fieldId, newVal) => handleChange(newVal)}
                 strict={true}
@@ -127,8 +142,8 @@ const { registry } = defineRegistry(formCatalog, {
 
             {props.error ? (
               <p className="text-xs text-red-500 pt-1">{props.error}</p>
-            ) : field.description ? (
-              <p className="text-xs text-gray-500 pt-1">{field.description}</p>
+            ) : descText ? (
+              <p className="text-xs text-gray-500 pt-1">{descText}</p>
             ) : null}
           </div>
         </div>
@@ -257,7 +272,7 @@ export const DynamicForm = forwardRef<DynamicFormHandle, DynamicFormProps>(
 
     return (
       <FormCallbackContext.Provider value={{ onFieldChange }}>
-        <JSONUIProvider store={store} onAction={handleAction}>
+        <JSONUIProvider store={store} {...{ onAction: handleAction } as any}>
           <div className="space-y-6">
             <Renderer spec={spec} registry={registry} />
           </div>

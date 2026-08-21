@@ -1,4 +1,5 @@
 import { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@ury/ui';
 import { Check } from 'lucide-react';
 import uryLogo from '../../../Public/photo_2026-08-19_13-24-09.jpg';
@@ -22,12 +23,15 @@ export function WizardLayout({
   children,
   onNext,
   onPrev,
-  nextLabel = 'Next',
+  nextLabel,
   isNextDisabled,
   isNextLoading,
   secondaryAction,
 }: WizardLayoutProps) {
+  const { t } = useTranslation();
   const version = (window as any).frappe?.boot?.versions?.ury || 'v3.2.0';
+
+  const resolvedNextLabel = nextLabel ?? t('configure.next');
 
   return (
     <div className="min-h-screen w-full flex flex-col bg-background">
@@ -36,14 +40,14 @@ export function WizardLayout({
         <div className={`${SHELL_WIDTH} h-16 flex items-center justify-between gap-4`}>
           <div className="flex items-center gap-3">
             <img src={uryLogo} alt="URY Logo" className="h-7 w-auto" />
-            <span className="text-sm font-semibold text-foreground leading-none">Let's get your restaurant ready</span>
+            <span className="text-sm font-semibold text-foreground leading-none">{t('setup.tagline')}</span>
           </div>
 
           {/* 2-step breadcrumb (Setup, Configure) */}
           <div className="hidden sm:flex items-center gap-2">
-            <BreadcrumbStep label="Setup" state={step === 1 ? 'active' : 'done'} />
+            <BreadcrumbStep label={t('setup.breadcrumb_setup')} state={step === 1 ? 'active' : 'done'} />
             <div className={`w-8 h-px ${step === 2 ? 'bg-primary' : 'bg-border'}`} />
-            <BreadcrumbStep label="Configure" state={step === 2 ? 'active' : 'upcoming'} />
+            <BreadcrumbStep label={t('setup.breadcrumb_configure')} state={step === 2 ? 'active' : 'upcoming'} />
           </div>
         </div>
       </header>
@@ -59,7 +63,7 @@ export function WizardLayout({
           <div className="flex items-center h-full">
             {step === 2 && onPrev && (
               <Button variant="outline" onClick={onPrev}>
-                Previous
+                {t('configure.previous')}
               </Button>
             )}
           </div>
@@ -67,7 +71,7 @@ export function WizardLayout({
           <div className="flex items-center gap-4 h-full">
             {secondaryAction}
             <Button variant="default" onClick={onNext} disabled={isNextDisabled || isNextLoading} className="px-6">
-              {isNextLoading ? 'Working...' : nextLabel}
+              {isNextLoading ? t('setup.working') : resolvedNextLabel}
             </Button>
           </div>
         </div>
@@ -91,7 +95,7 @@ function BreadcrumbStep({ label, state }: { label: string; state: 'active' | 'do
             state === 'active' ? 'bg-primary text-white ring-4 ring-primary/15' : 'bg-muted text-muted-foreground'
           }`}
         >
-          {label === 'Setup' ? 1 : 2}
+          {label === 'Setup' || label === 'الإعداد' || label === 'Configuration' ? 1 : 2}
         </div>
       )}
       <span className={`text-sm ${state === 'active' ? 'font-semibold text-foreground' : 'font-medium text-muted-foreground'}`}>

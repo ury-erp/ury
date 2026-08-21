@@ -1,7 +1,7 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { formatCurrency } from '@ury/core';
 import { Card, CardHeader, CardTitle, CardContent, Badge, Spinner } from '@ury/ui';
-import { useBranchContext } from '../../context/BranchContext';
 import { TransactionRecord } from '../../services/dashboard';
 
 interface ReportWidgetsProps {
@@ -10,9 +10,7 @@ interface ReportWidgetsProps {
 }
 
 export const ReportWidgets: React.FC<ReportWidgetsProps> = ({ recentTransactions, loading }) => {
-  const { activeBranchId, activeBranch } = useBranchContext();
-
-  const activeBranchName = activeBranchId === 'all' ? 'All Branches' : (activeBranch?.name || 'Selected Branch');
+  const { t } = useTranslation();
 
   return (
     <div className="space-y-6">
@@ -21,10 +19,10 @@ export const ReportWidgets: React.FC<ReportWidgetsProps> = ({ recentTransactions
         <CardHeader className="border-b border-gray-100 bg-gray-50/50 p-5">
           <div>
             <CardTitle className="text-lg font-bold text-gray-900">
-              Live POS Transactions
+              {t('widgets.live_transactions')}
             </CardTitle>
             <p className="text-xs text-gray-500 mt-0.5">
-              Real-time sales and active checkouts
+              {t('widgets.subtitle')}
             </p>
           </div>
         </CardHeader>
@@ -36,37 +34,41 @@ export const ReportWidgets: React.FC<ReportWidgetsProps> = ({ recentTransactions
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
+              <table className="w-full text-start text-xs">
                 <thead className="bg-gray-50 text-gray-500 font-semibold border-b border-gray-100">
                   <tr>
-                    <th className="px-5 py-3.5">Invoice ID</th>
-                    <th className="px-5 py-3.5">Customer</th>
-                    <th className="px-5 py-3.5">Table / Location</th>
-                    <th className="px-5 py-3.5">Order Type</th>
-                    <th className="px-5 py-3.5">Date &amp; Time</th>
-                    <th className="px-5 py-3.5">Status</th>
-                    <th className="px-5 py-3.5 text-right">Grand Total</th>
+                    <th className="px-5 py-3.5 text-start">{t('widgets.invoice_id')}</th>
+                    <th className="px-5 py-3.5 text-start">{t('widgets.customer')}</th>
+                    <th className="px-5 py-3.5 text-start">{t('widgets.table_location')}</th>
+                    <th className="px-5 py-3.5 text-start">{t('widgets.order_type')}</th>
+                    <th className="px-5 py-3.5 text-start">{t('widgets.datetime')}</th>
+                    <th className="px-5 py-3.5 text-start">{t('widgets.status')}</th>
+                    <th className="px-5 py-3.5 text-end">{t('widgets.grand_total')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 font-medium text-gray-700">
                   {recentTransactions.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="px-5 py-8 text-center text-gray-400">
-                        No transactions recorded yet today.
+                        {t('widgets.empty')}
                       </td>
                     </tr>
                   ) : (
                     recentTransactions.map((tx) => (
                       <tr key={tx.name} className="hover:bg-primary/10 transition-colors">
                         <td className="px-5 py-3.5 font-bold text-primary">{tx.name}</td>
-                        <td className="px-5 py-3.5 text-gray-900 font-semibold">{tx.customer || 'Walk-in Customer'}</td>
-                        <td className="px-5 py-3.5 text-gray-600">{tx.restaurant_table || 'Counter'}</td>
+                        <td className="px-5 py-3.5 text-gray-900 font-semibold">
+                          {tx.customer || t('widgets.walk_in')}
+                        </td>
+                        <td className="px-5 py-3.5 text-gray-600">
+                          {tx.restaurant_table || t('widgets.counter')}
+                        </td>
                         <td className="px-5 py-3.5">
                           <Badge
                             variant="outline"
                             className="border-primary/20 bg-primary/10 text-primary font-semibold"
                           >
-                            {tx.order_type || 'Dine In'}
+                            {tx.order_type || t('widgets.dine_in')}
                           </Badge>
                         </td>
                         <td className="px-5 py-3.5 text-gray-500">{tx.posting_date} {tx.posting_time}</td>
@@ -75,7 +77,7 @@ export const ReportWidgets: React.FC<ReportWidgetsProps> = ({ recentTransactions
                             {tx.status}
                           </Badge>
                         </td>
-                        <td className="px-5 py-3.5 text-right font-bold text-gray-900">
+                        <td className="px-5 py-3.5 text-end font-bold text-gray-900">
                           {formatCurrency(tx.grand_total)}
                         </td>
                       </tr>
