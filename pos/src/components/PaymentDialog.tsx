@@ -61,18 +61,6 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
     fetchPaymentModes();
   }, [fetchPaymentModes]);
 
-  // Calculate split payment total
-  const payments = paymentModes
-    .map((mode: any) => {
-      const id = typeof mode === 'string' ? mode : mode.id;
-      const amount = parseFloat(paymentInputs[id] || '');
-      return amount > 0 ? { mode_of_payment: id, amount } : null;
-    })
-    .filter(Boolean);
-  const paymentsTotal = payments.reduce((sum, p: any) => sum + p.amount, 0);
-  const shortfall = finalTotal - paymentsTotal;
-  const isShort = shortfall > 0.005;
-
   // baseTotal represents the amount before any invoice-level discount (like pricing rule or manual discount)
   const baseTotal = grandTotal + (discountAmount || 0);
 
@@ -100,6 +88,19 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   const discountedTotal = Math.max(0, subtotal - totalDiscount);
   // If discount is applied, round up; else, round normally
   const finalTotal = appliedDiscount > 0 ? Math.ceil(discountedTotal) : Math.round(discountedTotal);
+
+  // Calculate split payment total
+  const payments = paymentModes
+    .map((mode: any) => {
+      const id = typeof mode === 'string' ? mode : mode.id;
+      const amount = parseFloat(paymentInputs[id] || '');
+      return amount > 0 ? { mode_of_payment: id, amount } : null;
+    })
+    .filter(Boolean);
+  const paymentsTotal = payments.reduce((sum, p: any) => sum + p.amount, 0);
+  const shortfall = finalTotal - paymentsTotal;
+  const isShort = shortfall > 0.005;
+
   const finalAdjustment = finalTotal - discountedTotal;
   const roundedFinalAdjustment = Math.round(finalAdjustment * 100) / 100;
   const showFinalAdjustment = Math.abs(roundedFinalAdjustment) > 0.001;
