@@ -1,0 +1,26 @@
+[
+    {
+        "doctype": "Item Group",
+        "item_group_name": "STARTERS"
+    },
+    {
+        "doctype": "Item Group",
+        "item_group_name": "RICE"
+    },
+    {
+        "doctype": "Item Group",
+        "item_group_name": "GRAVIES"
+    },
+    {
+        "doctype": "Item Group",
+        "item_group_name": "VEGETABLES"
+    },
+    {
+        "doctype": "Item Group",
+        "item_group_name": "COMBOS"
+    },
+    {
+        "doctype": "Item Group",
+        "item_group_name": "MEAT"
+    }
+]

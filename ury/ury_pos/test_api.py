@@ -7,6 +7,55 @@ from frappe.tests.utils import FrappeTestCase
 from unittest.mock import patch, MagicMock
 from ury.ury_pos.api import searchPosInvoice
 from ury.ury_pos.api import get_split_group, getPosInvoiceItems
+from ury.ury_pos.api import getRestaurantMenu, resolve_restaurant_menu
+from ury.ury_pos.api import submit_checklist
+import json
+from datetime import date
+
+
+class TestGetRestaurantMenuPhase1(unittest.TestCase):
+    """Phase 1 regression: getRestaurantMenu() must remain a thin wrapper
+    around resolve_restaurant_menu() with byte-identical behavior for
+    existing (staff) callers."""
+
+    @patch("ury.ury_pos.api.getBranch")
+    @patch("ury.ury_pos.api.resolve_restaurant_menu")
+    @patch("ury.ury_pos.api.frappe.get_doc")
+    @patch("ury.ury_pos.api.frappe.get_roles")
+    def test_getRestaurantMenu_delegates_with_resolved_branch_and_cashier(
+        self, mock_get_roles, mock_get_doc, mock_resolve, mock_getBranch
+    ):
+        mock_get_roles.return_value = ["URY Cashier"]
+
+        mock_role = MagicMock()
+        mock_role.role = "URY Cashier"
+        mock_pos_profile = MagicMock()
+        mock_pos_profile.role_allowed_for_billing = [mock_role]
+        mock_get_doc.return_value = mock_pos_profile
+
+        mock_getBranch.return_value = "Branch A"
+        mock_resolve.return_value = {"items": [], "modified_time": None, "name": "Menu A"}
+
+        result = getRestaurantMenu("Test POS Profile", room="Room 1", order_type="Dine In")
+
+        mock_resolve.assert_called_once_with("Branch A", "Room 1", "Dine In", True)
+        self.assertEqual(result, {"items": [], "modified_time": None, "name": "Menu A"})
+
+    @patch("ury.ury_pos.api.getBranch")
+    @patch("ury.ury_pos.api.frappe.get_doc")
+    @patch("ury.ury_pos.api.frappe.get_roles")
+    def test_getRestaurantMenu_non_cashier_role(self, mock_get_roles, mock_get_doc, mock_getBranch):
+        mock_get_roles.return_value = ["Some Other Role"]
+        mock_pos_profile = MagicMock()
+        mock_pos_profile.role_allowed_for_billing = []
+        mock_get_doc.return_value = mock_pos_profile
+        mock_getBranch.return_value = "Branch A"
+
+        with patch("ury.ury_pos.api.resolve_restaurant_menu") as mock_resolve:
+            mock_resolve.return_value = {"items": [], "modified_time": None, "name": "Menu A"}
+            getRestaurantMenu("Test POS Profile")
+            mock_resolve.assert_called_once_with("Branch A", None, None, False)
+
 
 class TestMergeBillsSEC07(unittest.TestCase):
 
@@ -287,3 +336,380 @@ class TestUryPosApi(unittest.TestCase):
         
         self.assertEqual(result.get("status"), "success")
         self.assertTrue(frappe.db.exists("Customer", "Test Auth Customer"))
+
+
+
+class TestGetAllowedPosProfiles(unittest.TestCase):
+    @patch("ury.ury_pos.api.frappe.get_all")
+    def test_no_company_returns_empty(self, mock_get_all):
+        from ury.ury_pos.api import _get_allowed_pos_profiles
+
+        result = _get_allowed_pos_profiles("", "cashier@example.com")
+        self.assertEqual(result, [])
+        mock_get_all.assert_not_called()
+
+    @patch("ury.ury_pos.api.frappe.get_all")
+    def test_open_profile_included_when_no_users(self, mock_get_all):
+        from ury.ury_pos.api import _get_allowed_pos_profiles
+
+        mock_get_all.side_effect = [
+            [{"name": "POS-Profile-1"}],
+            [],
+            [{
+                "name": "POS-Profile-1",
+                "company": "Test Co",
+                "branch": "Branch A",
+                "restaurant": "Rest A",
+                "custom_enable_multiple_cashier": 0,
+                "custom_daily_pos_close": 0,
+            }],
+        ]
+
+        result = _get_allowed_pos_profiles("Test Co", "cashier@example.com")
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["name"], "POS-Profile-1")
+
+    @patch("ury.ury_pos.api.frappe.get_all")
+    def test_matching_user_included(self, mock_get_all):
+        from ury.ury_pos.api import _get_allowed_pos_profiles
+
+        mock_get_all.side_effect = [
+            [{"name": "POS-Profile-1"}],
+            [{"parent": "POS-Profile-1", "user": "cashier@example.com"}],
+            [{
+                "name": "POS-Profile-1",
+                "company": "Test Co",
+                "branch": "Branch A",
+                "restaurant": "Rest A",
+                "custom_enable_multiple_cashier": 0,
+                "custom_daily_pos_close": 0,
+            }],
+        ]
+
+        result = _get_allowed_pos_profiles("Test Co", "cashier@example.com")
+        self.assertEqual(len(result), 1)
+
+    @patch("ury.ury_pos.api.frappe.get_all")
+    def test_other_user_excluded(self, mock_get_all):
+        from ury.ury_pos.api import _get_allowed_pos_profiles
+
+        mock_get_all.side_effect = [
+            [{"name": "POS-Profile-1"}],
+            [{"parent": "POS-Profile-1", "user": "other@example.com"}],
+            [],
+        ]
+
+        result = _get_allowed_pos_profiles("Test Co", "cashier@example.com")
+        self.assertEqual(result, [])
+
+
+class TestGetPOSOpeningScreenData(unittest.TestCase):
+    @patch("ury.ury_pos.api.frappe.get_all")
+    @patch("ury.ury_pos.api.frappe.has_permission")
+    @patch("ury.ury_pos.api.validate_pos_close")
+    @patch("ury.ury_pos.api.getPosProfile")
+    @patch("ury.ury_pos.api._get_allowed_pos_profiles")
+    @patch("ury.ury_pos.api.frappe.db.get_default")
+    @patch("ury.ury_pos.api.frappe.defaults.get_user_default")
+    @patch("ury.ury_pos.api.frappe.session")
+    def test_returns_full_context(
+        self,
+        mock_session,
+        mock_user_default,
+        mock_global_default,
+        mock_allowed,
+        mock_get_pos_profile,
+        mock_validate_close,
+        mock_has_permission,
+        mock_get_all,
+    ):
+        from ury.ury_pos.api import get_pos_opening_screen_data
+
+        mock_session.user = "cashier@example.com"
+        mock_user_default.return_value = "Test Co"
+        mock_global_default.return_value = None
+        mock_allowed.return_value = [{"name": "POS-Profile-1", "company": "Test Co"}]
+        mock_get_pos_profile.return_value = {
+            "pos_profile": "POS-Profile-1",
+            "branch": "Branch A",
+            "company": "Test Co",
+            "restaurant": "Rest A",
+            "multiple_cashier": 1,
+            "owner": "owner@example.com",
+            "custom_daily_pos_close": 1,
+        }
+
+        mock_pos_doc = MagicMock()
+        mock_pos_doc.payments = [
+            MagicMock(mode_of_payment="Cash"),
+            MagicMock(mode_of_payment="Card"),
+        ]
+
+        def get_doc_side_effect(doctype, name):
+            if doctype == "POS Profile" and name == "POS-Profile-1":
+                return mock_pos_doc
+            return MagicMock()
+
+        with patch(
+            "ury.ury_pos.api._get_main_cashier_status"
+        ) as mock_multi_cashier, patch(
+            "ury.ury_pos.api.frappe.get_doc", side_effect=get_doc_side_effect
+        ):
+            mock_validate_close.return_value = "Success"
+            mock_has_permission.side_effect = lambda doctype, perm: perm == "create" or perm == "submit"
+            mock_multi_cashier.return_value = {
+                "enabled": True,
+                "main_cashier_configured": True,
+                "main_cashier_open": True,
+            }
+            mock_get_all.return_value = [
+                {"name": "POS-OPE-0001", "company": "Test Co", "pos_profile": "POS-Profile-1", "status": "Open"}
+            ]
+
+            result = get_pos_opening_screen_data()
+
+        self.assertEqual(result["user"], "cashier@example.com")
+        self.assertEqual(result["company"], "Test Co")
+        self.assertEqual(len(result["allowed_profiles"]), 1)
+        self.assertEqual(result["allowed_profiles"][0]["name"], "POS-Profile-1")
+        self.assertEqual(result["selected_profile"], "POS-Profile-1")
+        self.assertEqual(result["branch"], "Branch A")
+        self.assertEqual(result["restaurant"], "Rest A")
+        self.assertTrue(result["multi_cashier"]["enabled"])
+        self.assertTrue(result["multi_cashier"]["main_cashier_configured"])
+        self.assertTrue(result["multi_cashier"]["main_cashier_open"])
+        self.assertEqual(len(result["payment_modes"]), 2)
+        self.assertEqual(result["payment_modes"][0]["opening_amount"], 0.0)
+        self.assertFalse(result["daily_close_pending"])
+        self.assertTrue(result["permissions"]["create"])
+        self.assertTrue(result["permissions"]["submit"])
+        self.assertEqual(len(result["open_entries"]), 1)
+
+    @patch("ury.ury_pos.api.frappe.get_all")
+    @patch("ury.ury_pos.api.frappe.has_permission")
+    @patch("ury.ury_pos.api.getPosProfile")
+    @patch("ury.ury_pos.api._get_allowed_pos_profiles")
+    @patch("ury.ury_pos.api.frappe.db.get_default")
+    @patch("ury.ury_pos.api.frappe.defaults.get_user_default")
+    @patch("ury.ury_pos.api.frappe.session")
+    def test_handles_missing_company_and_profile_gracefully(
+        self,
+        mock_session,
+        mock_user_default,
+        mock_global_default,
+        mock_allowed,
+        mock_get_pos_profile,
+        mock_has_permission,
+        mock_get_all,
+    ):
+        from ury.ury_pos.api import get_pos_opening_screen_data
+
+        mock_session.user = "cashier@example.com"
+        mock_user_default.return_value = None
+        mock_global_default.return_value = None
+        mock_allowed.return_value = []
+        mock_get_pos_profile.side_effect = Exception("No branch")
+        mock_has_permission.return_value = False
+        mock_get_all.return_value = []
+
+        result = get_pos_opening_screen_data()
+
+        self.assertIsNone(result["company"])
+        self.assertEqual(result["allowed_profiles"], [])
+        self.assertIsNone(result["selected_profile"])
+        self.assertEqual(result["payment_modes"], [])
+        self.assertFalse(result["permissions"]["create"])
+        self.assertFalse(result["permissions"]["submit"])
+        self.assertEqual(result["open_entries"], [])
+
+class TestSubmitChecklistSEC10(FrappeTestCase):
+    """Test cases for submit_checklist function."""
+
+    def _create_mock_log_doc(self):
+        """Create a properly-configured MagicMock for log_doc that maintains an items list."""
+        # Create a real list to hold items
+        items_list = []
+
+        # Create the mock document
+        mock_log_doc = MagicMock()
+        mock_log_doc.name = "URY-POS-CHECKLIST-LOG-001"
+        mock_log_doc.status = None  # Will be set by submit_checklist
+        mock_log_doc.completed_by = None
+        mock_log_doc.completed_at = None
+
+        # Configure the items property to return the real list
+        mock_log_doc.items = items_list
+
+        # Mock the set() method to reset items when called with "items"
+        def mock_set(key, value):
+            if key == "items":
+                items_list.clear()
+                mock_log_doc.items = items_list
+
+        mock_log_doc.set = mock_set
+
+        # Mock the append() method to actually append to the items list
+        def mock_append(key, value):
+            if key == "items":
+                items_list.append(MagicMock(**value))
+
+        mock_log_doc.append = mock_append
+
+        return mock_log_doc
+
+    @patch("ury.ury_pos.api.frappe.get_all")
+    @patch("ury.ury_pos.api.frappe.new_doc")
+    @patch("ury.ury_pos.api.frappe.utils.now")
+    @patch("ury.ury_pos.api.frappe.session")
+    @patch("ury.ury_pos.api.getBranch")
+    @patch("ury.ury_pos.api._validate_checklist_branch")
+    def test_submit_checklist_all_mandatory_checked(
+        self, mock_validate_branch, mock_get_branch, mock_session, mock_now, mock_new_doc, mock_get_all
+    ):
+        """Test that submit_checklist returns status='Complete' when all mandatory items are checked."""
+        # Setup mocks
+        mock_session.user = "test_user@example.com"
+        mock_get_branch.return_value = "Branch A"
+        mock_now.return_value = "2025-01-15 10:30:00"
+
+        # Mock configured items - all mandatory
+        mock_configured_items = [
+            MagicMock(item_label="Opening Check", is_mandatory=True),
+            MagicMock(item_label="Stock Count", is_mandatory=True),
+        ]
+
+        # Mock existing log query returns empty (no existing log)
+        mock_get_all.side_effect = [mock_configured_items, []]
+
+        # Mock new document creation with properly-configured mock
+        mock_log_doc = self._create_mock_log_doc()
+        mock_log_doc.name = "URY-POS-CHECKLIST-LOG-001"
+        mock_new_doc.return_value = mock_log_doc
+
+        # Prepare checklist items - all checked
+        items = json.dumps([
+            {"item_label": "Opening Check", "is_checked": True, "remarks": ""},
+            {"item_label": "Stock Count", "is_checked": True, "remarks": ""},
+        ])
+
+        # Call the function
+        result = submit_checklist(
+            pos_profile="POS-Profile-001",
+            checklist_type="Opening",
+            items=items
+        )
+
+        # Assertions
+        # Verify that all mandatory items were appended
+        self.assertEqual(len(mock_log_doc.items), 2)
+        # Verify that both items have is_mandatory=True and is_checked=True
+        for item in mock_log_doc.items:
+            self.assertTrue(item.is_mandatory)
+            self.assertTrue(item.is_checked)
+        # Verify status is "Complete" because all mandatory items are checked
+        self.assertEqual(result["status"], "Complete")
+        self.assertEqual(mock_log_doc.status, "Complete")
+        self.assertEqual(result["name"], "URY-POS-CHECKLIST-LOG-001")
+        mock_log_doc.save.assert_called_once()
+
+    @patch("ury.ury_pos.api.frappe.get_all")
+    @patch("ury.ury_pos.api.frappe.new_doc")
+    @patch("ury.ury_pos.api.frappe.utils.now")
+    @patch("ury.ury_pos.api.frappe.session")
+    @patch("ury.ury_pos.api.getBranch")
+    @patch("ury.ury_pos.api._validate_checklist_branch")
+    def test_submit_checklist_mandatory_unchecked(
+        self, mock_validate_branch, mock_get_branch, mock_session, mock_now, mock_new_doc, mock_get_all
+    ):
+        """Test that submit_checklist returns status='In Progress' when at least one mandatory item is unchecked."""
+        # Setup mocks
+        mock_session.user = "test_user@example.com"
+        mock_get_branch.return_value = "Branch A"
+        mock_now.return_value = "2025-01-15 10:30:00"
+
+        # Mock configured items - mix of mandatory and optional
+        mock_configured_items = [
+            MagicMock(item_label="Opening Check", is_mandatory=True),
+            MagicMock(item_label="Stock Count", is_mandatory=True),
+            MagicMock(item_label="Optional Verification", is_mandatory=False),
+        ]
+
+        # Mock existing log query returns empty (no existing log)
+        mock_get_all.side_effect = [mock_configured_items, []]
+
+        # Mock new document creation with properly-configured mock
+        mock_log_doc = self._create_mock_log_doc()
+        mock_log_doc.name = "URY-POS-CHECKLIST-LOG-002"
+        mock_new_doc.return_value = mock_log_doc
+
+        # Prepare checklist items - one mandatory unchecked
+        items = json.dumps([
+            {"item_label": "Opening Check", "is_checked": True, "remarks": ""},
+            {"item_label": "Stock Count", "is_checked": False, "remarks": "Pending"},
+            {"item_label": "Optional Verification", "is_checked": False, "remarks": ""},
+        ])
+
+        # Call the function
+        result = submit_checklist(
+            pos_profile="POS-Profile-001",
+            checklist_type="Opening",
+            items=items
+        )
+
+        # Assertions
+        # Verify that all items were appended
+        self.assertEqual(len(mock_log_doc.items), 3)
+        # Verify that mandatory items have correct is_mandatory flag
+        opening_check = mock_log_doc.items[0]
+        stock_count = mock_log_doc.items[1]
+        optional_verification = mock_log_doc.items[2]
+
+        self.assertTrue(opening_check.is_mandatory)
+        self.assertTrue(opening_check.is_checked)
+
+        self.assertTrue(stock_count.is_mandatory)
+        self.assertFalse(stock_count.is_checked)  # This one is unchecked
+
+        self.assertFalse(optional_verification.is_mandatory)
+        self.assertFalse(optional_verification.is_checked)
+
+        # Verify status is "In Progress" because at least one mandatory item is unchecked
+        self.assertEqual(result["status"], "In Progress")
+        self.assertEqual(mock_log_doc.status, "In Progress")
+        self.assertEqual(result["name"], "URY-POS-CHECKLIST-LOG-002")
+        mock_log_doc.save.assert_called_once()
+
+    @patch("ury.ury_pos.api.frappe.throw")
+    @patch("ury.ury_pos.api.frappe.db.get_value")
+    @patch("ury.ury_pos.api.getBranch")
+    def test_validate_checklist_branch_cross_branch_rejection(
+        self, mock_get_branch, mock_db_get_value, mock_throw
+    ):
+        """Test that submit_checklist raises PermissionError when user's branch doesn't match POS Profile branch."""
+        # Setup mocks for _validate_checklist_branch (no mock of the validation function itself)
+        mock_get_branch.return_value = "Branch A"  # Session user's branch
+
+        # Mock frappe.db.get_value to return the POS Profile's branch (different from session user's)
+        mock_db_get_value.return_value = "Branch B"
+
+        # Make frappe.throw actually raise the exception
+        def throw_side_effect(message, exception_class=None):
+            if exception_class:
+                raise exception_class(message)
+            else:
+                raise frappe.ValidationError(message)
+
+        mock_throw.side_effect = throw_side_effect
+
+        # Prepare minimal checklist items
+        items = json.dumps([
+            {"item_label": "Opening Check", "is_checked": True, "remarks": ""},
+        ])
+
+        # Call the function and expect it to raise PermissionError
+        with self.assertRaises(frappe.PermissionError):
+            submit_checklist(
+                pos_profile="POS-Profile-Branch-B",
+                checklist_type="Opening",
+                items=items
+            )
