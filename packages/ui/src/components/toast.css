@@ -1,9 +1,18 @@
-/* Override default toast styles for custom design */
+/* Override default toast styles for custom design.
+   Shape, density and elevation now sit on the same scale as everything else:
+   the shared --radius token instead of a hardcoded 8px, the top of the
+   elevation scale (a toast floats over the whole app), and the 12/14px
+   padding rhythm the other surfaces use. The semantic colours further down
+   are left as literals on purpose — the token set has no success/info ramp to
+   map them onto, and inventing one is a colour-system change, not a design
+   pass. */
 .Toastify__toast {
-  border-radius: 8px !important;
+  border-radius: var(--radius) !important;
   font-family: inherit !important;
-  padding: 16px !important;
+  padding: 12px 14px !important;
   min-height: auto !important;
+  box-shadow: 0 8px 16px -4px hsl(var(--black) / 0.08),
+    0 24px 40px -8px hsl(var(--black) / 0.14) !important;
 }
 
 .Toastify__toast-icon {
@@ -65,10 +74,28 @@
   color: #1e40af !important;
 }
 
+/* Warning Toast */
+.toast-warning {
+  background-color: #fffbe6 !important;
+  color: #92400e !important;
+}
+
+.toast-warning .Toastify__toast-icon svg {
+  color: #d97706 !important;
+}
+
+.toast-warning .Toastify__progress-bar {
+  background-color: #d97706 !important;
+}
+
+.toast-warning .Toastify__close-button {
+  color: #92400e !important;
+}
+
 /* Common styles for all toasts */
 .Toastify__toast-body {
-  font-size: 0.875rem !important;
-  line-height: 1.25rem !important;
+  font-size: 0.8rem !important;
+  line-height: 1.15rem !important;
   font-weight: 500 !important;
 }
 

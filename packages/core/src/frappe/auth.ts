@@ -24,18 +24,34 @@ export const getLoggedUser = async (): Promise<LoggedUserResponse> => {
 
 export const getUserRoles = async (email: string): Promise<{ roles: string[]; full_name: string }> => {
   try {
-    // Get user details using db.getDoc
-    const userDoc = await db.getDoc<UserDoc>('User', email);
-    
-    if (!userDoc || !userDoc.roles) {
-      return { roles: [], full_name: '' };
+    // Prefer frappe.boot session data: it reflects the user's *effective* roles
+    // (including roles granted outside the User doctype's persisted "Has Role"
+    // child table, e.g. Administrator). A fresh db.getDoc('User', email) call
+    // reads that child table directly, which is not guaranteed to be populated
+    // the same way the session boot's role list is.
+    // @ts-ignore - frappe boot shape isn't typed here
+    const boot = (window as any)?.frappe?.boot;
+    const bootRoles: string[] = boot?.user?.roles || boot?.user_roles || [];
+    const bootFullName: string = boot?.user?.full_name || boot?.user_info?.[email]?.fullname || '';
+
+    let roles: string[] = bootRoles;
+    let full_name: string = bootFullName;
+
+    // Fall back to (and merge with) the persisted User doctype when boot data
+    // is unavailable or incomplete, e.g. when looking up a user other than the
+    // current session user, or when frappe.boot hasn't loaded yet.
+    if (!roles.length || !full_name) {
+      const userDoc = await db.getDoc<UserDoc>('User', email);
+
+      if (!roles.length && userDoc?.roles) {
+        roles = userDoc.roles.map(role => role.role);
+      }
+      if (!full_name && userDoc?.full_name) {
+        full_name = userDoc.full_name;
+      }
     }
 
-    // Extract role names and full_name from the user doc
-    return {
-      roles: userDoc.roles.map(role => role.role),
-      full_name: userDoc.full_name
-    };
+    return { roles, full_name };
   } catch (error) {
     console.error('Error getting user details:', error);
     return { roles: [], full_name: '' };

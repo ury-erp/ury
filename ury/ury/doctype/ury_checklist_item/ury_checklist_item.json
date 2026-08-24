@@ -1,0 +1,50 @@
+{
+ "actions": [],
+ "autoname": "autoincrement",
+ "creation": "2026-08-19 12:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "item_label",
+  "applies_to",
+  "is_mandatory"
+ ],
+ "fields": [
+  {
+   "fieldname": "item_label",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Item Label",
+   "reqd": 1
+  },
+  {
+   "default": "Both",
+   "fieldname": "applies_to",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Applies To",
+   "options": "Opening\nClosing\nBoth"
+  },
+  {
+   "default": "1",
+   "fieldname": "is_mandatory",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Is Mandatory"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-08-19 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY Checklist Item",
+ "naming_rule": "Autoincrement",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

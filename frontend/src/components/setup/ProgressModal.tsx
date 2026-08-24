@@ -1,0 +1,159 @@
+import { useEffect, useRef } from 'react';
+import { CheckCircle2, Circle, Loader2 } from 'lucide-react';
+import { subscribeRealtimeEvent } from '../../lib/realtimeClient';
+import { PROGRESS_STEPS } from './constants';
+
+interface ProgressModalProps {
+  visible: boolean;
+  activeIndex: number;
+  error?: string | null;
+  steps?: string[];
+  eventName?: string;
+  description?: string;
+  onStepChange?: (index: number) => void;
+  /** Called after the realtime subscription is attached — start the API call here */
+  onReady?: () => void;
+  /** Frappe setup_task status === "ok" (background setup) */
+  onComplete?: () => void;
+  onFail?: (message: string) => void;
+}
+
+type SetupTaskPayload = {
+  step?: number;
+  status?: string;
+  progress?: [number, number];
+  stage_status?: string;
+  fail_msg?: string;
+  message?: SetupTaskPayload;
+};
+
+function unwrapPayload(data: unknown): SetupTaskPayload {
+  if (!data || typeof data !== 'object') {
+    return {};
+  }
+  const obj = data as SetupTaskPayload;
+  if (obj.message && typeof obj.message === 'object') {
+    return obj.message;
+  }
+  return obj;
+}
+
+export function ProgressModal({
+  visible,
+  activeIndex,
+  error,
+  steps = PROGRESS_STEPS,
+  eventName = 'setup_task',
+  description = 'Setting things up, this usually takes less than a minute.',
+  onStepChange,
+  onReady,
+  onComplete,
+  onFail,
+}: ProgressModalProps) {
+  const onStepChangeRef = useRef(onStepChange);
+  const onReadyRef = useRef(onReady);
+  const onCompleteRef = useRef(onComplete);
+  const onFailRef = useRef(onFail);
+  useEffect(() => {
+    onStepChangeRef.current = onStepChange;
+    onReadyRef.current = onReady;
+    onCompleteRef.current = onComplete;
+    onFailRef.current = onFail;
+  });
+
+  useEffect(() => {
+    if (!visible) return;
+
+    const handler = (data: unknown) => {
+      const payload = unwrapPayload(data);
+
+      if (payload.fail_msg || payload.status === 'fail') {
+        onFailRef.current?.(payload.fail_msg || 'Setup failed');
+        return;
+      }
+
+      if (payload.status === 'ok') {
+        onCompleteRef.current?.();
+        return;
+      }
+
+      if (Array.isArray(payload.progress) && typeof payload.progress[0] === 'number') {
+        onStepChangeRef.current?.(payload.progress[0]);
+        return;
+      }
+
+      if (typeof payload.step !== 'number') return;
+
+      if (payload.status === 'loading') {
+        onStepChangeRef.current?.(payload.step);
+      } else if (payload.status === 'completed') {
+        onStepChangeRef.current?.(payload.step + 1);
+      }
+    };
+
+    const unsubscribe = subscribeRealtimeEvent(eventName, handler, () => {
+      onReadyRef.current?.();
+    });
+
+    return unsubscribe;
+  }, [visible, eventName]);
+
+  if (!visible) return null;
+
+  const totalSteps = steps.length;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 backdrop-blur-sm">
+      <div className="w-full max-w-[540px] bg-white rounded-2xl shadow-xl overflow-hidden">
+        
+        {/* Segmented Top Bar */}
+        <div className="flex px-10 pt-10 pb-6 gap-1">
+          {Array.from({ length: Math.max(totalSteps, 1) }).map((_, i) => {
+            const segmentProgress = i <= activeIndex ? 'bg-primary' : 'bg-gray-200';
+            return (
+              <div key={i} className={`flex-1 h-1.5 rounded-full ${segmentProgress}`} />
+            );
+          })}
+        </div>
+
+        <div className="px-10 pb-8">
+          <h2 className="text-2xl font-semibold text-foreground mb-1">Setting up your restaurant</h2>
+          <p className="text-sm text-muted-foreground mb-6">
+            {description}
+          </p>
+          
+          <div className="flex flex-col mb-4 max-h-[50vh] overflow-y-auto">
+            {steps.map((step, idx) => {
+              const isDone = idx < activeIndex;
+              const isActive = idx === activeIndex;
+
+              return (
+                <div key={idx} className="flex items-center gap-4 py-3 border-b border-gray-100 last:border-0 min-h-12">
+                  <div className="w-6 h-6 flex items-center justify-center shrink-0">
+                    {isDone ? (
+                      <CheckCircle2 className="w-6 h-6 text-white fill-green-500" />
+                    ) : isActive ? (
+                      <Loader2 className="w-6 h-6 text-primary animate-spin" />
+                    ) : (
+                      <Circle className="w-6 h-6 text-gray-200" />
+                    )}
+                  </div>
+                  <span className={`text-sm ${isActive ? 'font-medium text-gray-900' : isDone ? 'text-foreground' : 'text-gray-400'}`}>
+                    {step}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+
+          {error && (
+            <div className="mt-4 p-4 bg-red-50 text-red-600 text-sm rounded-lg border border-red-200">
+              {error}
+            </div>
+          )}
+        </div>
+        
+      </div>
+    </div>
+  );
+}

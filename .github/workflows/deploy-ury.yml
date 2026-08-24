@@ -1,0 +1,37 @@
+name: Deploy URY V3
+
+on:
+  push:
+    branches:
+      - v3-test
+
+permissions: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.URY_DEPLOY_SSH_KEY }}
+          SSH_HOST: ${{ secrets.URY_DEPLOY_HOST }}
+          SSH_PORT: ${{ secrets.URY_DEPLOY_PORT }}
+        run: |
+          mkdir -p ~/.ssh
+
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+
+          ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts
+
+      - name: Deploy
+        env:
+          SSH_HOST: ${{ secrets.URY_DEPLOY_HOST }}
+          SSH_USER: ${{ secrets.URY_DEPLOY_USER }}
+          SSH_PORT: ${{ secrets.URY_DEPLOY_PORT }}
+        run: |
+          ssh -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" \
+            "/home/beta/deploy-ury.sh \
+            '${GITHUB_REF_NAME}' \
+            '${GITHUB_SHA}'"

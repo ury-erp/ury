@@ -1,0 +1,8 @@
+"Bulk Edit Items"
+"Item","Item Name","Rate","Special Dish","Disabled","Course Icon","Course"
+"item","item_name","rate","special_dish","disabled","course_icon","course"
+" "," "," "," "," "," "," "
+"The CSV format is case sensitive"
+"Do not edit headers which are preset in the template"
+"------"
+"CB","Chicken Biryani",250,1,0,"","Main Courses"
