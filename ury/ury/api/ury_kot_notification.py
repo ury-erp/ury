@@ -1,4 +1,5 @@
 import frappe
+from frappe.utils import add_to_date, now_datetime
 
 
 def get_users_with_role(role_name):
@@ -18,7 +19,11 @@ def get_users_with_role(role_name):
 
 @frappe.whitelist()
 def order_delay_notification(id):
-    table = frappe.db.get_value("URY KOT", id, "restaurant_table")
+    kot_doc = frappe.get_doc("URY KOT", id)
+    if not frappe.has_permission("URY KOT", "write", doc=kot_doc):
+        frappe.throw(frappe._("Not permitted to send notifications for this KOT"), frappe.PermissionError)
+
+    table = kot_doc.restaurant_table
     tableOrTakeaway = "Take Away"
     if table:
         tableOrTakeaway = table
@@ -64,6 +69,17 @@ def order_delay_notification(id):
 
 
 def create_system_notification(message, user, subject):
+    recent_duplicate = frappe.db.exists(
+        "Notification Log",
+        {
+            "for_user": user,
+            "subject": subject,
+            "creation": [">", add_to_date(now_datetime(), minutes=-5)],
+        },
+    )
+    if recent_duplicate:
+        return
+
     communication = frappe.get_doc(
         {
             "doctype": "Notification Log",

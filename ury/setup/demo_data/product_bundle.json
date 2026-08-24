@@ -1,0 +1,20 @@
+[
+    {
+        "doctype": "Product Bundle",
+        "new_item_code": "TDC",
+        "items": [
+            {
+                "doctype": "Product Bundle Item",
+                "item_code": "GR",
+                "qty": 1,
+                "parentfield": "items"
+            },
+            {
+                "doctype": "Product Bundle Item",
+                "item_code": "CG",
+                "qty": 1,
+                "parentfield": "items"
+            }
+        ]
+    }
+]

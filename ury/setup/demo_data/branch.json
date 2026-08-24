@@ -1,0 +1,20 @@
+[
+    {
+        "doctype": "Branch",
+        "branch": "Demo Branch",
+        "user": [
+            {
+                "user": "Administrator"
+            },
+            {
+                "user": "cashier@ury.com"
+            },
+            {
+                "user": "captain@ury.com"
+            },
+            {
+                "user": "manager@ury.com"
+            }
+        ]
+    }
+]

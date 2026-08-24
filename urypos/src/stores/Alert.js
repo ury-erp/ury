@@ -41,32 +41,41 @@ export const useAlert = defineStore("alert", {
         }
         document.body.appendChild(modal);
 
-        // Create the modal content
+        // Create the modal content using safe DOM construction so that
+        // untrusted alert values are rendered as text, never as markup.
         const modalContent = document.createElement("div");
 
         const heading = document.createElement("h2");
-        heading.className = "text-base font-semibold mb-4";
+        heading.classList.add("text-base", "font-semibold", "mb-4");
         heading.textContent = title;
-        modalContent.appendChild(heading);
 
         const divider = document.createElement("hr");
-        divider.className = "my-6 border-t border-gray-300";
+        divider.classList.add("my-6", "border-t", "border-gray-300");
+
+        const messageParagraph = document.createElement("p");
+        messageParagraph.classList.add("mb-4", "text-justify", "text-sm");
+        messageParagraph.textContent = message;
+
+        const closeButton = document.createElement("button");
+        closeButton.classList.add(
+          "bg-blue-700",
+          "md:ml-96",
+          "ml-64",
+          "text-white",
+          "px-4",
+          "py-2",
+          "rounded-md"
+        );
+        closeButton.textContent = buttonText;
+
+        modalContent.appendChild(heading);
         modalContent.appendChild(divider);
-
-        const paragraph = document.createElement("p");
-        paragraph.className = "mb-4 text-justify text-sm";
-        paragraph.textContent = message;
-        modalContent.appendChild(paragraph);
-
-        const button = document.createElement("button");
-        button.className = "bg-blue-700 md:ml-96 ml-64 text-white px-4 py-2 rounded-md";
-        button.textContent = buttonText;
-        modalContent.appendChild(button);
+        modalContent.appendChild(messageParagraph);
+        modalContent.appendChild(closeButton);
 
         modal.appendChild(modalContent);
 
         // Close the modal and remove the backdrop when the button is clicked
-        const closeButton = modalContent.querySelector("button");
         closeButton.addEventListener("click", () => {
           modal.remove();
           backdrop.remove();

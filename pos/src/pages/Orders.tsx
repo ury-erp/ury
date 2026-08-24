@@ -229,7 +229,7 @@ export default function Orders() {
         await posStore.addToOrder(cartItem);
       }
       // Redirect to POS page
-      navigate('/');
+      navigate('/pos');
     } catch (err) {
       showToast.error(err instanceof Error ? err.message : t('errors.failed_edit_order'));
     } finally {
@@ -758,6 +758,8 @@ export default function Orders() {
           owner={posStore.posProfile?.cashier || ''}
           fetchOrders={fetchOrders}
           clearSelectedOrder={clearSelectedOrder}
+          discountPercentage={selectedOrder.additional_discount_percentage}
+          discountAmount={selectedOrder.discount_amount}
         />
       )}
       {selectedOrder && (

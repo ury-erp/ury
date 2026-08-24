@@ -1,0 +1,30 @@
+[
+    {
+        "doctype": "URY Room",
+        "__newname": "Ground Floor",
+        "room_type": "NON-AC",
+        "branch": "Demo Branch"
+    },
+    {
+        "doctype": "URY Room",
+        "__newname": "First Floor",
+        "room_type": "NON-AC",
+        "branch": "Demo Branch"
+    },
+    {
+        "doctype": "URY Room",
+        "__newname": "Ground Floor AC",
+        "branch": "Demo Branch"
+    },
+    {
+        "doctype": "URY Room",
+        "__newname": "First Floor AC",
+        "branch": "Demo Branch"
+    },
+    {
+        "doctype": "URY Room",
+        "__newname": "Second Floor",
+        "room_type": "NON-AC",
+        "branch": "Demo Branch"
+    }
+]

@@ -4,3 +4,4 @@
 [post_model_sync]
 # Patches added in this section will be executed after doctypes are migrated
 ury.patches.v2_0.default_permissions
+ury.patches.v2_0.fix_waiter_order_slip_print_format
