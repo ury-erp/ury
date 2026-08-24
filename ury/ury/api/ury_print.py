@@ -5,7 +5,11 @@ from frappe.utils import now_datetime
 import os
 
 from ury.ury.doctype.ury_order.ury_order import release_merge_cluster_tables
-from ury.ury.printing.print_job_monitor import register_print_job
+from ury.ury.printing.print_job_monitor import (
+    get_all_tracked_print_job_ids,
+    get_print_job,
+    register_print_job,
+)
 
 try:
     import cups
@@ -334,3 +338,86 @@ def get_print_job_status(print_job_id):
         )
         return {"status": "Failure", "message": str(e)}
 
+
+@frappe.whitelist()
+def get_failed_print_jobs(printer=None, invoice=None, limit=20, start=0):
+    """Return paginated failed print jobs from the Redis-backed store.
+
+    Args:
+        printer: Optional printer name or setting filter.
+        invoice: Optional invoice name filter.
+        limit: Max jobs to return (default 20, max 100).
+        start: Pagination offset (default 0).
+
+    Returns:
+        Dictionary with status, jobs array, total count, and pagination metadata.
+    """
+    try:
+        limit = min(int(limit or 20), 100)
+        start = max(int(start or 0), 0)
+
+        job_ids = get_all_tracked_print_job_ids() or []
+        job_ids = list(reversed(job_ids))
+
+        failed_jobs = []
+        for job_id in job_ids:
+            data = get_print_job(job_id)
+            if not data:
+                continue
+
+            status = str(data.get("status") or "").upper()
+            if status not in ("FAILED", "CANCELED"):
+                continue
+
+            if printer:
+                p_name = str(data.get("printer_name") or data.get("printer_setting") or data.get("printer") or "").lower()
+                if printer.lower() not in p_name:
+                    continue
+
+            if invoice:
+                inv_name = str(data.get("invoice") or "").lower()
+                if invoice.lower() not in inv_name:
+                    continue
+
+            failure_reason = data.get("failure_reason") or data.get("cups_state_reason") or data.get("error_message") or "Print job failed"
+
+            failed_jobs.append({
+                "print_job_id": data.get("print_job_id") or job_id,
+                "cups_job_id": data.get("cups_job_id"),
+                "invoice": data.get("invoice"),
+                "printer": data.get("printer_setting") or data.get("printer_name"),
+                "printer_name": data.get("printer_name"),
+                "server_ip": data.get("server_ip"),
+                "port": data.get("port"),
+                "status": status,
+                "failure_reason": failure_reason,
+                "cups_state_reason": data.get("cups_state_reason", ""),
+                "retry_count": data.get("retry_count", 0),
+                "observation_timed_out": bool(data.get("observation_timed_out", False)),
+                "created_at": data.get("created_at") or data.get("creation"),
+                "failed_at": data.get("last_checked_at") or data.get("modified"),
+                "last_checked_at": data.get("last_checked_at"),
+            })
+
+        total = len(failed_jobs)
+        paginated_jobs = failed_jobs[start : start + limit]
+
+        return {
+            "status": "Success",
+            "data": paginated_jobs,
+            "total_count": total,
+            "page_length": limit,
+            "start": start,
+            "has_more": (start + limit) < total,
+        }
+    except Exception as e:
+        frappe.logger("printing").warning(
+            {"event": "get_failed_print_jobs_failed", "error": str(e)},
+            exc_info=True,
+        )
+        return {
+            "status": "Failure",
+            "message": str(e),
+            "data": [],
+            "total_count": 0,
+        }
