@@ -1,8 +1,7 @@
 {
  "actions": [],
  "allow_copy": 1,
- "autoname": "field:print_job_id",
- "creation": "2026-08-16 18:09:38",
+ "creation": "2026-08-16 18:09:38.000000",
  "default_view": "List",
  "doctype": "DocType",
  "editable_grid": 1,
@@ -39,8 +38,7 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Print Job ID",
-   "read_only": 1,
-   "unique": 1
+   "read_only": 1
   },
   {
    "fieldname": "cups_job_id",
@@ -147,14 +145,18 @@
    "read_only": 1
   }
  ],
+ "autoname": "field:print_job_id",
  "hide_toolbar": 1,
  "is_virtual": 1,
+ "read_only_onload": 1,
+ "issingle": 0,
+ "istable": 0,
  "links": [],
- "modified": "2026-08-24 17:27:46.500768",
+ "modified": "2026-08-16 18:09:38.000000",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Print Job",
- "naming_rule": "By fieldname",
+ "naming_rule": "By field 'print_job_id'",
  "owner": "Administrator",
  "permissions": [
   {
@@ -194,20 +196,10 @@
    "read": 1,
    "role": "Employee",
    "select": 1
-  },
-  {
-   "email": 1,
-   "export": 1,
-   "print": 1,
-   "read": 1,
-   "report": 1,
-   "role": "Guest",
-   "select": 1,
-   "share": 1
   }
  ],
- "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
- "states": []
+ "states": [],
+ "title_field": ""
 }
