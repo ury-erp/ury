@@ -58,7 +58,7 @@ export async function getActiveTableOrders(
       ['branch', '=', branch],
       ['docstatus', '=', 0],
     ],
-    limit: '*' as unknown as number,
+    limit: 0,
     asDict: true,
   } as unknown as Parameters<typeof db.getDocList>[1])) as ActiveInvoiceRow[];
 
