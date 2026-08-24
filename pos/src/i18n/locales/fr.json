@@ -224,6 +224,7 @@
     "transfer_captain": "Transférer le capitaine",
     "select_destination_table": "Déplacer la commande de {{table}} vers toute table libre de l'établissement",
     "search_transfer_placeholder": "Rechercher par table ou salle",
+    "search_table_placeholder": "Rechercher une table",
     "current_table": "Table actuelle",
     "current_captain": "Capitaine actuel",
     "select_new_captain": "Choisir un nouveau capitaine pour cette commande",
