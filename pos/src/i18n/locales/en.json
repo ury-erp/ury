@@ -336,6 +336,7 @@
     "transfer_captain": "Transfer captain",
     "select_destination_table": "Move order from {{table}} to any vacant table in this branch",
     "search_transfer_placeholder": "Search by table or room",
+    "search_table_placeholder": "Search table",
     "current_table": "Current table",
     "current_captain": "Current captain",
     "select_new_captain": "Choose a new captain for this order",
