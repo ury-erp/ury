@@ -362,7 +362,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   addToOrder: async (item: OrderItem) => {
     try {
       if (!get().validateQuantity(item.quantity)) {
-        throw new CartError(`Quantity must be between ${MIN_QUANTITY} and ${MAX_QUANTITY}`);
+        throw new CartError(`Quantity must be at least ${MIN_QUANTITY}`);
       }
 
       const uniqueId = generateUniqueId(item);
@@ -374,7 +374,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
         const newComment = item.comment !== undefined ? item.comment : existingItem?.comment || "";
 
         if (!get().validateQuantity(newQuantity)) {
-          throw new CartError(`Cannot add item. Total quantity would exceed ${MAX_QUANTITY}`);
+          throw new CartError(`Quantity must be at least ${MIN_QUANTITY}`);
         }
 
         const newOrders = [...get().activeOrders];
@@ -410,7 +410,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   updateQuantity: async (uniqueId: string, quantity: number) => {
     try {
       if (!get().validateQuantity(quantity)) {
-        throw new CartError(`Quantity must be between ${MIN_QUANTITY} and ${MAX_QUANTITY}`);
+        throw new CartError(`Quantity must be at least ${MIN_QUANTITY}`);
       }
 
       const newOrders = get().activeOrders.map(item =>
@@ -569,7 +569,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   },
 
   validateQuantity: (quantity: number): boolean => {
-    return !isNaN(quantity) && quantity >= MIN_QUANTITY && quantity <= MAX_QUANTITY;
+    return !isNaN(quantity) && quantity >= MIN_QUANTITY;
   },
 
   getItemPrice: (item: OrderItem): number => {
