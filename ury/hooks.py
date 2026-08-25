@@ -164,7 +164,8 @@ scheduler_events = {
     "cron":{
 		"* * * * *":[
 			"ury.ury.api.ury_kot_validation.kotValidationThread",
-			"ury.ury.printing.print_job_poller.poll_active_print_jobs"
+			"ury.ury.printing.print_job_poller.poll_active_print_jobs",
+			"ury.ury.printing.file_store.prune_expired_jobs"
 		]
 	},
 # 	"all": [

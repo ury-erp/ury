@@ -11,9 +11,14 @@
   "print_job_info_section",
   "print_job_id",
   "cups_job_id",
+  "job_type",
   "invoice",
+  "reference_doctype",
+  "reference_name",
+  "production",
   "printer",
   "printer_name",
+  "kot_type",
   "column_break_1",
   "status",
   "cups_state",
@@ -50,16 +55,49 @@
    "read_only": 1
   },
   {
+   "fieldname": "job_type",
+   "fieldtype": "Select",
+   "default": "BILL",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Job Type",
+   "options": "BILL\nKOT\nWAITER_SLIP\nKOT_REPRINT",
+   "read_only": 1
+  },
+  {
    "fieldname": "invoice",
    "fieldtype": "Link",
    "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Invoice",
    "options": "POS Invoice",
    "read_only": 1
   },
   {
+   "fieldname": "reference_doctype",
+   "fieldtype": "Link",
+   "label": "Reference DocType",
+   "options": "DocType",
+   "read_only": 1
+  },
+  {
+   "fieldname": "reference_name",
+   "fieldtype": "Data",
+   "label": "Reference Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "production",
+   "fieldtype": "Link",
+   "label": "Production Unit",
+   "options": "URY Production Unit",
+   "read_only": 1
+  },
+  {
    "fieldname": "printer",
    "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Printer",
    "options": "Network Printer Settings",
    "read_only": 1
@@ -72,6 +110,12 @@
    "read_only": 1
   },
   {
+   "fieldname": "kot_type",
+   "fieldtype": "Data",
+   "label": "KOT Type",
+   "read_only": 1
+  },
+  {
    "fieldname": "column_break_1",
    "fieldtype": "Column Break"
   },
@@ -79,6 +123,7 @@
    "fieldname": "status",
    "fieldtype": "Data",
    "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Status",
    "read_only": 1
   },
@@ -150,7 +195,7 @@
  "hide_toolbar": 1,
  "is_virtual": 1,
  "links": [],
- "modified": "2026-08-24 18:27:08.894800",
+ "modified": "2026-08-25 04:00:00.000000",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Print Job",

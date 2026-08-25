@@ -1,16 +1,14 @@
-"""Redis-based active print job monitoring for URY printing.
+"""Active print job monitoring for URY printing.
 
-This module stores transient, high-frequency print-job state in Redis
-(``frappe.cache()``) instead of MariaDB.  All keys are intentionally
-short-lived and site-local.
+This module coordinates polling for print jobs submitted through CUPS.  Job
+metadata is persisted atomically in JSON files via ``file_store.py``; Redis
+keeps only a lightweight scheduling structure and polling locks.
 
 Redis schema
 ------------
 * Sorted set ``print_jobs:monitor``
     * score   -> next check Unix timestamp
     * member  -> ``print_job_id``
-* Hash ``print_job:<print_job_id>``
-    * field ``data`` -> pickled job metadata dictionary
 * String ``print_job_lock:<print_job_id>``
     * TTL lock used to avoid concurrent polling of the same job
 """
@@ -20,6 +18,7 @@ import time
 import frappe
 import redis.exceptions
 
+from ury.ury.printing.file_store import delete_job, get_job, list_all_jobs, save_job
 from ury.ury.printing.state_machine import (
     CANCELED,
     COMPLETED,
@@ -31,7 +30,6 @@ from ury.ury.printing.state_machine import (
 )
 
 MONITOR_ZSET = "print_jobs:monitor"
-JOB_HASH_PREFIX = "print_job:"
 LOCK_PREFIX = "print_job_lock:"
 
 INITIAL_INTERVAL_SECONDS = 2
@@ -56,46 +54,50 @@ def _now_ts():
     return time.time()
 
 
-def _job_key(print_job_id):
-    return f"{JOB_HASH_PREFIX}{print_job_id}"
-
-
 def _lock_key(print_job_id):
     return f"{LOCK_PREFIX}{print_job_id}"
 
 
 def register_print_job(print_job_metadata):
-    """Store job metadata in Redis and schedule the first monitor check.
+    """Persist job metadata to disk and schedule the first monitor check.
+
+    The authoritative metadata is written to a JSON file via ``file_store``;
+    Redis only stores the ``print_job_id`` in the monitor zset so the poller
+    knows the job is active.
 
     Args:
         print_job_metadata: Dictionary of job metadata. Must contain a
             ``print_job_id`` key.
 
     Returns:
-        The ``print_job_id`` on success, or ``None`` if Redis is unavailable.
+        The ``print_job_id`` on success, or ``None`` if persistence is
+        unavailable.
     """
     print_job_id = print_job_metadata.get("print_job_id")
     if not print_job_id:
         return None
 
-    cache = _redis()
-    if not cache:
+    metadata = dict(print_job_metadata)
+    if "monitoring_deadline" not in metadata:
+        metadata["monitoring_deadline"] = _now_ts() + OBSERVATION_TIMEOUT_SECONDS
+    if "long_running_notification_sent" not in metadata:
+        metadata["long_running_notification_sent"] = False
+
+    if not save_job(print_job_id, metadata):
         return None
 
+    cache = _redis()
+    if not cache:
+        return print_job_id
+
     try:
-        metadata = dict(print_job_metadata)
-        if "monitoring_deadline" not in metadata:
-            metadata["monitoring_deadline"] = _now_ts() + OBSERVATION_TIMEOUT_SECONDS
-        if "long_running_notification_sent" not in metadata:
-            metadata["long_running_notification_sent"] = False
-        cache.hset(_job_key(print_job_id), "data", metadata)
         next_check_at = _now_ts() + INITIAL_INTERVAL_SECONDS
         cache.zadd(MONITOR_ZSET, {print_job_id: next_check_at})
         return print_job_id
     except redis.exceptions.ConnectionError:
-        return None
+        return print_job_id
     except Exception:
-        return None
+        return print_job_id
 
 
 def get_due_print_jobs(now_ts=None):
@@ -145,52 +147,41 @@ def get_active_print_job_ids():
 
 
 def get_all_tracked_print_job_ids():
-    """Return every known print job ID, both active and retained.
+    """Return every known print job ID backed by a JSON file.
 
-    Combines members of the monitor zset with Redis hash keys matching
-    ``print_job:PJ-*`` so jobs that have left the active zset but still
-    have retained metadata are still listed.
+    Scans the file store for active jobs and cleans up orphaned zset members
+    that no longer have a corresponding JSON file.
 
     Returns:
-        List of ``print_job_id`` strings.
+        List of ``print_job_id`` strings sorted newest-first.
     """
     cache = _redis()
-    if not cache:
-        return []
-
     job_ids = set()
 
+    # Authoritative source: JSON files.
     try:
-        members = cache.zrange(MONITOR_ZSET, 0, -1) or []
-        for member in members:
-            print_job_id = member.decode() if isinstance(member, bytes) else member
-            # Clean up orphaned ZSET entries whose hash key is already gone.
-            if get_print_job(print_job_id) is None:
-                cache.zrem(MONITOR_ZSET, member)
-                continue
-            job_ids.add(print_job_id)
-    except redis.exceptions.ConnectionError:
-        pass
+        for job in list_all_jobs():
+            print_job_id = job.get("print_job_id")
+            if print_job_id:
+                job_ids.add(print_job_id)
     except Exception:
         pass
 
-    try:
-        redis_client = getattr(cache, "redis", cache)
-        site_key_prefix = cache.make_key("")
-        if isinstance(site_key_prefix, bytes):
-            site_key_prefix = site_key_prefix.decode()
-        prefixed_hash_prefix = f"{site_key_prefix}{JOB_HASH_PREFIX}"
-        pattern = f"{prefixed_hash_prefix}PJ-*"
-        for key in redis_client.scan_iter(match=pattern):
-            key_str = key.decode() if isinstance(key, bytes) else key
-            if key_str.startswith(prefixed_hash_prefix):
-                print_job_id = key_str[len(prefixed_hash_prefix) :]
-                if print_job_id:
-                    job_ids.add(print_job_id)
-    except redis.exceptions.ConnectionError:
-        pass
-    except Exception:
-        pass
+    # Remove any zset members that no longer have a backing file.
+    if cache:
+        try:
+            members = cache.zrange(MONITOR_ZSET, 0, -1) or []
+            for member in members:
+                print_job_id = member.decode() if isinstance(member, bytes) else member
+                if print_job_id not in job_ids:
+                    try:
+                        cache.zrem(MONITOR_ZSET, member)
+                    except Exception:
+                        pass
+        except redis.exceptions.ConnectionError:
+            pass
+        except Exception:
+            pass
 
     return sorted(job_ids)
 
@@ -245,16 +236,7 @@ def get_print_job(print_job_id):
     Returns:
         The metadata dictionary, or ``None`` if not found / unavailable.
     """
-    cache = _redis()
-    if not cache:
-        return None
-
-    try:
-        return cache.hget(_job_key(print_job_id), "data")
-    except redis.exceptions.ConnectionError:
-        return None
-    except Exception:
-        return None
+    return get_job(print_job_id)
 
 
 def update_print_job(print_job_id, updates):
@@ -267,16 +249,11 @@ def update_print_job(print_job_id, updates):
     Returns:
         The updated metadata dictionary, or ``None`` on failure.
     """
-    cache = _redis()
-    if not cache:
-        return None
-
     try:
-        data = get_print_job(print_job_id) or {}
+        data = get_job(print_job_id) or {}
         data.update(updates)
-        cache.hset(_job_key(print_job_id), "data", data)
-        return data
-    except redis.exceptions.ConnectionError:
+        if save_job(print_job_id, data):
+            return data
         return None
     except Exception:
         return None
@@ -300,15 +277,14 @@ def _calculate_check_interval(current_state, retry_count=0):
 
 
 def stop_monitoring_print_job(print_job_id, ttl_seconds=86400):
-    """Stop active monitoring for a job while retaining its metadata hash.
+    """Stop active monitoring for a job.
 
-    Terminal jobs leave the active monitor zset (so polling stops) but keep
-    their metadata hash in Redis with a TTL so the final result remains
-    queryable for a limited time.
+    Terminal jobs leave the active monitor zset (so polling stops) but their
+    JSON file remains queryable until the 2-hour file-store TTL removes it.
 
     Args:
         print_job_id: The job ID to stop monitoring.
-        ttl_seconds: TTL for the retained metadata hash (default 24 hours).
+        ttl_seconds: Ignored; kept for backward compatibility only.
     """
     cache = _redis()
     if not cache:
@@ -316,12 +292,6 @@ def stop_monitoring_print_job(print_job_id, ttl_seconds=86400):
 
     try:
         cache.zrem(MONITOR_ZSET, print_job_id)
-        redis_client = getattr(cache, "redis", cache)
-        prefixed_key = cache.make_key(_job_key(print_job_id))
-        prefixed_key_str = (
-            prefixed_key.decode() if isinstance(prefixed_key, bytes) else prefixed_key
-        )
-        redis_client.expire(prefixed_key_str, ttl_seconds)
         release_job_lock(print_job_id)
     except redis.exceptions.ConnectionError:
         pass
@@ -332,9 +302,8 @@ def stop_monitoring_print_job(print_job_id, ttl_seconds=86400):
 def schedule_next_check(print_job_id, current_state, retry_count=0):
     """Schedule the next monitor check for a job.
 
-    Terminal states stop active monitoring while retaining the job metadata
-    hash with a 24-hour TTL.  All other states update the zset score based on
-    the adaptive interval rules defined in the requirements.
+    Terminal states stop active monitoring.  All other states update the zset
+    score based on the adaptive interval rules defined in the requirements.
 
     Args:
         print_job_id: The job ID to schedule.
@@ -366,20 +335,22 @@ def schedule_next_check(print_job_id, current_state, retry_count=0):
 
 
 def remove_print_job(print_job_id):
-    """Remove a job from the monitor zset and clean up its Redis keys.
+    """Remove a job from the monitor zset and delete its JSON file.
 
     Args:
         print_job_id: The job ID to clean up.
     """
     cache = _redis()
-    if not cache:
-        return
 
-    try:
-        cache.zrem(MONITOR_ZSET, print_job_id)
-        cache.delete_value(_job_key(print_job_id))
-        release_job_lock(print_job_id)
-    except redis.exceptions.ConnectionError:
-        pass
-    except Exception:
-        pass
+    if cache:
+        try:
+            cache.zrem(MONITOR_ZSET, print_job_id)
+        except redis.exceptions.ConnectionError:
+            pass
+        except Exception:
+            pass
+
+    delete_job(print_job_id)
+    release_job_lock(print_job_id)
+
+

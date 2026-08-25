@@ -53,6 +53,10 @@ def _publish_status_update(metadata):
         {
             "print_job_id": metadata.get("print_job_id"),
             "cups_job_id": metadata.get("cups_job_id"),
+            "job_type": metadata.get("job_type"),
+            "reference_doctype": metadata.get("reference_doctype"),
+            "reference_name": metadata.get("reference_name"),
+            "production": metadata.get("production"),
             "invoice": metadata.get("invoice"),
             "status": metadata.get("status"),
             "cups_state_reason": metadata.get("cups_state_reason", ""),
@@ -123,6 +127,9 @@ def poll_single_print_job(print_job_id):
                             invoice=metadata.get("invoice"),
                             print_job_id=print_job_id,
                             printer_name=metadata.get("printer_name"),
+                            job_type=metadata.get("job_type", "BILL"),
+                            reference_doctype=metadata.get("reference_doctype"),
+                            reference_name=metadata.get("reference_name"),
                         )
                         update_print_job(
                             print_job_id,
@@ -177,6 +184,9 @@ def poll_single_print_job(print_job_id):
                         invoice=metadata.get("invoice"),
                         print_job_id=print_job_id,
                         printer_name=metadata.get("printer_name"),
+                        job_type=metadata.get("job_type", "BILL"),
+                        reference_doctype=metadata.get("reference_doctype"),
+                        reference_name=metadata.get("reference_name"),
                     )
                     update_print_job(
                         print_job_id,
