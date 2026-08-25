@@ -110,7 +110,7 @@ export const useTableStore = defineStore("table", {
           .getDocList("URY Room", {
             fields: ["name", "branch"],
             filters: [["branch", "like", this.invoiceData.branch]],
-            limit: "*",
+            limit: 0,
           })
           .then((docs) => {
             this.rooms = docs;
@@ -173,7 +173,7 @@ export const useTableStore = defineStore("table", {
             "merged_with"
           ],
           filters: [["restaurant_room", "=", this.selectedRoom]],
-          limit: "*",
+          limit: 0,
         })
         .then((tables) => {
           this.tables = tables.sort((a, b) => {
@@ -213,7 +213,7 @@ export const useTableStore = defineStore("table", {
       this.db
         .getDocList("URY Table", {
           filters: [["occupied", "like", "0%"]],
-          limit: "*",
+          limit: 0,
         })
         .then((table) => {
           this.transferTable = table;
@@ -232,7 +232,7 @@ export const useTableStore = defineStore("table", {
       this.db
         .getDocList("URY Table", {
           filters: [["occupied", "like", "0%"], ["name", "!=", this.mergeSourceTable], ["restaurant_room", "=", this.selectedRoom]],
-          limit: "*",
+          limit: 0,
         })
         .then((tableList) => {
           this.transferTable = tableList;
@@ -259,7 +259,7 @@ export const useTableStore = defineStore("table", {
       this.db
         .getDocList("User", {
           fields: ["name"],
-          limit: "*",
+          limit: 0,
         })
         .then((docs) => {
           this.captain = docs;
