@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Footer from './components/Footer';
 import Header from './components/Header';
+import { PrinterWatchProvider } from './components/PrinterWatch';
 import Orders from './pages/Orders';
 import POS from './pages/POS';
 import Table from './pages/Table';
@@ -11,6 +12,13 @@ import { ToastProvider } from '@ury/ui';
 import { usePOSStore } from './store/pos-store';
 import { useEffect } from 'react';
 import { getActiveLanguage } from './i18n';
+import { usePrintNotifications } from './lib/usePrintNotifications';
+
+
+function PrintNotificationListener() {
+  usePrintNotifications();
+  return null;
+}
 
 function App() {
   const {
@@ -28,8 +36,9 @@ function App() {
     document.documentElement.lang = lang || 'en';
   }, []);
   return (
-    <>
+    <PrinterWatchProvider>
       <ToastProvider />
+      <PrintNotificationListener />
       <ScreenSizeProvider>
         <AuthGuard>
           <POSOpeningProvider>
@@ -49,8 +58,9 @@ function App() {
           </POSOpeningProvider>
         </AuthGuard>
       </ScreenSizeProvider>
-    </>
+    </PrinterWatchProvider>
   );
 }
 
 export default App;
+

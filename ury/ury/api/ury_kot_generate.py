@@ -350,6 +350,12 @@ def kot_execute(
     previous_items=[],
     comments=None,
 ):
+    from frappe import _
+
+    pos_invoice = frappe.get_doc("POS Invoice", invoice_id)
+    if not frappe.has_permission("POS Invoice", "write", doc=pos_invoice):
+        frappe.throw(_("Not permitted to execute KOT for this invoice"), frappe.PermissionError)
+
     current_items = load_json(current_items)
     previous_items = load_json(previous_items)
     new_invoice_items_array = create_order_items(previous_items)
@@ -358,7 +364,6 @@ def kot_execute(
     final_array = compare_two_array(new_Order_items_array, new_invoice_items_array)
     removed_item = get_removed_items(new_invoice_items_array, new_Order_items_array)
 
-    pos_invoice = frappe.get_doc("POS Invoice", invoice_id)
     pos_profile_id = pos_invoice.pos_profile
     pos_profile = frappe.get_doc("POS Profile", pos_profile_id)
     kot_naming_series = pos_profile.custom_kot_naming_series

@@ -55,7 +55,7 @@ website_context = {"splash_image": "/assets/ury/Images/ury-logo.jpg"}
 website_route_rules = [
     {"from_route": "/pos/<path:app_path>", "to_route": "pos"},
     {"from_route": "/urypos/<path:app_path>", "to_route": "urypos"},
-    {"from_route": "/URYMosaic/<path:app_path>", "to_route": "URYMosaic"},
+    {"from_route": "/mosaic/<path:app_path>", "to_route": "mosaic"},
     {"from_route": "/ury/<path:app_path>", "to_route": "ury"},
 ]
 # Home Pages
@@ -146,9 +146,12 @@ doc_events = {
     "POS Opening Entry": {
         "validate":"ury.ury.hooks.ury_pos_opening_entry.set_cashier_room",
         "before_save": "ury.ury.hooks.ury_pos_opening_entry.before_save",
+        "before_insert":"ury.ury.api.ury_kot_order_number.set_last_invoice_in_pos_open",
         },
     "POS Closing Entry": {
         "on_submit": "ury.ury.hooks.ury_pos_closing_entry.on_submit",
+        "before_save": "ury.ury.hooks.ury_pos_closing_entry.before_save",
+        "validate":"ury.ury.hooks.ury_pos_closing_entry.validate"
         },
     "URY Menu Course": {
 		"validate": "ury.ury.api.ury_menu_course_validation.validate_priority",
@@ -161,24 +164,14 @@ doc_events = {
 scheduler_events = {
     "cron":{
 		"* * * * *":[
-			"ury.ury.api.ury_kot_validation.kotValidationThread"
+			"ury.ury.api.ury_kot_validation.kotValidationThread",
+			"ury.ury.printing.print_job_poller.poll_active_print_jobs",
+			"ury.ury.printing.file_store.prune_expired_jobs"
 		]
-	}
-# 	"all": [
-# 		"ury.tasks.all"
-# 	],
-# 	"daily": [
-# 		"ury.tasks.daily"
-# 	],
-# 	"hourly": [
-# 		"ury.tasks.hourly"
-# 	],
-# 	"weekly": [
-# 		"ury.tasks.weekly"
-# 	],
-# 	"monthly": [
-# 		"ury.tasks.monthly"
-# 	],
+	},
+	"hourly": [
+		"ury.ury.printing.recovery.reconcile_active_print_jobs"
+	],
 }
 
 # Testing
@@ -373,7 +366,7 @@ fixtures = [
                     "Employee-payment_amount",
                     "Employee-payment_type",
                     "POS Invoice-custom_printing_time",
-                    "POS Profile-custom_invoice_warning_time"
+                    "POS Profile-custom_invoice_warning_time",
                     "Employee-payment_type",
                     "Branch-custom_branch_settings_section",
                     "Branch-custom_reset_order_number_daily",

@@ -1,6 +1,6 @@
 import frappe
 from frappe.utils import flt
-from frappe.utils.print_format import print_by_server
+from ury.ury.printing.service import submit_and_monitor_print_job
 
 WAITER_PRINT_FORMAT = "URY Waiter Order Slip"
 ADD_KOT_TYPES = ("New Order", "Order Modified")
@@ -36,21 +36,21 @@ def _aggregate_kot_items(kot_docs):
 			if kot.type in CANCEL_KOT_TYPES:
 				if key not in cancel_items:
 					cancel_items[key] = {
-					"item": row.item,
-					"item_name": row.item_name,
-					"quantity": flt(row.quantity or 0),
-					"cancelled_qty": flt(row.cancelled_qty or 0),
-					"comments": row.comments,
-					"course": row.course,
+						"item": row.item,
+						"item_name": row.item_name,
+						"quantity": flt(row.quantity or 0),
+						"cancelled_qty": flt(row.cancelled_qty or 0),
+						"comments": row.comments,
+						"course": row.course,
 					}
 			elif kot.type in ADD_KOT_TYPES:
 				if key not in add_items:
 					add_items[key] = {
-					"item": row.item,
-					"item_name": row.item_name,
-					"quantity": flt(row.quantity or 0),
-					"comments": row.comments,
-					"course": row.course,
+						"item": row.item,
+						"item_name": row.item_name,
+						"quantity": flt(row.quantity or 0),
+						"comments": row.comments,
+						"course": row.course,
 					}
 
 	return list(add_items.values()) + list(cancel_items.values())
@@ -182,13 +182,19 @@ def print_combined_waiter_order_slip(invoice_id, kot_names, restaurant_table):
 			continue
 
 		try:
-			print_by_server(
-				"URY KOT",
-				kot_names[0],
-				printer_row.printer,
-				waiter_print_format,
+			submit_and_monitor_print_job(
+				doctype="URY KOT",
+				name=kot_names[0],
+				printer_setting=printer_row.printer,
+				print_format=waiter_print_format,
 				doc=combined_doc,
 				no_letterhead=1,
+				job_type="WAITER_SLIP",
+				extra_metadata={
+					"invoice": invoice_id,
+					"restaurant_table": restaurant_table,
+					"kot_names": kot_names,
+				},
 			)
 		except Exception as e:
 			frappe.log_error(
