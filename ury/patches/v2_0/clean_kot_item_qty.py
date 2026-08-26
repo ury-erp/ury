@@ -11,14 +11,14 @@ def execute():
 			"""
 			UPDATE `tabURY KOT Items`
 			SET cancelled_qty = '0'
-			WHERE cancelled_qty IS NULL OR CAST(cancelled_qty AS CHAR) IN ('', 'None')
+			WHERE cancelled_qty IS NULL OR CAST(cancelled_qty AS CHAR) NOT REGEXP '^ *[+-]?([0-9]*[.])?[0-9]+ *$'
 		"""
 		)
 		frappe.db.sql(
 			"""
 			UPDATE `tabURY KOT Items`
 			SET quantity = '0'
-			WHERE quantity IS NULL OR CAST(quantity AS CHAR) IN ('', 'None')
+			WHERE quantity IS NULL OR CAST(quantity AS CHAR) NOT REGEXP '^ *[+-]?([0-9]*[.])?[0-9]+ *$'
 		"""
 		)
 	except Exception as e:
