@@ -277,7 +277,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
 
   fetchMenuItems: async () => {
     const { posProfile, selectedRoom, selectedOrderType } = get();
-    if (!posProfile?.restaurant) return;
+    if (!posProfile?.branch) return;
 
     try {
       set({ menuLoading: true, error: null });
