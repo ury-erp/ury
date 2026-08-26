@@ -124,13 +124,13 @@ export const useTableStore = defineStore("table", {
               this.handleRoomChange();
             } else {
               this.db
-                .getDocList("URY Restaurant", {
-                  fields: ["branch", "default_room"],
-                  filters: [["branch", "like", this.invoiceData.branch]],
+                .getDocList("Branch", {
+                  fields: ["name", "custom_default_room"],
+                  filters: [["name", "like", this.invoiceData.branch]],
                 })
                 .then((docs) => {
-                  let room = docs.find((room) => room.default_room);
-                  this.selectedRoom = room ? room.default_room : null;
+                  let room = docs.find((room) => room.custom_default_room);
+                  this.selectedRoom = room ? room.custom_default_room : null;
 
                   this.handleRoomChange();
                 });
