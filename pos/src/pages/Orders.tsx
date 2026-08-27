@@ -1,9 +1,12 @@
 import React, { useEffect, useMemo, useRef } from 'react';
-import { Clock, User, UserCheck, Receipt, Printer, Pencil, X, GitBranch, GitMerge } from 'lucide-react';
+import { Clock, User, UserCheck, Receipt, Printer, Pencil, X, GitBranch, GitMerge, PrinterCheck } from 'lucide-react';
 import { Badge, Button, Card, CardContent } from '@ury/ui';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@ury/ui';
 import { showToast } from '@ury/ui';
 import OrderStatusSidebar from '../components/OrderStatusSidebar';
+import PrintJobsModal from '../components/PrintJobsModal';
+import { PrinterX } from '../components/icons/PrinterX';
+import { useOrdersPrintJobs } from '../hooks/useOrdersPrintJobs';
 import { useRootStore } from '../store/root-store';
 import { formatCurrency } from '@ury/core';
 import { Spinner } from '@ury/ui';
@@ -82,6 +85,16 @@ export default function Orders() {
   const [showMergeDialog, setShowMergeDialog] = React.useState(false);
   const [orderActionsMenuOpen, setOrderActionsMenuOpen] = React.useState(false);
   const [isPrinting, setIsPrinting] = React.useState(false);
+  const [printJobsModalOpen, setPrintJobsModalOpen] = React.useState(false);
+  const [selectedInvoiceId, setSelectedInvoiceId] = React.useState<string | null>(null);
+
+  const {
+    jobs: printJobs,
+    loading: printJobsLoading,
+    error: printJobsError,
+    refresh: refreshPrintJobs,
+    getInvoicePrintStatus,
+  } = useOrdersPrintJobs();
 
   const canSplitBill = useMemo(() => {
     if (!selectedOrder || selectedOrderItems.length === 0) return false;
@@ -379,9 +392,11 @@ export default function Orders() {
                   ? order.rounded_total + Math.round(order.custom_merged_total ?? 0)
                   : order.rounded_total;
 
+                const printStatus = getInvoicePrintStatus(order.name);
+
                 return (
-                <Card 
-                  key={order.name} 
+                <Card
+                  key={order.name}
                   className={`p-0 bg-white hover:shadow-md transition-shadow flex flex-col overflow-hidden cursor-pointer ${
                     selectedOrder?.name === order.name ? 'ring-2 ring-blue-500 shadow-lg' : ''
                   } ${splitBill || mergedBill ? 'border-s-4 border-s-primary-500' : ''}`}
@@ -457,10 +472,27 @@ export default function Orders() {
                       </div>
 
                       {/* Total - pushed to bottom like MenuCard */}
-                      <div className="mt-auto pt-2">
+                      <div className="mt-auto pt-2 flex items-center justify-between">
                         <span className="text-sm font-semibold text-gray-900 tabular-nums">
                           {formatCurrency(cardTotal)}
                         </span>
+                        <button
+                          type="button"
+                          className="inline-flex items-center justify-center rounded-md p-1.5 text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          aria-label={`View print jobs for ${order.name}`}
+                          title="View print jobs"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedInvoiceId(order.name);
+                            setPrintJobsModalOpen(true);
+                          }}
+                        >
+                          {printStatus.hasFailed ? (
+                            <PrinterX className="w-4 h-4 text-red-600" />
+                          ) : (
+                            <PrinterCheck className="w-4 h-4 text-gray-400" />
+                          )}
+                        </button>
                       </div>
                     </div>
                   </CardContent>
@@ -784,6 +816,16 @@ export default function Orders() {
           onConfirm={handleSplitBill}
         />
       )}
+
+      <PrintJobsModal
+        open={printJobsModalOpen}
+        onOpenChange={setPrintJobsModalOpen}
+        invoiceId={selectedInvoiceId}
+        jobs={printJobs}
+        loading={printJobsLoading}
+        error={printJobsError}
+        onRefresh={refreshPrintJobs}
+      />
     </div>
   );
 };

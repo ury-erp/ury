@@ -1,11 +1,19 @@
 {
  "actions": [],
  "allow_copy": 1,
+ "allow_events_in_timeline": 0,
+ "allow_guest_to_view": 0,
+ "allow_import": 0,
+ "allow_rename": 0,
  "autoname": "field:print_job_id",
+ "beta": 0,
  "creation": "2026-08-16 18:09:38",
+ "custom": 0,
  "default_view": "List",
  "doctype": "DocType",
+ "docstatus": 0,
  "editable_grid": 1,
+ "email_append_to": 0,
  "engine": "InnoDB",
  "field_order": [
   "print_job_info_section",
@@ -18,7 +26,6 @@
   "production",
   "printer",
   "printer_name",
-  "kot_type",
   "column_break_1",
   "status",
   "cups_state",
@@ -55,9 +62,9 @@
    "read_only": 1
   },
   {
+   "default": "BILL",
    "fieldname": "job_type",
    "fieldtype": "Select",
-   "default": "BILL",
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Job Type",
@@ -82,9 +89,9 @@
   },
   {
    "fieldname": "reference_name",
-   "fieldtype": "Data",
+   "fieldtype": "Dynamic Link",
    "label": "Reference Name",
-   "read_only": 1
+   "options": "reference_doctype"
   },
   {
    "fieldname": "production",
@@ -103,16 +110,11 @@
    "read_only": 1
   },
   {
+   "fetch_from": "printer.custom_printer_queue_name",
    "fieldname": "printer_name",
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Printer Name",
-   "read_only": 1
-  },
-  {
-   "fieldname": "kot_type",
-   "fieldtype": "Data",
-   "label": "KOT Type",
    "read_only": 1
   },
   {
@@ -193,9 +195,17 @@
   }
  ],
  "hide_toolbar": 1,
+ "idx": 0,
+ "in_create": 0,
+ "is_calendar_and_gantt": 0,
+ "is_submittable": 0,
+ "is_tree": 0,
  "is_virtual": 1,
+ "issingle": 0,
+ "istable": 0,
  "links": [],
- "modified": "2026-08-25 04:00:00.000000",
+ "migration_hash": "73ea7d85ea6f60e5ceb68a690c8934ff",
+ "modified": "2026-08-28 00:00:09.502374",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Print Job",
@@ -203,56 +213,133 @@
  "owner": "Administrator",
  "permissions": [
   {
+   "create": 0,
+   "delete": 1,
    "email": 1,
    "export": 1,
+   "if_owner": 0,
+   "import": 0,
+   "permlevel": 0,
    "print": 1,
    "read": 1,
    "report": 1,
    "role": "System Manager",
-   "share": 1
+   "select": 0,
+   "share": 1,
+   "submit": 0,
+   "write": 0
   },
   {
+   "create": 0,
+   "delete": 0,
    "email": 1,
    "export": 1,
+   "if_owner": 0,
+   "import": 0,
+   "permlevel": 0,
    "print": 1,
    "read": 1,
    "report": 1,
    "role": "URY Manager",
-   "share": 1
+   "select": 0,
+   "share": 1,
+   "submit": 0,
+   "write": 0
   },
   {
+   "create": 0,
+   "delete": 0,
+   "email": 0,
+   "export": 0,
+   "if_owner": 0,
+   "import": 0,
+   "permlevel": 0,
+   "print": 0,
    "read": 1,
+   "report": 0,
    "role": "URY Cashier",
-   "select": 1
+   "select": 1,
+   "share": 0,
+   "submit": 0,
+   "write": 0
   },
   {
+   "create": 0,
+   "delete": 0,
+   "email": 0,
+   "export": 0,
+   "if_owner": 0,
+   "import": 0,
+   "permlevel": 0,
+   "print": 0,
    "read": 1,
+   "report": 0,
    "role": "URY Captain",
-   "select": 1
+   "select": 1,
+   "share": 0,
+   "submit": 0,
+   "write": 0
   },
   {
+   "create": 0,
+   "delete": 0,
+   "email": 0,
+   "export": 0,
+   "if_owner": 0,
+   "import": 0,
+   "permlevel": 0,
+   "print": 0,
    "read": 1,
+   "report": 0,
    "role": "Cashier",
-   "select": 1
+   "select": 1,
+   "share": 0,
+   "submit": 0,
+   "write": 0
   },
   {
+   "create": 0,
+   "delete": 0,
+   "email": 0,
+   "export": 0,
+   "if_owner": 0,
+   "import": 0,
+   "permlevel": 0,
+   "print": 0,
    "read": 1,
+   "report": 0,
    "role": "Employee",
-   "select": 1
+   "select": 1,
+   "share": 0,
+   "submit": 0,
+   "write": 0
   },
   {
+   "create": 0,
+   "delete": 0,
    "email": 1,
    "export": 1,
+   "if_owner": 0,
+   "import": 0,
+   "permlevel": 0,
    "print": 1,
    "read": 1,
    "report": 1,
    "role": "Guest",
    "select": 1,
-   "share": 1
+   "share": 1,
+   "submit": 0,
+   "write": 0
   }
  ],
  "row_format": "Dynamic",
+ "show_name_in_global_search": 0,
+ "show_preview_popup": 0,
+ "show_title_field_in_link": 0,
  "sort_field": "modified",
  "sort_order": "DESC",
- "states": []
+ "track_changes": 0,
+ "track_seen": 0,
+ "track_views": 0,
+ "translated_doctype": 0
 }

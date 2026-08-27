@@ -31,7 +31,6 @@ class URYKOT(Document):
                         "invoice": self.invoice,
                         "restaurant_table": self.restaurant_table,
                         "production": self.production,
-                        "kot_type": self.type,
                     },
                 )
             except Exception:
