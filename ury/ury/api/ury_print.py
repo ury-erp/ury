@@ -37,10 +37,10 @@ def network_printing(
     if doctype == "POS Invoice":
         restaurant_table = frappe.db.get_value("POS Invoice", name, "restaurant_table")
 
-    result = submit_and_monitor_print_job(
+    printer_doc = frappe.get_doc("Network Printer Settings", printer_setting)
+    result = printer_doc.print_doc(
         doctype=doctype,
         name=name,
-        printer_setting=printer_setting,
         print_format=print_format,
         doc=doc,
         no_letterhead=no_letterhead,

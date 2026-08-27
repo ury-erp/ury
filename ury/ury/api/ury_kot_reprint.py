@@ -1,5 +1,6 @@
 import frappe
 from frappe.utils import cint
+from frappe.utils.print_format import print_by_server
 from ury.ury.printing.service import submit_and_monitor_print_job
 
 
@@ -41,17 +42,11 @@ def reprint_kot(invoice_number):
 
 def print_kot(printer, docname, kot_print_format, restaurant_table=None, order_type=None):
     try:
-        submit_and_monitor_print_job(
-            doctype="POS Invoice",
-            name=docname,
-            printer_setting=printer,
-            print_format=kot_print_format,
-            job_type="KOT_REPRINT",
-            extra_metadata={
-                "invoice": docname,
-                "restaurant_table": restaurant_table,
-                "order_type": order_type,
-            },
+        print_by_server(
+            "POS Invoice",
+            docname,
+            printer,
+            kot_print_format,
         )
     except Exception as e:
         frappe.log_error(f"KOT Reprint Error: {e}", "KOT Reprint Error")

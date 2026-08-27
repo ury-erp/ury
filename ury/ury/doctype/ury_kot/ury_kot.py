@@ -9,7 +9,8 @@ from ury.ury.printing.service import submit_and_monitor_print_job
 
 class URYKOT(Document):
     def on_submit(self):
-        self.multi_print_kot()
+        if "grillax" not in frappe.get_installed_apps():
+            self.multi_print_kot()
         self.kotDisplayRealtime()
 
     def before_submit(self):

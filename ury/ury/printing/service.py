@@ -8,9 +8,12 @@ from frappe.www.printview import validate_print_permission
 from ury.ury.printing.print_job_monitor import register_print_job
 
 
-def _make_print_job_id() -> str:
-    """Generate a unique internal URY Print Job identity."""
-    return f"PJ-{now_datetime().strftime('%Y%m%d%H%M%S')}-{frappe.generate_hash(length=6)}"
+def _make_print_job_id(printer_name: str = "Printer", cups_job_id: Optional[int] = None) -> str:
+    """Generate a unique URY Print Job identity formatted as Printer Name + CUPS Job ID."""
+    clean_printer = str(printer_name or "Printer").strip().replace(" ", "_")
+    if cups_job_id is not None:
+        return f"{clean_printer}-{cups_job_id}"
+    return f"{clean_printer}-{now_datetime().strftime('%Y%m%d%H%M%S')}-{frappe.generate_hash(length=4)}"
 
 
 def submit_and_monitor_print_job(
@@ -30,10 +33,6 @@ def submit_and_monitor_print_job(
     Grillax. It validates print permission, generates a PDF, submits the job to
     CUPS, persists metadata to the JSON file store, registers the job with the
     Redis monitor, and enqueues the poller.
-
-    Physical print success/failure is returned to the caller. Monitoring
-    registration is best-effort: if it fails, the physical print result is still
-    returned.
     """
     try:
         import cups
@@ -65,10 +64,16 @@ def submit_and_monitor_print_job(
         )
         return {"status": "Failure", "message": f"Failed to connect to printer: {e}"}
 
+    resolved_format = print_format
+    if not resolved_format and doctype == "POS Invoice":
+        pos_profile = getattr(target_doc, "pos_profile", None) or frappe.db.get_value("POS Invoice", name, "pos_profile")
+        if pos_profile:
+            resolved_format = frappe.db.get_value("POS Profile", pos_profile, "print_format")
+
     pdf_content = frappe.get_print(
         doctype,
         name,
-        print_format,
+        resolved_format,
         doc=doc,
         no_letterhead=no_letterhead,
         as_pdf=True,
@@ -84,7 +89,7 @@ def submit_and_monitor_print_job(
         for _ in range(print_count):
             cups_job_id = conn.printFile(print_settings.printer_name, file_path, name, {})
 
-        print_job_id = _make_print_job_id()
+        print_job_id = _make_print_job_id(print_settings.printer_name, cups_job_id)
 
         metadata = {
             "print_job_id": print_job_id,
@@ -96,6 +101,7 @@ def submit_and_monitor_print_job(
             "printer_name": print_settings.printer_name,
             "server_ip": print_settings.server_ip,
             "port": print_settings.port,
+            "file_path": file_path,
             "status": "SUBMITTED",
             "created_at": frappe.utils.now(),
         }
@@ -137,10 +143,8 @@ def submit_and_monitor_print_job(
             "job_type": job_type,
             "reference_doctype": doctype,
             "reference_name": name,
+            "file_path": file_path,
         }
-    finally:
-        if os.path.exists(file_path):
-            try:
-                os.remove(file_path)
-            except OSError:
-                pass
+    except Exception as e:
+        frappe.logger("printing").error(f"Failed to submit print job: {e}", exc_info=True)
+        return {"status": "Failure", "message": str(e)}

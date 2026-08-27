@@ -165,8 +165,11 @@ def _normalize_filters(filters):
             if isinstance(f, dict):
                 for fname, fval in f.items():
                     normalized.append((fname, "=", fval))
-            elif isinstance(f, (list, tuple)) and len(f) >= 3:
-                normalized.append((f[0], f[1], f[2]))
+            elif isinstance(f, (list, tuple)):
+                if len(f) == 4:
+                    normalized.append((f[1], f[2], f[3]))
+                elif len(f) >= 3:
+                    normalized.append((f[0], f[1], f[2]))
 
     return normalized
 

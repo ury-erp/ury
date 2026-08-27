@@ -190,19 +190,9 @@ scheduler_events = {
 
 # before_tests = "ury.install.before_tests"
 
-# Overriding Methods
-# ------------------------------
-#
-# override_whitelisted_methods = {
-# 	"frappe.desk.doctype.event.event.get_events": "ury.event.get_events"
-# }
-#
-# each overriding function accepts a `data` argument;
-# generated from the base implementation of the doctype dashboard,
-# along with any modifications made in other Frappe apps
-# override_doctype_dashboards = {
-# 	"Task": "ury.task.get_dashboard_data"
-# }
+override_doctype_class = {
+    "Network Printer Settings": "ury.ury.printing.custom_network_printer_settings.CustomNetworkPrinterSettings"
+}
 
 # exempt linked doctypes from being automatically cancelled
 #

@@ -1,5 +1,6 @@
 import frappe
-from ury.ury.printing.service import submit_and_monitor_print_job
+from frappe.utils import flt
+from frappe.utils.print_format import print_by_server
 
 WAITER_PRINT_FORMAT = "URY Waiter Order Slip"
 ADD_KOT_TYPES = ("New Order", "Order Modified")
@@ -37,8 +38,8 @@ def _aggregate_kot_items(kot_docs):
 					cancel_items[key] = {
 						"item": row.item,
 						"item_name": row.item_name,
-						"quantity": int(row.quantity or 0),
-						"cancelled_qty": int(row.cancelled_qty or 0),
+						"quantity": flt(row.quantity or 0),
+						"cancelled_qty": flt(row.cancelled_qty or 0),
 						"comments": row.comments,
 						"course": row.course,
 					}
@@ -47,10 +48,12 @@ def _aggregate_kot_items(kot_docs):
 					add_items[key] = {
 						"item": row.item,
 						"item_name": row.item_name,
-						"quantity": int(row.quantity or 0),
+						"quantity": flt(row.quantity or 0),
 						"comments": row.comments,
 						"course": row.course,
 					}
+				else:
+					add_items[key]["quantity"] += flt(row.quantity or 0)
 
 	return list(add_items.values()) + list(cancel_items.values())
 
@@ -66,7 +69,7 @@ def _get_invoice_item_qty_map(invoice_id):
 		fields=["item_code", "qty", "comment"],
 	):
 		key = (row["item_code"], row.get("comment") or "")
-		qty_map[key] = int(row.get("qty") or 0)
+		qty_map[key] = flt(row.get("qty") or 0)
 
 	return qty_map
 
@@ -80,14 +83,15 @@ def _enrich_item_display_fields(items, invoice_id):
 		key = (item["item"], item.get("comments") or "")
 
 		if item.get("cancelled_qty"):
-			old_qty = int(item.get("quantity") or 0)
-			cancelled_qty = int(item.get("cancelled_qty") or 0)
+			old_qty = flt(item.get("quantity") or 0)
+			cancelled_qty = flt(item.get("cancelled_qty") or 0)
 			new_qty = max(old_qty - cancelled_qty, 0)
 			item["display_mode"] = "old_new"
 			item["old_qty"] = old_qty
 			item["new_qty"] = new_qty
+			item["quantity"] = str(int(old_qty)) if old_qty.is_integer() else str(old_qty)
 		else:
-			delta_qty = int(item.get("quantity") or 0)
+			delta_qty = flt(item.get("quantity") or 0)
 			new_qty = invoice_qty_map.get(key, delta_qty)
 			old_qty = new_qty - delta_qty
 
@@ -99,6 +103,8 @@ def _enrich_item_display_fields(items, invoice_id):
 				item["display_mode"] = "old_new"
 				item["old_qty"] = old_qty
 				item["new_qty"] = new_qty
+
+			item["quantity"] = str(int(delta_qty)) if delta_qty.is_integer() else str(delta_qty)
 
 		enriched_items.append(item)
 
@@ -181,19 +187,13 @@ def print_combined_waiter_order_slip(invoice_id, kot_names, restaurant_table):
 			continue
 
 		try:
-			submit_and_monitor_print_job(
-				doctype="URY KOT",
-				name=kot_names[0],
-				printer_setting=printer_row.printer,
-				print_format=waiter_print_format,
+			print_by_server(
+				"URY KOT",
+				kot_names[0],
+				printer_row.printer,
+				waiter_print_format,
 				doc=combined_doc,
 				no_letterhead=1,
-				job_type="WAITER_SLIP",
-				extra_metadata={
-					"invoice": invoice_id,
-					"restaurant_table": restaurant_table,
-					"kot_names": kot_names,
-				},
 			)
 		except Exception as e:
 			frappe.log_error(
