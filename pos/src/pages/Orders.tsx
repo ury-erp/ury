@@ -123,6 +123,21 @@ export default function Orders() {
   const [showMergeDialog, setShowMergeDialog] = React.useState(false);
   const [orderActionsMenuOpen, setOrderActionsMenuOpen] = React.useState(false);
   const [isPrinting, setIsPrinting] = React.useState(false);
+  const [canCancelInvoice, setCanCancelInvoice] = React.useState(false);
+
+  React.useEffect(() => {
+    if (selectedOrder?.name) {
+      call.get('frappe.client.has_permission', { doctype: 'POS Invoice', docname: selectedOrder.name, perm_type: 'cancel' })
+        .then((res: any) => {
+          setCanCancelInvoice(res?.message?.has_permission === true);
+        })
+        .catch(() => {
+          setCanCancelInvoice(false);
+        });
+    } else {
+      setCanCancelInvoice(false);
+    }
+  }, [selectedOrder?.name]);
 
   const canSplitBill = useMemo(() => {
     if (!selectedOrder || selectedOrderItems.length === 0) return false;
@@ -646,14 +661,16 @@ export default function Orders() {
                         <Pencil className="w-4 h-4" />
                         {editLoading && <span className="ms-2 text-xs">{t('common.loading')}</span>}
                       </button>
-                      <button
-                        type="button"
-                        className="inline-flex items-center justify-center rounded-md p-2 bg-gray-100 hover:bg-gray-200 text-red-600 focus:outline-none focus:ring-2 focus:ring-red-500"
-                        aria-label="Cancel order"
-                        onClick={() => setCancelDialogOpen(true)}
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
+                      {canCancelInvoice && (
+                        <button
+                          type="button"
+                          className="inline-flex items-center justify-center rounded-md p-2 bg-gray-100 hover:bg-gray-200 text-red-600 focus:outline-none focus:ring-2 focus:ring-red-500"
+                          aria-label="Cancel order"
+                          onClick={() => setCancelDialogOpen(true)}
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
                     </>
                   )}
                   <Badge variant={getBadgeVariant(selectedOrder.status)}>
