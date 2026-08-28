@@ -7,7 +7,7 @@ export interface PrintJobStatusPayload {
   print_job_id: string;
   cups_job_id?: number;
   printer_name: string;
-  status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED' | 'CANCELED';
+  status: 'QUEUED' | 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED' | 'CANCELED';
   reason?: string;
 }
 
@@ -21,8 +21,8 @@ export function usePrintNotifications(activeInvoiceName?: string) {
     const handleStatusUpdate = (data: PrintJobStatusPayload) => {
       setActivePrintJobs((prev) => {
         const prevJob = prev[data.print_job_id];
-        // Only trigger info toast when transitioning into PENDING or PROCESSING for the first time
-        if (!prevJob && (data.status === 'PENDING' || data.status === 'PROCESSING')) {
+        // Only trigger info toast when transitioning into QUEUED, PENDING or PROCESSING for the first time
+        if (!prevJob && (data.status === 'QUEUED' || data.status === 'PENDING' || data.status === 'PROCESSING')) {
           if (!activeInvoiceName || data.invoice === activeInvoiceName) {
             showToast.info(`Invoice ${data.invoice} printing submitted (${data.status})...`);
           }

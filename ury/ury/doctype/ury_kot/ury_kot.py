@@ -4,12 +4,12 @@
 import json
 import frappe
 from frappe.model.document import Document
-from ury.ury.printing.service import submit_and_monitor_print_job
 
 
 class URYKOT(Document):
     def on_submit(self):
-        self.multi_print_kot()
+        if "grillax" not in frappe.get_installed_apps():
+            self.multi_print_kot()
         self.kotDisplayRealtime()
 
     def before_submit(self):
@@ -20,17 +20,16 @@ class URYKOT(Document):
         # Function for printing a KOT on a specified printer using unified dispatcher
         def print_kot(printer, kot_print_format):
             try:
-                submit_and_monitor_print_job(
+                printer_doc = frappe.get_doc("Network Printer Settings", printer)
+                printer_doc.print_doc(
                     doctype="URY KOT",
                     name=self.name,
-                    printer_setting=printer,
                     print_format=kot_print_format,
                     job_type="KOT",
                     extra_metadata={
                         "invoice": self.invoice,
                         "restaurant_table": self.restaurant_table,
                         "production": self.production,
-                        "kot_type": self.type,
                     },
                 )
             except Exception:

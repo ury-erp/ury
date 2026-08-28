@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useRef } from 'react';
-import { Clock, User, UserCheck, Receipt, Printer, Pencil, X, GitBranch, GitMerge } from 'lucide-react';
+import { Clock, User, UserCheck, Receipt, Printer, Pencil, X, GitBranch, GitMerge, ScrollText } from 'lucide-react';
 import { Badge, Button, Card, CardContent } from '@ury/ui';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@ury/ui';
 import { showToast } from '@ury/ui';
 import OrderStatusSidebar from '../components/OrderStatusSidebar';
+import PrintJobsModal from '../components/PrintJobsModal';
+import { useOrdersPrintJobs } from '../hooks/useOrdersPrintJobs';
 import { useRootStore } from '../store/root-store';
 import { formatCurrency, parseFrappeError } from '@ury/core';
 import { Spinner } from '@ury/ui';
@@ -123,6 +125,13 @@ export default function Orders() {
   const [showMergeDialog, setShowMergeDialog] = React.useState(false);
   const [orderActionsMenuOpen, setOrderActionsMenuOpen] = React.useState(false);
   const [isPrinting, setIsPrinting] = React.useState(false);
+  const [printJobsModalOpen, setPrintJobsModalOpen] = React.useState(false);
+  const [selectedInvoiceId, setSelectedInvoiceId] = React.useState<string | null>(null);
+
+  const {
+    hasInvoiceFailed,
+    refreshFailedJobs,
+  } = useOrdersPrintJobs();
   const [canCancelInvoice, setCanCancelInvoice] = React.useState(false);
 
   React.useEffect(() => {
@@ -487,9 +496,11 @@ export default function Orders() {
                   ? getElapsedTimeFormatted(order.custom_printing_time, order.posting_date, order.posting_time)
                   : '';
 
+                const isFailed = hasInvoiceFailed(order.name);
+
                 return (
-                <Card 
-                  key={order.name} 
+                <Card
+                  key={order.name}
                   className={`p-0 bg-white hover:shadow-md transition-shadow flex flex-col overflow-hidden cursor-pointer ${
                     selectedOrder?.name === order.name ? 'ring-2 ring-blue-500 shadow-lg' : ''
                   } ${splitBill || mergedBill ? 'border-s-4 border-s-primary-500' : ''}`}
@@ -569,10 +580,27 @@ export default function Orders() {
                       </div>
 
                       {/* Total - pushed to bottom like MenuCard */}
-                      <div className="mt-auto pt-2">
+                      <div className="mt-auto pt-2 flex items-center justify-between">
                         <span className="text-sm font-semibold text-gray-900 tabular-nums">
                           {formatCurrency(cardTotal)}
                         </span>
+                        <button
+                          type="button"
+                          className={`inline-flex items-center justify-center rounded-md p-1 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
+                            isFailed
+                              ? 'text-red-600 hover:bg-red-50'
+                              : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'
+                          }`}
+                          aria-label={`View print jobs for ${order.name}`}
+                          title={isFailed ? 'Print failed - click to view details' : 'View print jobs'}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedInvoiceId(order.name);
+                            setPrintJobsModalOpen(true);
+                          }}
+                        >
+                          <ScrollText className="w-5 h-5" />
+                        </button>
                       </div>
                     </div>
                   </CardContent>
@@ -900,6 +928,12 @@ export default function Orders() {
           onConfirm={handleSplitBill}
         />
       )}
+
+      <PrintJobsModal
+        open={printJobsModalOpen}
+        onOpenChange={setPrintJobsModalOpen}
+        invoiceId={selectedInvoiceId}
+      />
     </div>
   );
 };

@@ -4,7 +4,7 @@
 import frappe
 from frappe.model.document import Document
 
-from ury.ury.printing.file_store import delete_job, get_job, list_all_jobs
+from ury.ury.printing.file_store import delete_job, get_job, list_all_jobs, save_job
 
 
 class URYPrintJob(Document):
@@ -24,12 +24,16 @@ class URYPrintJob(Document):
         super(Document, self).__init__(_serialize_for_document(data))
 
     def db_insert(self, *args, **kwargs):
-        """No-op: virtual doctype does not write to MariaDB."""
-        pass
+        """Persist new job to file store."""
+        data = self.as_dict()
+        save_job(self.name, data)
 
     def db_update(self, *args, **kwargs):
-        """No-op: virtual doctype does not write to MariaDB."""
-        pass
+        """Persist updated job to file store."""
+        existing = get_job(self.name) or {}
+        data = self.as_dict()
+        existing.update(data)
+        save_job(self.name, existing)
 
     def delete(self, *args, **kwargs):
         """Delete the JSON file instead of removing a DB row."""
@@ -114,6 +118,12 @@ def _serialize_for_document(data):
     out.modified = out.get("last_checked_at") or out.get("modified") or out.creation
     out._comment_count = out.get("_comment_count", 0)
 
+    # Normalize the invoice identifier so filters on `invoice` work for all
+    # job types, including POS Invoice jobs that only store `reference_name`.
+    out.invoice = out.get("invoice") or (
+        out.get("reference_name") if out.get("reference_doctype") == "POS Invoice" else None
+    )
+
     return out
 
 
@@ -155,6 +165,15 @@ def _normalize_filters(filters):
     if not filters:
         return []
 
+    if isinstance(filters, str):
+        try:
+            filters = frappe.parse_json(filters)
+        except Exception:
+            filters = []
+
+    if not filters:
+        return []
+
     normalized = []
 
     if isinstance(filters, dict):
@@ -165,8 +184,11 @@ def _normalize_filters(filters):
             if isinstance(f, dict):
                 for fname, fval in f.items():
                     normalized.append((fname, "=", fval))
-            elif isinstance(f, (list, tuple)) and len(f) >= 3:
-                normalized.append((f[0], f[1], f[2]))
+            elif isinstance(f, (list, tuple)):
+                if len(f) == 4:
+                    normalized.append((f[1], f[2], f[3]))
+                elif len(f) >= 3:
+                    normalized.append((f[0], f[1], f[2]))
 
     return normalized
 
@@ -183,8 +205,17 @@ def _matches_filters(doc, filters):
         doc_value = doc.get(fname)
 
         if fop == "=":
-            if doc_value != fval:
-                return False
+            if doc_value == fval:
+                continue
+            # Fallback: POS Invoice jobs may match by reference_name even when
+            # the caller filters on `invoice`.
+            if (
+                fname == "invoice"
+                and doc.get("reference_doctype") == "POS Invoice"
+                and doc.get("reference_name") == fval
+            ):
+                continue
+            return False
         elif fop == "like":
             needle = str(fval).replace("%", "").lower()
             haystack = str(doc_value or "").lower()

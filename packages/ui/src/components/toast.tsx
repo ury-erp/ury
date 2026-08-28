@@ -1,4 +1,4 @@
-import { toast, ToastContainer } from 'react-toastify';
+import { toast, ToastContainer, ToastOptions } from 'react-toastify';
 import { CheckCircle, XCircle, Info } from 'lucide-react';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -12,7 +12,7 @@ const toastIcons = {
 };
 
 export const showToast = {
-  success: (message: string) => {
+  success: (message: string, options?: ToastOptions) => {
     toast.success(message, {
       position: 'top-right',
       autoClose: 2000,
@@ -24,9 +24,10 @@ export const showToast = {
       theme: 'colored',
       icon: toastIcons.success,
       className: 'toast-success',
+      ...options,
     });
   },
-  error: (message: string) => {
+  error: (message: string, options?: ToastOptions) => {
     toast.error(message, {
       position: 'top-right',
       autoClose: 2000,
@@ -38,9 +39,10 @@ export const showToast = {
       theme: 'colored',
       icon: toastIcons.error,
       className: 'toast-error',
+      ...options,
     });
   },
-  info: (message: string) => {
+  info: (message: string, options?: ToastOptions) => {
     toast.info(message, {
       position: 'top-right',
       autoClose: 2000,
@@ -52,9 +54,11 @@ export const showToast = {
       theme: 'colored',
       icon: toastIcons.info,
       className: 'toast-info',
+      ...options,
     });
   },
 };
+
 
 export const ToastProvider = () => {
   return (

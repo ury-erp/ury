@@ -8,48 +8,36 @@ from ury.ury.api.ury_print import network_printing, select_network_printer
 
 
 class TestURYPrint(FrappeTestCase):
-    @patch("ury.ury.api.ury_print.frappe.enqueue")
-    @patch("ury.ury.api.ury_print.register_print_job")
-    @patch("ury.ury.api.ury_print.now_datetime")
+    @patch("ury.ury.api.ury_print.frappe.db.set_value")
     @patch("ury.ury.api.ury_print.frappe.db.get_value")
-    @patch("ury.ury.api.ury_print.frappe.get_print")
-    @patch("ury.ury.api.ury_print.validate_print_permission")
     @patch("ury.ury.api.ury_print.frappe.get_doc")
-    @patch("ury.ury.api.ury_print.cups")
-    def test_network_printing_captures_cups_job_id_without_flipping_invoice_printed(
+    def test_network_printing_delegates_to_printer_doc_without_flipping_invoice_printed(
         self,
-        mock_cups,
         mock_get_doc,
-        mock_validate_print_permission,
-        mock_get_print,
         mock_db_get_value,
-        mock_now_datetime,
-        mock_register_print_job,
-        mock_enqueue,
+        mock_set_value,
     ):
-        """network_printing registers the CUPS job but does not finalize lifecycle side effects."""
-        network_printer = MagicMock()
-        network_printer.printer_name = "Test Printer"
-        network_printer.server_ip = "127.0.0.1"
-        network_printer.port = 631
+        """network_printing delegates to printer_doc.print_doc and does not finalize lifecycle side effects."""
+        printer_doc = MagicMock()
+        printer_doc.name = "Test Printer Setting"
+        printer_doc.print_doc.return_value = {
+            "status": "Success",
+            "cups_job_id": 123,
+            "print_job_id": "PJ-TestPrinterSetting-123",
+            "printer": "Test Printer Setting",
+            "invoice": "INV-001",
+        }
 
         pos_invoice = MagicMock()
 
         def get_doc_side_effect(doctype, name=None, *args, **kwargs):
             if doctype == "Network Printer Settings":
-                return network_printer
+                return printer_doc
             if doctype == "POS Invoice":
                 return pos_invoice
             return MagicMock()
 
         mock_get_doc.side_effect = get_doc_side_effect
-
-        mock_conn = MagicMock()
-        mock_conn.printFile.return_value = 123
-        mock_cups.Connection.return_value = mock_conn
-
-        mock_get_print.return_value = b"%PDF-1.4 test binary pdf data"
-        mock_now_datetime.return_value = datetime(2026, 8, 16, 12, 0, 0)
 
         mock_db_get_value.return_value = "T-01"
 
@@ -65,35 +53,23 @@ class TestURYPrint(FrappeTestCase):
         self.assertEqual(result.get("cups_job_id"), 123)
         self.assertEqual(result.get("printer"), "Test Printer Setting")
         self.assertEqual(result.get("invoice"), "INV-001")
-        self.assertTrue(
-            isinstance(result.get("print_job_id"), str)
-            and result.get("print_job_id", "").startswith("PJ-")
+
+        printer_doc.print_doc.assert_called_once_with(
+            doctype="POS Invoice",
+            name="INV-001",
+            print_format="Test Format",
+            doc=None,
+            no_letterhead=0,
+            job_type="BILL",
+            extra_metadata={
+                "invoice": "INV-001",
+                "restaurant_table": "T-01",
+            },
         )
 
-        self.assertEqual(mock_conn.printFile.call_count, 1)
-        args = mock_conn.printFile.call_args[0]
-        self.assertEqual(args[0], "Test Printer")
-        self.assertEqual(args[2], "INV-001")
-        self.assertEqual(args[3], {})
-
-        # The job is registered in Redis as SUBMITTED; invoice_printed and table
-        # release must only happen later when the poller reaches a terminal state.
-        mock_register_print_job.assert_called_once()
-        registered_metadata = mock_register_print_job.call_args.args[0]
-        self.assertEqual(registered_metadata["status"], "SUBMITTED")
-        self.assertEqual(registered_metadata["invoice"], "INV-001")
-        self.assertEqual(registered_metadata["restaurant_table"], "T-01")
-
-        # An immediate poll is enqueued after registration.
-        mock_enqueue.assert_called_once()
-        enqueue_args = mock_enqueue.call_args.args
-        enqueue_kwargs = mock_enqueue.call_args.kwargs
-        self.assertEqual(
-            enqueue_args[0],
-            "ury.ury.printing.print_job_poller.poll_single_print_job",
-        )
-        self.assertEqual(enqueue_kwargs["queue"], "default")
-        self.assertEqual(enqueue_kwargs["timeout"], 60)
+        # invoice_printed and table release must only happen later when the
+        # poller reaches a terminal state.
+        mock_set_value.assert_not_called()
 
         mock_db_get_value.assert_called_once_with(
             "POS Invoice", "INV-001", "restaurant_table"
