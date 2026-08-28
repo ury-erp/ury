@@ -1,0 +1,271 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "hash",
+ "creation": "2026-08-28 00:00:00.000000",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "issue_authorization",
+  "plan",
+  "branch",
+  "company",
+  "department",
+  "production_unit",
+  "column_break_scope",
+  "component_item",
+  "stock_uom",
+  "status",
+  "section_break_qty",
+  "held_qty_before",
+  "wasted_qty",
+  "column_break_qty",
+  "reason_category",
+  "reason_notes",
+  "section_break_valuation",
+  "valuation_rate",
+  "valuation_amount",
+  "valuation_is_estimated",
+  "section_break_approval",
+  "captured_by",
+  "captured_on",
+  "column_break_approval",
+  "approved_by",
+  "approved_on",
+  "approval_permission_basis",
+  "section_break_audit",
+  "audit_log"
+ ],
+ "fields": [
+  {
+   "fieldname": "issue_authorization",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Issue Authorization",
+   "options": "URY Issue Authorization",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "plan",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Sales Plan",
+   "options": "URY Sales Plan",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Branch",
+   "options": "Branch",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "department",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Department",
+   "options": "URY Production Department",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "production_unit",
+   "fieldtype": "Link",
+   "label": "Production Unit",
+   "options": "URY Production Unit",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_scope",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "component_item",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Component Item",
+   "options": "Item",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "stock_uom",
+   "fieldtype": "Link",
+   "label": "Stock UOM",
+   "options": "UOM",
+   "read_only": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Draft\nAuthorized\nRejected",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_qty",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "held_qty_before",
+   "fieldtype": "Float",
+   "label": "Held Qty Before Wastage",
+   "read_only": 1
+  },
+  {
+   "fieldname": "wasted_qty",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Wasted Qty",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_qty",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "reason_category",
+   "fieldtype": "Select",
+   "label": "Reason Category",
+   "options": "Spoilage\nPreparation Error\nDropped/Damaged\nExpired\nOther",
+   "read_only": 1
+  },
+  {
+   "fieldname": "reason_notes",
+   "fieldtype": "Small Text",
+   "label": "Reason Notes",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_valuation",
+   "fieldtype": "Section Break",
+   "label": "Valuation"
+  },
+  {
+   "fieldname": "valuation_rate",
+   "fieldtype": "Float",
+   "label": "Valuation Rate",
+   "read_only": 1
+  },
+  {
+   "fieldname": "valuation_amount",
+   "fieldtype": "Float",
+   "label": "Valuation Amount",
+   "read_only": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "valuation_is_estimated",
+   "fieldtype": "Check",
+   "label": "Valuation Is Estimated (Future Work: Real ERPNext Valuation Rate)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_approval",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "captured_by",
+   "fieldtype": "Data",
+   "label": "Captured By",
+   "read_only": 1
+  },
+  {
+   "fieldname": "captured_on",
+   "fieldtype": "Datetime",
+   "label": "Captured On",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_approval",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "approved_by",
+   "fieldtype": "Data",
+   "label": "Approved/Rejected By",
+   "read_only": 1
+  },
+  {
+   "fieldname": "approved_on",
+   "fieldtype": "Datetime",
+   "label": "Approved/Rejected On",
+   "read_only": 1
+  },
+  {
+   "fieldname": "approval_permission_basis",
+   "fieldtype": "Data",
+   "label": "Approval Permission Basis",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_audit",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "audit_log",
+   "fieldtype": "Long Text",
+   "label": "Audit Log (JSON)",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 0,
+ "links": [],
+ "modified": "2026-08-28 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY Issue Wastage",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Production Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "role": "Stock Manager",
+   "write": 1
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "role": "Stock User"
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

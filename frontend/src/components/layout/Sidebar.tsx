@@ -11,7 +11,8 @@ import {
   ChevronDown,
   FileText,
   Settings,
-  Store
+  Store,
+  ClipboardList
 } from 'lucide-react';
 
 interface NavItem {
@@ -28,7 +29,8 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'POS Profile', path: '/pos-profile', icon: SlidersHorizontal },
   { label: 'User', path: '/user', icon: Users },
   { label: 'Branch', path: '/branch', icon: Building2 },
-  { label: 'Aggregators', path: '/aggregator', icon: Store }
+  { label: 'Aggregators', path: '/aggregator', icon: Store },
+  { label: 'Sales Plan', path: '/sales-plan', icon: ClipboardList }
 ];
 
 export const Sidebar: React.FC = () => {

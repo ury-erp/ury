@@ -9,9 +9,16 @@
  "engine": "InnoDB",
  "field_order": [
   "production",
+  "enabled",
+  "department",
   "pos_profile",
   "branch",
   "warehouse",
+  "unit_type",
+  "lead_chef",
+  "assigned_employees",
+  "workstation",
+  "workstation_type",
   "item_groups",
   "printer_info_section",
   "printer_settings",
@@ -84,6 +91,48 @@
    "fieldtype": "Table",
    "label": "Order Type",
    "options": "KDS Order Type"
+  },
+  {
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enabled",
+   "default": "1"
+  },
+  {
+   "fieldname": "department",
+   "fieldtype": "Link",
+   "label": "Department",
+   "options": "URY Production Department",
+   "reqd": 1
+  },
+  {
+   "fieldname": "unit_type",
+   "fieldtype": "Data",
+   "label": "Unit Type"
+  },
+  {
+   "fieldname": "lead_chef",
+   "fieldtype": "Link",
+   "label": "Lead Chef",
+   "options": "Employee"
+  },
+  {
+   "fieldname": "assigned_employees",
+   "fieldtype": "Table",
+   "label": "Assigned Employees",
+   "options": "URY Production Unit Employee"
+  },
+  {
+   "fieldname": "workstation",
+   "fieldtype": "Link",
+   "label": "Workstation",
+   "options": "Workstation"
+  },
+  {
+   "fieldname": "workstation_type",
+   "fieldtype": "Link",
+   "label": "Workstation Type",
+   "options": "Workstation Type"
   }
  ],
  "index_web_pages_for_search": 1,

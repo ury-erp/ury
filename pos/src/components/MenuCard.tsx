@@ -1,6 +1,11 @@
-import { FC } from 'react';
+import { FC, useEffect, useState } from 'react';
 import { cn } from '@ury/ui';
 import { formatCurrency } from '@ury/core';
+import {
+  getAvailabilityMessage,
+  getItemAvailability,
+  ItemAvailability,
+} from '../lib/availability-api';
 
 interface MenuCardProps {
   id: string;
@@ -11,26 +16,59 @@ interface MenuCardProps {
   item: string;
   onClick?: () => void;
   disabled?: boolean;
+  /** Branch/company for the V3-44 availability lookup; omit to skip the check entirely. */
+  branch?: string;
+  company?: string;
 }
 
-const MenuCard: FC<MenuCardProps> = ({ 
-  name, 
-  price, 
-  item_image, 
-  course, 
+const MenuCard: FC<MenuCardProps> = ({
+  name,
+  price,
+  item_image,
+  course,
+  item,
   onClick,
-  disabled 
+  disabled,
+  branch,
+  company,
 }) => {
+  const [availability, setAvailability] = useState<ItemAvailability | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!branch || !company || !item) {
+      setAvailability(null);
+      return;
+    }
+    getItemAvailability({ item_code: item, branch, company })
+      .then((result) => {
+        if (!cancelled) setAvailability(result);
+      })
+      .catch(() => {
+        // Display-only lookup — a failed check must never block the menu
+        // from rendering. Treat as "unknown" (no gating) on error.
+        if (!cancelled) setAvailability(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [item, branch, company]);
+
+  const isUnavailable = !!availability && (!availability.sellable || availability.available_qty <= 0);
+  const isDisabled = disabled || isUnavailable;
+  const unavailableMessage = isUnavailable ? getAvailabilityMessage(availability?.reason_code) : null;
+
   return (
     <div
       className={cn(
         "bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow cursor-pointer h-56 flex flex-col",
-        disabled && "opacity-50 cursor-not-allowed pointer-events-none"
+        isDisabled && "opacity-50 cursor-not-allowed pointer-events-none"
       )}
-      onClick={disabled ? undefined : onClick}
+      onClick={isDisabled ? undefined : onClick}
+      aria-disabled={isDisabled || undefined}
     >
       {/* Image section - fixed height */}
-      <div className="h-24">
+      <div className="h-24 relative">
         {item_image ? (
           <img
             src={item_image}
@@ -53,6 +91,11 @@ const MenuCard: FC<MenuCardProps> = ({
           <div className="w-full h-full bg-gray-200 flex items-center justify-center text-2xl text-gray-400 font-medium">
             {name.slice(0, 2).toUpperCase()}
           </div>
+        )}
+        {unavailableMessage && (
+          <span className="absolute top-1 right-1 bg-gray-900/80 text-white text-[10px] font-medium px-2 py-0.5 rounded">
+            {unavailableMessage}
+          </span>
         )}
       </div>
 
@@ -83,4 +126,4 @@ const MenuCard: FC<MenuCardProps> = ({
   );
 };
 
-export default MenuCard; 
+export default MenuCard;

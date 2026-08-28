@@ -1,0 +1,270 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "hash",
+ "creation": "2026-08-28 00:00:00.000000",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "plan",
+  "plan_approval_hash",
+  "branch",
+  "company",
+  "department",
+  "production_unit",
+  "column_break_scope",
+  "component_item",
+  "stock_uom",
+  "control_mode",
+  "status",
+  "section_break_qty",
+  "required_qty",
+  "prior_authorized_qty",
+  "prior_returned_qty",
+  "prior_wasted_qty",
+  "column_break_qty",
+  "remaining_before_qty",
+  "authorized_qty",
+  "remaining_after_qty",
+  "section_break_override",
+  "is_override",
+  "override_actor",
+  "override_permission_basis",
+  "override_reason",
+  "override_timestamp",
+  "section_break_audit",
+  "actor",
+  "audit_log"
+ ],
+ "fields": [
+  {
+   "fieldname": "plan",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Sales Plan",
+   "options": "URY Sales Plan",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "plan_approval_hash",
+   "fieldtype": "Data",
+   "label": "Plan Approval Hash",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Branch",
+   "options": "Branch",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "department",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Department",
+   "options": "URY Production Department",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "production_unit",
+   "fieldtype": "Link",
+   "label": "Production Unit",
+   "options": "URY Production Unit",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_scope",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "component_item",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Component Item",
+   "options": "Item",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "stock_uom",
+   "fieldtype": "Link",
+   "label": "Stock UOM",
+   "options": "UOM",
+   "read_only": 1
+  },
+  {
+   "fieldname": "control_mode",
+   "fieldtype": "Select",
+   "label": "Control Mode",
+   "options": "UNCONSTRAINED\nSOFT\nHARD",
+   "read_only": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Authorized\nRejected",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_qty",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "required_qty",
+   "fieldtype": "Float",
+   "label": "Required Qty (Frozen Demand)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "prior_authorized_qty",
+   "fieldtype": "Float",
+   "label": "Prior Authorized Qty",
+   "read_only": 1
+  },
+  {
+   "fieldname": "prior_returned_qty",
+   "fieldtype": "Float",
+   "label": "Prior Returned Qty",
+   "read_only": 1
+  },
+  {
+   "fieldname": "prior_wasted_qty",
+   "fieldtype": "Float",
+   "label": "Prior Wasted Qty",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_qty",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "remaining_before_qty",
+   "fieldtype": "Float",
+   "label": "Remaining Entitlement Before",
+   "read_only": 1
+  },
+  {
+   "fieldname": "authorized_qty",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Authorized Qty",
+   "read_only": 1
+  },
+  {
+   "fieldname": "remaining_after_qty",
+   "fieldtype": "Float",
+   "label": "Remaining Entitlement After",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_override",
+   "fieldtype": "Section Break",
+   "label": "Override"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_override",
+   "fieldtype": "Check",
+   "label": "Is Override"
+  },
+  {
+   "fieldname": "override_actor",
+   "fieldtype": "Data",
+   "label": "Override Actor",
+   "read_only": 1
+  },
+  {
+   "fieldname": "override_permission_basis",
+   "fieldtype": "Data",
+   "label": "Override Permission Basis",
+   "read_only": 1
+  },
+  {
+   "fieldname": "override_reason",
+   "fieldtype": "Small Text",
+   "label": "Override Reason",
+   "read_only": 1
+  },
+  {
+   "fieldname": "override_timestamp",
+   "fieldtype": "Datetime",
+   "label": "Override Timestamp",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_audit",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "actor",
+   "fieldtype": "Data",
+   "label": "Actor",
+   "read_only": 1
+  },
+  {
+   "fieldname": "audit_log",
+   "fieldtype": "Long Text",
+   "label": "Audit Log (JSON)",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 0,
+ "links": [],
+ "modified": "2026-08-28 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY Issue Authorization",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Production Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "role": "Stock User"
+  },
+  {
+   "read": 1,
+   "role": "Stock Manager"
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
