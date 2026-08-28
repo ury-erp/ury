@@ -6,6 +6,7 @@ frappe.ui.form.on('URY Print Job', {
         const indicator_map = {
             'COMPLETED': 'green',
             'PROCESSING': 'blue',
+            'QUEUED': 'yellow',
             'PENDING': 'yellow',
             'SUBMITTED': 'yellow',
             'FAILED': 'red',

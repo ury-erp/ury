@@ -25,6 +25,7 @@ from ury.ury.printing.state_machine import (
     FAILED,
     PENDING,
     PROCESSING,
+    QUEUED,
     SUBMITTED,
     is_terminal,
 )
@@ -261,7 +262,7 @@ def update_print_job(print_job_id, updates):
 
 def _calculate_check_interval(current_state, retry_count=0):
     """Calculate the next polling interval in seconds for a job state."""
-    if current_state in (SUBMITTED, PENDING):
+    if current_state in (SUBMITTED, QUEUED, PENDING):
         return INITIAL_INTERVAL_SECONDS
 
     if current_state == PROCESSING:

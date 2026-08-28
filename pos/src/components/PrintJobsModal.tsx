@@ -22,6 +22,7 @@ function getStatusBadgeVariant(status: string) {
       return 'success' as const;
     case 'FAILED':
       return 'danger' as const;
+    case 'QUEUED':
     case 'PENDING':
     case 'PROCESSING':
       return 'warning' as const;
