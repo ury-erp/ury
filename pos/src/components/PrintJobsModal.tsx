@@ -76,7 +76,6 @@ export function PrintJobsModal({
           'cups_job_id',
         ],
         filters: [['invoice', '=', invoiceId]],
-        limit: 50,
       } as unknown as Parameters<typeof db.getDocList>[1]);
 
       setJobs(rows);

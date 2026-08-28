@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { db } from '@ury/core';
+import { showToast } from '@ury/ui';
 import { getFrappeSocket } from '../lib/socket';
 
 export interface URYPrintJob {
@@ -18,13 +19,13 @@ export interface URYPrintJob {
 }
 
 const POLL_INTERVAL_MS = 5000;
-const FETCH_LIMIT = 100;
 
 export function useOrdersPrintJobs() {
   const [failedInvoiceIds, setFailedInvoiceIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const initialLoadRef = useRef(true);
+  const notifiedJobIdsRef = useRef<Set<string>>(new Set());
 
   const fetchFailedJobs = useCallback(async () => {
     if (initialLoadRef.current) {
@@ -44,17 +45,27 @@ export function useOrdersPrintJobs() {
           'created_at',
         ],
         filters: [['status', '=', 'FAILED']],
-        limit: FETCH_LIMIT,
       } as unknown as Parameters<typeof db.getDocList>[1]);
 
       const ids = new Set<string>();
       if (Array.isArray(rows)) {
         rows.forEach((job) => {
+          const invoice = job.invoice || job.reference_name;
+          const jobId = job.print_job_id || job.name;
+
           if (job.invoice) {
             ids.add(String(job.invoice).trim());
           }
           if (job.reference_name) {
             ids.add(String(job.reference_name).trim());
+          }
+
+          if (jobId && !notifiedJobIdsRef.current.has(jobId)) {
+            notifiedJobIdsRef.current.add(jobId);
+            const msg = invoice
+              ? `Print job ${jobId} failed for invoice ${invoice}`
+              : `Print job ${jobId} failed`;
+            showToast.error(msg);
           }
         });
       }
