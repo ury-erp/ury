@@ -29,6 +29,12 @@ export default defineConfig({
     fs: {
       allow: ['..'],
     },
+    proxy: {
+      '/api': { target: 'http://ury.localhost:8002', changeOrigin: true },
+      '/app': { target: 'http://ury.localhost:8002', changeOrigin: true },
+      '/assets': { target: 'http://ury.localhost:8002', changeOrigin: true },
+      '/files': { target: 'http://ury.localhost:8002', changeOrigin: true },
+    },
   },
   build: {
     outDir: "../ury/public/ury",

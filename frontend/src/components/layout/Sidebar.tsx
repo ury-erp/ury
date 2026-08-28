@@ -27,18 +27,40 @@ interface NavItem {
   icon: React.ElementType;
 }
 
-const NAV_ITEMS: NavItem[] = [
-  { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-  { label: 'URY Menu', path: '/menu', icon: Utensils },
-  { label: 'URY Table', path: '/table', icon: Grid },
-  { label: 'URY Room', path: '/room', icon: Home },
-  { label: 'POS Profile', path: '/pos-profile', icon: SlidersHorizontal },
-  { label: 'User', path: '/user', icon: Users },
-  { label: 'Branch', path: '/branch', icon: Building2 },
-  { label: 'Aggregators', path: '/aggregator', icon: Store },
-  { label: 'Sales Plan', path: '/sales-plan', icon: ClipboardList },
-  { label: 'Department Stock', path: '/department-stock', icon: Warehouse },
-  { label: 'Profitability', path: '/department-profitability', icon: TrendingUp }
+interface NavGroup {
+  label: string;
+  items: NavItem[];
+}
+
+const NAV_GROUPS: NavGroup[] = [
+  {
+    label: 'Today',
+    items: [{ label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard }]
+  },
+  {
+    label: 'Plan',
+    items: [{ label: 'Sales Plan', path: '/sales-plan', icon: ClipboardList }]
+  },
+  {
+    label: 'Close',
+    items: [{ label: 'Department Stock', path: '/department-stock', icon: Warehouse }]
+  },
+  {
+    label: 'Insight',
+    items: [{ label: 'Profitability', path: '/department-profitability', icon: TrendingUp }]
+  },
+  {
+    label: 'Setup',
+    items: [
+      { label: 'URY Menu', path: '/menu', icon: Utensils },
+      { label: 'URY Table', path: '/table', icon: Grid },
+      { label: 'URY Room', path: '/room', icon: Home },
+      { label: 'POS Profile', path: '/pos-profile', icon: SlidersHorizontal },
+      { label: 'User', path: '/user', icon: Users },
+      { label: 'Branch', path: '/branch', icon: Building2 },
+      { label: 'Aggregators', path: '/aggregator', icon: Store }
+    ]
+  }
 ];
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
@@ -114,15 +136,22 @@ const MainPanel: React.FC<{ isManager: boolean }> = ({ isManager }) => {
           <div className="!mt-3 !mb-2 border-t border-gray-100" />
         </>
       )}
-      {NAV_ITEMS.map((item) => {
-        const Icon = item.icon;
-        return (
-          <NavLink key={item.path} to={item.path} className={navLinkClass}>
-            <Icon className="w-5 h-5 shrink-0" />
-            <span>{item.label}</span>
-          </NavLink>
-        );
-      })}
+      {NAV_GROUPS.map((group) => (
+        <div key={group.label}>
+          <h3 className="text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-2 px-3 pt-3 first:pt-0">
+            {group.label}
+          </h3>
+          {group.items.map((item) => {
+            const Icon = item.icon;
+            return (
+              <NavLink key={item.path} to={item.path} className={navLinkClass}>
+                <Icon className="w-5 h-5 shrink-0" />
+                <span>{item.label}</span>
+              </NavLink>
+            );
+          })}
+        </div>
+      ))}
 
       <div className="pt-2">
         <button
