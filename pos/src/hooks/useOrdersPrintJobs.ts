@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { db } from '@ury/core';
 import { showToast } from '@ury/ui';
 import { getFrappeSocket } from '../lib/socket';
 
@@ -34,8 +33,8 @@ export function useOrdersPrintJobs() {
     setError(null);
 
     try {
-      const rows = await db.getDocList<URYPrintJob>('URY Print Job', {
-        fields: [
+      const params = new URLSearchParams({
+        fields: JSON.stringify([
           'name',
           'print_job_id',
           'status',
@@ -43,9 +42,16 @@ export function useOrdersPrintJobs() {
           'reference_name',
           'failure_reason',
           'created_at',
-        ],
-        filters: [['status', '=', 'FAILED']],
-      } as unknown as Parameters<typeof db.getDocList>[1]);
+        ]),
+        filters: JSON.stringify([['status', '=', 'FAILED']]),
+      });
+
+      const res = await fetch(`/api/resource/URY%20Print%20Job?${params.toString()}`);
+      if (!res.ok) {
+        throw new Error(`Failed to fetch failed print jobs: ${res.statusText}`);
+      }
+      const data = await res.json();
+      const rows: URYPrintJob[] = data?.data || [];
 
       const ids = new Set<string>();
       const isInitial = initialLoadRef.current;

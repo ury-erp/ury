@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
-import { db } from '@ury/core';
 import {
   Badge,
   Dialog,
@@ -60,8 +59,8 @@ export function PrintJobsModal({
     setError(null);
 
     try {
-      const rows = await db.getDocList<URYPrintJob>('URY Print Job', {
-        fields: [
+      const params = new URLSearchParams({
+        fields: JSON.stringify([
           'name',
           'print_job_id',
           'job_type',
@@ -74,9 +73,16 @@ export function PrintJobsModal({
           'created_at',
           'retry_count',
           'cups_job_id',
-        ],
-        filters: [['invoice', '=', invoiceId]],
-      } as unknown as Parameters<typeof db.getDocList>[1]);
+        ]),
+        filters: JSON.stringify([['invoice', '=', invoiceId]]),
+      });
+
+      const res = await fetch(`/api/resource/URY%20Print%20Job?${params.toString()}`);
+      if (!res.ok) {
+        throw new Error(`Failed to fetch print jobs: ${res.statusText}`);
+      }
+      const data = await res.json();
+      const rows: URYPrintJob[] = data?.data || [];
 
       setJobs(rows);
     } catch (err) {
