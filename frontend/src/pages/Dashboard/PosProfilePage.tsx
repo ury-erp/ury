@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useBranchContext } from '../../context/BranchContext';
-import { SlidersHorizontal, Printer, Shield, Settings2, ChevronDown, Users, Plus, X } from 'lucide-react';
+import { SlidersHorizontal, Printer, Shield, Settings2, ChevronDown, Users, Plus, X, ClipboardList } from 'lucide-react';
 import { Card, Button, Badge, Input, Select, Spinner, showToast } from '@ury/ui';
 import { dashboardService } from '../../services/dashboard';
 import { call } from '@ury/core';
@@ -59,6 +60,7 @@ export const PosProfilePage: React.FC = () => {
   const [saving, setSaving] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<ActiveTab>('general');
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [editModalTab, setEditModalTab] = useState<'general' | 'users' | 'checklist'>('general');
 
   // Production units
   const [productionUnits, setProductionUnits] = useState<ProductionUnitRecord[]>([]);
@@ -251,8 +253,18 @@ export const PosProfilePage: React.FC = () => {
 
   const handleProfileSelect = (profile: PosProfileRecord) => {
     fetchProfileDetails(profile.name);
+    setEditModalTab('general');
     setIsDrawerOpen(true);
   };
+
+  // Close the wide Edit modal on Escape, mirroring SideDrawer's own behavior.
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsDrawerOpen(false);
+    };
+    if (isDrawerOpen) window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [isDrawerOpen]);
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
