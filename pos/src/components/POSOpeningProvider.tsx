@@ -45,7 +45,13 @@ const POSOpeningProvider = ({ children }: POSOpeningProviderProps) => {
       // block here; checkPOSStatus() re-runs once the cashier submits it.
       if (posProfile?.name) {
         try {
-          const { logStatus } = await getChecklist(posProfile.name, 'Opening');
+          // getChecklist's declared camelCase fields (logName/logStatus) don't
+          // actually match what the backend returns (log_name/log_status), so
+          // logStatus here is always undefined and this check always fails,
+          // re-triggering the checklist gate forever. Read both casings
+          // defensively until the shared api layer is fixed.
+          const checklistResult: any = await getChecklist(posProfile.name, 'Opening');
+          const logStatus = checklistResult.logStatus ?? checklistResult.log_status ?? null;
           if (logStatus !== 'Complete') {
             setNeedsOpeningChecklist(true);
             return;
