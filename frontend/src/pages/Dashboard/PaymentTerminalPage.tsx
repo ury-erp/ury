@@ -234,7 +234,7 @@ const PaymentTerminalContent: React.FC = () => {
           <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
-                <thead className="border-b border-gray-100 bg-gray-50 text-xs font-semibold uppercase text-gray-500">
+                <thead className="border-b border-gray-100 bg-gray-50 text-xs font-semibold text-gray-500">
                   <tr>
                     <th className="px-4 py-3">Terminal ID</th>
                     <th className="px-4 py-3">Device</th>
@@ -286,7 +286,7 @@ const PaymentTerminalContent: React.FC = () => {
           <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
-                <thead className="border-b border-gray-100 bg-gray-50 text-xs font-semibold uppercase text-gray-500">
+                <thead className="border-b border-gray-100 bg-gray-50 text-xs font-semibold text-gray-500">
                   <tr>
                     <th className="px-4 py-3">Terminal</th>
                     <th className="px-4 py-3">Invoice</th>

@@ -69,7 +69,7 @@ function MissingPricesWarning({ sections }: { sections: MissingPriceSection[] })
         <div className="px-4 pb-4 space-y-3 border-t border-amber-200 pt-3">
           {sections.map((s) => (
             <div key={s.label}>
-              <p className="text-xs font-semibold uppercase tracking-wide mb-1.5">
+              <p className="text-xs font-semibold tracking-wide mb-1.5">
                 {s.label} ({s.items.length})
               </p>
               <div className="flex flex-wrap gap-1.5">

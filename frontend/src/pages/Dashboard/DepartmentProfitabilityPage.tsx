@@ -264,8 +264,16 @@ export const DepartmentProfitabilityPage: React.FC = () => {
                   <th className="p-2">Net Revenue</th>
                   {canSeeCost && <th className="p-2">Posted Cost</th>}
                   {canSeeCost && <th className="p-2">Theoretical Cost</th>}
-                  {canSeeCost && <th className="p-2">Posted GP</th>}
-                  {canSeeCost && <th className="p-2">Theoretical GP</th>}
+                  {canSeeCost && (
+                    <th className="p-2" title="Gross profit using today's actual recorded cost for this item">
+                      Posted GP
+                    </th>
+                  )}
+                  {canSeeCost && (
+                    <th className="p-2" title="Gross profit if cost matched the standard recipe (BOM) cost exactly">
+                      Theoretical GP
+                    </th>
+                  )}
                   {canSeeCost && <th className="p-2">Variance</th>}
                 </tr>
               </thead>

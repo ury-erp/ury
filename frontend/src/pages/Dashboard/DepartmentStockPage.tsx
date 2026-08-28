@@ -612,7 +612,7 @@ const DepartmentStockContent: React.FC = () => {
                         <th className="px-4 py-3">Plan</th>
                         <th className="px-4 py-3">Component</th>
                         <th className="px-4 py-3 text-right">Authorized Qty</th>
-                        <th className="px-4 py-3 text-right">Remaining Entitlement</th>
+                        <th className="px-4 py-3 text-right" title="Authorized quantity still available to draw against this plan">Remaining Entitlement</th>
                         <th className="px-4 py-3">Status</th>
                         {canCapture && <th className="px-4 py-3">Actions</th>}
                       </tr>
