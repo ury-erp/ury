@@ -175,7 +175,10 @@ def get_needs_attention(branch=None):
 			"type": "pending_payment",
 			"message": f"{len(pending)} order(s) pending payment for over 15 minutes",
 			"severity": "high",
-			"reference": None,
+			"reference": {
+				"doctype": "POS Invoice",
+				"names": [row["name"] for row in pending],
+			},
 		})
 
 	tables = frappe.get_all(
@@ -188,7 +191,10 @@ def get_needs_attention(branch=None):
 			"type": "table_occupied_long",
 			"message": f"{len(tables)} table(s) occupied for over 60 minutes",
 			"severity": "medium",
-			"reference": None,
+			"reference": {
+				"doctype": "URY Table",
+				"names": [row["name"] for row in tables],
+			},
 		})
 
 	kot_errors = frappe.get_all(
@@ -201,7 +207,10 @@ def get_needs_attention(branch=None):
 			"type": "kot_errors",
 			"message": f"{len(kot_errors)} KOT generation issue(s) in the last hour",
 			"severity": "high",
-			"reference": None,
+			"reference": {
+				"doctype": "URY KOT Error Log",
+				"names": [row["name"] for row in kot_errors],
+			},
 		})
 
 	stale_sessions = frappe.get_all(
@@ -214,7 +223,10 @@ def get_needs_attention(branch=None):
 			"type": "unclosed_pos_session",
 			"message": f"{len(stale_sessions)} POS session(s) left open from a previous day",
 			"severity": "high",
-			"reference": None,
+			"reference": {
+				"doctype": "POS Opening Entry",
+				"names": [row["name"] for row in stale_sessions],
+			},
 		})
 
 	frappe.cache().set_value(cache_key, items, expires_in_sec=30)
