@@ -11,6 +11,7 @@ import { t } from '../i18n';
 export const TABLE_STATE_STYLES = {
   available: 'border-emerald-300 bg-emerald-50 text-emerald-900 hover:border-emerald-400',
   occupied: 'border-amber-400 bg-amber-50 text-amber-900',
+  restricted: 'border-emerald-300 bg-emerald-50 text-emerald-900 opacity-60 cursor-not-allowed',
 } as const;
 
 interface TableCardProps {
@@ -28,6 +29,7 @@ interface TableCardProps {
   onPreview: (event: MouseEvent<HTMLButtonElement>) => void;
   onPrint: (event: MouseEvent<HTMLButtonElement>) => void;
   isPrinting: boolean;
+  isRestricted?: boolean;
 }
 
 const TableCard = ({
@@ -45,6 +47,7 @@ const TableCard = ({
   onPreview,
   onPrint,
   isPrinting,
+  isRestricted = false,
 }: TableCardProps) => {
   const isOccupied = table.occupied === 1;
 
@@ -53,13 +56,17 @@ const TableCard = ({
       role={isOccupied ? 'group' : 'button'}
       tabIndex={isOccupied ? -1 : 0}
       onClick={() => {
-        if (!isOccupied) {
+        if (!isOccupied && !isRestricted) {
           onNavigate();
         }
       }}
       className={cn(
         'relative flex min-h-[15.5rem] flex-col rounded-lg border-2 bg-white p-4 transition-all',
-        isOccupied ? TABLE_STATE_STYLES.occupied : cn(TABLE_STATE_STYLES.available, 'cursor-pointer hover:shadow-md'),
+        isOccupied
+          ? TABLE_STATE_STYLES.occupied
+          : isRestricted
+            ? TABLE_STATE_STYLES.restricted
+            : cn(TABLE_STATE_STYLES.available, 'cursor-pointer hover:shadow-md'),
         menuOpen ? 'z-20' : 'z-0',
         className
       )}
@@ -141,7 +148,11 @@ const TableCard = ({
           <>
             <button
               onClick={onPreview}
-              className="flex flex-1 items-center justify-center gap-2 rounded bg-white py-2 text-xs font-semibold transition hover:bg-amber-100"
+              disabled={isRestricted}
+              className={cn(
+                "flex flex-1 items-center justify-center gap-2 rounded bg-white py-2 text-xs font-semibold transition hover:bg-amber-100",
+                isRestricted ? "opacity-50 cursor-not-allowed hover:bg-white" : ""
+              )}
             >
               <Eye className="h-3 w-3" />
               Preview

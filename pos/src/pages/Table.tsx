@@ -28,6 +28,7 @@ const TableView = () => {
   const { posProfile, setSelectedTable, setSelectedOrderType } = usePOSStore();
   const user = useRootStore((state) => state.user);
   const showCaptainTransfer = canCaptainTransfer(user, posProfile);
+  const isRestricted = isUserRestrictedFromTableOrders(user, posProfile);
 
   const branch = posProfile?.branch ?? null;
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -385,6 +386,7 @@ const TableView = () => {
       onPreview={(event) => handlePreviewTable(table, event)}
       onPrint={(event) => handlePrintTable(table, event)}
       isPrinting={printingTable === table.name}
+      isRestricted={isRestricted}
     />
     );
   };
