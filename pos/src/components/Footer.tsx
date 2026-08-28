@@ -5,6 +5,7 @@ import {
   ClipboardList,
   Table,
   Settings,
+  Clock,
 } from 'lucide-react';
 import { cn } from '@ury/ui';
 import { t } from '../i18n';
@@ -16,6 +17,7 @@ const Footer = () => {
     { icon: LayoutGrid, label: t('footer.pos'), path: '/pos' },
     { icon: Table, label: t('footer.tables'), path: '/tables' },
     { icon: ClipboardList, label: t('footer.orders'), path: '/orders' },
+    { icon: Clock, label: 'Open Sessions', path: '/open-entries' },
     { icon: Settings, label: t('footer.settings'), path: '/settings' },
   ];
 
