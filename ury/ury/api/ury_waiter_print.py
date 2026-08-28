@@ -1,6 +1,5 @@
 import frappe
 from frappe.utils import flt
-from frappe.utils.print_format import print_by_server
 
 WAITER_PRINT_FORMAT = "URY Waiter Order Slip"
 ADD_KOT_TYPES = ("New Order", "Order Modified")
@@ -187,13 +186,18 @@ def print_combined_waiter_order_slip(invoice_id, kot_names, restaurant_table):
 			continue
 
 		try:
-			print_by_server(
-				"URY KOT",
-				kot_names[0],
-				printer_row.printer,
-				waiter_print_format,
+			printer_doc = frappe.get_doc("Network Printer Settings", printer_row.printer)
+			printer_doc.print_doc(
+				doctype="URY KOT",
+				name=kot_names[0],
+				print_format=waiter_print_format,
 				doc=combined_doc,
 				no_letterhead=1,
+				job_type="WAITER_SLIP",
+				extra_metadata={
+					"invoice": invoice_id,
+					"restaurant_table": restaurant_table,
+				},
 			)
 		except Exception as e:
 			frappe.log_error(
