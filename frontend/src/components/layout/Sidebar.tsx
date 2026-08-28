@@ -52,7 +52,7 @@ const NAV_GROUPS: NavGroup[] = [
   },
   {
     label: 'Insight',
-    items: [{ label: 'Profitability', path: '/department-profitability', icon: TrendingUp }]
+    items: [{ label: 'Profitability', path: '/department-profitability', icon: TrendingUp }, { label: 'KOT Error Log', path: '/kot-error-log', icon: AlertCircle }]
   },
   {
     label: 'Setup',

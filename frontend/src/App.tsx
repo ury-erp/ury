@@ -20,6 +20,7 @@ import AggregatorPage from './pages/Dashboard/AggregatorPage';
 import SalesPlanPage from './pages/Dashboard/SalesPlanPage';
 import { DepartmentStockPage } from './pages/Dashboard/DepartmentStockPage';
 import { DepartmentProfitabilityPage } from './pages/Dashboard/DepartmentProfitabilityPage';
+import { KotErrorLogPage } from './pages/Dashboard/KotErrorLogPage';
 import { StockReservationPage } from './pages/Dashboard/StockReservationPage';
 import { RoleGuard } from './components/RoleGuard';
 import { AuthGuard } from './components/AuthGuard';
@@ -146,6 +147,11 @@ function App() {
           <Route
             path="department-profitability"
             element={<DepartmentProfitabilityPage />}
+          />
+
+          <Route
+            path="kot-error-log"
+            element={<KotErrorLogPage />}
           />
           <Route path="stock-reservations" element={<StockReservationPage />} />
 
