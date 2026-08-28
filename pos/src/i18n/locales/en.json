@@ -52,6 +52,7 @@
     "loading_order": "Loading order details...",
     "edit_item": "Edit item",
     "add_comment": "Add comment",
+    "reprint_kot": "Reprint KOT",
     "edit_comment": "Edit comment"
   },
   "order": {
@@ -136,7 +137,8 @@
     "discount_exceeds_max": "Percentage discount cannot exceed 100%",
     "please_print_first": "Please print invoice before making payment",
     "enter_cancel_reason": "Please enter a reason for cancellation.",
-    "dine_in_restricted": "Dine In is not available for your role"
+    "dine_in_restricted": "Dine In is not available for your role",
+    "payment_failed": "Payment could not be completed. Please try again."
   },
   "success": {
     "order_cancelled": "Order cancelled successfully",
@@ -222,6 +224,7 @@
     "transfer_captain": "Transfer captain",
     "select_destination_table": "Move order from {{table}} to any vacant table in this branch",
     "search_transfer_placeholder": "Search by table or room",
+    "search_table_placeholder": "Search table",
     "current_table": "Current table",
     "current_captain": "Current captain",
     "select_new_captain": "Choose a new captain for this order",

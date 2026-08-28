@@ -18,9 +18,11 @@ export interface PosProfileLimited {
   paid_limit: number;
   disable_rounded_total: number;
   enable_discount: number;
-  multiple_cashier: number;
-  owner: string;
+  multiple_cashier?: number;
+  owner?: string;
   edit_order_type?: number;
+  enable_kot_reprint?: number;
+  custom_invoice_warning_time?: number;
 }
 
 export interface PosProfileLimitedResponse {
@@ -85,6 +87,8 @@ export interface PosProfileCombined extends PosProfileFull {
   edit_order_type?: number;
   view_all_status?: number;
   custom_daily_pos_close?: number;
+  enable_kot_reprint?: number;
+  custom_invoice_warning_time?: number;
 }
 
 export interface Currency {
@@ -121,7 +125,7 @@ export async function getCombinedPosProfile(): Promise<PosProfileCombined> {
   // Merge both profiles
   const combinedProfile: PosProfileCombined = {
     ...fullProfile,
-    owner: limitedProfile.owner,
+    owner: limitedProfile.owner || fullProfile.owner,
     waiter: limitedProfile.waiter,
     cashier: limitedProfile.cashier,
     print_format: limitedProfile.print_format,
@@ -133,8 +137,10 @@ export async function getCombinedPosProfile(): Promise<PosProfileCombined> {
     paid_limit: limitedProfile.paid_limit,
     disable_rounded_total: limitedProfile.disable_rounded_total,
     enable_discount: limitedProfile.enable_discount,
-    multiple_cashier: limitedProfile.multiple_cashier,
+    multiple_cashier: limitedProfile.multiple_cashier || 0,
     edit_order_type: limitedProfile.edit_order_type,
+    enable_kot_reprint: limitedProfile.enable_kot_reprint,
+    custom_invoice_warning_time: limitedProfile.custom_invoice_warning_time ?? (fullProfile as any).custom_invoice_warning_time,
   };
 
   return combinedProfile;

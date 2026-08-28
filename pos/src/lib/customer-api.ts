@@ -47,7 +47,7 @@ export interface CreateCustomerResponse {
 export async function getCustomerGroups() {
   const groups = await db.getDocList(DOCTYPES.CUSTOMER_GROUP, {
     fields: ['name'],
-    limit: "*" as unknown as number,
+    limit: 0,
     orderBy: {
       field: 'name',
       order: 'asc',
@@ -59,7 +59,7 @@ export async function getCustomerGroups() {
 export async function getCustomerTerritories() {
   const territories = await db.getDocList(DOCTYPES.CUSTOMER_TERRITORY, {
     fields: ['name'],
-    limit: "*" as unknown as number,
+    limit: 0,
     orderBy: {
       field: 'name',
       order: 'asc',

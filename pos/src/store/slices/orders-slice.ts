@@ -7,6 +7,7 @@ import { searchPosInvoice } from '../../lib/invoice-api';
 export interface POSInvoice {
   name: string;
   invoice_printed: number;
+  custom_printing_time?: string | null;
   grand_total: number;
   restaurant_table: string | null;
   cashier: string;

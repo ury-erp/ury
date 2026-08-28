@@ -6,6 +6,7 @@ import type { Filter } from 'frappe-js-sdk/lib/db/types';
 export interface POSInvoice {
   name: string;
   invoice_printed: number;
+  custom_printing_time?: string | null;
   grand_total: number;
   restaurant_table: string | null;
   cashier: string;
@@ -328,9 +329,6 @@ export function resolvePrintFormat(
   order: Pick<POSInvoice, 'custom_merged_pos_invoice'>,
   defaultFormat: string | null | undefined
 ) {
-  if (order.custom_merged_pos_invoice) {
-    return MERGED_POS_INVOICE_PRINT_FORMAT;
-  }
   return defaultFormat as string;
 }
 

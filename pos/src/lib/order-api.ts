@@ -91,6 +91,11 @@ export const syncOrder = async (data: SyncOrderRequest) => {
   return call.post( 'ury.ury.doctype.ury_order.ury_order.sync_order',data);
 };
 
+export const reprintKOT = async (invoice_number: string) => {
+  const { call } = await import('@ury/core');
+  return call.post('ury.ury.api.ury_kot_reprint.reprint_kot', { invoice_number });
+};
+
 export interface SplitBillItemMove {
   name: string;
   qty: number;

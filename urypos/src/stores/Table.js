@@ -110,7 +110,7 @@ export const useTableStore = defineStore("table", {
           .getDocList("URY Room", {
             fields: ["name", "branch"],
             filters: [["branch", "like", this.invoiceData.branch]],
-            limit: "*",
+            limit: 0,
           })
           .then((docs) => {
             this.rooms = docs;
@@ -124,13 +124,13 @@ export const useTableStore = defineStore("table", {
               this.handleRoomChange();
             } else {
               this.db
-                .getDocList("URY Restaurant", {
-                  fields: ["branch", "default_room"],
-                  filters: [["branch", "like", this.invoiceData.branch]],
+                .getDocList("Branch", {
+                  fields: ["name", "custom_default_room"],
+                  filters: [["name", "like", this.invoiceData.branch]],
                 })
                 .then((docs) => {
-                  let room = docs.find((room) => room.default_room);
-                  this.selectedRoom = room ? room.default_room : null;
+                  let room = docs.find((room) => room.custom_default_room);
+                  this.selectedRoom = room ? room.custom_default_room : null;
 
                   this.handleRoomChange();
                 });
@@ -173,7 +173,7 @@ export const useTableStore = defineStore("table", {
             "merged_with"
           ],
           filters: [["restaurant_room", "=", this.selectedRoom]],
-          limit: "*",
+          limit: 0,
         })
         .then((tables) => {
           this.tables = tables.sort((a, b) => {
@@ -213,7 +213,7 @@ export const useTableStore = defineStore("table", {
       this.db
         .getDocList("URY Table", {
           filters: [["occupied", "like", "0%"]],
-          limit: "*",
+          limit: 0,
         })
         .then((table) => {
           this.transferTable = table;
@@ -232,7 +232,7 @@ export const useTableStore = defineStore("table", {
       this.db
         .getDocList("URY Table", {
           filters: [["occupied", "like", "0%"], ["name", "!=", this.mergeSourceTable], ["restaurant_room", "=", this.selectedRoom]],
-          limit: "*",
+          limit: 0,
         })
         .then((tableList) => {
           this.transferTable = tableList;
@@ -259,7 +259,7 @@ export const useTableStore = defineStore("table", {
       this.db
         .getDocList("User", {
           fields: ["name"],
-          limit: "*",
+          limit: 0,
         })
         .then((docs) => {
           this.captain = docs;

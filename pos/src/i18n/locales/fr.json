@@ -52,6 +52,7 @@
     "loading_order": "Chargement des détails de la commande...",
     "edit_item": "Modifier l'article",
     "add_comment": "Ajouter un commentaire",
+    "reprint_kot": "Réimprimer le KOT",
     "edit_comment": "Modifier le commentaire"
   },
   "order": {
@@ -136,7 +137,8 @@
     "discount_exceeds_max": "La remise en pourcentage ne peut pas dépasser 100 %",
     "please_print_first": "Veuillez imprimer la facture avant d'effectuer le paiement",
     "enter_cancel_reason": "Veuillez entrer un motif d'annulation.",
-    "dine_in_restricted": "La consommation sur place n'est pas disponible pour votre rôle"
+    "dine_in_restricted": "La consommation sur place n'est pas disponible pour votre rôle",
+    "payment_failed": "Le paiement n'a pas pu être effectué. Veuillez réessayer."
   },
   "success": {
     "order_cancelled": "Commande annulée avec succès",
@@ -222,6 +224,7 @@
     "transfer_captain": "Transférer le capitaine",
     "select_destination_table": "Déplacer la commande de {{table}} vers toute table libre de l'établissement",
     "search_transfer_placeholder": "Rechercher par table ou salle",
+    "search_table_placeholder": "Rechercher une table",
     "current_table": "Table actuelle",
     "current_captain": "Capitaine actuel",
     "select_new_captain": "Choisir un nouveau capitaine pour cette commande",

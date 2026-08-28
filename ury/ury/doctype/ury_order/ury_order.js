@@ -445,7 +445,7 @@ frappe.ui.form.on('URY Order', {
 							indicator: 'green'
 						}, 0.85);
 
-						const added_qty = d.qty - parseInt(oldqty)
+						const added_qty = d.qty - parseFloat(oldqty)
 						frm.events.calculate_total(frm, menu_item_list.rate_of_item, added_qty);
 					}
 				});

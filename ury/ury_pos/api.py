@@ -31,45 +31,65 @@ def getRestaurantMenu(pos_profile, room=None, order_type=None):
     restaurant = frappe.db.get_value("URY Restaurant", {"branch": branch_name}, "name")
     
     if room:
-    
-        room_wise_menu = frappe.db.get_value(
-            "URY Restaurant", restaurant, "room_wise_menu"
-        )
+        room_wise_menu = frappe.db.get_value("Branch", branch_name, "custom_room_wise_menu")
+        if room_wise_menu is None:
+            room_wise_menu = frappe.db.get_value("URY Restaurant", restaurant, "room_wise_menu") if restaurant else 0
         
         if room_wise_menu:
             menu = frappe.db.get_value(
                 "Menu for Room",
-                {"parent": restaurant, "room": room},
+                {"parent": branch_name, "room": room, "parenttype": "Branch"},
                 "menu"
             )
+            if not menu and restaurant:
+                menu = frappe.db.get_value(
+                    "Menu for Room",
+                    {"parent": restaurant, "room": room, "parenttype": "URY Restaurant"},
+                    "menu"
+                )
             if not menu:
-                 menu = frappe.db.get_value("URY Restaurant", restaurant, "active_menu")
+                menu = frappe.db.get_value("Branch", branch_name, "custom_active_menu")
+                if not menu and restaurant:
+                     menu = frappe.db.get_value("URY Restaurant", restaurant, "active_menu")
         else:
-            menu = frappe.db.get_value("URY Restaurant", restaurant, "active_menu")
+            menu = frappe.db.get_value("Branch", branch_name, "custom_active_menu")
+            if not menu and restaurant:
+                menu = frappe.db.get_value("URY Restaurant", restaurant, "active_menu")
 
     elif cashier and order_type:
-        order_type_wise_menu = frappe.db.get_value(
-            "URY Restaurant", restaurant, "order_type_wise_menu"
-        )
+        order_type_wise_menu = frappe.db.get_value("Branch", branch_name, "custom_order_type_wise_menu")
+        if order_type_wise_menu is None:
+            order_type_wise_menu = frappe.db.get_value("URY Restaurant", restaurant, "order_type_wise_menu") if restaurant else 0
     
         if order_type_wise_menu:
             menu = frappe.db.get_value(
                 "Order Type Menu",
-                {"parent": restaurant, "order_type": order_type},
+                {"parent": branch_name, "order_type": order_type, "parenttype": "Branch"},
                 "menu"
             )
+            if not menu and restaurant:
+                menu = frappe.db.get_value(
+                    "Order Type Menu",
+                    {"parent": restaurant, "order_type": order_type, "parenttype": "URY Restaurant"},
+                    "menu"
+                )
             if not menu:
-                 menu = frappe.db.get_value("URY Restaurant", restaurant, "active_menu")
-    
+                menu = frappe.db.get_value("Branch", branch_name, "custom_active_menu")
+                if not menu and restaurant:
+                     menu = frappe.db.get_value("URY Restaurant", restaurant, "active_menu")
         else:
-            menu = frappe.db.get_value("URY Restaurant", restaurant, "active_menu")
+            menu = frappe.db.get_value("Branch", branch_name, "custom_active_menu")
+            if not menu and restaurant:
+                menu = frappe.db.get_value("URY Restaurant", restaurant, "active_menu")
 
     # Default menu if nothing is selected
     else:
-        menu = frappe.db.get_value("URY Restaurant", restaurant, "active_menu")
+        menu = frappe.db.get_value("Branch", branch_name, "custom_active_menu")
+        if not menu and restaurant:
+            menu = frappe.db.get_value("URY Restaurant", restaurant, "active_menu")
     
     if not menu:
-        frappe.throw(_("Please set an active menu for Restaurant {0}").format(restaurant))
+        frappe.throw(_("Please set an active menu for Branch {0}").format(branch_name))
     
     
     # Get menu items (your existing code)
@@ -107,6 +127,45 @@ def getMenuCourses():
     courses = frappe.get_all("URY Menu Course", fields=["name"])
     return [{"name": d.name, "label": _(d.name)} for d in courses]
 
+
+
+def get_allowed_profiles(user, branch=None):
+    if not branch:
+        branch = getBranch()
+    try:
+        primary = _resolve_pos_profile(user, branch)
+    except Exception:
+        primary = None
+    if not primary:
+        return []
+    
+    allowed = [primary]
+    is_captain = False
+    is_cashier = False
+    
+    if frappe.db.exists("POS Profile User", {"parent": primary, "user": user}):
+        is_cashier = True
+        
+    if frappe.db.exists("POS Profile Captain", {"parent": primary, "user": user}):
+        is_captain = True
+        
+    try:
+        profile_doc = frappe.get_doc("POS Profile", primary)
+    except Exception:
+        return allowed
+    
+    if is_captain and profile_doc.custom_captain_access_to_other_profiles:
+        for p in profile_doc.get("custom_captain_accessible_profiles", []):
+            if p.pos_profile and p.pos_profile not in allowed:
+                allowed.append(p.pos_profile)
+                
+    if is_cashier and profile_doc.custom_cashier_access_to_other_profiles:
+        for p in profile_doc.get("custom_cashier_accessible_profiles", []):
+            if p.pos_profile and p.pos_profile not in allowed:
+                allowed.append(p.pos_profile)
+                
+    return allowed
+
 @frappe.whitelist()
 def getBranch():
     user = frappe.session.user
@@ -127,51 +186,46 @@ def getBranch():
 @frappe.whitelist()
 def getBranchRoom():
     user = frappe.session.user
-    sql_query = """
-        SELECT b.branch , a.room
-        FROM `tabURY User` AS a
-        INNER JOIN `tabBranch` AS b ON a.parent = b.name
-        WHERE a.user = %s
-    """
-    branch_array = frappe.db.sql(sql_query, user, as_dict=True)
+    branch = getBranch()
+    try:
+        pos_profile = getPosProfile().get("pos_profile")
+    except Exception:
+        pos_profile = None
+    if not pos_profile:
+        frappe.throw("No POS Profile found for user/branch. Please contact your administrator.")
     
-    branch_name = branch_array[0].get("branch")
-    room_name = branch_array[0].get("room")
-
-    if not branch_name:
-        frappe.throw("Branch information is missing for the user. Please contact your administrator.")
-
-    if not room_name:
-        frappe.throw("No room assigned to this user. Please contact your administrator.")
-
+    pos_profile_doc = frappe.get_doc("POS Profile", pos_profile)
+    rooms = [r.room for r in pos_profile_doc.get("custom_rooms", []) if r.room]
+    
+    if not rooms:
+        frappe.throw("No room assigned to this POS Profile. Please contact your administrator.")
+        
     return [{
-        "name":room_name ,
-        "branch": branch_name,
+        "name": rooms[0],
+        "branch": branch,
     }]
 
 @frappe.whitelist()
 def getRoom():
     user = frappe.session.user
-    sql_query = """
-        SELECT b.branch, a.room
-        FROM `tabURY User` AS a
-        INNER JOIN `tabBranch` AS b ON a.parent = b.name
-        WHERE a.user = %s
-    """
-    branch_array = frappe.db.sql(sql_query, user, as_dict=True)
+    branch = getBranch()
+    try:
+        pos_profile = getPosProfile().get("pos_profile")
+    except Exception:
+        pos_profile = None
+    if not pos_profile:
+        frappe.throw("No POS Profile found for user/branch. Please contact your administrator.")
     
-    if not branch_array:
-        frappe.throw("No branch or room information found for the user. Please contact your administrator.")
+    pos_profile_doc = frappe.get_doc("POS Profile", pos_profile)
+    rooms = [r.room for r in pos_profile_doc.get("custom_rooms", []) if r.room]
     
-    room_details = [
+    return [
         {
-            "name": row.get("room"),
-            "branch": row.get("branch")
-        } 
-        for row in branch_array
+            "name": r,
+            "branch": branch
+        }
+        for r in rooms
     ]
-
-    return room_details
 
 @frappe.whitelist()
 def getModeOfPayment():
@@ -284,16 +338,7 @@ def _enrich_split_group_meta(invoices):
 
 @frappe.whitelist()
 def get_split_group(invoice):
-    pos_invoice = frappe.get_doc("POS Invoice", invoice)
-    
-    if not frappe.has_permission("POS Invoice", "read", doc=pos_invoice):
-        frappe.throw(frappe._("Not permitted to view this order"), frappe.PermissionError)
-        
-    user_branch = getBranch()
-    if pos_invoice.branch and user_branch and pos_invoice.branch != user_branch:
-        frappe.throw(frappe._("Not permitted to view orders outside your active branch"), frappe.PermissionError)
-
-    group = pos_invoice.custom_split_group
+    group = frappe.db.get_value("POS Invoice", invoice, "custom_split_group")
     if not group:
         split_from = frappe.db.get_value("POS Invoice", invoice, "custom_split_from")
         if split_from:
@@ -323,9 +368,6 @@ def get_split_group(invoice):
         "net_total",
         "total_taxes_and_charges",
         "creation",
-        "branch",
-        "additional_discount_percentage",
-        "discount_amount",
     ]
 
     invoices = frappe.get_all(
@@ -351,15 +393,6 @@ def get_split_group(invoice):
 
     invoices.sort(key=lambda row: row.get("creation") or row.get("name"))
 
-    valid_invoices = []
-    for inv in invoices:
-        if inv.get("branch") and user_branch and inv.get("branch") != user_branch:
-            continue
-        if not frappe.has_permission("POS Invoice", "read", doc=inv.get("name")):
-            continue
-        valid_invoices.append(inv)
-    invoices = valid_invoices
-
     total = len(invoices)
     for index, inv in enumerate(invoices, start=1):
         inv["split_index"] = index
@@ -373,83 +406,126 @@ def get_split_group(invoice):
 @frappe.whitelist()
 def getInvoiceForCashier(status, cashier, limit, limit_start):
     branch = getBranch()
+    allowed_profiles = get_allowed_profiles(frappe.session.user, branch)
+    if not allowed_profiles:
+        return {"data": [], "next": False}
+        
+    try:
+        primary_profile = _resolve_pos_profile(frappe.session.user, branch)
+    except Exception:
+        primary_profile = None
+    other_profiles = [p for p in allowed_profiles if p != primary_profile]
+    
+    if other_profiles:
+        profile_condition = """
+            ( (pos_profile = %(primary_profile)s AND cashier = %(cashier)s) 
+              OR pos_profile IN %(other_profiles)s )
+        """
+    else:
+        profile_condition = "pos_profile = %(primary_profile)s AND cashier = %(cashier)s"
+        
     updatedlist = []
     limit = int(limit)+1
     limit_start = int(limit_start)
     if status == "Draft":
         invoices = frappe.db.sql(
-            """
+            f"""
             SELECT 
-                name, invoice_printed, grand_total, restaurant_table, custom_merged_tables,
+                name, invoice_printed, custom_printing_time, grand_total, restaurant_table, custom_merged_tables,
                 cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number, 
                 posting_date, rounded_total, order_type 
             FROM `tabPOS Invoice` 
-            WHERE branch = %s AND status = %s AND cashier = %s
+            WHERE {profile_condition} AND status = %(status)s
             AND (invoice_printed = 1 OR (invoice_printed = 0 AND COALESCE(restaurant_table, '') = ''))
             ORDER BY modified desc
-            LIMIT %s OFFSET %s
+            LIMIT %(limit)s OFFSET %(offset)s
             """,
-            (branch, status, cashier, limit,limit_start),
+            {
+                "primary_profile": primary_profile,
+                "other_profiles": other_profiles,
+                "status": status,
+                "cashier": cashier,
+                "limit": limit,
+                "offset": limit_start
+            },
             as_dict=True,
         )
         updatedlist.extend(invoices)
     elif status == "Unbilled":
-        
         docstatus = "Draft"
         invoices = frappe.db.sql(
-            """
+            f"""
             SELECT 
-                name, invoice_printed, grand_total, restaurant_table, custom_merged_tables,
+                name, invoice_printed, custom_printing_time, grand_total, restaurant_table, custom_merged_tables,
                 cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number, 
                 posting_date, rounded_total, order_type 
             FROM `tabPOS Invoice` 
-            WHERE branch = %s AND status = %s AND cashier = %s
+            WHERE {profile_condition} AND status = %(status)s
             AND (invoice_printed = 0 AND restaurant_table IS NOT NULL)
             ORDER BY modified desc
-            LIMIT %s OFFSET %s
+            LIMIT %(limit)s OFFSET %(offset)s
             """,
-            (branch, docstatus, cashier, limit, limit_start),
+            {
+                "primary_profile": primary_profile,
+                "other_profiles": other_profiles,
+                "status": docstatus,
+                "cashier": cashier,
+                "limit": limit,
+                "offset": limit_start
+            },
             as_dict=True,
         )
         updatedlist.extend(invoices)
     elif status == "Recently Paid":
         docstatus = "Paid"
         invoices = frappe.db.sql(
-            """
+            f"""
             SELECT 
-                name, invoice_printed, grand_total, restaurant_table, custom_merged_tables,
+                name, invoice_printed, custom_printing_time, grand_total, restaurant_table, custom_merged_tables,
                 cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number,
                 posting_date, rounded_total, order_type,additional_discount_percentage,discount_amount 
             FROM `tabPOS Invoice` 
-            WHERE branch = %s AND status = %s AND cashier = %s
+            WHERE {profile_condition} AND status = %(status)s
             ORDER BY modified desc
-            LIMIT %s OFFSET %s
+            LIMIT %(limit)s OFFSET %(offset)s
             """,
-            (branch, docstatus, cashier, limit, limit_start),
+            {
+                "primary_profile": primary_profile,
+                "other_profiles": other_profiles,
+                "status": docstatus,
+                "cashier": cashier,
+                "limit": limit,
+                "offset": limit_start
+            },
             as_dict=True,
         )
         updatedlist.extend(invoices)    
     else:
-        
         invoices = frappe.db.sql(
-            """
+            f"""
             SELECT 
-                name, invoice_printed, grand_total, restaurant_table, custom_merged_tables,
+                name, invoice_printed, custom_printing_time, grand_total, restaurant_table, custom_merged_tables,
                 cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number,
                 posting_date, rounded_total, order_type,additional_discount_percentage,discount_amount
             FROM `tabPOS Invoice` 
-            WHERE branch = %s AND status = %s AND cashier = %s
+            WHERE {profile_condition} AND status = %(status)s
             ORDER BY modified desc
-            LIMIT %s OFFSET %s
+            LIMIT %(limit)s OFFSET %(offset)s
             """,
-            (branch, status, cashier, limit, limit_start),
+            {
+                "primary_profile": primary_profile,
+                "other_profiles": other_profiles,
+                "status": status,
+                "cashier": cashier,
+                "limit": limit,
+                "offset": limit_start
+            },
             as_dict=True,
         )
-
         updatedlist.extend(invoices)
     if len(updatedlist) == limit and status != "Recently Paid":
             next = True
@@ -463,6 +539,10 @@ def getInvoiceForCashier(status, cashier, limit, limit_start):
 @frappe.whitelist()
 def getPosInvoice(status, limit, limit_start):
     branch = getBranch()
+    allowed_profiles = get_allowed_profiles(frappe.session.user, branch)
+    if not allowed_profiles:
+        return {"data": [], "next": False}
+
     updatedlist = []
     limit = int(limit)+1
     limit_start = int(limit_start)
@@ -470,43 +550,50 @@ def getPosInvoice(status, limit, limit_start):
         invoices = frappe.db.sql(
             """
             SELECT 
-                name, invoice_printed, grand_total, restaurant_table, custom_merged_tables,
+                name, invoice_printed, custom_printing_time, grand_total, restaurant_table, custom_merged_tables,
                 cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number, 
                 posting_date, rounded_total, order_type,
                 custom_split_group, custom_split_from,
-                custom_merged_pos_invoice, custom_merged_total,
-                additional_discount_percentage, discount_amount
+                custom_merged_pos_invoice, custom_merged_total
             FROM `tabPOS Invoice` 
-            WHERE branch = %s AND status = %s 
+            WHERE pos_profile IN %(allowed_profiles)s AND status = %(status)s 
             AND (invoice_printed = 1 OR (invoice_printed = 0 AND COALESCE(restaurant_table, '') = ''))
             ORDER BY modified desc
-            LIMIT %s OFFSET %s
+            LIMIT %(limit)s OFFSET %(offset)s
             """,
-            (branch, status, limit,limit_start),
+            {
+                "allowed_profiles": allowed_profiles,
+                "status": status,
+                "limit": limit,
+                "offset": limit_start
+            },
             as_dict=True,
         )
         updatedlist.extend(invoices)
     elif status == "Unbilled":
-        
         docstatus = "Draft"
         invoices = frappe.db.sql(
             """
             SELECT 
-                name, invoice_printed, grand_total, restaurant_table, custom_merged_tables,
+                name, invoice_printed, custom_printing_time, grand_total, restaurant_table, custom_merged_tables,
                 cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number, 
                 posting_date, rounded_total, order_type,
                 custom_split_group, custom_split_from,
-                custom_merged_pos_invoice, custom_merged_total,
-                additional_discount_percentage, discount_amount
+                custom_merged_pos_invoice, custom_merged_total
             FROM `tabPOS Invoice` 
-            WHERE branch = %s AND status = %s 
+            WHERE pos_profile IN %(allowed_profiles)s AND status = %(status)s 
             AND (invoice_printed = 0 AND restaurant_table IS NOT NULL)
             ORDER BY modified desc
-            LIMIT %s OFFSET %s
+            LIMIT %(limit)s OFFSET %(offset)s
             """,
-            (branch, docstatus, limit, limit_start),
+            {
+                "allowed_profiles": allowed_profiles,
+                "status": docstatus,
+                "limit": limit,
+                "offset": limit_start
+            },
             as_dict=True,
         )
         updatedlist.extend(invoices)
@@ -515,41 +602,49 @@ def getPosInvoice(status, limit, limit_start):
         invoices = frappe.db.sql(
             """
             SELECT 
-                name, invoice_printed, grand_total, restaurant_table, custom_merged_tables,
+                name, invoice_printed, custom_printing_time, grand_total, restaurant_table, custom_merged_tables,
                 cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number,
                 posting_date, rounded_total, order_type, additional_discount_percentage,
                 discount_amount, custom_split_group, custom_split_from,
                 custom_merged_pos_invoice, custom_merged_total
             FROM `tabPOS Invoice` 
-            WHERE branch = %s AND status = %s 
+            WHERE pos_profile IN %(allowed_profiles)s AND status = %(status)s 
             ORDER BY modified desc
-            LIMIT %s OFFSET %s
+            LIMIT %(limit)s OFFSET %(offset)s
             """,
-            (branch, docstatus, limit, limit_start),
+            {
+                "allowed_profiles": allowed_profiles,
+                "status": docstatus,
+                "limit": limit,
+                "offset": limit_start
+            },
             as_dict=True,
         )
         updatedlist.extend(invoices)    
     else:
-        
         invoices = frappe.db.sql(
             """
             SELECT 
-                name, invoice_printed, grand_total, restaurant_table, custom_merged_tables,
+                name, invoice_printed, custom_printing_time, grand_total, restaurant_table, custom_merged_tables,
                 cashier, waiter, net_total, posting_time, 
                 total_taxes_and_charges, customer, status, mobile_number,
                 posting_date, rounded_total, order_type, additional_discount_percentage,
                 discount_amount, custom_split_group, custom_split_from,
                 custom_merged_pos_invoice, custom_merged_total
             FROM `tabPOS Invoice` 
-            WHERE branch = %s AND status = %s 
+            WHERE pos_profile IN %(allowed_profiles)s AND status = %(status)s 
             ORDER BY modified desc
-            LIMIT %s OFFSET %s
+            LIMIT %(limit)s OFFSET %(offset)s
             """,
-            (branch, status, limit, limit_start),
+            {
+                "allowed_profiles": allowed_profiles,
+                "status": status,
+                "limit": limit,
+                "offset": limit_start
+            },
             as_dict=True,
         )
-
         updatedlist.extend(invoices)
     if len(updatedlist) == limit and status != "Recently Paid":
             next = True
@@ -567,17 +662,6 @@ def searchPosInvoice(query,status):
     query = query.lower()
     filters = {"status": "Paid" if status == "Recently Paid" else status}
     
-    try:
-        branch = getBranch()
-    except frappe.ValidationError:
-        if frappe.session.user == "Administrator" or "System Manager" in frappe.get_roles():
-            branch = None
-        else:
-            raise
-            
-    if branch:
-        filters["branch"] = branch
-
     # Add additional conditions for Unbilled status
     if status == "Unbilled":
         filters.update({
@@ -605,7 +689,9 @@ def searchPosInvoice(query,status):
             "status",
             "rounded_total",
             "net_total",
-            "mobile_number",
+            "mobile_number", 
+            "invoice_printed", 
+            "custom_printing_time",
             "invoice_printed",
             "cashier",
             "waiter",
@@ -614,8 +700,6 @@ def searchPosInvoice(query,status):
             "custom_split_from",
             "custom_merged_pos_invoice",
             "custom_merged_total",
-            "additional_discount_percentage",
-            "discount_amount"
         ],
         limit_page_length=10 
     )
@@ -635,20 +719,8 @@ def get_select_field_options():
 
 @frappe.whitelist()
 def fav_items(customer):
-    if not frappe.has_permission("Customer", "read", customer):
-        frappe.throw(_("Not permitted to access this Customer"), frappe.PermissionError)
-
-    filters = {"customer": customer}
-    try:
-        branch = getBranch()
-        if branch:
-            filters["branch"] = branch
-    except frappe.exceptions.ValidationError:
-        # Fallback if getBranch() throws (e.g., Administrator with no branch)
-        pass
-
     pos_invoices = frappe.get_all(
-        "POS Invoice", filters=filters, fields=["name"]
+        "POS Invoice", filters={"customer": customer}, fields=["name"]
     )
     item_qty = {}
 
@@ -688,6 +760,35 @@ def getCashier(room):
     return cashier       
     
 
+def _resolve_pos_profile(user, branch):
+    """Return the POS Profile name for `user` on `branch`.
+
+    Resolution order:
+    1. tabPOS Profile User  – user is a direct cashier
+    2. tabPOS Profile Captain – user is a captain
+    3. Branch fallback – first profile assigned to the branch
+    """
+    profile_users = frappe.db.sql("""
+        SELECT parent FROM `tabPOS Profile User` WHERE user = %s
+    """, (user,), as_dict=True)
+    for p in profile_users:
+        if frappe.db.get_value("POS Profile", p.parent, "branch") == branch:
+            return p.parent
+
+    captain_profiles = frappe.db.sql("""
+        SELECT parent FROM `tabPOS Profile Captain` WHERE user = %s
+    """, (user,), as_dict=True)
+    for p in captain_profiles:
+        if frappe.db.get_value("POS Profile", p.parent, "branch") == branch:
+            return p.parent
+
+    fallback = frappe.db.get_value("POS Profile", {"branch": branch}, "name")
+    if fallback:
+        return fallback
+
+    frappe.throw(f"No POS Profile found for user {user} on branch {branch}")
+
+
 @frappe.whitelist()
 def getPosProfile():
     branchName = getBranch()
@@ -697,82 +798,48 @@ def getPosProfile():
     printer = None
     cashier = None
     owner = None
-    posProfile = frappe.db.exists("POS Profile", {"branch": branchName})
+
+    posProfile = _resolve_pos_profile(waiter, branchName)
+
     pos_profiles = frappe.get_doc("POS Profile", posProfile)
     global_defaults = frappe.get_single('Global Defaults')
     disable_rounded_total = global_defaults.disable_rounded_total
     
+    pos_profile_name = pos_profiles.name
+    warehouse = pos_profiles.warehouse
+    branch = pos_profiles.branch
+    company = pos_profiles.company
+    tableAttention = pos_profiles.table_attention_time
+    print_format = pos_profiles.print_format
+    paid_limit = pos_profiles.paid_limit
+    enable_discount = pos_profiles.custom_enable_discount
+    edit_order_type = pos_profiles.custom_edit_order_type
+    enable_kot_reprint = pos_profiles.custom_enable_kot_reprint
+    custom_invoice_warning_time = pos_profiles.get("custom_invoice_warning_time")
+    
+    qz_print = pos_profiles.qz_print
+    print_type = None
 
-    if pos_profiles.branch == branchName:
-        pos_profile_name = pos_profiles.name
-        warehouse = pos_profiles.warehouse
-        branch = pos_profiles.branch
-        company = pos_profiles.company
-        tableAttention = pos_profiles.table_attention_time
-        get_cashier = frappe.get_doc("POS Profile", pos_profile_name)
-        print_format = pos_profiles.print_format
-        paid_limit=pos_profiles.paid_limit
-        enable_discount = pos_profiles.custom_enable_discount
-        multiple_cashier = pos_profiles.custom_enable_multiple_cashier
-        edit_order_type = pos_profiles.custom_edit_order_type
-        enable_kot_reprint = pos_profiles.custom_enable_kot_reprint
-        if multiple_cashier:
-            details = getBranchRoom()
-            room = details[0].get('name') 
-            branch = details[0].get('branch')
+    if pos_profiles.applicable_for_users:
+        cashier = pos_profiles.applicable_for_users[0].user
+        owner = pos_profiles.applicable_for_users[0].user
 
-            pos_opening_list = frappe.db.sql("""
-                SELECT DISTINCT `tabPOS Opening Entry`.name 
-                FROM `tabPOS Opening Entry`
-                INNER JOIN `tabMultiple Rooms` 
-                ON `tabMultiple Rooms`.parent = `tabPOS Opening Entry`.name
-                WHERE `tabPOS Opening Entry`.branch = %s
-                AND `tabPOS Opening Entry`.status = 'Open'
-                AND `tabPOS Opening Entry`.docstatus = 1
-                AND `tabMultiple Rooms`.room = %s
-            """, (branch, room), as_dict=True)
-            if pos_opening_list:
-                pos_opened_cashier = frappe.db.get_value(
-                    "POS Opening Entry",
-                    {"name": pos_opening_list[0].name},
-                    "user",)
-            else:
-                pos_opened_cashier = None
-            for user_details in get_cashier.applicable_for_users:
-                if user_details.custom_main_cashier:
-                    owner = user_details.user
-                
-                if frappe.session.user == owner:
-                    cashier = owner
-                else:
-                    cashier = pos_opened_cashier    
-                
-        else:    
-            cashier = get_cashier.applicable_for_users[0].user
-            owner = get_cashier.applicable_for_users[0].user
-        
-        qz_print = pos_profiles.qz_print
-        print_type = None
-
-        printers = []
-        for pos_profile in pos_profiles.printer_settings:
+    printers = []
+    for pos_profile in pos_profiles.printer_settings:
+        if pos_profile.bill == 1:
+            printers.append(pos_profile.printer)
+            bill_present = True
             
-            if pos_profile.bill == 1:
-                printers.append(pos_profile.printer)
-                bill_present = True
-                
-        if printers:
-            printer = ",".join(printers)
+    if printers:
+        printer = ",".join(printers)
 
-        if qz_print == 1:
-            print_type = "qz"
-            qz_host = pos_profiles.qz_host
-
-        elif bill_present == True:
-            print_type = "network"
-
-        else:
-            print_type = "socket"
+    if qz_print == 1:
+        print_type = "qz"
+        qz_host = pos_profiles.qz_host
+    elif bill_present == True:
+        print_type = "network"
+    else:
+        print_type = "socket"
 
     invoice_details = {
         "pos_profile": pos_profile_name,
@@ -787,14 +854,13 @@ def getPosProfile():
         "printer": printer,
         "print_type": print_type,
         "tableAttention": tableAttention,
-        "paid_limit":paid_limit,
-        "disable_rounded_total":disable_rounded_total,
-        "enable_discount":enable_discount,
-        "multiple_cashier":multiple_cashier,
-        "owner":owner,
-        "edit_order_type":edit_order_type,
-        "enable_kot_reprint":enable_kot_reprint
-
+        "paid_limit": paid_limit,
+        "disable_rounded_total": disable_rounded_total,
+        "enable_discount": enable_discount,
+        "owner": owner,
+        "edit_order_type": edit_order_type,
+        "enable_kot_reprint": enable_kot_reprint,
+        "custom_invoice_warning_time":custom_invoice_warning_time
     }
 
     return invoice_details
@@ -805,14 +871,6 @@ def getPosInvoiceItems(invoice):
     itemDetails = []
     taxDetails = []
     orderdItems = frappe.get_doc("POS Invoice", invoice)
-    
-    if not frappe.has_permission("POS Invoice", "read", doc=orderdItems):
-        frappe.throw(frappe._("Not permitted to view this order"), frappe.PermissionError)
-        
-    user_branch = getBranch()
-    if orderdItems.branch and user_branch and orderdItems.branch != user_branch:
-        frappe.throw(frappe._("Not permitted to view orders outside your active branch"), frappe.PermissionError)
-
     posItems = orderdItems.items
     for items in posItems:
         itemDetails.append(
@@ -908,9 +966,6 @@ def getAggregatorMOP(aggregator):
     return modeOfPaymentsList
 @frappe.whitelist()
 def create_customer(customer_name, mobile_number=None, customer_group="Individual", territory="India"):
-    if not frappe.has_permission("Customer", "create"):
-        frappe.throw("Not permitted to create customers", frappe.PermissionError)
-        
     if not customer_name:
         frappe.throw("Customer name is required")
     if not mobile_number:
@@ -929,7 +984,7 @@ def create_customer(customer_name, mobile_number=None, customer_group="Individua
             "customer_group": customer_group,
             "territory": territory
         })
-        customer.insert()
+        customer.insert(ignore_permissions=True)
         frappe.db.commit()
 
         return {
@@ -988,35 +1043,12 @@ def merge_bills(primary_invoice, secondary_invoice):
         if primary_invoice == secondary_invoice:
             frappe.throw("Cannot merge an invoice with itself.")
 
-        primary_doc = frappe.get_doc("POS Invoice", primary_invoice)
-        secondary_doc = frappe.get_doc("POS Invoice", secondary_invoice)
-
-        # Authorization: caller must have write permission on both invoices
-        if not frappe.has_permission("POS Invoice", "write", doc=primary_doc):
-            frappe.throw(
-                "You do not have permission to merge this bill.",
-                frappe.PermissionError,
-            )
-
-        if not frappe.has_permission("POS Invoice", "write", doc=secondary_doc):
-            frappe.throw(
-                "You do not have permission to merge the selected bill.",
-                frappe.PermissionError,
-            )
-
-          # Prevent cross-branch merging
-        if primary_doc.branch != secondary_doc.branch:
-            frappe.throw(
-                "Cannot merge bills from different branches.",
-                frappe.PermissionError,
-            )
+        primary_doc = frappe.get_doc("POS Invoice",primary_invoice,)
+        secondary_doc = frappe.get_doc("POS Invoice",secondary_invoice,)
 
         # Validation
         if (primary_doc.docstatus != 0 or secondary_doc.docstatus != 0):
             frappe.throw("Both invoices must be in Draft state to merge.")
-
-        if primary_doc.branch != secondary_doc.branch:
-            frappe.throw("Cannot merge bills from different branches.")
 
         if primary_doc.custom_merged_pos_invoice:
             frappe.throw("This bill already includes a merged bill.")
@@ -1054,6 +1086,7 @@ def merge_bills(primary_invoice, secondary_invoice):
             doc.flags.ignore_version = True
 
             doc.save(
+                ignore_permissions=True,
                 ignore_version=True,
             )
 
@@ -1092,13 +1125,6 @@ def merge_bills(primary_invoice, secondary_invoice):
         }
 
 
-    except frappe.PermissionError:
-
-        frappe.db.rollback()
-
-        raise
-
-
     except Exception as e:
 
         frappe.db.rollback()
@@ -1121,4 +1147,4 @@ def is_printer_watch_installed() -> dict:
         installed = "ury_printer_watch" in frappe.get_installed_apps()
     except Exception:
         installed = False
-    return {"installed": bool(installed)}
+    return {"installed": bool(installed)}

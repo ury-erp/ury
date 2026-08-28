@@ -3,6 +3,7 @@
  "autoname": "prompt",
  "creation": "2023-09-13 23:41:41.934914",
  "default_view": "List",
+ "description": "DEPRECATED: Will be removed in future. Use Branch instead.",
  "doctype": "DocType",
  "document_type": "Setup",
  "editable_grid": 1,
@@ -41,6 +42,7 @@
    "reqd": 1
   },
   {
+   "description": "DEPRECATED: Will be removed in future. Use Branch instead.",
    "fieldname": "invoice_series_prefix",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -52,6 +54,7 @@
    "fieldtype": "Column Break"
   },
   {
+   "description": "DEPRECATED: Will be removed in future. Use Branch instead.",
    "fieldname": "active_menu",
    "fieldtype": "Link",
    "label": "Default Menu",
@@ -65,12 +68,14 @@
    "reqd": 1
   },
   {
+   "description": "DEPRECATED: Will be removed in future. Use Branch instead.",
    "fieldname": "default_tax_template",
    "fieldtype": "Link",
    "label": "Default Tax Template",
    "options": "Sales Taxes and Charges Template"
   },
   {
+   "description": "DEPRECATED: Will be removed in future. Use POS Profile instead.",
    "fieldname": "address",
    "fieldtype": "Link",
    "label": "Address",
@@ -83,12 +88,14 @@
   },
   {
    "default": "0",
+   "description": "DEPRECATED: Will be removed in future. Use Branch instead.",
    "fieldname": "room_wise_menu",
    "fieldtype": "Check",
    "label": "Room Wise Menu"
   },
   {
    "depends_on": "eval:doc.room_wise_menu ",
+   "description": "DEPRECATED: Will be removed in future. Use Branch instead.",
    "fieldname": "menu_for_room",
    "fieldtype": "Table",
    "label": "Menu For Room",
@@ -99,6 +106,7 @@
    "fieldtype": "Column Break"
   },
   {
+   "description": "DEPRECATED: Will be removed in future. Use Branch instead.",
    "fieldname": "default_room",
    "fieldtype": "Link",
    "label": "Default Room",
@@ -106,18 +114,21 @@
    "reqd": 1
   },
   {
+   "description": "DEPRECATED: Will be removed in future. Use Branch instead.",
    "fieldname": "aggregator_series_prefix",
    "fieldtype": "Data",
    "label": "Aggregator Series Prefix"
   },
   {
    "default": "0",
+   "description": "DEPRECATED: Will be removed in future. Use Branch instead.",
    "fieldname": "order_type_wise_menu",
    "fieldtype": "Check",
    "label": "Order Type Wise Menu"
   },
   {
    "depends_on": "eval:doc.order_type_wise_menu ",
+   "description": "DEPRECATED: Will be removed in future. Use Branch instead.",
    "fieldname": "order_type_menu",
    "fieldtype": "Table",
    "label": "Order Type Menu",

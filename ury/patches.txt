@@ -1,7 +1,11 @@
 [pre_model_sync]
 # Patches added in this section will be executed before doctypes are migrated
+ury.patches.v2_0.clean_kot_item_qty
 
 [post_model_sync]
 # Patches added in this section will be executed after doctypes are migrated
 ury.patches.v2_0.default_permissions
+ury.patches.v2_0.restructure_pos_and_counters
+ury.patches.v2_0.migrate_restaurant_to_branch
+ury.patches.v2_0.migrate_kot_reprint_config
 ury.patches.v2_0.fix_waiter_order_slip_print_format

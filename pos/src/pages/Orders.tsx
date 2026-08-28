@@ -7,7 +7,7 @@ import OrderStatusSidebar from '../components/OrderStatusSidebar';
 import PrintJobsModal from '../components/PrintJobsModal';
 import { useOrdersPrintJobs } from '../hooks/useOrdersPrintJobs';
 import { useRootStore } from '../store/root-store';
-import { formatCurrency } from '@ury/core';
+import { formatCurrency, parseFrappeError } from '@ury/core';
 import { Spinner } from '@ury/ui';
 import { Textarea } from '@ury/ui';
 import { usePOSStore } from '../store/pos-store';
@@ -20,7 +20,7 @@ import SplitGroupPanel from '../components/SplitGroupPanel';
 import MergedBillPanel from '../components/MergedBillPanel';
 import { printOrder } from '../lib/print';
 import { call } from '@ury/core';
-import { splitBill } from '../lib/order-api';
+import { splitBill, reprintKOT } from '../lib/order-api';
 import {
   getOrdersTabForInvoice,
   getSplitGroup,
@@ -49,6 +49,47 @@ function isSplitBill(order: Pick<POSInvoice, 'split_total' | 'custom_split_group
     !!order.custom_split_group ||
     !!order.custom_split_from
   );
+}
+
+function parsePrintTime(timeStr?: string | null, postingDate?: string): number {
+  if (!timeStr) return NaN;
+  
+  // If timeStr only contains time, prepend the posting date
+  const fullStr = timeStr.includes('-') ? timeStr : `${postingDate} ${timeStr}`;
+  
+  // Strip microseconds and format as ISO 8601 (YYYY-MM-DDTHH:mm:ss)
+  const isoStr = fullStr.split('.')[0].replace(' ', 'T');
+  return new Date(isoStr).getTime();
+}
+
+function isInvoiceLimitExceeded(
+  order: POSInvoice,
+  custom_invoice_warning_time?: number
+): boolean {
+  const warningTime = Number(custom_invoice_warning_time);
+  if (!warningTime || warningTime <= 0 || Number(order.invoice_printed) !== 1) return false;
+  if (order.status !== 'Draft' && order.status !== 'Unbilled') return false;
+
+  const printTime = parsePrintTime(order.custom_printing_time || order.posting_time, order.posting_date);
+  if (isNaN(printTime)) return false;
+
+  return (Date.now() - printTime) / 60000 >= warningTime;
+}
+
+function getElapsedTimeFormatted(
+  printingTimeStr?: string | null,
+  postingDate?: string,
+  postingTime?: string
+): string {
+  const printTime = parsePrintTime(printingTimeStr || postingTime, postingDate);
+  if (isNaN(printTime)) return '';
+  
+  const elapsedMs = Math.max(0, Date.now() - printTime);
+  const totalMinutes = Math.floor(elapsedMs / 60000);
+  const hours = Math.floor(totalMinutes / 60);
+  const mins = totalMinutes % 60;
+  
+  return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
 }
 
 export default function Orders() {
@@ -91,6 +132,21 @@ export default function Orders() {
     hasInvoiceFailed,
     refreshFailedJobs,
   } = useOrdersPrintJobs();
+  const [canCancelInvoice, setCanCancelInvoice] = React.useState(false);
+
+  React.useEffect(() => {
+    if (selectedOrder?.name) {
+      call.get('frappe.client.has_permission', { doctype: 'POS Invoice', docname: selectedOrder.name, perm_type: 'cancel' })
+        .then((res: any) => {
+          setCanCancelInvoice(res?.message?.has_permission === true);
+        })
+        .catch(() => {
+          setCanCancelInvoice(false);
+        });
+    } else {
+      setCanCancelInvoice(false);
+    }
+  }, [selectedOrder?.name]);
 
   const canSplitBill = useMemo(() => {
     if (!selectedOrder || selectedOrderItems.length === 0) return false;
@@ -131,8 +187,25 @@ export default function Orders() {
   }, [selectedOrder?.name]);
 
   useEffect(() => {
+    if (!posStore.posProfile) {
+      posStore.fetchPosProfile();
+    }
     fetchOrders();
-  }, [fetchOrders]);
+  }, [fetchOrders, posStore.posProfile]);
+
+  const getWarningTime = () => {
+    if (posStore.posProfile?.custom_invoice_warning_time !== undefined) {
+      return posStore.posProfile.custom_invoice_warning_time;
+    }
+    try {
+      const cached = sessionStorage.getItem('posProfile');
+      if (cached) {
+        const p = JSON.parse(cached);
+        return p.custom_invoice_warning_time;
+      }
+    } catch (e) {}
+    return undefined;
+  };
 
   useEffect(() => {
     if (!mounted.current) {
@@ -195,7 +268,7 @@ export default function Orders() {
       clearSelectedOrder();
       fetchOrders();
     } catch (err) {
-      showToast.error(err instanceof Error ? err.message : t('errors.failed_cancel_order'));
+      showToast.error(parseFrappeError(err, t('errors.failed_cancel_order')));
     } finally {
       setCancelLoading(false);
     }
@@ -240,7 +313,7 @@ export default function Orders() {
       // Redirect to POS page
       navigate('/');
     } catch (err) {
-      showToast.error(err instanceof Error ? err.message : t('errors.failed_edit_order'));
+      showToast.error(parseFrappeError(err, t('errors.failed_edit_order')));
     } finally {
       setEditLoading(false);
     }
@@ -256,9 +329,10 @@ export default function Orders() {
         printFormat: resolvePrintFormat(selectedOrder, posStore.posProfile.print_format),
       });
       showToast.success(t('success.printed'));
-      // Locally update selectedOrder.invoice_printed to 1
+      // Locally update selectedOrder.invoice_printed to 1 and custom_printing_time to now
       if (selectedOrder && typeof selectedOrder === 'object') {
-        selectOrder({ ...selectedOrder, invoice_printed: 1 });
+        const nowStr = new Date().toISOString().replace('T', ' ').substring(0, 19);
+        selectOrder({ ...selectedOrder, invoice_printed: 1, custom_printing_time: nowStr });
       }
       // If order was Unbilled, set to Draft and reload draft orders
       if (selectedStatus === 'Unbilled') {
@@ -270,6 +344,32 @@ export default function Orders() {
       showToast.error(t('errors.print_failed', { reason: err?.message || String(err) }));
     } finally {
       setIsPrinting(false);
+    }
+  }
+
+  async function handleKOTReprint() {
+    if (!selectedOrder) return;
+    try {
+      const res = await reprintKOT(selectedOrder.name);
+      const message = typeof res === 'string' ? res : res?.message;
+      if (typeof message === 'string' && message.startsWith('Failure')) {
+        showToast.error(message);
+      } else {
+        showToast.success(t('success.kot_reprinted') || 'KOT Reprinted successfully');
+      }
+    } catch (error: any) {
+      console.error('Failed to reprint KOT:', error);
+      if (error && typeof error === 'object' && '_server_messages' in error && typeof error._server_messages === 'string') {
+        try {
+          const messages = JSON.parse(error._server_messages);
+          const messageObj = JSON.parse(messages[0]);
+          showToast.error(messageObj.message || 'API error');
+        } catch {
+          showToast.error('API error');
+        }
+      } else {
+        showToast.error(error.message || 'Failed to reprint KOT');
+      }
     }
   }
 
@@ -387,6 +487,14 @@ export default function Orders() {
                 const cardTotal = mergedBill
                   ? order.rounded_total + Math.round(order.custom_merged_total ?? 0)
                   : order.rounded_total;
+                const limitExceeded = isInvoiceLimitExceeded(
+                  order,
+                  getWarningTime()
+                );
+                const isPrinted = Number(order.invoice_printed) === 1;
+                const elapsedTimeText = isPrinted && limitExceeded
+                  ? getElapsedTimeFormatted(order.custom_printing_time, order.posting_date, order.posting_time)
+                  : '';
 
                 const isFailed = hasInvoiceFailed(order.name);
 
@@ -439,8 +547,12 @@ export default function Orders() {
                         </p>
                       </div>
                       <div className="flex shrink-0 items-center gap-1">
-                        <Badge variant={getBadgeVariant(order.status)}>
+                        <Badge 
+                          variant={limitExceeded ? 'outline' : getBadgeVariant(order.status)} 
+                          className={`ms-2 ${limitExceeded ? 'border-red-500 text-red-600 bg-red-50' : ''}`}
+                        >
                           {t(`order_status_types.${order.status.toLowerCase().replace(/ /g, '_')}`)}
+                          {isPrinted && elapsedTimeText ? ` ${elapsedTimeText}` : ''}
                         </Badge>
                       </div>
                     </div>
@@ -564,6 +676,8 @@ export default function Orders() {
                         onMergeBill={() => setShowMergeDialog(true)}
                         showSplitBill={canSplitBill}
                         onSplitBill={() => setShowSplitDialog(true)}
+                        showReprintKOT={posStore.posProfile?.enable_kot_reprint === 1 && !!selectedOrder}
+                        onReprintKOT={handleKOTReprint}
                       />
                       <button
                         type="button"
@@ -575,14 +689,16 @@ export default function Orders() {
                         <Pencil className="w-4 h-4" />
                         {editLoading && <span className="ms-2 text-xs">{t('common.loading')}</span>}
                       </button>
-                      <button
-                        type="button"
-                        className="inline-flex items-center justify-center rounded-md p-2 bg-gray-100 hover:bg-gray-200 text-red-600 focus:outline-none focus:ring-2 focus:ring-red-500"
-                        aria-label="Cancel order"
-                        onClick={() => setCancelDialogOpen(true)}
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
+                      {canCancelInvoice && (
+                        <button
+                          type="button"
+                          className="inline-flex items-center justify-center rounded-md p-2 bg-gray-100 hover:bg-gray-200 text-red-600 focus:outline-none focus:ring-2 focus:ring-red-500"
+                          aria-label="Cancel order"
+                          onClick={() => setCancelDialogOpen(true)}
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
                     </>
                   )}
                   <Badge variant={getBadgeVariant(selectedOrder.status)}>

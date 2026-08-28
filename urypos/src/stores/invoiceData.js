@@ -75,7 +75,7 @@ export const useInvoiceDataStore = defineStore("invoiceData", {
           this.posProfile = this.invoiceDetails.pos_profile;
           this.waiter = this.invoiceDetails.waiter;
           this.cashier = this.invoiceDetails.cashier;
-          this.owner = this.invoiceDetails.owner
+          this.owner = this.invoiceDetails.owner || this.invoiceDetails.cashier;
           this.branch = this.invoiceDetails.branch;
           this.company = this.invoiceDetails.company;
           this.print_format = this.invoiceDetails.print_format;
@@ -87,8 +87,8 @@ export const useInvoiceDataStore = defineStore("invoiceData", {
           this.disableRoundedTotal = this.invoiceDetails.disable_rounded_total;
           this.enableDiscount = this.invoiceDetails.enable_discount;
           this.enableKotReprint=this.invoiceDetails.enable_kot_reprint;
-          this.multipleCashier=this.invoiceDetails.multiple_cashier
-          this.editOrderType=this.invoiceDetails.edit_order_type
+          this.multipleCashier=this.invoiceDetails.multiple_cashier || 0;
+          this.editOrderType=this.invoiceDetails.edit_order_type;
           if (this.qz_host) {
             loadQzPrinter(this.qz_host);
           }
