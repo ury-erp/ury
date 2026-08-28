@@ -31,11 +31,14 @@ def _aggregate_kot_items(kot_docs):
 	cancel_items = {}
 
 	for kot in kot_docs:
+		kot_add_items = {}
+		kot_cancel_items = {}
+
 		for row in kot.kot_items:
 			key = (row.item, row.comments or "")
 			if kot.type in CANCEL_KOT_TYPES:
-				if key not in cancel_items:
-					cancel_items[key] = {
+				if key not in kot_cancel_items:
+					kot_cancel_items[key] = {
 						"item": row.item,
 						"item_name": row.item_name,
 						"quantity": flt(row.quantity or 0),
@@ -43,9 +46,12 @@ def _aggregate_kot_items(kot_docs):
 						"comments": row.comments,
 						"course": row.course,
 					}
+				else:
+					kot_cancel_items[key]["quantity"] += flt(row.quantity or 0)
+					kot_cancel_items[key]["cancelled_qty"] += flt(row.cancelled_qty or 0)
 			elif kot.type in ADD_KOT_TYPES:
-				if key not in add_items:
-					add_items[key] = {
+				if key not in kot_add_items:
+					kot_add_items[key] = {
 						"item": row.item,
 						"item_name": row.item_name,
 						"quantity": flt(row.quantity or 0),
@@ -53,7 +59,20 @@ def _aggregate_kot_items(kot_docs):
 						"course": row.course,
 					}
 				else:
-					add_items[key]["quantity"] += flt(row.quantity or 0)
+					kot_add_items[key]["quantity"] += flt(row.quantity or 0)
+
+		for key, data in kot_cancel_items.items():
+			if key not in cancel_items:
+				cancel_items[key] = data
+			else:
+				cancel_items[key]["quantity"] = max(cancel_items[key]["quantity"], data["quantity"])
+				cancel_items[key]["cancelled_qty"] = max(cancel_items[key]["cancelled_qty"], data["cancelled_qty"])
+
+		for key, data in kot_add_items.items():
+			if key not in add_items:
+				add_items[key] = data
+			else:
+				add_items[key]["quantity"] = max(add_items[key]["quantity"], data["quantity"])
 
 	return list(add_items.values()) + list(cancel_items.values())
 
@@ -69,7 +88,7 @@ def _get_invoice_item_qty_map(invoice_id):
 		fields=["item_code", "qty", "comment"],
 	):
 		key = (row["item_code"], row.get("comment") or "")
-		qty_map[key] = flt(row.get("qty") or 0)
+		qty_map[key] = qty_map.get(key, 0.0) + flt(row.get("qty") or 0)
 
 	return qty_map
 
