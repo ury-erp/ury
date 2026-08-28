@@ -141,13 +141,13 @@ export const saveSalesPlanDraftQuantities = (
 
 export const salesPlanService = {
   async getComparableHistory(params: LoadSalesPlanParams): Promise<ComparableHistoryResponse> {
-    const res = await call<ComparableHistoryResponse>(
+    const res = await call.get<ComparableHistoryResponse>(
       'ury.ury.api.ury_dashboard.get_comparable_weekday_history',
       {
         branch: params.branch === 'all' ? undefined : params.branch,
         company: params.company,
         plan_date: params.plan_date,
-        item_codes: params.item_codes,
+        items: params.item_codes,
       },
     );
     return normalizeHistoryResponse(res);

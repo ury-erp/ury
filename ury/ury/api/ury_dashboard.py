@@ -1,6 +1,83 @@
 import frappe
 
+from frappe import _
 from frappe.utils import get_datetime, datetime, add_to_date, today
+
+from ury.ury_pos.api import getBranch
+
+
+def _has_dashboard_cross_branch_access():
+	return frappe.session.user == "Administrator" or "System Manager" in frappe.get_roles()
+
+
+def _validate_comparable_history_access(branch, company):
+	if not frappe.has_permission("POS Invoice", "read"):
+		frappe.throw(_("Not permitted to read POS Invoice history"), frappe.PermissionError)
+
+	branch_company = frappe.db.get_value("Branch", branch, "company")
+	if not branch_company:
+		frappe.throw(_("Branch company is required for comparable history"), frappe.PermissionError)
+
+	if branch_company != company:
+		frappe.throw(_("Not permitted to read history for this branch and company"), frappe.PermissionError)
+
+	if _has_dashboard_cross_branch_access():
+		return
+
+	if getBranch() != branch:
+		frappe.throw(_("Not permitted to read history for this branch"), frappe.PermissionError)
+
+
+@frappe.whitelist(methods=["GET"])
+def get_comparable_weekday_history(plan_date, branch, company=None, items=None):
+	"""Return net fulfilled item quantities for prior matching weekdays.
+
+	company is server-derived from branch when the caller omits it (the
+	frontend branch context has no company field to send); a client-supplied
+	company is still validated against the branch, matching the fail-closed
+	server-derives-scope pattern used elsewhere in the V3 codebase.
+	"""
+	if not plan_date or not branch:
+		frappe.throw("plan_date and branch are required", frappe.ValidationError)
+
+	if not company:
+		company = frappe.db.get_value("Branch", branch, "company")
+
+	if not company:
+		frappe.throw("Branch company is required for comparable history", frappe.PermissionError)
+
+	_validate_comparable_history_access(branch, company)
+
+	item_codes = frappe.parse_json(items) if isinstance(items, str) else (items or [])
+	params = {"plan_date": plan_date, "branch": branch, "company": company}
+	item_filter = ""
+	if item_codes:
+		item_filter = " AND pii.item_code IN %(items)s"
+		params["items"] = tuple(item_codes)
+
+	rows = frappe.db.sql(
+		f"""
+		SELECT
+			pii.item_code,
+			pi.posting_date,
+			SUM(CASE WHEN pi.is_return = 1 THEN -ABS(pii.qty) ELSE pii.qty END) AS net_qty
+		FROM `tabPOS Invoice Item` pii
+		INNER JOIN `tabPOS Invoice` pi ON pi.name = pii.parent
+		WHERE pi.docstatus = 1
+			AND pi.status IN ('Consolidated', 'Paid')
+			AND pi.branch = %(branch)s
+			AND pi.company = %(company)s
+			AND pi.posting_date < %(plan_date)s
+			AND WEEKDAY(pi.posting_date) = WEEKDAY(%(plan_date)s)
+			{item_filter}
+		GROUP BY pii.item_code, pi.posting_date
+		ORDER BY pi.posting_date, pii.item_code
+		""",
+		params,
+		as_dict=True,
+	)
+
+	return rows
 
 
 @frappe.whitelist(methods=["GET"])
