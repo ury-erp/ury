@@ -16,7 +16,7 @@ import {
   Store,
   Building2,
   Check,
-  Monitor,
+  ExternalLink,
   RefreshCw
 } from 'lucide-react';
 
@@ -211,6 +211,15 @@ export const Header: React.FC = () => {
             )}
           </div>
 
+          {/* Open POS */}
+          <a
+            href="/pos"
+            className="flex items-center space-x-2 px-3 py-1.5 bg-primary text-white hover:bg-primary/90 rounded-md text-sm font-medium transition-colors"
+          >
+            <ExternalLink className="w-4 h-4" />
+            <span>Open POS</span>
+          </a>
+
           {/* Notifications Bell */}
           <button
             onClick={() => setIsNotificationOpen(true)}
@@ -244,17 +253,6 @@ export const Header: React.FC = () => {
                 </div>
 
                 <div className="py-2">
-                  <button
-                    onClick={() => {
-                      setIsUserMenuOpen(false);
-                      window.location.href = '/app';
-                    }}
-                    className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
-                  >
-                    <Monitor className="w-4 h-4" />
-                    <span>Switch To Desk</span>
-                  </button>
-
                   <button
                     onClick={() => {
                       setIsUserMenuOpen(false);
