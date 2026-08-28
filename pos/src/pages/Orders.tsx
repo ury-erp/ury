@@ -475,9 +475,13 @@ export default function Orders() {
                         </span>
                         <button
                           type="button"
-                          className="inline-flex items-center justify-center rounded-md p-1.5 text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className={`inline-flex items-center justify-center rounded-md p-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
+                            isFailed
+                              ? 'text-red-600 hover:bg-red-50'
+                              : 'text-gray-500 hover:bg-gray-100'
+                          }`}
                           aria-label={`View print jobs for ${order.name}`}
-                          title="View print jobs"
+                          title={isFailed ? 'Print failed - click to view details' : 'View print jobs'}
                           onClick={(e) => {
                             e.stopPropagation();
                             setSelectedInvoiceId(order.name);

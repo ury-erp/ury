@@ -48,14 +48,16 @@ export function useOrdersPrintJobs() {
       } as unknown as Parameters<typeof db.getDocList>[1]);
 
       const ids = new Set<string>();
-      rows.forEach((job) => {
-        if (job.invoice) {
-          ids.add(job.invoice);
-        }
-        if (job.reference_name) {
-          ids.add(job.reference_name);
-        }
-      });
+      if (Array.isArray(rows)) {
+        rows.forEach((job) => {
+          if (job.invoice) {
+            ids.add(String(job.invoice).trim());
+          }
+          if (job.reference_name) {
+            ids.add(String(job.reference_name).trim());
+          }
+        });
+      }
 
       setFailedInvoiceIds(ids);
     } catch (err) {
@@ -90,7 +92,10 @@ export function useOrdersPrintJobs() {
   }, [fetchFailedJobs]);
 
   const hasInvoiceFailed = useCallback(
-    (invoiceId: string) => failedInvoiceIds.has(invoiceId),
+    (invoiceId: string) => {
+      if (!invoiceId) return false;
+      return failedInvoiceIds.has(String(invoiceId).trim());
+    },
     [failedInvoiceIds]
   );
 
