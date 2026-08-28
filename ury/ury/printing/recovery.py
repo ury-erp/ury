@@ -165,6 +165,9 @@ def reconcile_active_print_jobs():
             if get_print_job(print_job_id) is not None:
                 continue
 
+            table_val = unprinted.get(invoice_name)
+            inv_owner = frappe.db.get_value("POS Invoice", invoice_name, "owner") or "Administrator"
+
             metadata = {
                 "print_job_id": print_job_id,
                 "cups_job_id": cups_job_id,
@@ -174,7 +177,9 @@ def reconcile_active_print_jobs():
                 "server_ip": server_ip,
                 "port": port,
                 "status": "SUBMITTED",
-                "restaurant_table": unprinted.get(invoice_name),
+                "table": table_val,
+                "restaurant_table": table_val,
+                "owner": inv_owner,
                 "recovered": True,
             }
 

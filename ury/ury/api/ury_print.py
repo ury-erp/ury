@@ -11,12 +11,6 @@ standard_format = "templates/print_formats/standard.html"
 
 from frappe.www.printview import validate_print_permission
 
-
-def _make_print_job_id():
-    """Generate a unique internal URY Print Job identity."""
-    return f"PJ-{now_datetime().strftime('%Y%m%d%H%M%S')}-{frappe.generate_hash(length=6)}"
-
-
 @frappe.whitelist()
 def network_printing(
     doctype,
@@ -47,7 +41,9 @@ def network_printing(
         job_type="BILL",
         extra_metadata={
             "invoice": name,
+            "table": restaurant_table,
             "restaurant_table": restaurant_table,
+            "owner": frappe.session.user,
         },
     )
 

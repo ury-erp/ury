@@ -112,7 +112,7 @@ def _serialize_for_document(data):
     out.doctype = "URY Print Job"
 
     # Ensure list-view / document contract fields are present.
-    out.owner = out.get("owner") or "Administrator"
+    out.owner = out.get("owner") or out.get("user") or "Administrator"
     out.modified_by = out.get("modified_by") or out.owner
     out.creation = out.get("created_at") or out.get("creation") or frappe.utils.now()
     out.modified = out.get("last_checked_at") or out.get("modified") or out.creation
@@ -123,6 +123,9 @@ def _serialize_for_document(data):
     out.invoice = out.get("invoice") or (
         out.get("reference_name") if out.get("reference_doctype") == "POS Invoice" else None
     )
+
+    # Normalize table / restaurant_table
+    out.table = out.get("table") or out.get("restaurant_table")
 
     return out
 
