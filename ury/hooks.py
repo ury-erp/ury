@@ -133,7 +133,10 @@ doc_events = {
         "validate": "ury.ury.hooks.ury_pos_invoice.validate",
         "after_insert":"ury.ury.api.ury_kot_order_number.set_order_number",
         "before_submit": "ury.ury.hooks.ury_pos_invoice.before_submit",
-        "on_submit": "ury.ury.hooks.ury_pos_invoice.on_submit",
+        "on_submit": [
+            "ury.ury.hooks.ury_pos_invoice.on_submit",
+            "ury.ury.api.ury_feature_flags.maybe_wire_fulfilment_on_submit",
+        ],
         "on_update": "ury.ury.hooks.ury_pos_invoice.on_update",
         "on_cancel": "ury.ury.hooks.ury_pos_invoice.on_trash",
         "on_trash": "ury.ury.hooks.ury_pos_invoice.on_trash",
