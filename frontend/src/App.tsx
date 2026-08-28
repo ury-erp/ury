@@ -14,6 +14,7 @@ import ProductionUnitPage from './pages/Dashboard/ProductionUnitPage';
 import AggregatorPage from './pages/Dashboard/AggregatorPage';
 import SalesPlanPage from './pages/Dashboard/SalesPlanPage';
 import { DepartmentStockPage } from './pages/Dashboard/DepartmentStockPage';
+import { DepartmentProfitabilityPage } from './pages/Dashboard/DepartmentProfitabilityPage';
 import { RoleGuard } from './components/RoleGuard';
 
 function SetupGuard() {
@@ -53,6 +54,7 @@ function App() {
           <Route path="aggregator" element={<AggregatorPage />} />
           <Route path="sales-plan" element={<SalesPlanPage />} />
           <Route path="department-stock" element={<DepartmentStockPage />} />
+          <Route path="department-profitability" element={<DepartmentProfitabilityPage />} />
         </Route>
       </Route>
 

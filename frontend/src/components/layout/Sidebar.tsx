@@ -12,7 +12,9 @@ import {
   FileText,
   Settings,
   Store,
-  ClipboardList
+  ClipboardList,
+  Warehouse,
+  TrendingUp
 } from 'lucide-react';
 
 interface NavItem {
@@ -30,7 +32,9 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'User', path: '/user', icon: Users },
   { label: 'Branch', path: '/branch', icon: Building2 },
   { label: 'Aggregators', path: '/aggregator', icon: Store },
-  { label: 'Sales Plan', path: '/sales-plan', icon: ClipboardList }
+  { label: 'Sales Plan', path: '/sales-plan', icon: ClipboardList },
+  { label: 'Department Stock', path: '/department-stock', icon: Warehouse },
+  { label: 'Profitability', path: '/department-profitability', icon: TrendingUp }
 ];
 
 export const Sidebar: React.FC = () => {
