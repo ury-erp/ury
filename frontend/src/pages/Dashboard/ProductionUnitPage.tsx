@@ -12,6 +12,7 @@ interface ProductionUnitRecord {
   production_unit_name?: string;
   branch?: string;
   item_groups?: string;
+  assigned_employees?: string;
 }
 
 export const ProductionUnitPage: React.FC = () => {
@@ -27,7 +28,8 @@ export const ProductionUnitPage: React.FC = () => {
   const [newUnit, setNewUnit] = useState({
     production_unit_name: '',
     branch: '',
-    item_groups: ''
+    item_groups: '',
+    assigned_employees: ''
   });
 
   const fetchBranches = async () => {
@@ -62,7 +64,8 @@ export const ProductionUnitPage: React.FC = () => {
     setNewUnit({
       production_unit_name: '',
       branch: activeBranchId !== 'all' ? activeBranchId : (branches[0]?.name || ''),
-      item_groups: ''
+      item_groups: '',
+      assigned_employees: ''
     });
     setIsDrawerOpen(true);
   };
@@ -75,25 +78,32 @@ export const ProductionUnitPage: React.FC = () => {
         name: unit.name
       });
       const data = doc.message || doc;
-      
+
       let itemGroupsStr = data.item_groups || '';
       if (Array.isArray(data.item_groups)) {
         itemGroupsStr = data.item_groups.map((ig: any) => ig.item_group).join(', ');
       }
-      
+
+      let employeesStr = data.assigned_employees || '';
+      if (Array.isArray(data.assigned_employees)) {
+        employeesStr = data.assigned_employees.map((emp: any) => emp.employee).join(', ');
+      }
+
       setNewUnit({
         production_unit_name: data.production_unit_name || data.name,
         branch: data.branch || '',
-        item_groups: itemGroupsStr
+        item_groups: itemGroupsStr,
+        assigned_employees: employeesStr
       });
     } catch (err) {
       setNewUnit({
         production_unit_name: unit.production_unit_name || unit.name,
         branch: unit.branch || '',
-        item_groups: unit.item_groups || ''
+        item_groups: unit.item_groups || '',
+        assigned_employees: unit.assigned_employees || ''
       });
     }
-    
+
     setIsDrawerOpen(true);
   };
 
@@ -103,12 +113,16 @@ export const ProductionUnitPage: React.FC = () => {
     setSaving(true);
     try {
       const itemGroupsList = newUnit.item_groups.split(',').map(g => g.trim()).filter(g => g);
-      const childTableData = itemGroupsList.map(g => ({ item_group: g }));
+      const itemGroupsData = itemGroupsList.map(g => ({ item_group: g }));
+
+      const employeesList = newUnit.assigned_employees.split(',').map(e => e.trim()).filter(e => e);
+      const employeesData = employeesList.map(e => ({ employee: e }));
 
       const payload = {
         production_unit_name: newUnit.production_unit_name,
         branch: newUnit.branch,
-        item_groups: childTableData.length > 0 ? childTableData : []
+        item_groups: itemGroupsData.length > 0 ? itemGroupsData : [],
+        assigned_employees: employeesData.length > 0 ? employeesData : []
       };
 
       if (editingUnit) {
@@ -241,6 +255,18 @@ export const ProductionUnitPage: React.FC = () => {
             />
             <p className="text-xs text-gray-500 mt-1">
               Comma separated list of item groups mapped to this unit.
+            </p>
+          </div>
+
+          <div>
+            <label className="block font-semibold text-gray-700 mb-1">Assigned Employees (comma separated)</label>
+            <Input
+              value={newUnit.assigned_employees}
+              onChange={(e) => setNewUnit({ ...newUnit, assigned_employees: e.target.value })}
+              placeholder="EMP001, EMP002"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Comma separated list of employee IDs assigned to this unit.
             </p>
           </div>
 
