@@ -149,11 +149,6 @@ export function PrintJobsModal({
                       {formatJobTime(job.created_at)}
                     </div>
 
-                    {job.failure_reason && (
-                      <div className="mt-2 text-xs text-red-700">
-                        {job.failure_reason}
-                      </div>
-                    )}
 
                     {job.status === 'FAILED' && (
                       <div className="mt-3">
