@@ -52,7 +52,8 @@
     "loading_order": "Loading order details...",
     "edit_item": "Edit item",
     "add_comment": "Add comment",
-    "edit_comment": "Edit comment"
+    "edit_comment": "Edit comment",
+    "pax": "Pax"
   },
   "order": {
     "select_to_view": "Select an order to view details",
@@ -86,6 +87,35 @@
     "not_closed_message": "Please close the previous POS Entry to continue.",
     "reload_page": "Reload Page",
     "switch_to_desk": "Switch to Desk"
+  },
+  "pos_closing": {
+    "title": "Close POS",
+    "description": "Review sales for your session and enter the actual closing amounts.",
+    "loading": "Loading closing details...",
+    "no_open_entry": "No open POS Opening Entry was found for your session.",
+    "period_start": "Period Start",
+    "period_end": "Period End",
+    "grand_total": "Grand Total",
+    "net_total": "Net Total",
+    "total_qty": "Total Quantity",
+    "total_invoices": "Total Invoices",
+    "no_invoices": "No invoices were found for this period.",
+    "submitting": "Closing POS...",
+    "submit": "Close POS",
+    "submit_failed": "Failed to close POS",
+    "load_failed": "Failed to load closing details"
+  },
+  "checklist": {
+    "title_opening": "Opening Checklist",
+    "title_closing": "Closing Checklist",
+    "description": "Please complete the checklist below before you continue.",
+    "loading": "Loading checklist...",
+    "remarks_placeholder": "Remarks (optional)",
+    "submit": "Submit Checklist",
+    "submitting": "Submitting...",
+    "load_failed": "Failed to load checklist",
+    "submit_failed": "Failed to submit checklist",
+    "incomplete_error": "All mandatory items must be checked before this checklist can be completed."
   },
   "customer": {
     "search_placeholder": "Search customer...",
@@ -136,7 +166,9 @@
     "discount_exceeds_max": "Percentage discount cannot exceed 100%",
     "please_print_first": "Please print invoice before making payment",
     "enter_cancel_reason": "Please enter a reason for cancellation.",
-    "dine_in_restricted": "Dine In is not available for your role"
+    "dine_in_restricted": "Dine In is not available for your role",
+    "order_modified": "This order has been modified. Please reload the page to retrieve the latest edits.",
+    "order_sync_failed": "Could not sync this order. Please reload the page and try again."
   },
   "success": {
     "order_cancelled": "Order cancelled successfully",

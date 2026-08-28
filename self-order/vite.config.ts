@@ -8,10 +8,6 @@ const __dirname = dirname(__filename)
 
 export default defineConfig({
   plugins: [react()],
-  test: {
-    environment: 'jsdom',
-    setupFiles: './src/test/setup.ts',
-  },
   resolve: {
     alias: {
       "@": resolve(__dirname, "./src"),
@@ -26,5 +22,9 @@ export default defineConfig({
   build: {
     outDir: "../ury/public/order",
     emptyOutDir: true,
+  },
+  test: {
+    environment: 'jsdom',
+    setupFiles: './src/test/setup.ts',
   },
 })

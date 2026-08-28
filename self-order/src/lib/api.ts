@@ -23,6 +23,9 @@ export interface OrderingContext {
   table: string | null
   layout: OrderingLayout
   capabilities: OrderingCapabilities
+  // Per-profile idle timeout (falls back to 30 server-side) — drives the
+  // not-yet-wired idle-reset timer (Phase 3) instead of a hardcoded value.
+  session_idle_timeout_minutes: number
 }
 
 export interface MenuItem {
@@ -55,6 +58,10 @@ export interface CustomerOrder {
   invoice: string | null
   table?: string | null
   order_type?: string
+  // Pickup reference code (derived from the invoice name) — the only
+  // identifier a QR Pickup customer has, since there's no table to point
+  // to. Present (possibly null before an order exists) on every response.
+  pickup_code?: string | null
   items: OrderItem[]
   grand_total: number
   billed: boolean
@@ -124,6 +131,22 @@ export async function bootstrapDevice(deviceId: string, deviceCredential: string
   return response.message
 }
 
+export async function assignDeviceTable(
+  deviceId: string,
+  deviceCredential: string,
+  staffPin: string,
+  table: string,
+): Promise<OrderingContext> {
+  const response = await call.post<FrappeResponse<OrderingContext>>(`${M}.assign_device_table`, {
+    device_id: deviceId,
+    device_credential: deviceCredential,
+    staff_pin: staffPin,
+    table,
+  })
+  storeContext(response.message)
+  return response.message
+}
+
 export async function getMenu(session: string): Promise<MenuResponse> {
   const response = await call.get<FrappeResponse<MenuResponse>>(`${M}.get_customer_menu`, { session })
   return response.message
@@ -141,6 +164,34 @@ export async function addItems(
   const response = await call.post<FrappeResponse<CustomerOrder>>(`${M}.add_customer_items`, {
     session,
     items: JSON.stringify(items),
+  })
+  return response.message
+}
+
+export interface ProductOption {
+  item_code: string
+  item_name: string
+  image: string | null
+  // Null when no `Item Price` row exists for the resolved price list — the
+  // caller must handle a missing rate gracefully, not assume it's always set.
+  rate: number | null
+}
+
+export interface ProductDetail {
+  item_code: string
+  item_name: string
+  // Null when the profile's `show_item_descriptions` capability is off.
+  description: string | null
+  // Null when the profile's `show_item_images` capability is off.
+  image: string | null
+  variants: ProductOption[]
+  addons: ProductOption[]
+}
+
+export async function getCustomerProduct(session: string, itemCode: string): Promise<ProductDetail> {
+  const response = await call.get<FrappeResponse<ProductDetail>>(`${M}.get_customer_product`, {
+    session,
+    item_code: itemCode,
   })
   return response.message
 }

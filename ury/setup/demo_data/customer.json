@@ -1,0 +1,17 @@
+[
+    {
+        "doctype": "Customer",
+        "customer_group": "Demo Customer Group",
+        "customer_name": "Grant Foodie Ltd."
+    },
+    {
+        "doctype": "Customer",
+        "customer_group": "Demo Customer Group",
+        "customer_name": "West View Foodie Ltd."
+    },
+    {
+        "doctype": "Customer",
+        "customer_group": "Demo Customer Group",
+        "customer_name": "Palmer Foodie Ltd."
+    }
+]

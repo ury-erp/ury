@@ -14,6 +14,14 @@ interface SearchableSelectProps {
   error?: boolean;
   onChange: (id: string, value: string) => void;
   onBlur?: (id: string) => void;
+  /**
+   * When true, only values matching an option in `options` are ever
+   * propagated via `onChange`. Typed text that doesn't match any option is
+   * still shown in the input, but is not committed to form state until the
+   * user selects a real option. Defaults to `false` to preserve free-text
+   * behavior for existing consumers (Dashboard pages, Menu course field).
+   */
+  strict?: boolean;
 }
 
 export function SearchableSelect({
@@ -24,6 +32,7 @@ export function SearchableSelect({
   error,
   onChange,
   onBlur,
+  strict = false,
 }: SearchableSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -59,7 +68,13 @@ export function SearchableSelect({
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setIsOpen(false);
         setIsTyping(false);
-        setSearchTerm(selectedOption ? selectedOption.label : value || '');
+        if (strict) {
+          // Revert any unmatched typed text back to the last valid
+          // selection rather than leaving an invalid string displayed.
+          setSearchTerm(selectedOption ? selectedOption.label : '');
+        } else {
+          setSearchTerm(selectedOption ? selectedOption.label : value || '');
+        }
         onBlur?.(id);
       }
     }
@@ -67,7 +82,7 @@ export function SearchableSelect({
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [id, value, selectedOption, onBlur]);
+  }, [id, value, selectedOption, onBlur, strict]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
@@ -80,9 +95,12 @@ export function SearchableSelect({
     );
     if (matched) {
       onChange(id, matched.value);
-    } else {
+    } else if (!strict) {
       onChange(id, val);
     }
+    // strict mode: leave the typed text visible in `searchTerm` (state
+    // above) without propagating it via onChange until a real option is
+    // selected — the last valid committed value stays in form state.
   };
 
   const handleSelectOption = (opt: Option) => {

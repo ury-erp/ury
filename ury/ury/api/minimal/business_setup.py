@@ -1,8 +1,11 @@
 import frappe
 from frappe import _
 
-@frappe.whitelist(allow_guest=True)
+@frappe.whitelist()
 def get_business_setup():
+    if frappe.session.user == "Guest":
+        frappe.throw("Not permitted")
+
     company = frappe.get_all("Company", limit=1)
     if not company:
         frappe.throw(_("No Company found."))
@@ -22,16 +25,22 @@ def get_business_setup():
         }
     }
 
-@frappe.whitelist(allow_guest=True)
+@frappe.whitelist()
 def get_branches():
+    if frappe.session.user == "Guest":
+        frappe.throw("Not permitted")
+
     comp = frappe.defaults.get_user_default("Company") or frappe.db.get_value("Company", {}, "name")
     tax_id = frappe.db.get_value("Company", comp, "tax_id") if comp else None
     
     branches = frappe.get_all("Branch", fields=["name", "branch"])
     return [{"id": b.name, "name": b.branch, "tax_id": tax_id} for b in branches]
 
-@frappe.whitelist(allow_guest=True)
+@frappe.whitelist()
 def update_business_setup(branch=None, restaurant=None):
+    if frappe.session.user == "Guest":
+        frappe.throw("Not permitted")
+
     if branch:
         if isinstance(branch, str):
             branch = frappe.parse_json(branch)
@@ -108,6 +117,10 @@ def submit_configure_data(data):
         data = frappe.parse_json(data)
         
     results = {}
+    user = frappe.session.user
+
+    # Step 0: Preparing setup
+    frappe.publish_realtime("ury_configure_progress", {"step": 0, "status": "loading"}, user=user)
     
     # Derive default company from site defaults or latest created company
     default_company = frappe.defaults.get_user_default("Company") or frappe.db.get_value("Company", {}, "name")
@@ -120,6 +133,10 @@ def submit_configure_data(data):
                 "default_currency": "INR"
             })
             comp_doc.insert(ignore_permissions=True)
+            
+    # Step 0 complete, Step 1 loading: Creating restaurant configuration
+    frappe.publish_realtime("ury_configure_progress", {"step": 0, "status": "completed"}, user=user)
+    frappe.publish_realtime("ury_configure_progress", {"step": 1, "status": "loading"}, user=user)
     
     # 1. Branch
     branch_name = default_company
@@ -199,6 +216,8 @@ def submit_configure_data(data):
 
     # 4. URY Tables (linked to Restaurant & Room!)
     results["tables"] = []
+    results["tables_created"] = []
+    results["tables_reused"] = []
     # Shape mapping: UI 'Round' -> DB 'Circle'
     shape_map = {"Round": "Circle", "Square": "Square", "Rectangle": "Rectangle"}
     for t in data.get("tables", []):
@@ -208,7 +227,7 @@ def submit_configure_data(data):
         room_link = t.get("room") or first_room_name
         raw_shape = t.get("shape", "Square")
         mapped_shape = shape_map.get(raw_shape, "Square")
-        
+
         if not frappe.db.exists("URY Table", t_name):
             table_doc = frappe.get_doc({
                 "doctype": "URY Table",
@@ -221,10 +240,23 @@ def submit_configure_data(data):
             })
             table_doc.insert(ignore_permissions=True)
             results["tables"].append(table_doc.name)
+            results["tables_created"].append(table_doc.name)
         else:
             results["tables"].append(t_name)
+            actual_room = frappe.db.get_value("URY Table", t_name, "restaurant_room")
+            if actual_room != room_link:
+                results["tables_reused"].append({
+                    "name": t_name,
+                    "expected_room": room_link,
+                    "actual_room": actual_room
+                })
+            else:
+                results["tables_reused"].append(t_name)
 
     # 5. URY Menu Courses, ERPNext Item Creation (Pass 1) & URY Menu (Pass 2)
+    frappe.publish_realtime("ury_configure_progress", {"step": 1, "status": "completed"}, user=user)
+    frappe.publish_realtime("ury_configure_progress", {"step": 2, "status": "loading"}, user=user)
+
     menu_items_table = []
     item_group = frappe.db.get_value("Item Group", {"is_group": 0}, "name") or "All Item Groups"
     
@@ -329,6 +361,9 @@ def submit_configure_data(data):
             pass
 
     # 8. POS Profile & Warehouse
+    frappe.publish_realtime("ury_configure_progress", {"step": 2, "status": "completed"}, user=user)
+    frappe.publish_realtime("ury_configure_progress", {"step": 3, "status": "loading"}, user=user)
+
     try:
         warehouse_name = f"Finished Goods - {frappe.db.get_value('Company', default_company, 'abbr')}"
         if not frappe.db.exists("Warehouse", warehouse_name):
@@ -490,6 +525,11 @@ def submit_configure_data(data):
             results["pos_profile"] = pos_profile_name
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "Failed to create POS Profile")
+        results["pos_profile_error"] = str(e)
+
+    frappe.db.set_single_value("System Settings", "setup_complete", 1)
+
+    frappe.publish_realtime("ury_configure_progress", {"step": 3, "status": "completed"}, user=user)
 
     frappe.db.commit()
     return {"status": "success", "results": results}
