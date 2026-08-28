@@ -426,36 +426,83 @@ export const PosProfilePage: React.FC = () => {
                 </div>
 
                 {activeTab === 'general' && (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-                    <div className="p-4 rounded-lg bg-primary/5 border border-primary/10">
-                      <span className="font-semibold text-gray-700 block">Item Discounts</span>
-                      <span className="text-primary font-bold text-sm mt-1 block">
-                        {!!p.custom_enable_discount ? 'Enabled' : 'Disabled'}
-                      </span>
+                  <div className="space-y-5 text-xs">
+                    <div>
+                      <h4 className="text-[11px] font-bold uppercase tracking-wide text-gray-400 mb-2">Operations</h4>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                        <div className="p-4 rounded-lg bg-primary/5 border border-primary/10 flex flex-col justify-between min-h-[72px]">
+                          <span className="font-semibold text-gray-700 block">Item Discounts</span>
+                          <span className="text-primary font-bold text-sm mt-1 block">
+                            {!!p.custom_enable_discount ? 'Enabled' : 'Disabled'}
+                          </span>
+                        </div>
+                        <div className="p-4 rounded-lg bg-primary/5 border border-primary/10 flex flex-col justify-between min-h-[72px]">
+                          <span className="font-semibold text-gray-700 block">KOT Reprint Option</span>
+                          <span className="text-primary font-bold text-sm mt-1 block">
+                            {!!p.custom_enable_kot_reprint ? 'Enabled' : 'Disabled'}
+                          </span>
+                        </div>
+                        <div className="p-4 rounded-lg bg-primary/5 border border-primary/10 flex flex-col justify-between min-h-[72px]">
+                          <span className="font-semibold text-gray-700 block">Multi-Cashier Support</span>
+                          <span className="text-primary font-bold text-sm mt-1 block">
+                            {p.custom_multiple_cashier_configuration ? 'Configured' : 'Standard'}
+                          </span>
+                        </div>
+                        <div className="p-4 rounded-lg bg-primary/5 border border-primary/10 flex flex-col justify-between min-h-[72px]">
+                          <span className="font-semibold text-gray-700 block">Order Type Edit</span>
+                          <span className="text-primary font-bold text-sm mt-1 block">
+                            {!!p.custom_edit_order_type ? 'Allowed' : 'Locked'}
+                          </span>
+                        </div>
+                        <div className="p-4 rounded-lg bg-primary/5 border border-primary/10 flex flex-col justify-between min-h-[72px]">
+                          <span className="font-semibold text-gray-700 block">Reset Order Number Daily</span>
+                          <span className="text-primary font-bold text-sm mt-1 block">
+                            {!!p.custom_reset_order_number_daily ? 'Enabled' : 'Disabled'}
+                          </span>
+                        </div>
+                        <div className="p-4 rounded-lg bg-primary/5 border border-primary/10 flex flex-col justify-between min-h-[72px]">
+                          <span className="font-semibold text-gray-700 block">Daily POS Closing</span>
+                          <span className="text-primary font-bold text-sm mt-1 block">
+                            {!!p.custom_daily_pos_close ? 'Required' : 'Not Required'}
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="p-4 rounded-lg bg-primary/5 border border-primary/10">
-                      <span className="font-semibold text-gray-700 block">KOT Reprint Option</span>
-                      <span className="text-primary font-bold text-sm mt-1 block">
-                        {!!p.custom_enable_kot_reprint ? 'Enabled' : 'Disabled'}
-                      </span>
+
+                    <div>
+                      <h4 className="text-[11px] font-bold uppercase tracking-wide text-gray-400 mb-2">Menu &amp; Pricing</h4>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="p-4 rounded-lg bg-gray-50 border border-gray-200 flex flex-col justify-between min-h-[72px]">
+                          <span className="font-semibold text-gray-700 block">Price List</span>
+                          <span className="text-gray-900 font-bold text-sm mt-1 block">
+                            {p.selling_price_list || 'Standard Selling'}
+                          </span>
+                        </div>
+                        <div className="p-4 rounded-lg bg-gray-50 border border-gray-200 flex flex-col justify-between min-h-[72px]">
+                          <span className="font-semibold text-gray-700 block">Print Format</span>
+                          <span className="text-gray-900 font-bold text-sm mt-1 block">
+                            {p.print_format || 'Default'}
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="p-4 rounded-lg bg-primary/5 border border-primary/10">
-                      <span className="font-semibold text-gray-700 block">Multi-Cashier Support</span>
-                      <span className="text-primary font-bold text-sm mt-1 block">
-                        {p.custom_multiple_cashier_configuration ? 'Configured' : 'Standard'}
-                      </span>
-                    </div>
-                    <div className="p-4 rounded-lg bg-primary/5 border border-primary/10">
-                      <span className="font-semibold text-gray-700 block">Price List</span>
-                      <span className="text-primary font-bold text-sm mt-1 block">
-                        {p.selling_price_list || 'Standard Selling'}
-                      </span>
-                    </div>
-                    <div className="p-4 rounded-lg bg-primary/5 border border-primary/10">
-                      <span className="font-semibold text-gray-700 block">Print Format</span>
-                      <span className="text-primary font-bold text-sm mt-1 block">
-                        {p.print_format || 'Default'}
-                      </span>
+
+                    <div>
+                      <h4 className="text-[11px] font-bold uppercase tracking-wide text-gray-400 mb-2">Limits &amp; Timing</h4>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="p-4 rounded-lg bg-gray-50 border border-gray-200 flex flex-col justify-between min-h-[72px]">
+                          <span className="font-semibold text-gray-700 block">Paid Limit</span>
+                          <span className="text-gray-900 font-bold text-sm mt-1 block">
+                            {p.paid_limit ? p.paid_limit.toLocaleString() : 'No Limit'}
+                          </span>
+                        </div>
+                        <div className="p-4 rounded-lg bg-gray-50 border border-gray-200 flex flex-col justify-between min-h-[72px]">
+                          <span className="font-semibold text-gray-700 block">Table Attention Time</span>
+                          <span className="text-gray-900 font-bold text-sm mt-1 block">
+                            {p.table_attention_time ? `${p.table_attention_time} min` : 'Not Set'}
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -804,7 +851,7 @@ export const PosProfilePage: React.FC = () => {
                 <p className="text-xs text-gray-400">No checklist items configured. Add items required for POS opening/closing.</p>
               )}
               {(profileForm.custom_checklist_items || []).map((row: any, idx: number) => (
-                <div key={idx} className="flex gap-2 items-center">
+                <div key={idx} className="flex gap-3 items-center h-10">
                   <Input
                     className="flex-1"
                     value={row.item_label || ''}
@@ -815,20 +862,21 @@ export const PosProfilePage: React.FC = () => {
                       setProfileForm({ ...profileForm, custom_checklist_items: newRows });
                     }}
                   />
-                  <Select
-                    className="w-32"
-                    value={row.applies_to || 'Both'}
-                    onChange={e => {
-                      const newRows = [...(profileForm.custom_checklist_items || [])];
-                      newRows[idx] = { ...newRows[idx], applies_to: e.target.value };
-                      setProfileForm({ ...profileForm, custom_checklist_items: newRows });
-                    }}
-                  >
-                    <option value="Opening">Opening</option>
-                    <option value="Closing">Closing</option>
-                    <option value="Both">Both</option>
-                  </Select>
-                  <label className="flex items-center gap-1 text-xs text-gray-600 whitespace-nowrap">
+                  <div className="w-32 flex-shrink-0">
+                    <Select
+                      value={row.applies_to || 'Both'}
+                      onChange={e => {
+                        const newRows = [...(profileForm.custom_checklist_items || [])];
+                        newRows[idx] = { ...newRows[idx], applies_to: e.target.value };
+                        setProfileForm({ ...profileForm, custom_checklist_items: newRows });
+                      }}
+                    >
+                      <option value="Opening">Opening</option>
+                      <option value="Closing">Closing</option>
+                      <option value="Both">Both</option>
+                    </Select>
+                  </div>
+                  <label className="flex items-center gap-1 text-xs text-gray-600 whitespace-nowrap flex-shrink-0">
                     <input
                       type="checkbox"
                       checked={row.is_mandatory === 1 || row.is_mandatory === undefined}
@@ -841,7 +889,7 @@ export const PosProfilePage: React.FC = () => {
                   </label>
                   <button
                     type="button"
-                    className="text-gray-400 hover:text-red-500"
+                    className="text-gray-400 hover:text-red-500 flex-shrink-0"
                     onClick={() => {
                       const newRows = (profileForm.custom_checklist_items || []).filter((_: any, i: number) => i !== idx);
                       setProfileForm({ ...profileForm, custom_checklist_items: newRows });
