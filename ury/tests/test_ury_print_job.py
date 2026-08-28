@@ -104,3 +104,31 @@ class TestURYPrintJobDocType(unittest.TestCase):
         self.assertTrue(found)
         found_job = next((j for j in job_list if j.get("name") == failed_job_id), {})
         self.assertEqual(found_job.get("invoice"), invoice_id)
+
+    def test_table_and_owner_fields(self):
+        job_id = "test-doc-table-owner-job"
+        self._save_extra_job(
+            job_id,
+            {
+                "print_job_id": job_id,
+                "status": "QUEUED",
+                "printer": "Kitchen_Printer",
+                "job_type": "KOT",
+                "table": "T-01",
+                "owner": "cashier@test.com",
+            },
+        )
+        doc = frappe.get_doc("URY Print Job", job_id)
+        self.assertEqual(doc.table, "T-01")
+        self.assertEqual(doc.owner, "cashier@test.com")
+
+        job_list = frappe.get_list(
+            "URY Print Job",
+            filters={"table": "T-01", "owner": "cashier@test.com"},
+            fields=["name", "table", "owner"],
+        )
+        found = any(j.get("name") == job_id for j in job_list)
+        self.assertTrue(found)
+        found_job = next((j for j in job_list if j.get("name") == job_id), {})
+        self.assertEqual(found_job.get("table"), "T-01")
+        self.assertEqual(found_job.get("owner"), "cashier@test.com")

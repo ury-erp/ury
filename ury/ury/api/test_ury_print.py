@@ -63,7 +63,9 @@ class TestURYPrint(FrappeTestCase):
             job_type="BILL",
             extra_metadata={
                 "invoice": "INV-001",
+                "table": "T-01",
                 "restaurant_table": "T-01",
+                "owner": "Administrator",
             },
         )
 

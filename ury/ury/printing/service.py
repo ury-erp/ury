@@ -91,6 +91,22 @@ def submit_and_monitor_print_job(
 
         print_job_id = _make_print_job_id(print_settings.printer_name, cups_job_id)
 
+        # Determine owner: extra_metadata -> frappe.session.user -> target_doc.owner -> Administrator
+        user_owner = (
+            (extra_metadata.get("owner") or extra_metadata.get("user")) if extra_metadata else None
+        )
+        if not user_owner:
+            session_user = getattr(frappe, "session", None) and getattr(frappe.session, "user", None)
+            if session_user and session_user != "Guest":
+                user_owner = session_user
+            else:
+                user_owner = getattr(target_doc, "owner", None) or "Administrator"
+
+        # Determine table: extra_metadata -> target_doc.restaurant_table -> target_doc.table
+        table_name = (
+            (extra_metadata.get("table") or extra_metadata.get("restaurant_table")) if extra_metadata else None
+        ) or getattr(target_doc, "restaurant_table", None) or getattr(target_doc, "table", None)
+
         metadata = {
             "print_job_id": print_job_id,
             "cups_job_id": cups_job_id,
@@ -104,6 +120,9 @@ def submit_and_monitor_print_job(
             "file_path": file_path,
             "status": "SUBMITTED",
             "created_at": frappe.utils.now(),
+            "owner": user_owner,
+            "table": table_name,
+            "restaurant_table": table_name,
         }
 
         if extra_metadata:
