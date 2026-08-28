@@ -345,5 +345,20 @@
     "paid": "Paid",
     "consolidated": "Consolidated",
     "return": "Return"
+  },
+  "settings": {
+    "title": "Settings",
+    "coming_soon": "More settings coming soon.",
+    "end_of_day": "End of Day",
+    "close_pos_title": "Close POS Session",
+    "close_pos_description": "Reconcile your cash drawer and close out today's POS session for this device.",
+    "close_pos_button": "Close POS / End Shift",
+    "confirm_title": "Close today's POS session?",
+    "confirm_description": "This will end your current session and cannot be undone. Make sure all orders are settled before continuing.",
+    "confirm_button": "Yes, Close Session",
+    "confirm_cancel": "Cancel",
+    "closed_title": "Session Closed",
+    "closed_description": "Your POS session has been closed successfully.",
+    "back_to_dashboard": "Back to Dashboard"
   }
 }
