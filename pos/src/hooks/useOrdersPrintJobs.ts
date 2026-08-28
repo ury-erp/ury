@@ -48,6 +48,8 @@ export function useOrdersPrintJobs() {
       } as unknown as Parameters<typeof db.getDocList>[1]);
 
       const ids = new Set<string>();
+      const isInitial = initialLoadRef.current;
+
       if (Array.isArray(rows)) {
         rows.forEach((job) => {
           const invoice = job.invoice || job.reference_name;
@@ -60,12 +62,16 @@ export function useOrdersPrintJobs() {
             ids.add(String(job.reference_name).trim());
           }
 
-          if (jobId && !notifiedJobIdsRef.current.has(jobId)) {
-            notifiedJobIdsRef.current.add(jobId);
-            const msg = invoice
-              ? `Print job ${jobId} failed for invoice ${invoice}`
-              : `Print job ${jobId} failed`;
-            showToast.error(msg);
+          if (jobId) {
+            if (!notifiedJobIdsRef.current.has(jobId)) {
+              notifiedJobIdsRef.current.add(jobId);
+              if (!isInitial) {
+                const msg = invoice
+                  ? `Print job ${jobId} failed for invoice ${invoice}`
+                  : `Print job ${jobId} failed`;
+                showToast.error(msg);
+              }
+            }
           }
         });
       }

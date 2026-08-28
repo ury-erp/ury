@@ -114,13 +114,13 @@
    "fieldtype": "Column Break"
   },
   {
-   "default": "SUBMITTED",
+   "default": "QUEUED",
    "fieldname": "status",
    "fieldtype": "Select",
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Status",
-   "options": "QUEUED\nSUBMITTED\nPENDING\nPROCESSING\nCOMPLETED\nFAILED"
+   "options": "QUEUED\nPENDING\nPROCESSING\nCOMPLETED\nFAILED"
   },
   {
    "fieldname": "cups_state",
@@ -190,7 +190,7 @@
  "hide_toolbar": 1,
  "is_virtual": 1,
  "links": [],
- "modified": "2026-08-28 11:24:30.260866",
+ "modified": "2026-08-28 11:59:01.952610",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Print Job",
