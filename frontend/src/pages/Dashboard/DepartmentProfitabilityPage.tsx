@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Card, Spinner, Input, Button } from '@ury/ui';
-import { getLoggedUser, getUserRoles } from '@ury/core';
+import { call, getLoggedUser, getUserRoles } from '@ury/core';
 import { useBranchContext } from '../../context/BranchContext';
 import {
   departmentProfitabilityService,
@@ -8,6 +8,7 @@ import {
   PlanVsActualResult,
   ProfitabilityRow,
 } from '../../services/departmentProfitability';
+import { departmentStockService, DepartmentOption } from '../../services/departmentStock';
 
 /**
  * Additive, unwired reporting page (V3-80): department profitability and
@@ -19,6 +20,14 @@ import {
  * at all (see departmentProfitability.ts), so `canSeeCost` here only
  * controls whether the *columns* are rendered -- there is never a value to
  * hide, because there is never a value present for that tier.
+ *
+ * Company and Department are both derived rather than free text: Company
+ * comes from the branch selected in the global branch context (mirrors the
+ * `Branch.company` lookup the backend itself enforces in
+ * `ury_department_profitability._require_branch_in_company`), and
+ * Department is a real dropdown scoped to that branch, reusing the same
+ * `URY Production Department` lookup as `DepartmentStockPage.tsx`
+ * (`departmentStockService.listDepartments`).
  */
 
 const NO_ACCESS_ROLES = new Set(['Cashier', 'URY Cashier', 'Captain', 'URY Captain']);
@@ -58,6 +67,7 @@ export const DepartmentProfitabilityPage: React.FC = () => {
   const [company, setCompany] = useState<string>('');
   const [serviceDate, setServiceDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [department, setDepartment] = useState<string>('');
+  const [departmentOptions, setDepartmentOptions] = useState<DepartmentOption[]>([]);
 
   const [profitability, setProfitability] = useState<DepartmentProfitabilityResult | null>(null);
   const [planVsActual, setPlanVsActual] = useState<PlanVsActualResult | null>(null);
@@ -69,8 +79,56 @@ export const DepartmentProfitabilityPage: React.FC = () => {
 
   const branch = selectedBranch !== 'all' ? selectedBranch : activeBranch?.id || '';
 
+  // Company is derived from the selected branch, never entered by hand --
+  // mirrors the Branch -> Company lookup the backend already enforces.
+  useEffect(() => {
+    let cancelled = false;
+    if (!branch) {
+      setCompany('');
+      return;
+    }
+    (async () => {
+      try {
+        const res = await call<any>('frappe.client.get_value', {
+          doctype: 'Branch',
+          filters: branch,
+          fieldname: 'company',
+        });
+        const value = res?.message?.company ?? res?.company ?? '';
+        if (!cancelled) setCompany(value || '');
+      } catch {
+        if (!cancelled) setCompany('');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [branch]);
+
+  // Department options are scoped to the selected branch, reusing the
+  // exact lookup DepartmentStockPage already relies on.
+  useEffect(() => {
+    let cancelled = false;
+    setDepartment('');
+    if (!branch) {
+      setDepartmentOptions([]);
+      return;
+    }
+    departmentStockService
+      .listDepartments(branch)
+      .then((rows) => {
+        if (!cancelled) setDepartmentOptions(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setDepartmentOptions([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [branch]);
+
   const load = async () => {
-    if (!branch || !serviceDate) {
+    if (!branch || !company || !serviceDate) {
       setState('empty');
       return;
     }
@@ -129,20 +187,48 @@ export const DepartmentProfitabilityPage: React.FC = () => {
     );
   }
 
+  if (!branch) {
+    return (
+      <div className="space-y-6 p-4" data-testid="department-profitability-page">
+        <Card className="p-6" data-testid="profitability-select-branch">
+          <p className="text-sm text-muted-foreground">
+            Select a specific branch above to view its department profitability.
+          </p>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 p-4" data-testid="department-profitability-page">
       <div className="flex flex-wrap gap-3 items-end">
         <div>
           <label className="text-xs text-muted-foreground">Company</label>
-          <Input value={company} onChange={(e) => setCompany(e.target.value)} placeholder="Company" />
+          <Input value={company} disabled placeholder="Derived from branch" data-testid="profitability-company" />
         </div>
         <div>
           <label className="text-xs text-muted-foreground">Service Date / Period</label>
           <Input value={serviceDate} onChange={(e) => setServiceDate(e.target.value)} placeholder="YYYY-MM-DD" />
         </div>
         <div>
-          <label className="text-xs text-muted-foreground">Department (optional)</label>
-          <Input value={department} onChange={(e) => setDepartment(e.target.value)} placeholder="Department" />
+          <label className="text-xs text-muted-foreground" htmlFor="profitability-department">
+            Department (optional)
+          </label>
+          <select
+            id="profitability-department"
+            aria-label="Department"
+            className="border rounded px-2 py-1 text-sm h-9"
+            value={department}
+            onChange={(e) => setDepartment(e.target.value)}
+            data-testid="profitability-department-select"
+          >
+            <option value="">All departments</option>
+            {departmentOptions.map((dept) => (
+              <option key={dept.name} value={dept.name}>
+                {dept.department_name}
+              </option>
+            ))}
+          </select>
         </div>
         <Button onClick={load}>Refresh</Button>
       </div>
@@ -156,8 +242,7 @@ export const DepartmentProfitabilityPage: React.FC = () => {
       {state === 'empty' && (
         <Card className="p-6" data-testid="profitability-empty">
           <p className="text-sm text-muted-foreground">
-            No data for this company/branch/service date. Provide a company, branch, and service date, or check
-            that an approved Sales Plan exists for this scope.
+            No data for this company/branch/service date. Check that an approved Sales Plan exists for this scope.
           </p>
         </Card>
       )}
