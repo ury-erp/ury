@@ -75,7 +75,7 @@ export function useOrdersPrintJobs() {
                 const msg = invoice
                   ? `Print job ${jobId} failed for invoice ${invoice}`
                   : `Print job ${jobId} failed`;
-                showToast.error(msg);
+                showToast.error(msg, { autoClose: false });
               }
             }
           }
