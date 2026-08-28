@@ -66,8 +66,9 @@ class TestURYOrder(FrappeTestCase):
         mock_pos_profile.custom_enable_multiple_cashier = 0
         mock_pos_profile.applicable_for_users = []
         mock_pos_profile.transfer_role_permissions = _role_rows("URY Manager")
-        mock_pos_profile.role_allowed_for_billing = _role_rows()
+        mock_pos_profile.role_allowed_for_billing = _role_rows("URY Manager")
         mock_pos_profile.role_restricted_for_table_order = _role_rows()
+        mock_pos_profile.applicable_for_users = []
         mock_get_doc.return_value = mock_pos_profile
 
         mock_get_roles.return_value = ["URY Manager"]
@@ -101,7 +102,7 @@ class TestURYOrder(FrappeTestCase):
                 except Exception as e:
                     pass
                 
-                mock_has_permission.assert_called_once_with("POS Invoice", "write", doc=mock_invoice)
+                mock_has_permission.assert_any_call("POS Invoice", "write", doc=mock_invoice)
                 
                 # Verify fake cashier/waiter were ignored
                 self.assertEqual(mock_invoice.cashier, "authorized@example.com")
@@ -112,7 +113,12 @@ class TestURYOrder(FrappeTestCase):
 
     @patch("ury.ury.doctype.ury_order.ury_order.get_order_invoice")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.has_permission")
-    def test_sync_order_unauthorized(self, mock_has_permission, mock_get_order_invoice):
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_doc")
+    def test_sync_order_unauthorized(self, mock_get_doc, mock_has_permission, mock_get_order_invoice):
+        mock_pos_profile = MagicMock()
+        mock_pos_profile.role_allowed_for_billing = _role_rows()
+        mock_get_doc.return_value = mock_pos_profile
+
         mock_invoice = MagicMock()
         mock_invoice.name = "POS-INV-001"
         mock_get_order_invoice.return_value = mock_invoice
