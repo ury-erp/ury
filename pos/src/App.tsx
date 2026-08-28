@@ -5,6 +5,7 @@ import POS from './pages/POS';
 import Table from './pages/Table';
 import Dashboard from './pages/Dashboard';
 import Settings from './pages/Settings';
+import OpenEntries from './pages/OpenEntries';
 import AuthGuard from './components/AuthGuard';
 import POSOpeningProvider from './components/POSOpeningProvider';
 import ScreenSizeProvider from './components/ScreenSizeProvider';
@@ -48,6 +49,7 @@ function App() {
                   <Route path="/tables" element={<Table />} />
                   <Route path="/orders" element={<Orders />} />
                   <Route path="/settings" element={<Settings />} />
+                  <Route path="/open-entries" element={<OpenEntries />} />
                 </Route>
                 {/*
                   Captain "Order" module — its own shell, sibling to the
