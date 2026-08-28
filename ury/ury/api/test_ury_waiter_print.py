@@ -250,7 +250,7 @@ class TestURYWaiterPrint(FrappeTestCase):
 		self.assertEqual(combined_doc.kot_items[0].old_qty, 10)
 		self.assertEqual(combined_doc.kot_items[0].new_qty, 0)
 
-	@patch("ury.ury.api.ury_waiter_print.print_by_server")
+	@patch("ury.ury.api.ury_waiter_print.frappe.get_doc")
 	@patch("ury.ury.api.ury_waiter_print.build_combined_kot_doc")
 	@patch("ury.ury.api.ury_waiter_print.frappe.db.get_value")
 	@patch("ury.ury.api.ury_waiter_print.frappe.get_all")
@@ -261,7 +261,7 @@ class TestURYWaiterPrint(FrappeTestCase):
 		mock_get_all,
 		mock_get_value,
 		mock_build_combined,
-		mock_print_by_server,
+		mock_get_doc,
 	):
 		mock_exists.return_value = True
 		mock_get_value.side_effect = lambda doctype, name, fieldname=None, **kwargs: {
@@ -275,23 +275,31 @@ class TestURYWaiterPrint(FrappeTestCase):
 		combined_doc.kot_items = [frappe._dict({"item": "Pizza", "quantity": "1"})]
 		mock_build_combined.return_value = combined_doc
 
+		printer_doc = MagicMock()
+		mock_get_doc.return_value = printer_doc
+
 		print_combined_waiter_order_slip("INV-001", ["KOT-1"], "T-01")
 
-		mock_print_by_server.assert_called_once_with(
-			"URY KOT",
-			"KOT-1",
-			"Waiter Printer",
-			WAITER_PRINT_FORMAT,
+		mock_get_doc.assert_called_once_with("Network Printer Settings", "Waiter Printer")
+		printer_doc.print_doc.assert_called_once_with(
+			doctype="URY KOT",
+			name="KOT-1",
+			print_format=WAITER_PRINT_FORMAT,
 			doc=combined_doc,
 			no_letterhead=1,
+			job_type="WAITER_SLIP",
+			extra_metadata={
+				"invoice": "INV-001",
+				"restaurant_table": "T-01",
+			},
 		)
 
-	@patch("ury.ury.api.ury_waiter_print.print_by_server")
+	@patch("ury.ury.api.ury_waiter_print.frappe.get_doc")
 	@patch("ury.ury.api.ury_waiter_print.build_combined_kot_doc")
 	@patch("ury.ury.api.ury_waiter_print.frappe.db.get_value")
 	@patch("ury.ury.api.ury_waiter_print.frappe.get_all")
 	def test_skips_when_combined_items_empty(
-		self, mock_get_all, mock_get_value, mock_build_combined, mock_print_by_server
+		self, mock_get_all, mock_get_value, mock_build_combined, mock_get_doc
 	):
 		mock_get_value.side_effect = lambda doctype, name, fieldname=None, **kwargs: {
 			("URY Table", "T-01", "restaurant_room"): "Room-1",
@@ -303,28 +311,28 @@ class TestURYWaiterPrint(FrappeTestCase):
 		mock_build_combined.return_value = combined_doc
 
 		print_combined_waiter_order_slip("INV-001", ["KOT-1"], "T-01")
-		mock_print_by_server.assert_not_called()
+		mock_get_doc.assert_not_called()
 
-	@patch("ury.ury.api.ury_waiter_print.print_by_server")
-	def test_skips_takeaway_tables(self, mock_print_by_server):
+	@patch("ury.ury.api.ury_waiter_print.frappe.get_doc")
+	def test_skips_takeaway_tables(self, mock_get_doc):
 		with patch(
 			"ury.ury.api.ury_waiter_print._is_takeaway_table",
 			return_value=True,
 		):
 			print_combined_waiter_order_slip("INV-001", ["KOT-1"], "T-01")
-		mock_print_by_server.assert_not_called()
+		mock_get_doc.assert_not_called()
 
-	@patch("ury.ury.api.ury_waiter_print.print_by_server")
-	def test_skips_without_restaurant_table(self, mock_print_by_server):
+	@patch("ury.ury.api.ury_waiter_print.frappe.get_doc")
+	def test_skips_without_restaurant_table(self, mock_get_doc):
 		print_combined_waiter_order_slip("INV-001", ["KOT-1"], None)
-		mock_print_by_server.assert_not_called()
+		mock_get_doc.assert_not_called()
 
-	@patch("ury.ury.api.ury_waiter_print.print_by_server")
+	@patch("ury.ury.api.ury_waiter_print.frappe.get_doc")
 	@patch("ury.ury.api.ury_waiter_print.build_combined_kot_doc")
 	@patch("ury.ury.api.ury_waiter_print.frappe.db.get_value")
 	@patch("ury.ury.api.ury_waiter_print.frappe.get_all")
 	def test_skips_when_no_waiter_printers(
-		self, mock_get_all, mock_get_value, mock_build_combined, mock_print_by_server
+		self, mock_get_all, mock_get_value, mock_build_combined, mock_get_doc
 	):
 		mock_get_value.side_effect = lambda doctype, name, fieldname=None, **kwargs: {
 			("URY Table", "T-01", "restaurant_room"): "Room-1",
@@ -334,15 +342,15 @@ class TestURYWaiterPrint(FrappeTestCase):
 		mock_build_combined.return_value = MagicMock(kot_items=[1])
 
 		print_combined_waiter_order_slip("INV-001", ["KOT-1"], "T-01")
-		mock_print_by_server.assert_not_called()
+		mock_get_doc.assert_not_called()
 
 	@patch("ury.ury.api.ury_waiter_print.frappe.log_error")
-	@patch("ury.ury.api.ury_waiter_print.print_by_server")
+	@patch("ury.ury.api.ury_waiter_print.frappe.get_doc")
 	@patch("ury.ury.api.ury_waiter_print.build_combined_kot_doc")
 	@patch("ury.ury.api.ury_waiter_print.frappe.db.get_value")
 	@patch("ury.ury.api.ury_waiter_print.frappe.get_all")
 	def test_skips_when_printer_format_not_set(
-		self, mock_get_all, mock_get_value, mock_build_combined, mock_print_by_server, mock_log_error
+		self, mock_get_all, mock_get_value, mock_build_combined, mock_get_doc, mock_log_error
 	):
 		mock_get_value.side_effect = lambda doctype, name, fieldname=None, **kwargs: {
 			("URY Table", "T-01", "restaurant_room"): "Room-1",
@@ -352,11 +360,11 @@ class TestURYWaiterPrint(FrappeTestCase):
 		mock_build_combined.return_value = MagicMock(kot_items=[1])
 
 		print_combined_waiter_order_slip("INV-001", ["KOT-1"], "T-01")
-		mock_print_by_server.assert_not_called()
+		mock_get_doc.assert_not_called()
 		mock_log_error.assert_called_once()
 
 	@patch("ury.ury.api.ury_waiter_print.frappe.log_error")
-	@patch("ury.ury.api.ury_waiter_print.print_by_server")
+	@patch("ury.ury.api.ury_waiter_print.frappe.get_doc")
 	@patch("ury.ury.api.ury_waiter_print.build_combined_kot_doc")
 	@patch("ury.ury.api.ury_waiter_print.frappe.db.get_value")
 	@patch("ury.ury.api.ury_waiter_print.frappe.get_all")
@@ -367,7 +375,7 @@ class TestURYWaiterPrint(FrappeTestCase):
 		mock_get_all,
 		mock_get_value,
 		mock_build_combined,
-		mock_print_by_server,
+		mock_get_doc,
 		mock_log_error,
 	):
 		mock_exists.return_value = False
@@ -379,11 +387,11 @@ class TestURYWaiterPrint(FrappeTestCase):
 		mock_build_combined.return_value = MagicMock(kot_items=[1])
 
 		print_combined_waiter_order_slip("INV-001", ["KOT-1"], "T-01")
-		mock_print_by_server.assert_not_called()
+		mock_get_doc.assert_not_called()
 		mock_log_error.assert_called_once()
 
 	@patch("ury.ury.api.ury_waiter_print.frappe.log_error")
-	@patch("ury.ury.api.ury_waiter_print.print_by_server")
+	@patch("ury.ury.api.ury_waiter_print.frappe.get_doc")
 	@patch("ury.ury.api.ury_waiter_print.build_combined_kot_doc")
 	@patch("ury.ury.api.ury_waiter_print.frappe.db.get_value")
 	@patch("ury.ury.api.ury_waiter_print.frappe.get_all")
@@ -394,7 +402,7 @@ class TestURYWaiterPrint(FrappeTestCase):
 		mock_get_all,
 		mock_get_value,
 		mock_build_combined,
-		mock_print_by_server,
+		mock_get_doc,
 		mock_log_error,
 	):
 		mock_exists.return_value = True
@@ -407,7 +415,7 @@ class TestURYWaiterPrint(FrappeTestCase):
 		mock_build_combined.return_value = MagicMock(kot_items=[1])
 
 		print_combined_waiter_order_slip("INV-001", ["KOT-1"], "T-01")
-		mock_print_by_server.assert_not_called()
+		mock_get_doc.assert_not_called()
 		mock_log_error.assert_called_once()
 
 	@patch("ury.ury.api.ury_waiter_print.print_combined_waiter_order_slip")
@@ -454,16 +462,25 @@ class TestURYWaiterPrint(FrappeTestCase):
 			"T-01",
 		)
 
-	@patch("ury.ury.api.ury_kot_reprint.print_by_server")
-	def test_kot_reprint_does_not_call_waiter_print(self, mock_print_by_server):
+	@patch("ury.ury.api.ury_kot_reprint.frappe.get_doc")
+	def test_kot_reprint_does_not_call_waiter_print(self, mock_get_doc):
 		from ury.ury.api.ury_kot_reprint import print_kot
 
+		printer_doc = MagicMock()
+		mock_get_doc.return_value = printer_doc
+
 		print_kot("Reprint Printer", "INV-001", "Reprint Format")
-		mock_print_by_server.assert_called_once_with(
-			"POS Invoice",
-			"INV-001",
-			"Reprint Printer",
-			"Reprint Format",
+		mock_get_doc.assert_called_once_with("Network Printer Settings", "Reprint Printer")
+		printer_doc.print_doc.assert_called_once_with(
+			doctype="POS Invoice",
+			name="INV-001",
+			print_format="Reprint Format",
+			job_type="KOT_REPRINT",
+			extra_metadata={
+				"invoice": "INV-001",
+				"restaurant_table": None,
+				"order_type": None,
+			},
 		)
 
 	def test_waiter_format_excludes_pricing_sections(self):
