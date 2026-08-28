@@ -29,6 +29,16 @@ interface NotificationItem {
   read: boolean;
 }
 
+/**
+ * Frappe's Notification Log stores `email_content` as HTML (built for email
+ * rendering). Strip tags for the compact drawer preview instead of trusting
+ * dangerouslySetInnerHTML on system-generated content.
+ */
+function stripHtml(html: string): string {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  return (doc.body.textContent || '').replace(/\s+/g, ' ').trim();
+}
+
 
 
 export const Header: React.FC = () => {
@@ -90,7 +100,7 @@ export const Header: React.FC = () => {
           const mapped = res.message.map((n: any) => ({
             id: n.name,
             title: n.subject || 'Notification',
-            message: n.email_content || '',
+            message: stripHtml(n.email_content || ''),
             timestamp: n.creation || '',
             type: 'info',
             read: !!n.read
