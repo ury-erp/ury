@@ -57,10 +57,23 @@ export const BranchProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setIsLoading(true);
       try {
         const res = await call<any>('ury.ury.api.minimal.business_setup.get_branches');
+        let fetched: Branch[] = [];
         if (res && Array.isArray(res)) {
-          setBranches(res);
+          fetched = res;
         } else if (res?.message && Array.isArray(res.message)) {
-          setBranches(res.message);
+          fetched = res.message;
+        }
+        setBranches(fetched);
+
+        // Default to the single branch instead of "All Branches" when
+        // there's only one -- most branch-scoped pages (Sales Plan,
+        // Department Stock, availability) require a specific branch to do
+        // anything useful, and "all" is never a meaningful choice for a
+        // single-branch deployment. Only applies when nothing was already
+        // explicitly chosen (no stored preference yet).
+        const hasStoredChoice = localStorage.getItem('ury_active_branch_id');
+        if (!hasStoredChoice && fetched.length === 1) {
+          setActiveBranchId(fetched[0].id);
         }
       } catch {
         // Handle error without fallback

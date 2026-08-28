@@ -129,6 +129,18 @@ export const SalesPlanPage: React.FC = () => {
     setError(null);
     setHistoryScope(null);
 
+    if (!activeBranchId || activeBranchId === 'all') {
+      // Sales Plan is inherently branch-scoped -- there is no meaningful
+      // "all branches" plan. Fail closed with a clear, actionable message
+      // instead of calling the API and surfacing its generic error.
+      setItems([]);
+      setError('Select a specific branch above to view or edit its Sales Plan.');
+      setLoading(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+
     (async () => {
       try {
         const history = await salesPlanService.getComparableHistory({
