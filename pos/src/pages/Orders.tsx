@@ -468,16 +468,16 @@ export default function Orders() {
                       </div>
 
                       {/* Total - pushed to bottom like MenuCard */}
-                      <div className="mt-auto pt-2 flex items-center justify-between">
+                      <div className="mt-auto pt-2.5 flex items-center justify-between border-t border-gray-100">
                         <span className="text-sm font-semibold text-gray-900 tabular-nums">
                           {formatCurrency(cardTotal)}
                         </span>
                         <button
                           type="button"
-                          className={`inline-flex items-center justify-center rounded-md p-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
+                          className={`inline-flex items-center justify-center rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${
                             isFailed
-                              ? 'text-red-600 hover:bg-red-50'
-                              : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'
+                              ? 'text-red-600 bg-red-50 hover:bg-red-100 border border-red-200'
+                              : 'text-gray-400 bg-gray-50/80 hover:bg-gray-100 hover:text-gray-700 border border-gray-100'
                           }`}
                           aria-label={`View print jobs for ${order.name}`}
                           title={isFailed ? 'Print failed - click to view details' : 'View print jobs'}
@@ -487,7 +487,7 @@ export default function Orders() {
                             setPrintJobsModalOpen(true);
                           }}
                         >
-                          <ScrollText className="w-4 h-4" />
+                          <ScrollText className="w-5 h-5" />
                         </button>
                       </div>
                     </div>
