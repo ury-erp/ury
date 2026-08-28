@@ -8,6 +8,10 @@ import { call } from '@ury/core';
  * whitelisted list/report functions this task expects V3-31/V3-32 to
  * expose; see the final report for whether they are actually
  * `@frappe.whitelist()`-decorated today.
+ *
+ * V3-33 (wastage) and issue authorization creation additions: these call
+ * the real whitelisted mutating endpoints in `ury.ury.api.ury_wastage` and
+ * `ury.ury.api.ury_issue_authorization.create_issue_authorization`.
  */
 
 export interface IssueAuthorizationRow {
@@ -92,6 +96,68 @@ export interface DepartmentOption {
   department_name: string;
 }
 
+export type WastageReasonCategory = 'Spoilage' | 'Preparation Error' | 'Dropped/Damaged' | 'Expired' | 'Other';
+
+/** Mirrors `ury.ury.api.ury_wastage.REASON_CATEGORIES` exactly. */
+export const WASTAGE_REASON_CATEGORIES: WastageReasonCategory[] = [
+  'Spoilage',
+  'Preparation Error',
+  'Dropped/Damaged',
+  'Expired',
+  'Other',
+];
+
+export interface WastageRow {
+  name: string;
+  component_item: string;
+  wasted_qty: number;
+  status: string;
+  department: string;
+  branch?: string;
+  company?: string;
+  valuation_rate?: number;
+  valuation_amount?: number;
+}
+
+export interface WastageFilters {
+  branch?: string;
+  company?: string;
+  department: string;
+  from_date: string;
+  to_date: string;
+}
+
+export interface CaptureWastageParams {
+  issue_authorization: string;
+  wasted_qty: number;
+  reason_category: WastageReasonCategory;
+  reason_notes?: string;
+  branch?: string;
+  company?: string;
+}
+
+export interface CreateIssueAuthorizationParams {
+  plan: string;
+  department: string;
+  component_item: string;
+  requested_qty: number;
+  branch?: string;
+  company?: string;
+  production_unit?: string;
+}
+
+const normalizeWastage = (row: any): WastageRow => ({
+  name: String(row.name || ''),
+  component_item: String(row.component_item || ''),
+  wasted_qty: Number(row.wasted_qty ?? 0),
+  status: String(row.status || ''),
+  department: String(row.department || ''),
+  branch: row.branch,
+  company: row.company,
+  valuation_rate: row.valuation_rate !== undefined ? Number(row.valuation_rate) : undefined,
+  valuation_amount: row.valuation_amount !== undefined ? Number(row.valuation_amount) : undefined,
+});
+
 export const departmentStockService = {
   /**
    * Lists `URY Production Department` records for a branch, for populating
@@ -143,5 +209,66 @@ export const departmentStockService = {
       to_date: filters.to_date,
     });
     return normalizeList<any>(res).map(normalizeStockMovement);
+  },
+
+  /**
+   * Lists `URY Issue Wastage` records for a branch/department/date range.
+   * Read-only: no wastage is captured, approved, or rejected by this call.
+   */
+  async listWastage(filters: WastageFilters): Promise<WastageRow[]> {
+    const res = await call<any>('ury.ury.api.ury_wastage.list_wastage', {
+      branch: filters.branch === 'all' ? undefined : filters.branch,
+      company: filters.company,
+      department: filters.department,
+      from_date: filters.from_date,
+      to_date: filters.to_date,
+    });
+    return normalizeList<any>(res).map(normalizeWastage);
+  },
+
+  /**
+   * Captures (creates) a Draft `URY Issue Wastage` record against an
+   * Authorized `URY Issue Authorization`. Draft rows never reduce
+   * entitlement -- they only start counting once explicitly approved.
+   */
+  async captureWastage(params: CaptureWastageParams): Promise<WastageRow> {
+    const res = await call<any>('ury.ury.api.ury_wastage.capture_wastage', {
+      issue_authorization: params.issue_authorization,
+      wasted_qty: params.wasted_qty,
+      reason_category: params.reason_category,
+      reason_notes: params.reason_notes,
+      branch: params.branch,
+      company: params.company,
+    });
+    return normalizeWastage((res as any)?.message ?? res);
+  },
+
+  /** Approves a Draft `URY Issue Wastage` record, flipping it to Authorized. */
+  async approveWastage(wastageName: string): Promise<WastageRow> {
+    const res = await call<any>('ury.ury.api.ury_wastage.approve_wastage', { wastage: wastageName });
+    return normalizeWastage((res as any)?.message ?? res);
+  },
+
+  /** Rejects a Draft `URY Issue Wastage` record; it never counts toward wasted_qty. */
+  async rejectWastage(wastageName: string): Promise<WastageRow> {
+    const res = await call<any>('ury.ury.api.ury_wastage.reject_wastage', { wastage: wastageName });
+    return normalizeWastage((res as any)?.message ?? res);
+  },
+
+  /**
+   * Creates a new `URY Issue Authorization` against an approved Sales
+   * Plan's frozen demand for one component/department.
+   */
+  async createIssueAuthorization(params: CreateIssueAuthorizationParams): Promise<IssueAuthorizationRow> {
+    const res = await call<any>('ury.ury.api.ury_issue_authorization.create_issue_authorization', {
+      plan: params.plan,
+      department: params.department,
+      component_item: params.component_item,
+      requested_qty: params.requested_qty,
+      branch: params.branch,
+      company: params.company,
+      production_unit: params.production_unit,
+    });
+    return normalizeIssueAuthorization((res as any)?.message ?? res);
   },
 };

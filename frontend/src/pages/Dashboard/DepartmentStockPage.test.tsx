@@ -21,6 +21,11 @@ vi.mock('../../services/departmentStock', async (importOriginal) => {
       ]),
       listIssueAuthorizations: vi.fn(),
       listStockMovements: vi.fn(),
+      listWastage: vi.fn(),
+      captureWastage: vi.fn(),
+      approveWastage: vi.fn(),
+      rejectWastage: vi.fn(),
+      createIssueAuthorization: vi.fn(),
     },
   };
 });
@@ -69,9 +74,20 @@ const movementRows = [
   },
 ];
 
-const grantAccess = () => {
+const wastageRows = [
+  {
+    name: 'IW-0001',
+    component_item: 'RAW-CHICKEN',
+    wasted_qty: 5,
+    status: 'Draft',
+    department: 'Indian',
+    branch: 'Kozhikode',
+  },
+];
+
+const grantAccess = (roles: string[] = ['Production Manager']) => {
   mockGetLoggedUser.mockResolvedValue('manager@ury.test');
-  mockGetUserRoles.mockResolvedValue({ roles: ['Production Manager'], full_name: 'Test Manager' });
+  mockGetUserRoles.mockResolvedValue({ roles, full_name: 'Test Manager' });
 };
 
 describe('DepartmentStockPage', () => {
@@ -79,6 +95,7 @@ describe('DepartmentStockPage', () => {
     cleanup();
     vi.mocked(departmentStockService.listIssueAuthorizations).mockResolvedValue(authorizationRows as any);
     vi.mocked(departmentStockService.listStockMovements).mockResolvedValue(movementRows as any);
+    vi.mocked(departmentStockService.listWastage).mockResolvedValue(wastageRows as any);
     mockGetLoggedUser.mockReset();
     mockGetUserRoles.mockReset();
   });
@@ -114,7 +131,8 @@ describe('DepartmentStockPage', () => {
     grantAccess();
     render(<DepartmentStockPage />);
 
-    await userEvent.selectOptions(await screen.findByLabelText('Department'), 'Indian');
+    await screen.findByRole('option', { name: 'Indian' });
+    await userEvent.selectOptions(screen.getByLabelText('Department'), 'Indian');
 
     expect(await screen.findByText('PLAN-0001')).toBeInTheDocument();
     expect(screen.getByText('Chicken (Raw)')).toBeInTheDocument();
@@ -127,10 +145,12 @@ describe('DepartmentStockPage', () => {
     grantAccess();
     vi.mocked(departmentStockService.listIssueAuthorizations).mockResolvedValue([]);
     vi.mocked(departmentStockService.listStockMovements).mockResolvedValue([]);
+    vi.mocked(departmentStockService.listWastage).mockResolvedValue([]);
 
     render(<DepartmentStockPage />);
 
-    await userEvent.selectOptions(await screen.findByLabelText('Department'), 'Indian');
+    await screen.findByRole('option', { name: 'Indian' });
+    await userEvent.selectOptions(screen.getByLabelText('Department'), 'Indian');
 
     expect(
       await screen.findByText('No issue authorizations found for this department and date range.'),
@@ -138,18 +158,55 @@ describe('DepartmentStockPage', () => {
     expect(
       screen.getByText('No transfers, receipts, or returns found for this department and date range.'),
     ).toBeInTheDocument();
+    expect(
+      screen.getByText('No wastage records found for this department and date range.'),
+    ).toBeInTheDocument();
   });
 
-  it('renders no mutation controls (create/approve/authorize/transfer buttons)', async () => {
-    grantAccess();
+  it('shows capture wastage and request authorization controls for a Production Manager', async () => {
+    grantAccess(['Production Manager']);
     render(<DepartmentStockPage />);
 
-    await userEvent.selectOptions(await screen.findByLabelText('Department'), 'Indian');
+    await screen.findByRole('option', { name: 'Indian' });
+    await userEvent.selectOptions(screen.getByLabelText('Department'), 'Indian');
     await screen.findByText('PLAN-0001');
 
-    const buttons = screen.queryAllByRole('button');
-    const mutationLabelPattern = /create|approve|authorize|transfer|receive|return|save|submit|issue/i;
-    const mutationButtons = buttons.filter((button) => mutationLabelPattern.test(button.textContent || ''));
-    expect(mutationButtons).toHaveLength(0);
+    expect(screen.getByRole('button', { name: 'Request Authorization' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Capture Wastage' })).toBeInTheDocument();
+    // Production Manager is not in APPROVE_ROLES, so no approve/reject controls.
+    expect(screen.queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Reject' })).not.toBeInTheDocument();
+  });
+
+  it('shows approve/reject controls for a Stock Manager and calls the service on click', async () => {
+    grantAccess(['Stock Manager']);
+    vi.mocked(departmentStockService.approveWastage).mockResolvedValue(wastageRows[0] as any);
+    render(<DepartmentStockPage />);
+
+    await screen.findByRole('option', { name: 'Indian' });
+    await userEvent.selectOptions(screen.getByLabelText('Department'), 'Indian');
+    const approveButton = await screen.findByRole('button', { name: 'Approve' });
+    await userEvent.click(approveButton);
+
+    await waitFor(() => expect(departmentStockService.approveWastage).toHaveBeenCalledWith('IW-0001'));
+  });
+
+  it('submits a capture wastage form calling captureWastage with the expected params', async () => {
+    grantAccess(['Production Manager']);
+    vi.mocked(departmentStockService.captureWastage).mockResolvedValue({} as any);
+    render(<DepartmentStockPage />);
+
+    await screen.findByRole('option', { name: 'Indian' });
+    await userEvent.selectOptions(screen.getByLabelText('Department'), 'Indian');
+    await userEvent.click(await screen.findByRole('button', { name: 'Capture Wastage' }));
+
+    await userEvent.type(screen.getByLabelText('Wasted quantity'), '2');
+    await userEvent.click(screen.getByRole('button', { name: 'Submit Wastage' }));
+
+    await waitFor(() =>
+      expect(departmentStockService.captureWastage).toHaveBeenCalledWith(
+        expect.objectContaining({ issue_authorization: 'IA-0001', wasted_qty: 2 }),
+      ),
+    );
   });
 });
