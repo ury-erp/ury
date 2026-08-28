@@ -172,3 +172,23 @@ class TestURYSalesPlanEndpoints(FrappeTestCase):
         result = get_plan(created["name"])
         self.assertEqual(result["name"], created["name"])
         self.assertEqual(result["status"], "Draft")
+
+    def test_get_plan_status_returns_status_for_existing_plan(self):
+        from ury.ury.api.ury_sales_plan import get_plan_status, save_draft
+
+        created = save_draft(
+            plan_date=self.plan_date,
+            branch=self.branch,
+            company=self.company,
+            items=[{"item_code": "MTPL", "qty": 5}],
+        )
+        result = get_plan_status(branch=self.branch, plan_date=self.plan_date)
+        self.assertEqual(result["name"], created["name"])
+        self.assertEqual(result["status"], "Draft")
+
+    def test_get_plan_status_returns_none_when_no_plan_exists(self):
+        from ury.ury.api.ury_sales_plan import get_plan_status
+
+        result = get_plan_status(branch=self.branch, plan_date="2099-01-01")
+        self.assertIsNone(result["name"])
+        self.assertIsNone(result["status"])

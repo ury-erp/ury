@@ -165,3 +165,22 @@ def get_plan(name):
         frappe.throw(_("Not permitted to read this Sales Plan"), frappe.PermissionError)
 
     return frappe.get_doc("URY Sales Plan", name).as_dict()
+
+
+@frappe.whitelist(methods=["GET"])
+def get_plan_status(branch, plan_date):
+    """Look up the (at most one, non-cancelled in normal operation) Sales Plan
+    for a branch+date scope without needing its name up front."""
+    if not frappe.has_permission("URY Sales Plan", "read"):
+        frappe.throw(_("Not permitted to read Sales Plans"), frappe.PermissionError)
+
+    rows = frappe.get_all(
+        "URY Sales Plan",
+        filters={"branch": branch, "plan_date": plan_date},
+        fields=["name", "status"],
+        order_by="modified desc",
+        limit=1,
+    )
+    if not rows:
+        return {"name": None, "status": None}
+    return {"name": rows[0]["name"], "status": rows[0]["status"]}
