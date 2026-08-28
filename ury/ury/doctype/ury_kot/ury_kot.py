@@ -52,7 +52,6 @@ class URYKOT(Document):
             pos_profile_doc = frappe.get_doc("POS Profile", self.pos_profile)
             if any(role.role in user_roles for role in pos_profile_doc.role_allowed_for_billing):
                 is_cashier_update = True
-                frappe.log_error(message="is_cashier_update True", title="Print Fail")
 
         pos_print_flag = True
         if self.production:
@@ -92,7 +91,7 @@ class URYKOT(Document):
                             pos_print_flag = False
                             print_kot(printer.printer, printer.custom_kot_print_format)
 
-                    if pos_print_flag == True or is_cashier_update:
+                    if pos_print_flag:
                         if pos_kot_printers:
                             for printer in pos_kot_printers:
                                 print_kot(printer.printer, printer.custom_kot_print_format)
@@ -101,6 +100,12 @@ class URYKOT(Document):
                     if pos_kot_printers:
                         for printer in pos_kot_printers:
                             print_kot(printer.printer, printer.custom_kot_print_format)
+
+        # Print customer copy at POS Profile printer when cashier updates a table order
+        if is_cashier_update:
+            if pos_kot_printers:
+                for printer in pos_kot_printers:
+                    print_kot(printer.printer, printer.custom_kot_print_format)
 
     # Function for displaying KOT-related information in real-time On KDS(Kitchen Display System)
     def kotDisplayRealtime(self):
