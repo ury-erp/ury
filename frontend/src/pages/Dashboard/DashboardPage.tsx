@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Card, Spinner } from '@ury/ui';
 import { useBranchContext } from '../../context/BranchContext';
 import {
@@ -68,6 +69,48 @@ const formatVsBaseline = (todaysSales: number | undefined, medianSales: number |
   if (!Number.isFinite(pct)) return '—';
   const rounded = Math.round(pct);
   return `${rounded >= 0 ? '+' : ''}${rounded}%`;
+};
+
+// Maps a needs-attention item to where the user should go to act on it.
+// Some targets live in this app (react-router `to`), others live in a
+// sibling SPA (`pos`) that we can only reach via a full page href since
+// there is no shared router between apps.
+interface AttentionLinkTarget {
+  kind: 'internal' | 'external';
+  to: string;
+  label: string;
+  note?: string;
+}
+
+const getAttentionLinkTarget = (item: NeedsAttentionItem): AttentionLinkTarget | null => {
+  switch (item.type) {
+    case 'kot_errors':
+      return { kind: 'internal', to: '/kot-error-log', label: 'View KOT error log' };
+    case 'table_occupied_long':
+      return {
+        kind: 'internal',
+        to: '/table',
+        label: 'View tables',
+        note: 'Opens table setup — a per-table live view is not available yet.',
+      };
+    case 'unclosed_pos_session':
+      return { kind: 'external', to: '/pos/open-entries', label: 'View open POS sessions' };
+    case 'pending_payment':
+      return {
+        kind: 'external',
+        to: '/pos/open-entries',
+        label: 'View POS sessions',
+        note: 'A dedicated pending-payments view is not available yet — this opens open POS sessions.',
+      };
+    default:
+      return null;
+  }
+};
+
+const referenceCountLabel = (item: NeedsAttentionItem): string | null => {
+  const count = item.reference?.names?.length;
+  if (!count) return null;
+  return `${count} record${count === 1 ? '' : 's'}`;
 };
 
 export const DashboardPage: React.FC = () => {
@@ -153,21 +196,63 @@ export const DashboardPage: React.FC = () => {
             <p className="text-sm text-gray-700">{buildSummaryLine(needsAttention)}</p>
           </Card>
 
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2">
             <Card className="p-4">
-              <p className="text-xs font-medium uppercase text-gray-500">Vs. Baseline</p>
+              <p className="text-xs font-medium text-gray-500">Vs. Baseline</p>
               <p className="mt-1 text-2xl font-semibold text-gray-900">{vsBaseline}</p>
             </Card>
             <Card className="p-4">
-              <p className="text-xs font-medium uppercase text-gray-500">Plan Status</p>
+              <p className="text-xs font-medium text-gray-500">Plan Status</p>
               <p className="mt-1 text-2xl font-semibold text-gray-900">{planStatusLabel}</p>
             </Card>
-            <Card className="p-4">
-              <p className="text-xs font-medium uppercase text-gray-500">Issue Progress</p>
-              <p className="mt-1 text-2xl font-semibold text-gray-900">—</p>
-              <p className="mt-1 text-xs text-gray-400">Not yet available</p>
-            </Card>
           </div>
+
+          <Card className="p-4">
+            <p className="text-sm font-medium text-gray-700">Needs Attention</p>
+            {needsAttention.length === 0 ? (
+              <p className="mt-2 text-sm text-gray-500">
+                No issues right now — service is running smoothly.
+              </p>
+            ) : (
+              <ul className="mt-3 divide-y divide-gray-100">
+                {needsAttention.map((item, index) => {
+                  const target = getAttentionLinkTarget(item);
+                  const countLabel = referenceCountLabel(item);
+                  return (
+                    <li
+                      key={`${item.type}-${index}`}
+                      className="flex flex-col gap-1 py-3 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div>
+                        <p className="text-sm text-gray-800">
+                          {item.message}
+                          {countLabel ? <span className="text-gray-400"> · {countLabel}</span> : null}
+                        </p>
+                        {target?.note ? <p className="mt-0.5 text-xs text-gray-400">{target.note}</p> : null}
+                      </div>
+                      {target ? (
+                        target.kind === 'internal' ? (
+                          <Link
+                            to={target.to}
+                            className="text-sm font-medium text-blue-600 hover:text-blue-700 hover:underline"
+                          >
+                            {target.label}
+                          </Link>
+                        ) : (
+                          <a
+                            href={target.to}
+                            className="text-sm font-medium text-blue-600 hover:text-blue-700 hover:underline"
+                          >
+                            {target.label}
+                          </a>
+                        )
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </Card>
         </>
       )}
     </div>
