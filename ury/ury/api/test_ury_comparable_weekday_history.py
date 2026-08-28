@@ -26,7 +26,16 @@ class TestComparableWeekdayHistory(FrappeTestCase):
 				"2026-09-12", "Branch A", "Company A", ["ITEM-1"]
 			)
 
-		self.assertEqual(result, [])
+		self.assertEqual(
+			result,
+			{
+				"plan_date": "2026-09-12",
+				"branch": "Branch A",
+				"company": "Company A",
+				"sample_dates": [],
+				"items": [],
+			},
+		)
 		query, params = sql.call_args.args[:2]
 		self.assertIn("pi.posting_date < %(plan_date)s", query)
 		self.assertIn("WEEKDAY(pi.posting_date) = WEEKDAY(%(plan_date)s)", query)
@@ -123,3 +132,34 @@ class TestComparableWeekdayHistory(FrappeTestCase):
 			"SUM(CASE WHEN pi.is_return = 1 THEN -ABS(pii.qty) ELSE pii.qty END) AS net_qty",
 			normalized_query,
 		)
+
+	def test_response_wraps_rows_into_expected_shape(self):
+		self._allow_history_access()
+
+		rows = [
+			{"item_code": "ITEM-1", "posting_date": "2026-09-05", "net_qty": 10},
+			{"item_code": "ITEM-1", "posting_date": "2026-08-29", "net_qty": 6},
+			{"item_code": "ITEM-2", "posting_date": "2026-09-05", "net_qty": 3},
+		]
+
+		with patch("ury.ury.api.ury_dashboard.frappe.db.sql", return_value=rows), patch(
+			"ury.ury.api.ury_dashboard.frappe.db.get_all",
+			return_value=[
+				{"item_code": "ITEM-1", "item_name": "Item One", "stock_uom": "Nos"},
+				{"item_code": "ITEM-2", "item_name": "Item Two", "stock_uom": "Nos"},
+			],
+		):
+			result = get_comparable_weekday_history("2026-09-12", "Branch A", "Company A")
+
+		self.assertEqual(result["plan_date"], "2026-09-12")
+		self.assertEqual(result["branch"], "Branch A")
+		self.assertEqual(result["company"], "Company A")
+		self.assertEqual(result["sample_dates"], ["2026-08-29", "2026-09-05"])
+		self.assertEqual(len(result["items"]), 2)
+
+		item_one = next(i for i in result["items"] if i["item_code"] == "ITEM-1")
+		self.assertEqual(item_one["item_name"], "Item One")
+		self.assertEqual(item_one["sample_days"], 2)
+		self.assertEqual(item_one["total_qty"], 16)
+		self.assertEqual(item_one["average_qty"], 8)
+		self.assertEqual(len(item_one["history"]), 2)

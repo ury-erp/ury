@@ -77,7 +77,64 @@ def get_comparable_weekday_history(plan_date, branch, company=None, items=None):
 		as_dict=True,
 	)
 
-	return rows
+	return _wrap_comparable_weekday_history(plan_date, branch, company, rows)
+
+
+def _wrap_comparable_weekday_history(plan_date, branch, company, rows):
+	"""Reshape flat (item_code, posting_date, net_qty) rows into the
+	per-item averaged payload the frontend's ``normalizeHistoryResponse``
+	expects: ``{plan_date, branch, company, sample_dates, items}``.
+	"""
+	items_by_code = {}
+	sample_dates = set()
+
+	for row in rows:
+		item_code = row["item_code"]
+		posting_date = row["posting_date"]
+		net_qty = row["net_qty"] or 0
+		sample_dates.add(str(posting_date))
+
+		entry = items_by_code.setdefault(
+			item_code,
+			{"item_code": item_code, "total_qty": 0, "history": []},
+		)
+		entry["total_qty"] += net_qty
+		entry["history"].append({"date": str(posting_date), "qty": net_qty})
+
+	item_codes = list(items_by_code.keys())
+	item_meta = {}
+	if item_codes:
+		for meta in frappe.db.get_all(
+			"Item",
+			filters={"item_code": ["in", item_codes]},
+			fields=["item_code", "item_name", "stock_uom"],
+		):
+			item_meta[meta["item_code"]] = meta
+
+	items = []
+	for item_code, entry in items_by_code.items():
+		sample_days = len(entry["history"])
+		average_qty = (entry["total_qty"] / sample_days) if sample_days else 0
+		meta = item_meta.get(item_code, {})
+		items.append({
+			"item_code": item_code,
+			"item_name": meta.get("item_name") or item_code,
+			"stock_uom": meta.get("stock_uom") or "Nos",
+			"department": None,
+			"production_unit": None,
+			"average_qty": average_qty,
+			"sample_days": sample_days,
+			"total_qty": entry["total_qty"],
+			"history": entry["history"],
+		})
+
+	return {
+		"plan_date": plan_date,
+		"branch": branch,
+		"company": company,
+		"sample_dates": sorted(sample_dates),
+		"items": items,
+	}
 
 
 @frappe.whitelist(methods=["GET"])
