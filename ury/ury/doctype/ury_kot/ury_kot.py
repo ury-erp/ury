@@ -45,6 +45,14 @@ class URYKOT(Document):
             filters={"parent": self.pos_profile, "custom_kot_print": 1, "parenttype": "POS Profile"},
             order_by="idx",
         )
+    
+        is_cashier_update = False
+        if self.type != "New Order" and self.pos_profile and self.table_takeaway == 0:
+            user_roles = frappe.get_roles()
+            pos_profile_doc = frappe.get_doc("POS Profile", self.pos_profile)
+            if any(role.role in user_roles for role in pos_profile_doc.role_allowed_for_billing):
+                is_cashier_update = True
+                frappe.log_error(message="is_cashier_update True", title="Print Fail")
 
         pos_print_flag = True
         if self.production:
@@ -84,7 +92,7 @@ class URYKOT(Document):
                             pos_print_flag = False
                             print_kot(printer.printer, printer.custom_kot_print_format)
 
-                    if pos_print_flag:
+                    if pos_print_flag == True or is_cashier_update:
                         if pos_kot_printers:
                             for printer in pos_kot_printers:
                                 print_kot(printer.printer, printer.custom_kot_print_format)

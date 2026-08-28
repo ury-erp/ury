@@ -12,7 +12,7 @@ import { DINE_IN } from '../data/order-types';
 import { captainTransfer, getTableOrder, tableTransfer } from '../lib/order-api';
 import { printOrder } from '../lib/print';
 import { resolvePrintFormat } from '../lib/invoice-api';
-import { canCaptainTransfer } from '@ury/core';
+import { canCaptainTransfer, isUserRestrictedFromTableOrders } from '@ury/core';
 import { showToast } from '@ury/ui';
 import { t } from '../i18n';
 import LayoutView from '../components/LayoutView';
@@ -28,6 +28,7 @@ const TableView = () => {
   const { posProfile, setSelectedTable, setSelectedOrderType } = usePOSStore();
   const user = useRootStore((state) => state.user);
   const showCaptainTransfer = canCaptainTransfer(user, posProfile);
+  const isRestricted = isUserRestrictedFromTableOrders(user, posProfile);
 
   const branch = posProfile?.branch ?? null;
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -378,6 +379,7 @@ const TableView = () => {
       onPreview={(event) => handlePreviewTable(table, event)}
       onPrint={(event) => handlePrintTable(table, event)}
       isPrinting={printingTable === table.name}
+      isRestricted={isRestricted}
     />
     );
   };
