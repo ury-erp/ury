@@ -12,6 +12,7 @@ import { PosProfilePage } from './pages/Dashboard/PosProfilePage';
 import { UserPage } from './pages/Dashboard/UserPage';
 import { BranchPage } from './pages/Dashboard/BranchPage';
 import { ReportSettingsPage } from './pages/Dashboard/ReportSettingsPage';
+import { SelfOrderingProfilePage } from './pages/Dashboard/SelfOrderingProfilePage';
 import ProductionUnitPage from './pages/Dashboard/ProductionUnitPage';
 import ProductionDepartmentPage from './pages/Dashboard/ProductionDepartmentPage';
 import ItemProductionConfigPage from './pages/Dashboard/ItemProductionConfigPage';
@@ -134,6 +135,7 @@ function App() {
           <Route path="user" element={<UserPage />} />
           <Route path="branch" element={<BranchPage />} />
           <Route path="report-settings" element={<ReportSettingsPage />} />
+          <Route path="self-ordering-profile" element={<SelfOrderingProfilePage />} />
           <Route path="production-unit" element={<ProductionUnitPage />} />
           <Route path="production-department" element={<ProductionDepartmentPage />} />
           <Route path="item-production-config" element={<ItemProductionConfigPage />} />
