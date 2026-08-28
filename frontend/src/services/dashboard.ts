@@ -143,3 +143,69 @@ export const dashboardService = {
     }
   },
 };
+
+export interface DashboardStats {
+  todays_sales: number;
+  orders_today: number;
+  avg_order_value: number;
+  active_tables: number;
+  total_tables: number;
+}
+
+export interface NeedsAttentionItem {
+  type: string;
+  message: string;
+  severity: string;
+  reference?: string;
+}
+
+export interface BaselineStats {
+  sample_days: number;
+  median_sales: number;
+  median_covers: number;
+}
+
+export interface ShiftMetrics {
+  sales: number;
+  covers: number;
+  avg_per_cover: number;
+  avg_ticket_minutes: number;
+}
+
+export interface PlanStatus {
+  name: string | null;
+  status: string | null;
+}
+
+const unwrap = <T,>(res: unknown): T => ((res as any)?.message ?? res) as T;
+
+export const uryDashboardService = {
+  async getDashboardStats(branch?: string): Promise<DashboardStats> {
+    const res = await call.get<DashboardStats>('ury.ury.api.ury_dashboard.get_dashboard_stats', { branch });
+    return unwrap<DashboardStats>(res);
+  },
+
+  async getNeedsAttention(branch?: string): Promise<NeedsAttentionItem[]> {
+    const res = await call.get<NeedsAttentionItem[]>('ury.ury.api.ury_dashboard.get_needs_attention', { branch });
+    const unwrapped = unwrap<NeedsAttentionItem[]>(res);
+    return Array.isArray(unwrapped) ? unwrapped : [];
+  },
+
+  async getBaseline(branch?: string): Promise<BaselineStats> {
+    const res = await call.get<BaselineStats>('ury.ury.api.ury_dashboard.get_baseline', { branch });
+    return unwrap<BaselineStats>(res);
+  },
+
+  async getShiftMetrics(branch?: string): Promise<ShiftMetrics> {
+    const res = await call.get<ShiftMetrics>('ury.ury.api.ury_dashboard.get_shift_metrics', { branch });
+    return unwrap<ShiftMetrics>(res);
+  },
+
+  async getPlanStatus(branch: string, planDate: string): Promise<PlanStatus> {
+    const res = await call.get<PlanStatus>('ury.ury.api.ury_sales_plan.get_plan_status', {
+      branch,
+      plan_date: planDate,
+    });
+    return unwrap<PlanStatus>(res);
+  },
+};
