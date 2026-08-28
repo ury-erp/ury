@@ -822,7 +822,6 @@ export default function Orders() {
         open={printJobsModalOpen}
         onOpenChange={setPrintJobsModalOpen}
         invoiceId={selectedInvoiceId}
-        onRefreshFailedJobs={refreshFailedJobs}
       />
     </div>
   );

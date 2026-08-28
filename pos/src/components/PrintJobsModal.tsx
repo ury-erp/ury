@@ -1,15 +1,12 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
-import { RefreshCw } from 'lucide-react';
-import { call, db } from '@ury/core';
+import { db } from '@ury/core';
 import {
   Badge,
-  Button,
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  showToast,
   Spinner,
 } from '@ury/ui';
 import type { URYPrintJob } from '../hooks/useOrdersPrintJobs';
@@ -18,7 +15,6 @@ interface PrintJobsModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   invoiceId: string | null;
-  onRefreshFailedJobs?: () => void;
 }
 
 function getStatusBadgeVariant(status: string) {
@@ -48,12 +44,10 @@ export function PrintJobsModal({
   open,
   onOpenChange,
   invoiceId,
-  onRefreshFailedJobs,
 }: PrintJobsModalProps) {
   const [jobs, setJobs] = useState<URYPrintJob[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [retryingIds, setRetryingIds] = useState<Set<string>>(new Set());
 
   const fetchInvoiceJobs = useCallback(async () => {
     if (!invoiceId) {
@@ -111,30 +105,6 @@ export function PrintJobsModal({
     );
   }, [jobs, invoiceId]);
 
-  const handleRetry = useCallback(
-    async (jobId: string) => {
-      setRetryingIds((prev) => new Set(prev).add(jobId));
-      try {
-        await call.post('ury.ury.printing.api.retry_print_job', {
-          print_job_id: jobId,
-        });
-        showToast.success('Print job retry submitted');
-        await fetchInvoiceJobs();
-        onRefreshFailedJobs?.();
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Retry failed';
-        showToast.error(message);
-      } finally {
-        setRetryingIds((prev) => {
-          const next = new Set(prev);
-          next.delete(jobId);
-          return next;
-        });
-      }
-    },
-    [fetchInvoiceJobs, onRefreshFailedJobs]
-  );
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -172,50 +142,29 @@ export function PrintJobsModal({
 
           {invoiceJobs.length > 0 && (
             <ul className="space-y-3">
-              {invoiceJobs.map((job) => {
-                const isRetrying = retryingIds.has(job.print_job_id);
-                return (
-                  <li
-                    key={job.print_job_id}
-                    className="rounded-lg border border-gray-200 bg-gray-50/80 p-3.5"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <h3 className="font-semibold text-gray-900 text-sm leading-tight">
-                        {job.job_type || 'BILL'}
-                      </h3>
-                      <Badge variant={getStatusBadgeVariant(job.status)}>
-                        {job.status}
-                      </Badge>
-                    </div>
+              {invoiceJobs.map((job) => (
+                <li
+                  key={job.print_job_id}
+                  className="rounded-lg border border-gray-200 bg-gray-50/80 p-3.5"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="font-semibold text-gray-900 text-sm leading-tight">
+                      {job.job_type || 'BILL'}
+                    </h3>
+                    <Badge variant={getStatusBadgeVariant(job.status)}>
+                      {job.status}
+                    </Badge>
+                  </div>
 
-                    <div className="mt-1 text-xs text-gray-600">
-                      {job.printer_name || job.printer || 'Unknown printer'}
-                    </div>
+                  <div className="mt-1 text-xs text-gray-600">
+                    {job.printer_name || job.printer || 'Unknown printer'}
+                  </div>
 
-                    <div className="mt-1 text-xs text-gray-500">
-                      {formatJobTime(job.created_at)}
-                    </div>
-
-                    {job.status === 'FAILED' && (
-                      <div className="mt-3">
-                        <Button
-                          size="xs"
-                          variant="outline"
-                          onClick={() => handleRetry(job.print_job_id)}
-                          disabled={isRetrying}
-                        >
-                          <RefreshCw
-                            className={`mr-1.5 h-3.5 w-3.5 ${
-                              isRetrying ? 'animate-spin' : ''
-                            }`}
-                          />
-                          {isRetrying ? 'Retrying...' : 'Retry Print'}
-                        </Button>
-                      </div>
-                    )}
-                  </li>
-                );
-              })}
+                  <div className="mt-1 text-xs text-gray-500">
+                    {formatJobTime(job.created_at)}
+                  </div>
+                </li>
+              ))}
             </ul>
           )}
         </div>
