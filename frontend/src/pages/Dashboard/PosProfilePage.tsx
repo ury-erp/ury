@@ -22,6 +22,7 @@ interface PosProfileRecord {
   custom_reset_order_number_daily?: number;
   disabled?: number;
   applicable_for_users?: ApplicableUser[];
+  custom_checklist_items?: ChecklistItem[];
 }
 
 interface PaymentMode {
@@ -33,6 +34,13 @@ interface ApplicableUser {
   name?: string;
   user?: string;
   default?: number;
+}
+
+interface ChecklistItem {
+  name?: string;
+  item_label?: string;
+  applies_to?: 'Opening' | 'Closing' | 'Both';
+  is_mandatory?: number;
 }
 
 interface ProductionUnitRecord {
@@ -216,6 +224,7 @@ export const PosProfilePage: React.FC = () => {
         custom_reset_order_number_daily: profile.custom_reset_order_number_daily || 0,
         applicable_for_users: profile.applicable_for_users || [],
         payments: profile.payments || [],
+        custom_checklist_items: profile.custom_checklist_items || [],
       });
     } catch {
       setSelectedProfile(null);
@@ -288,6 +297,14 @@ export const PosProfilePage: React.FC = () => {
           },
         });
       }
+
+      await call('frappe.client.set_value', {
+        doctype: 'POS Profile',
+        name: selectedProfile.name,
+        fieldname: {
+          custom_checklist_items: (profileForm.custom_checklist_items || []).filter((c: any) => c.item_label),
+        },
+      });
 
       showToast.success('POS Profile saved');
       fetchProfiles();
@@ -760,6 +777,78 @@ export const PosProfilePage: React.FC = () => {
                     const newRows = (profileForm.payments || []).filter((_: any, i: number) => i !== idx);
                     setProfileForm({...profileForm, payments: newRows});
                   }}><X className="w-4 h-4" /></button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Checklist Items - Editable */}
+          <div>
+            <h4 className="font-bold text-gray-700 text-xs uppercase tracking-wider mb-3 pb-2 border-b border-gray-100">Opening/Closing Checklist Items</h4>
+            <div className="flex items-center justify-end mb-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="text-primary h-6 px-2 text-xs"
+                onClick={() => setProfileForm({
+                  ...profileForm,
+                  custom_checklist_items: [...(profileForm.custom_checklist_items || []), { item_label: '', applies_to: 'Both', is_mandatory: 1 }],
+                })}
+              >
+                + Add Item
+              </Button>
+            </div>
+            <div className="space-y-2">
+              {(profileForm.custom_checklist_items || []).length === 0 && (
+                <p className="text-xs text-gray-400">No checklist items configured. Add items required for POS opening/closing.</p>
+              )}
+              {(profileForm.custom_checklist_items || []).map((row: any, idx: number) => (
+                <div key={idx} className="flex gap-2 items-center">
+                  <Input
+                    className="flex-1"
+                    value={row.item_label || ''}
+                    placeholder="Item label"
+                    onChange={e => {
+                      const newRows = [...(profileForm.custom_checklist_items || [])];
+                      newRows[idx] = { ...newRows[idx], item_label: e.target.value };
+                      setProfileForm({ ...profileForm, custom_checklist_items: newRows });
+                    }}
+                  />
+                  <Select
+                    className="w-32"
+                    value={row.applies_to || 'Both'}
+                    onChange={e => {
+                      const newRows = [...(profileForm.custom_checklist_items || [])];
+                      newRows[idx] = { ...newRows[idx], applies_to: e.target.value };
+                      setProfileForm({ ...profileForm, custom_checklist_items: newRows });
+                    }}
+                  >
+                    <option value="Opening">Opening</option>
+                    <option value="Closing">Closing</option>
+                    <option value="Both">Both</option>
+                  </Select>
+                  <label className="flex items-center gap-1 text-xs text-gray-600 whitespace-nowrap">
+                    <input
+                      type="checkbox"
+                      checked={row.is_mandatory === 1 || row.is_mandatory === undefined}
+                      onChange={e => {
+                        const newRows = [...(profileForm.custom_checklist_items || [])];
+                        newRows[idx] = { ...newRows[idx], is_mandatory: e.target.checked ? 1 : 0 };
+                        setProfileForm({ ...profileForm, custom_checklist_items: newRows });
+                      }}
+                    /> Mandatory
+                  </label>
+                  <button
+                    type="button"
+                    className="text-gray-400 hover:text-red-500"
+                    onClick={() => {
+                      const newRows = (profileForm.custom_checklist_items || []).filter((_: any, i: number) => i !== idx);
+                      setProfileForm({ ...profileForm, custom_checklist_items: newRows });
+                    }}
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
                 </div>
               ))}
             </div>
