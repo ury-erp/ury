@@ -157,6 +157,16 @@ export interface TransitionSalesPlanParams {
   target_state: string;
 }
 
+export interface GetPlanStatusParams {
+  branch: string;
+  plan_date: string;
+}
+
+export interface GetPlanStatusResponse {
+  name: string | null;
+  status: string | null;
+}
+
 export const salesPlanService = {
   async getComparableHistory(params: LoadSalesPlanParams): Promise<ComparableHistoryResponse> {
     const res = await call.get<ComparableHistoryResponse>(
@@ -202,5 +212,13 @@ export const salesPlanService = {
       { name },
     );
     return ((res as any)?.message ?? res) as Record<string, unknown>;
+  },
+
+  async getPlanStatus(params: GetPlanStatusParams): Promise<GetPlanStatusResponse> {
+    const res = await call.get<GetPlanStatusResponse>(
+      'ury.ury.api.ury_sales_plan.get_plan_status',
+      { branch: params.branch, plan_date: params.plan_date },
+    );
+    return ((res as any)?.message ?? res) as GetPlanStatusResponse;
   },
 };
