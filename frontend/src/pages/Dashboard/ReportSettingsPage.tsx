@@ -7,7 +7,6 @@ import {
   Plus,
   Trash2,
   Save,
-  Check,
   Calculator,
   FileSpreadsheet
 } from 'lucide-react';
@@ -49,6 +48,8 @@ interface ConsumableItem {
 interface ReportSettingsData {
   name: string;
   branch: string;
+  modified?: string;
+  creation?: string;
   extended_hours?: boolean;
   hours?: number;
   buying_price_list?: string;
@@ -258,6 +259,12 @@ export const ReportSettingsPage: React.FC = () => {
     setSaving(true);
     try {
       const docToSave: any = {
+        // Spread the originally-fetched doc first so standard Frappe metadata
+        // (owner, creation, modified, docstatus, idx, etc.) round-trips correctly —
+        // frappe.client.save's set-once/optimistic-lock checks reject a payload
+        // missing any of these, and whitelisting them one at a time chases each
+        // check in turn instead of fixing the actual problem.
+        ...(reportSettingsData || {}),
         doctype: 'URY Report Settings',
         branch: branchToFetch,
         extended_hours: extendedHours,
@@ -295,6 +302,8 @@ export const ReportSettingsPage: React.FC = () => {
       if (reportSettingsData) {
         // Update existing doc
         docToSave.name = reportSettingsData.name;
+        docToSave.modified = reportSettingsData.modified;
+        docToSave.creation = reportSettingsData.creation;
         await call('frappe.client.save', { doc: docToSave });
       } else {
         // Insert new doc
@@ -302,7 +311,7 @@ export const ReportSettingsPage: React.FC = () => {
       }
 
       showToast.success('Report settings saved successfully');
-      fetchReportSettings();
+      await fetchReportSettings();
     } catch (err: any) {
       showToast.error(err.message || 'Failed to save report settings');
     } finally {

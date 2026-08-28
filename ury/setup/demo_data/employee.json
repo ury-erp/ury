@@ -1,0 +1,32 @@
+[
+    {
+        "doctype": "Employee",
+        "email": "cashier@ury.com",
+        "first_name": "URY Cashier",
+        "gender": "Male",
+        "date_of_joining": "2025-09-01",
+        "date_of_birth": "2003-02-01",
+        "status": "Active",
+        "user_id": "cashier@ury.com"
+    },
+    {
+        "doctype": "Employee",
+        "email": "captain@ury.com",
+        "first_name": "URY Captain",
+        "gender": "Female",
+        "date_of_joining": "2025-09-01",
+        "date_of_birth": "2001-01-02",
+        "status": "Active",
+        "user_id": "captain@ury.com"
+    },
+    {
+        "doctype": "Employee",
+        "email": "manager@ury.com",
+        "first_name": "URY Manager",
+        "gender": "Female",
+        "date_of_joining": "2025-09-01",
+        "date_of_birth": "2000-01-02",
+        "status": "Active",
+        "user_id": "manager@ury.com"
+    }
+]

@@ -1,9 +1,15 @@
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Button } from '@ury/ui';
 import { WizardLayout } from '../../components/setup/WizardLayout';
 import { ConfigureSidebar } from '../../components/setup/ConfigureSidebar';
 import { SectionShell } from '../../components/setup/SectionShell';
-import { ConfigureProvider, useConfigure, SECTION_ORDER, SectionId } from '../../context/ConfigureContext';
+import {
+  ConfigureProvider,
+  useConfigure,
+  SECTION_ORDER,
+  SectionId,
+} from '../../context/ConfigureContext';
 import { BranchSection } from '../../components/setup/sections/BranchSection';
 import { RoomSection } from '../../components/setup/sections/RoomSection';
 import { TableSection } from '../../components/setup/sections/TableSection';
@@ -15,38 +21,132 @@ import { call } from '@ury/core';
 import { CONFIGURE_PROGRESS_STEPS } from '../../components/setup/constants';
 import { ProgressModal } from '../../components/setup/ProgressModal';
 
-const SECTION_CONFIGS: Record<SectionId, { title: string; description: string }> = {
+const SECTION_CONFIGS: Record<
+  SectionId,
+  { title: string; description: string }
+> = {
   branch: {
     title: 'Branch Details',
-    description: 'Set up your main branch name, invoice series prefixes, and tax details.',
+    description:
+      'Set up your main branch name, invoice numbering, and tax details.',
   },
   rooms: {
-    title: 'Dining Rooms',
-    description: 'Configure dining areas and room types for your restaurant.',
+    title: 'Rooms',
+    description:
+      "Add the seating areas in your restaurant — you'll set how many tables each one has.",
   },
   tables: {
-    title: 'Tables Setup',
-    description: 'Define table numbers, seating capacities, and room assignments.',
+    title: 'Tables',
+    description:
+      'Review and adjust the tables we generated for each room — rename, adjust seats, or add more.',
   },
   menu: {
-    title: 'Menu Configuration',
-    description: 'Add menu items manually or upload a menu file template.',
+    title: 'Menu',
+    description:
+      'Add a few items to get started — you can bulk-import or add hundreds more anytime later.',
   },
   payment: {
-    title: 'Modes of Payment',
-    description: 'Configure accepted payment methods at checkout.',
+    title: 'Payments',
+    description:
+      'How your customers will pay. Cash is added by default — add Card, UPI, or others your restaurant accepts.',
   },
   users: {
-    title: 'User Accounts',
-    description: 'Set up initial staff accounts and role assignments.',
+    title: 'Staff Accounts',
+    description:
+      "Add login accounts for your staff now, or skip this and add them later. We've suggested a starting cashier account below.",
   },
 };
 
+function classifyError(err: unknown): {
+  type: 'duplicate' | 'network' | 'validation' | 'unknown';
+  msg: string;
+} {
+  if (!err) {
+    return {
+      type: 'unknown',
+      msg: 'An unknown error occurred.',
+    };
+  }
+
+  // Network / fetch failure
+  if (err instanceof TypeError) {
+    return {
+      type: 'network',
+      msg: 'Network error, check your connection and retry.',
+    };
+  }
+
+  // Parse Frappe _server_messages
+  let serverMsg = '';
+
+  if (
+    typeof err === 'object' &&
+    err !== null &&
+    '_server_messages' in err
+  ) {
+    try {
+      const parsed = JSON.parse((err as any)._server_messages);
+
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const inner =
+          typeof parsed[0] === 'string'
+            ? JSON.parse(parsed[0])
+            : parsed[0];
+
+        serverMsg = inner.message || '';
+      }
+    } catch {
+      // Ignore parse errors
+    }
+  }
+
+  // Frappe DuplicateEntryError
+  const excType: string = (err as any)?.exc_type ?? '';
+
+  if (
+    excType.includes('Duplicate') ||
+    serverMsg.toLowerCase().includes('already exists')
+  ) {
+    return {
+      type: 'duplicate',
+      msg: 'Some records already exist and have been reused.',
+    };
+  }
+
+  // Validation / mandatory field error
+  if (
+    serverMsg.toLowerCase().includes('mandatory') ||
+    serverMsg.toLowerCase().includes('required')
+  ) {
+    return {
+      type: 'validation',
+      msg: serverMsg,
+    };
+  }
+
+  const msg =
+    serverMsg ||
+    (typeof err === 'string' ? err : '') ||
+    ((err as any)?.message ?? '') ||
+    ((err as any)?.exception ?? '') ||
+    'Failed to configure setup. Check backend logs.';
+
+  return {
+    type: 'unknown',
+    msg,
+  };
+}
+
 function ConfigurePageContent() {
   const navigate = useNavigate();
+
   const [finishing, setFinishing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
+
+  // Keep the configure payload until ProgressModal confirms
+  // that the realtime listener is ready.
+  const pendingFinish = useRef<object | null>(null);
 
   const {
     activeSection,
@@ -73,28 +173,23 @@ function ConfigurePageContent() {
     }
   };
 
-  const handleFinish = async () => {
-    setFinishing(true);
-    setError(null);
-    setActiveIndex(0);
+  const doConfigureApiCall = useCallback(async () => {
+    const payload = pendingFinish.current;
 
-    const interval = setInterval(() => {
-      setActiveIndex(i => Math.min(i + 1, CONFIGURE_PROGRESS_STEPS.length - 1));
-    }, 2000);
+    if (!payload) {
+      return;
+    }
+
+    pendingFinish.current = null;
 
     try {
-      const payload = {
-        branch,
-        rooms,
-        tables,
-        menuItems,
-        taxConfig,
-        paymentMethods,
-        users,
-      };
-
       await setupService.submitConfigureData(payload);
 
+      // Setup is complete — the in-progress wizard snapshot must not
+      // survive to a later setup attempt in the same tab/session.
+      sessionStorage.removeItem('ury.setup.configureState');
+
+      // Mark setup as complete in System Settings.
       await call('frappe.client.set_value', {
         doctype: 'System Settings',
         name: 'System Settings',
@@ -102,36 +197,65 @@ function ConfigurePageContent() {
         value: 1,
       });
 
-      clearInterval(interval);
+      // Mark all steps done.
       setActiveIndex(CONFIGURE_PROGRESS_STEPS.length);
 
       setTimeout(() => {
         window.location.href = '/ury/dashboard';
       }, 800);
-    } catch (err: any) {
-      clearInterval(interval);
+    } catch (err: unknown) {
       console.error('Failed to finish configure setup', err);
-      let msg = 'Failed to configure setup. Check backend logs.';
-      if (typeof err === 'string') {
-        msg = err;
-      } else if (err?.message) {
-        msg = err.message;
-      } else if (err?._server_messages) {
-        try {
-          const parsed = JSON.parse(err._server_messages);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            const inner = typeof parsed[0] === 'string' ? JSON.parse(parsed[0]) : parsed[0];
-            msg = inner.message || msg;
-          }
-        } catch (_) {
-          msg = String(err._server_messages);
-        }
-      } else if (err?.exception) {
-        msg = err.exception;
+
+      const classified = classifyError(err);
+
+      if (classified.type === 'duplicate') {
+        // Duplicate records are non-fatal.
+        // They already exist, so continue as if setup succeeded.
+        console.warn(
+          'Duplicate record warning (non-fatal):',
+          classified.msg
+        );
+
+        setActiveIndex(CONFIGURE_PROGRESS_STEPS.length);
+
+        setTimeout(() => {
+          window.location.href = '/ury/dashboard';
+        }, 800);
+
+        return;
       }
-      setError(msg);
+
+      if (classified.type === 'network') {
+        setError(
+          'Network error, check your connection. Your data is preserved. Click "Finish with defaults" to retry.'
+        );
+      } else {
+        setError(classified.msg);
+      }
+
       setFinishing(false);
     }
+  }, []);
+
+  const handleFinish = () => {
+    const payload = {
+      branch,
+      rooms,
+      tables,
+      menuItems,
+      taxConfig,
+      paymentMethods,
+      users,
+    };
+
+    pendingFinish.current = payload;
+
+    setFinishing(true);
+    setError(null);
+    setActiveIndex(0);
+
+    // doConfigureApiCall() is triggered by ProgressModal's onReady
+    // once the realtime listener is confirmed attached.
   };
 
   const handleNext = () => {
@@ -161,23 +285,43 @@ function ConfigurePageContent() {
     }
   };
 
-  const config = SECTION_CONFIGS[activeSection] || SECTION_CONFIGS.branch;
+  const config =
+    SECTION_CONFIGS[activeSection] || SECTION_CONFIGS.branch;
 
   return (
     <WizardLayout
       step={2}
       onPrev={handlePrev}
       onNext={handleNext}
-      nextLabel={isLastSection ? "Launch" : "Next"}
+      nextLabel={isLastSection ? 'Launch' : 'Next'}
       isNextLoading={finishing}
+      secondaryAction={
+        <div className="flex items-center gap-3">
+          <span className="hidden sm:inline text-xs text-muted-foreground">
+            the data can be changed later
+          </span>
+
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={handleFinish}
+            disabled={finishing}
+          >
+            Finish with defaults
+          </Button>
+        </div>
+      }
     >
       <div className="space-y-4 h-full">
         {error && (
           <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3 text-red-700">
             <div className="flex-1 text-sm font-medium">
-              <span className="font-bold block mb-1">Configuration Error:</span>
+              <span className="font-bold block mb-1">
+                Configuration Error:
+              </span>
               {error}
             </div>
+
             <button
               onClick={() => setError(null)}
               className="text-xs text-red-500 hover:text-red-700 font-semibold underline shrink-0"
@@ -187,14 +331,18 @@ function ConfigurePageContent() {
           </div>
         )}
 
-        {/* Two-Column Grid Layout */}
-        <div className="flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-gray-200 -my-8 -mx-8 h-full">
-          <div className="w-full md:w-64 shrink-0 p-6 md:py-8 md:pl-8 md:pr-6 h-full overflow-y-auto">
+        {/* Sidebar + content — the page scrolls naturally now,
+            no fixed-height card to bleed into */}
+        <div className="flex flex-col md:flex-row gap-6 md:gap-8">
+          <div className="w-full md:w-64 shrink-0 md:sticky md:top-8 md:self-start">
             <ConfigureSidebar />
           </div>
 
-          <div className="flex-1 min-w-0 p-6 md:p-8 h-full overflow-y-auto">
-            <SectionShell title={config.title} description={config.description}>
+          <div className="flex-1 min-w-0">
+            <SectionShell
+              title={config.title}
+              description={config.description}
+            >
               {renderSection()}
             </SectionShell>
           </div>
@@ -202,11 +350,14 @@ function ConfigurePageContent() {
       </div>
 
       {finishing && (
-        <ProgressModal 
-          visible={true} 
-          activeIndex={activeIndex} 
-          error={error} 
-          steps={CONFIGURE_PROGRESS_STEPS} 
+        <ProgressModal
+          visible={true}
+          activeIndex={activeIndex}
+          error={error}
+          steps={CONFIGURE_PROGRESS_STEPS}
+          eventName="ury_configure_progress"
+          onStepChange={setActiveIndex}
+          onReady={doConfigureApiCall}
         />
       )}
     </WizardLayout>

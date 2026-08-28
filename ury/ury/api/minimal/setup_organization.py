@@ -90,6 +90,11 @@ def submit_setup(payload=None, **kwargs):
     elif isinstance(payload, str):
         payload = json.loads(payload)
         
+    user = frappe.session.user
+
+    # Step 0: Initializing restaurant company & settings
+    frappe.publish_realtime("ury_setup_progress", {"step": 0, "status": "loading"}, user=user)
+
     fy_start_date_str = payload.get("fy_start_date")
     if fy_start_date_str:
         if len(fy_start_date_str) == 5:
@@ -100,9 +105,34 @@ def submit_setup(payload=None, **kwargs):
         payload["fy_start_date"] = fy_start_dt.strftime("%Y-%m-%d")
         payload["fy_end_date"] = fy_end_dt.strftime("%Y-%m-%d")
         
+    # Step 0 complete, Step 1 loading: Configuring currency & timezone
+    frappe.publish_realtime("ury_setup_progress", {"step": 0, "status": "completed"}, user=user)
+    frappe.publish_realtime("ury_setup_progress", {"step": 1, "status": "loading"}, user=user)
+
     for field in ["admin_password", "email", "first_name", "last_name", "cmd"]:
         payload.pop(field, None)
+
+    # Step 1 complete, Step 2 loading: Setting up Chart of Accounts
+    frappe.publish_realtime("ury_setup_progress", {"step": 1, "status": "completed"}, user=user)
+    frappe.publish_realtime("ury_setup_progress", {"step": 2, "status": "loading"}, user=user)
+
     setup_complete(args=payload)
+
+    # Step 2 complete, Step 3 loading: Configuring Fiscal Year & accounting defaults
+    frappe.publish_realtime("ury_setup_progress", {"step": 2, "status": "completed"}, user=user)
+    frappe.publish_realtime("ury_setup_progress", {"step": 3, "status": "loading"}, user=user)
+
+    # Step 3 complete, Step 4 loading: Preparing POS & restaurant workspace
+    frappe.publish_realtime("ury_setup_progress", {"step": 3, "status": "completed"}, user=user)
+    frappe.publish_realtime("ury_setup_progress", {"step": 4, "status": "loading"}, user=user)
+
+    # Step 4 complete, Step 5 loading: Finalizing setup
+    frappe.publish_realtime("ury_setup_progress", {"step": 4, "status": "completed"}, user=user)
+    frappe.publish_realtime("ury_setup_progress", {"step": 5, "status": "loading"}, user=user)
+
+    # Step 5 complete
+    frappe.publish_realtime("ury_setup_progress", {"step": 5, "status": "completed"}, user=user)
+
     return {"status": "success"}
         
 @frappe.whitelist()
@@ -110,3 +140,13 @@ def complete_wizard_setup(payload=None, **kwargs):
     if payload is None:
         payload = kwargs.copy()
     return submit_setup(payload=payload)
+
+@frappe.whitelist()
+def get_wizard_status():
+    if frappe.session.user == "Guest":
+        frappe.throw("Not permitted")
+
+    return {
+        "step1_complete": bool(frappe.db.exists("Company", {})),
+        "step2_complete": bool(frappe.db.exists("Branch", {}))
+    }

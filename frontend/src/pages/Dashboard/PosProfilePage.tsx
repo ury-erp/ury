@@ -660,7 +660,7 @@ export const PosProfilePage: React.FC = () => {
                 { key: 'custom_daily_pos_close', label: 'Require Daily POS Closing', type: 'checkbox' },
                 { key: 'custom_edit_order_type', label: 'Enable Order Type Edit', type: 'checkbox' },
                 { key: 'custom_reset_order_number_daily', label: 'Reset Order Number Daily', type: 'checkbox' },
-              ].map(({ key, label, type }) => (
+              ].map(({ key, label }) => (
                 <label key={key} className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
@@ -706,7 +706,7 @@ export const PosProfilePage: React.FC = () => {
               <Button type="button" size="sm" variant="ghost" className="text-primary h-6 px-2 text-xs" onClick={() => setProfileForm({...profileForm, applicable_for_users: [...(profileForm.applicable_for_users || []), {user:'', default:0}]})}>+ Add User</Button>
             </div>
             <div className="space-y-2">
-              {(profileForm.applicable_for_users || []).map((row, idx) => (
+              {(profileForm.applicable_for_users || []).map((row: any, idx: number) => (
                 <div key={idx} className="flex gap-2 items-center">
                   <Select className="flex-1" value={row.user || ''} onChange={e => {
                     const newRows = [...(profileForm.applicable_for_users || [])];
@@ -724,7 +724,7 @@ export const PosProfilePage: React.FC = () => {
                     }} /> Default
                   </label>
                   <button type="button" className="text-gray-400 hover:text-red-500" onClick={() => {
-                    const newRows = (profileForm.applicable_for_users || []).filter((_, i) => i !== idx);
+                    const newRows = (profileForm.applicable_for_users || []).filter((_: any, i: number) => i !== idx);
                     setProfileForm({...profileForm, applicable_for_users: newRows});
                   }}><X className="w-4 h-4" /></button>
                 </div>
@@ -739,7 +739,7 @@ export const PosProfilePage: React.FC = () => {
               <Button type="button" size="sm" variant="ghost" className="text-primary h-6 px-2 text-xs" onClick={() => setProfileForm({...profileForm, payments: [...(profileForm.payments || []), {mode_of_payment:'', default:0}]})}>+ Add Payment</Button>
             </div>
             <div className="space-y-2">
-              {(profileForm.payments || []).map((row, idx) => (
+              {(profileForm.payments || []).map((row: any, idx: number) => (
                 <div key={idx} className="flex gap-2 items-center">
                   <Select className="flex-1" value={row.mode_of_payment || ''} onChange={e => {
                     const newRows = [...(profileForm.payments || [])];
@@ -757,7 +757,7 @@ export const PosProfilePage: React.FC = () => {
                     }} /> Default
                   </label>
                   <button type="button" className="text-gray-400 hover:text-red-500" onClick={() => {
-                    const newRows = (profileForm.payments || []).filter((_, i) => i !== idx);
+                    const newRows = (profileForm.payments || []).filter((_: any, i: number) => i !== idx);
                     setProfileForm({...profileForm, payments: newRows});
                   }}><X className="w-4 h-4" /></button>
                 </div>

@@ -49,7 +49,6 @@
     },
     "items": {
       "type": "array",
-      "title": "Menu Items",
       "items": {
         "type": "object",
         "properties": {

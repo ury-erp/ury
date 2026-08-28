@@ -217,7 +217,7 @@ export function DatePicker({
                   onClick={() => handleSelectDay(item.dateStr)}
                   className={`text-sm py-1.5 rounded-lg cursor-pointer font-medium transition-colors select-none ${
                     isSelected
-                      ? 'bg-black text-white font-bold'
+                      ? 'bg-primary text-white font-bold'
                       : 'text-gray-800 hover:bg-gray-100'
                   }`}
                 >
@@ -232,7 +232,7 @@ export function DatePicker({
             <button
               type="button"
               onClick={handleTodayClick}
-              className="text-sm font-medium text-gray-700 hover:text-black transition-colors"
+              className="text-sm font-medium text-gray-700 hover:text-primary transition-colors"
             >
               Today
             </button>

@@ -1,0 +1,25 @@
+[
+    {
+        "doctype": "URY Production Unit",
+        "production": "Demo Kitchen",
+        "pos_profile": "Demo Profile",
+        "branch": "Demo Branch",
+        "item_groups": [
+            {
+                "doctype": "URY Production Item Groups",
+                "item_group": "STARTERS",
+                "parentfield": "item_groups"
+            },
+            {
+                "doctype": "URY Production Item Groups",
+                "item_group": "RICE",
+                "parentfield": "item_groups"
+            },
+            {
+                "doctype": "URY Production Item Groups",
+                "item_group": "GRAVIES",
+                "parentfield": "item_groups"
+            }
+        ]
+    }
+]

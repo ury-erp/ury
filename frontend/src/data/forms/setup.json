@@ -15,7 +15,8 @@
       "type": "text",
       "placeholder": "e.g. URY",
       "required": true,
-      "validations": ["required", "maxLength:5"]
+      "validations": ["required", "maxLength:5"],
+      "description": "Used as a short prefix for your invoice numbers. Auto-filled from your company name — edit if you'd like something different."
     },
     {
       "id": "language",
@@ -56,26 +57,28 @@
       "type": "select",
       "optionsKey": "charts_of_accounts",
       "required": false,
-      "validations": []
+      "validations": [],
+      "description": "A template for how your income and expenses get categorized. We've picked one for your country — you usually don't need to change this."
     },
     {
       "id": "fy_start_date",
       "label": "Financial Year Begins On",
       "type": "date",
       "required": true,
-      "validations": ["required"]
+      "validations": ["required"],
+      "description": "When your financial year starts. Most businesses use the default for their country — change this only if your accountant asks you to."
     }
   ],
   "installationTypes": [
     {
       "id": "minimal",
       "title": "Minimal Installation",
-      "description": "Core Restaurant Operations, Point of Sale, Inventory Management, and Accounting."
+      "description": "We'll walk you through setting up your branch, tables, menu and user in a moment. (Recommended for first-time setup)."
     },
     {
       "id": "advanced",
       "title": "Advanced Installation",
-      "description": "Includes Multi-Branch Management, CRM, Loyalty Programs, HR, and Advanced Analytics."
+      "description": "Skip the walkthrough and configure everything yourself in the full admin panel."
     }
   ]
 }
