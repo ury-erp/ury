@@ -664,255 +664,307 @@ export const PosProfilePage: React.FC = () => {
         </form>
       </SideDrawer>
 
-      {/* Edit POS Profile Drawer */}
-      <SideDrawer
-        isOpen={isDrawerOpen}
-        onClose={() => setIsDrawerOpen(false)}
-        title={selectedProfile ? `Edit: ${selectedProfile.name}` : 'Edit POS Profile'}
-      >
-        <form onSubmit={handleSaveProfile} className="space-y-6 text-sm">
-
-          
-          {/* General Settings */}
-          <div>
-            <h4 className="font-bold text-gray-700 text-xs tracking-wider mb-3 pb-2 border-b border-gray-100">General Settings</h4>
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <div>
-                <label className="block font-semibold text-gray-700 mb-1.5">Company</label>
-                <Select value={profileForm.company || ''} onChange={e => setProfileForm(p => ({ ...p, company: e.target.value }))}>
-                  <option value="">Select Company</option>
-                  {options.companies.map((c: any) => <option key={c.name} value={c.name}>{c.name}</option>)}
-                </Select>
-              </div>
-              <div>
-                <label className="block font-semibold text-gray-700 mb-1.5">Warehouse</label>
-                <Select value={profileForm.warehouse || ''} onChange={e => setProfileForm(p => ({ ...p, warehouse: e.target.value }))}>
-                  <option value="">Select Warehouse</option>
-                  {options.warehouses.map((w: any) => <option key={w.name} value={w.name}>{w.name}</option>)}
-                </Select>
-              </div>
-            </div>
-            <div className="space-y-4">
-
-              <div>
-                <label className="block font-semibold text-gray-700 mb-1.5">Price List</label>
-                <Input
-                  value={profileForm.selling_price_list || ''}
-                  onChange={(e) => setProfileForm(p => ({ ...p, selling_price_list: e.target.value }))}
-                  placeholder="Standard Selling"
-                />
-              </div>
-              <div>
-                <label className="block font-semibold text-gray-700 mb-1.5">Print Format</label>
-                <Input
-                  value={profileForm.print_format || ''}
-                  onChange={(e) => setProfileForm(p => ({ ...p, print_format: e.target.value }))}
-                  placeholder="Default"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Feature toggles */}
-          <div>
-            <h4 className="font-bold text-gray-700 text-xs tracking-wider mb-3 pb-2 border-b border-gray-100">Features</h4>
-            <div className="space-y-3">
-              {[
-                { key: 'custom_enable_discount', label: 'Enable Item Discounts', type: 'checkbox' },
-                { key: 'custom_enable_kot_reprint', label: 'Enable KOT Reprint', type: 'checkbox' },
-                { key: 'custom_multiple_cashier_configuration', label: 'Enable Multiple Cashier Configuration', type: 'checkbox' },
-                { key: 'custom_daily_pos_close', label: 'Require Daily POS Closing', type: 'checkbox' },
-                { key: 'custom_edit_order_type', label: 'Enable Order Type Edit', type: 'checkbox' },
-                { key: 'custom_reset_order_number_daily', label: 'Reset Order Number Daily', type: 'checkbox' },
-              ].map(({ key, label }) => (
-                <label key={key} className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={!!profileForm[key]}
-                    onChange={(e) => setProfileForm(p => ({ ...p, [key]: e.target.checked ? 1 : 0 }))}
-                    className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
-                  />
-                  <span className="font-medium text-gray-700">{label}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          {/* Numeric Settings */}
-          <div>
-            <h4 className="font-bold text-gray-700 text-xs tracking-wider mb-3 pb-2 border-b border-gray-100">Numeric Settings</h4>
-            <div className="space-y-4">
-              <div>
-                <label className="block font-semibold text-gray-700 mb-1.5">Show Limited Paid Invoices (Number)</label>
-                <Input
-                  type="number"
-                  value={profileForm.paid_limit || ''}
-                  onChange={(e) => setProfileForm(p => ({ ...p, paid_limit: e.target.value }))}
-                  placeholder="e.g. 10"
-                />
-              </div>
-              <div>
-                <label className="block font-semibold text-gray-700 mb-1.5">Table Attention Time (minutes)</label>
-                <Input
-                  type="number"
-                  value={profileForm.table_attention_time || ''}
-                  onChange={(e) => setProfileForm(p => ({ ...p, table_attention_time: e.target.value }))}
-                  placeholder="e.g. 15"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Applicable For Users - Editable */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="font-semibold text-gray-700">Applicable For Users</label>
-              <Button type="button" size="sm" variant="ghost" className="text-primary h-6 px-2 text-xs" onClick={() => setProfileForm({...profileForm, applicable_for_users: [...(profileForm.applicable_for_users || []), {user:'', default:0}]})}>+ Add User</Button>
-            </div>
-            <div className="space-y-2">
-              {(profileForm.applicable_for_users || []).map((row: any, idx: number) => (
-                <div key={idx} className="flex gap-2 items-center">
-                  <Select className="flex-1" value={row.user || ''} onChange={e => {
-                    const newRows = [...(profileForm.applicable_for_users || [])];
-                    newRows[idx].user = e.target.value;
-                    setProfileForm({...profileForm, applicable_for_users: newRows});
-                  }}>
-                    <option value="">Select User</option>
-                    {options.users.map((u: any) => <option key={u.name} value={u.name}>{u.full_name || u.name}</option>)}
-                  </Select>
-                  <label className="flex items-center gap-1 text-xs text-gray-600">
-                    <input type="checkbox" checked={row.default === 1} onChange={e => {
-                      const newRows = [...(profileForm.applicable_for_users || [])];
-                      newRows[idx].default = e.target.checked ? 1 : 0;
-                      setProfileForm({...profileForm, applicable_for_users: newRows});
-                    }} /> Default
-                  </label>
-                  <button type="button" className="text-gray-400 hover:text-red-500" onClick={() => {
-                    const newRows = (profileForm.applicable_for_users || []).filter((_: any, i: number) => i !== idx);
-                    setProfileForm({...profileForm, applicable_for_users: newRows});
-                  }}><X className="w-4 h-4" /></button>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Mode of Payment - Editable */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="font-semibold text-gray-700">Mode of Payment</label>
-              <Button type="button" size="sm" variant="ghost" className="text-primary h-6 px-2 text-xs" onClick={() => setProfileForm({...profileForm, payments: [...(profileForm.payments || []), {mode_of_payment:'', default:0}]})}>+ Add Payment</Button>
-            </div>
-            <div className="space-y-2">
-              {(profileForm.payments || []).map((row: any, idx: number) => (
-                <div key={idx} className="flex gap-2 items-center">
-                  <Select className="flex-1" value={row.mode_of_payment || ''} onChange={e => {
-                    const newRows = [...(profileForm.payments || [])];
-                    newRows[idx].mode_of_payment = e.target.value;
-                    setProfileForm({...profileForm, payments: newRows});
-                  }}>
-                    <option value="">Select Payment Mode</option>
-                    {options.payments.map((p: any) => <option key={p.name} value={p.name}>{p.name}</option>)}
-                  </Select>
-                  <label className="flex items-center gap-1 text-xs text-gray-600">
-                    <input type="checkbox" checked={row.default === 1} onChange={e => {
-                      const newRows = [...(profileForm.payments || [])];
-                      newRows[idx].default = e.target.checked ? 1 : 0;
-                      setProfileForm({...profileForm, payments: newRows});
-                    }} /> Default
-                  </label>
-                  <button type="button" className="text-gray-400 hover:text-red-500" onClick={() => {
-                    const newRows = (profileForm.payments || []).filter((_: any, i: number) => i !== idx);
-                    setProfileForm({...profileForm, payments: newRows});
-                  }}><X className="w-4 h-4" /></button>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Checklist Items - Editable */}
-          <div>
-            <h4 className="font-bold text-gray-700 text-xs tracking-wider mb-3 pb-2 border-b border-gray-100">Opening/Closing Checklist Items</h4>
-            <div className="flex items-center justify-end mb-2">
+      {/* Edit POS Profile Modal — wide, tabbed layout to make better use of horizontal space */}
+      {isDrawerOpen && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/40 transition-opacity backdrop-blur-sm"
+            onClick={() => setIsDrawerOpen(false)}
+          />
+          <div className="relative h-fit max-h-[90vh] w-full max-w-4xl bg-white rounded-lg shadow-2xl z-[101] flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between p-6 border-b border-gray-100 bg-gray-50/50">
+              <h2 className="text-xl font-bold text-gray-900">
+                {selectedProfile ? `Edit: ${selectedProfile.name}` : 'Edit POS Profile'}
+              </h2>
               <Button
-                type="button"
+                variant="outline"
                 size="sm"
-                variant="ghost"
-                className="text-primary h-6 px-2 text-xs"
-                onClick={() => setProfileForm({
-                  ...profileForm,
-                  custom_checklist_items: [...(profileForm.custom_checklist_items || []), { item_label: '', applies_to: 'Both', is_mandatory: 1 }],
-                })}
+                onClick={() => setIsDrawerOpen(false)}
+                className="p-2 h-auto rounded-full border-none hover:bg-gray-100 bg-transparent text-gray-500 hover:text-gray-900"
               >
-                + Add Item
+                <X className="w-5 h-5" />
               </Button>
             </div>
-            <div className="space-y-2">
-              {(profileForm.custom_checklist_items || []).length === 0 && (
-                <p className="text-xs text-gray-400">No checklist items configured. Add items required for POS opening/closing.</p>
-              )}
-              {(profileForm.custom_checklist_items || []).map((row: any, idx: number) => (
-                <div key={idx} className="flex gap-3 items-center h-10">
-                  <Input
-                    className="flex-1"
-                    value={row.item_label || ''}
-                    placeholder="Item label"
-                    onChange={e => {
-                      const newRows = [...(profileForm.custom_checklist_items || [])];
-                      newRows[idx] = { ...newRows[idx], item_label: e.target.value };
-                      setProfileForm({ ...profileForm, custom_checklist_items: newRows });
-                    }}
-                  />
-                  <div className="w-32 flex-shrink-0">
-                    <Select
-                      value={row.applies_to || 'Both'}
-                      onChange={e => {
-                        const newRows = [...(profileForm.custom_checklist_items || [])];
-                        newRows[idx] = { ...newRows[idx], applies_to: e.target.value };
-                        setProfileForm({ ...profileForm, custom_checklist_items: newRows });
-                      }}
-                    >
-                      <option value="Opening">Opening</option>
-                      <option value="Closing">Closing</option>
-                      <option value="Both">Both</option>
-                    </Select>
-                  </div>
-                  <label className="flex items-center gap-1 text-xs text-gray-600 whitespace-nowrap flex-shrink-0">
-                    <input
-                      type="checkbox"
-                      checked={row.is_mandatory === 1 || row.is_mandatory === undefined}
-                      onChange={e => {
-                        const newRows = [...(profileForm.custom_checklist_items || [])];
-                        newRows[idx] = { ...newRows[idx], is_mandatory: e.target.checked ? 1 : 0 };
-                        setProfileForm({ ...profileForm, custom_checklist_items: newRows });
-                      }}
-                    /> Mandatory
-                  </label>
-                  <button
-                    type="button"
-                    className="text-gray-400 hover:text-red-500 flex-shrink-0"
-                    onClick={() => {
-                      const newRows = (profileForm.custom_checklist_items || []).filter((_: any, i: number) => i !== idx);
-                      setProfileForm({ ...profileForm, custom_checklist_items: newRows });
-                    }}
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
 
-          <div className="pt-6 flex justify-end gap-3 border-t border-gray-100">
-            <Button type="button" variant="outline" onClick={() => setIsDrawerOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={saving} className="bg-primary hover:bg-primary/90 text-white">
-              {saving ? <Spinner className="w-4 h-4 mr-1.5" /> : null}
-              Save Changes
-            </Button>
+            {/* Internal tabs — mirrors the read-only view's tab pattern */}
+            <div className="px-6 pt-4 border-b border-gray-100 bg-gray-50/50">
+              <div className="flex items-center gap-1 p-1 bg-gray-100 rounded-lg w-fit">
+                {[
+                  { id: 'general' as const, label: 'General', icon: <Settings2 className="w-4 h-4" /> },
+                  { id: 'users' as const, label: 'Users & Payments', icon: <Users className="w-4 h-4" /> },
+                  { id: 'checklist' as const, label: 'Checklist', icon: <ClipboardList className="w-4 h-4" /> },
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setEditModalTab(tab.id)}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
+                      editModalTab === tab.id ? 'bg-white text-primary shadow-xs' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-700'
+                    }`}
+                  >
+                    {tab.icon}
+                    <span>{tab.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveProfile} className="flex-1 flex flex-col overflow-hidden text-sm">
+              <div className="flex-1 p-6 overflow-y-auto space-y-6">
+
+                {editModalTab === 'general' && (
+                  <>
+                    {/* General Settings */}
+                    <div>
+                      <h4 className="font-bold text-gray-700 text-xs tracking-wider mb-3 pb-2 border-b border-gray-100">General Settings</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block font-semibold text-gray-700 mb-1.5">Company</label>
+                          <Select value={profileForm.company || ''} onChange={e => setProfileForm(p => ({ ...p, company: e.target.value }))}>
+                            <option value="">Select Company</option>
+                            {options.companies.map((c: any) => <option key={c.name} value={c.name}>{c.name}</option>)}
+                          </Select>
+                        </div>
+                        <div>
+                          <label className="block font-semibold text-gray-700 mb-1.5">Warehouse</label>
+                          <Select value={profileForm.warehouse || ''} onChange={e => setProfileForm(p => ({ ...p, warehouse: e.target.value }))}>
+                            <option value="">Select Warehouse</option>
+                            {options.warehouses.map((w: any) => <option key={w.name} value={w.name}>{w.name}</option>)}
+                          </Select>
+                        </div>
+                        <div>
+                          <label className="block font-semibold text-gray-700 mb-1.5">Price List</label>
+                          <Input
+                            value={profileForm.selling_price_list || ''}
+                            onChange={(e) => setProfileForm(p => ({ ...p, selling_price_list: e.target.value }))}
+                            placeholder="Standard Selling"
+                          />
+                        </div>
+                        <div>
+                          <label className="block font-semibold text-gray-700 mb-1.5">Print Format</label>
+                          <Input
+                            value={profileForm.print_format || ''}
+                            onChange={(e) => setProfileForm(p => ({ ...p, print_format: e.target.value }))}
+                            placeholder="Default"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                      {/* Feature toggles */}
+                      <div>
+                        <h4 className="font-bold text-gray-700 text-xs tracking-wider mb-3 pb-2 border-b border-gray-100">Features</h4>
+                        <div className="space-y-3">
+                          {[
+                            { key: 'custom_enable_discount', label: 'Enable Item Discounts', type: 'checkbox' },
+                            { key: 'custom_enable_kot_reprint', label: 'Enable KOT Reprint', type: 'checkbox' },
+                            { key: 'custom_multiple_cashier_configuration', label: 'Enable Multiple Cashier Configuration', type: 'checkbox' },
+                            { key: 'custom_daily_pos_close', label: 'Require Daily POS Closing', type: 'checkbox' },
+                            { key: 'custom_edit_order_type', label: 'Enable Order Type Edit', type: 'checkbox' },
+                            { key: 'custom_reset_order_number_daily', label: 'Reset Order Number Daily', type: 'checkbox' },
+                          ].map(({ key, label }) => (
+                            <label key={key} className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={!!profileForm[key]}
+                                onChange={(e) => setProfileForm(p => ({ ...p, [key]: e.target.checked ? 1 : 0 }))}
+                                className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
+                              />
+                              <span className="font-medium text-gray-700">{label}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Numeric Settings */}
+                      <div>
+                        <h4 className="font-bold text-gray-700 text-xs tracking-wider mb-3 pb-2 border-b border-gray-100">Numeric Settings</h4>
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block font-semibold text-gray-700 mb-1.5">Show Limited Paid Invoices (Number)</label>
+                            <Input
+                              type="number"
+                              value={profileForm.paid_limit || ''}
+                              onChange={(e) => setProfileForm(p => ({ ...p, paid_limit: e.target.value }))}
+                              placeholder="e.g. 10"
+                            />
+                          </div>
+                          <div>
+                            <label className="block font-semibold text-gray-700 mb-1.5">Table Attention Time (minutes)</label>
+                            <Input
+                              type="number"
+                              value={profileForm.table_attention_time || ''}
+                              onChange={(e) => setProfileForm(p => ({ ...p, table_attention_time: e.target.value }))}
+                              placeholder="e.g. 15"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {editModalTab === 'users' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Applicable For Users - Editable */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="font-semibold text-gray-700">Applicable For Users</label>
+                        <Button type="button" size="sm" variant="ghost" className="text-primary h-6 px-2 text-xs" onClick={() => setProfileForm({...profileForm, applicable_for_users: [...(profileForm.applicable_for_users || []), {user:'', default:0}]})}>+ Add User</Button>
+                      </div>
+                      <div className="space-y-1.5">
+                        {(profileForm.applicable_for_users || []).map((row: any, idx: number) => (
+                          <div key={idx} className="flex gap-2 items-center">
+                            <Select className="flex-1" value={row.user || ''} onChange={e => {
+                              const newRows = [...(profileForm.applicable_for_users || [])];
+                              newRows[idx].user = e.target.value;
+                              setProfileForm({...profileForm, applicable_for_users: newRows});
+                            }}>
+                              <option value="">Select User</option>
+                              {options.users.map((u: any) => <option key={u.name} value={u.name}>{u.full_name || u.name}</option>)}
+                            </Select>
+                            <label className="flex items-center gap-1 text-xs text-gray-600">
+                              <input type="checkbox" checked={row.default === 1} onChange={e => {
+                                const newRows = [...(profileForm.applicable_for_users || [])];
+                                newRows[idx].default = e.target.checked ? 1 : 0;
+                                setProfileForm({...profileForm, applicable_for_users: newRows});
+                              }} /> Default
+                            </label>
+                            <button type="button" className="text-gray-400 hover:text-red-500" onClick={() => {
+                              const newRows = (profileForm.applicable_for_users || []).filter((_: any, i: number) => i !== idx);
+                              setProfileForm({...profileForm, applicable_for_users: newRows});
+                            }}><X className="w-4 h-4" /></button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Mode of Payment - Editable */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="font-semibold text-gray-700">Mode of Payment</label>
+                        <Button type="button" size="sm" variant="ghost" className="text-primary h-6 px-2 text-xs" onClick={() => setProfileForm({...profileForm, payments: [...(profileForm.payments || []), {mode_of_payment:'', default:0}]})}>+ Add Payment</Button>
+                      </div>
+                      <div className="space-y-1.5">
+                        {(profileForm.payments || []).map((row: any, idx: number) => (
+                          <div key={idx} className="flex gap-2 items-center">
+                            <Select className="flex-1" value={row.mode_of_payment || ''} onChange={e => {
+                              const newRows = [...(profileForm.payments || [])];
+                              newRows[idx].mode_of_payment = e.target.value;
+                              setProfileForm({...profileForm, payments: newRows});
+                            }}>
+                              <option value="">Select Payment Mode</option>
+                              {options.payments.map((p: any) => <option key={p.name} value={p.name}>{p.name}</option>)}
+                            </Select>
+                            <label className="flex items-center gap-1 text-xs text-gray-600">
+                              <input type="checkbox" checked={row.default === 1} onChange={e => {
+                                const newRows = [...(profileForm.payments || [])];
+                                newRows[idx].default = e.target.checked ? 1 : 0;
+                                setProfileForm({...profileForm, payments: newRows});
+                              }} /> Default
+                            </label>
+                            <button type="button" className="text-gray-400 hover:text-red-500" onClick={() => {
+                              const newRows = (profileForm.payments || []).filter((_: any, i: number) => i !== idx);
+                              setProfileForm({...profileForm, payments: newRows});
+                            }}><X className="w-4 h-4" /></button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {editModalTab === 'checklist' && (
+                  /* Checklist Items - Editable */
+                  <div>
+                    <h4 className="font-bold text-gray-700 text-xs tracking-wider mb-3 pb-2 border-b border-gray-100">Opening/Closing Checklist Items</h4>
+                    <div className="flex items-center justify-end mb-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="text-primary h-6 px-2 text-xs"
+                        onClick={() => setProfileForm({
+                          ...profileForm,
+                          custom_checklist_items: [...(profileForm.custom_checklist_items || []), { item_label: '', applies_to: 'Both', is_mandatory: 1 }],
+                        })}
+                      >
+                        + Add Item
+                      </Button>
+                    </div>
+                    <div className="space-y-2">
+                      {(profileForm.custom_checklist_items || []).length === 0 && (
+                        <p className="text-xs text-gray-400">No checklist items configured. Add items required for POS opening/closing.</p>
+                      )}
+                      {(profileForm.custom_checklist_items || []).map((row: any, idx: number) => (
+                        <div key={idx} className="flex gap-3 items-center h-10">
+                          <Input
+                            className="flex-1"
+                            value={row.item_label || ''}
+                            placeholder="Item label"
+                            onChange={e => {
+                              const newRows = [...(profileForm.custom_checklist_items || [])];
+                              newRows[idx] = { ...newRows[idx], item_label: e.target.value };
+                              setProfileForm({ ...profileForm, custom_checklist_items: newRows });
+                            }}
+                          />
+                          <div className="w-32 flex-shrink-0">
+                            <Select
+                              value={row.applies_to || 'Both'}
+                              onChange={e => {
+                                const newRows = [...(profileForm.custom_checklist_items || [])];
+                                newRows[idx] = { ...newRows[idx], applies_to: e.target.value };
+                                setProfileForm({ ...profileForm, custom_checklist_items: newRows });
+                              }}
+                            >
+                              <option value="Opening">Opening</option>
+                              <option value="Closing">Closing</option>
+                              <option value="Both">Both</option>
+                            </Select>
+                          </div>
+                          <label className="flex items-center gap-1 text-xs text-gray-600 whitespace-nowrap flex-shrink-0">
+                            <input
+                              type="checkbox"
+                              checked={row.is_mandatory === 1 || row.is_mandatory === undefined}
+                              onChange={e => {
+                                const newRows = [...(profileForm.custom_checklist_items || [])];
+                                newRows[idx] = { ...newRows[idx], is_mandatory: e.target.checked ? 1 : 0 };
+                                setProfileForm({ ...profileForm, custom_checklist_items: newRows });
+                              }}
+                            /> Mandatory
+                          </label>
+                          <button
+                            type="button"
+                            className="text-gray-400 hover:text-red-500 flex-shrink-0"
+                            onClick={() => {
+                              const newRows = (profileForm.custom_checklist_items || []).filter((_: any, i: number) => i !== idx);
+                              setProfileForm({ ...profileForm, custom_checklist_items: newRows });
+                            }}
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="p-6 pt-4 flex justify-end gap-3 border-t border-gray-100 bg-white">
+                <Button type="button" variant="outline" onClick={() => setIsDrawerOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={saving} className="bg-primary hover:bg-primary/90 text-white">
+                  {saving ? <Spinner className="w-4 h-4 mr-1.5" /> : null}
+                  Save Changes
+                </Button>
+              </div>
+            </form>
           </div>
-        </form>
-      </SideDrawer>
+        </div>,
+        document.body
+      )}
     </div>
   );
 };
