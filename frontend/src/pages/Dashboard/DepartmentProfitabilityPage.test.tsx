@@ -6,6 +6,7 @@ import '@testing-library/jest-dom/vitest';
 vi.mock('@ury/core', () => ({
   getLoggedUser: vi.fn(),
   getUserRoles: vi.fn(),
+  call: vi.fn(),
 }));
 
 vi.mock('../../context/BranchContext', () => ({
@@ -22,14 +23,23 @@ vi.mock('../../services/departmentProfitability', () => ({
   },
 }));
 
-import { getLoggedUser, getUserRoles } from '@ury/core';
+vi.mock('../../services/departmentStock', () => ({
+  departmentStockService: {
+    listDepartments: vi.fn(),
+  },
+}));
+
+import { call, getLoggedUser, getUserRoles } from '@ury/core';
 import { departmentProfitabilityService } from '../../services/departmentProfitability';
+import { departmentStockService } from '../../services/departmentStock';
 import { DepartmentProfitabilityPage } from './DepartmentProfitabilityPage';
 
+const mockedCall = vi.mocked(call);
 const mockedGetLoggedUser = vi.mocked(getLoggedUser);
 const mockedGetUserRoles = vi.mocked(getUserRoles);
 const mockedGetProfitability = vi.mocked(departmentProfitabilityService.getDepartmentProfitability);
 const mockedGetPlanVsActual = vi.mocked(departmentProfitabilityService.getPlanVsActual);
+const mockedListDepartments = vi.mocked(departmentStockService.listDepartments);
 
 const populatedProfitability = {
   company: 'URY Co',
@@ -77,6 +87,8 @@ afterEach(cleanup);
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockedCall.mockResolvedValue({ message: { company: 'URY Co' } });
+  mockedListDepartments.mockResolvedValue([{ name: 'Kitchen', department_name: 'Kitchen' }]);
 });
 
 describe('DepartmentProfitabilityPage', () => {
