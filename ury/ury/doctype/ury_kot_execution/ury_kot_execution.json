@@ -1,0 +1,216 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "hash",
+ "creation": "2026-08-28 00:00:00.000000",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "kot",
+  "state",
+  "idempotency_key",
+  "column_break_group",
+  "branch",
+  "company",
+  "production_unit",
+  "section_break_start",
+  "started_by",
+  "started_at",
+  "column_break_start",
+  "ready_by",
+  "ready_at",
+  "section_break_serve",
+  "served_by",
+  "served_at",
+  "column_break_serve",
+  "cancelled_by",
+  "cancelled_at",
+  "section_break_audit",
+  "audit_log"
+ ],
+ "fields": [
+  {
+   "fieldname": "kot",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "KOT",
+   "options": "URY KOT",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "state",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "State",
+   "options": "QUEUED\nIN_PREPARATION\nREADY\nSERVED\nCANCELLED_BEFORE_START\nCANCELLED_AFTER_START\nCANCELLED_AFTER_READY",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "description": "Scoped per (kot, target_state, idempotency_key). A repeated transition call with the same key returns the original result instead of re-applying.",
+   "fieldname": "idempotency_key",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Idempotency Key",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_group",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Branch",
+   "options": "Branch",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "production_unit",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Production Unit",
+   "options": "URY Production Unit",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_start",
+   "fieldtype": "Section Break",
+   "label": "Start"
+  },
+  {
+   "fieldname": "started_by",
+   "fieldtype": "Data",
+   "label": "Started By",
+   "read_only": 1
+  },
+  {
+   "fieldname": "started_at",
+   "fieldtype": "Datetime",
+   "label": "Started At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_start",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "ready_by",
+   "fieldtype": "Data",
+   "label": "Ready By",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ready_at",
+   "fieldtype": "Datetime",
+   "label": "Ready At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_serve",
+   "fieldtype": "Section Break",
+   "label": "Serve / Cancel"
+  },
+  {
+   "fieldname": "served_by",
+   "fieldtype": "Data",
+   "label": "Served By",
+   "read_only": 1
+  },
+  {
+   "fieldname": "served_at",
+   "fieldtype": "Datetime",
+   "label": "Served At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_serve",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "cancelled_by",
+   "fieldtype": "Data",
+   "label": "Cancelled By",
+   "read_only": 1
+  },
+  {
+   "fieldname": "cancelled_at",
+   "fieldtype": "Datetime",
+   "label": "Cancelled At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_audit",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "audit_log",
+   "fieldtype": "Long Text",
+   "label": "Audit Log (JSON)",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 0,
+ "links": [],
+ "modified": "2026-08-28 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY KOT Execution",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Production Manager"
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Chef"
+  },
+  {
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Stock Manager"
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

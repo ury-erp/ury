@@ -1,0 +1,193 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "hash",
+ "creation": "2026-08-28 00:00:00.000000",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "kot",
+  "item_code",
+  "qty",
+  "reservation_ref",
+  "fulfilment_type",
+  "batch_key",
+  "column_break_group",
+  "posted_to_erpnext",
+  "section_break_scope",
+  "branch",
+  "company",
+  "column_break_scope",
+  "actor",
+  "fulfilled_at",
+  "section_break_audit",
+  "audit_log"
+ ],
+ "fields": [
+  {
+   "fieldname": "kot",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "KOT",
+   "options": "URY KOT",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Item Code",
+   "options": "Item",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "qty",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Qty",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "reservation_ref",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Reservation Reference",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "fulfilment_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Fulfilment Type",
+   "options": "PRE_PRODUCED\nMTO",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "description": "V3-72's exactly-once idempotency key for MTO micro-batch posting (V3-70 Section 5, modeled on V3-53's idempotency_key pattern). Not used by PRE_PRODUCED rows (V3-71), which dedup on (kot, item_code) alone. Optional -- left blank for PRE_PRODUCED rows.",
+   "fieldname": "batch_key",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Batch Key",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_group",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "description": "Always False for pre-produced fulfilment as of V3-71: this record never posts to a real ERPNext stock document (no Stock Entry, no Bin mutation). Flipping this to True is exclusively V3-73's integration-boundary responsibility, gated by the V3-70 evidence bar.",
+   "fieldname": "posted_to_erpnext",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Posted To ERPNext",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_scope",
+   "fieldtype": "Section Break",
+   "label": "Scope"
+  },
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Branch",
+   "options": "Branch",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_scope",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "actor",
+   "fieldtype": "Data",
+   "label": "Actor",
+   "read_only": 1
+  },
+  {
+   "fieldname": "fulfilled_at",
+   "fieldtype": "Datetime",
+   "label": "Fulfilled At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_audit",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "audit_log",
+   "fieldtype": "Long Text",
+   "label": "Audit Log (JSON)",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 0,
+ "links": [],
+ "modified": "2026-08-28 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY Fulfilment Record",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Production Manager"
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Stock User"
+  },
+  {
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Stock Manager"
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

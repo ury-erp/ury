@@ -1,0 +1,96 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "creation": "2026-08-28 00:00:00.000000",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "item_code",
+  "qty",
+  "stock_uom",
+  "column_break_scope",
+  "department",
+  "production_unit",
+  "section_break_policy",
+  "production_policy",
+  "bom",
+  "bom_revision"
+ ],
+ "fields": [
+  {
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Item",
+   "options": "Item",
+   "reqd": 1
+  },
+  {
+   "fieldname": "qty",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Qty",
+   "reqd": 1
+  },
+  {
+   "fieldname": "stock_uom",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Stock UOM",
+   "options": "UOM"
+  },
+  {
+   "fieldname": "column_break_scope",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "department",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Department",
+   "options": "URY Production Department"
+  },
+  {
+   "fieldname": "production_unit",
+   "fieldtype": "Link",
+   "label": "Production Unit",
+   "options": "URY Production Unit"
+  },
+  {
+   "fieldname": "section_break_policy",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "production_policy",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Production Policy",
+   "options": "PRE_PRODUCED\nMADE_TO_ORDER\nDIRECT_RETAIL"
+  },
+  {
+   "fieldname": "bom",
+   "fieldtype": "Link",
+   "label": "BOM",
+   "options": "BOM"
+  },
+  {
+   "fieldname": "bom_revision",
+   "fieldtype": "Data",
+   "label": "BOM Revision"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-08-28 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY Sales Plan Item",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

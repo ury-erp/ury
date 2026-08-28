@@ -338,6 +338,7 @@ fixtures = [
                     "POS Opening Entry-branch",
                     "POS Opening Entry-custom_room",
                     "Branch-user",
+                    "Branch-company",
                     "Branch-custom_aggregator_settings",
                     "Branch-custom_aggregators",
                     "Branch-custom_make_unpaid",

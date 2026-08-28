@@ -10,8 +10,62 @@ from erpnext.controllers.queries import item_query
 from ury.ury_pos.api import getBranch, getBranchRoom
 from ury.ury.api.ury_kot_generate import kot_execute
 from ury.ury.api.ury_kot_generate import process_items_for_cancel_kot
+from ury.ury.api.ury_feature_flags import is_pos_stock_authority_flag_enabled
 
 from frappe import cache
+
+
+def _apply_pos_stock_authority(invoice, branch=None):
+    """V3-73: the SOLE integration point between POS Invoice creation and the
+    new fulfilment services (V3-71/V3-72).
+
+    Flag OFF (the only state that is ever true today, and the default in
+    every environment): behavior is byte-for-byte identical to before this
+    task -- `invoice.update_stock` is set to 1, nothing else happens. This
+    is the safe/current/rollback state. See the governing contract at
+    tracks/sa-v3_nxt/outputs/V3-70-fulfilment-accounting-transition-checklist.md.
+
+    Flag ON (never true today; only reachable if a human explicitly flips
+    the "URY Feature Flags" > "POS Stock Authority V2 Enabled" checkbox,
+    which no code in this app does): sets `invoice.update_stock = 0` and
+    makes a best-effort, minimal call into the V3-71/V3-72 fulfilment
+    services.
+
+    *** WARNING -- FLAG-ON PATH IS AN INTEGRATION STUB, NOT PRODUCTION-READY
+    ***: V3-71/V3-72 are standalone service functions
+    (`fulfil_preproduced_order` / `fulfil_mto_order`) that are not yet
+    robustly wired to a real invoice-submission trigger point (they expect a
+    KOT/reservation/execution-state context that this call site does not
+    have at invoice-creation time -- before items are finalized, taxes are
+    calculated, or the invoice is submitted). This function intentionally
+    does NOT call them here, to avoid guessing at parameter mapping that
+    could misfire against real stock/KOT state. Wiring the flag-on path to
+    the actual fulfilment services, at the correct trigger point in the
+    invoice lifecycle (submission, not creation), with real parameter
+    mapping and error handling, is explicitly out of scope for V3-73 and
+    requires its own dedicated integration-testing task before this flag may
+    ever be enabled in a real environment.
+    """
+
+    if is_pos_stock_authority_flag_enabled(branch=branch):
+        # FLAG-ON STUB -- see warning above. Only reachable via a deliberate,
+        # out-of-band admin action; never the default in any environment.
+        invoice.update_stock = 0
+        frappe.log_error(
+            title="V3-73 POS stock authority flag is ON",
+            message=(
+                "pos_stock_authority_v2 is enabled but the flag-on "
+                "integration path is a stub (see _apply_pos_stock_authority "
+                "in ury_order.py). update_stock has been set to 0; no "
+                "fulfilment service call has been made. This flag must not "
+                "be enabled in any real environment until dedicated "
+                "integration work wires this path to V3-71/V3-72 at the "
+                "correct invoice-submission trigger point."
+            ),
+        )
+    else:
+        # Flag OFF -- identical to this app's behavior before V3-73.
+        invoice.update_stock = 1
 
 
 class URYOrder(Document):
@@ -725,7 +779,7 @@ def get_order_invoice(table=None, invoiceNo=None, order_type=None, is_payment=No
             )
 
             invoice.is_pos = 1
-            invoice.update_stock = 1
+            _apply_pos_stock_authority(invoice, branch=branch)
             invoice.restaurant = restaurant
             invoice.branch = branch
 
@@ -772,8 +826,8 @@ def get_order_invoice(table=None, invoiceNo=None, order_type=None, is_payment=No
         else:
             invoice = frappe.new_doc("POS Invoice")
             invoice.is_pos = 1
-            invoice.update_stock = 1
-        
+            _apply_pos_stock_authority(invoice, branch=getBranch())
+
         branch = getBranch()
         restaurant = frappe.db.get_value("URY Restaurant", {"branch": branch}, "name")
    

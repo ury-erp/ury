@@ -1,0 +1,167 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "hash",
+ "creation": "2026-08-28 00:00:00.000000",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "item_code",
+  "qty",
+  "company",
+  "column_break_scope",
+  "computed_at",
+  "section_break_costs",
+  "theoretical_cost",
+  "posted_cost",
+  "column_break_costs",
+  "counted_qty",
+  "counted_cost",
+  "section_break_variance",
+  "variance_vs_theoretical",
+  "variance_vs_counted",
+  "reason"
+ ],
+ "fields": [
+  {
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Item Code",
+   "options": "Item",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "qty",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Qty",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Company",
+   "options": "Company",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_scope",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "computed_at",
+   "fieldtype": "Datetime",
+   "label": "Computed At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_costs",
+   "fieldtype": "Section Break",
+   "label": "Costs"
+  },
+  {
+   "fieldname": "theoretical_cost",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Theoretical Cost",
+   "read_only": 1
+  },
+  {
+   "description": "Currently theoretical-equivalent: no real ERPNext posting exists for this fulfilment path yet (V3-73's flag defaults off). See ury_cost_variance_attribution.compute_posted_cost.",
+   "fieldname": "posted_cost",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Posted Cost",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_costs",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Accepted external input: no physical-count doctype exists yet, so this value is supplied by the caller of compute_variance().",
+   "fieldname": "counted_qty",
+   "fieldtype": "Float",
+   "label": "Counted Qty",
+   "read_only": 1
+  },
+  {
+   "fieldname": "counted_cost",
+   "fieldtype": "Currency",
+   "label": "Counted Cost",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_variance",
+   "fieldtype": "Section Break",
+   "label": "Variance"
+  },
+  {
+   "fieldname": "variance_vs_theoretical",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Variance vs Theoretical",
+   "read_only": 1
+  },
+  {
+   "fieldname": "variance_vs_counted",
+   "fieldtype": "Currency",
+   "label": "Variance vs Counted",
+   "read_only": 1
+  },
+  {
+   "fieldname": "reason",
+   "fieldtype": "Small Text",
+   "label": "Reason",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 0,
+ "links": [],
+ "modified": "2026-08-28 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY Cost Variance Snapshot",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Production Manager"
+  },
+  {
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Stock Manager"
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
