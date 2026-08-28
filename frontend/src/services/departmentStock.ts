@@ -87,7 +87,33 @@ const normalizeStockMovement = (row: any): StockMovementRow => ({
   posting_datetime: row.posting_datetime,
 });
 
+export interface DepartmentOption {
+  name: string;
+  department_name: string;
+}
+
 export const departmentStockService = {
+  /**
+   * Lists `URY Production Department` records for a branch, for populating
+   * the department selector. Read-only. Previously the page tried to derive
+   * this from a non-existent `department` field on the branch context
+   * object, which meant the selector was always empty -- fixed to call a
+   * real list endpoint instead.
+   */
+  async listDepartments(branch: string): Promise<DepartmentOption[]> {
+    if (!branch || branch === 'all') return [];
+    const res = await call<any>('frappe.client.get_list', {
+      doctype: 'URY Production Department',
+      filters: { branch, enabled: 1 },
+      fields: ['name', 'department_name'],
+      limit_page_length: 0,
+    });
+    return normalizeList<any>(res).map((row) => ({
+      name: row.name,
+      department_name: row.department_name || row.name,
+    }));
+  },
+
   /**
    * Lists `URY Issue Authorization` records for a branch/department/date
    * range. Read-only: no authorization is created, mutated, or approved.

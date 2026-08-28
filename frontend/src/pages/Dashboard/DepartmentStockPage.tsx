@@ -1,9 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, Spinner } from '@ury/ui';
 import { getLoggedUser, getUserRoles } from '@ury/core';
 import { useBranchContext } from '../../context/BranchContext';
 import {
   departmentStockService,
+  DepartmentOption,
   IssueAuthorizationRow,
   StockMovementRow,
 } from '../../services/departmentStock';
@@ -90,12 +91,26 @@ const DepartmentStockContent: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const departmentOptions = useMemo(() => {
-    const fromBranches = branches
-      .map((b) => (b as any).department)
-      .filter((value): value is string => Boolean(value));
-    return Array.from(new Set(fromBranches));
-  }, [branches]);
+  const [departmentOptions, setDepartmentOptions] = useState<DepartmentOption[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!activeBranchId || activeBranchId === 'all') {
+      setDepartmentOptions([]);
+      return;
+    }
+    departmentStockService
+      .listDepartments(activeBranchId)
+      .then((rows) => {
+        if (!cancelled) setDepartmentOptions(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setDepartmentOptions([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeBranchId]);
 
   useEffect(() => {
     if (!department) {
@@ -159,8 +174,8 @@ const DepartmentStockContent: React.FC = () => {
             >
               <option value="">Select department</option>
               {departmentOptions.map((dept) => (
-                <option key={dept} value={dept}>
-                  {dept}
+                <option key={dept.name} value={dept.name}>
+                  {dept.department_name}
                 </option>
               ))}
             </select>
