@@ -3,6 +3,7 @@ import { checkPOSOpening, validatePOSClose } from '../lib/pos-opening-api';
 import { getChecklist } from '../lib/checklist-api';
 import { usePOSStore } from '../store/pos-store';
 import POSOpeningDialog from './POSOpeningDialog';
+import POSClosingDialog from './POSClosingDialog';
 import ChecklistGateDialog from './ChecklistGateDialog';
 import { t } from '../i18n';
 
@@ -20,6 +21,9 @@ const POSOpeningProvider = ({ children }: POSOpeningProviderProps) => {
   // before we even look at whether a previous session needs closing.
   const [needsOpeningChecklist, setNeedsOpeningChecklist] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  // Track whether POSClosingDialog failed/was cancelled and we should fall
+  // back to the blocker so the user has Switch to Desk escape hatch.
+  const [showClosingBlocker, setShowClosingBlocker] = useState(false);
   const { posProfile } = usePOSStore();
 
   const checkPOSStatus = async () => {
@@ -82,6 +86,8 @@ const POSOpeningProvider = ({ children }: POSOpeningProviderProps) => {
   };
 
   const handleReload = () => {
+    // Reset the blocker flag when reloading so we start fresh
+    setShowClosingBlocker(false);
     window.location.reload();
   };
 
@@ -89,6 +95,8 @@ const POSOpeningProvider = ({ children }: POSOpeningProviderProps) => {
     // Only check if we have the POS profile loaded
     if (posProfile) {
       checkPOSStatus();
+      // Reset the blocker flag when status check runs (e.g., after opening checklist completes)
+      setShowClosingBlocker(false);
     }
   }, [posProfile]);
 
@@ -105,8 +113,35 @@ const POSOpeningProvider = ({ children }: POSOpeningProviderProps) => {
   }
 
   // Show dialog if there's a validation issue
-  if (validationType) {
-    return <POSOpeningDialog onReload={handleReload} type={validationType} />;
+  if (validationType === 'opening') {
+    return <POSOpeningDialog onReload={handleReload} type="opening" />;
+  }
+
+  // For closing gate: fall back to blocker if POSClosingDialog failed/was cancelled
+  if (validationType === 'closing' && showClosingBlocker) {
+    return <POSOpeningDialog onReload={handleReload} type="closing" />;
+  }
+
+  // Show the real closing dialog. If it fails to load (e.g., no open entry
+  // found) or user cancels, fall back to the blocker so they have Switch to
+  // Desk option. This is necessary because POSClosingDialog.cancel is the
+  // only way to signal "user cancelled" when there's a load error.
+  if (validationType === 'closing') {
+    return (
+      <POSClosingDialog
+        open={true}
+        onOpenChange={(next) => {
+          if (!next) {
+            // Dialog is closing (error or user cancel) - fall back to blocker
+            setShowClosingBlocker(true);
+          }
+        }}
+        onClosingSubmitted={async () => {
+          setValidationType(null);
+          await checkPOSStatus();
+        }}
+      />
+    );
   }
 
   // Block on the Opening checklist until it's submitted as Complete.
