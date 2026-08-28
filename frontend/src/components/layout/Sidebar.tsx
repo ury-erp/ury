@@ -6,7 +6,6 @@ import {
   LayoutDashboard,
   Utensils,
   Grid,
-  Settings2,
   Home,
   SlidersHorizontal,
   Users,
@@ -19,7 +18,8 @@ import {
   Warehouse,
   TrendingUp,
   BarChart3,
-  ArrowLeft
+  ArrowLeft,
+  AlertCircle
 } from 'lucide-react';
 
 interface NavItem {
@@ -62,24 +62,25 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'POS Profile', path: '/pos-profile', icon: SlidersHorizontal },
       { label: 'User', path: '/user', icon: Users },
       { label: 'Branch', path: '/branch', icon: Building2 },
+      { label: 'Self Ordering Profile', path: '/self-ordering-profile', icon: Settings },
       { label: 'Aggregators', path: '/aggregator', icon: Store }
     ]
   }
 ];
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
-  \`flex items-center space-x-3 px-3.5 py-2.5 rounded-lg text-sm font-medium transition-all \${
+  `flex items-center space-x-3 px-3.5 py-2.5 rounded-lg text-sm font-medium transition-all ${
     isActive
       ? 'bg-[#2563eb] text-white shadow-sm font-semibold'
       : 'text-gray-600 hover:bg-blue-50 hover:text-[#2563eb]'
-  }\`;
+  }`;
 
 const reportLinkClass = ({ isActive }: { isActive: boolean }) =>
-  \`flex items-center space-x-2.5 px-3 py-2 rounded-md text-[13px] font-medium transition-all \${
+  `flex items-center space-x-2.5 px-3 py-2 rounded-md text-[13px] font-medium transition-all ${
     isActive
       ? 'bg-[#2563eb] text-white shadow-sm font-semibold'
       : 'text-gray-600 hover:bg-blue-50 hover:text-[#2563eb]'
-  }\`;
+  }`;
 
 const reportGroups = groupReports(reportsRegistry);
 const reportGroupEntries = Object.entries(reportGroups);
@@ -111,7 +112,7 @@ const ReportsPanel: React.FC = () => (
             {reports.map((report) => {
               const Icon = report.icon;
               return (
-                <NavLink key={report.id} to={\`/reports/\${report.path}\`} className={reportLinkClass}>
+                <NavLink key={report.id} to={`/reports/${report.path}`} className={reportLinkClass}>
                   <Icon className="w-4 h-4 shrink-0" />
                   <span>{report.label}</span>
                 </NavLink>
@@ -126,7 +127,7 @@ const ReportsPanel: React.FC = () => (
 
 const MainPanel: React.FC<{ isManager: boolean }> = ({ isManager }) => {
   const location = useLocation();
-  const isAdvancedPath = location.pathname.startsWith('/report-settings') || location.pathname.startsWith('/production-unit') || location.pathname.startsWith('/production-department') || location.pathname.startsWith('/item-production-config');
+  const isAdvancedPath = location.pathname.startsWith('/report-settings') || location.pathname.startsWith('/production-unit') || location.pathname.startsWith('/production-department');
   const [isAdvancedOpen, setIsAdvancedOpen] = useState<boolean>(isAdvancedPath);
 
   return (
@@ -160,20 +161,20 @@ const MainPanel: React.FC<{ isManager: boolean }> = ({ isManager }) => {
       <div className="pt-2">
         <button
           onClick={() => setIsAdvancedOpen(!isAdvancedOpen)}
-          className={\`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-sm font-medium transition-colors \${
+          className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-sm font-medium transition-colors ${
             isAdvancedPath
               ? 'text-[#2563eb] font-semibold bg-blue-50'
               : 'text-gray-600 hover:bg-blue-50 hover:text-[#2563eb]'
-          }\`}
+          }`}
         >
           <div className="flex items-center space-x-3">
             <Settings className="w-5 h-5 shrink-0" />
             <span>Advanced Settings</span>
           </div>
           <ChevronDown
-            className={\`w-4 h-4 transition-transform duration-200 \${
+            className={`w-4 h-4 transition-transform duration-200 ${
               isAdvancedOpen ? 'rotate-180 text-[#2563eb]' : 'text-gray-400'
-            }\`}
+            }`}
           />
         </button>
 
@@ -182,11 +183,11 @@ const MainPanel: React.FC<{ isManager: boolean }> = ({ isManager }) => {
             <NavLink
               to="/report-settings"
               className={({ isActive }) =>
-                \`flex items-center space-x-3 px-3.5 py-2 rounded-lg text-xs font-medium transition-all \${
+                `flex items-center space-x-3 px-3.5 py-2 rounded-lg text-xs font-medium transition-all ${
                   isActive
                     ? 'bg-primary text-white shadow-sm font-semibold'
                     : 'text-gray-600 hover:bg-blue-50 hover:text-primary'
-                }\`
+                }`
               }
             >
               <FileText className="w-4 h-4 shrink-0" />
@@ -195,11 +196,11 @@ const MainPanel: React.FC<{ isManager: boolean }> = ({ isManager }) => {
             <NavLink
               to="/production-unit"
               className={({ isActive }) =>
-                \`flex items-center space-x-3 px-3.5 py-2 rounded-lg text-xs font-medium transition-all \${
+                `flex items-center space-x-3 px-3.5 py-2 rounded-lg text-xs font-medium transition-all ${
                   isActive
                     ? 'bg-[#2563eb] text-white shadow-sm font-semibold'
                     : 'text-gray-600 hover:bg-blue-50 hover:text-[#2563eb]'
-                }\`
+                }`
               }
             >
               <Grid className="w-4 h-4 shrink-0" />
@@ -208,28 +209,15 @@ const MainPanel: React.FC<{ isManager: boolean }> = ({ isManager }) => {
             <NavLink
               to="/production-department"
               className={({ isActive }) =>
-                \`flex items-center space-x-3 px-3.5 py-2 rounded-lg text-xs font-medium transition-all \${
+                `flex items-center space-x-3 px-3.5 py-2 rounded-lg text-xs font-medium transition-all ${
                   isActive
                     ? 'bg-[#2563eb] text-white shadow-sm font-semibold'
                     : 'text-gray-600 hover:bg-blue-50 hover:text-[#2563eb]'
-                }\`
+                }`
               }
             >
               <Building2 className="w-4 h-4 shrink-0" />
               <span>Production Department</span>
-            </NavLink>
-            <NavLink
-              to="/item-production-config"
-              className={({ isActive }) =>
-                \`flex items-center space-x-3 px-3.5 py-2 rounded-lg text-xs font-medium transition-all \${
-                  isActive
-                    ? 'bg-[#2563eb] text-white shadow-sm font-semibold'
-                    : 'text-gray-600 hover:bg-blue-50 hover:text-[#2563eb]'
-                }\`
-              }
-            >
-              <Settings2 className="w-4 h-4 shrink-0" />
-              <span>Item Production Config</span>
             </NavLink>
           </div>
         )}

@@ -20,6 +20,7 @@ import AggregatorPage from './pages/Dashboard/AggregatorPage';
 import SalesPlanPage from './pages/Dashboard/SalesPlanPage';
 import { DepartmentStockPage } from './pages/Dashboard/DepartmentStockPage';
 import { DepartmentProfitabilityPage } from './pages/Dashboard/DepartmentProfitabilityPage';
+import { StockReservationPage } from './pages/Dashboard/StockReservationPage';
 import { RoleGuard } from './components/RoleGuard';
 import { AuthGuard } from './components/AuthGuard';
 import { ReportsLayout } from './pages/Reports/ReportsLayout';
@@ -146,6 +147,7 @@ function App() {
             path="department-profitability"
             element={<DepartmentProfitabilityPage />}
           />
+          <Route path="stock-reservations" element={<StockReservationPage />} />
 
           <Route
             path="reports/*"
