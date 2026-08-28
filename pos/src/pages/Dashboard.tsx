@@ -1,8 +1,9 @@
-import { TrendingUp, AlertTriangle, Bell, Users, ShoppingCart, Clock } from 'lucide-react';
+import { TrendingUp, AlertTriangle, Bell, Users, ShoppingCart, Clock, LogOut } from 'lucide-react';
 import { Card, CardContent } from '@ury/ui';
 import { useState, useEffect } from 'react';
 import { usePOSStore } from '../store/pos-store';
 import { formatCurrency } from '@ury/core';
+import { getOpenPosOpeningEntries, type OpenPosOpeningEntry } from '../lib/pos-closing-api';
 
 // Helper function to format relative time
 function getRelativeTime(creationDate: string): string {
@@ -28,6 +29,23 @@ function formatETA(minutes: number | null): string {
   return `~${hours} hr ${mins > 0 ? `${mins} min` : ''}`.trim();
 }
 
+// Helper to format date for open sessions display
+function formatOpenSessionDate(dateString: string): string {
+  try {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffMins = Math.floor((diffMs % 3600000) / 60000);
+
+    if (diffHours === 0) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ${diffMins}m ago`;
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  } catch {
+    return dateString;
+  }
+}
+
 export default function Dashboard() {
   const { posProfile } = usePOSStore();
   const [stats, setStats] = useState<any[]>([]);
@@ -38,6 +56,7 @@ export default function Dashboard() {
   const [runningLow, setRunningLow] = useState<any[]>([]);
   const [needsAttention, setNeedsAttention] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
+  const [openEntries, setOpenEntries] = useState<OpenPosOpeningEntry[]>([]);
   const [statsLoading, setStatsLoading] = useState(false);
   const [serviceLineLoading, setServiceLineLoading] = useState(false);
   const [metricsLoading, setMetricsLoading] = useState(false);
@@ -45,6 +64,7 @@ export default function Dashboard() {
   const [runningLowLoading, setRunningLowLoading] = useState(false);
   const [needsAttentionLoading, setNeedsAttentionLoading] = useState(false);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [openEntriesLoading, setOpenEntriesLoading] = useState(false);
   const [statsError, setStatsError] = useState<string | null>(null);
   const [serviceLineError, setServiceLineError] = useState<string | null>(null);
   const [metricsError, setMetricsError] = useState<string | null>(null);
@@ -52,6 +72,7 @@ export default function Dashboard() {
   const [runningLowError, setRunningLowError] = useState<string | null>(null);
   const [needsAttentionError, setNeedsAttentionError] = useState<string | null>(null);
   const [notificationsError, setNotificationsError] = useState<string | null>(null);
+  const [openEntriesError, setOpenEntriesError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!posProfile?.branch) return;
@@ -225,6 +246,27 @@ export default function Dashboard() {
 
     fetchDashboardData();
   }, [posProfile?.branch]);
+
+  // Fetch open sessions
+  useEffect(() => {
+    if (!posProfile?.name) return;
+
+    const fetchOpenEntries = async () => {
+      setOpenEntriesLoading(true);
+      setOpenEntriesError(null);
+      try {
+        const data = await getOpenPosOpeningEntries(posProfile.name);
+        setOpenEntries(data);
+      } catch (err) {
+        setOpenEntriesError('Failed to load open sessions');
+        console.error('Error fetching open entries:', err);
+      } finally {
+        setOpenEntriesLoading(false);
+      }
+    };
+
+    fetchOpenEntries();
+  }, [posProfile?.name]);
 
   // Calculate max minutes for service line bar height
   const maxMinutes = Math.max(90, ...serviceLine.filter(t => t.minutes !== null).map((t: any) => t.minutes), 1);
@@ -496,6 +538,51 @@ export default function Dashboard() {
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Open Sessions Section */}
+          <Card className="bg-white border border-gray-200">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <LogOut className="w-5 h-5 text-slate-600" />
+                <h3 className="text-lg font-semibold text-gray-900">Open Sessions</h3>
+              </div>
+              {openEntriesError ? (
+                <p className="text-red-600 text-sm">Failed to load</p>
+              ) : openEntriesLoading ? (
+                <p className="text-gray-600 text-sm">Loading...</p>
+              ) : openEntries.length === 0 ? (
+                <p className="text-gray-600 text-sm">No sessions left open.</p>
+              ) : (
+                <div className="space-y-3">
+                  <div className="text-sm text-gray-600 mb-3">
+                    <span className="font-semibold text-gray-900">{openEntries.length}</span>
+                    <span> session{openEntries.length !== 1 ? 's' : ''} open</span>
+                  </div>
+                  <div className="space-y-2">
+                    {openEntries.slice(0, 5).map((entry) => (
+                      <div key={entry.name} className="p-2 bg-gray-50 rounded text-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium text-gray-900">{entry.user}</span>
+                          <span className="text-gray-600">{formatOpenSessionDate(entry.period_start_date)}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {openEntries.length > 5 && (
+                    <div className="text-xs text-gray-600 text-center py-2">
+                      +{openEntries.length - 5} more
+                    </div>
+                  )}
+                  <a
+                    href="/pos/open-entries"
+                    className="block text-center text-xs font-medium text-blue-600 hover:text-blue-700 mt-3 pt-2 border-t border-gray-200"
+                  >
+                    View all
+                  </a>
                 </div>
               )}
             </CardContent>
