@@ -122,11 +122,13 @@
    "fieldtype": "Column Break"
   },
   {
+   "default": "SUBMITTED",
    "fieldname": "status",
-   "fieldtype": "Data",
+   "fieldtype": "Select",
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Status",
+   "options": "CREATED\nSUBMITTING\nSUBMITTED\nPENDING\nPROCESSING\nCOMPLETED\nFAILED\nCANCELED\nUNKNOWN",
    "read_only": 1
   },
   {
