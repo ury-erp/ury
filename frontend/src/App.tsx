@@ -22,6 +22,7 @@ import { DepartmentStockPage } from './pages/Dashboard/DepartmentStockPage';
 import { DepartmentProfitabilityPage } from './pages/Dashboard/DepartmentProfitabilityPage';
 import { KotErrorLogPage } from './pages/Dashboard/KotErrorLogPage';
 import { StockReservationPage } from './pages/Dashboard/StockReservationPage';
+import { PaymentTerminalPage } from './pages/Dashboard/PaymentTerminalPage';
 import { RoleGuard } from './components/RoleGuard';
 import { AuthGuard } from './components/AuthGuard';
 import { ReportsLayout } from './pages/Reports/ReportsLayout';
@@ -154,6 +155,7 @@ function App() {
             element={<KotErrorLogPage />}
           />
           <Route path="stock-reservations" element={<StockReservationPage />} />
+          <Route path="payment-terminals" element={<PaymentTerminalPage />} />
 
           <Route
             path="reports/*"
