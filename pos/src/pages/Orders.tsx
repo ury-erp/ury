@@ -89,11 +89,8 @@ export default function Orders() {
   const [selectedInvoiceId, setSelectedInvoiceId] = React.useState<string | null>(null);
 
   const {
-    jobs: printJobs,
-    loading: printJobsLoading,
-    error: printJobsError,
-    refresh: refreshPrintJobs,
-    getInvoicePrintStatus,
+    hasInvoiceFailed,
+    refreshFailedJobs,
   } = useOrdersPrintJobs();
 
   const canSplitBill = useMemo(() => {
@@ -392,7 +389,7 @@ export default function Orders() {
                   ? order.rounded_total + Math.round(order.custom_merged_total ?? 0)
                   : order.rounded_total;
 
-                const printStatus = getInvoicePrintStatus(order.name);
+                const isFailed = hasInvoiceFailed(order.name);
 
                 return (
                 <Card
@@ -487,7 +484,7 @@ export default function Orders() {
                             setPrintJobsModalOpen(true);
                           }}
                         >
-                          {printStatus.hasFailed ? (
+                          {isFailed ? (
                             <PrinterX className="w-4 h-4 text-red-600" />
                           ) : (
                             <PrinterCheck className="w-4 h-4 text-gray-400" />
@@ -821,10 +818,7 @@ export default function Orders() {
         open={printJobsModalOpen}
         onOpenChange={setPrintJobsModalOpen}
         invoiceId={selectedInvoiceId}
-        jobs={printJobs}
-        loading={printJobsLoading}
-        error={printJobsError}
-        onRefresh={refreshPrintJobs}
+        onRefreshFailedJobs={refreshFailedJobs}
       />
     </div>
   );
