@@ -3,6 +3,7 @@ import { checkPOSOpening, validatePOSClose } from '../lib/pos-opening-api';
 import { getChecklist } from '../lib/checklist-api';
 import { usePOSStore } from '../store/pos-store';
 import POSOpeningDialog from './POSOpeningDialog';
+import POSOpeningEntryDialog from './POSOpeningEntryDialog';
 import POSClosingDialog from './POSClosingDialog';
 import ChecklistGateDialog from './ChecklistGateDialog';
 import { t } from '../i18n';
@@ -112,9 +113,17 @@ const POSOpeningProvider = ({ children }: POSOpeningProviderProps) => {
     );
   }
 
-  // Show dialog if there's a validation issue
+  // Show opening entry creation dialog when POS needs to be opened
   if (validationType === 'opening') {
-    return <POSOpeningDialog onReload={handleReload} type="opening" />;
+    return (
+      <POSOpeningEntryDialog
+        open={true}
+        onOpenChange={() => {}}
+        onOpeningSubmitted={async () => {
+          await checkPOSStatus();
+        }}
+      />
+    );
   }
 
   // For closing gate: fall back to blocker if POSClosingDialog failed/was cancelled
@@ -162,4 +171,4 @@ const POSOpeningProvider = ({ children }: POSOpeningProviderProps) => {
   return <>{children}</>;
 };
 
-export default POSOpeningProvider; 
+export default POSOpeningProvider;
