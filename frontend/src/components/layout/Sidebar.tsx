@@ -20,7 +20,8 @@ import {
   TrendingUp,
   BarChart3,
   ArrowLeft,
-  AlertCircle
+  AlertCircle,
+  CreditCard
 } from 'lucide-react';
 
 interface NavItem {
@@ -64,7 +65,8 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'User', path: '/user', icon: Users },
       { label: 'Branch', path: '/branch', icon: Building2 },
       { label: 'Self Ordering Profile', path: '/self-ordering-profile', icon: Settings },
-      { label: 'Aggregators', path: '/aggregator', icon: Store }
+      { label: 'Aggregators', path: '/aggregator', icon: Store },
+      { label: 'Payment Terminals', path: '/payment-terminals', icon: CreditCard }
     ]
   }
 ];
