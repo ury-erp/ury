@@ -3,7 +3,8 @@
   "workspaces": [
     "packages/*",
     "pos",
-    "frontend"
+    "frontend",
+    "self-order"
   ],
   "scripts": {
     "ury-pos-install": "cd urypos && yarn install --check-files",

@@ -54,6 +54,7 @@ website_context = {"splash_image": "/assets/ury/Images/ury-logo.jpg"}
 
 website_route_rules = [
     {"from_route": "/urypos/<path:app_path>", "to_route": "urypos"},
+    {"from_route": "/order/<path:app_path>", "to_route": "order"},
     {"from_route": "/mosaic/<path:app_path>", "to_route": "mosaic"},
     {"from_route": "/ury/<path:app_path>", "to_route": "ury"},
     {"from_route": "/setup-wizard", "to_route": "ury"},
