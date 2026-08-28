@@ -26,12 +26,17 @@ export async function printOrder({ orderId, posProfile, printFormat }: PrintOrde
     await updatePrintStatus(orderId);
     return 'qz';
   } else if (print_type === 'network') {
+    let result: { status: 'Success' | 'Failure'; message?: string };
     if (cashier && !multiple_cashier) {
-      await networkPrint(orderId, printer as string, format as string);
+      result = await networkPrint(orderId, printer as string, format as string);
     } else {
-      await selectNetworkPrinter(orderId, name, format);
+      result = await selectNetworkPrinter(orderId, name, format);
     }
-    await updatePrintStatus(orderId);
+    // Network printing lifecycle is driven asynchronously by CUPS state polling
+    // and backend finalization; do NOT call updatePrintStatus here.
+    if (result.status === 'Failure') {
+      throw new Error(result.message || 'Network print submission failed');
+    }
     return 'network';
   } else {
     // Redirect to printview page

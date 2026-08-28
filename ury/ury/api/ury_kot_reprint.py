@@ -2,6 +2,7 @@ import copy
 
 import frappe
 from frappe.utils import cint
+from ury.ury.printing.service import submit_and_monitor_print_job
 
 
 @frappe.whitelist()
@@ -170,20 +171,21 @@ def reprint_kot(invoice_number):
 
 
 def print_kot(printer, docname, kot_print_format, doc=None):
-	"""
-	Dispatch a single KOT print job via the Frappe print server.
-
-	Args:
-	    printer: Name of the Network Printer Settings document.
-	    docname: Name of the POS Invoice to print.
-	    kot_print_format: Name of the Print Format to use.
-	    doc: Optional pre-built/cloned document object.  When supplied the
-	         print format renders this object instead of re-fetching from DB,
-	         which lets us print a filtered clone with only the relevant items.
-	"""
 	try:
-		from frappe.utils.print_format import print_by_server
-
-		print_by_server("POS Invoice", docname, printer, kot_print_format, doc=doc)
+		restaurant_table = doc.get("restaurant_table") if doc else None
+		order_type = doc.get("order_type") if doc else None
+		submit_and_monitor_print_job(
+			doctype="POS Invoice",
+			name=docname,
+			printer_setting=printer,
+			print_format=kot_print_format,
+			doc=doc,
+			job_type="KOT_REPRINT",
+			extra_metadata={
+				"invoice": docname,
+				"restaurant_table": restaurant_table,
+				"order_type": order_type,
+			},
+		)
 	except Exception as e:
-		frappe.log_error(f"KOT Reprint Error: {e}", "KOT Print Error")
+		frappe.log_error(f"KOT Reprint Error: {e}", "KOT Reprint Error")

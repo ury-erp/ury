@@ -515,7 +515,8 @@ export const useInvoiceDataStore = defineStore("invoiceData", {
             let errorMessage = "";
             do {
               const res = await printingCall();
-              if (res === "Success") {
+              const isSuccess = (res && typeof res === "object" && res.status === "Success") || res === "Success";
+              if (isSuccess) {
                 this.notification.createNotification("Print Successful");
                 const sendObj = {
                   invoice: invoiceNo,
@@ -530,10 +531,11 @@ export const useInvoiceDataStore = defineStore("invoiceData", {
               errorMessage = res;
               i++;
             } while (i < 1);
+            const errorMessageText = (errorMessage && typeof errorMessage === "object" && errorMessage.message) ? errorMessage.message : errorMessage;
             throw {
               alert: this.alert.createAlert(
                 "Message",
-                `Message:${errorMessage}`,
+                `Message:${errorMessageText}`,
                 "OK"
               ),
               custom: (this.isPrinting = false),
@@ -554,7 +556,8 @@ export const useInvoiceDataStore = defineStore("invoiceData", {
             let errorMessage = "";
             do {
               const res = await networkPrintPrintingCall();
-              if (res === "Success") {
+              const isSuccess = (res && typeof res === "object" && res.status === "Success") || res === "Success";
+              if (isSuccess) {
                 this.notification.createNotification("Print Successful");
                 const sendObj = {
                   invoice: invoiceNo,
@@ -569,10 +572,11 @@ export const useInvoiceDataStore = defineStore("invoiceData", {
               errorMessage = res;
               i++;
             } while (i < 1);
+            const errorMessageText = (errorMessage && typeof errorMessage === "object" && errorMessage.message) ? errorMessage.message : errorMessage;
             throw {
               alert: this.alert.createAlert(
                 "Message",
-                `Message:${errorMessage}`,
+                `Message:${errorMessageText}`,
                 "OK"
               ),
               custom: (this.isPrinting = false),
