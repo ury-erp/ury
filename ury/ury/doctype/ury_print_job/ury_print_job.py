@@ -114,6 +114,12 @@ def _serialize_for_document(data):
     out.modified = out.get("last_checked_at") or out.get("modified") or out.creation
     out._comment_count = out.get("_comment_count", 0)
 
+    # Normalize the invoice identifier so filters on `invoice` work for all
+    # job types, including POS Invoice jobs that only store `reference_name`.
+    out.invoice = out.get("invoice") or (
+        out.get("reference_name") if out.get("reference_doctype") == "POS Invoice" else None
+    )
+
     return out
 
 
@@ -186,8 +192,17 @@ def _matches_filters(doc, filters):
         doc_value = doc.get(fname)
 
         if fop == "=":
-            if doc_value != fval:
-                return False
+            if doc_value == fval:
+                continue
+            # Fallback: POS Invoice jobs may match by reference_name even when
+            # the caller filters on `invoice`.
+            if (
+                fname == "invoice"
+                and doc.get("reference_doctype") == "POS Invoice"
+                and doc.get("reference_name") == fval
+            ):
+                continue
+            return False
         elif fop == "like":
             needle = str(fval).replace("%", "").lower()
             haystack = str(doc_value or "").lower()
