@@ -210,6 +210,30 @@ def get_dashboard_stats(branch=None):
 
 
 @frappe.whitelist(methods=["GET"])
+def get_cancelled_invoices_count(branch=None):
+	"""Lightweight count of today's cancelled POS Invoices (docstatus=2).
+
+	Backs a Service Board warning badge only -- not the full cancelled
+	invoices audit list (that stays in report_api.sales.get_cancelled_invoices,
+	manager-gated). This is a plain today-only count, same access level as
+	the rest of ury_dashboard.py's stats.
+	"""
+	cache_key = f"ury_dashboard_cancelled_invoices_count:{branch}"
+	cached = frappe.cache().get_value(cache_key)
+	if cached is not None:
+		return cached
+
+	filters = {"docstatus": 2, "posting_date": today()}
+	if branch:
+		filters["branch"] = branch
+
+	count = frappe.db.count("POS Invoice", filters)
+
+	frappe.cache().set_value(cache_key, count, expires_in_sec=30)
+	return count
+
+
+@frappe.whitelist(methods=["GET"])
 def get_needs_attention(branch=None):
 	cache_key = f"ury_dashboard_needs_attention:{branch}"
 	cached = frappe.cache().get_value(cache_key)

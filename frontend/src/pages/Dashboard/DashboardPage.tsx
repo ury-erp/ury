@@ -4,6 +4,7 @@ import { Card, Spinner } from '@ury/ui';
 import { useBranchContext } from '../../context/BranchContext';
 import {
   BaselineStats,
+  DailyPnlSummary,
   DashboardStats,
   NeedsAttentionItem,
   PlanStatus,
@@ -59,6 +60,19 @@ const buildSummaryLine = (items: NeedsAttentionItem[]): string => {
   }
 
   return clauses.length > 0 ? clauses.join(' · ') : 'All clear — no issues need attention.';
+};
+
+const formatCurrency = (value: number | undefined): string => {
+  if (value === undefined || !Number.isFinite(value)) return '—';
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    maximumFractionDigits: 0,
+  }).format(value);
+};
+
+const getDailyPnlNetProfit = (pnl: DailyPnlSummary | null): number | undefined => {
+  return pnl?.summary?.find((row) => row.key === 'net_profit')?.amount;
 };
 
 const formatVsBaseline = (todaysSales: number | undefined, medianSales: number | undefined): string => {
@@ -121,6 +135,8 @@ export const DashboardPage: React.FC = () => {
   const [baseline, setBaseline] = useState<BaselineStats | null>(null);
   const [shiftMetrics, setShiftMetrics] = useState<ShiftMetrics | null>(null);
   const [planStatus, setPlanStatus] = useState<PlanStatus | null>(null);
+  const [dailyPnl, setDailyPnl] = useState<DailyPnlSummary | null>(null);
+  const [cancelledCount, setCancelledCount] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -136,6 +152,8 @@ export const DashboardPage: React.FC = () => {
       setBaseline(null);
       setShiftMetrics(null);
       setPlanStatus(null);
+      setDailyPnl(null);
+      setCancelledCount(0);
       setError('Select a specific branch above to view its Service Board.');
       setLoading(false);
       return;
@@ -147,12 +165,17 @@ export const DashboardPage: React.FC = () => {
 
     (async () => {
       try {
-        const [statsRes, attentionRes, baselineRes, shiftRes, planRes] = await Promise.all([
+        const [statsRes, attentionRes, baselineRes, shiftRes, planRes, pnlRes, cancelledRes] = await Promise.all([
           uryDashboardService.getDashboardStats(activeBranchId),
           uryDashboardService.getNeedsAttention(activeBranchId),
           uryDashboardService.getBaseline(activeBranchId),
           uryDashboardService.getShiftMetrics(activeBranchId),
           uryDashboardService.getPlanStatus(activeBranchId, today),
+          // Daily P&L is manager-gated on the backend (report_api.require_manager)
+          // and cancelled-invoices count is a minor extra -- neither should break
+          // the core Service Board for a non-manager viewer or a transient error.
+          uryDashboardService.getDailyPnlSummary(activeBranchId, today).catch(() => null),
+          uryDashboardService.getCancelledInvoicesCount(activeBranchId).catch(() => 0),
         ]);
         if (cancelled) return;
         setStats(statsRes);
@@ -160,6 +183,8 @@ export const DashboardPage: React.FC = () => {
         setBaseline(baselineRes);
         setShiftMetrics(shiftRes);
         setPlanStatus(planRes);
+        setDailyPnl(pnlRes);
+        setCancelledCount(cancelledRes);
       } catch (err) {
         console.error('Failed to load Service Board data:', err);
         if (!cancelled) {
@@ -177,6 +202,9 @@ export const DashboardPage: React.FC = () => {
 
   const vsBaseline = formatVsBaseline(shiftMetrics?.sales ?? stats?.todays_sales, baseline?.median_sales);
   const planStatusLabel = planStatus?.status || 'No plan';
+  const todaysSalesLabel = formatCurrency(stats?.todays_sales);
+  const dailyPnlNetProfit = getDailyPnlNetProfit(dailyPnl);
+  const dailyPnlStatusLabel = dailyPnl?.exists ? formatCurrency(dailyPnlNetProfit) : 'Not yet generated';
 
   return (
     <div className="space-y-6">
@@ -195,6 +223,30 @@ export const DashboardPage: React.FC = () => {
           <Card className="p-4">
             <p className="text-sm text-gray-700">{buildSummaryLine(needsAttention)}</p>
           </Card>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Card className="p-4">
+              <p className="text-xs font-medium text-gray-500">Today's Sales</p>
+              <p className="mt-1 text-2xl font-semibold text-gray-900">{todaysSalesLabel}</p>
+            </Card>
+            <Card className="p-4">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-medium text-gray-500">Daily P&amp;L</p>
+                {cancelledCount > 0 ? (
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                    {cancelledCount} cancelled
+                  </span>
+                ) : null}
+              </div>
+              <p className="mt-1 text-2xl font-semibold text-gray-900">{dailyPnlStatusLabel}</p>
+              <Link
+                to="/reports/daily-pnl"
+                className="mt-1 inline-block text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline"
+              >
+                View Daily P&amp;L report
+              </Link>
+            </Card>
+          </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <Card className="p-4">

@@ -177,6 +177,20 @@ export interface ShiftMetrics {
   avg_ticket_minutes: number;
 }
 
+export interface DailyPnlSummaryField {
+  key: string;
+  label: string;
+  amount: number;
+  percent: number;
+}
+
+export interface DailyPnlSummary {
+  exists: boolean;
+  branch?: string;
+  date?: string;
+  summary?: DailyPnlSummaryField[];
+}
+
 export interface PlanStatus {
   name: string | null;
   status: string | null;
@@ -185,6 +199,20 @@ export interface PlanStatus {
 const unwrap = <T,>(res: unknown): T => ((res as any)?.message ?? res) as T;
 
 export const uryDashboardService = {
+  async getCancelledInvoicesCount(branch?: string): Promise<number> {
+    const res = await call.get<number>('ury.ury.api.ury_dashboard.get_cancelled_invoices_count', { branch });
+    return unwrap<number>(res) ?? 0;
+  },
+
+  async getDailyPnlSummary(branch: string, date: string): Promise<DailyPnlSummary> {
+    const res = await call.get<DailyPnlSummary>('ury.ury.report_api.financial.get_daily_pnl', {
+      branch,
+      date,
+    });
+    return unwrap<DailyPnlSummary>(res);
+  },
+
+
   async getDashboardStats(branch?: string): Promise<DashboardStats> {
     const res = await call.get<DashboardStats>('ury.ury.api.ury_dashboard.get_dashboard_stats', { branch });
     return unwrap<DashboardStats>(res);
