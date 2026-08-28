@@ -73,8 +73,13 @@ const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: Checklis
     setLoadError(null);
 
     try {
-      const { items, logName: fetchedLogName } = await getChecklist(posProfile, checklistType);
-      setRows(toRowState(items));
+      // getChecklist's declared camelCase fields (logName/logStatus) don't
+      // actually match what the backend returns (log_name/log_status), so
+      // fetchedLogName was always undefined here. Read both casings
+      // defensively until the shared api layer is fixed.
+      const checklistResult: any = await getChecklist(posProfile, checklistType);
+      const fetchedLogName = checklistResult.logName ?? checklistResult.log_name ?? null;
+      setRows(toRowState(checklistResult.items));
       setLogName(fetchedLogName);
     } catch (error) {
       console.error('Failed to load checklist:', error);
