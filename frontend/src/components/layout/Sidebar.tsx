@@ -37,23 +37,23 @@ interface NavGroup {
 
 const NAV_GROUPS: NavGroup[] = [
   {
-    label: 'Today',
-    items: [{ label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard }]
-  },
-  {
     label: 'Plan',
     items: [{ label: 'Sales Plan', path: '/sales-plan', icon: ClipboardList }]
   },
   {
-    label: 'Close',
+    label: 'Observe',
     items: [
-      { label: 'Department Stock', path: '/department-stock', icon: Warehouse },
-      { label: 'Stock Reservations', path: '/stock-reservations', icon: Warehouse }
+      { label: 'Service Board', path: '/dashboard', icon: LayoutDashboard },
+      { label: 'Profitability', path: '/department-profitability', icon: TrendingUp }
     ]
   },
   {
-    label: 'Insight',
-    items: [{ label: 'Profitability', path: '/department-profitability', icon: TrendingUp }, { label: 'KOT Error Log', path: '/kot-error-log', icon: AlertCircle }]
+    label: 'Control',
+    items: [
+      { label: 'Department Stock', path: '/department-stock', icon: Warehouse },
+      { label: 'Stock Reservations', path: '/stock-reservations', icon: Warehouse },
+      { label: 'KOT Error Log', path: '/kot-error-log', icon: AlertCircle }
+    ]
   },
   {
     label: 'Setup',
