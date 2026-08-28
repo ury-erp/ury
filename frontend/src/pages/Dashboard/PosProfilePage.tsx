@@ -375,7 +375,7 @@ export const PosProfilePage: React.FC = () => {
           ) : (
             <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
               <table className="w-full text-left text-sm text-gray-600">
-                <thead className="bg-gray-50 border-b border-gray-100 text-xs uppercase text-gray-500 font-semibold">
+                <thead className="bg-gray-50 border-b border-gray-100 text-xs text-gray-500 font-semibold">
                   <tr>
                     <th className="px-6 py-4">Production Unit</th>
                     <th className="px-6 py-4">Branch</th>
@@ -628,7 +628,7 @@ export const PosProfilePage: React.FC = () => {
           
           {/* General Settings */}
           <div>
-            <h4 className="font-bold text-gray-700 text-xs uppercase tracking-wider mb-3 pb-2 border-b border-gray-100">General Settings</h4>
+            <h4 className="font-bold text-gray-700 text-xs tracking-wider mb-3 pb-2 border-b border-gray-100">General Settings</h4>
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="block font-semibold text-gray-700 mb-1.5">Company</label>
@@ -668,7 +668,7 @@ export const PosProfilePage: React.FC = () => {
 
           {/* Feature toggles */}
           <div>
-            <h4 className="font-bold text-gray-700 text-xs uppercase tracking-wider mb-3 pb-2 border-b border-gray-100">Features</h4>
+            <h4 className="font-bold text-gray-700 text-xs tracking-wider mb-3 pb-2 border-b border-gray-100">Features</h4>
             <div className="space-y-3">
               {[
                 { key: 'custom_enable_discount', label: 'Enable Item Discounts', type: 'checkbox' },
@@ -693,7 +693,7 @@ export const PosProfilePage: React.FC = () => {
 
           {/* Numeric Settings */}
           <div>
-            <h4 className="font-bold text-gray-700 text-xs uppercase tracking-wider mb-3 pb-2 border-b border-gray-100">Numeric Settings</h4>
+            <h4 className="font-bold text-gray-700 text-xs tracking-wider mb-3 pb-2 border-b border-gray-100">Numeric Settings</h4>
             <div className="space-y-4">
               <div>
                 <label className="block font-semibold text-gray-700 mb-1.5">Show Limited Paid Invoices (Number)</label>
@@ -784,7 +784,7 @@ export const PosProfilePage: React.FC = () => {
 
           {/* Checklist Items - Editable */}
           <div>
-            <h4 className="font-bold text-gray-700 text-xs uppercase tracking-wider mb-3 pb-2 border-b border-gray-100">Opening/Closing Checklist Items</h4>
+            <h4 className="font-bold text-gray-700 text-xs tracking-wider mb-3 pb-2 border-b border-gray-100">Opening/Closing Checklist Items</h4>
             <div className="flex items-center justify-end mb-2">
               <Button
                 type="button"
