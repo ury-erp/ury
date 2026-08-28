@@ -14,6 +14,7 @@ from unittest.mock import MagicMock, patch
 
 from frappe.tests.utils import FrappeTestCase
 
+from ury.ury.printing.file_store import delete_job
 from ury.ury.printing.finalizer import finalize_print_job
 from ury.ury.printing.print_job_monitor import (
     MONITOR_ZSET,
@@ -142,8 +143,12 @@ class TestPrintingE2EScenarios(FrappeTestCase):
         ]
         for p in self.redis_patches:
             p.start()
+        for i in range(ord('A'), ord('M')):
+            delete_job(f"PJ-SCENARIO-{chr(i)}")
 
     def tearDown(self):
+        for i in range(ord('A'), ord('M')):
+            delete_job(f"PJ-SCENARIO-{chr(i)}")
         for p in reversed(self.redis_patches):
             p.stop()
         super().tearDown()
@@ -735,13 +740,14 @@ class TestPrintingE2EScenarios(FrappeTestCase):
 
         metadata = get_print_job(job_id)
         self.assertIsNotNone(metadata)
-        self.assertEqual(metadata["status"], PROCESSING)
+        self.assertEqual(metadata["status"], FAILED)
         self.assertEqual(metadata["retry_count"], 10)
-        # Monitoring stops without marking FAILED/UNKNOWN; no invoice_printed change.
         self.assertNotIn(job_id, self.fake.zsets.get(MONITOR_ZSET, {}))
         self.assertTrue(metadata.get("long_running_notification_sent"))
         self.assertTrue(metadata.get("observation_timed_out"))
-        mock_db_set_value.assert_not_called()
+        mock_db_set_value.assert_called_with(
+            "POS Invoice", "INV-SCENARIO-K", "invoice_printed", 0
+        )
 
     @patch("ury.ury.printing.finalizer.release_merge_cluster_tables")
     @patch("ury.ury.printing.finalizer.frappe.db.set_value")

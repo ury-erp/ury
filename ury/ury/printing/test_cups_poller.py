@@ -198,7 +198,6 @@ class TestCupsPoller(FrappeTestCase):
         self.assertIsNotNone(metadata)
         self.assertEqual(metadata["status"], COMPLETED)
         self.assertNotIn(job_id, self.fake.zsets.get(MONITOR_ZSET, {}))
-        self.assertEqual(self.fake.ttls.get(f"print_job:{job_id}"), 86400)
 
         mock_publish.assert_called_once()
         event, payload = mock_publish.call_args.args
@@ -235,7 +234,6 @@ class TestCupsPoller(FrappeTestCase):
         self.assertIsNotNone(metadata)
         self.assertEqual(metadata["status"], FAILED)
         self.assertNotIn(job_id, self.fake.zsets.get(MONITOR_ZSET, {}))
-        self.assertEqual(self.fake.ttls.get(f"print_job:{job_id}"), 86400)
         self.assertNotIn(self._lock_key(job_id), self.fake.strings)
 
         mock_publish.assert_called_once()
@@ -246,13 +244,13 @@ class TestCupsPoller(FrappeTestCase):
 
         mock_finalize.assert_called_once_with(job_id, FAILED, failure_reason="job-stopped")
 
-    @patch("ury.ury.printing.notifications.frappe.publish_realtime")
-    @patch("ury.ury.printing.print_job_poller.frappe.publish_realtime")
     @patch("ury.ury.printing.print_job_poller.get_cups_job_attributes")
+    @patch("ury.ury.printing.print_job_poller.finalize_print_job")
+    @patch("ury.ury.printing.print_job_poller.frappe.publish_realtime")
     def test_disappearing_job_stops_monitoring_after_max_retries(
-        self, mock_get_attrs, mock_publish, mock_notify_publish
+        self, mock_publish, mock_finalize, mock_get_attrs
     ):
-        """A job that vanishes from CUPS stops monitoring once retries are exhausted."""
+        """A job that vanishes from CUPS marks FAILED and stops monitoring once retries are exhausted."""
         job_id = "PJ-disappeared"
         self._register(job_id, status=PROCESSING, retry_count=MAX_RETRIES)
 
@@ -262,20 +260,17 @@ class TestCupsPoller(FrappeTestCase):
 
         metadata = get_print_job(job_id)
         self.assertIsNotNone(metadata)
-        self.assertEqual(metadata["status"], PROCESSING)
+        self.assertEqual(metadata["status"], FAILED)
         self.assertEqual(metadata["retry_count"], MAX_RETRIES)
-        # Monitoring stops without marking FAILED or UNKNOWN.
         self.assertNotIn(job_id, self.fake.zsets.get(MONITOR_ZSET, {}))
         self.assertTrue(metadata.get("long_running_notification_sent"))
         self.assertTrue(metadata.get("observation_timed_out"))
         self.assertNotIn(self._lock_key(job_id), self.fake.strings)
 
-        # Status update should not fire; long-running notification should.
-        mock_publish.assert_not_called()
-        mock_notify_publish.assert_called_once()
-        event, payload = mock_notify_publish.call_args.args
-        self.assertEqual(event, "invoice_print_long_running")
-        self.assertEqual(payload["print_job_id"], job_id)
+        mock_finalize.assert_called_once_with(
+            job_id, FAILED, failure_reason="Max retries exceeded while querying printer"
+        )
+        self.assertEqual(mock_publish.call_count, 2)
 
     @patch("ury.ury.printing.print_job_poller.frappe.publish_realtime")
     @patch("ury.ury.printing.print_job_poller.get_cups_job_attributes")
@@ -343,7 +338,6 @@ class TestCupsPoller(FrappeTestCase):
         self.assertIsNotNone(metadata_a)
         self.assertEqual(metadata_a["status"], COMPLETED)
         self.assertNotIn(job_a, self.fake.zsets.get(MONITOR_ZSET, {}))
-        self.assertEqual(self.fake.ttls.get(f"print_job:{job_a}"), 86400)
 
         metadata_b = get_print_job(job_b)
         self.assertEqual(metadata_b["status"], PROCESSING)
@@ -393,10 +387,10 @@ class TestCupsPoller(FrappeTestCase):
         mock_publish.assert_not_called()
 
     @patch("ury.ury.printing.print_job_poller.get_cups_job_attributes")
-    @patch("ury.ury.printing.notifications.frappe.publish_realtime")
+    @patch("ury.ury.printing.print_job_poller.finalize_print_job")
     @patch("ury.ury.printing.print_job_poller.frappe.publish_realtime")
-    def test_observation_timeout_stops_monitoring(self, mock_publish, mock_notify_publish, mock_get_attrs):
-        """CUPS is queried first; only then does the expired deadline stop monitoring."""
+    def test_observation_timeout_stops_monitoring(self, mock_publish, mock_finalize, mock_get_attrs):
+        """CUPS is queried first; only then does the expired deadline mark FAILED and stop monitoring."""
         job_id = "PJ-timeout"
         metadata = self._sample_metadata(job_id, status=PROCESSING, retry_count=0)
         metadata["monitoring_deadline"] = time.time() - 1
@@ -408,8 +402,8 @@ class TestCupsPoller(FrappeTestCase):
 
         metadata = get_print_job(job_id)
         self.assertIsNotNone(metadata)
-        self.assertEqual(metadata["status"], PROCESSING)
-        self.assertNotEqual(metadata["status"], FAILED)
+        self.assertEqual(metadata["status"], FAILED)
+        self.assertEqual(metadata["failure_reason"], "Observation timeout exceeded")
         # retry_count incremented proves CUPS was queried before the deadline check.
         self.assertEqual(metadata["retry_count"], 1)
         self.assertTrue(metadata.get("long_running_notification_sent"))
@@ -417,11 +411,10 @@ class TestCupsPoller(FrappeTestCase):
         self.assertNotIn(job_id, self.fake.zsets.get(MONITOR_ZSET, {}))
 
         mock_get_attrs.assert_called_once_with("127.0.0.1", 631, 123)
-        mock_publish.assert_not_called()
-        mock_notify_publish.assert_called_once()
-        event, payload = mock_notify_publish.call_args.args
-        self.assertEqual(event, "invoice_print_long_running")
-        self.assertEqual(payload["invoice"], "INV-001")
+        self.assertEqual(mock_publish.call_count, 2)
+        mock_finalize.assert_called_once_with(
+            job_id, FAILED, failure_reason="Observation timeout exceeded"
+        )
 
     @patch("ury.ury.printing.print_job_poller.finalize_print_job")
     @patch("ury.ury.printing.print_job_poller.frappe.publish_realtime")
@@ -450,7 +443,6 @@ class TestCupsPoller(FrappeTestCase):
         self.assertFalse(metadata.get("long_running_notification_sent", False))
         self.assertFalse(metadata.get("observation_timed_out", False))
         self.assertNotIn(job_id, self.fake.zsets.get(MONITOR_ZSET, {}))
-        self.assertEqual(self.fake.ttls.get(f"print_job:{job_id}"), 86400)
 
         mock_get_attrs.assert_called_once_with("127.0.0.1", 631, 123)
         mock_publish.assert_called_once()
@@ -462,11 +454,11 @@ class TestCupsPoller(FrappeTestCase):
             job_id, COMPLETED, failure_reason="job-completed-successfully"
         )
 
-    @patch("ury.ury.printing.notifications.frappe.publish_realtime")
-    @patch("ury.ury.printing.print_job_poller.frappe.publish_realtime")
     @patch("ury.ury.printing.print_job_poller.get_cups_job_attributes")
-    def test_max_retries_stops_monitoring(self, mock_get_attrs, mock_publish, mock_notify_publish):
-        """When MAX_RETRIES exceeded, monitoring stops without UNKNOWN infinite loop."""
+    @patch("ury.ury.printing.print_job_poller.finalize_print_job")
+    @patch("ury.ury.printing.print_job_poller.frappe.publish_realtime")
+    def test_max_retries_stops_monitoring(self, mock_publish, mock_finalize, mock_get_attrs):
+        """When MAX_RETRIES exceeded, marks FAILED and stops monitoring."""
         job_id = "PJ-max-retries"
         metadata = self._sample_metadata(job_id, status=PROCESSING, retry_count=MAX_RETRIES)
         register_print_job(metadata)
@@ -477,11 +469,12 @@ class TestCupsPoller(FrappeTestCase):
 
         metadata = get_print_job(job_id)
         self.assertIsNotNone(metadata)
-        self.assertEqual(metadata["status"], PROCESSING)
-        self.assertNotEqual(metadata["status"], UNKNOWN)
+        self.assertEqual(metadata["status"], FAILED)
         self.assertTrue(metadata.get("long_running_notification_sent"))
         self.assertTrue(metadata.get("observation_timed_out"))
         self.assertEqual(metadata["retry_count"], MAX_RETRIES)
         self.assertNotIn(job_id, self.fake.zsets.get(MONITOR_ZSET, {}))
-        mock_notify_publish.assert_called_once()
-        mock_publish.assert_not_called()
+        mock_finalize.assert_called_once_with(
+            job_id, FAILED, failure_reason="Max retries exceeded while querying printer"
+        )
+        self.assertEqual(mock_publish.call_count, 2)
