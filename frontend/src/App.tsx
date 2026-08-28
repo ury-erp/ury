@@ -13,6 +13,8 @@ import { UserPage } from './pages/Dashboard/UserPage';
 import { BranchPage } from './pages/Dashboard/BranchPage';
 import { ReportSettingsPage } from './pages/Dashboard/ReportSettingsPage';
 import ProductionUnitPage from './pages/Dashboard/ProductionUnitPage';
+import ProductionDepartmentPage from './pages/Dashboard/ProductionDepartmentPage';
+import ItemProductionConfigPage from './pages/Dashboard/ItemProductionConfigPage';
 import AggregatorPage from './pages/Dashboard/AggregatorPage';
 import SalesPlanPage from './pages/Dashboard/SalesPlanPage';
 import { DepartmentStockPage } from './pages/Dashboard/DepartmentStockPage';
@@ -133,6 +135,8 @@ function App() {
           <Route path="branch" element={<BranchPage />} />
           <Route path="report-settings" element={<ReportSettingsPage />} />
           <Route path="production-unit" element={<ProductionUnitPage />} />
+          <Route path="production-department" element={<ProductionDepartmentPage />} />
+          <Route path="item-production-config" element={<ItemProductionConfigPage />} />
           <Route path="aggregator" element={<AggregatorPage />} />
           <Route path="sales-plan" element={<SalesPlanPage />} />
           <Route path="department-stock" element={<DepartmentStockPage />} />
