@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   Utensils,
   Grid,
+  Settings2,
   Home,
   SlidersHorizontal,
   Users,
@@ -127,7 +128,7 @@ const ReportsPanel: React.FC = () => (
 
 const MainPanel: React.FC<{ isManager: boolean }> = ({ isManager }) => {
   const location = useLocation();
-  const isAdvancedPath = location.pathname.startsWith('/report-settings') || location.pathname.startsWith('/production-unit') || location.pathname.startsWith('/production-department');
+  const isAdvancedPath = location.pathname.startsWith('/report-settings') || location.pathname.startsWith('/production-unit') || location.pathname.startsWith('/production-department') || location.pathname.startsWith('/item-production-config');
   const [isAdvancedOpen, setIsAdvancedOpen] = useState<boolean>(isAdvancedPath);
 
   return (
@@ -218,6 +219,19 @@ const MainPanel: React.FC<{ isManager: boolean }> = ({ isManager }) => {
             >
               <Building2 className="w-4 h-4 shrink-0" />
               <span>Production Department</span>
+            </NavLink>
+            <NavLink
+              to="/item-production-config"
+              className={({ isActive }) =>
+                `flex items-center space-x-3 px-3.5 py-2 rounded-lg text-xs font-medium transition-all ${
+                  isActive
+                    ? 'bg-[#2563eb] text-white shadow-sm font-semibold'
+                    : 'text-gray-600 hover:bg-blue-50 hover:text-[#2563eb]'
+                }`
+              }
+            >
+              <Settings2 className="w-4 h-4 shrink-0" />
+              <span>Item Production Config</span>
             </NavLink>
           </div>
         )}
