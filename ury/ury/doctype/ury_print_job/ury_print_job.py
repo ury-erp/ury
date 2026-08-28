@@ -4,7 +4,7 @@
 import frappe
 from frappe.model.document import Document
 
-from ury.ury.printing.file_store import delete_job, get_job, list_all_jobs
+from ury.ury.printing.file_store import delete_job, get_job, list_all_jobs, save_job
 
 
 class URYPrintJob(Document):
@@ -24,12 +24,16 @@ class URYPrintJob(Document):
         super(Document, self).__init__(_serialize_for_document(data))
 
     def db_insert(self, *args, **kwargs):
-        """No-op: virtual doctype does not write to MariaDB."""
-        pass
+        """Persist new job to file store."""
+        data = self.as_dict()
+        save_job(self.name, data)
 
     def db_update(self, *args, **kwargs):
-        """No-op: virtual doctype does not write to MariaDB."""
-        pass
+        """Persist updated job to file store."""
+        existing = get_job(self.name) or {}
+        data = self.as_dict()
+        existing.update(data)
+        save_job(self.name, existing)
 
     def delete(self, *args, **kwargs):
         """Delete the JSON file instead of removing a DB row."""
@@ -158,6 +162,15 @@ def _normalize_filters(filters):
     Accepts dicts, lists of tuples/lists, or single tuples/lists as returned
     by Frappe list views and reportview APIs.
     """
+    if not filters:
+        return []
+
+    if isinstance(filters, str):
+        try:
+            filters = frappe.parse_json(filters)
+        except Exception:
+            filters = []
+
     if not filters:
         return []
 
