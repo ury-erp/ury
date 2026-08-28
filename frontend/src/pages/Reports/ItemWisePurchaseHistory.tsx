@@ -95,8 +95,13 @@ export function ItemWisePurchaseHistory() {
         columns={columns}
         rows={data?.items ?? []}
         isLoading={isLoading}
-        emptyMessage="No purchase records in this range — Purchase Invoices are created via standard ERPNext Desk, not a URY-specific workflow, so this may legitimately be sparse."
+        emptyMessage="No purchase records in this range. This report summarizes item-wise spend from recorded Purchase Invoices for the selected period."
       />
+
+      <p className="text-xs text-muted-foreground">
+        Recording new Purchase Invoices isn't available in this app yet — that workflow is on
+        our roadmap. In the meantime, invoices entered elsewhere in ERPNext will show up here.
+      </p>
     </div>
   );
 }
