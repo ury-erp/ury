@@ -234,7 +234,7 @@ export default function Dashboard() {
     <div className="h-full overflow-y-auto p-6 bg-gray-50">
       {/* Stat Cards Row */}
       <div className="mb-6">
-        <h2 className="text-2xl font-semibold text-gray-900 mb-4">Dashboard</h2>
+        <h2 className="text-2xl font-semibold text-gray-900 mb-4">Shift Overview</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {statsError ? (
             <div className="col-span-full text-red-600 text-sm">Failed to load stats</div>

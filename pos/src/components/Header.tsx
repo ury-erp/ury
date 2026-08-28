@@ -5,7 +5,7 @@ import {
   Command,
   User,
   ChevronDown,
-  Monitor,
+  ExternalLink,
   LogOut,
   RefreshCw,
 } from 'lucide-react';
@@ -108,7 +108,7 @@ const Header = () => {
       <div className="flex items-center justify-between h-16 px-6">
         {/* Logo */}
         <div className="flex items-center">
-        <Link to="/dashboard" className="flex items-center gap-3">
+        <Link to="/dashboard" className="flex items-center gap-3" aria-label={t('header.shift_overview')} title={t('header.shift_overview')}>
             <img
               src="/assets/ury/pos/ury_pos.png"
               alt="URY POS" 
@@ -134,6 +134,15 @@ const Header = () => {
 
         {/* Right side actions */}
         <div className="flex items-center gap-4">
+          {/* Management (Service Board) */}
+          <a
+            href="/ury/dashboard"
+            className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
+          >
+            <ExternalLink className="w-4 h-4" />
+            <span>{t('header.service_board')}</span>
+          </a>
+
           {/* User menu */}
           <div className="relative" ref={userMenuRef}>
             <Button
@@ -156,14 +165,6 @@ const Header = () => {
                   <p className="text-sm text-gray-500">{user?.name || ''}</p>
                 </div>
                 <div className="py-2">
-                  <Button
-                    variant="ghost"
-                    className="flex justify-start items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
-                    onClick={() => window.location.href = '/app'}
-                  >
-                    <Monitor className="w-4 h-4 me-3" />
-                    {t('header.switch_to_desk')}
-                  </Button>
                   <Button
                     variant="ghost"
                     className="flex justify-start items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"

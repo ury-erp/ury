@@ -27,9 +27,10 @@
     "search_placeholder_default": "Search orders, menu items, or customers...",
     "search_placeholder_orders": "Search Orders",
     "search_placeholder_menu": "Search Menu",
-    "switch_to_desk": "Switch To Desk",
     "clear_cache": "Clear Cache",
-    "logout": "Logout"
+    "logout": "Logout",
+    "shift_overview": "Shift Overview",
+    "service_board": "Service Board"
   },
   "menu": {
     "special_items": "Special Items"
@@ -86,7 +87,7 @@
     "not_closed_title": "Previous POS Not Closed",
     "not_closed_message": "Please close the previous POS Entry to continue.",
     "reload_page": "Reload Page",
-    "switch_to_desk": "Switch to Desk"
+    "contact_manager": "If this keeps happening, contact your manager."
   },
   "pos_closing": {
     "title": "Close POS",
@@ -311,11 +312,12 @@
     "merged_items": "Items from merged bill"
   },
   "footer": {
-    "dashboard": "Dashboard",
+    "dashboard": "Shift Overview",
     "pos": "POS",
     "tables": "Tables",
     "orders": "Orders",
-    "settings": "Settings"
+    "settings": "Settings",
+    "service_board": "Service Board"
   },
   "product_dialog": {
     "special_instructions": "Special Instructions",
