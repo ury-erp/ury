@@ -316,5 +316,20 @@
     "paid": "Payé",
     "consolidated": "Consolidé",
     "return": "Retour"
+  },
+  "settings": {
+    "title": "Paramètres",
+    "coming_soon": "D'autres paramètres arrivent bientôt.",
+    "end_of_day": "Fin de journée",
+    "close_pos_title": "Clôturer la session POS",
+    "close_pos_description": "Réconciliez votre tiroir-caisse et clôturez la session POS d'aujourd'hui pour cet appareil.",
+    "close_pos_button": "Clôturer la POS / Fin de service",
+    "confirm_title": "Clôturer la session POS d'aujourd'hui ?",
+    "confirm_description": "Cela mettra fin à votre session en cours et ne peut pas être annulé. Assurez-vous que toutes les commandes sont réglées avant de continuer.",
+    "confirm_button": "Oui, clôturer la session",
+    "confirm_cancel": "Annuler",
+    "closed_title": "Session clôturée",
+    "closed_description": "Votre session POS a été clôturée avec succès.",
+    "back_to_dashboard": "Retour au tableau de bord"
   }
 }
