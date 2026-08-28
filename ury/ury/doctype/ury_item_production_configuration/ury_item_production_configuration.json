@@ -59,7 +59,7 @@
    "fieldname": "production_policy",
    "fieldtype": "Select",
    "label": "Production Policy",
-   "options": "Make to Order\nMake to Stock"
+   "options": "PRE_PRODUCED\nMADE_TO_ORDER\nDIRECT_RETAIL"
   },
   {
    "fieldname": "bom",

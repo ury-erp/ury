@@ -54,7 +54,14 @@ website_context = {"splash_image": "/assets/ury/Images/ury-logo.jpg"}
 
 website_route_rules = [
     {"from_route": "/urypos/<path:app_path>", "to_route": "urypos"},
+    # /order kept as a redirect-compatible alias below; /ury/order is the
+    # canonical route going forward (new app, no live QR codes/bookmarks
+    # to break). Established routes (urypos, pos, mosaic) are intentionally
+    # NOT renamed here -- that would risk breaking printed QR codes or
+    # staff muscle memory on a system that may already be in real use;
+    # renaming those needs its own deliberate, communicated migration.
     {"from_route": "/order/<path:app_path>", "to_route": "order"},
+    {"from_route": "/ury/order/<path:app_path>", "to_route": "order"},
     {"from_route": "/mosaic/<path:app_path>", "to_route": "mosaic"},
     {"from_route": "/ury/<path:app_path>", "to_route": "ury"},
     {"from_route": "/setup-wizard", "to_route": "ury"},

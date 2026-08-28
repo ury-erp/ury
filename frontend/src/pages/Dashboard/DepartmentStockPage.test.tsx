@@ -16,6 +16,9 @@ vi.mock('../../services/departmentStock', async (importOriginal) => {
   return {
     ...actual,
     departmentStockService: {
+      listDepartments: vi.fn().mockResolvedValue([
+        { name: 'Indian', department_name: 'Indian' },
+      ]),
       listIssueAuthorizations: vi.fn(),
       listStockMovements: vi.fn(),
     },
