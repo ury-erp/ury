@@ -1,7 +1,5 @@
 import frappe
 from frappe.utils import cint
-from frappe.utils.print_format import print_by_server
-from ury.ury.printing.service import submit_and_monitor_print_job
 
 
 @frappe.whitelist()
@@ -42,11 +40,17 @@ def reprint_kot(invoice_number):
 
 def print_kot(printer, docname, kot_print_format, restaurant_table=None, order_type=None):
     try:
-        print_by_server(
-            "POS Invoice",
-            docname,
-            printer,
-            kot_print_format,
+        printer_doc = frappe.get_doc("Network Printer Settings", printer)
+        printer_doc.print_doc(
+            doctype="POS Invoice",
+            name=docname,
+            print_format=kot_print_format,
+            job_type="KOT_REPRINT",
+            extra_metadata={
+                "invoice": docname,
+                "restaurant_table": restaurant_table,
+                "order_type": order_type,
+            },
         )
     except Exception as e:
         frappe.log_error(f"KOT Reprint Error: {e}", "KOT Reprint Error")
