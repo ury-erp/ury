@@ -35,7 +35,13 @@ export const getChecklist = async (
   logStatus: string | null;
 }> => {
   try {
-    const response = await call.get<ChecklistResponse>(
+    const response = await call.get<{
+      message: {
+        items: ChecklistItem[];
+        log_name: string | null;
+        log_status: string | null;
+      };
+    }>(
       'ury.ury_pos.api.get_checklist',
       {
         pos_profile: posProfile,
@@ -43,7 +49,12 @@ export const getChecklist = async (
       }
     );
 
-    return response.message;
+    // Map snake_case backend response to camelCase TypeScript interface
+    return {
+      items: response.message.items,
+      logName: response.message.log_name,
+      logStatus: response.message.log_status,
+    };
   } catch (error) {
     console.error('Error fetching checklist:', error);
     throw error;
