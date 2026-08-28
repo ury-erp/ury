@@ -152,11 +152,16 @@ export interface DashboardStats {
   total_tables: number;
 }
 
+export interface NeedsAttentionReference {
+  doctype: string;
+  names: string[];
+}
+
 export interface NeedsAttentionItem {
   type: string;
   message: string;
   severity: string;
-  reference?: string;
+  reference?: NeedsAttentionReference | null;
 }
 
 export interface BaselineStats {
