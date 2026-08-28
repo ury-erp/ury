@@ -1,11 +1,10 @@
 import React, { useEffect, useMemo, useRef } from 'react';
-import { Clock, User, UserCheck, Receipt, Printer, Pencil, X, GitBranch, GitMerge, PrinterCheck } from 'lucide-react';
+import { Clock, User, UserCheck, Receipt, Printer, Pencil, X, GitBranch, GitMerge, ScrollText } from 'lucide-react';
 import { Badge, Button, Card, CardContent } from '@ury/ui';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@ury/ui';
 import { showToast } from '@ury/ui';
 import OrderStatusSidebar from '../components/OrderStatusSidebar';
 import PrintJobsModal from '../components/PrintJobsModal';
-import { PrinterX } from '../components/icons/PrinterX';
 import { useOrdersPrintJobs } from '../hooks/useOrdersPrintJobs';
 import { useRootStore } from '../store/root-store';
 import { formatCurrency } from '@ury/core';
@@ -478,7 +477,7 @@ export default function Orders() {
                           className={`inline-flex items-center justify-center rounded-md p-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
                             isFailed
                               ? 'text-red-600 hover:bg-red-50'
-                              : 'text-gray-500 hover:bg-gray-100'
+                              : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'
                           }`}
                           aria-label={`View print jobs for ${order.name}`}
                           title={isFailed ? 'Print failed - click to view details' : 'View print jobs'}
@@ -488,11 +487,7 @@ export default function Orders() {
                             setPrintJobsModalOpen(true);
                           }}
                         >
-                          {isFailed ? (
-                            <PrinterX className="w-4 h-4 text-red-600" />
-                          ) : (
-                            <PrinterCheck className="w-4 h-4 text-gray-400" />
-                          )}
+                          <ScrollText className="w-4 h-4" />
                         </button>
                       </div>
                     </div>

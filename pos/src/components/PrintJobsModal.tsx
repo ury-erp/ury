@@ -148,29 +148,38 @@ export function PrintJobsModal({
 
           {invoiceJobs.length > 0 && (
             <ul className="space-y-3">
-              {invoiceJobs.map((job) => (
-                <li
-                  key={job.print_job_id}
-                  className="rounded-lg border border-gray-200 bg-gray-50/80 p-3.5"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <h3 className="font-semibold text-gray-900 text-sm leading-tight">
-                      {job.job_type || 'BILL'}
-                    </h3>
-                    <Badge variant={getStatusBadgeVariant(job.status)}>
-                      {job.status}
-                    </Badge>
-                  </div>
+              {invoiceJobs.map((job) => {
+                const jobName = job.print_job_id || job.name;
+                return (
+                  <li
+                    key={jobName}
+                    className="rounded-lg border border-gray-200 bg-gray-50/80 p-3.5"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-baseline gap-2 min-w-0">
+                        <h3 className="font-semibold text-gray-900 text-sm leading-tight">
+                          {job.job_type || 'BILL'}
+                        </h3>
+                        <span
+                          className="text-xs font-mono text-gray-500 truncate"
+                          title={jobName}
+                        >
+                          {jobName}
+                        </span>
+                      </div>
+                      <Badge variant={getStatusBadgeVariant(job.status)}>
+                        {job.status}
+                      </Badge>
+                    </div>
 
-                  <div className="mt-1 text-xs text-gray-600">
-                    {job.printer_name || job.printer || 'Unknown printer'}
-                  </div>
-
-                  <div className="mt-1 text-xs text-gray-500">
-                    {formatJobTime(job.created_at)}
-                  </div>
-                </li>
-              ))}
+                    <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-600">
+                      <span>{job.printer_name || job.printer || 'Unknown printer'}</span>
+                      <span className="text-gray-300">•</span>
+                      <span className="text-gray-500">{formatJobTime(job.created_at)}</span>
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>
