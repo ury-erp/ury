@@ -146,6 +146,31 @@ export interface CreateIssueAuthorizationParams {
   production_unit?: string;
 }
 
+/**
+ * One component/department row from a Sales Plan's frozen
+ * `approval_snapshot.demand_vector` (see
+ * `ury.ury.api.ury_issue_authorization.frozen_component_demand`). This is the
+ * only source of "what does this department actually need" — the Request
+ * Authorization form uses it to populate the Component dropdown and to
+ * suggest a quantity, instead of asking the operator to type a raw item
+ * code.
+ */
+export interface PlanComponentDemand {
+  component_item: string;
+  component_item_name?: string;
+  department: string;
+  production_unit?: string;
+  required_qty: number;
+  stock_uom?: string;
+  control_mode?: string;
+}
+
+export interface ActivePlan {
+  name: string;
+  status: string;
+  demandVector: PlanComponentDemand[];
+}
+
 const normalizeWastage = (row: any): WastageRow => ({
   name: String(row.name || ''),
   component_item: String(row.component_item || ''),
@@ -253,6 +278,55 @@ export const departmentStockService = {
   async rejectWastage(wastageName: string): Promise<WastageRow> {
     const res = await call<any>('ury.ury.api.ury_wastage.reject_wastage', { wastage: wastageName });
     return normalizeWastage((res as any)?.message ?? res);
+  },
+
+  /**
+   * Finds the (at most one, in normal operation) approved/locked Sales Plan
+   * for a branch on a given date and returns its frozen per-component demand
+   * vector, so the Request Authorization form can drive Plan and Component
+   * selection from real data instead of free text. Composes the existing
+   * read-only `get_plan_status` + `get_plan` endpoints -- no new backend
+   * endpoint. Returns null if no plan exists for the scope yet.
+   *
+   * Note: `approval_snapshot.demand_vector` is only populated once the
+   * upstream BOM-explosion step (referenced as a V3-30 contract gap in
+   * `ury_issue_authorization.py`) actually writes it; today
+   * `freeze_approval_snapshot` in `ury_sales_plan.py` only freezes raw plan
+   * items (item_code/qty/department/...), not exploded components. Until
+   * that gap is closed upstream, `demandVector` will come back empty even
+   * for an approved plan.
+   */
+  async getActivePlan(branch: string, planDate: string): Promise<ActivePlan | null> {
+    if (!branch || branch === 'all' || !planDate) return null;
+    const statusRes = await call.get<any>('ury.ury.api.ury_sales_plan.get_plan_status', {
+      branch,
+      plan_date: planDate,
+    });
+    const status = (statusRes as any)?.message ?? statusRes;
+    const planName = status?.name;
+    if (!planName) return null;
+
+    const planRes = await call.get<any>('ury.ury.api.ury_sales_plan.get_plan', { name: planName });
+    const plan = (planRes as any)?.message ?? planRes;
+
+    let demandVector: PlanComponentDemand[] = [];
+    const snapshotRaw = plan?.approval_snapshot;
+    if (snapshotRaw) {
+      try {
+        const snapshot = typeof snapshotRaw === 'string' ? JSON.parse(snapshotRaw) : snapshotRaw;
+        if (Array.isArray(snapshot?.demand_vector)) {
+          demandVector = snapshot.demand_vector;
+        }
+      } catch {
+        demandVector = [];
+      }
+    }
+
+    return {
+      name: plan?.name || planName,
+      status: plan?.status || status?.status || '',
+      demandVector,
+    };
   },
 
   /**

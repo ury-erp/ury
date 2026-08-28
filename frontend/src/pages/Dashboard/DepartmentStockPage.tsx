@@ -6,6 +6,7 @@ import {
   departmentStockService,
   DepartmentOption,
   IssueAuthorizationRow,
+  PlanComponentDemand,
   StockMovementRow,
   WastageRow,
   WASTAGE_REASON_CATEGORIES,
@@ -189,26 +190,98 @@ const CaptureWastageForm: React.FC<CaptureWastageFormProps> = ({ authorization, 
 
 interface RequestAuthorizationFormProps {
   branch: string;
+  department: string;
+  departmentName: string;
   onCancel: () => void;
   onSuccess: () => void;
   onError: (message: string) => void;
 }
 
-const RequestAuthorizationForm: React.FC<RequestAuthorizationFormProps> = ({ branch, onCancel, onSuccess, onError }) => {
-  const [plan, setPlan] = useState('');
-  const [department, setDepartment] = useState('');
+/** Cascading Request Authorization form: Plan is auto-resolved for the
+ * active branch/date (an amateur operator should never need to know or type
+ * an internal Sales Plan document name), Department is inherited from the
+ * page's already-selected department, and Component is a dropdown of what
+ * that department's approved plan actually requires -- not a raw item code
+ * field. Quantity is pre-filled from the plan's required quantity for the
+ * chosen component but stays editable. See the final report for the
+ * upstream data gap that leaves the Component dropdown empty until the
+ * Sales Plan's frozen demand vector is actually populated. */
+const RequestAuthorizationForm: React.FC<RequestAuthorizationFormProps> = ({
+  branch,
+  department,
+  departmentName,
+  onCancel,
+  onSuccess,
+  onError,
+}) => {
+  const [loadingPlan, setLoadingPlan] = useState(true);
+  const [planName, setPlanName] = useState<string | null>(null);
+  const [planStatus, setPlanStatus] = useState<string | null>(null);
+  const [componentOptions, setComponentOptions] = useState<PlanComponentDemand[]>([]);
   const [componentItem, setComponentItem] = useState('');
   const [requestedQty, setRequestedQty] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [planError, setPlanError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingPlan(true);
+    setPlanError(null);
+    setComponentOptions([]);
+    setComponentItem('');
+    setRequestedQty('');
+
+    (async () => {
+      try {
+        const plan = await departmentStockService.getActivePlan(branch, getToday());
+        if (cancelled) return;
+        if (!plan) {
+          setPlanName(null);
+          setPlanStatus(null);
+          setPlanError('No approved sales plan was found for this branch today.');
+          return;
+        }
+        setPlanName(plan.name);
+        setPlanStatus(plan.status);
+        const forDepartment = plan.demandVector.filter((row) => row.department === department);
+        setComponentOptions(forDepartment);
+        if (forDepartment.length === 0) {
+          setPlanError(
+            'This plan has no required components recorded yet for this department, so there is nothing to request against.'
+          );
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setPlanName(null);
+          setPlanStatus(null);
+          setPlanError('Unable to load the active sales plan for this branch.');
+        }
+      } finally {
+        if (!cancelled) setLoadingPlan(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [branch, department]);
+
+  const selectedComponent = componentOptions.find((row) => row.component_item === componentItem);
+
+  const handleComponentChange = (value: string) => {
+    setComponentItem(value);
+    const row = componentOptions.find((option) => option.component_item === value);
+    setRequestedQty(row ? String(row.required_qty) : '');
+  };
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     const qty = Number(requestedQty);
-    if (!plan || !department || !componentItem || !qty || qty <= 0) return;
+    if (!planName || !department || !componentItem || !qty || qty <= 0) return;
     setSubmitting(true);
     try {
       await departmentStockService.createIssueAuthorization({
-        plan,
+        plan: planName,
         department,
         component_item: componentItem,
         requested_qty: qty,
@@ -222,43 +295,49 @@ const RequestAuthorizationForm: React.FC<RequestAuthorizationFormProps> = ({ bra
     }
   };
 
+  if (loadingPlan) {
+    return (
+      <div className="mt-3 flex items-center justify-center rounded-md border border-gray-200 bg-gray-50 p-6">
+        <Spinner className="h-6 w-6 text-primary" />
+      </div>
+    );
+  }
+
   return (
     <form
       onSubmit={handleSubmit}
       className="mt-3 flex flex-col gap-2 rounded-md border border-gray-200 bg-gray-50 p-3 sm:flex-row sm:items-end sm:flex-wrap"
     >
-      <label className="flex flex-col text-xs font-medium text-gray-600">
+      <div className="flex flex-col text-xs font-medium text-gray-600">
         Plan
-        <input
-          aria-label="Plan"
-          type="text"
-          value={plan}
-          onChange={(event) => setPlan(event.target.value)}
-          className="mt-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
-          required
-        />
-      </label>
-      <label className="flex flex-col text-xs font-medium text-gray-600">
+        <span className="mt-1 rounded-md border border-gray-200 bg-white px-2 py-1.5 text-sm text-gray-900">
+          {planName || 'No active plan'}
+          {planStatus ? ` (${planStatus})` : ''}
+        </span>
+      </div>
+      <div className="flex flex-col text-xs font-medium text-gray-600">
         Department
-        <input
-          aria-label="Authorization department"
-          type="text"
-          value={department}
-          onChange={(event) => setDepartment(event.target.value)}
-          className="mt-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
-          required
-        />
-      </label>
+        <span className="mt-1 rounded-md border border-gray-200 bg-white px-2 py-1.5 text-sm text-gray-900">
+          {departmentName}
+        </span>
+      </div>
       <label className="flex flex-col text-xs font-medium text-gray-600">
-        Component Item
-        <input
-          aria-label="Component item"
-          type="text"
+        Required Component
+        <select
+          aria-label="Required component"
           value={componentItem}
-          onChange={(event) => setComponentItem(event.target.value)}
+          onChange={(event) => handleComponentChange(event.target.value)}
           className="mt-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
+          disabled={componentOptions.length === 0}
           required
-        />
+        >
+          <option value="">Select component</option>
+          {componentOptions.map((option) => (
+            <option key={option.component_item} value={option.component_item}>
+              {option.component_item_name || option.component_item}
+            </option>
+          ))}
+        </select>
       </label>
       <label className="flex flex-col text-xs font-medium text-gray-600">
         Requested Qty
@@ -270,13 +349,19 @@ const RequestAuthorizationForm: React.FC<RequestAuthorizationFormProps> = ({ bra
           value={requestedQty}
           onChange={(event) => setRequestedQty(event.target.value)}
           className="mt-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
+          disabled={!componentItem}
           required
         />
+        {selectedComponent && (
+          <span className="mt-1 text-xs font-normal text-gray-500">
+            Suggested: {formatQty(selectedComponent.required_qty)} {selectedComponent.stock_uom || ''}
+          </span>
+        )}
       </label>
       <div className="flex gap-2">
         <button
           type="submit"
-          disabled={submitting}
+          disabled={submitting || !planName || !componentItem}
           className="rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
         >
           Request Authorization
@@ -289,6 +374,7 @@ const RequestAuthorizationForm: React.FC<RequestAuthorizationFormProps> = ({ bra
           Cancel
         </button>
       </div>
+      {planError && <p className="w-full text-xs font-normal text-red-600">{planError}</p>}
     </form>
   );
 };
@@ -488,7 +574,7 @@ const DepartmentStockContent: React.FC = () => {
 
           <section>
             <div className="mb-2 flex items-center justify-between">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-700">Issue Authorizations</h2>
+              <h2 className="text-sm font-semibold tracking-wide text-gray-700">Issue Authorizations</h2>
               {canCapture && !showRequestForm && (
                 <button
                   type="button"
@@ -503,6 +589,10 @@ const DepartmentStockContent: React.FC = () => {
             {showRequestForm && (
               <RequestAuthorizationForm
                 branch={activeBranchId}
+                department={department}
+                departmentName={
+                  departmentOptions.find((opt) => opt.name === department)?.department_name || department
+                }
                 onCancel={() => setShowRequestForm(false)}
                 onSuccess={refresh}
                 onError={setActionError}
@@ -517,7 +607,7 @@ const DepartmentStockContent: React.FC = () => {
               <div className="mt-2 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[720px] text-left text-sm">
-                    <thead className="border-b border-gray-100 bg-gray-50 text-xs font-semibold uppercase text-gray-500">
+                    <thead className="border-b border-gray-100 bg-gray-50 text-xs font-semibold text-gray-500">
                       <tr>
                         <th className="px-4 py-3">Plan</th>
                         <th className="px-4 py-3">Component</th>
@@ -578,7 +668,7 @@ const DepartmentStockContent: React.FC = () => {
           </section>
 
           <section>
-            <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-700">Wastage</h2>
+            <h2 className="mb-2 text-sm font-semibold tracking-wide text-gray-700">Wastage</h2>
             {wastageRows.length === 0 ? (
               <Card className="p-8 text-center text-sm text-gray-500">
                 No wastage records found for this department and date range.
@@ -587,7 +677,7 @@ const DepartmentStockContent: React.FC = () => {
               <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[640px] text-left text-sm">
-                    <thead className="border-b border-gray-100 bg-gray-50 text-xs font-semibold uppercase text-gray-500">
+                    <thead className="border-b border-gray-100 bg-gray-50 text-xs font-semibold text-gray-500">
                       <tr>
                         <th className="px-4 py-3">Component</th>
                         <th className="px-4 py-3 text-right">Wasted Qty</th>
@@ -645,7 +735,7 @@ const DepartmentStockContent: React.FC = () => {
           </section>
 
           <section>
-            <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-700">
+            <h2 className="mb-2 text-sm font-semibold tracking-wide text-gray-700">
               Related Stock Movements
             </h2>
             {movements.length === 0 ? (
@@ -656,7 +746,7 @@ const DepartmentStockContent: React.FC = () => {
               <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[720px] text-left text-sm">
-                    <thead className="border-b border-gray-100 bg-gray-50 text-xs font-semibold uppercase text-gray-500">
+                    <thead className="border-b border-gray-100 bg-gray-50 text-xs font-semibold text-gray-500">
                       <tr>
                         <th className="px-4 py-3">Type</th>
                         <th className="px-4 py-3">Component</th>
