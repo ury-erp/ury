@@ -1,6 +1,6 @@
-import { useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { RefreshCw } from 'lucide-react';
-import { call } from '@ury/core';
+import { call, db } from '@ury/core';
 import {
   Badge,
   Button,
@@ -18,10 +18,7 @@ interface PrintJobsModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   invoiceId: string | null;
-  jobs: URYPrintJob[];
-  loading: boolean;
-  error: string | null;
-  onRefresh: () => void;
+  onRefreshFailedJobs?: () => void;
 }
 
 function getStatusBadgeVariant(status: string) {
@@ -51,12 +48,61 @@ export function PrintJobsModal({
   open,
   onOpenChange,
   invoiceId,
-  jobs,
-  loading,
-  error,
-  onRefresh,
+  onRefreshFailedJobs,
 }: PrintJobsModalProps) {
+  const [jobs, setJobs] = useState<URYPrintJob[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [retryingIds, setRetryingIds] = useState<Set<string>>(new Set());
+
+  const fetchInvoiceJobs = useCallback(async () => {
+    if (!invoiceId) {
+      setJobs([]);
+      setError(null);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const rows = await db.getDocList<URYPrintJob>('URY Print Job', {
+        fields: [
+          'name',
+          'print_job_id',
+          'job_type',
+          'status',
+          'invoice',
+          'reference_name',
+          'printer',
+          'printer_name',
+          'failure_reason',
+          'created_at',
+          'retry_count',
+          'cups_job_id',
+        ],
+        filters: [['invoice', '=', invoiceId]],
+        limit: 50,
+      } as unknown as Parameters<typeof db.getDocList>[1]);
+
+      setJobs(rows);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to fetch print jobs';
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  }, [invoiceId]);
+
+  useEffect(() => {
+    if (open && invoiceId) {
+      fetchInvoiceJobs();
+    }
+    if (!open) {
+      setJobs([]);
+      setError(null);
+    }
+  }, [open, invoiceId, fetchInvoiceJobs]);
 
   const invoiceJobs = useMemo(() => {
     if (!invoiceId) return [];
@@ -73,7 +119,8 @@ export function PrintJobsModal({
           print_job_id: jobId,
         });
         showToast.success('Print job retry submitted');
-        onRefresh();
+        await fetchInvoiceJobs();
+        onRefreshFailedJobs?.();
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Retry failed';
         showToast.error(message);
@@ -85,7 +132,7 @@ export function PrintJobsModal({
         });
       }
     },
-    [onRefresh]
+    [fetchInvoiceJobs, onRefreshFailedJobs]
   );
 
   return (
@@ -148,7 +195,6 @@ export function PrintJobsModal({
                     <div className="mt-1 text-xs text-gray-500">
                       {formatJobTime(job.created_at)}
                     </div>
-
 
                     {job.status === 'FAILED' && (
                       <div className="mt-3">
