@@ -27,9 +27,10 @@
     "search_placeholder_default": "Rechercher commandes, articles ou clients...",
     "search_placeholder_orders": "Rechercher des commandes",
     "search_placeholder_menu": "Rechercher dans le menu",
-    "switch_to_desk": "Accéder au bureau",
     "clear_cache": "Vider le cache",
-    "logout": "Déconnexion"
+    "logout": "Déconnexion",
+    "shift_overview": "Aperçu du service",
+    "service_board": "Tableau de service"
   },
   "menu": {
     "special_items": "Plats spéciaux"
@@ -86,7 +87,7 @@
     "not_closed_title": "PDV précédent non fermé",
     "not_closed_message": "Veuillez fermer l'entrée PDV précédente pour continuer.",
     "reload_page": "Recharger la page",
-    "switch_to_desk": "Accéder au bureau"
+    "contact_manager": "Si le problème persiste, contactez votre responsable."
   },
   "customer": {
     "search_placeholder": "Rechercher un client...",
@@ -282,11 +283,12 @@
     "merged_items": "Articles de l'addition fusionnée"
   },
   "footer": {
-    "dashboard": "Tableau de bord",
+    "dashboard": "Aperçu du service",
     "pos": "PDV",
     "tables": "Tables",
     "orders": "Commandes",
-    "settings": "Paramètres"
+    "settings": "Paramètres",
+    "service_board": "Tableau de service"
   },
   "product_dialog": {
     "special_instructions": "Instructions spéciales",

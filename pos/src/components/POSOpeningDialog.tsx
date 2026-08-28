@@ -1,4 +1,4 @@
-import { RefreshCw, AlertTriangle, Monitor } from 'lucide-react';
+import { RefreshCw, AlertTriangle } from 'lucide-react';
 import { Button } from '@ury/ui';
 import { t } from '../i18n';
 
@@ -9,13 +9,7 @@ interface POSOpeningDialogProps {
 
 const POSOpeningDialog = ({ onReload, type }: POSOpeningDialogProps) => {
   const isOpeningIssue = type === 'opening';
-  
-  const handleSwitchToDesk = () => {
-    // Get the current domain and open /app in a new tab
-    const currentDomain = window.location.origin;
-    window.open(`${currentDomain}/app`, '_blank');
-  };
-  
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4 shadow-xl">
@@ -50,16 +44,12 @@ const POSOpeningDialog = ({ onReload, type }: POSOpeningDialogProps) => {
               <RefreshCw className="w-5 h-5 mr-2" />
               {t('pos.reload_page')}
             </Button>
-
-            <Button
-              onClick={handleSwitchToDesk}
-              variant="outline"
-              className="w-full border-gray-300 text-gray-700 hover:bg-gray-50 font-medium py-3 px-6 rounded-lg transition-colors duration-200"
-            >
-              <Monitor className="w-5 h-5 mr-2" />
-              {t('pos.switch_to_desk')}
-            </Button>
           </div>
+
+          {/* Recovery guidance */}
+          <p className="mt-4 text-sm text-gray-500">
+            {t('pos.contact_manager')}
+          </p>
         </div>
       </div>
     </div>
