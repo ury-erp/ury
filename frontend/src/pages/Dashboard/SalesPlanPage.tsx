@@ -202,10 +202,29 @@ export const SalesPlanPage: React.FC = () => {
     )));
   };
 
-  const saveDraft = () => {
+  const saveDraft = async () => {
     setSaving(true);
+    // Immediate/offline fallback -- gives instant UI feedback even if the
+    // HTTP save below fails or is slow.
     saveSalesPlanDraftQuantities(draftKey, items);
-    window.setTimeout(() => setSaving(false), 250);
+
+    if (!historyScope?.branch || !historyScope?.plan_date) {
+      setSaving(false);
+      return;
+    }
+
+    try {
+      await salesPlanService.saveDraft({
+        plan_date: historyScope.plan_date,
+        branch: historyScope.branch,
+        company: historyScope.company,
+        items: items.map((item) => ({ item_code: item.item_code, qty: item.planned_qty })),
+      });
+    } catch (err) {
+      setError('Unable to save this Sales Plan draft.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (

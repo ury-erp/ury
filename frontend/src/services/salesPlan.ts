@@ -139,6 +139,24 @@ export const saveSalesPlanDraftQuantities = (
   window.localStorage.setItem(key, JSON.stringify(quantities));
 };
 
+export interface SaveSalesPlanDraftParams {
+  plan_date: string;
+  branch: string;
+  company?: string;
+  service_period?: string;
+  items: Pick<SalesPlanItem, 'item_code' | 'qty'>[];
+}
+
+export interface SaveSalesPlanDraftResponse {
+  name: string;
+  status: string;
+}
+
+export interface TransitionSalesPlanParams {
+  name: string;
+  target_state: string;
+}
+
 export const salesPlanService = {
   async getComparableHistory(params: LoadSalesPlanParams): Promise<ComparableHistoryResponse> {
     const res = await call.get<ComparableHistoryResponse>(
@@ -151,5 +169,38 @@ export const salesPlanService = {
       },
     );
     return normalizeHistoryResponse(res);
+  },
+
+  async saveDraft(params: SaveSalesPlanDraftParams): Promise<SaveSalesPlanDraftResponse> {
+    const res = await call.post<SaveSalesPlanDraftResponse>(
+      'ury.ury.api.ury_sales_plan.save_draft',
+      {
+        plan_date: params.plan_date,
+        branch: params.branch,
+        company: params.company,
+        service_period: params.service_period,
+        items: params.items,
+      },
+    );
+    return ((res as any)?.message ?? res) as SaveSalesPlanDraftResponse;
+  },
+
+  async transitionPlan(params: TransitionSalesPlanParams): Promise<SaveSalesPlanDraftResponse> {
+    const res = await call.post<SaveSalesPlanDraftResponse>(
+      'ury.ury.api.ury_sales_plan.transition_plan',
+      {
+        name: params.name,
+        target_state: params.target_state,
+      },
+    );
+    return ((res as any)?.message ?? res) as SaveSalesPlanDraftResponse;
+  },
+
+  async getPlan(name: string): Promise<Record<string, unknown>> {
+    const res = await call.get<Record<string, unknown>>(
+      'ury.ury.api.ury_sales_plan.get_plan',
+      { name },
+    );
+    return ((res as any)?.message ?? res) as Record<string, unknown>;
   },
 };

@@ -79,3 +79,89 @@ def append_audit(doc, from_state, to_state, actor):
     audits = doc.get("audit_log") or []
     audits.append({"from_state": from_state, "to_state": to_state, "actor": actor, "branch": doc.get("branch"), "company": doc.get("company")})
     doc.audit_log = audits
+
+
+SALES_PLAN_ITEM_FIELDS = (
+    "item_code",
+    "qty",
+    "stock_uom",
+    "department",
+    "production_unit",
+    "production_policy",
+    "bom",
+    "bom_revision",
+)
+
+
+@frappe.whitelist(methods=["POST"])
+def save_draft(plan_date, branch, company=None, service_period=None, items=None):
+    """Create or update the Draft Sales Plan for a (branch, company, plan_date) scope."""
+    if not plan_date or not branch:
+        frappe.throw(_("plan_date and branch are required"), frappe.ValidationError)
+
+    if not company:
+        company = frappe.db.get_value("Branch", branch, "company")
+
+    if not company:
+        frappe.throw(_("Branch company is required for Sales Plan"), frappe.PermissionError)
+
+    item_rows = frappe.parse_json(items) if isinstance(items, str) else (items or [])
+
+    existing_name = frappe.db.exists(
+        "URY Sales Plan",
+        {"branch": branch, "company": company, "plan_date": plan_date, "status": "Draft"},
+    )
+
+    if existing_name:
+        doc = frappe.get_doc("URY Sales Plan", existing_name)
+    else:
+        doc = frappe.get_doc(
+            {
+                "doctype": "URY Sales Plan",
+                "status": "Draft",
+                "branch": branch,
+                "company": company,
+                "plan_date": plan_date,
+            }
+        )
+
+    _validate_plan_scope(doc)
+
+    doc.service_period = service_period
+    doc.set("items", [])
+    for row in item_rows:
+        doc.append(
+            "items",
+            {field: row.get(field) for field in SALES_PLAN_ITEM_FIELDS},
+        )
+
+    if existing_name:
+        doc.save()
+    else:
+        doc.insert()
+
+    return {"name": doc.name, "status": doc.status}
+
+
+@frappe.whitelist(methods=["POST"])
+def transition_plan(name, target_state):
+    """Apply an audited state transition to an existing Sales Plan and persist it."""
+    doc = frappe.get_doc("URY Sales Plan", name)
+    transition_sales_plan(doc, target_state, actor=frappe.session.user)
+    if isinstance(doc.audit_log, list):
+        # audit_log is a Long Text (JSON) field -- transition_sales_plan appends
+        # to it as a Python list, which works for the in-memory dict-shaped docs
+        # used in its own unit tests, but a real Document requires the stored
+        # value to be a string before it can be saved.
+        doc.audit_log = json.dumps(doc.audit_log)
+    doc.save()
+    return {"name": doc.name, "status": doc.status}
+
+
+@frappe.whitelist(methods=["GET"])
+def get_plan(name):
+    """Fetch a Sales Plan by name for frontend state reload after save/transition."""
+    if not frappe.has_permission("URY Sales Plan", "read", doc=name):
+        frappe.throw(_("Not permitted to read this Sales Plan"), frappe.PermissionError)
+
+    return frappe.get_doc("URY Sales Plan", name).as_dict()

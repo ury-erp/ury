@@ -8,7 +8,7 @@ from ury.ury.api.ury_sales_plan import freeze_approval_snapshot, transition_sale
 
 class TestURYSalesPlanContract(FrappeTestCase):
     def _doc(self, **values):
-        doc = frappe._dict({"status": "Submitted for Approval", "branch": "Branch A", "company": "Company A", "plan_date": "2026-09-12", "items": [{"item_code": "ITEM-1", "qty": 2, "production_policy": "PRE_PRODUCED", "bom": "BOM-1"}], "insight_snapshot": {"source": "history"}})
+        doc = frappe._dict({"status": "Submitted for Approval", "branch": "Branch A", "company": "Company A", "plan_date": "2026-09-12", "items": [{"item_code": "MTPL", "qty": 2, "production_policy": "PRE_PRODUCED", "bom": "BOM-1"}], "insight_snapshot": {"source": "history"}})
         doc.update(values)
         return doc
 
@@ -20,7 +20,7 @@ class TestURYSalesPlanContract(FrappeTestCase):
             "ury.ury.api.ury_sales_plan.validate_item_production_configuration"
         ) as validate:
             transition_sales_plan(doc, "Approved", actor="approver@example.com")
-        validate.assert_called_once_with("ITEM-1", "Branch A")
+        validate.assert_called_once_with("MTPL", "Branch A")
         self.assertTrue(doc.approval_snapshot_hash)
         self.assertEqual(doc.status, "Approved")
         self.assertEqual(doc.audit_log[0]["to_state"], "Approved")
@@ -61,3 +61,114 @@ class TestURYSalesPlanContract(FrappeTestCase):
         # field -- use item access to reach the actual field instead.
         doc["items"][0]["qty"] = 99
         self.assertEqual(freeze_approval_snapshot(doc), first)
+
+
+class TestURYSalesPlanEndpoints(FrappeTestCase):
+    def setUp(self):
+        self.branch = "URY Branch"
+        self.company = "URY"
+        self.plan_date = "2026-09-20"
+        frappe.db.delete(
+            "URY Sales Plan",
+            {"branch": self.branch, "company": self.company, "plan_date": self.plan_date},
+        )
+
+    def tearDown(self):
+        frappe.db.delete(
+            "URY Sales Plan",
+            {"branch": self.branch, "company": self.company, "plan_date": self.plan_date},
+        )
+
+    def test_save_draft_creates_new_plan(self):
+        from ury.ury.api.ury_sales_plan import save_draft
+
+        result = save_draft(
+            plan_date=self.plan_date,
+            branch=self.branch,
+            company=self.company,
+            items=[{"item_code": "MTPL", "qty": 5}],
+        )
+        self.assertEqual(result["status"], "Draft")
+        self.assertTrue(frappe.db.exists("URY Sales Plan", result["name"]))
+        self.assertEqual(
+            frappe.db.count(
+                "URY Sales Plan",
+                {"branch": self.branch, "company": self.company, "plan_date": self.plan_date},
+            ),
+            1,
+        )
+
+    def test_save_draft_updates_existing_draft_without_duplicating(self):
+        from ury.ury.api.ury_sales_plan import save_draft
+
+        first = save_draft(
+            plan_date=self.plan_date,
+            branch=self.branch,
+            company=self.company,
+            items=[{"item_code": "MTPL", "qty": 5}],
+        )
+        second = save_draft(
+            plan_date=self.plan_date,
+            branch=self.branch,
+            company=self.company,
+            items=[{"item_code": "MTPL", "qty": 9}],
+        )
+        self.assertEqual(first["name"], second["name"])
+        self.assertEqual(
+            frappe.db.count(
+                "URY Sales Plan",
+                {"branch": self.branch, "company": self.company, "plan_date": self.plan_date},
+            ),
+            1,
+        )
+        doc = frappe.get_doc("URY Sales Plan", second["name"])
+        self.assertEqual(len(doc.items), 1)
+        self.assertEqual(doc.items[0].qty, 9)
+
+    def test_save_draft_rejects_mismatched_branch_company(self):
+        from ury.ury.api.ury_sales_plan import save_draft
+
+        with self.assertRaises(frappe.ValidationError):
+            save_draft(
+                plan_date=self.plan_date,
+                branch=self.branch,
+                company="Some Other Company",
+                items=[],
+            )
+
+    def test_transition_plan_moves_draft_to_proposed(self):
+        from ury.ury.api.ury_sales_plan import save_draft, transition_plan
+
+        created = save_draft(
+            plan_date=self.plan_date,
+            branch=self.branch,
+            company=self.company,
+            items=[{"item_code": "MTPL", "qty": 5}],
+        )
+        result = transition_plan(name=created["name"], target_state="Proposed")
+        self.assertEqual(result["status"], "Proposed")
+
+    def test_transition_plan_rejects_illegal_jump(self):
+        from ury.ury.api.ury_sales_plan import save_draft, transition_plan
+
+        created = save_draft(
+            plan_date=self.plan_date,
+            branch=self.branch,
+            company=self.company,
+            items=[{"item_code": "MTPL", "qty": 5}],
+        )
+        with self.assertRaises(frappe.ValidationError):
+            transition_plan(name=created["name"], target_state="Approved")
+
+    def test_get_plan_returns_doc_for_permitted_user(self):
+        from ury.ury.api.ury_sales_plan import get_plan, save_draft
+
+        created = save_draft(
+            plan_date=self.plan_date,
+            branch=self.branch,
+            company=self.company,
+            items=[{"item_code": "MTPL", "qty": 5}],
+        )
+        result = get_plan(created["name"])
+        self.assertEqual(result["name"], created["name"])
+        self.assertEqual(result["status"], "Draft")
