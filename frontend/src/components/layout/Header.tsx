@@ -163,7 +163,7 @@ export const Header: React.FC = () => {
             </button>
 
             {isBranchDropdownOpen && (
-              <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg border border-gray-200 py-1.5 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+              <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-1.5 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
                 <div className="px-3 py-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wider">
                   Select Active Branch
                 </div>
@@ -223,7 +223,7 @@ export const Header: React.FC = () => {
           {/* Notifications Bell */}
           <button
             onClick={() => setIsNotificationOpen(true)}
-            className="relative p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-colors"
+            className="relative p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
             aria-label="Open notifications"
           >
             <Bell className="w-5 h-5" />
@@ -236,7 +236,7 @@ export const Header: React.FC = () => {
           <div className="relative" ref={userMenuRef}>
             <button
               onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-              className="flex items-center gap-2 p-1 rounded-xl hover:bg-gray-100 transition-colors text-gray-600 hover:text-gray-900"
+              className="flex items-center gap-2 p-1 rounded-lg hover:bg-gray-100 transition-colors text-gray-600 hover:text-gray-900"
             >
               <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
                 <User className="w-4 h-4 text-white" />
@@ -356,7 +356,7 @@ export const Header: React.FC = () => {
               <div className="p-4 border-t border-gray-200 bg-gray-50 text-center">
                 <button
                   onClick={() => setIsNotificationOpen(false)}
-                  className="w-full py-2 text-sm font-medium text-gray-600 hover:text-gray-900 border border-gray-300 rounded-xl bg-white hover:bg-gray-50 transition-colors"
+                  className="w-full py-2 text-sm font-medium text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg bg-white hover:bg-gray-50 transition-colors"
                 >
                   Close
                 </button>
