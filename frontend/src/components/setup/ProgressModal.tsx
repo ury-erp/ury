@@ -65,7 +65,7 @@ export function ProgressModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 backdrop-blur-sm">
-      <div className="w-full max-w-[540px] bg-white rounded-2xl shadow-xl overflow-hidden">
+      <div className="w-full max-w-[540px] bg-white rounded-lg shadow-xl overflow-hidden">
         
         {/* Segmented Top Bar */}
         <div className="flex px-10 pt-10 pb-6 gap-1">
