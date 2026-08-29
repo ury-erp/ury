@@ -6,7 +6,7 @@ export default function Settings() {
   return (
     <div className="h-full overflow-y-auto p-6 bg-gray-50">
       <div className="max-w-md mx-auto space-y-6">
-        <h1 className="text-2xl font-bold text-gray-900">{t('settings.title')}</h1>
+        <h1 className="text-xl font-semibold text-gray-900">{t('settings.title')}</h1>
 
         <div>
           <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
