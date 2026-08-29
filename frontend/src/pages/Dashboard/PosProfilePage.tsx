@@ -440,7 +440,7 @@ export const PosProfilePage: React.FC = () => {
                 {activeTab === 'general' && (
                   <div className="space-y-5 text-xs">
                     <div>
-                      <h4 className="text-[11px] font-bold uppercase tracking-wide text-gray-400 mb-2">Operations</h4>
+                      <h4 className="text-[11px] font-bold tracking-wide text-gray-400 mb-2">Operations</h4>
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                         <div className="p-4 rounded-lg bg-primary/5 border border-primary/10 flex flex-col justify-between min-h-[72px]">
                           <span className="font-semibold text-gray-700 block">Item Discounts</span>
@@ -482,7 +482,7 @@ export const PosProfilePage: React.FC = () => {
                     </div>
 
                     <div>
-                      <h4 className="text-[11px] font-bold uppercase tracking-wide text-gray-400 mb-2">Menu &amp; Pricing</h4>
+                      <h4 className="text-[11px] font-bold tracking-wide text-gray-400 mb-2">Menu &amp; Pricing</h4>
                       <div className="grid grid-cols-2 gap-3">
                         <div className="p-4 rounded-lg bg-gray-50 border border-gray-200 flex flex-col justify-between min-h-[72px]">
                           <span className="font-semibold text-gray-700 block">Price List</span>
@@ -500,7 +500,7 @@ export const PosProfilePage: React.FC = () => {
                     </div>
 
                     <div>
-                      <h4 className="text-[11px] font-bold uppercase tracking-wide text-gray-400 mb-2">Limits &amp; Timing</h4>
+                      <h4 className="text-[11px] font-bold tracking-wide text-gray-400 mb-2">Limits &amp; Timing</h4>
                       <div className="grid grid-cols-2 gap-3">
                         <div className="p-4 rounded-lg bg-gray-50 border border-gray-200 flex flex-col justify-between min-h-[72px]">
                           <span className="font-semibold text-gray-700 block">Paid Limit</span>
@@ -626,10 +626,10 @@ export const PosProfilePage: React.FC = () => {
                       setAddForm({...addForm, applicable_for_users: newRows});
                     }} /> Default
                   </label>
-                  <button type="button" className="text-gray-400 hover:text-red-500" onClick={() => {
+                  <Button type="button" variant="ghost" size="xs" className="text-gray-400 hover:text-red-500 p-0 h-8 w-8" onClick={() => {
                     const newRows = addForm.applicable_for_users.filter((_, i) => i !== idx);
                     setAddForm({...addForm, applicable_for_users: newRows});
-                  }}><X className="w-4 h-4" /></button>
+                  }}><X className="w-4 h-4" /></Button>
                 </div>
               ))}
             </div>
@@ -658,10 +658,10 @@ export const PosProfilePage: React.FC = () => {
                       setAddForm({...addForm, payments: newRows});
                     }} /> Default
                   </label>
-                  <button type="button" className="text-gray-400 hover:text-red-500" onClick={() => {
+                  <Button type="button" variant="ghost" size="xs" className="text-gray-400 hover:text-red-500 p-0 h-8 w-8" onClick={() => {
                     const newRows = addForm.payments.filter((_, i) => i !== idx);
                     setAddForm({...addForm, payments: newRows});
-                  }}><X className="w-4 h-4" /></button>
+                  }}><X className="w-4 h-4" /></Button>
                 </div>
               ))}
             </div>
@@ -685,7 +685,7 @@ export const PosProfilePage: React.FC = () => {
           />
           <div className="relative h-fit max-h-[90vh] w-full max-w-4xl bg-white rounded-lg shadow-2xl z-[101] flex flex-col overflow-hidden">
             <div className="flex items-center justify-between p-6 border-b border-gray-100 bg-gray-50/50">
-              <h2 className="text-xl font-bold text-gray-900">
+              <h2 className="text-xl font-semibold text-gray-900">
                 {selectedProfile ? `Edit: ${selectedProfile.name}` : 'Edit POS Profile'}
               </h2>
               <Button
