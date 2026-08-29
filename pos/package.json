@@ -13,9 +13,9 @@
   },
   "dependencies": {
     "@radix-ui/react-select": "^2.2.5",
+    "@types/uuid": "^10.0.0",
     "@ury/core": "*",
     "@ury/ui": "*",
-    "@types/uuid": "^10.0.0",
     "autoprefixer": "^10.4.21",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -38,6 +38,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.21.0",
+    "@playwright/test": "^1.62.1",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.1.0",
