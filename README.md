@@ -111,6 +111,8 @@ Given below is the list of features of URY app.
 
 For more comprehensive list of features [go here.](FEATURES.md)
 
+> :warning: For Windows Users : 
+> If you try to `git clone` the project on a Windows machine, you might face a conflict that is caused by the file `plans/SweepSecurity:SEC-16-plan.json`. Git cannot create a file that contains a colon (:) in its filename due to Windows OS restrictions. Make sure you edit the filename and replcae the colon with a different character.
 
 ## Getting Started
 
