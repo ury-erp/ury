@@ -283,12 +283,12 @@
     "merged_items": "Articles de l'addition fusionnée"
   },
   "footer": {
-    "dashboard": "Aperçu du service",
+    "dashboard": "Aperçu",
     "pos": "PDV",
     "tables": "Tables",
     "orders": "Commandes",
     "settings": "Paramètres",
-    "service_board": "Tableau de service"
+    "sessions": "Sessions"
   },
   "product_dialog": {
     "special_instructions": "Instructions spéciales",

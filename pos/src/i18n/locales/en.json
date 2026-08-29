@@ -312,12 +312,12 @@
     "merged_items": "Items from merged bill"
   },
   "footer": {
-    "dashboard": "Shift Overview",
+    "dashboard": "Overview",
     "pos": "POS",
     "tables": "Tables",
     "orders": "Orders",
     "settings": "Settings",
-    "service_board": "Service Board"
+    "sessions": "Sessions"
   },
   "product_dialog": {
     "special_instructions": "Special Instructions",
