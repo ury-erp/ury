@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
-import { Card, CardContent, CardHeader, CardTitle, StatCard } from '@ury/ui';
+import { Card, CardContent, CardHeader, CardTitle, StatCard, Select, Input } from '@ury/ui';
 import { IndianRupee, TrendingUp, TrendingDown, Percent, AlertTriangle, ChevronDown } from 'lucide-react';
 import { useBranchContext } from '../../context/BranchContext';
 import { toApiDate } from '../../lib/reportDate';
@@ -183,35 +183,32 @@ export function DailyPnl() {
           <p className="text-sm text-muted-foreground">Full daily profit &amp; loss breakdown</p>
         </div>
         <div className="flex items-center gap-3">
-          <select
+          <Select
             value={branch}
             onChange={(e) => setBranch(e.target.value)}
-            className="border border-input rounded-md px-3 py-1.5 text-sm"
           >
             {branches.map((b) => (
               <option key={b.id} value={b.id}>
                 {b.name}
               </option>
             ))}
-          </select>
+          </Select>
           {availableDates.length > 0 ? (
-            <select
+            <Select
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className="border border-input rounded-md px-3 py-1.5 text-sm"
             >
               {availableDates.map((d) => (
                 <option key={d} value={d}>
                   {d}
                 </option>
               ))}
-            </select>
+            </Select>
           ) : (
-            <input
+            <Input
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className="border border-input rounded-md px-3 py-1.5 text-sm"
             />
           )}
         </div>

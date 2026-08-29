@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
-import { StatCard, DataTable, type DataTableColumn, Button } from '@ury/ui';
+import { StatCard, DataTable, type DataTableColumn, Button, Input } from '@ury/ui';
 import { Package, IndianRupee, Hash, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useBranchContext } from '../../context/BranchContext';
 import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
@@ -87,12 +87,12 @@ export function ItemWiseSales() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <input
+          <Input
             type="text"
             placeholder="Search items..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="border border-input rounded-md px-3 py-1.5 text-sm w-40"
+            className="w-40"
           />
           <DateRangeFilter value={range} onChange={setRange} />
         </div>
