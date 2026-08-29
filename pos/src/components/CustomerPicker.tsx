@@ -267,11 +267,12 @@ export function CustomerPicker({ value, onChange, disabled }: CustomerPickerProp
               {searchResults.map((customer, idx) => {
                 const parsed = parseCustomer(customer);
                 return (
-                  <button
+                  <Button
                     key={customer.name}
                     type="button"
-                    className={`w-full px-4 py-2 text-left text-sm ${
-                      idx === highlightedIndex ? 'bg-primary-50 text-primary-700' : 'hover:bg-gray-50'
+                    variant="ghost"
+                    className={`justify-start h-auto px-4 py-2 ${
+                      idx === highlightedIndex ? 'bg-primary-50 text-primary-700 hover:bg-primary-50' : 'hover:bg-gray-50'
                     }`}
                     onMouseDown={() => {
                       onChange(parsed);
@@ -279,14 +280,17 @@ export function CustomerPicker({ value, onChange, disabled }: CustomerPickerProp
                       setIsOpen(false);
                     }}
                   >
-                    <div className="font-medium">{parsed.name}</div>
-                    <div className="text-xs text-gray-500">{parsed.phone}</div>
-                  </button>
+                    <div className="text-left">
+                      <div className="font-medium">{parsed.name}</div>
+                      <div className="text-xs text-gray-500">{parsed.phone}</div>
+                    </div>
+                  </Button>
                 );
               })}
-              <button
+              <Button
                 type="button"
-                className="flex w-full items-center gap-2 px-4 py-2 text-sm font-medium text-primary-600 hover:bg-gray-50"
+                variant="ghost"
+                className="justify-start"
                 onMouseDown={() => {
                   if (/^\d+$/.test(searchTerm.trim())) {
                     setPrefillPhone(searchTerm.trim());
@@ -299,8 +303,8 @@ export function CustomerPicker({ value, onChange, disabled }: CustomerPickerProp
                   setIsOpen(false);
                 }}
               >
-                <UserPlus className="h-4 w-4" /> {t('customer.add_new')}
-              </button>
+                <UserPlus className="h-4 w-4 mr-2" /> {t('customer.add_new')}
+              </Button>
             </div>
           )}
         </div>

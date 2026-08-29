@@ -7,7 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@ury/ui';
-import { Button } from '@ury/ui';
+import { Button, Input } from '@ury/ui';
 import { cn } from '@ury/ui';
 import { t } from '../i18n';
 import { Spinner } from '@ury/ui';
@@ -138,19 +138,20 @@ const CaptainTransferDialog = ({
           <label className="mb-1 block text-sm font-medium text-gray-700">
             {t('tables.current_captain')}
           </label>
-          <input
+          <Input
             type="text"
             readOnly
             value={currentCaptain}
-            className="mb-4 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700"
+            className="mb-4"
+            variant="search"
           />
 
-          <input
+          <Input
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t('tables.search_captain_placeholder')}
-            className="mb-3 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className="mb-3"
             disabled={isSubmitting}
           />
 
@@ -167,21 +168,20 @@ const CaptainTransferDialog = ({
               {displayCandidates.map((row) => {
                 const isSelected = selected === row.name;
                 return (
-                  <button
+                  <Button
                     key={row.name}
                     type="button"
                     disabled={isSubmitting}
                     onClick={() => setSelected(row.name)}
+                    variant={isSelected ? 'default' : 'outline'}
                     className={cn(
-                      'flex w-full flex-col rounded-lg border p-3 text-left transition-colors',
-                      isSelected
-                        ? 'border-primary bg-primary-50/40'
-                        : 'border-gray-200 hover:border-gray-300'
+                      'justify-start h-auto flex-col items-start px-3 py-3',
+                      isSelected && 'bg-primary-50/40 border-primary'
                     )}
                   >
                     <p className="font-medium text-gray-900">{row.full_name || row.name}</p>
                     <p className="text-xs text-gray-500">{row.name}</p>
-                  </button>
+                  </Button>
                 );
               })}
             </div>
