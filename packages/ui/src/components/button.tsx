@@ -38,11 +38,11 @@ const buttonVariants = cva(
         link: "underline-offset-4 hover:underline text-primary active:scale-100 active:text-primary-600",
         tab: "bg-gray-100 text-gray-700 font-medium border-0 hover:bg-gray-200 active:bg-gray-300 data-[selected=true]:bg-primary-50 data-[selected=true]:text-primary-700 data-[selected=true]:hover:bg-primary-100",
         success:
-          "bg-green-600 text-white shadow-sm hover:bg-green-700 active:bg-green-800 active:shadow-none",
+          "bg-success-600 text-white shadow-sm hover:bg-success-700 active:bg-success-800 active:shadow-none",
         warning:
-          "bg-orange-600 text-white shadow-sm hover:bg-orange-700 active:bg-orange-800 active:shadow-none",
+          "bg-warning-600 text-white shadow-sm hover:bg-warning-700 active:bg-warning-800 active:shadow-none",
         danger:
-          "bg-red-600 text-white shadow-sm hover:bg-red-700 active:bg-red-800 active:shadow-none",
+          "bg-destructive text-white shadow-sm hover:bg-destructive/90 active:bg-destructive active:brightness-95 active:shadow-none",
       },
       // Control height scale, shared with Input/Select so a button always
       // lines up with the field next to it: xs 32 / sm 36 / default 44 / lg 48.
