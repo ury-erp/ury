@@ -1,5 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Button, Input, Spinner, cn } from '@ury/ui';
+import {
+  Button,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  Input,
+  Spinner,
+  cn,
+} from '@ury/ui';
 import { t } from '../i18n';
 import {
   getChecklist,
@@ -57,6 +67,13 @@ const toRowState = (items: ChecklistItem[]): ChecklistRowState[] =>
  * treatment as POSOpeningDialog, but interactive: fetches the checklist on
  * mount, renders each item with a mandatory marker and an optional remarks
  * field, and submits once every mandatory item is checked.
+ *
+ * Uses the shared Dialog/DialogContent primitives but intentionally omits
+ * `onOpenChange` and the close button (`onClose`): the primitives only ever
+ * initiate a close by invoking those callbacks (overlay click calls
+ * `onOpenChange?.(false)`, the close "x" calls `onClose`), so leaving both
+ * unset means there is no code path that can dismiss this gate — it can
+ * only close via `onComplete()` from a real, successful submit.
  */
 const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: ChecklistGateDialogProps) => {
   const [rows, setRows] = useState<ChecklistRowState[]>([]);
@@ -170,10 +187,14 @@ const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: Checklis
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-8 max-w-lg w-full mx-4 shadow-xl max-h-[90vh] flex flex-col">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2 text-center">{t(titleKey)}</h2>
-        <p className="text-gray-600 mb-6 text-center">{t('checklist.description')}</p>
+    // No onOpenChange: overlay clicks call `onOpenChange?.(false)`, which is
+    // a no-op here since the prop is unset, keeping this gate non-dismissable.
+    <Dialog open>
+      <DialogContent size="lg" showCloseButton={false} className="p-8 max-h-[90vh] flex flex-col">
+        <DialogHeader className="p-0 mb-2">
+          <DialogTitle className="text-2xl text-center">{t(titleKey)}</DialogTitle>
+          <DialogDescription className="text-center">{t('checklist.description')}</DialogDescription>
+        </DialogHeader>
 
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
@@ -226,8 +247,8 @@ const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: Checklis
             </Button>
           </>
         )}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 };
 
