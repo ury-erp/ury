@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
-import { StatCard, DataTable, type DataTableColumn } from '@ury/ui';
+import { StatCard, DataTable, type DataTableColumn, Select } from '@ury/ui';
 import { IndianRupee, TrendingUp, Trophy, TrendingDown } from 'lucide-react';
 import { useBranchContext } from '../../context/BranchContext';
 import { BarChartCard } from '../../components/reports/charts/BarChartCard';
@@ -81,17 +81,16 @@ export function MonthWiseSales() {
             Monthly revenue trend {activeBranchId === 'all' ? '· All Branches' : ''}
           </p>
         </div>
-        <select
+        <Select
           value={monthsBack}
           onChange={(e) => setMonthsBack(Number(e.target.value))}
-          className="border border-input rounded-md px-3 py-1.5 text-sm"
         >
           {MONTH_OPTIONS.map((m) => (
             <option key={m} value={m}>
               Last {m} months
             </option>
           ))}
-        </select>
+        </Select>
       </div>
 
       {error && (
