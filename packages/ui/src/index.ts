@@ -13,3 +13,6 @@ export * from './components/card';
 export * from './components/stat-card';
 export * from './components/data-table';
 export * from './components/toast';
+export * from './components/checkbox';
+export * from './components/tabs';
+export * from './components/alert';
