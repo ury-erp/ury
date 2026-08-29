@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Spinner } from '@ury/ui';
+import { Button, Card, Spinner, Textarea } from '@ury/ui';
 import { getLoggedUser, getUserRoles } from '@ury/core';
 import { useBranchContext } from '../../context/BranchContext';
 import {
@@ -133,12 +133,11 @@ const ActionModal: React.FC<ActionModalProps> = ({
         <div className="mb-4 space-y-3">
           <label className="flex flex-col text-sm font-medium text-gray-700">
             Reason (optional)
-            <textarea
+            <Textarea
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder="Enter reason for this action..."
-              className="mt-1 rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-500"
-              rows={3}
+              className="mt-1"
               disabled={loading}
             />
           </label>
@@ -147,20 +146,22 @@ const ActionModal: React.FC<ActionModalProps> = ({
           )}
         </div>
         <div className="flex gap-3 justify-end">
-          <button
+          <Button
             onClick={onCancel}
             disabled={loading}
-            className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            variant="outline"
+            size="sm"
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={handleConfirm}
             disabled={loading}
-            className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            variant="default"
+            size="sm"
           >
             {loading ? 'Processing...' : action}
-          </button>
+          </Button>
         </div>
       </Card>
     </div>
@@ -255,7 +256,7 @@ const StockReservationContent: React.FC = () => {
         <Card className="border-red-200 bg-red-50 p-6 text-sm text-red-700">{error}</Card>
       ) : reservations.length === 0 ? (
         <Card className="p-8 text-center text-sm text-gray-500">
-          No stock reservations found for this branch.
+          No active stock reservations for this branch right now.
         </Card>
       ) : (
         <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
@@ -296,18 +297,20 @@ const StockReservationContent: React.FC = () => {
                     <td className="px-4 py-3">
                       {row.status === 'Reserved' && (
                         <div className="flex gap-2">
-                          <button
+                          <Button
                             onClick={() => handleActionClick(row.name, 'release')}
-                            className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700 hover:bg-blue-200"
+                            variant="secondary"
+                            size="xs"
                           >
                             Release
-                          </button>
-                          <button
+                          </Button>
+                          <Button
                             onClick={() => handleActionClick(row.name, 'cancel')}
-                            className="text-xs px-2 py-1 rounded bg-red-100 text-red-700 hover:bg-red-200"
+                            variant="secondary"
+                            size="xs"
                           >
                             Cancel
-                          </button>
+                          </Button>
                         </div>
                       )}
                     </td>
