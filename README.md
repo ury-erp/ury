@@ -1,4 +1,3 @@
-
 # URY - Open Source Restaurant Management System
 
 URY is an open source ERP designed to simplify and streamline restaurant operations. It is built on top of  world's best free and open source ERP, ERPNext.
@@ -12,6 +11,9 @@ URY is an open source ERP designed to simplify and streamline restaurant operati
 	</a>
 </div>
 
+
+> :warning: For Windows users :
+> If you are trying to `git clone` the project, you might face failures regarding it. Even though the clone succeeds, the checkout may fail due to the file `‎plans/SweepSecurity:SEC-16-plan.json`‎. Since Windows does not let its users put a colon (:) in filenames, git will return an error regardless. In order to solve this issue, rename this file and replace the colon with any valid character; `plans/SweepSecurity-SEC-16-plan.json`.
 
 > :warning: Warning : 
 > URY is currently in active development, and we are continuously making changes, updates, and working on new features and improvements. Please be aware that until a stable release is reached, backward compatibility is not guaranteed. We make every effort to maintain compatibility.
