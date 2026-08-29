@@ -334,6 +334,8 @@ export const MenuPage: React.FC = () => {
 
   return (
     <div className="space-y-4 max-w-[1600px] mx-auto">
+      {/* Page Heading */}
+      <h1 className="text-xl font-semibold text-gray-900">Menu</h1>
 
       {/* Section: Menu Selector — Partition Style */}
       <div className="flex flex-col md:flex-row items-center justify-between gap-4 pb-3 border-b border-gray-200 -mx-6 px-6 -mt-6 pt-6">
@@ -420,11 +422,11 @@ export const MenuPage: React.FC = () => {
 
       {/* Content Area */}
       {loading ? (
-        <div className="py-24 flex items-center justify-center bg-white rounded-xl border border-gray-100 shadow-sm">
+        <div className="py-24 flex items-center justify-center bg-white rounded-lg border border-gray-100 shadow-sm">
           <Spinner className="w-8 h-8 text-primary" />
         </div>
       ) : filteredItems.length === 0 ? (
-        <Card className="p-16 flex flex-col items-center justify-center text-center rounded-xl border border-gray-100 shadow-sm bg-white">
+        <Card className="p-16 flex flex-col items-center justify-center text-center rounded-lg border border-gray-100 shadow-sm bg-white">
           <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-5">
             <Utensils className="w-8 h-8 text-primary" />
           </div>
@@ -480,9 +482,9 @@ export const MenuPage: React.FC = () => {
           ))}
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden overflow-x-auto">
+        <div className="bg-white rounded-lg border border-gray-100 shadow-sm overflow-hidden overflow-x-auto">
           <table className="w-full text-left text-sm text-gray-600 min-w-[600px]">
-            <thead className="bg-gray-50/80 border-b border-gray-100 text-xs uppercase text-gray-500 font-bold tracking-wider">
+            <thead className="bg-gray-50/80 border-b border-gray-100 text-xs text-gray-500 font-bold tracking-wider">
               <tr>
                 <th className="px-6 py-4">Item Name</th>
                 <th className="px-6 py-4">Course</th>
