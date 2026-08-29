@@ -3,6 +3,11 @@ import { createApp, reactive } from "vue";
 import App from "./App.vue";
 
 import router from './router';
+import { mountLanguageSwitcher, startDomI18n } from '@ury/core/i18n';
+import russianTranslations from './i18n/ru.json';
+
+startDomI18n(russianTranslations);
+mountLanguageSwitcher();
 
 const app = createApp(App);
 

@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-`@ury/core` is the **framework-agnostic shared utility package** for URY's React frontends (`pos/`, `frontend/`). It contains no React code — only TypeScript utilities for talking to the Frappe backend, session/role handling, local storage, formatting, and QZ-Tray thermal-print transport.
+`@ury/core` is the **framework-agnostic shared utility package** for URY's frontends. It contains no React or Vue code — only TypeScript utilities for talking to the Frappe backend, session/role handling, local storage, English/Russian language selection, formatting, and QZ-Tray thermal-print transport.
 
 - **Workspace package** (yarn classic workspaces, declared at repo root). Consumed as `"@ury/core": "*"`.
 - **Source-linked**: `package.json` `exports` points directly at `./src/index.ts`. There is no build step — the consuming app's Vite/TypeScript (`moduleResolution: "bundler"`) compiles the package source. Edits are picked up instantly by `vite dev`.
@@ -23,6 +23,7 @@ packages/core/src/
 │   └── roles.ts        ← isUserRestrictedFromTableOrders(), canCaptainTransfer(), derivePOSCapabilities()
 ├── storage.ts          ← storage: localStorage wrapper (+ POS-profile helpers)
 ├── format.ts           ← formatCurrency(), formatInvoiceTime()
+├── i18n.ts             ← EN/RU resolution, switcher, residual DOM translation bridge
 └── print/
     └── qz.ts           ← initPrinting(), loadQzPrinter(), printWithQz(), disconnectQzPrinter()
 ```
@@ -61,6 +62,16 @@ All take the shared `User` and `PosProfileCombined` types from `types.ts` (struc
 ### Formatting (`format.ts`)
 - `formatCurrency(amount)` — prefixes the symbol stored under the `currencySymbol` localStorage key (apps must seed it, e.g. after loading the POS profile).
 - `formatInvoiceTime(timestamp)` — locale time for ISO datetimes, handles bare `HH:MM:SS` strings, returns `'No bill activity yet'` for null.
+
+### Internationalisation (`i18n.ts`)
+
+- Only `en` and `ru` are supported. `resolveUryLanguage()` checks the shared
+  `ury_language` local-storage override before Frappe's boot language.
+- `mountLanguageSwitcher()` adds the compact EN/RU control used by frontends
+  without a native language selector.
+- `startDomI18n(dictionary)` translates residual hardcoded text, attributes,
+  toasts, and interpolated `{{placeholder}}` messages. Each consuming app owns
+  its Russian dictionary under `src/i18n/`.
 
 ### QZ-Tray printing (`print/qz.ts`)
 Transport + signing mechanics only; domain print orchestration (e.g. pos's `printOrder`) stays in the app.

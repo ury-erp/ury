@@ -106,7 +106,7 @@ pos/
 │       ├── resolve-language.ts
 │       └── locales/
 │           ├── en.json
-│           └── fr.json
+│           └── ru.json
 │
 ├── public/                   # Static assets (favicon, logos)
 ├── index.html                # HTML entry point
@@ -211,8 +211,8 @@ initI18n().then(() => ReactDOM.createRoot(...).render(...));
 ```
 
 `initI18n()` calls `resolveLanguage()` which checks (in priority order):
-1. `window.frappe.boot.lang` — Frappe/ERPNext system language
-2. `localStorage.getItem('ury_language')` — manual override
+1. `localStorage.getItem('ury_language')` — manual POS override
+2. `window.frappe.boot.lang` — Frappe/ERPNext system language
 3. `'en'` — default fallback
 
 ### File locations
@@ -225,7 +225,7 @@ src/i18n/
 ├── index.ts            — t(), initI18n(), getActiveLanguage()
 └── locales/
     ├── en.json         — English (source of truth)
-    └── fr.json         — French
+    └── ru.json         — Russian
 ```
 
 ### Key namespaces in locale files
@@ -244,15 +244,11 @@ src/i18n/
 | `errors` | All error messages |
 | `success` | All success/info messages |
 
-### Adding a new language
+### Supported languages
 
-1. Create `src/i18n/locales/<lang-code>.json` copying the structure of `en.json`.
-2. Translate all values (do not change keys).
-3. Add the language to `SUPPORTED_LANGUAGES` in `config.ts`:
-   ```typescript
-   export const SUPPORTED_LANGUAGES = { en: 'English', fr: 'Français', de: 'Deutsch' };
-   ```
-4. The loader will dynamically import the file on demand. No other changes needed.
+The product intentionally supports only English (`en`) and Russian (`ru`). Keep
+`SUPPORTED_LANGUAGES`, locale files, document metadata, and visible language
+selectors limited to those two languages unless the product requirement changes.
 
 ---
 
@@ -280,7 +276,7 @@ src/i18n/
 ## 9. Guidelines for AI Agents
 
 ### Safe to modify
-- Adding new `t()` keys: add to `en.json` and `fr.json` simultaneously, then use in component.
+- Adding new `t()` keys: add to `en.json` and `ru.json` simultaneously, then use in component.
 - UI text changes: always go through `t()`, never hardcode.
 - Adding new components: follow the existing pattern — named export, TypeScript props interface, Zustand for data.
 - Adding new API wrappers: add to the appropriate `lib/*-api.ts` file.
@@ -290,7 +286,7 @@ src/i18n/
 1. Define new state in the appropriate store slice.
 2. Add API call in `lib/`.
 3. Create or modify component.
-4. Add translation keys to both `en.json` and `fr.json`.
+4. Add translation keys to both `en.json` and `ru.json`.
 5. No need to modify `main.tsx`, `App.tsx`, or `vite.config.ts` for typical features.
 
 ### What NOT to break

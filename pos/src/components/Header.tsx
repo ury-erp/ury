@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { t } from '../i18n';
+import { getActiveLanguage, t } from '../i18n';
 import { Link, useLocation } from 'react-router-dom';
 import {
   Command,
@@ -9,6 +9,7 @@ import {
   LogOut,
   RefreshCw,
   Lock,
+  Languages,
 } from 'lucide-react';
 import { Button, Input } from '@ury/ui';
 import { useRootStore } from '../store/root-store';
@@ -26,6 +27,7 @@ const Header = () => {
   const { searchQuery, setSearchQuery, setShowVoluntaryClosing } = usePOSStore();
   const { orderSearchQuery, setOrderSearchQuery } = useRootStore();
   const [orderSearchInput, setOrderSearchInput] = useState(orderSearchQuery);
+  const activeLanguage = getActiveLanguage();
 
   // Determine placeholder and handlers based on route
   let searchPlaceholder = t('header.search_placeholder_default');
@@ -90,9 +92,17 @@ const Header = () => {
     try {
       await logout();
       window.location.href = '/login?redirect-to=%2Fpos';
-    } catch (error) {
+    } catch {
       showToast.error(t('errors.failed_logout'));
     }
+  };
+
+  const handleLanguageChange = (language: 'en' | 'ru') => {
+    setShowUserMenu(false);
+    if (language === activeLanguage) return;
+
+    localStorage.setItem('ury_language', language);
+    window.location.reload();
   };
 
   const handleClearCache = () => {
@@ -165,6 +175,32 @@ const Header = () => {
                   <p className="text-sm font-medium text-gray-900">{user?.full_name || 'User'}</p>
                   <p className="text-sm text-gray-500">{user?.name || ''}</p>
                 </div>
+                <div className="p-3 border-b border-gray-200">
+                  <div className="flex items-center gap-2 px-1 text-xs font-medium text-gray-500">
+                    <Languages className="w-4 h-4" />
+                    <span>{t('header.language')}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 mt-2">
+                    <Button
+                      type="button"
+                      size="xs"
+                      variant={activeLanguage === 'en' ? 'default' : 'outline'}
+                      aria-pressed={activeLanguage === 'en'}
+                      onClick={() => handleLanguageChange('en')}
+                    >
+                      {t('header.english')}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="xs"
+                      variant={activeLanguage === 'ru' ? 'default' : 'outline'}
+                      aria-pressed={activeLanguage === 'ru'}
+                      onClick={() => handleLanguageChange('ru')}
+                    >
+                      {t('header.russian')}
+                    </Button>
+                  </div>
+                </div>
                 <div className="py-2">
                   <Button
                     variant="ghost"
@@ -216,4 +252,4 @@ const Header = () => {
   );
 };
 
-export default Header; 
+export default Header;

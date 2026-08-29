@@ -1,5 +1,11 @@
-const common_site_config = require('../../../sites/common_site_config.json');
-const { webserver_port } = common_site_config;
+import fs from 'node:fs';
+import path from 'node:path';
+
+const configPath = path.resolve(process.cwd(), '../../../sites/common_site_config.json');
+const commonSiteConfig = fs.existsSync(configPath)
+	? JSON.parse(fs.readFileSync(configPath, 'utf8'))
+	: {};
+const webserver_port = commonSiteConfig.webserver_port || 8000;
 
 export default {
 	'^/(app|api|assets|files)': {

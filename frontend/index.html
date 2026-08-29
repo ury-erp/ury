@@ -1,7 +1,7 @@
 <!doctype html>
-{% set user_lang = frappe.lang or 'en' %}
-{% set is_rtl = user_lang in ['ar', 'he', 'fa', 'ur', 'ku'] %}
-<html lang="{{ user_lang }}" dir="{{ 'rtl' if is_rtl else 'ltr' }}">
+{% set requested_lang = frappe.lang or 'en' %}
+{% set user_lang = requested_lang if requested_lang in ['en', 'ru'] else 'en' %}
+<html lang="{{ user_lang }}" dir="ltr">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" href="/assets/ury/pos/ury.ico" />

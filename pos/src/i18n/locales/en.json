@@ -28,6 +28,9 @@
     "search_placeholder_orders": "Search Orders",
     "search_placeholder_menu": "Search Menu",
     "close_shift": "Close Shift",
+    "language": "Language",
+    "english": "English",
+    "russian": "Russian",
     "switch_to_desk": "Switch To Desk",
     "clear_cache": "Clear Cache",
     "logout": "Logout"
