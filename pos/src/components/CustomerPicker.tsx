@@ -100,13 +100,13 @@ function NewCustomerForm({
   return (
     <form className="space-y-4" onSubmit={handleAddCustomerSubmit}>
       {apiError && (
-        <div className="rounded-md border border-red-200 bg-red-50 p-3">
-          <div className="text-sm text-red-600">{apiError}</div>
+        <div className="rounded-md border border-destructive/20 bg-destructive/5 p-3">
+          <div className="text-sm text-destructive">{apiError}</div>
         </div>
       )}
       <div>
         <label className="mb-1 block text-sm font-medium text-gray-700" htmlFor="new-customer-name">
-          {t('customer.name_label')} <span className="text-red-500">*</span>
+          {t('customer.name_label')} <span className="text-destructive">*</span>
         </label>
         <Input
           id="new-customer-name"
@@ -119,7 +119,7 @@ function NewCustomerForm({
       </div>
       <div>
         <label className="mb-1 block text-sm font-medium text-gray-700" htmlFor="new-customer-phone">
-          {t('customer.phone_label')} <span className="text-red-500">*</span>
+          {t('customer.phone_label')} <span className="text-destructive">*</span>
         </label>
         <div className="relative">
           <Input
@@ -222,17 +222,17 @@ export function CustomerPicker({ value, onChange, disabled }: CustomerPickerProp
   return (
     <div className="relative">
       {value ? (
-        <div className="flex items-center justify-between rounded-lg bg-blue-50 p-3">
+        <div className="flex items-center justify-between rounded-lg bg-primary-50 p-3">
           <div>
-            <p className="font-medium text-blue-900">{value.name}</p>
-            <p className="text-sm text-blue-700">{value.phone}</p>
+            <p className="font-medium text-primary-900">{value.name}</p>
+            <p className="text-sm text-primary-700">{value.phone}</p>
           </div>
           <Button
             onClick={() => onChange(null)}
             disabled={disabled}
             variant="ghost"
             size="sm"
-            className="text-blue-700 hover:text-blue-800"
+            className="text-primary-700 hover:text-primary-800"
           >
             {t('common.change')}
           </Button>
@@ -263,7 +263,7 @@ export function CustomerPicker({ value, onChange, disabled }: CustomerPickerProp
                   <Loader className="mr-2 h-4 w-4 animate-spin" /> {t('common.searching')}
                 </div>
               )}
-              {searchError && <div className="p-4 text-center text-sm text-red-500">{searchError}</div>}
+              {searchError && <div className="p-4 text-center text-sm text-destructive">{searchError}</div>}
               {searchResults.map((customer, idx) => {
                 const parsed = parseCustomer(customer);
                 return (
