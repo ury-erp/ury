@@ -18,9 +18,9 @@ const textareaVariants = cva(
       variant: {
         default: "border-gray-200 hover:border-gray-300 focus-visible:border-primary",
         error:
-          "border-red-300 hover:border-red-400 focus-visible:border-red-500 focus-visible:ring-red-500",
+          "border-destructive/40 hover:border-destructive/60 focus-visible:border-destructive focus-visible:ring-destructive",
         success:
-          "border-green-300 hover:border-green-400 focus-visible:border-green-500 focus-visible:ring-green-500",
+          "border-success-300 hover:border-success-400 focus-visible:border-success-500 focus-visible:ring-success-500",
       },
       // Sizes now carry padding as well as height, so a Textarea's text gutter
       // lines up with the Input of the same size instead of always being px-3.
