@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
-import { StatCard, DataTable, type DataTableColumn } from '@ury/ui';
+import { StatCard, DataTable, type DataTableColumn, Input, Button } from '@ury/ui';
 import { Package, IndianRupee, Search } from 'lucide-react';
 import { useBranchContext } from '../../context/BranchContext';
 import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
@@ -99,7 +99,7 @@ export function EmployeeItemWiseSales() {
       <div className="relative max-w-sm">
         <div className="flex items-center border border-input rounded-md px-3 py-2 gap-2">
           <Search className="w-4 h-4 text-muted-foreground shrink-0" />
-          <input
+                    <Input
             type="text"
             placeholder="Search employee by name..."
             value={query}
@@ -108,23 +108,27 @@ export function EmployeeItemWiseSales() {
               setSelectedEmployee(null);
               setData(null);
             }}
-            className="flex-1 text-sm outline-none"
+            variant="default"
+            size="default"
+            className="border-0 shadow-none px-0"
           />
         </div>
         {suggestions.length > 0 && !selectedEmployee && (
           <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
             {suggestions.map((s) => (
-              <button
+                            <Button
                 key={s.name}
                 onClick={() => {
                   setSelectedEmployee(s.name);
                   setQuery(s.full_name);
                   setSuggestions([]);
                 }}
-                className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50"
+                variant="ghost"
+                size="default"
+                className="w-full justify-start px-3 py-2 text-sm"
               >
                 {s.full_name}
-              </button>
+              </Button>
             ))}
           </div>
         )}

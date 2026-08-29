@@ -4,7 +4,7 @@ import { StatCard, DataTable, type DataTableColumn } from '@ury/ui';
 import { Factory, Package } from 'lucide-react';
 import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
 import { toApiDate } from '../../lib/reportDate';
-import { subMonths, endOfDay } from 'date-fns';
+import { subMonths, endOfDay, format } from 'date-fns';
 
 interface WorkOrderRow {
   name: string;
@@ -59,6 +59,7 @@ export function CompletedWorkOrders() {
 
   useEffect(() => {
     fetchData();
+const formatDate = (d: Date) => format(d, 'MMM d, yyyy');  const emptyMessage = 'No completed work orders from ' + formatDate(range.from) + ' to ' + formatDate(range.to) + '.';
   }, [fetchData]);
 
   return (
@@ -88,7 +89,7 @@ export function CompletedWorkOrders() {
         columns={columns}
         rows={data?.work_orders ?? []}
         isLoading={isLoading}
-        emptyMessage="No completed work orders in this range."
+        emptyMessage={emptyMessage}
       />
     </div>
   );

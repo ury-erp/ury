@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call } from '@ury/core';
-import { StatCard, DataTable, type DataTableColumn } from '@ury/ui';
+import { StatCard, DataTable, type DataTableColumn, Button } from '@ury/ui';
 import { Users } from 'lucide-react';
 import { useBranchContext } from '../../context/BranchContext';
 import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
@@ -85,13 +85,14 @@ export function DaywiseCustomerDetails() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <button
+                    <Button
             onClick={exportCsv}
             disabled={!data || data.customers.length === 0}
-            className="text-sm px-3 py-1.5 border border-input rounded-md hover:bg-accent disabled:opacity-50"
+            variant="outline"
+            size="sm"
           >
             Export CSV
-          </button>
+          </Button>
           <DateRangeFilter value={range} onChange={setRange} />
         </div>
       </div>

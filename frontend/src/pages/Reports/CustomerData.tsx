@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
-import { StatCard, DataTable, type DataTableColumn } from '@ury/ui';
+import { StatCard, DataTable, type DataTableColumn, Input, Button } from '@ury/ui';
 import { Receipt, IndianRupee, TrendingUp, Search } from 'lucide-react';
 import { useBranchContext } from '../../context/BranchContext';
 import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
@@ -120,18 +120,20 @@ export function CustomerData() {
         {suggestions.length > 0 && !selectedCustomer && (
           <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
             {suggestions.map((s) => (
-              <button
+                            <Button
                 key={s.name}
                 onClick={() => {
                   setSelectedCustomer(s.customer_name);
                   setQuery(s.customer_name);
                   setSuggestions([]);
                 }}
-                className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 flex items-center justify-between"
+                variant="ghost"
+                size="default"
+                className="w-full justify-between px-3 py-2 text-sm"
               >
                 <span>{s.customer_name}</span>
                 {s.mobile_no && <span className="text-xs text-muted-foreground">{s.mobile_no}</span>}
-              </button>
+              </Button>
             ))}
           </div>
         )}
