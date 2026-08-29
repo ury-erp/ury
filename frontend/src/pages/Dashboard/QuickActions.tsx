@@ -78,8 +78,8 @@ export const QuickActions: React.FC = () => {
       title: 'Open POS Terminal',
       description: 'Launch billing counter for active restaurant orders',
       actionText: 'Launch POS',
-      color: 'bg-purple-600 hover:bg-purple-700 text-white',
-      border: 'border-purple-200',
+      color: 'bg-primary-600 hover:bg-primary-700 text-white',
+      border: 'border-primary-200',
       icon: (
         <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
@@ -96,10 +96,10 @@ export const QuickActions: React.FC = () => {
       title: 'Add Menu Item',
       description: 'Create new dishes, pricing, or course categories',
       actionText: '+ Add Menu',
-      color: 'bg-white hover:bg-purple-50 text-purple-700',
-      border: 'border-gray-200 hover:border-purple-300',
+      color: 'bg-white hover:bg-primary-50 text-primary-700',
+      border: 'border-gray-200 hover:border-primary-300',
       icon: (
-        <svg className="h-6 w-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="h-6 w-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -114,10 +114,10 @@ export const QuickActions: React.FC = () => {
       title: 'Add Table',
       description: 'Configure new dining table layout & seat capacity',
       actionText: '+ Add Table',
-      color: 'bg-white hover:bg-purple-50 text-purple-700',
-      border: 'border-gray-200 hover:border-purple-300',
+      color: 'bg-white hover:bg-primary-50 text-primary-700',
+      border: 'border-gray-200 hover:border-primary-300',
       icon: (
-        <svg className="h-6 w-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="h-6 w-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
         </svg>
       ),
@@ -127,10 +127,10 @@ export const QuickActions: React.FC = () => {
       title: 'Add Room / Zone',
       description: 'Set up AC Hall, Terrace, VIP, or Bar dining sections',
       actionText: '+ Add Zone',
-      color: 'bg-white hover:bg-purple-50 text-purple-700',
-      border: 'border-gray-200 hover:border-purple-300',
+      color: 'bg-white hover:bg-primary-50 text-primary-700',
+      border: 'border-gray-200 hover:border-primary-300',
       icon: (
-        <svg className="h-6 w-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="h-6 w-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -145,10 +145,10 @@ export const QuickActions: React.FC = () => {
       title: 'Add Branch',
       description: 'Configure multi-outlet restaurant profiles & prefixes',
       actionText: '+ Add Branch',
-      color: 'bg-white hover:bg-purple-50 text-purple-700',
-      border: 'border-gray-200 hover:border-purple-300',
+      color: 'bg-white hover:bg-primary-50 text-primary-700',
+      border: 'border-gray-200 hover:border-primary-300',
       icon: (
-        <svg className="h-6 w-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="h-6 w-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -163,10 +163,10 @@ export const QuickActions: React.FC = () => {
       title: 'Add User / Staff',
       description: 'Grant cashier, captain, or manager POS permissions',
       actionText: '+ Add User',
-      color: 'bg-white hover:bg-purple-50 text-purple-700',
-      border: 'border-gray-200 hover:border-purple-300',
+      color: 'bg-white hover:bg-primary-50 text-primary-700',
+      border: 'border-gray-200 hover:border-primary-300',
       icon: (
-        <svg className="h-6 w-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="h-6 w-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -183,9 +183,9 @@ export const QuickActions: React.FC = () => {
     <section className="w-full">
       {/* Toast feedback banner */}
       {toastMessage && (
-        <div className="mb-4 rounded-xl bg-purple-900 text-white px-4 py-3 shadow-md flex items-center justify-between text-xs font-semibold animate-fade-in">
+        <div className="mb-4 rounded-xl bg-primary-900 text-white px-4 py-3 shadow-md flex items-center justify-between text-xs font-semibold animate-fade-in">
           <span>{toastMessage}</span>
-          <button onClick={() => setToastMessage(null)} className="text-purple-200 hover:text-white">
+          <button onClick={() => setToastMessage(null)} className="text-primary-200 hover:text-white">
             Dismiss
           </button>
         </div>
@@ -204,7 +204,7 @@ export const QuickActions: React.FC = () => {
             className={`cursor-pointer rounded-xl border ${card.border} p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md flex flex-col justify-between`}
           >
             <div>
-              <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-purple-50">
+              <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-primary-50">
                 {card.icon}
               </div>
               <h3 className="font-bold text-sm text-gray-900">{card.title}</h3>
@@ -214,7 +214,7 @@ export const QuickActions: React.FC = () => {
               <Button
                 variant={idx === 0 ? 'default' : 'outline'}
                 size="sm"
-                className={`w-full justify-center text-xs font-bold ${idx === 0 ? 'bg-purple-600 hover:bg-purple-700 text-white' : 'border-purple-200 text-purple-700 hover:bg-purple-50'}`}
+                className={`w-full justify-center text-xs font-bold ${idx === 0 ? 'bg-primary-600 hover:bg-primary-700 text-white' : 'border-primary-200 text-primary-700 hover:bg-primary-50'}`}
               >
                 {card.actionText}
               </Button>
@@ -268,7 +268,7 @@ export const QuickActions: React.FC = () => {
               <Button type="button" variant="outline" onClick={handleClose}>
                 Cancel
               </Button>
-              <Button type="submit" className="bg-purple-600 hover:bg-purple-700 text-white">
+              <Button type="submit" className="bg-primary-600 hover:bg-primary-700 text-white">
                 Save Item
               </Button>
             </DialogFooter>
@@ -319,7 +319,7 @@ export const QuickActions: React.FC = () => {
               <Button type="button" variant="outline" onClick={handleClose}>
                 Cancel
               </Button>
-              <Button type="submit" className="bg-purple-600 hover:bg-purple-700 text-white">
+              <Button type="submit" className="bg-primary-600 hover:bg-primary-700 text-white">
                 Save Table
               </Button>
             </DialogFooter>
@@ -361,7 +361,7 @@ export const QuickActions: React.FC = () => {
               <Button type="button" variant="outline" onClick={handleClose}>
                 Cancel
               </Button>
-              <Button type="submit" className="bg-purple-600 hover:bg-purple-700 text-white">
+              <Button type="submit" className="bg-primary-600 hover:bg-primary-700 text-white">
                 Save Zone
               </Button>
             </DialogFooter>
@@ -405,7 +405,7 @@ export const QuickActions: React.FC = () => {
               <Button type="button" variant="outline" onClick={handleClose}>
                 Cancel
               </Button>
-              <Button type="submit" className="bg-purple-600 hover:bg-purple-700 text-white">
+              <Button type="submit" className="bg-primary-600 hover:bg-primary-700 text-white">
                 Create Branch
               </Button>
             </DialogFooter>
@@ -457,7 +457,7 @@ export const QuickActions: React.FC = () => {
               <Button type="button" variant="outline" onClick={handleClose}>
                 Cancel
               </Button>
-              <Button type="submit" className="bg-purple-600 hover:bg-purple-700 text-white">
+              <Button type="submit" className="bg-primary-600 hover:bg-primary-700 text-white">
                 Create User
               </Button>
             </DialogFooter>
