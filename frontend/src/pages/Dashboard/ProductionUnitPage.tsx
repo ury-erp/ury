@@ -201,7 +201,7 @@ export const ProductionUnitPage: React.FC = () => {
       ) : (
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
           <table className="w-full text-left text-sm text-gray-600">
-            <thead className="bg-gray-50 border-b border-gray-100 text-xs uppercase text-gray-500 font-semibold">
+            <thead className="bg-gray-50 border-b border-gray-100 text-xs text-gray-500 font-semibold">
               <tr>
                 <th className="px-6 py-4">Production Unit</th>
                 <th className="px-6 py-4">Branch</th>

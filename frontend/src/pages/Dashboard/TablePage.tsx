@@ -181,6 +181,8 @@ export const TablePage: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      <h1 className="text-xl font-semibold text-gray-900">Tables</h1>
+
       {/* Toolbar — Partition Style */}
       <div className="flex flex-col md:flex-row items-center justify-between gap-4 pb-3 border-b border-gray-200 -mx-6 px-6 -mt-6 pt-6">
         <div className="flex bg-gray-100 rounded-lg p-1">
@@ -279,7 +281,7 @@ export const TablePage: React.FC = () => {
       ) : (
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
           <table className="w-full text-left text-sm text-gray-600">
-            <thead className="bg-gray-50 border-b border-gray-100 text-xs uppercase text-gray-500 font-semibold">
+            <thead className="bg-gray-50 border-b border-gray-100 text-xs text-gray-500 font-semibold">
               <tr>
                 <th className="px-6 py-4">Table Name</th>
                 <th className="px-6 py-4">Room</th>
@@ -405,7 +407,7 @@ export const TablePage: React.FC = () => {
                 id="is_take_away"
                 checked={newTable.is_take_away}
                 onChange={(e) => setNewTable({ ...newTable, is_take_away: e.target.checked })}
-                className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
+                className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary cursor-pointer"
               />
               <label htmlFor="is_take_away" className="text-sm font-medium text-gray-700 cursor-pointer">
                 Is Take Away Table
