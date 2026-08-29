@@ -17,7 +17,7 @@ interface KPICardProps {
 const KPICard: React.FC<KPICardProps> = ({ title, value, loading }) => {
   return (
     <Card className="rounded-lg border border-gray-200 bg-white p-5 shadow-xs transition-all duration-200 hover:shadow-md hover:border-primary/20">
-      <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">{title}</p>
+      <p className="text-xs font-medium text-gray-500">{title}</p>
       {loading ? (
         <div className="mt-2 flex items-center space-x-2">
           <Spinner className="w-4 h-4 text-primary" />
