@@ -1,5 +1,21 @@
-import { TrendingUp, AlertTriangle, Bell, Users, ShoppingCart, Clock, LogOut } from 'lucide-react';
-import { Card, CardContent } from '@ury/ui';
+import {
+  TrendingUp,
+  AlertTriangle,
+  Bell,
+  Users,
+  ShoppingCart,
+  Clock,
+  LogOut,
+  Receipt,
+  CheckCircle2,
+  Activity,
+  Gauge,
+  Sparkles,
+  PackageSearch,
+  ArrowRight,
+} from 'lucide-react';
+import { Card, CardContent, StatCard, cn } from '@ury/ui';
+import type { StatCardTone } from '@ury/ui';
 import { useState, useEffect } from 'react';
 import { usePOSStore } from '../store/pos-store';
 import { formatCurrency } from '@ury/core';
@@ -46,6 +62,74 @@ function formatOpenSessionDate(dateString: string): string {
   }
 }
 
+/**
+ * One table moves through five stages during service, and the same five colours
+ * have to read identically in the legend, in the bars and in the summary line.
+ * Declaring them once — on the token ramps rather than raw palette classes —
+ * is what lets a cashier learn the colour language on this screen and carry it
+ * to the Tables screen.
+ */
+type StageKey = 'open' | 'seated' | 'fired' | 'served' | 'over';
+
+const STAGES: { key: StageKey; label: string; bar: string; chip: string; dot: string }[] = [
+  { key: 'open', label: 'Open', bar: 'bg-gray-300', chip: 'bg-gray-100 text-gray-700 ring-gray-200', dot: 'bg-gray-400' },
+  { key: 'seated', label: 'Seated', bar: 'bg-primary-200', chip: 'bg-primary-50 text-primary-700 ring-primary-200', dot: 'bg-primary-200' },
+  { key: 'fired', label: 'Fired', bar: 'bg-primary-400', chip: 'bg-primary-50 text-primary-800 ring-primary-300', dot: 'bg-primary-400' },
+  { key: 'served', label: 'Served', bar: 'bg-primary-700', chip: 'bg-primary-100 text-primary-900 ring-primary-400', dot: 'bg-primary-700' },
+  { key: 'over', label: 'Over time', bar: 'bg-destructive', chip: 'bg-red-50 text-red-700 ring-red-200', dot: 'bg-destructive' },
+];
+
+const STAGE_BY_KEY = Object.fromEntries(STAGES.map((s) => [s.key, s])) as Record<StageKey, (typeof STAGES)[number]>;
+
+/**
+ * Every panel on this page is the same object: an icon chip, a title, optional
+ * trailing meta, then body. Hand-rolling that header nine times is what made
+ * the old page read as nine unrelated boxes.
+ */
+function Panel({
+  icon: Icon,
+  title,
+  meta,
+  tone = 'neutral',
+  children,
+  className,
+}: {
+  icon: React.ElementType;
+  title: string;
+  meta?: React.ReactNode;
+  tone?: 'neutral' | 'primary';
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <Card padding="none" className={cn('bg-white', className)}>
+      <CardContent className="p-5 pt-5">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <span
+              className={cn(
+                'flex h-7 w-7 shrink-0 items-center justify-center rounded-md',
+                tone === 'primary' ? 'bg-primary-50 text-primary' : 'bg-gray-100 text-gray-500'
+              )}
+            >
+              <Icon className="h-4 w-4" />
+            </span>
+            <h2 className="text-sm font-semibold text-gray-900">{title}</h2>
+          </div>
+          {meta ? <div className="text-xs font-medium text-gray-500">{meta}</div> : null}
+        </div>
+        {children}
+      </CardContent>
+    </Card>
+  );
+}
+
+function PanelState({ kind, children }: { kind: 'loading' | 'error' | 'empty'; children: React.ReactNode }) {
+  return (
+    <p className={cn('text-sm', kind === 'error' ? 'text-destructive' : 'text-gray-500')}>{children}</p>
+  );
+}
+
 export default function Dashboard() {
   const { posProfile } = usePOSStore();
   const [stats, setStats] = useState<any[]>([]);
@@ -88,30 +172,36 @@ export default function Dashboard() {
           branch: posProfile.branch
         });
         const statsData = statsRes.message;
+        const occupancy = statsData.total_tables
+          ? statsData.active_tables / statsData.total_tables
+          : 0;
         setStats([
           {
             label: "Today's Sales",
             value: formatCurrency(statsData.todays_sales),
             icon: TrendingUp,
-            color: 'text-green-600'
+            tone: 'success' as StatCardTone
           },
           {
             label: 'Orders Today',
             value: String(statsData.orders_today),
             icon: ShoppingCart,
-            color: 'text-blue-600'
+            tone: 'primary' as StatCardTone
           },
           {
             label: 'Avg. Order Value',
             value: formatCurrency(statsData.avg_order_value),
-            icon: Clock,
-            color: 'text-purple-600'
+            icon: Receipt,
+            tone: 'default' as StatCardTone
           },
           {
             label: 'Active Tables',
             value: `${statsData.active_tables} / ${statsData.total_tables}`,
             icon: Users,
-            color: 'text-orange-600'
+            // A near-full floor is the one stat on this row that is actionable,
+            // so it earns the amber rail only when it actually matters.
+            tone: (occupancy >= 0.85 ? 'warning' : 'default') as StatCardTone,
+            hint: occupancy >= 0.85 ? 'Floor nearly full' : undefined
           }
         ]);
       } catch (err) {
@@ -272,267 +362,357 @@ export default function Dashboard() {
   const maxMinutes = Math.max(90, ...serviceLine.filter(t => t.minutes !== null).map((t: any) => t.minutes), 1);
   const maxTableCount = Math.max(...floorLoad.map((f: any) => f.table_count), 1);
 
+  const stageCounts = STAGES.map((stage) => ({
+    ...stage,
+    count: serviceLine.filter((t: any) => t.stage === stage.key).length,
+  }));
+  const overCount = stageCounts.find((s) => s.key === 'over')?.count ?? 0;
+
+  const hasHighSeverity = needsAttention.some((item) => item.severity === 'high');
+  const attentionResolved = !needsAttentionLoading && !needsAttentionError && needsAttention.length === 0;
+
   return (
-    <div className="h-full overflow-y-auto p-6 bg-gray-50">
-      {/* Stat Cards Row */}
-      <div className="mb-6">
-        <h2 className="text-2xl font-semibold text-gray-900 mb-4">Shift Overview</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="h-full overflow-y-auto bg-gray-50">
+      <div className="mx-auto max-w-screen-2xl p-6 space-y-5">
+        {/* Page header — states where you are and that the numbers are live. */}
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-semibold text-gray-900">Shift Overview</h1>
+            <p className="mt-0.5 text-sm text-gray-500">
+              {posProfile?.branch ? `${posProfile.branch} · ` : ''}Live floor status for the current shift
+            </p>
+          </div>
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-xs font-medium text-gray-600 ring-1 ring-gray-200">
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-2 w-2 animate-ping rounded-full bg-success-500 opacity-60" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-success-600" />
+            </span>
+            Live
+          </span>
+        </div>
+
+        {/*
+          Attention comes first and full-width. The old page buried this in the
+          left column below three neutral panels, which meant the one thing a
+          cashier must act on had the same visual weight as a copy of yesterday's
+          median cover count.
+        */}
+        {needsAttentionError ? (
+          <div className="rounded-lg border border-gray-200 bg-white p-4 text-sm text-destructive">
+            Failed to load attention items
+          </div>
+        ) : needsAttentionLoading ? null : attentionResolved ? (
+          <div className="flex items-center gap-2.5 rounded-lg border border-success-200 bg-success-50 px-4 py-2.5">
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-success-600" />
+            <p className="text-sm font-medium text-success-800">All clear — nothing needs attention right now.</p>
+          </div>
+        ) : (
+          <div
+            className={cn(
+              'overflow-hidden rounded-xl border-l-4 shadow-sm',
+              hasHighSeverity
+                ? 'border-l-destructive bg-red-50 ring-1 ring-red-200'
+                : 'border-l-warning-400 bg-warning-50 ring-1 ring-warning-200'
+            )}
+          >
+            <div className="flex items-start gap-3 p-4">
+              <span
+                className={cn(
+                  'flex h-9 w-9 shrink-0 items-center justify-center rounded-full',
+                  hasHighSeverity ? 'bg-destructive text-white' : 'bg-warning-400 text-warning-foreground'
+                )}
+              >
+                <AlertTriangle className="h-5 w-5" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <h2
+                    className={cn(
+                      'text-sm font-semibold',
+                      hasHighSeverity ? 'text-red-900' : 'text-warning-900'
+                    )}
+                  >
+                    Needs Attention
+                  </h2>
+                  <span
+                    className={cn(
+                      'inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full px-1.5 text-xs font-bold tabular-nums',
+                      hasHighSeverity ? 'bg-destructive text-white' : 'bg-warning-400 text-warning-foreground'
+                    )}
+                  >
+                    {needsAttention.length}
+                  </span>
+                </div>
+                <ul className="mt-2 space-y-1.5">
+                  {needsAttention.map((item) => {
+                    const ItemIcon = item.icon;
+                    return (
+                      <li key={item.id} className="flex items-center gap-2.5">
+                        <ItemIcon
+                          className={cn(
+                            'h-4 w-4 shrink-0',
+                            item.severity === 'high' ? 'text-destructive' : 'text-warning-600'
+                          )}
+                        />
+                        <p
+                          className={cn(
+                            'text-sm',
+                            item.severity === 'high' ? 'font-medium text-red-900' : 'text-warning-900'
+                          )}
+                        >
+                          {item.message}
+                        </p>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Stat row */}
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
           {statsError ? (
-            <div className="col-span-full text-red-600 text-sm">Failed to load stats</div>
+            <div className="col-span-full text-sm text-destructive">Failed to load stats</div>
           ) : statsLoading ? (
-            <div className="col-span-full text-gray-600 text-sm">Loading...</div>
+            Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="h-[7.5rem] animate-pulse rounded-lg border border-gray-200 bg-white" />
+            ))
           ) : (
             stats.map((stat, index) => {
               const IconComponent = stat.icon;
               return (
-                <Card key={index} className="bg-white border border-gray-200">
-                  <CardContent className="p-6">
-                    <div className="flex items-start justify-between mb-3">
-                      <h3 className="text-sm font-medium text-gray-600">{stat.label}</h3>
-                      <IconComponent className={`w-5 h-5 ${stat.color}`} />
-                    </div>
-                    <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
-                  </CardContent>
-                </Card>
+                <StatCard
+                  key={index}
+                  label={stat.label}
+                  value={stat.value}
+                  tone={stat.tone}
+                  hint={stat.hint}
+                  icon={<IconComponent className="h-4 w-4" />}
+                />
               );
             })
           )}
         </div>
-      </div>
 
-      {/* Service Line Section */}
-      <div className="mb-6">
-        <Card className="bg-white border border-gray-200">
-          <CardContent className="p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Service Line</h3>
-            {serviceLineError ? (
-              <p className="text-red-600 text-sm">Failed to load service line</p>
-            ) : serviceLineLoading ? (
-              <p className="text-gray-600 text-sm">Loading...</p>
-            ) : serviceLine.length === 0 ? (
-              <p className="text-gray-600 text-sm">No tables currently seated.</p>
-            ) : (
-              <div>
-                {/* Legend */}
-                <div className="flex flex-wrap gap-4 mb-4 text-xs text-gray-600">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-gray-300 rounded"></div>
-                    <span>Open</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-blue-300 rounded"></div>
-                    <span>Seated</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-blue-500 rounded"></div>
-                    <span>Fired</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-blue-700 rounded"></div>
-                    <span>Served</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-red-600 rounded"></div>
-                    <span>Over time</span>
-                  </div>
-                </div>
+        {/* Service Line — the operational heart of the screen. */}
+        <Panel
+          icon={Activity}
+          title="Service Line"
+          tone="primary"
+          meta={
+            overCount > 0 ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 ring-1 ring-red-200">
+                <span className="h-1.5 w-1.5 rounded-full bg-destructive" />
+                {overCount} over time
+              </span>
+            ) : serviceLine.length > 0 ? (
+              `${serviceLine.length} tables tracked`
+            ) : undefined
+          }
+        >
+          {serviceLineError ? (
+            <PanelState kind="error">Failed to load service line</PanelState>
+          ) : serviceLineLoading ? (
+            <PanelState kind="loading">Loading…</PanelState>
+          ) : serviceLine.length === 0 ? (
+            <PanelState kind="empty">No tables currently seated.</PanelState>
+          ) : (
+            <div>
+              {/*
+                Legend chips, not 12px dots. Each stage carries its live count,
+                so the legend doubles as the shift summary and a cashier reads
+                "4 fired, 1 over" without decoding a bar chart.
+              */}
+              <div className="mb-5 flex flex-wrap gap-2">
+                {stageCounts.map((stage) => (
+                  <span
+                    key={stage.key}
+                    className={cn(
+                      'inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-xs font-medium ring-1',
+                      stage.chip,
+                      stage.count === 0 && 'opacity-45'
+                    )}
+                  >
+                    <span className={cn('h-2 w-2 rounded-full', stage.dot)} />
+                    {stage.label}
+                    <span className="tabular-nums font-semibold">{stage.count}</span>
+                  </span>
+                ))}
+              </div>
 
-                {/* Bars */}
-                <div className="flex items-end gap-1 h-24 border-b border-gray-200 pb-2 overflow-x-auto">
-                  {serviceLine.map((table: any, idx: number) => {
-                    let barColor = 'bg-gray-300';
-                    if (table.stage === 'open') barColor = 'bg-gray-300';
-                    else if (table.stage === 'seated') barColor = 'bg-blue-300';
-                    else if (table.stage === 'fired') barColor = 'bg-blue-500';
-                    else if (table.stage === 'served') barColor = 'bg-blue-700';
-                    else if (table.stage === 'over') barColor = 'bg-red-600';
+              {/* Bars */}
+              <div className="flex items-end gap-2 overflow-x-auto border-b border-gray-200 pb-3">
+                {serviceLine.map((table: any, idx: number) => {
+                  const stage = STAGE_BY_KEY[table.stage as StageKey] ?? STAGE_BY_KEY.open;
+                  const isOver = table.stage === 'over';
+                  const barHeight = table.minutes !== null ? (table.minutes / maxMinutes) * 100 : 5;
 
-                    const barHeight = table.minutes !== null ? (table.minutes / maxMinutes) * 100 : 5;
-
-                    return (
-                      <div key={idx} className="flex flex-col items-center flex-shrink-0">
-                        {table.minutes !== null && (
-                          <span className="text-xs text-gray-600 mb-1 h-4">{table.minutes}</span>
+                  return (
+                    <div
+                      key={idx}
+                      className="flex w-11 shrink-0 flex-col items-center"
+                      title={`${table.table} · ${stage.label}${table.minutes !== null ? ` · ${table.minutes} min` : ''}`}
+                    >
+                      <span
+                        className={cn(
+                          'mb-1 h-4 text-xs font-semibold tabular-nums',
+                          isOver ? 'text-destructive' : 'text-gray-500'
                         )}
+                      >
+                        {table.minutes !== null ? table.minutes : ''}
+                      </span>
+                      <div className="flex h-28 w-full items-end justify-center rounded-md bg-gray-100/70 p-1">
                         <div
-                          className={`w-8 ${barColor} rounded-t transition-all`}
-                          style={{ height: `${barHeight}%`, minHeight: '4px' }}
+                          className={cn(
+                            'w-full rounded-sm transition-all duration-200 ease-out',
+                            stage.bar,
+                            isOver && 'ring-2 ring-destructive/25'
+                          )}
+                          style={{ height: `${barHeight}%`, minHeight: '6px' }}
                         />
-                        <span className="text-xs text-gray-700 mt-1">{table.table}</span>
+                      </div>
+                      <span
+                        className={cn(
+                          'mt-1.5 w-full truncate rounded px-1 py-0.5 text-center text-[11px] font-medium',
+                          isOver ? 'bg-red-50 text-red-700' : 'text-gray-600'
+                        )}
+                      >
+                        {table.table}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {overCount > 0 && (
+                <p className="mt-3 text-sm font-medium text-destructive">
+                  {overCount} table{overCount !== 1 ? 's' : ''} running over time — check on them before the next fire.
+                </p>
+              )}
+            </div>
+          )}
+        </Panel>
+
+        {/* Two-column layout */}
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_340px]">
+          {/* Left column */}
+          <div className="space-y-5">
+            <Panel
+              icon={Gauge}
+              title="Tonight vs Baseline"
+              meta={baseline?.sample_days > 0 ? `${baseline.sample_days}-day median` : undefined}
+            >
+              {metricsError ? (
+                <PanelState kind="error">Failed to load metrics</PanelState>
+              ) : metricsLoading ? (
+                <PanelState kind="loading">Loading…</PanelState>
+              ) : !shiftMetrics || !baseline ? (
+                <PanelState kind="empty">No data available</PanelState>
+              ) : (
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <MetricTile
+                    label="Sales"
+                    value={formatCurrency(shiftMetrics.sales)}
+                    delta={
+                      baseline.sample_days > 0 && baseline.median_sales
+                        ? {
+                            up: shiftMetrics.sales >= baseline.median_sales,
+                            text: `${shiftMetrics.sales >= baseline.median_sales ? '+' : ''}${(((shiftMetrics.sales - baseline.median_sales) / baseline.median_sales) * 100).toFixed(0)}%`,
+                            against: formatCurrency(baseline.median_sales),
+                          }
+                        : undefined
+                    }
+                  />
+                  <MetricTile
+                    label="Covers"
+                    value={String(shiftMetrics.covers)}
+                    delta={
+                      baseline.sample_days > 0
+                        ? {
+                            up: shiftMetrics.covers >= baseline.median_covers,
+                            text: `${shiftMetrics.covers >= baseline.median_covers ? '+' : ''}${shiftMetrics.covers - baseline.median_covers}`,
+                            against: String(baseline.median_covers),
+                          }
+                        : undefined
+                    }
+                  />
+                  <MetricTile label="Avg per Cover" value={formatCurrency(shiftMetrics.avg_per_cover)} />
+                  <MetricTile
+                    label="Avg Ticket Time"
+                    value={shiftMetrics.avg_ticket_minutes !== null ? `${shiftMetrics.avg_ticket_minutes} min` : '—'}
+                  />
+                </div>
+              )}
+            </Panel>
+
+            <Panel icon={PackageSearch} title="Running Low">
+              {runningLowError ? (
+                <PanelState kind="error">Failed to load</PanelState>
+              ) : runningLowLoading ? (
+                <PanelState kind="loading">Loading…</PanelState>
+              ) : runningLow.length === 0 ? (
+                <PanelState kind="empty">No items selling fast enough to forecast yet.</PanelState>
+              ) : (
+                <div className="space-y-3.5">
+                  {runningLow.map((item, idx) => {
+                    const pct = Math.min((item.remaining / (item.remaining + item.qty_sold_today)) * 100, 100);
+                    const critical = item.eta_minutes !== null && item.eta_minutes <= 60;
+                    return (
+                      <div key={idx}>
+                        <div className="mb-1.5 flex items-center justify-between gap-2">
+                          <span className="truncate text-sm font-medium text-gray-900">{item.item_name}</span>
+                          <span
+                            className={cn(
+                              'shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums ring-1',
+                              critical
+                                ? 'bg-red-50 text-red-700 ring-red-200'
+                                : 'bg-warning-50 text-warning-700 ring-warning-200'
+                            )}
+                          >
+                            {formatETA(item.eta_minutes)}
+                          </span>
+                        </div>
+                        <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200">
+                          <div
+                            className={cn('h-full rounded-full', critical ? 'bg-destructive' : 'bg-warning-400')}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                        {item.data_quality_issue && (
+                          <p className="mt-1 text-xs text-gray-500">(stock data needs review)</p>
+                        )}
                       </div>
                     );
                   })}
                 </div>
-
-                {/* Summary */}
-                {serviceLine.filter((t: any) => t.stage === 'over').length > 0 && (
-                  <div className="mt-3 text-sm text-red-600">
-                    {serviceLine.filter((t: any) => t.stage === 'over').length} table{serviceLine.filter((t: any) => t.stage === 'over').length !== 1 ? 's' : ''} running over time
-                  </div>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Two-column layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
-        {/* Left column - stacked sections */}
-        <div className="space-y-6">
-          {/* Needs Attention Section */}
-          <Card className="bg-white border border-gray-200">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <AlertTriangle className="w-5 h-5 text-amber-600" />
-                <h3 className="text-lg font-semibold text-gray-900">Needs Attention</h3>
-              </div>
-              <div className="space-y-3">
-                {needsAttentionError ? (
-                  <p className="text-red-600 text-sm">Failed to load</p>
-                ) : needsAttentionLoading ? (
-                  <p className="text-gray-600 text-sm">Loading...</p>
-                ) : needsAttention.length === 0 ? (
-                  <p className="text-gray-600 text-sm">Nothing needs attention right now.</p>
-                ) : (
-                  needsAttention.map((item) => {
-                    const ItemIcon = item.icon;
-                    const severityColor = item.severity === 'high'
-                      ? 'border-l-4 border-l-red-500 bg-red-50'
-                      : 'border-l-4 border-l-amber-500 bg-amber-50';
-                    return (
-                      <div key={item.id} className={`p-3 rounded ${severityColor}`}>
-                        <div className="flex items-center gap-3">
-                          <ItemIcon className={`w-4 h-4 flex-shrink-0 ${item.severity === 'high' ? 'text-red-600' : 'text-amber-600'}`} />
-                          <p className="text-sm text-gray-700">{item.message}</p>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Tonight vs Baseline */}
-          <Card className="bg-white border border-gray-200">
-            <CardContent className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Tonight vs Baseline</h3>
-              {metricsError ? (
-                <p className="text-red-600 text-sm">Failed to load metrics</p>
-              ) : metricsLoading ? (
-                <p className="text-gray-600 text-sm">Loading...</p>
-              ) : !shiftMetrics || !baseline ? (
-                <p className="text-gray-600 text-sm">No data available</p>
-              ) : (
-                <div className="grid grid-cols-2 gap-4">
-                  {/* Sales */}
-                  <div className="p-3 bg-gray-50 rounded-lg">
-                    <p className="text-xs text-gray-600 mb-1">Sales</p>
-                    <p className="text-lg font-bold text-gray-900">{formatCurrency(shiftMetrics.sales)}</p>
-                    {baseline.sample_days > 0 && (
-                      <p className="text-xs mt-1">
-                        <span className={shiftMetrics.sales >= baseline.median_sales ? 'text-green-600' : 'text-red-600'}>
-                          {shiftMetrics.sales >= baseline.median_sales ? '+' : ''}{((shiftMetrics.sales - baseline.median_sales) / baseline.median_sales * 100).toFixed(0)}%
-                        </span>
-                        <span className="text-gray-600"> vs {formatCurrency(baseline.median_sales)}</span>
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Covers */}
-                  <div className="p-3 bg-gray-50 rounded-lg">
-                    <p className="text-xs text-gray-600 mb-1">Covers</p>
-                    <p className="text-lg font-bold text-gray-900">{shiftMetrics.covers}</p>
-                    {baseline.sample_days > 0 && (
-                      <p className="text-xs mt-1">
-                        <span className={shiftMetrics.covers >= baseline.median_covers ? 'text-green-600' : 'text-red-600'}>
-                          {shiftMetrics.covers >= baseline.median_covers ? '+' : ''}{shiftMetrics.covers - baseline.median_covers}
-                        </span>
-                        <span className="text-gray-600"> vs {baseline.median_covers}</span>
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Avg per Cover */}
-                  <div className="p-3 bg-gray-50 rounded-lg">
-                    <p className="text-xs text-gray-600 mb-1">Avg per Cover</p>
-                    <p className="text-lg font-bold text-gray-900">{formatCurrency(shiftMetrics.avg_per_cover)}</p>
-                  </div>
-
-                  {/* Avg Ticket Time */}
-                  <div className="p-3 bg-gray-50 rounded-lg">
-                    <p className="text-xs text-gray-600 mb-1">Avg Ticket Time</p>
-                    <p className="text-lg font-bold text-gray-900">
-                      {shiftMetrics.avg_ticket_minutes !== null ? `${shiftMetrics.avg_ticket_minutes} min` : '—'}
-                    </p>
-                  </div>
-                </div>
               )}
-            </CardContent>
-          </Card>
+            </Panel>
+          </div>
 
-          {/* Running Low Section */}
-          <Card className="bg-white border border-gray-200">
-            <CardContent className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Running Low</h3>
-              {runningLowError ? (
-                <p className="text-red-600 text-sm">Failed to load</p>
-              ) : runningLowLoading ? (
-                <p className="text-gray-600 text-sm">Loading...</p>
-              ) : runningLow.length === 0 ? (
-                <p className="text-gray-600 text-sm">No items selling fast enough to forecast yet.</p>
-              ) : (
-                <div className="space-y-3">
-                  {runningLow.map((item, idx) => (
-                    <div key={idx} className="flex items-center gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-sm font-medium text-gray-900 truncate">{item.item_name}</span>
-                          <span className="text-xs text-gray-600 ml-2 flex-shrink-0">{formatETA(item.eta_minutes)}</span>
-                        </div>
-                        <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-amber-500 rounded-full"
-                            style={{ width: `${Math.min((item.remaining / (item.remaining + item.qty_sold_today)) * 100, 100)}%` }}
-                          />
-                        </div>
-                        {item.data_quality_issue && (
-                          <p className="text-xs text-gray-500 mt-1">(stock data needs review)</p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Right column - narrow rail */}
-        <div className="space-y-6">
-          {/* Floor Load Section */}
-          <Card className="bg-white border border-gray-200">
-            <CardContent className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Floor Load</h3>
+          {/* Right rail */}
+          <div className="space-y-5">
+            <Panel icon={Users} title="Floor Load">
               {floorLoadError ? (
-                <p className="text-red-600 text-sm">Failed to load</p>
+                <PanelState kind="error">Failed to load</PanelState>
               ) : floorLoadLoading ? (
-                <p className="text-gray-600 text-sm">Loading...</p>
+                <PanelState kind="loading">Loading…</PanelState>
               ) : floorLoad.length === 0 ? (
-                <p className="text-gray-600 text-sm">No tables currently assigned.</p>
+                <PanelState kind="empty">No tables currently assigned.</PanelState>
               ) : (
                 <div className="space-y-3">
                   {floorLoad.map((waiter, idx) => (
                     <div key={idx}>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm font-medium text-gray-700">{waiter.waiter}</span>
-                        <span className="text-xs text-gray-600">{waiter.table_count} table{waiter.table_count !== 1 ? 's' : ''}</span>
+                      <div className="mb-1 flex items-center justify-between gap-2">
+                        <span className="truncate text-sm font-medium text-gray-700">{waiter.waiter}</span>
+                        <span className="shrink-0 text-xs font-semibold tabular-nums text-gray-500">
+                          {waiter.table_count}
+                        </span>
                       </div>
-                      <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                      <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200">
                         <div
-                          className="h-full bg-blue-600 rounded-full"
+                          className="h-full rounded-full bg-primary"
                           style={{ width: `${(waiter.table_count / maxTableCount) * 100}%` }}
                         />
                       </div>
@@ -540,96 +720,116 @@ export default function Dashboard() {
                   ))}
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </Panel>
 
-          {/* Open Sessions Section */}
-          <Card className="bg-white border border-gray-200">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <LogOut className="w-5 h-5 text-slate-600" />
-                <h3 className="text-lg font-semibold text-gray-900">Open Sessions</h3>
-              </div>
+            <Panel
+              icon={LogOut}
+              title="Open Sessions"
+              meta={openEntries.length > 0 ? `${openEntries.length} open` : undefined}
+            >
               {openEntriesError ? (
-                <p className="text-red-600 text-sm">Failed to load</p>
+                <PanelState kind="error">Failed to load</PanelState>
               ) : openEntriesLoading ? (
-                <p className="text-gray-600 text-sm">Loading...</p>
+                <PanelState kind="loading">Loading…</PanelState>
               ) : openEntries.length === 0 ? (
-                <p className="text-gray-600 text-sm">No sessions left open.</p>
+                <PanelState kind="empty">No sessions left open.</PanelState>
               ) : (
-                <div className="space-y-3">
-                  <div className="text-sm text-gray-600 mb-3">
-                    <span className="font-semibold text-gray-900">{openEntries.length}</span>
-                    <span> session{openEntries.length !== 1 ? 's' : ''} open</span>
-                  </div>
-                  <div className="space-y-2">
+                <div>
+                  <div className="space-y-1.5">
                     {openEntries.slice(0, 5).map((entry) => (
-                      <div key={entry.name} className="p-2 bg-gray-50 rounded text-xs">
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium text-gray-900">{entry.user}</span>
-                          <span className="text-gray-600">{formatOpenSessionDate(entry.period_start_date)}</span>
-                        </div>
+                      <div
+                        key={entry.name}
+                        className="flex items-center justify-between gap-2 rounded-md bg-gray-50 px-2.5 py-2"
+                      >
+                        <span className="truncate text-xs font-medium text-gray-900">{entry.user}</span>
+                        <span className="shrink-0 text-xs text-gray-500">
+                          {formatOpenSessionDate(entry.period_start_date)}
+                        </span>
                       </div>
                     ))}
                   </div>
                   {openEntries.length > 5 && (
-                    <div className="text-xs text-gray-600 text-center py-2">
-                      +{openEntries.length - 5} more
-                    </div>
+                    <p className="py-2 text-center text-xs text-gray-500">+{openEntries.length - 5} more</p>
                   )}
                   <a
                     href="/pos/open-entries"
-                    className="block text-center text-xs font-medium text-blue-600 hover:text-blue-700 mt-3 pt-2 border-t border-gray-200"
+                    className="mt-3 flex items-center justify-center gap-1 border-t border-gray-200 pt-2.5 text-xs font-semibold text-primary hover:text-primary-600"
                   >
                     View all
+                    <ArrowRight className="h-3.5 w-3.5" />
                   </a>
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </Panel>
 
-          {/* Shift Brief Section */}
-          <Card className="bg-white border border-gray-200">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between gap-2 mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">Shift Brief</h3>
-                <span className="inline-block text-xs font-semibold px-2 py-1 bg-purple-50 text-purple-700 border border-purple-200 rounded">
+            <Panel
+              icon={Sparkles}
+              title="Shift Brief"
+              meta={
+                <span className="rounded bg-primary-50 px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-primary ring-1 ring-primary-200">
                   HUF
                 </span>
-              </div>
-              <p className="text-sm text-gray-600">
-                AI-written shift summaries are not yet connected. This panel will show HUF's shift observations once integrated.
+              }
+            >
+              <p className="text-sm text-gray-500">
+                AI-written shift summaries are not yet connected. This panel will show HUF's shift
+                observations once integrated.
               </p>
-            </CardContent>
-          </Card>
+            </Panel>
 
-          {/* Recent Notifications Section */}
-          <Card className="bg-white border border-gray-200">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <Bell className="w-5 h-5 text-blue-600" />
-                <h3 className="text-lg font-semibold text-gray-900">Recent Notifications</h3>
-              </div>
-              <div className="space-y-2">
-                {notificationsError ? (
-                  <p className="text-red-600 text-sm">Failed to load</p>
-                ) : notificationsLoading ? (
-                  <p className="text-gray-600 text-sm">Loading...</p>
-                ) : notifications.length === 0 ? (
-                  <p className="text-gray-600 text-sm">No recent notifications.</p>
-                ) : (
-                  notifications.map((notification) => (
-                    <div key={notification.id} className="flex items-start justify-between py-2 border-b border-gray-100 last:border-b-0">
-                      <p className="text-xs text-gray-700">{notification.message}</p>
-                      <span className="text-xs text-gray-500 ml-2 flex-shrink-0 whitespace-nowrap">{notification.timestamp}</span>
+            <Panel icon={Bell} title="Recent Notifications">
+              {notificationsError ? (
+                <PanelState kind="error">Failed to load</PanelState>
+              ) : notificationsLoading ? (
+                <PanelState kind="loading">Loading…</PanelState>
+              ) : notifications.length === 0 ? (
+                <PanelState kind="empty">No recent notifications.</PanelState>
+              ) : (
+                <div className="divide-y divide-gray-100">
+                  {notifications.map((notification) => (
+                    <div key={notification.id} className="flex items-start justify-between gap-2 py-2 first:pt-0 last:pb-0">
+                      <p className="text-xs leading-relaxed text-gray-700">{notification.message}</p>
+                      <span className="shrink-0 whitespace-nowrap text-xs text-gray-400">
+                        {notification.timestamp}
+                      </span>
                     </div>
-                  ))
-                )}
-              </div>
-            </CardContent>
-          </Card>
+                  ))}
+                </div>
+              )}
+            </Panel>
+          </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function MetricTile({
+  label,
+  value,
+  delta,
+}: {
+  label: string;
+  value: string;
+  delta?: { up: boolean; text: string; against: string };
+}) {
+  return (
+    <div className="rounded-lg bg-gray-50 p-3 ring-1 ring-gray-100">
+      <p className="text-xs font-medium text-gray-500">{label}</p>
+      <p className="mt-1 text-xl font-semibold tabular-nums text-gray-900">{value}</p>
+      {delta ? (
+        <p className="mt-1 flex flex-wrap items-baseline gap-1 text-xs">
+          <span
+            className={cn(
+              'font-semibold tabular-nums',
+              delta.up ? 'text-success-600' : 'text-destructive'
+            )}
+          >
+            {delta.up ? '▲' : '▼'} {delta.text}
+          </span>
+          <span className="text-gray-400">vs {delta.against}</span>
+        </p>
+      ) : null}
     </div>
   );
 }

@@ -207,12 +207,12 @@
     "zoom_pan_hint": "استخدم التمرير للتكبير • اسحب الخلفية للتحريك"
   },
   "footer": {
-    "dashboard": "نظرة عامة على الوردية",
+    "dashboard": "نظرة عامة",
     "pos": "نقطة البيع",
     "tables": "الطاولات",
     "orders": "الطلبات",
     "settings": "الإعدادات",
-    "service_board": "لوحة الخدمة"
+    "sessions": "الجلسات"
   },
   "product_dialog": {
     "special_instructions": "تعليمات خاصة",

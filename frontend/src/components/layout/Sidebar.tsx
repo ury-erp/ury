@@ -5,23 +5,27 @@ import { reportsRegistry, groupReports } from '../../pages/Reports/reportsRegist
 import {
   LayoutDashboard,
   Utensils,
-  Grid,
-  Settings2,
-  Home,
+  Armchair,
+  DoorOpen,
   SlidersHorizontal,
   Users,
   Building2,
   ChevronDown,
-  FileText,
+  FileCog,
   Settings,
-  Store,
-  ClipboardList,
-  Warehouse,
+  Globe,
+  Target,
+  Boxes,
+  BookmarkCheck,
   TrendingUp,
   BarChart3,
   ArrowLeft,
   AlertCircle,
-  CreditCard
+  CreditCard,
+  Smartphone,
+  Factory,
+  Network,
+  Package
 } from 'lucide-react';
 
 interface NavItem {
@@ -35,10 +39,22 @@ interface NavGroup {
   items: NavItem[];
 }
 
+/**
+ * Naming rule for this rail: one or two words, plural for collections, and no
+ * "URY" prefix — every screen in this app is URY, so the prefix carried no
+ * information and only made three Setup rows longer than the rest. The group
+ * header ("Control", "Setup") already supplies the context that the old longer
+ * labels were duplicating, which is why "Department Stock" / "Stock
+ * Reservations" can safely become "Stock" / "Reservations".
+ *
+ * Icons are picked for distinct silhouettes at 16px. The old set reused `Grid`
+ * twice, `Warehouse` twice, `Building2` twice and `Settings` twice, so four
+ * pairs of rows were visually interchangeable.
+ */
 const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Plan',
-    items: [{ label: 'Sales Plan', path: '/sales-plan', icon: ClipboardList }]
+    items: [{ label: 'Sales Plan', path: '/sales-plan', icon: Target }]
   },
   {
     label: 'Observe',
@@ -50,43 +66,55 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Control',
     items: [
-      { label: 'Department Stock', path: '/department-stock', icon: Warehouse },
-      { label: 'Stock Reservations', path: '/stock-reservations', icon: Warehouse },
-      { label: 'KOT Error Log', path: '/kot-error-log', icon: AlertCircle }
+      { label: 'Stock', path: '/department-stock', icon: Boxes },
+      { label: 'Reservations', path: '/stock-reservations', icon: BookmarkCheck },
+      { label: 'KOT Errors', path: '/kot-error-log', icon: AlertCircle }
     ]
   },
   {
     label: 'Setup',
     items: [
-      { label: 'URY Menu', path: '/menu', icon: Utensils },
-      { label: 'URY Table', path: '/table', icon: Grid },
-      { label: 'URY Room', path: '/room', icon: Home },
+      { label: 'Menu', path: '/menu', icon: Utensils },
+      { label: 'Tables', path: '/table', icon: Armchair },
+      { label: 'Rooms', path: '/room', icon: DoorOpen },
       { label: 'POS Profile', path: '/pos-profile', icon: SlidersHorizontal },
-      { label: 'User', path: '/user', icon: Users },
-      { label: 'Branch', path: '/branch', icon: Building2 },
-      { label: 'Self Ordering Profile', path: '/self-ordering-profile', icon: Settings },
-      { label: 'Aggregators', path: '/aggregator', icon: Store },
+      { label: 'Users', path: '/user', icon: Users },
+      { label: 'Branches', path: '/branch', icon: Building2 },
+      { label: 'Self Ordering', path: '/self-ordering-profile', icon: Smartphone },
+      { label: 'Aggregators', path: '/aggregator', icon: Globe },
       { label: 'Payment Terminals', path: '/payment-terminals', icon: CreditCard }
     ]
   }
 ];
 
-const navLinkClass = ({ isActive }: { isActive: boolean }) =>
-  `flex items-center space-x-3 px-3.5 py-2.5 rounded-lg text-sm font-medium transition-all ${
-    isActive
-      ? 'bg-[#2563eb] text-white shadow-sm font-semibold'
-      : 'text-gray-600 hover:bg-blue-50 hover:text-[#2563eb]'
-  }`;
+const ADVANCED_ITEMS: NavItem[] = [
+  { label: 'Report Settings', path: '/report-settings', icon: FileCog },
+  { label: 'Production Units', path: '/production-unit', icon: Factory },
+  { label: 'Departments', path: '/production-department', icon: Network },
+  { label: 'Item Config', path: '/item-production-config', icon: Package }
+];
 
-const reportLinkClass = ({ isActive }: { isActive: boolean }) =>
+/**
+ * One link treatment for the whole sidebar, lifted from the Reports rail: a
+ * 16px icon, 13px medium label, `rounded-md` with a `px-3 py-2` hit area and a
+ * 10px gap. The main panel previously ran 20px icons at 14px in `rounded-lg`
+ * `px-3.5 py-2.5` rows, so switching into Reports visibly changed the density
+ * of the same rail.
+ */
+const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   `flex items-center space-x-2.5 px-3 py-2 rounded-md text-[13px] font-medium transition-all ${
     isActive
-      ? 'bg-[#2563eb] text-white shadow-sm font-semibold'
-      : 'text-gray-600 hover:bg-blue-50 hover:text-[#2563eb]'
+      ? 'bg-primary text-white shadow-sm font-semibold'
+      : 'text-gray-600 hover:bg-primary-50 hover:text-primary'
   }`;
+
+const reportLinkClass = navLinkClass;
 
 const reportGroups = groupReports(reportsRegistry);
 const reportGroupEntries = Object.entries(reportGroups);
+
+const groupHeadingClass =
+  'text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-2 px-3';
 
 const ReportsPanel: React.FC = () => (
   <div className="flex-1 overflow-y-auto">
@@ -99,8 +127,8 @@ const ReportsPanel: React.FC = () => (
         <span>Back to Dashboard</span>
       </Link>
       <div className="flex items-center space-x-2 px-1">
-        <div className="flex items-center justify-center w-7 h-7 rounded-md bg-blue-50 shrink-0">
-          <BarChart3 className="w-4 h-4 text-[#2563eb]" />
+        <div className="flex items-center justify-center w-7 h-7 rounded-md bg-primary-50 shrink-0">
+          <BarChart3 className="w-4 h-4 text-primary" />
         </div>
         <h2 className="text-sm font-semibold text-gray-900">Reports</h2>
       </div>
@@ -108,9 +136,7 @@ const ReportsPanel: React.FC = () => (
     <div className="p-4 space-y-5">
       {reportGroupEntries.map(([group, reports], index) => (
         <div key={group} className={index > 0 ? 'pt-4 border-t border-gray-100' : undefined}>
-          <h3 className="text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-2 px-3">
-            {group}
-          </h3>
+          <h3 className={groupHeadingClass}>{group}</h3>
           <div className="space-y-0.5">
             {reports.map((report) => {
               const Icon = report.icon;
@@ -130,30 +156,28 @@ const ReportsPanel: React.FC = () => (
 
 const MainPanel: React.FC<{ isManager: boolean }> = ({ isManager }) => {
   const location = useLocation();
-  const isAdvancedPath = location.pathname.startsWith('/report-settings') || location.pathname.startsWith('/production-unit') || location.pathname.startsWith('/production-department') || location.pathname.startsWith('/item-production-config');
+  const isAdvancedPath = ADVANCED_ITEMS.some((item) => location.pathname.startsWith(item.path));
   const [isAdvancedOpen, setIsAdvancedOpen] = useState<boolean>(isAdvancedPath);
 
   return (
-    <div className="p-4 flex-1 space-y-1">
+    <div className="p-4 flex-1 space-y-0.5">
       {isManager && (
         <>
           <NavLink to="/reports" className={navLinkClass}>
-            <BarChart3 className="w-5 h-5 shrink-0" />
+            <BarChart3 className="w-4 h-4 shrink-0" />
             <span>Reports</span>
           </NavLink>
           <div className="!mt-3 !mb-2 border-t border-gray-100" />
         </>
       )}
       {NAV_GROUPS.map((group) => (
-        <div key={group.label}>
-          <h3 className="text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-2 px-3 pt-3 first:pt-0">
-            {group.label}
-          </h3>
+        <div key={group.label} className="space-y-0.5 pt-3 first:pt-0">
+          <h3 className={groupHeadingClass}>{group.label}</h3>
           {group.items.map((item) => {
             const Icon = item.icon;
             return (
               <NavLink key={item.path} to={item.path} className={navLinkClass}>
-                <Icon className="w-5 h-5 shrink-0" />
+                <Icon className="w-4 h-4 shrink-0" />
                 <span>{item.label}</span>
               </NavLink>
             );
@@ -161,80 +185,37 @@ const MainPanel: React.FC<{ isManager: boolean }> = ({ isManager }) => {
         </div>
       ))}
 
-      <div className="pt-2">
+      <div className="pt-3">
         <button
           onClick={() => setIsAdvancedOpen(!isAdvancedOpen)}
-          className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+          className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-[13px] font-medium transition-colors ${
             isAdvancedPath
-              ? 'text-[#2563eb] font-semibold bg-blue-50'
-              : 'text-gray-600 hover:bg-blue-50 hover:text-[#2563eb]'
+              ? 'text-primary font-semibold bg-primary-50'
+              : 'text-gray-600 hover:bg-primary-50 hover:text-primary'
           }`}
         >
-          <div className="flex items-center space-x-3">
-            <Settings className="w-5 h-5 shrink-0" />
-            <span>Advanced Settings</span>
+          <div className="flex items-center space-x-2.5">
+            <Settings className="w-4 h-4 shrink-0" />
+            <span>Advanced</span>
           </div>
           <ChevronDown
             className={`w-4 h-4 transition-transform duration-200 ${
-              isAdvancedOpen ? 'rotate-180 text-[#2563eb]' : 'text-gray-400'
+              isAdvancedOpen ? 'rotate-180 text-primary' : 'text-gray-400'
             }`}
           />
         </button>
 
         {isAdvancedOpen && (
-          <div className="mt-1 pl-4 space-y-1">
-            <NavLink
-              to="/report-settings"
-              className={({ isActive }) =>
-                `flex items-center space-x-3 px-3.5 py-2 rounded-lg text-xs font-medium transition-all ${
-                  isActive
-                    ? 'bg-primary text-white shadow-sm font-semibold'
-                    : 'text-gray-600 hover:bg-blue-50 hover:text-primary'
-                }`
-              }
-            >
-              <FileText className="w-4 h-4 shrink-0" />
-              <span>URY Report Settings</span>
-            </NavLink>
-            <NavLink
-              to="/production-unit"
-              className={({ isActive }) =>
-                `flex items-center space-x-3 px-3.5 py-2 rounded-lg text-xs font-medium transition-all ${
-                  isActive
-                    ? 'bg-[#2563eb] text-white shadow-sm font-semibold'
-                    : 'text-gray-600 hover:bg-blue-50 hover:text-[#2563eb]'
-                }`
-              }
-            >
-              <Grid className="w-4 h-4 shrink-0" />
-              <span>Production Unit</span>
-            </NavLink>
-            <NavLink
-              to="/production-department"
-              className={({ isActive }) =>
-                `flex items-center space-x-3 px-3.5 py-2 rounded-lg text-xs font-medium transition-all ${
-                  isActive
-                    ? 'bg-[#2563eb] text-white shadow-sm font-semibold'
-                    : 'text-gray-600 hover:bg-blue-50 hover:text-[#2563eb]'
-                }`
-              }
-            >
-              <Building2 className="w-4 h-4 shrink-0" />
-              <span>Production Department</span>
-            </NavLink>
-            <NavLink
-              to="/item-production-config"
-              className={({ isActive }) =>
-                `flex items-center space-x-3 px-3.5 py-2 rounded-lg text-xs font-medium transition-all ${
-                  isActive
-                    ? 'bg-[#2563eb] text-white shadow-sm font-semibold'
-                    : 'text-gray-600 hover:bg-blue-50 hover:text-[#2563eb]'
-                }`
-              }
-            >
-              <Settings2 className="w-4 h-4 shrink-0" />
-              <span>Item Production Config</span>
-            </NavLink>
+          <div className="mt-1 pl-4 space-y-0.5">
+            {ADVANCED_ITEMS.map((item) => {
+              const Icon = item.icon;
+              return (
+                <NavLink key={item.path} to={item.path} className={navLinkClass}>
+                  <Icon className="w-4 h-4 shrink-0" />
+                  <span>{item.label}</span>
+                </NavLink>
+              );
+            })}
           </div>
         )}
       </div>

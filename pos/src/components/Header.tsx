@@ -134,10 +134,16 @@ const Header = () => {
 
         {/* Right side actions */}
         <div className="flex items-center gap-4">
-          {/* Management (Service Board) */}
+          {/*
+            Cross-app jump into the management SPA. Styled to mirror the
+            management app's own "Open POS" button (solid primary + external
+            icon) so the same gesture looks the same in both directions, and so
+            it reads as leaving the POS rather than as another POS tab.
+          */}
           <a
             href="/ury/dashboard"
-            className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
+            title={`${t('header.service_board')} (opens the management app)`}
+            className="flex items-center gap-2 px-3 py-1.5 bg-primary text-white hover:bg-primary/90 rounded-md text-sm font-medium transition-colors"
           >
             <ExternalLink className="w-4 h-4" />
             <span>{t('header.service_board')}</span>
