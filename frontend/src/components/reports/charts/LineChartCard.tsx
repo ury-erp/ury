@@ -10,8 +10,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-
-const DEFAULT_COLORS = ["#3b82f6", "#6366f1", "#8b5cf6", "#a855f7", "#0ea5e9", "#14b8a6"];
+import { CHART_COLORS } from "../../../lib/chartColors";
 
 export interface LineChartCardProps {
   title: string;
@@ -23,7 +22,7 @@ export interface LineChartCardProps {
 }
 
 export function LineChartCard({ title, data, xKey, yKeys, colors, labels }: LineChartCardProps) {
-  const palette = colors ?? DEFAULT_COLORS;
+  const palette = colors ?? CHART_COLORS;
   const showDots = data.length > 0 && data.length < 20;
 
   return (
