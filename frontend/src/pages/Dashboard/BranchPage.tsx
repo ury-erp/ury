@@ -267,13 +267,14 @@ export const BranchPage: React.FC = () => {
   if (!hasBranch) {
     return (
       <Card className="p-12 text-center text-gray-400 rounded-lg border border-gray-200">
-        No branches found. Please create one in Desk first.
+        No branches yet. Add your first branch to get started.
       </Card>
     );
   }
 
   return (
     <div className="space-y-6">
+      <h1 className="text-xl font-semibold text-gray-900 mb-6">Branches</h1>
 
       {/* Save button */}
       <div className="flex items-center justify-end gap-3 pb-3 border-b border-gray-200 -mx-6 px-6 -mt-6 pt-6">
@@ -296,11 +297,11 @@ export const BranchPage: React.FC = () => {
 
       {/* Branch Details */}
       <Card className="p-6 rounded-lg border-gray-200 bg-white shadow-sm">
-        <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-6">Branch Details</h2>
+        <h2 className="text-sm font-bold text-gray-700 tracking-wider mb-6">Branch Details</h2>
 
         {/* Branch Info Section */}
         <div className="mb-6">
-          <h3 className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-4 pb-2 border-b border-gray-100">Branch Info</h3>
+          <h3 className="text-xs font-semibold text-gray-600 tracking-wider mb-4 pb-2 border-b border-gray-100">Branch Info</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700">Branch Name</label>
@@ -323,7 +324,7 @@ export const BranchPage: React.FC = () => {
 
         {/* Restaurant Info Section */}
         <div>
-          <h3 className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-4 pb-2 border-b border-gray-100">Restaurant Info</h3>
+          <h3 className="text-xs font-semibold text-gray-600 tracking-wider mb-4 pb-2 border-b border-gray-100">Restaurant Info</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700">Invoice Series Prefix <span className="text-red-500">*</span></label>
@@ -381,7 +382,7 @@ export const BranchPage: React.FC = () => {
           onClick={() => setMenuSectionOpen(!menuSectionOpen)}
           className="w-full flex items-center justify-between p-4 border-b border-gray-100 hover:bg-gray-50 transition-colors text-left"
         >
-          <span className="text-sm font-bold text-gray-700 uppercase tracking-wider">Menu</span>
+          <span className="text-sm font-bold text-gray-700 tracking-wider">Menu</span>
           {menuSectionOpen ? <ChevronDown className="w-4 h-4 text-gray-400" /> : <ChevronRight className="w-4 h-4 text-gray-400" />}
         </button>
         {menuSectionOpen && (
@@ -477,7 +478,7 @@ export const BranchPage: React.FC = () => {
           onClick={() => setRoomSectionOpen(!roomSectionOpen)}
           className="w-full flex items-center justify-between p-4 border-b border-gray-100 hover:bg-gray-50 transition-colors text-left"
         >
-          <span className="text-sm font-bold text-gray-700 uppercase tracking-wider">Room</span>
+          <span className="text-sm font-bold text-gray-700 tracking-wider">Room</span>
           {roomSectionOpen ? <ChevronDown className="w-4 h-4 text-gray-400" /> : <ChevronRight className="w-4 h-4 text-gray-400" />}
         </button>
         {roomSectionOpen && (
@@ -508,7 +509,7 @@ export const BranchPage: React.FC = () => {
           onClick={() => setOrderTypeSectionOpen(!orderTypeSectionOpen)}
           className="w-full flex items-center justify-between p-4 border-b border-gray-100 hover:bg-gray-50 transition-colors text-left"
         >
-          <span className="text-sm font-bold text-gray-700 uppercase tracking-wider">Order Type Menu</span>
+          <span className="text-sm font-bold text-gray-700 tracking-wider">Order Type Menu</span>
           {orderTypeSectionOpen ? <ChevronDown className="w-4 h-4 text-gray-400" /> : <ChevronRight className="w-4 h-4 text-gray-400" />}
         </button>
         {orderTypeSectionOpen && (
