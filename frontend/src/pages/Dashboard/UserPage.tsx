@@ -189,6 +189,8 @@ export const UserPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      <h1 className="text-xl font-semibold text-gray-900">Users</h1>
+
       {/* Toolbar — no title, partition style */}
       <div className="flex flex-col md:flex-row items-center justify-end gap-4 pb-3 border-b border-gray-200 -mx-6 px-6 -mt-6 pt-6">
         <Button
@@ -224,7 +226,7 @@ export const UserPage: React.FC = () => {
       ) : (
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
           <table className="w-full text-left text-sm text-gray-600">
-            <thead className="bg-gray-50 border-b border-gray-100 text-xs uppercase text-gray-500 font-semibold">
+            <thead className="bg-gray-50 border-b border-gray-100 text-xs text-gray-500 font-semibold">
               <tr>
                 <th className="px-6 py-4">User</th>
                 <th className="px-6 py-4">User ID</th>
@@ -322,9 +324,9 @@ export const UserPage: React.FC = () => {
               id="user-enabled"
               checked={newUser.enabled}
               onChange={(e) => setNewUser({ ...newUser, enabled: e.target.checked })}
-              className="w-4 h-4 text-primary bg-gray-100 border-gray-300 rounded focus:ring-primary focus:ring-2"
+              className="w-4 h-4 text-primary bg-gray-100 border-gray-300 rounded focus:ring-primary focus:ring-2 cursor-pointer"
             />
-            <label htmlFor="user-enabled" className="font-semibold text-gray-700">
+            <label htmlFor="user-enabled" className="font-semibold text-gray-700 cursor-pointer">
               Enabled (Active User)
             </label>
           </div>
