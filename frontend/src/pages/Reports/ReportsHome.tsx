@@ -158,7 +158,7 @@ export function ReportsHome() {
   ];
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
+    <div>
       <h1 className="text-2xl font-semibold mb-1">What do you want to understand?</h1>
       <p className="text-muted-foreground mb-6">
         Search any report, or jump straight into one of the most-used ones below. The full list

@@ -3,6 +3,7 @@ import { formatCurrency } from '@ury/core';
 import { Card, CardHeader, CardTitle, CardContent, Badge, Spinner } from '@ury/ui';
 import { useBranchContext } from '../../context/BranchContext';
 import { DashboardChartsData } from '../../services/dashboard';
+import { CHART_COLORS } from "../../lib/chartColors";
 
 interface AnalyticsChartsProps {
   chartsData: DashboardChartsData | null;
@@ -44,7 +45,7 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
   const maxBranchRevenue = Math.max(...branchData.map(b => b.revenue), 1);
 
   // Payment method distribution
-  const colors = ['#7C3AED', '#3B82F6', '#10B981', '#F59E0B', '#EC4899', '#6366F1'];
+  const colors = CHART_COLORS;
   const totalPayment = chartsData?.payment_methods?.reduce((sum, pm) => sum + (pm.total || 0), 0) || 0;
   let currentOffset = 0;
   const paymentMethods = chartsData?.payment_methods?.map((pm, index) => {

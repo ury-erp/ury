@@ -189,7 +189,7 @@ export const DepartmentProfitabilityPage: React.FC = () => {
 
   if (!branch) {
     return (
-      <div className="space-y-6 p-4" data-testid="department-profitability-page">
+      <div className="space-y-6" data-testid="department-profitability-page">
         <Card className="p-6" data-testid="profitability-select-branch">
           <p className="text-sm text-muted-foreground">
             Select a specific branch above to view its department profitability.
@@ -200,7 +200,7 @@ export const DepartmentProfitabilityPage: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6 p-4" data-testid="department-profitability-page">
+    <div className="space-y-6" data-testid="department-profitability-page">
       <div className="flex flex-wrap gap-3 items-end">
         <div>
           <label className="text-xs text-muted-foreground">Company</label>
