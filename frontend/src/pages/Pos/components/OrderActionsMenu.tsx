@@ -70,11 +70,11 @@ const OrderActionsMenu = ({
       </Button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border border-border bg-card py-1 shadow-lg">
+        <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-[9px] border border-hair2 bg-card shadow-md overflow-hidden">
           {showMergeBill && (
             <Button
               variant="ghost"
-              className="flex h-auto w-full justify-start gap-2 rounded-none px-4 py-2 text-sm font-normal text-muted-foreground hover:bg-muted"
+              className="flex h-auto w-full justify-start gap-2 rounded-none px-3.5 py-2 text-[12.5px] font-normal text-muted-foreground hover:bg-muted"
               onClick={handleMergeBill}
             >
               <GitMerge className="h-4 w-4 shrink-0" />
@@ -84,7 +84,7 @@ const OrderActionsMenu = ({
           {showSplitBill && (
             <Button
               variant="ghost"
-              className="flex h-auto w-full justify-start gap-2 rounded-none px-4 py-2 text-sm font-normal text-muted-foreground hover:bg-muted"
+              className="flex h-auto w-full justify-start gap-2 rounded-none px-3.5 py-2 text-[12.5px] font-normal text-muted-foreground hover:bg-muted"
               onClick={handleSplitBill}
             >
               <SplitSquareHorizontal className="h-4 w-4 shrink-0" />
