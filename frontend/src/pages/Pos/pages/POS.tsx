@@ -7,7 +7,7 @@ import ProductDialog from '../components/ProductDialog';
 import MenuList from '../components/MenuList';
 import { usePOSStore } from '../store/pos-store';
 import { cn } from '@ury/ui';
-import { Spinner } from '@ury/ui';
+import { Spinner, Button } from '@ury/ui';
 import InitialLoader from '../components/InitialLoader';
 
 export default function POS() {
@@ -48,7 +48,7 @@ export default function POS() {
     }, 250); // 250ms threshold for double click
   };
 
-  const QuickFilterButton = ({ filter, icon: Icon, label }: { 
+  const QuickFilterButton = ({ filter, icon: Icon, label }: {
     filter: 'all' | 'special';
     icon: React.ElementType;
     label: string;
@@ -56,10 +56,10 @@ export default function POS() {
     <button
       onClick={() => setQuickFilter(filter)}
       className={cn(
-        'flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-colors',
+        'flex items-center gap-2 px-2.5 py-1 rounded-[5px] text-xs font-medium transition-colors',
         quickFilter === filter
-          ? 'bg-primary-tint text-primary'
-          : 'bg-muted text-muted-foreground hover:bg-muted',
+          ? 'bg-card text-foreground font-[550] shadow-[0_1px_2px_rgba(0,0,0,0.05)]'
+          : 'text-muted-foreground hover:text-foreground',
         isMenuInteractionDisabled() && 'opacity-50 cursor-not-allowed pointer-events-none'
       )}
       disabled={isMenuInteractionDisabled()}
@@ -79,12 +79,12 @@ export default function POS() {
         <div className="text-center">
           <p className="text-xl font-semibold text-destructive mb-2">Failed to load POS</p>
           <p className="text-muted-foreground">{error}</p>
-          <button 
+          <Button
             onClick={() => window.location.reload()}
-            className="mt-4 px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700"
+            className="mt-4"
           >
             Retry
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -123,9 +123,11 @@ export default function POS() {
                 isVisible={showSearch}
                 disabled={isMenuInteractionDisabled()}
               /> */}
-              
-              <QuickFilterButton filter="all" icon={Star} label={t('common.all')} />
-              <QuickFilterButton filter="special" icon={TrendingUp} label={t('menu.special_items')} />
+
+              <div className="bg-muted rounded-[7px] p-0.5 flex items-center gap-0">
+                <QuickFilterButton filter="all" icon={Star} label={t('common.all')} />
+                <QuickFilterButton filter="special" icon={TrendingUp} label={t('menu.special_items')} />
+              </div>
             </div>
           </div>
         </div>

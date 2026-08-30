@@ -16,12 +16,12 @@ const POSOpeningDialog = ({ onReload, type }: POSOpeningDialogProps) => {
         <div className="text-center">
           {/* Icon */}
           <div className={`mx-auto flex items-center justify-center h-16 w-16 rounded-full mb-6 ${
-            isOpeningIssue ? 'bg-destructive-tint' : 'bg-orange-100'
+            isOpeningIssue ? 'bg-destructive-tint' : 'bg-warning-tint'
           }`}>
             {isOpeningIssue ? (
               <RefreshCw className="h-8 w-8 text-destructive" />
             ) : (
-              <AlertTriangle className="h-8 w-8 text-orange-600" />
+              <AlertTriangle className="h-8 w-8 text-warning" />
             )}
           </div>
           
