@@ -387,67 +387,99 @@ class URYDailyPandL(Document):
 		salary_cost_gross = 0
 		self.total_employee_costs = 0
 
-		attendance_count = frappe.db.sql('''
-			SELECT
-				%(date)s AS "Date",
-				COUNT(b.`name`) AS "Total Attendance"
-			FROM `tabAttendance` b
-			LEFT JOIN `tabEmployee` c ON 
-			c.name = b.employee
-			WHERE 
-				b.`attendance_date` = %(date)s
-				AND c.`branch` = %(branch)s
-				AND b.`docstatus` = 1
-				AND b.`status` IN ("Present", "Half Day")
-		''', {"branch": self.branch, "date": self.date}, as_dict=True)    
+		# Attendance (and by extension employee daily-wage proration) depends on
+		# the `hrms` app, which is NOT a declared dependency of this app
+		# (see ury/hooks.py required_apps). On an install without hrms the
+		# `tabAttendance` table simply does not exist, and this whole block
+		# must be skipped rather than raising a hard SQL error. This is
+		# evaluated once, and only checks table existence — it must not
+		# swallow genuine SQL errors from a present Attendance table.
+		# cached=False: frappe.db.table_exists() caches the table list per
+		# connection/worker by default -- in a long-lived worker process
+		# that cache could go stale relative to whether hrms has since
+		# been installed, so this check is forced to hit the DB for real
+		# (confirmed live: with cached=True this returned a stale False
+		# even after the table existed; cached=False was accurate).
+		attendance_table_exists = frappe.db.table_exists("Attendance", cached=False)
 
-		attendance_count =  attendance_count[0]
-
-		if attendance_count['Total Attendance'] == 0:
-			frappe.throw(title='No Attendance !',msg=("Attendance not marked"))
-
-		ns_employee_attendance_list = frappe.db.sql(''' 
-			SELECT
-				b.`employee_name` AS "Name"
-			FROM `tabAttendance` b
-			LEFT JOIN `tabEmployee` c ON (
+		if attendance_table_exists:
+			attendance_count = frappe.db.sql('''
+				SELECT
+					%(date)s AS "Date",
+					COUNT(b.`name`) AS "Total Attendance"
+				FROM `tabAttendance` b
+				LEFT JOIN `tabEmployee` c ON
 				c.name = b.employee
-				AND (
-					(c.`payment_amount` IS NULL OR c.`payment_amount` = 0.0 ) 
-					OR 
-					(c.`payment_type` IS NULL OR c.`payment_type` = "")
+				WHERE
+					b.`attendance_date` = %(date)s
+					AND c.`branch` = %(branch)s
+					AND b.`docstatus` = 1
+					AND b.`status` IN ("Present", "Half Day")
+			''', {"branch": self.branch, "date": self.date}, as_dict=True)
+
+			attendance_count =  attendance_count[0]
+
+			if attendance_count['Total Attendance'] == 0:
+				frappe.throw(title='No Attendance !',msg=("Attendance not marked"))
+
+			ns_employee_attendance_list = frappe.db.sql('''
+				SELECT
+					b.`employee_name` AS "Name"
+				FROM `tabAttendance` b
+				LEFT JOIN `tabEmployee` c ON (
+					c.name = b.employee
+					AND (
+						(c.`payment_amount` IS NULL OR c.`payment_amount` = 0.0 )
+						OR
+						(c.`payment_type` IS NULL OR c.`payment_type` = "")
+					)
 				)
+				WHERE
+					b.`attendance_date` = %(date)s
+					AND c.`branch` = %(branch)s
+				GROUP BY
+					b.`employee_name`
+			''', {"branch": self.branch, "date": self.date}, as_dict=True)
+
+			if len(ns_employee_attendance_list) > 0:
+				ns_employee_attendance_list = json.dumps(ns_employee_attendance_list)
+				frappe.throw(title='Set Payment Type/Amount',msg=("Employees:  {0}").format(ns_employee_attendance_list))
+
+			employee_attendance_dw_list = frappe.db.sql('''
+				SELECT
+					%(date)s AS "Date",
+					b.`employee` AS "Employee",
+					b.`status` AS "Status",
+					c.`payment_amount` AS "Salary"
+				FROM `tabAttendance` b
+				LEFT JOIN `tabEmployee` c ON c.name = b.employee
+				WHERE
+					b.`attendance_date` = %(date)s
+					AND c.`branch` = %(branch)s
+					AND c.`payment_type` = "Daily Wage"
+			''', {"branch": self.branch, "date": self.date}, as_dict=True)
+
+			for attendance in employee_attendance_dw_list:
+				if attendance["Status"] == "Half Day":
+					salary_cost_gross = round((salary_cost_gross + 0.5 * attendance["Salary"]),2)
+				if attendance["Status"] == "Present":
+					salary_cost_gross = round((salary_cost_gross + attendance["Salary"]),2)
+		else:
+			# hrms not installed: Attendance-based daily-wage employee cost
+			# cannot be computed. Contribute 0 and surface this loudly on
+			# the document itself so the resulting understated cost /
+			# overstated profit is never silent.
+			cost_exclusion_note = (
+				"[Auto-note] Daily-wage employee cost (Attendance-based proration) "
+				"could not be computed because the Attendance doctype/table is "
+				"unavailable (hrms not installed) and was excluded (treated as 0) "
+				"from this P&L. Costs are understated and profit is overstated "
+				"accordingly. Install hrms and resubmit/amend for an accurate figure."
 			)
-			WHERE 
-				b.`attendance_date` = %(date)s
-				AND c.`branch` = %(branch)s
-			GROUP BY
-				b.`employee_name`                
-		''', {"branch": self.branch, "date": self.date}, as_dict=True)
-
-		if len(ns_employee_attendance_list) > 0:
-			ns_employee_attendance_list = json.dumps(ns_employee_attendance_list)
-			frappe.throw(title='Set Payment Type/Amount',msg=("Employees:  {0}").format(ns_employee_attendance_list))
-
-		employee_attendance_dw_list = frappe.db.sql('''
-			SELECT
-				%(date)s AS "Date",
-				b.`employee` AS "Employee",
-				b.`status` AS "Status",
-				c.`payment_amount` AS "Salary"
-			FROM `tabAttendance` b
-			LEFT JOIN `tabEmployee` c ON c.name = b.employee
-			WHERE 
-				b.`attendance_date` = %(date)s
-				AND c.`branch` = %(branch)s
-				AND c.`payment_type` = "Daily Wage"                        
-		''', {"branch": self.branch, "date": self.date}, as_dict=True)
-
-		for attendance in employee_attendance_dw_list:
-			if attendance["Status"] == "Half Day":
-				salary_cost_gross = round((salary_cost_gross + 0.5 * attendance["Salary"]),2)
-			if attendance["Status"] == "Present":
-				salary_cost_gross = round((salary_cost_gross + attendance["Salary"]),2)
+			self.remarks = (
+				(self.remarks + "\n" + cost_exclusion_note) if self.remarks else cost_exclusion_note
+			)
+			frappe.msgprint(cost_exclusion_note, title="Employee Cost Excluded", indicator="orange")
 
 		date_str =  self.date
 		date_obj = datetime.strptime(date_str, '%Y-%m-%d')
