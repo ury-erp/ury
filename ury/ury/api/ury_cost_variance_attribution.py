@@ -55,6 +55,7 @@ import frappe
 from frappe import _
 
 from ury.ury.api.ury_bom_compiler import compile_bom_vector
+from ury.ury.report_api.utils import require_manager
 
 
 COST_VARIANCE_SNAPSHOT_DOCTYPE = "URY Cost Variance Snapshot"
@@ -185,6 +186,7 @@ def compute_variance(item_code, qty, company, counted_qty=None, persist=False):
 			"snapshot" (only if persist truthy),
 		}
 	"""
+	require_manager()
 	_require_scope(company)
 
 	if qty is None or qty <= 0:
