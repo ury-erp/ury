@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useBranchContext } from '../../context/BranchContext';
-import { SlidersHorizontal, Printer, Shield, Settings2, ChevronDown, Users, Plus, X, ClipboardList } from 'lucide-react';
-import { Card, Button, Badge, Input, Select, Spinner, showToast } from '@ury/ui';
+import { Printer, Shield, Settings2, ChevronDown, Users, Plus, X, ClipboardList } from 'lucide-react';
+import { Page, Section, Panel, Button, Badge, Input, Select, Spinner, showToast } from '@ury/ui';
 import { dashboardService } from '../../services/dashboard';
 import { call } from '@ury/core';
 import SideDrawer from '../../components/layout/SideDrawer';
@@ -24,11 +24,6 @@ interface PosProfileRecord {
   disabled?: number;
   applicable_for_users?: ApplicableUser[];
   custom_checklist_items?: ChecklistItem[];
-}
-
-interface PaymentMode {
-  mode_of_payment?: string;
-  default?: number;
 }
 
 interface ApplicableUser {
@@ -53,7 +48,7 @@ interface ProductionUnitRecord {
 type ActiveTab = 'general' | 'printing' | 'cashiers' | 'production';
 
 export const PosProfilePage: React.FC = () => {
-  const { activeBranchId, activeBranch, branches = [] } = useBranchContext();
+  const { activeBranchId, branches = [] } = useBranchContext();
   const [profiles, setProfiles] = useState<PosProfileRecord[]>([]);
   const [selectedProfile, setSelectedProfile] = useState<PosProfileRecord | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -336,9 +331,9 @@ export const PosProfilePage: React.FC = () => {
   ];
 
   return (
-    <div className="space-y-6">
+    <Page>
       {/* Toolbar — Partition Style, no title */}
-      <div className="flex flex-col md:flex-row items-center justify-end gap-4 pb-3 border-b border-border -mx-6 px-6 -mt-6 pt-6">
+      <div className="flex flex-col md:flex-row items-center justify-end gap-4 pb-3 border-b border-border">
         <Button
           onClick={openAddDrawer}
           className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center space-x-1.5 shadow-xs"
@@ -348,8 +343,9 @@ export const PosProfilePage: React.FC = () => {
         </Button>
       </div>
 
-      {/* Tabs */}
-      <div className="flex items-center gap-1 p-1 bg-muted rounded-lg w-fit">
+      <Section>
+        {/* Tabs */}
+        <div className="flex items-center gap-1 p-1 bg-muted rounded-lg w-fit">
         {tabs.map((tab) => (
           <button
             key={tab.id}
@@ -362,28 +358,30 @@ export const PosProfilePage: React.FC = () => {
             <span>{tab.label}</span>
           </button>
         ))}
-      </div>
-
-      {/* Content */}
-      {loading ? (
-        <div className="py-16 flex items-center justify-center bg-card rounded-lg border border-border">
-          <Spinner className="w-8 h-8 text-primary" />
         </div>
-      ) : activeTab === 'production' ? (
-        /* Production Unit Section */
-        <div className="space-y-4">
-          <div className="flex items-center justify-between pb-2 border-b border-border">
-            <h3 className="text-sm font-semibold text-muted-foreground">Production Units</h3>
+      </Section>
+
+      <Section>
+        {/* Content */}
+        {loading ? (
+          <div className="py-16 flex items-center justify-center bg-card rounded-lg border border-border">
+            <Spinner className="w-8 h-8 text-primary" />
           </div>
+        ) : activeTab === 'production' ? (
+        /* Production Unit Section */
+        <div>
+          <h3 className="text-sm font-semibold text-muted-foreground mb-4">Production Units</h3>
           {loadingUnits ? (
             <div className="py-8 flex items-center justify-center">
               <Spinner className="w-6 h-6 text-primary" />
             </div>
           ) : productionUnits.length === 0 ? (
-            <Card className="p-8 text-center rounded-lg border border-border bg-card">
-              <p className="text-text-tertiary text-sm">No production units found for this branch.</p>
-              <p className="text-xs text-text-tertiary mt-1">Configure production units from Frappe Desk under URY Production Unit.</p>
-            </Card>
+            <Panel pad>
+              <div className="text-center">
+                <p className="text-text-tertiary text-sm">No production units found for this branch.</p>
+                <p className="text-xs text-text-tertiary mt-1">Configure production units from Frappe Desk under URY Production Unit.</p>
+              </div>
+            </Panel>
           ) : (
             <div className="bg-card rounded-lg border border-border shadow-sm overflow-hidden">
               <table className="w-full text-left text-sm text-muted-foreground">
@@ -407,16 +405,18 @@ export const PosProfilePage: React.FC = () => {
         </div>
       ) : (
         /* Profiles list */
-        <div className="space-y-4">
+        <div>
           {profiles.length === 0 ? (
-            <Card className="p-12 text-center rounded-lg border border-border bg-card">
-              <p className="text-text-tertiary">No POS Profiles found for this branch.</p>
-            </Card>
+            <Panel pad>
+              <div className="text-center text-text-tertiary">
+                No POS Profiles found for this branch.
+              </div>
+            </Panel>
           ) : (
             profiles.map((p) => (
-              <Card
+              <div
                 key={p.name}
-                className="p-6 rounded-lg border border-border bg-card shadow-xs space-y-4 cursor-pointer hover:border-primary-tint-border transition-all"
+                className="mb-6 p-6 rounded-[9px] border border-hair bg-card space-y-4 cursor-pointer hover:border-primary-tint-border transition-all"
                 onClick={() => handleProfileSelect(p)}
               >
                 <div className="flex items-center justify-between border-b border-border pb-4">
@@ -541,13 +541,13 @@ export const PosProfilePage: React.FC = () => {
                     <p className="text-text-tertiary">Only users assigned in the POS Profile user table are allowed billing access.</p>
                   </div>
                 )}
-              </Card>
+              </div>
             ))
           )}
         </div>
       )}
+      </Section>
 
-      
       {/* Add POS Profile Drawer */}
       <SideDrawer
         isOpen={isAddDrawerOpen}
@@ -977,7 +977,7 @@ export const PosProfilePage: React.FC = () => {
         </div>,
         document.body
       )}
-    </div>
+    </Page>
   );
 };
 

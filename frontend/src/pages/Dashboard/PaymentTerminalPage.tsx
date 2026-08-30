@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Badge, Card, Spinner } from '@ury/ui';
-import { call } from '@ury/core';
+import { Page, Section, Panel, Badge, Spinner } from '@ury/ui';
 import {
   paymentTerminalService,
   PaymentTerminal,
@@ -131,17 +130,18 @@ const PaymentTerminalContent: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="-mx-6 -mt-6 border-b border-border px-6 pb-4 pt-6">
+    <Page>
+      <div>
         <h1 className="text-xl font-semibold text-foreground">Payment Terminals</h1>
         <p className="mt-1 text-sm text-text-tertiary">
           Register and manage payment terminal devices. Monitor terminal status and view transaction history.
         </p>
       </div>
 
-      <div>
-        <h2 className="text-lg font-semibold text-foreground mb-4">Register New Terminal</h2>
-        <Card className="p-6">
+      <Section>
+        <div>
+          <h2 className="text-lg font-semibold text-foreground mb-4">Register New Terminal</h2>
+          <Panel pad>
           <form onSubmit={handleCreateTerminal} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="flex flex-col">
@@ -213,24 +213,28 @@ const PaymentTerminalContent: React.FC = () => {
               </div>
             )}
           </form>
-        </Card>
-      </div>
+          </Panel>
+        </div>
+      </Section>
 
-      <div>
-        <h2 className="text-lg font-semibold text-foreground mb-4">Registered Terminals</h2>
-        {loading ? (
-          <div className="flex items-center justify-center rounded-lg border border-border bg-card py-16">
-            <Spinner className="h-8 w-8 text-primary" />
-          </div>
-        ) : error ? (
-          <Card className="border-destructive-tint-border bg-destructive-tint p-6 text-sm text-destructive">
-            {error}
-          </Card>
-        ) : terminals.length === 0 ? (
-          <Card className="p-8 text-center text-sm text-text-tertiary">
-            No payment terminals registered yet. Create one using the form above.
-          </Card>
-        ) : (
+      <Section>
+        <div>
+          <h2 className="text-lg font-semibold text-foreground mb-4">Registered Terminals</h2>
+          {loading ? (
+            <div className="flex items-center justify-center rounded-lg border border-border bg-card py-16">
+              <Spinner className="h-8 w-8 text-primary" />
+            </div>
+          ) : error ? (
+            <Panel className="border-destructive-tint-border bg-destructive-tint text-sm text-destructive" pad>
+              {error}
+            </Panel>
+          ) : terminals.length === 0 ? (
+            <Panel pad>
+              <div className="text-center text-sm text-text-tertiary">
+                No payment terminals registered yet. Create one using the form above.
+              </div>
+            </Panel>
+          ) : (
           <div className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
@@ -270,19 +274,23 @@ const PaymentTerminalContent: React.FC = () => {
             </div>
           </div>
         )}
-      </div>
+        </div>
+      </Section>
 
-      <div>
-        <h2 className="text-lg font-semibold text-foreground mb-4">Transaction Log</h2>
-        {transactionLoading ? (
-          <div className="flex items-center justify-center rounded-lg border border-border bg-card py-16">
-            <Spinner className="h-8 w-8 text-primary" />
-          </div>
-        ) : transactions.length === 0 ? (
-          <Card className="p-8 text-center text-sm text-text-tertiary">
-            No transactions recorded yet.
-          </Card>
-        ) : (
+      <Section>
+        <div>
+          <h2 className="text-lg font-semibold text-foreground mb-4">Transaction Log</h2>
+          {transactionLoading ? (
+            <div className="flex items-center justify-center rounded-lg border border-border bg-card py-16">
+              <Spinner className="h-8 w-8 text-primary" />
+            </div>
+          ) : transactions.length === 0 ? (
+            <Panel pad>
+              <div className="text-center text-sm text-text-tertiary">
+                No transactions recorded yet.
+              </div>
+            </Panel>
+          ) : (
           <div className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
@@ -322,8 +330,9 @@ const PaymentTerminalContent: React.FC = () => {
             </div>
           </div>
         )}
-      </div>
-    </div>
+        </div>
+      </Section>
+    </Page>
   );
 };
 
