@@ -74,7 +74,7 @@ const TableCard = ({
             </span>
           </div>
           <div className="flex shrink-0 items-center gap-1">
-            <Badge variant={isOccupied ? 'primary' : 'success'} className="whitespace-nowrap">
+            <Badge variant={isOccupied ? 'info' : 'success'} className="whitespace-nowrap">
               {isOccupied ? t('tables.occupied') : t('tables.available')}
             </Badge>
             <TableActionsMenu

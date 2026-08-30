@@ -196,7 +196,7 @@ const TableSelectionDialog: React.FC<Props> = ({ onClose }) => {
                     })()}
                     <div className="mt-2 h-4">
                       {table.occupied === 1 && (
-                        <Badge variant="primary" className="text-xs">
+                        <Badge variant="info" className="text-xs">
                           {t('tables.occupied')}
                         </Badge>
                       )}
