@@ -330,7 +330,7 @@ export const ReportSettingsPage: React.FC = () => {
   const branchLabel = activeBranchId === 'all' ? 'All Branches' : (activeBranch?.name || 'Selected Branch');
 
   return (
-    <div className="min-h-screen bg-gray-50/50">
+    <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-6 rounded-xl border border-border shadow-xs">
@@ -360,7 +360,7 @@ export const ReportSettingsPage: React.FC = () => {
           <Card className="rounded-xl border border-border bg-card overflow-hidden shadow-xs">
             <button
               onClick={() => toggleSection('businessHours')}
-              className="w-full px-6 py-4 bg-card flex items-center justify-between border-b border-border hover:bg-gray-50/80 transition-colors text-left"
+              className="w-full px-6 py-4 bg-card flex items-center justify-between border-b border-border hover:bg-muted transition-colors text-left"
             >
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-lg bg-purple-50 text-primary flex items-center justify-center">
@@ -420,7 +420,7 @@ export const ReportSettingsPage: React.FC = () => {
           <Card className="rounded-xl border border-border bg-card overflow-hidden shadow-xs">
             <button
               onClick={() => toggleSection('costConfig')}
-              className="w-full px-6 py-4 bg-card flex items-center justify-between border-b border-border hover:bg-gray-50/80 transition-colors text-left"
+              className="w-full px-6 py-4 bg-card flex items-center justify-between border-b border-border hover:bg-muted transition-colors text-left"
             >
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-lg bg-primary-tint text-primary flex items-center justify-center">
@@ -483,10 +483,10 @@ export const ReportSettingsPage: React.FC = () => {
           <Card className="rounded-xl border border-border bg-card overflow-hidden shadow-xs">
             <button
               onClick={() => toggleSection('expenses')}
-              className="w-full px-6 py-4 bg-card flex items-center justify-between border-b border-border hover:bg-gray-50/80 transition-colors text-left"
+              className="w-full px-6 py-4 bg-card flex items-center justify-between border-b border-border hover:bg-muted transition-colors text-left"
             >
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                <div className="w-9 h-9 rounded-lg bg-success-tint text-success flex items-center justify-center">
                   <Receipt className="w-5 h-5" />
                 </div>
                 <div>
@@ -525,9 +525,9 @@ export const ReportSettingsPage: React.FC = () => {
                           <th className="p-3.5 text-right">Action</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-200">
+                      <tbody className="divide-y divide-border">
                         {directFixedExpenses.map((row) => (
-                          <tr key={row.id} className="hover:bg-gray-50/50">
+                          <tr key={row.id} className="hover:bg-muted">
                             <td className="p-3.5">
                               <Input
                                 value={row.expense}
@@ -591,9 +591,9 @@ export const ReportSettingsPage: React.FC = () => {
                           <th className="p-3.5 text-right">Action</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-200">
+                      <tbody className="divide-y divide-border">
                         {indirectFixedExpenses.map((row) => (
-                          <tr key={row.id} className="hover:bg-gray-50/50">
+                          <tr key={row.id} className="hover:bg-muted">
                             <td className="p-3.5">
                               <Input
                                 value={row.expense}
@@ -658,9 +658,9 @@ export const ReportSettingsPage: React.FC = () => {
                           <th className="p-3.5 text-right">Action</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-200">
+                      <tbody className="divide-y divide-border">
                         {percentageExpenses.map((row) => (
-                          <tr key={row.id} className="hover:bg-gray-50/50">
+                          <tr key={row.id} className="hover:bg-muted">
                             <td className="p-3.5">
                               <Input
                                 value={row.expense}
@@ -741,9 +741,9 @@ export const ReportSettingsPage: React.FC = () => {
                           <th className="p-3.5 text-right">Action</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-200">
+                      <tbody className="divide-y divide-border">
                         {employeeCosts.map((row) => (
-                          <tr key={row.id} className="hover:bg-gray-50/50">
+                          <tr key={row.id} className="hover:bg-muted">
                             <td className="p-3.5">
                               <Input
                                 value={row.expense}
@@ -807,9 +807,9 @@ export const ReportSettingsPage: React.FC = () => {
                           <th className="p-3.5 text-right">Action</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-200">
+                      <tbody className="divide-y divide-border">
                         {monthlyFixedExpenses.map((row) => (
-                          <tr key={row.id} className="hover:bg-gray-50/50">
+                          <tr key={row.id} className="hover:bg-muted">
                             <td className="p-3.5">
                               <Input
                                 value={row.expense}
@@ -873,9 +873,9 @@ export const ReportSettingsPage: React.FC = () => {
                           <th className="p-3.5 text-right">Action</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-200">
+                      <tbody className="divide-y divide-border">
                         {consumables.map((row) => (
-                          <tr key={row.id} className="hover:bg-gray-50/50">
+                          <tr key={row.id} className="hover:bg-muted">
                             <td className="p-3.5">
                               <Input
                                 value={row.material}

@@ -51,7 +51,7 @@ const Sidebar = ({ disabled }: SidebarProps) => {
               'w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium transition-all duration-200 group relative mb-1',
               selectedCategory === ''
                 ? 'bg-card text-foreground shadow-sm font-semibold'
-                : 'text-muted-foreground hover:bg-white/60 hover:text-foreground'
+                : 'text-muted-foreground hover:bg-card/60 hover:text-foreground'
             )}
             disabled={disabled}
           >
@@ -86,7 +86,7 @@ const Sidebar = ({ disabled }: SidebarProps) => {
                     'w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium transition-all duration-200 group relative',
                     selectedCategory === category.name
                       ? 'bg-card text-foreground shadow-sm font-semibold'
-                      : 'text-muted-foreground hover:bg-white/60 hover:text-foreground'
+                      : 'text-muted-foreground hover:bg-card/60 hover:text-foreground'
                   )}
                   disabled={disabled}
                 >

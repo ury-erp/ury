@@ -257,7 +257,7 @@ export function CustomerPicker({ value, onChange, disabled }: CustomerPickerProp
           />
           <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
           {isOpen && (
-            <div className="absolute z-50 mt-2 max-h-80 w-full overflow-y-auto rounded-lg border border-border bg-white shadow-lg">
+            <div className="absolute z-50 mt-2 max-h-80 w-full overflow-y-auto rounded-lg border border-border bg-card shadow-lg">
               {isSearching && (
                 <div className="flex items-center justify-center p-4 text-sm text-text-tertiary">
                   <Loader className="mr-2 h-4 w-4 animate-spin" /> {t('common.searching')}

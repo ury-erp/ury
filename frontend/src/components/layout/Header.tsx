@@ -339,7 +339,7 @@ export const Header: React.FC = () => {
                       <div className="flex items-start space-x-3">
                         <div className="mt-0.5">
                           {item.type === 'info' && <Info className="w-5 h-5 text-primary" />}
-                          {item.type === 'warning' && <AlertTriangle className="w-5 h-5 text-amber-500" />}
+                          {item.type === 'warning' && <AlertTriangle className="w-5 h-5 text-warning" />}
                           {item.type === 'success' && <CheckCircle2 className="w-5 h-5 text-emerald-500" />}
                         </div>
 

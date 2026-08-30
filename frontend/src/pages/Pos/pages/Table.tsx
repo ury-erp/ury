@@ -431,7 +431,7 @@ const TableView = () => {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="p-4 bg-white border-b border-border">
+      <div className="p-4 bg-card border-b border-border">
         <div className="max-w-screen-xl mx-auto">
           <div className="flex flex-col gap-3">
             <div className="flex justify-between items-start gap-4">
@@ -459,7 +459,7 @@ const TableView = () => {
                   >
                     {room.name}
                     {typeof roomCounts[room.name] === 'number' ? (
-                      <Badge variant="outline" className="ml-2 bg-white/60">
+                      <Badge variant="outline" className="ml-2 bg-card/60">
                         {roomCounts[room.name]}
                       </Badge>
                     ) : null}
@@ -504,7 +504,7 @@ const TableView = () => {
                 ) : (
                   <div
                     key={group.map((t) => t.name).join('-')}
-                    className="col-span-full flex flex-wrap items-stretch gap-y-2 rounded-lg border border-blue-200/70 bg-blue-50/40 p-2"
+                    className="col-span-full flex flex-wrap items-stretch gap-y-2 rounded-lg border border-primary/70 bg-primary-tint/40 p-2"
                   >
                     {group.map((table, index) => (
                       <Fragment key={table.name}>
@@ -573,7 +573,7 @@ const TableView = () => {
       />
 
       {/* Status Legend */}
-      <div className="fixed bottom-[4.5rem] w-full p-4 bg-white border-t border-border">
+      <div className="fixed bottom-[4.5rem] w-full p-4 bg-card border-t border-border">
         <div className="max-w-screen-xl mx-auto">
           <div className="flex items-center justify-center gap-6 text-sm">
             <div className="flex items-center gap-2">

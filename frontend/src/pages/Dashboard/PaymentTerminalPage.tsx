@@ -28,7 +28,7 @@ const getStatusBadgeClass = (status: string) => {
     case 'Idle':
       return 'inline-flex items-center rounded-full bg-success-tint px-2.5 py-0.5 text-xs font-medium text-success';
     case 'Busy':
-      return 'inline-flex items-center rounded-full bg-warning-tint px-2.5 py-0.5 text-xs font-medium text-yellow-800';
+      return 'inline-flex items-center rounded-full bg-warning-tint px-2.5 py-0.5 text-xs font-medium text-warning';
     case 'Offline':
       return 'inline-flex items-center rounded-full bg-destructive-tint px-2.5 py-0.5 text-xs font-medium text-destructive';
     default:
@@ -43,7 +43,7 @@ const getTransactionStatusBadgeClass = (status: string) => {
     case 'Failed':
       return 'inline-flex items-center rounded-full bg-destructive-tint px-2.5 py-0.5 text-xs font-medium text-destructive';
     case 'Pending':
-      return 'inline-flex items-center rounded-full bg-warning-tint px-2.5 py-0.5 text-xs font-medium text-yellow-800';
+      return 'inline-flex items-center rounded-full bg-warning-tint px-2.5 py-0.5 text-xs font-medium text-warning';
     default:
       return 'inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-foreground';
   }
@@ -155,7 +155,7 @@ const PaymentTerminalContent: React.FC = () => {
                     setFormData({ ...formData, terminal_id: e.target.value })
                   }
                   placeholder="e.g., TERM-001"
-                  className="rounded-md border border-border px-3 py-2 text-sm text-foreground placeholder-gray-500 focus:border-primary focus:outline-none"
+                  className="rounded-md border border-border px-3 py-2 text-sm text-foreground placeholder-text-tertiary focus:border-primary focus:outline-none"
                   disabled={createLoading}
                 />
               </div>
@@ -171,7 +171,7 @@ const PaymentTerminalContent: React.FC = () => {
                     setFormData({ ...formData, device: e.target.value })
                   }
                   placeholder="e.g., Ingenico iCT2X0"
-                  className="rounded-md border border-border px-3 py-2 text-sm text-foreground placeholder-gray-500 focus:border-primary focus:outline-none"
+                  className="rounded-md border border-border px-3 py-2 text-sm text-foreground placeholder-text-tertiary focus:border-primary focus:outline-none"
                   disabled={createLoading}
                 />
               </div>
@@ -219,7 +219,7 @@ const PaymentTerminalContent: React.FC = () => {
       <div>
         <h2 className="text-lg font-semibold text-foreground mb-4">Registered Terminals</h2>
         {loading ? (
-          <div className="flex items-center justify-center rounded-lg border border-border bg-white py-16">
+          <div className="flex items-center justify-center rounded-lg border border-border bg-card py-16">
             <Spinner className="h-8 w-8 text-primary" />
           </div>
         ) : error ? (
@@ -231,7 +231,7 @@ const PaymentTerminalContent: React.FC = () => {
             No payment terminals registered yet. Create one using the form above.
           </Card>
         ) : (
-          <div className="overflow-hidden rounded-lg border border-border bg-white shadow-sm">
+          <div className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead className="border-b border-border bg-muted text-xs font-semibold text-text-tertiary">
@@ -243,7 +243,7 @@ const PaymentTerminalContent: React.FC = () => {
                     <th className="px-4 py-3">Last Seen</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-border">
                   {terminals.map((terminal) => (
                     <tr key={terminal.name}>
                       <td className="px-4 py-3 font-medium text-foreground">
@@ -275,7 +275,7 @@ const PaymentTerminalContent: React.FC = () => {
       <div>
         <h2 className="text-lg font-semibold text-foreground mb-4">Transaction Log</h2>
         {transactionLoading ? (
-          <div className="flex items-center justify-center rounded-lg border border-border bg-white py-16">
+          <div className="flex items-center justify-center rounded-lg border border-border bg-card py-16">
             <Spinner className="h-8 w-8 text-primary" />
           </div>
         ) : transactions.length === 0 ? (
@@ -283,7 +283,7 @@ const PaymentTerminalContent: React.FC = () => {
             No transactions recorded yet.
           </Card>
         ) : (
-          <div className="overflow-hidden rounded-lg border border-border bg-white shadow-sm">
+          <div className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead className="border-b border-border bg-muted text-xs font-semibold text-text-tertiary">
@@ -295,7 +295,7 @@ const PaymentTerminalContent: React.FC = () => {
                     <th className="px-4 py-3">Created</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-border">
                   {transactions.map((tx) => (
                     <tr key={tx.name}>
                       <td className="px-4 py-3 font-medium text-foreground font-mono text-xs">

@@ -411,7 +411,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
               <div>{t('tables.autosave_hint')}</div>
             </div>
           ) : (
-            <div className="bg-white/80 backdrop-blur border border-border rounded-lg p-2 text-xs text-text-tertiary shadow-sm">
+            <div className="bg-card/80 backdrop-blur border border-border rounded-lg p-2 text-xs text-text-tertiary shadow-sm">
               {t('tables.zoom_pan_hint')}
             </div>
           )}

@@ -269,9 +269,9 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
     const baseClasses = cn(
       'absolute border-2 flex items-center justify-center text-sm font-semibold cursor-pointer transition-all select-none',
       getTableStatusColor(table.occupied),
-      isEditMode && 'hover:ring-2 hover:ring-blue-400 cursor-move',
+      isEditMode && 'hover:ring-2 hover:ring-primary cursor-move',
       draggedTable === table.name && 'shadow-xl scale-105 z-20',
-      selectedTable === table.name && 'ring-2 ring-blue-600 z-10'
+      selectedTable === table.name && 'ring-2 ring-primary z-10'
     );
 
     const style = {
@@ -417,13 +417,13 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
         {/* Instructions */}
         <div className="absolute bottom-4 right-4 z-30 pointer-events-none">
           {isEditMode ? (
-            <div className="bg-blue-50/90 backdrop-blur border border-primary rounded-lg p-3 text-sm text-primary shadow-lg">
+            <div className="bg-primary-tint/90 backdrop-blur border border-primary rounded-lg p-3 text-sm text-primary shadow-lg">
               <div className="font-medium mb-1">{t('tables.editing_layout_hint_title')}</div>
               <div>{t('tables.drag_tables_hint')}</div>
               <div>{t('tables.autosave_hint')}</div>
             </div>
           ) : (
-            <div className="bg-white/80 backdrop-blur border border-border rounded-lg p-2 text-xs text-text-tertiary shadow-sm">
+            <div className="bg-card/80 backdrop-blur border border-border rounded-lg p-2 text-xs text-text-tertiary shadow-sm">
               {t('tables.zoom_pan_hint')}
             </div>
           )}
@@ -498,7 +498,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
                 className={cn(
                   "w-full px-3 py-2 border rounded-md text-sm",
                   isEditMode
-                    ? "border-border bg-white"
+                    ? "border-border bg-card"
                     : "border-border bg-muted cursor-not-allowed"
                 )}
                 placeholder={t('tables.capacity_placeholder')}

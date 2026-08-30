@@ -44,8 +44,8 @@ const OrderStatusSidebar = ({
                 className={cn(
                   'w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium transition-all duration-200 group relative',
                   selectedStatus === status.value
-                    ? 'bg-white text-foreground shadow-sm font-semibold'
-                    : 'text-muted-foreground hover:bg-white/60 hover:text-foreground'
+                    ? 'bg-card text-foreground shadow-sm font-semibold'
+                    : 'text-muted-foreground hover:bg-card/60 hover:text-foreground'
                 )}
                 disabled={disabled}
               >

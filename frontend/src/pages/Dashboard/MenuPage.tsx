@@ -482,7 +482,7 @@ export const MenuPage: React.FC = () => {
           ))}
         </div>
       ) : (
-        <div className="bg-white rounded-lg border border-border shadow-sm overflow-hidden overflow-x-auto">
+        <div className="bg-card rounded-lg border border-border shadow-sm overflow-hidden overflow-x-auto">
           <table className="w-full text-left text-sm text-muted-foreground min-w-[600px]">
             <thead className="bg-gray-50/80 border-b border-border text-xs text-text-tertiary font-bold tracking-wider">
               <tr>

@@ -183,7 +183,7 @@ const BillSplitDialog = ({
                   <div
                     className={cn(
                       'mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border',
-                      isSelected ? 'border-primary bg-primary text-white' : 'border-border bg-white'
+                      isSelected ? 'border-primary bg-primary text-white' : 'border-border bg-card'
                     )}
                     aria-hidden
                   >

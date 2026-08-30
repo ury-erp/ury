@@ -607,7 +607,7 @@ export const SelfOrderingProfilePage: React.FC = () => {
                 </button>
 
                 {openSections.billingPayment && (
-                  <div className="p-4 space-y-3 bg-white grid grid-cols-1 md:grid-cols-2">
+                  <div className="p-4 space-y-3 bg-card grid grid-cols-1 md:grid-cols-2">
                     <label className="flex items-center space-x-2 cursor-pointer">
                       <input
                         type="checkbox"
@@ -675,7 +675,7 @@ export const SelfOrderingProfilePage: React.FC = () => {
                 </button>
 
                 {openSections.session && (
-                  <div className="p-4 bg-white">
+                  <div className="p-4 bg-card">
                     <div className="max-w-xs">
                       <label className="block text-sm font-medium text-muted-foreground mb-1.5">
                         Session Idle Timeout (Minutes)
@@ -732,7 +732,7 @@ export const SelfOrderingProfilePage: React.FC = () => {
 
         {/* Profiles List */}
         {!showForm && (
-          <Card className="rounded-xl border border-border bg-white shadow-sm overflow-hidden">
+          <Card className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
             {profiles.length === 0 ? (
               <div className="p-12 text-center">
                 <Settings className="w-12 h-12 text-text-tertiary mx-auto mb-3" />

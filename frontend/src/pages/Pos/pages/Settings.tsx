@@ -15,7 +15,7 @@ export default function Settings() {
           <POSCloseFlow />
         </div>
 
-        <Card className="bg-white border border-border">
+        <Card className="bg-card border border-border">
           <CardContent className="p-8 text-center">
             <p className="text-muted-foreground text-sm">{t('settings.coming_soon')}</p>
           </CardContent>
