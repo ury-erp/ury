@@ -1,5 +1,20 @@
-import React, { useEffect, useState } from 'react';
-import { Card, Spinner } from '@ury/ui';
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  Badge,
+  Button,
+  Card,
+  DataTable,
+  DataTableColumn,
+  Drawer,
+  DrawerSectionLabel,
+  Input,
+  KeyValueRow,
+  KpiItemProps,
+  KpiStrip,
+  Select,
+  Spinner,
+  numericCellClass,
+} from '@ury/ui';
 import { getLoggedUser, getUserRoles } from '@ury/core';
 import { useBranchContext } from '../../context/BranchContext';
 import {
@@ -38,6 +53,43 @@ const getDefaultFromDate = () => {
 const getToday = () => new Date().toISOString().slice(0, 10);
 
 const formatQty = (value: number) => (Number.isInteger(value) ? String(value) : value.toFixed(2));
+
+const formatCurrency = (value: number) =>
+  value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/** Mirrors `StoreIssuePage.tsx`'s badge mapping for `URY Issue
+ * Authorization.status`. */
+const authorizationBadgeVariant = (status: string): 'success' | 'warning' | 'pending' | 'cancelled' => {
+  const normalized = status.toLowerCase();
+  if (normalized === 'authorized') return 'success';
+  if (normalized === 'cancelled' || normalized === 'rejected') return 'cancelled';
+  if (normalized === 'draft' || normalized === 'pending') return 'pending';
+  return 'warning';
+};
+
+/** Mirrors `WastagePage.tsx`'s badge mapping for `URY Issue
+ * Wastage.status`. */
+const wastageBadgeVariant = (status: string): 'success' | 'danger' | 'pending' | 'secondary' => {
+  if (status === 'Authorized') return 'success';
+  if (status === 'Rejected') return 'danger';
+  if (status === 'Draft') return 'pending';
+  return 'secondary';
+};
+
+/** `URY Stock Movement.movement_type` badge -- Transfer/Receipt/Return are
+ * peers, not a status progression, so this uses neutral/informational
+ * variants rather than success/danger semantics. */
+const movementBadgeVariant = (movementType: StockMovementRow['movement_type']): 'info' | 'success' | 'secondary' => {
+  if (movementType === 'Receipt') return 'success';
+  if (movementType === 'Return') return 'secondary';
+  return 'info';
+};
+
+/** A row is "fully issued" once nothing remains against its authorized
+ * quantity. `remaining_after_qty` is the backend's own running entitlement
+ * balance, so this reuses it rather than re-deriving issue state. Mirrors
+ * `StoreIssuePage.tsx`. */
+const isFullyIssued = (row: IssueAuthorizationRow) => row.remaining_after_qty <= 0;
 
 interface DepartmentStockRoleGateProps {
   children: React.ReactNode;
@@ -121,7 +173,7 @@ const CaptureWastageForm: React.FC<CaptureWastageFormProps> = ({ authorization, 
         company: authorization.company,
       });
       onSuccess();
-    } catch (err) {
+    } catch {
       onError('Unable to capture wastage for this issue authorization.');
     } finally {
       setSubmitting(false);
@@ -129,60 +181,55 @@ const CaptureWastageForm: React.FC<CaptureWastageFormProps> = ({ authorization, 
   };
 
   return (
-    <form onSubmit={handleSubmit} className="mt-2 flex flex-col gap-2 rounded-md border border-gray-200 bg-gray-50 p-3 sm:flex-row sm:items-end">
+    <form onSubmit={handleSubmit} className="mt-2 flex flex-col gap-2 rounded-md border border-gray-200 bg-gray-50 p-3">
       <label className="flex flex-col text-xs font-medium text-gray-600">
         Wasted Qty
-        <input
+        <Input
           aria-label="Wasted quantity"
           type="number"
           min="0"
           step="any"
+          size="sm"
           value={wastedQty}
           onChange={(event) => setWastedQty(event.target.value)}
-          className="mt-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
+          className="mt-1"
           required
         />
       </label>
       <label className="flex flex-col text-xs font-medium text-gray-600">
         Reason
-        <select
+        <Select
           aria-label="Reason category"
+          size="sm"
           value={reasonCategory}
           onChange={(event) => setReasonCategory(event.target.value as WastageReasonCategory)}
-          className="mt-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
+          className="mt-1"
         >
           {WASTAGE_REASON_CATEGORIES.map((category) => (
             <option key={category} value={category}>
               {category}
             </option>
           ))}
-        </select>
+        </Select>
       </label>
-      <label className="flex flex-1 flex-col text-xs font-medium text-gray-600">
+      <label className="flex flex-col text-xs font-medium text-gray-600">
         Notes (optional)
-        <input
+        <Input
           aria-label="Reason notes"
           type="text"
+          size="sm"
           value={reasonNotes}
           onChange={(event) => setReasonNotes(event.target.value)}
-          className="mt-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
+          className="mt-1"
         />
       </label>
       <div className="flex gap-2">
-        <button
-          type="submit"
-          disabled={submitting}
-          className="rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
-        >
+        <Button type="submit" size="sm" disabled={submitting}>
           Submit Wastage
-        </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700"
-        >
+        </Button>
+        <Button type="button" size="sm" variant="outline" onClick={onCancel}>
           Cancel
-        </button>
+        </Button>
       </div>
     </form>
   );
@@ -250,7 +297,7 @@ const RequestAuthorizationForm: React.FC<RequestAuthorizationFormProps> = ({
             'This plan has no required components recorded yet for this department, so there is nothing to request against.'
           );
         }
-      } catch (err) {
+      } catch {
         if (!cancelled) {
           setPlanName(null);
           setPlanStatus(null);
@@ -288,7 +335,7 @@ const RequestAuthorizationForm: React.FC<RequestAuthorizationFormProps> = ({
         branch: branch === 'all' ? undefined : branch,
       });
       onSuccess();
-    } catch (err) {
+    } catch {
       onError('Unable to create issue authorization for this plan and component.');
     } finally {
       setSubmitting(false);
@@ -323,11 +370,12 @@ const RequestAuthorizationForm: React.FC<RequestAuthorizationFormProps> = ({
       </div>
       <label className="flex flex-col text-xs font-medium text-gray-600">
         Required Component
-        <select
+        <Select
           aria-label="Required component"
+          size="sm"
           value={componentItem}
           onChange={(event) => handleComponentChange(event.target.value)}
-          className="mt-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
+          className="mt-1"
           disabled={componentOptions.length === 0}
           required
         >
@@ -337,18 +385,19 @@ const RequestAuthorizationForm: React.FC<RequestAuthorizationFormProps> = ({
               {option.component_item_name || option.component_item}
             </option>
           ))}
-        </select>
+        </Select>
       </label>
       <label className="flex flex-col text-xs font-medium text-gray-600">
         Requested Qty
-        <input
+        <Input
           aria-label="Requested quantity"
           type="number"
           min="0"
           step="any"
+          size="sm"
           value={requestedQty}
           onChange={(event) => setRequestedQty(event.target.value)}
-          className="mt-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
+          className="mt-1"
           disabled={!componentItem}
           required
         />
@@ -359,20 +408,12 @@ const RequestAuthorizationForm: React.FC<RequestAuthorizationFormProps> = ({
         )}
       </label>
       <div className="flex gap-2">
-        <button
-          type="submit"
-          disabled={submitting || !planName || !componentItem}
-          className="rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
-        >
+        <Button type="submit" size="sm" disabled={submitting || !planName || !componentItem}>
           Request Authorization
-        </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700"
-        >
+        </Button>
+        <Button type="button" size="sm" variant="outline" onClick={onCancel}>
           Cancel
-        </button>
+        </Button>
       </div>
       {planError && <p className="w-full text-xs font-normal text-red-600">{planError}</p>}
     </form>
@@ -380,7 +421,7 @@ const RequestAuthorizationForm: React.FC<RequestAuthorizationFormProps> = ({
 };
 
 const DepartmentStockContent: React.FC = () => {
-  const { activeBranchId, branches } = useBranchContext();
+  const { activeBranchId } = useBranchContext();
   const [department, setDepartment] = useState('');
   const [fromDate, setFromDate] = useState(getDefaultFromDate);
   const [toDate, setToDate] = useState(getToday);
@@ -394,8 +435,14 @@ const DepartmentStockContent: React.FC = () => {
 
   const [departmentOptions, setDepartmentOptions] = useState<DepartmentOption[]>([]);
   const [userRoles, setUserRoles] = useState<string[]>([]);
-  const [captureFor, setCaptureFor] = useState<string | null>(null);
   const [showRequestForm, setShowRequestForm] = useState(false);
+
+  const [selectedAuthorization, setSelectedAuthorization] = useState<IssueAuthorizationRow | null>(null);
+  const [showCaptureForm, setShowCaptureForm] = useState(false);
+  const [selectedWastage, setSelectedWastage] = useState<WastageRow | null>(null);
+  const [wastageDrawerAction, setWastageDrawerAction] = useState<'approve' | 'reject' | null>(null);
+  const [wastageDrawerBusy, setWastageDrawerBusy] = useState(false);
+  const [selectedMovement, setSelectedMovement] = useState<StockMovementRow | null>(null);
 
   const canCapture = userRoles.some((role) => CAPTURE_ROLES.includes(role));
   const canApprove = userRoles.some((role) => APPROVE_ROLES.includes(role));
@@ -465,7 +512,7 @@ const DepartmentStockContent: React.FC = () => {
         setAuthorizations(authRows);
         setMovements(movementRows);
         setWastageRows(wastage);
-      } catch (err) {
+      } catch {
         if (!cancelled) {
           setAuthorizations([]);
           setMovements([]);
@@ -484,30 +531,171 @@ const DepartmentStockContent: React.FC = () => {
 
   const refresh = () => {
     setActionError(null);
-    setCaptureFor(null);
     setShowRequestForm(false);
+    setShowCaptureForm(false);
+    setSelectedAuthorization(null);
+    setWastageDrawerAction(null);
+    setWastageDrawerBusy(false);
+    setSelectedWastage(null);
     setRefreshToken((token) => token + 1);
   };
 
-  const handleApprove = async (wastageName: string) => {
+  const closeWastageDrawer = () => {
+    setSelectedWastage(null);
+    setWastageDrawerAction(null);
+    setWastageDrawerBusy(false);
+  };
+
+  const handleWastageDrawerConfirm = async () => {
+    if (!selectedWastage || !wastageDrawerAction) return;
     setActionError(null);
+    setWastageDrawerBusy(true);
     try {
-      await departmentStockService.approveWastage(wastageName);
+      if (wastageDrawerAction === 'approve') {
+        await departmentStockService.approveWastage(selectedWastage.name);
+      } else {
+        await departmentStockService.rejectWastage(selectedWastage.name);
+      }
       refresh();
-    } catch (err) {
-      setActionError('Unable to approve this wastage record.');
+    } catch {
+      setActionError(
+        wastageDrawerAction === 'approve'
+          ? 'Unable to approve this wastage record.'
+          : 'Unable to reject this wastage record.'
+      );
+      setWastageDrawerBusy(false);
     }
   };
 
-  const handleReject = async (wastageName: string) => {
-    setActionError(null);
-    try {
-      await departmentStockService.rejectWastage(wastageName);
-      refresh();
-    } catch (err) {
-      setActionError('Unable to reject this wastage record.');
-    }
-  };
+  const departmentName = (dept: string) =>
+    departmentOptions.find((opt) => opt.name === dept)?.department_name || dept;
+
+  /**
+   * KPI figures computed strictly from the three real datasets already
+   * fetched for this department/date range -- no fabricated opening-value,
+   * yield %, or "Supports" figures (those fields don't exist on
+   * `IssueAuthorizationRow`, `WastageRow`, or `StockMovementRow`; see
+   * `departmentStock.ts`). "Wastage Value" reuses `WastageRow.valuation_amount`,
+   * the same real field `WastagePage.tsx`'s KPI strip uses.
+   */
+  const kpis = useMemo<KpiItemProps[]>(() => {
+    const fullyIssuedCount = authorizations.filter(isFullyIssued).length;
+    const totalWastageValue = wastageRows.reduce((sum, row) => sum + (row.valuation_amount ?? 0), 0);
+
+    const items: KpiItemProps[] = [
+      { label: 'Issue Lines', value: authorizations.length },
+      { label: 'Fully Issued', value: fullyIssuedCount, tone: 'default' },
+      { label: 'Wastage Entries', value: wastageRows.length, tone: wastageRows.length > 0 ? 'danger' : 'default' },
+      { label: 'Wastage Value', value: `Rs. ${formatCurrency(totalWastageValue)}`, tone: 'danger' },
+      { label: 'Stock Movements', value: movements.length },
+    ];
+    return items;
+  }, [authorizations, wastageRows, movements]);
+
+  const authorizationColumns: DataTableColumn<IssueAuthorizationRow>[] = [
+    {
+      key: 'plan',
+      header: 'Plan',
+      render: (row) => <span className="font-medium text-gray-900">{row.plan}</span>,
+    },
+    {
+      key: 'component_item',
+      header: 'Component',
+      render: (row) => row.component_item_name || row.component_item,
+    },
+    {
+      key: 'authorized_qty',
+      header: 'Authorized Qty',
+      align: 'right',
+      render: (row) => (
+        <span className={numericCellClass}>
+          {formatQty(row.authorized_qty)} {row.stock_uom}
+        </span>
+      ),
+    },
+    {
+      key: 'remaining_after_qty',
+      header: 'Remaining Entitlement',
+      align: 'right',
+      render: (row) => (
+        <span className={numericCellClass}>
+          {formatQty(row.remaining_after_qty)} {row.stock_uom}
+        </span>
+      ),
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      render: (row) => <Badge variant={authorizationBadgeVariant(row.status)}>{row.status}</Badge>,
+    },
+  ];
+
+  const wastageColumns: DataTableColumn<WastageRow>[] = [
+    {
+      key: 'component_item',
+      header: 'Component',
+      render: (row) => <span className="font-medium text-gray-900">{row.component_item}</span>,
+    },
+    {
+      key: 'wasted_qty',
+      header: 'Wasted Qty',
+      align: 'right',
+      render: (row) => <span className={numericCellClass}>{formatQty(row.wasted_qty)}</span>,
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      render: (row) => <Badge variant={wastageBadgeVariant(row.status)}>{row.status}</Badge>,
+    },
+    {
+      key: 'valuation_amount',
+      header: 'Value',
+      align: 'right',
+      render: (row) => (
+        <span className={numericCellClass}>
+          {row.valuation_amount !== undefined ? `Rs. ${formatCurrency(row.valuation_amount)}` : '-'}
+        </span>
+      ),
+    },
+  ];
+
+  const movementColumns: DataTableColumn<StockMovementRow>[] = [
+    {
+      key: 'movement_type',
+      header: 'Type',
+      render: (row) => <Badge variant={movementBadgeVariant(row.movement_type)}>{row.movement_type}</Badge>,
+    },
+    {
+      key: 'component_item',
+      header: 'Component',
+      render: (row) => <span className="font-medium text-gray-900">{row.component_item}</span>,
+    },
+    {
+      key: 'qty',
+      header: 'Qty',
+      align: 'right',
+      render: (row) => (
+        <span className={numericCellClass}>
+          {formatQty(row.qty)} {row.stock_uom}
+        </span>
+      ),
+    },
+    {
+      key: 'from_location',
+      header: 'From',
+      render: (row) => row.from_location || '-',
+    },
+    {
+      key: 'to_location',
+      header: 'To',
+      render: (row) => row.to_location || '-',
+    },
+    {
+      key: 'posting_datetime',
+      header: 'Posted',
+      render: (row) => row.posting_datetime || '-',
+    },
+  ];
 
   return (
     <div className="space-y-6">
@@ -521,11 +709,12 @@ const DepartmentStockContent: React.FC = () => {
         <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
           <label className="flex flex-col text-xs font-medium text-gray-600">
             Department
-            <select
+            <Select
               aria-label="Department"
+              size="sm"
               value={department}
               onChange={(event) => setDepartment(event.target.value)}
-              className="mt-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
+              className="mt-1"
             >
               <option value="">Select department</option>
               {departmentOptions.map((dept) => (
@@ -533,26 +722,28 @@ const DepartmentStockContent: React.FC = () => {
                   {dept.department_name}
                 </option>
               ))}
-            </select>
+            </Select>
           </label>
           <label className="flex flex-col text-xs font-medium text-gray-600">
             From
-            <input
+            <Input
               aria-label="From date"
               type="date"
+              size="sm"
               value={fromDate}
               onChange={(event) => setFromDate(event.target.value)}
-              className="mt-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
+              className="mt-1"
             />
           </label>
           <label className="flex flex-col text-xs font-medium text-gray-600">
             To
-            <input
+            <Input
               aria-label="To date"
               type="date"
+              size="sm"
               value={toDate}
               onChange={(event) => setToDate(event.target.value)}
-              className="mt-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
+              className="mt-1"
             />
           </label>
         </div>
@@ -560,14 +751,12 @@ const DepartmentStockContent: React.FC = () => {
 
       {!department ? (
         <Card className="p-10 text-center text-sm text-gray-500">Select a department to view its data.</Card>
-      ) : loading ? (
-        <div className="flex items-center justify-center rounded-lg border border-gray-200 bg-white py-16">
-          <Spinner className="h-8 w-8 text-primary" />
-        </div>
       ) : error ? (
         <Card className="border-red-200 bg-red-50 p-6 text-sm text-red-700">{error}</Card>
       ) : (
         <>
+          <KpiStrip items={kpis} />
+
           {actionError && (
             <Card className="border-red-200 bg-red-50 p-4 text-sm text-red-700">{actionError}</Card>
           )}
@@ -576,13 +765,9 @@ const DepartmentStockContent: React.FC = () => {
             <div className="mb-2 flex items-center justify-between">
               <h2 className="text-sm font-semibold tracking-wide text-gray-700">Issue Authorizations</h2>
               {canCapture && !showRequestForm && (
-                <button
-                  type="button"
-                  onClick={() => setShowRequestForm(true)}
-                  className="rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-white"
-                >
+                <Button type="button" size="sm" variant="outline" onClick={() => setShowRequestForm(true)}>
                   Request Authorization
-                </button>
+                </Button>
               )}
             </div>
 
@@ -599,184 +784,195 @@ const DepartmentStockContent: React.FC = () => {
               />
             )}
 
-            {authorizations.length === 0 ? (
-              <Card className="mt-2 p-8 text-center text-sm text-gray-500">
-                No issue authorizations found for this department and date range.
-              </Card>
-            ) : (
-              <div className="mt-2 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[720px] text-left text-sm">
-                    <thead className="border-b border-gray-100 bg-gray-50 text-xs font-semibold text-gray-500">
-                      <tr>
-                        <th className="px-4 py-3">Plan</th>
-                        <th className="px-4 py-3">Component</th>
-                        <th className="px-4 py-3 text-right">Authorized Qty</th>
-                        <th className="px-4 py-3 text-right" title="Authorized quantity still available to draw against this plan">Remaining Entitlement</th>
-                        <th className="px-4 py-3">Status</th>
-                        {canCapture && <th className="px-4 py-3">Actions</th>}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {authorizations.map((row) => (
-                        <React.Fragment key={row.name}>
-                          <tr>
-                            <td className="px-4 py-3 font-medium text-gray-900">{row.plan}</td>
-                            <td className="px-4 py-3 text-gray-700">
-                              {row.component_item_name || row.component_item}
-                            </td>
-                            <td className="px-4 py-3 text-right text-gray-700">
-                              {formatQty(row.authorized_qty)} {row.stock_uom}
-                            </td>
-                            <td className="px-4 py-3 text-right text-gray-700">
-                              {formatQty(row.remaining_after_qty)} {row.stock_uom}
-                            </td>
-                            <td className="px-4 py-3 text-gray-600">{row.status}</td>
-                            {canCapture && (
-                              <td className="px-4 py-3">
-                                {row.status === 'Authorized' && captureFor !== row.name && (
-                                  <button
-                                    type="button"
-                                    onClick={() => setCaptureFor(row.name)}
-                                    className="rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700"
-                                  >
-                                    Capture Wastage
-                                  </button>
-                                )}
-                              </td>
-                            )}
-                          </tr>
-                          {captureFor === row.name && (
-                            <tr>
-                              <td colSpan={canCapture ? 6 : 5} className="px-4 pb-3">
-                                <CaptureWastageForm
-                                  authorization={row}
-                                  onCancel={() => setCaptureFor(null)}
-                                  onSuccess={refresh}
-                                  onError={setActionError}
-                                />
-                              </td>
-                            </tr>
-                          )}
-                        </React.Fragment>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
+            <div className="mt-2">
+              <DataTable
+                columns={authorizationColumns}
+                rows={authorizations}
+                isLoading={loading}
+                emptyMessage="No issue authorizations found for this department and date range."
+                onRowClick={(row) => {
+                  setSelectedAuthorization(row);
+                  setShowCaptureForm(false);
+                }}
+              />
+            </div>
           </section>
 
           <section>
             <h2 className="mb-2 text-sm font-semibold tracking-wide text-gray-700">Wastage</h2>
-            {wastageRows.length === 0 ? (
-              <Card className="p-8 text-center text-sm text-gray-500">
-                No wastage records found for this department and date range.
-              </Card>
-            ) : (
-              <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[640px] text-left text-sm">
-                    <thead className="border-b border-gray-100 bg-gray-50 text-xs font-semibold text-gray-500">
-                      <tr>
-                        <th className="px-4 py-3">Component</th>
-                        <th className="px-4 py-3 text-right">Wasted Qty</th>
-                        <th className="px-4 py-3">Status</th>
-                        {canApprove && <th className="px-4 py-3">Actions</th>}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {wastageRows.map((row) => (
-                        <tr key={row.name}>
-                          <td className="px-4 py-3 font-medium text-gray-900">{row.component_item}</td>
-                          <td className="px-4 py-3 text-right text-gray-700">{formatQty(row.wasted_qty)}</td>
-                          <td className="px-4 py-3">
-                            <span
-                              className={
-                                row.status === 'Authorized'
-                                  ? 'rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700'
-                                  : row.status === 'Rejected'
-                                    ? 'rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700'
-                                    : 'rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-700'
-                              }
-                            >
-                              {row.status}
-                            </span>
-                          </td>
-                          {canApprove && (
-                            <td className="px-4 py-3">
-                              {row.status === 'Draft' && (
-                                <div className="flex gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleApprove(row.name)}
-                                    className="rounded-md bg-primary px-2 py-1 text-xs font-semibold text-white"
-                                  >
-                                    Approve
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleReject(row.name)}
-                                    className="rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700"
-                                  >
-                                    Reject
-                                  </button>
-                                </div>
-                              )}
-                            </td>
-                          )}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
+            <DataTable
+              columns={wastageColumns}
+              rows={wastageRows}
+              isLoading={loading}
+              emptyMessage="No wastage records found for this department and date range."
+              onRowClick={(row) => {
+                setSelectedWastage(row);
+                setWastageDrawerAction(null);
+              }}
+            />
           </section>
 
           <section>
-            <h2 className="mb-2 text-sm font-semibold tracking-wide text-gray-700">
-              Related Stock Movements
-            </h2>
-            {movements.length === 0 ? (
-              <Card className="p-8 text-center text-sm text-gray-500">
-                No transfers, receipts, or returns found for this department and date range.
-              </Card>
-            ) : (
-              <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[720px] text-left text-sm">
-                    <thead className="border-b border-gray-100 bg-gray-50 text-xs font-semibold text-gray-500">
-                      <tr>
-                        <th className="px-4 py-3">Type</th>
-                        <th className="px-4 py-3">Component</th>
-                        <th className="px-4 py-3 text-right">Qty</th>
-                        <th className="px-4 py-3">From</th>
-                        <th className="px-4 py-3">To</th>
-                        <th className="px-4 py-3">Posted</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {movements.map((row) => (
-                        <tr key={row.name}>
-                          <td className="px-4 py-3 font-medium text-gray-900">{row.movement_type}</td>
-                          <td className="px-4 py-3 text-gray-700">{row.component_item}</td>
-                          <td className="px-4 py-3 text-right text-gray-700">
-                            {formatQty(row.qty)} {row.stock_uom}
-                          </td>
-                          <td className="px-4 py-3 text-gray-600">{row.from_location}</td>
-                          <td className="px-4 py-3 text-gray-600">{row.to_location}</td>
-                          <td className="px-4 py-3 text-gray-600">{row.posting_datetime}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
+            <h2 className="mb-2 text-sm font-semibold tracking-wide text-gray-700">Related Stock Movements</h2>
+            <DataTable
+              columns={movementColumns}
+              rows={movements}
+              isLoading={loading}
+              emptyMessage="No transfers, receipts, or returns found for this department and date range."
+              onRowClick={setSelectedMovement}
+            />
           </section>
         </>
       )}
+
+      <Drawer
+        open={selectedAuthorization !== null}
+        onClose={() => {
+          setSelectedAuthorization(null);
+          setShowCaptureForm(false);
+        }}
+        title={selectedAuthorization ? selectedAuthorization.component_item_name || selectedAuthorization.component_item : 'Issue authorization'}
+        footer={
+          selectedAuthorization && canCapture && selectedAuthorization.status === 'Authorized' && !showCaptureForm ? (
+            <Button type="button" size="sm" onClick={() => setShowCaptureForm(true)}>
+              Capture Wastage
+            </Button>
+          ) : undefined
+        }
+      >
+        {selectedAuthorization && (
+          <>
+            <DrawerSectionLabel>Details</DrawerSectionLabel>
+            <KeyValueRow label="Plan" value={selectedAuthorization.plan} />
+            <KeyValueRow label="Department" value={departmentName(selectedAuthorization.department)} />
+            <KeyValueRow
+              label="Component"
+              value={selectedAuthorization.component_item_name || selectedAuthorization.component_item}
+            />
+            <KeyValueRow
+              label="Status"
+              value={<Badge variant={authorizationBadgeVariant(selectedAuthorization.status)}>{selectedAuthorization.status}</Badge>}
+            />
+            <KeyValueRow
+              label="Required qty"
+              value={`${formatQty(selectedAuthorization.required_qty)} ${selectedAuthorization.stock_uom || ''}`}
+            />
+            <KeyValueRow
+              label="Authorized qty"
+              value={`${formatQty(selectedAuthorization.authorized_qty)} ${selectedAuthorization.stock_uom || ''}`}
+            />
+            <KeyValueRow
+              label="Remaining entitlement"
+              value={`${formatQty(selectedAuthorization.remaining_after_qty)} ${selectedAuthorization.stock_uom || ''}`}
+            />
+            {selectedAuthorization.production_unit && (
+              <KeyValueRow label="Production unit" value={selectedAuthorization.production_unit} />
+            )}
+            {selectedAuthorization.branch && <KeyValueRow label="Branch" value={selectedAuthorization.branch} />}
+            {selectedAuthorization.company && <KeyValueRow label="Company" value={selectedAuthorization.company} />}
+            {selectedAuthorization.creation && <KeyValueRow label="Created" value={selectedAuthorization.creation} />}
+
+            {showCaptureForm && (
+              <>
+                <DrawerSectionLabel>Capture Wastage</DrawerSectionLabel>
+                <CaptureWastageForm
+                  authorization={selectedAuthorization}
+                  onCancel={() => setShowCaptureForm(false)}
+                  onSuccess={refresh}
+                  onError={setActionError}
+                />
+              </>
+            )}
+          </>
+        )}
+      </Drawer>
+
+      <Drawer
+        open={selectedWastage !== null}
+        onClose={closeWastageDrawer}
+        title={selectedWastage ? selectedWastage.component_item : 'Wastage entry'}
+        footer={
+          selectedWastage && canApprove && selectedWastage.status === 'Draft' ? (
+            wastageDrawerAction ? (
+              <>
+                <span className="mr-auto self-center text-xs text-gray-600">
+                  {wastageDrawerAction === 'approve' ? 'Approve this entry?' : 'Reject this entry?'}
+                </span>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setWastageDrawerAction(null)}
+                  disabled={wastageDrawerBusy}
+                >
+                  Cancel
+                </Button>
+                <Button type="button" size="sm" onClick={handleWastageDrawerConfirm} disabled={wastageDrawerBusy}>
+                  Confirm
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button type="button" size="sm" variant="outline" onClick={() => setWastageDrawerAction('reject')}>
+                  Reject
+                </Button>
+                <Button type="button" size="sm" onClick={() => setWastageDrawerAction('approve')}>
+                  Approve
+                </Button>
+              </>
+            )
+          ) : undefined
+        }
+      >
+        {selectedWastage && (
+          <>
+            <DrawerSectionLabel>Details</DrawerSectionLabel>
+            <KeyValueRow label="Component" value={selectedWastage.component_item} />
+            <KeyValueRow label="Department" value={departmentName(selectedWastage.department)} />
+            <KeyValueRow label="Wasted qty" value={formatQty(selectedWastage.wasted_qty)} />
+            <KeyValueRow
+              label="Status"
+              value={<Badge variant={wastageBadgeVariant(selectedWastage.status)}>{selectedWastage.status}</Badge>}
+            />
+            {selectedWastage.branch !== undefined && <KeyValueRow label="Branch" value={selectedWastage.branch} />}
+            {selectedWastage.company !== undefined && <KeyValueRow label="Company" value={selectedWastage.company} />}
+            {selectedWastage.valuation_rate !== undefined && (
+              <KeyValueRow label="Valuation rate" value={`Rs. ${formatCurrency(selectedWastage.valuation_rate)}`} />
+            )}
+            {selectedWastage.valuation_amount !== undefined && (
+              <KeyValueRow label="Valuation amount" value={`Rs. ${formatCurrency(selectedWastage.valuation_amount)}`} />
+            )}
+          </>
+        )}
+      </Drawer>
+
+      <Drawer
+        open={selectedMovement !== null}
+        onClose={() => setSelectedMovement(null)}
+        title={selectedMovement ? selectedMovement.component_item : 'Stock movement'}
+      >
+        {selectedMovement && (
+          <>
+            <DrawerSectionLabel>Details</DrawerSectionLabel>
+            <KeyValueRow
+              label="Type"
+              value={<Badge variant={movementBadgeVariant(selectedMovement.movement_type)}>{selectedMovement.movement_type}</Badge>}
+            />
+            <KeyValueRow label="Component" value={selectedMovement.component_item} />
+            <KeyValueRow label="Department" value={departmentName(selectedMovement.department)} />
+            <KeyValueRow
+              label="Qty"
+              value={`${formatQty(selectedMovement.qty)} ${selectedMovement.stock_uom || ''}`}
+            />
+            <KeyValueRow label="From" value={selectedMovement.from_location || '-'} />
+            <KeyValueRow label="To" value={selectedMovement.to_location || '-'} />
+            <KeyValueRow label="Posted" value={selectedMovement.posting_datetime || '-'} />
+            <KeyValueRow label="Issue authorization" value={selectedMovement.issue_authorization} />
+            {selectedMovement.branch && <KeyValueRow label="Branch" value={selectedMovement.branch} />}
+            {selectedMovement.company && <KeyValueRow label="Company" value={selectedMovement.company} />}
+          </>
+        )}
+      </Drawer>
     </div>
   );
 };
