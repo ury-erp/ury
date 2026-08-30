@@ -237,60 +237,63 @@ function App() {
             <Route path="daily-pnl" element={<DailyPnl />} />
           </Route>
 
-          {/*
-            TODO Phase 2 (PLAN.md tracks/sa-app-consolidation §7 Phase 2):
-            this `pos/*` subtree is mounted here reachable only behind the
-            outer guards above (SetupGuard, RoleGuard on the "/" route,
-            AuthGuard on `frontend/`'s pages) — the same as every other
-            route in this file. It does NOT yet have pos/'s own
-            POS-Profile-aware `AuthGuard`+`POSOpeningProvider` gate wrapped
-            around it (that gate is cashier/waiter-role-driven, not
-            'URY Manager'-driven, and mounting it is explicitly deferred to
-            Phase 2 per the Opus review's phasing correction — see PLAN.md
-            §4/§7.5 point 2). Until Phase 2 lands, this subtree is verified
-            reachable under a manager-role session only; it is NOT yet
-            cashier-safe (a cashier session would currently be blocked by
-            the outer 'URY Manager'-only RoleGuard/AuthGuard, not routed
-            through pos/'s own opening/checklist gate).
-          */}
-          <Route
-            path="pos"
-            element={
-              <Suspense fallback={<PosRouteFallback />}>
-                <PosLayout />
-              </Suspense>
-            }
-          >
-            <Route index element={<Navigate to="dashboard" replace />} />
-            <Route path="dashboard" element={<PosDashboard />} />
-            <Route path="pos" element={<PosPOS />} />
-            <Route path="tables" element={<PosTable />} />
-            <Route path="orders" element={<PosOrders />} />
-            <Route path="settings" element={<PosSettings />} />
-            <Route path="open-entries" element={<PosOpenEntries />} />
-          </Route>
-          <Route
-            path="pos/order"
-            element={
-              <Suspense fallback={<PosRouteFallback />}>
-                <CaptainRouteGuard>
-                  <CaptainTables />
-                </CaptainRouteGuard>
-              </Suspense>
-            }
-          />
-          <Route
-            path="pos/order/table/:table"
-            element={
-              <Suspense fallback={<PosRouteFallback />}>
-                <CaptainRouteGuard>
-                  <CaptainOrder />
-                </CaptainRouteGuard>
-              </Suspense>
-            }
-          />
         </Route>
       </Route>
+
+      {/*
+        Phase 2 (PLAN.md tracks/sa-app-consolidation §7 Phase 2): the
+        `/ury/pos/*` subtree is a SIBLING of the `SetupGuard` route above,
+        not nested inside it. Per the Opus review (§7.5 point 2), SetupGuard
+        sits above RoleGuard in the tree and falls back to redirecting into
+        the setup wizard on ANY exception from
+        `setup_organization.get_wizard_status` — including a cashier session
+        that lacks permission on that manager-oriented endpoint. Composing
+        pos/'s own guards *underneath* SetupGuard/RoleGuard would still let
+        SetupGuard intercept and redirect a cashier before pos/'s guards
+        ever ran. So this subtree is carved out to bypass
+        SetupGuard/RoleGuard/frontend's AuthGuard entirely and is instead
+        gated by pos/'s own POS-Profile-aware `AuthGuard` +
+        `POSOpeningProvider` (mounted inside `PosLayout`, see
+        pages/Pos/PosLayout.tsx) — cashier/waiter-role-driven, not
+        'URY Manager'-driven. Every other route above keeps the original
+        SetupGuard -> RoleGuard -> AuthGuard chain unchanged.
+      */}
+      <Route
+        path="pos"
+        element={
+          <Suspense fallback={<PosRouteFallback />}>
+            <PosLayout />
+          </Suspense>
+        }
+      >
+        <Route index element={<Navigate to="dashboard" replace />} />
+        <Route path="dashboard" element={<PosDashboard />} />
+        <Route path="pos" element={<PosPOS />} />
+        <Route path="tables" element={<PosTable />} />
+        <Route path="orders" element={<PosOrders />} />
+        <Route path="settings" element={<PosSettings />} />
+        <Route path="open-entries" element={<PosOpenEntries />} />
+      </Route>
+      <Route
+        path="pos/order"
+        element={
+          <Suspense fallback={<PosRouteFallback />}>
+            <CaptainRouteGuard>
+              <CaptainTables />
+            </CaptainRouteGuard>
+          </Suspense>
+        }
+      />
+      <Route
+        path="pos/order/table/:table"
+        element={
+          <Suspense fallback={<PosRouteFallback />}>
+            <CaptainRouteGuard>
+              <CaptainOrder />
+            </CaptainRouteGuard>
+          </Suspense>
+        }
+      />
 
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
