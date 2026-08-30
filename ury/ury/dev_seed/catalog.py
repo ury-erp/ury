@@ -188,6 +188,48 @@ def _ensure_items():
 	return created
 
 
+def _ensure_item_prices():
+	"""Create an ``Item Price`` row against "Standard Selling" for every
+	MENU_ITEMS item so real-order price lookups (and ``kot_seed.py``'s own
+	price lookup) find a deterministic rate instead of falling through to
+	``Item.standard_rate``.
+
+	Previously this module created ``Item.standard_rate`` but no ``Item
+	Price`` rows at all, so a naive ``Price List {selling: 1}`` lookup could
+	non-deterministically resolve to an unrelated selling price list (e.g.
+	an aggregator list such as "Direct") rather than "Standard Selling" --
+	confirmed live on the bench. ``kot_seed.py`` worked around this locally
+	by pinning to "Standard Selling" with an ``Item.standard_rate``
+	fallback; this creates the missing rows at the source instead.
+	"""
+	price_list = "Standard Selling"
+	if not frappe.db.exists("Price List", price_list):
+		print(f"Skipped Item Price seed: Price List '{price_list}' not found")
+		return []
+
+	created = []
+	for item_name, _item_group, rate in MENU_ITEMS:
+		if not frappe.db.exists("Item", item_name):
+			continue
+		if frappe.db.exists(
+			"Item Price", {"item_code": item_name, "price_list": price_list}
+		):
+			continue
+		doc = frappe.get_doc(
+			{
+				"doctype": "Item Price",
+				"item_code": item_name,
+				"price_list": price_list,
+				"price_list_rate": rate,
+				"selling": 1,
+			}
+		)
+		doc.insert(ignore_permissions=True)
+		created.append(doc.name)
+		print(f"Created Item Price for {item_name}: {rate}")
+	return created
+
+
 def _ensure_restaurant_and_room(branch_name, company_name):
 	"""URY Table requires a URY Restaurant and a URY Room, both linked to
 	the Branch (see business_setup.py, step 2-3). Reuse existing ones for
@@ -286,6 +328,7 @@ def seed():
 	_ensure_uom()
 	item_groups = _ensure_item_groups()
 	items = _ensure_items()
+	item_prices = _ensure_item_prices()
 	tables = _ensure_tables(branch_name, company_name)
 	customers = _ensure_customers()
 
@@ -296,6 +339,7 @@ def seed():
 		"company": company_name,
 		"item_groups_created": len(item_groups),
 		"items_created": len(items),
+		"item_prices_created": len(item_prices),
 		"tables_created": len(tables),
 		"customers_created": len(customers),
 	}

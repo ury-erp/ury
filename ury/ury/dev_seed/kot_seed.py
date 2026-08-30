@@ -201,13 +201,12 @@ def _get_mode_of_payment():
 
 
 def _get_item_rate(item_code, price_list):
-	"""`catalog.py` seeds `Item.standard_rate` for every MENU_ITEMS row but
-	never creates an `Item Price` row (confirmed: `rg "Item Price" catalog.py`
-	has no hits) -- so an `Item Price` lookup at any price list comes back
-	empty for these items on a bench that has only run `catalog.py`, not
-	some other seed script. Prefer a real `Item Price` row if one exists
-	(so this stays correct on a bench that *has* priced these items, e.g.
-	via the POS UI), otherwise fall back to `Item.standard_rate`.
+	"""`catalog.py` now creates an `Item Price` row against "Standard
+	Selling" for every MENU_ITEMS item (see `catalog.py::_ensure_item_prices`),
+	so this should normally resolve via the `Item Price` lookup below.
+	Kept as a defensive fallback to `Item.standard_rate` for a bench that
+	ran an older `catalog.py` (pre-`_ensure_item_prices`) or has items
+	seeded by some other script without prices.
 	"""
 	rate = frappe.db.get_value("Item Price", {"item_code": item_code, "price_list": price_list}, "price_list_rate")
 	if rate:
