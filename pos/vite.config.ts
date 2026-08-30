@@ -9,10 +9,6 @@ const __dirname = dirname(__filename)
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
-  test: {
-    environment: 'jsdom',
-    setupFiles: './src/test/setup.ts',
-  },
   resolve: {
     alias: {
       "@": resolve(__dirname, "./src"),
@@ -22,12 +18,6 @@ export default defineConfig({
   server: {
     fs: {
       allow: ['..'],
-    },
-    proxy: {
-      '/api': { target: 'http://ury.localhost:8002', changeOrigin: true },
-      '/app': { target: 'http://ury.localhost:8002', changeOrigin: true },
-      '/assets': { target: 'http://ury.localhost:8002', changeOrigin: true },
-      '/files': { target: 'http://ury.localhost:8002', changeOrigin: true },
     },
   },
   build: {
