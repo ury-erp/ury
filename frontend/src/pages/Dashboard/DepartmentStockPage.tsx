@@ -11,6 +11,8 @@ import {
   KeyValueRow,
   KpiItemProps,
   KpiStrip,
+  Page,
+  Section,
   Select,
   Spinner,
   numericCellClass,
@@ -698,8 +700,8 @@ const DepartmentStockContent: React.FC = () => {
   ];
 
   return (
-    <div className="space-y-6">
-      <div className="-mx-6 -mt-6 border-b border-border px-6 pb-4 pt-6">
+    <Page>
+      <div className="-mx-page-x -mt-page-top border-b border-border px-page-x pb-4 pt-page-top">
         <h1 className="text-xl font-semibold text-foreground">Department Stock &amp; Issue Authorizations</h1>
         <p className="mt-1 text-sm text-text-tertiary">
           Read-only view of authorized issue quantities, remaining entitlement, and related stock movements
@@ -750,11 +752,15 @@ const DepartmentStockContent: React.FC = () => {
       </div>
 
       {!department ? (
-        <Card className="p-10 text-center text-sm text-text-tertiary">Select a department to view its data.</Card>
+        <Section>
+          <Card className="p-10 text-center text-sm text-text-tertiary">Select a department to view its data.</Card>
+        </Section>
       ) : error ? (
-        <Card className="border-destructive-tint-border bg-destructive-tint p-6 text-sm text-destructive">{error}</Card>
+        <Section>
+          <Card className="border-destructive-tint-border bg-destructive-tint p-6 text-sm text-destructive">{error}</Card>
+        </Section>
       ) : (
-        <>
+        <Section>
           <KpiStrip items={kpis} />
 
           {actionError && (
@@ -822,7 +828,7 @@ const DepartmentStockContent: React.FC = () => {
               onRowClick={setSelectedMovement}
             />
           </section>
-        </>
+        </Section>
       )}
 
       <Drawer
@@ -973,7 +979,7 @@ const DepartmentStockContent: React.FC = () => {
           </>
         )}
       </Drawer>
-    </div>
+    </Page>
   );
 };
 

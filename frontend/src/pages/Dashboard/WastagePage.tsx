@@ -11,6 +11,8 @@ import {
   KeyValueRow,
   KpiItemProps,
   KpiStrip,
+  Page,
+  Section,
   Select,
   Spinner,
   numericCellClass,
@@ -316,8 +318,8 @@ const WastageContent: React.FC = () => {
   ];
 
   return (
-    <div className="space-y-6">
-      <div className="-mx-6 -mt-6 border-b border-border px-6 pb-4 pt-6">
+    <Page>
+      <div className="-mx-page-x -mt-page-top border-b border-border px-page-x pb-4 pt-page-top">
         <h1 className="text-xl font-semibold text-foreground">Wastage</h1>
         <p className="mt-1 text-sm text-text-tertiary">
           Read-only view of captured wastage entries and their approval status for a branch and date range.
@@ -367,9 +369,11 @@ const WastageContent: React.FC = () => {
       </div>
 
       {!activeBranchId || activeBranchId === 'all' ? (
-        <Card className="p-10 text-center text-sm text-text-tertiary">Select a branch to view wastage data.</Card>
+        <Section>
+          <Card className="p-10 text-center text-sm text-text-tertiary">Select a branch to view wastage data.</Card>
+        </Section>
       ) : (
-        <>
+        <Section>
           <KpiStrip items={kpis} />
 
           {actionError && <Card className="border-destructive-tint-border bg-destructive-tint p-4 text-sm text-destructive">{actionError}</Card>}
@@ -385,7 +389,7 @@ const WastageContent: React.FC = () => {
               onRowClick={openDrawer}
             />
           )}
-        </>
+        </Section>
       )}
 
       <Drawer
@@ -440,7 +444,7 @@ const WastageContent: React.FC = () => {
           </>
         )}
       </Drawer>
-    </div>
+    </Page>
   );
 };
 
