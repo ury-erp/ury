@@ -533,7 +533,15 @@ export default function Orders() {
                 columns={orderColumns}
                 rows={orders}
                 onRowClick={handleOrderClick}
-                rowTone={(order) => (getStatusTone(order.status) === 'destructive' ? 'danger' : undefined)}
+                // Precedence: a returned/voided order still reads as `danger` even
+                // while selected -- the error state matters more than the cursor.
+                rowTone={(order) =>
+                  getStatusTone(order.status) === 'destructive'
+                    ? 'danger'
+                    : selectedOrder?.name === order.name
+                      ? 'selected'
+                      : undefined
+                }
                 emptyMessage={t('orders.no_orders_found')}
                 className="bg-card"
               />
