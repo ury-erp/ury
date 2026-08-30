@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
-import { KpiStrip, DataTable, type DataTableColumn, Input, Button } from '@ury/ui';
+import { KpiStrip, DataTable, type DataTableColumn, Input, Button, Page, Section } from '@ury/ui';
 import { Search } from 'lucide-react';
 import { useBranchContext } from '../../context/BranchContext';
 import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
@@ -87,7 +87,7 @@ export function EmployeeItemWiseSales() {
   }, [fetchData]);
 
   return (
-    <div className="space-y-6">
+    <Page>
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-semibold">Employee Item Wise Sales</h1>
@@ -96,67 +96,81 @@ export function EmployeeItemWiseSales() {
         <DateRangeFilter value={range} onChange={setRange} />
       </div>
 
-      <div className="relative max-w-sm">
-        <div className="flex items-center border border-input rounded-md px-3 py-2 gap-2">
-          <Search className="w-4 h-4 text-muted-foreground shrink-0" />
-                    <Input
-            type="text"
-            placeholder="Search employee by name..."
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setSelectedEmployee(null);
-              setData(null);
-            }}
-            variant="default"
-            size="default"
-            className="border-0 shadow-none px-0"
-          />
-        </div>
-        {suggestions.length > 0 && !selectedEmployee && (
-          <div className="absolute z-10 mt-1 w-full bg-card border border-border rounded-md shadow-lg max-h-60 overflow-y-auto">
-            {suggestions.map((s) => (
-                            <Button
-                key={s.name}
-                onClick={() => {
-                  setSelectedEmployee(s.name);
-                  setQuery(s.full_name);
-                  setSuggestions([]);
-                }}
-                variant="ghost"
-                size="default"
-                className="w-full justify-start px-3 py-2 text-sm"
-              >
-                {s.full_name}
-              </Button>
-            ))}
+      <Section>
+        <div className="relative max-w-sm">
+          <div className="flex items-center border border-input rounded-md px-3 py-2 gap-2">
+            <Search className="w-4 h-4 text-muted-foreground shrink-0" />
+                      <Input
+              type="text"
+              placeholder="Search employee by name..."
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setSelectedEmployee(null);
+                setData(null);
+              }}
+              variant="default"
+              size="default"
+              className="border-0 shadow-none px-0"
+            />
           </div>
-        )}
-      </div>
+          {suggestions.length > 0 && !selectedEmployee && (
+            <div className="absolute z-10 mt-1 w-full bg-card border border-border rounded-md shadow-lg max-h-60 overflow-y-auto">
+              {suggestions.map((s) => (
+                              <Button
+                  key={s.name}
+                  onClick={() => {
+                    setSelectedEmployee(s.name);
+                    setQuery(s.full_name);
+                    setSuggestions([]);
+                  }}
+                  variant="ghost"
+                  size="default"
+                  className="w-full justify-start px-3 py-2 text-sm"
+                >
+                  {s.full_name}
+                </Button>
+              ))}
+            </div>
+          )}
+        </div>
+      </Section>
 
       {error && (
-        <div className="rounded-md border border-destructive-tint-border bg-destructive-tint px-4 py-3 text-sm text-destructive">
-          {error}
-        </div>
+        <Section>
+          <div className="rounded-md border border-destructive-tint-border bg-destructive-tint px-4 py-3 text-sm text-destructive">
+            {error}
+          </div>
+        </Section>
       )}
 
       {!selectedEmployee && !error && (
-        <div className="text-sm text-muted-foreground">Search and select an employee to view their item breakdown.</div>
+        <Section>
+          <div className="text-sm text-muted-foreground">Search and select an employee to view their item breakdown.</div>
+        </Section>
       )}
 
-      {isLoading && <div className="text-sm text-muted-foreground">Loading...</div>}
+      {isLoading && (
+        <Section>
+          <div className="text-sm text-muted-foreground">Loading...</div>
+        </Section>
+      )}
 
       {data && !isLoading && (
         <>
-          <KpiStrip
-            items={[
-              { label: 'Total Qty', value: data.summary.total_qty },
-              { label: 'Total Amount', value: formatCurrency(data.summary.total_amount) },
-            ]}
-          />
-          <DataTable columns={columns} rows={data.items} isLoading={isLoading} />
+          <Section>
+            <KpiStrip
+              items={[
+                { label: 'Total Qty', value: data.summary.total_qty },
+                { label: 'Total Amount', value: formatCurrency(data.summary.total_amount) },
+              ]}
+            />
+          </Section>
+          <Section>
+            <DataTable columns={columns} rows={data.items} isLoading={isLoading} />
+          </Section>
         </>
       )}
-    </div>
+    </Page>
   );
 }
