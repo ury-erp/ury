@@ -186,6 +186,38 @@ export default {
         'badge-min': 'var(--badge-min-width)',
         'dialog-max-w': 'var(--dialog-max-width)',
         'dialog-max-h': 'var(--dialog-max-height)',
+        // Density-discipline scale, ported from `ury-pos.html` (the tighter,
+        // tablet-constrained mockup — standardised on deliberately over
+        // `ury-app.html`, whose numbers differ slightly; see
+        // DENSITY_PLAN.md §1 for the reasoning). One named key per rhythm
+        // tier so call sites stop reaching for a single ad-hoc `space-y-6`/
+        // `p-3`/`p-4` for every gap, which is the density problem this scale
+        // exists to fix. Purely additive — no existing key is touched.
+        section: '24px', // `.sec` margin-top: gap between stacked sections
+        sect: '9px', // `.sect` margin-bottom: section header -> content
+        'stats-mb': '20px', // `.stats` margin-bottom
+        'stats-pb': '16px', // `.stats` padding-bottom
+        'grid-gap': '14px', // `.grid`/`.gridN` gap
+        'page-x': '22px', // `.page` left/right padding
+        'page-top': '20px', // `.page` top padding
+        'page-bottom': '34px', // `.page` bottom padding (POS base value;
+        // ury-app.html's dashboard uses 90px to reserve room below the fold
+        // for something this app doesn't have — pages needing that clearance
+        // should override pb-* locally rather than inflating the shared base)
+        //
+        // `.panel.pad` (14px 16px) is two-axis and a single Tailwind spacing
+        // key can only express one number, so it's split into a pair rather
+        // than one `panel` key: `panelX` (16px, left/right) and `panelY`
+        // (14px, top/bottom). Consumed together as `px-panelX py-panelY` by
+        // <Panel pad> in panel.tsx. A pair was chosen over a small plugin
+        // utility (e.g. a `.panel-pad` custom utility class) because it stays
+        // inside the existing `theme.extend.spacing` mechanism every other
+        // token here uses — no new plugin, no new class name vocabulary to
+        // learn, and `px-panelX`/`py-panelY` compose normally with
+        // Tailwind's existing arbitrary overrides if a call site ever needs
+        // one axis but not the other.
+        panelX: '16px',
+        panelY: '14px',
       },
     },
   },
