@@ -116,11 +116,14 @@ export const DayClosePage: React.FC = () => {
     }
     (async () => {
       try {
-        const res = await call<any>('frappe.client.get_value', {
-          doctype: 'Branch',
-          filters: branch,
-          fieldname: 'company',
-        });
+        const res = await call<{ message?: { company?: string }; company?: string }>(
+          'frappe.client.get_value',
+          {
+            doctype: 'Branch',
+            filters: branch,
+            fieldname: 'company',
+          }
+        );
         const value = res?.message?.company ?? res?.company ?? '';
         if (!cancelled) setCompany(value || '');
       } catch {
@@ -154,8 +157,9 @@ export const DayClosePage: React.FC = () => {
       setPlanVsActual(planVsActualResult);
       const hasRows = (planVsActualResult.rows?.length || 0) > 0;
       setState(hasRows || pnlResult?.exists ? 'populated' : 'empty');
-    } catch (err: any) {
-      setErrorMessage(err?.message || 'Failed to load day-close data');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to load day-close data';
+      setErrorMessage(message);
       setState('error');
     }
   };

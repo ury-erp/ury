@@ -149,7 +149,7 @@ export const RequirementsPage: React.FC = () => {
             production_unit: item.production_unit,
           })),
         );
-      } catch (err) {
+      } catch {
         if (!cancelled) {
           setError('Unable to load Requirements for this branch and date.');
         }
