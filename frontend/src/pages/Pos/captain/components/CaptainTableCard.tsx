@@ -55,12 +55,12 @@ const CaptainTableCard = ({
   const elapsed = isOccupied ? elapsedLabel(table.latest_invoice_time) : null;
 
   const colorClasses = isBilled
-    ? 'border-slate-400 bg-slate-100 text-slate-900'
+    ? 'border-border bg-card text-foreground'
     : ownership === 'mine'
-      ? 'border-sky-400 bg-sky-50 text-sky-900'
+      ? 'border-primary bg-primary-tint text-primary'
       : ownership === 'free'
-        ? 'border-emerald-300 bg-emerald-50 text-emerald-900'
-        : 'border-amber-400 bg-warning-tint text-warning';
+        ? 'border-dashed border-hair bg-muted text-muted-foreground'
+        : 'border-warning-tint-border bg-warning-tint text-warning';
 
   const statusLabel = isBilled
     ? 'Billed'
