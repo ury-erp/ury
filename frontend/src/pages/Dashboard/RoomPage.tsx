@@ -178,7 +178,7 @@ export const RoomPage: React.FC = () => {
                 <tr key={room.name} className="hover:bg-muted transition-colors">
                   <td className="px-[14px] py-2 text-[12.5px] font-semibold text-foreground">{room.name}</td>
                   <td className="px-[14px] py-2 text-[12.5px]">
-                    <span className="inline-flex items-center gap-[5px] text-[11px] h-[19px] px-[7px] rounded-[5px] text-primary bg-primary/10">
+                    <span className="inline-flex items-center gap-[5px] text-[11px] h-[19px] px-[7px] rounded-[5px] text-primary bg-primary-tint">
                       <Layers className="w-3 h-3" />
                       {room.room_type || 'General'}
                     </span>

@@ -335,7 +335,7 @@ export const ReportSettingsPage: React.FC = () => {
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-6 rounded-xl border border-border shadow-xs">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-semibold shrink-0">
+            <div className="w-12 h-12 rounded-xl bg-primary-tint text-primary flex items-center justify-center font-semibold shrink-0">
               <FileSpreadsheet className="w-6 h-6" />
             </div>
             <div>

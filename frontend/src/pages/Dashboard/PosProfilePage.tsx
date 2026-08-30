@@ -355,7 +355,7 @@ export const PosProfilePage: React.FC = () => {
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
-              activeTab === tab.id ? 'bg-primary/10 text-primary font-semibold' : 'text-muted-foreground hover:bg-muted hover:text-muted-foreground'
+              activeTab === tab.id ? 'bg-primary-tint text-primary font-semibold' : 'text-muted-foreground hover:bg-muted hover:text-muted-foreground'
             }`}
           >
             {tab.icon}
@@ -395,7 +395,7 @@ export const PosProfilePage: React.FC = () => {
                 </thead>
                 <tbody className="divide-y divide-hair">
                   {productionUnits.map((unit) => (
-                    <tr key={unit.name} className="hover:bg-primary/10 transition-colors">
+                    <tr key={unit.name} className="hover:bg-muted transition-colors">
                       <td className="px-6 py-4 font-semibold text-foreground">{unit.production_unit_name || unit.name}</td>
                       <td className="px-6 py-4 text-text-tertiary">{unit.branch || '-'}</td>
                     </tr>
@@ -416,7 +416,7 @@ export const PosProfilePage: React.FC = () => {
             profiles.map((p) => (
               <Card
                 key={p.name}
-                className="p-6 rounded-lg border border-border bg-card shadow-xs space-y-4 cursor-pointer hover:border-primary/30 transition-all"
+                className="p-6 rounded-lg border border-border bg-card shadow-xs space-y-4 cursor-pointer hover:border-primary-tint-border transition-all"
                 onClick={() => handleProfileSelect(p)}
               >
                 <div className="flex items-center justify-between border-b border-border pb-4">
@@ -431,7 +431,7 @@ export const PosProfilePage: React.FC = () => {
                     <Badge variant={!p.disabled ? "success" : "outline"} size="sm">
                       {!p.disabled ? 'Active' : 'Inactive'}
                     </Badge>
-                    <Button variant="outline" size="sm" className="text-primary border-primary/20" onClick={(e) => { e.stopPropagation(); handleProfileSelect(p); }}>
+                    <Button variant="outline" size="sm" className="text-primary border-primary-tint-border" onClick={(e) => { e.stopPropagation(); handleProfileSelect(p); }}>
                       Edit
                     </Button>
                   </div>
@@ -442,37 +442,37 @@ export const PosProfilePage: React.FC = () => {
                     <div>
                       <h4 className="text-[11px] font-bold tracking-wide text-text-tertiary mb-2">Operations</h4>
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                        <div className="p-4 rounded-lg bg-primary-tint border border-primary/10 flex flex-col justify-between min-h-[72px]">
+                        <div className="p-4 rounded-lg bg-primary-tint border border-primary-tint-border flex flex-col justify-between min-h-[72px]">
                           <span className="font-semibold text-muted-foreground block">Item Discounts</span>
                           <span className="text-primary font-bold text-sm mt-1 block">
                             {!!p.custom_enable_discount ? 'Enabled' : 'Disabled'}
                           </span>
                         </div>
-                        <div className="p-4 rounded-lg bg-primary-tint border border-primary/10 flex flex-col justify-between min-h-[72px]">
+                        <div className="p-4 rounded-lg bg-primary-tint border border-primary-tint-border flex flex-col justify-between min-h-[72px]">
                           <span className="font-semibold text-muted-foreground block">KOT Reprint Option</span>
                           <span className="text-primary font-bold text-sm mt-1 block">
                             {!!p.custom_enable_kot_reprint ? 'Enabled' : 'Disabled'}
                           </span>
                         </div>
-                        <div className="p-4 rounded-lg bg-primary-tint border border-primary/10 flex flex-col justify-between min-h-[72px]">
+                        <div className="p-4 rounded-lg bg-primary-tint border border-primary-tint-border flex flex-col justify-between min-h-[72px]">
                           <span className="font-semibold text-muted-foreground block">Multi-Cashier Support</span>
                           <span className="text-primary font-bold text-sm mt-1 block">
                             {p.custom_multiple_cashier_configuration ? 'Configured' : 'Standard'}
                           </span>
                         </div>
-                        <div className="p-4 rounded-lg bg-primary-tint border border-primary/10 flex flex-col justify-between min-h-[72px]">
+                        <div className="p-4 rounded-lg bg-primary-tint border border-primary-tint-border flex flex-col justify-between min-h-[72px]">
                           <span className="font-semibold text-muted-foreground block">Order Type Edit</span>
                           <span className="text-primary font-bold text-sm mt-1 block">
                             {!!p.custom_edit_order_type ? 'Allowed' : 'Locked'}
                           </span>
                         </div>
-                        <div className="p-4 rounded-lg bg-primary-tint border border-primary/10 flex flex-col justify-between min-h-[72px]">
+                        <div className="p-4 rounded-lg bg-primary-tint border border-primary-tint-border flex flex-col justify-between min-h-[72px]">
                           <span className="font-semibold text-muted-foreground block">Reset Order Number Daily</span>
                           <span className="text-primary font-bold text-sm mt-1 block">
                             {!!p.custom_reset_order_number_daily ? 'Enabled' : 'Disabled'}
                           </span>
                         </div>
-                        <div className="p-4 rounded-lg bg-primary-tint border border-primary/10 flex flex-col justify-between min-h-[72px]">
+                        <div className="p-4 rounded-lg bg-primary-tint border border-primary-tint-border flex flex-col justify-between min-h-[72px]">
                           <span className="font-semibold text-muted-foreground block">Daily POS Closing</span>
                           <span className="text-primary font-bold text-sm mt-1 block">
                             {!!p.custom_daily_pos_close ? 'Required' : 'Not Required'}
@@ -523,7 +523,7 @@ export const PosProfilePage: React.FC = () => {
                   <div className="p-4 rounded-lg bg-muted border border-border text-xs space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-foreground">QZ Tray Hardware Printing</span>
-                      <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary">
+                      <Badge variant="outline" className="border-primary-tint-border bg-primary-tint text-primary">
                         Direct Thermal Ready
                       </Badge>
                     </div>

@@ -247,7 +247,7 @@ export const UserPage: React.FC = () => {
                     {user.email}
                   </td>
                   <td className="px-[14px] py-2 text-[12.5px]">
-                    <span className="inline-flex items-center gap-[5px] text-[11px] h-[19px] px-[7px] rounded-[5px] text-primary bg-primary/10">
+                    <span className="inline-flex items-center gap-[5px] text-[11px] h-[19px] px-[7px] rounded-[5px] text-primary bg-primary-tint">
                       <ShieldCheck className="w-3 h-3" />
                       {getDisplayRole(user)}
                     </span>

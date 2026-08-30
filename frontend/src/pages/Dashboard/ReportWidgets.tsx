@@ -57,14 +57,14 @@ export const ReportWidgets: React.FC<ReportWidgetsProps> = ({ recentTransactions
                     </tr>
                   ) : (
                     recentTransactions.map((tx) => (
-                      <tr key={tx.name} className="hover:bg-primary/10 transition-colors">
+                      <tr key={tx.name} className="hover:bg-muted transition-colors">
                         <td className="px-5 py-3.5 font-bold text-primary">{tx.name}</td>
                         <td className="px-5 py-3.5 text-foreground font-semibold">{tx.customer || 'Walk-in Customer'}</td>
                         <td className="px-5 py-3.5 text-muted-foreground">{tx.restaurant_table || 'Counter'}</td>
                         <td className="px-5 py-3.5">
                           <Badge
                             variant="outline"
-                            className="border-primary/20 bg-primary/10 text-primary font-semibold"
+                            className="border-primary-tint-border bg-primary-tint text-primary font-semibold"
                           >
                             {tx.order_type || 'Dine In'}
                           </Badge>
