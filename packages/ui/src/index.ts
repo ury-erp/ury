@@ -21,3 +21,4 @@ export * from './components/checkbox';
 export * from './components/tabs';
 export * from './components/alert';
 export * from './components/attention-feed';
+export * from './components/key-value-row';

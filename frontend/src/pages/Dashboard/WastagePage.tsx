@@ -5,7 +5,10 @@ import {
   Card,
   DataTable,
   DataTableColumn,
+  Drawer,
+  DrawerSectionLabel,
   Input,
+  KeyValueRow,
   KpiItemProps,
   KpiStrip,
   Select,
@@ -110,9 +113,11 @@ const WastageContent: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [pendingAction, setPendingAction] = useState<{ name: string; type: 'approve' | 'reject' } | null>(null);
   const [userRoles, setUserRoles] = useState<string[]>([]);
   const [refreshToken, setRefreshToken] = useState(0);
+  const [selectedRow, setSelectedRow] = useState<WastageRow | null>(null);
+  const [drawerAction, setDrawerAction] = useState<'approve' | 'reject' | null>(null);
+  const [drawerActionBusy, setDrawerActionBusy] = useState(false);
 
   const canApprove = userRoles.some((role) => APPROVE_ROLES.includes(role));
 
@@ -187,32 +192,42 @@ const WastageContent: React.FC = () => {
   }, [activeBranchId, department, fromDate, toDate, refreshToken]);
 
   const refresh = () => {
-    setActionError(null);
-    setPendingAction(null);
     setRefreshToken((token) => token + 1);
   };
 
-  const handleApprove = async (wastageName: string) => {
+  const closeDrawer = () => {
+    setSelectedRow(null);
+    setDrawerAction(null);
+    setDrawerActionBusy(false);
+  };
+
+  const openDrawer = (row: WastageRow) => {
+    setDrawerAction(null);
+    setSelectedRow(row);
+  };
+
+  const handleDrawerConfirm = async () => {
+    if (!selectedRow || !drawerAction) return;
     setActionError(null);
+    setDrawerActionBusy(true);
     try {
-      await departmentStockService.approveWastage(wastageName);
+      if (drawerAction === 'approve') {
+        await departmentStockService.approveWastage(selectedRow.name);
+      } else {
+        await departmentStockService.rejectWastage(selectedRow.name);
+      }
+      closeDrawer();
       refresh();
     } catch {
-      setActionError('Unable to approve this wastage record.');
-      setPendingAction(null);
+      setActionError(
+        drawerAction === 'approve' ? 'Unable to approve this wastage record.' : 'Unable to reject this wastage record.'
+      );
+      setDrawerActionBusy(false);
     }
   };
 
-  const handleReject = async (wastageName: string) => {
-    setActionError(null);
-    try {
-      await departmentStockService.rejectWastage(wastageName);
-      refresh();
-    } catch {
-      setActionError('Unable to reject this wastage record.');
-      setPendingAction(null);
-    }
-  };
+  const departmentName = (dept: string) =>
+    departmentOptions.find((d) => d.name === dept)?.department_name || dept;
 
   /**
    * KPI figures computed strictly from `listWastage()`'s real rows. The
@@ -275,7 +290,7 @@ const WastageContent: React.FC = () => {
     {
       key: 'department',
       header: 'Department',
-      render: (row) => departmentOptions.find((d) => d.name === row.department)?.department_name || row.department,
+      render: (row) => departmentName(row.department),
     },
     {
       key: 'wasted_qty',
@@ -298,54 +313,6 @@ const WastageContent: React.FC = () => {
         </span>
       ),
     },
-    ...(canApprove
-      ? [
-          {
-            key: 'actions',
-            header: 'Actions',
-            render: (row: WastageRow) =>
-              row.status === 'Draft' ? (
-                pendingAction?.name === row.name ? (
-                  <div className="flex items-center gap-2 text-xs">
-                    <span className="text-gray-600">
-                      {pendingAction.type === 'approve' ? 'Approve this entry?' : 'Reject this entry?'}
-                    </span>
-                    <Button
-                      type="button"
-                      size="xs"
-                      onClick={() =>
-                        pendingAction.type === 'approve' ? handleApprove(row.name) : handleReject(row.name)
-                      }
-                    >
-                      Confirm
-                    </Button>
-                    <Button type="button" size="xs" variant="outline" onClick={() => setPendingAction(null)}>
-                      Cancel
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="flex gap-2">
-                    <Button
-                      type="button"
-                      size="xs"
-                      onClick={() => setPendingAction({ name: row.name, type: 'approve' })}
-                    >
-                      Approve
-                    </Button>
-                    <Button
-                      type="button"
-                      size="xs"
-                      variant="outline"
-                      onClick={() => setPendingAction({ name: row.name, type: 'reject' })}
-                    >
-                      Reject
-                    </Button>
-                  </div>
-                )
-              ) : null,
-          } as DataTableColumn<WastageRow>,
-        ]
-      : []),
   ];
 
   return (
@@ -415,10 +382,64 @@ const WastageContent: React.FC = () => {
               rows={wastageRows}
               isLoading={loading}
               emptyMessage="No wastage records found for this branch, department, and date range."
+              onRowClick={openDrawer}
             />
           )}
         </>
       )}
+
+      <Drawer
+        open={selectedRow !== null}
+        onClose={closeDrawer}
+        title={selectedRow ? selectedRow.component_item : 'Wastage entry'}
+        footer={
+          selectedRow && canApprove && selectedRow.status === 'Draft' ? (
+            drawerAction ? (
+              <>
+                <span className="mr-auto self-center text-xs text-gray-600">
+                  {drawerAction === 'approve' ? 'Approve this entry?' : 'Reject this entry?'}
+                </span>
+                <Button type="button" size="sm" variant="outline" onClick={() => setDrawerAction(null)} disabled={drawerActionBusy}>
+                  Cancel
+                </Button>
+                <Button type="button" size="sm" onClick={handleDrawerConfirm} disabled={drawerActionBusy}>
+                  Confirm
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button type="button" size="sm" variant="outline" onClick={() => setDrawerAction('reject')}>
+                  Reject
+                </Button>
+                <Button type="button" size="sm" onClick={() => setDrawerAction('approve')}>
+                  Approve
+                </Button>
+              </>
+            )
+          ) : undefined
+        }
+      >
+        {selectedRow && (
+          <>
+            <DrawerSectionLabel>Details</DrawerSectionLabel>
+            <KeyValueRow label="Item" value={selectedRow.component_item} />
+            <KeyValueRow label="Department" value={departmentName(selectedRow.department)} />
+            <KeyValueRow label="Wasted qty" value={formatQty(selectedRow.wasted_qty)} />
+            <KeyValueRow
+              label="Status"
+              value={<Badge variant={statusBadgeVariant(selectedRow.status)}>{selectedRow.status}</Badge>}
+            />
+            {selectedRow.branch !== undefined && <KeyValueRow label="Branch" value={selectedRow.branch} />}
+            {selectedRow.company !== undefined && <KeyValueRow label="Company" value={selectedRow.company} />}
+            {selectedRow.valuation_rate !== undefined && (
+              <KeyValueRow label="Valuation rate" value={`Rs. ${formatCurrency(selectedRow.valuation_rate)}`} />
+            )}
+            {selectedRow.valuation_amount !== undefined && (
+              <KeyValueRow label="Valuation amount" value={`Rs. ${formatCurrency(selectedRow.valuation_amount)}`} />
+            )}
+          </>
+        )}
+      </Drawer>
     </div>
   );
 };

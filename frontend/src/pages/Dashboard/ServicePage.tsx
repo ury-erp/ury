@@ -6,6 +6,9 @@ import {
   Card,
   DataTable,
   DataTableColumn,
+  Drawer,
+  DrawerSectionLabel,
+  KeyValueRow,
   KpiStrip,
   Spinner,
   numericCellClass,
@@ -88,6 +91,7 @@ export const ServicePage: React.FC = () => {
   const [needsAttention, setNeedsAttention] = useState<AttentionItemProps[]>([]);
   const [departmentRows, setDepartmentRows] = useState<DepartmentRow[]>([]);
   const [hasCostData, setHasCostData] = useState(false);
+  const [selectedDepartment, setSelectedDepartment] = useState<DepartmentRow | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -304,8 +308,31 @@ export const ServicePage: React.FC = () => {
           columns={departmentColumns}
           rows={departmentRows}
           emptyMessage="No department activity for today yet."
+          onRowClick={setSelectedDepartment}
         />
       </Card>
+
+      <Drawer
+        open={selectedDepartment !== null}
+        onClose={() => setSelectedDepartment(null)}
+        title={selectedDepartment?.department ?? ''}
+      >
+        {selectedDepartment && (
+          <>
+            <DrawerSectionLabel>Today</DrawerSectionLabel>
+            <KeyValueRow label="Net Sales" value={formatCurrency(selectedDepartment.netRevenue)} />
+            {selectedDepartment.postedCost !== undefined && (
+              <KeyValueRow label="Posted Cost" value={formatCurrency(selectedDepartment.postedCost)} />
+            )}
+            {selectedDepartment.postedGrossProfit !== undefined && (
+              <KeyValueRow
+                label="Posted Gross Profit"
+                value={formatCurrency(selectedDepartment.postedGrossProfit)}
+              />
+            )}
+          </>
+        )}
+      </Drawer>
     </div>
   );
 };
