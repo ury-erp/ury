@@ -21,6 +21,7 @@ import SalesPlanPage from './pages/Dashboard/SalesPlanPage';
 import RequirementsPage from './pages/Dashboard/RequirementsPage';
 import { ServicePage } from './pages/Dashboard/ServicePage';
 import { DepartmentStockPage } from './pages/Dashboard/DepartmentStockPage';
+import { StoreIssuePage } from './pages/Dashboard/StoreIssuePage';
 import { WastagePage } from './pages/Dashboard/WastagePage';
 import { DepartmentProfitabilityPage } from './pages/Dashboard/DepartmentProfitabilityPage';
 import { DayClosePage } from './pages/Dashboard/DayClosePage';
@@ -151,6 +152,7 @@ function App() {
           <Route path="requirements" element={<RequirementsPage />} />
           <Route path="service" element={<ServicePage />} />
           <Route path="department-stock" element={<DepartmentStockPage />} />
+          <Route path="store-issue" element={<StoreIssuePage />} />
           <Route path="wastage" element={<WastagePage />} />
           <Route
             path="department-profitability"
