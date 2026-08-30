@@ -9,7 +9,12 @@ export default {
   ],
   presets: [preset],
   theme: {
-    extend: {},
+    extend: {
+      fontFamily: {
+        display: ['"Inter Tight"', 'system-ui', 'sans-serif'],
+        mono: ['"IBM Plex Mono"', 'ui-monospace', 'monospace'],
+      },
+    },
   },
   plugins: [],
 } 

@@ -131,14 +131,14 @@ export function ProgressModal({
                 <div key={idx} className="flex items-center gap-4 py-3 border-b border-gray-100 last:border-0 min-h-12">
                   <div className="w-6 h-6 flex items-center justify-center shrink-0">
                     {isDone ? (
-                      <CheckCircle2 className="w-6 h-6 text-white fill-green-500" />
+                      <CheckCircle2 className="w-6 h-6 text-white fill-primary" />
                     ) : isActive ? (
                       <Loader2 className="w-6 h-6 text-primary animate-spin" />
                     ) : (
                       <Circle className="w-6 h-6 text-gray-200" />
                     )}
                   </div>
-                  <span className={`text-sm ${isActive ? 'font-medium text-gray-900' : isDone ? 'text-foreground' : 'text-gray-400'}`}>
+                  <span className={`text-sm ${isActive ? 'font-medium text-primary' : isDone ? 'text-foreground' : 'text-gray-400'}`}>
                     {step}
                   </span>
                 </div>

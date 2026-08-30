@@ -1,4 +1,4 @@
-import { useEffect, useState, lazy, Suspense } from 'react';
+import { useEffect, useRef, useState, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { call } from '@ury/core';
 import SetupPage from './pages/Setup/SetupPage';
@@ -12,6 +12,7 @@ import { PosProfilePage } from './pages/Dashboard/PosProfilePage';
 import { UserPage } from './pages/Dashboard/UserPage';
 import { BranchPage } from './pages/Dashboard/BranchPage';
 import { ReportSettingsPage } from './pages/Dashboard/ReportSettingsPage';
+import { AiAssistantSettingsPage } from './pages/Dashboard/AiAssistantSettingsPage';
 import { SelfOrderingProfilePage } from './pages/Dashboard/SelfOrderingProfilePage';
 import ProductionUnitPage from './pages/Dashboard/ProductionUnitPage';
 import ProductionDepartmentPage from './pages/Dashboard/ProductionDepartmentPage';
@@ -33,6 +34,12 @@ import { RoleGuard } from './components/RoleGuard';
 import { AuthGuard } from './components/AuthGuard';
 import { Landing } from './components/Landing';
 import { ReportsLayout } from './pages/Reports/ReportsLayout';
+import { ActiveReportProvider } from './components/chat/ActiveReportContext';
+import ChatWidget, {
+  ChatWidgetRefProvider,
+  AiEnabledProvider,
+  type ChatWidgetHandle,
+} from './components/chat/ChatWidget';
 import { ReportsHome } from './pages/Reports/ReportsHome';
 import { TodaysSales } from './pages/Reports/TodaysSales';
 import { DaywiseSales } from './pages/Reports/DaywiseSales';
@@ -149,7 +156,53 @@ function SetupGuard() {
   return <Outlet />;
 }
 
+function useAiSettings() {
+  // Fail-closed: no AI surface renders until the backend explicitly says
+  // {enabled: true}. Any fetch failure (network, permissions, etc.) leaves
+  // this false rather than defaulting open.
+  const [aiEnabled, setAiEnabled] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const { call } = await import('@ury/core');
+        const res = await call.get('ury.ury.api.ury_ai_settings.get_ai_settings');
+        const data = res?.message ?? res;
+        if (!cancelled && data?.enabled === true) {
+          setAiEnabled(true);
+        }
+      } catch (err) {
+        console.error('Error fetching AI settings:', err);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return aiEnabled;
+}
+
 function App() {
+  const chatRef = useRef<ChatWidgetHandle>(null);
+  const aiEnabled = useAiSettings();
+
+  return (
+    <ActiveReportProvider>
+      <AiEnabledProvider enabled={aiEnabled}>
+        <ChatWidgetRefProvider chatRef={chatRef}>
+          <AppRoutes />
+          {aiEnabled && <ChatWidget ref={chatRef} />}
+        </ChatWidgetRefProvider>
+      </AiEnabledProvider>
+    </ActiveReportProvider>
+  );
+}
+
+function AppRoutes() {
   return (
     <Routes>
       <Route element={<SetupGuard />}>
@@ -182,6 +235,7 @@ function App() {
           <Route path="user" element={<UserPage />} />
           <Route path="branch" element={<BranchPage />} />
           <Route path="report-settings" element={<ReportSettingsPage />} />
+          <Route path="ai-settings" element={<AiAssistantSettingsPage />} />
           <Route path="self-ordering-profile" element={<SelfOrderingProfilePage />} />
           <Route path="production-unit" element={<ProductionUnitPage />} />
           <Route path="production-department" element={<ProductionDepartmentPage />} />

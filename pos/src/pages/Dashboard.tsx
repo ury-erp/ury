@@ -20,6 +20,8 @@ import { useState, useEffect } from 'react';
 import { usePOSStore } from '../store/pos-store';
 import { formatCurrency } from '@ury/core';
 import { getOpenPosOpeningEntries, type OpenPosOpeningEntry } from '../lib/pos-closing-api';
+import InsightFeed from '../components/dashboard/InsightFeed';
+import AskBar from '../components/chat/AskBar';
 
 // Helper function to format relative time
 function getRelativeTime(creationDate: string): string {
@@ -382,14 +384,24 @@ export default function Dashboard() {
               {posProfile?.branch ? `${posProfile.branch} · ` : ''}Live floor status for the current shift
             </p>
           </div>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-xs font-medium text-gray-600 ring-1 ring-gray-200">
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-2 w-2 animate-ping rounded-full bg-success-500 opacity-60" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-success-600" />
+          <div className="flex items-center gap-3">
+            {/* Ask bar (PLAN.md item 6) — opens the shared ChatWidget pre-focused,
+                also reachable via the global ⌘K shortcut. Additive only: does not
+                replace or restructure anything else on this page. */}
+            <AskBar />
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-xs font-medium text-gray-600 ring-1 ring-gray-200">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-2 w-2 animate-ping rounded-full bg-success-500 opacity-60" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-success-600" />
+              </span>
+              Live
             </span>
-            Live
-          </span>
+          </div>
         </div>
+
+        {/* AI insight feed ("Act now") — surfaces HUF's generated insights
+            above the manual attention/stat rows below. */}
+        <InsightFeed branch={posProfile?.branch} />
 
         {/*
           Attention comes first and full-width. The old page buried this in the

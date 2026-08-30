@@ -103,6 +103,12 @@ export const KPIGrid: React.FC<KPIGridProps> = ({ summary, loading }) => {
         />
 
         <KPICard
+          title="Active Menu Items"
+          value={`${totalMenuItems} Items`}
+          loading={loading}
+        />
+
+        <KPICard
           title="Average Order Value"
           value={formatCurrency(aov)}
           loading={loading}
@@ -111,6 +117,12 @@ export const KPIGrid: React.FC<KPIGridProps> = ({ summary, loading }) => {
         <KPICard
           title="Pending Kitchen Orders"
           value={`${pendingOrders} KOTs`}
+          loading={loading}
+        />
+
+        <KPICard
+          title="Active Cashiers"
+          value={`${activeCashiers} Online`}
           loading={loading}
         />
       </div>

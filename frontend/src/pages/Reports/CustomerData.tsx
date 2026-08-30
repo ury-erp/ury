@@ -103,7 +103,7 @@ export function CustomerData() {
       </div>
 
       <div className="relative max-w-sm">
-        <div className="flex items-center border border-input rounded-md px-3 py-2 gap-2">
+        <div className="flex items-center border border-input rounded-md px-3.5 py-2 gap-2">
           <Search className="w-4 h-4 text-muted-foreground shrink-0" />
           <input
             type="text"
@@ -147,7 +147,7 @@ export function CustomerData() {
         <div className="text-sm text-muted-foreground">Search and select a customer to view their history.</div>
       )}
 
-      {isLoading && <div className="text-sm text-muted-foreground">Loading...</div>}
+      {isLoading && <div className="text-sm text-muted-foreground">Loading…</div>}
 
       {data && !isLoading && (
         <>

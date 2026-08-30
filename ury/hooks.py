@@ -173,6 +173,11 @@ before_uninstall = "ury.uninstall.uninstall"
 # 	"ToDo": "custom_app.overrides.CustomToDo"
 # }
 
+# HUF-optional: seeds/self-heals the "URY Dashboard Assistant" Agent record
+# on every migrate. Safe to define even when huf is not installed — the
+# function itself no-ops when "huf" isn't in the installed apps list.
+after_migrate = ["ury.ury.ai_tools.agent_seeding.after_migrate"]
+
 # Document Events
 # ---------------
 # Hook on document methods and events
@@ -208,7 +213,8 @@ doc_events = {
         },
     "URY Menu Course": {
 		"validate": "ury.ury.api.ury_menu_course_validation.validate_priority",
-	}    
+	},
+    "AI Provider": {"on_update": "ury.ury.ai_tools.agent_seeding.on_ai_provider_update"},
 }
 
 # Scheduled Tasks
@@ -325,6 +331,15 @@ extend_bootinfo = [
 # auth_hooks = [
 # 	"ury.auth.validate"
 # ]
+
+# HUF (AI assistant app) tool registration — read only if huf is installed
+# alongside this app. HUF's own `huf.ai.tool_registry.sync_app_tools`
+# (registered under HUF's `after_migrate`) reads this hook across every
+# installed app on `bench migrate` and syncs the listed tools into
+# `Agent Tool`/`Agent Tool Function` records. Safe to define even when huf is
+# not installed — an unused hook value is simply never read.
+# See tracks/sa-ai-reports-dashboard/HUF_API_NOTES.md for how this was confirmed.
+huf_tools = "ury.ury.ai_tools.ury_tools_registry.ALL_URY_TOOLS"
 
 fixtures = [
     {
