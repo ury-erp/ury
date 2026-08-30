@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
-import { KpiStrip, DataTable, type DataTableColumn, Button, Page, Section } from '@ury/ui';
-import { ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
+import { StatCard, DataTable, type DataTableColumn, Button } from '@ury/ui';
+import { Ban, IndianRupee, Users, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
 import { useBranchContext } from '../../context/BranchContext';
 import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
 import { toApiDate } from '../../lib/reportDate';
@@ -77,7 +77,7 @@ export function CancelledInvoices() {
       header: 'Amount',
       align: 'right',
       render: (r) => (
-        <span className={r.amount > threshold ? 'flex items-center gap-1 text-destructive font-semibold' : ''}>
+        <span className={r.amount > threshold ? 'flex items-center gap-1 text-red-600 font-semibold' : ''}>
           {r.amount > threshold && <AlertTriangle className="w-3.5 h-3.5" />}
           {formatCurrency(r.amount)}
         </span>
@@ -90,7 +90,7 @@ export function CancelledInvoices() {
   const pagination = data?.pagination;
 
   return (
-    <Page>
+    <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-semibold">Cancelled Invoices</h1>
@@ -102,51 +102,49 @@ export function CancelledInvoices() {
       </div>
 
       {error && (
-        <Section>
-          <div className="rounded-md border border-destructive-tint-border bg-destructive-tint px-4 py-3 text-sm text-destructive">
-            {error}
-          </div>
-        </Section>
+        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
       )}
 
       {data && (
-        <Section>
-          <KpiStrip
-            items={[
-              { label: 'Total Cancelled', value: data.summary.total_count },
-              { label: 'Total Amount', value: formatCurrency(data.summary.total_amount) },
-              { label: 'Unique Cancellers', value: data.summary.unique_cancellers },
-            ]}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <StatCard label="Total Cancelled" value={data.summary.total_count} icon={<Ban className="w-4 h-4" />} />
+          <StatCard
+            label="Total Amount"
+            value={formatCurrency(data.summary.total_amount)}
+            icon={<IndianRupee className="w-4 h-4" />}
           />
-        </Section>
+          <StatCard
+            label="Unique Cancellers"
+            value={data.summary.unique_cancellers}
+            icon={<Users className="w-4 h-4" />}
+          />
+        </div>
       )}
 
-      <Section>
-        <DataTable columns={columns} rows={data?.invoices ?? []} isLoading={isLoading} />
-      </Section>
+      <DataTable columns={columns} rows={data?.invoices ?? []} isLoading={isLoading} />
 
       {pagination && pagination.total_pages > 1 && (
-        <Section>
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">
-              Page {pagination.page} of {pagination.total_pages}
-            </span>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
-                <ChevronLeft className="w-4 h-4" /> Prev
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page >= pagination.total_pages}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                Next <ChevronRight className="w-4 h-4" />
-              </Button>
-            </div>
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-muted-foreground">
+            Page {pagination.page} of {pagination.total_pages}
+          </span>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+              <ChevronLeft className="w-4 h-4" /> Prev
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page >= pagination.total_pages}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              Next <ChevronRight className="w-4 h-4" />
+            </Button>
           </div>
-        </Section>
+        </div>
       )}
-    </Page>
+    </div>
   );
 }

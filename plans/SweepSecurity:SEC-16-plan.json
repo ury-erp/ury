@@ -1,0 +1,17 @@
+{
+  "subtasks": [
+    {
+      "objective": "Eliminate the legacy POS alert XSS sink by replacing Alert.js innerHTML interpolation of title, message, and buttonText with safe DOM construction using textContent/createElement, while preserving the existing modal structure and behavior.",
+      "acceptance": "urypos/src/stores/Alert.js no longer assigns untrusted alert values through innerHTML; title, message, and button text are rendered as text nodes/textContent; the documented invoiceData.js error callers that pass e?.title and err.message continue to display alerts without executing embedded markup or scripts; the legacy POS app builds or the changed files pass an equivalent syntax check.",
+      "scope": [
+        "urypos/src/stores/Alert.js",
+        "urypos/src/stores/invoiceData.js"
+      ],
+      "task_type": "impl",
+      "difficulty": 2,
+      "risk": 2,
+      "uncertainty": 1,
+      "priority": 100
+    }
+  ]
+}

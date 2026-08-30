@@ -148,6 +148,7 @@ export default {
       // wider ambient one) so surfaces read as lifted rather than smudged.
       // Deliberately low-alpha: elevation should be felt, not seen.
       boxShadow: {
+        xs: "0 1px 1px 0 hsl(var(--black) / 0.04)",
         sm: "0 1px 2px 0 hsl(var(--black) / 0.05)",
         DEFAULT:
           "0 1px 2px 0 hsl(var(--black) / 0.06), 0 1px 3px 0 hsl(var(--black) / 0.08)",

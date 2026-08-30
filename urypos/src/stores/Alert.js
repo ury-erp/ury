@@ -72,6 +72,7 @@ export const useAlert = defineStore("alert", {
         modalContent.appendChild(divider);
         modalContent.appendChild(messageParagraph);
         modalContent.appendChild(closeButton);
+
         modal.appendChild(modalContent);
 
         // Close the modal and remove the backdrop when the button is clicked

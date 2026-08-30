@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
-import { KpiStrip, DataTable, type DataTableColumn, Page, Section } from '@ury/ui';
+import { StatCard, DataTable, type DataTableColumn } from '@ury/ui';
+import { Users, IndianRupee, Receipt } from 'lucide-react';
 import { useBranchContext } from '../../context/BranchContext';
 import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
 import { BarChartCard } from '../../components/reports/charts/BarChartCard';
@@ -64,7 +65,7 @@ export function EmployeeSales() {
   const top10 = data?.employees.slice(0, 10) ?? [];
 
   return (
-    <Page>
+    <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-semibold">Employee Sales</h1>
@@ -76,42 +77,40 @@ export function EmployeeSales() {
       </div>
 
       {error && (
-        <Section>
-          <div className="rounded-md border border-destructive-tint-border bg-destructive-tint px-4 py-3 text-sm text-destructive">
-            {error}
-          </div>
-        </Section>
+        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
       )}
 
       {data && (
         <>
-          <Section>
-            <KpiStrip
-              items={[
-                { label: 'Staff', value: data.summary.total_employees },
-                { label: 'Total Invoices', value: data.summary.period_total_invoices },
-                { label: 'Total Sales', value: formatCurrency(data.summary.period_total_sales) },
-              ]}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <StatCard label="Staff" value={data.summary.total_employees} icon={<Users className="w-4 h-4" />} />
+            <StatCard
+              label="Total Invoices"
+              value={data.summary.period_total_invoices}
+              icon={<Receipt className="w-4 h-4" />}
             />
-          </Section>
+            <StatCard
+              label="Total Sales"
+              value={formatCurrency(data.summary.period_total_sales)}
+              icon={<IndianRupee className="w-4 h-4" />}
+            />
+          </div>
 
           {top10.length >= 2 && (
-            <Section>
-              <BarChartCard
-                title={`Top ${Math.min(10, top10.length)} by Sales`}
-                data={top10}
-                xKey="employee_name"
-                yKeys={['sales_amount']}
-                labels={{ sales_amount: 'Sales Amount' }}
-              />
-            </Section>
+            <BarChartCard
+              title={`Top ${Math.min(10, top10.length)} by Sales`}
+              data={top10}
+              xKey="employee_name"
+              yKeys={['sales_amount']}
+              labels={{ sales_amount: 'Sales Amount' }}
+            />
           )}
         </>
       )}
 
-      <Section>
-        <DataTable columns={columns} rows={data?.employees ?? []} isLoading={isLoading} />
-      </Section>
-    </Page>
+      <DataTable columns={columns} rows={data?.employees ?? []} isLoading={isLoading} />
+    </div>
   );
 }

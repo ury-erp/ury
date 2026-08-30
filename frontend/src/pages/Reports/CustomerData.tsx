@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
-import { KpiStrip, DataTable, type DataTableColumn, Input, Button, Page, Section } from '@ury/ui';
-import { Search } from 'lucide-react';
+import { StatCard, DataTable, type DataTableColumn } from '@ury/ui';
+import { Receipt, IndianRupee, TrendingUp, Search } from 'lucide-react';
 import { useBranchContext } from '../../context/BranchContext';
 import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
 import { toApiDate } from '../../lib/reportDate';
@@ -93,7 +93,7 @@ export function CustomerData() {
   }, [fetchData]);
 
   return (
-    <Page>
+    <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-semibold">Customer Data</h1>
@@ -102,81 +102,71 @@ export function CustomerData() {
         <DateRangeFilter value={range} onChange={setRange} />
       </div>
 
-      <Section>
-        <div className="relative max-w-sm">
-          <div className="flex items-center border border-input rounded-md px-3 py-2 gap-2">
-            <Search className="w-4 h-4 text-muted-foreground shrink-0" />
-            <input
-              type="text"
-              placeholder="Search customer by name..."
-              value={query}
-              onChange={(e) => {
-                setQuery(e.target.value);
-                setSelectedCustomer(null);
-                setData(null);
-              }}
-              className="flex-1 text-sm outline-none"
-            />
-          </div>
-          {suggestions.length > 0 && !selectedCustomer && (
-            <div className="absolute z-10 mt-1 w-full bg-card border border-border rounded-md shadow-lg max-h-60 overflow-y-auto">
-              {suggestions.map((s) => (
-                              <Button
-                  key={s.name}
-                  onClick={() => {
-                    setSelectedCustomer(s.customer_name);
-                    setQuery(s.customer_name);
-                    setSuggestions([]);
-                  }}
-                  variant="ghost"
-                  size="default"
-                  className="w-full justify-between px-3 py-2 text-sm"
-                >
-                  <span>{s.customer_name}</span>
-                  {s.mobile_no && <span className="text-xs text-muted-foreground">{s.mobile_no}</span>}
-                </Button>
-              ))}
-            </div>
-          )}
+      <div className="relative max-w-sm">
+        <div className="flex items-center border border-input rounded-md px-3 py-2 gap-2">
+          <Search className="w-4 h-4 text-muted-foreground shrink-0" />
+          <input
+            type="text"
+            placeholder="Search customer by name..."
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setSelectedCustomer(null);
+              setData(null);
+            }}
+            className="flex-1 text-sm outline-none"
+          />
         </div>
-      </Section>
+        {suggestions.length > 0 && !selectedCustomer && (
+          <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
+            {suggestions.map((s) => (
+              <button
+                key={s.name}
+                onClick={() => {
+                  setSelectedCustomer(s.customer_name);
+                  setQuery(s.customer_name);
+                  setSuggestions([]);
+                }}
+                className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 flex items-center justify-between"
+              >
+                <span>{s.customer_name}</span>
+                {s.mobile_no && <span className="text-xs text-muted-foreground">{s.mobile_no}</span>}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
       {error && (
-        <Section>
-          <div className="rounded-md border border-destructive-tint-border bg-destructive-tint px-4 py-3 text-sm text-destructive">
-            {error}
-          </div>
-        </Section>
+        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
       )}
 
       {!selectedCustomer && !error && (
-        <Section>
-          <div className="text-sm text-muted-foreground">Search and select a customer to view their history.</div>
-        </Section>
+        <div className="text-sm text-muted-foreground">Search and select a customer to view their history.</div>
       )}
 
-      {isLoading && (
-        <Section>
-          <div className="text-sm text-muted-foreground">Loading...</div>
-        </Section>
-      )}
+      {isLoading && <div className="text-sm text-muted-foreground">Loading...</div>}
 
       {data && !isLoading && (
         <>
-          <Section>
-            <KpiStrip
-              items={[
-                { label: 'Visits', value: data.summary.visit_count },
-                { label: 'Total Spend', value: formatCurrency(data.summary.total_spend) },
-                { label: 'Avg Spend / Visit', value: formatCurrency(data.summary.avg_spend) },
-              ]}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <StatCard label="Visits" value={data.summary.visit_count} icon={<Receipt className="w-4 h-4" />} />
+            <StatCard
+              label="Total Spend"
+              value={formatCurrency(data.summary.total_spend)}
+              icon={<IndianRupee className="w-4 h-4" />}
             />
-          </Section>
-          <Section>
-            <DataTable columns={columns} rows={data.invoices} isLoading={isLoading} />
-          </Section>
+            <StatCard
+              label="Avg Spend / Visit"
+              value={formatCurrency(data.summary.avg_spend)}
+              icon={<TrendingUp className="w-4 h-4" />}
+            />
+          </div>
+          <DataTable columns={columns} rows={data.invoices} isLoading={isLoading} />
         </>
       )}
-    </Page>
+    </div>
   );
 }

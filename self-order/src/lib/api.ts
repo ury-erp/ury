@@ -23,9 +23,6 @@ export interface OrderingContext {
   table: string | null
   layout: OrderingLayout
   capabilities: OrderingCapabilities
-  // Per-profile idle timeout (falls back to 30 server-side) — drives the
-  // not-yet-wired idle-reset timer (Phase 3) instead of a hardcoded value.
-  session_idle_timeout_minutes: number
 }
 
 export interface MenuItem {
@@ -164,34 +161,6 @@ export async function addItems(
   const response = await call.post<FrappeResponse<CustomerOrder>>(`${M}.add_customer_items`, {
     session,
     items: JSON.stringify(items),
-  })
-  return response.message
-}
-
-export interface ProductOption {
-  item_code: string
-  item_name: string
-  image: string | null
-  // Null when no `Item Price` row exists for the resolved price list — the
-  // caller must handle a missing rate gracefully, not assume it's always set.
-  rate: number | null
-}
-
-export interface ProductDetail {
-  item_code: string
-  item_name: string
-  // Null when the profile's `show_item_descriptions` capability is off.
-  description: string | null
-  // Null when the profile's `show_item_images` capability is off.
-  image: string | null
-  variants: ProductOption[]
-  addons: ProductOption[]
-}
-
-export async function getCustomerProduct(session: string, itemCode: string): Promise<ProductDetail> {
-  const response = await call.get<FrappeResponse<ProductDetail>>(`${M}.get_customer_product`, {
-    session,
-    item_code: itemCode,
   })
   return response.message
 }

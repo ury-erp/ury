@@ -21,14 +21,28 @@ export const SideDrawer: React.FC<SideDrawerProps> = ({ isOpen, onClose, title, 
 
   if (!isOpen) return null;
 
+  const handleBackdropClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    onClose();
+  };
+
+  const handleContentClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+  };
+
   return createPortal(
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+    <div 
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+      onClick={(e) => e.stopPropagation()}
+    >
       <div 
         className="absolute inset-0 bg-black/40 transition-opacity backdrop-blur-sm" 
-        onClick={onClose}
+        onClick={handleBackdropClick}
       />
       <div
         className="relative h-fit max-h-[90vh] w-full max-w-lg bg-card rounded-lg shadow-2xl z-[101] flex flex-col overflow-hidden"
+        onClick={handleContentClick}
       >
         <div className="flex items-center justify-between p-6 border-b border-border bg-muted/50">
           <h2 className="text-xl font-bold text-foreground">{title}</h2>

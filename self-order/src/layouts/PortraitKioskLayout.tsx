@@ -1,12 +1,12 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
+import { formatCurrency } from '@ury/core'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@ury/ui'
 import { useIdleReset } from '../hooks/useIdleReset'
 import { useOrderingSession } from '../hooks/useOrderingSession'
 import type { MenuItem, OrderingContext } from '../lib/api'
-import SearchBar from './shared/SearchBar'
-import ProductDetail from './shared/ProductDetail'
-import CartPage from './shared/CartPage'
-import CheckoutScreen from './shared/CheckoutScreen'
-import OrderStatusScreen from './shared/OrderStatusScreen'
+
+const IDLE_WARN_MS = 60000
+const IDLE_RESET_GRACE_MS = 15000
 
 const ALL_CATEGORY = '__all__'
 
@@ -35,7 +35,6 @@ function PortraitKioskLayout({ initialContext }: LayoutProps) {
     context,
     menu,
     order,
-    orderStatus,
     cart,
     loading,
     submitting,
@@ -51,17 +50,12 @@ function PortraitKioskLayout({ initialContext }: LayoutProps) {
     cartItems,
     cartCount,
     cartTotal,
-    screen,
-    detailItemCode,
-    goToMenu,
-    goToDetail,
-    goToCheckout,
-    goToStatus,
   } = useOrderingSession(initialContext)
 
   const [selectedCategory, setSelectedCategory] = useState<string>(ALL_CATEGORY)
   const [cartExpanded, setCartExpanded] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
+  const [showIdleWarning, setShowIdleWarning] = useState(false)
+  const idleResetTimerRef = useRef<ReturnType<typeof setTimeout>>()
 
   function handleReset() {
     if (window.confirm('Start a new order? Current cart will be cleared.')) {
@@ -69,10 +63,25 @@ function PortraitKioskLayout({ initialContext }: LayoutProps) {
     }
   }
 
-  // Idle-reset: resetSession already re-bootstraps immediately for
-  // device-bootstrapped kiosks and falls back to the QR "rescan" error state
-  // for link-based sessions, so no separate device/QR branch is needed here.
-  useIdleReset(resetSession, (context?.session_idle_timeout_minutes ?? 30) * 60000)
+  // Unattended-kiosk protection: warn after IDLE_WARN_MS of no interaction,
+  // then reset after an additional IDLE_RESET_GRACE_MS if the guest doesn't
+  // respond. Never fires mid-checkout — submitting/payingOnline gate both
+  // the warning and the reset itself.
+  useIdleReset(() => {
+    if (submitting || payingOnline) return
+    setShowIdleWarning(true)
+    idleResetTimerRef.current = setTimeout(() => {
+      setShowIdleWarning(false)
+      if (!submitting && !payingOnline) {
+        resetSession()
+      }
+    }, IDLE_RESET_GRACE_MS)
+  }, IDLE_WARN_MS)
+
+  function handleStillHere() {
+    clearTimeout(idleResetTimerRef.current)
+    setShowIdleWarning(false)
+  }
 
   const categories = useMemo(() => {
     const seen = new Map<string, string>()
@@ -87,25 +96,9 @@ function PortraitKioskLayout({ initialContext }: LayoutProps) {
   }, [menu])
 
   const visibleMenu = useMemo(() => {
-    let filtered = menu
-
-    // Apply category filter
-    if (selectedCategory !== ALL_CATEGORY) {
-      filtered = filtered.filter((item) => (item.course ?? ALL_CATEGORY) === selectedCategory)
-    }
-
-    // Apply search filter
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase()
-      filtered = filtered.filter(
-        (item) =>
-          item.item_name.toLowerCase().includes(query) ||
-          item.item?.toLowerCase().includes(query),
-      )
-    }
-
-    return filtered
-  }, [menu, selectedCategory, searchQuery])
+    if (selectedCategory === ALL_CATEGORY) return menu
+    return menu.filter((item) => (item.course ?? ALL_CATEGORY) === selectedCategory)
+  }, [menu, selectedCategory])
 
   if (loading) {
     return (
@@ -123,153 +116,6 @@ function PortraitKioskLayout({ initialContext }: LayoutProps) {
     )
   }
 
-  // Get the detail item if we're on the detail screen
-  const detailItem = detailItemCode
-    ? menu.find((item) => item.item === detailItemCode)
-    : null
-
-  // Determine if product detail is enabled
-  const productDetailEnabled = context?.capabilities.product_detail_enabled ?? false
-
-  // Handle product tap: either go to detail or add directly to cart
-  function handleProductTap(item: MenuItem) {
-    if (productDetailEnabled) {
-      goToDetail(item.item)
-    } else {
-      addToCart(item)
-    }
-  }
-
-  // Render different screens based on state
-  if (screen === 'detail' && detailItem) {
-    return (
-      <div className="flex min-h-screen flex-col">
-        <header className="sticky top-0 z-10 flex items-center justify-between border-b bg-background/95 px-6 py-4 backdrop-blur">
-          <h1 className="text-2xl font-semibold">
-            {context?.table ? `Table ${context.table}` : 'Order for Pickup'}
-          </h1>
-          <button
-            onClick={handleReset}
-            className="rounded-md border px-3 py-2 text-sm font-medium text-muted-foreground"
-          >
-            New Order
-          </button>
-        </header>
-
-        <ProductDetail
-          session={context!.session}
-          itemCode={detailItemCode!}
-          menuItem={detailItem}
-          onAddToCart={addToCart}
-          onBack={goToMenu}
-        />
-      </div>
-    )
-  }
-
-  if (screen === 'cart') {
-    return (
-      <div className="flex min-h-screen flex-col">
-        <header className="sticky top-0 z-10 flex items-center justify-between border-b bg-background/95 px-6 py-4 backdrop-blur">
-          <h1 className="text-2xl font-semibold">
-            {context?.table ? `Table ${context.table}` : 'Order for Pickup'}
-          </h1>
-          <button
-            onClick={handleReset}
-            className="rounded-md border px-3 py-2 text-sm font-medium text-muted-foreground"
-          >
-            New Order
-          </button>
-        </header>
-
-        <CartPage
-          cartItems={cartItems}
-          cartCount={cartCount}
-          cartTotal={cartTotal}
-          itemNotesEnabled={context?.capabilities.item_notes_enabled ?? false}
-          onIncrement={addToCart}
-          onDecrement={decrementCart}
-          onBack={goToMenu}
-          onCheckout={goToCheckout}
-          className="flex-1"
-        />
-      </div>
-    )
-  }
-
-  if (screen === 'checkout') {
-    return (
-      <div className="flex min-h-screen flex-col">
-        <header className="sticky top-0 z-10 flex items-center justify-between border-b bg-background/95 px-6 py-4 backdrop-blur">
-          <h1 className="text-2xl font-semibold">
-            {context?.table ? `Table ${context.table}` : 'Order for Pickup'}
-          </h1>
-          <button
-            onClick={handleReset}
-            className="rounded-md border px-3 py-2 text-sm font-medium text-muted-foreground"
-          >
-            New Order
-          </button>
-        </header>
-
-        <div className="flex flex-1 flex-col overflow-y-auto">
-          <CheckoutScreen
-            capabilities={{
-              customer_payment_enabled: context?.capabilities.customer_payment_enabled ?? false,
-              pay_at_counter_enabled: context?.capabilities.pay_at_counter_enabled ?? false,
-              request_bill_enabled: context?.capabilities.request_bill_enabled ?? false,
-            }}
-            cartItems={cartItems}
-            cartCount={cartCount}
-            cartTotal={cartTotal}
-            submitting={submitting}
-            payingOnline={payingOnline}
-            billRequested={billRequested}
-            paymentRequest={null}
-            onSubmitCart={() => {
-              submitCart().then((success) => {
-                if (success) goToStatus()
-              })
-            }}
-            onPayOnline={async () => {
-              if (cartItems.length > 0 && !(await submitCart())) return
-              payOnline()
-            }}
-            onRequestBill={handleRequestBill}
-          />
-        </div>
-      </div>
-    )
-  }
-
-  if (screen === 'status') {
-    return (
-      <div className="flex min-h-screen flex-col bg-background">
-        <header className="sticky top-0 z-10 flex items-center justify-between border-b bg-background/95 px-6 py-4 backdrop-blur">
-          <h1 className="text-2xl font-semibold">
-            {context?.table ? `Table ${context.table}` : 'Order for Pickup'}
-          </h1>
-          <button
-            onClick={handleReset}
-            className="rounded-md border px-3 py-2 text-sm font-medium text-muted-foreground"
-          >
-            New Order
-          </button>
-        </header>
-
-        <OrderStatusScreen
-          status={orderStatus}
-          isPickup={!context?.table}
-          pickupCode={order?.pickup_code}
-          canAddMore={context?.capabilities.add_to_running_table_enabled ?? false}
-          onAddMore={goToMenu}
-          onDone={handleReset}
-        />
-      </div>
-    )
-  }
-
-  // Default: menu screen
   return (
     <div className="flex min-h-screen flex-col pb-24">
       <header className="sticky top-0 z-10 flex items-center justify-between border-b bg-background/95 px-6 py-4 backdrop-blur">
@@ -303,46 +149,57 @@ function PortraitKioskLayout({ initialContext }: LayoutProps) {
             <span>Total</span>
             <span>{order.grand_total}</span>
           </div>
+          {context?.capabilities.customer_payment_enabled && !order.billed && (
+            <button
+              className="mt-3 w-full rounded-md bg-primary py-3 text-sm font-medium text-primary-foreground disabled:opacity-50"
+              disabled={payingOnline}
+              onClick={payOnline}
+            >
+              {payingOnline ? 'Starting payment…' : 'Pay Online'}
+            </button>
+          )}
+          {context?.capabilities.request_bill_enabled && !order.billed && (
+            <button
+              className="mt-3 w-full rounded-md border py-3 text-sm font-medium disabled:opacity-50"
+              disabled={billRequested}
+              onClick={handleRequestBill}
+            >
+              {billRequested ? 'Bill requested — staff notified' : 'Request Bill'}
+            </button>
+          )}
         </section>
       )}
 
-      <div className="flex flex-1 flex-col gap-4 px-6 pt-4">
-        {/* Search bar and category rail */}
-        <div className="flex gap-4">
-          <div className="w-40 shrink-0">
-            <SearchBar value={searchQuery} onChange={setSearchQuery} placeholder="Search..." />
-          </div>
-          <nav
-            aria-label="Menu categories"
-            className="flex flex-1 gap-2 self-start overflow-x-auto rounded-lg border p-2"
+      <div className="flex flex-1 gap-4 px-6 pt-4">
+        <nav
+          aria-label="Menu categories"
+          className="flex w-40 shrink-0 flex-col gap-2 self-start rounded-lg border p-2"
+        >
+          <button
+            onClick={() => setSelectedCategory(ALL_CATEGORY)}
+            className={`rounded-md px-3 py-3 text-left text-sm font-medium transition ${
+              selectedCategory === ALL_CATEGORY
+                ? 'bg-primary text-primary-foreground'
+                : 'text-foreground hover:bg-muted'
+            }`}
           >
+            All Items
+          </button>
+          {categories.map((category) => (
             <button
-              onClick={() => setSelectedCategory(ALL_CATEGORY)}
-              className={`shrink-0 rounded-md px-3 py-3 text-left text-sm font-medium transition ${
-                selectedCategory === ALL_CATEGORY
+              key={category.course}
+              onClick={() => setSelectedCategory(category.course)}
+              className={`rounded-md px-3 py-3 text-left text-sm font-medium transition ${
+                selectedCategory === category.course
                   ? 'bg-primary text-primary-foreground'
                   : 'text-foreground hover:bg-muted'
               }`}
             >
-              All Items
+              {category.label}
             </button>
-            {categories.map((category) => (
-              <button
-                key={category.course}
-                onClick={() => setSelectedCategory(category.course)}
-                className={`shrink-0 rounded-md px-3 py-3 text-left text-sm font-medium transition ${
-                  selectedCategory === category.course
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-foreground hover:bg-muted'
-                }`}
-              >
-                {category.label}
-              </button>
-            ))}
-          </nav>
-        </div>
+          ))}
+        </nav>
 
-        {/* Product grid */}
         <section className="grid flex-1 grid-cols-2 gap-4 self-start">
           {visibleMenu.map((item) => (
             <MenuCard
@@ -350,7 +207,7 @@ function PortraitKioskLayout({ initialContext }: LayoutProps) {
               item={item}
               qtyInCart={cart[item.item]?.qty ?? 0}
               showImage={context?.capabilities.show_item_images ?? false}
-              onTap={() => handleProductTap(item)}
+              onAdd={() => addToCart(item)}
             />
           ))}
         </section>
@@ -396,18 +253,34 @@ function PortraitKioskLayout({ initialContext }: LayoutProps) {
               <span className="text-base font-semibold">
                 {cartCount} item{cartCount > 1 ? 's' : ''}
               </span>
-              <span className="text-base font-semibold">{cartTotal}</span>
+              <span className="text-base font-semibold tabular-nums">{formatCurrency(cartTotal)}</span>
             </button>
             <button
-              onClick={goToCheckout}
-              disabled={cartCount === 0}
+              onClick={submitCart}
+              disabled={submitting}
               className="rounded-md bg-primary px-6 py-3 text-base font-medium text-primary-foreground disabled:opacity-50"
             >
-              Checkout
+              {submitting ? 'Placing…' : 'Place Order'}
             </button>
           </div>
         </div>
       )}
+
+      <Dialog open={showIdleWarning} onOpenChange={(open) => !open && handleStillHere()}>
+        <DialogContent onClose={handleStillHere}>
+          <DialogHeader>
+            <DialogTitle>Still there?</DialogTitle>
+          </DialogHeader>
+          <DialogFooter>
+            <button
+              onClick={handleStillHere}
+              className="w-full rounded-md bg-primary py-3 text-base font-medium text-primary-foreground"
+            >
+              I'm still here
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
@@ -416,16 +289,16 @@ function MenuCard({
   item,
   qtyInCart,
   showImage,
-  onTap,
+  onAdd,
 }: {
   item: MenuItem
   qtyInCart: number
   showImage: boolean
-  onTap: () => void
+  onAdd: () => void
 }) {
   return (
     <button
-      onClick={onTap}
+      onClick={onAdd}
       className="flex flex-col overflow-hidden rounded-xl border text-left transition active:scale-[0.98]"
     >
       {showImage && item.item_image && (
@@ -433,7 +306,7 @@ function MenuCard({
       )}
       <div className="p-4">
         <div className="text-lg font-medium">{item.item_name}</div>
-        <div className="mt-1 text-base text-muted-foreground">{item.rate}</div>
+        <div className="mt-1 text-base text-muted-foreground tabular-nums">{formatCurrency(item.rate)}</div>
         {qtyInCart > 0 && (
           <div className="mt-2 text-sm font-semibold text-primary">In cart: {qtyInCart}</div>
         )}

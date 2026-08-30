@@ -10,7 +10,8 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { CHART_COLORS } from "../../../lib/chartColors";
+
+const DEFAULT_COLORS = ["#3b82f6", "#6366f1", "#8b5cf6", "#a855f7", "#0ea5e9", "#14b8a6"];
 
 export interface BarChartCardProps {
   title: string;
@@ -22,7 +23,7 @@ export interface BarChartCardProps {
 }
 
 export function BarChartCard({ title, data, xKey, yKeys, colors, labels }: BarChartCardProps) {
-  const palette = colors ?? CHART_COLORS;
+  const palette = colors ?? DEFAULT_COLORS;
 
   return (
     <Card>

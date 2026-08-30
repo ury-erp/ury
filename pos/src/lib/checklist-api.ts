@@ -8,8 +8,8 @@ export interface ChecklistItem {
 export interface ChecklistResponse {
   message: {
     items: ChecklistItem[];
-    logName: string | null;
-    logStatus: string | null;
+    log_name: string | null;
+    log_status: string | null;
   };
 }
 
@@ -35,13 +35,7 @@ export const getChecklist = async (
   logStatus: string | null;
 }> => {
   try {
-    const response = await call.get<{
-      message: {
-        items: ChecklistItem[];
-        log_name: string | null;
-        log_status: string | null;
-      };
-    }>(
+    const response = await call.get<ChecklistResponse>(
       'ury.ury_pos.api.get_checklist',
       {
         pos_profile: posProfile,
@@ -49,7 +43,7 @@ export const getChecklist = async (
       }
     );
 
-    // Map snake_case backend response to camelCase TypeScript interface
+    // Map backend's snake_case keys to camelCase for consumer compatibility
     return {
       items: response.message.items,
       logName: response.message.log_name,

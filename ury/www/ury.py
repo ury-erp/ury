@@ -7,23 +7,25 @@ from frappe import _
 from frappe.utils.telemetry import capture
 
 no_cache = 1
+login_required = True
 
 SCRIPT_TAG_PATTERN = re.compile(r"\<script[^<]*\</script\>")
 CLOSING_SCRIPT_TAG_PATTERN = re.compile(r"</script\>")
 
 
 def get_context(context):
+	if frappe.session.user == "Guest":
+		frappe.local.flags.redirect_location = "/login"
+		raise frappe.Redirect
+
 	csrf_token = frappe.sessions.get_csrf_token()
 	# Manually commit the CSRF token here
 	frappe.db.commit()  # nosemgrep
 
-	if frappe.session.user == "Guest":
-		boot = frappe.website.utils.get_boot_data()
-	else:
-		try:
-			boot = frappe.sessions.get()
-		except Exception as e:
-			raise frappe.SessionBootFailed from e
+	try:
+		boot = frappe.sessions.get()
+	except Exception as e:
+		raise frappe.SessionBootFailed from e
 
 	# add server_script_enabled in boot
 	if "server_script_enabled" in frappe.conf:
@@ -38,8 +40,15 @@ def get_context(context):
 	boot_json = CLOSING_SCRIPT_TAG_PATTERN.sub("", boot_json)
 	boot_json = json.dumps(boot_json)
 
+	from frappe.utils import cint
+
 	context.update(
-		{"build_version": frappe.utils.get_build_version(), "boot": boot_json, "csrf_token": csrf_token}
+		{
+			"build_version": frappe.utils.get_build_version(),
+			"boot": boot_json,
+			"csrf_token": csrf_token,
+			"dev_server": cint(getattr(frappe.local, "dev_server", 0)),
+		}
 	)
 	return context
 
