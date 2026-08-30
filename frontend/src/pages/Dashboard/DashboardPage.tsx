@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Card, KpiStrip, Spinner } from '@ury/ui';
+import { KpiStrip, Page, Panel, Section, Spinner } from '@ury/ui';
 import { useBranchContext } from '../../context/BranchContext';
 import {
   BaselineStats,
@@ -207,106 +207,118 @@ export const DashboardPage: React.FC = () => {
   const dailyPnlStatusLabel = dailyPnl?.exists ? formatCurrency(dailyPnlNetProfit) : 'Not yet generated';
 
   return (
-    <div className="space-y-6">
+    <Page>
       <div>
         <h1 className="text-xl font-semibold text-foreground">Service Board — {formatHeaderDate(today)}</h1>
       </div>
 
       {loading ? (
-        <Card className="flex items-center justify-center rounded-[9px] border-hair p-10 shadow-none">
-          <Spinner />
-        </Card>
+        <Section>
+          <Panel className="flex items-center justify-center p-10">
+            <Spinner />
+          </Panel>
+        </Section>
       ) : error ? (
-        <Card className="rounded-[9px] border-destructive-tint-border bg-destructive-tint p-[14px_16px] text-sm text-destructive shadow-none">
-          {error}
-        </Card>
+        <Section>
+          <Panel pad className="border-destructive-tint-border bg-destructive-tint text-sm text-destructive">
+            {error}
+          </Panel>
+        </Section>
       ) : (
         <>
-          <Card className="rounded-[9px] border-hair p-[14px_16px] shadow-none">
-            <p className="text-sm text-muted-foreground">{buildSummaryLine(needsAttention)}</p>
-          </Card>
+          <Section>
+            <Panel pad>
+              <p className="text-sm text-muted-foreground">{buildSummaryLine(needsAttention)}</p>
+            </Panel>
+          </Section>
 
-          <KpiStrip
-            items={[
-              {
-                label: "Today's Sales",
-                value: todaysSalesLabel,
-              },
-              {
-                label: "Daily P&L",
-                value: dailyPnlStatusLabel,
-                hint: cancelledCount > 0 ? `${cancelledCount} cancelled` : undefined,
-              },
-              {
-                label: "Vs. Baseline",
-                value: vsBaseline,
-              },
-              {
-                label: "Plan Status",
-                value: planStatusLabel,
-              },
-            ]}
-          />
+          <Section>
+            <KpiStrip
+              items={[
+                {
+                  label: "Today's Sales",
+                  value: todaysSalesLabel,
+                },
+                {
+                  label: "Daily P&L",
+                  value: dailyPnlStatusLabel,
+                  hint: cancelledCount > 0 ? `${cancelledCount} cancelled` : undefined,
+                },
+                {
+                  label: "Vs. Baseline",
+                  value: vsBaseline,
+                },
+                {
+                  label: "Plan Status",
+                  value: planStatusLabel,
+                },
+              ]}
+            />
+          </Section>
 
-          <Link
-            to="/reports/daily-pnl"
-            className="text-xs font-medium text-primary hover:text-primary hover:underline"
-          >
-            View Daily P&amp;L report
-          </Link>
+          <Section>
+            <Link
+              to="/reports/daily-pnl"
+              className="text-xs font-medium text-primary hover:text-primary hover:underline"
+            >
+              View Daily P&amp;L report
+            </Link>
+          </Section>
 
-          <Card className="rounded-[9px] border-hair p-[14px_16px] shadow-none">
-            <div className="mb-[9px] flex items-center gap-[9px]">
-              <h2 className="text-[12.5px] font-semibold">Needs Attention</h2>
-              <span className="text-[11.5px] text-text-tertiary">{needsAttention.length}</span>
-            </div>
-            {needsAttention.length === 0 ? (
-              <div className="flex items-center gap-2.5 p-[18px_16px] text-xs text-text-tertiary">
-                No issues right now — service is running smoothly.
+          <Section>
+            <Panel pad>
+              <div className="mb-sect flex items-center gap-[9px]">
+                <h2 className="text-[12.5px] font-semibold">Needs Attention</h2>
+                <span className="text-[11.5px] text-text-tertiary">{needsAttention.length}</span>
               </div>
-            ) : (
-              <ul className="divide-y divide-hair">
-                {needsAttention.map((item, index) => {
-                  const target = getAttentionLinkTarget(item);
-                  const countLabel = referenceCountLabel(item);
-                  return (
-                    <li
-                      key={`${item.type}-${index}`}
-                      className="flex flex-col gap-1 py-3 sm:flex-row sm:items-center sm:justify-between"
-                    >
-                      <div>
-                        <p className="text-sm text-foreground">
-                          {item.message}
-                          {countLabel ? <span className="text-text-tertiary"> · {countLabel}</span> : null}
-                        </p>
-                        {target?.note ? <p className="mt-0.5 text-xs text-text-tertiary">{target.note}</p> : null}
-                      </div>
-                      {target ? (
-                        target.kind === 'internal' ? (
-                          <Link
-                            to={target.to}
-                            className="text-sm font-medium text-primary hover:text-primary hover:underline"
-                          >
-                            {target.label}
-                          </Link>
-                        ) : (
-                          <a
-                            href={target.to}
-                            className="text-sm font-medium text-primary hover:text-primary hover:underline"
-                          >
-                            {target.label}
-                          </a>
-                        )
-                      ) : null}
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </Card>
+              {needsAttention.length === 0 ? (
+                <div className="flex items-center gap-2.5 p-[18px_16px] text-xs text-text-tertiary">
+                  No issues right now — service is running smoothly.
+                </div>
+              ) : (
+                <ul className="divide-y divide-hair">
+                  {needsAttention.map((item, index) => {
+                    const target = getAttentionLinkTarget(item);
+                    const countLabel = referenceCountLabel(item);
+                    return (
+                      <li
+                        key={`${item.type}-${index}`}
+                        className="flex flex-col gap-1 py-3 sm:flex-row sm:items-center sm:justify-between"
+                      >
+                        <div>
+                          <p className="text-sm text-foreground">
+                            {item.message}
+                            {countLabel ? <span className="text-text-tertiary"> · {countLabel}</span> : null}
+                          </p>
+                          {target?.note ? <p className="mt-0.5 text-xs text-text-tertiary">{target.note}</p> : null}
+                        </div>
+                        {target ? (
+                          target.kind === 'internal' ? (
+                            <Link
+                              to={target.to}
+                              className="text-sm font-medium text-primary hover:text-primary hover:underline"
+                            >
+                              {target.label}
+                            </Link>
+                          ) : (
+                            <a
+                              href={target.to}
+                              className="text-sm font-medium text-primary hover:text-primary hover:underline"
+                            >
+                              {target.label}
+                            </a>
+                          )
+                        ) : null}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </Panel>
+          </Section>
         </>
       )}
-    </div>
+    </Page>
   );
 };
 
