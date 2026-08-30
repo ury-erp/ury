@@ -31,11 +31,6 @@ const DEVICE_CREDENTIAL_KEY = 'ury_device_credential'
  * for this MVP pass. The backend still validates the table exists and
  * belongs to the device's branch, so a bad value is rejected, not silently
  * accepted.
- *
- * Deliberately does NOT use `useIdleReset`: this screen is a staff-only PIN
- * entry / table-assignment step (customers never see it), so a customer
- * idling here doesn't apply. Idle-reset kicks in once `TabletLayout` takes
- * over below with the assigned context.
  */
 function PortableTabletAssignment() {
   const [step, setStep] = useState<Step>('pin')
@@ -91,44 +86,31 @@ function PortableTabletAssignment() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-8 p-6">
-      <div className="flex flex-col items-center gap-2">
-        <h1 className="text-2xl font-semibold">Assign This Tablet</h1>
-        <p className="text-sm text-muted-foreground">Bind a portable tablet to a table</p>
-      </div>
+    <div className="flex min-h-screen flex-col items-center justify-center gap-6 p-6">
+      <h1 className="text-xl font-semibold">Assign This Tablet</h1>
 
       {error && (
-        <div className="w-full max-w-xs rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
-          <div className="font-medium mb-1">Assignment Failed</div>
-          <div>{error}</div>
+        <div className="w-full max-w-xs rounded-md bg-destructive/10 p-3 text-center text-sm text-destructive">
+          {error}
         </div>
       )}
 
       {step === 'pin' && (
-        <div className="flex w-full max-w-xs flex-col gap-6">
-          <div className="flex flex-col gap-2">
-            <label htmlFor="pin-display" className="text-sm font-semibold text-foreground">
-              Staff PIN
-            </label>
-            <p className="text-xs text-muted-foreground">Enter the 4-6 digit PIN to proceed</p>
-          </div>
-
-          <div className="flex justify-center gap-2" aria-label="PIN entry" id="pin-display">
+        <div className="flex w-full max-w-xs flex-col items-center gap-4">
+          <p className="text-sm text-muted-foreground">Enter staff PIN</p>
+          <div className="flex gap-2" aria-label="PIN entry">
             {Array.from({ length: MAX_PIN_LENGTH }).map((_, idx) => (
               <div
                 key={idx}
-                className={`flex h-14 w-12 items-center justify-center rounded-lg border-2 text-2xl font-semibold transition-all ${
-                  idx < pin.length
-                    ? 'border-primary bg-primary/10 text-primary'
-                    : 'border-input bg-background text-transparent'
+                className={`h-10 w-8 rounded-md border text-center text-lg leading-10 ${
+                  idx < pin.length ? 'bg-muted' : ''
                 }`}
               >
                 {idx < pin.length ? '•' : ''}
               </div>
             ))}
           </div>
-
-          <div className="grid grid-cols-3 gap-2.5">
+          <div className="grid grid-cols-3 gap-3">
             {['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', '⌫'].map((key, idx) =>
               key === '' ? (
                 <div key={idx} />
@@ -136,18 +118,17 @@ function PortableTabletAssignment() {
                 <button
                   key={idx}
                   onClick={() => (key === '⌫' ? handlePinBackspace() : handlePinDigit(key))}
-                  className="flex h-16 w-16 items-center justify-center rounded-xl border-2 border-input bg-background text-lg font-semibold text-foreground transition-all hover:bg-muted active:scale-95"
+                  className="h-14 w-14 rounded-full border text-lg font-medium active:scale-95"
                 >
                   {key}
                 </button>
               ),
             )}
           </div>
-
           <button
             onClick={handlePinSubmit}
             disabled={pin.length < MIN_PIN_LENGTH}
-            className="w-full rounded-lg bg-primary py-4 text-base font-semibold text-primary-foreground transition-all hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full rounded-md bg-primary py-3 font-medium text-primary-foreground disabled:opacity-50"
           >
             Continue
           </button>
@@ -155,49 +136,25 @@ function PortableTabletAssignment() {
       )}
 
       {step === 'table' && (
-        <div className="flex w-full max-w-xs flex-col gap-6">
-          <div className="flex flex-col gap-2">
-            <label htmlFor="table-input" className="text-sm font-semibold text-foreground">
-              Table Name or Code
-            </label>
-            <p className="text-xs text-muted-foreground">Enter the table identifier to assign</p>
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <input
-              id="table-input"
-              value={table}
-              onChange={(event) => setTable(event.target.value)}
-              placeholder="e.g. T12, Table A, 5"
-              disabled={submitting}
-              className="rounded-lg border border-input bg-background px-4 py-3 text-base placeholder:text-muted-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/10 disabled:opacity-50 disabled:cursor-not-allowed"
-            />
-            {table && (
-              <p className="text-xs text-muted-foreground">
-                {table.length} character{table.length !== 1 ? 's' : ''}
-              </p>
-            )}
-          </div>
-
+        <div className="flex w-full max-w-xs flex-col gap-4">
+          <p className="text-sm text-muted-foreground">Enter table name or code</p>
+          <input
+            value={table}
+            onChange={(event) => setTable(event.target.value)}
+            placeholder="e.g. T12"
+            className="rounded-md border px-4 py-3 text-base"
+          />
           <button
             onClick={handleAssign}
             disabled={!table.trim() || submitting}
-            className="flex items-center justify-center gap-2 w-full rounded-lg bg-primary py-4 text-base font-semibold text-primary-foreground transition-all hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full rounded-md bg-primary py-3 font-medium text-primary-foreground disabled:opacity-50"
           >
-            {submitting ? (
-              <>
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
-                Assigning…
-              </>
-            ) : (
-              'Assign Table'
-            )}
+            {submitting ? 'Assigning…' : 'Assign Table'}
           </button>
-
           <button
             onClick={() => setStep('pin')}
             disabled={submitting}
-            className="w-full rounded-lg border border-input bg-background py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full rounded-md border py-3 text-sm font-medium"
           >
             Back
           </button>

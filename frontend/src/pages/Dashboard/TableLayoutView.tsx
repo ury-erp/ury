@@ -11,6 +11,8 @@ export interface Table {
   table_name?: string;
   room?: string;
   capacity?: number;
+  no_of_seats?: number;
+  minimum_seating?: number;
   table_shape?: string;
   layout_x?: number;
   layout_y?: number;
@@ -33,8 +35,8 @@ const updateTableLayout = async (name: string, updates: any) => {
 };
 
 type POSInvoice = any;
-const getTableOrder = async (name: string) => null;
-const getCombinedOrderTotals = (order: any) => ({ roundedTotal: 0 });
+const getTableOrder = async (_name: string): Promise<any> => null;
+const getCombinedOrderTotals = (_order: any) => ({ roundedTotal: 0 });
 
 const t = (key: string) => {
   const parts = key.split('.');
@@ -71,21 +73,122 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
   // Save to local storage effect removed
 
 
-  // Merge props.tables with saved positions
-  const tablesWithPosition = useMemo(() => {
-    return tables.map((table, index) => {
-      const local = localLayouts[table.name] || {};
+  // Calculate table dimensions based on capacity and shape
+  const getTableDimensions = (shape?: string, capacity: number = 4) => {
+    // Dynamic sizing: minimum 60px, scales up by 10px per person, max 250px
+    const size = Math.max(60, Math.min(250, 60 + (capacity * 10)));
 
-      // Use local overrides, then backend fields, then grid defaults
-      const x = local.layout_x ?? table.layout_x ?? (100 + (index % 5) * 150);
-      const y = local.layout_y ?? table.layout_y ?? (100 + Math.floor(index / 5) * 150);
+    const normalizedShape = shape?.toLowerCase() || 'rectangle';
+
+    switch (normalizedShape) {
+      case 'circle':
+      case 'square':
+        return { width: size, height: size };
+      case 'rectangle':
+      default:
+        return { width: size * 1.5, height: size };
+    }
+  };
+
+  // Merge props.tables with saved positions or dynamically auto-arrange unpositioned tables
+  const tablesWithPosition = useMemo(() => {
+    const canvasWidth = canvasRef.current ? canvasRef.current.clientWidth : (typeof window !== 'undefined' ? Math.max(800, window.innerWidth - 320) : 1200);
+    const startMarginX = 60;
+    const startMarginY = 60;
+    const gapX = 40;
+    const gapY = 40;
+    const maxRowWidth = Math.max(600, canvasWidth - startMarginX * 2);
+
+    // Track occupied bounding boxes to guarantee 0 overlaps
+    const occupiedBoxes: Array<{ x: number; y: number; width: number; height: number }> = [];
+
+    // Pass 1: Collect explicit saved/local positions
+    tables.forEach((table) => {
+      const local = localLayouts[table.name] || {};
+      const shape = local.table_shape ?? table.table_shape ?? 'rectangle';
+      const seats = local.no_of_seats ?? table.no_of_seats ?? table.capacity ?? 4;
+      const { width, height } = getTableDimensions(shape, seats);
+
+      const hasLocalPos = local.layout_x !== undefined && local.layout_y !== undefined;
+      const hasSavedPos =
+        table.layout_x !== undefined &&
+        table.layout_x !== null &&
+        table.layout_x > 0 &&
+        table.layout_y !== undefined &&
+        table.layout_y !== null &&
+        table.layout_y > 0;
+
+      if (hasLocalPos) {
+        occupiedBoxes.push({ x: local.layout_x!, y: local.layout_y!, width, height });
+      } else if (hasSavedPos) {
+        occupiedBoxes.push({ x: table.layout_x!, y: table.layout_y!, width, height });
+      }
+    });
+
+    const isColliding = (candX: number, candY: number, w: number, h: number) => {
+      return occupiedBoxes.some(box =>
+        candX < box.x + box.width + 10 &&
+        candX + w + 10 > box.x &&
+        candY < box.y + box.height + 10 &&
+        candY + h + 10 > box.y
+      );
+    };
+
+    let currentX = startMarginX;
+    let currentY = startMarginY;
+    let maxRowHeight = 0;
+
+    // Pass 2: Position tables (preserving saved, dynamically placing unpositioned)
+    return tables.map((table) => {
+      const local = localLayouts[table.name] || {};
+      const shape = local.table_shape ?? table.table_shape ?? 'rectangle';
+      const seats = local.no_of_seats ?? table.no_of_seats ?? table.capacity ?? 4;
+      const { width, height } = getTableDimensions(shape, seats);
+
+      const hasLocalPos = local.layout_x !== undefined && local.layout_y !== undefined;
+      const hasSavedPos =
+        table.layout_x !== undefined &&
+        table.layout_x !== null &&
+        table.layout_x > 0 &&
+        table.layout_y !== undefined &&
+        table.layout_y !== null &&
+        table.layout_y > 0;
+
+      let x: number;
+      let y: number;
+
+      if (hasLocalPos) {
+        x = local.layout_x!;
+        y = local.layout_y!;
+      } else if (hasSavedPos) {
+        x = table.layout_x!;
+        y = table.layout_y!;
+      } else {
+        // Find next open collision-free position in the grid
+        while (isColliding(currentX, currentY, width, height) || (currentX + width > maxRowWidth && currentX > startMarginX)) {
+          if (currentX + width > maxRowWidth && currentX > startMarginX) {
+            currentX = startMarginX;
+            currentY = currentY + (maxRowHeight > 0 ? maxRowHeight : 100) + gapY;
+            maxRowHeight = 0;
+          } else {
+            currentX += width + gapX;
+          }
+        }
+
+        x = currentX;
+        y = currentY;
+
+        occupiedBoxes.push({ x, y, width, height });
+        currentX += width + gapX;
+        maxRowHeight = Math.max(maxRowHeight, height);
+      }
 
       return {
         ...table,
         x,
         y,
-        table_shape: local.table_shape ?? table.table_shape,
-        no_of_seats: local.no_of_seats ?? table.no_of_seats,
+        table_shape: shape,
+        no_of_seats: seats,
       };
     });
   }, [tables, localLayouts]);
@@ -97,24 +200,6 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
       setCapacityInput(table?.no_of_seats?.toString() ?? '');
     }
   }, [selectedTable, tablesWithPosition]);
-
-  // Calculate table dimensions based on capacity and shape
-  const getTableDimensions = (shape: string, capacity: number = 4) => {
-    // Dynamic sizing: minimum 60px, scales up by 10px per person, max 250px
-    const size = Math.max(60, Math.min(250, 60 + (capacity * 10)));
-
-    const normalizedShape = shape?.toLowerCase() || 'rectangle';
-
-    switch (normalizedShape) {
-      case 'circle':
-        return { width: size, height: size };
-      case 'square':
-        return { width: size, height: size };
-      case 'rectangle':
-      default:
-        return { width: size * 1.5, height: size };
-    }
-  };
 
   // Zoom functionality (simple scale)
   const handleZoomIn = () => setZoom(prev => Math.min(prev + 0.1, 3));
@@ -215,11 +300,9 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
   };
 
   const getTableStatusColor = (occupied: number) => {
-    // Binary state: occupied (accent treatment) vs free (muted/available)
-    // Warning/destructive tints reserved for future "table needs attention" state
     return occupied
-      ? 'bg-card border-primary-tint-border text-primary'
-      : 'bg-muted border-dashed border-hair text-muted-foreground';
+      ? 'bg-amber-100 border-amber-300 text-amber-900 shadow-sm'
+      : 'bg-emerald-50 border-emerald-200 text-emerald-800 hover:shadow-md';
   };
 
   const handleMouseDown = (e: React.MouseEvent, table: typeof tablesWithPosition[0]) => {
@@ -229,7 +312,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
 
     if (table.occupied) {
       getTableOrder(table.name).then(res => {
-        setSelectedTableOrder(res.message);
+        if (res) setSelectedTableOrder(res.message);
       }).catch(console.error);
     } else {
       setSelectedTableOrder(null);
@@ -270,10 +353,10 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
 
     const baseClasses = cn(
       'absolute border-2 flex items-center justify-center text-sm font-semibold cursor-pointer transition-all select-none',
-      getTableStatusColor(table.occupied),
-      isEditMode && 'hover:ring-2 hover:ring-primary cursor-move',
+      getTableStatusColor(table.occupied || 0),
+      isEditMode && 'hover:ring-2 hover:ring-blue-400 cursor-move',
       draggedTable === table.name && 'shadow-xl scale-105 z-20',
-      selectedTable === table.name && 'ring-2 ring-primary z-10'
+      selectedTable === table.name && 'ring-2 ring-blue-600 z-10'
     );
 
     const style = {
@@ -309,7 +392,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
         </div>
         {isEditMode && (
           <>
-            <div className="absolute -top-1 -right-1 bg-primary text-white rounded-full p-0.5 shadow-sm">
+            <div className="absolute -top-1 -right-1 bg-blue-500 text-white rounded-full p-0.5 shadow-sm">
               <Move className="w-2 h-2" />
             </div>
           </>
@@ -363,7 +446,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
   const selectedTableData = tablesWithPosition.find(t => t.name === selectedTable);
 
   return (
-    <div className="flex flex-col h-full bg-muted">
+    <div className="flex flex-col h-full bg-gray-50">
 
 
       {/* Canvas Area */}
@@ -380,8 +463,8 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
             className={cn(
               'flex items-center gap-2 px-4 py-2 rounded-lg shadow-lg text-sm font-medium border transition-all',
               isEditMode
-                ? 'bg-primary hover:bg-primary text-white border-green-700'
-                : 'bg-card hover:bg-muted text-muted-foreground border-border'
+                ? 'bg-blue-600 hover:bg-blue-700 text-white border-green-700'
+                : 'bg-white hover:bg-gray-50 text-gray-700 border-gray-200'
             )}
           >
             {isEditMode ? <Save className="w-4 h-4" /> : <Edit3 className="w-4 h-4" />}
@@ -392,26 +475,26 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
         <div className="absolute top-4 left-4 z-30 flex flex-col gap-2">
           <button
             onClick={handleZoomIn}
-            className="p-2 bg-card hover:bg-muted rounded-lg shadow-lg border border-border transition-colors"
+            className="p-2 bg-white hover:bg-gray-50 rounded-lg shadow-lg border border-gray-200 transition-colors"
             title="Zoom In"
           >
-            <ZoomIn className="w-5 h-5 text-muted-foreground" />
+            <ZoomIn className="w-5 h-5 text-gray-700" />
           </button>
           <button
             onClick={handleZoomOut}
-            className="p-2 bg-card hover:bg-muted rounded-lg shadow-lg border border-border transition-colors"
+            className="p-2 bg-white hover:bg-gray-50 rounded-lg shadow-lg border border-gray-200 transition-colors"
             title="Zoom Out"
           >
-            <ZoomOut className="w-5 h-5 text-muted-foreground" />
+            <ZoomOut className="w-5 h-5 text-gray-700" />
           </button>
           <button
             onClick={handleResetZoom}
-            className="p-2 bg-card hover:bg-muted rounded-lg shadow-lg border border-border transition-colors"
+            className="p-2 bg-white hover:bg-gray-50 rounded-lg shadow-lg border border-gray-200 transition-colors"
             title="Reset Zoom & Pan"
           >
-            <RotateCcw className="w-5 h-5 text-muted-foreground" />
+            <RotateCcw className="w-5 h-5 text-gray-700" />
           </button>
-          <div className="px-2 py-1 bg-card rounded-lg shadow-lg border border-border text-xs font-medium text-muted-foreground">
+          <div className="px-2 py-1 bg-white rounded-lg shadow-lg border border-gray-200 text-xs font-medium text-gray-600">
             {Math.round(zoom * 100)}%
           </div>
         </div>
@@ -419,13 +502,13 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
         {/* Instructions */}
         <div className="absolute bottom-4 right-4 z-30 pointer-events-none">
           {isEditMode ? (
-            <div className="bg-primary-tint/90 backdrop-blur border border-primary rounded-lg p-3 text-sm text-primary shadow-lg">
+            <div className="bg-blue-50/90 backdrop-blur border border-blue-200 rounded-lg p-3 text-sm text-blue-800 shadow-lg">
               <div className="font-medium mb-1">{t('tables.editing_layout_hint_title')}</div>
               <div>{t('tables.drag_tables_hint')}</div>
               <div>{t('tables.autosave_hint')}</div>
             </div>
           ) : (
-            <div className="bg-card/80 backdrop-blur border border-border rounded-lg p-2 text-xs text-text-tertiary shadow-sm">
+            <div className="bg-white/80 backdrop-blur border border-gray-200 rounded-lg p-2 text-xs text-gray-500 shadow-sm">
               {t('tables.zoom_pan_hint')}
             </div>
           )}
@@ -433,7 +516,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
 
         <div
           ref={canvasRef}
-          className="w-full h-full relative bg-background overflow-hidden cursor-grab active:cursor-grabbing"
+          className="w-full h-full relative bg-white overflow-hidden cursor-grab active:cursor-grabbing"
           style={{
             backgroundImage: `
               linear-gradient(to right, #e5e7eb 1px, transparent 1px),
@@ -463,14 +546,14 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
 
       {/* Table Properties Panel */}
       {selectedTable && selectedTableData && (
-        <div className={cn("absolute bottom-0 top-36 bg-card rounded-t-lg shadow-xl border-t border-l border-border p-4 w-full max-w-xs z-40 max-h-[72vh] overflow-y-auto", isRTL ? "left-0 border-r" : "right-0")}>
+        <div className={cn("absolute bottom-0 top-36 bg-white rounded-t-lg shadow-xl border-t border-l border-gray-200 p-4 w-full max-w-xs z-40 max-h-[72vh] overflow-y-auto", isRTL ? "left-0 border-r" : "right-0")}>
           <div className="flex justify-between items-center mb-3">
-            <h4 className="font-semibold text-foreground">
+            <h4 className="font-semibold text-gray-900">
               {isEditMode ? t('tables.edit_settings') : t('tables.table_info')}
             </h4>
             <button
               onClick={() => setSelectedTable(null)}
-              className="p-1 hover:bg-muted rounded"
+              className="p-1 hover:bg-gray-100 rounded"
             >
               <X className="w-4 h-4" />
             </button>
@@ -483,7 +566,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
                 type="text"
                 value={selectedTableData.name}
                 disabled={true}
-                className="w-full px-3 py-2 border rounded-md text-sm border-border bg-muted cursor-not-allowed"
+                className="w-full px-3 py-2 border rounded-md text-sm border-gray-200 bg-gray-50 cursor-not-allowed"
                 title={t('tables.table_name_title')}
               />
             </div>
@@ -500,12 +583,12 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
                 className={cn(
                   "w-full px-3 py-2 border rounded-md text-sm",
                   isEditMode
-                    ? "border-border bg-card"
-                    : "border-border bg-muted cursor-not-allowed"
+                    ? "border-gray-300 bg-white"
+                    : "border-gray-200 bg-gray-50 cursor-not-allowed"
                 )}
                 placeholder={t('tables.capacity_placeholder')}
               />
-              <p className="text-xs text-text-tertiary mt-1">{t('tables.capacity_range_hint')}</p>
+              <p className="text-xs text-gray-500 mt-1">{t('tables.capacity_range_hint')}</p>
             </div>
 
             <div>
@@ -527,21 +610,21 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
 
             <div>
               <label className="block text-sm font-medium mb-1">{t('tables.status')}</label>
-              <div className="w-full px-3 py-2 border border-border bg-muted rounded-md text-sm cursor-not-allowed capitalize">
+              <div className="w-full px-3 py-2 border border-gray-200 bg-gray-50 rounded-md text-sm cursor-not-allowed capitalize">
                 {selectedTableData.occupied ? t('tables.occupied') : t('tables.available')}
               </div>
             </div>
 
             {/* Position Information */}
-            <div className="pt-3 border-t border-border">
+            <div className="pt-3 border-t border-gray-200">
               <label className="block text-sm font-medium mb-2">{t('tables.position')}</label>
               <div className={cn("grid grid-cols-2 gap-2 text-sm", isRTL && "flex-row-reverse")}>
                 <div>
-                  <span className="text-text-tertiary">X:</span>
+                  <span className="text-gray-500">X:</span>
                   <span className="ml-1">{Math.round(selectedTableData.x)}px</span>
                 </div>
                 <div>
-                  <span className="text-text-tertiary">Y:</span>
+                  <span className="text-gray-500">Y:</span>
                   <span className="ml-1">{Math.round(selectedTableData.y)}px</span>
                 </div>
               </div>
@@ -552,11 +635,11 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
               <label className="block text-sm font-medium mb-2">{t('tables.size')}</label>
               <div className={cn("grid grid-cols-2 gap-2 text-sm", isRTL && "flex-row-reverse")}>
                 <div>
-                  <span className="text-text-tertiary">W:</span>
+                  <span className="text-gray-500">W:</span>
                   <span className="ml-1">{getTableDimensions(selectedTableData.table_shape || 'Rectangle').width}px</span>
                 </div>
                 <div>
-                  <span className="text-text-tertiary">H:</span>
+                  <span className="text-gray-500">H:</span>
                   <span className="ml-1">{getTableDimensions(selectedTableData.table_shape || 'Rectangle').height}px</span>
                 </div>
               </div>
@@ -564,17 +647,17 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
 
             {/* Show current bill info if table is occupied */}
             {selectedTableData.latest_invoice_time && (
-              <div className="pt-3 border-t border-border">
+              <div className="pt-3 border-t border-gray-200">
                 <label className="block text-sm font-medium mb-2">{t('tables.current_bill')}</label>
-                <div className="bg-primary-tint p-3 rounded-md text-sm">
+                <div className="bg-blue-50 p-3 rounded-md text-sm">
                   <div className="flex justify-between mb-1">
                     <span>{t('tables.started_at')}</span>
                     <span>{formatInvoiceTime(selectedTableData.latest_invoice_time)}</span>
                   </div>
                   {selectedTableOrder && (
-                    <div className="flex justify-between items-center pt-2 mt-2 border-t border-primary">
+                    <div className="flex justify-between items-center pt-2 mt-2 border-t border-blue-200">
                       <span>{t('tables.total_amount')}</span>
-                      <span className="font-bold text-lg text-primary">
+                      <span className="font-bold text-lg text-blue-800">
                         {getCombinedOrderTotals(selectedTableOrder).roundedTotal.toFixed(2)}
                       </span>
                     </div>

@@ -32,7 +32,7 @@ def get_dashboard_charts(branch=None):
 
 @frappe.whitelist()
 def get_recent_transactions(branch=None, limit=10):
-    filters = {}
+    filters = {"docstatus": ["in", [0, 1]]}
     if branch and branch != 'all':
         pass # Add branch filter if applicable for POS Invoice, usually 'custom_branch' or 'branch'
     
@@ -40,12 +40,18 @@ def get_recent_transactions(branch=None, limit=10):
         try:
             invoices = frappe.get_all("POS Invoice", 
                 filters=filters,
-                fields=["name", "customer", "posting_date", "posting_time", "grand_total", "status", "custom_order_type as order_type", "custom_restaurant_table as restaurant_table", "owner as cashier"],
+                fields=["name", "customer", "posting_date", "posting_time", "grand_total", "status", "order_type", "restaurant_table as restaurant_table", "owner as cashier"],
                 order_by="creation desc",
                 limit=int(limit)
             )
+            for inv in invoices:
+                if not inv.get("status"):
+                    inv["status"] = "Draft" if inv.get("docstatus") == 0 else "Paid"
+                if not inv.get("order_type"):
+                    inv["order_type"] = "Dine In"
             return invoices
-        except Exception:
+        except Exception as e:
+            frappe.log_error(f"Error in get_recent_transactions: {str(e)}")
             return []
     return []
 

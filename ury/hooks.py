@@ -23,6 +23,7 @@ add_to_apps_screen = [
 # include js, css files in header of desk.html
 # app_include_css = "/assets/ury/css/ury.css"
 app_include_js = [
+    "/assets/ury/js/setup_redirect.js",
     "/assets/ury/js/quick_entry.js",
     "/assets/ury/js/pos_print.js",
     "/assets/ury/js/restrict_qty_edit_pos.js",
@@ -270,10 +271,24 @@ on_session_creation = [
 
 # Request Events
 # ----------------
-before_request = [
-    "ury.ury.controllers.setup_redirect.redirect_to_setup"
+# before_request cannot issue a real HTTP redirect for Desk page GETs.
+# website_path_resolver runs inside PathResolver, which handles frappe.Redirect.
+website_path_resolver = [
+    "ury.ury.controllers.setup_redirect.website_path_resolver"
 ]
 # after_request = ["ury.utils.after_request"]
+
+website_redirects = [
+    {
+        "source": "/setup-wizard",
+        "target": "/ury/setup-wizard/0",
+        "redirect_http_status": 302,
+    }
+]
+
+extend_bootinfo = [
+    "ury.ury.controllers.setup_redirect.extend_bootinfo"
+]
 
 # Job Events
 # ----------

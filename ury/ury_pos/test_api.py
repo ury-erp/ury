@@ -331,12 +331,196 @@ class TestUryPosApi(unittest.TestCase):
 
     def test_authorized_create_customer(self):
         frappe.set_user("Administrator")
-
+        
         result = create_customer("Test Auth Customer", "+919876543210")
-
+        
         self.assertEqual(result.get("status"), "success")
         self.assertTrue(frappe.db.exists("Customer", "Test Auth Customer"))
 
+
+
+class TestGetAllowedPosProfiles(unittest.TestCase):
+    @patch("ury.ury_pos.api.frappe.get_all")
+    def test_no_company_returns_empty(self, mock_get_all):
+        from ury.ury_pos.api import _get_allowed_pos_profiles
+
+        result = _get_allowed_pos_profiles("", "cashier@example.com")
+        self.assertEqual(result, [])
+        mock_get_all.assert_not_called()
+
+    @patch("ury.ury_pos.api.frappe.get_all")
+    def test_open_profile_included_when_no_users(self, mock_get_all):
+        from ury.ury_pos.api import _get_allowed_pos_profiles
+
+        mock_get_all.side_effect = [
+            [{"name": "POS-Profile-1"}],
+            [],
+            [{
+                "name": "POS-Profile-1",
+                "company": "Test Co",
+                "branch": "Branch A",
+                "restaurant": "Rest A",
+                "custom_enable_multiple_cashier": 0,
+                "custom_daily_pos_close": 0,
+            }],
+        ]
+
+        result = _get_allowed_pos_profiles("Test Co", "cashier@example.com")
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["name"], "POS-Profile-1")
+
+    @patch("ury.ury_pos.api.frappe.get_all")
+    def test_matching_user_included(self, mock_get_all):
+        from ury.ury_pos.api import _get_allowed_pos_profiles
+
+        mock_get_all.side_effect = [
+            [{"name": "POS-Profile-1"}],
+            [{"parent": "POS-Profile-1", "user": "cashier@example.com"}],
+            [{
+                "name": "POS-Profile-1",
+                "company": "Test Co",
+                "branch": "Branch A",
+                "restaurant": "Rest A",
+                "custom_enable_multiple_cashier": 0,
+                "custom_daily_pos_close": 0,
+            }],
+        ]
+
+        result = _get_allowed_pos_profiles("Test Co", "cashier@example.com")
+        self.assertEqual(len(result), 1)
+
+    @patch("ury.ury_pos.api.frappe.get_all")
+    def test_other_user_excluded(self, mock_get_all):
+        from ury.ury_pos.api import _get_allowed_pos_profiles
+
+        mock_get_all.side_effect = [
+            [{"name": "POS-Profile-1"}],
+            [{"parent": "POS-Profile-1", "user": "other@example.com"}],
+            [],
+        ]
+
+        result = _get_allowed_pos_profiles("Test Co", "cashier@example.com")
+        self.assertEqual(result, [])
+
+
+class TestGetPOSOpeningScreenData(unittest.TestCase):
+    @patch("ury.ury_pos.api.frappe.get_all")
+    @patch("ury.ury_pos.api.frappe.has_permission")
+    @patch("ury.ury_pos.api.validate_pos_close")
+    @patch("ury.ury_pos.api.getPosProfile")
+    @patch("ury.ury_pos.api._get_allowed_pos_profiles")
+    @patch("ury.ury_pos.api.frappe.db.get_default")
+    @patch("ury.ury_pos.api.frappe.defaults.get_user_default")
+    @patch("ury.ury_pos.api.frappe.session")
+    def test_returns_full_context(
+        self,
+        mock_session,
+        mock_user_default,
+        mock_global_default,
+        mock_allowed,
+        mock_get_pos_profile,
+        mock_validate_close,
+        mock_has_permission,
+        mock_get_all,
+    ):
+        from ury.ury_pos.api import get_pos_opening_screen_data
+
+        mock_session.user = "cashier@example.com"
+        mock_user_default.return_value = "Test Co"
+        mock_global_default.return_value = None
+        mock_allowed.return_value = [{"name": "POS-Profile-1", "company": "Test Co"}]
+        mock_get_pos_profile.return_value = {
+            "pos_profile": "POS-Profile-1",
+            "branch": "Branch A",
+            "company": "Test Co",
+            "restaurant": "Rest A",
+            "multiple_cashier": 1,
+            "owner": "owner@example.com",
+            "custom_daily_pos_close": 1,
+        }
+
+        mock_pos_doc = MagicMock()
+        mock_pos_doc.payments = [
+            MagicMock(mode_of_payment="Cash"),
+            MagicMock(mode_of_payment="Card"),
+        ]
+
+        def get_doc_side_effect(doctype, name):
+            if doctype == "POS Profile" and name == "POS-Profile-1":
+                return mock_pos_doc
+            return MagicMock()
+
+        with patch(
+            "ury.ury_pos.api._get_main_cashier_status"
+        ) as mock_multi_cashier, patch(
+            "ury.ury_pos.api.frappe.get_doc", side_effect=get_doc_side_effect
+        ):
+            mock_validate_close.return_value = "Success"
+            mock_has_permission.side_effect = lambda doctype, perm: perm == "create" or perm == "submit"
+            mock_multi_cashier.return_value = {
+                "enabled": True,
+                "main_cashier_configured": True,
+                "main_cashier_open": True,
+            }
+            mock_get_all.return_value = [
+                {"name": "POS-OPE-0001", "company": "Test Co", "pos_profile": "POS-Profile-1", "status": "Open"}
+            ]
+
+            result = get_pos_opening_screen_data()
+
+        self.assertEqual(result["user"], "cashier@example.com")
+        self.assertEqual(result["company"], "Test Co")
+        self.assertEqual(len(result["allowed_profiles"]), 1)
+        self.assertEqual(result["allowed_profiles"][0]["name"], "POS-Profile-1")
+        self.assertEqual(result["selected_profile"], "POS-Profile-1")
+        self.assertEqual(result["branch"], "Branch A")
+        self.assertEqual(result["restaurant"], "Rest A")
+        self.assertTrue(result["multi_cashier"]["enabled"])
+        self.assertTrue(result["multi_cashier"]["main_cashier_configured"])
+        self.assertTrue(result["multi_cashier"]["main_cashier_open"])
+        self.assertEqual(len(result["payment_modes"]), 2)
+        self.assertEqual(result["payment_modes"][0]["opening_amount"], 0.0)
+        self.assertFalse(result["daily_close_pending"])
+        self.assertTrue(result["permissions"]["create"])
+        self.assertTrue(result["permissions"]["submit"])
+        self.assertEqual(len(result["open_entries"]), 1)
+
+    @patch("ury.ury_pos.api.frappe.get_all")
+    @patch("ury.ury_pos.api.frappe.has_permission")
+    @patch("ury.ury_pos.api.getPosProfile")
+    @patch("ury.ury_pos.api._get_allowed_pos_profiles")
+    @patch("ury.ury_pos.api.frappe.db.get_default")
+    @patch("ury.ury_pos.api.frappe.defaults.get_user_default")
+    @patch("ury.ury_pos.api.frappe.session")
+    def test_handles_missing_company_and_profile_gracefully(
+        self,
+        mock_session,
+        mock_user_default,
+        mock_global_default,
+        mock_allowed,
+        mock_get_pos_profile,
+        mock_has_permission,
+        mock_get_all,
+    ):
+        from ury.ury_pos.api import get_pos_opening_screen_data
+
+        mock_session.user = "cashier@example.com"
+        mock_user_default.return_value = None
+        mock_global_default.return_value = None
+        mock_allowed.return_value = []
+        mock_get_pos_profile.side_effect = Exception("No branch")
+        mock_has_permission.return_value = False
+        mock_get_all.return_value = []
+
+        result = get_pos_opening_screen_data()
+
+        self.assertIsNone(result["company"])
+        self.assertEqual(result["allowed_profiles"], [])
+        self.assertIsNone(result["selected_profile"])
+        self.assertEqual(result["payment_modes"], [])
+        self.assertFalse(result["permissions"]["create"])
+        self.assertFalse(result["permissions"]["submit"])
+        self.assertEqual(result["open_entries"], [])
 
 class TestSubmitChecklistSEC10(FrappeTestCase):
     """Test cases for submit_checklist function."""
@@ -494,3 +678,38 @@ class TestSubmitChecklistSEC10(FrappeTestCase):
         self.assertEqual(mock_log_doc.status, "In Progress")
         self.assertEqual(result["name"], "URY-POS-CHECKLIST-LOG-002")
         mock_log_doc.save.assert_called_once()
+
+    @patch("ury.ury_pos.api.frappe.throw")
+    @patch("ury.ury_pos.api.frappe.db.get_value")
+    @patch("ury.ury_pos.api.getBranch")
+    def test_validate_checklist_branch_cross_branch_rejection(
+        self, mock_get_branch, mock_db_get_value, mock_throw
+    ):
+        """Test that submit_checklist raises PermissionError when user's branch doesn't match POS Profile branch."""
+        # Setup mocks for _validate_checklist_branch (no mock of the validation function itself)
+        mock_get_branch.return_value = "Branch A"  # Session user's branch
+
+        # Mock frappe.db.get_value to return the POS Profile's branch (different from session user's)
+        mock_db_get_value.return_value = "Branch B"
+
+        # Make frappe.throw actually raise the exception
+        def throw_side_effect(message, exception_class=None):
+            if exception_class:
+                raise exception_class(message)
+            else:
+                raise frappe.ValidationError(message)
+
+        mock_throw.side_effect = throw_side_effect
+
+        # Prepare minimal checklist items
+        items = json.dumps([
+            {"item_label": "Opening Check", "is_checked": True, "remarks": ""},
+        ])
+
+        # Call the function and expect it to raise PermissionError
+        with self.assertRaises(frappe.PermissionError):
+            submit_checklist(
+                pos_profile="POS-Profile-Branch-B",
+                checklist_type="Opening",
+                items=items
+            )

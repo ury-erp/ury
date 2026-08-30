@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
 import { Plus, Layers, Edit2 } from 'lucide-react';
-import { Badge, Button, Input, Page, Panel, Spinner, showToast } from '@ury/ui';
+import { Card, Button, Badge, Input, Spinner, showToast } from '@ury/ui';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
+import { Switch } from '../../components/ui/switch';
 import { dashboardService } from '../../services/dashboard';
 import { call } from '@ury/core';
 import SideDrawer from '../../components/layout/SideDrawer';
@@ -12,6 +13,9 @@ interface UryRoomRecord {
   room_name?: string;
   room_type?: string;
   branch?: string;
+  kot_printing?: number;
+  print_format?: string;
+  block_takeaway?: number;
 }
 
 export const RoomPage: React.FC = () => {
@@ -97,9 +101,48 @@ export const RoomPage: React.FC = () => {
     setSaving(true);
     try {
       if (editingRoom) {
+        // Derive display name from room.name, stripping branch suffix if present
+        let originalDisplayName = editingRoom.name;
+        if (editingRoom.branch && originalDisplayName.endsWith(` - ${editingRoom.branch}`)) {
+          originalDisplayName = originalDisplayName.substring(0, originalDisplayName.length - (` - ${editingRoom.branch}`).length);
+        }
+
+        const original = {
+          room_name: originalDisplayName || '',
+          room_type: editingRoom.room_type || 'AC',
+          branch: editingRoom.branch || '',
+          kot_printing: editingRoom.kot_printing === 1 ? 1 : 0,
+          print_format: editingRoom.print_format || '',
+          block_takeaway: editingRoom.block_takeaway === 1 ? 1 : 0,
+        };
+        const current = {
+          room_name: newRoom.room_name || '',
+          room_type: newRoom.room_type || 'AC',
+          branch: newRoom.branch || '',
+          kot_printing: newRoom.kot_printing ? 1 : 0,
+          print_format: newRoom.print_format || '',
+          block_takeaway: newRoom.block_takeaway ? 1 : 0,
+        };
+        if (JSON.stringify(original) === JSON.stringify(current)) {
+          showToast.warning('No changes in document');
+          setSaving(false);
+          return;
+        }
+
+        let currentName = editingRoom.name;
+        const newDocName = newRoom.branch ? `${newRoom.room_name} - ${newRoom.branch}` : newRoom.room_name;
+        if (newDocName !== editingRoom.name) {
+          await call('frappe.client.rename_doc', {
+            doctype: 'URY Room',
+            old_name: editingRoom.name,
+            new_name: newDocName,
+          });
+          currentName = newDocName;
+        }
+
         await call('frappe.client.set_value', {
           doctype: 'URY Room',
-          name: editingRoom.name,
+          name: currentName,
           fieldname: {
             room_type: newRoom.room_type,
             branch: newRoom.branch,
@@ -133,9 +176,9 @@ export const RoomPage: React.FC = () => {
   };
 
   return (
-    <Page>
+    <div className="space-y-6">
       {/* Toolbar — Partition Style, no title */}
-      <div className="flex flex-col md:flex-row items-center justify-end gap-4 pb-3 border-b border-border -mx-6 px-6 -mt-6 pt-6">
+      <div className="flex flex-col md:flex-row items-center justify-end gap-4 pb-3 border-b border-gray-200 -mx-6 px-6 -mt-6 pt-6">
         <Button
           onClick={openAddDrawer}
           className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center space-x-1.5 shadow-xs"
@@ -146,46 +189,50 @@ export const RoomPage: React.FC = () => {
       </div>
 
       {loading ? (
-        <div className="mt-section py-16 flex items-center justify-center bg-card rounded-[9px] border border-hair">
+        <div className="py-16 flex items-center justify-center bg-white rounded-lg border border-gray-200">
           <Spinner className="w-8 h-8 text-primary" />
         </div>
       ) : rooms.length === 0 ? (
-        <div className="mt-section px-4 py-[18px] text-xs text-text-tertiary flex items-center gap-2.5 bg-card border border-hair rounded-[9px]">
-          <span>Add dining rooms or zones to organize your tables.</span>
+        <Card className="p-12 flex flex-col items-center justify-center text-center rounded-lg border border-gray-200 shadow-sm bg-white">
+          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+            <Layers className="w-6 h-6 text-primary" />
+          </div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-1">No Rooms Configured</h3>
+          <p className="text-gray-500 mb-6 max-w-sm">
+            Add dining rooms or zones to organize your tables.
+          </p>
           <Button
             onClick={openAddDrawer}
-            variant="chrome"
-            size="compactSm"
-            className="ml-auto"
+            className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center space-x-1.5 shadow-xs"
           >
-            <Plus className="w-3.5 h-3.5" />
+            <Plus className="w-4 h-4" />
             <span>Add Room</span>
           </Button>
-        </div>
+        </Card>
       ) : (
-        <Panel className="mt-section overflow-hidden">
-          <table className="w-full text-left text-sm text-muted-foreground">
-            <thead className="border-b border-hair">
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+          <table className="w-full text-left text-sm text-gray-600">
+            <thead className="bg-gray-50 border-b border-gray-100 text-xs uppercase text-gray-500 font-semibold">
               <tr>
-                <th className="px-[14px] py-[7px] text-[11px] font-medium text-text-tertiary text-left">Room Name</th>
-                <th className="px-[14px] py-[7px] text-[11px] font-medium text-text-tertiary text-left">Room Type</th>
-                <th className="px-[14px] py-[7px] text-[11px] font-medium text-text-tertiary text-left">Branch</th>
-                <th className="px-[14px] py-[7px] text-[11px] font-medium text-text-tertiary text-right">Actions</th>
+                <th className="px-6 py-4">Room Name</th>
+                <th className="px-6 py-4">Room Type</th>
+                <th className="px-6 py-4">Branch</th>
+                <th className="px-6 py-4 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-hair">
+            <tbody className="divide-y divide-gray-100">
               {rooms.map((room) => (
-                <tr key={room.name} className="hover:bg-muted transition-colors">
-                  <td className="px-[14px] py-2 text-[12.5px] font-semibold text-foreground">{room.name}</td>
-                  <td className="px-[14px] py-2 text-[12.5px]">
-                    <Badge size="tag" variant="tagAccent">
-                      <Layers className="w-3 h-3" />
-                      {room.room_type || 'General'}
+                <tr key={room.name} className="hover:bg-primary/10 transition-colors">
+                  <td className="px-6 py-4 font-semibold text-gray-900">{room.name}</td>
+                  <td className="px-6 py-4">
+                    <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary text-[10px]">
+                      <Layers className="w-3 h-3 mr-1" />
+                      {room.room_type === 'NON-AC' ? 'Non-AC' : (room.room_type || 'General')}
                     </Badge>
                   </td>
-                  <td className="px-[14px] py-2 text-[12.5px]">{room.branch || 'Main'}</td>
-                  <td className="px-[14px] py-2 text-[12.5px] text-right">
-                    <Button variant="ghost" size="sm" onClick={() => openEditDrawer(room)} className="text-text-tertiary hover:text-primary">
+                  <td className="px-6 py-4">{room.branch || 'Main'}</td>
+                  <td className="px-6 py-4 text-right">
+                    <Button variant="ghost" size="sm" onClick={() => openEditDrawer(room)} className="text-gray-500 hover:text-primary">
                       <Edit2 className="w-4 h-4" />
                     </Button>
                   </td>
@@ -193,7 +240,7 @@ export const RoomPage: React.FC = () => {
               ))}
             </tbody>
           </table>
-        </Panel>
+        </div>
       )}
 
       {/* Add/Edit SideDrawer */}
@@ -204,37 +251,30 @@ export const RoomPage: React.FC = () => {
       >
         <form onSubmit={handleSaveRoom} className="space-y-4 text-sm">
           <div>
-            <label className="block font-semibold text-muted-foreground mb-1">Room Name</label>
+            <label className="block font-semibold text-gray-700 mb-1">Room Name</label>
             <Input
               value={newRoom.room_name}
               onChange={(e) => setNewRoom({ ...newRoom, room_name: e.target.value })}
-              disabled={!!editingRoom}
-              required={!editingRoom}
+              required
             />
-            {editingRoom && (
-              <p className="text-xs text-text-tertiary mt-1">Room name cannot be changed after creation</p>
-            )}
           </div>
 
           <div>
-            <label className="block font-semibold text-muted-foreground mb-1">Room Type</label>
+            <label className="block font-semibold text-gray-700 mb-1">Room Type</label>
             <SearchableSelect
               id="room_type"
               value={newRoom.room_type}
               onChange={(_, value) => setNewRoom({ ...newRoom, room_type: value })}
               options={[
                 { value: 'AC', label: 'AC' },
-                { value: 'Non-AC', label: 'Non-AC' },
-                { value: 'Rooftop', label: 'Rooftop' },
-                { value: 'Outdoor', label: 'Outdoor' },
-                { value: 'Bar', label: 'Bar' },
+                { value: 'NON-AC', label: 'Non-AC' },
               ]}
             />
           </div>
 
           {/* Branch field */}
           <div>
-            <label className="block font-semibold text-muted-foreground mb-1">Branch</label>
+            <label className="block font-semibold text-gray-700 mb-1">Branch</label>
             <SearchableSelect
               id="branch"
               value={newRoom.branch}
@@ -246,22 +286,21 @@ export const RoomPage: React.FC = () => {
             />
           </div>
 
-          <div className="pt-4 border-t border-border">
-            <h3 className="font-semibold text-foreground mb-3">Printer Configuration</h3>
+          <div className="pt-4 border-t border-gray-100">
+            <h3 className="font-semibold text-gray-900 mb-3">Printer Configuration</h3>
             <div className="space-y-3">
-              <label className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="kot_printing"
                   checked={newRoom.kot_printing}
-                  onChange={(e) => setNewRoom({ ...newRoom, kot_printing: e.target.checked })}
-                  className="rounded text-primary border-border focus:ring-primary"
+                  onCheckedChange={(checked) => setNewRoom({ ...newRoom, kot_printing: checked })}
                 />
-                <span className="text-muted-foreground">Enable KOT Printing for this room</span>
-              </label>
+                <label htmlFor="kot_printing" className="text-gray-700 cursor-pointer">Enable KOT Printing for this room</label>
+              </div>
 
               {newRoom.kot_printing && (
                 <div>
-                  <label className="block font-medium text-muted-foreground mb-1">Print Format</label>
+                  <label className="block font-medium text-gray-700 mb-1">Print Format</label>
                   <Input
                     value={newRoom.print_format}
                     onChange={(e) => setNewRoom({ ...newRoom, print_format: e.target.value })}
@@ -269,30 +308,28 @@ export const RoomPage: React.FC = () => {
                 </div>
               )}
 
-              <label className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="block_takeaway"
                   checked={newRoom.block_takeaway}
-                  onChange={(e) => setNewRoom({ ...newRoom, block_takeaway: e.target.checked })}
-                  className="rounded text-primary border-border focus:ring-primary"
+                  onCheckedChange={(checked) => setNewRoom({ ...newRoom, block_takeaway: checked })}
                 />
-                <span className="text-muted-foreground">Block Takeaway / Delivery Printing</span>
-              </label>
+                <label htmlFor="block_takeaway" className="text-gray-700 cursor-pointer">Block Takeaway / Delivery Printing</label>
+              </div>
             </div>
           </div>
 
-          <div className="pt-6 flex justify-end gap-2 border-t mt-4 border-border">
+          <div className="pt-6 flex justify-end gap-2 border-t mt-4 border-gray-100">
             <Button type="button" variant="outline" onClick={() => setIsDrawerOpen(false)} disabled={saving}>
               Cancel
             </Button>
             <Button type="submit" disabled={saving} className="bg-primary hover:bg-primary/90 text-white">
-              {saving ? <Spinner className="w-4 h-4 mr-1.5" /> : null}
               {editingRoom ? 'Save Changes' : 'Save Room'}
             </Button>
           </div>
         </form>
       </SideDrawer>
-    </Page>
+    </div>
   );
 };
 

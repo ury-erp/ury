@@ -1,15 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  Button,
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  Input,
-  Spinner,
-  cn,
-} from '@ury/ui';
+import { Button, Input, Spinner, cn } from '@ury/ui';
 import { t } from '../i18n';
 import {
   getChecklist,
@@ -67,13 +57,6 @@ const toRowState = (items: ChecklistItem[]): ChecklistRowState[] =>
  * treatment as POSOpeningDialog, but interactive: fetches the checklist on
  * mount, renders each item with a mandatory marker and an optional remarks
  * field, and submits once every mandatory item is checked.
- *
- * Uses the shared Dialog/DialogContent primitives but intentionally omits
- * `onOpenChange` and the close button (`onClose`): the primitives only ever
- * initiate a close by invoking those callbacks (overlay click calls
- * `onOpenChange?.(false)`, the close "x" calls `onClose`), so leaving both
- * unset means there is no code path that can dismiss this gate — it can
- * only close via `onComplete()` from a real, successful submit.
  */
 const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: ChecklistGateDialogProps) => {
   const [rows, setRows] = useState<ChecklistRowState[]>([]);
@@ -90,13 +73,14 @@ const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: Checklis
     setLoadError(null);
 
     try {
-      // getChecklist's declared camelCase fields (logName/logStatus) don't
-      // actually match what the backend returns (log_name/log_status), so
-      // fetchedLogName was always undefined here. Read both casings
-      // defensively until the shared api layer is fixed.
-      const checklistResult: any = await getChecklist(posProfile, checklistType);
-      const fetchedLogName = checklistResult.logName ?? checklistResult.log_name ?? null;
-      setRows(toRowState(checklistResult.items));
+      const { items, logName: fetchedLogName, logStatus } = await getChecklist(posProfile, checklistType);
+      
+      if (items.length === 0 || logStatus === 'Complete') {
+        onComplete();
+        return;
+      }
+
+      setRows(toRowState(items));
       setLogName(fetchedLogName);
     } catch (error) {
       console.error('Failed to load checklist:', error);
@@ -104,42 +88,11 @@ const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: Checklis
     } finally {
       setIsLoading(false);
     }
-  }, [posProfile, checklistType]);
+  }, [posProfile, checklistType, onComplete]);
 
   useEffect(() => {
     loadChecklist();
   }, [loadChecklist]);
-
-  // Auto-submit when the checklist has zero configured items. Since there's
-  // nothing to check, we immediately submit with an empty items array, which
-  // the backend correctly marks as Complete (all_mandatory_checked is
-  // vacuously true for empty lists). This prevents the confusing UX of showing
-  // a gate with a Submit button but no items to interact with.
-  useEffect(() => {
-    // Only auto-submit once when: finished loading, no load error, no items, and not already submitting
-    if (!isLoading && !loadError && rows.length === 0 && !isSubmitting) {
-      const autoSubmit = async () => {
-        setIsSubmitting(true);
-        setSubmitError(null);
-
-        try {
-          const response = await submitChecklist(posProfile, checklistType, [], logName ?? undefined);
-          if (response.status === 'Complete') {
-            onComplete();
-          } else {
-            setSubmitError(t('checklist.incomplete_error'));
-          }
-        } catch (error) {
-          console.error('Failed to auto-submit empty checklist:', error);
-          setSubmitError(extractServerErrorMessage(error, t('checklist.submit_failed')));
-        } finally {
-          setIsSubmitting(false);
-        }
-      };
-
-      autoSubmit();
-    }
-  }, [isLoading, loadError, rows.length, isSubmitting, posProfile, checklistType, logName, onComplete]);
 
   const handleCheckedChange = (index: number, isChecked: boolean) => {
     setRows((prev) => prev.map((row, i) => (i === index ? { ...row, is_checked: isChecked } : row)));
@@ -187,14 +140,10 @@ const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: Checklis
   };
 
   return (
-    // No onOpenChange: overlay clicks call `onOpenChange?.(false)`, which is
-    // a no-op here since the prop is unset, keeping this gate non-dismissable.
-    <Dialog open>
-      <DialogContent size="lg" showCloseButton={false} className="p-8 max-h-[90vh] flex flex-col">
-        <DialogHeader className="p-0 mb-2">
-          <DialogTitle className="text-2xl text-center">{t(titleKey)}</DialogTitle>
-          <DialogDescription className="text-center">{t('checklist.description')}</DialogDescription>
-        </DialogHeader>
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-8 max-w-lg w-full mx-4 shadow-xl max-h-[90vh] flex flex-col">
+        <h2 className="text-2xl font-bold text-gray-900 mb-2 text-center">{t(titleKey)}</h2>
+        <p className="text-gray-600 mb-6 text-center">{t('checklist.description')}</p>
 
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
@@ -206,7 +155,7 @@ const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: Checklis
           <>
             <div className="flex-1 overflow-y-auto space-y-4 mb-6 pr-1">
               {rows.map((row, index) => (
-                <div key={`${row.item_label}-${index}`} className="border border-gray-200 rounded-lg p-3">
+                <div key={`${row.item_label}-${index}`}>
                   <label className="flex items-start gap-3 cursor-pointer">
                     <input
                       type="checkbox"
@@ -247,8 +196,8 @@ const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: Checklis
             </Button>
           </>
         )}
-      </DialogContent>
-    </Dialog>
+      </div>
+    </div>
   );
 };
 

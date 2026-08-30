@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
-import { KpiStrip, Select, Input, Page, Section, Panel, PanelHeader, PanelTitle } from '@ury/ui';
-import { AlertTriangle, ChevronDown } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, StatCard } from '@ury/ui';
+import { IndianRupee, TrendingUp, TrendingDown, Percent, AlertTriangle, ChevronDown } from 'lucide-react';
 import { useBranchContext } from '../../context/BranchContext';
 import { toApiDate } from '../../lib/reportDate';
+import { DatePicker } from '../../components/setup/DatePicker';
+import { SearchableSelect } from '../../components/common/SearchableSelect';
 
 interface MissingPriceSection {
   label: string;
@@ -53,7 +55,7 @@ function MissingPricesWarning({ sections }: { sections: MissingPriceSection[] })
   const totalItems = sections.reduce((sum, s) => sum + s.items.length, 0);
 
   return (
-    <div className="rounded-md border border-warning-tint-border bg-warning-tint text-warning overflow-hidden">
+    <div className="rounded-md border border-amber-200 bg-amber-50 text-amber-800 overflow-hidden">
       <button
         onClick={() => setExpanded((e) => !e)}
         className="w-full flex items-center justify-between gap-2 px-4 py-3 text-sm text-left"
@@ -66,22 +68,22 @@ function MissingPricesWarning({ sections }: { sections: MissingPriceSection[] })
         <ChevronDown className={`w-4 h-4 shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`} />
       </button>
       {expanded && (
-        <div className="px-4 pb-4 space-y-3 border-t border-warning-tint-border pt-3">
+        <div className="px-4 pb-4 space-y-3 border-t border-amber-200 pt-3">
           {sections.map((s) => (
             <div key={s.label}>
-              <p className="text-xs font-semibold tracking-wide mb-1.5">
+              <p className="text-xs font-semibold uppercase tracking-wide mb-1.5">
                 {s.label} ({s.items.length})
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {s.items.map((item) => (
-                  <span key={item} className="px-2 py-0.5 rounded bg-warning-tint text-xs">
+                  <span key={item} className="px-2 py-0.5 rounded bg-amber-100 text-xs">
                     {item}
                   </span>
                 ))}
               </div>
             </div>
           ))}
-          <p className="text-xs text-warning">
+          <p className="text-xs text-amber-700">
             Update these item prices, then submit the document again for accurate Cost of Goods.
           </p>
         </div>
@@ -103,24 +105,22 @@ function BreakupTable({
 }) {
   if (rows.length === 0) return null;
   return (
-    <div className={className}>
-      <PanelHeader>
-        <PanelTitle>{title}</PanelTitle>
-      </PanelHeader>
-      <Panel pad>
-        <div className={twoColumn ? 'grid grid-cols-1 md:grid-cols-2 gap-x-8' : 'space-y-1'}>
-          {rows.map((r, i) => (
-            <div key={i} className="flex items-center justify-between text-sm py-1 border-b last:border-0">
-              <span className="text-muted-foreground">{r.label}</span>
-              <span className="font-medium">
-                {formatCurrency(r.amount)}{' '}
-                <span className="text-xs text-muted-foreground">({Number(r.percent).toFixed(1)}%)</span>
-              </span>
-            </div>
-          ))}
-        </div>
-      </Panel>
-    </div>
+    <Card className={className}>
+      <CardHeader>
+        <CardTitle className="text-base">{title}</CardTitle>
+      </CardHeader>
+      <CardContent className={twoColumn ? 'grid grid-cols-1 md:grid-cols-2 gap-x-8' : 'space-y-1'}>
+        {rows.map((r, i) => (
+          <div key={i} className="flex items-center justify-between text-sm py-1 border-b last:border-0">
+            <span className="text-muted-foreground">{r.label}</span>
+            <span className="font-medium">
+              {formatCurrency(r.amount)}{' '}
+              <span className="text-xs text-muted-foreground">({Number(r.percent).toFixed(1)}%)</span>
+            </span>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -178,56 +178,61 @@ export function DailyPnl() {
   const rest = (data?.summary ?? []).filter((r) => !HERO_KEYS.includes(r.key));
 
   return (
-    <Page>
+    <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-semibold">Daily P&amp;L</h1>
           <p className="text-sm text-muted-foreground">Full daily profit &amp; loss breakdown</p>
         </div>
         <div className="flex items-center gap-3">
-          <Select
-            value={branch}
-            onChange={(e) => setBranch(e.target.value)}
-          >
-            {branches.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-              </option>
-            ))}
-          </Select>
+          <div className="w-48">
+            <SearchableSelect
+              id="branch-select"
+              value={branch}
+              onChange={(_, val) => setBranch(val)}
+              options={branches.map((b) => ({
+                value: b.id,
+                label: b.name,
+              }))}
+              strict
+            />
+          </div>
           {availableDates.length > 0 ? (
-            <Select
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-            >
-              {availableDates.map((d) => (
-                <option key={d} value={d}>
-                  {d}
-                </option>
-              ))}
-            </Select>
+            <div className="w-40">
+              <SearchableSelect
+                id="date-select"
+                value={date}
+                onChange={(_, val) => setDate(val)}
+                options={availableDates.map((d) => ({
+                  value: d,
+                  label: d,
+                }))}
+                strict
+              />
+            </div>
           ) : (
-            <Input
-              type="date"
+            <DatePicker
+              id="daily-pnl-date"
               value={date}
-              onChange={(e) => setDate(e.target.value)}
+              onChange={(_id, val) => setDate(val)}
+              className="w-36"
             />
           )}
         </div>
       </div>
 
       {error && (
-        <Section className="rounded-md border border-destructive-tint-border bg-destructive-tint px-4 py-3 text-sm text-destructive">
+        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {error}
-        </Section>
+        </div>
       )}
 
       {isLoading ? (
-        <Section className="text-sm text-muted-foreground">Loading...</Section>
+        <div className="text-sm text-muted-foreground">Loading...</div>
       ) : !data?.exists ? (
-        <Section className="rounded-md border border-warning-tint-border bg-warning-tint px-4 py-3 text-sm text-warning">
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           No submitted Daily P&amp;L exists for this branch/date. It must be created and submitted in Desk first.
-        </Section>
+        </div>
       ) : (
         <>
           {data.missing_prices && data.missing_prices.length > 0 ? (
@@ -236,64 +241,71 @@ export function DailyPnl() {
             // generates). Rendering item names as plain React children
             // (never dangerouslySetInnerHTML) keeps this safe even though
             // the source is user-editable Item/Product Bundle names.
-            <Section>
-              <MissingPricesWarning sections={data.missing_prices} />
-            </Section>
+            <MissingPricesWarning sections={data.missing_prices} />
           ) : (
             data.remarks && (
               // Fallback for genuine free-text remarks (e.g. hand-typed via
               // Desk) that don't match the known structured warning shape.
               // Still never HTML-rendered — same rationale as above.
-              <Section className="rounded-md border border-warning-tint-border bg-warning-tint px-4 py-3 text-sm text-warning">
+              <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
                 {data.remarks.split(/<br\s*\/?>/i).map((line, i) => (
                   <div key={i}>{line}</div>
                 ))}
-              </Section>
+              </div>
             )
           )}
 
-          <Section>
-            <KpiStrip
-              items={[
-                { label: 'Gross Sales', value: formatCurrency(summaryMap.get('gross_sales')?.amount ?? 0) },
-                { label: 'Net Sales', value: formatCurrency(summaryMap.get('net_sales')?.amount ?? 0) },
-                {
-                  label: 'Gross Profit',
-                  value: `${formatCurrency(summaryMap.get('gross_profit')?.amount ?? 0)} (${Number(
-                    summaryMap.get('gross_profit')?.percent ?? 0
-                  ).toFixed(1)}%)`,
-                },
-                {
-                  label: 'Net Profit',
-                  value: `${formatCurrency(summaryMap.get('net_profit')?.amount ?? 0)} (${Number(
-                    summaryMap.get('net_profit')?.percent ?? 0
-                  ).toFixed(1)}%)`,
-                  tone: (summaryMap.get('net_profit')?.amount ?? 0) >= 0 ? 'success' : 'danger',
-                },
-              ]}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <StatCard
+              label="Gross Sales"
+              value={formatCurrency(summaryMap.get('gross_sales')?.amount ?? 0)}
+              icon={<IndianRupee className="w-4 h-4" />}
             />
-          </Section>
+            <StatCard
+              label="Net Sales"
+              value={formatCurrency(summaryMap.get('net_sales')?.amount ?? 0)}
+              icon={<TrendingUp className="w-4 h-4" />}
+            />
+            <StatCard
+              label="Gross Profit"
+              value={`${formatCurrency(summaryMap.get('gross_profit')?.amount ?? 0)} (${Number(
+                summaryMap.get('gross_profit')?.percent ?? 0
+              ).toFixed(1)}%)`}
+              icon={<Percent className="w-4 h-4" />}
+            />
+            <StatCard
+              label="Net Profit"
+              value={`${formatCurrency(summaryMap.get('net_profit')?.amount ?? 0)} (${Number(
+                summaryMap.get('net_profit')?.percent ?? 0
+              ).toFixed(1)}%)`}
+              icon={
+                (summaryMap.get('net_profit')?.amount ?? 0) >= 0 ? (
+                  <TrendingUp className="w-4 h-4" />
+                ) : (
+                  <TrendingDown className="w-4 h-4" />
+                )
+              }
+            />
+          </div>
 
-          <Section>
-            <PanelHeader>
-              <PanelTitle className="text-base">P&amp;L Statement</PanelTitle>
-            </PanelHeader>
-            <Panel pad>
-              <div className="space-y-1">
-                {rest.map((r) => (
-                  <div key={r.key} className="flex items-center justify-between text-sm py-1.5 border-b last:border-0">
-                    <span>{r.label}</span>
-                    <span className="font-medium">
-                      {formatCurrency(r.amount)}{' '}
-                      <span className="text-xs text-muted-foreground">({Number(r.percent).toFixed(1)}%)</span>
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </Panel>
-          </Section>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">P&amp;L Statement</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-1">
+              {rest.map((r) => (
+                <div key={r.key} className="flex items-center justify-between text-sm py-1.5 border-b last:border-0">
+                  <span>{r.label}</span>
+                  <span className="font-medium">
+                    {formatCurrency(r.amount)}{' '}
+                    <span className="text-xs text-muted-foreground">({Number(r.percent).toFixed(1)}%)</span>
+                  </span>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
 
-          <Section className="grid grid-cols-1 lg:grid-cols-2 gap-grid-gap items-start">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
             <BreakupTable title="Direct Expenses" rows={data.direct_expenses_breakup ?? []} className="self-start" />
             <BreakupTable title="Employee Costs" rows={data.employee_costs_breakup ?? []} className="self-start" />
             <BreakupTable
@@ -302,14 +314,14 @@ export function DailyPnl() {
               className="lg:col-span-2"
               twoColumn
             />
-          </Section>
+          </div>
 
           {data.cost_of_goods && data.cost_of_goods.length > 0 && (
-            <Section>
-              <PanelHeader>
-                <PanelTitle className="text-base">Cost of Goods Sold</PanelTitle>
-              </PanelHeader>
-              <Panel pad className="overflow-x-auto">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Cost of Goods Sold</CardTitle>
+              </CardHeader>
+              <CardContent className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="text-left text-muted-foreground border-b">
@@ -332,11 +344,11 @@ export function DailyPnl() {
                     ))}
                   </tbody>
                 </table>
-              </Panel>
-            </Section>
+              </CardContent>
+            </Card>
           )}
         </>
       )}
-    </Page>
+    </div>
   );
 }

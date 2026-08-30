@@ -69,13 +69,13 @@ class SubPOSClosing(Document):
     
     def on_submit(self):
         opening_entry = frappe.get_doc("POS Opening Entry", self.pos_opening_entry)
-        opening_entry.custom_sub_pos_close = self.name
+        opening_entry.custom_sub_pos_close_entry = self.name
         opening_entry.status = "Closed"
         opening_entry.save()
     
     def on_cancel(self):
         opening_entry = frappe.get_doc("POS Opening Entry", self.pos_opening_entry)
-        opening_entry.custom_sub_pos_close = self.name
+        opening_entry.custom_sub_pos_close_entry = self.name
         opening_entry.status = "Open"
         opening_entry.save()
 

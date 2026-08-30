@@ -3,91 +3,115 @@
 
 import frappe
 from frappe import _
-from ury.setup.demo import setup_ury_demo_data
-from erpnext.setup.setup_wizard.operations.install_fixtures import create_bank_account
+from frappe.utils import cint
+from ury.setup.demo import process_masters, process_transactions
+from ury.setup.pos_demo import generate_pos_demo
 
 
 def get_setup_stages(args=None):
-    return [
-        {
-            "status": _("Generating URY Demo Data"),
-            "fail_msg": _("Failed to generate URY demo data"),
-            "tasks": [
-                {
-                    "fn": enqueue_ury_demo_data,
-                    "args": args,
-                    "fail_msg": _("Failed to start background demo generation")
-                }
-            ]
-        }
-    ]
+	"""URY stages run only when the wizard asks for demo data.
+
+	Stages are synchronous so Frappe's setup_task progress ticks after each
+	one actually finishes, and demo records land on the company ERPNext just
+	created (args.company_name) rather than a second "(Demo)" company.
+	"""
+	if not _wants_ury_demo(args):
+		return []
+
+	return [
+		{
+			"status": _("Loading restaurant demo masters"),
+			"fail_msg": _("Failed to load restaurant demo masters"),
+			"tasks": [
+				{
+					"fn": load_demo_masters,
+					"args": args,
+					"fail_msg": _("Failed to load restaurant demo masters"),
+				}
+			],
+		},
+		{
+			"status": _("Creating demo transactions"),
+			"fail_msg": _("Failed to create demo transactions"),
+			"tasks": [
+				{
+					"fn": load_demo_transactions,
+					"args": args,
+					"fail_msg": _("Failed to create demo transactions"),
+				}
+			],
+		},
+		{
+			"status": _("Setting up POS demo"),
+			"fail_msg": _("Failed to set up POS demo"),
+			"tasks": [
+				{
+					"fn": load_demo_pos,
+					"args": args,
+					"fail_msg": _("Failed to set up POS demo"),
+				}
+			],
+		},
+	]
 
 
-def enqueue_ury_demo_data(args=None):
-    if args and args.get("setup_ury_demo"):
-        frappe.enqueue(
-            "ury.setup.setup_wizard.generate_actual_demo_data",
-            queue="default",
-            timeout=1500,
-            enqueue_after_commit=True,
-            at_front=True,
-            args=args
-        )
-
-def generate_actual_demo_data(args=None):
-    company = create_demo_company()
-
-    # Switch default company settings
-    frappe.defaults.set_user_default("Company", company)
-    frappe.db.set_default("company", company)
-    frappe.db.set_default("demo_data_type", "ury")
-
-    # Execute demo data setup
-    setup_ury_demo_data(company)
+def _wants_ury_demo(args):
+	if not args:
+		return False
+	value = args.get("setup_ury_demo")
+	if value in (True, "true", "True"):
+		return True
+	return bool(cint(value))
 
 
-def create_demo_company():
-    """
-    Creates demo company using ERPNext's official logic.
-    DO NOT customize unless ERPNext changes upstream.
-    """
+def _prepare_demo_company(args=None):
+	company = (args or {}).get("company_name")
+	if not company or not frappe.db.exists("Company", company):
+		companies = frappe.get_all("Company", pluck="name", limit=1)
+		if not companies:
+			frappe.throw(_("No company found for URY demo data"))
+		company = companies[0]
 
-    # Use first real company as template
-    company = frappe.db.get_all("Company")[0].name
-    company_doc = frappe.get_doc("Company", company)
+	frappe.defaults.set_user_default("Company", company)
+	frappe.db.set_default("company", company)
+	frappe.db.set_default("demo_data_type", "ury")
+	frappe.db.set_single_value("Global Defaults", "demo_company", company)
+	return company
 
-    # Create demo company
-    demo_company = frappe.new_doc("Company")
-    demo_company.company_name = f"{company_doc.company_name} (Demo)"
-    demo_company.abbr = f"{company_doc.abbr}D"
-    demo_company.enable_perpetual_inventory = 1
-    demo_company.default_currency = company_doc.default_currency
-    demo_company.country = company_doc.country
-    demo_company.chart_of_accounts_based_on = "Standard Template"
-    demo_company.chart_of_accounts = company_doc.chart_of_accounts
-    demo_company.insert(ignore_permissions=True)
 
-    # Set demo company defaults
-    frappe.db.set_single_value(
-        "Global Defaults",
-        "demo_company",
-        demo_company.name,
-    )
-    frappe.db.set_default("company", demo_company.name)
+def _cleanup_demo_flags():
+	frappe.db.set_single_value("Stock Settings", "allow_negative_stock", 0)
+	frappe.flags.mute_messages = False
 
-    # Create default bank account (ERPNext internal API)
-    bank_account = create_bank_account(
-        {"company_name": demo_company.name},
-        demo=True,
-    )
 
-    frappe.db.set_value(
-        "Company",
-        demo_company.name,
-        "default_bank_account",
-        bank_account.name,
-    )
+def load_demo_masters(args=None):
+	company = _prepare_demo_company(args)
+	frappe.flags.mute_messages = True
+	frappe.db.set_single_value("Stock Settings", "allow_negative_stock", 1)
+	try:
+		process_masters(company)
+	except Exception:
+		_cleanup_demo_flags()
+		raise
 
-    frappe.db.commit()
 
-    return demo_company.name
+def load_demo_transactions(args=None):
+	company = _prepare_demo_company(args)
+	try:
+		process_transactions(company)
+	except Exception:
+		_cleanup_demo_flags()
+		raise
+
+
+def load_demo_pos(args=None):
+	_prepare_demo_company(args)
+	try:
+		generate_pos_demo()
+		admin = frappe.get_doc("User", "Administrator")
+		admin.add_roles("URY Cashier", "URY Captain", "URY Manager")
+		frappe.cache.delete_keys("bootinfo")
+		if hasattr(frappe.local, "message_log"):
+			frappe.local.message_log = []
+	finally:
+		_cleanup_demo_flags()

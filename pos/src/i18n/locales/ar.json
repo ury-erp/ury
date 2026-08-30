@@ -37,7 +37,8 @@
     "clear_cache": "مسح ذاكرة التخزين المؤقت",
     "logout": "تسجيل الخروج",
     "shift_overview": "نظرة عامة على الوردية",
-    "service_board": "لوحة الخدمة"
+    "service_board": "لوحة الخدمة",
+    "switch_to_desk": "التبديل إلى المكتب"
   },
   "menu": {
     "special_items": "أصناف مميزة"
@@ -85,7 +86,10 @@
     "adjustment": "التسوية",
     "total": "الإجمالي",
     "pay_button": "دفع {{amount}}",
-    "processing": "جاري المعالجة..."
+    "processing": "جاري المعالجة...",
+    "short_by": "ناقص {{amount}}",
+    "change_due": "الباقي: {{amount}}",
+    "success": "تم الدفع بنجاح: تم استلام {{amount}}"
   },
   "pos": {
     "not_opened_title": "نقطة البيع غير مفتوحة",
@@ -93,7 +97,8 @@
     "not_opened_message": "يجب فتح وردية نقطة بيع جديدة للبدء.",
     "not_closed_message": "يجب إغلاق وردية نقطة البيع السابقة قبل البدء بوردية جديدة. يرجى إغلاقها للمتابعة.",
     "reload_page": "إعادة تحميل الصفحة",
-    "contact_manager": "إذا استمرت المشكلة، يرجى التواصل مع المدير."
+    "contact_manager": "إذا استمرت المشكلة، يرجى التواصل مع المدير.",
+    "switch_to_desk": "التبديل إلى لوحة التحكم (Desk)"
   },
   "customer": {
     "search_placeholder": "ابحث عن عميل...",
@@ -207,7 +212,7 @@
     "zoom_pan_hint": "استخدم التمرير للتكبير • اسحب الخلفية للتحريك"
   },
   "footer": {
-    "dashboard": "نظرة عامة",
+    "dashboard": "لوحة التحكم",
     "pos": "نقطة البيع",
     "tables": "الطاولات",
     "orders": "الطلبات",

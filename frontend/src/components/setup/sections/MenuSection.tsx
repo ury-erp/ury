@@ -1,9 +1,10 @@
-import React, { useState, useRef, DragEvent, ChangeEvent } from 'react';
+import React from 'react';
 import { useConfigure } from '../../../context/ConfigureContext';
 import { Input, Button } from '@ury/ui';
-import { Plus, Trash2, Upload, FileText, X, Download } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { SearchableSelect } from '../../common/SearchableSelect';
 import { Switch } from '../../ui/switch';
+import { MenuBulkUpload } from '../../common/MenuBulkUpload';
 
 const COURSE_OPTIONS = [
   { value: 'Starters', label: 'Starters' },
@@ -12,100 +13,6 @@ const COURSE_OPTIONS = [
   { value: 'Desserts', label: 'Desserts' },
   { value: 'Sides', label: 'Sides' },
 ];
-
-interface ParsedMenuRow {
-  name: string;
-  course: string;
-  price: number;
-}
-
-/** Splits a single CSV line into raw cell values, honoring double-quoted fields (with "" escapes). */
-function parseCsvLine(line: string): string[] {
-  const cells: string[] = [];
-  let current = '';
-  let inQuotes = false;
-
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i];
-    if (inQuotes) {
-      if (char === '"') {
-        if (line[i + 1] === '"') {
-          current += '"';
-          i++;
-        } else {
-          inQuotes = false;
-        }
-      } else {
-        current += char;
-      }
-    } else if (char === '"') {
-      inQuotes = true;
-    } else if (char === ',') {
-      cells.push(current);
-      current = '';
-    } else {
-      current += char;
-    }
-  }
-  cells.push(current);
-  return cells.map((cell) => cell.trim());
-}
-
-/**
- * Parses the menu CSV template (matches ury/public/files/menu_template.csv):
- *   "Bulk Edit Items"
- *   "Item","Item Name","Rate","Special Dish","Disabled","Course Icon","Course"
- *   "item","item_name","rate","special_dish","disabled","course_icon","course"
- *   ...instructions / separator rows...
- *   "CB","Chicken Biriyani",250,1,0,"","Main Courses"
- *
- * Falls back to a plain name,course,price layout if the template's "Item Name"
- * header isn't found, so a simpler hand-written CSV still imports.
- */
-function parseMenuCsv(text: string): ParsedMenuRow[] {
-  const lines = text.split(/\r\n|\r|\n/).filter((line) => line.trim().length > 0);
-  if (lines.length === 0) return [];
-
-  let headerIndex = -1;
-  let nameIndex = -1;
-  let courseIndex = -1;
-  let priceIndex = -1;
-
-  for (let i = 0; i < Math.min(lines.length, 5); i++) {
-    const cells = parseCsvLine(lines[i]);
-    const foundNameIndex = cells.findIndex((cell) => cell.toLowerCase() === 'item name');
-    if (foundNameIndex !== -1) {
-      headerIndex = i;
-      nameIndex = foundNameIndex;
-      courseIndex = cells.findIndex((cell) => cell.toLowerCase() === 'course');
-      priceIndex = cells.findIndex((cell) => cell.toLowerCase() === 'rate');
-      break;
-    }
-  }
-
-  if (headerIndex === -1) {
-    // Fall back to a simple name,course,price CSV with a header row.
-    headerIndex = 0;
-    nameIndex = 0;
-    courseIndex = 1;
-    priceIndex = 2;
-  }
-
-  const rows: ParsedMenuRow[] = [];
-  for (let i = headerIndex + 1; i < lines.length; i++) {
-    const cells = parseCsvLine(lines[i]);
-    const name = (cells[nameIndex] || '').trim();
-    if (!name) continue;
-    // Skip the machine-readable field-name row (e.g. "item_name") that follows the label row.
-    if (name.toLowerCase() === 'item_name' || name.toLowerCase() === 'item name') continue;
-
-    const course = (cells[courseIndex] || '').trim();
-    const price = parseFloat(cells[priceIndex]) || 0;
-    rows.push({ name, course, price });
-  }
-
-  return rows;
-}
 
 export function MenuSection() {
   const {
@@ -121,12 +28,6 @@ export function MenuSection() {
     updateTaxConfig,
   } = useConfigure();
 
-  const [isDragging, setIsDragging] = useState(false);
-  const [importMessage, setImportMessage] = useState<string | null>(null);
-  const [importError, setImportError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const messageTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   const currencyLabel = (window as any).frappe?.boot?.sysdefaults?.currency;
   const priceColumnLabel = currencyLabel ? `Price (${currencyLabel})` : 'Price';
 
@@ -138,122 +39,16 @@ export function MenuSection() {
     });
   };
 
-  const importFile = async (file: File) => {
-    if (messageTimeoutRef.current) clearTimeout(messageTimeoutRef.current);
-    setImportMessage(null);
-    setImportError(null);
-    setMenuFile(file);
-
-    try {
-      const text = await file.text();
-      const rows = parseMenuCsv(text);
-
-      if (rows.length === 0) {
-        setImportError("Couldn't read that file , make sure it matches the template format.");
-        return;
-      }
-
-      addMenuItems(rows);
-      setImportMessage(`Imported ${rows.length} item${rows.length === 1 ? '' : 's'} from ${file.name} , review and edit below.`);
-      messageTimeoutRef.current = setTimeout(() => setImportMessage(null), 5000);
-    } catch {
-      setImportError("Couldn't read that file , make sure it matches the template format.");
-    }
-  };
-
-  const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = (e: DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    setIsDragging(false);
-  };
-
-  const handleDrop = (e: DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    setIsDragging(false);
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      importFile(e.dataTransfer.files[0]);
-    }
-  };
-
-  const handleFileSelect = (e: ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      importFile(e.target.files[0]);
-    }
-  };
-
   return (
     <div className="space-y-8">
       {/* 1. Bulk Menu Upload */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-foreground">Bulk Menu Upload</h3>
-          <a href="/assets/ury/files/menu_template.csv" download className="text-xs font-medium text-primary hover:underline flex items-center gap-1">
-            <Download className="w-3 h-3" /> Download Template
-          </a>
-        </div>
-
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".csv"
-          onChange={handleFileSelect}
-          className="hidden"
-        />
-
-        {menuFile ? (
-          <div className="p-3 border border-primary bg-primary/10 rounded-lg flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <FileText className="w-4 h-4 text-primary" />
-              <div>
-                <p className="text-xs font-medium text-foreground">{menuFile.name}</p>
-                <p className="text-[10px] text-muted-foreground">{(menuFile.size / 1024).toFixed(1)} KB</p>
-              </div>
-            </div>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => {
-                setMenuFile(null);
-                setImportMessage(null);
-                setImportError(null);
-              }}
-              className="text-muted-foreground hover:text-destructive p-1 h-auto"
-              title="Remove File"
-            >
-              <X className="w-4 h-4" />
-            </Button>
-          </div>
-        ) : (
-          <div
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            onClick={() => fileInputRef.current?.click()}
-            className={`p-4 border border-dashed rounded-lg text-center cursor-pointer transition-colors ${
-              isDragging
-                ? 'border-primary bg-primary/10'
-                : 'border-border hover:border-primary bg-muted'
-            }`}
-          >
-            <Upload className="w-5 h-5 text-muted-foreground mx-auto mb-1.5" />
-            <p className="text-xs font-medium text-foreground">
-              Drag &amp; drop CSV template here, or <span className="text-primary">browse</span>
-            </p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">Supports CSV files only</p>
-          </div>
-        )}
-
-        {importMessage && (
-          <p className="text-xs font-medium text-primary">{importMessage}</p>
-        )}
-        {importError && (
-          <p className="text-xs font-medium text-destructive">{importError}</p>
-        )}
-      </div>
+      <MenuBulkUpload
+        onItemsParsed={addMenuItems}
+        title="Bulk Menu Upload"
+        subtitle=""
+        file={menuFile}
+        onFileChange={setMenuFile}
+      />
 
       {/* 2. Tax Settings */}
       {branch.taxId && branch.taxId.trim() !== '' && (
@@ -293,7 +88,7 @@ export function MenuSection() {
                 updateTaxConfig({ taxPercentage: parseFloat(e.target.value) || 0 })
               }
               placeholder="5"
-              className="w-full text-sm bg-card"
+              className="w-full text-sm bg-white"
             />
           </div>
         </div>
@@ -326,7 +121,7 @@ export function MenuSection() {
                       updateMenuItem(item.id, { name: e.target.value })
                     }
                     placeholder="Item Name"
-                    className="w-full text-sm bg-card"
+                    className="w-full text-sm bg-white"
                   />
                 </div>
 
@@ -349,7 +144,7 @@ export function MenuSection() {
                       updateMenuItem(item.id, { price: parseFloat(e.target.value) || 0 })
                     }
                     placeholder="0.00"
-                    className="w-full text-sm bg-card"
+                    className="w-full text-sm bg-white"
                   />
                 </div>
               </div>
@@ -359,7 +154,7 @@ export function MenuSection() {
                   type="button"
                   variant="ghost"
                   onClick={() => deleteMenuItem(item.id)}
-                  className="text-destructive hover:text-destructive hover:bg-destructive-tint self-end md:self-center shrink-0 p-2 h-auto"
+                  className="text-red-500 hover:text-red-700 hover:bg-red-50 self-end md:self-center shrink-0 p-2 h-auto"
                   title="Delete Item"
                 >
                   <Trash2 className="w-4 h-4" />
