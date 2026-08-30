@@ -66,9 +66,10 @@ const MenuList: React.FC<MenuListProps> = ({ onItemClick }) => {
           </div>
         ) : (
           <div className={cn(
-            "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3",
+            "grid gap-2",
             isInteractionDisabled && "opacity-50 pointer-events-none"
-          )}>
+          )}
+          style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(148px, 1fr))' }}>
             {filteredItems.map((item) => (
               <MenuCard
                 key={item.id}
