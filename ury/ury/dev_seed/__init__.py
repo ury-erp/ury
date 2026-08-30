@@ -13,7 +13,7 @@ tables, and a POS Profile to create valid POS Invoices against).
 
 import frappe
 
-from ury.ury.dev_seed import catalog, historical_sales, profiles
+from ury.ury.dev_seed import catalog, historical_sales, operations, profiles
 
 
 def run_all():
@@ -22,6 +22,9 @@ def run_all():
 
 	print("=== dev_seed: profiles ===")
 	profiles.seed()
+
+	print("=== dev_seed: operations ===")
+	operations.seed()
 
 	print("=== dev_seed: historical_sales ===")
 	historical_sales.seed()
