@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call } from '@ury/core';
-import { KpiStrip, DataTable, type DataTableColumn } from '@ury/ui';
+import { KpiStrip, DataTable, type DataTableColumn, Page, Section } from '@ury/ui';
 import { useBranchContext } from '../../context/BranchContext';
 import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
 import { BarChartCard } from '../../components/reports/charts/BarChartCard';
@@ -66,7 +66,7 @@ export function RepeatedCustomers() {
   }, [fetchData]);
 
   return (
-    <div className="space-y-6">
+    <Page>
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-semibold">Repeated Customers</h1>
@@ -78,35 +78,45 @@ export function RepeatedCustomers() {
       </div>
 
       {error && (
-        <div className="rounded-md border border-destructive-tint-border bg-destructive-tint px-4 py-3 text-sm text-destructive">
-          {error}
-        </div>
+        <Section>
+          <div className="rounded-md border border-destructive-tint-border bg-destructive-tint px-4 py-3 text-sm text-destructive">
+            {error}
+          </div>
+        </Section>
       )}
 
       {isLoading && !data ? (
-        <div className="text-sm text-muted-foreground">Loading...</div>
+        <Section>
+          <div className="text-sm text-muted-foreground">Loading...</div>
+        </Section>
       ) : data ? (
         <>
-          <KpiStrip
-            items={[
-              { label: 'Total Visits', value: data.summary.total_customers },
-              { label: 'New Customers', value: data.summary.new_customers },
-              { label: 'Repeat Visits', value: data.summary.repeat_customers },
-              { label: 'Avg Repeat Rate', value: `${data.summary.avg_repeat_rate_percent}%` },
-            ]}
-          />
+          <Section>
+            <KpiStrip
+              items={[
+                { label: 'Total Visits', value: data.summary.total_customers },
+                { label: 'New Customers', value: data.summary.new_customers },
+                { label: 'Repeat Visits', value: data.summary.repeat_customers },
+                { label: 'Avg Repeat Rate', value: `${data.summary.avg_repeat_rate_percent}%` },
+              ]}
+            />
+          </Section>
 
-          <BarChartCard
-            title="New vs Repeat Visits"
-            data={data.rows}
-            xKey="date"
-            yKeys={['new_customers', 'repeat_customers']}
-            labels={{ new_customers: 'New Customers', repeat_customers: 'Repeat Customers' }}
-          />
+          <Section>
+            <BarChartCard
+              title="New vs Repeat Visits"
+              data={data.rows}
+              xKey="date"
+              yKeys={['new_customers', 'repeat_customers']}
+              labels={{ new_customers: 'New Customers', repeat_customers: 'Repeat Customers' }}
+            />
+          </Section>
 
-          <DataTable columns={columns} rows={data.rows} isLoading={isLoading} />
+          <Section>
+            <DataTable columns={columns} rows={data.rows} isLoading={isLoading} />
+          </Section>
         </>
       ) : null}
-    </div>
+    </Page>
   );
 }

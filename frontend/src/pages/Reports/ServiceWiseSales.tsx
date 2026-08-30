@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
-import { KpiStrip, DataTable, type DataTableColumn } from '@ury/ui';
+import { KpiStrip, DataTable, type DataTableColumn, Page, Section } from '@ury/ui';
 import { useBranchContext } from '../../context/BranchContext';
 import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
 import { PieChartCard } from '../../components/reports/charts/PieChartCard';
@@ -61,7 +61,7 @@ export function ServiceWiseSales() {
   }, [fetchData]);
 
   return (
-    <div className="space-y-6">
+    <Page>
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-semibold">Service Wise Sales</h1>
@@ -73,38 +73,46 @@ export function ServiceWiseSales() {
       </div>
 
       {error && (
-        <div className="rounded-md border border-destructive-tint-border bg-destructive-tint px-4 py-3 text-sm text-destructive">
-          {error}
-        </div>
+        <Section>
+          <div className="rounded-md border border-destructive-tint-border bg-destructive-tint px-4 py-3 text-sm text-destructive">
+            {error}
+          </div>
+        </Section>
       )}
 
       {isLoading && !data ? (
-        <div className="text-sm text-muted-foreground">Loading...</div>
+        <Section>
+          <div className="text-sm text-muted-foreground">Loading...</div>
+        </Section>
       ) : data ? (
         <>
-          <KpiStrip
-            items={[
-              { label: 'Total Revenue', value: formatCurrency(data.summary.total_revenue) },
-              { label: 'Total Orders', value: data.summary.total_orders },
-              { label: 'Avg Order Value', value: formatCurrency(data.summary.avg_order_value) },
-            ]}
-          />
+          <Section>
+            <KpiStrip
+              items={[
+                { label: 'Total Revenue', value: formatCurrency(data.summary.total_revenue) },
+                { label: 'Total Orders', value: data.summary.total_orders },
+                { label: 'Avg Order Value', value: formatCurrency(data.summary.avg_order_value) },
+              ]}
+            />
+          </Section>
 
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-            <div className="lg:col-span-2">
-              <PieChartCard
-                title="Revenue by Order Type"
-                data={data.by_service_type}
-                dataKey="revenue"
-                nameKey="order_type"
-              />
+          <Section>
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-grid-gap">
+              <div className="lg:col-span-2">
+                <PieChartCard
+                  title="Revenue by Order Type"
+                  data={data.by_service_type}
+                  dataKey="revenue"
+                  nameKey="order_type"
+                />
+              </div>
+              <div className="lg:col-span-3">
+                <DataTable columns={columns} rows={data.by_service_type} isLoading={isLoading} />
+              </div>
             </div>
-            <div className="lg:col-span-3">
-              <DataTable columns={columns} rows={data.by_service_type} isLoading={isLoading} />
-            </div>
-          </div>
+          </Section>
         </>
       ) : null}
-    </div>
+    </Page>
   );
 }
