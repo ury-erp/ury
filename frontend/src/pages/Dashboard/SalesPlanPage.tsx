@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarDays, CheckCircle2, History, Lock, Save, Search, Send, X } from 'lucide-react';
-import { AttentionFeed, Badge, Button, Card, Input, KpiStrip, Spinner } from '@ury/ui';
+import { AttentionFeed, Badge, Button, Card, Input, KpiStrip, Page, Section, Spinner } from '@ury/ui';
 import { useBranchContext } from '../../context/BranchContext';
 import { useAuth } from '../../store/useAuth';
 import {
@@ -370,7 +370,7 @@ export const SalesPlanPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <Page>
       <div className="-mx-6 -mt-6 border-b border-border px-6 pb-4 pt-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
@@ -420,8 +420,9 @@ export const SalesPlanPage: React.FC = () => {
         )}
       </div>
 
-      <KpiStrip
-        items={[
+      <Section>
+        <KpiStrip
+          items={[
           { label: 'Planned Qty', value: formatQty(totalPlannedQty) },
           { label: 'History Avg', value: formatQty(totalHistoryQty) },
           { label: 'Items', value: items.length },
@@ -429,10 +430,12 @@ export const SalesPlanPage: React.FC = () => {
             ? [{ label: 'Blocked', value: blockedItems.length, tone: 'warning' as const }]
             : []),
         ]}
-      />
+        />
+      </Section>
 
       {!loading && !error && blockedItems.length > 0 && (
-        <AttentionFeed
+        <Section>
+          <AttentionFeed
           title="Needs Attention"
           items={blockedItems.map((item) => {
             const missingProductionUnit = item.production_unit === 'Unassigned';
@@ -448,10 +451,12 @@ export const SalesPlanPage: React.FC = () => {
               },
             };
           })}
-        />
+          />
+        </Section>
       )}
 
-      <div className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3 shadow-sm">
+      <Section>
+        <div className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3 shadow-sm">
         <Search className="h-4 w-4 shrink-0 text-text-tertiary" />
         <input
           value={query}
@@ -459,18 +464,26 @@ export const SalesPlanPage: React.FC = () => {
           placeholder="Search item, department, or production unit"
           className="h-8 flex-1 border-none bg-transparent text-sm text-foreground outline-none placeholder:text-text-tertiary"
         />
-      </div>
+        </div>
+      </Section>
 
       {loading ? (
-        <div className="flex items-center justify-center rounded-lg border border-border bg-card py-16">
+        <Section>
+          <div className="flex items-center justify-center rounded-lg border border-border bg-card py-16">
           <Spinner className="h-8 w-8 text-primary" />
-        </div>
+          </div>
+        </Section>
       ) : error ? (
-        <Card className="border-destructive-tint-border bg-destructive-tint p-6 text-sm text-destructive">{error}</Card>
+        <Section>
+          <Card className="border-destructive-tint-border bg-destructive-tint p-6 text-sm text-destructive">{error}</Card>
+        </Section>
       ) : filteredItems.length === 0 ? (
-        <Card className="p-10 text-center text-sm text-text-tertiary">No comparable history items found for this plan date.</Card>
+        <Section>
+          <Card className="p-10 text-center text-sm text-text-tertiary">No comparable history items found for this plan date.</Card>
+        </Section>
       ) : (
-        <div className="space-y-5">
+        <Section>
+          <div className="space-y-5">
           {Object.entries(groupedItems).map(([department, departmentItems]) => (
             <div key={department} className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
               <div className="flex items-center justify-between border-b border-border bg-muted px-5 py-3">
@@ -542,11 +555,12 @@ export const SalesPlanPage: React.FC = () => {
               </div>
             </div>
           ))}
-        </div>
+          </div>
+        </Section>
       )}
 
       <HistoryModal item={selectedHistoryItem} onClose={() => setSelectedHistoryItem(null)} />
-    </div>
+    </Page>
   );
 };
 

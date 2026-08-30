@@ -9,6 +9,8 @@ import {
   InlineEditCell,
   Input,
   KpiStrip,
+  Page,
+  Section,
   Spinner,
   numericCellClass,
 } from '@ury/ui';
@@ -245,7 +247,7 @@ export const RequirementsPage: React.FC = () => {
   ];
 
   return (
-    <div className="space-y-6">
+    <Page>
       <div className="-mx-6 -mt-6 border-b border-border px-6 pb-4 pt-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
@@ -273,14 +275,19 @@ export const RequirementsPage: React.FC = () => {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center rounded-lg border border-border bg-card py-16">
-          <Spinner className="h-8 w-8 text-primary" />
-        </div>
+        <Section>
+          <div className="flex items-center justify-center rounded-lg border border-border bg-card py-16">
+            <Spinner className="h-8 w-8 text-primary" />
+          </div>
+        </Section>
       ) : error ? (
-        <Card className="border-destructive-tint-border bg-destructive-tint p-6 text-sm text-destructive">{error}</Card>
+        <Section>
+          <Card className="border-destructive-tint-border bg-destructive-tint p-6 text-sm text-destructive">{error}</Card>
+        </Section>
       ) : (
         <>
-          <KpiStrip
+          <Section>
+            <KpiStrip
             items={[
               {
                 label: 'Material value',
@@ -303,9 +310,11 @@ export const RequirementsPage: React.FC = () => {
                 hint: `${departmentCount} department${departmentCount === 1 ? '' : 's'} · cost not available`,
               },
             ]}
-          />
+            />
+          </Section>
 
-          <AttentionFeed
+          <Section>
+            <AttentionFeed
             title="Shortfalls"
             items={[
               {
@@ -314,9 +323,11 @@ export const RequirementsPage: React.FC = () => {
                 detail: `This workspace has no stock-on-hand data source yet, so automatic shortfall detection is not possible. ${demandVector.length} required-quantity line${demandVector.length === 1 ? '' : 's'} below need manual verification against store stock.`,
               },
             ]}
-          />
+            />
+          </Section>
 
-          <div>
+          <Section>
+            <div>
             <h2 className="mb-2 text-sm font-semibold tracking-wide text-muted-foreground">
               Materials to issue <span className="ml-1 text-xs font-normal text-text-tertiary">{demandVector.length} lines</span>
             </h2>
@@ -325,9 +336,11 @@ export const RequirementsPage: React.FC = () => {
               rows={demandVector}
               emptyMessage="No component demand recorded on this plan yet."
             />
-          </div>
+            </div>
+          </Section>
 
-          <div>
+          <Section>
+            <div>
             <h2 className="mb-2 text-sm font-semibold tracking-wide text-muted-foreground">
               Production targets <span className="ml-1 text-xs font-normal text-text-tertiary">{productionItems.length} items</span>
             </h2>
@@ -336,10 +349,11 @@ export const RequirementsPage: React.FC = () => {
               rows={productionItems}
               emptyMessage="No items recorded on this plan yet."
             />
-          </div>
+            </div>
+          </Section>
         </>
       )}
-    </div>
+    </Page>
   );
 };
 

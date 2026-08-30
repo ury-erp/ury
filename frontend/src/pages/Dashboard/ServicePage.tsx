@@ -10,6 +10,8 @@ import {
   DrawerSectionLabel,
   KeyValueRow,
   KpiStrip,
+  Page,
+  Section,
   Spinner,
   numericCellClass,
 } from '@ury/ui';
@@ -297,12 +299,19 @@ export const ServicePage: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6" data-testid="service-page">
-      {kpiItems.length > 0 && <KpiStrip items={kpiItems} />}
+    <Page data-testid="service-page">
+      {kpiItems.length > 0 && (
+        <Section>
+          <KpiStrip items={kpiItems} />
+        </Section>
+      )}
 
-      <AttentionFeed title="Needs Attention" items={needsAttention} />
+      <Section>
+        <AttentionFeed title="Needs Attention" items={needsAttention} />
+      </Section>
 
-      <Card className="p-4" data-testid="service-departments-table">
+      <Section>
+        <Card className="p-4" data-testid="service-departments-table">
         <h3 className="text-sm font-semibold mb-2">Departments</h3>
         <DataTable
           columns={departmentColumns}
@@ -310,7 +319,8 @@ export const ServicePage: React.FC = () => {
           emptyMessage="No department activity for today yet."
           onRowClick={setSelectedDepartment}
         />
-      </Card>
+        </Card>
+      </Section>
 
       <Drawer
         open={selectedDepartment !== null}
@@ -333,7 +343,7 @@ export const ServicePage: React.FC = () => {
           </>
         )}
       </Drawer>
-    </div>
+    </Page>
   );
 };
 

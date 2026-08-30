@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Badge, Button, Card, Spinner, Textarea } from '@ury/ui';
+import { Badge, Button, Card, Page, Section, Spinner, Textarea } from '@ury/ui';
 import { getLoggedUser, getUserRoles } from '@ury/core';
 import { useBranchContext } from '../../context/BranchContext';
 import {
@@ -235,7 +235,7 @@ const StockReservationContent: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <Page>
       <div className="-mx-6 -mt-6 border-b border-border px-6 pb-4 pt-6">
         <h1 className="text-xl font-semibold text-foreground">Stock Reservations</h1>
         <p className="mt-1 text-sm text-text-tertiary">
@@ -245,21 +245,30 @@ const StockReservationContent: React.FC = () => {
       </div>
 
       {!activeBranchId || activeBranchId === 'all' ? (
-        <Card className="p-10 text-center text-sm text-text-tertiary">
-          Select a branch to view its reservations.
-        </Card>
+        <Section>
+          <Card className="p-10 text-center text-sm text-text-tertiary">
+            Select a branch to view its reservations.
+          </Card>
+        </Section>
       ) : loading ? (
-        <div className="flex items-center justify-center rounded-lg border border-border bg-card py-16">
-          <Spinner className="h-8 w-8 text-primary" />
-        </div>
+        <Section>
+          <div className="flex items-center justify-center rounded-lg border border-border bg-card py-16">
+            <Spinner className="h-8 w-8 text-primary" />
+          </div>
+        </Section>
       ) : error ? (
-        <Card className="border-destructive-tint-border bg-destructive-tint p-6 text-sm text-destructive">{error}</Card>
+        <Section>
+          <Card className="border-destructive-tint-border bg-destructive-tint p-6 text-sm text-destructive">{error}</Card>
+        </Section>
       ) : reservations.length === 0 ? (
-        <Card className="p-8 text-center text-sm text-text-tertiary">
-          No active stock reservations for this branch right now.
-        </Card>
+        <Section>
+          <Card className="p-8 text-center text-sm text-text-tertiary">
+            No active stock reservations for this branch right now.
+          </Card>
+        </Section>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
+        <Section>
+          <div className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead className="border-b border-border bg-muted text-xs font-semibold text-text-tertiary">
@@ -319,7 +328,8 @@ const StockReservationContent: React.FC = () => {
               </tbody>
             </table>
           </div>
-        </div>
+          </div>
+        </Section>
       )}
 
       <ActionModal
@@ -329,7 +339,7 @@ const StockReservationContent: React.FC = () => {
         onConfirm={handleConfirmAction}
         onCancel={() => setActionModal({ ...actionModal, isOpen: false })}
       />
-    </div>
+    </Page>
   );
 };
 
