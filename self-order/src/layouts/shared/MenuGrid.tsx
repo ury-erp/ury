@@ -1,14 +1,18 @@
 import { useEffect, useState } from 'react'
-import type { MenuItem, OrderingCapabilities } from '../../lib/api'
+import type { MenuItem } from '../../lib/api'
 import { getAvailabilityMessage, getItemAvailability, ItemAvailability } from '../../lib/availability'
+import ProductCard from './ProductCard'
 
 type Cart = Record<string, { item: MenuItem; qty: number }>
 
 interface MenuGridProps {
   menu: MenuItem[]
   cart: Cart
-  capabilities: OrderingCapabilities | undefined
-  onAdd: (item: MenuItem) => void
+  showImage: boolean
+  /** Called when a card is tapped and it is available. Callers decide
+   * whether that means "add directly to cart" or "open product detail" —
+   * see each layout's handleProductClick/handleProductTap. */
+  onItemClick: (item: MenuItem) => void
   /** Tailwind grid classes (columns/gap) — differs between Tablet and Kiosk. */
   gridClassName: string
   /** Tailwind classes for each card — controls touch-target size. */
@@ -23,15 +27,18 @@ interface MenuGridProps {
 }
 
 /**
- * Category-free scrollable grid of menu items. Shared visual language
- * between TabletLayout and LandscapeKioskLayout — only the sizing classes
- * differ (larger cards, more columns on the kiosk).
+ * Category-free scrollable grid of menu items, shared between TabletLayout
+ * and LandscapeKioskLayout. Renders each item via the shared `ProductCard`
+ * (same visual language as the rest of the #288 UI overhaul) but wraps it
+ * with a per-item availability check (V3-44 material/production-plan stock
+ * gating) that dims and disables out-of-stock items before ProductCard ever
+ * sees the click.
  */
 function MenuGrid({
   menu,
   cart,
-  capabilities,
-  onAdd,
+  showImage,
+  onItemClick,
   gridClassName,
   cardClassName,
   imageClassName,
@@ -44,9 +51,9 @@ function MenuGrid({
         <MenuGridCard
           key={item.item}
           item={item}
-          cartQty={cart[item.item]?.qty}
-          showImage={!!capabilities?.show_item_images}
-          onAdd={onAdd}
+          cartQty={cart[item.item]?.qty ?? 0}
+          showImage={showImage}
+          onClick={onItemClick}
           cardClassName={cardClassName}
           imageClassName={imageClassName}
           branch={branch}
@@ -59,16 +66,16 @@ function MenuGrid({
 
 interface MenuGridCardProps {
   item: MenuItem
-  cartQty: number | undefined
+  cartQty: number
   showImage: boolean
-  onAdd: (item: MenuItem) => void
+  onClick: (item: MenuItem) => void
   cardClassName: string
   imageClassName?: string
   branch?: string
   company?: string
 }
 
-function MenuGridCard({ item, cartQty, showImage, onAdd, cardClassName, imageClassName, branch, company }: MenuGridCardProps) {
+function MenuGridCard({ item, cartQty, showImage, onClick, cardClassName, imageClassName, branch, company }: MenuGridCardProps) {
   const [availability, setAvailability] = useState<ItemAvailability | null>(null)
 
   useEffect(() => {
@@ -95,25 +102,16 @@ function MenuGridCard({ item, cartQty, showImage, onAdd, cardClassName, imageCla
   const unavailableMessage = isUnavailable ? getAvailabilityMessage(availability?.reason_code) : null
 
   return (
-    <button
-      onClick={() => (isUnavailable ? undefined : onAdd(item))}
+    <ProductCard
+      item={item}
+      cartQty={cartQty}
+      showImage={showImage}
+      onClick={() => onClick(item)}
+      cardClassName={cardClassName}
+      imageClassName={imageClassName}
       disabled={isUnavailable}
-      aria-disabled={isUnavailable || undefined}
-      className={`${cardClassName} ${isUnavailable ? 'opacity-50 cursor-not-allowed' : ''}`}
-    >
-      {showImage && item.item_image && (
-        <img src={item.item_image} alt={item.item_name} className={imageClassName ?? 'w-full object-cover'} />
-      )}
-      <div className="flex flex-1 flex-col gap-1 p-3">
-        <div className="font-medium">{item.item_name}</div>
-        <div className="text-muted-foreground">{item.rate}</div>
-        {unavailableMessage ? (
-          <div className="mt-1 text-sm font-semibold text-destructive">{unavailableMessage}</div>
-        ) : (
-          cartQty && <div className="mt-1 text-sm font-semibold text-primary">In cart: {cartQty}</div>
-        )}
-      </div>
-    </button>
+      unavailableMessage={unavailableMessage}
+    />
   )
 }
 
