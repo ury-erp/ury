@@ -528,30 +528,33 @@ export default {
     updateTimeRemaining() {
       // console.log("update time", this.kot_channel);
       this.kot.forEach((kot) => {
-        kot.timeRemaining = this.calculateTimeRemaining(kot.time);
-
-        const timeRemaining = kot.timeRemaining.split(":");
-        const minutes =
-          parseInt(timeRemaining[0]) * 60 + parseInt(timeRemaining[1]);
+        const { totalMinutes, label } = this.calculateTimeRemaining(kot.time);
+        kot.timeRemaining = label;
 
         if (
-          minutes === this.kot_alert_time &&
+          totalMinutes === this.kot_alert_time &&
           kot.type !== "Cancelled" &&
           kot.type !== "Partially cancelled"
         ) {
           this.orderDelayNotify(kot);
         }
-        if (minutes >= this.kot_alert_time) {
+        if (totalMinutes >= this.kot_alert_time) {
           kot.timecolor = "text-[var(--rd)]";
         } else {
           kot.timecolor = "text-[var(--t1)]";
         }
       });
     },
+    // `targetTime` is the KOT's creation time ("HH:MM:SS"), always in the
+    // past. This returns how long ago that was ("elapsed"), never a
+    // countdown — the KDS shows how long an order has been sitting, and
+    // flips to red once that elapsed time reaches `kot_alert_time` minutes.
     calculateTimeRemaining(targetTime) {
       const currentTime = new Date();
-      const [targetHours, targetMinutes, targetSeconds] = targetTime.split(":");
-      const targetDate = new Date(
+      const [targetHours, targetMinutes, targetSeconds] = targetTime
+        .split(":")
+        .map(Number);
+      let targetDate = new Date(
         currentTime.getFullYear(),
         currentTime.getMonth(),
         currentTime.getDate(),
@@ -560,11 +563,33 @@ export default {
         targetSeconds
       );
 
-      const timeDifference = currentTime - targetDate;
-      const hoursRemaining = Math.floor(timeDifference / 3600000);
-      const minutesRemaining = Math.floor((timeDifference % 3600000) / 60000);
+      // The creation time is always in the past. If placing it on today's
+      // date makes it look more than 12 hours in the future, the KOT was
+      // actually created yesterday (e.g. just before midnight) — roll the
+      // date back a day so elapsed time stays correct across the boundary.
+      if (targetDate.getTime() - currentTime.getTime() > 12 * 60 * 60 * 1000) {
+        targetDate.setDate(targetDate.getDate() - 1);
+      }
 
-      return `${hoursRemaining} : ${minutesRemaining}`;
+      // Elapsed time since creation. Clamp at 0 defensively (e.g. clock
+      // skew) so a not-yet-overdue KOT never renders a negative value.
+      const elapsedMs = Math.max(
+        0,
+        currentTime.getTime() - targetDate.getTime()
+      );
+      const totalMinutes = Math.floor(elapsedMs / 60000);
+      const hoursElapsed = Math.floor(totalMinutes / 60);
+      const minutesElapsed = totalMinutes % 60;
+
+      // Once overdue, prefix with "+" so "overdue by" is unambiguous at a
+      // glance from the plain elapsed reading below the alert threshold —
+      // the existing red text colour reinforces this further.
+      const isOverdue = totalMinutes >= this.kot_alert_time;
+      const label = isOverdue
+        ? `+${hoursElapsed} : ${minutesElapsed}`
+        : `${hoursElapsed} : ${minutesElapsed}`;
+
+      return { totalMinutes, label };
     },
     fetchkotwithmasonry() {
       return this.fetchKOT().then(() => {
