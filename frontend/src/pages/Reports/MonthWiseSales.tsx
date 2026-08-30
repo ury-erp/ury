@@ -4,7 +4,6 @@ import { StatCard, DataTable, type DataTableColumn } from '@ury/ui';
 import { IndianRupee, TrendingUp, Trophy, TrendingDown } from 'lucide-react';
 import { useBranchContext } from '../../context/BranchContext';
 import { BarChartCard } from '../../components/reports/charts/BarChartCard';
-import { SearchableSelect } from '../../components/common/SearchableSelect';
 
 interface MonthRow {
   year: number;
@@ -82,18 +81,17 @@ export function MonthWiseSales() {
             Monthly revenue trend {activeBranchId === 'all' ? '· All Branches' : ''}
           </p>
         </div>
-        <div className="w-44">
-          <SearchableSelect
-            id="months-back"
-            value={String(monthsBack)}
-            onChange={(_, val) => setMonthsBack(Number(val))}
-            options={MONTH_OPTIONS.map((m) => ({
-              value: String(m),
-              label: `Last ${m} months`,
-            }))}
-            strict
-          />
-        </div>
+        <select
+          value={monthsBack}
+          onChange={(e) => setMonthsBack(Number(e.target.value))}
+          className="border border-input rounded-md px-3 py-1.5 text-sm"
+        >
+          {MONTH_OPTIONS.map((m) => (
+            <option key={m} value={m}>
+              Last {m} months
+            </option>
+          ))}
+        </select>
       </div>
 
       {error && (
