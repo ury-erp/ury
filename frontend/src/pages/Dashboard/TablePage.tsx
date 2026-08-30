@@ -247,14 +247,16 @@ export const TablePage: React.FC = () => {
       ) : viewMode === 'grid' ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
           {tables.map((t) => (
-            <div key={t.name} className="p-5 rounded-[9px] border border-hair bg-card hover:shadow-md transition-all hover:border-primary/20 flex flex-col justify-between relative group cursor-pointer" onClick={() => openEditDrawer(t)}>
+            <div key={t.name} className="p-5 rounded-[9px] border border-hair bg-card hover:shadow-md transition-all hover:border-primary-tint-border flex flex-col justify-between relative group cursor-pointer" onClick={() => openEditDrawer(t)}>
               <div>
                 <div className="flex items-center justify-between">
-                  <span className="inline-flex items-center gap-[5px] text-[11px] h-[19px] px-[7px] rounded-[5px] text-primary bg-primary/10">
+                  <span className="inline-flex items-center gap-[5px] text-[11px] h-[19px] px-[7px] rounded-[5px] text-primary bg-primary-tint">
                     <Square className="w-3 h-3" />
                     {t.table_shape || 'Square'}
                   </span>
-                  <span className={`text-[11px] h-[19px] px-[7px] rounded-[5px] inline-flex items-center font-medium ${t.status === 'Occupied' ? 'text-warning bg-warning/10' : 'text-success bg-success/10'}`}>
+                  {/* Table status: Occupied=normal active service (primary), Available=empty recessive (muted).
+                       Warning/destructive colors deliberately reserved for future "table needs attention" state. */}
+                  <span className={`text-[11px] h-[19px] px-[7px] rounded-[5px] inline-flex items-center font-medium ${t.status === 'Occupied' ? 'text-primary bg-primary-tint' : 'text-muted-foreground bg-muted'}`}>
                     {t.status || 'Available'}
                   </span>
                 </div>
@@ -294,12 +296,14 @@ export const TablePage: React.FC = () => {
                   <td className="px-[14px] py-2 text-[12.5px]">{t.restaurant_room || 'Main Hall'}</td>
                   <td className="px-[14px] py-2 text-[12.5px] font-mono text-right tabular-nums">{t.no_of_seats || 4}</td>
                   <td className="px-[14px] py-2 text-[12.5px]">
-                    <span className="inline-flex items-center gap-[5px] text-[11px] h-[19px] px-[7px] rounded-[5px] text-primary bg-primary/10">
+                    <span className="inline-flex items-center gap-[5px] text-[11px] h-[19px] px-[7px] rounded-[5px] text-primary bg-primary-tint">
                       {t.table_shape || 'Square'}
                     </span>
                   </td>
                   <td className="px-[14px] py-2 text-[12.5px]">
-                    <span className={`text-[11px] h-[19px] px-[7px] rounded-[5px] inline-flex items-center font-medium ${t.status === 'Occupied' ? 'text-warning bg-warning/10' : 'text-success bg-success/10'}`}>
+                    {/* Table status: Occupied=normal active service (primary), Available=empty recessive (muted).
+                         Warning/destructive colors deliberately reserved for future "table needs attention" state. */}
+                    <span className={`text-[11px] h-[19px] px-[7px] rounded-[5px] inline-flex items-center font-medium ${t.status === 'Occupied' ? 'text-primary bg-primary-tint' : 'text-muted-foreground bg-muted'}`}>
                       {t.status || 'Available'}
                     </span>
                   </td>
