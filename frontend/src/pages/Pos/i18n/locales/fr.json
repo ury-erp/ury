@@ -331,5 +331,15 @@
     "closed_title": "Session clôturée",
     "closed_description": "Votre session POS a été clôturée avec succès.",
     "back_to_dashboard": "Retour au tableau de bord"
+  },
+  "pos_opening": {
+    "title": "Ouvrir le PDV",
+    "description": "Saisissez le montant d'ouverture pour chaque mode de paiement afin de démarrer cette session.",
+    "loading": "Chargement des modes de paiement...",
+    "no_payment_modes": "Aucun mode de paiement n'est configuré pour ce profil PDV.",
+    "submit": "Ouvrir le PDV",
+    "submitting": "Ouverture en cours...",
+    "load_failed": "Échec du chargement des modes de paiement. Veuillez réessayer.",
+    "submit_failed": "Échec de l'ouverture du PDV. Veuillez réessayer."
   }
 }

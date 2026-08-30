@@ -360,5 +360,15 @@
     "closed_title": "Session Closed",
     "closed_description": "Your POS session has been closed successfully.",
     "back_to_dashboard": "Back to Dashboard"
+  },
+  "pos_opening": {
+    "title": "Open POS",
+    "description": "Enter the opening amount for each payment mode to start this session.",
+    "loading": "Loading payment modes...",
+    "no_payment_modes": "No payment modes are configured for this POS profile.",
+    "submit": "Open POS",
+    "submitting": "Opening...",
+    "load_failed": "Failed to load payment modes. Please try again.",
+    "submit_failed": "Failed to open POS. Please try again."
   }
 }
