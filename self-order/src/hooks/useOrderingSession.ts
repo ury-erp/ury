@@ -154,8 +154,8 @@ export function useOrderingSession(initialContext?: OrderingContext) {
   const cartCount = cartItems.reduce((sum, entry) => sum + entry.qty, 0)
   const cartTotal = cartItems.reduce((sum, entry) => sum + entry.qty * entry.item.rate, 0)
 
-  async function submitCart() {
-    if (!context || cartItems.length === 0) return
+  async function submitCart(): Promise<boolean> {
+    if (!context || cartItems.length === 0) return false
     setSubmitting(true)
     setError(null)
     try {
@@ -163,8 +163,10 @@ export function useOrderingSession(initialContext?: OrderingContext) {
       const updated = await addItems(context.session, payload)
       setOrder(updated)
       setCart({})
+      return true
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not place the order. Please try again.')
+      return false
     } finally {
       setSubmitting(false)
     }

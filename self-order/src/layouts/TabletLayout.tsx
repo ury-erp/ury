@@ -6,7 +6,6 @@ import type { OrderingContext } from '../lib/api'
 import CartPanel from './shared/CartPanel'
 import MenuGrid from './shared/MenuGrid'
 
-const IDLE_WARN_MS = 60000
 const IDLE_RESET_GRACE_MS = 15000
 
 interface LayoutProps {
@@ -43,6 +42,7 @@ function TabletLayout({ initialContext }: LayoutProps) {
 
   const [showIdleWarning, setShowIdleWarning] = useState(false)
   const idleResetTimerRef = useRef<ReturnType<typeof setTimeout>>()
+  const idleWarnMs = (context?.session_idle_timeout_minutes ?? 30) * 60000
 
   function handleReset() {
     if (window.confirm('Start a new order? Current cart will be cleared.')) {
@@ -50,7 +50,7 @@ function TabletLayout({ initialContext }: LayoutProps) {
     }
   }
 
-  // Unattended-kiosk protection: warn after IDLE_WARN_MS of no interaction,
+  // Unattended-kiosk protection: warn after idleWarnMs of no interaction,
   // then reset after an additional IDLE_RESET_GRACE_MS if the guest doesn't
   // respond. Never fires mid-checkout — submitting/payingOnline gate both
   // the warning and the reset itself.
@@ -63,7 +63,7 @@ function TabletLayout({ initialContext }: LayoutProps) {
         resetSession()
       }
     }, IDLE_RESET_GRACE_MS)
-  }, IDLE_WARN_MS)
+  }, idleWarnMs)
 
   function handleStillHere() {
     clearTimeout(idleResetTimerRef.current)
@@ -114,6 +114,7 @@ function TabletLayout({ initialContext }: LayoutProps) {
             gridClassName="grid grid-cols-3 gap-4 lg:grid-cols-4"
             cardClassName="flex min-w-[150px] flex-col overflow-hidden rounded-xl border text-left transition active:scale-[0.98]"
             imageClassName="h-32 w-full object-cover"
+            branch={context?.restaurant}
           />
         </main>
 
