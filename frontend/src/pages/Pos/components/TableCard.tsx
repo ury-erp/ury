@@ -55,8 +55,8 @@ const TableCard = ({
       className={cn(
         'relative flex min-h-[15.5rem] flex-col rounded-lg border-2 bg-card p-4 transition-all',
         isOccupied
-          ? 'border-amber-400 bg-warning-tint text-warning'
-          : 'cursor-pointer border-emerald-300 bg-emerald-50 text-emerald-900 hover:border-emerald-400 hover:shadow-md',
+          ? 'border-warning-tint-border bg-warning-tint'
+          : 'cursor-pointer border-dashed border-hair bg-muted hover:shadow-md',
         menuOpen ? 'z-20' : 'z-0',
         className
       )}
@@ -131,7 +131,7 @@ const TableCard = ({
       <div
         className={cn(
           'mt-auto flex min-h-[2.75rem] gap-2 border-t pt-3',
-          isOccupied ? 'border-amber-200' : 'border-transparent'
+          isOccupied ? 'border-warning-tint-border' : 'border-transparent'
         )}
       >
         {isOccupied ? (

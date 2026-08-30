@@ -171,7 +171,7 @@ const TableSelectionDialog: React.FC<Props> = ({ onClose }) => {
                     selectedTable === table.name
                       ? 'border-primary-600 bg-primary-50'
                       : table.occupied === 1
-                      ? 'border-amber-500 bg-warning-tint hover:border-amber-600 hover:bg-warning-tint'
+                      ? 'border-warning-tint-border bg-warning-tint hover:border-warning-tint-border hover:bg-warning-tint'
                       : 'border-border hover:border-primary-300 hover:bg-muted',
                     'focus-visible:ring-2 focus-visible:ring-primary-600',
                   )}
@@ -180,7 +180,7 @@ const TableSelectionDialog: React.FC<Props> = ({ onClose }) => {
                     shape={table.table_shape}
                     className={cn(
                       'w-8 h-8',
-                      table.occupied === 1 ? 'text-warning' : 'text-text-tertiary'
+                      table.occupied === 1 ? 'text-foreground' : 'text-text-tertiary'
                     )}
                   />
                   <div className="text-center">
@@ -195,7 +195,7 @@ const TableSelectionDialog: React.FC<Props> = ({ onClose }) => {
                     })()}
                     <div className="mt-2 h-4">
                       {table.occupied === 1 && (
-                        <Badge variant="secondary" className="text-xs bg-warning-tint text-warning hover:bg-warning-tint">
+                        <Badge variant="secondary" className="text-xs bg-warning-tint text-foreground hover:bg-warning-tint">
                           {t('tables.occupied')}
                         </Badge>
                       )}
