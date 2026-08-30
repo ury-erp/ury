@@ -31,7 +31,7 @@ interface RestaurantData {
 }
 
 export const BranchPage: React.FC = () => {
-  const { activeBranch, activeBranchId, branches } = useBranchContext();
+  const { activeBranchId, branches } = useBranchContext();
   const [branchData, setBranchData] = useState<BranchData | null>(null);
   const [restaurantData, setRestaurantData] = useState<RestaurantData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
