@@ -1,14 +1,7 @@
 import {
   AlertTriangle,
-  Bell,
-  Users,
   Clock,
-  LogOut,
   CheckCircle2,
-  Activity,
-  Gauge,
-  Sparkles,
-  PackageSearch,
   ArrowRight,
 } from 'lucide-react';
 import { Card, CardContent, KpiStrip, cn } from '@ury/ui';
@@ -68,51 +61,39 @@ function formatOpenSessionDate(dateString: string): string {
 type StageKey = 'open' | 'seated' | 'fired' | 'served' | 'over';
 
 const STAGES: { key: StageKey; label: string; bar: string; chip: string; dot: string }[] = [
-  { key: 'open', label: 'Open', bar: 'bg-muted-foreground', chip: 'bg-muted text-muted-foreground ring-border', dot: 'bg-muted-foreground' },
-  { key: 'seated', label: 'Seated', bar: 'bg-primary-200', chip: 'bg-primary-50 text-primary-700 ring-primary-200', dot: 'bg-primary-200' },
-  { key: 'fired', label: 'Fired', bar: 'bg-primary-400', chip: 'bg-primary-50 text-primary-800 ring-primary-300', dot: 'bg-primary-400' },
-  { key: 'served', label: 'Served', bar: 'bg-primary-700', chip: 'bg-primary-100 text-primary-900 ring-primary-400', dot: 'bg-primary-700' },
-  { key: 'over', label: 'Over time', bar: 'bg-destructive', chip: 'bg-destructive-tint text-destructive ring-destructive-tint-border', dot: 'bg-destructive' },
+  { key: 'open', label: 'Open', bar: 'bg-muted-foreground', chip: 'bg-muted text-muted-foreground', dot: 'bg-muted-foreground' },
+  { key: 'seated', label: 'Seated', bar: 'bg-primary-200', chip: 'bg-primary-50 text-primary-700', dot: 'bg-primary-200' },
+  { key: 'fired', label: 'Fired', bar: 'bg-primary-400', chip: 'bg-primary-50 text-primary-800', dot: 'bg-primary-400' },
+  { key: 'served', label: 'Served', bar: 'bg-primary-700', chip: 'bg-primary-100 text-primary-900', dot: 'bg-primary-700' },
+  { key: 'over', label: 'Over time', bar: 'bg-destructive', chip: 'bg-destructive-tint text-destructive', dot: 'bg-destructive' },
 ];
 
 const STAGE_BY_KEY = Object.fromEntries(STAGES.map((s) => [s.key, s])) as Record<StageKey, (typeof STAGES)[number]>;
 
 /**
- * Every panel on this page is the same object: an icon chip, a title, optional
- * trailing meta, then body. Hand-rolling that header nine times is what made
- * the old page read as nine unrelated boxes.
+ * Every panel on this page is the same object: a title, optional trailing
+ * meta, then body. Hand-rolling that header nine times is what made the old
+ * page read as nine unrelated boxes. Matches the `.panel`/`.sect` spec: a
+ * flat hairline border, no shadow, dense padding, and a plain-text header
+ * with no decorative icon tile.
  */
 function Panel({
-  icon: Icon,
   title,
   meta,
-  tone = 'neutral',
   children,
   className,
 }: {
-  icon: React.ElementType;
   title: string;
   meta?: React.ReactNode;
-  tone?: 'neutral' | 'primary';
   children: React.ReactNode;
   className?: string;
 }) {
   return (
-    <Card padding="none" className={cn('bg-card', className)}>
-      <CardContent className="p-5 pt-5">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <span
-              className={cn(
-                'flex h-7 w-7 shrink-0 items-center justify-center rounded-md',
-                tone === 'primary' ? 'bg-primary-50 text-primary' : 'bg-muted text-text-tertiary'
-              )}
-            >
-              <Icon className="h-4 w-4" />
-            </span>
-            <h2 className="text-sm font-semibold text-foreground">{title}</h2>
-          </div>
-          {meta ? <div className="text-xs font-medium text-text-tertiary">{meta}</div> : null}
+    <Card variant="ghost" padding="none" className={cn('rounded-[9px] border border-hair bg-card', className)}>
+      <CardContent className="p-[14px_16px]">
+        <div className="mb-[9px] flex items-center justify-between gap-3">
+          <h2 className="text-[12.5px] font-semibold text-foreground">{title}</h2>
+          {meta ? <div className="ml-auto text-[11.5px] text-text-tertiary">{meta}</div> : null}
         </div>
         {children}
       </CardContent>
@@ -426,7 +407,7 @@ export default function Dashboard() {
                   </h2>
                   <span
                     className={cn(
-                      'inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full px-1.5 text-xs font-bold tabular-nums',
+                      'inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full px-1.5 font-mono text-xs font-bold tabular-nums',
                       hasHighSeverity ? 'bg-destructive text-white' : 'bg-warning-400 text-warning-foreground'
                     )}
                   >
@@ -472,14 +453,12 @@ export default function Dashboard() {
 
         {/* Service Line — the operational heart of the screen. */}
         <Panel
-          icon={Activity}
           title="Service Line"
-          tone="primary"
           meta={
             overCount > 0 ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-destructive-tint px-2.5 py-1 text-xs font-semibold text-destructive ring-1 ring-destructive-tint-border">
-                <span className="h-1.5 w-1.5 rounded-full bg-destructive" />
-                {overCount} over time
+              <span className="inline-flex h-[19px] items-center gap-[5px] rounded-[5px] bg-destructive-tint px-[7px] text-[11px] font-semibold text-destructive">
+                <span className="h-[5px] w-[5px] shrink-0 rounded-full bg-current" />
+                <span className="font-mono tabular-nums">{overCount}</span> over time
               </span>
             ) : serviceLine.length > 0 ? (
               `${serviceLine.length} tables tracked`
@@ -499,25 +478,25 @@ export default function Dashboard() {
                 so the legend doubles as the shift summary and a cashier reads
                 "4 fired, 1 over" without decoding a bar chart.
               */}
-              <div className="mb-5 flex flex-wrap gap-2">
+              <div className="mb-[14px] flex flex-wrap gap-1.5">
                 {stageCounts.map((stage) => (
                   <span
                     key={stage.key}
                     className={cn(
-                      'inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-xs font-medium ring-1',
+                      'inline-flex h-[19px] items-center gap-[5px] rounded-[5px] px-[7px] text-[11px] font-medium',
                       stage.chip,
                       stage.count === 0 && 'opacity-45'
                     )}
                   >
-                    <span className={cn('h-2 w-2 rounded-full', stage.dot)} />
+                    <span className={cn('h-[5px] w-[5px] shrink-0 rounded-full', stage.dot)} />
                     {stage.label}
-                    <span className="tabular-nums font-semibold">{stage.count}</span>
+                    <span className="font-mono tabular-nums font-semibold">{stage.count}</span>
                   </span>
                 ))}
               </div>
 
               {/* Bars */}
-              <div className="flex items-end gap-2 overflow-x-auto border-b border-border pb-3">
+              <div className="flex items-end gap-2 overflow-x-auto border-b border-hair pb-3">
                 {serviceLine.map((table: any, idx: number) => {
                   const stage = STAGE_BY_KEY[table.stage as StageKey] ?? STAGE_BY_KEY.open;
                   const isOver = table.stage === 'over';
@@ -531,13 +510,13 @@ export default function Dashboard() {
                     >
                       <span
                         className={cn(
-                          'mb-1 h-4 text-xs font-semibold tabular-nums',
+                          'mb-1 h-4 font-mono text-[11px] tabular-nums',
                           isOver ? 'text-destructive' : 'text-text-tertiary'
                         )}
                       >
                         {table.minutes !== null ? table.minutes : ''}
                       </span>
-                      <div className="flex h-28 w-full items-end justify-center rounded-md bg-muted/70 p-1">
+                      <div className="flex h-28 w-full items-end justify-center rounded-md bg-hair p-1">
                         <div
                           className={cn(
                             'w-full rounded-sm transition-all duration-200 ease-out',
@@ -574,7 +553,6 @@ export default function Dashboard() {
           {/* Left column */}
           <div className="space-y-5">
             <Panel
-              icon={Gauge}
               title="Tonight vs Baseline"
               meta={baseline?.sample_days > 0 ? `${baseline.sample_days}-day median` : undefined}
             >
@@ -621,7 +599,7 @@ export default function Dashboard() {
               )}
             </Panel>
 
-            <Panel icon={PackageSearch} title="Running Low">
+            <Panel title="Running Low">
               {runningLowError ? (
                 <PanelState kind="error">Failed to load</PanelState>
               ) : runningLowLoading ? (
@@ -639,18 +617,18 @@ export default function Dashboard() {
                           <span className="truncate text-sm font-medium text-foreground">{item.item_name}</span>
                           <span
                             className={cn(
-                              'shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums ring-1',
+                              'inline-flex h-[19px] shrink-0 items-center rounded-[5px] px-[7px] font-mono text-[11px] font-semibold tabular-nums',
                               critical
-                                ? 'bg-destructive-tint text-destructive ring-destructive-tint-border'
-                                : 'bg-warning-50 text-warning-700 ring-warning-200'
+                                ? 'bg-destructive-tint text-destructive'
+                                : 'bg-warning-50 text-warning-700'
                             )}
                           >
                             {formatETA(item.eta_minutes)}
                           </span>
                         </div>
-                        <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                        <div className="h-1 w-full overflow-hidden rounded-[3px] bg-hair">
                           <div
-                            className={cn('h-full rounded-full', critical ? 'bg-destructive' : 'bg-warning-400')}
+                            className={cn('h-full rounded-[3px]', critical ? 'bg-destructive' : 'bg-warning-400')}
                             style={{ width: `${pct}%` }}
                           />
                         </div>
@@ -667,7 +645,7 @@ export default function Dashboard() {
 
           {/* Right rail */}
           <div className="space-y-5">
-            <Panel icon={Users} title="Floor Load">
+            <Panel title="Floor Load">
               {floorLoadError ? (
                 <PanelState kind="error">Failed to load</PanelState>
               ) : floorLoadLoading ? (
@@ -680,13 +658,13 @@ export default function Dashboard() {
                     <div key={idx}>
                       <div className="mb-1 flex items-center justify-between gap-2">
                         <span className="truncate text-sm font-medium text-muted-foreground">{waiter.waiter}</span>
-                        <span className="shrink-0 text-xs font-semibold tabular-nums text-text-tertiary">
+                        <span className="shrink-0 font-mono text-xs font-semibold tabular-nums text-text-tertiary">
                           {waiter.table_count}
                         </span>
                       </div>
-                      <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                      <div className="h-1 w-full overflow-hidden rounded-[3px] bg-hair">
                         <div
-                          className="h-full rounded-full bg-primary"
+                          className="h-full rounded-[3px] bg-primary"
                           style={{ width: `${(waiter.table_count / maxTableCount) * 100}%` }}
                         />
                       </div>
@@ -697,7 +675,6 @@ export default function Dashboard() {
             </Panel>
 
             <Panel
-              icon={LogOut}
               title="Open Sessions"
               meta={openEntries.length > 0 ? `${openEntries.length} open` : undefined}
             >
@@ -737,7 +714,6 @@ export default function Dashboard() {
             </Panel>
 
             <Panel
-              icon={Sparkles}
               title="Shift Brief"
               meta={
                 <span className="rounded bg-primary-50 px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-primary ring-1 ring-primary-200">
@@ -751,7 +727,7 @@ export default function Dashboard() {
               </p>
             </Panel>
 
-            <Panel icon={Bell} title="Recent Notifications">
+            <Panel title="Recent Notifications">
               {notificationsError ? (
                 <PanelState kind="error">Failed to load</PanelState>
               ) : notificationsLoading ? (
@@ -788,14 +764,14 @@ function MetricTile({
   delta?: { up: boolean; text: string; against: string };
 }) {
   return (
-    <div className="rounded-lg bg-muted p-3 ring-1 ring-border">
+    <div className="rounded-[9px] border border-hair bg-muted p-3">
       <p className="text-xs font-medium text-text-tertiary">{label}</p>
-      <p className="mt-1 text-xl font-semibold tabular-nums text-foreground">{value}</p>
+      <p className="mt-1 font-mono text-xl font-semibold tabular-nums text-foreground">{value}</p>
       {delta ? (
         <p className="mt-1 flex flex-wrap items-baseline gap-1 text-xs">
           <span
             className={cn(
-              'font-semibold tabular-nums',
+              'font-mono font-semibold tabular-nums',
               delta.up ? 'text-success-600' : 'text-destructive'
             )}
           >
