@@ -46,11 +46,11 @@ const toneRail: Record<StatCardTone, string> = {
 };
 
 const toneChip: Record<StatCardTone, string> = {
-  default: "bg-gray-100 text-gray-500",
+  default: "bg-muted text-muted-foreground",
   primary: "bg-primary-50 text-primary",
   success: "bg-success-50 text-success-700",
   warning: "bg-warning-50 text-warning-700",
-  danger: "bg-red-50 text-destructive",
+  danger: "bg-destructive-50 text-destructive",
 };
 
 export const StatCard = React.forwardRef<HTMLDivElement, StatCardProps>(
@@ -58,7 +58,7 @@ export const StatCard = React.forwardRef<HTMLDivElement, StatCardProps>(
     <div
       ref={ref}
       className={cn(
-        "relative overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm p-5",
+        "relative overflow-hidden rounded-lg border border-border bg-card shadow-sm p-5",
         tone !== "default" &&
           "before:absolute before:inset-x-0 before:top-0 before:h-1 before:content-['']",
         toneRail[tone],

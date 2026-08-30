@@ -59,11 +59,11 @@ const InlineEditCell = React.forwardRef<HTMLInputElement, InlineEditCellProps>(
           // Text alignment
           align === 'right' ? 'text-right' : 'text-left',
           // Hover: subtle border appears
-          "hover:border-gray-300 hover:bg-gray-50",
+          "hover:border-border hover:bg-muted",
           // Focus: visible border and background (similar to input focus state)
-          "focus:outline-none focus:border-blue-400 focus:bg-blue-50 focus:ring-1 focus:ring-blue-200",
+          "focus:outline-none focus:border-primary focus:bg-primary-50 focus:ring-1 focus:ring-primary",
           // Error state: red border
-          error && "border-red-400 focus:border-red-500 focus:bg-red-50 focus:ring-red-200 text-red-600",
+          error && "border-destructive focus:border-destructive focus:bg-destructive-50 focus:ring-destructive text-destructive",
           // Disabled state
           disabled && "opacity-50 cursor-not-allowed",
           // Transition for smooth appearance changes

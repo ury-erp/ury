@@ -55,7 +55,7 @@ const Drawer = React.forwardRef<HTMLDivElement, DrawerProps>(
               type="button"
               onClick={onClose}
               aria-label="Close drawer"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 ease-out hover:bg-accent hover:text-foreground active:bg-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background disabled:pointer-events-none flex-shrink-0"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 ease-out hover:bg-accent hover:text-foreground active:bg-accent/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background disabled:pointer-events-none flex-shrink-0"
             >
               <X className="h-4 w-4" />
               <span className="sr-only">Close</span>

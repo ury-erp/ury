@@ -64,7 +64,7 @@ const TabsList = React.forwardRef<HTMLDivElement, TabsListProps>(
       ref={ref}
       role="tablist"
       className={cn(
-        "inline-flex items-center gap-1 rounded-lg bg-gray-100 p-1 w-fit",
+        "inline-flex items-center gap-1 rounded-lg bg-muted p-1 w-fit",
         className
       )}
       {...props}
@@ -98,8 +98,8 @@ const TabsTrigger = React.forwardRef<HTMLButtonElement, TabsTriggerProps>(
           "flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold transition-all",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background",
           isActive
-            ? "bg-white text-primary shadow-xs"
-            : "text-gray-600 hover:bg-gray-100 hover:text-gray-700",
+            ? "bg-card text-primary shadow-xs"
+            : "text-gray-600 hover:bg-muted hover:text-gray-700",
           className
         )}
         {...props}
