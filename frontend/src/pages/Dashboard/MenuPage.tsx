@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
 import { Utensils, Search, Plus, LayoutGrid, List, Edit2, Check, X } from 'lucide-react';
-import { Card, Button, Badge, Input, Spinner, showToast, Select } from '@ury/ui';
+import { Button, Input, Spinner, showToast, Select } from '@ury/ui';
 import { formatCurrency, call } from '@ury/core';
 import { dashboardService } from '../../services/dashboard';
 import SideDrawer from '../../components/layout/SideDrawer';
@@ -422,29 +422,27 @@ export const MenuPage: React.FC = () => {
 
       {/* Content Area */}
       {loading ? (
-        <div className="py-24 flex items-center justify-center bg-card rounded-lg border border-border shadow-sm">
+        <div className="py-24 flex items-center justify-center bg-card rounded-[9px] border border-hair">
           <Spinner className="w-8 h-8 text-primary" />
         </div>
       ) : filteredItems.length === 0 ? (
-        <Card className="p-16 flex flex-col items-center justify-center text-center rounded-lg border border-border shadow-sm bg-card">
-          <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-5">
-            <Utensils className="w-8 h-8 text-primary" />
-          </div>
-          <h3 className="text-xl font-bold text-foreground mb-2">No Items Found</h3>
-          <p className="text-text-tertiary mb-8 max-w-sm">
+        <div className="px-4 py-[18px] text-xs text-text-tertiary flex items-center gap-2.5 bg-card border border-hair rounded-[9px]">
+          <span>
             {search || categoryFilter !== 'all'
               ? "We couldn't find any items matching your filters."
               : 'Your menu is empty. Start adding delicious items for your customers!'}
-          </p>
+          </span>
           <Button
             onClick={openAddItemDrawer}
             disabled={menus.length === 0}
-            className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center gap-1.5 shadow-xs px-6"
+            variant="chrome"
+            size="compactSm"
+            className="ml-auto"
           >
-            <Plus className="w-4 h-4" />
-            <span>Add Menu Item</span>
+            <Plus className="w-3.5 h-3.5" />
+            <span>Add Item</span>
           </Button>
-        </Card>
+        </div>
       ) : viewMode === 'grid' ? (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
           {filteredItems.map((item, idx) => (
@@ -482,22 +480,22 @@ export const MenuPage: React.FC = () => {
           ))}
         </div>
       ) : (
-        <div className="bg-card rounded-lg border border-border shadow-sm overflow-hidden overflow-x-auto">
+        <div className="bg-card border border-hair rounded-[9px] overflow-hidden overflow-x-auto">
           <table className="w-full text-left text-sm text-muted-foreground min-w-[600px]">
-            <thead className="bg-muted/50 border-b border-border text-xs text-text-tertiary font-bold tracking-wider">
+            <thead className="border-b border-hair">
               <tr>
-                <th className="px-6 py-4">Item Name</th>
-                <th className="px-6 py-4">Course</th>
-                <th className="px-6 py-4">Standard Rate</th>
-                <th className="px-6 py-4 text-center">Special</th>
-                <th className="px-6 py-4 text-center">Disabled</th>
-                <th className="px-6 py-4 text-right">Actions</th>
+                <th className="px-[14px] py-[7px] text-[11px] font-medium text-text-tertiary text-left">Item Name</th>
+                <th className="px-[14px] py-[7px] text-[11px] font-medium text-text-tertiary text-left">Course</th>
+                <th className="px-[14px] py-[7px] text-[11px] font-medium text-text-tertiary text-right font-mono">Standard Rate</th>
+                <th className="px-[14px] py-[7px] text-[11px] font-medium text-text-tertiary text-center">Special</th>
+                <th className="px-[14px] py-[7px] text-[11px] font-medium text-text-tertiary text-center">Disabled</th>
+                <th className="px-[14px] py-[7px] text-[11px] font-medium text-text-tertiary text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-hair">
               {filteredItems.map((item, idx) => (
-                <tr key={item.name || idx} className="transition-colors">
-                  <td className="px-6 py-4 font-semibold text-foreground">
+                <tr key={item.name || idx} className="transition-colors hover:bg-muted">
+                  <td className="px-[14px] py-2 text-[12.5px] font-semibold text-foreground">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-md bg-muted flex items-center justify-center shrink-0">
                         <Utensils className="w-4 h-4 text-text-tertiary" />
@@ -505,23 +503,19 @@ export const MenuPage: React.FC = () => {
                       {item.item_name}
                     </div>
                   </td>
-                  <td className="px-6 py-4">
-                    <Badge variant="outline" className="border-border bg-muted text-muted-foreground text-xs font-medium">
+                  <td className="px-[14px] py-2 text-[12.5px]">
+                    <span className="inline-flex items-center gap-[5px] text-[11px] h-[19px] px-[7px] rounded-[5px] text-muted-foreground bg-muted">
                       {item.course || 'None'}
-                    </Badge>
+                    </span>
                   </td>
-                  <td className="px-6 py-4 font-bold text-primary">{formatCurrency(item.rate || 0)}</td>
-                  <td className="px-6 py-4">
-                    <div className="flex justify-center">
-                      {item.special_dish ? <Check className="w-4 h-4 text-success" /> : <X className="w-4 h-4 text-text-tertiary" />}
-                    </div>
+                  <td className="px-[14px] py-2 text-[12.5px] font-mono text-right tabular-nums text-primary font-semibold">{formatCurrency(item.rate || 0)}</td>
+                  <td className="px-[14px] py-2 text-[12.5px] text-center">
+                    {item.special_dish ? <Check className="w-4 h-4 text-success inline" /> : <X className="w-4 h-4 text-text-tertiary inline" />}
                   </td>
-                  <td className="px-6 py-4">
-                    <div className="flex justify-center">
-                      {item.disabled ? <Check className="w-4 h-4 text-destructive" /> : <X className="w-4 h-4 text-text-tertiary" />}
-                    </div>
+                  <td className="px-[14px] py-2 text-[12.5px] text-center">
+                    {item.disabled ? <Check className="w-4 h-4 text-destructive inline" /> : <X className="w-4 h-4 text-text-tertiary inline" />}
                   </td>
-                  <td className="px-6 py-4 text-right">
+                  <td className="px-[14px] py-2 text-[12.5px] text-right">
                     <Button variant="ghost" size="sm" onClick={() => openEditItemDrawer(item)} className="text-text-tertiary hover:text-primary">
                       <Edit2 className="w-4 h-4" />
                     </Button>
