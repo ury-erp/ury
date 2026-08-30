@@ -1,3 +1,4 @@
+import { describe, it, expect } from 'vitest';
 import { fuzzyMatchIcon } from './category-icons';
 
 interface Case {
@@ -25,19 +26,11 @@ const cases: Case[] = [
   { input: 'Soft Drinks', expected: 'CupSoda' },
 ];
 
-let failures = 0;
-for (const { input, expected } of cases) {
-  const actual = fuzzyMatchIcon(input);
-  if (actual !== expected) {
-    failures++;
-    console.error(`FAIL: "${input}" => expected ${expected}, got ${actual}`);
-  } else {
-    console.log(`PASS: "${input}" => ${actual}`);
-  }
-}
-
-if (failures > 0) {
-  console.error(`\n${failures} test(s) failed.`);
-  process.exit(1);
-}
-console.log('\nAll tests passed.');
+describe('category-icons', () => {
+  it('should correctly match category names to icons', () => {
+    for (const { input, expected } of cases) {
+      const actual = fuzzyMatchIcon(input);
+      expect(actual).toBe(expected);
+    }
+  });
+});
