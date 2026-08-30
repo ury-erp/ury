@@ -63,8 +63,8 @@ type StageKey = 'open' | 'seated' | 'fired' | 'served' | 'over';
 const STAGES: { key: StageKey; label: string; bar: string; chip: string; dot: string }[] = [
   { key: 'open', label: 'Open', bar: 'bg-muted-foreground', chip: 'bg-muted text-muted-foreground', dot: 'bg-muted-foreground' },
   { key: 'seated', label: 'Seated', bar: 'bg-primary-200', chip: 'bg-primary-50 text-primary-700', dot: 'bg-primary-200' },
-  { key: 'fired', label: 'Fired', bar: 'bg-primary-400', chip: 'bg-primary-50 text-primary-800', dot: 'bg-primary-400' },
-  { key: 'served', label: 'Served', bar: 'bg-primary-700', chip: 'bg-primary-100 text-primary-900', dot: 'bg-primary-700' },
+  { key: 'fired', label: 'Fired', bar: 'bg-primary-400', chip: 'bg-primary-100 text-primary-800', dot: 'bg-primary-400' },
+  { key: 'served', label: 'Served', bar: 'bg-primary-700', chip: 'bg-primary-200 text-primary-900', dot: 'bg-primary-700' },
   { key: 'over', label: 'Over time', bar: 'bg-destructive', chip: 'bg-destructive-tint text-destructive', dot: 'bg-destructive' },
 ];
 
