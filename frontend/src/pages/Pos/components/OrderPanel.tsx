@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Trash2, Edit, FrownIcon, Plus, Loader2, MessageSquare } from 'lucide-react';
+import { Trash2, Edit, FrownIcon, Loader2, MessageSquare } from 'lucide-react';
 import { usePOSStore } from '../store/pos-store';
 import { cn } from '@ury/ui';
 import { formatCurrency } from '@ury/core';
@@ -170,27 +170,25 @@ const OrderPanel = () => {
     setNoOfPax(Math.min(MAX_PAX, noOfPax + 1));
   };
 
+  // The panel has two distinct empty cases: a dine-in order with no table
+  // picked yet (table selection happens elsewhere, so this is text-only),
+  // and a table/order-type already chosen but nothing added to the cart yet.
+  const noTableSelected = selectedOrderType === DINE_IN && !selectedTable;
+
   const EmptyCartUI = () => (
-    <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-      <div className="w-24 h-24 bg-muted rounded-full flex items-center justify-center mb-6">
-        <FrownIcon className="w-12 h-12 text-text-tertiary" />
-      </div>
-      
-      <h3 className="text-lg font-semibold text-foreground mb-2">
-        {t('cart.empty_title')}
-      </h3>
-
-      <p className="text-text-tertiary text-sm mb-6 max-w-xs leading-relaxed">
-        {t('cart.empty_subtitle')}
-      </p>
-
-      <div className="flex items-center gap-2 text-primary bg-primary-tint px-4 py-2 rounded-lg">
-        <Plus className="w-4 h-4" />
-        <span className="text-sm font-medium">{t('cart.click_to_add')}</span>
-      </div>
-
-      <div className="mt-4 text-xs text-text-tertiary">
-        {t('cart.double_click_hint')}
+    <div className="flex-1 flex flex-col justify-start">
+      <div className="flex items-center gap-2.5 px-4 py-[18px] text-xs text-text-tertiary">
+        <FrownIcon className="w-4 h-4 shrink-0" aria-hidden="true" />
+        {noTableSelected ? (
+          <span>{t('errors.select_table', { order_type: DINE_IN })}</span>
+        ) : (
+          <div>
+            <p className="text-foreground font-medium text-[12.5px]">{t('cart.empty_title')}</p>
+            <p className="text-text-tertiary text-[11.5px] mt-0.5">
+              {t('cart.click_to_add')} — {t('cart.double_click_hint')}
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -245,32 +243,35 @@ const OrderPanel = () => {
               <div
                 key={item.uniqueId}
                 className={cn(
-                  "flex flex-col py-4 border-b border-border",
+                  "flex gap-[10px] py-2 border-b border-hair text-[12.5px]",
                   isInteractionDisabled && "opacity-50"
                 )}
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <h3 className="font-medium text-foreground text-sm">{item.name}</h3>
-                    </div>
-                    {item.selectedVariant && (
-                      <p className="text-sm text-muted-foreground">{item.selectedVariant.name}</p>
-                    )}
-                    {item.selectedAddons && item.selectedAddons.length > 0 && (
-                      <p className="text-sm text-text-tertiary">
-                        {item.selectedAddons.map(addon => addon.name).join(', ')}
-                      </p>
-                    )}
-                    <p className="text-muted-foreground text-sm">{formatCurrency(calculateItemTotal(item))}</p>
+                <span className="font-mono tabular-nums text-muted-foreground w-[22px] shrink-0 pt-0.5">
+                  {item.quantity}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-2">
+                    <h3 className="font-medium text-foreground">{item.name}</h3>
+                    <span className="ml-auto font-mono tabular-nums text-xs shrink-0">
+                      {formatCurrency(calculateItemTotal(item))}
+                    </span>
                   </div>
-                  
-                  <div className="flex items-center gap-2">
+                  {item.selectedVariant && (
+                    <p className="text-text-tertiary text-[11.5px]">{item.selectedVariant.name}</p>
+                  )}
+                  {item.selectedAddons && item.selectedAddons.length > 0 && (
+                    <p className="text-text-tertiary text-[11.5px]">
+                      {item.selectedAddons.map(addon => addon.name).join(', ')}
+                    </p>
+                  )}
+
+                  <div className="flex items-center gap-2 mt-2">
                     <Button
                       onClick={() => handleEdit(item)}
                       variant="ghost"
                       size="icon"
-                      className="text-primary hover:text-primary"
+                      className="text-primary hover:text-primary h-7 w-7"
                       title={t('cart.edit_item')}
                       disabled={isInteractionDisabled}
                     >
@@ -288,31 +289,31 @@ const OrderPanel = () => {
                         }}
                         variant="outline"
                         size="icon"
-                        className="w-8 h-8 rounded-full"
+                        className="w-7 h-7 rounded-full"
                         disabled={isInteractionDisabled}
                       >
                         -
                       </Button>
-                      <span className="w-6 text-center">{item.quantity}</span>
+                      <span className="w-6 text-center font-mono tabular-nums">{item.quantity}</span>
                       <Button
                         onClick={() => updateQuantity(item.uniqueId!, Math.round((item.quantity + 1) * 1000) / 1000)}
                         variant="outline"
                         size="icon"
-                        className="w-8 h-8 rounded-full"
+                        className="w-7 h-7 rounded-full"
                         disabled={isInteractionDisabled}
                       >
                         +
                       </Button>
                     </div>
-                    
+
                     <Button
                       onClick={() => removeFromOrder(item.uniqueId!)}
                       variant="ghost"
                       size="icon"
-                      className="text-destructive hover:text-destructive"
+                      className="text-destructive hover:text-destructive h-7 w-7 ml-auto"
                       disabled={isInteractionDisabled}
                     >
-                      <Trash2 className="w-5 h-5" />
+                      <Trash2 className="w-4 h-4" />
                     </Button>
                   </div>
                 </div>
@@ -332,30 +333,27 @@ const OrderPanel = () => {
           </div>
           
           <div className="p-4 border-t border-border flex-shrink-0 bg-card">
-            <div className="flex justify-between items-center mb-4">
-              <div className="flex items-center gap-2">
-                <Button
-                  onClick={() => setShowCommentDialog(true)}
-                  variant="ghost"
-                  size="sm"
-                  className={cn(
-                    "h-8 w-8 p-0",
-                    orderComment ? "text-primary" : "text-text-tertiary hover:text-muted-foreground"
-                  )}
-                  disabled={isInteractionDisabled}
-                  title={orderComment ? t('cart.edit_comment') : t('cart.add_comment')}
-                >
-                  <MessageSquare className="w-4 h-4" />
-                </Button>
-                <span className="text-lg font-semibold">{t('cart.total')}</span>
-              </div>
-              <span className="text-lg font-semibold">{formatCurrency(total)}</span>
+            <div className="flex items-center py-1.5 last:border-0 text-[12.5px] font-[550] text-foreground">
+              <Button
+                onClick={() => setShowCommentDialog(true)}
+                variant="ghost"
+                size="icon"
+                className={cn(
+                  "h-7 w-7 -ms-1 me-1",
+                  orderComment ? "text-primary" : "text-text-tertiary hover:text-muted-foreground"
+                )}
+                disabled={isInteractionDisabled}
+                title={orderComment ? t('cart.edit_comment') : t('cart.add_comment')}
+              >
+                <MessageSquare className="w-4 h-4" />
+              </Button>
+              <span>{t('cart.total')}</span>
+              <span className="ml-auto font-mono tabular-nums text-sm">{formatCurrency(total)}</span>
             </div>
             <Button
               onClick={handleSubmit}
               variant="default"
-              size="default"
-              className="w-full"
+              className="w-full h-9 px-3.5 text-[13px] rounded-[7px] mt-3"
               disabled={isInteractionDisabled}
             >
               {isSubmitting ? (
