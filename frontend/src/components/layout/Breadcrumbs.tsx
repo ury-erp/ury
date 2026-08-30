@@ -1,15 +1,14 @@
 import React from 'react';
 import { useLocation } from 'react-router-dom';
-import { NAV_GROUPS, ADVANCED_ITEMS } from './Sidebar';
+import { NAV_GROUPS, SETUP_ITEMS } from './Sidebar';
 import { reportsRegistry } from '../../pages/Reports/reportsRegistry';
 
 /**
  * Route -> {group, label} lookup built directly from the Sidebar's own nav
  * structure so the breadcrumb can never drift out of sync with the rail.
- * `ADVANCED_ITEMS` isn't inside a `NAV_GROUPS` entry (it lives in its own
- * collapsible section in the sidebar), but every item in it is a setup-style
- * screen, so it's grouped under "Setup" here — the same group whose items
- * are visually closest to it in the rail.
+ * `SETUP_ITEMS` isn't a `NAV_GROUPS` entry (it lives in its own collapsed
+ * disclosure pinned to the bottom of the rail), but every item in it is a
+ * setup-style screen, so it's grouped under "Setup" here.
  */
 const ROUTE_MAP: Record<string, { group: string; label: string }> = {};
 
@@ -19,7 +18,7 @@ NAV_GROUPS.forEach((group) => {
   });
 });
 
-ADVANCED_ITEMS.forEach((item) => {
+SETUP_ITEMS.forEach((item) => {
   ROUTE_MAP[item.path] = { group: 'Setup', label: item.label };
 });
 
