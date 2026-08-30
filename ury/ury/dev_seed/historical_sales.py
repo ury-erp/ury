@@ -84,29 +84,76 @@ import random
 from datetime import timedelta
 
 import frappe
-from frappe.utils import add_days, flt, now_datetime, nowtime, today
+from frappe.utils import add_days, flt, getdate, now_datetime, nowtime, today
 
 # ---------------------------------------------------------------------------
 # Tunables
 # ---------------------------------------------------------------------------
 
-HISTORICAL_DAYS = 12          # how many past days to backfill
+HISTORICAL_DAYS = 120         # total days of history to backfill (~4 calendar
+                               # months ending today), so MonthWiseSales spans
+                               # several distinct months. Density tapers with
+                               # age -- see _order_count_for_offset() -- to
+                               # keep the total invoice volume tractable.
+RECENT_DENSE_DAYS = 21         # most recent ~3 weeks: full daily volume
+MID_RANGE_DAYS = 60            # up to ~2 months back: medium volume
+                               # beyond that (up to HISTORICAL_DAYS): sparse
+
 MIN_ORDERS_PER_DAY = 15
 MAX_ORDERS_PER_DAY = 30
+MID_MIN_ORDERS_PER_DAY = 8
+MID_MAX_ORDERS_PER_DAY = 15
+SPARSE_MIN_ORDERS_PER_DAY = 4
+SPARSE_MAX_ORDERS_PER_DAY = 8
+
 MIN_ITEMS_PER_ORDER = 2
 MAX_ITEMS_PER_ORDER = 6
 MIN_QTY = 1
 MAX_QTY = 3
+
+WEEKEND_ORDER_MULTIPLIER = 1.3  # Sat/Sun get a bump for weekday/weekend shape
 
 TODAY_ORDER_COUNT = 10        # extra submitted invoices dated today
 DRAFT_ORDER_COUNT = 4         # unsubmitted "open" orders dated today
 
 ORDER_TYPES = ["Dine In", "Take Away"]
 
-DEMO_EMPLOYEE_ID = "ury-dev-seed-employee"
-DEMO_EMPLOYEE_EMAIL = "dev-seed-employee@ury.local"
-
 ELECTRICITY_UNITS_PER_DAY = 40  # closing - opening, arbitrary but > 0
+
+# --- Multiple staff, for meaningful EmployeeSales/EmployeeItemWiseSales ---
+MIN_STAFF_PER_ROLE = 5         # cashiers and waiters each, if the bench has
+                               # fewer real Users with the role we create
+                               # simple demo Users to reach this count
+STAFF_WEIGHTS = [35, 25, 18, 12, 10, 6, 4]  # descending volume shares,
+                               # sliced to however many staff exist -- gives
+                               # a realistic leaderboard spread rather than a
+                               # flat distribution
+
+# --- Repeat vs one-time customers, for RepeatedCustomers/CustomerData ---
+REPEAT_CUSTOMER_POOL_SIZE = 8   # customers deliberately reused across many
+                               # distinct dates
+REPEAT_CUSTOMER_SHARE = 0.55    # probability an order picks from that pool
+                               # rather than a one-time customer
+
+# --- Cancelled/returned invoices, for CancelledInvoices ---
+CANCEL_RATE = 0.04              # small realistic fraction of invoices
+CANCEL_REASONS = [
+	"Customer changed mind",
+	"Order placed by mistake",
+	"Kitchen out of stock",
+	"Duplicate order",
+	"Payment issue",
+]
+
+# --- Posting-time shape: lunch/dinner peaks instead of a flat 11-22 spread ---
+# (start_hour, end_hour, weight) buckets across service hours.
+TIME_BUCKETS = [
+	(11, 12, 10),   # late morning trickle
+	(12, 15, 35),   # lunch peak
+	(15, 18, 15),   # afternoon lull
+	(18, 22, 35),   # dinner peak
+	(22, 23, 5),    # late closing trickle
+]
 
 
 # ---------------------------------------------------------------------------
@@ -132,7 +179,18 @@ def _get_pos_profile(branch_name):
 
 
 def _get_price_list():
-	return frappe.db.get_value("Price List", {"selling": 1}, "name") or "Standard Selling"
+	"""Pick a selling Price List that actually has Item Price rows -- a bench
+	can have several selling price lists (Direct, Swiggy, Zomato, ...) with
+	no Item Price rows of their own, and `{"selling": 1}` picks whichever one
+	the DB happens to return first, which can silently be an empty one. Not
+	part of the historical-sales fix directly, but it's a real pre-existing
+	bug in this same file that otherwise blocks the whole seed from ever
+	running."""
+	candidates = frappe.get_all("Price List", filters={"selling": 1}, pluck="name")
+	for name in candidates:
+		if frappe.db.exists("Item Price", {"price_list": name}):
+			return name
+	return candidates[0] if candidates else "Standard Selling"
 
 
 def _get_tax_template(restaurant_name):
@@ -171,11 +229,114 @@ def _get_mode_of_payment():
 
 
 def _get_staff_user(role):
+	users = _get_staff_users(role)
+	return users[0] if users else "Administrator"
+
+
+def _get_staff_users(role):
 	rows = frappe.get_all(
 		"Has Role", filters={"role": role, "parenttype": "User"}, fields=["parent"]
 	)
-	users = sorted({r.parent for r in rows if r.parent not in ("Administrator", "Guest")})
-	return users[0] if users else "Administrator"
+	return sorted({r.parent for r in rows if r.parent not in ("Administrator", "Guest")})
+
+
+def _ensure_min_staff(role, min_count, name_prefix):
+	"""Make sure at least `min_count` real Users hold `role`, so EmployeeSales
+	(which INNER JOINs POS Invoice.cashier/waiter to tabUser) has more than
+	one row to rank. Reuses whatever Users already have the role; creates
+	simple demo Users (idempotent by email) only to fill the gap -- never
+	removes or reassigns existing ones.
+	"""
+	users = _get_staff_users(role)
+	needed = min_count - len(users)
+	if needed <= 0:
+		return users
+
+	for i in range(1, needed + 1):
+		email = f"dev-seed-{name_prefix}-{i}@ury.local"
+		if not frappe.db.exists("User", email):
+			try:
+				user = frappe.get_doc(
+					{
+						"doctype": "User",
+						"email": email,
+						"first_name": f"Dev Seed {name_prefix.title()} {i}",
+						"send_welcome_email": 0,
+						"roles": [{"role": role}],
+					}
+				)
+				user.insert(ignore_permissions=True)
+				print(f"Created demo User '{email}' with role '{role}' for staff-sales seeding")
+			except Exception as e:
+				print(f"  ! Failed to create demo User '{email}': {e}")
+				continue
+		elif not frappe.db.exists("Has Role", {"parent": email, "role": role}):
+			try:
+				user = frappe.get_doc("User", email)
+				user.append("roles", {"role": role})
+				user.save(ignore_permissions=True)
+			except Exception as e:
+				print(f"  ! Failed to grant role '{role}' to existing User '{email}': {e}")
+				continue
+		users.append(email)
+
+	return sorted(set(users))
+
+
+def _weighted_pick(pool, weights):
+	if not pool:
+		return None
+	w = weights[: len(pool)]
+	if len(w) < len(pool):
+		w = w + [w[-1] if w else 1] * (len(pool) - len(w))
+	return random.choices(pool, weights=w, k=1)[0]
+
+
+def _pick_posting_time():
+	"""Weighted lunch/dinner-peaked posting time, for TimeWiseSales/
+	AverageBillValue shape instead of a flat spread across service hours."""
+	starts, ends, weights = zip(*TIME_BUCKETS)
+	idx = random.choices(range(len(TIME_BUCKETS)), weights=weights, k=1)[0]
+	hour = random.randint(starts[idx], ends[idx] - 1) if ends[idx] > starts[idx] else starts[idx]
+	minute = random.randint(0, 59)
+	return f"{hour:02d}:{minute:02d}:00"
+
+
+def _order_count_for_offset(offset):
+	"""Tapered daily order volume by how far back `offset` (days ago) is --
+	keeps recent weeks dense (for fine-grained TimeWise/day reports) while
+	older months stay sparse (keeps total submit volume tractable)."""
+	if offset <= RECENT_DENSE_DAYS:
+		lo, hi = MIN_ORDERS_PER_DAY, MAX_ORDERS_PER_DAY
+	elif offset <= MID_RANGE_DAYS:
+		lo, hi = MID_MIN_ORDERS_PER_DAY, MID_MAX_ORDERS_PER_DAY
+	else:
+		lo, hi = SPARSE_MIN_ORDERS_PER_DAY, SPARSE_MAX_ORDERS_PER_DAY
+	count = random.randint(lo, hi)
+
+	date = getdate(add_days(today(), -offset))
+	# weekday() 5=Sat, 6=Sun
+	if date.weekday() >= 5:
+		count = max(count, round(count * WEEKEND_ORDER_MULTIPLIER))
+	return count
+
+
+def _split_customer_pools(customers):
+	"""Split into a small pool deliberately reused across many dates
+	(RepeatedCustomers/CustomerData/DaywiseCustomerDetails need repeats to
+	be meaningful) and the rest, used at most a handful of times each."""
+	pool_size = min(REPEAT_CUSTOMER_POOL_SIZE, len(customers))
+	shuffled = customers[:]
+	random.shuffle(shuffled)
+	repeat_pool = shuffled[:pool_size]
+	one_time_pool = shuffled[pool_size:] or shuffled
+	return repeat_pool, one_time_pool
+
+
+def _pick_customer(repeat_pool, one_time_pool):
+	if repeat_pool and (not one_time_pool or random.random() < REPEAT_CUSTOMER_SHARE):
+		return random.choice(repeat_pool)
+	return random.choice(one_time_pool)
 
 
 # ---------------------------------------------------------------------------
@@ -320,6 +481,28 @@ def _seed_submitted_invoice(
 		return None
 
 
+def _maybe_cancel_invoice(name):
+	"""Cancel a small fraction of already-submitted invoices, for the
+	CancelledInvoices report (docstatus=2, reads `cancel_reason`/
+	`modified_by`). `cancel_reason` is a custom Data field guarded by core
+	Frappe's "not allowed to change after submission" rule (it treats any
+	field-level "Reason"-style change on a submitted doc as an amend-only
+	edit), so it can't be set via `.save()` before/after submit -- cancel
+	first (docstatus=2 is no longer "submitted" for that check), then set
+	the reason directly via `db.set_value`, matching this module's existing
+	`invoice_printed` convention for fields with no meaningful doctype
+	action of their own. Best-effort -- a failed cancel just leaves the
+	invoice submitted, which is harmless."""
+	try:
+		doc = frappe.get_doc("POS Invoice", name)
+		doc.cancel()
+		frappe.db.set_value("POS Invoice", name, "cancel_reason", random.choice(CANCEL_REASONS))
+		return True
+	except Exception as e:
+		print(f"  ! Failed to cancel POS Invoice {name}: {e}")
+		return False
+
+
 def _seed_draft_invoice(mode_of_payment=None, **build_kwargs):
 	doc = _build_pos_invoice(**build_kwargs)
 	if doc is None:
@@ -353,15 +536,19 @@ def _seed_draft_invoice(mode_of_payment=None, **build_kwargs):
 # ---------------------------------------------------------------------------
 
 def _ensure_demo_employee(branch_name):
-	if frappe.db.exists("Employee", DEMO_EMPLOYEE_ID):
-		return DEMO_EMPLOYEE_ID
+	# Employee uses hash/naming-series autoname on this bench (confirmed:
+	# passing `name`/`employee` above was silently ignored, producing a new
+	# HR-EMP-NNNNN row -- and therefore a new demo Employee -- on every
+	# single `seed()` call). Look it up by `employee_name` instead, per this
+	# module's own documented "known trap" for hash-autonamed doctypes.
+	existing = frappe.db.get_value("Employee", {"employee_name": "Dev Seed Staff"}, "name")
+	if existing:
+		return existing
 
 	try:
 		doc = frappe.get_doc(
 			{
 				"doctype": "Employee",
-				"name": DEMO_EMPLOYEE_ID,
-				"employee": DEMO_EMPLOYEE_ID,
 				"first_name": "Dev Seed Staff",
 				"gender": "Male",
 				"date_of_birth": "1995-01-01",
@@ -509,10 +696,17 @@ def seed():
 		return {"skipped": True, "reason": "no Mode of Payment"}
 
 	currency = frappe.db.get_value("Company", company_name, "default_currency") or "INR"
-	cashier = _get_staff_user("URY Cashier")
-	waiter = _get_staff_user("URY Captain")
+	cashiers = _ensure_min_staff("URY Cashier", MIN_STAFF_PER_ROLE, "cashier")
+	waiters = _ensure_min_staff("URY Captain", MIN_STAFF_PER_ROLE, "waiter")
+	if not cashiers:
+		cashiers = ["Administrator"]
+	if not waiters:
+		waiters = ["Administrator"]
+
+	repeat_customers, one_time_customers = _split_customer_pools(customers)
 
 	invoices_created = 0
+	invoices_cancelled = 0
 	dates_seeded = []
 	dates_skipped = 0
 
@@ -527,13 +721,15 @@ def seed():
 			dates_skipped += 1
 			continue
 
-		order_count = random.randint(MIN_ORDERS_PER_DAY, MAX_ORDERS_PER_DAY)
+		order_count = _order_count_for_offset(offset)
 		day_created = 0
 		for _ in range(order_count):
 			order_type = random.choice(ORDER_TYPES)
 			table = random.choice(tables) if (tables and order_type == "Dine In") else None
-			customer = random.choice(customers)
-			posting_time = f"{random.randint(11, 22):02d}:{random.randint(0, 59):02d}:00"
+			customer = _pick_customer(repeat_customers, one_time_customers)
+			posting_time = _pick_posting_time()
+			cashier = _weighted_pick(cashiers, STAFF_WEIGHTS)
+			waiter = _weighted_pick(waiters, STAFF_WEIGHTS)
 
 			name = _seed_submitted_invoice(
 				branch_name=branch_name,
@@ -557,6 +753,9 @@ def seed():
 			)
 			if name:
 				day_created += 1
+				if random.random() < CANCEL_RATE:
+					if _maybe_cancel_invoice(name):
+						invoices_cancelled += 1
 
 		if day_created:
 			invoices_created += day_created
@@ -579,7 +778,9 @@ def seed():
 		for _ in range(to_create):
 			order_type = random.choice(ORDER_TYPES)
 			table = random.choice(tables) if (tables and order_type == "Dine In") else None
-			customer = random.choice(customers)
+			customer = _pick_customer(repeat_customers, one_time_customers)
+			cashier = _weighted_pick(cashiers, STAFF_WEIGHTS)
+			waiter = _weighted_pick(waiters, STAFF_WEIGHTS)
 			name = _seed_submitted_invoice(
 				branch_name=branch_name,
 				company_name=company_name,
@@ -618,7 +819,9 @@ def seed():
 			to_create = min(DRAFT_ORDER_COUNT - existing_drafts, len(free_tables))
 			chosen_tables = random.sample(free_tables, to_create)
 			for table in chosen_tables:
-				customer = random.choice(customers)
+				customer = _pick_customer(repeat_customers, one_time_customers)
+				cashier = _weighted_pick(cashiers, STAFF_WEIGHTS)
+				waiter = _weighted_pick(waiters, STAFF_WEIGHTS)
 				name = _seed_draft_invoice(
 					mode_of_payment=mode_of_payment,
 					branch_name=branch_name,
@@ -655,6 +858,7 @@ def seed():
 		"historical_days_seeded": len(dates_seeded),
 		"historical_days_skipped_existing": dates_skipped,
 		"historical_invoices_created": invoices_created,
+		"historical_invoices_cancelled": invoices_cancelled,
 		"today_invoices_created": today_created,
 		"draft_invoices_created": draft_created,
 		"daily_pnl_created": pnl_created,
