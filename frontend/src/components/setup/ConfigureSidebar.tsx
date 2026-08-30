@@ -41,7 +41,7 @@ export function ConfigureSidebar() {
                   className={`w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium transition-all duration-200 group relative rounded-md ${
                     isActive
                       ? 'bg-card text-foreground shadow-sm font-semibold'
-                      : 'text-muted-foreground hover:bg-white/60 hover:text-foreground'
+                      : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'
                   }`}
                 >
                   {/* Active indicator bar */}

@@ -6,6 +6,7 @@ import { Card, Button, Badge, Input, Spinner, showToast } from '@ury/ui';
 import { formatCurrency, call } from '@ury/core';
 import { dashboardService } from '../../services/dashboard';
 import SideDrawer from '../../components/layout/SideDrawer';
+import { PageToolbar } from '../../components/layout/PageToolbar';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { MenuBulkUpload } from '../../components/common/MenuBulkUpload';
 
@@ -689,7 +690,7 @@ export const MenuPage: React.FC = () => {
     <div className="space-y-4 max-w-[1600px] mx-auto">
 
       {/* Section: Menu Selector — Partition Style */}
-      <div className="flex flex-col md:flex-row items-center justify-between gap-4 pb-3 border-b border-gray-200 -mx-6 px-6 -mt-6 pt-6">
+      <PageToolbar className="flex-col md:flex-row justify-between">
         <div className="flex items-center gap-3 w-full md:w-auto">
           <div className="w-full sm:w-48">
             <SearchableSelect
@@ -717,16 +718,16 @@ export const MenuPage: React.FC = () => {
             />
           </div>
 
-          <div className="flex items-center bg-gray-100 p-1 rounded-lg shrink-0">
+          <div className="flex items-center bg-muted p-1 rounded-lg shrink-0">
             <button
               onClick={() => setViewMode('grid')}
-              className={`p-1.5 rounded-md transition-all flex items-center justify-center ${viewMode === 'grid' ? 'bg-white shadow-sm text-primary' : 'text-gray-500 hover:text-gray-700'}`}
+              className={`p-1.5 rounded-md transition-all flex items-center justify-center ${viewMode === 'grid' ? 'bg-card shadow-sm text-primary' : 'text-muted-foreground hover:text-foreground'}`}
             >
               <LayoutGrid className="w-4 h-4" />
             </button>
             <button
               onClick={() => setViewMode('list')}
-              className={`p-1.5 rounded-md transition-all flex items-center justify-center ${viewMode === 'list' ? 'bg-white shadow-sm text-primary' : 'text-gray-500 hover:text-gray-700'}`}
+              className={`p-1.5 rounded-md transition-all flex items-center justify-center ${viewMode === 'list' ? 'bg-card shadow-sm text-primary' : 'text-muted-foreground hover:text-foreground'}`}
             >
               <List className="w-4 h-4" />
             </button>
@@ -735,20 +736,20 @@ export const MenuPage: React.FC = () => {
 
         <div className="flex items-center gap-3">
           <div className="relative w-full md:w-56">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               type="text"
               placeholder="Search items..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 bg-gray-50 border-gray-200 w-full"
+              className="pl-9 bg-muted border-border w-full"
             />
           </div>
 
           <Button
             variant="outline"
             onClick={() => openAddCourseDrawer(false)}
-            className="border-gray-300 text-gray-700 font-semibold flex items-center gap-1.5 whitespace-nowrap"
+            className="font-semibold flex items-center gap-1.5 whitespace-nowrap"
           >
             <Plus className="w-4 h-4" />
             <span>Add Course</span>
@@ -757,7 +758,7 @@ export const MenuPage: React.FC = () => {
           <Button
             variant="outline"
             onClick={openAddMenuDrawer}
-            className="border-gray-300 text-gray-700 font-semibold flex items-center gap-1.5 whitespace-nowrap"
+            className="font-semibold flex items-center gap-1.5 whitespace-nowrap"
           >
             <Plus className="w-4 h-4" />
             <span>Add Menu</span>
@@ -772,20 +773,20 @@ export const MenuPage: React.FC = () => {
             <span>Add Item</span>
           </Button>
         </div>
-      </div>
+      </PageToolbar>
 
       {/* Content Area */}
       {loading ? (
-        <div className="py-24 flex items-center justify-center bg-white rounded-xl border border-gray-100 shadow-sm">
+        <div className="py-24 flex items-center justify-center bg-card rounded-xl border border-border shadow-sm">
           <Spinner className="w-8 h-8 text-primary" />
         </div>
       ) : filteredItems.length === 0 ? (
-        <Card className="p-16 flex flex-col items-center justify-center text-center rounded-xl border border-gray-100 shadow-sm bg-white">
+        <Card className="p-16 flex flex-col items-center justify-center text-center rounded-xl border border-border shadow-sm bg-card">
           <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-5">
             <Utensils className="w-8 h-8 text-primary" />
           </div>
-          <h3 className="text-xl font-bold text-gray-900 mb-2">No Items Found</h3>
-          <p className="text-gray-500 mb-8 max-w-sm">
+          <h3 className="text-xl font-bold text-foreground mb-2">No Items Found</h3>
+          <p className="text-muted-foreground mb-8 max-w-sm">
             {search || categoryFilter !== 'all'
               ? "We couldn't find any items matching your filters."
               : 'Your menu is empty. Start adding delicious items for your customers!'}
@@ -802,7 +803,7 @@ export const MenuPage: React.FC = () => {
       ) : viewMode === 'grid' ? (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
           {filteredItems.map((item, idx) => (
-            <div key={item.name || idx} className="bg-white rounded-lg shadow-sm overflow-hidden transition-shadow relative h-56 flex flex-col group">
+            <div key={item.name || idx} className="bg-card rounded-lg shadow-sm overflow-hidden transition-shadow relative h-56 flex flex-col group">
               <div className="h-24 w-full shrink-0">
                 {getItemImage(item) ? (
                   <img
@@ -813,25 +814,25 @@ export const MenuPage: React.FC = () => {
                     title="Click to preview image"
                   />
                 ) : (
-                  <div className="w-full h-full bg-gray-200 flex items-center justify-center text-2xl text-gray-400 font-medium select-none">
+                  <div className="w-full h-full bg-muted flex items-center justify-center text-2xl text-muted-foreground font-medium select-none">
                     {(item.item_name || 'IT').slice(0, 2).toUpperCase()}
                   </div>
                 )}
               </div>
               <div className="flex-1 p-3 flex flex-col">
-                <h3 className="font-medium text-gray-900 text-sm leading-5 line-clamp-2" title={item.item_name}>
+                <h3 className="font-medium text-foreground text-sm leading-5 line-clamp-2" title={item.item_name}>
                   {item.item_name}
                 </h3>
                 <div className="h-5 mt-1">
-                  <p className="text-xs text-gray-500 truncate" title={item.course || ''}>{item.course || ' '}</p>
+                  <p className="text-xs text-muted-foreground truncate" title={item.course || ''}>{item.course || ' '}</p>
                 </div>
                 <div className="mt-auto pt-2 flex items-center justify-between">
-                  <span className="text-sm font-semibold text-gray-900 tabular-nums">
+                  <span className="text-sm font-semibold text-foreground tabular-nums">
                     {formatCurrency(item.rate || 0)}
                   </span>
                   <button
                     onClick={(e) => { e.stopPropagation(); openEditItemDrawer(item); }}
-                    className="p-1.5 text-gray-400 hover:text-primary hover:bg-primary/5 rounded-md transition-colors -mr-1.5 -mb-1.5"
+                    className="p-1.5 text-muted-foreground hover:text-primary hover:bg-primary/5 rounded-md transition-colors -mr-1.5 -mb-1.5"
                     title="Edit Item"
                   >
                     <Edit2 className="w-4 h-4" />
@@ -842,9 +843,9 @@ export const MenuPage: React.FC = () => {
           ))}
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden overflow-x-auto">
-          <table className="w-full text-left text-sm text-gray-600 min-w-[600px]">
-            <thead className="bg-gray-50/80 border-b border-gray-100 text-xs uppercase text-gray-500 font-bold tracking-wider">
+        <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden overflow-x-auto">
+          <table className="w-full text-left text-sm text-muted-foreground min-w-[600px]">
+            <thead className="bg-muted/50 border-b border-border text-xs uppercase text-muted-foreground font-bold tracking-wider">
               <tr>
                 <th className="px-6 py-4">Item Name</th>
                 <th className="px-6 py-4">Course</th>
@@ -854,12 +855,12 @@ export const MenuPage: React.FC = () => {
                 <th className="px-6 py-4 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-border">
               {filteredItems.map((item, idx) => (
                 <tr key={item.name || idx} className="transition-colors">
-                  <td className="px-6 py-4 font-semibold text-gray-900">
+                  <td className="px-6 py-4 font-semibold text-foreground">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-md bg-gray-100 flex items-center justify-center shrink-0 overflow-hidden border border-gray-100">
+                      <div className="w-8 h-8 rounded-md bg-muted flex items-center justify-center shrink-0 overflow-hidden border border-border">
                         {getItemImage(item) ? (
                           <img
                             src={getItemImage(item)}
@@ -869,14 +870,14 @@ export const MenuPage: React.FC = () => {
                             title="Click to preview image"
                           />
                         ) : (
-                          <Utensils className="w-4 h-4 text-gray-400" />
+                          <Utensils className="w-4 h-4 text-muted-foreground" />
                         )}
                       </div>
                       {item.item_name}
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <Badge variant="outline" className="border-gray-200 bg-gray-50 text-gray-600 text-xs font-medium">
+                    <Badge variant="outline" className="border-border bg-muted text-muted-foreground text-xs font-medium">
                       {item.course || 'None'}
                     </Badge>
                   </td>
@@ -912,7 +913,7 @@ export const MenuPage: React.FC = () => {
         <form onSubmit={handleSaveItem} className="space-y-5 text-sm">
           {creatingItemForRowIndex === null && (
             <div>
-              <label className="block font-semibold text-gray-700 mb-1.5">Target Menu <span className="text-red-500">*</span></label>
+              <label className="block font-semibold text-foreground mb-1.5">Target Menu <span className="text-red-500">*</span></label>
               <SearchableSelect
                 id="target_menu"
                 value={newItem.target_menu}
@@ -925,7 +926,7 @@ export const MenuPage: React.FC = () => {
           {/* Item Name & Upload Image Row */}
           <div className="flex items-end gap-3">
             <div className="flex-1">
-              <label className="block font-semibold text-gray-700 mb-1.5">
+              <label className="block font-semibold text-foreground mb-1.5">
                 Item Name <span className="text-red-500">*</span>
               </label>
               <Input
@@ -939,10 +940,10 @@ export const MenuPage: React.FC = () => {
             <div className="shrink-0 h-10 flex items-center">
               {newItem.image ? (
                 <div
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-md text-xs font-medium text-gray-700 max-w-[170px]"
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 bg-muted border border-border rounded-md text-xs font-medium text-foreground max-w-[170px]"
                 >
                   <span
-                    className="truncate font-medium text-gray-700 select-none"
+                    className="truncate font-medium text-foreground select-none"
                     title={newItem.image_name || newItem.image}
                   >
                     {newItem.image_name || (newItem.image.split('/').pop()?.split('?')[0] || 'attached_image.png')}
@@ -950,7 +951,7 @@ export const MenuPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setNewItem(prev => ({ ...prev, image: '', image_name: '' }))}
-                    className="p-0.5 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-200/60 transition-colors shrink-0"
+                    className="p-0.5 text-muted-foreground hover:text-foreground rounded-full hover:bg-muted/60 transition-colors shrink-0"
                     title="Remove image"
                   >
                     <X className="w-3.5 h-3.5" />
@@ -958,7 +959,7 @@ export const MenuPage: React.FC = () => {
                 </div>
               ) : (
                 <label
-                  className={`flex items-center gap-1.5 px-2.5 py-2 text-xs font-semibold text-gray-600 hover:text-primary cursor-pointer transition-colors rounded-md hover:bg-primary/5 focus-within:ring-2 focus-within:ring-primary/20 shrink-0 group ${uploadingImage ? 'pointer-events-none opacity-60' : ''}`}
+                  className={`flex items-center gap-1.5 px-2.5 py-2 text-xs font-semibold text-muted-foreground hover:text-primary cursor-pointer transition-colors rounded-md hover:bg-primary/5 focus-within:ring-2 focus-within:ring-primary/20 shrink-0 group ${uploadingImage ? 'pointer-events-none opacity-60' : ''}`}
                   title="Upload Image"
                 >
                   <span>{uploadingImage ? 'Uploading...' : 'Upload Image'}</span>
@@ -975,7 +976,7 @@ export const MenuPage: React.FC = () => {
                       strokeWidth="2"
                       strokeLinecap="round"
                       strokeLinejoin="round"
-                      className="lucide lucide-paperclip-icon lucide-paperclip text-gray-500 group-hover:text-primary transition-colors shrink-0"
+                      className="lucide lucide-paperclip-icon lucide-paperclip text-muted-foreground group-hover:text-primary transition-colors shrink-0"
                     >
                       <path d="m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551" />
                     </svg>
@@ -994,7 +995,7 @@ export const MenuPage: React.FC = () => {
 
           {/* Course field */}
           <div>
-            <label className="block font-semibold text-gray-700 mb-1.5">Course</label>
+            <label className="block font-semibold text-foreground mb-1.5">Course</label>
             <SearchableSelect
               id="course"
               value={newItem.course}
@@ -1014,7 +1015,7 @@ export const MenuPage: React.FC = () => {
           </div>
 
           <div>
-            <label className="block font-semibold text-gray-700 mb-1.5">Standard Rate (₹) <span className="text-red-500">*</span></label>
+            <label className="block font-semibold text-foreground mb-1.5">Standard Rate (₹) <span className="text-red-500">*</span></label>
             <Input
               type="number"
               value={newItem.rate}
@@ -1024,7 +1025,7 @@ export const MenuPage: React.FC = () => {
             />
           </div>
 
-          <div className="pt-6 flex justify-end gap-3 border-t mt-8 border-gray-100">
+          <div className="pt-6 flex justify-end gap-3 border-t mt-8 border-border">
             <Button type="button" variant="outline" onClick={closeDrawer} className="font-semibold" disabled={savingItem}>Cancel</Button>
             <Button type="submit" disabled={savingItem} className="bg-primary hover:bg-primary/90 text-white font-semibold shadow-xs flex items-center gap-2">
               {editingItem ? 'Save Changes' : 'Create Item'}
@@ -1041,7 +1042,7 @@ export const MenuPage: React.FC = () => {
       >
         <form onSubmit={handleSaveMenu} className="space-y-5 text-sm">
           <div>
-            <label className="block font-semibold text-gray-700 mb-1.5">Menu Name <span className="text-red-500">*</span></label>
+            <label className="block font-semibold text-foreground mb-1.5">Menu Name <span className="text-red-500">*</span></label>
             <Input
               value={newMenu.menu_name}
               onChange={(e) => setNewMenu({ ...newMenu, menu_name: e.target.value })}
@@ -1051,7 +1052,7 @@ export const MenuPage: React.FC = () => {
           </div>
 
           <div>
-            <label className="block font-semibold text-gray-700 mb-1.5">Branch <span className="text-red-500">*</span></label>
+            <label className="block font-semibold text-foreground mb-1.5">Branch <span className="text-red-500">*</span></label>
             <SearchableSelect
               id="branch"
               value={newMenu.branch}
@@ -1064,17 +1065,17 @@ export const MenuPage: React.FC = () => {
           {/* Menu Items Section */}
           <div className="space-y-4 pt-2">
             <div className="flex flex-col">
-              <label className="block font-semibold text-gray-700 text-sm">
+              <label className="block font-semibold text-foreground text-sm">
                 Menu Items <span className="text-red-500">*</span>
               </label>
-              <span className="text-xs text-gray-500 mt-0.5">
+              <span className="text-xs text-muted-foreground mt-0.5">
                 Add items and set custom price for this menu
               </span>
             </div>
 
             <div className="space-y-3">
               {/* Header Row */}
-              <div className="flex gap-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              <div className="flex gap-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 <div className="flex-[3]">Item</div>
                 <div className="flex-[1.5]">Price (₹)</div>
                 {newMenuRows.length > 1 && <div className="w-9 shrink-0"></div>}
@@ -1144,7 +1145,7 @@ export const MenuPage: React.FC = () => {
                           setNewMenuRows(updatedRows);
                         }}
                         required
-                        className="w-full text-sm bg-white"
+                        className="w-full text-sm bg-background"
                       />
                     </div>
 
@@ -1178,7 +1179,7 @@ export const MenuPage: React.FC = () => {
           </div>
 
           {/* Bulk Upload Section */}
-          <div className="pt-4 border-t border-gray-100">
+          <div className="pt-4 border-t border-border">
             <MenuBulkUpload
               onItemsParsed={handleBulkUploadParsed}
               title="Bulk Upload (Optional)"
@@ -1186,7 +1187,7 @@ export const MenuPage: React.FC = () => {
             />
           </div>
 
-          <div className="pt-6 flex justify-end gap-3 border-t mt-8 border-gray-100">
+          <div className="pt-6 flex justify-end gap-3 border-t mt-8 border-border">
             <Button type="button" variant="outline" onClick={closeDrawer} className="font-semibold" disabled={savingMenu}>Cancel</Button>
             <Button type="submit" disabled={savingMenu} className="bg-primary hover:bg-primary/90 text-white font-semibold shadow-xs flex items-center gap-2">
               Create Menu
@@ -1203,7 +1204,7 @@ export const MenuPage: React.FC = () => {
       >
         <form onSubmit={handleSaveCourse} className="space-y-5 text-sm">
           <div>
-            <label className="block font-semibold text-gray-700 mb-1.5">Course Name <span className="text-red-500">*</span></label>
+            <label className="block font-semibold text-foreground mb-1.5">Course Name <span className="text-red-500">*</span></label>
             <Input
               value={newCourseName}
               onChange={(e) => setNewCourseName(e.target.value)}
@@ -1213,7 +1214,7 @@ export const MenuPage: React.FC = () => {
           </div>
 
           <div>
-            <label className="block font-semibold text-gray-700 mb-1.5">Icon</label>
+            <label className="block font-semibold text-foreground mb-1.5">Icon</label>
             <SearchableSelect
               id="course-icon"
               value={newCourseIcon}
@@ -1235,7 +1236,7 @@ export const MenuPage: React.FC = () => {
             />
           </div>
 
-          <div className="pt-6 flex justify-end gap-3 border-t mt-8 border-gray-100">
+          <div className="pt-6 flex justify-end gap-3 border-t mt-8 border-border">
             <Button type="button" variant="outline" onClick={closeDrawer} className="font-semibold" disabled={savingCourse}>Cancel</Button>
             <Button type="submit" disabled={savingCourse} className="bg-primary hover:bg-primary/90 text-white font-semibold shadow-xs flex items-center gap-2">
               Create Course

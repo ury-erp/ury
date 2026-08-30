@@ -1,6 +1,6 @@
 import React from 'react';
 import { formatCurrency } from '@ury/core';
-import { Card, Spinner } from '@ury/ui';
+import { Card, StatCard, Spinner } from '@ury/ui';
 import { DashboardSummary } from '../../services/dashboard';
 import uryPosLogo from '../../../../pos/public/ury_pos.png';
 import uryMosaicLogo from '../../../../mosaic/src/assets/logos/mosaic.jpg';
@@ -14,11 +14,11 @@ interface LinkCardProps {
 const LinkCard: React.FC<LinkCardProps> = ({ logoSrc, label, href }) => {
   return (
     <a href={href} className="block outline-none h-full">
-      <Card className="h-full rounded-lg border border-gray-200 bg-white p-5 shadow-xs transition-all duration-200 hover:shadow-md hover:border-primary/20">
+      <Card className="h-full rounded-lg border border-border bg-card p-5 shadow-xs transition-all duration-200 hover:shadow-md hover:border-primary/20">
         <div className="flex h-4 items-center mb-2">
           <img src={logoSrc} alt="Logo" className="h-full object-contain opacity-70 mix-blend-multiply" />
         </div>
-        <h3 className="mt-2 text-2xl font-bold text-gray-900 tracking-tight">{label}</h3>
+        <h3 className="mt-2 text-2xl font-bold text-foreground tracking-tight">{label}</h3>
       </Card>
     </a>
   );
@@ -29,25 +29,37 @@ interface KPIGridProps {
   loading: boolean;
 }
 
-interface KPICardProps {
+interface KPITileProps {
   title: string;
   value: string;
   loading?: boolean;
 }
 
-const KPICard: React.FC<KPICardProps> = ({ title, value, loading }) => {
-  return (
-    <Card className="rounded-lg border border-gray-200 bg-white p-5 shadow-xs transition-all duration-200 hover:shadow-md hover:border-primary/20">
-      <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">{title}</p>
-      {loading ? (
+// StatCard's `value` prop only accepts `string | number`, so it can't carry a
+// spinner + "Loading..." node. The loading state is rendered as a lightweight
+// placeholder that mirrors StatCard's own shell/tokens instead; once data is
+// available, the tile renders through StatCard itself.
+const KPITile: React.FC<KPITileProps> = ({ title, value, loading }) => {
+  if (loading) {
+    return (
+      <div className="rounded-lg border border-border bg-card shadow-sm p-5 transition-all duration-200 hover:shadow-md hover:border-primary/20">
+        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          {title}
+        </span>
         <div className="mt-2 flex items-center space-x-2">
           <Spinner className="w-4 h-4 text-primary" />
-          <span className="text-sm text-gray-400">Loading...</span>
+          <span className="text-sm text-muted-foreground">Loading...</span>
         </div>
-      ) : (
-        <h3 className="mt-2 text-2xl font-bold text-gray-900 tracking-tight">{value}</h3>
-      )}
-    </Card>
+      </div>
+    );
+  }
+
+  return (
+    <StatCard
+      label={title}
+      value={value}
+      className="transition-all duration-200 hover:shadow-md hover:border-primary/20"
+    />
   );
 };
 
@@ -60,8 +72,6 @@ export const KPIGrid: React.FC<KPIGridProps> = ({ summary, loading }) => {
   const activeCashiers = summary?.active_cashiers ?? 0;
   const pendingOrders = summary?.pending_kitchen_orders ?? 0;
   const totalMenuItems = summary?.total_menu_items ?? 0;
-
-  const occupancyRate = totalTables > 0 ? Math.round((occupiedTables / totalTables) * 100) : 0;
 
   return (
     <section className="w-full">
@@ -78,49 +88,49 @@ export const KPIGrid: React.FC<KPIGridProps> = ({ summary, loading }) => {
           href="/mosaic"
         />
 
-        <KPICard
+        <KPITile
           title="Today's Sales"
           value={formatCurrency(todaySales)}
           loading={loading}
         />
 
-        <KPICard
+        <KPITile
           title="Orders Today"
           value={ordersToday.toString()}
           loading={loading}
         />
 
-        <KPICard
-          title="Table Occupancy"
-          value={`${occupancyRate}%`}
+        <KPITile
+          title="Active Tables"
+          value={`${totalTables} Tables`}
           loading={loading}
         />
 
-        <KPICard
+        <KPITile
           title="Occupied Tables"
           value={`${occupiedTables} / ${totalTables}`}
           loading={loading}
         />
 
-        <KPICard
+        <KPITile
           title="Active Menu Items"
           value={`${totalMenuItems} Items`}
           loading={loading}
         />
 
-        <KPICard
+        <KPITile
           title="Average Order Value"
           value={formatCurrency(aov)}
           loading={loading}
         />
 
-        <KPICard
+        <KPITile
           title="Pending Kitchen Orders"
           value={`${pendingOrders} KOTs`}
           loading={loading}
         />
 
-        <KPICard
+        <KPITile
           title="Active Cashiers"
           value={`${activeCashiers} Online`}
           loading={loading}
