@@ -1,3 +1,5 @@
+from datetime import datetime as _datetime, timedelta as _timedelta
+
 import frappe
 
 from frappe.utils import get_datetime, add_to_date, today
@@ -30,7 +32,26 @@ def get_service_line(branch=None):
 
 		minutes = None
 		if t.latest_invoice_time:
-			minutes = int((now - get_datetime(t.latest_invoice_time)).total_seconds() // 60)
+			# `URY Table.latest_invoice_time` is a **Time** field (confirmed
+			# via ury_table.json), not Datetime -- Frappe's ORM returns Time
+			# columns as `datetime.timedelta` (seconds since midnight), not
+			# a full datetime. The previous code (`now - get_datetime(...)`,
+			# and frappe.utils.time_diff_in_seconds, which does the same
+			# thing internally) assumed a full datetime and broke: when one
+			# operand of a `-` is already a timedelta, `datetime -
+			# timedelta` returns a *datetime*, not a timedelta, so the
+			# `.total_seconds()` call on the result raised AttributeError.
+			# Fix: compare against "now" expressed the same way (seconds
+			# since midnight today), so both sides of the subtraction are
+			# real timedeltas.
+			now_since_midnight = now - _datetime.combine(now.date(), _datetime.min.time())
+			delta = now_since_midnight - t.latest_invoice_time
+			if delta.total_seconds() < 0:
+				# Order was placed before midnight and it's now past
+				# midnight -- add a day so this still reads as "elapsed",
+				# not a negative/nonsensical value.
+				delta += _timedelta(days=1)
+			minutes = int(delta.total_seconds() // 60)
 
 		invoice = frappe.db.sql(
 			"""
