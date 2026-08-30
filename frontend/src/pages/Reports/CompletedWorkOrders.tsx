@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call } from '@ury/core';
-import { StatCard, DataTable, type DataTableColumn } from '@ury/ui';
-import { Factory, Package } from 'lucide-react';
+import { KpiStrip, DataTable, type DataTableColumn } from '@ury/ui';
 import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
 import { toApiDate } from '../../lib/reportDate';
 import { subMonths, endOfDay, format } from 'date-fns';
@@ -79,10 +78,12 @@ const formatDate = (d: Date) => format(d, 'MMM d, yyyy');  const emptyMessage = 
       )}
 
       {data && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <StatCard label="Completed" value={data.summary.total_completed} icon={<Factory className="w-4 h-4" />} />
-          <StatCard label="Qty Produced" value={data.summary.total_qty_produced} icon={<Package className="w-4 h-4" />} />
-        </div>
+        <KpiStrip
+          items={[
+            { label: 'Completed', value: data.summary.total_completed },
+            { label: 'Qty Produced', value: data.summary.total_qty_produced },
+          ]}
+        />
       )}
 
       <DataTable
