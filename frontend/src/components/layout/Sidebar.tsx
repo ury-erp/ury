@@ -123,15 +123,21 @@ export const ADVANCED_ITEMS: NavItem[] = [
  * `px-3.5 py-2.5` rows, so switching into Reports visibly changed the density
  * of the same rail.
  */
+// Matches ury-app.html's `.it` / `.it.on` spec (lines 55-59). The active
+// item is a WHITE CHIP RAISED OFF THE GREY RAIL -- a hairline ring plus a
+// barely-there shadow -- and the accent colour is carried by the *icon*,
+// not by a filled background. The previous saturated-blue filled pill was
+// the single most visible reason the sidebar read as a different product
+// from the mockup. See tracks/sa-ury-app-transition/DESIGN_GAP.md.
 const getNavLinkClass =
   (isCollapsed: boolean) =>
   ({ isActive }: { isActive: boolean }) =>
-    `flex items-center rounded-md text-[13px] font-medium transition-all ${
-      isCollapsed ? 'justify-center px-2 py-2' : 'space-x-2.5 px-3 py-2'
+    `flex items-center rounded-md text-[12.5px] transition-all ${
+      isCollapsed ? 'justify-center px-2 py-[5.5px]' : 'space-x-2 px-2 py-[5.5px]'
     } ${
       isActive
-        ? 'bg-primary text-white shadow-sm font-semibold'
-        : 'text-gray-600 hover:bg-primary-50 hover:text-primary'
+        ? 'bg-card text-foreground font-[550] shadow-[0_0_0_1px_hsl(var(--hair)),0_1px_2px_rgba(0,0,0,0.03)] [&_svg]:text-primary [&_svg]:opacity-100'
+        : 'text-muted-foreground font-medium hover:bg-hair/60 hover:text-foreground [&_svg]:opacity-60'
     }`;
 
 
@@ -139,15 +145,15 @@ const reportGroups = groupReports(reportsRegistry);
 const reportGroupEntries = Object.entries(reportGroups);
 
 const groupHeadingClass =
-  'text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-2 px-3';
+  'text-[10.5px] font-medium uppercase tracking-[0.04em] text-text-tertiary pt-3 pb-[5px] px-2';
 
 const ReportsPanel: React.FC<{ isCollapsed: boolean }> = ({ isCollapsed }) => (
   <div className="flex-1 overflow-y-auto">
-    <div className={`p-4 pb-2 border-b border-gray-100 ${isCollapsed ? 'px-2' : ''}`}>
+    <div className={`p-4 pb-2 border-b border-border ${isCollapsed ? 'px-2' : ''}`}>
       <Link
         to="/dashboard"
         title="Back to Dashboard"
-        className={`flex items-center rounded-md text-xs font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors mb-3 ${
+        className={`flex items-center rounded-md text-xs font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors mb-3 ${
           isCollapsed ? 'justify-center p-1.5' : 'space-x-2 px-2 py-1.5 -ml-2'
         }`}
       >
@@ -158,12 +164,12 @@ const ReportsPanel: React.FC<{ isCollapsed: boolean }> = ({ isCollapsed }) => (
         <div className="flex items-center justify-center w-7 h-7 rounded-md bg-primary-50 shrink-0">
           <BarChart3 className="w-4 h-4 text-primary" />
         </div>
-        {!isCollapsed && <h2 className="text-sm font-semibold text-gray-900">Reports</h2>}
+        {!isCollapsed && <h2 className="text-sm font-semibold text-foreground">Reports</h2>}
       </div>
     </div>
     <div className={`p-4 space-y-5 ${isCollapsed ? 'px-2' : ''}`}>
       {reportGroupEntries.map(([group, reports], index) => (
-        <div key={group} className={index > 0 ? 'pt-4 border-t border-gray-100' : undefined}>
+        <div key={group} className={index > 0 ? 'pt-4 border-t border-border' : undefined}>
           {!isCollapsed && <h3 className={groupHeadingClass}>{group}</h3>}
           <div className="space-y-0.5">
             {reports.map((report) => {
@@ -241,8 +247,8 @@ const MainPanel: React.FC<{ isManager: boolean; isCollapsed: boolean }> = ({
             onClick={() => setIsAdvancedOpen(!isAdvancedOpen)}
             className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-[13px] font-medium transition-colors ${
               isAdvancedPath
-                ? 'text-primary font-semibold bg-primary-50'
-                : 'text-gray-600 hover:bg-primary-50 hover:text-primary'
+                ? 'bg-card text-foreground font-[550] shadow-[0_0_0_1px_hsl(var(--hair)),0_1px_2px_rgba(0,0,0,0.03)]'
+                : 'text-muted-foreground hover:bg-hair/60 hover:text-foreground'
             }`}
           >
             <div className="flex items-center space-x-2.5">
@@ -304,8 +310,8 @@ export const Sidebar: React.FC = () => {
 
   return (
     <aside
-      className={`bg-white border-r border-gray-200 sticky top-16 h-[calc(100vh-4rem)] flex flex-col shrink-0 overflow-y-auto overflow-x-hidden font-inter transition-[width] duration-200 ${
-        isCollapsed ? 'w-16' : 'w-64'
+      className={`bg-rail border-r border-hair sticky top-16 h-[calc(100vh-4rem)] flex flex-col shrink-0 overflow-y-auto overflow-x-hidden transition-[width] duration-200 ${
+        isCollapsed ? 'w-16' : 'w-[232px]'
       }`}
     >
       <div className={`flex items-center py-2 shrink-0 ${isCollapsed ? 'justify-center' : 'justify-end px-2'}`}>
