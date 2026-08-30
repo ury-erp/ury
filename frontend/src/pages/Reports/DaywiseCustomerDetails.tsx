@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call } from '@ury/core';
-import { KpiStrip, DataTable, type DataTableColumn, Button } from '@ury/ui';
+import { KpiStrip, DataTable, type DataTableColumn, Button, Page, Section } from '@ury/ui';
 import { useBranchContext } from '../../context/BranchContext';
 import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
 import { toApiDate } from '../../lib/reportDate';
@@ -75,7 +75,7 @@ export function DaywiseCustomerDetails() {
   };
 
   return (
-    <div className="space-y-6">
+    <Page>
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-semibold">Daywise Customer Details</h1>
@@ -97,14 +97,22 @@ export function DaywiseCustomerDetails() {
       </div>
 
       {error && (
-        <div className="rounded-md border border-destructive-tint-border bg-destructive-tint px-4 py-3 text-sm text-destructive">
-          {error}
-        </div>
+        <Section>
+          <div className="rounded-md border border-destructive-tint-border bg-destructive-tint px-4 py-3 text-sm text-destructive">
+            {error}
+          </div>
+        </Section>
       )}
 
-      {data && <KpiStrip items={[{ label: 'Unique Customers', value: data.total_count }]} />}
+      {data && (
+        <Section>
+          <KpiStrip items={[{ label: 'Unique Customers', value: data.total_count }]} />
+        </Section>
+      )}
 
-      <DataTable columns={columns} rows={data?.customers ?? []} isLoading={isLoading} />
-    </div>
+      <Section>
+        <DataTable columns={columns} rows={data?.customers ?? []} isLoading={isLoading} />
+      </Section>
+    </Page>
   );
 }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
-import { KpiStrip, DataTable, type DataTableColumn } from '@ury/ui';
+import { KpiStrip, DataTable, type DataTableColumn, Page, Section } from '@ury/ui';
 import { useBranchContext } from '../../context/BranchContext';
 import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
 import { LineChartCard } from '../../components/reports/charts/LineChartCard';
@@ -74,7 +74,7 @@ export function DaywiseSales() {
   }, [fetchData]);
 
   return (
-    <div className="space-y-6">
+    <Page>
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-semibold">Daywise Sales</h1>
@@ -86,39 +86,49 @@ export function DaywiseSales() {
       </div>
 
       {error && (
-        <div className="rounded-md border border-destructive-tint-border bg-destructive-tint px-4 py-3 text-sm text-destructive">
-          {error}
-        </div>
+        <Section>
+          <div className="rounded-md border border-destructive-tint-border bg-destructive-tint px-4 py-3 text-sm text-destructive">
+            {error}
+          </div>
+        </Section>
       )}
 
       {isLoading && !data ? (
-        <div className="text-sm text-muted-foreground">Loading...</div>
+        <Section>
+          <div className="text-sm text-muted-foreground">Loading...</div>
+        </Section>
       ) : data ? (
         <>
-          <KpiStrip
-            items={[
-              { label: 'Period Total', value: formatCurrency(data.summary.period_total) },
-              { label: 'Avg Daily Sales', value: formatCurrency(data.summary.period_avg_daily) },
-              { label: 'Total Invoices', value: data.summary.total_invoices },
-              {
-                label: 'Peak Day',
-                value: data.summary.peak_day ? `${data.summary.peak_day}` : '—',
-                hint: data.summary.peak_day ? formatCurrency(data.summary.peak_day_total) : undefined,
-              },
-            ]}
-          />
+          <Section>
+            <KpiStrip
+              items={[
+                { label: 'Period Total', value: formatCurrency(data.summary.period_total) },
+                { label: 'Avg Daily Sales', value: formatCurrency(data.summary.period_avg_daily) },
+                { label: 'Total Invoices', value: data.summary.total_invoices },
+                {
+                  label: 'Peak Day',
+                  value: data.summary.peak_day ? `${data.summary.peak_day}` : '—',
+                  hint: data.summary.peak_day ? formatCurrency(data.summary.peak_day_total) : undefined,
+                },
+              ]}
+            />
+          </Section>
 
-          <LineChartCard
-            title="Grand Total Trend"
-            data={data.rows}
-            xKey="date"
-            yKeys={['grand_total']}
-            labels={{ grand_total: 'Grand Total' }}
-          />
+          <Section>
+            <LineChartCard
+              title="Grand Total Trend"
+              data={data.rows}
+              xKey="date"
+              yKeys={['grand_total']}
+              labels={{ grand_total: 'Grand Total' }}
+            />
+          </Section>
 
-          <DataTable columns={columns} rows={data.rows} isLoading={isLoading} />
+          <Section>
+            <DataTable columns={columns} rows={data.rows} isLoading={isLoading} />
+          </Section>
         </>
       ) : null}
-    </div>
+    </Page>
   );
 }
