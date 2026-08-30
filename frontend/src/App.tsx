@@ -19,6 +19,7 @@ import ItemProductionConfigPage from './pages/Dashboard/ItemProductionConfigPage
 import AggregatorPage from './pages/Dashboard/AggregatorPage';
 import SalesPlanPage from './pages/Dashboard/SalesPlanPage';
 import RequirementsPage from './pages/Dashboard/RequirementsPage';
+import MenuRoutingPage from './pages/Dashboard/MenuRoutingPage';
 import { ServicePage } from './pages/Dashboard/ServicePage';
 import { DepartmentStockPage } from './pages/Dashboard/DepartmentStockPage';
 import { StoreIssuePage } from './pages/Dashboard/StoreIssuePage';
@@ -180,6 +181,7 @@ function App() {
           <Route path="requirements" element={<RequirementsPage />} />
           <Route path="service" element={<ServicePage />} />
           <Route path="department-stock" element={<DepartmentStockPage />} />
+          <Route path="menu-routing" element={<MenuRoutingPage />} />
           <Route path="store-issue" element={<StoreIssuePage />} />
           <Route path="wastage" element={<WastagePage />} />
           <Route

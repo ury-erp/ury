@@ -32,7 +32,8 @@ import {
   ClipboardCheck,
   Lock,
   Trash2,
-  ArrowRightLeft
+  ArrowRightLeft,
+  Ban
 } from 'lucide-react';
 
 interface NavItem {
@@ -84,7 +85,8 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Store Issue', path: '/store-issue', icon: ArrowRightLeft },
       { label: 'Wastage', path: '/wastage', icon: Trash2 },
       { label: 'Reservations', path: '/stock-reservations', icon: BookmarkCheck },
-      { label: 'KOT Errors', path: '/kot-error-log', icon: AlertCircle }
+      { label: 'KOT Errors', path: '/kot-error-log', icon: AlertCircle },
+      { label: 'Sellability', path: '/menu-routing', icon: Ban }
     ]
   },
   {
