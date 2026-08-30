@@ -1,9 +1,9 @@
 <template>
-  <div class="p-6">
+  <div class="p-6" style="font-family: var(--s)">
 
     <!-- Loading -->
     <div v-if="loading" class="text-center py-10">
-      <h2 class="text-lg font-semibold text-gray-500">
+      <h2 class="text-lg font-semibold" style="color: var(--t3)">
         Loading Production Dashboard...
       </h2>
     </div>
@@ -11,7 +11,7 @@
     <!-- Production Cards -->
     <div
       v-else
-      class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"
+      class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"
     >
       <ProductionCard
         v-for="unit in dashboard"
