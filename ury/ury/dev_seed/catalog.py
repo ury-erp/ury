@@ -224,7 +224,18 @@ def _ensure_item_prices():
 				"selling": 1,
 			}
 		)
-		doc.insert(ignore_permissions=True)
+		try:
+			doc.insert(ignore_permissions=True)
+		except Exception as e:
+			# Guarded like every other insert in this package (see
+			# `kot_seed.py::_get_or_create_department_invoice`,
+			# `more_seed.py`'s wastage/reservation inserts): an unguarded
+			# insert here (e.g. a currency mismatch validation error) would
+			# raise past `seed()`'s own `frappe.db.commit()` at the end of
+			# this function, losing every table/customer this run also
+			# created before reaching it.
+			print(f"  ! Failed to create Item Price for {item_name}: {e}")
+			continue
 		created.append(doc.name)
 		print(f"Created Item Price for {item_name}: {rate}")
 	return created

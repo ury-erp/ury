@@ -267,8 +267,19 @@ def _get_or_create_department_invoice(
 		"POS Invoice",
 		{"restaurant_table": table, "docstatus": 0, "pos_profile": pos_profile_name},
 		"name",
+		order_by="creation asc",
 	)
 	if existing:
+		# Reuse branch: the create branch below stamps `occupied`/
+		# `latest_invoice_time` unconditionally, but this early return used
+		# to skip that -- a table freed after the invoice was first created
+		# (e.g. by a demo user) would never re-occupy on a later reseed.
+		# Make it unconditional for the tables this module owns.
+		frappe.db.set_value(
+			"URY Table",
+			table,
+			{"occupied": 1, "latest_invoice_time": frappe.db.get_value("POS Invoice", existing, "creation")},
+		)
 		return existing
 
 	mode_of_payment = _get_mode_of_payment()
@@ -330,16 +341,29 @@ def _get_or_create_department_invoice(
 # ---------------------------------------------------------------------------
 
 
-def _kot_exists(invoice, production, label):
+def _kot_exists(production, label):
 	# `comments` carries the spec's stable `label` tag (see TICKET_SPECS) --
 	# needed because several specs share the same (type, order_status,
-	# verified) triple and would otherwise collide on a rerun.
+	# verified) triple and would otherwise collide on a rerun. `invoice` is
+	# deliberately NOT part of this filter: `(production, comments)` is
+	# already globally unique on its own (one label per department per
+	# run), and keying on `invoice` too made the dedup unstable -- reusing
+	# a different draft invoice (e.g. after a demo user submitted the
+	# previously-picked one) meant the old `(invoice, production, comments)`
+	# tuple no longer matched anything, so a rerun created a fresh, fully
+	# duplicate set of KOTs against the new invoice.
+	#
+	# `docstatus: 1` guards against a different rerun trap: if `submit()`
+	# ever fails after a successful `insert()`, the leftover draft KOT would
+	# otherwise satisfy this filter and permanently mask the missing
+	# (never-submitted) ticket on every future run -- while never showing up
+	# in `kot_list()`/`served_kot_list()`, which only read submitted docs.
 	return frappe.db.exists(
 		"URY KOT",
 		{
-			"invoice": invoice,
 			"production": production,
 			"comments": f"dev_seed:{label}",
+			"docstatus": 1,
 		},
 	)
 
@@ -360,10 +384,18 @@ def _create_kot(
 	item_codes,
 	with_note,
 ):
-	if _kot_exists(invoice, production, label):
+	if _kot_exists(production, label):
 		return None
 
 	created_at = now_datetime() - timedelta(minutes=age_minutes)
+
+	# Mirrors `create_kot_doc()` (`ury/ury/api/ury_kot_generate.py:41,59`):
+	# `order_no` comes from the backing invoice's own
+	# `custom_ury_order_number` (stamped by the real `set_order_number`
+	# after_insert hook, `ury/ury/api/ury_kot_order_number.py`, when the
+	# draft invoice above was inserted) -- left unset before this fix, so
+	# every seeded ticket rendered with a blank order number in the KDS.
+	order_no = frappe.db.get_value("POS Invoice", invoice, "custom_ury_order_number")
 
 	kot_doc = frappe.get_doc(
 		{
@@ -381,6 +413,7 @@ def _create_kot(
 			"date": created_at.date(),
 			"time": created_at.time(),
 			"table_takeaway": 0,
+			"order_no": order_no,
 		}
 	)
 
@@ -416,9 +449,17 @@ def _create_kot(
 
 	if order_status == ORDER_STATUS_SERVED:
 		# Mirror serve_kot()'s bookkeeping (production_time / start_time_serv)
-		# instead of leaving them blank on a "Served" ticket.
+		# instead of leaving them blank on a "Served" ticket. Deliberately
+		# uses the local `created_at` variable, NOT `kot_doc.creation`:
+		# `insert()`/`submit()` both call Frappe's `set_user_and_timestamp()`,
+		# which overwrites `doc.creation`/`doc.modified` back to `now()` in
+		# memory (the backdated value only survives via the `db_set` calls
+		# below, which run AFTER this). Reading `kot_doc.creation` here would
+		# silently pick up that in-memory `now()` instead of the intended
+		# backdated timestamp, producing a negative `production_time` for
+		# every "Served" ticket.
 		served_at = created_at + timedelta(minutes=min(age_minutes, 20))
-		production_time_minutes = (served_at - get_datetime(kot_doc.creation)).total_seconds() / 60
+		production_time_minutes = (served_at - get_datetime(created_at)).total_seconds() / 60
 		frappe.db.set_value("URY KOT", kot_doc.name, "start_time_serv", served_at.strftime("%H:%M:%S"))
 		frappe.db.set_value("URY KOT", kot_doc.name, "production_time", production_time_minutes)
 
