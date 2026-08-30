@@ -297,7 +297,7 @@ export const AggregatorPage: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Toolbar */}
-      <div className="-mx-6 px-6 -mt-6 pt-6 pb-3 border-b border-gray-200 flex flex-col md:flex-row items-center justify-end gap-4">
+      <div className="-mx-6 px-6 -mt-6 pt-6 pb-3 border-b border-border flex flex-col md:flex-row items-center justify-end gap-4">
         <Button
           onClick={handleOpenAddModal}
           className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center space-x-1.5 shadow-xs"
@@ -318,8 +318,8 @@ export const AggregatorPage: React.FC = () => {
           <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
             <Store className="w-6 h-6 text-primary" />
           </div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-1">No Aggregators Found</h3>
-          <p className="text-gray-500 mb-6 max-w-sm">
+          <h3 className="text-lg font-semibold text-foreground mb-1">No Aggregators Found</h3>
+          <p className="text-muted-foreground mb-6 max-w-sm">
             Add aggregators like Zomato, Swiggy to configure aggregator settings.
           </p>
           <Button
@@ -342,14 +342,14 @@ export const AggregatorPage: React.FC = () => {
                 <th className="px-6 py-4 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-border">
               {aggregators.map((item, idx) => {
                 const name = item.aggregator || item.customer || item.name || '-';
                 const pl = item.price_list || '-';
                 const mop = item.mode_of_payments || item.mode_of_payment || '-';
                 return (
-                  <tr key={idx} className="hover:bg-gray-50/50 transition-colors">
-                    <td className="px-6 py-4 font-semibold text-gray-900">{name}</td>
+                  <tr key={idx} className="hover:bg-primary/10 transition-colors">
+                    <td className="px-6 py-4 font-semibold text-foreground">{name}</td>
                     <td className="px-6 py-4">{pl}</td>
                     <td className="px-6 py-4">{mop}</td>
                     <td className="px-6 py-4 text-right">
@@ -357,7 +357,7 @@ export const AggregatorPage: React.FC = () => {
                         variant="ghost"
                         size="sm"
                         onClick={() => handleEditAggregator(item, idx)}
-                        className="text-gray-500 hover:text-primary p-1.5 h-8 w-8"
+                        className="text-muted-foreground hover:text-primary p-1.5 h-8 w-8"
                         title="Edit Aggregator"
                       >
                         <Edit2 className="w-4 h-4" />
@@ -373,13 +373,13 @@ export const AggregatorPage: React.FC = () => {
 
       {/* Add Modal */}
       <Dialog open={isAddOpen} onOpenChange={(open) => !open && setIsAddOpen(false)}>
-        <DialogContent className="max-w-md bg-white p-6 rounded-xl border border-gray-200 shadow-xl" onClose={() => setIsAddOpen(false)}>
+        <DialogContent className="max-w-md bg-card p-6 rounded-xl border border-border shadow-xl" onClose={() => setIsAddOpen(false)}>
           <DialogHeader>
-            <DialogTitle className="text-lg font-bold text-gray-900">Add Aggregator</DialogTitle>
+            <DialogTitle className="text-lg font-bold text-foreground">Add Aggregator</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleCreateAggregator} className="space-y-4 text-sm mt-4">
             <div>
-              <label className="block font-semibold text-gray-700 mb-1.5">
+              <label className="block font-semibold text-foreground mb-1.5">
                 Aggregator Name <span className="text-red-500">*</span>
               </label>
               <Input
@@ -390,7 +390,7 @@ export const AggregatorPage: React.FC = () => {
               />
             </div>
 
-            <div className="pt-6 flex justify-end gap-3 border-t mt-6 border-gray-100">
+            <div className="pt-6 flex justify-end gap-3 border-t mt-6 border-border">
               <Button type="button" variant="outline" onClick={() => setIsAddOpen(false)} disabled={saving} className="font-semibold">
                 Cancel
               </Button>
@@ -404,13 +404,13 @@ export const AggregatorPage: React.FC = () => {
 
       {/* Edit Modal */}
       <Dialog open={editingIndex !== null} onOpenChange={(open) => !open && setEditingIndex(null)}>
-        <DialogContent className="max-w-md bg-white p-6 rounded-xl border border-gray-200 shadow-xl" onClose={() => setEditingIndex(null)}>
+        <DialogContent className="max-w-md bg-card p-6 rounded-xl border border-border shadow-xl" onClose={() => setEditingIndex(null)}>
           <DialogHeader>
-            <DialogTitle className="text-lg font-bold text-gray-900">Edit Aggregator</DialogTitle>
+            <DialogTitle className="text-lg font-bold text-foreground">Edit Aggregator</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSaveEdit} className="space-y-4 text-sm mt-4">
             <div>
-              <label className="block font-semibold text-gray-700 mb-1.5">
+              <label className="block font-semibold text-foreground mb-1.5">
                 Aggregator Name <span className="text-red-500">*</span>
               </label>
               <Input
@@ -421,7 +421,7 @@ export const AggregatorPage: React.FC = () => {
             </div>
 
             <div>
-              <label className="block font-semibold text-gray-700 mb-1.5">Price List</label>
+              <label className="block font-semibold text-foreground mb-1.5">Price List</label>
               <SearchableSelect
                 id="edit_price_list"
                 value={editForm.price_list || ''}
@@ -435,7 +435,7 @@ export const AggregatorPage: React.FC = () => {
             </div>
 
             <div>
-              <label className="block font-semibold text-gray-700 mb-1.5">Mode of Payment</label>
+              <label className="block font-semibold text-foreground mb-1.5">Mode of Payment</label>
               <SearchableSelect
                 id="edit_mode_of_payment"
                 value={editForm.mode_of_payment || ''}
@@ -448,7 +448,7 @@ export const AggregatorPage: React.FC = () => {
               />
             </div>
 
-            <div className="pt-6 flex justify-end gap-3 border-t mt-6 border-gray-100">
+            <div className="pt-6 flex justify-end gap-3 border-t mt-6 border-border">
               <Button type="button" variant="outline" onClick={() => setEditingIndex(null)} disabled={saving} className="font-semibold">
                 Cancel
               </Button>
