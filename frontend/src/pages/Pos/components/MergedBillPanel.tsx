@@ -70,7 +70,7 @@ const MergedBillPanel = ({ order, onOpenSecondary }: MergedBillPanelProps) => {
 
       <div className="mb-3 flex items-center justify-between rounded-md border border-border bg-card px-3 py-2 text-sm">
         <span className="font-medium text-foreground">{secondaryName}</span>
-        <span className="font-semibold text-foreground tabular-nums">
+        <span className="font-semibold text-foreground font-mono tabular-nums">
           {formatCurrency(Math.round(order.custom_merged_total ?? 0))}
         </span>
       </div>
@@ -89,7 +89,7 @@ const MergedBillPanel = ({ order, onOpenSecondary }: MergedBillPanelProps) => {
               className="flex items-center justify-between rounded-md border border-border bg-card px-3 py-2 text-sm"
             >
               <span className="truncate text-foreground">{item.item_name}</span>
-              <span className="ms-2 shrink-0 text-muted-foreground tabular-nums">
+              <span className="ms-2 shrink-0 text-muted-foreground font-mono tabular-nums">
                 {item.qty} × {formatCurrency(item.rate)}
               </span>
             </div>
@@ -99,7 +99,7 @@ const MergedBillPanel = ({ order, onOpenSecondary }: MergedBillPanelProps) => {
 
       <div className="mt-3 flex items-center justify-between border-t border-primary-200 pt-3 text-sm">
         <span className="font-medium text-muted-foreground">{t('bill_merge.combined_total')}</span>
-        <span className="font-bold text-primary tabular-nums">{formatCurrency(combinedTotal)}</span>
+        <span className="font-bold text-primary font-mono tabular-nums">{formatCurrency(combinedTotal)}</span>
       </div>
     </div>
   );

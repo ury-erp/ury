@@ -168,7 +168,7 @@ const SplitGroupPanel = ({ invoiceName, onOpenInvoice }: SplitGroupPanelProps) =
                   )}
                 </div>
               </div>
-              <span className="ms-3 shrink-0 font-semibold text-foreground tabular-nums">
+              <span className="ms-3 shrink-0 font-semibold text-foreground font-mono tabular-nums">
                 {formatCurrency(invoice.rounded_total)}
               </span>
             </div>
