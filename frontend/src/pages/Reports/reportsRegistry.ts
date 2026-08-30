@@ -17,6 +17,7 @@ import {
   ClipboardList,
   Factory,
   IndianRupee,
+  Percent,
 } from 'lucide-react';
 
 export interface ReportEntry {
@@ -44,6 +45,7 @@ export const reportsRegistry: ReportEntry[] = [
   { id: 'repeated-customers', label: 'Repeated Customers', group: 'Customers & Items', path: 'repeated-customers', icon: Repeat },
 
   { id: 'employee-sales', label: 'Employee Sales', group: 'Employees & Operations', path: 'employee-sales', icon: UserCog },
+  { id: 'employee-commission', label: 'Employee Commission', group: 'Employees & Operations', path: 'employee-commission', icon: Percent },
   { id: 'employee-item-wise-sales', label: 'Employee Item Wise Sales', group: 'Employees & Operations', path: 'employee-item-wise-sales', icon: ClipboardList },
   { id: 'completed-work-orders', label: 'Completed Work Orders', group: 'Employees & Operations', path: 'completed-work-orders', icon: Factory },
 
