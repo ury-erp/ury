@@ -234,7 +234,7 @@ export const UserPage: React.FC = () => {
                 <th className="px-6 py-4 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-hair">
               {users.map((user) => (
                 <tr key={user.name} className="hover:bg-primary/10 transition-colors">
                   <td className="px-6 py-4">

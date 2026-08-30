@@ -393,7 +393,7 @@ export const PosProfilePage: React.FC = () => {
                     <th className="px-6 py-4">Branch</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-hair">
                   {productionUnits.map((unit) => (
                     <tr key={unit.name} className="hover:bg-primary/10 transition-colors">
                       <td className="px-6 py-4 font-semibold text-foreground">{unit.production_unit_name || unit.name}</td>

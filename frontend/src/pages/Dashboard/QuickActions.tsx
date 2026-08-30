@@ -183,7 +183,7 @@ export const QuickActions: React.FC = () => {
     <section className="w-full">
       {/* Toast feedback banner */}
       {toastMessage && (
-        <div className="mb-4 rounded-xl bg-primary-900 text-white px-4 py-3 shadow-md flex items-center justify-between text-xs font-semibold animate-fade-in">
+        <div className="mb-4 rounded-[9px] bg-primary-900 text-white px-4 py-3 flex items-center justify-between text-xs font-semibold animate-fade-in">
           <span>{toastMessage}</span>
           <button onClick={() => setToastMessage(null)} className="text-primary-200 hover:text-white">
             Dismiss
@@ -201,7 +201,7 @@ export const QuickActions: React.FC = () => {
           <Card
             key={idx}
             onClick={card.onClick}
-            className={`cursor-pointer rounded-xl border ${card.border} p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md flex flex-col justify-between`}
+            className={`cursor-pointer rounded-[9px] border-hair p-[14px_16px] shadow-none transition-colors hover:bg-muted/50 flex flex-col justify-between`}
           >
             <div>
               <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-primary-50">

@@ -424,7 +424,7 @@ export const BranchPage: React.FC = () => {
                           <th className="px-4 py-2 text-left">Menu</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-100">
+                      <tbody className="divide-y divide-hair">
                         {(restaurantForm.menu_for_room || []).map((row: any, idx: number) => (
                           <tr key={idx}>
                             <td className="px-4 py-2">
@@ -537,7 +537,7 @@ export const BranchPage: React.FC = () => {
                           <th className="px-4 py-2 text-left">Menu</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-100">
+                      <tbody className="divide-y divide-hair">
                         {(restaurantForm.order_type_menu || []).map((row: any, idx: number) => (
                           <tr key={idx}>
                             <td className="px-4 py-2">

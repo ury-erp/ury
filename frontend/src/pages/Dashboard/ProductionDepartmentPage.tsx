@@ -240,7 +240,7 @@ export const ProductionDepartmentPage: React.FC = () => {
                 <th className="px-6 py-4">Policy</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-hair">
               {departments.map((dept) => (
                 <tr key={dept.name} className="transition-colors cursor-pointer hover:bg-muted" onClick={() => openEditDrawer(dept)}>
                   <td className="px-6 py-4 font-semibold text-foreground">{dept.department_name || dept.name}</td>

@@ -291,7 +291,7 @@ export const TablePage: React.FC = () => {
                 <th className="px-6 py-4 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-hair">
               {tables.map((t) => (
                 <tr key={t.name} className="hover:bg-primary/10 transition-colors">
                   <td className="px-6 py-4 font-semibold text-foreground">{t.table_name || t.name}</td>

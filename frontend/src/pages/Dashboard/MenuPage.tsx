@@ -484,7 +484,7 @@ export const MenuPage: React.FC = () => {
       ) : (
         <div className="bg-card rounded-lg border border-border shadow-sm overflow-hidden overflow-x-auto">
           <table className="w-full text-left text-sm text-muted-foreground min-w-[600px]">
-            <thead className="bg-gray-50/80 border-b border-border text-xs text-text-tertiary font-bold tracking-wider">
+            <thead className="bg-muted/50 border-b border-border text-xs text-text-tertiary font-bold tracking-wider">
               <tr>
                 <th className="px-6 py-4">Item Name</th>
                 <th className="px-6 py-4">Course</th>
@@ -494,7 +494,7 @@ export const MenuPage: React.FC = () => {
                 <th className="px-6 py-4 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-hair">
               {filteredItems.map((item, idx) => (
                 <tr key={item.name || idx} className="transition-colors">
                   <td className="px-6 py-4 font-semibold text-foreground">
