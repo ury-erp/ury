@@ -70,7 +70,7 @@ export const KpiStrip = React.forwardRef<HTMLDivElement, KpiStripProps>(
         <div
           ref={ref}
           className={cn(
-            "flex flex-wrap border-b border-border pb-4 mb-1",
+            "flex flex-wrap border-b border-hair pb-stats-pb mb-stats-mb",
             className
           )}
         >
@@ -102,7 +102,7 @@ export const KpiStrip = React.forwardRef<HTMLDivElement, KpiStripProps>(
       <div
         ref={ref}
         className={cn(
-          "grid grid-cols-2 sm:grid-cols-4 gap-y-4 border-b border-border pb-4 mb-1",
+          "grid grid-cols-2 sm:grid-cols-4 gap-y-4 border-b border-hair pb-stats-pb mb-stats-mb",
           "[&>*]:pr-5",
           "[&>*:not(:nth-child(2n+1))]:pl-5 [&>*:not(:nth-child(2n+1))]:border-l [&>*:not(:nth-child(2n+1))]:border-border",
           "sm:[&>*:not(:nth-child(4n+1))]:pl-5 sm:[&>*:not(:nth-child(4n+1))]:border-l sm:[&>*:not(:nth-child(4n+1))]:border-border",

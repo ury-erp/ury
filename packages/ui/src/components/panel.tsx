@@ -40,4 +40,81 @@ const Panel = React.forwardRef<HTMLDivElement, PanelProps>(
 )
 Panel.displayName = "Panel"
 
-export { Panel, panelVariants }
+// Mockup's `.sect` (`ury-pos.html` lines 93-96) is a header row that sits
+// ABOVE and OUTSIDE the `.panel` border, as a sibling — every call site in
+// the mockup is `<div class="sect">...</div><div class="panel">...</div>`,
+// never `.sect` nested inside `.panel`. `PanelHeader` models that faithfully
+// as a sibling component rather than an in-panel slot: putting it inside
+// `Panel` would mean either drawing a divider the mockup doesn't have, or
+// eating into `Panel`'s own padding in a way that doesn't match `.sect`'s
+// unbordered, unpadded look. Keeping it a sibling also keeps `Panel` itself
+// unchanged for every existing bare-panel call site (DashboardPage's four
+// `Card`->`Panel` conversions included).
+//
+// Migration shape (Card + CardHeader + CardTitle -> Panel + PanelHeader):
+//
+//   <Card>                              <>
+//     <CardHeader>                        <PanelHeader>
+//       <CardTitle>Title</CardTitle>        <PanelTitle>Title</PanelTitle>
+//     </CardHeader>                         {subtitle && <PanelSubtitle>{subtitle}</PanelSubtitle>}
+//     <CardContent>                         {actions && <PanelActions>{actions}</PanelActions>}
+//       ...content...                     </PanelHeader>
+//     </CardContent>                       <Panel pad>
+//   </Card>                                  ...content... (was CardContent)
+//                                          </Panel>
+//                                        </>
+//
+// `PanelSubtitle` is optional (maps to `.sect .n`, the muted count/subtitle
+// beside the title) and `PanelActions` is optional (maps to `.sect .r`, the
+// right-aligned action slot) — most `CardHeader`/`CardTitle` call sites have
+// neither and migrate as just `<PanelHeader><PanelTitle>...</PanelTitle></PanelHeader>`.
+const PanelHeader = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+  ({ className, ...props }, ref) => (
+    <div
+      ref={ref}
+      className={cn("flex items-center gap-[9px] mb-[9px]", className)}
+      {...props}
+    />
+  )
+)
+PanelHeader.displayName = "PanelHeader"
+
+// `.sect h2` — the section title. Rendered as an `h2` to match the mockup's
+// markup and preserve document heading structure.
+const PanelTitle = React.forwardRef<HTMLHeadingElement, React.HTMLAttributes<HTMLHeadingElement>>(
+  ({ className, ...props }, ref) => (
+    <h2
+      ref={ref}
+      className={cn("text-[12.5px] font-semibold m-0", className)}
+      {...props}
+    />
+  )
+)
+PanelTitle.displayName = "PanelTitle"
+
+// `.sect .n` — the muted count/subtitle beside the title (e.g. "2", "Open
+// orders, oldest first").
+const PanelSubtitle = React.forwardRef<HTMLSpanElement, React.HTMLAttributes<HTMLSpanElement>>(
+  ({ className, ...props }, ref) => (
+    <span
+      ref={ref}
+      className={cn("text-[11.5px] text-text-tertiary", className)}
+      {...props}
+    />
+  )
+)
+PanelSubtitle.displayName = "PanelSubtitle"
+
+// `.sect .r` — the right-aligned action slot (buttons, tags).
+const PanelActions = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+  ({ className, ...props }, ref) => (
+    <div
+      ref={ref}
+      className={cn("ml-auto flex items-center gap-[6px]", className)}
+      {...props}
+    />
+  )
+)
+PanelActions.displayName = "PanelActions"
+
+export { Panel, panelVariants, PanelHeader, PanelTitle, PanelSubtitle, PanelActions }
