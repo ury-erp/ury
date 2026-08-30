@@ -65,12 +65,14 @@ const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: Checklis
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [hasAttemptedAutoSubmit, setHasAttemptedAutoSubmit] = useState(false);
 
   const titleKey = checklistType === 'Opening' ? 'checklist.title_opening' : 'checklist.title_closing';
 
   const loadChecklist = useCallback(async () => {
     setIsLoading(true);
     setLoadError(null);
+    setHasAttemptedAutoSubmit(false);
 
     try {
       const { items, logName: fetchedLogName, logStatus } = await getChecklist(posProfile, checklistType);
@@ -100,8 +102,14 @@ const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: Checklis
   // vacuously true for empty lists). This prevents the confusing UX of showing
   // a gate with a Submit button but no items to interact with.
   useEffect(() => {
-    // Only auto-submit once when: finished loading, no load error, no items, and not already submitting
-    if (!isLoading && !loadError && rows.length === 0 && !isSubmitting) {
+    // Only auto-submit once when: finished loading, no load error, no items,
+    // not already submitting, and we haven't already tried this session. The
+    // "hasAttemptedAutoSubmit" guard is load-bearing: without it, a non-Complete
+    // response (e.g. a stale in-progress log surfaced for an empty checklist,
+    // see ury_pos/api.py::submit_checklist) flips isSubmitting back to false
+    // and this effect would fire again indefinitely, reproducing the exact
+    // "Checking POS status..." infinite loop this dialog exists to prevent.
+    if (!isLoading && !loadError && rows.length === 0 && !isSubmitting && !hasAttemptedAutoSubmit) {
       const autoSubmit = async () => {
         setIsSubmitting(true);
         setSubmitError(null);
@@ -118,12 +126,13 @@ const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: Checklis
           setSubmitError(extractServerErrorMessage(error, t('checklist.submit_failed')));
         } finally {
           setIsSubmitting(false);
+          setHasAttemptedAutoSubmit(true);
         }
       };
 
       autoSubmit();
     }
-  }, [isLoading, loadError, rows.length, isSubmitting, posProfile, checklistType, logName, onComplete]);
+  }, [isLoading, loadError, rows.length, isSubmitting, hasAttemptedAutoSubmit, posProfile, checklistType, logName, onComplete]);
 
   const handleCheckedChange = (index: number, isChecked: boolean) => {
     setRows((prev) => prev.map((row, i) => (i === index ? { ...row, is_checked: isChecked } : row)));
