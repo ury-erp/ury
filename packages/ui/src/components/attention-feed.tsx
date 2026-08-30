@@ -28,27 +28,26 @@ const AttentionItem = React.forwardRef<HTMLDivElement, AttentionItemProps>(
       <div
         ref={ref}
         className={cn(
-          "flex items-center gap-3 px-4 py-3",
+          "flex items-center gap-3 px-[14px] py-[11px]",
           "border-b border-border last:border-b-0",
-          "hover:bg-accent/50 cursor-pointer transition-colors"
+          "hover:bg-muted/60 cursor-pointer transition-colors"
         )}
       >
         {/* Left severity bar */}
         <div
           className={cn(
-            "w-1 flex-shrink-0 rounded-sm",
-            "h-[calc(100%+24px)] mx-[-12px]",
+            "w-[3px] flex-shrink-0 rounded-sm self-stretch",
             severityBarColorMap[severity]
           )}
         />
 
         {/* Content area */}
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-medium leading-tight text-foreground">
+          <div className="text-[12.5px] font-semibold leading-tight text-foreground">
             {title}
           </div>
           {detail && (
-            <div className="text-xs leading-normal text-muted-foreground mt-1">
+            <div className="text-[11.5px] leading-normal text-muted-foreground mt-[1px]">
               {detail}
             </div>
           )}
@@ -57,7 +56,7 @@ const AttentionItem = React.forwardRef<HTMLDivElement, AttentionItemProps>(
         {/* Right-aligned section */}
         <div className="ml-auto flex items-center gap-2 flex-shrink-0">
           {amount && (
-            <span className="text-xs font-medium text-muted-foreground">
+            <span className="font-mono text-xs text-muted-foreground">
               {amount}
             </span>
           )}
@@ -93,10 +92,10 @@ export interface AttentionFeedProps {
 const AttentionFeed = React.forwardRef<HTMLDivElement, AttentionFeedProps>(
   ({ items, title }, ref) => {
     return (
-      <Card ref={ref} padding="none">
+      <Card ref={ref} padding="none" variant="outlined" className="border shadow-none rounded-[9px]">
         {title && (
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-            <CardTitle>{title}</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 py-[9px] px-[2px]">
+            <CardTitle className="text-[12.5px] font-semibold">{title}</CardTitle>
             <Badge variant="secondary" size="sm">
               {items.length}
             </Badge>

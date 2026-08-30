@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Spinner, Input, Button, KpiStrip, DataTable, StatusDot, numericCellClass, type DataTableColumn, type StatCardProps } from '@ury/ui';
+import { Card, Spinner, Input, Button, KpiStrip, DataTable, StatusDot, numericCellClass, type DataTableColumn, type KpiItemProps } from '@ury/ui';
 import { call, getLoggedUser, getUserRoles } from '@ury/core';
 import { useBranchContext } from '../../context/BranchContext';
 import {
@@ -200,7 +200,7 @@ export const DayClosePage: React.FC = () => {
     );
   }
 
-  const kpiItems: StatCardProps[] = pnlSummary?.exists
+  const kpiItems: KpiItemProps[] = pnlSummary?.exists
     ? (pnlSummary.summary || []).map((field) => ({
         label: field.label,
         value: formatCurrency(field.amount),

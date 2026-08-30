@@ -30,7 +30,8 @@ import {
   Package,
   ClipboardList,
   ClipboardCheck,
-  Lock
+  Lock,
+  Trash2
 } from 'lucide-react';
 
 interface NavItem {
@@ -79,6 +80,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: 'Control',
     items: [
       { label: 'Stock', path: '/department-stock', icon: Boxes },
+      { label: 'Wastage', path: '/wastage', icon: Trash2 },
       { label: 'Reservations', path: '/stock-reservations', icon: BookmarkCheck },
       { label: 'KOT Errors', path: '/kot-error-log', icon: AlertCircle }
     ]

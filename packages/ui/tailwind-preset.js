@@ -106,6 +106,13 @@ export default {
       },
       fontFamily: {
         inter: ['Inter', 'sans-serif'],
+        // Geist / Geist Mono (https://github.com/vercel/geist-font),
+        // self-hosted via @fontsource — matches ury-app.html's type system.
+        // Redefines the default `font-sans`/`font-mono` utilities so every
+        // existing `font-mono` call site (numeric table cells, amounts)
+        // picks up Geist Mono without call-site changes.
+        sans: ['Geist', 'ui-sans-serif', 'system-ui', '-apple-system', 'sans-serif'],
+        mono: ['Geist Mono', 'ui-monospace', 'SFMono-Regular', 'monospace'],
       },
       borderRadius: {
         xl: "calc(var(--radius) + 4px)",
