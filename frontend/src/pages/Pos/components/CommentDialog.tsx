@@ -54,7 +54,7 @@ const CommentDialog = ({ isOpen, onClose, onSave, initialComment = '' }: Comment
             value={comment}
             onChange={(e) => setComment(e.target.value)}
             placeholder={t('comment.placeholder')}
-            className="w-full h-32 px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-primary resize-none"
+            className="w-full h-32 px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary resize-none"
             autoFocus
           />
         </div>

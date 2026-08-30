@@ -53,36 +53,36 @@ export default function OpenEntries() {
       <div className="max-w-6xl mx-auto">
         <h1 className="text-2xl font-semibold text-foreground mb-6">Open Sessions</h1>
 
-        <Card className="bg-card border border-border">
-          <CardContent className="p-6">
+        <Card className="bg-card border border-border overflow-hidden">
+          <CardContent className="p-0">
             {error ? (
-              <div className="text-center py-8">
-                <p className="text-destructive text-sm">{error}</p>
+              <div className="flex items-center gap-3 px-4 py-3 bg-card border-b border-hair text-destructive text-sm">
+                <span>{error}</span>
               </div>
             ) : loading ? (
               <div className="flex items-center justify-center py-8">
                 <Spinner size="lg" />
               </div>
             ) : entries.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-muted-foreground text-sm">No open POS sessions</p>
+              <div className="flex items-center px-4 py-2 text-text-tertiary text-[12px] bg-card border-b border-hair">
+                <span>No open POS sessions</span>
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse">
                   <thead>
-                    <tr className="border-b border-border">
-                      <th className="text-left px-4 py-3 font-semibold text-muted-foreground text-sm">User</th>
-                      <th className="text-left px-4 py-3 font-semibold text-muted-foreground text-sm">Period Start Date</th>
-                      <th className="text-left px-4 py-3 font-semibold text-muted-foreground text-sm">POS Profile</th>
+                    <tr className="border-b border-hair">
+                      <th className="text-left px-[14px] py-[7px] font-medium text-text-tertiary text-[11px]">User</th>
+                      <th className="text-left px-[14px] py-[7px] font-medium text-text-tertiary text-[11px]">Period Start Date</th>
+                      <th className="text-left px-[14px] py-[7px] font-medium text-text-tertiary text-[11px]">POS Profile</th>
                     </tr>
                   </thead>
                   <tbody>
                     {entries.map((entry) => (
-                      <tr key={entry.name} className="border-b border-border hover:bg-muted transition-colors">
-                        <td className="px-4 py-3 text-foreground text-sm">{entry.user}</td>
-                        <td className="px-4 py-3 text-muted-foreground text-sm">{formatDate(entry.period_start_date)}</td>
-                        <td className="px-4 py-3 text-muted-foreground text-sm">{entry.pos_profile}</td>
+                      <tr key={entry.name} className="border-b border-hair hover:bg-muted transition-colors">
+                        <td className="px-[14px] py-2 text-foreground text-[12.5px]">{entry.user}</td>
+                        <td className="px-[14px] py-2 text-muted-foreground text-[12.5px]">{formatDate(entry.period_start_date)}</td>
+                        <td className="px-[14px] py-2 text-muted-foreground text-[12.5px]">{entry.pos_profile}</td>
                       </tr>
                     ))}
                   </tbody>

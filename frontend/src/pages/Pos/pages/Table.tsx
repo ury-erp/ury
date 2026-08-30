@@ -577,7 +577,7 @@ const TableView = () => {
         <div className="max-w-screen-xl mx-auto">
           <div className="flex items-center justify-center gap-6 text-sm">
             <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-success-tint border border-green-300 rounded"></div>
+              <div className="w-4 h-4 bg-success-tint border border-success-tint-border rounded"></div>
               <span>{t('tables.available')}</span>
             </div>
             <div className="flex items-center gap-2">
