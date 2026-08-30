@@ -310,7 +310,7 @@ export const Sidebar: React.FC = () => {
 
   return (
     <aside
-      className={`bg-rail border-r border-hair sticky top-16 h-[calc(100vh-4rem)] flex flex-col shrink-0 overflow-y-auto overflow-x-hidden transition-[width] duration-200 ${
+      className={`bg-rail border-r border-hair sticky top-12 h-[calc(100vh-3rem)] flex flex-col shrink-0 overflow-y-auto overflow-x-hidden transition-[width] duration-200 ${
         isCollapsed ? 'w-16' : 'w-[232px]'
       }`}
     >
