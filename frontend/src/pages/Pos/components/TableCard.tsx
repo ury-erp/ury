@@ -54,8 +54,10 @@ const TableCard = ({
       }}
       className={cn(
         'relative flex min-h-[15.5rem] flex-col rounded-lg border-2 bg-card p-4 transition-all',
+        // Binary state: occupied (accent treatment) vs free (muted/available)
+        // Warning/destructive tints reserved for future "table needs attention" state
         isOccupied
-          ? 'border-warning-tint-border bg-warning-tint'
+          ? 'border-primary-tint-border'
           : 'cursor-pointer border-dashed border-hair bg-muted hover:shadow-md',
         menuOpen ? 'z-20' : 'z-0',
         className
@@ -72,7 +74,7 @@ const TableCard = ({
             </span>
           </div>
           <div className="flex shrink-0 items-center gap-1">
-            <Badge variant={isOccupied ? 'warning' : 'success'} className="whitespace-nowrap">
+            <Badge variant={isOccupied ? 'primary' : 'success'} className="whitespace-nowrap">
               {isOccupied ? t('tables.occupied') : t('tables.available')}
             </Badge>
             <TableActionsMenu
@@ -131,14 +133,14 @@ const TableCard = ({
       <div
         className={cn(
           'mt-auto flex min-h-[2.75rem] gap-2 border-t pt-3',
-          isOccupied ? 'border-warning-tint-border' : 'border-transparent'
+          isOccupied ? 'border-primary-tint-border' : 'border-transparent'
         )}
       >
         {isOccupied ? (
           <>
             <button
               onClick={onPreview}
-              className="flex flex-1 items-center justify-center gap-2 rounded bg-card py-2 text-xs font-semibold transition hover:bg-warning-tint"
+              className="flex flex-1 items-center justify-center gap-2 rounded bg-card py-2 text-xs font-semibold transition hover:bg-primary-tint"
             >
               <Eye className="h-3 w-3" />
               Preview
@@ -146,7 +148,7 @@ const TableCard = ({
             <button
               onClick={onPrint}
               disabled={isPrinting}
-              className="flex flex-1 items-center justify-center gap-2 rounded bg-card py-2 text-xs font-semibold transition hover:bg-warning-tint disabled:cursor-not-allowed disabled:opacity-60"
+              className="flex flex-1 items-center justify-center gap-2 rounded bg-card py-2 text-xs font-semibold transition hover:bg-primary-tint disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isPrinting ? (
                 <>
