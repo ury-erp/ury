@@ -20,7 +20,7 @@ interface EmployeeRow {
 
 interface EmployeeSalesData {
   employees: EmployeeRow[];
-  summary: { total_employees: number; period_total_invoices: number; period_total_sales: number; unattributed_invoices?: number; unattributed_base?: number };
+  summary: { total_employees: number; period_total_invoices: number; period_total_sales: number; unattributed_invoices?: number; unattributed_sales?: number };
 }
 
 const columns: DataTableColumn<EmployeeRow>[] = [
@@ -91,7 +91,7 @@ export function EmployeeSales() {
 
       {data && data.summary.unattributed_invoices && data.summary.unattributed_invoices > 0 && (
         <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          {data.summary.unattributed_invoices} invoices ({formatCurrency(data.summary.unattributed_base || 0)}) could not be attributed to an employee. Set the Employee record's linked User first, then re-run the attribution backfill.
+          {data.summary.unattributed_invoices} invoices ({formatCurrency(data.summary.unattributed_sales || 0)}) could not be attributed to an employee. Set the Employee record's linked User first, then re-run the attribution backfill.
         </div>
       )}
 
