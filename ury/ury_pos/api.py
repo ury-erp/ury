@@ -1452,17 +1452,10 @@ def submit_checklist(pos_profile, checklist_type, items, pos_opening_entry=None)
         filters={"parent": pos_profile, "applies_to": ["in", [checklist_type, "Both"]]},
         parent_doctype="POS Profile",
     )
-    
-    if not configured_items:
-        return {
-            "status": "Complete",
-            "name": None,
-        }
-    mandatory_by_label = {row.item_label: row.is_mandatory for row in configured_items}
 
     existing_log = frappe.get_all(
         "URY POS Checklist Log",
-        fields=["name"],
+        fields=["name", "status"],
         filters={
             "pos_profile": pos_profile,
             "checklist_type": checklist_type,
@@ -1470,6 +1463,22 @@ def submit_checklist(pos_profile, checklist_type, items, pos_opening_entry=None)
         },
         limit=1,
     )
+
+    if not configured_items:
+        # Mirror get_checklist: a pre-existing log for today still reflects
+        # the real state (e.g. "In Progress") even if the checklist type's
+        # items were since removed/reconfigured. Only default to "Complete"
+        # when there is genuinely no prior log to contradict.
+        if existing_log:
+            return {
+                "status": existing_log[0].status,
+                "name": existing_log[0].name,
+            }
+        return {
+            "status": "Complete",
+            "name": None,
+        }
+    mandatory_by_label = {row.item_label: row.is_mandatory for row in configured_items}
 
     if existing_log:
         log_doc = frappe.get_doc("URY POS Checklist Log", existing_log[0].name)
