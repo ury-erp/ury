@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
-import { KpiStrip, DataTable, type DataTableColumn } from '@ury/ui';
+import { KpiStrip, DataTable, type DataTableColumn, Page, Section } from '@ury/ui';
 import { useBranchContext } from '../../context/BranchContext';
 import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
 import { BarChartCard } from '../../components/reports/charts/BarChartCard';
@@ -64,7 +64,7 @@ export function EmployeeSales() {
   const top10 = data?.employees.slice(0, 10) ?? [];
 
   return (
-    <div className="space-y-6">
+    <Page>
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-semibold">Employee Sales</h1>
@@ -76,34 +76,42 @@ export function EmployeeSales() {
       </div>
 
       {error && (
-        <div className="rounded-md border border-destructive-tint-border bg-destructive-tint px-4 py-3 text-sm text-destructive">
-          {error}
-        </div>
+        <Section>
+          <div className="rounded-md border border-destructive-tint-border bg-destructive-tint px-4 py-3 text-sm text-destructive">
+            {error}
+          </div>
+        </Section>
       )}
 
       {data && (
         <>
-          <KpiStrip
-            items={[
-              { label: 'Staff', value: data.summary.total_employees },
-              { label: 'Total Invoices', value: data.summary.period_total_invoices },
-              { label: 'Total Sales', value: formatCurrency(data.summary.period_total_sales) },
-            ]}
-          />
+          <Section>
+            <KpiStrip
+              items={[
+                { label: 'Staff', value: data.summary.total_employees },
+                { label: 'Total Invoices', value: data.summary.period_total_invoices },
+                { label: 'Total Sales', value: formatCurrency(data.summary.period_total_sales) },
+              ]}
+            />
+          </Section>
 
           {top10.length >= 2 && (
-            <BarChartCard
-              title={`Top ${Math.min(10, top10.length)} by Sales`}
-              data={top10}
-              xKey="employee_name"
-              yKeys={['sales_amount']}
-              labels={{ sales_amount: 'Sales Amount' }}
-            />
+            <Section>
+              <BarChartCard
+                title={`Top ${Math.min(10, top10.length)} by Sales`}
+                data={top10}
+                xKey="employee_name"
+                yKeys={['sales_amount']}
+                labels={{ sales_amount: 'Sales Amount' }}
+              />
+            </Section>
           )}
         </>
       )}
 
-      <DataTable columns={columns} rows={data?.employees ?? []} isLoading={isLoading} />
-    </div>
+      <Section>
+        <DataTable columns={columns} rows={data?.employees ?? []} isLoading={isLoading} />
+      </Section>
+    </Page>
   );
 }
