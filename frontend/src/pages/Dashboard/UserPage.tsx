@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
 import { Plus, ShieldCheck, Edit2 } from 'lucide-react';
-import { Button, Input, Spinner, showToast } from '@ury/ui';
+import { Badge, Button, Input, Spinner, showToast } from '@ury/ui';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { dashboardService } from '../../services/dashboard';
 import { call } from '@ury/core';
@@ -247,10 +247,10 @@ export const UserPage: React.FC = () => {
                     {user.email}
                   </td>
                   <td className="px-[14px] py-2 text-[12.5px]">
-                    <span className="inline-flex items-center gap-[5px] text-[11px] h-[19px] px-[7px] rounded-[5px] text-primary bg-primary-tint">
+                    <Badge size="tag" variant="tagAccent">
                       <ShieldCheck className="w-3 h-3" />
                       {getDisplayRole(user)}
-                    </span>
+                    </Badge>
                   </td>
                   <td className="px-[14px] py-2 text-[12.5px] text-right">
                     <Button variant="ghost" size="sm" onClick={() => openEditDrawer(user)} className="text-text-tertiary hover:text-primary">

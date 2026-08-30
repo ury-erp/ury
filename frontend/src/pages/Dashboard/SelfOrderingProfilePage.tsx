@@ -10,7 +10,7 @@ import {
   X,
   Loader
 } from 'lucide-react';
-import { Button, Input, Card, Spinner, showToast } from '@ury/ui';
+import { Badge, Button, Input, Card, Spinner, showToast } from '@ury/ui';
 import { call } from '@ury/core';
 import { SearchableSelect, Option } from '../../components/common/SearchableSelect';
 import { dashboardService } from '../../services/dashboard';
@@ -762,15 +762,9 @@ export const SelfOrderingProfilePage: React.FC = () => {
                         <td className="p-4 font-medium text-foreground">{profile.profile_name}</td>
                         <td className="p-4">{profile.branch}</td>
                         <td className="p-4">
-                          <span
-                            className={`inline-flex h-[19px] items-center gap-[5px] rounded-[5px] px-[7px] text-[11px] font-medium ${
-                              profile.enabled === 1
-                                ? 'bg-success-tint text-success'
-                                : 'bg-muted text-muted-foreground'
-                            }`}
-                          >
+                          <Badge size="tag" variant={profile.enabled === 1 ? 'tagSuccess' : 'cancelled'}>
                             {profile.enabled === 1 ? 'Enabled' : 'Disabled'}
-                          </span>
+                          </Badge>
                         </td>
                         <td className="p-4 text-right space-x-2 flex justify-end">
                           <button

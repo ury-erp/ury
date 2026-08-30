@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
 import { Plus } from 'lucide-react';
-import { Button, Input, Select, Spinner, showToast } from '@ury/ui';
+import { Badge, Button, Input, Select, Spinner, showToast } from '@ury/ui';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { dashboardService } from '../../services/dashboard';
 import { call } from '@ury/core';
@@ -244,9 +244,9 @@ export const ProductionDepartmentPage: React.FC = () => {
                   <td className="px-[14px] py-2 text-[12.5px]">{dept.branch || '-'}</td>
                   <td className="px-[14px] py-2 text-[12.5px]">{dept.department_warehouse || '-'}</td>
                   <td className="px-[14px] py-2 text-[12.5px]">
-                    <span className="inline-flex items-center gap-[5px] text-[11px] h-[19px] px-[7px] rounded-[5px] text-muted-foreground bg-muted">
+                    <Badge size="tag" variant="cancelled">
                       {dept.issue_control_policy || 'Plan Controlled'}
-                    </span>
+                    </Badge>
                   </td>
                 </tr>
               ))}

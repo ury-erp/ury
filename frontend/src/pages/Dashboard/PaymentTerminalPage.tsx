@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Spinner } from '@ury/ui';
+import { Badge, Card, Spinner } from '@ury/ui';
 import { call } from '@ury/core';
 import {
   paymentTerminalService,
@@ -23,32 +23,29 @@ const formatCurrency = (value?: number) => {
   }).format(value);
 };
 
-const TAG_BASE =
-  'inline-flex items-center gap-[5px] h-[19px] rounded-[5px] px-[7px] text-[11px] font-medium';
-
-const getStatusBadgeClass = (status: string) => {
+const getStatusBadgeVariant = (status: string) => {
   switch (status) {
     case 'Idle':
-      return `${TAG_BASE} bg-success-tint text-success`;
+      return 'tagSuccess' as const;
     case 'Busy':
-      return `${TAG_BASE} bg-warning-tint text-warning`;
+      return 'tagWarning' as const;
     case 'Offline':
-      return `${TAG_BASE} bg-destructive-tint text-destructive`;
+      return 'tagDestructive' as const;
     default:
-      return `${TAG_BASE} bg-muted text-foreground`;
+      return 'cancelled' as const;
   }
 };
 
-const getTransactionStatusBadgeClass = (status: string) => {
+const getTransactionStatusBadgeVariant = (status: string) => {
   switch (status) {
     case 'Success':
-      return `${TAG_BASE} bg-success-tint text-success`;
+      return 'tagSuccess' as const;
     case 'Failed':
-      return `${TAG_BASE} bg-destructive-tint text-destructive`;
+      return 'tagDestructive' as const;
     case 'Pending':
-      return `${TAG_BASE} bg-warning-tint text-warning`;
+      return 'tagWarning' as const;
     default:
-      return `${TAG_BASE} bg-muted text-foreground`;
+      return 'cancelled' as const;
   }
 };
 
@@ -259,9 +256,9 @@ const PaymentTerminalContent: React.FC = () => {
                         {terminal.provider || '-'}
                       </td>
                       <td className="px-4 py-3">
-                        <span className={getStatusBadgeClass(terminal.status || 'Idle')}>
+                        <Badge size="tag" variant={getStatusBadgeVariant(terminal.status || 'Idle')}>
                           {terminal.status || 'Idle'}
-                        </span>
+                        </Badge>
                       </td>
                       <td className="px-4 py-3 text-muted-foreground text-xs">
                         {formatDateTime(terminal.last_seen)}
@@ -311,9 +308,9 @@ const PaymentTerminalContent: React.FC = () => {
                         {formatCurrency(tx.amount)}
                       </td>
                       <td className="px-4 py-3">
-                        <span className={getTransactionStatusBadgeClass(tx.status || 'Pending')}>
+                        <Badge size="tag" variant={getTransactionStatusBadgeVariant(tx.status || 'Pending')}>
                           {tx.status || 'Pending'}
-                        </span>
+                        </Badge>
                       </td>
                       <td className="px-4 py-3 text-muted-foreground text-xs">
                         {formatDateTime(tx.created_at)}
