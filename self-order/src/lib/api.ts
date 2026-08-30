@@ -23,6 +23,9 @@ export interface OrderingContext {
   table: string | null
   layout: OrderingLayout
   capabilities: OrderingCapabilities
+  /** Per-profile idle timeout (defaults to 30 server-side) — used to configure
+   * idle-reset timers instead of hardcoding a value. */
+  session_idle_timeout_minutes: number
 }
 
 export interface MenuItem {
