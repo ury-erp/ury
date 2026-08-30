@@ -68,11 +68,11 @@ function formatOpenSessionDate(dateString: string): string {
 type StageKey = 'open' | 'seated' | 'fired' | 'served' | 'over';
 
 const STAGES: { key: StageKey; label: string; bar: string; chip: string; dot: string }[] = [
-  { key: 'open', label: 'Open', bar: 'bg-muted-foreground', chip: 'bg-muted text-muted-foreground ring-gray-200', dot: 'bg-muted-foreground' },
+  { key: 'open', label: 'Open', bar: 'bg-muted-foreground', chip: 'bg-muted text-muted-foreground ring-border', dot: 'bg-muted-foreground' },
   { key: 'seated', label: 'Seated', bar: 'bg-primary-200', chip: 'bg-primary-50 text-primary-700 ring-primary-200', dot: 'bg-primary-200' },
   { key: 'fired', label: 'Fired', bar: 'bg-primary-400', chip: 'bg-primary-50 text-primary-800 ring-primary-300', dot: 'bg-primary-400' },
   { key: 'served', label: 'Served', bar: 'bg-primary-700', chip: 'bg-primary-100 text-primary-900 ring-primary-400', dot: 'bg-primary-700' },
-  { key: 'over', label: 'Over time', bar: 'bg-destructive', chip: 'bg-destructive-tint text-destructive ring-red-200', dot: 'bg-destructive' },
+  { key: 'over', label: 'Over time', bar: 'bg-destructive', chip: 'bg-destructive-tint text-destructive ring-destructive-tint-border', dot: 'bg-destructive' },
 ];
 
 const STAGE_BY_KEY = Object.fromEntries(STAGES.map((s) => [s.key, s])) as Record<StageKey, (typeof STAGES)[number]>;
@@ -372,7 +372,7 @@ export default function Dashboard() {
               {posProfile?.branch ? `${posProfile.branch} · ` : ''}Live floor status for the current shift
             </p>
           </div>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-card px-2.5 py-1 text-xs font-medium text-muted-foreground ring-1 ring-gray-200">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-card px-2.5 py-1 text-xs font-medium text-muted-foreground ring-1 ring-border">
             <span className="relative flex h-2 w-2">
               <span className="absolute inline-flex h-2 w-2 animate-ping rounded-full bg-success-500 opacity-60" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-success-600" />
@@ -401,7 +401,7 @@ export default function Dashboard() {
             className={cn(
               'overflow-hidden rounded-xl border-l-4 shadow-sm',
               hasHighSeverity
-                ? 'border-l-destructive bg-destructive-tint ring-1 ring-red-200'
+                ? 'border-l-destructive bg-destructive-tint ring-1 ring-destructive-tint-border'
                 : 'border-l-warning-400 bg-warning-50 ring-1 ring-warning-200'
             )}
           >
@@ -477,7 +477,7 @@ export default function Dashboard() {
           tone="primary"
           meta={
             overCount > 0 ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-destructive-tint px-2.5 py-1 text-xs font-semibold text-destructive ring-1 ring-red-200">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-destructive-tint px-2.5 py-1 text-xs font-semibold text-destructive ring-1 ring-destructive-tint-border">
                 <span className="h-1.5 w-1.5 rounded-full bg-destructive" />
                 {overCount} over time
               </span>
@@ -641,7 +641,7 @@ export default function Dashboard() {
                             className={cn(
                               'shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums ring-1',
                               critical
-                                ? 'bg-destructive-tint text-destructive ring-red-200'
+                                ? 'bg-destructive-tint text-destructive ring-destructive-tint-border'
                                 : 'bg-warning-50 text-warning-700 ring-warning-200'
                             )}
                           >
@@ -759,7 +759,7 @@ export default function Dashboard() {
               ) : notifications.length === 0 ? (
                 <PanelState kind="empty">No recent notifications.</PanelState>
               ) : (
-                <div className="divide-y divide-gray-100">
+                <div className="divide-y divide-hair">
                   {notifications.map((notification) => (
                     <div key={notification.id} className="flex items-start justify-between gap-2 py-2 first:pt-0 last:pb-0">
                       <p className="text-xs leading-relaxed text-muted-foreground">{notification.message}</p>
@@ -788,7 +788,7 @@ function MetricTile({
   delta?: { up: boolean; text: string; against: string };
 }) {
   return (
-    <div className="rounded-lg bg-muted p-3 ring-1 ring-gray-100">
+    <div className="rounded-lg bg-muted p-3 ring-1 ring-border">
       <p className="text-xs font-medium text-text-tertiary">{label}</p>
       <p className="mt-1 text-xl font-semibold tabular-nums text-foreground">{value}</p>
       {delta ? (
