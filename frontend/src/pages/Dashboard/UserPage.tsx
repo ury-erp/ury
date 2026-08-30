@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
 import { Plus, ShieldCheck, Edit2 } from 'lucide-react';
-import { Badge, Button, Input, Spinner, showToast } from '@ury/ui';
+import { Badge, Button, Input, Page, Section, Spinner, showToast } from '@ury/ui';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { dashboardService } from '../../services/dashboard';
 import { call } from '@ury/core';
@@ -188,11 +188,12 @@ export const UserPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <Page>
       <h1 className="text-xl font-semibold text-foreground">Users</h1>
 
       {/* Toolbar — no title, partition style */}
-      <div className="flex flex-col md:flex-row items-center justify-end gap-4 pb-3 border-b border-border -mx-6 px-6 -mt-6 pt-6">
+      <Section>
+        <div className="flex flex-col md:flex-row items-center justify-end gap-4 pb-3 border-b border-border -mx-page-x px-page-x pt-6">
         <Button
           onClick={openAddDrawer}
           className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center space-x-1.5 shadow-xs"
@@ -201,7 +202,9 @@ export const UserPage: React.FC = () => {
           <span>Add User</span>
         </Button>
       </div>
+      </Section>
 
+      <Section>
       {loading ? (
         <div className="py-16 flex items-center justify-center bg-card rounded-[9px] border border-hair">
           <Spinner className="w-8 h-8 text-primary" />
@@ -263,6 +266,7 @@ export const UserPage: React.FC = () => {
           </table>
         </div>
       )}
+      </Section>
 
       {/* Add/Edit SideDrawer */}
       <SideDrawer
@@ -338,7 +342,7 @@ export const UserPage: React.FC = () => {
           </div>
         </form>
       </SideDrawer>
-    </div>
+    </Page>
   );
 };
 

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Badge, Card, DataTable, KpiStrip, Spinner, numericCellClass } from '@ury/ui';
+import { Badge, Card, DataTable, KpiStrip, Page, Section, Spinner, numericCellClass } from '@ury/ui';
 import type { DataTableColumn } from '@ury/ui';
 import { useBranchContext } from '../../context/BranchContext';
 import {
@@ -199,8 +199,8 @@ const StoreIssueContent: React.FC = () => {
   ];
 
   return (
-    <div className="space-y-6">
-      <div className="-mx-6 -mt-6 border-b border-border px-6 pb-4 pt-6">
+    <Page>
+      <div className="-mx-page-x -mt-page-top border-b border-border px-page-x pb-4 pt-page-top">
         <h1 className="text-xl font-semibold text-foreground">Store Issue</h1>
         <p className="mt-1 text-sm text-text-tertiary">
           Read-only view of issue authorizations across every department for this branch and date range.
@@ -231,11 +231,15 @@ const StoreIssueContent: React.FC = () => {
       </div>
 
       {!activeBranchId || activeBranchId === 'all' ? (
-        <Card className="p-10 text-center text-sm text-text-tertiary">Select a branch to view store issue data.</Card>
+        <Section>
+          <Card className="p-10 text-center text-sm text-text-tertiary">Select a branch to view store issue data.</Card>
+        </Section>
       ) : error ? (
-        <Card className="border-destructive-tint-border bg-destructive-tint p-6 text-sm text-destructive">{error}</Card>
+        <Section>
+          <Card className="border-destructive-tint-border bg-destructive-tint p-6 text-sm text-destructive">{error}</Card>
+        </Section>
       ) : (
-        <>
+        <Section>
           <KpiStrip items={kpiItems} />
 
           {departmentChips.length > 0 && (
@@ -259,9 +263,9 @@ const StoreIssueContent: React.FC = () => {
               emptyMessage="No issue authorizations found for this branch and date range."
             />
           )}
-        </>
+        </Section>
       )}
-    </div>
+    </Page>
   );
 };
 
