@@ -156,8 +156,18 @@ function App() {
         <Route path="setup-wizard/0" element={<SetupPage />} />
         <Route path="setup-wizard/1" element={<ConfigurePage />} />
 
+        {/*
+          No `path` prop here (was `path="/"`): a route with `path="/"` still
+          matches the bare root URL even with no `index` child -- it just
+          renders this layout element with an empty `<Outlet/>` (sidebar
+          shows, main content area is blank), which is exactly the bug this
+          fix addresses. Only `Landing`'s route below should own the exact
+          "/" match. A pathless layout route doesn't consume a URL segment,
+          so its children ("dashboard", "menu", etc.) still resolve to
+          "/dashboard", "/menu", etc. exactly as before -- this only removes
+          this route's own (incorrect) claim on bare "/".
+        */}
         <Route
-          path="/"
           element={
             <RoleGuard>
               <DashboardLayout />
