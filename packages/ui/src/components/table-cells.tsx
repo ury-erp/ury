@@ -112,5 +112,5 @@ export const numericCellClass = cn(
   "text-right",
   "font-mono",
   "tabular-nums",
-  "text-sm"
+  "text-[12px]"
 );

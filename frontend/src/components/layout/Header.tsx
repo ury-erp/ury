@@ -167,8 +167,8 @@ export const Header: React.FC = () => {
             </button>
 
             {isBranchDropdownOpen && (
-              <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-1.5 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
-                <div className="px-3 py-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+              <div className="absolute right-0 mt-2 w-64 bg-card rounded-lg shadow-lg border border-border py-1.5 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="px-3 py-1.5 text-xs font-semibold text-text-tertiary uppercase tracking-wider">
                   Select Active Branch
                 </div>
 
@@ -179,8 +179,8 @@ export const Header: React.FC = () => {
                   }}
                   className={`w-full flex items-center justify-between px-3 py-2 text-sm text-left transition-colors ${
                     activeBranchId === 'all'
-                      ? 'bg-blue-50 text-primary font-semibold'
-                      : 'text-gray-700 hover:bg-gray-50'
+                      ? 'bg-primary-tint text-primary font-semibold'
+                      : 'text-foreground hover:bg-muted'
                   }`}
                 >
                   <div className="flex items-center space-x-2">
@@ -190,7 +190,7 @@ export const Header: React.FC = () => {
                   {activeBranchId === 'all' && <Check className="w-4 h-4 text-primary" />}
                 </button>
 
-                <div className="my-1 border-t border-gray-100" />
+                <div className="my-1 border-t border-border" />
 
                 {branches.map((b) => (
                   <button
@@ -201,8 +201,8 @@ export const Header: React.FC = () => {
                     }}
                     className={`w-full flex items-center justify-between px-3 py-2 text-sm text-left transition-colors ${
                       activeBranchId === b.id
-                        ? 'bg-blue-50 text-primary font-semibold'
-                        : 'text-gray-700 hover:bg-gray-50'
+                        ? 'bg-primary-tint text-primary font-semibold'
+                        : 'text-foreground hover:bg-muted'
                     }`}
                   >
                     <div className="flex items-center space-x-2 truncate">
@@ -250,10 +250,10 @@ export const Header: React.FC = () => {
             </button>
 
             {isUserMenuOpen && (
-              <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
-                <div className="p-4 border-b border-gray-200">
-                  <p className="text-sm font-medium text-gray-900">{userInfo.fullName}</p>
-                  <p className="text-sm text-gray-500 truncate">{userInfo.email}</p>
+              <div className="absolute right-0 mt-2 w-56 bg-card rounded-lg shadow-lg border border-border z-50">
+                <div className="p-4 border-b border-border">
+                  <p className="text-sm font-medium text-foreground">{userInfo.fullName}</p>
+                  <p className="text-sm text-muted-foreground truncate">{userInfo.email}</p>
                 </div>
 
                 <div className="py-2">
@@ -262,7 +262,7 @@ export const Header: React.FC = () => {
                       setIsUserMenuOpen(false);
                       handleClearCache();
                     }}
-                    className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                    className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-foreground hover:bg-muted transition-colors"
                   >
                     <RefreshCw className="w-4 h-4" />
                     <span>Clear Cache</span>
@@ -270,9 +270,9 @@ export const Header: React.FC = () => {
 
                   <button
                     onClick={handleLogout}
-                    className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                    className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-destructive hover:bg-destructive-tint transition-colors"
                   >
-                    <LogOut className="w-4 h-4 text-red-500" />
+                    <LogOut className="w-4 h-4 text-destructive" />
                     <span>Logout</span>
                   </button>
                 </div>
@@ -291,12 +291,12 @@ export const Header: React.FC = () => {
           />
 
           <div className="fixed inset-y-0 right-0 pl-10 max-w-full flex">
-            <div className="w-screen max-w-md bg-white shadow-2xl flex flex-col border-l border-gray-200">
+            <div className="w-screen max-w-md bg-card shadow-2xl flex flex-col border-l border-border">
               {/* Drawer Header */}
-              <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-gray-50">
+              <div className="p-4 border-b border-border flex items-center justify-between bg-muted">
                 <div className="flex items-center space-x-2">
                   <Bell className="w-5 h-5 text-primary" />
-                  <h2 className="text-base font-semibold text-gray-900">Notifications</h2>
+                  <h2 className="text-base font-semibold text-foreground">Notifications</h2>
                   {unreadCount > 0 && (
                     <span className="px-2 py-0.5 text-xs font-bold bg-primary text-white rounded-full">
                       {unreadCount}
@@ -315,7 +315,7 @@ export const Header: React.FC = () => {
                   )}
                   <button
                     onClick={() => setIsNotificationOpen(false)}
-                    className="p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-200/50"
+                    className="p-1 rounded-lg text-text-tertiary hover:text-foreground hover:bg-muted"
                   >
                     <X className="w-5 h-5" />
                   </button>
@@ -323,9 +323,9 @@ export const Header: React.FC = () => {
               </div>
 
               {/* Drawer List */}
-              <div className="flex-1 overflow-y-auto divide-y divide-gray-100">
+              <div className="flex-1 overflow-y-auto divide-y divide-border">
                 {notifications.length === 0 ? (
-                  <div className="p-8 text-center text-gray-500">
+                  <div className="p-8 text-center text-muted-foreground">
                     No new notifications
                   </div>
                 ) : (
@@ -333,22 +333,22 @@ export const Header: React.FC = () => {
                     <div
                       key={item.id}
                       className={`p-4 transition-colors ${
-                        item.read ? 'bg-white' : 'bg-blue-50/40'
+                        item.read ? 'bg-card' : 'bg-primary-tint/40'
                       }`}
                     >
                       <div className="flex items-start space-x-3">
                         <div className="mt-0.5">
-                          {item.type === 'info' && <Info className="w-5 h-5 text-blue-500" />}
+                          {item.type === 'info' && <Info className="w-5 h-5 text-primary" />}
                           {item.type === 'warning' && <AlertTriangle className="w-5 h-5 text-amber-500" />}
                           {item.type === 'success' && <CheckCircle2 className="w-5 h-5 text-emerald-500" />}
                         </div>
 
                         <div className="flex-1">
                           <div className="flex items-center justify-between">
-                            <p className="text-sm font-semibold text-gray-900">{item.title}</p>
-                            <span className="text-xs text-gray-400">{item.timestamp}</span>
+                            <p className="text-sm font-semibold text-foreground">{item.title}</p>
+                            <span className="text-xs text-text-tertiary">{item.timestamp}</span>
                           </div>
-                          <p className="text-xs text-gray-600 mt-1">{item.message}</p>
+                          <p className="text-xs text-muted-foreground mt-1">{item.message}</p>
                         </div>
                       </div>
                     </div>
@@ -357,10 +357,10 @@ export const Header: React.FC = () => {
               </div>
 
               {/* Drawer Footer */}
-              <div className="p-4 border-t border-gray-200 bg-gray-50 text-center">
+              <div className="p-4 border-t border-border bg-muted text-center">
                 <button
                   onClick={() => setIsNotificationOpen(false)}
-                  className="w-full py-2 text-sm font-medium text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg bg-white hover:bg-gray-50 transition-colors"
+                  className="w-full py-2 text-sm font-medium text-muted-foreground hover:text-foreground border border-border rounded-lg bg-card hover:bg-muted transition-colors"
                 >
                   Close
                 </button>

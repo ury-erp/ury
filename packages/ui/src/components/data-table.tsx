@@ -8,6 +8,8 @@ export interface DataTableColumn<T> {
   align?: "left" | "right";
 }
 
+export type DataTableRowTone = "default" | "danger" | "warning" | undefined;
+
 export interface DataTableProps<T> {
   columns: DataTableColumn<T>[];
   rows: T[];
@@ -15,7 +17,19 @@ export interface DataTableProps<T> {
   emptyMessage?: string;
   className?: string;
   onRowClick?: (row: T) => void;
+  /**
+   * Optional per-row tone hook, mirroring the mockup's `.warnrow` treatment.
+   * Return "danger" or "warning" to wash a row in the corresponding tint
+   * (e.g. to flag an anomaly); return "default" or undefined for no tint.
+   * Purely additive — omitting this prop leaves existing rows unaffected.
+   */
+  rowTone?: (row: T) => DataTableRowTone;
 }
+
+const rowToneClasses: Record<"danger" | "warning", string> = {
+  danger: "bg-destructive-tint hover:bg-destructive-tint-border",
+  warning: "bg-warning-tint hover:bg-warning-tint-border",
+};
 
 export function DataTable<T>({
   columns,
@@ -24,17 +38,18 @@ export function DataTable<T>({
   emptyMessage = "No results found.",
   className,
   onRowClick,
+  rowTone,
 }: DataTableProps<T>) {
   return (
     <div className={cn("relative w-full overflow-auto rounded-lg border", className)}>
       <table className="w-full caption-bottom text-sm">
-        <thead className="border-b bg-muted/50">
+        <thead className="border-b border-hair bg-muted/50">
           <tr>
             {columns.map((column) => (
               <th
                 key={column.key}
                 className={cn(
-                  "h-12 px-4 align-middle font-medium text-muted-foreground",
+                  "px-[14px] py-[7px] align-middle text-[11px] font-medium text-muted-foreground",
                   column.align === "right" ? "text-right" : "text-left"
                 )}
               >
@@ -57,30 +72,36 @@ export function DataTable<T>({
               </td>
             </tr>
           ) : (
-            rows.map((row, rowIndex) => (
-              <tr
-                key={rowIndex}
-                className={cn(
-                  "border-b transition-colors hover:bg-muted/50",
-                  onRowClick && "cursor-pointer"
-                )}
-                onClick={onRowClick ? () => onRowClick(row) : undefined}
-              >
-                {columns.map((column) => (
-                  <td
-                    key={column.key}
-                    className={cn(
-                      "p-4 align-middle",
-                      column.align === "right" ? "text-right tabular-nums" : "text-left"
-                    )}
-                  >
-                    {column.render
-                      ? column.render(row)
-                      : String((row as Record<string, unknown>)[column.key] ?? "")}
-                  </td>
-                ))}
-              </tr>
-            ))
+            rows.map((row, rowIndex) => {
+              const tone = rowTone?.(row);
+              return (
+                <tr
+                  key={rowIndex}
+                  className={cn(
+                    "border-b border-hair transition-colors last:border-b-0",
+                    tone === "danger" || tone === "warning"
+                      ? rowToneClasses[tone]
+                      : "hover:bg-muted/50",
+                    onRowClick && "cursor-pointer"
+                  )}
+                  onClick={onRowClick ? () => onRowClick(row) : undefined}
+                >
+                  {columns.map((column) => (
+                    <td
+                      key={column.key}
+                      className={cn(
+                        "px-[14px] py-[8px] align-middle text-[12.5px]",
+                        column.align === "right" ? "text-right tabular-nums" : "text-left"
+                      )}
+                    >
+                      {column.render
+                        ? column.render(row)
+                        : String((row as Record<string, unknown>)[column.key] ?? "")}
+                    </td>
+                  ))}
+                </tr>
+              );
+            })
           )}
         </tbody>
       </table>

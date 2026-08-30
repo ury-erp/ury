@@ -54,8 +54,8 @@
     --warning-50: 41 90% 96%;
     --warning-100: 41 88% 90%;
     --warning-200: 41 90% 80%;
-    --warning-300: 41 93% 68%;
-    --warning-400: 41 95% 55%;
+    --warning-300: 41 90% 44%;
+    --warning-400: 41 92% 38%;
     --warning-500: 41.2 94.9% 31.0%;
     --warning-600: 41 92% 27%;
     --warning-700: 41 88% 23%;
@@ -69,8 +69,8 @@
     --success-50: 155 40% 96%;
     --success-100: 155 42% 90%;
     --success-200: 155 45% 80%;
-    --success-300: 155 50% 68%;
-    --success-400: 155 60% 50%;
+    --success-300: 155 55% 42%;
+    --success-400: 155 62% 35%;
     --success-500: 154.8 70.4% 27.8%;
     --success-600: 155 68% 24%;
     --success-700: 155 65% 20%;
@@ -125,11 +125,25 @@
      shape (hue/DEFAULT unchanged) so `bg-destructive-500` etc. resolve in both
      themes, and --ring was left at its existing dark value (not derived from
      the new light --primary). Dark warning/success hues (38 and 142) are close
-     enough to the new light hues (41.2 and 154.8) that no change was needed. */
+     enough to the new light hues (41.2 and 154.8) that no change was needed.
+
+     The light-mode retune also introduced --rail/--hair/--hair2/
+     --text-tertiary/--text-quaternary and the eight *-tint/*-tint-border
+     tokens, none of which existed in .dark before. Since the source mockup
+     is light-mode-only, there is no specified dark design for these — the
+     values below are a coherent inversion of the same tier/contrast
+     relationships the light theme uses, not a literal translation of the
+     light numbers. */
   .dark {
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
+    /* Elevated surfaces must be LIGHTER than their surroundings in dark
+       mode, mirroring light mode where the white chip lifts off the grey
+       rail. Stock shadcn ships --card == --background, which combined
+       with the new --rail (9%) left the sidebar's active-item chip
+       DARKER than the rail it sits on -- i.e. receding instead of
+       lifting. Ordering is now background 4.9% < rail 9% < card 13%. */
+    --card: 222.2 45% 13%;
     --card-foreground: 210 40% 98%;
     --popover: 222.2 84% 4.9%;
     --popover-foreground: 210 40% 98%;
@@ -146,12 +160,26 @@
     --primary-800: 221 53% 50%;
     --primary-900: 221 45% 55%;
     --primary-950: 221 37% 60%;
+    --primary-tint: 221 40% 14%;
+    --primary-tint-border: 221 35% 24%;
     --secondary: 217.2 32.6% 17.5%;
     --secondary-foreground: 210 40% 98%;
     --muted: 217.2 32.6% 17.5%;
     --muted-foreground: 215 20.2% 65.1%;
+    --text-tertiary: 215 15% 48%;
+    --text-quaternary: 215 12% 34%;
     --accent: 217.2 32.6% 17.5%;
     --accent-foreground: 210 40% 98%;
+    /* --rail sits a touch lighter than --background, the same tier
+       relationship the light theme has (just inverted, since dark
+       surfaces get lighter rather than darker as they rise). --card is
+       kept at its existing (darker) value so it still reads as a
+       distinct surface against --rail — the sidebar's active-item chip
+       depends on that contrast. --hair/--hair2 are hairlines, so they
+       run lighter than their surrounding surfaces rather than darker. */
+    --rail: 222.2 30% 9%;
+    --hair: 217.2 25% 16%;
+    --hair2: 217.2 22% 22%;
     --accent-50: 355 100% 10%;
     --accent-100: 353 96% 15%;
     --accent-200: 352 94% 20%;
@@ -176,6 +204,8 @@
     --warning-800: 30 92% 65%;
     --warning-900: 28 94% 74%;
     --warning-950: 26 96% 84%;
+    --warning-tint: 41 40% 14%;
+    --warning-tint-border: 41 38% 24%;
     --success: 142 69% 48%;
     --success-foreground: 145 80% 8%;
     --success-50: 145 40% 10%;
@@ -189,19 +219,23 @@
     --success-800: 141 72% 68%;
     --success-900: 141 78% 78%;
     --success-950: 138 84% 88%;
+    --success-tint: 145 35% 13%;
+    --success-tint-border: 145 32% 22%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
     --destructive-50: 0 40% 10%;
     --destructive-100: 0 42% 14%;
     --destructive-200: 0 46% 19%;
     --destructive-300: 0 50% 25%;
-    --destructive-400: 0 55% 30.6%;
+    --destructive-400: 0 58% 28%;
     --destructive-500: 0 62.8% 30.6%;
     --destructive-600: 0 64% 38%;
     --destructive-700: 0 68% 48%;
     --destructive-800: 0 72% 58%;
     --destructive-900: 0 78% 68%;
     --destructive-950: 0 84% 78%;
+    --destructive-tint: 0 40% 14%;
+    --destructive-tint-border: 0 36% 24%;
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 224.3 76.3% 94.1%;
