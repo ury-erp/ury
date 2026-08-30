@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Spinner, Input, Button, KpiStrip, DataTable, StatusDot, numericCellClass, type DataTableColumn, type KpiItemProps } from '@ury/ui';
+import { Page, Section, Panel, Card, Spinner, Input, Button, KpiStrip, DataTable, StatusDot, numericCellClass, type DataTableColumn, type KpiItemProps } from '@ury/ui';
 import { call, getLoggedUser, getUserRoles } from '@ury/core';
 import { useBranchContext } from '../../context/BranchContext';
 import {
@@ -177,27 +177,33 @@ export const DayClosePage: React.FC = () => {
 
   if (roles === null || state === 'loading') {
     return (
-      <div className="flex items-center justify-center p-12" data-testid="close-day-loading">
-        <Spinner />
-      </div>
+      <Page>
+        <div className="flex items-center justify-center p-12" data-testid="close-day-loading">
+          <Spinner />
+        </div>
+      </Page>
     );
   }
 
   if (isDenied || state === 'denied') {
     return (
-      <Card className="p-6" data-testid="close-day-denied">
-        <p className="text-sm text-muted-foreground">You do not have access to day-close reporting.</p>
-      </Card>
+      <Page>
+        <Panel pad data-testid="close-day-denied">
+          <p className="text-sm text-muted-foreground">You do not have access to day-close reporting.</p>
+        </Panel>
+      </Page>
     );
   }
 
   if (!branch) {
     return (
-      <div className="space-y-6" data-testid="day-close-page">
-        <Card className="p-6" data-testid="close-day-select-branch">
-          <p className="text-sm text-muted-foreground">Select a specific branch above to view its day-close status.</p>
-        </Card>
-      </div>
+      <Page data-testid="day-close-page">
+        <Section>
+          <Panel pad data-testid="close-day-select-branch">
+            <p className="text-sm text-muted-foreground">Select a specific branch above to view its day-close status.</p>
+          </Panel>
+        </Section>
+      </Page>
     );
   }
 
@@ -222,7 +228,7 @@ export const DayClosePage: React.FC = () => {
   });
 
   return (
-    <div className="space-y-6" data-testid="day-close-page">
+    <Page data-testid="day-close-page">
       <div className="flex flex-wrap gap-3 items-end">
         <div>
           <label className="text-xs text-muted-foreground">Company</label>
@@ -236,62 +242,74 @@ export const DayClosePage: React.FC = () => {
       </div>
 
       {state === 'error' && (
-        <Card className="p-4" data-testid="close-day-error">
-          <p className="text-sm text-destructive">{errorMessage}</p>
-        </Card>
+        <Section>
+          <Panel pad data-testid="close-day-error">
+            <p className="text-sm text-destructive">{errorMessage}</p>
+          </Panel>
+        </Section>
       )}
 
-      <KpiStrip items={kpiItems} data-testid="close-day-kpi-strip" />
+      <Section>
+        <KpiStrip items={kpiItems} data-testid="close-day-kpi-strip" />
+      </Section>
 
       {state === 'empty' && (
-        <Card className="p-6" data-testid="close-day-empty">
-          <p className="text-sm text-muted-foreground">
-            No plan-vs-actual data for this company/branch/service date. Check that an approved Sales Plan exists for
-            this scope.
-          </p>
-        </Card>
+        <Section>
+          <Panel pad data-testid="close-day-empty">
+            <p className="text-sm text-muted-foreground">
+              No plan-vs-actual data for this company/branch/service date. Check that an approved Sales Plan exists for
+              this scope.
+            </p>
+          </Panel>
+        </Section>
       )}
 
       {state === 'populated' && planVsActual && (
-        <Card className="p-4" data-testid="close-day-plan-vs-actual">
-          <h3 className="text-sm font-semibold mb-2">Plan vs Actual</h3>
-          {planVsActual.reason && (
-            <p className="text-xs text-warning mb-2" data-testid="close-day-plan-vs-actual-reason">
-              {planVsActual.reason}
-            </p>
-          )}
-          <DataTable columns={planVsActualColumns} rows={planVsActual.rows} emptyMessage="No plan-vs-actual rows for this scope." />
-        </Card>
+        <Section>
+          <Panel pad data-testid="close-day-plan-vs-actual">
+            <h3 className="text-sm font-semibold mb-2">Plan vs Actual</h3>
+            {planVsActual.reason && (
+              <p className="text-xs text-warning mb-2" data-testid="close-day-plan-vs-actual-reason">
+                {planVsActual.reason}
+              </p>
+            )}
+            <DataTable columns={planVsActualColumns} rows={planVsActual.rows} emptyMessage="No plan-vs-actual rows for this scope." />
+          </Panel>
+        </Section>
       )}
 
       {/* Honest stub: no close-day blocker checklist endpoint exists yet
           anywhere in frontend/src/services. Do not fabricate checklist
           items or interactive checkboxes that would not persist. */}
-      <Card className="p-4" data-testid="close-day-checklist-stub">
-        <h3 className="text-sm font-semibold mb-2">Close Day Checklist</h3>
-        <p className="text-sm text-muted-foreground">
-          The close-day blocker checklist (open tables, unposted production, closing counts, wastage sign-off) is not
-          yet available -- there is no backend endpoint for it. This section will populate once that API exists.
-        </p>
-      </Card>
+      <Section>
+        <Panel pad data-testid="close-day-checklist-stub">
+          <h3 className="text-sm font-semibold mb-2">Close Day Checklist</h3>
+          <p className="text-sm text-muted-foreground">
+            The close-day blocker checklist (open tables, unposted production, closing counts, wastage sign-off) is not
+            yet available -- there is no backend endpoint for it. This section will populate once that API exists.
+          </p>
+        </Panel>
+      </Section>
 
       {/* Honest stub: no "apply to next plan" mutation endpoint exists yet.
           Disabled button, not a functional-looking no-op. */}
-      <Card className="p-4" data-testid="close-day-apply-to-plan-stub">
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div>
-            <h3 className="text-sm font-semibold mb-1">Apply to Next Plan</h3>
-            <p className="text-sm text-muted-foreground">
-              Carrying today's variance into tomorrow's sales plan is not wired up yet -- no backend endpoint exists
-              for it.
-            </p>
+      <Section>
+        <Panel pad data-testid="close-day-apply-to-plan-stub">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <h3 className="text-sm font-semibold mb-1">Apply to Next Plan</h3>
+              <p className="text-sm text-muted-foreground">
+                Carrying today's variance into tomorrow's sales plan is not wired up yet -- no backend endpoint exists
+                for it.
+              </p>
+            </div>
+            <Button disabled title="Not yet available: no backend endpoint exists for this action" data-testid="close-day-apply-to-plan-button">
+              Apply to Next Plan
+            </Button>
           </div>
-          <Button disabled title="Not yet available: no backend endpoint exists for this action" data-testid="close-day-apply-to-plan-button">
-            Apply to Next Plan
-          </Button>
-        </div>
-      </Card>
-    </div>
+        </Panel>
+      </Section>
+    </Page>
   );
 };
 

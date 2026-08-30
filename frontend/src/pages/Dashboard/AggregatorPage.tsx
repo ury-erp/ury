@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
 import { Plus } from 'lucide-react';
-import { Card, Button, Input, Spinner, showToast } from '@ury/ui';
+import { Page, Section, Panel, Card, Button, Input, Spinner, showToast } from '@ury/ui';
 import { call } from '@ury/core';
 
 interface AggregatorSetting {
@@ -133,7 +133,7 @@ export const AggregatorPage: React.FC = () => {
   const hasBranch = branches.length > 0;
 
   return (
-    <div className="space-y-6">
+    <Page>
       {/* Toolbar & Filters */}
       <div className="p-4 rounded-[9px] border border-hair bg-card">
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
@@ -151,8 +151,9 @@ export const AggregatorPage: React.FC = () => {
         </div>
       </div>
 
-      {/* List View */}
-      {loading ? (
+      <Section>
+        {/* List View */}
+        {loading ? (
         <div className="py-16 flex items-center justify-center bg-card rounded-[9px] border border-hair">
           <Spinner className="w-8 h-8 text-primary" />
         </div>
@@ -193,7 +194,8 @@ export const AggregatorPage: React.FC = () => {
             </tbody>
           </table>
         </div>
-      )}
+        )}
+      </Section>
 
       {/* Add Modal */}
       {isDialogOpen && (
@@ -228,7 +230,7 @@ export const AggregatorPage: React.FC = () => {
           </Card>
         </div>
       )}
-    </div>
+    </Page>
   );
 };
 
