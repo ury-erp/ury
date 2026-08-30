@@ -60,7 +60,7 @@ const { registry } = defineRegistry(formCatalog, {
     FormSection: ({ props, children }) => (
       <div className="w-full space-y-4">
         {props.label && (
-          <h3 className="text-md font-semibold text-foreground">{props.label}</h3>
+          <h3 className="text-sm font-semibold text-foreground">{props.label}</h3>
         )}
         <div className="grid grid-cols-1 md:grid-cols-12 gap-x-6 gap-y-4 w-full">
           {children}

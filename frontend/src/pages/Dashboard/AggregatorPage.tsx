@@ -310,11 +310,11 @@ export const AggregatorPage: React.FC = () => {
 
       {/* List View */}
       {loading ? (
-        <div className="py-16 flex items-center justify-center bg-white rounded-lg border border-gray-200">
+        <div className="py-16 flex items-center justify-center bg-card rounded-lg border border-border">
           <Spinner className="w-8 h-8 text-primary" />
         </div>
       ) : aggregators.length === 0 ? (
-        <Card className="p-12 flex flex-col items-center justify-center text-center rounded-lg border border-gray-200 shadow-sm bg-white">
+        <Card className="p-12 flex flex-col items-center justify-center text-center rounded-lg border border-border shadow-sm bg-card">
           <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
             <Store className="w-6 h-6 text-primary" />
           </div>
@@ -332,9 +332,9 @@ export const AggregatorPage: React.FC = () => {
           </Button>
         </Card>
       ) : (
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-          <table className="w-full text-left text-sm text-gray-600">
-            <thead className="bg-gray-50 border-b border-gray-100 text-xs uppercase text-gray-500 font-semibold">
+        <div className="bg-card rounded-lg border border-border shadow-sm overflow-hidden">
+          <table className="w-full text-left text-sm text-muted-foreground">
+            <thead className="bg-card border-b border-border text-xs uppercase text-muted-foreground font-semibold">
               <tr>
                 <th className="px-6 py-4">Aggregator</th>
                 <th className="px-6 py-4">Price List</th>

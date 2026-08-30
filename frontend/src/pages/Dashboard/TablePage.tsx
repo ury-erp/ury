@@ -7,6 +7,7 @@ import { Switch } from '../../components/ui/switch';
 import { dashboardService } from '../../services/dashboard';
 import { call } from '@ury/core';
 import SideDrawer from '../../components/layout/SideDrawer';
+import { PageToolbar } from '../../components/layout/PageToolbar';
 import TableLayoutView from './TableLayoutView';
 
 interface UryTableRecord {
@@ -226,17 +227,17 @@ export const TablePage: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Toolbar — Partition Style */}
-      <div className="flex flex-col md:flex-row items-center justify-between gap-4 pb-3 border-b border-gray-200 -mx-6 px-6 -mt-6 pt-6">
-        <div className="flex bg-gray-100 rounded-lg p-1">
+      <PageToolbar className="flex-col md:flex-row justify-between">
+        <div className="flex bg-muted rounded-lg p-1">
           <button
             onClick={() => setViewMode('list')}
-            className={`p-1.5 rounded-md flex items-center justify-center transition-colors ${viewMode === 'list' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-900'}`}
+            className={`p-1.5 rounded-md flex items-center justify-center transition-colors ${viewMode === 'list' ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
           >
             <List className="w-4 h-4" />
           </button>
           <button
             onClick={() => setViewMode('grid')}
-            className={`p-1.5 rounded-md flex items-center justify-center transition-colors ${viewMode === 'grid' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-900'}`}
+            className={`p-1.5 rounded-md flex items-center justify-center transition-colors ${viewMode === 'grid' ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
           >
             <Grid className="w-4 h-4" />
           </button>
@@ -245,7 +246,7 @@ export const TablePage: React.FC = () => {
           <Button
             variant="outline"
             onClick={() => setViewMode('layout')}
-            className={`border-gray-300 text-gray-700 font-semibold flex items-center gap-1.5 ${viewMode === 'layout' ? 'bg-primary/10 border-primary/30 text-primary' : ''}`}
+            className={`font-semibold flex items-center gap-1.5 ${viewMode === 'layout' ? 'bg-primary/10 border-primary/30 text-primary' : ''}`}
           >
             <LayoutTemplate className="w-4 h-4" />
             <span>Edit Layout</span>
@@ -258,19 +259,19 @@ export const TablePage: React.FC = () => {
             <span>Add Table</span>
           </Button>
         </div>
-      </div>
+      </PageToolbar>
 
       {loading ? (
-        <div className="py-16 flex items-center justify-center bg-white rounded-lg border border-gray-200">
+        <div className="py-16 flex items-center justify-center bg-card rounded-lg border border-border">
           <Spinner className="w-8 h-8 text-primary" />
         </div>
       ) : tables.length === 0 ? (
-        <Card className="p-12 flex flex-col items-center justify-center text-center rounded-lg border border-gray-200 shadow-sm bg-white">
+        <Card className="p-12 flex flex-col items-center justify-center text-center rounded-lg border border-border shadow-sm bg-card">
           <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
             <Grid className="w-6 h-6 text-primary" />
           </div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-1">No Dining Tables Configured</h3>
-          <p className="text-gray-500 mb-6 max-w-sm">
+          <h3 className="text-lg font-semibold text-foreground mb-1">No Dining Tables Configured</h3>
+          <p className="text-muted-foreground mb-6 max-w-sm">
             Add dining tables to configure your restaurant layout.
           </p>
           <Button
@@ -282,7 +283,7 @@ export const TablePage: React.FC = () => {
           </Button>
         </Card>
       ) : viewMode === 'layout' ? (
-        <div className="bg-white border border-gray-200 rounded-lg shadow-xs overflow-hidden h-[600px] relative">
+        <div className="bg-card border border-border rounded-lg shadow-xs overflow-hidden h-[600px] relative">
           <TableLayoutView
             selectedRoom="All"
             tables={tables as any}
@@ -293,7 +294,7 @@ export const TablePage: React.FC = () => {
       ) : viewMode === 'grid' ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
           {tables.map((t) => (
-            <Card key={t.name} className="p-5 rounded-lg border border-gray-200 bg-white shadow-xs hover:shadow-md transition-all hover:border-primary/20 flex flex-col justify-between relative group cursor-pointer" onClick={() => openEditDrawer(t)}>
+            <Card key={t.name} className="p-5 rounded-lg border border-border bg-card shadow-xs hover:shadow-md transition-all hover:border-primary/20 flex flex-col justify-between relative group cursor-pointer" onClick={() => openEditDrawer(t)}>
               <div>
                 <div className="flex items-center justify-between">
                   <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary text-[10px]">
@@ -304,15 +305,15 @@ export const TablePage: React.FC = () => {
                     {t.status || 'Available'}
                   </Badge>
                 </div>
-                <h3 className="mt-3 text-xl font-bold text-gray-900 tracking-tight">{t.table_name || t.name}</h3>
-                <p className="text-xs text-gray-500 mt-1 font-medium">{t.restaurant_room || 'Main Hall'}</p>
+                <h3 className="mt-3 text-xl font-bold text-foreground tracking-tight">{t.table_name || t.name}</h3>
+                <p className="text-xs text-muted-foreground mt-1 font-medium">{t.restaurant_room || 'Main Hall'}</p>
               </div>
-              <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between text-xs text-gray-600 font-semibold">
+              <div className="mt-4 pt-3 border-t border-border flex items-center justify-between text-xs text-muted-foreground font-semibold">
                 <span className="flex items-center">
                   <Users className="w-3.5 h-3.5 mr-1 text-primary" />
                   {t.no_of_seats || 4} Seats
                 </span>
-                <span className="text-gray-400">Branch: {t.branch || 'Main'}</span>
+                <span className="text-muted-foreground">Branch: {t.branch || 'Main'}</span>
               </div>
               <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
                 <Edit2 className="w-6 h-6 text-primary" />
@@ -321,9 +322,9 @@ export const TablePage: React.FC = () => {
           ))}
         </div>
       ) : (
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-          <table className="w-full text-left text-sm text-gray-600">
-            <thead className="bg-gray-50 border-b border-gray-100 text-xs uppercase text-gray-500 font-semibold">
+        <div className="bg-card rounded-lg border border-border shadow-sm overflow-hidden">
+          <table className="w-full text-left text-sm text-muted-foreground">
+            <thead className="bg-muted border-b border-border text-xs uppercase text-muted-foreground font-semibold">
               <tr>
                 <th className="px-6 py-4">Table Name</th>
                 <th className="px-6 py-4">Room</th>
@@ -333,10 +334,10 @@ export const TablePage: React.FC = () => {
                 <th className="px-6 py-4 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-border">
               {tables.map((t) => (
                 <tr key={t.name} className="hover:bg-primary/10 transition-colors">
-                  <td className="px-6 py-4 font-semibold text-gray-900">{t.table_name || t.name}</td>
+                  <td className="px-6 py-4 font-semibold text-foreground">{t.table_name || t.name}</td>
                   <td className="px-6 py-4">{t.restaurant_room || 'Main Hall'}</td>
                   <td className="px-6 py-4 font-mono">{t.no_of_seats || 4}</td>
                   <td className="px-6 py-4">
@@ -370,7 +371,7 @@ export const TablePage: React.FC = () => {
         <form onSubmit={handleSaveTable} className="space-y-5">
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Table Name</label>
+              <label className="block text-sm font-semibold text-foreground mb-1">Table Name</label>
               <Input
                 value={newTable.table_name}
                 onChange={(e) => setNewTable({ ...newTable, table_name: e.target.value })}
@@ -381,7 +382,7 @@ export const TablePage: React.FC = () => {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Seats Capacity</label>
+                <label className="block text-sm font-semibold text-foreground mb-1">Seats Capacity</label>
                 <Input
                   type="number"
                   value={newTable.no_of_seats}
@@ -390,7 +391,7 @@ export const TablePage: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Min. Seating</label>
+                <label className="block text-sm font-semibold text-foreground mb-1">Min. Seating</label>
                 <Input
                   type="number"
                   value={newTable.minimum_seating}
@@ -402,7 +403,7 @@ export const TablePage: React.FC = () => {
 
             {/* Branch — Select from Branch doctype */}
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Branch</label>
+              <label className="block text-sm font-semibold text-foreground mb-1">Branch</label>
               <SearchableSelect
                 id="branch"
                 value={newTable.branch}
@@ -416,7 +417,7 @@ export const TablePage: React.FC = () => {
 
             {/* Room — Select from URY Room docs */}
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Room</label>
+              <label className="block text-sm font-semibold text-foreground mb-1">Room</label>
               <SearchableSelect
                 id="restaurant_room"
                 value={newTable.restaurant_room}
@@ -429,7 +430,7 @@ export const TablePage: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Table Shape</label>
+              <label className="block text-sm font-semibold text-foreground mb-1">Table Shape</label>
               <SearchableSelect
                 id="table_shape"
                 value={newTable.table_shape}
@@ -448,13 +449,13 @@ export const TablePage: React.FC = () => {
                 checked={newTable.is_take_away}
                 onCheckedChange={(checked) => setNewTable({ ...newTable, is_take_away: checked })}
               />
-              <label htmlFor="is_take_away" className="text-sm font-medium text-gray-700 cursor-pointer">
+              <label htmlFor="is_take_away" className="text-sm font-medium text-foreground cursor-pointer">
                 Is Take Away Table
               </label>
             </div>
           </div>
 
-          <div className="pt-6 flex justify-end gap-3 border-t border-gray-100">
+          <div className="pt-6 flex justify-end gap-3 border-t border-border">
             <Button type="button" variant="outline" onClick={() => setIsDrawerOpen(false)} disabled={saving}>
               Cancel
             </Button>

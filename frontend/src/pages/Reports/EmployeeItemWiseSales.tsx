@@ -140,7 +140,7 @@ export function EmployeeItemWiseSales() {
         <div className="text-sm text-muted-foreground">Search and select an employee to view their item breakdown.</div>
       )}
 
-      {isLoading && <div className="text-sm text-muted-foreground">Loading...</div>}
+      {isLoading && <div className="text-sm text-muted-foreground">Loading…</div>}
 
       {data && !isLoading && (
         <>

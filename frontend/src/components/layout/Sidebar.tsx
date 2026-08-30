@@ -34,7 +34,8 @@ import {
   ArrowRightLeft,
   Ban,
   PanelLeftClose,
-  PanelLeftOpen
+  PanelLeftOpen,
+  Bot
 } from 'lucide-react';
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = 'ury.sidebar.collapsed';
@@ -128,6 +129,7 @@ export const SETUP_ITEMS: NavItem[] = [
   { label: 'Aggregators', path: '/aggregator', icon: Globe },
   { label: 'Payment Terminals', path: '/payment-terminals', icon: CreditCard },
   { label: 'Report Settings', path: '/report-settings', icon: FileCog },
+  { label: 'AI Assistant', path: '/ai-settings', icon: Bot },
   { label: 'Production Units', path: '/production-unit', icon: Factory },
   { label: 'Departments', path: '/production-department', icon: Network },
   { label: 'Item Config', path: '/item-production-config', icon: Package }

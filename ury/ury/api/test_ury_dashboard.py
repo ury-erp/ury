@@ -1,5 +1,6 @@
 import frappe
 from frappe.tests.utils import FrappeTestCase
+from frappe.utils import get_datetime
 from unittest.mock import patch, MagicMock
 from ury.ury.api.ury_dashboard import (
     get_dashboard_stats,
@@ -140,6 +141,59 @@ class TestGetNeedsAttention(FrappeTestCase):
         result = get_needs_attention(branch=None)
 
         self.assertEqual(result, [])
+
+    @patch("ury.ury.api.ury_dashboard.frappe.get_all")
+    @patch("ury.ury.api.ury_dashboard.frappe.db.sql")
+    @patch("ury.ury.api.ury_dashboard.frappe.cache")
+    @patch("ury.ury.api.ury_dashboard.add_to_date")
+    @patch("ury.ury.api.ury_dashboard.get_datetime")
+    @patch("ury.ury.api.ury_dashboard._business_day_bounds")
+    def test_pending_payment_query_is_capped_to_business_day_window(
+        self, mock_bounds, mock_get_datetime, mock_add_to_date, mock_cache_obj, mock_sql, mock_get_all
+    ):
+        """Regression test for the unpaid-orders age-cap bug: the pending-
+        payment query must bound `creation` on both sides (>= shift_start,
+        < shift_end), not just the 15-minute-old lower bound — otherwise a
+        months-old seed draft outside the current shift window is picked up.
+        """
+        mock_cache_instance = MagicMock()
+        mock_cache_obj.return_value = mock_cache_instance
+        mock_cache_instance.get_value.return_value = None
+
+        mock_get_datetime.return_value = "2026-08-19 10:00:00"
+        mock_add_to_date.return_value = "2026-08-19 09:45:00"
+        mock_bounds.return_value = ("2026-08-19 06:00:00", "2026-08-20 06:00:00")
+
+        mock_sql.return_value = []
+        mock_get_all.side_effect = [[], [], []]
+
+        get_needs_attention(branch="URY Branch")
+
+        mock_bounds.assert_called_once_with("URY Branch")
+
+        query, params = mock_sql.call_args[0][0], mock_sql.call_args[0][1]
+        self.assertIn("creation >= %(shift_start)s", query)
+        self.assertIn("creation < %(shift_end)s", query)
+        self.assertEqual(params["shift_start"], "2026-08-19 06:00:00")
+        self.assertEqual(params["shift_end"], "2026-08-20 06:00:00")
+
+    def test_business_day_window_excludes_old_draft_includes_recent_one(self):
+        """Focused unit test of the date-window condition itself (no DB): a
+        draft created before `shift_start` must fall outside the
+        [shift_start, shift_end) window used by the pending-payment query,
+        while one created just after `shift_start` must fall inside it.
+        """
+        shift_start = get_datetime("2026-08-19 06:00:00")
+        shift_end = get_datetime("2026-08-20 06:00:00")
+
+        old_draft_creation = get_datetime("2026-06-01 12:00:00")
+        recent_draft_creation = get_datetime("2026-08-19 09:00:00")
+
+        def in_window(creation):
+            return shift_start <= creation < shift_end
+
+        self.assertFalse(in_window(old_draft_creation))
+        self.assertTrue(in_window(recent_draft_creation))
 
 
 class TestGetShiftMetrics(FrappeTestCase):
