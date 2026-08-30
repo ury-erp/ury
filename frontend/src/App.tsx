@@ -31,6 +31,7 @@ import { StockReservationPage } from './pages/Dashboard/StockReservationPage';
 import { PaymentTerminalPage } from './pages/Dashboard/PaymentTerminalPage';
 import { RoleGuard } from './components/RoleGuard';
 import { AuthGuard } from './components/AuthGuard';
+import { Landing } from './components/Landing';
 import { ReportsLayout } from './pages/Reports/ReportsLayout';
 import { ReportsHome } from './pages/Reports/ReportsHome';
 import { TodaysSales } from './pages/Reports/TodaysSales';
@@ -163,7 +164,6 @@ function App() {
             </RoleGuard>
           }
         >
-          <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="menu" element={<MenuPage />} />
           <Route path="table" element={<TablePage />} />
@@ -241,6 +241,25 @@ function App() {
 
         </Route>
       </Route>
+
+      {/*
+        Phase 3 (PLAN.md tracks/sa-app-consolidation §7 Phase 3): a
+        client-side-only role-aware landing redirect for the bare root URL.
+        This is a SIBLING of the `SetupGuard` route above (same nesting
+        level as the `/ury/pos/*` carve-out below), i.e. it sits OUTSIDE
+        `RoleGuard`/`SetupGuard` entirely so a non-manager (e.g. a cashier)
+        never hits `RoleGuard`'s dead-end "Access Denied" card just from
+        loading "/". `Landing` only decides which area to send the user to
+        (`/dashboard` vs `/pos/dashboard`) via `useAuth`'s `isManager` — it
+        does not replace any real auth/permission check: `RoleGuard` still
+        guards every route under it (including anyone who bookmarks or
+        types `/ury/dashboard` directly, bypassing Landing), and pos/'s own
+        `AuthGuard` still guards the POS routes. Because this route owns
+        the exact "/" match, the `RoleGuard`-wrapped "/" layout route above
+        no longer declares an `index` child — it only matches its explicit
+        child paths (`dashboard`, `menu`, etc.), never bare "/".
+      */}
+      <Route path="/" element={<Landing />} />
 
       {/*
         Phase 2 (PLAN.md tracks/sa-app-consolidation §7 Phase 2): the
