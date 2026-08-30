@@ -31,6 +31,16 @@ const buttonVariants = cva(
           "bg-destructive text-white shadow-sm hover:bg-destructive/90 active:bg-destructive active:brightness-95 active:shadow-none",
         outline:
           "border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground hover:border-gray-300 active:bg-gray-100 active:shadow-none",
+        // Mockup's default `.btn`: inset 1px ring on a card surface instead
+        // of a real border, so it sits flush against adjacent chrome. Kept
+        // separate from `outline` (rather than changing it in place) because
+        // `outline` is used broadly across existing call sites that expect a
+        // real border/background pairing — swapping its box model risks
+        // visible regressions we can't audit from this file alone.
+        chrome:
+          "bg-card text-foreground shadow-[inset_0_0_0_1px_hsl(var(--hair2))] hover:bg-muted active:bg-muted active:shadow-[inset_0_0_0_1px_hsl(var(--hair2))]",
+        solid:
+          "bg-foreground text-background shadow-none hover:bg-foreground/90 active:bg-foreground",
         secondary:
           "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80 active:bg-gray-200 active:shadow-none",
         ghost:
@@ -54,6 +64,12 @@ const buttonVariants = cva(
         lg: "h-12 px-6 text-base rounded-md",
         icon: "h-11 w-11 p-0",
         xs: "h-8 px-2.5 text-xs rounded-sm",
+        // Mockup's dense `.btn` scale (28/24/36px), additive alongside the
+        // touch-target-first defaults above — for chrome/toolbars, not
+        // primary POS actions.
+        compact: "h-7 px-2.5 text-xs rounded-[7px] gap-1.5",
+        compactSm: "h-6 px-2 text-[11.5px] rounded-[7px] gap-1.5",
+        compactLg: "h-9 px-3.5 text-[13px] rounded-[7px] gap-1.5",
       },
     },
     defaultVariants: {
