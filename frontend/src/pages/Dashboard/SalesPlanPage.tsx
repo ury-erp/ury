@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarDays, CheckCircle2, History, Lock, Save, Search, Send, X } from 'lucide-react';
-import { Button, Card, Input, Spinner } from '@ury/ui';
+import { AttentionFeed, Button, Card, Input, KpiStrip, Spinner } from '@ury/ui';
 import { useBranchContext } from '../../context/BranchContext';
 import { useAuth } from '../../store/useAuth';
 import {
@@ -186,6 +186,8 @@ export const SalesPlanPage: React.FC = () => {
   const [transitionError, setTransitionError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [selectedHistoryItem, setSelectedHistoryItem] = useState<ComparableHistoryItem | null>(null);
+  const [highlightedItemCode, setHighlightedItemCode] = useState<string | null>(null);
+  const rowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
 
   const draftKey = useMemo(() => {
     if (!historyScope) return null;
@@ -288,6 +290,23 @@ export const SalesPlanPage: React.FC = () => {
 
   const totalPlannedQty = items.reduce((total, item) => total + item.planned_qty, 0);
   const totalHistoryQty = items.reduce((total, item) => total + item.average_qty, 0);
+
+  // Real, backend-derived blockers: an item with no production unit assigned
+  // can't be routed for prep, and an item with zero comparable sample days
+  // has no history to base the suggested quantity on -- both come straight
+  // off the comparable-history response, nothing fabricated here.
+  const blockedItems = useMemo(() => {
+    return items.filter((item) => item.production_unit === 'Unassigned' || item.sample_days === 0);
+  }, [items]);
+
+  const focusItemRow = (itemCode: string) => {
+    setHighlightedItemCode(itemCode);
+    const row = rowRefs.current[itemCode];
+    row?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    window.setTimeout(() => {
+      setHighlightedItemCode((current) => (current === itemCode ? null : current));
+    }, 2000);
+  };
 
   const updatePlannedQty = (itemCode: string, qty: number) => {
     setItems((currentItems) => currentItems.map((item) => (
@@ -401,20 +420,36 @@ export const SalesPlanPage: React.FC = () => {
         )}
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card className="p-4">
-          <p className="text-xs font-medium text-gray-500">Planned Qty</p>
-          <p className="mt-1 text-2xl font-semibold text-gray-900">{formatQty(totalPlannedQty)}</p>
-        </Card>
-        <Card className="p-4">
-          <p className="text-xs font-medium text-gray-500">History Avg</p>
-          <p className="mt-1 text-2xl font-semibold text-gray-900">{formatQty(totalHistoryQty)}</p>
-        </Card>
-        <Card className="p-4">
-          <p className="text-xs font-medium text-gray-500">Items</p>
-          <p className="mt-1 text-2xl font-semibold text-gray-900">{items.length}</p>
-        </Card>
-      </div>
+      <KpiStrip
+        items={[
+          { label: 'Planned Qty', value: formatQty(totalPlannedQty) },
+          { label: 'History Avg', value: formatQty(totalHistoryQty) },
+          { label: 'Items', value: items.length },
+          ...(blockedItems.length > 0
+            ? [{ label: 'Blocked', value: blockedItems.length, tone: 'warning' as const }]
+            : []),
+        ]}
+      />
+
+      {!loading && !error && blockedItems.length > 0 && (
+        <AttentionFeed
+          title="Needs Attention"
+          items={blockedItems.map((item) => {
+            const missingProductionUnit = item.production_unit === 'Unassigned';
+            return {
+              severity: missingProductionUnit ? 'blocking' : 'warning',
+              title: item.item_name || item.item_code,
+              detail: missingProductionUnit
+                ? 'No production unit assigned'
+                : 'No comparable sales history for this weekday',
+              action: {
+                label: 'View item',
+                onClick: () => focusItemRow(item.item_code),
+              },
+            };
+          })}
+        />
+      )}
 
       <div className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm">
         <Search className="h-4 w-4 shrink-0 text-gray-400" />
@@ -459,7 +494,15 @@ export const SalesPlanPage: React.FC = () => {
                     {departmentItems.map((item) => {
                       const variance = getVariance(item);
                       return (
-                        <tr key={item.item_code} className="hover:bg-gray-50">
+                        <tr
+                          key={item.item_code}
+                          ref={(el) => {
+                            rowRefs.current[item.item_code] = el;
+                          }}
+                          className={`hover:bg-gray-50 ${
+                            highlightedItemCode === item.item_code ? 'bg-amber-50 transition-colors' : ''
+                          }`}
+                        >
                           <td className="px-5 py-4">
                             <p className="font-semibold text-gray-900">{item.item_name || item.item_code}</p>
                             <p className="mt-0.5 text-xs text-gray-500">{item.item_code}</p>
