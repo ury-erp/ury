@@ -163,7 +163,7 @@ const LifecycleStepper: React.FC<LifecycleStepperProps> = ({ status }) => {
         );
       })}
       {isTerminalOther && (
-        <span className="ml-1 rounded-full border border-destructive bg-destructive-tint px-3 py-1 text-xs font-medium text-destructive">
+        <span className="ml-1 rounded-full border border-destructive-tint-border bg-destructive-tint px-3 py-1 text-xs font-medium text-destructive">
           Superseded/Cancelled
         </span>
       )}
@@ -416,7 +416,7 @@ export const SalesPlanPage: React.FC = () => {
         </div>
 
         {transitionError && (
-          <p className="mt-3 rounded-md border border-destructive bg-destructive-tint px-3 py-2 text-sm text-destructive">{transitionError}</p>
+          <p className="mt-3 rounded-md border border-destructive-tint-border bg-destructive-tint px-3 py-2 text-sm text-destructive">{transitionError}</p>
         )}
       </div>
 
@@ -466,7 +466,7 @@ export const SalesPlanPage: React.FC = () => {
           <Spinner className="h-8 w-8 text-primary" />
         </div>
       ) : error ? (
-        <Card className="border-destructive bg-destructive-tint p-6 text-sm text-destructive">{error}</Card>
+        <Card className="border-destructive-tint-border bg-destructive-tint p-6 text-sm text-destructive">{error}</Card>
       ) : filteredItems.length === 0 ? (
         <Card className="p-10 text-center text-sm text-text-tertiary">No comparable history items found for this plan date.</Card>
       ) : (

@@ -27,7 +27,11 @@
     --secondary-foreground: 222.2 84% 4.9%;
     --muted: 60.0 4.8% 95.9%;
     --muted-foreground: 216.0 5.2% 38.0%;
-    --text-tertiary: 213.3 4.0% 56.3%;
+    --text-tertiary: 213.3 5.0% 45%;  /* was 56.3% (mockup --t3 #8B8F94). At 56.3%
+       on --card that is 3.2:1 -- below WCAG AA 4.5:1 -- and it carries 312 real
+       body/label strings here, not just decorative hints. Darkened to ~45% for AA.
+       NOTE: mosaic/src/index.css keeps a hand-copied duplicate of this palette and
+       must be updated in lockstep. */
     --text-quaternary: 210.0 5.3% 70.2%;
     --accent: 60.0 3.7% 94.7%;
     --accent-foreground: 222.2 84% 4.9%;

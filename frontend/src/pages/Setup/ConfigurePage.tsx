@@ -314,7 +314,7 @@ function ConfigurePageContent() {
     >
       <div className="space-y-4 h-full">
         {error && (
-          <div className="p-4 bg-destructive-tint border border-destructive rounded-lg flex items-start gap-3 text-destructive">
+          <div className="p-4 bg-destructive-tint border border-destructive-tint-border rounded-lg flex items-start gap-3 text-destructive">
             <div className="flex-1 text-sm font-medium">
               <span className="font-bold block mb-1">
                 Configuration Error:

@@ -200,7 +200,7 @@ const PaymentTerminalContent: React.FC = () => {
                 <button
                   type="submit"
                   disabled={createLoading}
-                  className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {createLoading ? 'Creating...' : 'Register Terminal'}
                 </button>
@@ -223,7 +223,7 @@ const PaymentTerminalContent: React.FC = () => {
             <Spinner className="h-8 w-8 text-primary" />
           </div>
         ) : error ? (
-          <Card className="border-destructive bg-destructive-tint p-6 text-sm text-destructive">
+          <Card className="border-destructive-tint-border bg-destructive-tint p-6 text-sm text-destructive">
             {error}
           </Card>
         ) : terminals.length === 0 ? (

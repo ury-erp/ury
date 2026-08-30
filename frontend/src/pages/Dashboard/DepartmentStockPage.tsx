@@ -752,13 +752,13 @@ const DepartmentStockContent: React.FC = () => {
       {!department ? (
         <Card className="p-10 text-center text-sm text-text-tertiary">Select a department to view its data.</Card>
       ) : error ? (
-        <Card className="border-destructive bg-destructive-tint p-6 text-sm text-destructive">{error}</Card>
+        <Card className="border-destructive-tint-border bg-destructive-tint p-6 text-sm text-destructive">{error}</Card>
       ) : (
         <>
           <KpiStrip items={kpis} />
 
           {actionError && (
-            <Card className="border-destructive bg-destructive-tint p-4 text-sm text-destructive">{actionError}</Card>
+            <Card className="border-destructive-tint-border bg-destructive-tint p-4 text-sm text-destructive">{actionError}</Card>
           )}
 
           <section>

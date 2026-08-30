@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Card, Spinner } from '@ury/ui';
+import { Card, KpiStrip, Spinner } from '@ury/ui';
 import { useBranchContext } from '../../context/BranchContext';
 import {
   BaselineStats,
@@ -217,47 +217,41 @@ export const DashboardPage: React.FC = () => {
           <Spinner />
         </Card>
       ) : error ? (
-        <Card className="border-destructive bg-destructive-tint p-6 text-sm text-destructive">{error}</Card>
+        <Card className="border-destructive-tint-border bg-destructive-tint p-6 text-sm text-destructive">{error}</Card>
       ) : (
         <>
           <Card className="p-4">
             <p className="text-sm text-muted-foreground">{buildSummaryLine(needsAttention)}</p>
           </Card>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Card className="p-4">
-              <p className="text-xs font-medium text-text-tertiary">Today's Sales</p>
-              <p className="mt-1 text-2xl font-semibold text-foreground">{todaysSalesLabel}</p>
-            </Card>
-            <Card className="p-4">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-medium text-text-tertiary">Daily P&amp;L</p>
-                {cancelledCount > 0 ? (
-                  <span className="rounded-full bg-warning-tint px-2 py-0.5 text-xs font-medium text-warning">
-                    {cancelledCount} cancelled
-                  </span>
-                ) : null}
-              </div>
-              <p className="mt-1 text-2xl font-semibold text-foreground">{dailyPnlStatusLabel}</p>
-              <Link
-                to="/reports/daily-pnl"
-                className="mt-1 inline-block text-xs font-medium text-primary hover:text-primary hover:underline"
-              >
-                View Daily P&amp;L report
-              </Link>
-            </Card>
-          </div>
+          <KpiStrip
+            items={[
+              {
+                label: "Today's Sales",
+                value: todaysSalesLabel,
+              },
+              {
+                label: "Daily P&L",
+                value: dailyPnlStatusLabel,
+                hint: cancelledCount > 0 ? `${cancelledCount} cancelled` : undefined,
+              },
+              {
+                label: "Vs. Baseline",
+                value: vsBaseline,
+              },
+              {
+                label: "Plan Status",
+                value: planStatusLabel,
+              },
+            ]}
+          />
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Card className="p-4">
-              <p className="text-xs font-medium text-text-tertiary">Vs. Baseline</p>
-              <p className="mt-1 text-2xl font-semibold text-foreground">{vsBaseline}</p>
-            </Card>
-            <Card className="p-4">
-              <p className="text-xs font-medium text-text-tertiary">Plan Status</p>
-              <p className="mt-1 text-2xl font-semibold text-foreground">{planStatusLabel}</p>
-            </Card>
-          </div>
+          <Link
+            to="/reports/daily-pnl"
+            className="text-xs font-medium text-primary hover:text-primary hover:underline"
+          >
+            View Daily P&amp;L report
+          </Link>
 
           <Card className="p-4">
             <p className="text-sm font-medium text-muted-foreground">Needs Attention</p>
