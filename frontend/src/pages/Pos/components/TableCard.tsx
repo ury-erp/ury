@@ -53,7 +53,7 @@ const TableCard = ({
         }
       }}
       className={cn(
-        'relative flex min-h-[15.5rem] flex-col rounded-lg border-2 bg-white p-4 transition-all',
+        'relative flex min-h-[15.5rem] flex-col rounded-lg border-2 bg-card p-4 transition-all',
         isOccupied
           ? 'border-amber-400 bg-warning-tint text-warning'
           : 'cursor-pointer border-emerald-300 bg-emerald-50 text-emerald-900 hover:border-emerald-400 hover:shadow-md',
@@ -138,7 +138,7 @@ const TableCard = ({
           <>
             <button
               onClick={onPreview}
-              className="flex flex-1 items-center justify-center gap-2 rounded bg-white py-2 text-xs font-semibold transition hover:bg-warning-tint"
+              className="flex flex-1 items-center justify-center gap-2 rounded bg-card py-2 text-xs font-semibold transition hover:bg-warning-tint"
             >
               <Eye className="h-3 w-3" />
               Preview
@@ -146,7 +146,7 @@ const TableCard = ({
             <button
               onClick={onPrint}
               disabled={isPrinting}
-              className="flex flex-1 items-center justify-center gap-2 rounded bg-white py-2 text-xs font-semibold transition hover:bg-warning-tint disabled:cursor-not-allowed disabled:opacity-60"
+              className="flex flex-1 items-center justify-center gap-2 rounded bg-card py-2 text-xs font-semibold transition hover:bg-warning-tint disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isPrinting ? (
                 <>

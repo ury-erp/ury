@@ -62,13 +62,13 @@ export const Drawer: React.FC<DrawerProps> = ({
       <div className="fixed inset-y-0 right-0 flex max-w-full pl-10">
         <div
           className={cn(
-            'w-screen transform bg-white shadow-2xl transition-transform duration-300 ease-in-out flex flex-col',
+            'w-screen transform bg-card shadow-2xl transition-transform duration-300 ease-in-out flex flex-col',
             sizeClasses[size],
             className
           )}
         >
           {/* Header */}
-          <div className="px-6 py-5 border-b border-border bg-white flex items-center justify-between sticky top-0 z-10">
+          <div className="px-6 py-5 border-b border-border bg-card flex items-center justify-between sticky top-0 z-10">
             <div>
               <div className="flex items-center gap-2">
                 <div className="w-2 h-6 bg-primary rounded-full" />
@@ -96,7 +96,7 @@ export const Drawer: React.FC<DrawerProps> = ({
 
           {/* Optional Footer */}
           {footer && (
-            <div className="px-6 py-4 bg-white border-t border-border flex items-center justify-end gap-3 sticky bottom-0 z-10">
+            <div className="px-6 py-4 bg-card border-t border-border flex items-center justify-end gap-3 sticky bottom-0 z-10">
               {footer}
             </div>
           )}

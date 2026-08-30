@@ -32,8 +32,8 @@ export function InstallationTypeCard({ type, selected, onSelect }: InstallationT
             <Info className="w-4 h-4 shrink-0" />
             
             {showTooltip && (
-              <div 
-                className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-[440px] max-w-[calc(100vw-2rem)] bg-white border border-border text-black text-xs font-normal p-3.5 rounded-lg shadow-xl leading-relaxed z-50 pointer-events-none transition-all duration-150 animate-dialog-in"
+              <div
+                className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-[440px] max-w-[calc(100vw-2rem)] bg-card border border-border text-black text-xs font-normal p-3.5 rounded-lg shadow-xl leading-relaxed z-50 pointer-events-none transition-all duration-150 animate-dialog-in"
                 style={{ contentVisibility: 'auto' }}
               >
                 {type.description}

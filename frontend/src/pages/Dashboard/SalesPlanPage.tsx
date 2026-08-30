@@ -451,7 +451,7 @@ export const SalesPlanPage: React.FC = () => {
         />
       )}
 
-      <div className="flex items-center gap-3 rounded-lg border border-border bg-white px-4 py-3 shadow-sm">
+      <div className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3 shadow-sm">
         <Search className="h-4 w-4 shrink-0 text-text-tertiary" />
         <input
           value={query}
@@ -462,7 +462,7 @@ export const SalesPlanPage: React.FC = () => {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center rounded-lg border border-border bg-white py-16">
+        <div className="flex items-center justify-center rounded-lg border border-border bg-card py-16">
           <Spinner className="h-8 w-8 text-primary" />
         </div>
       ) : error ? (
@@ -472,7 +472,7 @@ export const SalesPlanPage: React.FC = () => {
       ) : (
         <div className="space-y-5">
           {Object.entries(groupedItems).map(([department, departmentItems]) => (
-            <div key={department} className="overflow-hidden rounded-lg border border-border bg-white shadow-sm">
+            <div key={department} className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
               <div className="flex items-center justify-between border-b border-border bg-muted px-5 py-3">
                 <h2 className="text-sm font-semibold tracking-wide text-muted-foreground">{department}</h2>
                 <span className="text-xs font-medium text-text-tertiary">
@@ -481,7 +481,7 @@ export const SalesPlanPage: React.FC = () => {
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[760px] text-left text-sm">
-                  <thead className="border-b border-border bg-white text-xs font-semibold text-text-tertiary">
+                  <thead className="border-b border-border bg-card text-xs font-semibold text-text-tertiary">
                     <tr>
                       <th className="px-5 py-3">Item</th>
                       <th className="px-5 py-3">History Insight</th>

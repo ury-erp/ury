@@ -81,7 +81,7 @@ export function DateRangeFilter({ value, onChange }: DateRangeFilterProps) {
       </button>
 
       {open && (
-        <div className="absolute z-10 mt-2 w-auto min-w-[20rem] rounded-md border bg-white p-3 shadow-md">
+        <div className="absolute z-10 mt-2 w-auto min-w-[20rem] rounded-md border bg-card p-3 shadow-md">
           <div className="mb-3 flex flex-wrap gap-2">
             {PRESETS.map((preset) => (
               <button

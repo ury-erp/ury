@@ -136,7 +136,7 @@ const SplitGroupPanel = ({ invoiceName, onOpenInvoice }: SplitGroupPanelProps) =
                 'flex items-center justify-between rounded-md border px-3 py-2 text-sm',
                 isCurrent
                   ? 'border-primary bg-primary-50/50'
-                  : 'cursor-pointer border-border bg-white hover:border-border hover:bg-muted',
+                  : 'cursor-pointer border-border bg-card hover:border-border hover:bg-muted',
                 isPaid && !isCurrent && 'opacity-80'
               )}
             >

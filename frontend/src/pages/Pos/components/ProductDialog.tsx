@@ -310,10 +310,10 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
 
   return (
     <Dialog open={true} onOpenChange={handleClose}>
-      <DialogContent 
+      <DialogContent
         ref={dialogRef}
         variant="xlarge"
-        className="bg-white w-full max-w-[90rem] max-h-dialog-max-h overflow-y-auto flex flex-col md:flex-row p-0"
+        className="bg-card w-full max-w-[90rem] max-h-dialog-max-h overflow-y-auto flex flex-col md:flex-row p-0"
         showCloseButton={false}
       >
         {/* Left Column - Image  */}
@@ -344,7 +344,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
             onClick={handleClose}
             variant="outline"
             size="icon"
-            className="absolute top-4 right-4 bg-white shadow-lg"
+            className="absolute top-4 right-4 bg-card shadow-lg"
           >
             <X className="w-5 h-5" />
           </Button>

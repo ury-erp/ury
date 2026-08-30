@@ -118,7 +118,7 @@ export function CustomerData() {
           />
         </div>
         {suggestions.length > 0 && !selectedCustomer && (
-          <div className="absolute z-10 mt-1 w-full bg-white border border-border rounded-md shadow-lg max-h-60 overflow-y-auto">
+          <div className="absolute z-10 mt-1 w-full bg-card border border-border rounded-md shadow-lg max-h-60 overflow-y-auto">
             {suggestions.map((s) => (
                             <Button
                 key={s.name}

@@ -293,7 +293,7 @@ export function MenuSection() {
                 updateTaxConfig({ taxPercentage: parseFloat(e.target.value) || 0 })
               }
               placeholder="5"
-              className="w-full text-sm bg-white"
+              className="w-full text-sm bg-card"
             />
           </div>
         </div>
@@ -326,7 +326,7 @@ export function MenuSection() {
                       updateMenuItem(item.id, { name: e.target.value })
                     }
                     placeholder="Item Name"
-                    className="w-full text-sm bg-white"
+                    className="w-full text-sm bg-card"
                   />
                 </div>
 
@@ -349,7 +349,7 @@ export function MenuSection() {
                       updateMenuItem(item.id, { price: parseFloat(e.target.value) || 0 })
                     }
                     placeholder="0.00"
-                    className="w-full text-sm bg-white"
+                    className="w-full text-sm bg-card"
                   />
                 </div>
               </div>

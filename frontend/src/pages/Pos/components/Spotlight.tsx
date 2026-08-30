@@ -62,7 +62,7 @@ const Spotlight = () => {
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogContent className="bg-white rounded-lg shadow-xl w-full max-w-2xl p-0">
+      <DialogContent className="bg-card rounded-lg shadow-xl w-full max-w-2xl p-0">
         <div className="flex items-center border-b border-border p-4">
           <Search className="w-5 h-5 text-text-tertiary me-3" />
           <Input

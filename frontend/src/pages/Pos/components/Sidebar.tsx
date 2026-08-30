@@ -32,7 +32,7 @@ const Sidebar = ({ disabled }: SidebarProps) => {
 
   return (
     <div className={cn(
-      "w-64 bg-white border-e border-border h-screen flex flex-col",
+      "w-64 bg-card border-e border-border h-screen flex flex-col",
       disabled && "opacity-50 pointer-events-none"
     )}>
       {/* Categories List */}
@@ -50,7 +50,7 @@ const Sidebar = ({ disabled }: SidebarProps) => {
             className={cn(
               'w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium transition-all duration-200 group relative mb-1',
               selectedCategory === ''
-                ? 'bg-white text-foreground shadow-sm font-semibold'
+                ? 'bg-card text-foreground shadow-sm font-semibold'
                 : 'text-muted-foreground hover:bg-white/60 hover:text-foreground'
             )}
             disabled={disabled}
@@ -85,7 +85,7 @@ const Sidebar = ({ disabled }: SidebarProps) => {
                   className={cn(
                     'w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium transition-all duration-200 group relative',
                     selectedCategory === category.name
-                      ? 'bg-white text-foreground shadow-sm font-semibold'
+                      ? 'bg-card text-foreground shadow-sm font-semibold'
                       : 'text-muted-foreground hover:bg-white/60 hover:text-foreground'
                   )}
                   disabled={disabled}

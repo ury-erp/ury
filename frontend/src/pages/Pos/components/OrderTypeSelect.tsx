@@ -66,7 +66,7 @@ const OrderTypeSelect = ({ disabled }: OrderTypeSelectProps) => {
               onClick={() => handleOrderTypeSelect(value)}
               variant={selectedOrderType === value ? 'default' : 'outline'}
               className={cn(
-                'h-fit flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap bg-white border transition-colors',
+                'h-fit flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap bg-card border transition-colors',
                 selectedOrderType === value
                 ? 'text-primary-700 bg-primary-50 border-primary-600 hover:bg-primary-50'
                 : 'text-muted-foreground border-border hover:bg-muted',

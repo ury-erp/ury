@@ -12,7 +12,7 @@ const POSOpeningDialog = ({ onReload, type }: POSOpeningDialogProps) => {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4 shadow-xl">
+      <div className="bg-card rounded-lg p-8 max-w-md w-full mx-4 shadow-xl">
         <div className="text-center">
           {/* Icon */}
           <div className={`mx-auto flex items-center justify-center h-16 w-16 rounded-full mb-6 ${

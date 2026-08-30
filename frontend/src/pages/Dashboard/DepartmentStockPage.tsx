@@ -357,14 +357,14 @@ const RequestAuthorizationForm: React.FC<RequestAuthorizationFormProps> = ({
     >
       <div className="flex flex-col text-xs font-medium text-muted-foreground">
         Plan
-        <span className="mt-1 rounded-md border border-border bg-white px-2 py-1.5 text-sm text-foreground">
+        <span className="mt-1 rounded-md border border-border bg-card px-2 py-1.5 text-sm text-foreground">
           {planName || 'No active plan'}
           {planStatus ? ` (${planStatus})` : ''}
         </span>
       </div>
       <div className="flex flex-col text-xs font-medium text-muted-foreground">
         Department
-        <span className="mt-1 rounded-md border border-border bg-white px-2 py-1.5 text-sm text-foreground">
+        <span className="mt-1 rounded-md border border-border bg-card px-2 py-1.5 text-sm text-foreground">
           {departmentName}
         </span>
       </div>

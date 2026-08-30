@@ -43,7 +43,7 @@ const POSCloseFlow = () => {
 
   if (closed) {
     return (
-      <Card className="bg-white border border-border">
+      <Card className="bg-card border border-border">
         <CardContent className="p-8 text-center">
           <CheckCircle2 className="mx-auto mb-3 h-10 w-10 text-success" />
           <h2 className="text-lg font-semibold text-foreground mb-1">
@@ -60,7 +60,7 @@ const POSCloseFlow = () => {
 
   return (
     <>
-      <Card className="bg-white border border-border">
+      <Card className="bg-card border border-border">
         <CardContent className="p-6">
           <h2 className="text-base font-semibold text-foreground mb-1">
             {t('settings.close_pos_title')}

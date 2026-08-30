@@ -366,13 +366,13 @@ export const MenuPage: React.FC = () => {
           <div className="flex items-center bg-muted p-1 rounded-lg shrink-0">
             <button
               onClick={() => setViewMode('grid')}
-              className={`p-1.5 rounded-md transition-all flex items-center justify-center ${viewMode === 'grid' ? 'bg-white shadow-sm text-primary' : 'text-text-tertiary hover:text-muted-foreground'}`}
+              className={`p-1.5 rounded-md transition-all flex items-center justify-center ${viewMode === 'grid' ? 'bg-card shadow-sm text-primary' : 'text-text-tertiary hover:text-muted-foreground'}`}
             >
               <LayoutGrid className="w-4 h-4" />
             </button>
             <button
               onClick={() => setViewMode('list')}
-              className={`p-1.5 rounded-md transition-all flex items-center justify-center ${viewMode === 'list' ? 'bg-white shadow-sm text-primary' : 'text-text-tertiary hover:text-muted-foreground'}`}
+              className={`p-1.5 rounded-md transition-all flex items-center justify-center ${viewMode === 'list' ? 'bg-card shadow-sm text-primary' : 'text-text-tertiary hover:text-muted-foreground'}`}
             >
               <List className="w-4 h-4" />
             </button>
@@ -422,11 +422,11 @@ export const MenuPage: React.FC = () => {
 
       {/* Content Area */}
       {loading ? (
-        <div className="py-24 flex items-center justify-center bg-white rounded-lg border border-border shadow-sm">
+        <div className="py-24 flex items-center justify-center bg-card rounded-lg border border-border shadow-sm">
           <Spinner className="w-8 h-8 text-primary" />
         </div>
       ) : filteredItems.length === 0 ? (
-        <Card className="p-16 flex flex-col items-center justify-center text-center rounded-lg border border-border shadow-sm bg-white">
+        <Card className="p-16 flex flex-col items-center justify-center text-center rounded-lg border border-border shadow-sm bg-card">
           <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-5">
             <Utensils className="w-8 h-8 text-primary" />
           </div>
@@ -448,7 +448,7 @@ export const MenuPage: React.FC = () => {
       ) : viewMode === 'grid' ? (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
           {filteredItems.map((item, idx) => (
-            <div key={item.name || idx} className="bg-white rounded-lg shadow-sm overflow-hidden transition-shadow relative h-56 flex flex-col group">
+            <div key={item.name || idx} className="bg-card rounded-lg shadow-sm overflow-hidden transition-shadow relative h-56 flex flex-col group">
               <div className="h-24 w-full shrink-0">
                 {item.image ? (
                   <img src={item.image} alt={item.item_name} className="w-full h-full object-cover" />

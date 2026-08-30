@@ -159,11 +159,11 @@ export function DatePicker({
         onClick={() => setIsOpen((prev) => !prev)}
         placeholder={placeholder}
         error={error}
-        className="w-full cursor-pointer bg-white"
+        className="w-full cursor-pointer bg-card"
       />
 
       {isOpen && (
-        <div className="absolute top-[calc(100%+8px)] left-0 z-[100] bg-white border border-border rounded-lg shadow-xl p-4 w-[280px] focus:outline-none">
+        <div className="absolute top-[calc(100%+8px)] left-0 z-[100] bg-card border border-border rounded-lg shadow-xl p-4 w-[280px] focus:outline-none">
           {/* Header Month / Year Navigation */}
           <div className="flex items-center justify-between mb-4 px-1">
             <button

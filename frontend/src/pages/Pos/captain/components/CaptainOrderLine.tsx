@@ -39,7 +39,7 @@ const CaptainOrderLine: React.FC<CaptainOrderLineProps> = ({
         'flex items-center justify-between gap-3 py-3 px-3 rounded-lg',
         variant === 'delta' && 'bg-primary-tint',
         variant === 'reduction' && 'bg-destructive-tint',
-        variant === 'confirmed' && 'bg-white'
+        variant === 'confirmed' && 'bg-card'
       )}
     >
       <button
