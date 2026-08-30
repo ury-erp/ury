@@ -136,9 +136,11 @@ describe('DepartmentStockPage', () => {
 
     expect(await screen.findByText('PLAN-0001')).toBeInTheDocument();
     expect(screen.getByText('Chicken (Raw)')).toBeInTheDocument();
-    expect(screen.getByText((_, el) => el?.textContent === '40 Kg')).toBeInTheDocument();
+    // Match only the <span> that carries the qty text, not its ancestor <td>
+    // (which shares the same textContent since the span is its only child).
+    expect(screen.getByText((_, el) => el?.tagName === 'SPAN' && el.textContent === '40 Kg')).toBeInTheDocument();
     expect(screen.getByText('Transfer')).toBeInTheDocument();
-    expect(screen.getByText((_, el) => el?.textContent === '30 Kg')).toBeInTheDocument();
+    expect(screen.getByText((_, el) => el?.tagName === 'SPAN' && el.textContent === '30 Kg')).toBeInTheDocument();
   });
 
   it('shows empty states when no data is returned for the selected department', async () => {
@@ -172,7 +174,11 @@ describe('DepartmentStockPage', () => {
     await screen.findByText('PLAN-0001');
 
     expect(screen.getByRole('button', { name: 'Request Authorization' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Capture Wastage' })).toBeInTheDocument();
+
+    // Capture Wastage is a per-row action rendered in the authorization's
+    // detail drawer footer, so the drawer must be opened first.
+    await userEvent.click(screen.getByText('PLAN-0001'));
+    expect(await screen.findByRole('button', { name: 'Capture Wastage' })).toBeInTheDocument();
     // Production Manager is not in APPROVE_ROLES, so no approve/reject controls.
     expect(screen.queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Reject' })).not.toBeInTheDocument();
@@ -185,8 +191,18 @@ describe('DepartmentStockPage', () => {
 
     await screen.findByRole('option', { name: 'Indian' });
     await userEvent.selectOptions(screen.getByLabelText('Department'), 'Indian');
+
+    // Approve/Reject are per-row actions rendered in the wastage entry's
+    // detail drawer footer, so the drawer must be opened first by clicking
+    // the row.
+    // Both the wastage row and the stock movement row show component
+    // 'RAW-CHICKEN', so click via the wastage-only 'Draft' status badge to
+    // unambiguously target the wastage row.
+    await userEvent.click(await screen.findByText('Draft'));
     const approveButton = await screen.findByRole('button', { name: 'Approve' });
     await userEvent.click(approveButton);
+    // Clicking Approve moves the footer into a confirm step.
+    await userEvent.click(await screen.findByRole('button', { name: 'Confirm' }));
 
     await waitFor(() => expect(departmentStockService.approveWastage).toHaveBeenCalledWith('IW-0001'));
   });
@@ -198,6 +214,9 @@ describe('DepartmentStockPage', () => {
 
     await screen.findByRole('option', { name: 'Indian' });
     await userEvent.selectOptions(screen.getByLabelText('Department'), 'Indian');
+    // Capture Wastage is a per-row action rendered in the authorization's
+    // detail drawer footer, so the drawer must be opened first.
+    await userEvent.click(await screen.findByText('PLAN-0001'));
     await userEvent.click(await screen.findByRole('button', { name: 'Capture Wastage' }));
 
     await userEvent.type(screen.getByLabelText('Wasted quantity'), '2');
