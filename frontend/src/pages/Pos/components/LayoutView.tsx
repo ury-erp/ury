@@ -180,9 +180,11 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
     setDragOffset({ x: 0, y: 0 });
   };
 
+  // Binary state: occupied (accent treatment) vs free (muted/available)
+  // Warning/destructive tints reserved for future "table needs attention" state
   const getTableStatusColor = (occupied: number) => {
     return occupied
-      ? 'bg-warning-tint border-warning-tint-border shadow-sm'
+      ? 'bg-card border-primary-tint-border shadow-sm'
       : 'bg-muted border-dashed border-hair hover:shadow-md';
   };
 
