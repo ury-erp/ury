@@ -215,9 +215,11 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
   };
 
   const getTableStatusColor = (occupied: number) => {
+    // Binary state: occupied (accent treatment) vs free (muted/available)
+    // Warning/destructive tints reserved for future "table needs attention" state
     return occupied
-      ? 'bg-warning-tint border-warning-tint-border text-warning'
-      : 'bg-success-tint border-success-tint-border text-success';
+      ? 'bg-card border-primary-tint-border text-primary'
+      : 'bg-muted border-dashed border-hair text-muted-foreground';
   };
 
   const handleMouseDown = (e: React.MouseEvent, table: typeof tablesWithPosition[0]) => {

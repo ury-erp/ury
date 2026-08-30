@@ -153,8 +153,8 @@ const LifecycleStepper: React.FC<LifecycleStepperProps> = ({ status }) => {
                 isActive
                   ? 'bg-primary-tint text-primary'
                   : isComplete
-                    ? 'bg-muted text-text-tertiary'
-                    : 'bg-muted/50 text-text-tertiary'
+                    ? 'bg-success-tint text-success'
+                    : 'bg-muted text-text-tertiary'
               }`}
             >
               {step.label}
