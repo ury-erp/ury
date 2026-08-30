@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
-import { KpiStrip, DataTable, type DataTableColumn, Button } from '@ury/ui';
+import { KpiStrip, DataTable, type DataTableColumn, Button, Page, Section } from '@ury/ui';
 import { ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
 import { useBranchContext } from '../../context/BranchContext';
 import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
@@ -90,7 +90,7 @@ export function CancelledInvoices() {
   const pagination = data?.pagination;
 
   return (
-    <div className="space-y-6">
+    <Page>
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-semibold">Cancelled Invoices</h1>
@@ -102,43 +102,51 @@ export function CancelledInvoices() {
       </div>
 
       {error && (
-        <div className="rounded-md border border-destructive-tint-border bg-destructive-tint px-4 py-3 text-sm text-destructive">
-          {error}
-        </div>
+        <Section>
+          <div className="rounded-md border border-destructive-tint-border bg-destructive-tint px-4 py-3 text-sm text-destructive">
+            {error}
+          </div>
+        </Section>
       )}
 
       {data && (
-        <KpiStrip
-          items={[
-            { label: 'Total Cancelled', value: data.summary.total_count },
-            { label: 'Total Amount', value: formatCurrency(data.summary.total_amount) },
-            { label: 'Unique Cancellers', value: data.summary.unique_cancellers },
-          ]}
-        />
+        <Section>
+          <KpiStrip
+            items={[
+              { label: 'Total Cancelled', value: data.summary.total_count },
+              { label: 'Total Amount', value: formatCurrency(data.summary.total_amount) },
+              { label: 'Unique Cancellers', value: data.summary.unique_cancellers },
+            ]}
+          />
+        </Section>
       )}
 
-      <DataTable columns={columns} rows={data?.invoices ?? []} isLoading={isLoading} />
+      <Section>
+        <DataTable columns={columns} rows={data?.invoices ?? []} isLoading={isLoading} />
+      </Section>
 
       {pagination && pagination.total_pages > 1 && (
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-muted-foreground">
-            Page {pagination.page} of {pagination.total_pages}
-          </span>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
-              <ChevronLeft className="w-4 h-4" /> Prev
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page >= pagination.total_pages}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              Next <ChevronRight className="w-4 h-4" />
-            </Button>
+        <Section>
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">
+              Page {pagination.page} of {pagination.total_pages}
+            </span>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+                <ChevronLeft className="w-4 h-4" /> Prev
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page >= pagination.total_pages}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                Next <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
-        </div>
+        </Section>
       )}
-    </div>
+    </Page>
   );
 }
