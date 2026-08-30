@@ -29,6 +29,15 @@ const badgeVariants = cva(
         pending: "border-transparent bg-warning-100 text-warning-800",
         completed: "border-transparent bg-success-100 text-success-800",
         cancelled: "border-transparent bg-muted text-muted-foreground",
+        // Tint-based variants matching the `.tag` mockup spec (ury-pos.html
+        // lines 110-113). Distinct from `success`/`warning`/`danger`/`info`
+        // above, which use the `-100`/`-800` pair and are already relied on
+        // by existing call sites (e.g. Sidebar, DayStatusCard, TableCard) —
+        // retuning those would change their appearance. These are additive.
+        tagSuccess: "border-transparent bg-success-tint text-success",
+        tagDestructive: "border-transparent bg-destructive-tint text-destructive",
+        tagWarning: "border-transparent bg-warning-tint text-warning",
+        tagAccent: "border-transparent bg-primary-tint text-primary",
       },
       // With leading-none these resolve to 20 / 24 / 28px pill heights — a
       // deliberate 4px step that mirrors the control scale below it.
@@ -36,6 +45,10 @@ const badgeVariants = cva(
         default: "h-6 px-2.5 text-xs",
         sm: "h-5 px-2 text-xs",
         lg: "h-7 px-3 text-sm",
+        // Matches the `.tag` mockup spec exactly (ury-pos.html lines
+        // 110-113): 19px chip used for compact status labels across
+        // Dashboard pages (table/terminal/stock/room/role/config state).
+        tag: "h-[19px] px-[7px] rounded-[5px] text-[11px] gap-[5px] inline-flex items-center whitespace-nowrap font-normal",
       },
     },
     defaultVariants: {
