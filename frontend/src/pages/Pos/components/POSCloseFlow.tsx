@@ -50,7 +50,7 @@ const POSCloseFlow = () => {
             {t('settings.closed_title')}
           </h2>
           <p className="text-sm text-gray-600 mb-6">{t('settings.closed_description')}</p>
-          <Button onClick={() => navigate('/dashboard')}>
+          <Button onClick={() => navigate('/pos/dashboard')}>
             {t('settings.back_to_dashboard')}
           </Button>
         </CardContent>

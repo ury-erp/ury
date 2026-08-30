@@ -23,13 +23,18 @@ import { t } from '../i18n';
  */
 const Footer = () => {
 
+  // Absolute paths, prefixed with /pos: the sa-app-consolidation merge nested
+  // this whole app under frontend/'s router at /ury/pos/*, so an unprefixed
+  // absolute path (e.g. "/dashboard") now resolves against the router root
+  // and collides with frontend/'s own top-level routes of the same name,
+  // instead of staying inside this same-app rail as the comment above intends.
   const navItems = [
-    { icon: Gauge, label: t('footer.dashboard'), path: '/dashboard' },
-    { icon: ShoppingCart, label: t('footer.pos'), path: '/pos' },
-    { icon: Armchair, label: t('footer.tables'), path: '/tables' },
-    { icon: ReceiptText, label: t('footer.orders'), path: '/orders' },
-    { icon: Wallet, label: t('footer.sessions'), path: '/open-entries' },
-    { icon: Settings, label: t('footer.settings'), path: '/settings' },
+    { icon: Gauge, label: t('footer.dashboard'), path: '/pos/dashboard' },
+    { icon: ShoppingCart, label: t('footer.pos'), path: '/pos/pos' },
+    { icon: Armchair, label: t('footer.tables'), path: '/pos/tables' },
+    { icon: ReceiptText, label: t('footer.orders'), path: '/pos/orders' },
+    { icon: Wallet, label: t('footer.sessions'), path: '/pos/open-entries' },
+    { icon: Settings, label: t('footer.settings'), path: '/pos/settings' },
   ];
 
   return (
