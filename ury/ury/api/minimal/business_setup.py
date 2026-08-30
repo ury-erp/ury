@@ -113,15 +113,38 @@ def create_setup_user(email, name, password=None, role="URY Cashier"):
 
 @frappe.whitelist()
 def submit_configure_data(data):
+    from frappe.utils import cint
+
+    if frappe.session.user == "Guest":
+        frappe.throw("Not permitted")
+
+    if cint(frappe.db.get_single_value("System Settings", "setup_complete")):
+        frappe.throw("Setup already completed")
+
     if isinstance(data, str):
         data = frappe.parse_json(data)
-        
+
     results = {}
     user = frappe.session.user
 
+    try:
+        return _run_configure_data(data, results, user)
+    except frappe.PermissionError:
+        frappe.db.rollback()
+        raise
+    except Exception as e:
+        frappe.db.rollback()
+        frappe.log_error(
+            title="Business Setup Configure Error",
+            message=frappe.get_traceback(),
+        )
+        raise
+
+
+def _run_configure_data(data, results, user):
     # Step 0: Preparing setup
     frappe.publish_realtime("ury_configure_progress", {"step": 0, "status": "loading"}, user=user)
-    
+
     # Derive default company from site defaults or latest created company
     default_company = frappe.defaults.get_user_default("Company") or frappe.db.get_value("Company", {}, "name")
     if not default_company:
