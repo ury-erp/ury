@@ -18,8 +18,11 @@ import ProductionDepartmentPage from './pages/Dashboard/ProductionDepartmentPage
 import ItemProductionConfigPage from './pages/Dashboard/ItemProductionConfigPage';
 import AggregatorPage from './pages/Dashboard/AggregatorPage';
 import SalesPlanPage from './pages/Dashboard/SalesPlanPage';
+import RequirementsPage from './pages/Dashboard/RequirementsPage';
+import { ServicePage } from './pages/Dashboard/ServicePage';
 import { DepartmentStockPage } from './pages/Dashboard/DepartmentStockPage';
 import { DepartmentProfitabilityPage } from './pages/Dashboard/DepartmentProfitabilityPage';
+import { DayClosePage } from './pages/Dashboard/DayClosePage';
 import { KotErrorLogPage } from './pages/Dashboard/KotErrorLogPage';
 import { StockReservationPage } from './pages/Dashboard/StockReservationPage';
 import { PaymentTerminalPage } from './pages/Dashboard/PaymentTerminalPage';
@@ -144,11 +147,14 @@ function App() {
           <Route path="item-production-config" element={<ItemProductionConfigPage />} />
           <Route path="aggregator" element={<AggregatorPage />} />
           <Route path="sales-plan" element={<SalesPlanPage />} />
+          <Route path="requirements" element={<RequirementsPage />} />
+          <Route path="service" element={<ServicePage />} />
           <Route path="department-stock" element={<DepartmentStockPage />} />
           <Route
             path="department-profitability"
             element={<DepartmentProfitabilityPage />}
           />
+          <Route path="close-day" element={<DayClosePage />} />
 
           <Route
             path="kot-error-log"
