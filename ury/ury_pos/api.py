@@ -975,22 +975,56 @@ def get_open_pos_opening_entries(pos_profile):
     Close Shift dialog failed outright with "no attribute
     'get_open_pos_opening_entries'").
 
-    Read-only, no cross-branch/company filtering beyond `pos_profile` itself
-    -- matches this file's existing convention for closing-flow helpers
-    (validate_pos_close, _get_main_cashier_status), which likewise scope by
-    pos_profile alone and rely on frappe.has_permission on the returned
-    POS Invoice-adjacent data downstream for anything more granular.
+    Scoped by branch (the POS Profile must belong to the session user's
+    branch) and, for non-supervisors, by user (only their own open entries
+    are returned) -- matches this file's existing getBranch()/System Manager
+    supervisor-bypass convention used elsewhere (e.g. searchPosInvoice,
+    fav_items).
     """
     if not frappe.has_permission("POS Opening Entry", "read"):
         frappe.throw(_("Not permitted to view POS Opening Entries."), frappe.PermissionError)
 
+    session_user = frappe.session.user
+    is_supervisor = session_user == "Administrator" or "System Manager" in frappe.get_roles()
+
+    try:
+        session_branch = getBranch()
+    except frappe.ValidationError:
+        if is_supervisor:
+            # Supervisors may not be mapped to a branch
+            session_branch = None
+        else:
+            raise
+
+    profile_branch = frappe.db.get_value("POS Profile", pos_profile, "branch")
+
+    if not profile_branch:
+        frappe.throw(
+            _("POS Profile {0} not found.").format(pos_profile),
+            frappe.DoesNotExistError,
+        )
+
+    if session_branch and profile_branch != session_branch:
+        frappe.throw(
+            _("You do not have permission to access opening entries for POS Profile {0}.").format(
+                pos_profile
+            ),
+            frappe.PermissionError,
+        )
+
+    filters = {
+        "pos_profile": pos_profile,
+        "status": "Open",
+        "docstatus": 1,
+    }
+
+    # Non-supervisors only see their own open entries
+    if not is_supervisor:
+        filters["user"] = session_user
+
     return frappe.get_all(
         "POS Opening Entry",
-        filters={
-            "pos_profile": pos_profile,
-            "status": "Open",
-            "docstatus": 1,
-        },
+        filters=filters,
         fields=["name", "period_start_date", "user", "pos_profile"],
     )
 
@@ -1306,8 +1340,6 @@ def get_pos_opening_screen_data() -> dict:
         "open_entries": open_entries,
     }
 
-
-@frappe.whitelist()
 
 def _validate_checklist_branch(pos_profile):
     """Ensure the session user's branch matches the given POS Profile's branch."""
