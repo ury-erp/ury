@@ -81,7 +81,7 @@ export function TodaysSales() {
       </div>
 
       {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="rounded-md border border-destructive bg-destructive-tint px-4 py-3 text-sm text-destructive">
           {error}
         </div>
       )}

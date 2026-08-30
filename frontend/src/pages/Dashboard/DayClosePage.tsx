@@ -237,7 +237,7 @@ export const DayClosePage: React.FC = () => {
 
       {state === 'error' && (
         <Card className="p-4" data-testid="close-day-error">
-          <p className="text-sm text-red-600">{errorMessage}</p>
+          <p className="text-sm text-destructive">{errorMessage}</p>
         </Card>
       )}
 
@@ -256,7 +256,7 @@ export const DayClosePage: React.FC = () => {
         <Card className="p-4" data-testid="close-day-plan-vs-actual">
           <h3 className="text-sm font-semibold mb-2">Plan vs Actual</h3>
           {planVsActual.reason && (
-            <p className="text-xs text-amber-600 mb-2" data-testid="close-day-plan-vs-actual-reason">
+            <p className="text-xs text-warning mb-2" data-testid="close-day-plan-vs-actual-reason">
               {planVsActual.reason}
             </p>
           )}

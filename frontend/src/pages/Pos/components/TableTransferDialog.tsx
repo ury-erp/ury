@@ -111,7 +111,7 @@ const TableTransferDialog = ({
         </DialogHeader>
 
         <div className="px-6 pb-2">
-          <label className="mb-1 block text-sm font-medium text-gray-700">
+          <label className="mb-1 block text-sm font-medium text-muted-foreground">
             {t('tables.current_table')}
           </label>
           <Input
@@ -137,12 +137,12 @@ const TableTransferDialog = ({
               <Spinner hideMessage  message={t('common.loading')} />
             </div>
           ) : filtered.length === 0 ? (
-            <p className="py-4 text-sm text-gray-500">{t('tables.no_destination_tables')}</p>
+            <p className="py-4 text-sm text-text-tertiary">{t('tables.no_destination_tables')}</p>
           ) : (
             <div className="space-y-4">
               {groupedByRoom.map((group) => (
                 <div key={group.room}>
-                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-tertiary">
                     {group.room}
                   </p>
                   <div className="space-y-2">
@@ -159,13 +159,13 @@ const TableTransferDialog = ({
                             'flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors h-auto',
                             isSelected
                               ? 'border-primary bg-primary-50/40'
-                              : 'border-gray-200 hover:border-gray-300'
+                              : 'border-border hover:border-border'
                           )}
                         >
                           <TableShapeIcon shape={table.table_shape || 'Rectangle'} />
                           <div className="min-w-0">
-                            <p className="font-medium text-gray-900">{table.name}</p>
-                            <p className="text-xs text-gray-500">
+                            <p className="font-medium text-foreground">{table.name}</p>
+                            <p className="text-xs text-text-tertiary">
                               {typeof table.no_of_seats === 'number'
                                 ? `${table.no_of_seats} ${t('tables.seats')}`
                                 : ''}
@@ -181,7 +181,7 @@ const TableTransferDialog = ({
           )}
         </div>
 
-        {error && <p className="px-6 pb-2 text-sm text-red-600">{error}</p>}
+        {error && <p className="px-6 pb-2 text-sm text-destructive">{error}</p>}
 
         <DialogFooter>
           <Button variant="outline" onClick={() => handleOpenChange(false)} disabled={isSubmitting}>

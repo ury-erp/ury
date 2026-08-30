@@ -86,7 +86,7 @@ function UserRow({ user, usersLength, updateUser, deleteUser }: any) {
           type="button"
           variant="ghost"
           onClick={() => deleteUser(user.id)}
-          className="text-red-500 hover:text-red-700 hover:bg-red-50 self-end md:self-center shrink-0 p-2 h-auto"
+          className="text-destructive hover:text-destructive hover:bg-destructive-tint self-end md:self-center shrink-0 p-2 h-auto"
           title="Delete User"
           aria-label="Delete user"
         >

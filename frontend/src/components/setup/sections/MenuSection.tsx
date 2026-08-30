@@ -221,7 +221,7 @@ export function MenuSection() {
                 setImportMessage(null);
                 setImportError(null);
               }}
-              className="text-muted-foreground hover:text-red-600 p-1 h-auto"
+              className="text-muted-foreground hover:text-destructive p-1 h-auto"
               title="Remove File"
             >
               <X className="w-4 h-4" />
@@ -251,7 +251,7 @@ export function MenuSection() {
           <p className="text-xs font-medium text-primary">{importMessage}</p>
         )}
         {importError && (
-          <p className="text-xs font-medium text-red-600">{importError}</p>
+          <p className="text-xs font-medium text-destructive">{importError}</p>
         )}
       </div>
 
@@ -359,7 +359,7 @@ export function MenuSection() {
                   type="button"
                   variant="ghost"
                   onClick={() => deleteMenuItem(item.id)}
-                  className="text-red-500 hover:text-red-700 hover:bg-red-50 self-end md:self-center shrink-0 p-2 h-auto"
+                  className="text-destructive hover:text-destructive hover:bg-destructive-tint self-end md:self-center shrink-0 p-2 h-auto"
                   title="Delete Item"
                 >
                   <Trash2 className="w-4 h-4" />

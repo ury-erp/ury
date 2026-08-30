@@ -58,7 +58,7 @@ const SplitGroupPanel = ({ invoiceName, onOpenInvoice }: SplitGroupPanelProps) =
 
   if (loading) {
     return (
-      <div className="mb-6 flex items-center gap-2 text-sm text-gray-500">
+      <div className="mb-6 flex items-center gap-2 text-sm text-text-tertiary">
         <Spinner className="h-4 w-4" hideMessage  message={t('common.loading')} />
         {t('common.loading')}
       </div>
@@ -73,8 +73,8 @@ const SplitGroupPanel = ({ invoiceName, onOpenInvoice }: SplitGroupPanelProps) =
     <div className="mb-6 rounded-lg border-2 border-primary-200 bg-primary-50/60 p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <Link2 className="h-4 w-4 text-gray-500" />
-          <h3 className="text-sm font-semibold text-gray-900">{t('bill_split.related_bills')}</h3>
+          <Link2 className="h-4 w-4 text-text-tertiary" />
+          <h3 className="text-sm font-semibold text-foreground">{t('bill_split.related_bills')}</h3>
         </div>
         <div className="flex items-center gap-1">
           {originalInvoice && originalInvoice.name !== invoiceName && (
@@ -136,7 +136,7 @@ const SplitGroupPanel = ({ invoiceName, onOpenInvoice }: SplitGroupPanelProps) =
                 'flex items-center justify-between rounded-md border px-3 py-2 text-sm',
                 isCurrent
                   ? 'border-primary bg-primary-50/50'
-                  : 'cursor-pointer border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50',
+                  : 'cursor-pointer border-border bg-white hover:border-border hover:bg-muted',
                 isPaid && !isCurrent && 'opacity-80'
               )}
             >
@@ -144,12 +144,12 @@ const SplitGroupPanel = ({ invoiceName, onOpenInvoice }: SplitGroupPanelProps) =
                 <span
                   className={cn(
                     'truncate font-medium',
-                    isCurrent ? 'text-primary' : 'text-gray-900'
+                    isCurrent ? 'text-primary' : 'text-foreground'
                   )}
                 >
                   {invoice.name}
                 </span>
-                <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-text-tertiary">
                   {invoice.is_original && <span>{t('bill_split.original_bill')}</span>}
                   {isCurrent && <span>{t('bill_split.current_bill')}</span>}
                   {isPaid ? (
@@ -168,7 +168,7 @@ const SplitGroupPanel = ({ invoiceName, onOpenInvoice }: SplitGroupPanelProps) =
                   )}
                 </div>
               </div>
-              <span className="ms-3 shrink-0 font-semibold text-gray-900 tabular-nums">
+              <span className="ms-3 shrink-0 font-semibold text-foreground tabular-nums">
                 {formatCurrency(invoice.rounded_total)}
               </span>
             </div>

@@ -44,7 +44,7 @@ const MenuList: React.FC<MenuListProps> = ({ onItemClick }) => {
   const isInteractionDisabled = isMenuInteractionDisabled() || isOrderInteractionDisabled();
 
   return (
-    <div className="flex-1 overflow-auto bg-gray-50">
+    <div className="flex-1 overflow-auto bg-muted">
       <div className="max-w-screen-xl mx-auto p-4 pb-40">
         {menuLoading ? (
           <div className="h-96">
@@ -52,14 +52,14 @@ const MenuList: React.FC<MenuListProps> = ({ onItemClick }) => {
           </div>
         ) : error ? (
           <div className="flex items-center justify-center h-96">
-            <div className="text-red-600 text-center">
+            <div className="text-destructive text-center">
               <p className="text-lg font-medium">{t('common.error_loading_menu_items')}</p>
               <p className="text-sm mt-2">{error}</p>
             </div>
           </div>
         ) : filteredItems.length === 0 ? (
           <div className="flex items-center justify-center h-96">
-            <div className="text-gray-500 text-center">
+            <div className="text-text-tertiary text-center">
               <p className="text-lg font-medium">{t('common.no_items_found')}</p>
               <p className="text-sm mt-2">{t('common.try_adjusting_filters')}</p>
             </div>

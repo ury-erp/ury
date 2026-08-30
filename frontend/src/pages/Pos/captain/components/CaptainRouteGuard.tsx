@@ -42,9 +42,9 @@ const CaptainRouteGuard: React.FC<Props> = ({ children }) => {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <div className="text-red-600 text-xl mb-4">⚠️</div>
-          <h2 className="text-xl font-semibold text-gray-800 mb-2">Unable to load Captain context</h2>
-          <p className="text-gray-600">{error}</p>
+          <div className="text-destructive text-xl mb-4">⚠️</div>
+          <h2 className="text-xl font-semibold text-foreground mb-2">Unable to load Captain context</h2>
+          <p className="text-muted-foreground">{error}</p>
         </div>
       </div>
     );
@@ -54,9 +54,9 @@ const CaptainRouteGuard: React.FC<Props> = ({ children }) => {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <div className="text-amber-600 text-xl mb-4">🔒</div>
-          <h2 className="text-xl font-semibold text-gray-800 mb-2">Not permitted</h2>
-          <p className="text-gray-600">
+          <div className="text-warning text-xl mb-4">🔒</div>
+          <h2 className="text-xl font-semibold text-foreground mb-2">Not permitted</h2>
+          <p className="text-muted-foreground">
             You do not have permission to take table orders.
           </p>
         </div>

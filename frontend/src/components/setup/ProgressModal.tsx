@@ -89,7 +89,7 @@ export function ProgressModal({
               const isActive = idx === activeIndex;
 
               return (
-                <div key={idx} className="flex items-center gap-4 py-3 border-b border-gray-100 last:border-0 h-12">
+                <div key={idx} className="flex items-center gap-4 py-3 border-b border-border last:border-0 h-12">
                   <div className="w-6 h-6 flex items-center justify-center shrink-0">
                     {isDone ? (
                       <CheckCircle2 className="w-6 h-6 text-white fill-green-500" />
@@ -99,7 +99,7 @@ export function ProgressModal({
                       <Circle className="w-6 h-6 text-gray-200" />
                     )}
                   </div>
-                  <span className={`text-sm ${isActive ? 'font-medium text-gray-900' : isDone ? 'text-foreground' : 'text-gray-400'}`}>
+                  <span className={`text-sm ${isActive ? 'font-medium text-foreground' : isDone ? 'text-foreground' : 'text-text-tertiary'}`}>
                     {step}
                   </span>
                 </div>
@@ -108,7 +108,7 @@ export function ProgressModal({
           </div>
 
           {error && (
-            <div className="mt-4 p-4 bg-red-50 text-red-600 text-sm rounded-lg border border-red-200">
+            <div className="mt-4 p-4 bg-destructive-tint text-destructive text-sm rounded-lg border border-destructive">
               {error}
             </div>
           )}

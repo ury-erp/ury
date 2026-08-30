@@ -114,7 +114,7 @@ export function EmployeeItemWiseSales() {
           />
         </div>
         {suggestions.length > 0 && !selectedEmployee && (
-          <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
+          <div className="absolute z-10 mt-1 w-full bg-white border border-border rounded-md shadow-lg max-h-60 overflow-y-auto">
             {suggestions.map((s) => (
                             <Button
                 key={s.name}
@@ -135,7 +135,7 @@ export function EmployeeItemWiseSales() {
       </div>
 
       {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="rounded-md border border-destructive bg-destructive-tint px-4 py-3 text-sm text-destructive">
           {error}
         </div>
       )}

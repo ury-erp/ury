@@ -133,7 +133,7 @@ export function SearchableSelect({
             setIsOpen((prev) => !prev);
             if (!isOpen) setIsTyping(false);
           }} 
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 cursor-pointer p-1 hover:text-gray-600 transition-colors"
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-text-tertiary cursor-pointer p-1 hover:text-muted-foreground transition-colors"
         >
           <svg className={`w-4 h-4 transform transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
@@ -142,7 +142,7 @@ export function SearchableSelect({
       </div>
 
       {isOpen && (
-        <div className="absolute top-full left-0 right-0 mt-2 z-50 bg-white border border-gray-200 rounded-lg shadow-lg max-h-80 overflow-y-auto p-1 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-500">
+        <div className="absolute top-full left-0 right-0 mt-2 z-50 bg-white border border-border rounded-lg shadow-lg max-h-80 overflow-y-auto p-1 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-primary">
           {filteredOptions.length > 0 ? (
             filteredOptions.map((opt) => (
               <div
@@ -150,15 +150,15 @@ export function SearchableSelect({
                 onClick={() => handleSelectOption(opt)}
                 className={`px-4 py-2 text-sm rounded-md cursor-pointer select-none transition-colors ${
                   opt.value === value || opt.label === value
-                    ? 'bg-blue-50 text-blue-700 font-normal'
-                    : 'text-gray-800 hover:bg-gray-50'
+                    ? 'bg-primary-tint text-primary font-normal'
+                    : 'text-foreground hover:bg-muted'
                 }`}
               >
                 {opt.label}
               </div>
             ))
           ) : (
-            <div className="px-4 py-2 text-sm text-gray-400">No matching options</div>
+            <div className="px-4 py-2 text-sm text-text-tertiary">No matching options</div>
           )}
         </div>
       )}

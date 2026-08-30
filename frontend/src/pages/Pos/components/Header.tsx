@@ -104,7 +104,7 @@ const Header = () => {
   };
 
   return (
-    <header className="bg-white border-b border-gray-200">
+    <header className="bg-white border-b border-border">
       <div className="flex items-center justify-between h-16 px-6">
         {/* Logo */}
         <div className="flex items-center">
@@ -118,7 +118,7 @@ const Header = () => {
         </div>
 
         {/* Search Bar */}
-        <div className="px-4 py-2 flex-1 flex items-center max-w-2xl mx-8  bg-gray-50 hover:bg-gray-100 border border-input rounded-md">
+        <div className="px-4 py-2 flex-1 flex items-center max-w-2xl mx-8  bg-muted hover:bg-muted border border-input rounded-md">
             <Input
               ref={searchInputRef}
               placeholder={searchPlaceholder}
@@ -126,7 +126,7 @@ const Header = () => {
               value={searchValue}
               onChange={searchOnChange}
             />
-            <div className="flex items-center gap-2 text-gray-400">
+            <div className="flex items-center gap-2 text-text-tertiary">
               <Command className="w-4 h-4" />
               <span>K</span>
             </div>
@@ -154,7 +154,7 @@ const Header = () => {
             <Button
               onClick={handleUserMenuToggle}
               variant="ghost"
-              className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
+              className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
             >
               <div className="w-8 h-8 bg-primary-500 rounded-full flex items-center justify-center">
                 <User className="w-4 h-4 text-white" />
@@ -165,15 +165,15 @@ const Header = () => {
 
             {/* User dropdown */}
             {showUserMenu && (
-              <div className="absolute end-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
-                <div className="p-4 border-b border-gray-200">
-                  <p className="text-sm font-medium text-gray-900">{user?.full_name || 'User'}</p>
-                  <p className="text-sm text-gray-500">{user?.name || ''}</p>
+              <div className="absolute end-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-border z-50">
+                <div className="p-4 border-b border-border">
+                  <p className="text-sm font-medium text-foreground">{user?.full_name || 'User'}</p>
+                  <p className="text-sm text-text-tertiary">{user?.name || ''}</p>
                 </div>
                 <div className="py-2">
                   <Button
                     variant="ghost"
-                    className="flex justify-start items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                    className="flex justify-start items-center w-full px-4 py-2 text-sm text-muted-foreground hover:bg-muted transition-colors"
                     onClick={handleClearCache}
                   >
                     <RefreshCw className="w-4 h-4 me-3" />
@@ -181,7 +181,7 @@ const Header = () => {
                   </Button>
                   <Button
                     variant="ghost"
-                    className="flex justify-start items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 hover:text-red-700 transition-colors"
+                    className="flex justify-start items-center w-full px-4 py-2 text-sm text-destructive hover:bg-destructive-tint hover:text-destructive transition-colors"
                     onClick={handleLogout}
                   >
                     <LogOut className="w-4 h-4 me-3" />

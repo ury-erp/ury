@@ -63,8 +63,8 @@ const Spotlight = () => {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogContent className="bg-white rounded-lg shadow-xl w-full max-w-2xl p-0">
-        <div className="flex items-center border-b border-gray-200 p-4">
-          <Search className="w-5 h-5 text-gray-400 me-3" />
+        <div className="flex items-center border-b border-border p-4">
+          <Search className="w-5 h-5 text-text-tertiary me-3" />
           <Input
             ref={inputRef}
             type="text"
@@ -92,8 +92,8 @@ const Spotlight = () => {
                 onClick={() => handleSelect(item)}
                 variant="ghost"
                 className={cn(
-                  'w-full flex items-center p-4 hover:bg-gray-50 transition-colors',
-                  index === selectedIndex && 'bg-blue-50'
+                  'w-full flex items-center p-4 hover:bg-muted transition-colors',
+                  index === selectedIndex && 'bg-primary-tint'
                 )}
               >
                 <img
@@ -103,7 +103,7 @@ const Spotlight = () => {
                 />
                 <div className="flex-1 text-start">
                   <div className="font-medium">{item.name}</div>
-                  <div className="text-sm text-gray-500">{item.category}</div>
+                  <div className="text-sm text-text-tertiary">{item.category}</div>
                 </div>
                 <div className="text-end">
                   <div className="font-medium">{formatCurrency(item.price)}</div>
@@ -111,13 +111,13 @@ const Spotlight = () => {
               </Button>
             ))
           ) : (
-            <div className="p-4 text-center text-gray-500">
+            <div className="p-4 text-center text-text-tertiary">
               No items found
             </div>
           )}
         </div>
 
-        <div className="border-t border-gray-200 p-4 text-sm text-gray-500">
+        <div className="border-t border-border p-4 text-sm text-text-tertiary">
           <div className="flex items-center justify-between">
             <span>Use ↑↓ to navigate, Enter to select</span>
             <div className="flex items-center gap-2">

@@ -167,9 +167,9 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent variant="xlarge" className="bg-white w-full max-w-4xl max-h-dialog-max-h flex flex-col md:flex-row p-0" showCloseButton={false}>
         {/* Left Column - Discount and Payment Mode */}
-        <div className="md:w-1/2 p-6 border-b md:border-b-0 md:border-r border-gray-200 overflow-y-auto">
+        <div className="md:w-1/2 p-6 border-b md:border-b-0 md:border-r border-border overflow-y-auto">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">{t('payment.title')}</h2>
+            <h2 className="text-2xl font-bold text-foreground">{t('payment.title')}</h2>
             <Button
               onClick={onClose}
               variant="ghost"
@@ -234,7 +234,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
             </div>
             <div className="flex justify-between mt-2 text-sm">
               <span className="font-medium">{t('payment.total_entered')}</span>
-              <span className={'text-green-600 font-semibold flex items-center gap-1'}>
+              <span className={'text-success font-semibold flex items-center gap-1'}>
                 {formatCurrency(paymentsTotal)} / {formatCurrency(finalTotal)}
                 {paymentsTotal > finalTotal && (
                   <span className="text-yellow-700 font-semibold">
@@ -251,8 +251,8 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
         <div className="md:w-1/2 p-6 overflow-y-auto">
           {/* Error Message */}
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-red-700 text-sm">{error}</p>
+            <div className="mb-4 p-3 bg-destructive-tint border border-destructive rounded-lg">
+              <p className="text-destructive text-sm">{error}</p>
             </div>
           )}
 
@@ -261,26 +261,26 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
             <h3 className="text-lg font-semibold">{t('payment.order_summary')}</h3>
             {tableLabel && (
               <div className="flex justify-between text-sm">
-                <span className="text-gray-600">{t('tables.table_name')}</span>
+                <span className="text-muted-foreground">{t('tables.table_name')}</span>
                 <span className="font-medium">{tableLabel}</span>
               </div>
             )}
             <div className="space-y-2 text-sm">
               {/* Subtotal (Grand Total) */}
               <div className="flex justify-between">
-                <span className="text-gray-600">{t('payment.subtotal')}</span>
+                <span className="text-muted-foreground">{t('payment.subtotal')}</span>
                 <span>{formatCurrency(subtotal)}</span>
               </div>
               {/* Discount */}
               {appliedDiscount > 0 && (
-                <div className="flex justify-between text-green-600">
+                <div className="flex justify-between text-success">
                   <span>{t('payment.discount')}</span>
                   <span>-{formatCurrency(appliedDiscount)}</span>
                 </div>
               )}
               {/* Adjustment (if any) */}
               {showFinalAdjustment && (
-                <div className="flex justify-between text-blue-600">
+                <div className="flex justify-between text-primary">
                   <span>{t('payment.adjustment')}</span>
                   <span>{roundedFinalAdjustment > 0 ? '+' : ''}{formatCurrency(roundedFinalAdjustment)}</span>
                 </div>

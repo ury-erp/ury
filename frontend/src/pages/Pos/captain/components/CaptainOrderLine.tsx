@@ -37,8 +37,8 @@ const CaptainOrderLine: React.FC<CaptainOrderLineProps> = ({
     <div
       className={cn(
         'flex items-center justify-between gap-3 py-3 px-3 rounded-lg',
-        variant === 'delta' && 'bg-blue-50',
-        variant === 'reduction' && 'bg-red-50',
+        variant === 'delta' && 'bg-primary-tint',
+        variant === 'reduction' && 'bg-destructive-tint',
         variant === 'confirmed' && 'bg-white'
       )}
     >
@@ -54,7 +54,7 @@ const CaptainOrderLine: React.FC<CaptainOrderLineProps> = ({
               'font-medium text-sm',
               variant === 'delta' && 'text-blue-900',
               variant === 'reduction' && 'text-red-900 line-through decoration-red-400',
-              variant === 'confirmed' && 'text-gray-900'
+              variant === 'confirmed' && 'text-foreground'
             )}
           >
             {sign}
@@ -62,12 +62,12 @@ const CaptainOrderLine: React.FC<CaptainOrderLineProps> = ({
           </span>
         </div>
         {line.comment && (
-          <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
+          <p className="text-xs text-text-tertiary mt-0.5 flex items-center gap-1">
             <MessageSquare className="w-3 h-3" />
             {line.comment}
           </p>
         )}
-        <p className="text-xs text-gray-500 mt-0.5">{formatCurrency(line.price * displayQty)}</p>
+        <p className="text-xs text-text-tertiary mt-0.5">{formatCurrency(line.price * displayQty)}</p>
       </button>
 
       <div className="flex items-center gap-1 shrink-0">
@@ -77,7 +77,7 @@ const CaptainOrderLine: React.FC<CaptainOrderLineProps> = ({
               type="button"
               onClick={onDecrement}
               disabled={disabled}
-              className="w-9 h-9 rounded-full border border-gray-300 flex items-center justify-center disabled:opacity-40"
+              className="w-9 h-9 rounded-full border border-border flex items-center justify-center disabled:opacity-40"
               aria-label="Decrease"
             >
               <Minus className="w-4 h-4" />
@@ -86,7 +86,7 @@ const CaptainOrderLine: React.FC<CaptainOrderLineProps> = ({
               type="button"
               onClick={onIncrement}
               disabled={disabled}
-              className="w-9 h-9 rounded-full border border-gray-300 flex items-center justify-center disabled:opacity-40"
+              className="w-9 h-9 rounded-full border border-border flex items-center justify-center disabled:opacity-40"
               aria-label="Increase"
             >
               <Plus className="w-4 h-4" />
@@ -99,7 +99,7 @@ const CaptainOrderLine: React.FC<CaptainOrderLineProps> = ({
             type="button"
             onClick={onDecrement}
             disabled={disabled}
-            className="w-9 h-9 rounded-full border border-gray-300 flex items-center justify-center disabled:opacity-40"
+            className="w-9 h-9 rounded-full border border-border flex items-center justify-center disabled:opacity-40"
             aria-label="Reduce quantity"
             title="Reduce quantity"
           >
@@ -112,7 +112,7 @@ const CaptainOrderLine: React.FC<CaptainOrderLineProps> = ({
             type="button"
             onClick={onRemove}
             disabled={disabled}
-            className="w-9 h-9 rounded-full border border-red-200 text-red-600 flex items-center justify-center disabled:opacity-40"
+            className="w-9 h-9 rounded-full border border-destructive text-destructive flex items-center justify-center disabled:opacity-40"
             aria-label="Remove item"
             title="Remove item"
           >
@@ -125,7 +125,7 @@ const CaptainOrderLine: React.FC<CaptainOrderLineProps> = ({
             type="button"
             onClick={onRestore}
             disabled={disabled}
-            className="w-9 h-9 rounded-full border border-gray-300 flex items-center justify-center disabled:opacity-40"
+            className="w-9 h-9 rounded-full border border-border flex items-center justify-center disabled:opacity-40"
             aria-label="Undo reduction"
             title="Undo"
           >

@@ -134,8 +134,8 @@ export const DepartmentStockRoleGate: React.FC<DepartmentStockRoleGateProps> = (
   if (status === 'denied') {
     return (
       <Card className="w-full max-w-md p-6 text-center" data-testid="department-stock-access-denied">
-        <h2 className="mb-2 text-lg font-semibold text-gray-900">Access Denied</h2>
-        <p className="text-gray-600">
+        <h2 className="mb-2 text-lg font-semibold text-foreground">Access Denied</h2>
+        <p className="text-muted-foreground">
           You need the Production Manager, Stock Manager, or System Manager role to view this section.
         </p>
       </Card>
@@ -181,8 +181,8 @@ const CaptureWastageForm: React.FC<CaptureWastageFormProps> = ({ authorization, 
   };
 
   return (
-    <form onSubmit={handleSubmit} className="mt-2 flex flex-col gap-2 rounded-md border border-gray-200 bg-gray-50 p-3">
-      <label className="flex flex-col text-xs font-medium text-gray-600">
+    <form onSubmit={handleSubmit} className="mt-2 flex flex-col gap-2 rounded-md border border-border bg-muted p-3">
+      <label className="flex flex-col text-xs font-medium text-muted-foreground">
         Wasted Qty
         <Input
           aria-label="Wasted quantity"
@@ -196,7 +196,7 @@ const CaptureWastageForm: React.FC<CaptureWastageFormProps> = ({ authorization, 
           required
         />
       </label>
-      <label className="flex flex-col text-xs font-medium text-gray-600">
+      <label className="flex flex-col text-xs font-medium text-muted-foreground">
         Reason
         <Select
           aria-label="Reason category"
@@ -212,7 +212,7 @@ const CaptureWastageForm: React.FC<CaptureWastageFormProps> = ({ authorization, 
           ))}
         </Select>
       </label>
-      <label className="flex flex-col text-xs font-medium text-gray-600">
+      <label className="flex flex-col text-xs font-medium text-muted-foreground">
         Notes (optional)
         <Input
           aria-label="Reason notes"
@@ -344,7 +344,7 @@ const RequestAuthorizationForm: React.FC<RequestAuthorizationFormProps> = ({
 
   if (loadingPlan) {
     return (
-      <div className="mt-3 flex items-center justify-center rounded-md border border-gray-200 bg-gray-50 p-6">
+      <div className="mt-3 flex items-center justify-center rounded-md border border-border bg-muted p-6">
         <Spinner className="h-6 w-6 text-primary" />
       </div>
     );
@@ -353,22 +353,22 @@ const RequestAuthorizationForm: React.FC<RequestAuthorizationFormProps> = ({
   return (
     <form
       onSubmit={handleSubmit}
-      className="mt-3 flex flex-col gap-2 rounded-md border border-gray-200 bg-gray-50 p-3 sm:flex-row sm:items-end sm:flex-wrap"
+      className="mt-3 flex flex-col gap-2 rounded-md border border-border bg-muted p-3 sm:flex-row sm:items-end sm:flex-wrap"
     >
-      <div className="flex flex-col text-xs font-medium text-gray-600">
+      <div className="flex flex-col text-xs font-medium text-muted-foreground">
         Plan
-        <span className="mt-1 rounded-md border border-gray-200 bg-white px-2 py-1.5 text-sm text-gray-900">
+        <span className="mt-1 rounded-md border border-border bg-white px-2 py-1.5 text-sm text-foreground">
           {planName || 'No active plan'}
           {planStatus ? ` (${planStatus})` : ''}
         </span>
       </div>
-      <div className="flex flex-col text-xs font-medium text-gray-600">
+      <div className="flex flex-col text-xs font-medium text-muted-foreground">
         Department
-        <span className="mt-1 rounded-md border border-gray-200 bg-white px-2 py-1.5 text-sm text-gray-900">
+        <span className="mt-1 rounded-md border border-border bg-white px-2 py-1.5 text-sm text-foreground">
           {departmentName}
         </span>
       </div>
-      <label className="flex flex-col text-xs font-medium text-gray-600">
+      <label className="flex flex-col text-xs font-medium text-muted-foreground">
         Required Component
         <Select
           aria-label="Required component"
@@ -387,7 +387,7 @@ const RequestAuthorizationForm: React.FC<RequestAuthorizationFormProps> = ({
           ))}
         </Select>
       </label>
-      <label className="flex flex-col text-xs font-medium text-gray-600">
+      <label className="flex flex-col text-xs font-medium text-muted-foreground">
         Requested Qty
         <Input
           aria-label="Requested quantity"
@@ -402,7 +402,7 @@ const RequestAuthorizationForm: React.FC<RequestAuthorizationFormProps> = ({
           required
         />
         {selectedComponent && (
-          <span className="mt-1 text-xs font-normal text-gray-500">
+          <span className="mt-1 text-xs font-normal text-text-tertiary">
             Suggested: {formatQty(selectedComponent.required_qty)} {selectedComponent.stock_uom || ''}
           </span>
         )}
@@ -415,7 +415,7 @@ const RequestAuthorizationForm: React.FC<RequestAuthorizationFormProps> = ({
           Cancel
         </Button>
       </div>
-      {planError && <p className="w-full text-xs font-normal text-red-600">{planError}</p>}
+      {planError && <p className="w-full text-xs font-normal text-destructive">{planError}</p>}
     </form>
   );
 };
@@ -596,7 +596,7 @@ const DepartmentStockContent: React.FC = () => {
     {
       key: 'plan',
       header: 'Plan',
-      render: (row) => <span className="font-medium text-gray-900">{row.plan}</span>,
+      render: (row) => <span className="font-medium text-foreground">{row.plan}</span>,
     },
     {
       key: 'component_item',
@@ -634,7 +634,7 @@ const DepartmentStockContent: React.FC = () => {
     {
       key: 'component_item',
       header: 'Component',
-      render: (row) => <span className="font-medium text-gray-900">{row.component_item}</span>,
+      render: (row) => <span className="font-medium text-foreground">{row.component_item}</span>,
     },
     {
       key: 'wasted_qty',
@@ -668,7 +668,7 @@ const DepartmentStockContent: React.FC = () => {
     {
       key: 'component_item',
       header: 'Component',
-      render: (row) => <span className="font-medium text-gray-900">{row.component_item}</span>,
+      render: (row) => <span className="font-medium text-foreground">{row.component_item}</span>,
     },
     {
       key: 'qty',
@@ -699,15 +699,15 @@ const DepartmentStockContent: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="-mx-6 -mt-6 border-b border-gray-200 px-6 pb-4 pt-6">
-        <h1 className="text-xl font-semibold text-gray-900">Department Stock &amp; Issue Authorizations</h1>
-        <p className="mt-1 text-sm text-gray-500">
+      <div className="-mx-6 -mt-6 border-b border-border px-6 pb-4 pt-6">
+        <h1 className="text-xl font-semibold text-foreground">Department Stock &amp; Issue Authorizations</h1>
+        <p className="mt-1 text-sm text-text-tertiary">
           Read-only view of authorized issue quantities, remaining entitlement, and related stock movements
           for a department.
         </p>
 
         <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
-          <label className="flex flex-col text-xs font-medium text-gray-600">
+          <label className="flex flex-col text-xs font-medium text-muted-foreground">
             Department
             <Select
               aria-label="Department"
@@ -724,7 +724,7 @@ const DepartmentStockContent: React.FC = () => {
               ))}
             </Select>
           </label>
-          <label className="flex flex-col text-xs font-medium text-gray-600">
+          <label className="flex flex-col text-xs font-medium text-muted-foreground">
             From
             <Input
               aria-label="From date"
@@ -735,7 +735,7 @@ const DepartmentStockContent: React.FC = () => {
               className="mt-1"
             />
           </label>
-          <label className="flex flex-col text-xs font-medium text-gray-600">
+          <label className="flex flex-col text-xs font-medium text-muted-foreground">
             To
             <Input
               aria-label="To date"
@@ -750,20 +750,20 @@ const DepartmentStockContent: React.FC = () => {
       </div>
 
       {!department ? (
-        <Card className="p-10 text-center text-sm text-gray-500">Select a department to view its data.</Card>
+        <Card className="p-10 text-center text-sm text-text-tertiary">Select a department to view its data.</Card>
       ) : error ? (
-        <Card className="border-red-200 bg-red-50 p-6 text-sm text-red-700">{error}</Card>
+        <Card className="border-destructive bg-destructive-tint p-6 text-sm text-destructive">{error}</Card>
       ) : (
         <>
           <KpiStrip items={kpis} />
 
           {actionError && (
-            <Card className="border-red-200 bg-red-50 p-4 text-sm text-red-700">{actionError}</Card>
+            <Card className="border-destructive bg-destructive-tint p-4 text-sm text-destructive">{actionError}</Card>
           )}
 
           <section>
             <div className="mb-2 flex items-center justify-between">
-              <h2 className="text-sm font-semibold tracking-wide text-gray-700">Issue Authorizations</h2>
+              <h2 className="text-sm font-semibold tracking-wide text-muted-foreground">Issue Authorizations</h2>
               {canCapture && !showRequestForm && (
                 <Button type="button" size="sm" variant="outline" onClick={() => setShowRequestForm(true)}>
                   Request Authorization
@@ -799,7 +799,7 @@ const DepartmentStockContent: React.FC = () => {
           </section>
 
           <section>
-            <h2 className="mb-2 text-sm font-semibold tracking-wide text-gray-700">Wastage</h2>
+            <h2 className="mb-2 text-sm font-semibold tracking-wide text-muted-foreground">Wastage</h2>
             <DataTable
               columns={wastageColumns}
               rows={wastageRows}
@@ -813,7 +813,7 @@ const DepartmentStockContent: React.FC = () => {
           </section>
 
           <section>
-            <h2 className="mb-2 text-sm font-semibold tracking-wide text-gray-700">Related Stock Movements</h2>
+            <h2 className="mb-2 text-sm font-semibold tracking-wide text-muted-foreground">Related Stock Movements</h2>
             <DataTable
               columns={movementColumns}
               rows={movements}
@@ -895,7 +895,7 @@ const DepartmentStockContent: React.FC = () => {
           selectedWastage && canApprove && selectedWastage.status === 'Draft' ? (
             wastageDrawerAction ? (
               <>
-                <span className="mr-auto self-center text-xs text-gray-600">
+                <span className="mr-auto self-center text-xs text-muted-foreground">
                   {wastageDrawerAction === 'approve' ? 'Approve this entry?' : 'Reject this entry?'}
                 </span>
                 <Button

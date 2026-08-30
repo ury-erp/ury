@@ -12,7 +12,7 @@ export function BranchSection() {
       <div className="grid grid-cols-1 w-full gap-4">
         <div className="space-y-1.5">
           <label className="text-sm font-medium text-foreground">
-            Branch Name <span className="text-red-500">*</span>
+            Branch Name <span className="text-destructive">*</span>
           </label>
           <Input
             type="text"
@@ -46,7 +46,7 @@ export function BranchSection() {
       <div className="grid grid-cols-1 w-full gap-4 items-start">
         <div className="space-y-1.5">
           <label className="text-sm font-medium text-foreground">
-            Invoice Prefix <span className="text-red-500">*</span>
+            Invoice Prefix <span className="text-destructive">*</span>
           </label>
           <Input
             type="text"

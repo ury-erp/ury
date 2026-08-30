@@ -431,7 +431,7 @@ const TableView = () => {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="p-4 bg-white border-b border-gray-200">
+      <div className="p-4 bg-white border-b border-border">
         <div className="max-w-screen-xl mx-auto">
           <div className="flex flex-col gap-3">
             <div className="flex justify-between items-start gap-4">
@@ -443,7 +443,7 @@ const TableView = () => {
                 )}
 
                 {!loadingRooms && !hasRooms && (
-                  <div className="flex items-center gap-2 text-gray-500 text-sm">
+                  <div className="flex items-center gap-2 text-text-tertiary text-sm">
                     <AlertTriangle className="w-4 h-4" />
                     No rooms found for this branch
                   </div>
@@ -482,17 +482,17 @@ const TableView = () => {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto bg-gray-50 p-6">
+      <div className="flex-1 overflow-auto bg-muted p-6">
         <div className="max-w-screen-xl mx-auto h-full">
           {error && !loadingTables ? (
-            <div className="h-full flex flex-col items-center justify-center gap-3 text-red-500">
+            <div className="h-full flex flex-col items-center justify-center gap-3 text-destructive">
               <AlertTriangle className="w-10 h-10" />
               <p>{error}</p>
             </div>
           ) : showGridSkeleton ? (
             <Spinner message={t('common.loading_tables')} />
           ) : tablesToDisplay.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center gap-3 text-gray-500">
+            <div className="h-full flex flex-col items-center justify-center gap-3 text-text-tertiary">
               <Square className="w-10 h-10" />
               <p>{t('tables.no_tables_found')}</p>
             </div>
@@ -573,7 +573,7 @@ const TableView = () => {
       />
 
       {/* Status Legend */}
-      <div className="fixed bottom-[4.5rem] w-full p-4 bg-white border-t border-gray-200">
+      <div className="fixed bottom-[4.5rem] w-full p-4 bg-white border-t border-border">
         <div className="max-w-screen-xl mx-auto">
           <div className="flex items-center justify-center gap-6 text-sm">
             <div className="flex items-center gap-2">
@@ -581,7 +581,7 @@ const TableView = () => {
               <span>{t('tables.available')}</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-red-100 border border-red-300 rounded"></div>
+              <div className="w-4 h-4 bg-red-100 border border-destructive rounded"></div>
               <span>{t('tables.occupied')}</span>
             </div>
           </div>

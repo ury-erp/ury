@@ -327,9 +327,9 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
   const selectedTableData = tablesWithPosition.find(t => t.name === selectedTable);
 
   return (
-    <div className="flex flex-col h-full bg-gray-50">
+    <div className="flex flex-col h-full bg-muted">
       {/* Header Controls */}
-      <div className="bg-white border-b border-gray-200 p-4">
+      <div className="bg-white border-b border-border p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Button
@@ -340,7 +340,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
               <Grid3X3 className="w-4 h-4" />
               {t('tables.grid_view')}
             </Button>
-            <h2 className="text-lg font-semibold">{selectedRoom} <span className="text-gray-400 mx-2">|</span> {t('tables.layout')}</h2>
+            <h2 className="text-lg font-semibold">{selectedRoom} <span className="text-text-tertiary mx-2">|</span> {t('tables.layout')}</h2>
           </div>
           <div className="flex items-center gap-2">
             {/* Edit Mode Toggle */}
@@ -397,7 +397,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
           >
             <RotateCcw className="w-5 h-5" />
           </Button>
-          <div className="px-2 py-1 bg-white rounded-lg shadow-lg border border-gray-200 text-xs font-medium text-gray-600">
+          <div className="px-2 py-1 bg-white rounded-lg shadow-lg border border-border text-xs font-medium text-muted-foreground">
             {Math.round(zoom * 100)}%
           </div>
         </div>
@@ -411,7 +411,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
               <div>{t('tables.autosave_hint')}</div>
             </div>
           ) : (
-            <div className="bg-white/80 backdrop-blur border border-gray-200 rounded-lg p-2 text-xs text-gray-500 shadow-sm">
+            <div className="bg-white/80 backdrop-blur border border-border rounded-lg p-2 text-xs text-text-tertiary shadow-sm">
               {t('tables.zoom_pan_hint')}
             </div>
           )}
@@ -449,9 +449,9 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
 
       {/* Table Properties Panel */}
       {selectedTable && selectedTableData && (
-        <div className={cn("absolute bottom-0 top-36 bg-white rounded-t-lg shadow-xl border-t border-l border-gray-200 p-4 w-full max-w-xs z-40 max-h-[72vh] overflow-y-auto", isRTL ? "left-0 border-r" : "right-0")}>
+        <div className={cn("absolute bottom-0 top-36 bg-white rounded-t-lg shadow-xl border-t border-l border-border p-4 w-full max-w-xs z-40 max-h-[72vh] overflow-y-auto", isRTL ? "left-0 border-r" : "right-0")}>
           <div className="flex justify-between items-center mb-3">
-            <h4 className="font-semibold text-gray-900">
+            <h4 className="font-semibold text-foreground">
               {isEditMode ? t('tables.edit_settings') : t('tables.table_info')}
             </h4>
             <Button
@@ -486,7 +486,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
                 disabled={!isEditMode}
                 placeholder={t('tables.capacity_placeholder')}
               />
-              <p className="text-xs text-gray-500 mt-1">{t('tables.capacity_range_hint')}</p>
+              <p className="text-xs text-text-tertiary mt-1">{t('tables.capacity_range_hint')}</p>
             </div>
 
             <div>
@@ -504,21 +504,21 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
 
             <div>
               <label className="block text-sm font-medium mb-1">{t('tables.status')}</label>
-              <div className="w-full px-3 py-2 border border-gray-200 bg-gray-50 rounded-md text-sm cursor-not-allowed capitalize">
+              <div className="w-full px-3 py-2 border border-border bg-muted rounded-md text-sm cursor-not-allowed capitalize">
                 {selectedTableData.occupied ? t('tables.occupied') : t('tables.available')}
               </div>
             </div>
 
             {/* Position Information */}
-            <div className="pt-3 border-t border-gray-200">
+            <div className="pt-3 border-t border-border">
               <label className="block text-sm font-medium mb-2">{t('tables.position')}</label>
               <div className={cn("grid grid-cols-2 gap-2 text-sm", isRTL && "flex-row-reverse")}>
                 <div>
-                  <span className="text-gray-500">X:</span>
+                  <span className="text-text-tertiary">X:</span>
                   <span className="ml-1">{Math.round(selectedTableData.x)}px</span>
                 </div>
                 <div>
-                  <span className="text-gray-500">Y:</span>
+                  <span className="text-text-tertiary">Y:</span>
                   <span className="ml-1">{Math.round(selectedTableData.y)}px</span>
                 </div>
               </div>
@@ -529,11 +529,11 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
               <label className="block text-sm font-medium mb-2">{t('tables.size')}</label>
               <div className={cn("grid grid-cols-2 gap-2 text-sm", isRTL && "flex-row-reverse")}>
                 <div>
-                  <span className="text-gray-500">W:</span>
+                  <span className="text-text-tertiary">W:</span>
                   <span className="ml-1">{getTableDimensions(selectedTableData.table_shape || 'Rectangle').width}px</span>
                 </div>
                 <div>
-                  <span className="text-gray-500">H:</span>
+                  <span className="text-text-tertiary">H:</span>
                   <span className="ml-1">{getTableDimensions(selectedTableData.table_shape || 'Rectangle').height}px</span>
                 </div>
               </div>
@@ -541,7 +541,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
 
             {/* Show current bill info if table is occupied */}
             {selectedTableData.latest_invoice_time && (
-              <div className="pt-3 border-t border-gray-200">
+              <div className="pt-3 border-t border-border">
                 <label className="block text-sm font-medium mb-2">{t('tables.current_bill')}</label>
                 <div className="bg-primary-50 p-3 rounded-md text-sm">
                   <div className="flex justify-between mb-1">

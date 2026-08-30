@@ -374,15 +374,15 @@ export default function CaptainOrder() {
       )}
 
       {!canModify && (
-        <div className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-3">
-          <span className="text-sm font-medium text-gray-700">Pax</span>
-          <span className="text-sm text-gray-900">{noOfPax}</span>
+        <div className="flex items-center justify-between bg-white border border-border rounded-lg px-3 py-3">
+          <span className="text-sm font-medium text-muted-foreground">Pax</span>
+          <span className="text-sm text-foreground">{noOfPax}</span>
         </div>
       )}
 
       {canModify && (
-        <div className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-3">
-          <span className="text-sm font-medium text-gray-700">Pax</span>
+        <div className="flex items-center justify-between bg-white border border-border rounded-lg px-3 py-3">
+          <span className="text-sm font-medium text-muted-foreground">Pax</span>
           <div className="flex items-center gap-3">
             <Button
               onClick={() => setNoOfPax(Math.max(MIN_PAX, noOfPax - 1))}
@@ -410,7 +410,7 @@ export default function CaptainOrder() {
       {activeOrders.length === 0 && alreadyOrderedLines.length === 0 ? (
         <div className="flex flex-col items-center justify-center text-center py-16">
           <ClipboardList className="w-10 h-10 text-gray-300 mb-3" />
-          <p className="text-gray-500 text-sm">No items yet.</p>
+          <p className="text-text-tertiary text-sm">No items yet.</p>
           {canModify && (
             <Button onClick={() => setMode('menu')} variant="outline" size="sm" className="mt-3 lg:hidden">
               Browse menu
@@ -421,7 +421,7 @@ export default function CaptainOrder() {
         <>
           {alreadyOrderedLines.length > 0 && (
             <section>
-              <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 px-1">
+              <h2 className="text-xs font-semibold text-text-tertiary uppercase tracking-wide mb-2 px-1">
                 Already Ordered
               </h2>
               <div className="space-y-2">
@@ -442,7 +442,7 @@ export default function CaptainOrder() {
 
           {newOrChangedLines.length > 0 && (
             <section>
-              <h2 className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-2 px-1">
+              <h2 className="text-xs font-semibold text-primary uppercase tracking-wide mb-2 px-1">
                 New / Changed
               </h2>
               <div className="space-y-2">
@@ -463,7 +463,7 @@ export default function CaptainOrder() {
 
           {reductionPendingLines.length > 0 && (
             <section>
-              <h2 className="text-xs font-semibold text-red-600 uppercase tracking-wide mb-2 px-1">
+              <h2 className="text-xs font-semibold text-destructive uppercase tracking-wide mb-2 px-1">
                 Reduction Pending
               </h2>
               <div className="space-y-2">
@@ -486,7 +486,7 @@ export default function CaptainOrder() {
 
   if (isContextLoading || !isOrderReady) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-muted">
         <Spinner message="Loading table…" />
       </div>
     );
@@ -494,10 +494,10 @@ export default function CaptainOrder() {
 
   if (contextError) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
+      <div className="min-h-screen flex items-center justify-center bg-muted p-6">
         <div className="text-center">
-          <p className="text-lg font-semibold text-red-600 mb-2">Unable to load this table</p>
-          <p className="text-gray-600 text-sm">{contextError}</p>
+          <p className="text-lg font-semibold text-destructive mb-2">Unable to load this table</p>
+          <p className="text-muted-foreground text-sm">{contextError}</p>
           <Button onClick={() => navigate('/pos/order')} variant="outline" className="mt-4">
             Back to Tables
           </Button>
@@ -508,10 +508,10 @@ export default function CaptainOrder() {
 
   if (!canView) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
+      <div className="min-h-screen flex items-center justify-center bg-muted p-6">
         <div className="text-center max-w-sm">
-          <p className="text-lg font-semibold text-gray-900 mb-2">Not permitted</p>
-          <p className="text-gray-600 text-sm">
+          <p className="text-lg font-semibold text-foreground mb-2">Not permitted</p>
+          <p className="text-muted-foreground text-sm">
             You don't have access to view this table's order. It may belong to another captain.
           </p>
           <Button onClick={() => navigate('/pos/order')} variant="outline" className="mt-4">
@@ -523,27 +523,27 @@ export default function CaptainOrder() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen bg-muted flex flex-col">
       {/* Header */}
-      <div className="sticky top-0 z-20 bg-white border-b border-gray-200 px-3 py-3 flex items-center justify-between">
+      <div className="sticky top-0 z-20 bg-white border-b border-border px-3 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Button onClick={() => navigate('/pos/order')} variant="ghost" size="icon" aria-label="Back to Tables">
             <ChevronLeft className="w-5 h-5" />
           </Button>
           <div>
-            <h1 className="font-semibold text-gray-900 leading-tight">Table {table}</h1>
-            <p className="text-xs text-gray-500">{isUpdatingOrder ? 'Updating order' : 'New order'}</p>
+            <h1 className="font-semibold text-foreground leading-tight">Table {table}</h1>
+            <p className="text-xs text-text-tertiary">{isUpdatingOrder ? 'Updating order' : 'New order'}</p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
           {canModify && (
-            <div className="flex items-center gap-1 bg-gray-100 rounded-full p-1 lg:hidden">
+            <div className="flex items-center gap-1 bg-muted rounded-full p-1 lg:hidden">
               <button
                 onClick={() => setMode('menu')}
                 className={cn(
                   'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium',
-                  mode === 'menu' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-600'
+                  mode === 'menu' ? 'bg-white shadow-sm text-foreground' : 'text-muted-foreground'
                 )}
               >
                 <UtensilsCrossed className="w-4 h-4" />
@@ -553,7 +553,7 @@ export default function CaptainOrder() {
                 onClick={() => setMode('order')}
                 className={cn(
                   'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium',
-                  mode === 'order' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-600'
+                  mode === 'order' ? 'bg-white shadow-sm text-foreground' : 'text-muted-foreground'
                 )}
               >
                 <ClipboardList className="w-4 h-4" />
@@ -586,7 +586,7 @@ export default function CaptainOrder() {
 
       {!canModify && (
         <div className="px-3 pt-3">
-          <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+          <p className="text-sm text-amber-800 bg-warning-tint border border-amber-200 rounded-lg px-3 py-2">
             View only — you don't have permission to modify this table's order right now.
           </p>
         </div>
@@ -605,21 +605,21 @@ export default function CaptainOrder() {
       <div className="hidden lg:flex lg:flex-col lg:flex-1 lg:overflow-hidden">
         <div className="flex flex-row gap-4 flex-1 overflow-hidden p-3">
           {canModify && (
-            <div className="flex-1 min-h-0 overflow-hidden rounded-lg border border-gray-200 bg-white">
+            <div className="flex-1 min-h-0 overflow-hidden rounded-lg border border-border bg-white">
               <CaptainMenu canAddItems={canModify} />
             </div>
           )}
-          <div className="flex-1 min-h-0 overflow-hidden rounded-lg border border-gray-200 bg-white">
+          <div className="flex-1 min-h-0 overflow-hidden rounded-lg border border-border bg-white">
             <OrderListContent />
           </div>
         </div>
 
         {/* Primary action for tablet */}
         {canModify && (
-          <div className="bg-white border-t border-gray-200 p-3 mx-3 mb-3 rounded-lg">
+          <div className="bg-white border-t border-border p-3 mx-3 mb-3 rounded-lg">
             <div className="flex items-center justify-between mb-2 px-1">
-              <span className="text-sm font-semibold text-gray-700">Total</span>
-              <span className="text-lg font-semibold text-gray-900">{formatCurrency(total)}</span>
+              <span className="text-sm font-semibold text-muted-foreground">Total</span>
+              <span className="text-lg font-semibold text-foreground">{formatCurrency(total)}</span>
             </div>
             <Button
               onClick={handleSend}
@@ -645,10 +645,10 @@ export default function CaptainOrder() {
 
       {/* Primary action for mobile */}
       {canModify && (
-        <div className="sticky bottom-0 lg:hidden bg-white border-t border-gray-200 p-3">
+        <div className="sticky bottom-0 lg:hidden bg-white border-t border-border p-3">
           <div className="flex items-center justify-between mb-2 px-1">
-            <span className="text-sm font-semibold text-gray-700">Total</span>
-            <span className="text-lg font-semibold text-gray-900">{formatCurrency(total)}</span>
+            <span className="text-sm font-semibold text-muted-foreground">Total</span>
+            <span className="text-lg font-semibold text-foreground">{formatCurrency(total)}</span>
           </div>
           <Button
             onClick={handleSend}

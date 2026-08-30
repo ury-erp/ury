@@ -72,11 +72,11 @@ function formatOpenSessionDate(dateString: string): string {
 type StageKey = 'open' | 'seated' | 'fired' | 'served' | 'over';
 
 const STAGES: { key: StageKey; label: string; bar: string; chip: string; dot: string }[] = [
-  { key: 'open', label: 'Open', bar: 'bg-gray-300', chip: 'bg-gray-100 text-gray-700 ring-gray-200', dot: 'bg-gray-400' },
+  { key: 'open', label: 'Open', bar: 'bg-gray-300', chip: 'bg-muted text-muted-foreground ring-gray-200', dot: 'bg-gray-400' },
   { key: 'seated', label: 'Seated', bar: 'bg-primary-200', chip: 'bg-primary-50 text-primary-700 ring-primary-200', dot: 'bg-primary-200' },
   { key: 'fired', label: 'Fired', bar: 'bg-primary-400', chip: 'bg-primary-50 text-primary-800 ring-primary-300', dot: 'bg-primary-400' },
   { key: 'served', label: 'Served', bar: 'bg-primary-700', chip: 'bg-primary-100 text-primary-900 ring-primary-400', dot: 'bg-primary-700' },
-  { key: 'over', label: 'Over time', bar: 'bg-destructive', chip: 'bg-red-50 text-red-700 ring-red-200', dot: 'bg-destructive' },
+  { key: 'over', label: 'Over time', bar: 'bg-destructive', chip: 'bg-destructive-tint text-destructive ring-red-200', dot: 'bg-destructive' },
 ];
 
 const STAGE_BY_KEY = Object.fromEntries(STAGES.map((s) => [s.key, s])) as Record<StageKey, (typeof STAGES)[number]>;
@@ -109,14 +109,14 @@ function Panel({
             <span
               className={cn(
                 'flex h-7 w-7 shrink-0 items-center justify-center rounded-md',
-                tone === 'primary' ? 'bg-primary-50 text-primary' : 'bg-gray-100 text-gray-500'
+                tone === 'primary' ? 'bg-primary-50 text-primary' : 'bg-muted text-text-tertiary'
               )}
             >
               <Icon className="h-4 w-4" />
             </span>
-            <h2 className="text-sm font-semibold text-gray-900">{title}</h2>
+            <h2 className="text-sm font-semibold text-foreground">{title}</h2>
           </div>
-          {meta ? <div className="text-xs font-medium text-gray-500">{meta}</div> : null}
+          {meta ? <div className="text-xs font-medium text-text-tertiary">{meta}</div> : null}
         </div>
         {children}
       </CardContent>
@@ -126,7 +126,7 @@ function Panel({
 
 function PanelState({ kind, children }: { kind: 'loading' | 'error' | 'empty'; children: React.ReactNode }) {
   return (
-    <p className={cn('text-sm', kind === 'error' ? 'text-destructive' : 'text-gray-500')}>{children}</p>
+    <p className={cn('text-sm', kind === 'error' ? 'text-destructive' : 'text-text-tertiary')}>{children}</p>
   );
 }
 
@@ -372,17 +372,17 @@ export default function Dashboard() {
   const attentionResolved = !needsAttentionLoading && !needsAttentionError && needsAttention.length === 0;
 
   return (
-    <div className="h-full overflow-y-auto bg-gray-50">
+    <div className="h-full overflow-y-auto bg-muted">
       <div className="mx-auto max-w-screen-2xl p-6 space-y-5">
         {/* Page header — states where you are and that the numbers are live. */}
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 className="text-xl font-semibold text-gray-900">Shift Overview</h1>
-            <p className="mt-0.5 text-sm text-gray-500">
+            <h1 className="text-xl font-semibold text-foreground">Shift Overview</h1>
+            <p className="mt-0.5 text-sm text-text-tertiary">
               {posProfile?.branch ? `${posProfile.branch} · ` : ''}Live floor status for the current shift
             </p>
           </div>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-xs font-medium text-gray-600 ring-1 ring-gray-200">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-xs font-medium text-muted-foreground ring-1 ring-gray-200">
             <span className="relative flex h-2 w-2">
               <span className="absolute inline-flex h-2 w-2 animate-ping rounded-full bg-success-500 opacity-60" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-success-600" />
@@ -398,7 +398,7 @@ export default function Dashboard() {
           median cover count.
         */}
         {needsAttentionError ? (
-          <div className="rounded-lg border border-gray-200 bg-white p-4 text-sm text-destructive">
+          <div className="rounded-lg border border-border bg-white p-4 text-sm text-destructive">
             Failed to load attention items
           </div>
         ) : needsAttentionLoading ? null : attentionResolved ? (
@@ -411,7 +411,7 @@ export default function Dashboard() {
             className={cn(
               'overflow-hidden rounded-xl border-l-4 shadow-sm',
               hasHighSeverity
-                ? 'border-l-destructive bg-red-50 ring-1 ring-red-200'
+                ? 'border-l-destructive bg-destructive-tint ring-1 ring-red-200'
                 : 'border-l-warning-400 bg-warning-50 ring-1 ring-warning-200'
             )}
           >
@@ -477,7 +477,7 @@ export default function Dashboard() {
             <div className="col-span-full text-sm text-destructive">Failed to load stats</div>
           ) : statsLoading ? (
             Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="h-[7.5rem] animate-pulse rounded-lg border border-gray-200 bg-white" />
+              <div key={i} className="h-[7.5rem] animate-pulse rounded-lg border border-border bg-white" />
             ))
           ) : (
             stats.map((stat, index) => {
@@ -503,7 +503,7 @@ export default function Dashboard() {
           tone="primary"
           meta={
             overCount > 0 ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 ring-1 ring-red-200">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-destructive-tint px-2.5 py-1 text-xs font-semibold text-destructive ring-1 ring-red-200">
                 <span className="h-1.5 w-1.5 rounded-full bg-destructive" />
                 {overCount} over time
               </span>
@@ -543,7 +543,7 @@ export default function Dashboard() {
               </div>
 
               {/* Bars */}
-              <div className="flex items-end gap-2 overflow-x-auto border-b border-gray-200 pb-3">
+              <div className="flex items-end gap-2 overflow-x-auto border-b border-border pb-3">
                 {serviceLine.map((table: any, idx: number) => {
                   const stage = STAGE_BY_KEY[table.stage as StageKey] ?? STAGE_BY_KEY.open;
                   const isOver = table.stage === 'over';
@@ -558,7 +558,7 @@ export default function Dashboard() {
                       <span
                         className={cn(
                           'mb-1 h-4 text-xs font-semibold tabular-nums',
-                          isOver ? 'text-destructive' : 'text-gray-500'
+                          isOver ? 'text-destructive' : 'text-text-tertiary'
                         )}
                       >
                         {table.minutes !== null ? table.minutes : ''}
@@ -576,7 +576,7 @@ export default function Dashboard() {
                       <span
                         className={cn(
                           'mt-1.5 w-full truncate rounded px-1 py-0.5 text-center text-[11px] font-medium',
-                          isOver ? 'bg-red-50 text-red-700' : 'text-gray-600'
+                          isOver ? 'bg-destructive-tint text-destructive' : 'text-muted-foreground'
                         )}
                       >
                         {table.table}
@@ -662,12 +662,12 @@ export default function Dashboard() {
                     return (
                       <div key={idx}>
                         <div className="mb-1.5 flex items-center justify-between gap-2">
-                          <span className="truncate text-sm font-medium text-gray-900">{item.item_name}</span>
+                          <span className="truncate text-sm font-medium text-foreground">{item.item_name}</span>
                           <span
                             className={cn(
                               'shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums ring-1',
                               critical
-                                ? 'bg-red-50 text-red-700 ring-red-200'
+                                ? 'bg-destructive-tint text-destructive ring-red-200'
                                 : 'bg-warning-50 text-warning-700 ring-warning-200'
                             )}
                           >
@@ -681,7 +681,7 @@ export default function Dashboard() {
                           />
                         </div>
                         {item.data_quality_issue && (
-                          <p className="mt-1 text-xs text-gray-500">(stock data needs review)</p>
+                          <p className="mt-1 text-xs text-text-tertiary">(stock data needs review)</p>
                         )}
                       </div>
                     );
@@ -705,8 +705,8 @@ export default function Dashboard() {
                   {floorLoad.map((waiter, idx) => (
                     <div key={idx}>
                       <div className="mb-1 flex items-center justify-between gap-2">
-                        <span className="truncate text-sm font-medium text-gray-700">{waiter.waiter}</span>
-                        <span className="shrink-0 text-xs font-semibold tabular-nums text-gray-500">
+                        <span className="truncate text-sm font-medium text-muted-foreground">{waiter.waiter}</span>
+                        <span className="shrink-0 text-xs font-semibold tabular-nums text-text-tertiary">
                           {waiter.table_count}
                         </span>
                       </div>
@@ -739,21 +739,21 @@ export default function Dashboard() {
                     {openEntries.slice(0, 5).map((entry) => (
                       <div
                         key={entry.name}
-                        className="flex items-center justify-between gap-2 rounded-md bg-gray-50 px-2.5 py-2"
+                        className="flex items-center justify-between gap-2 rounded-md bg-muted px-2.5 py-2"
                       >
-                        <span className="truncate text-xs font-medium text-gray-900">{entry.user}</span>
-                        <span className="shrink-0 text-xs text-gray-500">
+                        <span className="truncate text-xs font-medium text-foreground">{entry.user}</span>
+                        <span className="shrink-0 text-xs text-text-tertiary">
                           {formatOpenSessionDate(entry.period_start_date)}
                         </span>
                       </div>
                     ))}
                   </div>
                   {openEntries.length > 5 && (
-                    <p className="py-2 text-center text-xs text-gray-500">+{openEntries.length - 5} more</p>
+                    <p className="py-2 text-center text-xs text-text-tertiary">+{openEntries.length - 5} more</p>
                   )}
                   <a
                     href="/pos/open-entries"
-                    className="mt-3 flex items-center justify-center gap-1 border-t border-gray-200 pt-2.5 text-xs font-semibold text-primary hover:text-primary-600"
+                    className="mt-3 flex items-center justify-center gap-1 border-t border-border pt-2.5 text-xs font-semibold text-primary hover:text-primary-600"
                   >
                     View all
                     <ArrowRight className="h-3.5 w-3.5" />
@@ -771,7 +771,7 @@ export default function Dashboard() {
                 </span>
               }
             >
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-text-tertiary">
                 AI-written shift summaries are not yet connected. This panel will show HUF's shift
                 observations once integrated.
               </p>
@@ -788,8 +788,8 @@ export default function Dashboard() {
                 <div className="divide-y divide-gray-100">
                   {notifications.map((notification) => (
                     <div key={notification.id} className="flex items-start justify-between gap-2 py-2 first:pt-0 last:pb-0">
-                      <p className="text-xs leading-relaxed text-gray-700">{notification.message}</p>
-                      <span className="shrink-0 whitespace-nowrap text-xs text-gray-400">
+                      <p className="text-xs leading-relaxed text-muted-foreground">{notification.message}</p>
+                      <span className="shrink-0 whitespace-nowrap text-xs text-text-tertiary">
                         {notification.timestamp}
                       </span>
                     </div>
@@ -814,9 +814,9 @@ function MetricTile({
   delta?: { up: boolean; text: string; against: string };
 }) {
   return (
-    <div className="rounded-lg bg-gray-50 p-3 ring-1 ring-gray-100">
-      <p className="text-xs font-medium text-gray-500">{label}</p>
-      <p className="mt-1 text-xl font-semibold tabular-nums text-gray-900">{value}</p>
+    <div className="rounded-lg bg-muted p-3 ring-1 ring-gray-100">
+      <p className="text-xs font-medium text-text-tertiary">{label}</p>
+      <p className="mt-1 text-xl font-semibold tabular-nums text-foreground">{value}</p>
       {delta ? (
         <p className="mt-1 flex flex-wrap items-baseline gap-1 text-xs">
           <span
@@ -827,7 +827,7 @@ function MetricTile({
           >
             {delta.up ? '▲' : '▼'} {delta.text}
           </span>
-          <span className="text-gray-400">vs {delta.against}</span>
+          <span className="text-text-tertiary">vs {delta.against}</span>
         </p>
       ) : null}
     </div>

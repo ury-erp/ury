@@ -58,8 +58,8 @@ export default function POS() {
       className={cn(
         'flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-colors',
         quickFilter === filter
-          ? 'bg-blue-100 text-blue-700'
-          : 'bg-gray-100 text-gray-700 hover:bg-gray-200',
+          ? 'bg-primary-tint text-primary'
+          : 'bg-muted text-muted-foreground hover:bg-gray-200',
         isMenuInteractionDisabled() && 'opacity-50 cursor-not-allowed pointer-events-none'
       )}
       disabled={isMenuInteractionDisabled()}
@@ -77,8 +77,8 @@ export default function POS() {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-center">
-          <p className="text-xl font-semibold text-red-600 mb-2">Failed to load POS</p>
-          <p className="text-gray-600">{error}</p>
+          <p className="text-xl font-semibold text-destructive mb-2">Failed to load POS</p>
+          <p className="text-muted-foreground">{error}</p>
           <button 
             onClick={() => window.location.reload()}
             className="mt-4 px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700"
@@ -102,8 +102,8 @@ export default function POS() {
     return (
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center">
-          <p className="text-lg font-medium text-red-600">{t('common.error_loading_menu_items')}</p>
-          <p className="text-sm text-gray-500 mt-2">{error}</p>
+          <p className="text-lg font-medium text-destructive">{t('common.error_loading_menu_items')}</p>
+          <p className="text-sm text-text-tertiary mt-2">{error}</p>
         </div>
       </div>
     );
@@ -113,7 +113,7 @@ export default function POS() {
     <div className="flex flex-1 overflow-hidden">
       <Sidebar disabled={isMenuInteractionDisabled()} />
       <div className="flex-1 flex flex-col h-screen overflow-hidden pe-96">
-        <div className="p-4 bg-white border-b border-gray-200">
+        <div className="p-4 bg-white border-b border-border">
           <div className="max-w-screen-xl mx-auto space-y-3">
             <div className="flex items-center gap-2 overflow-x-auto overflow-y-hidden">
               {/* <SearchBar

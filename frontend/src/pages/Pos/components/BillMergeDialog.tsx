@@ -184,11 +184,11 @@ const BillMergeDialog = ({
     }
 
     if (loadError) {
-      return <p className="py-4 text-sm text-red-600">{loadError}</p>;
+      return <p className="py-4 text-sm text-destructive">{loadError}</p>;
     }
 
     if (candidates.length === 0 && !searchLoading) {
-      return <p className="py-4 text-sm text-gray-500">{t('bill_merge.no_candidates')}</p>;
+      return <p className="py-4 text-sm text-text-tertiary">{t('bill_merge.no_candidates')}</p>;
     }
 
     return (
@@ -215,17 +215,17 @@ const BillMergeDialog = ({
                 'flex w-full items-center justify-between rounded-lg border p-3 text-left transition-colors',
                 isSelected
                   ? 'border-primary bg-primary-50/40'
-                  : 'border-gray-200 hover:border-gray-300'
+                  : 'border-border hover:border-border'
               )}
             >
               <div className="min-w-0">
-                <p className="font-medium text-gray-900">{row.name}</p>
-                <p className="text-xs text-gray-500">
+                <p className="font-medium text-foreground">{row.name}</p>
+                <p className="text-xs text-text-tertiary">
                   {row.customer_name || row.customer}
                   {tableLabel ? ` • Table ${tableLabel}` : ''}
                 </p>
               </div>
-              <span className="ms-3 shrink-0 text-sm font-semibold text-gray-900 tabular-nums">
+              <span className="ms-3 shrink-0 text-sm font-semibold text-foreground tabular-nums">
                 {formatCurrency(row.rounded_total ?? row.grand_total)}
               </span>
             </button>
@@ -269,7 +269,7 @@ const BillMergeDialog = ({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t('header.search_placeholder_orders')}
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
             disabled={isSubmitting}
           />
         </div>
@@ -278,7 +278,7 @@ const BillMergeDialog = ({
           {renderListContent()}
         </div>
 
-        {error && <p className="shrink-0 px-6 pb-2 text-sm text-red-600">{error}</p>}
+        {error && <p className="shrink-0 px-6 pb-2 text-sm text-destructive">{error}</p>}
 
         <DialogFooter className="shrink-0">
           <Button variant="outline" onClick={() => handleOpenChange(false)} disabled={isSubmitting}>

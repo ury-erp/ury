@@ -32,14 +32,14 @@ const Sidebar = ({ disabled }: SidebarProps) => {
 
   return (
     <div className={cn(
-      "w-64 bg-white border-e border-gray-200 h-screen flex flex-col",
+      "w-64 bg-white border-e border-border h-screen flex flex-col",
       disabled && "opacity-50 pointer-events-none"
     )}>
       {/* Categories List */}
       <nav className="flex-1 p-6 overflow-y-auto">
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+        <div className="bg-muted border border-border rounded-lg p-4">
           {/* Section Title */}
-          <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3 px-1">
+          <h2 className="text-xs font-medium text-text-tertiary uppercase tracking-wide mb-3 px-1">
             {t('pos_sidebar.categories')}
           </h2>
           
@@ -50,8 +50,8 @@ const Sidebar = ({ disabled }: SidebarProps) => {
             className={cn(
               'w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium transition-all duration-200 group relative mb-1',
               selectedCategory === ''
-                ? 'bg-white text-gray-900 shadow-sm font-semibold'
-                : 'text-gray-700 hover:bg-white/60 hover:text-gray-900'
+                ? 'bg-white text-foreground shadow-sm font-semibold'
+                : 'text-muted-foreground hover:bg-white/60 hover:text-foreground'
             )}
             disabled={disabled}
           >
@@ -61,11 +61,11 @@ const Sidebar = ({ disabled }: SidebarProps) => {
             )}
             
             <div className="flex items-center gap-3 ms-1">
-              <Grid3X3 className="w-4 h-4 text-gray-500" />
+              <Grid3X3 className="w-4 h-4 text-text-tertiary" />
               <span>{t('pos_sidebar.all_items')}</span>
             </div>
             
-            <Badge variant="secondary" size="sm" className="text-xs text-gray-500 bg-gray-100 min-w-[24px] text-center">
+            <Badge variant="secondary" size="sm" className="text-xs text-text-tertiary bg-muted min-w-[24px] text-center">
               {getAllItemsCount()}
             </Badge>
           </Button>
@@ -85,8 +85,8 @@ const Sidebar = ({ disabled }: SidebarProps) => {
                   className={cn(
                     'w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium transition-all duration-200 group relative',
                     selectedCategory === category.name
-                      ? 'bg-white text-gray-900 shadow-sm font-semibold'
-                      : 'text-gray-700 hover:bg-white/60 hover:text-gray-900'
+                      ? 'bg-white text-foreground shadow-sm font-semibold'
+                      : 'text-muted-foreground hover:bg-white/60 hover:text-foreground'
                   )}
                   disabled={disabled}
                 >
@@ -98,11 +98,11 @@ const Sidebar = ({ disabled }: SidebarProps) => {
                     <CategoryIcon
                       name={category.icon}
                       courseName={category.name}
-                      className="w-4 h-4 text-gray-500 flex-shrink-0"
+                      className="w-4 h-4 text-text-tertiary flex-shrink-0"
                     />
                     <span className="text-start">{category.label}</span>
                   </div>
-                  <Badge variant="secondary" size="sm" className="text-xs text-gray-500 bg-gray-100 min-w-[24px] text-center">
+                  <Badge variant="secondary" size="sm" className="text-xs text-text-tertiary bg-muted min-w-[24px] text-center">
                     {count}
                   </Badge>
                 </Button>

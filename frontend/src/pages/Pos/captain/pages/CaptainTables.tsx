@@ -176,19 +176,19 @@ export default function CaptainTables() {
     return (
       <div className="flex min-h-screen items-center justify-center p-6">
         <div className="text-center">
-          <AlertTriangle className="mx-auto mb-3 h-8 w-8 text-red-600" />
-          <h2 className="mb-1 text-lg font-semibold text-gray-800">Unable to load tables</h2>
-          <p className="text-sm text-gray-600">{error}</p>
+          <AlertTriangle className="mx-auto mb-3 h-8 w-8 text-destructive" />
+          <h2 className="mb-1 text-lg font-semibold text-foreground">Unable to load tables</h2>
+          <p className="text-sm text-muted-foreground">{error}</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-gray-50">
-      <div className="sticky top-0 z-10 border-b border-gray-200 bg-white p-3">
+    <div className="flex min-h-screen flex-col bg-muted">
+      <div className="sticky top-0 z-10 border-b border-border bg-white p-3">
         <div className="flex items-center justify-between gap-2">
-          <h1 className="text-lg font-bold text-gray-900">Tables</h1>
+          <h1 className="text-lg font-bold text-foreground">Tables</h1>
           <Button variant="ghost" size="sm" onClick={refresh}>
             Refresh
           </Button>
@@ -214,19 +214,19 @@ export default function CaptainTables() {
 
       <div className="flex-1 p-3">
         {branchRooms.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center gap-2 py-16 text-gray-500">
+          <div className="flex h-full flex-col items-center justify-center gap-2 py-16 text-text-tertiary">
             <AlertTriangle className="h-8 w-8" />
             <p className="text-sm">No rooms available for your account.</p>
           </div>
         ) : tablesError ? (
-          <div className="flex h-full flex-col items-center justify-center gap-2 py-16 text-red-500">
+          <div className="flex h-full flex-col items-center justify-center gap-2 py-16 text-destructive">
             <AlertTriangle className="h-8 w-8" />
             <p className="text-sm">{tablesError}</p>
           </div>
         ) : tablesLoading ? (
           <Spinner message="Loading tables..." />
         ) : tableGroups.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center gap-2 py-16 text-gray-500">
+          <div className="flex h-full flex-col items-center justify-center gap-2 py-16 text-text-tertiary">
             <Square className="h-8 w-8" />
             <p className="text-sm">No tables found in this room.</p>
           </div>

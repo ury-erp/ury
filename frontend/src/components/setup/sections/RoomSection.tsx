@@ -112,7 +112,7 @@ function RoomRow({ room, canDelete, renameRoom, deleteRoom, previewShrink, setRo
             variant="ghost"
             onClick={() => deleteRoom(room.id)}
             aria-label="Delete room"
-            className="text-red-500 hover:text-red-700 hover:bg-red-50 shrink-0 p-2 h-auto justify-self-end"
+            className="text-destructive hover:text-destructive hover:bg-destructive-tint shrink-0 p-2 h-auto justify-self-end"
           >
             <Trash2 className="w-4 h-4" />
           </Button>
@@ -124,7 +124,7 @@ function RoomRow({ room, canDelete, renameRoom, deleteRoom, previewShrink, setRo
       </p>
 
       {pendingShrink && (
-        <div className="rounded-md border border-amber-300 bg-amber-50 p-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:justify-between">
+        <div className="rounded-md border border-amber-300 bg-warning-tint p-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:justify-between">
           <p className="text-sm text-amber-900">
             Remove {pendingShrink.tables.map((t) => t.name).join(' and ')}? This can't be undone.
           </p>

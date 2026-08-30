@@ -53,7 +53,7 @@ function MissingPricesWarning({ sections }: { sections: MissingPriceSection[] })
   const totalItems = sections.reduce((sum, s) => sum + s.items.length, 0);
 
   return (
-    <div className="rounded-md border border-amber-200 bg-amber-50 text-amber-800 overflow-hidden">
+    <div className="rounded-md border border-amber-200 bg-warning-tint text-amber-800 overflow-hidden">
       <button
         onClick={() => setExpanded((e) => !e)}
         className="w-full flex items-center justify-between gap-2 px-4 py-3 text-sm text-left"
@@ -81,7 +81,7 @@ function MissingPricesWarning({ sections }: { sections: MissingPriceSection[] })
               </div>
             </div>
           ))}
-          <p className="text-xs text-amber-700">
+          <p className="text-xs text-warning">
             Update these item prices, then submit the document again for accurate Cost of Goods.
           </p>
         </div>
@@ -215,7 +215,7 @@ export function DailyPnl() {
       </div>
 
       {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="rounded-md border border-destructive bg-destructive-tint px-4 py-3 text-sm text-destructive">
           {error}
         </div>
       )}
@@ -223,7 +223,7 @@ export function DailyPnl() {
       {isLoading ? (
         <div className="text-sm text-muted-foreground">Loading...</div>
       ) : !data?.exists ? (
-        <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <div className="rounded-md border border-amber-200 bg-warning-tint px-4 py-3 text-sm text-amber-800">
           No submitted Daily P&amp;L exists for this branch/date. It must be created and submitted in Desk first.
         </div>
       ) : (
@@ -240,7 +240,7 @@ export function DailyPnl() {
               // Fallback for genuine free-text remarks (e.g. hand-typed via
               // Desk) that don't match the known structured warning shape.
               // Still never HTML-rendered — same rationale as above.
-              <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              <div className="rounded-md border border-amber-200 bg-warning-tint px-4 py-3 text-sm text-amber-800">
                 {data.remarks.split(/<br\s*\/?>/i).map((line, i) => (
                   <div key={i}>{line}</div>
                 ))}

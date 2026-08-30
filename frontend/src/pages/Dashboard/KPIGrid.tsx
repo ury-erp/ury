@@ -16,15 +16,15 @@ interface KPICardProps {
 
 const KPICard: React.FC<KPICardProps> = ({ title, value, loading }) => {
   return (
-    <Card className="rounded-lg border border-gray-200 bg-white p-5 shadow-xs transition-all duration-200 hover:shadow-md hover:border-primary/20">
-      <p className="text-xs font-medium text-gray-500">{title}</p>
+    <Card className="rounded-lg border border-border bg-white p-5 shadow-xs transition-all duration-200 hover:shadow-md hover:border-primary/20">
+      <p className="text-xs font-medium text-text-tertiary">{title}</p>
       {loading ? (
         <div className="mt-2 flex items-center space-x-2">
           <Spinner className="w-4 h-4 text-primary" />
-          <span className="text-sm text-gray-400">Loading...</span>
+          <span className="text-sm text-text-tertiary">Loading...</span>
         </div>
       ) : (
-        <h3 className="mt-2 text-2xl font-bold text-gray-900 tracking-tight">{value}</h3>
+        <h3 className="mt-2 text-2xl font-bold text-foreground tracking-tight">{value}</h3>
       )}
     </Card>
   );

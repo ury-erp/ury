@@ -68,21 +68,21 @@ export const Drawer: React.FC<DrawerProps> = ({
           )}
         >
           {/* Header */}
-          <div className="px-6 py-5 border-b border-gray-100 bg-white flex items-center justify-between sticky top-0 z-10">
+          <div className="px-6 py-5 border-b border-border bg-white flex items-center justify-between sticky top-0 z-10">
             <div>
               <div className="flex items-center gap-2">
                 <div className="w-2 h-6 bg-primary rounded-full" />
-                <h2 className="text-xl font-bold text-gray-900 tracking-tight">{title}</h2>
+                <h2 className="text-xl font-bold text-foreground tracking-tight">{title}</h2>
               </div>
               {subtitle && (
-                <p className="text-xs text-gray-500 mt-1 pl-4">{subtitle}</p>
+                <p className="text-xs text-text-tertiary mt-1 pl-4">{subtitle}</p>
               )}
             </div>
 
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-primary"
+              className="rounded-lg p-2 text-text-tertiary hover:text-muted-foreground hover:bg-muted transition-colors focus:outline-none focus:ring-2 focus:ring-primary"
               aria-label="Close panel"
             >
               <X className="w-5 h-5" />
@@ -96,7 +96,7 @@ export const Drawer: React.FC<DrawerProps> = ({
 
           {/* Optional Footer */}
           {footer && (
-            <div className="px-6 py-4 bg-white border-t border-gray-100 flex items-center justify-end gap-3 sticky bottom-0 z-10">
+            <div className="px-6 py-4 bg-white border-t border-border flex items-center justify-end gap-3 sticky bottom-0 z-10">
               {footer}
             </div>
           )}

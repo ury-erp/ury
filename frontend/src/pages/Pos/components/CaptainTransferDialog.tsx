@@ -135,7 +135,7 @@ const CaptainTransferDialog = ({
         </DialogHeader>
 
         <div className="px-6 pb-2">
-          <label className="mb-1 block text-sm font-medium text-gray-700">
+          <label className="mb-1 block text-sm font-medium text-muted-foreground">
             {t('tables.current_captain')}
           </label>
           <Input
@@ -160,9 +160,9 @@ const CaptainTransferDialog = ({
               <Spinner hideMessage  message={t('common.loading')} />
             </div>
           ) : loadError ? (
-            <p className="py-4 text-sm text-red-600">{loadError}</p>
+            <p className="py-4 text-sm text-destructive">{loadError}</p>
           ) : displayCandidates.length === 0 ? (
-            <p className="py-4 text-sm text-gray-500">{t('tables.no_captains_found')}</p>
+            <p className="py-4 text-sm text-text-tertiary">{t('tables.no_captains_found')}</p>
           ) : (
             <div className="space-y-2">
               {displayCandidates.map((row) => {
@@ -179,8 +179,8 @@ const CaptainTransferDialog = ({
                       isSelected && 'bg-primary-50/40 border-primary'
                     )}
                   >
-                    <p className="font-medium text-gray-900">{row.full_name || row.name}</p>
-                    <p className="text-xs text-gray-500">{row.name}</p>
+                    <p className="font-medium text-foreground">{row.full_name || row.name}</p>
+                    <p className="text-xs text-text-tertiary">{row.name}</p>
                   </Button>
                 );
               })}
@@ -188,7 +188,7 @@ const CaptainTransferDialog = ({
           )}
         </div>
 
-        {error && <p className="px-6 pb-2 text-sm text-red-600">{error}</p>}
+        {error && <p className="px-6 pb-2 text-sm text-destructive">{error}</p>}
 
         <DialogFooter>
           <Button variant="outline" onClick={() => handleOpenChange(false)} disabled={isSubmitting}>

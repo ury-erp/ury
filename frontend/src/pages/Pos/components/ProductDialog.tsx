@@ -329,14 +329,14 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
                 const parent = target.parentElement;
                 if (parent) {
                   const placeholder = document.createElement('div');
-                  placeholder.className = 'w-full h-96 bg-gray-200 flex items-center justify-center text-[8rem] text-gray-400 font-medium rounded-t-lg md:rounded-l-lg md:rounded-tr-none';
+                  placeholder.className = 'w-full h-96 bg-gray-200 flex items-center justify-center text-[8rem] text-text-tertiary font-medium rounded-t-lg md:rounded-l-lg md:rounded-tr-none';
                   placeholder.textContent = itemDoc.name.slice(0, 2).toUpperCase();
                   parent.insertBefore(placeholder, target);
                 }
               }}
             />
           ) : (
-            <div className="w-full min-h-96 h-full bg-gray-200 flex items-center justify-center text-[8rem] text-gray-400 font-medium rounded-t-lg md:rounded-l-lg md:rounded-tr-none">
+            <div className="w-full min-h-96 h-full bg-gray-200 flex items-center justify-center text-[8rem] text-text-tertiary font-medium rounded-t-lg md:rounded-l-lg md:rounded-tr-none">
               {itemDoc?.name.slice(0, 2).toUpperCase()}
             </div>
           )}
@@ -353,13 +353,13 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
         {/* Middle Column - Variants and Quantity */}
         <div className="md:w-1/3 p-6 overflow-y-auto">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">{selectedItem?.item_name}</h2>
+            <h2 className="text-2xl font-bold text-foreground">{selectedItem?.item_name}</h2>
             <div className="flex items-center gap-2 mt-1">
-              <span className="text-sm text-gray-500">{selectedItem?.item}</span>
+              <span className="text-sm text-text-tertiary">{selectedItem?.item}</span>
               {(selectedItem?.course_label || selectedItem?.course) && (
                 <>
                   <span className="text-gray-300">•</span>
-                  <span className="text-sm font-medium text-blue-600">{selectedItem?.course_label || selectedItem?.course}</span>
+                  <span className="text-sm font-medium text-primary">{selectedItem?.course_label || selectedItem?.course}</span>
                 </>
               )}
             </div>
@@ -425,12 +425,12 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
                       className={cn(
                         'p-2 rounded-lg text-left w-full flex justify-between items-center',
                         variant.id === itemDoc?.item
-                          ? 'border-blue-500 bg-blue-50 hover:border-blue-500'
-                          : 'border-gray-200 hover:border-blue-200'
+                          ? 'border-primary bg-primary-tint hover:border-primary'
+                          : 'border-border hover:border-primary'
                       )}
                     >
                       <div className="font-medium">{variant.name}</div>
-                      <div className="text-sm text-gray-500">{formatCurrency(menuVariant ? Number(menuVariant.price) : 0)}</div>
+                      <div className="text-sm text-text-tertiary">{formatCurrency(menuVariant ? Number(menuVariant.price) : 0)}</div>
                     </Button>
                   );
                 })}
@@ -441,12 +441,12 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
 
 
         {/* Right Column - Add-ons and Order Button */}
-        <div className="h-auto md:w-1/3 p-6 border-t md:border-t-0 md:border-l border-gray-200 overflow-y-auto flex flex-col">
+        <div className="h-auto md:w-1/3 p-6 border-t md:border-t-0 md:border-l border-border overflow-y-auto flex flex-col">
           <div className="overflow-y-auto mb-6">
             {isAddonLoading ? (
-              <div className="mb-6 flex items-center justify-center text-gray-500">{t('product_dialog.loading_addons')}</div>
+              <div className="mb-6 flex items-center justify-center text-text-tertiary">{t('product_dialog.loading_addons')}</div>
             ) : addonError ? (
-              <div className="flex items-center justify-center text-red-500">{addonError}</div>
+              <div className="flex items-center justify-center text-destructive">{addonError}</div>
             ) : addonDetails.length > 0 ? (
               <div className="mb-6">
                 <h3 className="text-lg font-semibold mb-3">{t('product_dialog.addons')}</h3>
@@ -459,24 +459,24 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
                       className={cn(
                         'w-full p-3 rounded-lg text-left',
                         selectedAddons.some(item => item.id === addon.id)
-                          ? 'border-blue-500 bg-blue-50 hover:border-blue-500'
-                          : 'border-gray-200 hover:border-blue-200'
+                          ? 'border-primary bg-primary-tint hover:border-primary'
+                          : 'border-border hover:border-primary'
                       )}
                     >
                       <div className="flex justify-between items-center">
                         <span>{addon.name}</span>
-                        <span className="text-sm text-gray-500">+{formatCurrency(Number(addon.price))}</span>
+                        <span className="text-sm text-text-tertiary">+{formatCurrency(Number(addon.price))}</span>
                       </div>
                     </Button>
                   ))}
                 </div>
               </div>
             ) : (
-              <div className="flex items-center justify-center text-gray-400 text-sm">{t('product_dialog.no_addons')}</div>
+              <div className="flex items-center justify-center text-text-tertiary text-sm">{t('product_dialog.no_addons')}</div>
             )}
           </div>
           {/* Always show total section at the end */}
-          <div className="mt-auto pt-2 border-t border-gray-200">
+          <div className="mt-auto pt-2 border-t border-border">
             <div className="flex justify-between items-center text-lg font-semibold">
               <span>{t('product_dialog.total')}&nbsp;</span>
               <span>{formatCurrency(total)}</span>

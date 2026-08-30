@@ -103,8 +103,8 @@ const TableSelectionDialog: React.FC<Props> = ({ onClose }) => {
   return (
     <Dialog open onOpenChange={onClose}>
       <DialogContent className="bg-white rounded-lg w-full h-5/6 max-w-2xl mx-auto p-0 overflow-y-auto">
-        <div className="p-4 border-b border-gray-200 flex justify-between items-center">
-          <h2 className="text-lg font-semibold text-gray-900">{t('common.select_table_title')}</h2>
+        <div className="p-4 border-b border-border flex justify-between items-center">
+          <h2 className="text-lg font-semibold text-foreground">{t('common.select_table_title')}</h2>
           <Button onClick={onClose} variant="ghost" size="icon">
             <X className="w-5 h-5" />
           </Button>
@@ -116,12 +116,12 @@ const TableSelectionDialog: React.FC<Props> = ({ onClose }) => {
               <Spinner message={t('common.loading_rooms')} />
             </div>
           ) : error ? (
-            <div className="mb-6 flex flex-col items-center justify-center gap-2 text-red-500">
+            <div className="mb-6 flex flex-col items-center justify-center gap-2 text-destructive">
               <AlertTriangle className="w-8 h-8 mb-1" />
               <span>{error}</span>
             </div>
           ) : rooms.length === 0 ? (
-            <div className="mb-6 flex flex-col items-center justify-center gap-2 text-gray-400">
+            <div className="mb-6 flex flex-col items-center justify-center gap-2 text-text-tertiary">
               <Square className="w-8 h-8 mb-1" />
               <span>{t('common.no_rooms_found')}</span>
             </div>
@@ -147,12 +147,12 @@ const TableSelectionDialog: React.FC<Props> = ({ onClose }) => {
               <Spinner message={t('common.loading_tables')} />
             </div>
           ) : error ? (
-            <div className="flex flex-col items-center justify-center gap-2 text-red-500 mt-8">
+            <div className="flex flex-col items-center justify-center gap-2 text-destructive mt-8">
               <AlertTriangle className="w-8 h-8 mb-1" />
               <span>{error}</span>
             </div>
           ) : tables.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-2 text-gray-400 mt-8">
+            <div className="flex flex-col items-center justify-center gap-2 text-text-tertiary mt-8">
               <Square className="w-8 h-8 mb-1" />
               <span>{t('common.no_tables_found')}</span>
             </div>
@@ -171,8 +171,8 @@ const TableSelectionDialog: React.FC<Props> = ({ onClose }) => {
                     selectedTable === table.name
                       ? 'border-primary-600 bg-primary-50'
                       : table.occupied === 1
-                      ? 'border-amber-500 bg-amber-50 hover:border-amber-600 hover:bg-amber-100'
-                      : 'border-gray-200 hover:border-primary-300 hover:bg-gray-50',
+                      ? 'border-amber-500 bg-warning-tint hover:border-amber-600 hover:bg-amber-100'
+                      : 'border-border hover:border-primary-300 hover:bg-muted',
                     'focus-visible:ring-2 focus-visible:ring-primary-600',
                   )}
                 >
@@ -180,7 +180,7 @@ const TableSelectionDialog: React.FC<Props> = ({ onClose }) => {
                     shape={table.table_shape}
                     className={cn(
                       'w-8 h-8',
-                      table.occupied === 1 ? 'text-amber-500' : 'text-gray-500'
+                      table.occupied === 1 ? 'text-amber-500' : 'text-text-tertiary'
                     )}
                   />
                   <div className="text-center">
@@ -195,7 +195,7 @@ const TableSelectionDialog: React.FC<Props> = ({ onClose }) => {
                     })()}
                     <div className="mt-2 h-4">
                       {table.occupied === 1 && (
-                        <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-700 hover:bg-amber-100">
+                        <Badge variant="secondary" className="text-xs bg-amber-100 text-warning hover:bg-amber-100">
                           {t('tables.occupied')}
                         </Badge>
                       )}
