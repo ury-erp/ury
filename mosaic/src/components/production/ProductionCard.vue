@@ -4,59 +4,61 @@
     :class="{
       'opacity-50 blur-[1px] cursor-not-allowed': disabled
     }"
-    class="bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer p-5"
+    class="rounded-lg transition-all duration-200 cursor-pointer p-4"
+    style="background: var(--panel); border: 1px solid var(--hair); font-family: var(--s)"
   >
     <!-- Header -->
     <div class="flex items-center gap-3">
       <div
-        class="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center text-2xl"
+        class="w-10 h-10 rounded-lg flex items-center justify-center text-xl"
+        style="background: var(--ac-t)"
       >
         🍳
       </div>
 
       <div>
-        <h2 class="text-xl font-bold text-gray-800">
+        <h2 class="text-base font-semibold" style="color: var(--t1)">
           {{ title }}
         </h2>
 
-        <p class="text-sm text-gray-500">
+        <p class="text-xs" style="color: var(--t3)">
           Production Unit
         </p>
       </div>
     </div>
 
     <!-- Statistics -->
-    <div class="grid grid-cols-3 gap-3 mt-6">
+    <div class="grid grid-cols-3 gap-2 mt-4">
 
       <!-- Active -->
-      <div class="bg-blue-50 rounded-xl p-3 text-center">
-        <div class="text-3xl font-bold text-blue-700">
+      <div class="rounded-md p-2 text-center" style="background: var(--ac-t)">
+        <div class="text-2xl font-semibold" style="color: var(--ac); font-family: var(--m); font-variant-numeric: tabular-nums">
           {{ activeOrders }}
         </div>
 
-        <div class="text-xs text-gray-500 mt-1">
+        <div class="text-xs mt-1" style="color: var(--t3)">
           Active
         </div>
       </div>
 
       <!-- Served -->
-      <div class="bg-green-50 rounded-xl p-3 text-center">
-        <div class="text-3xl font-bold text-green-600">
+      <div class="rounded-md p-2 text-center" style="background: var(--gr-t)">
+        <div class="text-2xl font-semibold" style="color: var(--gr); font-family: var(--m); font-variant-numeric: tabular-nums">
           {{ servedOrders }}
         </div>
 
-        <div class="text-xs text-gray-500 mt-1">
+        <div class="text-xs mt-1" style="color: var(--t3)">
           Served
         </div>
       </div>
 
       <!-- Total -->
-      <div class="bg-slate-100 rounded-xl p-3 text-center">
-        <div class="text-3xl font-bold text-slate-700">
+      <div class="rounded-md p-2 text-center" style="background: var(--sunk)">
+        <div class="text-2xl font-semibold" style="color: var(--t1); font-family: var(--m); font-variant-numeric: tabular-nums">
           {{ totalOrders }}
         </div>
 
-        <div class="text-xs text-gray-500 mt-1">
+        <div class="text-xs mt-1" style="color: var(--t3)">
           Total
         </div>
       </div>
@@ -64,8 +66,8 @@
     </div>
 
     <!-- Footer -->
-    <div class="mt-6 border-t pt-4">
-      <span class="text-xs text-gray-400">
+    <div class="mt-4 pt-3" style="border-top: 1px solid var(--hair)">
+      <span class="text-xs" style="color: var(--t4)">
         Click to view KOTs
       </span>
     </div>

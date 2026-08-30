@@ -1,4 +1,79 @@
+/* Self-hosted Geist (https://github.com/vercel/geist-font), matching
+   ury-app.html's Geist / Geist Mono pairing and mirroring frontend/src/index.css. */
+@font-face {
+  font-family: 'Geist';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./assets/fonts/geist-sans-latin-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Geist';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('./assets/fonts/geist-sans-latin-500-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Geist';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('./assets/fonts/geist-sans-latin-600-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Geist';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('./assets/fonts/geist-sans-latin-700-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Geist Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./assets/fonts/geist-mono-latin-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Geist Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('./assets/fonts/geist-mono-latin-500-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Geist Mono';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('./assets/fonts/geist-mono-latin-600-normal.woff2') format('woff2');
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-	
+
+/* Design tokens carried over from ury-app.html's visual language (see
+   tracks/sa-even-better/ury-app.html lines 11-23). KDS logic/layout is
+   untouched; this file only sets the shared color/type/density tokens. */
+:root {
+  --bg: #FBFBFA; --panel: #FFFFFF; --rail: #F7F7F6; --hover: #F2F2F1; --sunk: #F5F5F4;
+  --t1: #0D0D0F; --t2: #5C6066; --t3: #8B8F94; --t4: #AFB3B7;
+  --hair: #EAEAE8; --hair2: #DEDEDB;
+  --ac: #2457C5; --ac-t: #F0F4FC; --ac-b: #C9D8F2;
+  --rd: #BE3227; --rd-t: #FDF0EE; --rd-b: #F2CFC9;
+  --am: #9A6B04; --am-t: #FCF5E6; --am-b: #EEDFB8;
+  --gr: #15794F; --gr-t: #EDF6F1; --gr-b: #C4E0D1;
+  --s: 'Geist', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --m: 'Geist Mono', ui-monospace, monospace;
+}
+
+body {
+  font-family: var(--s);
+  background: var(--bg);
+  color: var(--t1);
+  font-size: 13px;
+  letter-spacing: -0.005em;
+  -webkit-font-smoothing: antialiased;
+}

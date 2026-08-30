@@ -1,23 +1,26 @@
 <template>
-  <div class="mx-auto p-6 mb-16 relative">
+  <div class="mx-auto p-6 mb-16 relative" style="font-family: var(--s)">
     <!-- Alert Modal div start-->
     <div
       v-if="this.showModal"
-      class="fixed inset-0 z-10 overflow-y-auto bg-gray-100"
+      class="fixed inset-0 z-10 overflow-y-auto"
+      style="background: rgba(13, 13, 15, 0.2)"
     >
       <div class="flex items-center justify-center">
-        <div class="w-full rounded-lg bg-white p-6 shadow-lg md:max-w-md">
+        <div class="w-full rounded-lg p-6 md:max-w-md" style="background: var(--panel); border: 1px solid var(--hair); box-shadow: 0 8px 30px rgba(0,0,0,.12)">
           <p
-            class="block text-left text-xl font-medium text-gray dark:text-gray"
+            class="block text-left text-xl font-medium"
+            style="color: var(--t1)"
           >
             <span
-              class="w-3 h-3 rounded-full inline-block mr-1 bg-red-500"
+              class="w-3 h-3 rounded-full inline-block mr-1"
+              style="background: var(--rd)"
             ></span>
             Not Permitted
           </p>
-          <hr class="border-gray-200" />
+          <hr style="border-color: var(--hair)" />
 
-          <p class="text-left text-xl mt-6 font-medium text-gray-500">
+          <p class="text-left text-xl mt-6 font-medium" style="color: var(--t2)">
             Log in to access this page.
           </p>
 
@@ -27,7 +30,8 @@
                 this.showModal = false;
                 this.redirectToLogin();
               "
-              class="mt-8 rounded bg-blue-500 px-3 py-2 text-white hover:bg-blue-600"
+              class="mt-8 rounded px-3 py-2"
+              style="background: var(--ac); color: #fff"
             >
               Login
             </button>
@@ -37,25 +41,26 @@
     </div>
     <!-- Alert Modal div end-->
 
-    <div v-if="kot.filter(k => k.production === production).length === 0 && !loadingKots" class="text-center py-10 text-gray-500 text-xl">
+    <div v-if="kot.filter(k => k.production === production).length === 0 && !loadingKots" class="text-center py-10 text-xl" style="color: var(--t3)">
       No active orders for {{ production }}
     </div>
 
     <div
-      class="grid grid-cols-1 gap-10 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+      class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
     >
       <div v-for="kot in this.kot" :key="kot.name">
         <div
           :class="[kot.color]"
-          class="inline-block shadow-lg gap-4 p-3 rounded-2xl w-90 h-auto masonry-item"
-          style="margin-top: 28px"
+          class="inline-block gap-4 p-3 rounded-lg border w-90 h-auto masonry-item"
+          style="margin-top: 28px; border-color: var(--hair2)"
           v-if="!kot.showDiv && kot.production === production"
         >
           <div class="w-64 check">
             <div
               :class="[{ hidden: !kot.isRotated }]"
               @click="rotateCard(kot)"
-              class="absolute inset-0 bg-white z-50 opacity-80 rounded-2xl flex flex-col justify-center items-center"
+              class="absolute inset-0 z-50 opacity-90 rounded-lg flex flex-col justify-center items-center"
+              style="background: var(--panel)"
             >
               <button
                 @click="
@@ -64,7 +69,8 @@
                     : serveOrder(kot)
                 "
                 :class="[{ hidden: !kot.isRotated }]"
-                class="py-2 px-6 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition duration-300 ease-in-out"
+                class="py-2 px-6 rounded-md transition duration-300 ease-in-out"
+                style="background: var(--ac); color: #fff; font-family: var(--s); font-size: 12.5px; font-weight: 550"
               >
                 {{
                   kot.type === "Cancelled" || kot.type === "Partially cancelled"
@@ -79,33 +85,35 @@
 
               <!-- Card Header: Table Name and Order Number -->
               <div class="flex justify-between" @click="rotateCard(kot)">
-                <div class="text-sm w-48">
+                <div class="text-sm w-48" style="font-family: var(--s)">
                   <span
                     v-if="kot.tableortakeaway !== 'Takeaway'"
-                    class="text-sm font-medium text-[#6B7280]"
+                    class="text-sm font-medium"
+                    style="color: var(--t2)"
                     >Table
                   </span>
-                  <span class="text-black-500 font-semibold">
+                  <span class="font-semibold" style="color: var(--t1)">
                     {{ kot.tableortakeaway }}
-                    <span class="text-sm font-medium text-[#6B7280]"
+                    <span class="text-sm font-medium" style="color: var(--t2)"
                       >( {{ kot.user }} )</span
                     ></span
                   ><br />
-                  <span v-if="kot.is_aggregator" class="text-sm font-medium text-[#6B7280]">Aggregator</span>
-                  <span v-if="kot.is_aggregator" class="text-black-500 ml-2 font-semibold"
+                  <span v-if="kot.is_aggregator" class="text-sm font-medium" style="color: var(--t2)">Aggregator</span>
+                  <span v-if="kot.is_aggregator" class="ml-2 font-semibold" style="color: var(--t1)"
                     >{{ kot.customer_name }}
                   </span><br v-if="kot.is_aggregator" />
-                  <span v-if="kot.is_aggregator" class="text-sm font-medium text-[#6B7280]">Aggregator ID</span>
-                  <span v-if="kot.is_aggregator" class="text-black-500 ml-2 font-semibold"
+                  <span v-if="kot.is_aggregator" class="text-sm font-medium" style="color: var(--t2)">Aggregator ID</span>
+                  <span v-if="kot.is_aggregator" class="ml-2 font-semibold" style="color: var(--t1)"
                     >{{ kot.aggregator_id }}
                   </span><br v-if="kot.is_aggregator"/>
-                  <span class="text-sm font-medium text-[#6B7280]">Order</span>
-                  <span class="text-black-500 ml-2 font-semibold"
+                  <span class="text-sm font-medium" style="color: var(--t2)">Order</span>
+                  <span class="ml-2 font-semibold" style="color: var(--t1); font-family: var(--m)"
                     >{{ this.daily_order_number ? kot.order_no : kot.invoice.slice(-4) }}
-                    
+
                   </span>
                   <span
-                    class="text-black-500 ml-2 font-semibold"
+                    class="ml-2 font-semibold"
+                    style="color: var(--t1)"
                     v-if="
                       kot.type === 'Partially cancelled' ||
                       kot.type === 'Cancelled'
@@ -116,18 +124,20 @@
                 </div>
                 <div
                   :class="kot.timecolor"
-                  class="font-inter font-semibold text-2xl leading-10"
+                  class="font-semibold text-2xl leading-10"
+                  style="font-family: var(--m); font-variant-numeric: tabular-nums"
                 >
                   {{ kot.timeRemaining }}
                 </div>
               </div>
               <div
                 v-if="kot.type === 'Duplicate'"
-                class="text-[#DC0000] font-medium"
+                class="font-medium"
+                style="color: var(--rd); font-family: var(--s)"
               >
                 ( Duplicate KOT ( CHECK WITH CAPTAIN ) )
               </div>
-              <div v-show="kot.comments" class="text-[#6B7280] font-medium">
+              <div v-show="kot.comments" class="font-medium" style="color: var(--t2); font-family: var(--s)">
                 ( {{ kot.comments }} )
               </div>
               <div></div>
@@ -136,6 +146,7 @@
                   class="font-semibold justify-between items-center mt-2"
                   v-for="kotitem in sortedKotItems(kot)"
                   :key="kotitem.name"
+                  style="font-family: var(--s); font-size: 12.5px"
                 >
                   <div
                     @click="
@@ -144,18 +155,19 @@
                       }
                     "
                     :class="{
-                      'line-through text-green-700': kotitem.striked,
+                      'line-through': kotitem.striked,
                     }"
+                    :style="{ color: kotitem.striked ? 'var(--gr)' : 'var(--t1)' }"
                     class="flex font-semibold justify-between items-center"
                   >
                     <div>
-                      <span class="ml-2 text-black-100">{{
+                      <span class="ml-2">{{
                         kotitem.item_name
-                      }}<span v-show="kotitem.indicate_course" class="text-sm text-gray-500 ml-1"> ( {{kotitem.course}} )</span>
+                      }}<span v-show="kotitem.indicate_course" class="text-sm ml-1" style="color: var(--t3)"> ( {{kotitem.course}} )</span>
                       </span
                       ><br />
                       <span
-                        class="ml-2 text-black-100"
+                        class="ml-2"
                         v-if="
                           kot.type === 'Partially cancelled' ||
                           kot.type === 'Cancelled'
@@ -164,17 +176,18 @@
                       >
                     </div>
                     <div>
-                      <span class="ml-2 text-black-100">{{ kotitem.qty }}</span>
+                      <span class="ml-2" style="font-family: var(--m); font-variant-numeric: tabular-nums">{{ kotitem.qty }}</span>
                     </div>
                   </div>
                   <div>
                     <p
                       v-show="kotitem.comments"
-                      class="ml-2 text-[#6B7280] font-medium"
+                      class="ml-2 font-medium"
+                      style="color: var(--t2)"
                     >
                       {{ kotitem.comments }}
                     </p>
-                    <hr class="my-1 border-gray-200 mt-2" />
+                    <hr class="my-1 mt-2" style="border-color: var(--hair)" />
                   </div>
                 </div>
               </div>
@@ -188,7 +201,8 @@
     <!-- Audio Alert Message -->
     <div
       v-if="showAudioAlertMessage"
-      class="absolute top-1 left-1/2 transform -translate-x-1/2 p-2 font-bold text-2xl text-red-500 text-center"
+      class="absolute top-1 left-1/2 transform -translate-x-1/2 p-2 font-bold text-2xl text-center"
+      style="color: var(--rd)"
     >
       Audio notifications disabled. Click anywhere to enable.
     </div>
@@ -196,15 +210,16 @@
     <!-- KOT Delay Error Alert Banner -->
     <div
       v-if="showKotErrorAlert && kotErrorAlert"
-      class="fixed top-0 left-0 right-0 mx-auto p-4 bg-red-50 border-b-4 border-red-500 shadow-lg z-40 flex justify-between items-center"
+      class="fixed top-0 left-0 right-0 mx-auto p-4 z-40 flex justify-between items-center"
+      style="background: var(--rd-t); border-bottom: 3px solid var(--rd)"
     >
       <div class="flex items-center gap-3">
         <div class="flex-shrink-0">
           <span class="text-3xl">⚠️</span>
         </div>
         <div class="flex-1">
-          <p class="font-bold text-red-700">Order Delayed</p>
-          <p class="text-red-600 text-sm mt-1">
+          <p class="font-bold" style="color: var(--rd)">Order Delayed</p>
+          <p class="text-sm mt-1" style="color: var(--rd)">
             <span v-if="!daily_order_number">Invoice: {{ kotErrorAlert.invoice.slice(-4) }}</span>
             <span v-else>Order #: {{ kotErrorAlert.order_no }}</span>
             | Table: {{ kotErrorAlert.tableortakeaway }} | Time: {{ kotErrorAlert.timestamp }}
@@ -213,7 +228,8 @@
       </div>
       <button
         @click="hideKotErrorAlert"
-        class="ml-4 text-red-700 hover:text-red-900 font-bold text-xl flex-shrink-0"
+        class="ml-4 font-bold text-xl flex-shrink-0"
+        style="color: var(--rd)"
       >
         ✕
       </button>
@@ -455,13 +471,13 @@ export default {
         }
       }
       if (type == "Order Modified") {
-        kot.color = "bg-[#FFD493] border border-[#FFC700]";
+        kot.color = "bg-[var(--am-t)] border-[var(--am-b)]";
       } else if (type == "Partially cancelled" || type == "Cancelled") {
-        kot.color = "bg-[#FFD2D2] border border-[#FAA7A7]";
+        kot.color = "bg-[var(--rd-t)] border-[var(--rd-b)]";
       } else if (restaurant_table === undefined || table_takeaway == 1) {
-        kot.color = "bg-blue-100 border border-blue-200";
+        kot.color = "bg-[var(--ac-t)] border-[var(--ac-b)]";
       } else {
-        kot.color = "bg-white";
+        kot.color = "bg-[var(--panel)]";
       }
       console.log(type,".............type")
     },
@@ -526,9 +542,9 @@ export default {
           this.orderDelayNotify(kot);
         }
         if (minutes >= this.kot_alert_time) {
-          kot.timecolor = "text-[#DC0000]";
+          kot.timecolor = "text-[var(--rd)]";
         } else {
-          kot.timecolor = "text-black";
+          kot.timecolor = "text-[var(--t1)]";
         }
       });
     },
@@ -689,3 +705,4 @@ export default {
   background-color: rgba(0, 0, 0, 0.2);
 }
 </style>
+
