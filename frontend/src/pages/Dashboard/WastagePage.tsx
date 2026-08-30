@@ -85,8 +85,8 @@ export const WastageRoleGate: React.FC<WastageRoleGateProps> = ({ children }) =>
   if (status === 'denied') {
     return (
       <Card className="w-full max-w-md p-6 text-center" data-testid="wastage-access-denied">
-        <h2 className="mb-2 text-lg font-semibold text-gray-900">Access Denied</h2>
-        <p className="text-gray-600">
+        <h2 className="mb-2 text-lg font-semibold text-foreground">Access Denied</h2>
+        <p className="text-muted-foreground">
           You need the Production Manager, Stock Manager, or System Manager role to view this section.
         </p>
       </Card>
@@ -285,7 +285,7 @@ const WastageContent: React.FC = () => {
     {
       key: 'component_item',
       header: 'Item',
-      render: (row) => <span className="font-medium text-gray-900">{row.component_item}</span>,
+      render: (row) => <span className="font-medium text-foreground">{row.component_item}</span>,
     },
     {
       key: 'department',
@@ -317,14 +317,14 @@ const WastageContent: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="-mx-6 -mt-6 border-b border-gray-200 px-6 pb-4 pt-6">
-        <h1 className="text-xl font-semibold text-gray-900">Wastage</h1>
-        <p className="mt-1 text-sm text-gray-500">
+      <div className="-mx-6 -mt-6 border-b border-border px-6 pb-4 pt-6">
+        <h1 className="text-xl font-semibold text-foreground">Wastage</h1>
+        <p className="mt-1 text-sm text-text-tertiary">
           Read-only view of captured wastage entries and their approval status for a branch and date range.
         </p>
 
         <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
-          <label className="flex flex-col text-xs font-medium text-gray-600">
+          <label className="flex flex-col text-xs font-medium text-muted-foreground">
             Department
             <Select
               aria-label="Department"
@@ -341,7 +341,7 @@ const WastageContent: React.FC = () => {
               ))}
             </Select>
           </label>
-          <label className="flex flex-col text-xs font-medium text-gray-600">
+          <label className="flex flex-col text-xs font-medium text-muted-foreground">
             From
             <Input
               aria-label="From date"
@@ -352,7 +352,7 @@ const WastageContent: React.FC = () => {
               className="mt-1"
             />
           </label>
-          <label className="flex flex-col text-xs font-medium text-gray-600">
+          <label className="flex flex-col text-xs font-medium text-muted-foreground">
             To
             <Input
               aria-label="To date"
@@ -367,15 +367,15 @@ const WastageContent: React.FC = () => {
       </div>
 
       {!activeBranchId || activeBranchId === 'all' ? (
-        <Card className="p-10 text-center text-sm text-gray-500">Select a branch to view wastage data.</Card>
+        <Card className="p-10 text-center text-sm text-text-tertiary">Select a branch to view wastage data.</Card>
       ) : (
         <>
           <KpiStrip items={kpis} />
 
-          {actionError && <Card className="border-red-200 bg-red-50 p-4 text-sm text-red-700">{actionError}</Card>}
+          {actionError && <Card className="border-destructive bg-destructive-tint p-4 text-sm text-destructive">{actionError}</Card>}
 
           {error ? (
-            <Card className="border-red-200 bg-red-50 p-6 text-sm text-red-700">{error}</Card>
+            <Card className="border-destructive bg-destructive-tint p-6 text-sm text-destructive">{error}</Card>
           ) : (
             <DataTable
               columns={columns}
@@ -396,7 +396,7 @@ const WastageContent: React.FC = () => {
           selectedRow && canApprove && selectedRow.status === 'Draft' ? (
             drawerAction ? (
               <>
-                <span className="mr-auto self-center text-xs text-gray-600">
+                <span className="mr-auto self-center text-xs text-muted-foreground">
                   {drawerAction === 'approve' ? 'Approve this entry?' : 'Reject this entry?'}
                 </span>
                 <Button type="button" size="sm" variant="outline" onClick={() => setDrawerAction(null)} disabled={drawerActionBusy}>

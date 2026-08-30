@@ -163,25 +163,25 @@ export function DatePicker({
       />
 
       {isOpen && (
-        <div className="absolute top-[calc(100%+8px)] left-0 z-[100] bg-white border border-gray-100 rounded-lg shadow-xl p-4 w-[280px] focus:outline-none">
+        <div className="absolute top-[calc(100%+8px)] left-0 z-[100] bg-white border border-border rounded-lg shadow-xl p-4 w-[280px] focus:outline-none">
           {/* Header Month / Year Navigation */}
           <div className="flex items-center justify-between mb-4 px-1">
             <button
               type="button"
               onClick={handlePrevMonth}
-              className="p-1 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+              className="p-1 rounded-full text-text-tertiary hover:text-muted-foreground hover:bg-muted transition-colors"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
               </svg>
             </button>
-            <span className="text-sm font-semibold text-gray-800">
+            <span className="text-sm font-semibold text-foreground">
               {MONTH_NAMES[viewDate.getMonth()]}, {viewDate.getFullYear()}
             </span>
             <button
               type="button"
               onClick={handleNextMonth}
-              className="p-1 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+              className="p-1 rounded-full text-text-tertiary hover:text-muted-foreground hover:bg-muted transition-colors"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
@@ -192,7 +192,7 @@ export function DatePicker({
           {/* Weekday headers */}
           <div className="grid grid-cols-7 gap-1 text-center mb-2">
             {WEEKDAYS.map((wd) => (
-              <span key={wd} className="text-xs font-semibold text-gray-400">
+              <span key={wd} className="text-xs font-semibold text-text-tertiary">
                 {wd}
               </span>
             ))}
@@ -218,7 +218,7 @@ export function DatePicker({
                   className={`text-sm py-1.5 rounded-lg cursor-pointer font-medium transition-colors select-none ${
                     isSelected
                       ? 'bg-primary text-white font-bold'
-                      : 'text-gray-800 hover:bg-gray-100'
+                      : 'text-foreground hover:bg-muted'
                   }`}
                 >
                   {item.day}
@@ -228,11 +228,11 @@ export function DatePicker({
           </div>
 
           {/* Footer Today Button */}
-          <div className="border-t border-gray-100 pt-3 mt-3 text-center">
+          <div className="border-t border-border pt-3 mt-3 text-center">
             <button
               type="button"
               onClick={handleTodayClick}
-              className="text-sm font-medium text-gray-700 hover:text-primary transition-colors"
+              className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
             >
               Today
             </button>

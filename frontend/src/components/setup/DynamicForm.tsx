@@ -92,8 +92,8 @@ const { registry } = defineRegistry(formCatalog, {
       return (
         <div className={getColSpanClass(field)}>
           <div className="space-y-1.5">
-            <label htmlFor={field.id} className="text-sm font-medium text-gray-700">
-              {field.label} {field.required && <span className="text-red-500">*</span>}
+            <label htmlFor={field.id} className="text-sm font-medium text-muted-foreground">
+              {field.label} {field.required && <span className="text-destructive">*</span>}
             </label>
 
             {field.type === 'text' || field.type === 'password' || field.type === 'email' ? (
@@ -126,9 +126,9 @@ const { registry } = defineRegistry(formCatalog, {
             ) : null}
 
             {props.error ? (
-              <p className="text-xs text-red-500 pt-1">{props.error}</p>
+              <p className="text-xs text-destructive pt-1">{props.error}</p>
             ) : field.description ? (
-              <p className="text-xs text-gray-500 pt-1">{field.description}</p>
+              <p className="text-xs text-text-tertiary pt-1">{field.description}</p>
             ) : null}
           </div>
         </div>

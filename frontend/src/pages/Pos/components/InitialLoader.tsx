@@ -7,8 +7,8 @@ const InitialLoader: React.FC = () => {
     <div className="fixed inset-0 bg-white flex items-center justify-center">
       <div className="text-center">
         <Spinner className="w-12 h-12"  message={t('common.loading')} />
-        <p className="mt-4 text-lg font-medium text-gray-900">{t('common.loading_ury_pos')}</p>
-        <p className="mt-2 text-sm text-gray-500">{t('common.please_wait_setup')}</p>
+        <p className="mt-4 text-lg font-medium text-foreground">{t('common.loading_ury_pos')}</p>
+        <p className="mt-2 text-sm text-text-tertiary">{t('common.please_wait_setup')}</p>
       </div>
     </div>
   );

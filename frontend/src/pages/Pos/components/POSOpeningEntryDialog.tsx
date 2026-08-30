@@ -168,16 +168,16 @@ const POSOpeningEntryDialog = ({ open, onOpenChange, onOpeningSubmitted }: POSOp
               <Spinner message={t('pos_opening.loading')} />
             </div>
           ) : loadError ? (
-            <p className="py-8 text-center text-sm text-red-600">{loadError}</p>
+            <p className="py-8 text-center text-sm text-destructive">{loadError}</p>
           ) : rows.length > 0 ? (
             <div className="w-full overflow-x-auto">
               <table className="w-full border-collapse">
                 <thead>
-                  <tr className="border-b border-gray-300 bg-gray-50">
-                    <th className="text-left py-3 px-4 font-semibold text-gray-900">
+                  <tr className="border-b border-border bg-muted">
+                    <th className="text-left py-3 px-4 font-semibold text-foreground">
                       Payment Mode
                     </th>
-                    <th className="text-center py-3 px-4 font-semibold text-gray-900">
+                    <th className="text-center py-3 px-4 font-semibold text-foreground">
                       Opening Amount
                     </th>
                   </tr>
@@ -186,9 +186,9 @@ const POSOpeningEntryDialog = ({ open, onOpenChange, onOpeningSubmitted }: POSOp
                   {rows.map((row) => (
                     <tr
                       key={row.mode_of_payment}
-                      className="border-b border-gray-200 hover:bg-gray-50 transition-colors"
+                      className="border-b border-border hover:bg-muted transition-colors"
                     >
-                      <td className="py-3 px-4 text-gray-900 font-medium">
+                      <td className="py-3 px-4 text-foreground font-medium">
                         {row.mode_of_payment}
                       </td>
                       <td className="py-3 px-4">
@@ -211,14 +211,14 @@ const POSOpeningEntryDialog = ({ open, onOpenChange, onOpeningSubmitted }: POSOp
               </table>
             </div>
           ) : (
-            <p className="py-8 text-center text-sm text-gray-500">
+            <p className="py-8 text-center text-sm text-text-tertiary">
               {t('pos_opening.no_payment_modes')}
             </p>
           )}
         </div>
 
         {submitError && (
-          <p className="px-6 pb-2 text-sm font-medium text-red-600">{submitError}</p>
+          <p className="px-6 pb-2 text-sm font-medium text-destructive">{submitError}</p>
         )}
 
         <DialogFooter>

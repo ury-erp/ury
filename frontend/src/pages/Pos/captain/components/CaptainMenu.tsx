@@ -59,14 +59,14 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="sticky top-0 z-10 bg-white border-b border-gray-200 p-3 space-y-2">
+      <div className="sticky top-0 z-10 bg-white border-b border-border p-3 space-y-2">
         <div className="relative">
-          <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-tertiary" />
           <input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search menu"
-            className="w-full ps-9 pe-3 py-3 rounded-lg border border-gray-200 bg-gray-50 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full ps-9 pe-3 py-3 rounded-lg border border-border bg-muted text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
 
@@ -76,8 +76,8 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
             className={cn(
               'shrink-0 px-4 py-2 rounded-full text-sm font-medium border',
               selectedCategory === ''
-                ? 'bg-blue-600 text-white border-blue-600'
-                : 'bg-white text-gray-700 border-gray-200'
+                ? 'bg-blue-600 text-white border-primary'
+                : 'bg-white text-muted-foreground border-border'
             )}
           >
             All
@@ -89,8 +89,8 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
               className={cn(
                 'shrink-0 px-4 py-2 rounded-full text-sm font-medium border',
                 selectedCategory === category.name
-                  ? 'bg-blue-600 text-white border-blue-600'
-                  : 'bg-white text-gray-700 border-gray-200'
+                  ? 'bg-blue-600 text-white border-primary'
+                  : 'bg-white text-muted-foreground border-border'
               )}
             >
               {category.label}
@@ -99,7 +99,7 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
         </div>
 
         {!canAddItems && (
-          <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+          <p className="text-xs text-warning bg-warning-tint border border-amber-200 rounded px-3 py-2">
             You can browse the menu, but you don't have permission to add items to this order.
           </p>
         )}
@@ -109,7 +109,7 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
         {menuLoading ? (
           <Spinner message="Loading menu…" />
         ) : filteredItems.length === 0 ? (
-          <p className="text-center text-gray-500 text-sm mt-8">No items found.</p>
+          <p className="text-center text-text-tertiary text-sm mt-8">No items found.</p>
         ) : (
           <div className="grid grid-cols-2 gap-3 pb-8">
             {filteredItems.map((item) => (

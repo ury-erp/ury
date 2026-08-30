@@ -201,22 +201,22 @@ const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: Checklis
             <Spinner message={t('checklist.loading')} />
           </div>
         ) : loadError ? (
-          <p className="py-8 text-center text-sm text-red-600">{loadError}</p>
+          <p className="py-8 text-center text-sm text-destructive">{loadError}</p>
         ) : (
           <>
             <div className="flex-1 overflow-y-auto space-y-4 mb-6 pr-1">
               {rows.map((row, index) => (
-                <div key={`${row.item_label}-${index}`} className="border border-gray-200 rounded-lg p-3">
+                <div key={`${row.item_label}-${index}`} className="border border-border rounded-lg p-3">
                   <label className="flex items-start gap-3 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={row.is_checked}
                       onChange={(e) => handleCheckedChange(index, e.target.checked)}
-                      className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      className="mt-1 h-4 w-4 rounded border-border text-primary focus:ring-blue-500"
                     />
-                    <span className="text-sm font-medium text-gray-900">
+                    <span className="text-sm font-medium text-foreground">
                       {row.item_label}
-                      {row.is_mandatory && <span className="text-red-600 ml-1">*</span>}
+                      {row.is_mandatory && <span className="text-destructive ml-1">*</span>}
                     </span>
                   </label>
                   <Input
@@ -232,7 +232,7 @@ const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: Checklis
             </div>
 
             {submitError && (
-              <p className="mb-4 text-center text-sm text-red-600">{submitError}</p>
+              <p className="mb-4 text-center text-sm text-destructive">{submitError}</p>
             )}
 
             <Button

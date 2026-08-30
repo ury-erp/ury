@@ -296,24 +296,24 @@ export const SelfOrderingProfilePage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-muted">
         <Spinner />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-muted">
       <div className="max-w-6xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-lg bg-primary-tint text-primary flex items-center justify-center">
               <Settings className="w-6 h-6" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Self Ordering Profiles</h1>
-              <p className="text-sm text-gray-500">Manage QR & kiosk ordering configurations</p>
+              <h1 className="text-2xl font-bold text-foreground">Self Ordering Profiles</h1>
+              <p className="text-sm text-text-tertiary">Manage QR & kiosk ordering configurations</p>
             </div>
           </div>
           <Button
@@ -327,9 +327,9 @@ export const SelfOrderingProfilePage: React.FC = () => {
 
         {/* Form */}
         {showForm && (
-          <Card className="rounded-xl border border-gray-200 bg-white shadow-sm">
-            <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-gray-900">
+          <Card className="rounded-xl border border-border bg-white shadow-sm">
+            <div className="p-6 border-b border-border flex items-center justify-between">
+              <h2 className="text-lg font-bold text-foreground">
                 {editingProfile ? 'Edit Profile' : 'Create New Profile'}
               </h2>
               <button
@@ -337,25 +337,25 @@ export const SelfOrderingProfilePage: React.FC = () => {
                   setShowForm(false);
                   resetForm();
                 }}
-                className="p-1 hover:bg-gray-100 rounded-md transition-colors"
+                className="p-1 hover:bg-muted rounded-md transition-colors"
               >
-                <X className="w-5 h-5 text-gray-400" />
+                <X className="w-5 h-5 text-text-tertiary" />
               </button>
             </div>
 
             <form onSubmit={handleSaveProfile} className="p-6 space-y-6">
               {/* Profile Info Section */}
-              <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <div className="border border-border rounded-lg overflow-hidden">
                 <button
                   type="button"
                   onClick={() => toggleSection('profileInfo')}
-                  className="w-full px-4 py-3 bg-gray-50 flex items-center justify-between hover:bg-gray-100 transition-colors"
+                  className="w-full px-4 py-3 bg-muted flex items-center justify-between hover:bg-muted transition-colors"
                 >
-                  <h3 className="text-sm font-bold text-gray-900">Profile Info</h3>
+                  <h3 className="text-sm font-bold text-foreground">Profile Info</h3>
                   {openSections.profileInfo ? (
-                    <ChevronUp className="w-4 h-4 text-gray-400" />
+                    <ChevronUp className="w-4 h-4 text-text-tertiary" />
                   ) : (
-                    <ChevronDown className="w-4 h-4 text-gray-400" />
+                    <ChevronDown className="w-4 h-4 text-text-tertiary" />
                   )}
                 </button>
 
@@ -363,7 +363,7 @@ export const SelfOrderingProfilePage: React.FC = () => {
                   <div className="p-4 space-y-4 bg-white">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                        <label className="block text-sm font-medium text-muted-foreground mb-1.5">
                           Profile Name *
                         </label>
                         <Input
@@ -378,7 +378,7 @@ export const SelfOrderingProfilePage: React.FC = () => {
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                        <label className="block text-sm font-medium text-muted-foreground mb-1.5">
                           Restaurant *
                         </label>
                         <SearchableSelect
@@ -393,7 +393,7 @@ export const SelfOrderingProfilePage: React.FC = () => {
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                        <label className="block text-sm font-medium text-muted-foreground mb-1.5">
                           Branch *
                         </label>
                         <SearchableSelect
@@ -408,7 +408,7 @@ export const SelfOrderingProfilePage: React.FC = () => {
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                        <label className="block text-sm font-medium text-muted-foreground mb-1.5">
                           POS Profile *
                         </label>
                         <SearchableSelect
@@ -423,7 +423,7 @@ export const SelfOrderingProfilePage: React.FC = () => {
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                        <label className="block text-sm font-medium text-muted-foreground mb-1.5">
                           Default Customer
                         </label>
                         <SearchableSelect
@@ -445,9 +445,9 @@ export const SelfOrderingProfilePage: React.FC = () => {
                             onChange={(e) =>
                               setFormData({ ...formData, enabled: e.target.checked })
                             }
-                            className="w-4 h-4 rounded border-gray-300"
+                            className="w-4 h-4 rounded border-border"
                           />
-                          <span className="text-sm font-medium text-gray-700">Enabled</span>
+                          <span className="text-sm font-medium text-muted-foreground">Enabled</span>
                         </label>
                       </div>
                     </div>
@@ -456,17 +456,17 @@ export const SelfOrderingProfilePage: React.FC = () => {
               </div>
 
               {/* Ordering Modes Section */}
-              <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <div className="border border-border rounded-lg overflow-hidden">
                 <button
                   type="button"
                   onClick={() => toggleSection('orderingModes')}
-                  className="w-full px-4 py-3 bg-gray-50 flex items-center justify-between hover:bg-gray-100 transition-colors"
+                  className="w-full px-4 py-3 bg-muted flex items-center justify-between hover:bg-muted transition-colors"
                 >
-                  <h3 className="text-sm font-bold text-gray-900">Ordering Modes</h3>
+                  <h3 className="text-sm font-bold text-foreground">Ordering Modes</h3>
                   {openSections.orderingModes ? (
-                    <ChevronUp className="w-4 h-4 text-gray-400" />
+                    <ChevronUp className="w-4 h-4 text-text-tertiary" />
                   ) : (
-                    <ChevronDown className="w-4 h-4 text-gray-400" />
+                    <ChevronDown className="w-4 h-4 text-text-tertiary" />
                   )}
                 </button>
 
@@ -479,9 +479,9 @@ export const SelfOrderingProfilePage: React.FC = () => {
                         onChange={(e) =>
                           setFormData({ ...formData, enable_qr_table_ordering: e.target.checked })
                         }
-                        className="w-4 h-4 rounded border-gray-300"
+                        className="w-4 h-4 rounded border-border"
                       />
-                      <span className="text-sm font-medium text-gray-700">QR Table Ordering</span>
+                      <span className="text-sm font-medium text-muted-foreground">QR Table Ordering</span>
                     </label>
 
                     <label className="flex items-center space-x-2 cursor-pointer">
@@ -491,9 +491,9 @@ export const SelfOrderingProfilePage: React.FC = () => {
                         onChange={(e) =>
                           setFormData({ ...formData, enable_qr_pickup_ordering: e.target.checked })
                         }
-                        className="w-4 h-4 rounded border-gray-300"
+                        className="w-4 h-4 rounded border-border"
                       />
-                      <span className="text-sm font-medium text-gray-700">QR Pickup Ordering</span>
+                      <span className="text-sm font-medium text-muted-foreground">QR Pickup Ordering</span>
                     </label>
 
                     <label className="flex items-center space-x-2 cursor-pointer">
@@ -503,9 +503,9 @@ export const SelfOrderingProfilePage: React.FC = () => {
                         onChange={(e) =>
                           setFormData({ ...formData, enable_kiosk_ordering: e.target.checked })
                         }
-                        className="w-4 h-4 rounded border-gray-300"
+                        className="w-4 h-4 rounded border-border"
                       />
-                      <span className="text-sm font-medium text-gray-700">Kiosk Ordering</span>
+                      <span className="text-sm font-medium text-muted-foreground">Kiosk Ordering</span>
                     </label>
 
                     <label className="flex items-center space-x-2 cursor-pointer">
@@ -515,26 +515,26 @@ export const SelfOrderingProfilePage: React.FC = () => {
                         onChange={(e) =>
                           setFormData({ ...formData, allow_add_to_running_table: e.target.checked })
                         }
-                        className="w-4 h-4 rounded border-gray-300"
+                        className="w-4 h-4 rounded border-border"
                       />
-                      <span className="text-sm font-medium text-gray-700">Allow Add to Running Table</span>
+                      <span className="text-sm font-medium text-muted-foreground">Allow Add to Running Table</span>
                     </label>
                   </div>
                 )}
               </div>
 
               {/* Product Display Section */}
-              <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <div className="border border-border rounded-lg overflow-hidden">
                 <button
                   type="button"
                   onClick={() => toggleSection('productDisplay')}
-                  className="w-full px-4 py-3 bg-gray-50 flex items-center justify-between hover:bg-gray-100 transition-colors"
+                  className="w-full px-4 py-3 bg-muted flex items-center justify-between hover:bg-muted transition-colors"
                 >
-                  <h3 className="text-sm font-bold text-gray-900">Product Display</h3>
+                  <h3 className="text-sm font-bold text-foreground">Product Display</h3>
                   {openSections.productDisplay ? (
-                    <ChevronUp className="w-4 h-4 text-gray-400" />
+                    <ChevronUp className="w-4 h-4 text-text-tertiary" />
                   ) : (
-                    <ChevronDown className="w-4 h-4 text-gray-400" />
+                    <ChevronDown className="w-4 h-4 text-text-tertiary" />
                   )}
                 </button>
 
@@ -547,9 +547,9 @@ export const SelfOrderingProfilePage: React.FC = () => {
                         onChange={(e) =>
                           setFormData({ ...formData, enable_product_detail_page: e.target.checked })
                         }
-                        className="w-4 h-4 rounded border-gray-300"
+                        className="w-4 h-4 rounded border-border"
                       />
-                      <span className="text-sm font-medium text-gray-700">Product Detail Page</span>
+                      <span className="text-sm font-medium text-muted-foreground">Product Detail Page</span>
                     </label>
 
                     <label className="flex items-center space-x-2 cursor-pointer">
@@ -559,9 +559,9 @@ export const SelfOrderingProfilePage: React.FC = () => {
                         onChange={(e) =>
                           setFormData({ ...formData, show_item_images: e.target.checked })
                         }
-                        className="w-4 h-4 rounded border-gray-300"
+                        className="w-4 h-4 rounded border-border"
                       />
-                      <span className="text-sm font-medium text-gray-700">Show Item Images</span>
+                      <span className="text-sm font-medium text-muted-foreground">Show Item Images</span>
                     </label>
 
                     <label className="flex items-center space-x-2 cursor-pointer">
@@ -571,9 +571,9 @@ export const SelfOrderingProfilePage: React.FC = () => {
                         onChange={(e) =>
                           setFormData({ ...formData, show_item_descriptions: e.target.checked })
                         }
-                        className="w-4 h-4 rounded border-gray-300"
+                        className="w-4 h-4 rounded border-border"
                       />
-                      <span className="text-sm font-medium text-gray-700">Show Item Descriptions</span>
+                      <span className="text-sm font-medium text-muted-foreground">Show Item Descriptions</span>
                     </label>
 
                     <label className="flex items-center space-x-2 cursor-pointer">
@@ -583,26 +583,26 @@ export const SelfOrderingProfilePage: React.FC = () => {
                         onChange={(e) =>
                           setFormData({ ...formData, enable_item_notes: e.target.checked })
                         }
-                        className="w-4 h-4 rounded border-gray-300"
+                        className="w-4 h-4 rounded border-border"
                       />
-                      <span className="text-sm font-medium text-gray-700">Enable Item Notes</span>
+                      <span className="text-sm font-medium text-muted-foreground">Enable Item Notes</span>
                     </label>
                   </div>
                 )}
               </div>
 
               {/* Billing & Payment Section */}
-              <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <div className="border border-border rounded-lg overflow-hidden">
                 <button
                   type="button"
                   onClick={() => toggleSection('billingPayment')}
-                  className="w-full px-4 py-3 bg-gray-50 flex items-center justify-between hover:bg-gray-100 transition-colors"
+                  className="w-full px-4 py-3 bg-muted flex items-center justify-between hover:bg-muted transition-colors"
                 >
-                  <h3 className="text-sm font-bold text-gray-900">Billing & Payment</h3>
+                  <h3 className="text-sm font-bold text-foreground">Billing & Payment</h3>
                   {openSections.billingPayment ? (
-                    <ChevronUp className="w-4 h-4 text-gray-400" />
+                    <ChevronUp className="w-4 h-4 text-text-tertiary" />
                   ) : (
-                    <ChevronDown className="w-4 h-4 text-gray-400" />
+                    <ChevronDown className="w-4 h-4 text-text-tertiary" />
                   )}
                 </button>
 
@@ -615,9 +615,9 @@ export const SelfOrderingProfilePage: React.FC = () => {
                         onChange={(e) =>
                           setFormData({ ...formData, enable_request_bill: e.target.checked })
                         }
-                        className="w-4 h-4 rounded border-gray-300"
+                        className="w-4 h-4 rounded border-border"
                       />
-                      <span className="text-sm font-medium text-gray-700">Enable Request Bill</span>
+                      <span className="text-sm font-medium text-muted-foreground">Enable Request Bill</span>
                     </label>
 
                     <label className="flex items-center space-x-2 cursor-pointer">
@@ -627,9 +627,9 @@ export const SelfOrderingProfilePage: React.FC = () => {
                         onChange={(e) =>
                           setFormData({ ...formData, enable_customer_payment: e.target.checked })
                         }
-                        className="w-4 h-4 rounded border-gray-300"
+                        className="w-4 h-4 rounded border-border"
                       />
-                      <span className="text-sm font-medium text-gray-700">Enable Customer Payment</span>
+                      <span className="text-sm font-medium text-muted-foreground">Enable Customer Payment</span>
                     </label>
 
                     <label className="flex items-center space-x-2 cursor-pointer">
@@ -639,9 +639,9 @@ export const SelfOrderingProfilePage: React.FC = () => {
                         onChange={(e) =>
                           setFormData({ ...formData, enable_payment_link: e.target.checked })
                         }
-                        className="w-4 h-4 rounded border-gray-300"
+                        className="w-4 h-4 rounded border-border"
                       />
-                      <span className="text-sm font-medium text-gray-700">Enable Payment Link</span>
+                      <span className="text-sm font-medium text-muted-foreground">Enable Payment Link</span>
                     </label>
 
                     <label className="flex items-center space-x-2 cursor-pointer">
@@ -651,33 +651,33 @@ export const SelfOrderingProfilePage: React.FC = () => {
                         onChange={(e) =>
                           setFormData({ ...formData, enable_pay_at_counter: e.target.checked })
                         }
-                        className="w-4 h-4 rounded border-gray-300"
+                        className="w-4 h-4 rounded border-border"
                       />
-                      <span className="text-sm font-medium text-gray-700">Enable Pay at Counter</span>
+                      <span className="text-sm font-medium text-muted-foreground">Enable Pay at Counter</span>
                     </label>
                   </div>
                 )}
               </div>
 
               {/* Session Section */}
-              <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <div className="border border-border rounded-lg overflow-hidden">
                 <button
                   type="button"
                   onClick={() => toggleSection('session')}
-                  className="w-full px-4 py-3 bg-gray-50 flex items-center justify-between hover:bg-gray-100 transition-colors"
+                  className="w-full px-4 py-3 bg-muted flex items-center justify-between hover:bg-muted transition-colors"
                 >
-                  <h3 className="text-sm font-bold text-gray-900">Session</h3>
+                  <h3 className="text-sm font-bold text-foreground">Session</h3>
                   {openSections.session ? (
-                    <ChevronUp className="w-4 h-4 text-gray-400" />
+                    <ChevronUp className="w-4 h-4 text-text-tertiary" />
                   ) : (
-                    <ChevronDown className="w-4 h-4 text-gray-400" />
+                    <ChevronDown className="w-4 h-4 text-text-tertiary" />
                   )}
                 </button>
 
                 {openSections.session && (
                   <div className="p-4 bg-white">
                     <div className="max-w-xs">
-                      <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                      <label className="block text-sm font-medium text-muted-foreground mb-1.5">
                         Session Idle Timeout (Minutes)
                       </label>
                       <Input
@@ -721,7 +721,7 @@ export const SelfOrderingProfilePage: React.FC = () => {
                     setShowForm(false);
                     resetForm();
                   }}
-                  className="bg-gray-200 text-gray-900 hover:bg-gray-300"
+                  className="bg-gray-200 text-foreground hover:bg-gray-300"
                 >
                   Cancel
                 </Button>
@@ -732,11 +732,11 @@ export const SelfOrderingProfilePage: React.FC = () => {
 
         {/* Profiles List */}
         {!showForm && (
-          <Card className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+          <Card className="rounded-xl border border-border bg-white shadow-sm overflow-hidden">
             {profiles.length === 0 ? (
               <div className="p-12 text-center">
                 <Settings className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-500 font-medium mb-4">No profiles configured yet</p>
+                <p className="text-text-tertiary font-medium mb-4">No profiles configured yet</p>
                 <Button
                   onClick={() => handleOpenForm()}
                   className="bg-blue-600 text-white hover:bg-blue-700"
@@ -747,8 +747,8 @@ export const SelfOrderingProfilePage: React.FC = () => {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm text-gray-600">
-                  <thead className="bg-gray-50 text-gray-700 font-medium border-b border-gray-200">
+                <table className="w-full text-left text-sm text-muted-foreground">
+                  <thead className="bg-muted text-muted-foreground font-medium border-b border-border">
                     <tr>
                       <th className="p-4">Profile Name</th>
                       <th className="p-4">Branch</th>
@@ -758,15 +758,15 @@ export const SelfOrderingProfilePage: React.FC = () => {
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     {profiles.map((profile) => (
-                      <tr key={profile.name} className="hover:bg-gray-50">
-                        <td className="p-4 font-medium text-gray-900">{profile.profile_name}</td>
+                      <tr key={profile.name} className="hover:bg-muted">
+                        <td className="p-4 font-medium text-foreground">{profile.profile_name}</td>
                         <td className="p-4">{profile.branch}</td>
                         <td className="p-4">
                           <span
                             className={`px-2.5 py-1 rounded-full text-xs font-medium ${
                               profile.enabled === 1
-                                ? 'bg-green-50 text-green-700'
-                                : 'bg-gray-100 text-gray-600'
+                                ? 'bg-success-tint text-success'
+                                : 'bg-muted text-muted-foreground'
                             }`}
                           >
                             {profile.enabled === 1 ? 'Enabled' : 'Disabled'}
@@ -775,13 +775,13 @@ export const SelfOrderingProfilePage: React.FC = () => {
                         <td className="p-4 text-right space-x-2 flex justify-end">
                           <button
                             onClick={() => handleOpenForm(profile)}
-                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+                            className="p-1.5 text-primary hover:bg-primary-tint rounded-md transition-colors"
                           >
                             <Edit2 className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => handleDeleteProfile(profile)}
-                            className="p-1.5 text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                            className="p-1.5 text-destructive hover:bg-destructive-tint rounded-md transition-colors"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>

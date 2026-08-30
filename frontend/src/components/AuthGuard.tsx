@@ -20,9 +20,9 @@ export function AuthGuard({ children }: AuthGuardProps) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <div className="text-red-600 text-xl mb-4">⚠️</div>
-          <h2 className="text-xl font-semibold text-gray-800 mb-2">Access Denied</h2>
-          <p className="text-gray-600">
+          <div className="text-destructive text-xl mb-4">⚠️</div>
+          <h2 className="text-xl font-semibold text-foreground mb-2">Access Denied</h2>
+          <p className="text-muted-foreground">
             {error || 'Please log in to access this section.'}
           </p>
         </div>
@@ -34,9 +34,9 @@ export function AuthGuard({ children }: AuthGuardProps) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <div className="text-amber-600 text-xl mb-4">🔒</div>
-          <h2 className="text-xl font-semibold text-gray-800 mb-2">Permission Required</h2>
-          <p className="text-gray-600">This section is restricted to Managers.</p>
+          <div className="text-warning text-xl mb-4">🔒</div>
+          <h2 className="text-xl font-semibold text-foreground mb-2">Permission Required</h2>
+          <p className="text-muted-foreground">This section is restricted to Managers.</p>
         </div>
       </div>
     );

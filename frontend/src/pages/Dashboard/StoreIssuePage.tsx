@@ -200,40 +200,40 @@ const StoreIssueContent: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="-mx-6 -mt-6 border-b border-gray-200 px-6 pb-4 pt-6">
-        <h1 className="text-xl font-semibold text-gray-900">Store Issue</h1>
-        <p className="mt-1 text-sm text-gray-500">
+      <div className="-mx-6 -mt-6 border-b border-border px-6 pb-4 pt-6">
+        <h1 className="text-xl font-semibold text-foreground">Store Issue</h1>
+        <p className="mt-1 text-sm text-text-tertiary">
           Read-only view of issue authorizations across every department for this branch and date range.
         </p>
 
         <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
-          <label className="flex flex-col text-xs font-medium text-gray-600">
+          <label className="flex flex-col text-xs font-medium text-muted-foreground">
             From
             <input
               aria-label="From date"
               type="date"
               value={fromDate}
               onChange={(event) => setFromDate(event.target.value)}
-              className="mt-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
+              className="mt-1 rounded-md border border-border px-2 py-1.5 text-sm text-foreground"
             />
           </label>
-          <label className="flex flex-col text-xs font-medium text-gray-600">
+          <label className="flex flex-col text-xs font-medium text-muted-foreground">
             To
             <input
               aria-label="To date"
               type="date"
               value={toDate}
               onChange={(event) => setToDate(event.target.value)}
-              className="mt-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm text-gray-900"
+              className="mt-1 rounded-md border border-border px-2 py-1.5 text-sm text-foreground"
             />
           </label>
         </div>
       </div>
 
       {!activeBranchId || activeBranchId === 'all' ? (
-        <Card className="p-10 text-center text-sm text-gray-500">Select a branch to view store issue data.</Card>
+        <Card className="p-10 text-center text-sm text-text-tertiary">Select a branch to view store issue data.</Card>
       ) : error ? (
-        <Card className="border-red-200 bg-red-50 p-6 text-sm text-red-700">{error}</Card>
+        <Card className="border-destructive bg-destructive-tint p-6 text-sm text-destructive">{error}</Card>
       ) : (
         <>
           <KpiStrip items={kpiItems} />
@@ -249,7 +249,7 @@ const StoreIssueContent: React.FC = () => {
           )}
 
           {loading ? (
-            <div className="flex items-center justify-center rounded-lg border border-gray-200 bg-white py-16">
+            <div className="flex items-center justify-center rounded-lg border border-border bg-white py-16">
               <Spinner className="h-8 w-8 text-primary" />
             </div>
           ) : (

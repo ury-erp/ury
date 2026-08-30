@@ -24,17 +24,17 @@ const formatQty = (value: number) => (Number.isInteger(value) ? String(value) : 
 const getStatusBadgeClass = (status: string) => {
   switch (status) {
     case 'Reserved':
-      return 'inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800';
+      return 'inline-flex items-center rounded-full bg-primary-tint px-2.5 py-0.5 text-xs font-medium text-blue-800';
     case 'Fulfilled':
       return 'inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800';
     case 'Released':
-      return 'inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800';
+      return 'inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-foreground';
     case 'Expired':
       return 'inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800';
     case 'Cancelled':
       return 'inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800';
     default:
-      return 'inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800';
+      return 'inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-foreground';
   }
 };
 
@@ -80,8 +80,8 @@ export const StockReservationRoleGate: React.FC<StockReservationRoleGateProps> =
   if (status === 'denied') {
     return (
       <Card className="w-full max-w-md p-6 text-center" data-testid="stock-reservation-access-denied">
-        <h2 className="mb-2 text-lg font-semibold text-gray-900">Access Denied</h2>
-        <p className="text-gray-600">
+        <h2 className="mb-2 text-lg font-semibold text-foreground">Access Denied</h2>
+        <p className="text-muted-foreground">
           You need the Production Manager, Stock Manager, or System Manager role to view this section.
         </p>
       </Card>
@@ -129,9 +129,9 @@ const ActionModal: React.FC<ActionModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
       <Card className="w-full max-w-md p-6">
-        <h2 className="mb-4 text-lg font-semibold text-gray-900">{title}</h2>
+        <h2 className="mb-4 text-lg font-semibold text-foreground">{title}</h2>
         <div className="mb-4 space-y-3">
-          <label className="flex flex-col text-sm font-medium text-gray-700">
+          <label className="flex flex-col text-sm font-medium text-muted-foreground">
             Reason (optional)
             <Textarea
               value={reason}
@@ -142,7 +142,7 @@ const ActionModal: React.FC<ActionModalProps> = ({
             />
           </label>
           {error && (
-            <div className="text-sm text-red-700">{error}</div>
+            <div className="text-sm text-destructive">{error}</div>
           )}
         </div>
         <div className="flex gap-3 justify-end">
@@ -236,33 +236,33 @@ const StockReservationContent: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="-mx-6 -mt-6 border-b border-gray-200 px-6 pb-4 pt-6">
-        <h1 className="text-xl font-semibold text-gray-900">Stock Reservations</h1>
-        <p className="mt-1 text-sm text-gray-500">
+      <div className="-mx-6 -mt-6 border-b border-border px-6 pb-4 pt-6">
+        <h1 className="text-xl font-semibold text-foreground">Stock Reservations</h1>
+        <p className="mt-1 text-sm text-text-tertiary">
           Monitor active stock reservations and manage capacity holds. Managers can release or cancel
           Reserved status reservations to restore inventory availability.
         </p>
       </div>
 
       {!activeBranchId || activeBranchId === 'all' ? (
-        <Card className="p-10 text-center text-sm text-gray-500">
+        <Card className="p-10 text-center text-sm text-text-tertiary">
           Select a branch to view its reservations.
         </Card>
       ) : loading ? (
-        <div className="flex items-center justify-center rounded-lg border border-gray-200 bg-white py-16">
+        <div className="flex items-center justify-center rounded-lg border border-border bg-white py-16">
           <Spinner className="h-8 w-8 text-primary" />
         </div>
       ) : error ? (
-        <Card className="border-red-200 bg-red-50 p-6 text-sm text-red-700">{error}</Card>
+        <Card className="border-destructive bg-destructive-tint p-6 text-sm text-destructive">{error}</Card>
       ) : reservations.length === 0 ? (
-        <Card className="p-8 text-center text-sm text-gray-500">
+        <Card className="p-8 text-center text-sm text-text-tertiary">
           No active stock reservations for this branch right now.
         </Card>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+        <div className="overflow-hidden rounded-lg border border-border bg-white shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="border-b border-gray-100 bg-gray-50 text-xs font-semibold text-gray-500">
+              <thead className="border-b border-border bg-muted text-xs font-semibold text-text-tertiary">
                 <tr>
                   <th className="px-4 py-3">Item</th>
                   <th className="px-4 py-3 text-right">Qty</th>
@@ -276,14 +276,14 @@ const StockReservationContent: React.FC = () => {
               <tbody className="divide-y divide-gray-100">
                 {reservations.map((row) => (
                   <tr key={row.name}>
-                    <td className="px-4 py-3 font-medium text-gray-900">
+                    <td className="px-4 py-3 font-medium text-foreground">
                       {row.component_item}
                     </td>
-                    <td className="px-4 py-3 text-right text-gray-700">
+                    <td className="px-4 py-3 text-right text-muted-foreground">
                       {formatQty(row.qty)}
                     </td>
-                    <td className="px-4 py-3 text-gray-700">{row.warehouse}</td>
-                    <td className="px-4 py-3 text-gray-700 font-mono text-xs">
+                    <td className="px-4 py-3 text-muted-foreground">{row.warehouse}</td>
+                    <td className="px-4 py-3 text-muted-foreground font-mono text-xs">
                       {row.order_ref}
                     </td>
                     <td className="px-4 py-3">
@@ -291,7 +291,7 @@ const StockReservationContent: React.FC = () => {
                         {row.status}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-gray-600">
+                    <td className="px-4 py-3 text-muted-foreground">
                       {formatDateTime(row.expires_at)}
                     </td>
                     <td className="px-4 py-3">

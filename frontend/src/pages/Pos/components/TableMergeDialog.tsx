@@ -121,7 +121,7 @@ const TableMergeDialog = ({
 
             <div className="max-h-64 overflow-y-auto px-6 pb-2">
               {mergeCandidates.length === 0 ? (
-                <p className="py-4 text-center text-sm text-gray-500">
+                <p className="py-4 text-center text-sm text-text-tertiary">
                   {t('tables.no_tables_to_merge')}
                 </p>
               ) : (
@@ -137,7 +137,7 @@ const TableMergeDialog = ({
                           'flex items-center gap-2 rounded-lg border-2 p-3 text-left transition-all',
                           isSelected
                             ? 'border-primary bg-primary-50'
-                            : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                            : 'border-border hover:border-border hover:bg-muted'
                         )}
                       >
                         <div
@@ -145,16 +145,16 @@ const TableMergeDialog = ({
                             'flex h-4 w-4 shrink-0 items-center justify-center rounded border',
                             isSelected
                               ? 'border-primary bg-primary text-white'
-                              : 'border-gray-300 bg-white'
+                              : 'border-border bg-white'
                           )}
                         >
                           {isSelected && <Check className="h-3 w-3" />}
                         </div>
                         <TableShapeIcon shape={table.table_shape || 'Rectangle'} />
                         <div className="min-w-0 flex-1">
-                          <span className="block truncate font-medium text-gray-900">{table.name}</span>
+                          <span className="block truncate font-medium text-foreground">{table.name}</span>
                           {typeof table.no_of_seats === 'number' && (
-                            <span className="text-xs text-gray-500">
+                            <span className="text-xs text-text-tertiary">
                               {t('tables.seats')}: {table.no_of_seats}
                             </span>
                           )}
@@ -187,7 +187,7 @@ const TableMergeDialog = ({
 
         {(phase === 'merging' || phase === 'done') && selectedTargets.size > 0 && (
           <div className="flex flex-col items-center px-6 py-8">
-            <p className="mb-6 text-sm font-medium text-gray-600">
+            <p className="mb-6 text-sm font-medium text-muted-foreground">
               {phase === 'done' ? t('tables.merge_success') : t('tables.merging_tables')}
             </p>
 
@@ -200,7 +200,7 @@ const TableMergeDialog = ({
                   )}
                 >
                   <TableShapeIcon shape={sourceTable.table_shape || 'Rectangle'} />
-                  <span className="mt-2 text-sm font-semibold text-gray-900">{sourceTable.name}</span>
+                  <span className="mt-2 text-sm font-semibold text-foreground">{sourceTable.name}</span>
                 </div>
 
                 <div
@@ -211,7 +211,7 @@ const TableMergeDialog = ({
                   )}
                 >
                   {phase === 'done' ? (
-                    <Check className="h-5 w-5 text-green-600" />
+                    <Check className="h-5 w-5 text-success" />
                   ) : (
                     <Link2 className="h-5 w-5 text-primary" />
                   )}
@@ -224,7 +224,7 @@ const TableMergeDialog = ({
                   )}
                 >
                   <TableShapeIcon shape={selectedTargetList[0].table_shape || 'Rectangle'} />
-                  <span className="mt-2 text-sm font-semibold text-gray-900">{selectedTargetList[0].name}</span>
+                  <span className="mt-2 text-sm font-semibold text-foreground">{selectedTargetList[0].name}</span>
                 </div>
               </div>
             ) : (
@@ -236,7 +236,7 @@ const TableMergeDialog = ({
                   )}
                 >
                   <TableShapeIcon shape={sourceTable.table_shape || 'Rectangle'} />
-                  <span className="mt-2 text-sm font-semibold text-gray-900">{sourceTable.name}</span>
+                  <span className="mt-2 text-sm font-semibold text-foreground">{sourceTable.name}</span>
                 </div>
 
                 <div
@@ -247,7 +247,7 @@ const TableMergeDialog = ({
                   )}
                 >
                   {phase === 'done' ? (
-                    <Check className="h-5 w-5 text-green-600" />
+                    <Check className="h-5 w-5 text-success" />
                   ) : (
                     <Link2 className="h-5 w-5 text-primary" />
                   )}
@@ -262,7 +262,7 @@ const TableMergeDialog = ({
                   {selectedTargetList.map((table) => (
                     <div key={table.name} className="flex flex-col items-center px-2 py-1">
                       <TableShapeIcon shape={table.table_shape || 'Rectangle'} />
-                      <span className="mt-1 text-xs font-semibold text-gray-900">{table.name}</span>
+                      <span className="mt-1 text-xs font-semibold text-foreground">{table.name}</span>
                     </div>
                   ))}
                 </div>

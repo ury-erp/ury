@@ -87,7 +87,7 @@ const TableActionsMenu = ({
       <Button
         variant="ghost"
         size="icon"
-        className="h-8 w-8 shrink-0 text-gray-600 hover:text-gray-900"
+        className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
         onClick={handleToggle}
         aria-label={t('tables.table_actions')}
         aria-expanded={isOpen}
@@ -96,12 +96,12 @@ const TableActionsMenu = ({
       </Button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+        <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border border-border bg-white py-1 shadow-lg">
           {isAvailable && (
             <>
               <Button
                 variant="ghost"
-                className="flex h-auto w-full justify-start gap-2 rounded-none px-4 py-2 text-sm font-normal text-gray-700 hover:bg-gray-100"
+                className="flex h-auto w-full justify-start gap-2 rounded-none px-4 py-2 text-sm font-normal text-muted-foreground hover:bg-muted"
                 onClick={handleMerge}
               >
                 <Link2 className="h-4 w-4 shrink-0" />
@@ -109,10 +109,10 @@ const TableActionsMenu = ({
               </Button>
               {canUnmerge && (
                 <>
-                  <div className="my-1 border-t border-gray-100" />
+                  <div className="my-1 border-t border-border" />
                   <Button
                     variant="ghost"
-                    className="flex h-auto w-full justify-start gap-2 rounded-none px-4 py-2 text-sm font-normal text-red-600 hover:bg-red-50"
+                    className="flex h-auto w-full justify-start gap-2 rounded-none px-4 py-2 text-sm font-normal text-destructive hover:bg-destructive-tint"
                     onClick={handleUnmerge}
                   >
                     <Unlink className="h-4 w-4 shrink-0" />
@@ -127,7 +127,7 @@ const TableActionsMenu = ({
             <>
               <Button
                 variant="ghost"
-                className="flex h-auto w-full justify-start gap-2 rounded-none px-4 py-2 text-sm font-normal text-gray-700 hover:bg-gray-100"
+                className="flex h-auto w-full justify-start gap-2 rounded-none px-4 py-2 text-sm font-normal text-muted-foreground hover:bg-muted"
                 onClick={handleMerge}
               >
                 <Link2 className="h-4 w-4 shrink-0" />
@@ -136,7 +136,7 @@ const TableActionsMenu = ({
               {onTransferTable && (
                 <Button
                   variant="ghost"
-                  className="flex h-auto w-full justify-start gap-2 rounded-none px-4 py-2 text-sm font-normal text-gray-700 hover:bg-gray-100"
+                  className="flex h-auto w-full justify-start gap-2 rounded-none px-4 py-2 text-sm font-normal text-muted-foreground hover:bg-muted"
                   onClick={handleTransferTable}
                 >
                   <ArrowRightLeft className="h-4 w-4 shrink-0" />
@@ -146,7 +146,7 @@ const TableActionsMenu = ({
               {showCaptainTransfer && onTransferCaptain && (
                 <Button
                   variant="ghost"
-                  className="flex h-auto w-full justify-start gap-2 rounded-none px-4 py-2 text-sm font-normal text-gray-700 hover:bg-gray-100"
+                  className="flex h-auto w-full justify-start gap-2 rounded-none px-4 py-2 text-sm font-normal text-muted-foreground hover:bg-muted"
                   onClick={handleTransferCaptain}
                 >
                   <UserRound className="h-4 w-4 shrink-0" />

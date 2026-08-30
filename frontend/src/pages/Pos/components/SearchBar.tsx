@@ -76,7 +76,7 @@ export default function SearchBar({
             variant="ghost"
             size="sm"
             className={cn(
-              "absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 p-0 text-gray-400 hover:text-gray-600 transition-all duration-200 hover:scale-110 active:scale-90",
+              "absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 p-0 text-text-tertiary hover:text-muted-foreground transition-all duration-200 hover:scale-110 active:scale-90",
               disabled && "opacity-50 cursor-not-allowed pointer-events-none"
             )}
             disabled={disabled}

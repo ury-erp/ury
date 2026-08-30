@@ -55,7 +55,7 @@ const TableCard = ({
       className={cn(
         'relative flex min-h-[15.5rem] flex-col rounded-lg border-2 bg-white p-4 transition-all',
         isOccupied
-          ? 'border-amber-400 bg-amber-50 text-amber-900'
+          ? 'border-amber-400 bg-warning-tint text-amber-900'
           : 'cursor-pointer border-emerald-300 bg-emerald-50 text-emerald-900 hover:border-emerald-400 hover:shadow-md',
         menuOpen ? 'z-20' : 'z-0',
         className
@@ -67,7 +67,7 @@ const TableCard = ({
             <div className="shrink-0">
               <TableShapeIcon shape={table.table_shape || 'Rectangle'} />
             </div>
-            <span className="truncate text-lg font-semibold text-gray-900" title={mergeGroupLabel ?? table.name}>
+            <span className="truncate text-lg font-semibold text-foreground" title={mergeGroupLabel ?? table.name}>
               {table.name}
             </span>
           </div>
@@ -102,7 +102,7 @@ const TableCard = ({
             : '\u00a0'}
         </p>
 
-        <div className="space-y-2 text-sm text-gray-700">
+        <div className="space-y-2 text-sm text-muted-foreground">
           <div className="flex items-center justify-between">
             <span className="font-medium">{t('tables.room')}</span>
             <span>{table.restaurant_room}</span>

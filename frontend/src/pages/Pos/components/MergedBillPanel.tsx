@@ -52,8 +52,8 @@ const MergedBillPanel = ({ order, onOpenSecondary }: MergedBillPanelProps) => {
     <div className="mb-6 rounded-lg border-2 border-primary-200 bg-primary-50/60 p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <Link2 className="h-4 w-4 text-gray-500" />
-          <h3 className="text-sm font-semibold text-gray-900">{t('bill_merge.merged_bill')}</h3>
+          <Link2 className="h-4 w-4 text-text-tertiary" />
+          <h3 className="text-sm font-semibold text-foreground">{t('bill_merge.merged_bill')}</h3>
         </div>
         {onOpenSecondary && (
           <Button
@@ -68,28 +68,28 @@ const MergedBillPanel = ({ order, onOpenSecondary }: MergedBillPanelProps) => {
         )}
       </div>
 
-      <div className="mb-3 flex items-center justify-between rounded-md border border-gray-200 bg-white px-3 py-2 text-sm">
-        <span className="font-medium text-gray-900">{secondaryName}</span>
-        <span className="font-semibold text-gray-900 tabular-nums">
+      <div className="mb-3 flex items-center justify-between rounded-md border border-border bg-white px-3 py-2 text-sm">
+        <span className="font-medium text-foreground">{secondaryName}</span>
+        <span className="font-semibold text-foreground tabular-nums">
           {formatCurrency(Math.round(order.custom_merged_total ?? 0))}
         </span>
       </div>
 
       {loading ? (
-        <div className="flex items-center gap-2 text-sm text-gray-500">
+        <div className="flex items-center gap-2 text-sm text-text-tertiary">
           <Spinner className="h-4 w-4" hideMessage  message={t('common.loading')} />
           {t('common.loading')}
         </div>
       ) : items.length > 0 ? (
         <div className="space-y-1">
-          <p className="mb-2 text-xs font-medium text-gray-600">{t('bill_merge.merged_items')}</p>
+          <p className="mb-2 text-xs font-medium text-muted-foreground">{t('bill_merge.merged_items')}</p>
           {items.map((item) => (
             <div
               key={item.name}
-              className="flex items-center justify-between rounded-md border border-gray-200 bg-white px-3 py-2 text-sm"
+              className="flex items-center justify-between rounded-md border border-border bg-white px-3 py-2 text-sm"
             >
-              <span className="truncate text-gray-900">{item.item_name}</span>
-              <span className="ms-2 shrink-0 text-gray-600 tabular-nums">
+              <span className="truncate text-foreground">{item.item_name}</span>
+              <span className="ms-2 shrink-0 text-muted-foreground tabular-nums">
                 {item.qty} × {formatCurrency(item.rate)}
               </span>
             </div>
@@ -98,7 +98,7 @@ const MergedBillPanel = ({ order, onOpenSecondary }: MergedBillPanelProps) => {
       ) : null}
 
       <div className="mt-3 flex items-center justify-between border-t border-primary-200 pt-3 text-sm">
-        <span className="font-medium text-gray-700">{t('bill_merge.combined_total')}</span>
+        <span className="font-medium text-muted-foreground">{t('bill_merge.combined_total')}</span>
         <span className="font-bold text-primary tabular-nums">{formatCurrency(combinedTotal)}</span>
       </div>
     </div>

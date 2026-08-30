@@ -38,7 +38,7 @@ const Footer = () => {
   ];
 
   return (
-    <div className="bg-white border-t border-gray-200 py-1.5 relative">
+    <div className="bg-white border-t border-border py-1.5 relative">
       <nav className="max-w-screen-xl mx-auto px-4">
         <div className="flex justify-center items-center gap-1">
           {navItems.map((item) => (
@@ -52,7 +52,7 @@ const Footer = () => {
                   'flex min-w-[4.5rem] flex-col items-center gap-1 rounded-md px-3 py-1.5 text-[13px] font-medium transition-colors',
                   isActive
                     ? 'text-primary font-semibold'
-                    : 'text-gray-600 hover:bg-primary-50 hover:text-primary'
+                    : 'text-muted-foreground hover:bg-primary-50 hover:text-primary'
                 )
               }
             >

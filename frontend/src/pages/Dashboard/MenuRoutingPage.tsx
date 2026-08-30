@@ -154,9 +154,9 @@ export const MenuRoutingPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="-mx-6 -mt-6 border-b border-gray-200 px-6 pb-4 pt-6">
-        <h1 className="text-xl font-semibold text-gray-900">Menu Sellability</h1>
-        <p className="mt-1 text-sm text-gray-500">
+      <div className="-mx-6 -mt-6 border-b border-border px-6 pb-4 pt-6">
+        <h1 className="text-xl font-semibold text-foreground">Menu Sellability</h1>
+        <p className="mt-1 text-sm text-text-tertiary">
           Real per-item availability from the server (`get_item_availability`) -- which catalog items can&apos;t be
           sold right now at this branch, and the server-reported reason. Station/recipe-version routing is not shown
           here; that data does not exist in the backend yet.
@@ -164,11 +164,11 @@ export const MenuRoutingPage: React.FC = () => {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center rounded-lg border border-gray-200 bg-white py-16">
+        <div className="flex items-center justify-center rounded-lg border border-border bg-white py-16">
           <Spinner className="h-8 w-8 text-primary" />
         </div>
       ) : error ? (
-        <Card className="border-red-200 bg-red-50 p-6 text-sm text-red-700">{error}</Card>
+        <Card className="border-destructive bg-destructive-tint p-6 text-sm text-destructive">{error}</Card>
       ) : (
         <>
           <KpiStrip

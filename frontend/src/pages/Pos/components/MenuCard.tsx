@@ -81,14 +81,14 @@ const MenuCard: FC<MenuCardProps> = ({
               const parent = target.parentElement;
               if (parent) {
                 const placeholder = document.createElement('div');
-                placeholder.className = 'w-full h-full bg-gray-200 flex items-center justify-center text-2xl text-gray-400 font-medium';
+                placeholder.className = 'w-full h-full bg-gray-200 flex items-center justify-center text-2xl text-text-tertiary font-medium';
                 placeholder.textContent = name.slice(0, 2).toUpperCase();
                 parent.insertBefore(placeholder, target);
               }
             }}
           />
         ) : (
-          <div className="w-full h-full bg-gray-200 flex items-center justify-center text-2xl text-gray-400 font-medium">
+          <div className="w-full h-full bg-gray-200 flex items-center justify-center text-2xl text-text-tertiary font-medium">
             {name.slice(0, 2).toUpperCase()}
           </div>
         )}
@@ -103,21 +103,21 @@ const MenuCard: FC<MenuCardProps> = ({
       <div className="flex-1 p-3 flex flex-col">
         {/* Name section - fixed height for 2 lines */}
         <div className="">
-          <h3 className="font-medium text-gray-900 text-sm leading-5 line-clamp-2" title={name}>
+          <h3 className="font-medium text-foreground text-sm leading-5 line-clamp-2" title={name}>
             {name}
           </h3>
         </div>
 
         {/* Course section - fixed height for 1 line */}
         <div className="h-5 mt-1">
-          <p className="text-xs text-gray-500 truncate" title={course}>
+          <p className="text-xs text-text-tertiary truncate" title={course}>
             {course || ' '}
           </p>
         </div>
 
         {/* Price section - pushed to bottom */}
         <div className="mt-auto pt-2">
-          <span className="text-sm font-semibold text-gray-900 tabular-nums">
+          <span className="text-sm font-semibold text-foreground tabular-nums">
             {formatCurrency(price)}
           </span>
         </div>

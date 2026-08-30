@@ -42,7 +42,7 @@ const PosLayout = () => {
       <KotAlertListener />
       <AuthGuard>
         <POSOpeningProvider>
-          <div className="flex flex-col h-screen bg-gray-100 font-inter">
+          <div className="flex flex-col h-screen bg-muted font-inter">
             <Header />
             <div className="flex-1 overflow-hidden">
               <Outlet />

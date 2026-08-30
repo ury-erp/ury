@@ -196,8 +196,8 @@ export const RequirementsPage: React.FC = () => {
   const materialsColumns: DataTableColumn<PlanComponentDemand>[] = [
     { key: 'component_item', header: 'Material', render: (row) => (
       <div>
-        <p className="font-semibold text-gray-900">{row.component_item_name || row.component_item}</p>
-        <p className="mt-0.5 text-xs text-gray-500">{row.component_item}</p>
+        <p className="font-semibold text-foreground">{row.component_item_name || row.component_item}</p>
+        <p className="mt-0.5 text-xs text-text-tertiary">{row.component_item}</p>
       </div>
     ) },
     { key: 'department', header: 'Department', render: (row) => row.department || '—' },
@@ -220,7 +220,7 @@ export const RequirementsPage: React.FC = () => {
   ];
 
   const productionColumns: DataTableColumn<ProductionTargetRow>[] = [
-    { key: 'item_code', header: 'Item', render: (row) => <span className="font-semibold text-gray-900">{row.item_code}</span> },
+    { key: 'item_code', header: 'Item', render: (row) => <span className="font-semibold text-foreground">{row.item_code}</span> },
     {
       key: 'department',
       header: 'Department',
@@ -246,21 +246,21 @@ export const RequirementsPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="-mx-6 -mt-6 border-b border-gray-200 px-6 pb-4 pt-6">
+      <div className="-mx-6 -mt-6 border-b border-border px-6 pb-4 pt-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h1 className="text-xl font-semibold text-gray-900">Requirements</h1>
-            <p className="mt-1 text-sm text-gray-500">
+            <h1 className="text-xl font-semibold text-foreground">Requirements</h1>
+            <p className="mt-1 text-sm text-text-tertiary">
               Materials and production targets derived from the approved Sales Plan.
               {planName && (
-                <span className="ml-1 text-gray-400">
+                <span className="ml-1 text-text-tertiary">
                   Plan {planName}{planStatus ? ` · ${planStatus}` : ''}
                 </span>
               )}
             </p>
           </div>
           <label className="relative block">
-            <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
             <Input
               aria-label="Requirements date"
               type="date"
@@ -273,11 +273,11 @@ export const RequirementsPage: React.FC = () => {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center rounded-lg border border-gray-200 bg-white py-16">
+        <div className="flex items-center justify-center rounded-lg border border-border bg-white py-16">
           <Spinner className="h-8 w-8 text-primary" />
         </div>
       ) : error ? (
-        <Card className="border-red-200 bg-red-50 p-6 text-sm text-red-700">{error}</Card>
+        <Card className="border-destructive bg-destructive-tint p-6 text-sm text-destructive">{error}</Card>
       ) : (
         <>
           <KpiStrip
@@ -317,8 +317,8 @@ export const RequirementsPage: React.FC = () => {
           />
 
           <div>
-            <h2 className="mb-2 text-sm font-semibold tracking-wide text-gray-700">
-              Materials to issue <span className="ml-1 text-xs font-normal text-gray-500">{demandVector.length} lines</span>
+            <h2 className="mb-2 text-sm font-semibold tracking-wide text-muted-foreground">
+              Materials to issue <span className="ml-1 text-xs font-normal text-text-tertiary">{demandVector.length} lines</span>
             </h2>
             <DataTable
               columns={materialsColumns}
@@ -328,8 +328,8 @@ export const RequirementsPage: React.FC = () => {
           </div>
 
           <div>
-            <h2 className="mb-2 text-sm font-semibold tracking-wide text-gray-700">
-              Production targets <span className="ml-1 text-xs font-normal text-gray-500">{productionItems.length} items</span>
+            <h2 className="mb-2 text-sm font-semibold tracking-wide text-muted-foreground">
+              Production targets <span className="ml-1 text-xs font-normal text-text-tertiary">{productionItems.length} items</span>
             </h2>
             <DataTable
               columns={productionColumns}

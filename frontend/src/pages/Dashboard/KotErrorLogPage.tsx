@@ -98,7 +98,7 @@ export const KotErrorLogPage: React.FC = () => {
   if (state === "error") {
     return (
       <Card className="p-4">
-        <p className="text-sm text-red-600">{errorMessage}</p>
+        <p className="text-sm text-destructive">{errorMessage}</p>
       </Card>
     );
   }

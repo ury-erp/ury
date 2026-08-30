@@ -19,20 +19,20 @@ const ClosingPaymentTable: React.FC<ClosingPaymentTableProps> = ({ rows, onChang
     <div className="w-full overflow-x-auto">
       <table className="w-full border-collapse">
         <thead>
-          <tr className="border-b border-gray-300 bg-gray-50">
-            <th className="text-left py-3 px-4 font-semibold text-gray-900">
+          <tr className="border-b border-border bg-muted">
+            <th className="text-left py-3 px-4 font-semibold text-foreground">
               Payment Mode
             </th>
-            <th className="text-right py-3 px-4 font-semibold text-gray-900">
+            <th className="text-right py-3 px-4 font-semibold text-foreground">
               Opening
             </th>
-            <th className="text-right py-3 px-4 font-semibold text-gray-900">
+            <th className="text-right py-3 px-4 font-semibold text-foreground">
               Expected
             </th>
-            <th className="text-center py-3 px-4 font-semibold text-gray-900">
+            <th className="text-center py-3 px-4 font-semibold text-foreground">
               Closing
             </th>
-            <th className="text-right py-3 px-4 font-semibold text-gray-900">
+            <th className="text-right py-3 px-4 font-semibold text-foreground">
               Difference
             </th>
           </tr>
@@ -45,15 +45,15 @@ const ClosingPaymentTable: React.FC<ClosingPaymentTableProps> = ({ rows, onChang
             return (
               <tr
                 key={row.mode_of_payment}
-                className="border-b border-gray-200 hover:bg-gray-50 transition-colors"
+                className="border-b border-border hover:bg-muted transition-colors"
               >
-                <td className="py-3 px-4 text-gray-900 font-medium">
+                <td className="py-3 px-4 text-foreground font-medium">
                   {row.mode_of_payment}
                 </td>
-                <td className="py-3 px-4 text-right text-gray-700">
+                <td className="py-3 px-4 text-right text-muted-foreground">
                   {formatCurrency(row.opening_amount)}
                 </td>
-                <td className="py-3 px-4 text-right text-gray-700">
+                <td className="py-3 px-4 text-right text-muted-foreground">
                   {formatCurrency(row.expected_amount)}
                 </td>
                 <td className="py-3 px-4">
@@ -73,7 +73,7 @@ const ClosingPaymentTable: React.FC<ClosingPaymentTableProps> = ({ rows, onChang
                 <td
                   className={cn(
                     'py-3 px-4 text-right font-medium',
-                    hasDifference ? 'text-red-600' : 'text-green-600'
+                    hasDifference ? 'text-destructive' : 'text-success'
                   )}
                 >
                   {formatCurrency(difference)}

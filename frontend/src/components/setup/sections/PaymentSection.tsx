@@ -65,7 +65,7 @@ export function PaymentSection() {
                 type="button"
                 variant="ghost"
                 onClick={() => deletePaymentMethod(method.id)}
-                className="text-red-500 hover:text-red-700 hover:bg-red-50 shrink-0 p-2 h-auto"
+                className="text-destructive hover:text-destructive hover:bg-destructive-tint shrink-0 p-2 h-auto"
                 title="Delete Method"
               >
                 <Trash2 className="w-4 h-4" />
@@ -76,7 +76,7 @@ export function PaymentSection() {
       </div>
 
       {fetchError && (
-        <p className="text-xs font-medium text-red-600">{fetchError}</p>
+        <p className="text-xs font-medium text-destructive">{fetchError}</p>
       )}
 
       <Button

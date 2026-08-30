@@ -348,36 +348,36 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
               <Spinner message={t('pos_closing.loading')} />
             </div>
           ) : loadError ? (
-            <p className="py-8 text-center text-sm text-red-600">{loadError}</p>
+            <p className="py-8 text-center text-sm text-destructive">{loadError}</p>
           ) : (
             <>
               <div className="mb-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
-                <div className="rounded-lg border border-gray-200 p-3">
-                  <p className="text-xs text-gray-500">{t('pos_closing.grand_total')}</p>
-                  <p className="text-lg font-semibold text-gray-900">
+                <div className="rounded-lg border border-border p-3">
+                  <p className="text-xs text-text-tertiary">{t('pos_closing.grand_total')}</p>
+                  <p className="text-lg font-semibold text-foreground">
                     {formatCurrency(totals.grandTotal)}
                   </p>
                 </div>
-                <div className="rounded-lg border border-gray-200 p-3">
-                  <p className="text-xs text-gray-500">{t('pos_closing.net_total')}</p>
-                  <p className="text-lg font-semibold text-gray-900">
+                <div className="rounded-lg border border-border p-3">
+                  <p className="text-xs text-text-tertiary">{t('pos_closing.net_total')}</p>
+                  <p className="text-lg font-semibold text-foreground">
                     {formatCurrency(totals.netTotal)}
                   </p>
                 </div>
-                <div className="rounded-lg border border-gray-200 p-3">
-                  <p className="text-xs text-gray-500">{t('pos_closing.total_qty')}</p>
-                  <p className="text-lg font-semibold text-gray-900">{totals.totalQty}</p>
+                <div className="rounded-lg border border-border p-3">
+                  <p className="text-xs text-text-tertiary">{t('pos_closing.total_qty')}</p>
+                  <p className="text-lg font-semibold text-foreground">{totals.totalQty}</p>
                 </div>
-                <div className="rounded-lg border border-gray-200 p-3">
-                  <p className="text-xs text-gray-500">{t('pos_closing.total_invoices')}</p>
-                  <p className="text-lg font-semibold text-gray-900">{invoiceCount}</p>
+                <div className="rounded-lg border border-border p-3">
+                  <p className="text-xs text-text-tertiary">{t('pos_closing.total_invoices')}</p>
+                  <p className="text-lg font-semibold text-foreground">{invoiceCount}</p>
                 </div>
               </div>
 
               {hasRows ? (
                 <ClosingPaymentTable rows={rows} onChange={handleRowChange} />
               ) : (
-                <p className="py-8 text-center text-sm text-gray-500">
+                <p className="py-8 text-center text-sm text-text-tertiary">
                   {t('pos_closing.no_invoices')}
                 </p>
               )}
@@ -386,7 +386,7 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
         </div>
 
         {submitError && (
-          <p className="px-6 pb-2 text-sm font-medium text-red-600">{submitError}</p>
+          <p className="px-6 pb-2 text-sm font-medium text-destructive">{submitError}</p>
         )}
 
         <DialogFooter>

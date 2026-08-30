@@ -237,7 +237,7 @@ export const DepartmentProfitabilityPage: React.FC = () => {
 
       {state === 'error' && (
         <Card className="p-4" data-testid="profitability-error">
-          <p className="text-sm text-red-600">{errorMessage}</p>
+          <p className="text-sm text-destructive">{errorMessage}</p>
         </Card>
       )}
 
@@ -253,7 +253,7 @@ export const DepartmentProfitabilityPage: React.FC = () => {
         <Card className="p-4" data-testid="profitability-table">
           <h3 className="text-sm font-semibold mb-2">Department Profitability</h3>
           {profitability.reason && (
-            <p className="text-xs text-amber-600 mb-2" data-testid="profitability-reason">
+            <p className="text-xs text-warning mb-2" data-testid="profitability-reason">
               {profitability.reason}
             </p>
           )}

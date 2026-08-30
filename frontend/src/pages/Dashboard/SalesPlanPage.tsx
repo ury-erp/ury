@@ -73,10 +73,10 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ item, onClose }) => {
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="history-modal-title">
       <button className="absolute inset-0 bg-black/40 backdrop-blur-sm" aria-label="Close history" onClick={onClose} />
       <div className="relative z-[101] w-full max-w-2xl overflow-hidden rounded-lg bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b border-gray-100 bg-gray-50 px-6 py-4">
+        <div className="flex items-center justify-between border-b border-border bg-muted px-6 py-4">
           <div>
-            <h2 id="history-modal-title" className="text-lg font-semibold text-gray-900">{item.item_name || item.item_code}</h2>
-            <p className="mt-1 text-sm text-gray-500">Comparable weekday sales history</p>
+            <h2 id="history-modal-title" className="text-lg font-semibold text-foreground">{item.item_name || item.item_code}</h2>
+            <p className="mt-1 text-sm text-text-tertiary">Comparable weekday sales history</p>
           </div>
           <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close history details">
             <X className="h-5 w-5" />
@@ -84,28 +84,28 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ item, onClose }) => {
         </div>
         <div className="p-6">
           <div className="mb-5 grid gap-3 sm:grid-cols-3">
-            <div className="rounded-md border border-gray-200 p-3">
-              <p className="text-xs font-medium text-gray-500">Average</p>
-              <p className="mt-1 text-xl font-semibold text-gray-900">{formatQty(item.average_qty)} {item.stock_uom}</p>
+            <div className="rounded-md border border-border p-3">
+              <p className="text-xs font-medium text-text-tertiary">Average</p>
+              <p className="mt-1 text-xl font-semibold text-foreground">{formatQty(item.average_qty)} {item.stock_uom}</p>
             </div>
-            <div className="rounded-md border border-gray-200 p-3">
-              <p className="text-xs font-medium text-gray-500">Sample Days</p>
-              <p className="mt-1 text-xl font-semibold text-gray-900">{item.sample_days}</p>
+            <div className="rounded-md border border-border p-3">
+              <p className="text-xs font-medium text-text-tertiary">Sample Days</p>
+              <p className="mt-1 text-xl font-semibold text-foreground">{item.sample_days}</p>
             </div>
-            <div className="rounded-md border border-gray-200 p-3">
-              <p className="text-xs font-medium text-gray-500">Production Unit</p>
-              <p className="mt-1 text-sm font-semibold text-gray-900">{item.production_unit || 'Unassigned'}</p>
+            <div className="rounded-md border border-border p-3">
+              <p className="text-xs font-medium text-text-tertiary">Production Unit</p>
+              <p className="mt-1 text-sm font-semibold text-foreground">{item.production_unit || 'Unassigned'}</p>
             </div>
           </div>
 
           {item.history.length === 0 ? (
-            <div className="rounded-md border border-dashed border-gray-300 p-8 text-center text-sm text-gray-500">
+            <div className="rounded-md border border-dashed border-border p-8 text-center text-sm text-text-tertiary">
               No prior comparable weekday sales found for this item.
             </div>
           ) : (
-            <div className="overflow-hidden rounded-lg border border-gray-200">
+            <div className="overflow-hidden rounded-lg border border-border">
               <table className="w-full text-left text-sm">
-                <thead className="bg-gray-50 text-xs font-semibold text-gray-500">
+                <thead className="bg-muted text-xs font-semibold text-text-tertiary">
                   <tr>
                     <th className="px-4 py-3">Date</th>
                     <th className="px-4 py-3 text-right">Net Qty</th>
@@ -115,9 +115,9 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ item, onClose }) => {
                 <tbody className="divide-y divide-gray-100">
                   {item.history.map((day) => (
                     <tr key={day.date}>
-                      <td className="px-4 py-3 font-medium text-gray-900">{day.label || day.date}</td>
-                      <td className="px-4 py-3 text-right text-gray-700">{formatQty(day.qty)}</td>
-                      <td className="px-4 py-3 text-right text-gray-500">{day.invoices ?? '-'}</td>
+                      <td className="px-4 py-3 font-medium text-foreground">{day.label || day.date}</td>
+                      <td className="px-4 py-3 text-right text-muted-foreground">{formatQty(day.qty)}</td>
+                      <td className="px-4 py-3 text-right text-text-tertiary">{day.invoices ?? '-'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -153,8 +153,8 @@ const LifecycleStepper: React.FC<LifecycleStepperProps> = ({ status }) => {
                 isActive
                   ? 'border-primary bg-primary/10 text-primary'
                   : isComplete
-                    ? 'border-gray-200 bg-gray-50 text-gray-500'
-                    : 'border-gray-200 bg-white text-gray-400'
+                    ? 'border-border bg-muted text-text-tertiary'
+                    : 'border-border bg-white text-text-tertiary'
               }`}
             >
               {step.label}
@@ -163,7 +163,7 @@ const LifecycleStepper: React.FC<LifecycleStepperProps> = ({ status }) => {
         );
       })}
       {isTerminalOther && (
-        <span className="ml-1 rounded-full border border-red-200 bg-red-50 px-3 py-1 text-xs font-medium text-red-600">
+        <span className="ml-1 rounded-full border border-destructive bg-destructive-tint px-3 py-1 text-xs font-medium text-destructive">
           Superseded/Cancelled
         </span>
       )}
@@ -371,17 +371,17 @@ export const SalesPlanPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="-mx-6 -mt-6 border-b border-gray-200 px-6 pb-4 pt-6">
+      <div className="-mx-6 -mt-6 border-b border-border px-6 pb-4 pt-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h1 className="text-xl font-semibold text-gray-900">Sales Plan</h1>
-            <p className="mt-1 text-sm text-gray-500">
+            <h1 className="text-xl font-semibold text-foreground">Sales Plan</h1>
+            <p className="mt-1 text-sm text-text-tertiary">
               We've suggested quantities based on similar days. Adjust anything you expect to be different, then submit the plan for approval.
             </p>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <label className="relative block">
-              <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
               <Input
                 aria-label="Plan date"
                 type="date"
@@ -411,12 +411,12 @@ export const SalesPlanPage: React.FC = () => {
         <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <LifecycleStepper status={planStatus} />
           {actionBlockedByRole && (
-            <p className="text-xs text-gray-500">Only managers can approve this plan.</p>
+            <p className="text-xs text-text-tertiary">Only managers can approve this plan.</p>
           )}
         </div>
 
         {transitionError && (
-          <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{transitionError}</p>
+          <p className="mt-3 rounded-md border border-destructive bg-destructive-tint px-3 py-2 text-sm text-destructive">{transitionError}</p>
         )}
       </div>
 
@@ -451,37 +451,37 @@ export const SalesPlanPage: React.FC = () => {
         />
       )}
 
-      <div className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm">
-        <Search className="h-4 w-4 shrink-0 text-gray-400" />
+      <div className="flex items-center gap-3 rounded-lg border border-border bg-white px-4 py-3 shadow-sm">
+        <Search className="h-4 w-4 shrink-0 text-text-tertiary" />
         <input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Search item, department, or production unit"
-          className="h-8 flex-1 border-none bg-transparent text-sm text-gray-900 outline-none placeholder:text-gray-400"
+          className="h-8 flex-1 border-none bg-transparent text-sm text-foreground outline-none placeholder:text-text-tertiary"
         />
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center rounded-lg border border-gray-200 bg-white py-16">
+        <div className="flex items-center justify-center rounded-lg border border-border bg-white py-16">
           <Spinner className="h-8 w-8 text-primary" />
         </div>
       ) : error ? (
-        <Card className="border-red-200 bg-red-50 p-6 text-sm text-red-700">{error}</Card>
+        <Card className="border-destructive bg-destructive-tint p-6 text-sm text-destructive">{error}</Card>
       ) : filteredItems.length === 0 ? (
-        <Card className="p-10 text-center text-sm text-gray-500">No comparable history items found for this plan date.</Card>
+        <Card className="p-10 text-center text-sm text-text-tertiary">No comparable history items found for this plan date.</Card>
       ) : (
         <div className="space-y-5">
           {Object.entries(groupedItems).map(([department, departmentItems]) => (
-            <div key={department} className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-              <div className="flex items-center justify-between border-b border-gray-100 bg-gray-50 px-5 py-3">
-                <h2 className="text-sm font-semibold tracking-wide text-gray-700">{department}</h2>
-                <span className="text-xs font-medium text-gray-500">
+            <div key={department} className="overflow-hidden rounded-lg border border-border bg-white shadow-sm">
+              <div className="flex items-center justify-between border-b border-border bg-muted px-5 py-3">
+                <h2 className="text-sm font-semibold tracking-wide text-muted-foreground">{department}</h2>
+                <span className="text-xs font-medium text-text-tertiary">
                   {formatQty(departmentItems.reduce((total, item) => total + item.planned_qty, 0))} planned
                 </span>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[760px] text-left text-sm">
-                  <thead className="border-b border-gray-100 bg-white text-xs font-semibold text-gray-500">
+                  <thead className="border-b border-border bg-white text-xs font-semibold text-text-tertiary">
                     <tr>
                       <th className="px-5 py-3">Item</th>
                       <th className="px-5 py-3">History Insight</th>
@@ -499,19 +499,19 @@ export const SalesPlanPage: React.FC = () => {
                           ref={(el) => {
                             rowRefs.current[item.item_code] = el;
                           }}
-                          className={`hover:bg-gray-50 ${
-                            highlightedItemCode === item.item_code ? 'bg-amber-50 transition-colors' : ''
+                          className={`hover:bg-muted ${
+                            highlightedItemCode === item.item_code ? 'bg-warning-tint transition-colors' : ''
                           }`}
                         >
                           <td className="px-5 py-4">
-                            <p className="font-semibold text-gray-900">{item.item_name || item.item_code}</p>
-                            <p className="mt-0.5 text-xs text-gray-500">{item.item_code}</p>
+                            <p className="font-semibold text-foreground">{item.item_name || item.item_code}</p>
+                            <p className="mt-0.5 text-xs text-text-tertiary">{item.item_code}</p>
                           </td>
                           <td className="px-5 py-4">
                             <button
                               type="button"
                               onClick={() => setSelectedHistoryItem(item)}
-                              className="inline-flex items-center gap-2 rounded-md px-2 py-1 text-left text-primary hover:bg-blue-50"
+                              className="inline-flex items-center gap-2 rounded-md px-2 py-1 text-left text-primary hover:bg-primary-tint"
                             >
                               <History className="h-4 w-4" />
                               <span>
@@ -519,7 +519,7 @@ export const SalesPlanPage: React.FC = () => {
                               </span>
                             </button>
                           </td>
-                          <td className="px-5 py-4 text-gray-600">{item.production_unit || 'Unassigned'}</td>
+                          <td className="px-5 py-4 text-muted-foreground">{item.production_unit || 'Unassigned'}</td>
                           <td className="px-5 py-4">
                             <Input
                               aria-label={`Plan quantity for ${item.item_name || item.item_code}`}
@@ -531,7 +531,7 @@ export const SalesPlanPage: React.FC = () => {
                               className="ml-auto w-28 text-right"
                             />
                           </td>
-                          <td className={`px-5 py-4 text-right font-semibold ${variance < 0 ? 'text-orange-600' : 'text-green-700'}`}>
+                          <td className={`px-5 py-4 text-right font-semibold ${variance < 0 ? 'text-orange-600' : 'text-success'}`}>
                             {variance > 0 ? '+' : ''}{formatQty(variance)}
                           </td>
                         </tr>

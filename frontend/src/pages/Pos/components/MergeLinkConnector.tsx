@@ -13,7 +13,7 @@ const MergeLinkConnector = ({ leftTable, rightTable }: MergeLinkConnectorProps) 
     aria-label={t('tables.merged_with_list', { tables: rightTable })}
     title={t('tables.merged_with_list', { tables: `${leftTable}, ${rightTable}` })}
   >
-    <Link2 className="h-5 w-5 shrink-0 text-blue-600" />
+    <Link2 className="h-5 w-5 shrink-0 text-primary" />
   </div>
 );
 

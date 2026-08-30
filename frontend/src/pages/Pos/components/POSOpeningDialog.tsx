@@ -19,19 +19,19 @@ const POSOpeningDialog = ({ onReload, type }: POSOpeningDialogProps) => {
             isOpeningIssue ? 'bg-red-100' : 'bg-orange-100'
           }`}>
             {isOpeningIssue ? (
-              <RefreshCw className="h-8 w-8 text-red-600" />
+              <RefreshCw className="h-8 w-8 text-destructive" />
             ) : (
               <AlertTriangle className="h-8 w-8 text-orange-600" />
             )}
           </div>
           
           {/* Title */}
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">
+          <h2 className="text-2xl font-bold text-foreground mb-4">
             {isOpeningIssue ? t('pos.not_opened_title') : t('pos.not_closed_title')}
           </h2>
 
           {/* Message */}
-          <p className="text-gray-600 mb-8 text-lg">
+          <p className="text-muted-foreground mb-8 text-lg">
             {isOpeningIssue ? t('pos.not_opened_message') : t('pos.not_closed_message')}
           </p>
 
@@ -47,7 +47,7 @@ const POSOpeningDialog = ({ onReload, type }: POSOpeningDialogProps) => {
           </div>
 
           {/* Recovery guidance */}
-          <p className="mt-4 text-sm text-gray-500">
+          <p className="mt-4 text-sm text-text-tertiary">
             {t('pos.contact_manager')}
           </p>
         </div>

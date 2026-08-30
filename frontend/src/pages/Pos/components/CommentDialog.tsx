@@ -30,8 +30,8 @@ const CommentDialog = ({ isOpen, onClose, onSave, initialComment = '' }: Comment
       <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <MessageSquare className="w-5 h-5 text-blue-600" />
-            <h2 className="text-lg font-semibold text-gray-900">
+            <MessageSquare className="w-5 h-5 text-primary" />
+            <h2 className="text-lg font-semibold text-foreground">
               {t('comment.title')}
             </h2>
           </div>
@@ -46,7 +46,7 @@ const CommentDialog = ({ isOpen, onClose, onSave, initialComment = '' }: Comment
         </div>
         
         <div className="mb-6">
-          <label htmlFor="comment" className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="comment" className="block text-sm font-medium text-muted-foreground mb-2">
             {t('comment.label')}
           </label>
           <textarea
@@ -54,7 +54,7 @@ const CommentDialog = ({ isOpen, onClose, onSave, initialComment = '' }: Comment
             value={comment}
             onChange={(e) => setComment(e.target.value)}
             placeholder={t('comment.placeholder')}
-            className="w-full h-32 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+            className="w-full h-32 px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-primary resize-none"
             autoFocus
           />
         </div>
