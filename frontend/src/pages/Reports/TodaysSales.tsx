@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
-import { KpiStrip, Input } from '@ury/ui';
+import { KpiStrip, Input, Page, Section } from '@ury/ui';
 import { useBranchContext } from '../../context/BranchContext';
 import { toApiDate } from '../../lib/reportDate';
 
@@ -55,7 +55,7 @@ export function TodaysSales() {
   }, [date, fetchData]);
 
   return (
-    <div className="space-y-6">
+    <Page>
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-semibold">Today's Sales</h1>
@@ -80,29 +80,35 @@ export function TodaysSales() {
       </div>
 
       {error && (
-        <div className="rounded-md border border-destructive-tint-border bg-destructive-tint px-4 py-3 text-sm text-destructive">
-          {error}
-        </div>
+        <Section>
+          <div className="rounded-md border border-destructive-tint-border bg-destructive-tint px-4 py-3 text-sm text-destructive">
+            {error}
+          </div>
+        </Section>
       )}
 
       {isLoading && !data ? (
-        <div className="text-sm text-muted-foreground">Loading...</div>
+        <Section>
+          <div className="text-sm text-muted-foreground">Loading...</div>
+        </Section>
       ) : data ? (
-        <KpiStrip
-          items={[
-            { label: 'Total Invoices', value: data.total_invoices },
-            { label: 'Item Total', value: formatCurrency(data.item_total) },
-            { label: 'Total Taxes & Charges', value: formatCurrency(data.total_taxes_and_charges) },
-            { label: 'Grand Total', value: formatCurrency(data.grand_total) },
-            { label: 'Round Off', value: formatCurrency(data.round_off) },
-            {
-              label: 'Cash Discounts',
-              value: formatCurrency(data.cash_discounts),
-              hint: data.cash_discounts !== 0 ? (data.cash_discounts < 0 ? 'given away' : 'owed to house') : undefined,
-            },
-          ]}
-        />
+        <Section>
+          <KpiStrip
+            items={[
+              { label: 'Total Invoices', value: data.total_invoices },
+              { label: 'Item Total', value: formatCurrency(data.item_total) },
+              { label: 'Total Taxes & Charges', value: formatCurrency(data.total_taxes_and_charges) },
+              { label: 'Grand Total', value: formatCurrency(data.grand_total) },
+              { label: 'Round Off', value: formatCurrency(data.round_off) },
+              {
+                label: 'Cash Discounts',
+                value: formatCurrency(data.cash_discounts),
+                hint: data.cash_discounts !== 0 ? (data.cash_discounts < 0 ? 'given away' : 'owed to house') : undefined,
+              },
+            ]}
+          />
+        </Section>
       ) : null}
-    </div>
+    </Page>
   );
 }
