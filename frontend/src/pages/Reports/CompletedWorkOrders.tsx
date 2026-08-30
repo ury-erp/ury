@@ -58,8 +58,13 @@ export function CompletedWorkOrders() {
 
   useEffect(() => {
     fetchData();
-const formatDate = (d: Date) => format(d, 'MMM d, yyyy');  const emptyMessage = 'No completed work orders from ' + formatDate(range.from) + ' to ' + formatDate(range.to) + '.';
   }, [fetchData]);
+
+  // These were previously declared inside the effect above, so the JSX below
+  // referenced an `emptyMessage` that was never in scope -- the page crashed
+  // with "emptyMessage is not defined" and rendered blank.
+  const formatDate = (d: Date) => format(d, 'MMM d, yyyy');
+  const emptyMessage = `No completed work orders from ${formatDate(range.from)} to ${formatDate(range.to)}.`;
 
   return (
     <Page>
