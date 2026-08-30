@@ -30,7 +30,7 @@ const buttonVariants = cva(
         destructive:
           "bg-destructive text-white shadow-sm hover:bg-destructive/90 active:bg-destructive active:brightness-95 active:shadow-none",
         outline:
-          "border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground hover:border-gray-300 active:bg-gray-100 active:shadow-none",
+          "border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground hover:border-border active:bg-accent/80 active:shadow-none",
         // Mockup's default `.btn`: inset 1px ring on a card surface instead
         // of a real border, so it sits flush against adjacent chrome. Kept
         // separate from `outline` (rather than changing it in place) because
@@ -42,9 +42,9 @@ const buttonVariants = cva(
         solid:
           "bg-foreground text-background shadow-none hover:bg-foreground/90 active:bg-foreground",
         secondary:
-          "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80 active:bg-gray-200 active:shadow-none",
+          "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80 active:bg-secondary/60 active:shadow-none",
         ghost:
-          "hover:bg-accent hover:text-accent-foreground active:bg-gray-200",
+          "hover:bg-accent hover:text-accent-foreground active:bg-accent/80",
         link: "underline-offset-4 hover:underline text-primary active:scale-100 active:text-primary-600",
         tab: "bg-gray-100 text-gray-700 font-medium border-0 hover:bg-gray-200 active:bg-gray-300 data-[selected=true]:bg-primary-50 data-[selected=true]:text-primary-700 data-[selected=true]:hover:bg-primary-100",
         success:

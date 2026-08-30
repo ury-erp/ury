@@ -28,7 +28,7 @@ const badgeVariants = cva(
         info: "border-transparent bg-primary-100 text-primary-800",
         pending: "border-transparent bg-warning-100 text-warning-800",
         completed: "border-transparent bg-success-100 text-success-800",
-        cancelled: "border-transparent bg-gray-100 text-gray-800",
+        cancelled: "border-transparent bg-muted text-muted-foreground",
       },
       // With leading-none these resolve to 20 / 24 / 28px pill heights — a
       // deliberate 4px step that mirrors the control scale below it.
