@@ -108,7 +108,7 @@ const Header = () => {
       <div className="flex items-center justify-between h-16 px-6">
         {/* Logo */}
         <div className="flex items-center">
-        <Link to="/dashboard" className="flex items-center gap-3" aria-label={t('header.shift_overview')} title={t('header.shift_overview')}>
+        <Link to="/pos/dashboard" className="flex items-center gap-3" aria-label={t('header.shift_overview')} title={t('header.shift_overview')}>
             <img
               src="/assets/ury/pos/ury_pos.png"
               alt="URY POS" 

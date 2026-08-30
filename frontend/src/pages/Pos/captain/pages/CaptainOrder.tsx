@@ -235,7 +235,7 @@ export default function CaptainOrder() {
 
       clearTableOrder();
       showToast.success(isUpdatingOrder ? 'Order updated.' : 'Order sent to kitchen.');
-      navigate('/order');
+      navigate('/pos/order');
     } catch (error) {
       console.error('Failed to sync order:', error);
       const serverMessages =
@@ -339,7 +339,7 @@ export default function CaptainOrder() {
     await tableTransfer(table, newTable, invoiceId);
     clearTableOrder();
     showToast.success('Table transferred.');
-    navigate('/order');
+    navigate('/pos/order');
   };
 
   const currentCaptain = context?.assignment?.waiter ?? '';
@@ -357,7 +357,7 @@ export default function CaptainOrder() {
     await captainTransfer(currentCaptain, newCaptain, invoiceId);
     clearTableOrder();
     showToast.success('Captain transferred.');
-    navigate('/order');
+    navigate('/pos/order');
   };
 
   const MIN_PAX = 1;
@@ -498,7 +498,7 @@ export default function CaptainOrder() {
         <div className="text-center">
           <p className="text-lg font-semibold text-red-600 mb-2">Unable to load this table</p>
           <p className="text-gray-600 text-sm">{contextError}</p>
-          <Button onClick={() => navigate('/order')} variant="outline" className="mt-4">
+          <Button onClick={() => navigate('/pos/order')} variant="outline" className="mt-4">
             Back to Tables
           </Button>
         </div>
@@ -514,7 +514,7 @@ export default function CaptainOrder() {
           <p className="text-gray-600 text-sm">
             You don't have access to view this table's order. It may belong to another captain.
           </p>
-          <Button onClick={() => navigate('/order')} variant="outline" className="mt-4">
+          <Button onClick={() => navigate('/pos/order')} variant="outline" className="mt-4">
             Back to Tables
           </Button>
         </div>
@@ -527,7 +527,7 @@ export default function CaptainOrder() {
       {/* Header */}
       <div className="sticky top-0 z-20 bg-white border-b border-gray-200 px-3 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Button onClick={() => navigate('/order')} variant="ghost" size="icon" aria-label="Back to Tables">
+          <Button onClick={() => navigate('/pos/order')} variant="ghost" size="icon" aria-label="Back to Tables">
             <ChevronLeft className="w-5 h-5" />
           </Button>
           <div>
