@@ -586,7 +586,7 @@ export default function CaptainOrder() {
 
       {!canModify && (
         <div className="px-3 pt-3">
-          <p className="text-sm text-warning bg-warning-tint border border-amber-200 rounded-lg px-3 py-2">
+          <p className="text-sm text-warning bg-warning-tint border border-warning-tint-border rounded-lg px-3 py-2">
             View only — you don't have permission to modify this table's order right now.
           </p>
         </div>

@@ -66,7 +66,7 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search menu"
-            className="w-full ps-9 pe-3 py-3 rounded-lg border border-border bg-muted text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full ps-9 pe-3 py-3 rounded-lg border border-border bg-muted text-base focus:outline-none focus:ring-2 focus:ring-primary"
           />
         </div>
 
@@ -99,7 +99,7 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
         </div>
 
         {!canAddItems && (
-          <p className="text-xs text-warning bg-warning-tint border border-amber-200 rounded px-3 py-2">
+          <p className="text-xs text-warning bg-warning-tint border border-warning-tint-border rounded px-3 py-2">
             You can browse the menu, but you don't have permission to add items to this order.
           </p>
         )}
