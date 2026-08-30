@@ -222,6 +222,62 @@ def _ensure_production_units(dept_names, branch_name):
 	return created
 
 
+def _ensure_production_item_groups():
+	"""Populate each Production Unit's ``URY Production Item Groups`` child
+	table (fieldname ``item_groups``, child fieldname ``item_group``) so the
+	*real* order-creation path (``ury_kot_generate.py::process_items_for_kot``)
+	can actually route a POS order: it matches each ordered item's
+	``item_group`` against this exact child table per Production Unit
+	(scoped by ``POS Profile.branch`` -> ``URY Production Unit.branch``).
+
+	``kot_seed.py`` seeds KOT tickets by setting ``URY KOT.production``
+	directly and does not touch this table, so without this step a real POS
+	order would find no routing match at all even though the KDS screens
+	already show seeded data -- this is the gap this function closes.
+
+	Uses ``DEPARTMENTS`` (the same production_unit -> item_groups mapping
+	``kot_seed.py``'s comments describe as authoritative) so seeded and
+	real-order routing agree. Every catalog.py item group
+	(``ITEM_GROUP_TO_DEPARTMENT`` covers all six) ends up in exactly one
+	unit's table; "Tandoor" intentionally gets none for now (no catalog.py
+	item group maps 1:1 to it yet -- kept for menu growth, matching
+	``DEPARTMENTS``' own comment) so it is not a silent gap, just an empty
+	unit until a Tandoor item group exists.
+
+	Idempotent: appends a child row only if that (parent, item_group) pair
+	isn't already present, so a second run adds no duplicates.
+	"""
+	updated = []
+	for d in DEPARTMENTS:
+		unit_name = d["production_unit"]
+		item_groups = d["item_groups"]
+		if not item_groups:
+			continue
+		if not frappe.db.exists("URY Production Unit", unit_name):
+			print(f"Skipped production item groups for {unit_name}: unit not found")
+			continue
+
+		existing = {
+			row.item_group
+			for row in frappe.get_all(
+				"URY Production Item Groups",
+				fields=["item_group"],
+				filters={"parent": unit_name, "parenttype": "URY Production Unit"},
+			)
+		}
+		missing = [ig for ig in item_groups if ig not in existing]
+		if not missing:
+			continue
+
+		doc = frappe.get_doc("URY Production Unit", unit_name)
+		for ig in missing:
+			doc.append("item_groups", {"item_group": ig})
+		doc.save(ignore_permissions=True)
+		updated.append(unit_name)
+		print(f"Added item groups {missing} to Production Unit {unit_name}")
+	return updated
+
+
 def _ensure_item_production_configurations(branch_name, dept_names):
 	"""One row per real Item that catalog.py seeded (its MENU_ITEMS), mapped
 	to a department/production_unit via ITEM_GROUP_TO_DEPARTMENT and a
@@ -409,6 +465,7 @@ def seed():
 		branch_name, company_name, warehouse, cost_center
 	)
 	production_units_created = _ensure_production_units(dept_names, branch_name)
+	production_item_groups_updated = _ensure_production_item_groups()
 	item_configs_created = _ensure_item_production_configurations(branch_name, dept_names)
 	report_settings = _ensure_report_settings(branch_name)
 	aggregators_created = _ensure_aggregators(branch_name)
@@ -420,6 +477,7 @@ def seed():
 		"company": company_name,
 		"departments_created": len(departments_created),
 		"production_units_created": len(production_units_created),
+		"production_item_groups_updated": production_item_groups_updated,
 		"item_configs_created": len(item_configs_created),
 		"report_settings_created": report_settings,
 		"aggregators_created": aggregators_created,
