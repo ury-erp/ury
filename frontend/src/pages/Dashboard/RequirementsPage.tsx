@@ -86,6 +86,7 @@ export const RequirementsPage: React.FC = () => {
   const [planCompany, setPlanCompany] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [stockData, setStockData] = useState<Map<string, any>>(new Map());
 
   const draftKey = useMemo(() => {
     if (!activeBranchId || activeBranchId === 'all' || !planCompany || !requirementsDate) return null;
@@ -165,10 +166,92 @@ export const RequirementsPage: React.FC = () => {
     };
   }, [activeBranchId, requirementsDate]);
 
+  // Fetch stock-on-hand data for the production items
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!activeBranchId || activeBranchId === 'all' || productionItems.length === 0) {
+      setStockData(new Map());
+      return;
+    }
+
+    (async () => {
+      try {
+        const items = productionItems.map((item) => ({
+          item_code: item.item_code,
+          department: item.department,
+        }));
+        const stockResults = await departmentStockService.getPlanStockOnHand(activeBranchId, items);
+        if (cancelled) return;
+
+        // Build a map for quick lookup: "item_code:department" -> stock data
+        const stockMap = new Map();
+        stockResults.forEach((stock) => {
+          const key = `${stock.item_code}:${stock.department || ''}`;
+          stockMap.set(key, stock);
+        });
+        setStockData(stockMap);
+      } catch {
+        // If stock fetch fails, continue with empty stock data so page still renders
+        setStockData(new Map());
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeBranchId, productionItems]);
+
   const departmentCount = useMemo(
     () => new Set(demandVector.map((row) => row.department).filter(Boolean)).size,
     [demandVector],
   );
+
+  // Compute KPI values from stock data and demand vector
+  const kpiMetrics = useMemo(() => {
+    let materialValue = 0;
+    let coveredByStock = 0;
+    let short = 0;
+    let toPurchase = 0;
+    let totalRequired = 0;
+    let hasUnresolvedWarehouse = false;
+
+    demandVector.forEach((row) => {
+      const key = `${row.component_item}:${row.department || ''}`;
+      const stock = stockData.get(key);
+
+      // Material value: sum of (required_qty * valuation_rate) for all items
+      if (stock && stock.resolved_from !== null && stock.valuation_rate !== null) {
+        materialValue += (row.required_qty || 0) * (stock.valuation_rate || 0);
+      } else if (!stock) {
+        // If no stock data returned at all, warehouse couldn't be resolved
+        hasUnresolvedWarehouse = true;
+      }
+
+      // Covered by stock: sum of actual stock that meets requirement
+      // Short: sum of unmet required_qty
+      if (stock && stock.resolved_from !== null && stock.allocatable_qty !== null) {
+        coveredByStock += Math.min(stock.allocatable_qty, row.required_qty || 0);
+        short += Math.max(0, (row.required_qty || 0) - (stock.allocatable_qty || 0));
+
+        // To purchase: sum of (short_qty * valuation_rate)
+        const shortQty = Math.max(0, (row.required_qty || 0) - (stock.allocatable_qty || 0));
+        toPurchase += shortQty * (stock.valuation_rate || 0);
+      } else if (!stock) {
+        hasUnresolvedWarehouse = true;
+      }
+
+      totalRequired += row.required_qty || 0;
+    });
+
+    return {
+      materialValue: materialValue.toFixed(2),
+      coveredByStock: totalRequired > 0 ? ((coveredByStock / totalRequired) * 100).toFixed(1) : '0.0',
+      short: short.toFixed(3),
+      toPurchase: toPurchase.toFixed(2),
+      hasUnresolvedWarehouse,
+    };
+  }, [demandVector, stockData]);
 
   const persistProductionQuantities = (nextItems: ProductionTargetRow[]) => {
     if (!draftKey) return;
@@ -213,11 +296,41 @@ export const RequirementsPage: React.FC = () => {
       key: 'in_store',
       header: 'In store',
       align: 'right',
-      render: () => (
-        <Badge variant="secondary" size="sm" title="No stock-on-hand data source exists yet">
-          Not available
-        </Badge>
-      ),
+      render: (row) => {
+        const key = `${row.component_item}:${row.department || ''}`;
+        const stock = stockData.get(key);
+
+        // If no stock data found or resolved_from is null, warehouse couldn't be resolved
+        if (!stock || stock.resolved_from === null) {
+          return (
+            <Badge variant="secondary" size="sm" title="No warehouse configured for this branch/department">
+              Not available
+            </Badge>
+          );
+        }
+
+        // Show warning if allocatable_qty is negative (data quality issue)
+        if (stock.allocatable_qty !== null && stock.allocatable_qty < 0) {
+          return (
+            <div className="flex items-center gap-2">
+              <span className={numericCellClass}>{formatQty(stock.allocatable_qty, row.stock_uom)}</span>
+              <span title="Negative stock indicates data quality issue">⚠️</span>
+            </div>
+          );
+        }
+
+        // Show the allocatable quantity
+        if (stock.allocatable_qty !== null) {
+          return <span className={numericCellClass}>{formatQty(stock.allocatable_qty, row.stock_uom)}</span>;
+        }
+
+        // Fallback to "Not available" if we somehow have stock data but no allocatable_qty
+        return (
+          <Badge variant="secondary" size="sm" title="Stock quantity unavailable">
+            Not available
+          </Badge>
+        );
+      },
     },
   ];
 
@@ -291,23 +404,23 @@ export const RequirementsPage: React.FC = () => {
             items={[
               {
                 label: 'Material value',
-                value: 'Not available',
-                hint: 'No cost data source for plan demand',
+                value: kpiMetrics.hasUnresolvedWarehouse ? 'Not available' : `${kpiMetrics.materialValue}`,
+                hint: kpiMetrics.hasUnresolvedWarehouse ? 'Some items have no warehouse configured' : 'Sum of required qty × valuation rate',
               },
               {
                 label: 'Covered by stock',
-                value: 'Not available',
-                hint: 'No stock-on-hand data source',
+                value: kpiMetrics.hasUnresolvedWarehouse ? 'Not available' : `${kpiMetrics.coveredByStock}%`,
+                hint: kpiMetrics.hasUnresolvedWarehouse ? 'Some items have no warehouse configured' : 'Percentage of demand covered by allocatable stock',
               },
               {
                 label: 'Short',
-                value: 'Not available',
-                hint: 'No stock-on-hand data source',
+                value: kpiMetrics.hasUnresolvedWarehouse ? 'Not available' : kpiMetrics.short,
+                hint: kpiMetrics.hasUnresolvedWarehouse ? 'Some items have no warehouse configured' : 'Total quantity short after allocating available stock',
               },
               {
                 label: 'To purchase',
-                value: `${demandVector.length} line${demandVector.length === 1 ? '' : 's'}`,
-                hint: `${departmentCount} department${departmentCount === 1 ? '' : 's'} · cost not available`,
+                value: kpiMetrics.hasUnresolvedWarehouse ? 'Not available' : `${kpiMetrics.toPurchase}`,
+                hint: kpiMetrics.hasUnresolvedWarehouse ? 'Some items have no warehouse configured' : 'Cost of items short (short qty × valuation rate)',
               },
             ]}
             />
@@ -316,11 +429,17 @@ export const RequirementsPage: React.FC = () => {
           <Section>
             <AttentionFeed
             title="Shortfalls"
-            items={[
+            items={kpiMetrics.hasUnresolvedWarehouse ? [
+              {
+                severity: 'warning',
+                title: 'Some items have no warehouse configured',
+                detail: `This branch or some departments are missing warehouse configuration, so stock-on-hand data cannot be resolved for those items. Configure a POS Profile warehouse for this branch and/or department warehouses for your production departments to enable full stock tracking.`,
+              },
+            ] : [
               {
                 severity: 'info',
-                title: 'Stock-on-hand data not available',
-                detail: `This workspace has no stock-on-hand data source yet, so automatic shortfall detection is not possible. ${demandVector.length} required-quantity line${demandVector.length === 1 ? '' : 's'} below need manual verification against store stock.`,
+                title: 'Stock-on-hand tracking enabled',
+                detail: `Real-time stock data is available for all items. Review the materials below to identify any shortages and create purchase orders as needed.`,
               },
             ]}
             />

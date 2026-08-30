@@ -171,6 +171,17 @@ export interface ActivePlan {
   demandVector: PlanComponentDemand[];
 }
 
+export interface PlanStockOnHand {
+  item_code: string;
+  department?: string;
+  warehouse?: string;
+  actual_qty?: number;
+  projected_qty?: number;
+  allocatable_qty?: number;
+  valuation_rate?: number;
+  resolved_from?: 'department' | 'pos_profile' | null;
+}
+
 const normalizeWastage = (row: any): WastageRow => ({
   name: String(row.name || ''),
   component_item: String(row.component_item || ''),
@@ -344,5 +355,31 @@ export const departmentStockService = {
       production_unit: params.production_unit,
     });
     return normalizeIssueAuthorization((res as any)?.message ?? res);
+  },
+
+  /**
+   * Fetches stock-on-hand data for a list of items on an approved Sales Plan,
+   * including actual/projected quantities and valuation rates. This data is
+   * used to compute "In store", "Cover", and material value metrics on the
+   * Requirements page.
+   *
+   * Returns `resolved_from: null` when no warehouse could be resolved for an
+   * item (no POS Profile for the branch, no department warehouse configured),
+   * so the frontend can render "Not available" rather than a zero quantity
+   * (since zero and unknown are different per the page's design premise).
+   */
+  async getPlanStockOnHand(
+    branch: string,
+    items: Array<{ item_code: string; department?: string }>,
+  ): Promise<PlanStockOnHand[]> {
+    if (!branch || branch === 'all' || !items || items.length === 0) {
+      return [];
+    }
+    const res = await call.get<any>('ury.ury.api.ury_requirements_stock.get_plan_stock_on_hand', {
+      branch,
+      items: JSON.stringify(items),
+    });
+    const result = (res as any)?.message ?? res;
+    return Array.isArray(result) ? result : [];
   },
 };
