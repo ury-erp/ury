@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
 import { Plus } from 'lucide-react';
-import { Page, Section, Panel, Card, Button, Input, Spinner, showToast } from '@ury/ui';
+import { Page, Section, Card, Button, Input, Spinner, showToast } from '@ury/ui';
 import { call } from '@ury/core';
 
 interface AggregatorSetting {
