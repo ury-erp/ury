@@ -47,12 +47,12 @@ const ScreenSizeDialog = () => {
           
           {/* Alternative Option */}
           <div className="bg-primary-tint rounded-lg p-4 mb-6">
-            <p className="text-sm text-blue-800 mb-3">
+            <p className="text-sm text-primary mb-3">
               You can use URY POS Version 1 for mobile devices.
             </p>
             <Button
               onClick={handleSwitchToVersion1}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 text-sm"
+              className="w-full bg-primary hover:bg-primary text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 text-sm"
             >
               <ExternalLink className="w-4 h-4 mr-2" />
               Switch to Version 1

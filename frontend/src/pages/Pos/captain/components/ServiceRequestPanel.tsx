@@ -118,7 +118,7 @@ const ServiceRequestPanel: React.FC<Props> = ({ branch }) => {
                       <Clock className="h-3 w-3" />
                       {timeElapsed(request.requested_at)}
                       {request.status === 'Acknowledged' && (
-                        <span className="ml-1 rounded bg-amber-100 px-1.5 py-0.5 text-warning">
+                        <span className="ml-1 rounded bg-warning-tint px-1.5 py-0.5 text-warning">
                           Acknowledged
                         </span>
                       )}
@@ -161,12 +161,12 @@ const ServiceRequestPanel: React.FC<Props> = ({ branch }) => {
         aria-label="Toggle service requests"
         className={cn(
           'relative flex h-12 w-12 items-center justify-center rounded-full shadow-lg transition-colors',
-          count > 0 ? 'bg-amber-500 text-white' : 'bg-white text-muted-foreground border border-border'
+          count > 0 ? 'bg-warning text-white' : 'bg-white text-muted-foreground border border-border'
         )}
       >
         <Bell className="h-5 w-5" />
         {count > 0 && (
-          <span className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-xs font-bold text-white">
+          <span className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 text-xs font-bold text-white">
             {count}
           </span>
         )}

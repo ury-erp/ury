@@ -53,7 +53,7 @@ function MissingPricesWarning({ sections }: { sections: MissingPriceSection[] })
   const totalItems = sections.reduce((sum, s) => sum + s.items.length, 0);
 
   return (
-    <div className="rounded-md border border-amber-200 bg-warning-tint text-amber-800 overflow-hidden">
+    <div className="rounded-md border border-amber-200 bg-warning-tint text-warning overflow-hidden">
       <button
         onClick={() => setExpanded((e) => !e)}
         className="w-full flex items-center justify-between gap-2 px-4 py-3 text-sm text-left"
@@ -74,7 +74,7 @@ function MissingPricesWarning({ sections }: { sections: MissingPriceSection[] })
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {s.items.map((item) => (
-                  <span key={item} className="px-2 py-0.5 rounded bg-amber-100 text-xs">
+                  <span key={item} className="px-2 py-0.5 rounded bg-warning-tint text-xs">
                     {item}
                   </span>
                 ))}
@@ -223,7 +223,7 @@ export function DailyPnl() {
       {isLoading ? (
         <div className="text-sm text-muted-foreground">Loading...</div>
       ) : !data?.exists ? (
-        <div className="rounded-md border border-amber-200 bg-warning-tint px-4 py-3 text-sm text-amber-800">
+        <div className="rounded-md border border-amber-200 bg-warning-tint px-4 py-3 text-sm text-warning">
           No submitted Daily P&amp;L exists for this branch/date. It must be created and submitted in Desk first.
         </div>
       ) : (
@@ -240,7 +240,7 @@ export function DailyPnl() {
               // Fallback for genuine free-text remarks (e.g. hand-typed via
               // Desk) that don't match the known structured warning shape.
               // Still never HTML-rendered — same rationale as above.
-              <div className="rounded-md border border-amber-200 bg-warning-tint px-4 py-3 text-sm text-amber-800">
+              <div className="rounded-md border border-amber-200 bg-warning-tint px-4 py-3 text-sm text-warning">
                 {data.remarks.split(/<br\s*\/?>/i).map((line, i) => (
                   <div key={i}>{line}</div>
                 ))}

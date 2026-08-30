@@ -318,7 +318,7 @@ export const SelfOrderingProfilePage: React.FC = () => {
           </div>
           <Button
             onClick={() => handleOpenForm()}
-            className="bg-blue-600 text-white hover:bg-blue-700"
+            className="bg-primary text-white hover:bg-primary"
           >
             <Plus className="w-4 h-4 mr-2" />
             New Profile
@@ -701,7 +701,7 @@ export const SelfOrderingProfilePage: React.FC = () => {
                 <Button
                   type="submit"
                   disabled={saving}
-                  className="bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-2"
+                  className="bg-primary text-white hover:bg-primary flex items-center gap-2"
                 >
                   {saving ? (
                     <>
@@ -721,7 +721,7 @@ export const SelfOrderingProfilePage: React.FC = () => {
                     setShowForm(false);
                     resetForm();
                   }}
-                  className="bg-gray-200 text-foreground hover:bg-gray-300"
+                  className="bg-muted text-foreground hover:bg-muted-foreground"
                 >
                   Cancel
                 </Button>
@@ -735,11 +735,11 @@ export const SelfOrderingProfilePage: React.FC = () => {
           <Card className="rounded-xl border border-border bg-white shadow-sm overflow-hidden">
             {profiles.length === 0 ? (
               <div className="p-12 text-center">
-                <Settings className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                <Settings className="w-12 h-12 text-text-tertiary mx-auto mb-3" />
                 <p className="text-text-tertiary font-medium mb-4">No profiles configured yet</p>
                 <Button
                   onClick={() => handleOpenForm()}
-                  className="bg-blue-600 text-white hover:bg-blue-700"
+                  className="bg-primary text-white hover:bg-primary"
                 >
                   <Plus className="w-4 h-4 mr-2" />
                   Create First Profile

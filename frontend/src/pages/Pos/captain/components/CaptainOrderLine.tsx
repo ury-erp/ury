@@ -52,8 +52,8 @@ const CaptainOrderLine: React.FC<CaptainOrderLineProps> = ({
           <span
             className={cn(
               'font-medium text-sm',
-              variant === 'delta' && 'text-blue-900',
-              variant === 'reduction' && 'text-red-900 line-through decoration-red-400',
+              variant === 'delta' && 'text-primary',
+              variant === 'reduction' && 'text-destructive line-through decoration-red-400',
               variant === 'confirmed' && 'text-foreground'
             )}
           >

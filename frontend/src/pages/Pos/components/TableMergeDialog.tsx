@@ -207,7 +207,7 @@ const TableMergeDialog = ({
                   className={cn(
                     'absolute left-1/2 z-10 flex h-10 w-10 -translate-x-1/2 items-center justify-center rounded-full bg-white shadow-md',
                     phase === 'merging' && 'animate-merge-link-pulse',
-                    phase === 'done' && 'bg-green-100'
+                    phase === 'done' && 'bg-success-tint'
                   )}
                 >
                   {phase === 'done' ? (
@@ -243,7 +243,7 @@ const TableMergeDialog = ({
                   className={cn(
                     'absolute left-1/2 top-1/2 z-10 flex h-10 w-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white shadow-md',
                     phase === 'merging' && 'animate-merge-link-pulse',
-                    phase === 'done' && 'bg-green-100'
+                    phase === 'done' && 'bg-success-tint'
                   )}
                 >
                   {phase === 'done' ? (

@@ -329,14 +329,14 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
                 const parent = target.parentElement;
                 if (parent) {
                   const placeholder = document.createElement('div');
-                  placeholder.className = 'w-full h-96 bg-gray-200 flex items-center justify-center text-[8rem] text-text-tertiary font-medium rounded-t-lg md:rounded-l-lg md:rounded-tr-none';
+                  placeholder.className = 'w-full h-96 bg-muted flex items-center justify-center text-[8rem] text-text-tertiary font-medium rounded-t-lg md:rounded-l-lg md:rounded-tr-none';
                   placeholder.textContent = itemDoc.name.slice(0, 2).toUpperCase();
                   parent.insertBefore(placeholder, target);
                 }
               }}
             />
           ) : (
-            <div className="w-full min-h-96 h-full bg-gray-200 flex items-center justify-center text-[8rem] text-text-tertiary font-medium rounded-t-lg md:rounded-l-lg md:rounded-tr-none">
+            <div className="w-full min-h-96 h-full bg-muted flex items-center justify-center text-[8rem] text-text-tertiary font-medium rounded-t-lg md:rounded-l-lg md:rounded-tr-none">
               {itemDoc?.name.slice(0, 2).toUpperCase()}
             </div>
           )}
@@ -358,7 +358,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
               <span className="text-sm text-text-tertiary">{selectedItem?.item}</span>
               {(selectedItem?.course_label || selectedItem?.course) && (
                 <>
-                  <span className="text-gray-300">•</span>
+                  <span className="text-text-tertiary">•</span>
                   <span className="text-sm font-medium text-primary">{selectedItem?.course_label || selectedItem?.course}</span>
                 </>
               )}

@@ -216,7 +216,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
 
   const getTableStatusColor = (occupied: number) => {
     return occupied
-      ? 'bg-amber-100 border-amber-300 text-amber-900 shadow-sm'
+      ? 'bg-warning-tint border-amber-300 text-warning shadow-sm'
       : 'bg-emerald-50 border-emerald-200 text-emerald-800 hover:shadow-md';
   };
 
@@ -307,7 +307,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
         </div>
         {isEditMode && (
           <>
-            <div className="absolute -top-1 -right-1 bg-blue-500 text-white rounded-full p-0.5 shadow-sm">
+            <div className="absolute -top-1 -right-1 bg-primary text-white rounded-full p-0.5 shadow-sm">
               <Move className="w-2 h-2" />
             </div>
           </>
@@ -378,7 +378,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
             className={cn(
               'flex items-center gap-2 px-4 py-2 rounded-lg shadow-lg text-sm font-medium border transition-all',
               isEditMode
-                ? 'bg-blue-600 hover:bg-blue-700 text-white border-green-700'
+                ? 'bg-primary hover:bg-primary text-white border-green-700'
                 : 'bg-white hover:bg-muted text-muted-foreground border-border'
             )}
           >
@@ -417,7 +417,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
         {/* Instructions */}
         <div className="absolute bottom-4 right-4 z-30 pointer-events-none">
           {isEditMode ? (
-            <div className="bg-blue-50/90 backdrop-blur border border-primary rounded-lg p-3 text-sm text-blue-800 shadow-lg">
+            <div className="bg-blue-50/90 backdrop-blur border border-primary rounded-lg p-3 text-sm text-primary shadow-lg">
               <div className="font-medium mb-1">{t('tables.editing_layout_hint_title')}</div>
               <div>{t('tables.drag_tables_hint')}</div>
               <div>{t('tables.autosave_hint')}</div>
@@ -572,7 +572,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
                   {selectedTableOrder && (
                     <div className="flex justify-between items-center pt-2 mt-2 border-t border-primary">
                       <span>{t('tables.total_amount')}</span>
-                      <span className="font-bold text-lg text-blue-800">
+                      <span className="font-bold text-lg text-primary">
                         {getCombinedOrderTotals(selectedTableOrder).roundedTotal.toFixed(2)}
                       </span>
                     </div>

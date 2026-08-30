@@ -76,7 +76,7 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
             className={cn(
               'shrink-0 px-4 py-2 rounded-full text-sm font-medium border',
               selectedCategory === ''
-                ? 'bg-blue-600 text-white border-primary'
+                ? 'bg-primary text-white border-primary'
                 : 'bg-white text-muted-foreground border-border'
             )}
           >
@@ -89,7 +89,7 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
               className={cn(
                 'shrink-0 px-4 py-2 rounded-full text-sm font-medium border',
                 selectedCategory === category.name
-                  ? 'bg-blue-600 text-white border-primary'
+                  ? 'bg-primary text-white border-primary'
                   : 'bg-white text-muted-foreground border-border'
               )}
             >

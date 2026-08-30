@@ -69,7 +69,7 @@ const CommentDialog = ({ isOpen, onClose, onSave, initialComment = '' }: Comment
           </Button>
           <Button
             onClick={handleSave}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700"
+            className="px-4 py-2 bg-primary hover:bg-primary"
           >
             {t('comment.save_button')}
           </Button>

@@ -57,7 +57,7 @@ const Sidebar = ({ disabled }: SidebarProps) => {
           >
             {/* Active indicator bar */}
             {selectedCategory === '' && (
-              <div className="absolute start-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-blue-600 rounded-e-full" />
+              <div className="absolute start-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-primary rounded-e-full" />
             )}
             
             <div className="flex items-center gap-3 ms-1">
@@ -71,7 +71,7 @@ const Sidebar = ({ disabled }: SidebarProps) => {
           </Button>
 
           {/* Divider */}
-          <div className="h-px bg-gray-200 my-3 mx-1" />
+          <div className="h-px bg-muted my-3 mx-1" />
 
           {/* Category Items */}
           <div className="space-y-1">
@@ -92,7 +92,7 @@ const Sidebar = ({ disabled }: SidebarProps) => {
                 >
                   {/* Active indicator bar */}
                   {selectedCategory === category.name && (
-                    <div className="absolute start-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-blue-600 rounded-e-full" />
+                    <div className="absolute start-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-primary rounded-e-full" />
                   )}
                   <div className="flex items-center gap-3 ms-1">
                     <CategoryIcon

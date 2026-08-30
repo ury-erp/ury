@@ -539,7 +539,7 @@ export default function Orders() {
                       />
                       <button
                         type="button"
-                        className="inline-flex items-center justify-center rounded-md p-2 bg-muted hover:bg-gray-200 text-muted-foreground focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="inline-flex items-center justify-center rounded-md p-2 bg-muted hover:bg-muted text-muted-foreground focus:outline-none focus:ring-2 focus:ring-blue-500"
                         aria-label="Edit order"
                         onClick={handleEditOrder}
                         disabled={editLoading}
@@ -549,7 +549,7 @@ export default function Orders() {
                       </button>
                       <button
                         type="button"
-                        className="inline-flex items-center justify-center rounded-md p-2 bg-muted hover:bg-gray-200 text-destructive focus:outline-none focus:ring-2 focus:ring-red-500"
+                        className="inline-flex items-center justify-center rounded-md p-2 bg-muted hover:bg-muted text-destructive focus:outline-none focus:ring-2 focus:ring-red-500"
                         aria-label="Cancel order"
                         onClick={() => setCancelDialogOpen(true)}
                       >
