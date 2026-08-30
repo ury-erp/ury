@@ -2,7 +2,9 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useBranchContext } from '../../context/BranchContext';
 import { logout, call, getLoggedUser, getUserRoles } from '@ury/core';
+import { Breadcrumbs } from './Breadcrumbs';
 import uryLogo from '../../../Public/URY-bg.png';
+import { buttonVariants } from '@ury/ui';
 import {
   Bell,
   User,
@@ -138,13 +140,15 @@ export const Header: React.FC = () => {
   };
 
   return (
-    <header className="sticky top-0 z-40 w-full bg-white border-b border-gray-200 shadow-sm">
-      <div className="flex items-center justify-between h-16 px-4 md:px-6">
-        {/* Left Section: Logo & Brand */}
-        <div className="flex items-center space-x-3">
-          <Link to="/dashboard" className="flex items-center space-x-3 group">
+    <header className="sticky top-0 z-40 w-full bg-background border-b border-border">
+      <div className="flex items-center justify-between h-12 px-4 md:px-6">
+        {/* Left Section: Logo, Brand & Breadcrumb */}
+        <div className="flex items-center space-x-4 min-w-0">
+          <Link to="/dashboard" className="flex items-center space-x-3 group shrink-0">
             <img src={uryLogo} alt="URY Logo" className="h-8 w-auto" />
           </Link>
+          <div className="hidden sm:block h-4 w-px bg-border shrink-0" />
+          <Breadcrumbs />
         </div>
 
         {/* Right Section: Actions, Notifications, Branch Selector, User Profile */}
@@ -153,13 +157,13 @@ export const Header: React.FC = () => {
           <div className="relative" ref={branchMenuRef}>
             <button
               onClick={() => setIsBranchDropdownOpen(!isBranchDropdownOpen)}
-              className="flex items-center space-x-2 px-3 py-1.5 bg-blue-50 hover:bg-blue-100/80 border border-blue-200 rounded-md text-sm font-medium text-primary transition-colors"
+              className="flex items-center space-x-2 h-7 px-2.5 bg-muted hover:bg-muted/70 rounded-[7px] text-sm font-medium text-foreground transition-colors"
             >
-              <Building2 className="w-4 h-4 text-primary" />
+              <Building2 className="w-4 h-4 text-muted-foreground" />
               <span className="max-w-[120px] sm:max-w-[160px] truncate">
                 {activeBranchId === 'all' ? 'All Branches' : (activeBranch?.name || 'Select Branch')}
               </span>
-              <ChevronDown className={`w-4 h-4 transition-transform ${isBranchDropdownOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${isBranchDropdownOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {isBranchDropdownOpen && (
@@ -214,7 +218,7 @@ export const Header: React.FC = () => {
           {/* Open POS */}
           <a
             href="/pos"
-            className="flex items-center space-x-2 px-3 py-1.5 bg-primary text-white hover:bg-primary/90 rounded-md text-sm font-medium transition-colors"
+            className={buttonVariants({ variant: 'default', size: 'xs', className: 'rounded-[7px] gap-2' })}
           >
             <ExternalLink className="w-4 h-4" />
             <span>Open POS</span>
@@ -223,12 +227,12 @@ export const Header: React.FC = () => {
           {/* Notifications Bell */}
           <button
             onClick={() => setIsNotificationOpen(true)}
-            className="relative p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+            className="relative flex items-center justify-center w-7 h-7 rounded-[7px] text-muted-foreground hover:bg-muted transition-colors"
             aria-label="Open notifications"
           >
-            <Bell className="w-5 h-5" />
+            <Bell className="w-4 h-4" />
             {unreadCount > 0 && (
-              <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-primary rounded-full ring-2 ring-white" />
+              <span className="absolute top-1 right-1 w-2 h-2 bg-primary rounded-full ring-2 ring-background" />
             )}
           </button>
 
@@ -236,13 +240,13 @@ export const Header: React.FC = () => {
           <div className="relative" ref={userMenuRef}>
             <button
               onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-              className="flex items-center gap-2 p-1 rounded-lg hover:bg-gray-100 transition-colors text-gray-600 hover:text-gray-900"
+              className="flex items-center gap-2 h-7 px-1 rounded-[7px] hover:bg-muted transition-colors text-foreground"
             >
-              <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-                <User className="w-4 h-4 text-white" />
+              <div className="w-6 h-6 bg-muted rounded-full flex items-center justify-center">
+                <User className="w-3.5 h-3.5 text-muted-foreground" />
               </div>
               <span className="text-sm font-medium">{userInfo.fullName}</span>
-              <ChevronDown className="w-4 h-4 text-gray-500" />
+              <ChevronDown className="w-4 h-4 text-muted-foreground" />
             </button>
 
             {isUserMenuOpen && (

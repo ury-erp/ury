@@ -53,7 +53,12 @@ const PhaseSegment: React.FC<PhaseSegmentProps> = ({ label, state }) => (
   />
 );
 
-export const DayStatusCard: React.FC = () => {
+interface DayStatusCardProps {
+  /** Renders a compact phase-strip-only version for the icon-only sidebar. */
+  isCollapsed?: boolean;
+}
+
+export const DayStatusCard: React.FC<DayStatusCardProps> = ({ isCollapsed = false }) => {
   const { activeBranchId } = useBranchContext();
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<boolean>(false);
@@ -99,6 +104,35 @@ export const DayStatusCard: React.FC = () => {
 
   const currentPhaseIndex = resolveCurrentPhaseIndex(planStatus?.status ?? null);
   const attentionCount = needsAttention.length;
+
+  if (isCollapsed) {
+    return (
+      <div
+        title={loading ? 'Loading…' : error ? 'Status unavailable' : planStatus?.status ?? 'No plan yet'}
+        className="mx-2 mt-0.5 mb-2.5 p-1.5 rounded-lg border border-gray-200 bg-white flex flex-col items-center gap-1.5"
+      >
+        <span
+          className={`inline-block w-1.5 h-1.5 rounded-full shrink-0 ${
+            loading ? 'bg-gray-300' : error ? 'bg-destructive' : 'bg-success-500'
+          }`}
+        />
+        <div className="flex flex-col gap-[3px] w-full">
+          {PHASES.map((phase, index) => (
+            <PhaseSegment
+              key={phase}
+              label={phase}
+              state={index < currentPhaseIndex ? 'done' : index === currentPhaseIndex ? 'current' : 'upcoming'}
+            />
+          ))}
+        </div>
+        {!loading && attentionCount > 0 && (
+          <Badge variant="warning" size="sm" className="h-4 px-1 text-[9px]">
+            {attentionCount}
+          </Badge>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="mx-2.5 mt-0.5 mb-2.5 p-2.5 rounded-lg border border-gray-200 bg-white">
