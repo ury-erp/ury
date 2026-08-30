@@ -1,30 +1,39 @@
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Warm-neutral palette retuned from tracks/sa-even-better/ury-app.html
+       (lines 11-23). See DESIGN_GAP.md for the root-cause analysis. */
+    --background: 60.0 11.1% 98.2%;
+    --foreground: 240.0 7.1% 5.5%;
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 240.0 7.1% 5.5%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
+    --popover-foreground: 240.0 7.1% 5.5%;
+    --primary: 221.0 69.1% 45.7%;
     --primary-foreground: 210 40% 98%;
-    --primary-50: 226 100% 97%;
-    --primary-100: 224 96% 90%;
-    --primary-200: 223 94% 82%;
-    --primary-300: 222 91% 69%;
-    --primary-400: 221 83% 53%;
-    --primary-500: 221 76% 47%;
-    --primary-600: 221 69% 42%;
-    --primary-700: 221 61% 36%;
-    --primary-800: 221 53% 30%;
-    --primary-900: 221 45% 24%;
-    --primary-950: 221 37% 18%;
+    --primary-50: 221 100% 97%;
+    --primary-100: 221 96% 93%;
+    --primary-200: 221 90% 86%;
+    --primary-300: 221 82% 76%;
+    --primary-400: 221 75% 62%;
+    --primary-500: 221.0 69.1% 45.7%;
+    --primary-600: 221 69% 40%;
+    --primary-700: 221 65% 34%;
+    --primary-800: 221 60% 28%;
+    --primary-900: 221 55% 22%;
+    --primary-950: 221 50% 16%;
+    --primary-tint: 220.0 66.7% 96.5%;
+    --primary-tint-border: 218.0 61.2% 86.9%;
     --secondary: 210 40% 96%;
     --secondary-foreground: 222.2 84% 4.9%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96%;
+    --muted: 60.0 4.8% 95.9%;
+    --muted-foreground: 216.0 5.2% 38.0%;
+    --text-tertiary: 213.3 4.0% 56.3%;
+    --text-quaternary: 210.0 5.3% 70.2%;
+    --accent: 60.0 3.7% 94.7%;
     --accent-foreground: 222.2 84% 4.9%;
+    --rail: 60.0 5.9% 96.7%;
+    --hair: 60.0 4.5% 91.4%;
+    --hair2: 60.0 4.3% 86.5%;
     --accent-50: 355 100% 97%;
     --accent-100: 353 96% 90%;
     --accent-200: 352 94% 82%;
@@ -40,37 +49,54 @@
        as raw Tailwind palette classes scattered through call sites (bg-amber-50,
        text-green-600); naming them here makes attention and health states part
        of the token system and lets them flip correctly in dark mode. */
-    --warning: 38 92% 50%;
+    --warning: 41.2 94.9% 31.0%;
     --warning-foreground: 26 52% 12%;
-    --warning-50: 48 100% 96%;
-    --warning-100: 45 96% 89%;
-    --warning-200: 43 96% 76%;
-    --warning-300: 41 96% 64%;
-    --warning-400: 38 92% 50%;
-    --warning-500: 36 84% 45%;
-    --warning-600: 34 80% 40%;
-    --warning-700: 32 75% 34%;
-    --warning-800: 30 68% 28%;
-    --warning-900: 28 60% 23%;
-    --warning-950: 26 52% 17%;
-    --success: 142 76% 36%;
+    --warning-50: 41 90% 96%;
+    --warning-100: 41 88% 90%;
+    --warning-200: 41 90% 80%;
+    --warning-300: 41 93% 68%;
+    --warning-400: 41 95% 55%;
+    --warning-500: 41.2 94.9% 31.0%;
+    --warning-600: 41 92% 27%;
+    --warning-700: 41 88% 23%;
+    --warning-800: 41 82% 19%;
+    --warning-900: 41 75% 15%;
+    --warning-950: 41 65% 10%;
+    --warning-tint: 40.9 78.6% 94.5%;
+    --warning-tint-border: 43.3 61.4% 82.7%;
+    --success: 154.8 70.4% 27.8%;
     --success-foreground: 210 40% 98%;
-    --success-50: 138 76% 97%;
-    --success-100: 141 84% 93%;
-    --success-200: 141 79% 85%;
-    --success-300: 142 77% 73%;
-    --success-400: 142 69% 58%;
-    --success-500: 142 71% 45%;
-    --success-600: 142 76% 36%;
-    --success-700: 142 72% 29%;
-    --success-800: 143 64% 24%;
-    --success-900: 144 61% 20%;
-    --success-950: 145 80% 10%;
-    --destructive: 0 84.2% 60.2%;
+    --success-50: 155 40% 96%;
+    --success-100: 155 42% 90%;
+    --success-200: 155 45% 80%;
+    --success-300: 155 50% 68%;
+    --success-400: 155 60% 50%;
+    --success-500: 154.8 70.4% 27.8%;
+    --success-600: 155 68% 24%;
+    --success-700: 155 65% 20%;
+    --success-800: 155 60% 16%;
+    --success-900: 155 55% 12%;
+    --success-950: 155 50% 8%;
+    --success-tint: 146.7 33.3% 94.7%;
+    --success-tint-border: 147.9 31.1% 82.4%;
+    --destructive: 4.4 65.9% 44.9%;
     --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
+    --destructive-50: 4.4 90% 97%;
+    --destructive-100: 4.4 85% 92%;
+    --destructive-200: 4.4 80% 84%;
+    --destructive-300: 4.4 75% 73%;
+    --destructive-400: 4.4 70% 60%;
+    --destructive-500: 4.4 65.9% 44.9%;
+    --destructive-600: 4.4 66% 39%;
+    --destructive-700: 4.4 62% 33%;
+    --destructive-800: 4.4 58% 27%;
+    --destructive-900: 4.4 54% 21%;
+    --destructive-950: 4.4 50% 15%;
+    --destructive-tint: 8.0 78.9% 96.3%;
+    --destructive-tint-border: 8.8 61.2% 86.9%;
+    --border: 60.0 4.5% 91.4%;
+    --input: 60.0 4.5% 91.4%;
+    --ring: 221.0 69.1% 45.7%;
     --radius: 0.5rem;
     --gray-50: 240 20% 99%;
     --gray-100: 240 20% 97%;
@@ -91,6 +117,15 @@
     --dialog-max-height: 90vh;
   }
 
+  /* This task only retunes light mode; the mockup driving it
+     (tracks/sa-even-better/ury-app.html) is light-mode-only. Dark mode is
+     left functionally as-is — background/foreground/card/muted/accent/border
+     stay untouched (independently tuned, out of scope) — except that
+     --destructive was widened to add a 50-950 ramp matching the new light-mode
+     shape (hue/DEFAULT unchanged) so `bg-destructive-500` etc. resolve in both
+     themes, and --ring was left at its existing dark value (not derived from
+     the new light --primary). Dark warning/success hues (38 and 142) are close
+     enough to the new light hues (41.2 and 154.8) that no change was needed. */
   .dark {
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
@@ -156,6 +191,17 @@
     --success-950: 138 84% 88%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
+    --destructive-50: 0 40% 10%;
+    --destructive-100: 0 42% 14%;
+    --destructive-200: 0 46% 19%;
+    --destructive-300: 0 50% 25%;
+    --destructive-400: 0 55% 30.6%;
+    --destructive-500: 0 62.8% 30.6%;
+    --destructive-600: 0 64% 38%;
+    --destructive-700: 0 68% 48%;
+    --destructive-800: 0 72% 58%;
+    --destructive-900: 0 78% 68%;
+    --destructive-950: 0 84% 78%;
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 224.3 76.3% 94.1%;

@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { call } from '@ury/core';
-import { Input } from '@ury/ui';
+import { Card, Input } from '@ury/ui';
 import { Search, Sun, IndianRupee, Package, Ban, ArrowRight } from 'lucide-react';
-import { reportsRegistry, categoryColors, type ReportEntry } from './reportsRegistry';
+import { reportsRegistry, type ReportEntry } from './reportsRegistry';
 import { useBranchContext } from '../../context/BranchContext';
 import { toApiDate } from '../../lib/reportDate';
 
@@ -169,14 +169,15 @@ export function ReportsHome() {
         <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
           autoFocus
+          variant="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search reports by name or category…"
-          className="pl-10"
+          className="pl-10 rounded-lg"
           size="lg"
         />
         {query.trim() && (
-          <div className="mt-3 border rounded-lg divide-y overflow-hidden">
+          <div className="mt-3 border border-border rounded-lg divide-y divide-border overflow-hidden">
             {filtered.length === 0 ? (
               <p className="px-4 py-3 text-sm text-muted-foreground">No reports match {query}.</p>
             ) : (
@@ -211,8 +212,7 @@ export function ReportsHome() {
                 key={h.path}
                 to={h.path}
                 onClick={() => goToReport({ path: h.path, label: h.label, group: h.category })}
-                className="flex items-center justify-between gap-2 rounded-lg border p-3 hover:bg-accent hover:text-accent-foreground transition-colors"
-                style={{ borderLeft: `3px solid ${categoryColors[h.category] ?? '#e5e7eb'}` }}
+                className="flex items-center justify-between gap-2 rounded-lg border border-border p-3 hover:bg-accent hover:text-accent-foreground transition-colors"
               >
                 <div>
                   <div className="text-sm font-medium">{h.label}</div>
@@ -230,29 +230,36 @@ export function ReportsHome() {
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
             Start here
           </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {startHere.map((card) => {
               const Icon = card.icon;
-              const color = categoryColors[card.group] ?? '#2563eb';
               return (
                 <Link
                   key={card.id}
                   to={card.path}
                   onClick={() => goToReport({ path: card.path, label: card.label, group: card.group })}
-                  className="rounded-xl border bg-white p-5 hover:shadow-md transition-shadow flex flex-col gap-3"
-                  style={{ borderLeft: `4px solid ${color}` }}
                 >
-                  <div className="flex items-center gap-2">
-                    <Icon className="h-5 w-5 shrink-0" style={{ color }} />
-                    <span className="text-sm font-semibold">{card.label}</span>
-                  </div>
-                  {card.value ? (
-                    <div className="text-2xl font-bold tabular-nums">{card.value}</div>
-                  ) : card.fallback ? (
-                    <div className="text-sm text-muted-foreground">{card.fallback}</div>
-                  ) : (
-                    <div className="text-sm text-muted-foreground">View report</div>
-                  )}
+                  <Card
+                    variant="ghost"
+                    className="border border-border shadow-none hover:bg-accent hover:border-input transition-colors flex flex-col gap-2"
+                  >
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Icon className="h-3.5 w-3.5 shrink-0" />
+                      <span className="text-[11px]">{card.label}</span>
+                    </div>
+                    {card.value ? (
+                      <div className="text-[25px] font-semibold leading-[1.15] tracking-tight tabular-nums">
+                        {card.value}
+                      </div>
+                    ) : card.fallback ? (
+                      <div className="text-sm text-muted-foreground">{card.fallback}</div>
+                    ) : (
+                      <div className="flex items-center gap-1.5 text-sm font-medium">
+                        View report
+                        <ArrowRight className="h-3.5 w-3.5" />
+                      </div>
+                    )}
+                  </Card>
                 </Link>
               );
             })}
