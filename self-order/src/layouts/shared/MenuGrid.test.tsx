@@ -49,14 +49,14 @@ describe('MenuGrid availability gating (self-order)', () => {
       available_qty: 4,
       reason_code: 'AVAILABLE',
     })
-    const onAdd = vi.fn()
+    const onItemClick = vi.fn()
 
     render(
       <MenuGrid
         menu={[sellableItem]}
         cart={{}}
-        capabilities={undefined}
-        onAdd={onAdd}
+        showImage={false}
+        onItemClick={onItemClick}
         gridClassName="grid"
         cardClassName="card"
         branch="Kozhikode"
@@ -68,7 +68,7 @@ describe('MenuGrid availability gating (self-order)', () => {
     expect(screen.queryByText(/not available|sold out|unavailable/i)).not.toBeInTheDocument()
 
     await userEvent.click(screen.getByText('Veg Fried Rice'))
-    expect(onAdd).toHaveBeenCalledWith(sellableItem)
+    expect(onItemClick).toHaveBeenCalledWith(sellableItem)
   })
 
   it('disables an unsellable item and shows its reason-code message', async () => {
@@ -78,14 +78,14 @@ describe('MenuGrid availability gating (self-order)', () => {
       available_qty: 0,
       reason_code: 'NOT_PRODUCED',
     })
-    const onAdd = vi.fn()
+    const onItemClick = vi.fn()
 
     render(
       <MenuGrid
         menu={[unavailableItem]}
         cart={{}}
-        capabilities={undefined}
-        onAdd={onAdd}
+        showImage={false}
+        onItemClick={onItemClick}
         gridClassName="grid"
         cardClassName="card"
         branch="Kozhikode"
@@ -96,7 +96,7 @@ describe('MenuGrid availability gating (self-order)', () => {
     expect(await screen.findByText('Not available today')).toBeInTheDocument()
 
     await userEvent.click(screen.getByText('Chicken Curry'))
-    expect(onAdd).not.toHaveBeenCalled()
+    expect(onItemClick).not.toHaveBeenCalled()
   })
 
   it('skips the availability check entirely (renders unattenuated) when company is missing', async () => {
@@ -104,8 +104,8 @@ describe('MenuGrid availability gating (self-order)', () => {
       <MenuGrid
         menu={[sellableItem]}
         cart={{}}
-        capabilities={undefined}
-        onAdd={vi.fn()}
+        showImage={false}
+        onItemClick={vi.fn()}
         gridClassName="grid"
         cardClassName="card"
         branch="Kozhikode"
