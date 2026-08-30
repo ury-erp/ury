@@ -221,7 +221,7 @@ export function fuzzyMatchIcon(courseName?: string): string | undefined {
     [/\bchinese\b/, 'Soup'],
     [/\bnoodles?\b/, 'Soup'],
     [/\bmanchurian\b/, 'Soup'],
-    [/\bstarters?\b/, 'Flame'],
+    [/\bstarters?\b/, 'EggFried'],
     [/\bappetizers?\b/, 'Flame'],
     [/\bshrimps?\b/, 'Shrimp'],
     [/\bseafood\b/, 'Fish'],
