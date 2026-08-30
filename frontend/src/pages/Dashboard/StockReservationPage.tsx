@@ -24,15 +24,15 @@ const formatQty = (value: number) => (Number.isInteger(value) ? String(value) : 
 const getStatusBadgeClass = (status: string) => {
   switch (status) {
     case 'Reserved':
-      return 'inline-flex items-center rounded-full bg-primary-tint px-2.5 py-0.5 text-xs font-medium text-blue-800';
+      return 'inline-flex items-center rounded-full bg-primary-tint px-2.5 py-0.5 text-xs font-medium text-primary';
     case 'Fulfilled':
-      return 'inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800';
+      return 'inline-flex items-center rounded-full bg-success-tint px-2.5 py-0.5 text-xs font-medium text-success';
     case 'Released':
       return 'inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-foreground';
     case 'Expired':
-      return 'inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800';
+      return 'inline-flex items-center rounded-full bg-warning-tint px-2.5 py-0.5 text-xs font-medium text-yellow-800';
     case 'Cancelled':
-      return 'inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800';
+      return 'inline-flex items-center rounded-full bg-destructive-tint px-2.5 py-0.5 text-xs font-medium text-destructive';
     default:
       return 'inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-foreground';
   }

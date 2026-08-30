@@ -70,7 +70,7 @@ export function ProgressModal({
         {/* Segmented Top Bar */}
         <div className="flex px-10 pt-10 pb-6 gap-1">
           {Array.from({ length: totalSteps }).map((_, i) => {
-            const segmentProgress = i <= activeIndex ? 'bg-primary' : 'bg-gray-200';
+            const segmentProgress = i <= activeIndex ? 'bg-primary' : 'bg-muted';
             return (
               <div key={i} className={`flex-1 h-1.5 rounded-full ${segmentProgress}`} />
             );

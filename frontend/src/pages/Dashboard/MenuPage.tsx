@@ -453,7 +453,7 @@ export const MenuPage: React.FC = () => {
                 {item.image ? (
                   <img src={item.image} alt={item.item_name} className="w-full h-full object-cover" />
                 ) : (
-                  <div className="w-full h-full bg-gray-200 flex items-center justify-center text-2xl text-text-tertiary font-medium select-none">
+                  <div className="w-full h-full bg-muted flex items-center justify-center text-2xl text-text-tertiary font-medium select-none">
                     {(item.item_name || 'IT').slice(0, 2).toUpperCase()}
                   </div>
                 )}
@@ -513,12 +513,12 @@ export const MenuPage: React.FC = () => {
                   <td className="px-6 py-4 font-bold text-primary">{formatCurrency(item.rate || 0)}</td>
                   <td className="px-6 py-4">
                     <div className="flex justify-center">
-                      {item.special_dish ? <Check className="w-4 h-4 text-green-500" /> : <X className="w-4 h-4 text-gray-300" />}
+                      {item.special_dish ? <Check className="w-4 h-4 text-success" /> : <X className="w-4 h-4 text-text-tertiary" />}
                     </div>
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex justify-center">
-                      {item.disabled ? <Check className="w-4 h-4 text-destructive" /> : <X className="w-4 h-4 text-gray-300" />}
+                      {item.disabled ? <Check className="w-4 h-4 text-destructive" /> : <X className="w-4 h-4 text-text-tertiary" />}
                     </div>
                   </td>
                   <td className="px-6 py-4 text-right">

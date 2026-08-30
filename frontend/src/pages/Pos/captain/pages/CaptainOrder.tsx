@@ -409,7 +409,7 @@ export default function CaptainOrder() {
 
       {activeOrders.length === 0 && alreadyOrderedLines.length === 0 ? (
         <div className="flex flex-col items-center justify-center text-center py-16">
-          <ClipboardList className="w-10 h-10 text-gray-300 mb-3" />
+          <ClipboardList className="w-10 h-10 text-text-tertiary mb-3" />
           <p className="text-text-tertiary text-sm">No items yet.</p>
           {canModify && (
             <Button onClick={() => setMode('menu')} variant="outline" size="sm" className="mt-3 lg:hidden">
@@ -559,7 +559,7 @@ export default function CaptainOrder() {
                 <ClipboardList className="w-4 h-4" />
                 Order
                 {activeOrders.length > 0 && (
-                  <span className="ms-0.5 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded-full bg-blue-600 text-white text-xs">
+                  <span className="ms-0.5 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded-full bg-primary text-white text-xs">
                     {activeOrders.length}
                   </span>
                 )}
@@ -586,7 +586,7 @@ export default function CaptainOrder() {
 
       {!canModify && (
         <div className="px-3 pt-3">
-          <p className="text-sm text-amber-800 bg-warning-tint border border-amber-200 rounded-lg px-3 py-2">
+          <p className="text-sm text-warning bg-warning-tint border border-amber-200 rounded-lg px-3 py-2">
             View only — you don't have permission to modify this table's order right now.
           </p>
         </div>

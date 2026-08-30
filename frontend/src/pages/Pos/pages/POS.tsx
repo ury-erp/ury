@@ -59,7 +59,7 @@ export default function POS() {
         'flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-colors',
         quickFilter === filter
           ? 'bg-primary-tint text-primary'
-          : 'bg-muted text-muted-foreground hover:bg-gray-200',
+          : 'bg-muted text-muted-foreground hover:bg-muted',
         isMenuInteractionDisabled() && 'opacity-50 cursor-not-allowed pointer-events-none'
       )}
       disabled={isMenuInteractionDisabled()}

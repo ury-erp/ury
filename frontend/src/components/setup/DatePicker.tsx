@@ -203,7 +203,7 @@ export function DatePicker({
             {calendarDays.map((item, index) => {
               if (!item.isCurrentMonth) {
                 return (
-                  <div key={index} className="text-sm py-1.5 text-gray-300 select-none">
+                  <div key={index} className="text-sm py-1.5 text-text-tertiary select-none">
                     {item.day}
                   </div>
                 );

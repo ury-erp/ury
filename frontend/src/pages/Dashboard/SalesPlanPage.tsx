@@ -146,7 +146,7 @@ const LifecycleStepper: React.FC<LifecycleStepperProps> = ({ status }) => {
         return (
           <React.Fragment key={step.key}>
             {index > 0 && (
-              <div className={`h-px w-6 shrink-0 ${isComplete || isActive ? 'bg-primary' : 'bg-gray-200'}`} />
+              <div className={`h-px w-6 shrink-0 ${isComplete || isActive ? 'bg-primary' : 'bg-muted'}`} />
             )}
             <div
               className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium ${

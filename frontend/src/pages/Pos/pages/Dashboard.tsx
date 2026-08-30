@@ -72,7 +72,7 @@ function formatOpenSessionDate(dateString: string): string {
 type StageKey = 'open' | 'seated' | 'fired' | 'served' | 'over';
 
 const STAGES: { key: StageKey; label: string; bar: string; chip: string; dot: string }[] = [
-  { key: 'open', label: 'Open', bar: 'bg-gray-300', chip: 'bg-muted text-muted-foreground ring-gray-200', dot: 'bg-gray-400' },
+  { key: 'open', label: 'Open', bar: 'bg-muted-foreground', chip: 'bg-muted text-muted-foreground ring-gray-200', dot: 'bg-muted-foreground' },
   { key: 'seated', label: 'Seated', bar: 'bg-primary-200', chip: 'bg-primary-50 text-primary-700 ring-primary-200', dot: 'bg-primary-200' },
   { key: 'fired', label: 'Fired', bar: 'bg-primary-400', chip: 'bg-primary-50 text-primary-800 ring-primary-300', dot: 'bg-primary-400' },
   { key: 'served', label: 'Served', bar: 'bg-primary-700', chip: 'bg-primary-100 text-primary-900 ring-primary-400', dot: 'bg-primary-700' },
@@ -429,7 +429,7 @@ export default function Dashboard() {
                   <h2
                     className={cn(
                       'text-sm font-semibold',
-                      hasHighSeverity ? 'text-red-900' : 'text-warning-900'
+                      hasHighSeverity ? 'text-destructive' : 'text-warning-900'
                     )}
                   >
                     Needs Attention
@@ -457,7 +457,7 @@ export default function Dashboard() {
                         <p
                           className={cn(
                             'text-sm',
-                            item.severity === 'high' ? 'font-medium text-red-900' : 'text-warning-900'
+                            item.severity === 'high' ? 'font-medium text-destructive' : 'text-warning-900'
                           )}
                         >
                           {item.message}
@@ -674,7 +674,7 @@ export default function Dashboard() {
                             {formatETA(item.eta_minutes)}
                           </span>
                         </div>
-                        <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200">
+                        <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
                           <div
                             className={cn('h-full rounded-full', critical ? 'bg-destructive' : 'bg-warning-400')}
                             style={{ width: `${pct}%` }}
@@ -710,7 +710,7 @@ export default function Dashboard() {
                           {waiter.table_count}
                         </span>
                       </div>
-                      <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200">
+                      <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
                         <div
                           className="h-full rounded-full bg-primary"
                           style={{ width: `${(waiter.table_count / maxTableCount) * 100}%` }}

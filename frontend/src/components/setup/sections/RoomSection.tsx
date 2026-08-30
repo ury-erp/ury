@@ -125,7 +125,7 @@ function RoomRow({ room, canDelete, renameRoom, deleteRoom, previewShrink, setRo
 
       {pendingShrink && (
         <div className="rounded-md border border-amber-300 bg-warning-tint p-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:justify-between">
-          <p className="text-sm text-amber-900">
+          <p className="text-sm text-warning">
             Remove {pendingShrink.tables.map((t) => t.name).join(' and ')}? This can't be undone.
           </p>
           <div className="flex gap-2 shrink-0">

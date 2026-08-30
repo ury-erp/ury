@@ -81,14 +81,14 @@ const MenuCard: FC<MenuCardProps> = ({
               const parent = target.parentElement;
               if (parent) {
                 const placeholder = document.createElement('div');
-                placeholder.className = 'w-full h-full bg-gray-200 flex items-center justify-center text-2xl text-text-tertiary font-medium';
+                placeholder.className = 'w-full h-full bg-muted flex items-center justify-center text-2xl text-text-tertiary font-medium';
                 placeholder.textContent = name.slice(0, 2).toUpperCase();
                 parent.insertBefore(placeholder, target);
               }
             }}
           />
         ) : (
-          <div className="w-full h-full bg-gray-200 flex items-center justify-center text-2xl text-text-tertiary font-medium">
+          <div className="w-full h-full bg-muted flex items-center justify-center text-2xl text-text-tertiary font-medium">
             {name.slice(0, 2).toUpperCase()}
           </div>
         )}

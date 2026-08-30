@@ -60,7 +60,7 @@ const CaptainTableCard = ({
       ? 'border-sky-400 bg-sky-50 text-sky-900'
       : ownership === 'free'
         ? 'border-emerald-300 bg-emerald-50 text-emerald-900'
-        : 'border-amber-400 bg-warning-tint text-amber-900';
+        : 'border-amber-400 bg-warning-tint text-warning';
 
   const statusLabel = isBilled
     ? 'Billed'
