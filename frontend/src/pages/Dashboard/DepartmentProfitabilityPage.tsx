@@ -32,6 +32,7 @@ import { departmentStockService, DepartmentOption } from '../../services/departm
 
 const NO_ACCESS_ROLES = new Set(['Cashier', 'URY Cashier', 'Captain', 'URY Captain']);
 const QUANTITY_ONLY_ROLES = new Set(['Chef', 'URY Chef', 'Production', 'URY Production']);
+const FULL_ACCESS_ROLES = new Set(['Administrator', 'System Manager']);
 
 type LoadState = 'loading' | 'empty' | 'populated' | 'error' | 'denied';
 
@@ -74,8 +75,9 @@ export const DepartmentProfitabilityPage: React.FC = () => {
   const [state, setState] = useState<LoadState>('loading');
   const [errorMessage, setErrorMessage] = useState<string>('');
 
-  const isDenied = roles !== null && roles.some((r) => NO_ACCESS_ROLES.has(r));
-  const canSeeCost = roles !== null && !roles.some((r) => QUANTITY_ONLY_ROLES.has(r));
+  const hasFullAccess = roles !== null && roles.some((r) => FULL_ACCESS_ROLES.has(r));
+  const isDenied = roles !== null && !hasFullAccess && roles.some((r) => NO_ACCESS_ROLES.has(r));
+  const canSeeCost = roles !== null && (hasFullAccess || !roles.some((r) => QUANTITY_ONLY_ROLES.has(r)));
 
   const branch = selectedBranch !== 'all' ? selectedBranch : activeBranch?.id || '';
 

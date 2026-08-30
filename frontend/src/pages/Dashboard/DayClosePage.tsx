@@ -25,6 +25,7 @@ import { uryDashboardService, DailyPnlSummary, PlanStatus } from '../../services
  */
 
 const NO_ACCESS_ROLES = new Set(['Cashier', 'URY Cashier', 'Captain', 'URY Captain']);
+const FULL_ACCESS_ROLES = new Set(['Administrator', 'System Manager']);
 
 type LoadState = 'loading' | 'empty' | 'populated' | 'error' | 'denied';
 
@@ -102,7 +103,7 @@ export const DayClosePage: React.FC = () => {
   const [state, setState] = useState<LoadState>('loading');
   const [errorMessage, setErrorMessage] = useState<string>('');
 
-  const isDenied = roles !== null && roles.some((r) => NO_ACCESS_ROLES.has(r));
+  const isDenied = roles !== null && !roles.some((r) => FULL_ACCESS_ROLES.has(r)) && roles.some((r) => NO_ACCESS_ROLES.has(r));
 
   const branch = selectedBranch !== 'all' ? selectedBranch : activeBranch?.id || '';
 
