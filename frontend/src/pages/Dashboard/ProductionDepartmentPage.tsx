@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
-import { Building, Plus, Edit2 } from 'lucide-react';
-import { Card, Button, Input, Select, Spinner, showToast } from '@ury/ui';
+import { Plus } from 'lucide-react';
+import { Button, Input, Select, Spinner, showToast } from '@ury/ui';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { dashboardService } from '../../services/dashboard';
 import { call } from '@ury/core';
@@ -208,46 +208,46 @@ export const ProductionDepartmentPage: React.FC = () => {
       </div>
 
       {loading ? (
-        <div className="py-16 flex items-center justify-center bg-card rounded-lg border border-border">
+        <div className="py-16 flex items-center justify-center bg-card rounded-[9px] border border-hair">
           <Spinner className="w-8 h-8 text-primary" />
         </div>
       ) : departments.length === 0 ? (
-        <Card className="p-12 flex flex-col items-center justify-center text-center rounded-lg border border-border shadow-sm bg-card">
-          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-            <Building className="w-6 h-6 text-primary" />
-          </div>
-          <h3 className="text-lg font-semibold text-foreground mb-1">No Production Departments Configured</h3>
-          <p className="text-text-tertiary mb-6 max-w-sm">
-            Add production departments to organize kitchen operations and control policies.
-          </p>
+        <div className="px-4 py-[18px] text-xs text-text-tertiary flex items-center gap-2.5 bg-card border border-hair rounded-[9px]">
+          <span>Add production departments to organize kitchen operations and control policies.</span>
           <Button
             onClick={openAddDrawer}
-            className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center space-x-1.5 shadow-xs"
+            variant="chrome"
+            size="compactSm"
+            className="ml-auto"
           >
-            <Plus className="w-4 h-4" />
-            <span>Add Production Department</span>
+            <Plus className="w-3.5 h-3.5" />
+            <span>Add Dept</span>
           </Button>
-        </Card>
+        </div>
       ) : (
-        <div className="bg-card rounded-lg border border-border shadow-sm overflow-hidden">
+        <div className="bg-card border border-hair rounded-[9px] overflow-hidden">
           <table className="w-full text-left text-sm text-muted-foreground">
-            <thead className="bg-muted border-b border-border text-xs text-text-tertiary font-semibold">
+            <thead className="border-b border-hair">
               <tr>
-                <th className="px-6 py-4">Department</th>
-                <th className="px-6 py-4">Company</th>
-                <th className="px-6 py-4">Branch</th>
-                <th className="px-6 py-4">Warehouse</th>
-                <th className="px-6 py-4">Policy</th>
+                <th className="px-[14px] py-[7px] text-[11px] font-medium text-text-tertiary text-left">Department</th>
+                <th className="px-[14px] py-[7px] text-[11px] font-medium text-text-tertiary text-left">Company</th>
+                <th className="px-[14px] py-[7px] text-[11px] font-medium text-text-tertiary text-left">Branch</th>
+                <th className="px-[14px] py-[7px] text-[11px] font-medium text-text-tertiary text-left">Warehouse</th>
+                <th className="px-[14px] py-[7px] text-[11px] font-medium text-text-tertiary text-left">Policy</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-hair">
               {departments.map((dept) => (
                 <tr key={dept.name} className="transition-colors cursor-pointer hover:bg-muted" onClick={() => openEditDrawer(dept)}>
-                  <td className="px-6 py-4 font-semibold text-foreground">{dept.department_name || dept.name}</td>
-                  <td className="px-6 py-4">{dept.company || '-'}</td>
-                  <td className="px-6 py-4">{dept.branch || '-'}</td>
-                  <td className="px-6 py-4">{dept.department_warehouse || '-'}</td>
-                  <td className="px-6 py-4 text-xs bg-primary-tint text-primary rounded px-2 py-1 inline-block">{dept.issue_control_policy || 'Plan Controlled'}</td>
+                  <td className="px-[14px] py-2 text-[12.5px] font-semibold text-foreground">{dept.department_name || dept.name}</td>
+                  <td className="px-[14px] py-2 text-[12.5px]">{dept.company || '-'}</td>
+                  <td className="px-[14px] py-2 text-[12.5px]">{dept.branch || '-'}</td>
+                  <td className="px-[14px] py-2 text-[12.5px]">{dept.department_warehouse || '-'}</td>
+                  <td className="px-[14px] py-2 text-[12.5px]">
+                    <span className="inline-flex items-center gap-[5px] text-[11px] h-[19px] px-[7px] rounded-[5px] text-muted-foreground bg-muted">
+                      {dept.issue_control_policy || 'Plan Controlled'}
+                    </span>
+                  </td>
                 </tr>
               ))}
             </tbody>
