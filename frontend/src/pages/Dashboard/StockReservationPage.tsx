@@ -21,20 +21,23 @@ const formatDateTime = (value?: string) => {
 
 const formatQty = (value: number) => (Number.isInteger(value) ? String(value) : value.toFixed(2));
 
+const TAG_BASE =
+  'inline-flex items-center gap-[5px] h-[19px] rounded-[5px] px-[7px] text-[11px] font-medium';
+
 const getStatusBadgeClass = (status: string) => {
   switch (status) {
     case 'Reserved':
-      return 'inline-flex items-center rounded-full bg-primary-tint px-2.5 py-0.5 text-xs font-medium text-primary';
+      return `${TAG_BASE} bg-primary-tint text-primary`;
     case 'Fulfilled':
-      return 'inline-flex items-center rounded-full bg-success-tint px-2.5 py-0.5 text-xs font-medium text-success';
+      return `${TAG_BASE} bg-success-tint text-success`;
     case 'Released':
-      return 'inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-foreground';
+      return `${TAG_BASE} bg-muted text-foreground`;
     case 'Expired':
-      return 'inline-flex items-center rounded-full bg-warning-tint px-2.5 py-0.5 text-xs font-medium text-yellow-800';
+      return `${TAG_BASE} bg-warning-tint text-warning`;
     case 'Cancelled':
-      return 'inline-flex items-center rounded-full bg-destructive-tint px-2.5 py-0.5 text-xs font-medium text-destructive';
+      return `${TAG_BASE} bg-destructive-tint text-destructive`;
     default:
-      return 'inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-foreground';
+      return `${TAG_BASE} bg-muted text-foreground`;
   }
 };
 
@@ -273,7 +276,7 @@ const StockReservationContent: React.FC = () => {
                   <th className="px-4 py-3">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-hair">
                 {reservations.map((row) => (
                   <tr key={row.name}>
                     <td className="px-4 py-3 font-medium text-foreground">

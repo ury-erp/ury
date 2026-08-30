@@ -112,7 +112,7 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ item, onClose }) => {
                     <th className="px-4 py-3 text-right">Invoices</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-hair">
                   {item.history.map((day) => (
                     <tr key={day.date}>
                       <td className="px-4 py-3 font-medium text-foreground">{day.label || day.date}</td>
@@ -149,12 +149,12 @@ const LifecycleStepper: React.FC<LifecycleStepperProps> = ({ status }) => {
               <div className={`h-px w-6 shrink-0 ${isComplete || isActive ? 'bg-primary' : 'bg-muted'}`} />
             )}
             <div
-              className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium ${
+              className={`inline-flex h-[19px] items-center gap-[5px] rounded-[5px] px-[7px] text-[11px] font-medium ${
                 isActive
-                  ? 'border-primary bg-primary/10 text-primary'
+                  ? 'bg-primary-tint text-primary'
                   : isComplete
-                    ? 'border-border bg-muted text-text-tertiary'
-                    : 'border-border bg-card text-text-tertiary'
+                    ? 'bg-muted text-text-tertiary'
+                    : 'bg-muted/50 text-text-tertiary'
               }`}
             >
               {step.label}
@@ -163,7 +163,7 @@ const LifecycleStepper: React.FC<LifecycleStepperProps> = ({ status }) => {
         );
       })}
       {isTerminalOther && (
-        <span className="ml-1 rounded-full border border-destructive-tint-border bg-destructive-tint px-3 py-1 text-xs font-medium text-destructive">
+        <span className="ml-1 inline-flex h-[19px] items-center gap-[5px] rounded-[5px] bg-destructive-tint px-[7px] text-[11px] font-medium text-destructive">
           Superseded/Cancelled
         </span>
       )}
@@ -490,7 +490,7 @@ export const SalesPlanPage: React.FC = () => {
                       <th className="px-5 py-3 text-right">Variance</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody className="divide-y divide-hair">
                     {departmentItems.map((item) => {
                       const variance = getVariance(item);
                       return (
@@ -531,7 +531,7 @@ export const SalesPlanPage: React.FC = () => {
                               className="ml-auto w-28 text-right"
                             />
                           </td>
-                          <td className={`px-5 py-4 text-right font-semibold ${variance < 0 ? 'text-orange-600' : 'text-success'}`}>
+                          <td className={`px-5 py-4 text-right font-semibold ${variance < 0 ? 'text-warning' : 'text-success'}`}>
                             {variance > 0 ? '+' : ''}{formatQty(variance)}
                           </td>
                         </tr>

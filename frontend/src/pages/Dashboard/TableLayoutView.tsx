@@ -216,8 +216,8 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
 
   const getTableStatusColor = (occupied: number) => {
     return occupied
-      ? 'bg-warning-tint border-amber-300 text-warning shadow-sm'
-      : 'bg-emerald-50 border-emerald-200 text-emerald-800 hover:shadow-md';
+      ? 'bg-warning-tint border-warning-tint-border text-warning'
+      : 'bg-success-tint border-success-tint-border text-success';
   };
 
   const handleMouseDown = (e: React.MouseEvent, table: typeof tablesWithPosition[0]) => {
