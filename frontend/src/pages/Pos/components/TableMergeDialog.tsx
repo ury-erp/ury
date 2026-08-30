@@ -145,7 +145,7 @@ const TableMergeDialog = ({
                             'flex h-4 w-4 shrink-0 items-center justify-center rounded border',
                             isSelected
                               ? 'border-primary bg-primary text-white'
-                              : 'border-border bg-white'
+                              : 'border-border bg-card'
                           )}
                         >
                           {isSelected && <Check className="h-3 w-3" />}
@@ -205,7 +205,7 @@ const TableMergeDialog = ({
 
                 <div
                   className={cn(
-                    'absolute left-1/2 z-10 flex h-10 w-10 -translate-x-1/2 items-center justify-center rounded-full bg-white shadow-md',
+                    'absolute left-1/2 z-10 flex h-10 w-10 -translate-x-1/2 items-center justify-center rounded-full bg-card shadow-md',
                     phase === 'merging' && 'animate-merge-link-pulse',
                     phase === 'done' && 'bg-success-tint'
                   )}
@@ -241,7 +241,7 @@ const TableMergeDialog = ({
 
                 <div
                   className={cn(
-                    'absolute left-1/2 top-1/2 z-10 flex h-10 w-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white shadow-md',
+                    'absolute left-1/2 top-1/2 z-10 flex h-10 w-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-card shadow-md',
                     phase === 'merging' && 'animate-merge-link-pulse',
                     phase === 'done' && 'bg-success-tint'
                   )}

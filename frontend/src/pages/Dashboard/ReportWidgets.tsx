@@ -17,7 +17,7 @@ export const ReportWidgets: React.FC<ReportWidgetsProps> = ({ recentTransactions
   return (
     <div className="space-y-6">
       {/* Live POS Transactions */}
-      <Card className="rounded-lg border border-border bg-white shadow-xs overflow-hidden">
+      <Card className="rounded-lg border border-border bg-card shadow-xs overflow-hidden">
         <CardHeader className="border-b border-border bg-gray-50/50 p-5">
           <div>
             <CardTitle className="text-lg font-bold text-foreground">

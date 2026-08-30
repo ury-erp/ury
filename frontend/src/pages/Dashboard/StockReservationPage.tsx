@@ -249,7 +249,7 @@ const StockReservationContent: React.FC = () => {
           Select a branch to view its reservations.
         </Card>
       ) : loading ? (
-        <div className="flex items-center justify-center rounded-lg border border-border bg-white py-16">
+        <div className="flex items-center justify-center rounded-lg border border-border bg-card py-16">
           <Spinner className="h-8 w-8 text-primary" />
         </div>
       ) : error ? (
@@ -259,7 +259,7 @@ const StockReservationContent: React.FC = () => {
           No active stock reservations for this branch right now.
         </Card>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-border bg-white shadow-sm">
+        <div className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead className="border-b border-border bg-muted text-xs font-semibold text-text-tertiary">

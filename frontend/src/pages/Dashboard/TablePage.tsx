@@ -188,13 +188,13 @@ export const TablePage: React.FC = () => {
         <div className="flex bg-muted rounded-lg p-1">
           <button
             onClick={() => setViewMode('list')}
-            className={`p-1.5 rounded-md flex items-center justify-center transition-colors ${viewMode === 'list' ? 'bg-white shadow-sm text-foreground' : 'text-text-tertiary hover:text-foreground'}`}
+            className={`p-1.5 rounded-md flex items-center justify-center transition-colors ${viewMode === 'list' ? 'bg-card shadow-sm text-foreground' : 'text-text-tertiary hover:text-foreground'}`}
           >
             <List className="w-4 h-4" />
           </button>
           <button
             onClick={() => setViewMode('grid')}
-            className={`p-1.5 rounded-md flex items-center justify-center transition-colors ${viewMode === 'grid' ? 'bg-white shadow-sm text-foreground' : 'text-text-tertiary hover:text-foreground'}`}
+            className={`p-1.5 rounded-md flex items-center justify-center transition-colors ${viewMode === 'grid' ? 'bg-card shadow-sm text-foreground' : 'text-text-tertiary hover:text-foreground'}`}
           >
             <Grid className="w-4 h-4" />
           </button>
@@ -219,11 +219,11 @@ export const TablePage: React.FC = () => {
       </div>
 
       {loading ? (
-        <div className="py-16 flex items-center justify-center bg-white rounded-lg border border-border">
+        <div className="py-16 flex items-center justify-center bg-card rounded-lg border border-border">
           <Spinner className="w-8 h-8 text-primary" />
         </div>
       ) : tables.length === 0 ? (
-        <Card className="p-12 flex flex-col items-center justify-center text-center rounded-lg border border-border shadow-sm bg-white">
+        <Card className="p-12 flex flex-col items-center justify-center text-center rounded-lg border border-border shadow-sm bg-card">
           <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
             <Grid className="w-6 h-6 text-primary" />
           </div>
@@ -240,7 +240,7 @@ export const TablePage: React.FC = () => {
           </Button>
         </Card>
       ) : viewMode === 'layout' ? (
-        <div className="bg-white border border-border rounded-lg shadow-xs overflow-hidden h-[600px] relative">
+        <div className="bg-background border border-border rounded-lg shadow-xs overflow-hidden h-[600px] relative">
           <TableLayoutView
             selectedRoom="All"
             tables={tables as any}
@@ -251,7 +251,7 @@ export const TablePage: React.FC = () => {
       ) : viewMode === 'grid' ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
           {tables.map((t) => (
-            <Card key={t.name} className="p-5 rounded-lg border border-border bg-white shadow-xs hover:shadow-md transition-all hover:border-primary/20 flex flex-col justify-between relative group cursor-pointer" onClick={() => openEditDrawer(t)}>
+            <Card key={t.name} className="p-5 rounded-lg border border-border bg-card shadow-xs hover:shadow-md transition-all hover:border-primary/20 flex flex-col justify-between relative group cursor-pointer" onClick={() => openEditDrawer(t)}>
               <div>
                 <div className="flex items-center justify-between">
                   <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary text-[10px]">
@@ -279,7 +279,7 @@ export const TablePage: React.FC = () => {
           ))}
         </div>
       ) : (
-        <div className="bg-white rounded-lg border border-border shadow-sm overflow-hidden">
+        <div className="bg-card rounded-lg border border-border shadow-sm overflow-hidden">
           <table className="w-full text-left text-sm text-muted-foreground">
             <thead className="bg-muted border-b border-border text-xs text-text-tertiary font-semibold">
               <tr>

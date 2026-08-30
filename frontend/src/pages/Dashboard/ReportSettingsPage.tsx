@@ -321,7 +321,7 @@ export const ReportSettingsPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="py-16 flex items-center justify-center bg-white rounded-lg border border-border">
+      <div className="py-16 flex items-center justify-center bg-card rounded-lg border border-border">
         <Spinner className="w-8 h-8 text-primary" />
       </div>
     );
@@ -333,7 +333,7 @@ export const ReportSettingsPage: React.FC = () => {
     <div className="min-h-screen bg-gray-50/50">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-xl border border-border shadow-xs">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-6 rounded-xl border border-border shadow-xs">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-semibold shrink-0">
               <FileSpreadsheet className="w-6 h-6" />
@@ -357,10 +357,10 @@ export const ReportSettingsPage: React.FC = () => {
         <div className="space-y-6">
 
           {/* Accordion 1: Business Hours */}
-          <Card className="rounded-xl border border-border bg-white overflow-hidden shadow-xs">
+          <Card className="rounded-xl border border-border bg-card overflow-hidden shadow-xs">
             <button
               onClick={() => toggleSection('businessHours')}
-              className="w-full px-6 py-4 bg-white flex items-center justify-between border-b border-border hover:bg-gray-50/80 transition-colors text-left"
+              className="w-full px-6 py-4 bg-card flex items-center justify-between border-b border-border hover:bg-gray-50/80 transition-colors text-left"
             >
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-lg bg-purple-50 text-primary flex items-center justify-center">
@@ -379,7 +379,7 @@ export const ReportSettingsPage: React.FC = () => {
             </button>
 
             {openSections.businessHours && (
-              <div className="p-6 space-y-6 bg-white">
+              <div className="p-6 space-y-6 bg-card">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="flex items-center justify-between p-4 bg-muted rounded-xl border border-border">
                     <div>
@@ -417,10 +417,10 @@ export const ReportSettingsPage: React.FC = () => {
           </Card>
 
           {/* Accordion 2: Cost Configuration */}
-          <Card className="rounded-xl border border-border bg-white overflow-hidden shadow-xs">
+          <Card className="rounded-xl border border-border bg-card overflow-hidden shadow-xs">
             <button
               onClick={() => toggleSection('costConfig')}
-              className="w-full px-6 py-4 bg-white flex items-center justify-between border-b border-border hover:bg-gray-50/80 transition-colors text-left"
+              className="w-full px-6 py-4 bg-card flex items-center justify-between border-b border-border hover:bg-gray-50/80 transition-colors text-left"
             >
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-lg bg-primary-tint text-primary flex items-center justify-center">
@@ -439,7 +439,7 @@ export const ReportSettingsPage: React.FC = () => {
             </button>
 
             {openSections.costConfig && (
-              <div className="p-6 space-y-6 bg-white">
+              <div className="p-6 space-y-6 bg-card">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div>
                     <label className="block text-sm font-medium text-muted-foreground mb-1.5">
@@ -480,10 +480,10 @@ export const ReportSettingsPage: React.FC = () => {
           </Card>
 
           {/* Accordion 3: Expenses Repeatable Tables */}
-          <Card className="rounded-xl border border-border bg-white overflow-hidden shadow-xs">
+          <Card className="rounded-xl border border-border bg-card overflow-hidden shadow-xs">
             <button
               onClick={() => toggleSection('expenses')}
-              className="w-full px-6 py-4 bg-white flex items-center justify-between border-b border-border hover:bg-gray-50/80 transition-colors text-left"
+              className="w-full px-6 py-4 bg-card flex items-center justify-between border-b border-border hover:bg-gray-50/80 transition-colors text-left"
             >
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
@@ -502,7 +502,7 @@ export const ReportSettingsPage: React.FC = () => {
             </button>
 
             {openSections.expenses && (
-              <div className="p-6 space-y-8 bg-white">
+              <div className="p-6 space-y-8 bg-card">
 
                 {/* 3.1 Direct Fixed Expenses */}
                 <div className="space-y-3">

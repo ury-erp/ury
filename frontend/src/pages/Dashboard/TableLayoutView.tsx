@@ -379,7 +379,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
               'flex items-center gap-2 px-4 py-2 rounded-lg shadow-lg text-sm font-medium border transition-all',
               isEditMode
                 ? 'bg-primary hover:bg-primary text-white border-green-700'
-                : 'bg-white hover:bg-muted text-muted-foreground border-border'
+                : 'bg-card hover:bg-muted text-muted-foreground border-border'
             )}
           >
             {isEditMode ? <Save className="w-4 h-4" /> : <Edit3 className="w-4 h-4" />}
@@ -390,26 +390,26 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
         <div className="absolute top-4 left-4 z-30 flex flex-col gap-2">
           <button
             onClick={handleZoomIn}
-            className="p-2 bg-white hover:bg-muted rounded-lg shadow-lg border border-border transition-colors"
+            className="p-2 bg-card hover:bg-muted rounded-lg shadow-lg border border-border transition-colors"
             title="Zoom In"
           >
             <ZoomIn className="w-5 h-5 text-muted-foreground" />
           </button>
           <button
             onClick={handleZoomOut}
-            className="p-2 bg-white hover:bg-muted rounded-lg shadow-lg border border-border transition-colors"
+            className="p-2 bg-card hover:bg-muted rounded-lg shadow-lg border border-border transition-colors"
             title="Zoom Out"
           >
             <ZoomOut className="w-5 h-5 text-muted-foreground" />
           </button>
           <button
             onClick={handleResetZoom}
-            className="p-2 bg-white hover:bg-muted rounded-lg shadow-lg border border-border transition-colors"
+            className="p-2 bg-card hover:bg-muted rounded-lg shadow-lg border border-border transition-colors"
             title="Reset Zoom & Pan"
           >
             <RotateCcw className="w-5 h-5 text-muted-foreground" />
           </button>
-          <div className="px-2 py-1 bg-white rounded-lg shadow-lg border border-border text-xs font-medium text-muted-foreground">
+          <div className="px-2 py-1 bg-card rounded-lg shadow-lg border border-border text-xs font-medium text-muted-foreground">
             {Math.round(zoom * 100)}%
           </div>
         </div>
@@ -431,7 +431,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
 
         <div
           ref={canvasRef}
-          className="w-full h-full relative bg-white overflow-hidden cursor-grab active:cursor-grabbing"
+          className="w-full h-full relative bg-background overflow-hidden cursor-grab active:cursor-grabbing"
           style={{
             backgroundImage: `
               linear-gradient(to right, #e5e7eb 1px, transparent 1px),
@@ -461,7 +461,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
 
       {/* Table Properties Panel */}
       {selectedTable && selectedTableData && (
-        <div className={cn("absolute bottom-0 top-36 bg-white rounded-t-lg shadow-xl border-t border-l border-border p-4 w-full max-w-xs z-40 max-h-[72vh] overflow-y-auto", isRTL ? "left-0 border-r" : "right-0")}>
+        <div className={cn("absolute bottom-0 top-36 bg-card rounded-t-lg shadow-xl border-t border-l border-border p-4 w-full max-w-xs z-40 max-h-[72vh] overflow-y-auto", isRTL ? "left-0 border-r" : "right-0")}>
           <div className="flex justify-between items-center mb-3">
             <h4 className="font-semibold text-foreground">
               {isEditMode ? t('tables.edit_settings') : t('tables.table_info')}

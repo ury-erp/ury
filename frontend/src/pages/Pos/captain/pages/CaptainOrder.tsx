@@ -374,14 +374,14 @@ export default function CaptainOrder() {
       )}
 
       {!canModify && (
-        <div className="flex items-center justify-between bg-white border border-border rounded-lg px-3 py-3">
+        <div className="flex items-center justify-between bg-card border border-border rounded-lg px-3 py-3">
           <span className="text-sm font-medium text-muted-foreground">Pax</span>
           <span className="text-sm text-foreground">{noOfPax}</span>
         </div>
       )}
 
       {canModify && (
-        <div className="flex items-center justify-between bg-white border border-border rounded-lg px-3 py-3">
+        <div className="flex items-center justify-between bg-card border border-border rounded-lg px-3 py-3">
           <span className="text-sm font-medium text-muted-foreground">Pax</span>
           <div className="flex items-center gap-3">
             <Button
@@ -525,7 +525,7 @@ export default function CaptainOrder() {
   return (
     <div className="min-h-screen bg-muted flex flex-col">
       {/* Header */}
-      <div className="sticky top-0 z-20 bg-white border-b border-border px-3 py-3 flex items-center justify-between">
+      <div className="sticky top-0 z-20 bg-card border-b border-border px-3 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Button onClick={() => navigate('/pos/order')} variant="ghost" size="icon" aria-label="Back to Tables">
             <ChevronLeft className="w-5 h-5" />
@@ -543,7 +543,7 @@ export default function CaptainOrder() {
                 onClick={() => setMode('menu')}
                 className={cn(
                   'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium',
-                  mode === 'menu' ? 'bg-white shadow-sm text-foreground' : 'text-muted-foreground'
+                  mode === 'menu' ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground'
                 )}
               >
                 <UtensilsCrossed className="w-4 h-4" />
@@ -553,7 +553,7 @@ export default function CaptainOrder() {
                 onClick={() => setMode('order')}
                 className={cn(
                   'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium',
-                  mode === 'order' ? 'bg-white shadow-sm text-foreground' : 'text-muted-foreground'
+                  mode === 'order' ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground'
                 )}
               >
                 <ClipboardList className="w-4 h-4" />
@@ -605,18 +605,18 @@ export default function CaptainOrder() {
       <div className="hidden lg:flex lg:flex-col lg:flex-1 lg:overflow-hidden">
         <div className="flex flex-row gap-4 flex-1 overflow-hidden p-3">
           {canModify && (
-            <div className="flex-1 min-h-0 overflow-hidden rounded-lg border border-border bg-white">
+            <div className="flex-1 min-h-0 overflow-hidden rounded-lg border border-border bg-card">
               <CaptainMenu canAddItems={canModify} />
             </div>
           )}
-          <div className="flex-1 min-h-0 overflow-hidden rounded-lg border border-border bg-white">
+          <div className="flex-1 min-h-0 overflow-hidden rounded-lg border border-border bg-card">
             <OrderListContent />
           </div>
         </div>
 
         {/* Primary action for tablet */}
         {canModify && (
-          <div className="bg-white border-t border-border p-3 mx-3 mb-3 rounded-lg">
+          <div className="bg-card border-t border-border p-3 mx-3 mb-3 rounded-lg">
             <div className="flex items-center justify-between mb-2 px-1">
               <span className="text-sm font-semibold text-muted-foreground">Total</span>
               <span className="text-lg font-semibold text-foreground">{formatCurrency(total)}</span>
@@ -645,7 +645,7 @@ export default function CaptainOrder() {
 
       {/* Primary action for mobile */}
       {canModify && (
-        <div className="sticky bottom-0 lg:hidden bg-white border-t border-border p-3">
+        <div className="sticky bottom-0 lg:hidden bg-card border-t border-border p-3">
           <div className="flex items-center justify-between mb-2 px-1">
             <span className="text-sm font-semibold text-muted-foreground">Total</span>
             <span className="text-lg font-semibold text-foreground">{formatCurrency(total)}</span>

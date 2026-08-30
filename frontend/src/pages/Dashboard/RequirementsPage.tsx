@@ -273,7 +273,7 @@ export const RequirementsPage: React.FC = () => {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center rounded-lg border border-border bg-white py-16">
+        <div className="flex items-center justify-center rounded-lg border border-border bg-card py-16">
           <Spinner className="h-8 w-8 text-primary" />
         </div>
       ) : error ? (

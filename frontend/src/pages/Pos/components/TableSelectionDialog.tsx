@@ -102,7 +102,7 @@ const TableSelectionDialog: React.FC<Props> = ({ onClose }) => {
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="bg-white rounded-lg w-full h-5/6 max-w-2xl mx-auto p-0 overflow-y-auto">
+      <DialogContent className="bg-card rounded-lg w-full h-5/6 max-w-2xl mx-auto p-0 overflow-y-auto">
         <div className="p-4 border-b border-border flex justify-between items-center">
           <h2 className="text-lg font-semibold text-foreground">{t('common.select_table_title')}</h2>
           <Button onClick={onClose} variant="ghost" size="icon">

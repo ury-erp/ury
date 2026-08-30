@@ -59,7 +59,7 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="sticky top-0 z-10 bg-white border-b border-border p-3 space-y-2">
+      <div className="sticky top-0 z-10 bg-card border-b border-border p-3 space-y-2">
         <div className="relative">
           <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-tertiary" />
           <input
@@ -77,7 +77,7 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
               'shrink-0 px-4 py-2 rounded-full text-sm font-medium border',
               selectedCategory === ''
                 ? 'bg-primary text-white border-primary'
-                : 'bg-white text-muted-foreground border-border'
+                : 'bg-card text-muted-foreground border-border'
             )}
           >
             All
@@ -90,7 +90,7 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
                 'shrink-0 px-4 py-2 rounded-full text-sm font-medium border',
                 selectedCategory === category.name
                   ? 'bg-primary text-white border-primary'
-                  : 'bg-white text-muted-foreground border-border'
+                  : 'bg-card text-muted-foreground border-border'
               )}
             >
               {category.label}

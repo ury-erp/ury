@@ -240,11 +240,11 @@ export const ItemProductionConfigPage: React.FC = () => {
       </div>
 
       {loading ? (
-        <div className="py-16 flex items-center justify-center bg-white rounded-lg border border-border">
+        <div className="py-16 flex items-center justify-center bg-card rounded-lg border border-border">
           <Spinner className="w-8 h-8 text-primary" />
         </div>
       ) : configs.length === 0 ? (
-        <Card className="p-12 flex flex-col items-center justify-center text-center rounded-lg border border-border shadow-sm bg-white">
+        <Card className="p-12 flex flex-col items-center justify-center text-center rounded-lg border border-border shadow-sm bg-card">
           <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
             <Settings2 className="w-6 h-6 text-primary" />
           </div>
@@ -261,7 +261,7 @@ export const ItemProductionConfigPage: React.FC = () => {
           </Button>
         </Card>
       ) : (
-        <div className="bg-white rounded-lg border border-border shadow-sm overflow-hidden overflow-x-auto">
+        <div className="bg-card rounded-lg border border-border shadow-sm overflow-hidden overflow-x-auto">
           <table className="w-full text-left text-sm text-muted-foreground">
             <thead className="bg-muted border-b border-border text-xs text-text-tertiary font-semibold">
               <tr>

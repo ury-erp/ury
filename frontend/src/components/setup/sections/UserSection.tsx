@@ -23,7 +23,7 @@ function UserRow({ user, usersLength, updateUser, deleteUser }: any) {
             value={user.name}
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateUser(user.id, { name: e.target.value })}
             placeholder="Full Name"
-            className="w-full text-sm bg-white"
+            className="w-full text-sm bg-card"
           />
         </div>
 
@@ -37,7 +37,7 @@ function UserRow({ user, usersLength, updateUser, deleteUser }: any) {
             value={user.email}
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateUser(user.id, { email: e.target.value })}
             placeholder="user@example.com"
-            className="w-full text-sm bg-white"
+            className="w-full text-sm bg-card"
           />
         </div>
 
@@ -51,7 +51,7 @@ function UserRow({ user, usersLength, updateUser, deleteUser }: any) {
             value={user.passwordPlaceholder}
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateUser(user.id, { passwordPlaceholder: e.target.value })}
             placeholder="Password"
-            className="w-full text-sm bg-white pr-9"
+            className="w-full text-sm bg-card pr-9"
             autoComplete="new-password"
           />
           <button

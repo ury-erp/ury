@@ -256,7 +256,7 @@ export const BranchPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="py-16 flex items-center justify-center bg-white rounded-lg border border-border">
+      <div className="py-16 flex items-center justify-center bg-card rounded-lg border border-border">
         <Spinner className="w-8 h-8 text-primary" />
       </div>
     );
@@ -296,7 +296,7 @@ export const BranchPage: React.FC = () => {
       </div>
 
       {/* Branch Details */}
-      <Card className="p-6 rounded-lg border-border bg-white shadow-sm">
+      <Card className="p-6 rounded-lg border-border bg-card shadow-sm">
         <h2 className="text-sm font-bold text-muted-foreground tracking-wider mb-6">Branch Details</h2>
 
         {/* Branch Info Section */}
@@ -377,7 +377,7 @@ export const BranchPage: React.FC = () => {
       </Card>
 
       {/* Menu Section */}
-      <div className="border border-border rounded-lg bg-white shadow-sm overflow-hidden">
+      <div className="border border-border rounded-lg bg-card shadow-sm overflow-hidden">
         <button
           onClick={() => setMenuSectionOpen(!menuSectionOpen)}
           className="w-full flex items-center justify-between p-4 border-b border-border hover:bg-muted transition-colors text-left"
@@ -473,7 +473,7 @@ export const BranchPage: React.FC = () => {
       </div>
 
       {/* Room Section */}
-      <div className="border border-border rounded-lg bg-white shadow-sm overflow-hidden">
+      <div className="border border-border rounded-lg bg-card shadow-sm overflow-hidden">
         <button
           onClick={() => setRoomSectionOpen(!roomSectionOpen)}
           className="w-full flex items-center justify-between p-4 border-b border-border hover:bg-muted transition-colors text-left"
@@ -504,7 +504,7 @@ export const BranchPage: React.FC = () => {
       </div>
 
       {/* Order Type Menu Section */}
-      <div className="border border-border rounded-lg bg-white shadow-sm overflow-hidden">
+      <div className="border border-border rounded-lg bg-card shadow-sm overflow-hidden">
         <button
           onClick={() => setOrderTypeSectionOpen(!orderTypeSectionOpen)}
           className="w-full flex items-center justify-between p-4 border-b border-border hover:bg-muted transition-colors text-left"

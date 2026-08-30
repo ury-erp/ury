@@ -329,7 +329,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
   return (
     <div className="flex flex-col h-full bg-muted">
       {/* Header Controls */}
-      <div className="bg-white border-b border-border p-4">
+      <div className="bg-card border-b border-border p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Button
@@ -397,7 +397,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
           >
             <RotateCcw className="w-5 h-5" />
           </Button>
-          <div className="px-2 py-1 bg-white rounded-lg shadow-lg border border-border text-xs font-medium text-muted-foreground">
+          <div className="px-2 py-1 bg-card rounded-lg shadow-lg border border-border text-xs font-medium text-muted-foreground">
             {Math.round(zoom * 100)}%
           </div>
         </div>
@@ -419,7 +419,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
 
         <div
           ref={canvasRef}
-          className="w-full h-full relative bg-white overflow-hidden cursor-grab active:cursor-grabbing"
+          className="w-full h-full relative bg-background overflow-hidden cursor-grab active:cursor-grabbing"
           style={{
             backgroundImage: `
               linear-gradient(to right, hsl(var(--gray-200)) 1px, transparent 1px),
@@ -449,7 +449,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
 
       {/* Table Properties Panel */}
       {selectedTable && selectedTableData && (
-        <div className={cn("absolute bottom-0 top-36 bg-white rounded-t-lg shadow-xl border-t border-l border-border p-4 w-full max-w-xs z-40 max-h-[72vh] overflow-y-auto", isRTL ? "left-0 border-r" : "right-0")}>
+        <div className={cn("absolute bottom-0 top-36 bg-card rounded-t-lg shadow-xl border-t border-l border-border p-4 w-full max-w-xs z-40 max-h-[72vh] overflow-y-auto", isRTL ? "left-0 border-r" : "right-0")}>
           <div className="flex justify-between items-center mb-3">
             <h4 className="font-semibold text-foreground">
               {isEditMode ? t('tables.edit_settings') : t('tables.table_info')}

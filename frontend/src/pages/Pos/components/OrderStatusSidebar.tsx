@@ -24,7 +24,7 @@ const OrderStatusSidebar = ({
 
   return (
     <div className={cn(
-      "w-64 bg-white border-e border-border h-full flex flex-col",
+      "w-64 bg-card border-e border-border h-full flex flex-col",
       disabled && "opacity-50 pointer-events-none"
     )}>
       <nav className="flex-1 p-6 overflow-y-auto">

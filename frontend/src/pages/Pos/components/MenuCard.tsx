@@ -61,7 +61,7 @@ const MenuCard: FC<MenuCardProps> = ({
   return (
     <div
       className={cn(
-        "bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow cursor-pointer h-56 flex flex-col",
+        "bg-card rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow cursor-pointer h-56 flex flex-col",
         isDisabled && "opacity-50 cursor-not-allowed pointer-events-none"
       )}
       onClick={isDisabled ? undefined : onClick}

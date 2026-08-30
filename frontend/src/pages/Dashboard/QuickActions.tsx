@@ -96,7 +96,7 @@ export const QuickActions: React.FC = () => {
       title: 'Add Menu Item',
       description: 'Create new dishes, pricing, or course categories',
       actionText: '+ Add Menu',
-      color: 'bg-white hover:bg-primary-50 text-primary-700',
+      color: 'bg-card hover:bg-primary-50 text-primary-700',
       border: 'border-border hover:border-primary-300',
       icon: (
         <svg className="h-6 w-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -114,7 +114,7 @@ export const QuickActions: React.FC = () => {
       title: 'Add Table',
       description: 'Configure new dining table layout & seat capacity',
       actionText: '+ Add Table',
-      color: 'bg-white hover:bg-primary-50 text-primary-700',
+      color: 'bg-card hover:bg-primary-50 text-primary-700',
       border: 'border-border hover:border-primary-300',
       icon: (
         <svg className="h-6 w-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -127,7 +127,7 @@ export const QuickActions: React.FC = () => {
       title: 'Add Room / Zone',
       description: 'Set up AC Hall, Terrace, VIP, or Bar dining sections',
       actionText: '+ Add Zone',
-      color: 'bg-white hover:bg-primary-50 text-primary-700',
+      color: 'bg-card hover:bg-primary-50 text-primary-700',
       border: 'border-border hover:border-primary-300',
       icon: (
         <svg className="h-6 w-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -145,7 +145,7 @@ export const QuickActions: React.FC = () => {
       title: 'Add Branch',
       description: 'Configure multi-outlet restaurant profiles & prefixes',
       actionText: '+ Add Branch',
-      color: 'bg-white hover:bg-primary-50 text-primary-700',
+      color: 'bg-card hover:bg-primary-50 text-primary-700',
       border: 'border-border hover:border-primary-300',
       icon: (
         <svg className="h-6 w-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -163,7 +163,7 @@ export const QuickActions: React.FC = () => {
       title: 'Add User / Staff',
       description: 'Grant cashier, captain, or manager POS permissions',
       actionText: '+ Add User',
-      color: 'bg-white hover:bg-primary-50 text-primary-700',
+      color: 'bg-card hover:bg-primary-50 text-primary-700',
       border: 'border-border hover:border-primary-300',
       icon: (
         <svg className="h-6 w-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -225,7 +225,7 @@ export const QuickActions: React.FC = () => {
 
       {/* 1. Add Menu Drawer/Dialog */}
       <Dialog open={activeModal === 'menu'} onOpenChange={handleClose}>
-        <DialogContent className="max-w-md bg-white p-6 rounded-xl border border-border shadow-xl">
+        <DialogContent className="max-w-md bg-card p-6 rounded-xl border border-border shadow-xl">
           <DialogHeader>
             <DialogTitle className="text-lg font-bold text-foreground">Add Menu Item</DialogTitle>
           </DialogHeader>
@@ -278,7 +278,7 @@ export const QuickActions: React.FC = () => {
 
       {/* 2. Add Table Drawer/Dialog */}
       <Dialog open={activeModal === 'table'} onOpenChange={handleClose}>
-        <DialogContent className="max-w-md bg-white p-6 rounded-xl border border-border shadow-xl">
+        <DialogContent className="max-w-md bg-card p-6 rounded-xl border border-border shadow-xl">
           <DialogHeader>
             <DialogTitle className="text-lg font-bold text-foreground">Add Table</DialogTitle>
           </DialogHeader>
@@ -329,7 +329,7 @@ export const QuickActions: React.FC = () => {
 
       {/* 3. Add Room / Zone Dialog */}
       <Dialog open={activeModal === 'room'} onOpenChange={handleClose}>
-        <DialogContent className="max-w-md bg-white p-6 rounded-xl border border-border shadow-xl">
+        <DialogContent className="max-w-md bg-card p-6 rounded-xl border border-border shadow-xl">
           <DialogHeader>
             <DialogTitle className="text-lg font-bold text-foreground">Add Dining Zone / Room</DialogTitle>
           </DialogHeader>
@@ -371,7 +371,7 @@ export const QuickActions: React.FC = () => {
 
       {/* 4. Add Branch Dialog */}
       <Dialog open={activeModal === 'branch'} onOpenChange={handleClose}>
-        <DialogContent className="max-w-md bg-white p-6 rounded-xl border border-border shadow-xl">
+        <DialogContent className="max-w-md bg-card p-6 rounded-xl border border-border shadow-xl">
           <DialogHeader>
             <DialogTitle className="text-lg font-bold text-foreground">Add Restaurant Branch</DialogTitle>
           </DialogHeader>
@@ -415,7 +415,7 @@ export const QuickActions: React.FC = () => {
 
       {/* 5. Add User Dialog */}
       <Dialog open={activeModal === 'user'} onOpenChange={handleClose}>
-        <DialogContent className="max-w-md bg-white p-6 rounded-xl border border-border shadow-xl">
+        <DialogContent className="max-w-md bg-card p-6 rounded-xl border border-border shadow-xl">
           <DialogHeader>
             <DialogTitle className="text-lg font-bold text-foreground">Add Staff User</DialogTitle>
           </DialogHeader>

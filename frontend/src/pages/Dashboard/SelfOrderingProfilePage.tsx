@@ -327,7 +327,7 @@ export const SelfOrderingProfilePage: React.FC = () => {
 
         {/* Form */}
         {showForm && (
-          <Card className="rounded-xl border border-border bg-white shadow-sm">
+          <Card className="rounded-xl border border-border bg-card shadow-sm">
             <div className="p-6 border-b border-border flex items-center justify-between">
               <h2 className="text-lg font-bold text-foreground">
                 {editingProfile ? 'Edit Profile' : 'Create New Profile'}
@@ -360,7 +360,7 @@ export const SelfOrderingProfilePage: React.FC = () => {
                 </button>
 
                 {openSections.profileInfo && (
-                  <div className="p-4 space-y-4 bg-white">
+                  <div className="p-4 space-y-4 bg-card">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-muted-foreground mb-1.5">
@@ -471,7 +471,7 @@ export const SelfOrderingProfilePage: React.FC = () => {
                 </button>
 
                 {openSections.orderingModes && (
-                  <div className="p-4 space-y-3 bg-white grid grid-cols-1 md:grid-cols-2">
+                  <div className="p-4 space-y-3 bg-card grid grid-cols-1 md:grid-cols-2">
                     <label className="flex items-center space-x-2 cursor-pointer">
                       <input
                         type="checkbox"
@@ -539,7 +539,7 @@ export const SelfOrderingProfilePage: React.FC = () => {
                 </button>
 
                 {openSections.productDisplay && (
-                  <div className="p-4 space-y-3 bg-white grid grid-cols-1 md:grid-cols-2">
+                  <div className="p-4 space-y-3 bg-card grid grid-cols-1 md:grid-cols-2">
                     <label className="flex items-center space-x-2 cursor-pointer">
                       <input
                         type="checkbox"

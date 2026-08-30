@@ -111,7 +111,7 @@ const POSOpeningProvider = ({ children }: POSOpeningProviderProps) => {
   // Show loading state while checking
   if (isLoading) {
     return (
-      <div className="fixed inset-0 bg-white flex items-center justify-center z-50">
+      <div className="fixed inset-0 bg-background flex items-center justify-center z-50">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-muted-foreground">{t('common.checking_pos_status')}</p>
