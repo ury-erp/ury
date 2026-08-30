@@ -1,12 +1,9 @@
 import {
-  TrendingUp,
   AlertTriangle,
   Bell,
   Users,
-  ShoppingCart,
   Clock,
   LogOut,
-  Receipt,
   CheckCircle2,
   Activity,
   Gauge,
@@ -14,8 +11,7 @@ import {
   PackageSearch,
   ArrowRight,
 } from 'lucide-react';
-import { Card, CardContent, StatCard, cn } from '@ury/ui';
-import type { StatCardTone } from '@ury/ui';
+import { Card, CardContent, KpiStrip, cn } from '@ury/ui';
 import { useState, useEffect } from 'react';
 import { usePOSStore } from '../store/pos-store';
 import { formatCurrency } from '@ury/core';
@@ -179,28 +175,22 @@ export default function Dashboard() {
           {
             label: "Today's Sales",
             value: formatCurrency(statsData.todays_sales),
-            icon: TrendingUp,
-            tone: 'success' as StatCardTone
+            tone: 'success'
           },
           {
             label: 'Orders Today',
-            value: String(statsData.orders_today),
-            icon: ShoppingCart,
-            tone: 'primary' as StatCardTone
+            value: String(statsData.orders_today)
           },
           {
             label: 'Avg. Order Value',
-            value: formatCurrency(statsData.avg_order_value),
-            icon: Receipt,
-            tone: 'default' as StatCardTone
+            value: formatCurrency(statsData.avg_order_value)
           },
           {
             label: 'Active Tables',
             value: `${statsData.active_tables} / ${statsData.total_tables}`,
-            icon: Users,
             // A near-full floor is the one stat on this row that is actionable,
-            // so it earns the amber rail only when it actually matters.
-            tone: (occupancy >= 0.85 ? 'warning' : 'default') as StatCardTone,
+            // so it earns warning tone only when it actually matters.
+            tone: occupancy >= 0.85 ? 'warning' : undefined,
             hint: occupancy >= 0.85 ? 'Floor nearly full' : undefined
           }
         ]);
@@ -471,30 +461,14 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Stat row */}
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {statsError ? (
-            <div className="col-span-full text-sm text-destructive">Failed to load stats</div>
-          ) : statsLoading ? (
-            Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="h-[7.5rem] animate-pulse rounded-lg border border-border bg-card" />
-            ))
-          ) : (
-            stats.map((stat, index) => {
-              const IconComponent = stat.icon;
-              return (
-                <StatCard
-                  key={index}
-                  label={stat.label}
-                  value={stat.value}
-                  tone={stat.tone}
-                  hint={stat.hint}
-                  icon={<IconComponent className="h-4 w-4" />}
-                />
-              );
-            })
-          )}
-        </div>
+        {/* Stat strip */}
+        {statsError ? (
+          <div className="text-sm text-destructive">Failed to load stats</div>
+        ) : statsLoading ? (
+          <div className="h-20 animate-pulse rounded-lg border border-border bg-card" />
+        ) : (
+          <KpiStrip items={stats} />
+        )}
 
         {/* Service Line — the operational heart of the screen. */}
         <Panel
