@@ -10,7 +10,7 @@ import {
   Calculator,
   FileSpreadsheet
 } from 'lucide-react';
-import { Button, Input, Select, SelectItem, Card, Spinner, showToast } from '@ury/ui';
+import { Button, Input, Page, Select, SelectItem, Card, Section, Spinner, showToast } from '@ury/ui';
 import { call } from '@ury/core';
 import { useBranchContext } from '../../context/BranchContext';
 
@@ -330,10 +330,9 @@ export const ReportSettingsPage: React.FC = () => {
   const branchLabel = activeBranchId === 'all' ? 'All Branches' : (activeBranch?.name || 'Selected Branch');
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-6 rounded-xl border border-border shadow-xs">
+    <Page>
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-6 rounded-xl border border-border shadow-xs">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-xl bg-primary-tint text-primary flex items-center justify-center font-semibold shrink-0">
               <FileSpreadsheet className="w-6 h-6" />
@@ -351,13 +350,13 @@ export const ReportSettingsPage: React.FC = () => {
             {saving ? <Spinner className="w-4 h-4" /> : <Save className="w-4 h-4" />}
             Save Report Settings
           </Button>
-        </div>
+      </div>
 
-        {/* Expandable Accordion Cards Container */}
-        <div className="space-y-6">
+      {/* Expandable Accordion Cards Container */}
 
-          {/* Accordion 1: Business Hours */}
-          <Card className="rounded-xl border border-border bg-card overflow-hidden shadow-xs">
+      {/* Accordion 1: Business Hours */}
+      <Section>
+        <Card className="rounded-xl border border-border bg-card overflow-hidden shadow-xs">
             <button
               onClick={() => toggleSection('businessHours')}
               className="w-full px-6 py-4 bg-card flex items-center justify-between border-b border-border hover:bg-muted transition-colors text-left"
@@ -414,10 +413,12 @@ export const ReportSettingsPage: React.FC = () => {
                 </div>
               </div>
             )}
-          </Card>
+        </Card>
+      </Section>
 
-          {/* Accordion 2: Cost Configuration */}
-          <Card className="rounded-xl border border-border bg-card overflow-hidden shadow-xs">
+      {/* Accordion 2: Cost Configuration */}
+      <Section>
+        <Card className="rounded-xl border border-border bg-card overflow-hidden shadow-xs">
             <button
               onClick={() => toggleSection('costConfig')}
               className="w-full px-6 py-4 bg-card flex items-center justify-between border-b border-border hover:bg-muted transition-colors text-left"
@@ -477,10 +478,12 @@ export const ReportSettingsPage: React.FC = () => {
                 </div>
               </div>
             )}
-          </Card>
+        </Card>
+      </Section>
 
-          {/* Accordion 3: Expenses Repeatable Tables */}
-          <Card className="rounded-xl border border-border bg-card overflow-hidden shadow-xs">
+      {/* Accordion 3: Expenses Repeatable Tables */}
+      <Section>
+        <Card className="rounded-xl border border-border bg-card overflow-hidden shadow-xs">
             <button
               onClick={() => toggleSection('expenses')}
               className="w-full px-6 py-4 bg-card flex items-center justify-between border-b border-border hover:bg-muted transition-colors text-left"
@@ -920,11 +923,9 @@ export const ReportSettingsPage: React.FC = () => {
 
               </div>
             )}
-          </Card>
-
-        </div>
-      </div>
-    </div>
+        </Card>
+      </Section>
+    </Page>
   );
 };
 
