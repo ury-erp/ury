@@ -195,7 +195,7 @@ const TableMergeDialog = ({
               <div className="relative flex w-full max-w-xs items-center justify-center gap-4">
                 <div
                   className={cn(
-                    'flex flex-1 flex-col items-center rounded-lg border-2 border-emerald-300 bg-emerald-50 p-4',
+                    'flex flex-1 flex-col items-center rounded-lg border-2 border-muted bg-muted border-dashed p-4',
                     phase === 'merging' && 'animate-merge-slide-left'
                   )}
                 >
@@ -219,7 +219,7 @@ const TableMergeDialog = ({
 
                 <div
                   className={cn(
-                    'flex flex-1 flex-col items-center rounded-lg border-2 border-emerald-300 bg-emerald-50 p-4',
+                    'flex flex-1 flex-col items-center rounded-lg border-2 border-muted bg-muted border-dashed p-4',
                     phase === 'merging' && 'animate-merge-slide-right'
                   )}
                 >
@@ -231,7 +231,7 @@ const TableMergeDialog = ({
               <div className="relative flex w-full max-w-lg items-stretch justify-center gap-3">
                 <div
                   className={cn(
-                    'flex min-w-[7rem] flex-1 flex-col items-center justify-center rounded-lg border-2 border-emerald-300 bg-emerald-50 p-4',
+                    'flex min-w-[7rem] flex-1 flex-col items-center justify-center rounded-lg border-2 border-muted bg-muted border-dashed p-4',
                     phase === 'merging' && 'animate-merge-slide-left'
                   )}
                 >
@@ -255,7 +255,7 @@ const TableMergeDialog = ({
 
                 <div
                   className={cn(
-                    'flex flex-1 flex-wrap items-center justify-center gap-2 rounded-lg border-2 border-emerald-300 bg-emerald-50 p-3',
+                    'flex flex-1 flex-wrap items-center justify-center gap-2 rounded-lg border-2 border-muted bg-muted border-dashed p-3',
                     phase === 'merging' && 'animate-merge-slide-right'
                   )}
                 >
