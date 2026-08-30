@@ -102,11 +102,14 @@ export const ServicePage: React.FC = () => {
     }
     (async () => {
       try {
-        const res = await call<any>('frappe.client.get_value', {
-          doctype: 'Branch',
-          filters: branch,
-          fieldname: 'company',
-        });
+        const res = await call<{ message?: { company?: string }; company?: string }>(
+          'frappe.client.get_value',
+          {
+            doctype: 'Branch',
+            filters: branch,
+            fieldname: 'company',
+          }
+        );
         const value = res?.message?.company ?? res?.company ?? '';
         if (!cancelled) setCompany(value || '');
       } catch {
@@ -174,7 +177,7 @@ export const ServicePage: React.FC = () => {
             return mapped;
           })
         );
-      } catch (err) {
+      } catch {
         if (!cancelled) {
           setError('Unable to load Service page data.');
           setShiftMetrics(null);
