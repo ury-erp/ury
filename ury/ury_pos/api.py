@@ -204,6 +204,33 @@ def getModeOfPayment():
     return modeOfPayments
 
 
+@frappe.whitelist()
+def get_production_units_for_branch():
+	"""Fetch all production unit names for the current user's branch.
+
+	Returns a list of production unit names that should be subscribed to for
+	KOT error channels on the POS terminal.
+	"""
+	try:
+		branch = getBranch()
+	except frappe.exceptions.ValidationError:
+		# Fallback if getBranch() throws (e.g., Administrator with no branch)
+		return {"production_units": []}
+
+	if not branch:
+		return {"production_units": []}
+
+	productions = frappe.get_all(
+		"URY Production Unit",
+		filters={"branch": branch},
+		fields=["name"]
+	)
+
+	production_names = [p.name for p in productions]
+
+	return {"production_units": production_names}
+
+
 def format_merged_table_label(primary, merged_tables=None):
     if not primary:
         return ""
