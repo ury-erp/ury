@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
-import { StatCard, DataTable, type DataTableColumn } from '@ury/ui';
-import { Users, IndianRupee, Receipt } from 'lucide-react';
+import { KpiStrip, DataTable, type DataTableColumn } from '@ury/ui';
 import { useBranchContext } from '../../context/BranchContext';
 import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
 import { BarChartCard } from '../../components/reports/charts/BarChartCard';
@@ -84,19 +83,13 @@ export function EmployeeSales() {
 
       {data && (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <StatCard label="Staff" value={data.summary.total_employees} icon={<Users className="w-4 h-4" />} />
-            <StatCard
-              label="Total Invoices"
-              value={data.summary.period_total_invoices}
-              icon={<Receipt className="w-4 h-4" />}
-            />
-            <StatCard
-              label="Total Sales"
-              value={formatCurrency(data.summary.period_total_sales)}
-              icon={<IndianRupee className="w-4 h-4" />}
-            />
-          </div>
+          <KpiStrip
+            items={[
+              { label: 'Staff', value: data.summary.total_employees },
+              { label: 'Total Invoices', value: data.summary.period_total_invoices },
+              { label: 'Total Sales', value: formatCurrency(data.summary.period_total_sales) },
+            ]}
+          />
 
           {top10.length >= 2 && (
             <BarChartCard

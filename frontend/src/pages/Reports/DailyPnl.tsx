@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
-import { Card, CardContent, CardHeader, CardTitle, StatCard, Select, Input } from '@ury/ui';
-import { IndianRupee, TrendingUp, TrendingDown, Percent, AlertTriangle, ChevronDown } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, KpiStrip, Select, Input } from '@ury/ui';
+import { AlertTriangle, ChevronDown } from 'lucide-react';
 import { useBranchContext } from '../../context/BranchContext';
 import { toApiDate } from '../../lib/reportDate';
 
@@ -248,38 +248,25 @@ export function DailyPnl() {
             )
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatCard
-              label="Gross Sales"
-              value={formatCurrency(summaryMap.get('gross_sales')?.amount ?? 0)}
-              icon={<IndianRupee className="w-4 h-4" />}
-            />
-            <StatCard
-              label="Net Sales"
-              value={formatCurrency(summaryMap.get('net_sales')?.amount ?? 0)}
-              icon={<TrendingUp className="w-4 h-4" />}
-            />
-            <StatCard
-              label="Gross Profit"
-              value={`${formatCurrency(summaryMap.get('gross_profit')?.amount ?? 0)} (${Number(
-                summaryMap.get('gross_profit')?.percent ?? 0
-              ).toFixed(1)}%)`}
-              icon={<Percent className="w-4 h-4" />}
-            />
-            <StatCard
-              label="Net Profit"
-              value={`${formatCurrency(summaryMap.get('net_profit')?.amount ?? 0)} (${Number(
-                summaryMap.get('net_profit')?.percent ?? 0
-              ).toFixed(1)}%)`}
-              icon={
-                (summaryMap.get('net_profit')?.amount ?? 0) >= 0 ? (
-                  <TrendingUp className="w-4 h-4" />
-                ) : (
-                  <TrendingDown className="w-4 h-4" />
-                )
-              }
-            />
-          </div>
+          <KpiStrip
+            items={[
+              { label: 'Gross Sales', value: formatCurrency(summaryMap.get('gross_sales')?.amount ?? 0) },
+              { label: 'Net Sales', value: formatCurrency(summaryMap.get('net_sales')?.amount ?? 0) },
+              {
+                label: 'Gross Profit',
+                value: `${formatCurrency(summaryMap.get('gross_profit')?.amount ?? 0)} (${Number(
+                  summaryMap.get('gross_profit')?.percent ?? 0
+                ).toFixed(1)}%)`,
+              },
+              {
+                label: 'Net Profit',
+                value: `${formatCurrency(summaryMap.get('net_profit')?.amount ?? 0)} (${Number(
+                  summaryMap.get('net_profit')?.percent ?? 0
+                ).toFixed(1)}%)`,
+                tone: (summaryMap.get('net_profit')?.amount ?? 0) >= 0 ? 'success' : 'danger',
+              },
+            ]}
+          />
 
           <Card>
             <CardHeader>
