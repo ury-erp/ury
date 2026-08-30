@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
-import { Users, Plus, ShieldCheck, Edit2 } from 'lucide-react';
-import { Card, Button, Badge, Input, Spinner, showToast } from '@ury/ui';
+import { Plus, ShieldCheck, Edit2 } from 'lucide-react';
+import { Button, Input, Spinner, showToast } from '@ury/ui';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { dashboardService } from '../../services/dashboard';
 import { call } from '@ury/core';
@@ -203,41 +203,37 @@ export const UserPage: React.FC = () => {
       </div>
 
       {loading ? (
-        <div className="py-16 flex items-center justify-center bg-card rounded-lg border border-border">
+        <div className="py-16 flex items-center justify-center bg-card rounded-[9px] border border-hair">
           <Spinner className="w-8 h-8 text-primary" />
         </div>
       ) : users.length === 0 ? (
-        <Card className="p-12 flex flex-col items-center justify-center text-center rounded-lg border border-border shadow-sm bg-card">
-          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-            <Users className="w-6 h-6 text-primary" />
-          </div>
-          <h3 className="text-lg font-semibold text-foreground mb-1">No Users Configured</h3>
-          <p className="text-text-tertiary mb-6 max-w-sm">
-            Add staff users and assign them roles for this branch.
-          </p>
+        <div className="px-4 py-[18px] text-xs text-text-tertiary flex items-center gap-2.5 bg-card border border-hair rounded-[9px]">
+          <span>Add staff users and assign them roles for this branch.</span>
           <Button
             onClick={openAddDrawer}
-            className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center space-x-1.5 shadow-xs"
+            variant="chrome"
+            size="compactSm"
+            className="ml-auto"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="w-3.5 h-3.5" />
             <span>Add User</span>
           </Button>
-        </Card>
+        </div>
       ) : (
-        <div className="bg-card rounded-lg border border-border shadow-sm overflow-hidden">
+        <div className="bg-card border border-hair rounded-[9px] overflow-hidden">
           <table className="w-full text-left text-sm text-muted-foreground">
-            <thead className="bg-muted border-b border-border text-xs text-text-tertiary font-semibold">
+            <thead className="border-b border-hair">
               <tr>
-                <th className="px-6 py-4">User</th>
-                <th className="px-6 py-4">User ID</th>
-                <th className="px-6 py-4">Role</th>
-                <th className="px-6 py-4 text-right">Actions</th>
+                <th className="px-[14px] py-[7px] text-[11px] font-medium text-text-tertiary text-left">User</th>
+                <th className="px-[14px] py-[7px] text-[11px] font-medium text-text-tertiary text-left">User ID</th>
+                <th className="px-[14px] py-[7px] text-[11px] font-medium text-text-tertiary text-left">Role</th>
+                <th className="px-[14px] py-[7px] text-[11px] font-medium text-text-tertiary text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-hair">
               {users.map((user) => (
-                <tr key={user.name} className="hover:bg-primary/10 transition-colors">
-                  <td className="px-6 py-4">
+                <tr key={user.name} className="hover:bg-muted transition-colors">
+                  <td className="px-[14px] py-2 text-[12.5px]">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-xs uppercase shrink-0">
                         {(user.first_name || user.email || user.name || '?').charAt(0)}
@@ -247,16 +243,16 @@ export const UserPage: React.FC = () => {
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-muted-foreground font-medium">
+                  <td className="px-[14px] py-2 text-[12.5px] font-mono text-muted-foreground">
                     {user.email}
                   </td>
-                  <td className="px-6 py-4">
-                    <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary text-[10px]">
-                      <ShieldCheck className="w-3 h-3 mr-1" />
+                  <td className="px-[14px] py-2 text-[12.5px]">
+                    <span className="inline-flex items-center gap-[5px] text-[11px] h-[19px] px-[7px] rounded-[5px] text-primary bg-primary/10">
+                      <ShieldCheck className="w-3 h-3" />
                       {getDisplayRole(user)}
-                    </Badge>
+                    </span>
                   </td>
-                  <td className="px-6 py-4 text-right">
+                  <td className="px-[14px] py-2 text-[12.5px] text-right">
                     <Button variant="ghost" size="sm" onClick={() => openEditDrawer(user)} className="text-text-tertiary hover:text-primary">
                       <Edit2 className="w-4 h-4" />
                     </Button>

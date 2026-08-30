@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
 import { Grid, Plus, Users, Square, List, Edit2, LayoutTemplate } from 'lucide-react';
-import { Card, Button, Badge, Input, Spinner, showToast } from '@ury/ui';
+import { Button, Input, Spinner, showToast } from '@ury/ui';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { dashboardService } from '../../services/dashboard';
 import { call } from '@ury/core';
@@ -219,26 +219,22 @@ export const TablePage: React.FC = () => {
       </div>
 
       {loading ? (
-        <div className="py-16 flex items-center justify-center bg-card rounded-lg border border-border">
+        <div className="py-16 flex items-center justify-center bg-card rounded-[9px] border border-hair">
           <Spinner className="w-8 h-8 text-primary" />
         </div>
       ) : tables.length === 0 ? (
-        <Card className="p-12 flex flex-col items-center justify-center text-center rounded-lg border border-border shadow-sm bg-card">
-          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-            <Grid className="w-6 h-6 text-primary" />
-          </div>
-          <h3 className="text-lg font-semibold text-foreground mb-1">No Dining Tables Configured</h3>
-          <p className="text-text-tertiary mb-6 max-w-sm">
-            Add dining tables to configure your restaurant layout.
-          </p>
+        <div className="px-4 py-[18px] text-xs text-text-tertiary flex items-center gap-2.5 bg-card border border-hair rounded-[9px]">
+          <span>Add dining tables to configure your restaurant layout.</span>
           <Button
             onClick={openAddDrawer}
-            className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center space-x-1.5 shadow-xs"
+            variant="chrome"
+            size="compactSm"
+            className="ml-auto"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="w-3.5 h-3.5" />
             <span>Add Table</span>
           </Button>
-        </Card>
+        </div>
       ) : viewMode === 'layout' ? (
         <div className="bg-background border border-border rounded-lg shadow-xs overflow-hidden h-[600px] relative">
           <TableLayoutView
@@ -251,63 +247,63 @@ export const TablePage: React.FC = () => {
       ) : viewMode === 'grid' ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
           {tables.map((t) => (
-            <Card key={t.name} className="p-5 rounded-lg border border-border bg-card shadow-xs hover:shadow-md transition-all hover:border-primary/20 flex flex-col justify-between relative group cursor-pointer" onClick={() => openEditDrawer(t)}>
+            <div key={t.name} className="p-5 rounded-[9px] border border-hair bg-card hover:shadow-md transition-all hover:border-primary/20 flex flex-col justify-between relative group cursor-pointer" onClick={() => openEditDrawer(t)}>
               <div>
                 <div className="flex items-center justify-between">
-                  <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary text-[10px]">
-                    <Square className="w-3 h-3 mr-1" />
+                  <span className="inline-flex items-center gap-[5px] text-[11px] h-[19px] px-[7px] rounded-[5px] text-primary bg-primary/10">
+                    <Square className="w-3 h-3" />
                     {t.table_shape || 'Square'}
-                  </Badge>
-                  <Badge variant={t.status === 'Occupied' ? 'warning' : 'success'} size="sm">
+                  </span>
+                  <span className={`text-[11px] h-[19px] px-[7px] rounded-[5px] inline-flex items-center font-medium ${t.status === 'Occupied' ? 'text-warning bg-warning/10' : 'text-success bg-success/10'}`}>
                     {t.status || 'Available'}
-                  </Badge>
+                  </span>
                 </div>
                 <h3 className="mt-3 text-xl font-bold text-foreground tracking-tight">{t.table_name || t.name}</h3>
                 <p className="text-xs text-text-tertiary mt-1 font-medium">{t.restaurant_room || 'Main Hall'}</p>
               </div>
-              <div className="mt-4 pt-3 border-t border-border flex items-center justify-between text-xs text-muted-foreground font-semibold">
+              <div className="mt-4 pt-3 border-t border-hair flex items-center justify-between text-xs text-muted-foreground font-semibold">
                 <span className="flex items-center">
                   <Users className="w-3.5 h-3.5 mr-1 text-primary" />
                   {t.no_of_seats || 4} Seats
                 </span>
                 <span className="text-text-tertiary">Branch: {t.branch || 'Main'}</span>
               </div>
-              <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
+              <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-[9px] flex items-center justify-center">
                 <Edit2 className="w-6 h-6 text-primary" />
               </div>
-            </Card>
+            </div>
           ))}
         </div>
       ) : (
-        <div className="bg-card rounded-lg border border-border shadow-sm overflow-hidden">
+        <div className="bg-card border border-hair rounded-[9px] overflow-hidden">
           <table className="w-full text-left text-sm text-muted-foreground">
-            <thead className="bg-muted border-b border-border text-xs text-text-tertiary font-semibold">
+            <thead className="border-b border-hair">
               <tr>
-                <th className="px-6 py-4">Table Name</th>
-                <th className="px-6 py-4">Room</th>
-                <th className="px-6 py-4">Seats</th>
-                <th className="px-6 py-4">Shape</th>
-                <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4 text-right">Actions</th>
+                <th className="px-[14px] py-[7px] text-[11px] font-medium text-text-tertiary text-left">Table Name</th>
+                <th className="px-[14px] py-[7px] text-[11px] font-medium text-text-tertiary text-left">Room</th>
+                <th className="px-[14px] py-[7px] text-[11px] font-medium text-text-tertiary text-right font-mono">Seats</th>
+                <th className="px-[14px] py-[7px] text-[11px] font-medium text-text-tertiary text-left">Shape</th>
+                <th className="px-[14px] py-[7px] text-[11px] font-medium text-text-tertiary text-left">Status</th>
+                <th className="px-[14px] py-[7px] text-[11px] font-medium text-text-tertiary text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-hair">
               {tables.map((t) => (
-                <tr key={t.name} className="hover:bg-primary/10 transition-colors">
-                  <td className="px-6 py-4 font-semibold text-foreground">{t.table_name || t.name}</td>
-                  <td className="px-6 py-4">{t.restaurant_room || 'Main Hall'}</td>
-                  <td className="px-6 py-4 font-mono">{t.no_of_seats || 4}</td>
-                  <td className="px-6 py-4">
-                    <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary text-[10px]">
+                <tr key={t.name} className="hover:bg-muted transition-colors">
+                  <td className="px-[14px] py-2 text-[12.5px] font-semibold text-foreground">{t.table_name || t.name}</td>
+                  <td className="px-[14px] py-2 text-[12.5px]">{t.restaurant_room || 'Main Hall'}</td>
+                  <td className="px-[14px] py-2 text-[12.5px] font-mono text-right tabular-nums">{t.no_of_seats || 4}</td>
+                  <td className="px-[14px] py-2 text-[12.5px]">
+                    <span className="inline-flex items-center gap-[5px] text-[11px] h-[19px] px-[7px] rounded-[5px] text-primary bg-primary/10">
                       {t.table_shape || 'Square'}
-                    </Badge>
+                    </span>
                   </td>
-                  <td className="px-6 py-4">
-                    <Badge variant={t.status === 'Occupied' ? 'warning' : 'success'} size="sm">
+                  <td className="px-[14px] py-2 text-[12.5px]">
+                    <span className={`text-[11px] h-[19px] px-[7px] rounded-[5px] inline-flex items-center font-medium ${t.status === 'Occupied' ? 'text-warning bg-warning/10' : 'text-success bg-success/10'}`}>
                       {t.status || 'Available'}
-                    </Badge>
+                    </span>
                   </td>
-                  <td className="px-6 py-4 text-right">
+                  <td className="px-[14px] py-2 text-[12.5px] text-right">
                     <Button variant="ghost" size="sm" onClick={() => openEditDrawer(t)} className="text-text-tertiary hover:text-primary">
                       <Edit2 className="w-4 h-4" />
                     </Button>
