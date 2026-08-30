@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
-import { Settings2, Plus } from 'lucide-react';
-import { Card, Button, Select, SelectItem, Spinner, showToast } from '@ury/ui';
+import { Plus } from 'lucide-react';
+import { Button, Select, SelectItem, Spinner, showToast } from '@ury/ui';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { dashboardService } from '../../services/dashboard';
 import { call } from '@ury/core';
@@ -240,37 +240,33 @@ export const ItemProductionConfigPage: React.FC = () => {
       </div>
 
       {loading ? (
-        <div className="py-16 flex items-center justify-center bg-card rounded-lg border border-border">
+        <div className="py-16 flex items-center justify-center bg-card rounded-[9px] border border-hair">
           <Spinner className="w-8 h-8 text-primary" />
         </div>
       ) : configs.length === 0 ? (
-        <Card className="p-12 flex flex-col items-center justify-center text-center rounded-lg border border-border shadow-sm bg-card">
-          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-            <Settings2 className="w-6 h-6 text-primary" />
-          </div>
-          <h3 className="text-lg font-semibold text-foreground mb-1">No Item Production Configurations</h3>
-          <p className="text-text-tertiary mb-6 max-w-sm">
-            Map items to production units and departments to enable kitchen/bar routing.
-          </p>
+        <div className="px-4 py-[18px] text-xs text-text-tertiary flex items-center gap-2.5 bg-card border border-hair rounded-[9px]">
+          <span>Map items to production units and departments to enable kitchen/bar routing.</span>
           <Button
             onClick={openAddDrawer}
-            className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center space-x-1.5 shadow-xs"
+            variant="chrome"
+            size="compactSm"
+            className="ml-auto"
           >
-            <Plus className="w-4 h-4" />
-            <span>Add Item Production Configuration</span>
+            <Plus className="w-3.5 h-3.5" />
+            <span>Add Config</span>
           </Button>
-        </Card>
+        </div>
       ) : (
-        <div className="bg-card rounded-lg border border-border shadow-sm overflow-hidden overflow-x-auto">
+        <div className="bg-card border border-hair rounded-[9px] overflow-hidden overflow-x-auto">
           <table className="w-full text-left text-sm text-muted-foreground">
-            <thead className="bg-muted border-b border-border text-xs text-text-tertiary font-semibold">
+            <thead className="border-b border-hair">
               <tr>
-                <th className="px-6 py-4">Item</th>
-                <th className="px-6 py-4">Branch</th>
-                <th className="px-6 py-4">Department</th>
-                <th className="px-6 py-4">Production Unit</th>
-                <th className="px-6 py-4">Policy</th>
-                <th className="px-6 py-4">Active</th>
+                <th className="px-[14px] py-[7px] text-[11px] font-medium text-text-tertiary text-left">Item</th>
+                <th className="px-[14px] py-[7px] text-[11px] font-medium text-text-tertiary text-left">Branch</th>
+                <th className="px-[14px] py-[7px] text-[11px] font-medium text-text-tertiary text-left">Department</th>
+                <th className="px-[14px] py-[7px] text-[11px] font-medium text-text-tertiary text-left">Production Unit</th>
+                <th className="px-[14px] py-[7px] text-[11px] font-medium text-text-tertiary text-left">Policy</th>
+                <th className="px-[14px] py-[7px] text-[11px] font-medium text-text-tertiary text-center">Active</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-hair">
@@ -280,12 +276,12 @@ export const ItemProductionConfigPage: React.FC = () => {
                   className="transition-colors cursor-pointer hover:bg-muted"
                   onClick={() => openEditDrawer(config)}
                 >
-                  <td className="px-6 py-4 font-semibold text-foreground">{config.item}</td>
-                  <td className="px-6 py-4">{config.branch}</td>
-                  <td className="px-6 py-4">{config.department || '-'}</td>
-                  <td className="px-6 py-4">{config.production_unit || '-'}</td>
-                  <td className="px-6 py-4">{config.production_policy || '-'}</td>
-                  <td className="px-6 py-4">{config.active ? 'Yes' : 'No'}</td>
+                  <td className="px-[14px] py-2 text-[12.5px] font-semibold text-foreground">{config.item}</td>
+                  <td className="px-[14px] py-2 text-[12.5px]">{config.branch}</td>
+                  <td className="px-[14px] py-2 text-[12.5px]">{config.department || '-'}</td>
+                  <td className="px-[14px] py-2 text-[12.5px]">{config.production_unit || '-'}</td>
+                  <td className="px-[14px] py-2 text-[12.5px]">{config.production_policy || '-'}</td>
+                  <td className="px-[14px] py-2 text-[12.5px] text-center">{config.active ? 'Yes' : 'No'}</td>
                 </tr>
               ))}
             </tbody>

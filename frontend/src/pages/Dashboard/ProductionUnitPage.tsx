@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
-import { Factory, Plus, Edit2 } from 'lucide-react';
-import { Card, Button, Input, Select, Spinner, showToast } from '@ury/ui';
+import { Plus } from 'lucide-react';
+import { Button, Input, Spinner, showToast } from '@ury/ui';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { dashboardService } from '../../services/dashboard';
 import { call } from '@ury/core';
@@ -178,40 +178,36 @@ export const ProductionUnitPage: React.FC = () => {
       </div>
 
       {loading ? (
-        <div className="py-16 flex items-center justify-center bg-card rounded-lg border border-border">
+        <div className="py-16 flex items-center justify-center bg-card rounded-[9px] border border-hair">
           <Spinner className="w-8 h-8 text-primary" />
         </div>
       ) : units.length === 0 ? (
-        <Card className="p-12 flex flex-col items-center justify-center text-center rounded-lg border border-border shadow-sm bg-card">
-          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-            <Factory className="w-6 h-6 text-primary" />
-          </div>
-          <h3 className="text-lg font-semibold text-foreground mb-1">No Production Units Configured</h3>
-          <p className="text-text-tertiary mb-6 max-w-sm">
-            Add production units to organize kitchen routing for item groups.
-          </p>
+        <div className="px-4 py-[18px] text-xs text-text-tertiary flex items-center gap-2.5 bg-card border border-hair rounded-[9px]">
+          <span>Add production units to organize kitchen routing for item groups.</span>
           <Button
             onClick={openAddDrawer}
-            className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center space-x-1.5 shadow-xs"
+            variant="chrome"
+            size="compactSm"
+            className="ml-auto"
           >
-            <Plus className="w-4 h-4" />
-            <span>Add Production Unit</span>
+            <Plus className="w-3.5 h-3.5" />
+            <span>Add Unit</span>
           </Button>
-        </Card>
+        </div>
       ) : (
-        <div className="bg-card rounded-lg border border-border shadow-sm overflow-hidden">
+        <div className="bg-card border border-hair rounded-[9px] overflow-hidden">
           <table className="w-full text-left text-sm text-muted-foreground">
-            <thead className="bg-muted border-b border-border text-xs text-text-tertiary font-semibold">
+            <thead className="border-b border-hair">
               <tr>
-                <th className="px-6 py-4">Production Unit</th>
-                <th className="px-6 py-4">Branch</th>
+                <th className="px-[14px] py-[7px] text-[11px] font-medium text-text-tertiary text-left">Production Unit</th>
+                <th className="px-[14px] py-[7px] text-[11px] font-medium text-text-tertiary text-left">Branch</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-hair">
               {units.map((unit) => (
                 <tr key={unit.name} className="transition-colors cursor-pointer hover:bg-muted" onClick={() => openEditDrawer(unit)}>
-                  <td className="px-6 py-4 font-semibold text-foreground">{unit.production_unit_name || unit.name}</td>
-                  <td className="px-6 py-4">{unit.branch || 'Main'}</td>
+                  <td className="px-[14px] py-2 text-[12.5px] font-semibold text-foreground">{unit.production_unit_name || unit.name}</td>
+                  <td className="px-[14px] py-2 text-[12.5px]">{unit.branch || 'Main'}</td>
                 </tr>
               ))}
             </tbody>
