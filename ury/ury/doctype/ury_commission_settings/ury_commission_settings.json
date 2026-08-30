@@ -1,0 +1,98 @@
+{
+ "actions": [],
+ "creation": "2026-08-31 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "enabled",
+  "commission_base",
+  "include_returns",
+  "attribution_mode",
+  "default_rate",
+  "tier_period",
+  "rules_section",
+  "rules"
+ ],
+ "fields": [
+  {
+   "default": "0",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enabled"
+  },
+  {
+   "default": "Net Sales",
+   "fieldname": "commission_base",
+   "fieldtype": "Select",
+   "label": "Commission Base",
+   "options": "Net Sales\nNet Total\nItem Total\nGrand Total"
+  },
+  {
+   "default": "1",
+   "fieldname": "include_returns",
+   "fieldtype": "Check",
+   "label": "Include Returns"
+  },
+  {
+   "default": "Opener",
+   "fieldname": "attribution_mode",
+   "fieldtype": "Select",
+   "label": "Attribution Mode",
+   "options": "Opener\nCloser\nSplit Evenly\nSplit By Contribution"
+  },
+  {
+   "default": "0",
+   "fieldname": "default_rate",
+   "fieldtype": "Percent",
+   "label": "Default Rate"
+  },
+  {
+   "default": "Monthly",
+   "fieldname": "tier_period",
+   "fieldtype": "Select",
+   "label": "Tier Period",
+   "options": "Monthly\nWeekly"
+  },
+  {
+   "fieldname": "rules_section",
+   "fieldtype": "Section Break",
+   "label": "Rules"
+  },
+  {
+   "fieldname": "rules",
+   "fieldtype": "Table",
+   "label": "Rules",
+   "options": "URY Commission Rule"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-08-31 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY Commission Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "read": 1,
+   "role": "URY Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
