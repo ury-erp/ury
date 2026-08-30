@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
-import { Card, CardContent, CardHeader, CardTitle, KpiStrip, Select, Input } from '@ury/ui';
+import { Card, CardContent, CardHeader, CardTitle, KpiStrip, Select, Input, Page, Section } from '@ury/ui';
 import { AlertTriangle, ChevronDown } from 'lucide-react';
 import { useBranchContext } from '../../context/BranchContext';
 import { toApiDate } from '../../lib/reportDate';
@@ -176,7 +176,7 @@ export function DailyPnl() {
   const rest = (data?.summary ?? []).filter((r) => !HERO_KEYS.includes(r.key));
 
   return (
-    <div className="space-y-6">
+    <Page>
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-semibold">Daily P&amp;L</h1>
@@ -215,17 +215,17 @@ export function DailyPnl() {
       </div>
 
       {error && (
-        <div className="rounded-md border border-destructive-tint-border bg-destructive-tint px-4 py-3 text-sm text-destructive">
+        <Section className="rounded-md border border-destructive-tint-border bg-destructive-tint px-4 py-3 text-sm text-destructive">
           {error}
-        </div>
+        </Section>
       )}
 
       {isLoading ? (
-        <div className="text-sm text-muted-foreground">Loading...</div>
+        <Section className="text-sm text-muted-foreground">Loading...</Section>
       ) : !data?.exists ? (
-        <div className="rounded-md border border-warning-tint-border bg-warning-tint px-4 py-3 text-sm text-warning">
+        <Section className="rounded-md border border-warning-tint-border bg-warning-tint px-4 py-3 text-sm text-warning">
           No submitted Daily P&amp;L exists for this branch/date. It must be created and submitted in Desk first.
-        </div>
+        </Section>
       ) : (
         <>
           {data.missing_prices && data.missing_prices.length > 0 ? (
@@ -234,17 +234,19 @@ export function DailyPnl() {
             // generates). Rendering item names as plain React children
             // (never dangerouslySetInnerHTML) keeps this safe even though
             // the source is user-editable Item/Product Bundle names.
-            <MissingPricesWarning sections={data.missing_prices} />
+            <Section>
+              <MissingPricesWarning sections={data.missing_prices} />
+            </Section>
           ) : (
             data.remarks && (
               // Fallback for genuine free-text remarks (e.g. hand-typed via
               // Desk) that don't match the known structured warning shape.
               // Still never HTML-rendered — same rationale as above.
-              <div className="rounded-md border border-warning-tint-border bg-warning-tint px-4 py-3 text-sm text-warning">
+              <Section className="rounded-md border border-warning-tint-border bg-warning-tint px-4 py-3 text-sm text-warning">
                 {data.remarks.split(/<br\s*\/?>/i).map((line, i) => (
                   <div key={i}>{line}</div>
                 ))}
-              </div>
+              </Section>
             )
           )}
 
@@ -268,24 +270,26 @@ export function DailyPnl() {
             ]}
           />
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">P&amp;L Statement</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-1">
-              {rest.map((r) => (
-                <div key={r.key} className="flex items-center justify-between text-sm py-1.5 border-b last:border-0">
-                  <span>{r.label}</span>
-                  <span className="font-medium">
-                    {formatCurrency(r.amount)}{' '}
-                    <span className="text-xs text-muted-foreground">({Number(r.percent).toFixed(1)}%)</span>
-                  </span>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+          <Section>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">P&amp;L Statement</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-1">
+                {rest.map((r) => (
+                  <div key={r.key} className="flex items-center justify-between text-sm py-1.5 border-b last:border-0">
+                    <span>{r.label}</span>
+                    <span className="font-medium">
+                      {formatCurrency(r.amount)}{' '}
+                      <span className="text-xs text-muted-foreground">({Number(r.percent).toFixed(1)}%)</span>
+                    </span>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </Section>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+          <Section className="grid grid-cols-1 lg:grid-cols-2 gap-grid-gap items-start">
             <BreakupTable title="Direct Expenses" rows={data.direct_expenses_breakup ?? []} className="self-start" />
             <BreakupTable title="Employee Costs" rows={data.employee_costs_breakup ?? []} className="self-start" />
             <BreakupTable
@@ -294,41 +298,43 @@ export function DailyPnl() {
               className="lg:col-span-2"
               twoColumn
             />
-          </div>
+          </Section>
 
           {data.cost_of_goods && data.cost_of_goods.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Cost of Goods Sold</CardTitle>
-              </CardHeader>
-              <CardContent className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-left text-muted-foreground border-b">
-                      <th className="py-1.5 pr-4">Item</th>
-                      <th className="py-1.5 pr-4">Group</th>
-                      <th className="py-1.5 pr-4">Qty</th>
-                      <th className="py-1.5 pr-4">Buying Price</th>
-                      <th className="py-1.5">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.cost_of_goods.map((r, i) => (
-                      <tr key={i} className="border-b last:border-0">
-                        <td className="py-1.5 pr-4">{r.item_name || r.item_code}</td>
-                        <td className="py-1.5 pr-4">{r.item_group || '—'}</td>
-                        <td className="py-1.5 pr-4">{r.qty}</td>
-                        <td className="py-1.5 pr-4">{formatCurrency(r.buying_price)}</td>
-                        <td className="py-1.5">{formatCurrency(r.amount)}</td>
+            <Section>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Cost of Goods Sold</CardTitle>
+                </CardHeader>
+                <CardContent className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-muted-foreground border-b">
+                        <th className="py-1.5 pr-4">Item</th>
+                        <th className="py-1.5 pr-4">Group</th>
+                        <th className="py-1.5 pr-4">Qty</th>
+                        <th className="py-1.5 pr-4">Buying Price</th>
+                        <th className="py-1.5">Amount</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </CardContent>
-            </Card>
+                    </thead>
+                    <tbody>
+                      {data.cost_of_goods.map((r, i) => (
+                        <tr key={i} className="border-b last:border-0">
+                          <td className="py-1.5 pr-4">{r.item_name || r.item_code}</td>
+                          <td className="py-1.5 pr-4">{r.item_group || '—'}</td>
+                          <td className="py-1.5 pr-4">{r.qty}</td>
+                          <td className="py-1.5 pr-4">{formatCurrency(r.buying_price)}</td>
+                          <td className="py-1.5">{formatCurrency(r.amount)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </CardContent>
+              </Card>
+            </Section>
           )}
         </>
       )}
-    </div>
+    </Page>
   );
 }
