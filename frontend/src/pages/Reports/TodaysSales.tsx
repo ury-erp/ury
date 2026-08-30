@@ -4,7 +4,6 @@ import { StatCard } from '@ury/ui';
 import { Receipt, IndianRupee, Percent, Sigma, Equal, BadgePercent } from 'lucide-react';
 import { useBranchContext } from '../../context/BranchContext';
 import { toApiDate } from '../../lib/reportDate';
-import { DatePicker } from '../../components/setup/DatePicker';
 
 interface TodaySalesData {
   branch: string | null;
@@ -67,12 +66,12 @@ export function TodaysSales() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <DatePicker
-            id="todays-sales-date"
+          <input
+            type="date"
             value={date}
-            maxDate={toApiDate(new Date())}
-            onChange={(_id, val) => setDate(val)}
-            className="w-36"
+            max={toApiDate(new Date())}
+            onChange={(e) => setDate(e.target.value)}
+            className="border border-input rounded-md px-3 py-1.5 text-sm"
           />
           {data && (
             <span className="text-xs text-muted-foreground">
