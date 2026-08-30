@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Spinner, Input, Button } from '@ury/ui';
+import { Page, Section, Panel, Spinner, Input, Button } from '@ury/ui';
 import { call, getLoggedUser, getUserRoles } from '@ury/core';
 import { useBranchContext } from '../../context/BranchContext';
 import {
@@ -173,36 +173,42 @@ export const DepartmentProfitabilityPage: React.FC = () => {
 
   if (roles === null || state === 'loading') {
     return (
-      <div className="flex items-center justify-center p-12" data-testid="profitability-loading">
-        <Spinner />
-      </div>
+      <Page>
+        <div className="flex items-center justify-center p-12" data-testid="profitability-loading">
+          <Spinner />
+        </div>
+      </Page>
     );
   }
 
   if (isDenied || state === 'denied') {
     return (
-      <Card className="p-6" data-testid="profitability-denied">
-        <p className="text-sm text-muted-foreground">
-          You do not have access to department profitability reporting.
-        </p>
-      </Card>
+      <Page>
+        <Panel pad data-testid="profitability-denied">
+          <p className="text-sm text-muted-foreground">
+            You do not have access to department profitability reporting.
+          </p>
+        </Panel>
+      </Page>
     );
   }
 
   if (!branch) {
     return (
-      <div className="space-y-6" data-testid="department-profitability-page">
-        <Card className="p-6" data-testid="profitability-select-branch">
-          <p className="text-sm text-muted-foreground">
-            Select a specific branch above to view its department profitability.
-          </p>
-        </Card>
-      </div>
+      <Page data-testid="department-profitability-page">
+        <Section>
+          <Panel pad data-testid="profitability-select-branch">
+            <p className="text-sm text-muted-foreground">
+              Select a specific branch above to view its department profitability.
+            </p>
+          </Panel>
+        </Section>
+      </Page>
     );
   }
 
   return (
-    <div className="space-y-6" data-testid="department-profitability-page">
+    <Page data-testid="department-profitability-page">
       <div className="flex flex-wrap gap-3 items-end">
         <div>
           <label className="text-xs text-muted-foreground">Company</label>
@@ -236,98 +242,106 @@ export const DepartmentProfitabilityPage: React.FC = () => {
       </div>
 
       {state === 'error' && (
-        <Card className="p-4" data-testid="profitability-error">
-          <p className="text-sm text-destructive">{errorMessage}</p>
-        </Card>
+        <Section>
+          <Panel pad data-testid="profitability-error">
+            <p className="text-sm text-destructive">{errorMessage}</p>
+          </Panel>
+        </Section>
       )}
 
       {state === 'empty' && (
-        <Card className="p-6" data-testid="profitability-empty">
-          <p className="text-sm text-muted-foreground">
-            No data for this company/branch/service date. Check that an approved Sales Plan exists for this scope.
-          </p>
-        </Card>
+        <Section>
+          <Panel pad data-testid="profitability-empty">
+            <p className="text-sm text-muted-foreground">
+              No data for this company/branch/service date. Check that an approved Sales Plan exists for this scope.
+            </p>
+          </Panel>
+        </Section>
       )}
 
       {state === 'populated' && profitability && (
-        <Card className="p-4" data-testid="profitability-table">
-          <h3 className="text-sm font-semibold mb-2">Department Profitability</h3>
-          {profitability.reason && (
-            <p className="text-xs text-warning mb-2" data-testid="profitability-reason">
-              {profitability.reason}
-            </p>
-          )}
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-xs text-muted-foreground">
-                  <th className="p-2">Department</th>
-                  <th className="p-2">Item</th>
-                  <th className="p-2">Net Revenue</th>
-                  {canSeeCost && <th className="p-2">Posted Cost</th>}
-                  {canSeeCost && <th className="p-2">Theoretical Cost</th>}
-                  {canSeeCost && (
-                    <th className="p-2" title="Gross profit using today's actual recorded cost for this item">
-                      Posted GP
-                    </th>
-                  )}
-                  {canSeeCost && (
-                    <th className="p-2" title="Gross profit if cost matched the standard recipe (BOM) cost exactly">
-                      Theoretical GP
-                    </th>
-                  )}
-                  {canSeeCost && <th className="p-2">Variance</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {profitability.rows.map((row: ProfitabilityRow, idx: number) => (
-                  <tr key={`${row.item_or_component}-${idx}`} className="border-t">
-                    <td className="p-2">{row.department}</td>
-                    <td className="p-2">{row.item_or_component}</td>
-                    <td className="p-2">{formatCurrency(row.net_revenue)}</td>
-                    {canSeeCost && <td className="p-2">{formatCurrency(row.posted_cost)}</td>}
-                    {canSeeCost && <td className="p-2">{formatCurrency(row.theoretical_cost)}</td>}
-                    {canSeeCost && <td className="p-2">{formatCurrency(row.posted_gross_profit)}</td>}
-                    {canSeeCost && <td className="p-2">{formatCurrency(row.theoretical_gross_profit)}</td>}
-                    {canSeeCost && <td className="p-2">{formatCurrency(row.variance)}</td>}
+        <Section>
+          <Panel pad data-testid="profitability-table">
+            <h3 className="text-sm font-semibold mb-2">Department Profitability</h3>
+            {profitability.reason && (
+              <p className="text-xs text-warning mb-2" data-testid="profitability-reason">
+                {profitability.reason}
+              </p>
+            )}
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs text-muted-foreground">
+                    <th className="p-2">Department</th>
+                    <th className="p-2">Item</th>
+                    <th className="p-2">Net Revenue</th>
+                    {canSeeCost && <th className="p-2">Posted Cost</th>}
+                    {canSeeCost && <th className="p-2">Theoretical Cost</th>}
+                    {canSeeCost && (
+                      <th className="p-2" title="Gross profit using today's actual recorded cost for this item">
+                        Posted GP
+                      </th>
+                    )}
+                    {canSeeCost && (
+                      <th className="p-2" title="Gross profit if cost matched the standard recipe (BOM) cost exactly">
+                        Theoretical GP
+                      </th>
+                    )}
+                    {canSeeCost && <th className="p-2">Variance</th>}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
+                </thead>
+                <tbody>
+                  {profitability.rows.map((row: ProfitabilityRow, idx: number) => (
+                    <tr key={`${row.item_or_component}-${idx}`} className="border-t">
+                      <td className="p-2">{row.department}</td>
+                      <td className="p-2">{row.item_or_component}</td>
+                      <td className="p-2">{formatCurrency(row.net_revenue)}</td>
+                      {canSeeCost && <td className="p-2">{formatCurrency(row.posted_cost)}</td>}
+                      {canSeeCost && <td className="p-2">{formatCurrency(row.theoretical_cost)}</td>}
+                      {canSeeCost && <td className="p-2">{formatCurrency(row.posted_gross_profit)}</td>}
+                      {canSeeCost && <td className="p-2">{formatCurrency(row.theoretical_gross_profit)}</td>}
+                      {canSeeCost && <td className="p-2">{formatCurrency(row.variance)}</td>}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Panel>
+        </Section>
       )}
 
       {state === 'populated' && planVsActual && (
-        <Card className="p-4" data-testid="plan-vs-actual-table">
-          <h3 className="text-sm font-semibold mb-2">Plan vs Actual</h3>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-xs text-muted-foreground">
-                  <th className="p-2">Department</th>
-                  <th className="p-2">Item</th>
-                  <th className="p-2">Planned Qty</th>
-                  <th className="p-2">Actual Qty</th>
-                  <th className="p-2">Variance</th>
-                </tr>
-              </thead>
-              <tbody>
-                {planVsActual.rows.map((row, idx) => (
-                  <tr key={`${row.item_or_component}-${idx}`} className="border-t">
-                    <td className="p-2">{row.department}</td>
-                    <td className="p-2">{row.item_or_component}</td>
-                    <td className="p-2">{row.planned_qty}</td>
-                    <td className="p-2">{row.actual_qty}</td>
-                    <td className="p-2">{row.qty_variance}</td>
+        <Section>
+          <Panel pad data-testid="plan-vs-actual-table">
+            <h3 className="text-sm font-semibold mb-2">Plan vs Actual</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs text-muted-foreground">
+                    <th className="p-2">Department</th>
+                    <th className="p-2">Item</th>
+                    <th className="p-2">Planned Qty</th>
+                    <th className="p-2">Actual Qty</th>
+                    <th className="p-2">Variance</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
+                </thead>
+                <tbody>
+                  {planVsActual.rows.map((row, idx) => (
+                    <tr key={`${row.item_or_component}-${idx}`} className="border-t">
+                      <td className="p-2">{row.department}</td>
+                      <td className="p-2">{row.item_or_component}</td>
+                      <td className="p-2">{row.planned_qty}</td>
+                      <td className="p-2">{row.actual_qty}</td>
+                      <td className="p-2">{row.qty_variance}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Panel>
+        </Section>
       )}
-    </div>
+    </Page>
   );
 };
 

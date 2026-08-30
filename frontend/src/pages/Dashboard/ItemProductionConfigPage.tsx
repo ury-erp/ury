@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
 import { Plus } from 'lucide-react';
-import { Button, Select, SelectItem, Spinner, showToast } from '@ury/ui';
+import { Page, Section, Button, Select, SelectItem, Spinner, showToast } from '@ury/ui';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { dashboardService } from '../../services/dashboard';
 import { call } from '@ury/core';
@@ -228,8 +228,8 @@ export const ItemProductionConfigPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="-mx-6 px-6 -mt-6 pt-6 pb-3 border-b border-border flex flex-col md:flex-row items-center justify-end gap-4">
+    <Page>
+      <div className="flex flex-col md:flex-row items-center justify-end gap-4 pb-3 border-b border-border">
         <Button
           onClick={openAddDrawer}
           className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center space-x-1.5 shadow-xs"
@@ -239,55 +239,57 @@ export const ItemProductionConfigPage: React.FC = () => {
         </Button>
       </div>
 
-      {loading ? (
-        <div className="py-16 flex items-center justify-center bg-card rounded-[9px] border border-hair">
-          <Spinner className="w-8 h-8 text-primary" />
-        </div>
-      ) : configs.length === 0 ? (
-        <div className="px-4 py-[18px] text-xs text-text-tertiary flex items-center gap-2.5 bg-card border border-hair rounded-[9px]">
-          <span>Map items to production units and departments to enable kitchen/bar routing.</span>
-          <Button
-            onClick={openAddDrawer}
-            variant="chrome"
-            size="compactSm"
-            className="ml-auto"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Add Config</span>
-          </Button>
-        </div>
-      ) : (
-        <div className="bg-card border border-hair rounded-[9px] overflow-hidden overflow-x-auto">
-          <table className="w-full text-left text-sm text-muted-foreground">
-            <thead className="border-b border-hair">
-              <tr>
-                <th className="px-[14px] py-[7px] text-[11px] font-medium text-text-tertiary text-left">Item</th>
-                <th className="px-[14px] py-[7px] text-[11px] font-medium text-text-tertiary text-left">Branch</th>
-                <th className="px-[14px] py-[7px] text-[11px] font-medium text-text-tertiary text-left">Department</th>
-                <th className="px-[14px] py-[7px] text-[11px] font-medium text-text-tertiary text-left">Production Unit</th>
-                <th className="px-[14px] py-[7px] text-[11px] font-medium text-text-tertiary text-left">Policy</th>
-                <th className="px-[14px] py-[7px] text-[11px] font-medium text-text-tertiary text-center">Active</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-hair">
-              {configs.map((config) => (
-                <tr
-                  key={config.name}
-                  className="transition-colors cursor-pointer hover:bg-muted"
-                  onClick={() => openEditDrawer(config)}
-                >
-                  <td className="px-[14px] py-2 text-[12.5px] font-semibold text-foreground">{config.item}</td>
-                  <td className="px-[14px] py-2 text-[12.5px]">{config.branch}</td>
-                  <td className="px-[14px] py-2 text-[12.5px]">{config.department || '-'}</td>
-                  <td className="px-[14px] py-2 text-[12.5px]">{config.production_unit || '-'}</td>
-                  <td className="px-[14px] py-2 text-[12.5px]">{config.production_policy || '-'}</td>
-                  <td className="px-[14px] py-2 text-[12.5px] text-center">{config.active ? 'Yes' : 'No'}</td>
+      <Section>
+        {loading ? (
+          <div className="py-16 flex items-center justify-center bg-card rounded-[9px] border border-hair">
+            <Spinner className="w-8 h-8 text-primary" />
+          </div>
+        ) : configs.length === 0 ? (
+          <div className="px-4 py-[18px] text-xs text-text-tertiary flex items-center gap-2.5 bg-card border border-hair rounded-[9px]">
+            <span>Map items to production units and departments to enable kitchen/bar routing.</span>
+            <Button
+              onClick={openAddDrawer}
+              variant="chrome"
+              size="compactSm"
+              className="ml-auto"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Add Config</span>
+            </Button>
+          </div>
+        ) : (
+          <div className="bg-card border border-hair rounded-[9px] overflow-hidden overflow-x-auto">
+            <table className="w-full text-left text-sm text-muted-foreground">
+              <thead className="border-b border-hair">
+                <tr>
+                  <th className="px-[14px] py-[7px] text-[11px] font-medium text-text-tertiary text-left">Item</th>
+                  <th className="px-[14px] py-[7px] text-[11px] font-medium text-text-tertiary text-left">Branch</th>
+                  <th className="px-[14px] py-[7px] text-[11px] font-medium text-text-tertiary text-left">Department</th>
+                  <th className="px-[14px] py-[7px] text-[11px] font-medium text-text-tertiary text-left">Production Unit</th>
+                  <th className="px-[14px] py-[7px] text-[11px] font-medium text-text-tertiary text-left">Policy</th>
+                  <th className="px-[14px] py-[7px] text-[11px] font-medium text-text-tertiary text-center">Active</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+              </thead>
+              <tbody className="divide-y divide-hair">
+                {configs.map((config) => (
+                  <tr
+                    key={config.name}
+                    className="transition-colors cursor-pointer hover:bg-muted"
+                    onClick={() => openEditDrawer(config)}
+                  >
+                    <td className="px-[14px] py-2 text-[12.5px] font-semibold text-foreground">{config.item}</td>
+                    <td className="px-[14px] py-2 text-[12.5px]">{config.branch}</td>
+                    <td className="px-[14px] py-2 text-[12.5px]">{config.department || '-'}</td>
+                    <td className="px-[14px] py-2 text-[12.5px]">{config.production_unit || '-'}</td>
+                    <td className="px-[14px] py-2 text-[12.5px]">{config.production_policy || '-'}</td>
+                    <td className="px-[14px] py-2 text-[12.5px] text-center">{config.active ? 'Yes' : 'No'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Section>
 
       <SideDrawer
         isOpen={isDrawerOpen}
@@ -457,7 +459,7 @@ export const ItemProductionConfigPage: React.FC = () => {
           </div>
         </form>
       </SideDrawer>
-    </div>
+    </Page>
   );
 };
 
