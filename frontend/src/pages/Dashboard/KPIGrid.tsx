@@ -1,34 +1,12 @@
 import React from 'react';
 import { formatCurrency } from '@ury/core';
-import { Card, Spinner } from '@ury/ui';
+import { KpiStrip } from '@ury/ui';
 import { DashboardSummary } from '../../services/dashboard';
 
 interface KPIGridProps {
   summary: DashboardSummary | null;
   loading: boolean;
 }
-
-interface KPICardProps {
-  title: string;
-  value: string;
-  loading?: boolean;
-}
-
-const KPICard: React.FC<KPICardProps> = ({ title, value, loading }) => {
-  return (
-    <Card className="rounded-lg border border-border bg-card p-5 shadow-xs transition-all duration-200 hover:shadow-md hover:border-primary/20">
-      <p className="text-xs font-medium text-text-tertiary">{title}</p>
-      {loading ? (
-        <div className="mt-2 flex items-center space-x-2">
-          <Spinner className="w-4 h-4 text-primary" />
-          <span className="text-sm text-text-tertiary">Loading...</span>
-        </div>
-      ) : (
-        <h3 className="mt-2 text-2xl font-bold text-foreground tracking-tight">{value}</h3>
-      )}
-    </Card>
-  );
-};
 
 export const KPIGrid: React.FC<KPIGridProps> = ({ summary, loading }) => {
   const todaySales = summary?.today_sales ?? 0;
@@ -40,59 +18,22 @@ export const KPIGrid: React.FC<KPIGridProps> = ({ summary, loading }) => {
   const pendingOrders = summary?.pending_kitchen_orders ?? 0;
   const totalMenuItems = summary?.total_menu_items ?? 0;
 
-  const occupancyRate = totalTables > 0 ? Math.round((occupiedTables / totalTables) * 100) : 0;
+  const placeholder = loading ? '—' : undefined;
 
   return (
     <section className="w-full">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <KPICard
-          title="Today's Sales"
-          value={formatCurrency(todaySales)}
-          loading={loading}
-        />
-
-        <KPICard
-          title="Orders Today"
-          value={ordersToday.toString()}
-          loading={loading}
-        />
-
-        <KPICard
-          title="Active Tables"
-          value={`${totalTables} Tables`}
-          loading={loading}
-        />
-
-        <KPICard
-          title="Occupied Tables"
-          value={`${occupiedTables} / ${totalTables}`}
-          loading={loading}
-        />
-
-        <KPICard
-          title="Active Menu Items"
-          value={`${totalMenuItems} Items`}
-          loading={loading}
-        />
-
-        <KPICard
-          title="Average Order Value"
-          value={formatCurrency(aov)}
-          loading={loading}
-        />
-
-        <KPICard
-          title="Pending Kitchen Orders"
-          value={`${pendingOrders} KOTs`}
-          loading={loading}
-        />
-
-        <KPICard
-          title="Active Cashiers"
-          value={`${activeCashiers} Online`}
-          loading={loading}
-        />
-      </div>
+      <KpiStrip
+        items={[
+          { label: "Today's Sales", value: placeholder ?? formatCurrency(todaySales) },
+          { label: 'Orders Today', value: placeholder ?? ordersToday.toString() },
+          { label: 'Active Tables', value: placeholder ?? `${totalTables} Tables` },
+          { label: 'Occupied Tables', value: placeholder ?? `${occupiedTables} / ${totalTables}` },
+          { label: 'Active Menu Items', value: placeholder ?? `${totalMenuItems} Items` },
+          { label: 'Average Order Value', value: placeholder ?? formatCurrency(aov) },
+          { label: 'Pending Kitchen Orders', value: placeholder ?? `${pendingOrders} KOTs` },
+          { label: 'Active Cashiers', value: placeholder ?? `${activeCashiers} Online` },
+        ]}
+      />
     </section>
   );
 };

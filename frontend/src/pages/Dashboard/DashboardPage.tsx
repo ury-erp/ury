@@ -213,14 +213,16 @@ export const DashboardPage: React.FC = () => {
       </div>
 
       {loading ? (
-        <Card className="flex items-center justify-center p-10">
+        <Card className="flex items-center justify-center rounded-[9px] border-hair p-10 shadow-none">
           <Spinner />
         </Card>
       ) : error ? (
-        <Card className="border-destructive-tint-border bg-destructive-tint p-6 text-sm text-destructive">{error}</Card>
+        <Card className="rounded-[9px] border-destructive-tint-border bg-destructive-tint p-[14px_16px] text-sm text-destructive shadow-none">
+          {error}
+        </Card>
       ) : (
         <>
-          <Card className="p-4">
+          <Card className="rounded-[9px] border-hair p-[14px_16px] shadow-none">
             <p className="text-sm text-muted-foreground">{buildSummaryLine(needsAttention)}</p>
           </Card>
 
@@ -253,14 +255,17 @@ export const DashboardPage: React.FC = () => {
             View Daily P&amp;L report
           </Link>
 
-          <Card className="p-4">
-            <p className="text-sm font-medium text-muted-foreground">Needs Attention</p>
+          <Card className="rounded-[9px] border-hair p-[14px_16px] shadow-none">
+            <div className="mb-[9px] flex items-center gap-[9px]">
+              <h2 className="text-[12.5px] font-semibold">Needs Attention</h2>
+              <span className="text-[11.5px] text-text-tertiary">{needsAttention.length}</span>
+            </div>
             {needsAttention.length === 0 ? (
-              <p className="mt-2 text-sm text-text-tertiary">
+              <div className="flex items-center gap-2.5 p-[18px_16px] text-xs text-text-tertiary">
                 No issues right now — service is running smoothly.
-              </p>
+              </div>
             ) : (
-              <ul className="mt-3 divide-y divide-gray-100">
+              <ul className="divide-y divide-hair">
                 {needsAttention.map((item, index) => {
                   const target = getAttentionLinkTarget(item);
                   const countLabel = referenceCountLabel(item);
