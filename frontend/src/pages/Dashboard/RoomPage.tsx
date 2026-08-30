@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
 import { Plus, Layers, Edit2 } from 'lucide-react';
-import { Badge, Button, Input, Spinner, showToast } from '@ury/ui';
+import { Badge, Button, Input, Page, Panel, Spinner, showToast } from '@ury/ui';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { dashboardService } from '../../services/dashboard';
 import { call } from '@ury/core';
@@ -133,7 +133,7 @@ export const RoomPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <Page>
       {/* Toolbar — Partition Style, no title */}
       <div className="flex flex-col md:flex-row items-center justify-end gap-4 pb-3 border-b border-border -mx-6 px-6 -mt-6 pt-6">
         <Button
@@ -146,11 +146,11 @@ export const RoomPage: React.FC = () => {
       </div>
 
       {loading ? (
-        <div className="py-16 flex items-center justify-center bg-card rounded-[9px] border border-hair">
+        <div className="mt-section py-16 flex items-center justify-center bg-card rounded-[9px] border border-hair">
           <Spinner className="w-8 h-8 text-primary" />
         </div>
       ) : rooms.length === 0 ? (
-        <div className="px-4 py-[18px] text-xs text-text-tertiary flex items-center gap-2.5 bg-card border border-hair rounded-[9px]">
+        <div className="mt-section px-4 py-[18px] text-xs text-text-tertiary flex items-center gap-2.5 bg-card border border-hair rounded-[9px]">
           <span>Add dining rooms or zones to organize your tables.</span>
           <Button
             onClick={openAddDrawer}
@@ -163,7 +163,7 @@ export const RoomPage: React.FC = () => {
           </Button>
         </div>
       ) : (
-        <div className="bg-card border border-hair rounded-[9px] overflow-hidden">
+        <Panel className="mt-section overflow-hidden">
           <table className="w-full text-left text-sm text-muted-foreground">
             <thead className="border-b border-hair">
               <tr>
@@ -193,7 +193,7 @@ export const RoomPage: React.FC = () => {
               ))}
             </tbody>
           </table>
-        </div>
+        </Panel>
       )}
 
       {/* Add/Edit SideDrawer */}
@@ -292,7 +292,7 @@ export const RoomPage: React.FC = () => {
           </div>
         </form>
       </SideDrawer>
-    </div>
+    </Page>
   );
 };
 

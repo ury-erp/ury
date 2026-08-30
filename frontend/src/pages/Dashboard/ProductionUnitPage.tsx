@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
 import { Plus } from 'lucide-react';
-import { Button, Input, Spinner, showToast } from '@ury/ui';
+import { Button, Input, Page, Panel, Spinner, showToast } from '@ury/ui';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { dashboardService } from '../../services/dashboard';
 import { call } from '@ury/core';
@@ -165,7 +165,7 @@ export const ProductionUnitPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <Page>
       {/* Toolbar — Partition Style, no title */}
       <div className="-mx-6 px-6 -mt-6 pt-6 pb-3 border-b border-border flex flex-col md:flex-row items-center justify-end gap-4">
         <Button
@@ -178,11 +178,11 @@ export const ProductionUnitPage: React.FC = () => {
       </div>
 
       {loading ? (
-        <div className="py-16 flex items-center justify-center bg-card rounded-[9px] border border-hair">
+        <div className="mt-section py-16 flex items-center justify-center bg-card rounded-[9px] border border-hair">
           <Spinner className="w-8 h-8 text-primary" />
         </div>
       ) : units.length === 0 ? (
-        <div className="px-4 py-[18px] text-xs text-text-tertiary flex items-center gap-2.5 bg-card border border-hair rounded-[9px]">
+        <div className="mt-section px-4 py-[18px] text-xs text-text-tertiary flex items-center gap-2.5 bg-card border border-hair rounded-[9px]">
           <span>Add production units to organize kitchen routing for item groups.</span>
           <Button
             onClick={openAddDrawer}
@@ -195,7 +195,7 @@ export const ProductionUnitPage: React.FC = () => {
           </Button>
         </div>
       ) : (
-        <div className="bg-card border border-hair rounded-[9px] overflow-hidden">
+        <Panel className="mt-section overflow-hidden">
           <table className="w-full text-left text-sm text-muted-foreground">
             <thead className="border-b border-hair">
               <tr>
@@ -212,7 +212,7 @@ export const ProductionUnitPage: React.FC = () => {
               ))}
             </tbody>
           </table>
-        </div>
+        </Panel>
       )}
 
       {/* Add/Edit SideDrawer */}
@@ -279,7 +279,7 @@ export const ProductionUnitPage: React.FC = () => {
           </div>
         </form>
       </SideDrawer>
-    </div>
+    </Page>
   );
 };
 
