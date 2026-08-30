@@ -74,8 +74,8 @@ const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: Checklis
 
     try {
       const { items, logName: fetchedLogName, logStatus } = await getChecklist(posProfile, checklistType);
-      
-      if (items.length === 0 || logStatus === 'Complete') {
+
+      if (logStatus === 'Complete') {
         onComplete();
         return;
       }
@@ -93,6 +93,37 @@ const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: Checklis
   useEffect(() => {
     loadChecklist();
   }, [loadChecklist]);
+
+  // Auto-submit when the checklist has zero configured items. Since there's
+  // nothing to check, we immediately submit with an empty items array, which
+  // the backend correctly marks as Complete (all_mandatory_checked is
+  // vacuously true for empty lists). This prevents the confusing UX of showing
+  // a gate with a Submit button but no items to interact with.
+  useEffect(() => {
+    // Only auto-submit once when: finished loading, no load error, no items, and not already submitting
+    if (!isLoading && !loadError && rows.length === 0 && !isSubmitting) {
+      const autoSubmit = async () => {
+        setIsSubmitting(true);
+        setSubmitError(null);
+
+        try {
+          const response = await submitChecklist(posProfile, checklistType, [], logName ?? undefined);
+          if (response.status === 'Complete') {
+            onComplete();
+          } else {
+            setSubmitError(t('checklist.incomplete_error'));
+          }
+        } catch (error) {
+          console.error('Failed to auto-submit empty checklist:', error);
+          setSubmitError(extractServerErrorMessage(error, t('checklist.submit_failed')));
+        } finally {
+          setIsSubmitting(false);
+        }
+      };
+
+      autoSubmit();
+    }
+  }, [isLoading, loadError, rows.length, isSubmitting, posProfile, checklistType, logName, onComplete]);
 
   const handleCheckedChange = (index: number, isChecked: boolean) => {
     setRows((prev) => prev.map((row, i) => (i === index ? { ...row, is_checked: isChecked } : row)));
