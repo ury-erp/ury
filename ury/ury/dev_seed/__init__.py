@@ -26,6 +26,9 @@ def run_all():
 	print("=== dev_seed: operations ===")
 	operations.seed()
 
+	print("=== dev_seed: more_seed ===")
+	more_seed.seed()
+
 	print("=== dev_seed: historical_sales ===")
 	historical_sales.seed()
 

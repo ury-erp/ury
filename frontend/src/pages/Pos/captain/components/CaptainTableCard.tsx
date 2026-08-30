@@ -55,7 +55,7 @@ const CaptainTableCard = ({
   const elapsed = isOccupied ? elapsedLabel(table.latest_invoice_time) : null;
 
   const colorClasses = isBilled
-    ? 'border-border bg-card text-foreground'
+    ? 'border-success-tint-border bg-success-tint text-success'
     : ownership === 'mine'
       ? 'border-primary bg-primary-tint text-primary'
       : ownership === 'free'
