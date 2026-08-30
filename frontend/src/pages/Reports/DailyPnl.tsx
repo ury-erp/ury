@@ -53,7 +53,7 @@ function MissingPricesWarning({ sections }: { sections: MissingPriceSection[] })
   const totalItems = sections.reduce((sum, s) => sum + s.items.length, 0);
 
   return (
-    <div className="rounded-md border border-amber-200 bg-warning-tint text-warning overflow-hidden">
+    <div className="rounded-md border border-warning-tint-border bg-warning-tint text-warning overflow-hidden">
       <button
         onClick={() => setExpanded((e) => !e)}
         className="w-full flex items-center justify-between gap-2 px-4 py-3 text-sm text-left"
@@ -66,7 +66,7 @@ function MissingPricesWarning({ sections }: { sections: MissingPriceSection[] })
         <ChevronDown className={`w-4 h-4 shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`} />
       </button>
       {expanded && (
-        <div className="px-4 pb-4 space-y-3 border-t border-amber-200 pt-3">
+        <div className="px-4 pb-4 space-y-3 border-t border-warning-tint-border pt-3">
           {sections.map((s) => (
             <div key={s.label}>
               <p className="text-xs font-semibold tracking-wide mb-1.5">
@@ -223,7 +223,7 @@ export function DailyPnl() {
       {isLoading ? (
         <div className="text-sm text-muted-foreground">Loading...</div>
       ) : !data?.exists ? (
-        <div className="rounded-md border border-amber-200 bg-warning-tint px-4 py-3 text-sm text-warning">
+        <div className="rounded-md border border-warning-tint-border bg-warning-tint px-4 py-3 text-sm text-warning">
           No submitted Daily P&amp;L exists for this branch/date. It must be created and submitted in Desk first.
         </div>
       ) : (
@@ -240,7 +240,7 @@ export function DailyPnl() {
               // Fallback for genuine free-text remarks (e.g. hand-typed via
               // Desk) that don't match the known structured warning shape.
               // Still never HTML-rendered — same rationale as above.
-              <div className="rounded-md border border-amber-200 bg-warning-tint px-4 py-3 text-sm text-warning">
+              <div className="rounded-md border border-warning-tint-border bg-warning-tint px-4 py-3 text-sm text-warning">
                 {data.remarks.split(/<br\s*\/?>/i).map((line, i) => (
                   <div key={i}>{line}</div>
                 ))}
