@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { NavLink, useLocation, Link } from 'react-router-dom';
+import { Badge } from '@ury/ui';
 import { useAuth } from '../../store/useAuth';
 import { reportsRegistry, groupReports } from '../../pages/Reports/reportsRegistry';
+import { DayStatusCard } from './DayStatusCard';
 import {
   LayoutDashboard,
   Utensils,
@@ -25,13 +27,18 @@ import {
   Smartphone,
   Factory,
   Network,
-  Package
+  Package,
+  ClipboardList,
+  ClipboardCheck,
+  Lock
 } from 'lucide-react';
 
 interface NavItem {
   label: string;
   path: string;
   icon: React.ElementType;
+  /** Small numeric count shown next to the label (e.g. unresolved items). Omit when there's nothing to flag. */
+  badgeCount?: number;
 }
 
 interface NavGroup {
@@ -54,13 +61,18 @@ interface NavGroup {
 const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Plan',
-    items: [{ label: 'Sales Plan', path: '/sales-plan', icon: Target }]
+    items: [
+      { label: 'Sales Plan', path: '/sales-plan', icon: Target },
+      { label: 'Requirements', path: '/requirements', icon: ClipboardList }
+    ]
   },
   {
     label: 'Observe',
     items: [
       { label: 'Service Board', path: '/dashboard', icon: LayoutDashboard },
-      { label: 'Profitability', path: '/department-profitability', icon: TrendingUp }
+      { label: 'Service', path: '/service', icon: ClipboardCheck },
+      { label: 'Profitability', path: '/department-profitability', icon: TrendingUp },
+      { label: 'Close Day', path: '/close-day', icon: Lock }
     ]
   },
   {
@@ -160,7 +172,9 @@ const MainPanel: React.FC<{ isManager: boolean }> = ({ isManager }) => {
   const [isAdvancedOpen, setIsAdvancedOpen] = useState<boolean>(isAdvancedPath);
 
   return (
-    <div className="p-4 flex-1 space-y-0.5">
+    <div className="flex-1 flex flex-col">
+      <DayStatusCard />
+      <div className="px-4 pb-4 flex-1 space-y-0.5">
       {isManager && (
         <>
           <NavLink to="/reports" className={navLinkClass}>
@@ -179,6 +193,11 @@ const MainPanel: React.FC<{ isManager: boolean }> = ({ isManager }) => {
               <NavLink key={item.path} to={item.path} className={navLinkClass}>
                 <Icon className="w-4 h-4 shrink-0" />
                 <span>{item.label}</span>
+                {typeof item.badgeCount === 'number' && item.badgeCount > 0 && (
+                  <Badge variant="warning" size="sm" className="ml-auto h-4 px-1.5 text-[10px]">
+                    {item.badgeCount}
+                  </Badge>
+                )}
               </NavLink>
             );
           })}
@@ -218,6 +237,7 @@ const MainPanel: React.FC<{ isManager: boolean }> = ({ isManager }) => {
             })}
           </div>
         )}
+      </div>
       </div>
     </div>
   );
