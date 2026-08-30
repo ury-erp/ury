@@ -13,6 +13,7 @@ import { UserPage } from './pages/Dashboard/UserPage';
 import { BranchPage } from './pages/Dashboard/BranchPage';
 import { ReportSettingsPage } from './pages/Dashboard/ReportSettingsPage';
 import { AiAssistantSettingsPage } from './pages/Dashboard/AiAssistantSettingsPage';
+import { CommissionSettingsPage } from './pages/Dashboard/CommissionSettingsPage';
 import { SelfOrderingProfilePage } from './pages/Dashboard/SelfOrderingProfilePage';
 import ProductionUnitPage from './pages/Dashboard/ProductionUnitPage';
 import ProductionDepartmentPage from './pages/Dashboard/ProductionDepartmentPage';
@@ -55,6 +56,7 @@ import { CustomerData } from './pages/Reports/CustomerData';
 import { DaywiseCustomerDetails } from './pages/Reports/DaywiseCustomerDetails';
 import { RepeatedCustomers } from './pages/Reports/RepeatedCustomers';
 import { EmployeeSales } from './pages/Reports/EmployeeSales';
+import { EmployeeCommission } from './pages/Reports/EmployeeCommission';
 import { EmployeeItemWiseSales } from './pages/Reports/EmployeeItemWiseSales';
 import { CompletedWorkOrders } from './pages/Reports/CompletedWorkOrders';
 import { DailyPnl } from './pages/Reports/DailyPnl';
@@ -236,6 +238,7 @@ function AppRoutes() {
           <Route path="branch" element={<BranchPage />} />
           <Route path="report-settings" element={<ReportSettingsPage />} />
           <Route path="ai-settings" element={<AiAssistantSettingsPage />} />
+          <Route path="commission-settings" element={<CommissionSettingsPage />} />
           <Route path="self-ordering-profile" element={<SelfOrderingProfilePage />} />
           <Route path="production-unit" element={<ProductionUnitPage />} />
           <Route path="production-department" element={<ProductionDepartmentPage />} />
@@ -292,6 +295,7 @@ function AppRoutes() {
             />
             <Route path="repeated-customers" element={<RepeatedCustomers />} />
             <Route path="employee-sales" element={<EmployeeSales />} />
+            <Route path="employee-commission" element={<EmployeeCommission />} />
             <Route
               path="employee-item-wise-sales"
               element={<EmployeeItemWiseSales />}
