@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
-import { KpiStrip, DataTable, type DataTableColumn } from '@ury/ui';
+import { KpiStrip, DataTable, type DataTableColumn, Page, Section } from '@ury/ui';
 import { useBranchContext } from '../../context/BranchContext';
 import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
 import { toApiDate } from '../../lib/reportDate';
@@ -62,7 +62,7 @@ export function ItemWisePurchaseHistory() {
   }, [fetchData]);
 
   return (
-    <div className="space-y-6">
+    <Page>
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-semibold">Item-wise Purchase History</h1>
@@ -74,31 +74,39 @@ export function ItemWisePurchaseHistory() {
       </div>
 
       {error && (
-        <div className="rounded-md border border-destructive-tint-border bg-destructive-tint px-4 py-3 text-sm text-destructive">
-          {error}
-        </div>
+        <Section>
+          <div className="rounded-md border border-destructive-tint-border bg-destructive-tint px-4 py-3 text-sm text-destructive">
+            {error}
+          </div>
+        </Section>
       )}
 
       {data && (
-        <KpiStrip
-          items={[
-            { label: 'Total Qty Purchased', value: data.summary.total_qty },
-            { label: 'Total Spend', value: formatCurrency(data.summary.total_amount) },
-          ]}
-        />
+        <Section>
+          <KpiStrip
+            items={[
+              { label: 'Total Qty Purchased', value: data.summary.total_qty },
+              { label: 'Total Spend', value: formatCurrency(data.summary.total_amount) },
+            ]}
+          />
+        </Section>
       )}
 
-      <DataTable
-        columns={columns}
-        rows={data?.items ?? []}
-        isLoading={isLoading}
-        emptyMessage="No purchase records in this range. This report summarizes item-wise spend from recorded Purchase Invoices for the selected period."
-      />
+      <Section>
+        <DataTable
+          columns={columns}
+          rows={data?.items ?? []}
+          isLoading={isLoading}
+          emptyMessage="No purchase records in this range. This report summarizes item-wise spend from recorded Purchase Invoices for the selected period."
+        />
+      </Section>
 
-      <p className="text-xs text-muted-foreground">
-        Recording new Purchase Invoices isn't available in this app yet — that workflow is on
-        our roadmap. In the meantime, invoices entered elsewhere in ERPNext will show up here.
-      </p>
-    </div>
+      <Section>
+        <p className="text-xs text-muted-foreground">
+          Recording new Purchase Invoices isn't available in this app yet — that workflow is on
+          our roadmap. In the meantime, invoices entered elsewhere in ERPNext will show up here.
+        </p>
+      </Section>
+    </Page>
   );
 }
