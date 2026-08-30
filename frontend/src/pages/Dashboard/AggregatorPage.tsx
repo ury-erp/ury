@@ -185,7 +185,7 @@ export const AggregatorPage: React.FC = () => {
                 <th className="px-6 py-4">Mode of Payment</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-hair">
               {aggregators.map((item, idx) => (
                 <tr key={idx} className="hover:bg-primary/10 transition-colors">
                   <td className="px-6 py-4 font-semibold text-foreground">{item.aggregator}</td>

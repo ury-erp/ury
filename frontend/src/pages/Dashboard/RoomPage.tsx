@@ -177,7 +177,7 @@ export const RoomPage: React.FC = () => {
                 <th className="px-6 py-4 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-hair">
               {rooms.map((room) => (
                 <tr key={room.name} className="hover:bg-primary/10 transition-colors">
                   <td className="px-6 py-4 font-semibold text-foreground">{room.name}</td>

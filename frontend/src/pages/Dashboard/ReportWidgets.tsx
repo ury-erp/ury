@@ -18,7 +18,7 @@ export const ReportWidgets: React.FC<ReportWidgetsProps> = ({ recentTransactions
     <div className="space-y-6">
       {/* Live POS Transactions */}
       <Card className="rounded-lg border border-border bg-card shadow-xs overflow-hidden">
-        <CardHeader className="border-b border-border bg-gray-50/50 p-5">
+        <CardHeader className="border-b border-border bg-muted/50 p-5">
           <div>
             <CardTitle className="text-lg font-bold text-foreground">
               Live POS Transactions
@@ -48,7 +48,7 @@ export const ReportWidgets: React.FC<ReportWidgetsProps> = ({ recentTransactions
                     <th className="px-5 py-3.5 text-right">Grand Total</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100 font-medium text-muted-foreground">
+                <tbody className="divide-y divide-hair font-medium text-muted-foreground">
                   {recentTransactions.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="px-5 py-8 text-center text-text-tertiary">

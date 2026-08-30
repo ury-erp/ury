@@ -131,7 +131,7 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
                 <CardTitle className="text-lg font-bold text-foreground">Sales Trend</CardTitle>
                 <p className="text-xs text-text-tertiary mt-1">Real-time revenue flow throughout operating hours</p>
               </div>
-              <Badge variant="outline" className="border-purple-200 bg-purple-50 text-purple-700 font-medium">
+              <Badge variant="outline" className="border-primary-tint-border bg-primary-tint text-primary font-medium">
                 Peak: {peakTrend.time} ({formatCurrency(peakTrend.sales)})
               </Badge>
             </div>
@@ -201,7 +201,7 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
                 <CardTitle className="text-lg font-bold text-foreground">Peak Sales Distribution</CardTitle>
                 <p className="text-xs text-text-tertiary mt-1">Hourly order volume density</p>
               </div>
-              <span className="text-xs font-semibold text-purple-600 bg-purple-50 px-2 py-1 rounded">Hourly Peak</span>
+              <span className="text-xs font-semibold text-primary bg-primary-tint px-2 py-1 rounded">Hourly Peak</span>
             </div>
           </CardHeader>
           <CardContent className="p-0 pt-2">
@@ -279,7 +279,7 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
                   <div key={i} className={`space-y-1.5 ${!isSelected ? 'opacity-40' : ''}`}>
                     <div className="flex items-center justify-between text-xs font-semibold">
                       <span className="text-foreground">{branch.name}</span>
-                      <span className="text-purple-700 font-bold">{formatCurrency(branch.revenue)}</span>
+                      <span className="text-primary font-bold">{formatCurrency(branch.revenue)}</span>
                     </div>
                     <div className="relative h-3.5 w-full rounded-full bg-muted overflow-hidden">
                       <div
@@ -437,7 +437,7 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
               <CardTitle className="text-lg font-bold text-foreground">Top Selling Menu Items</CardTitle>
               <p className="text-xs text-text-tertiary mt-1">Highest grossing items ranked by order count & volume</p>
             </div>
-            <Badge variant="outline" className="border-purple-200 bg-purple-50 text-purple-700">
+            <Badge variant="outline" className="border-primary-tint-border bg-primary-tint text-primary">
               Ranked Top {topItems.length}
             </Badge>
           </div>
@@ -454,7 +454,7 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
               {topItems.map((item) => (
-                <div key={item.rank} className="flex items-center gap-3 p-3 rounded-lg hover:bg-purple-50/50 transition-colors">
+                <div key={item.rank} className="flex items-center gap-3 p-3 rounded-lg hover:bg-primary-tint/50 transition-colors">
                   <span
                     className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
                       item.rank === 1
@@ -463,7 +463,7 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
                         ? 'bg-muted text-foreground border border-border'
                         : item.rank === 3
                         ? 'bg-amber-800/10 text-amber-900 border border-amber-800/30'
-                        : 'bg-purple-50 text-purple-700'
+                        : 'bg-primary-tint text-primary'
                     }`}
                   >
                     #{item.rank}
@@ -471,7 +471,7 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
                   <div className="flex-1 space-y-1">
                     <div className="flex items-center justify-between text-xs">
                       <span className="font-bold text-foreground">{item.name}</span>
-                      <span className="font-bold text-purple-700">{formatCurrency(item.revenue)}</span>
+                      <span className="font-bold text-primary">{formatCurrency(item.revenue)}</span>
                     </div>
                     <div className="relative h-2 w-full rounded-full bg-muted overflow-hidden">
                       <div

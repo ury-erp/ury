@@ -273,7 +273,7 @@ export const ItemProductionConfigPage: React.FC = () => {
                 <th className="px-6 py-4">Active</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-hair">
               {configs.map((config) => (
                 <tr
                   key={config.name}
