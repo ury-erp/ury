@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Button, Card, Spinner, Textarea } from '@ury/ui';
+import { Badge, Button, Card, Spinner, Textarea } from '@ury/ui';
 import { getLoggedUser, getUserRoles } from '@ury/core';
 import { useBranchContext } from '../../context/BranchContext';
 import {
@@ -21,23 +21,20 @@ const formatDateTime = (value?: string) => {
 
 const formatQty = (value: number) => (Number.isInteger(value) ? String(value) : value.toFixed(2));
 
-const TAG_BASE =
-  'inline-flex items-center gap-[5px] h-[19px] rounded-[5px] px-[7px] text-[11px] font-medium';
-
-const getStatusBadgeClass = (status: string) => {
+const getStatusBadgeVariant = (status: string) => {
   switch (status) {
     case 'Reserved':
-      return `${TAG_BASE} bg-primary-tint text-primary`;
+      return 'tagAccent' as const;
     case 'Fulfilled':
-      return `${TAG_BASE} bg-success-tint text-success`;
+      return 'tagSuccess' as const;
     case 'Released':
-      return `${TAG_BASE} bg-muted text-foreground`;
+      return 'cancelled' as const;
     case 'Expired':
-      return `${TAG_BASE} bg-warning-tint text-warning`;
+      return 'tagWarning' as const;
     case 'Cancelled':
-      return `${TAG_BASE} bg-destructive-tint text-destructive`;
+      return 'tagDestructive' as const;
     default:
-      return `${TAG_BASE} bg-muted text-foreground`;
+      return 'cancelled' as const;
   }
 };
 
@@ -290,9 +287,9 @@ const StockReservationContent: React.FC = () => {
                       {row.order_ref}
                     </td>
                     <td className="px-4 py-3">
-                      <span className={getStatusBadgeClass(row.status)}>
+                      <Badge size="tag" variant={getStatusBadgeVariant(row.status)}>
                         {row.status}
-                      </span>
+                      </Badge>
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">
                       {formatDateTime(row.expires_at)}

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
 import { Utensils, Search, Plus, LayoutGrid, List, Edit2, Check, X } from 'lucide-react';
-import { Button, Input, Spinner, showToast, Select } from '@ury/ui';
+import { Badge, Button, Input, Spinner, showToast, Select } from '@ury/ui';
 import { formatCurrency, call } from '@ury/core';
 import { dashboardService } from '../../services/dashboard';
 import SideDrawer from '../../components/layout/SideDrawer';
@@ -504,9 +504,9 @@ export const MenuPage: React.FC = () => {
                     </div>
                   </td>
                   <td className="px-[14px] py-2 text-[12.5px]">
-                    <span className="inline-flex items-center gap-[5px] text-[11px] h-[19px] px-[7px] rounded-[5px] text-muted-foreground bg-muted">
+                    <Badge size="tag" variant="cancelled">
                       {item.course || 'None'}
-                    </span>
+                    </Badge>
                   </td>
                   <td className="px-[14px] py-2 text-[12.5px] font-mono text-right tabular-nums text-primary font-semibold">{formatCurrency(item.rate || 0)}</td>
                   <td className="px-[14px] py-2 text-[12.5px] text-center">

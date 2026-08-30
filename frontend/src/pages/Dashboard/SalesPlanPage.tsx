@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarDays, CheckCircle2, History, Lock, Save, Search, Send, X } from 'lucide-react';
-import { AttentionFeed, Button, Card, Input, KpiStrip, Spinner } from '@ury/ui';
+import { AttentionFeed, Badge, Button, Card, Input, KpiStrip, Spinner } from '@ury/ui';
 import { useBranchContext } from '../../context/BranchContext';
 import { useAuth } from '../../store/useAuth';
 import {
@@ -163,9 +163,9 @@ const LifecycleStepper: React.FC<LifecycleStepperProps> = ({ status }) => {
         );
       })}
       {isTerminalOther && (
-        <span className="ml-1 inline-flex h-[19px] items-center gap-[5px] rounded-[5px] bg-destructive-tint px-[7px] text-[11px] font-medium text-destructive">
+        <Badge size="tag" variant="tagDestructive" className="ml-1">
           Superseded/Cancelled
-        </span>
+        </Badge>
       )}
     </div>
   );
