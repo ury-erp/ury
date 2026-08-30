@@ -248,7 +248,15 @@ const MainPanel: React.FC<{ isManager: boolean; isCollapsed: boolean }> = ({
     setGroupState((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
-  const isGroupOpen = (key: GroupKey) => isCollapsed || groupState[key];
+  // The four lifecycle groups (Plan/Operate/Observe/Control) hide their
+  // header when the rail is collapsed, so without an override their items
+  // would become unreachable — force them open. Reports and Setup keep
+  // their own disclosure header (rendered as a toggle button) even when
+  // collapsed, so `groupState` stays authoritative for them: collapsing the
+  // rail must not force-expand ~30 extra icon rows into a flat column.
+  const LIFECYCLE_GROUP_KEYS: GroupKey[] = ['Plan', 'Operate', 'Observe', 'Control'];
+  const isGroupOpen = (key: GroupKey) =>
+    (isCollapsed && LIFECYCLE_GROUP_KEYS.includes(key)) || groupState[key];
 
   return (
     <div className="flex-1 flex flex-col overflow-y-auto">
@@ -276,9 +284,10 @@ const MainPanel: React.FC<{ isManager: boolean; isCollapsed: boolean }> = ({
                       key={item.path}
                       to={item.path}
                       title={isCollapsed ? item.label : undefined}
+                      aria-label={isCollapsed ? item.label : undefined}
                       className={linkClass}
                     >
-                      <Icon className="w-4 h-4 shrink-0" />
+                      <Icon className="w-4 h-4 shrink-0" aria-hidden="true" />
                       {!isCollapsed && <span>{item.label}</span>}
                       {!isCollapsed && typeof item.badgeCount === 'number' && item.badgeCount > 0 && (
                         <Badge variant="warning" size="sm" className="ml-auto h-4 px-1.5 text-[10px]">
@@ -303,13 +312,16 @@ const MainPanel: React.FC<{ isManager: boolean; isCollapsed: boolean }> = ({
                 icon={BarChart3}
               />
             ) : (
-              <NavLink
-                to="/reports/today-sales"
+              <button
+                type="button"
+                onClick={() => toggleGroup('Reports')}
+                aria-expanded={isGroupOpen('Reports')}
+                aria-label="Reports"
                 title="Reports"
-                className={linkClass}
+                className={linkClass({ isActive: isReportsPath })}
               >
-                <BarChart3 className="w-4 h-4 shrink-0" />
-              </NavLink>
+                <BarChart3 className="w-4 h-4 shrink-0" aria-hidden="true" />
+              </button>
             )}
 
             {isGroupOpen('Reports') && (
@@ -329,9 +341,10 @@ const MainPanel: React.FC<{ isManager: boolean; isCollapsed: boolean }> = ({
                             key={report.id}
                             to={`/reports/${report.path}`}
                             title={isCollapsed ? report.label : undefined}
+                            aria-label={isCollapsed ? report.label : undefined}
                             className={linkClass}
                           >
-                            <Icon className="w-4 h-4 shrink-0" />
+                            <Icon className="w-4 h-4 shrink-0" aria-hidden="true" />
                             {!isCollapsed && <span>{report.label}</span>}
                           </NavLink>
                         );
@@ -355,9 +368,16 @@ const MainPanel: React.FC<{ isManager: boolean; isCollapsed: boolean }> = ({
             icon={Settings}
           />
         ) : (
-          <div className="flex items-center justify-center py-1.5 text-text-tertiary" title="Setup">
-            <Settings className="w-4 h-4" />
-          </div>
+          <button
+            type="button"
+            onClick={() => toggleGroup('Setup')}
+            aria-expanded={isGroupOpen('Setup')}
+            aria-label="Setup"
+            title="Setup"
+            className={linkClass({ isActive: isSetupPath })}
+          >
+            <Settings className="w-4 h-4 shrink-0" aria-hidden="true" />
+          </button>
         )}
 
         {isGroupOpen('Setup') && (
@@ -369,9 +389,10 @@ const MainPanel: React.FC<{ isManager: boolean; isCollapsed: boolean }> = ({
                   key={item.path}
                   to={item.path}
                   title={isCollapsed ? item.label : undefined}
+                  aria-label={isCollapsed ? item.label : undefined}
                   className={linkClass}
                 >
-                  <Icon className="w-4 h-4 shrink-0" />
+                  <Icon className="w-4 h-4 shrink-0" aria-hidden="true" />
                   {!isCollapsed && <span>{item.label}</span>}
                 </NavLink>
               );
