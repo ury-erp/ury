@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { call } from '@ury/core';
 import SetupPage from './pages/Setup/SetupPage';
@@ -49,6 +49,34 @@ import { EmployeeSales } from './pages/Reports/EmployeeSales';
 import { EmployeeItemWiseSales } from './pages/Reports/EmployeeItemWiseSales';
 import { CompletedWorkOrders } from './pages/Reports/CompletedWorkOrders';
 import { DailyPnl } from './pages/Reports/DailyPnl';
+
+// `/ury/pos/*` — pos/ route tree merged in per PLAN.md
+// tracks/sa-app-consolidation §7 Phase 1. Lazy-loaded per route (not just
+// per subtree) so admin-report chunks (recharts, @json-render/*, the 18
+// report pages) never ship to cashier/waiter hardware on first load, and
+// vice versa (§6's bundle-size risk) — `frontend/`'s existing routes above
+// are NOT retrofitted to lazy-loading, only these new ones.
+const PosLayout = lazy(() => import('./pages/Pos/PosLayout'));
+const PosDashboard = lazy(() => import('./pages/Pos/pages/Dashboard'));
+const PosPOS = lazy(() => import('./pages/Pos/pages/POS'));
+const PosTable = lazy(() => import('./pages/Pos/pages/Table'));
+const PosOrders = lazy(() => import('./pages/Pos/pages/Orders'));
+const PosSettings = lazy(() => import('./pages/Pos/pages/Settings'));
+const PosOpenEntries = lazy(() => import('./pages/Pos/pages/OpenEntries'));
+const CaptainRouteGuard = lazy(() => import('./pages/Pos/captain/components/CaptainRouteGuard'));
+const CaptainTables = lazy(() => import('./pages/Pos/captain/pages/CaptainTables'));
+const CaptainOrder = lazy(() => import('./pages/Pos/captain/pages/CaptainOrder'));
+
+function PosRouteFallback() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="flex flex-col items-center gap-3">
+        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+        <p className="text-sm text-muted-foreground">Loading…</p>
+      </div>
+    </div>
+  );
+}
 
 interface WizardStatus {
   step1_complete: boolean;
@@ -208,6 +236,59 @@ function App() {
             />
             <Route path="daily-pnl" element={<DailyPnl />} />
           </Route>
+
+          {/*
+            TODO Phase 2 (PLAN.md tracks/sa-app-consolidation §7 Phase 2):
+            this `pos/*` subtree is mounted here reachable only behind the
+            outer guards above (SetupGuard, RoleGuard on the "/" route,
+            AuthGuard on `frontend/`'s pages) — the same as every other
+            route in this file. It does NOT yet have pos/'s own
+            POS-Profile-aware `AuthGuard`+`POSOpeningProvider` gate wrapped
+            around it (that gate is cashier/waiter-role-driven, not
+            'URY Manager'-driven, and mounting it is explicitly deferred to
+            Phase 2 per the Opus review's phasing correction — see PLAN.md
+            §4/§7.5 point 2). Until Phase 2 lands, this subtree is verified
+            reachable under a manager-role session only; it is NOT yet
+            cashier-safe (a cashier session would currently be blocked by
+            the outer 'URY Manager'-only RoleGuard/AuthGuard, not routed
+            through pos/'s own opening/checklist gate).
+          */}
+          <Route
+            path="pos"
+            element={
+              <Suspense fallback={<PosRouteFallback />}>
+                <PosLayout />
+              </Suspense>
+            }
+          >
+            <Route index element={<Navigate to="dashboard" replace />} />
+            <Route path="dashboard" element={<PosDashboard />} />
+            <Route path="pos" element={<PosPOS />} />
+            <Route path="tables" element={<PosTable />} />
+            <Route path="orders" element={<PosOrders />} />
+            <Route path="settings" element={<PosSettings />} />
+            <Route path="open-entries" element={<PosOpenEntries />} />
+          </Route>
+          <Route
+            path="pos/order"
+            element={
+              <Suspense fallback={<PosRouteFallback />}>
+                <CaptainRouteGuard>
+                  <CaptainTables />
+                </CaptainRouteGuard>
+              </Suspense>
+            }
+          />
+          <Route
+            path="pos/order/table/:table"
+            element={
+              <Suspense fallback={<PosRouteFallback />}>
+                <CaptainRouteGuard>
+                  <CaptainOrder />
+                </CaptainRouteGuard>
+              </Suspense>
+            }
+          />
         </Route>
       </Route>
 
