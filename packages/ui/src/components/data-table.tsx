@@ -8,7 +8,7 @@ export interface DataTableColumn<T> {
   align?: "left" | "right";
 }
 
-export type DataTableRowTone = "default" | "danger" | "warning" | undefined;
+export type DataTableRowTone = "default" | "danger" | "warning" | "selected" | undefined;
 
 export interface DataTableProps<T> {
   columns: DataTableColumn<T>[];
@@ -19,16 +19,19 @@ export interface DataTableProps<T> {
   onRowClick?: (row: T) => void;
   /**
    * Optional per-row tone hook, mirroring the mockup's `.warnrow` treatment.
-   * Return "danger" or "warning" to wash a row in the corresponding tint
-   * (e.g. to flag an anomaly); return "default" or undefined for no tint.
+   * Return "danger", "warning", or "selected" to wash a row in the corresponding tint
+   * (e.g. to flag an anomaly, or to highlight a selected row); return "default" or undefined for no tint.
    * Purely additive — omitting this prop leaves existing rows unaffected.
    */
   rowTone?: (row: T) => DataTableRowTone;
 }
 
-const rowToneClasses: Record<"danger" | "warning", string> = {
+const rowToneClasses: Record<"danger" | "warning" | "selected", string> = {
   danger: "bg-destructive-tint hover:bg-destructive-tint-border",
   warning: "bg-warning-tint hover:bg-warning-tint-border",
+  // Precedence: danger > warning > selected. Selected maintains tint on hover to remain
+  // distinguishable from a regular hover.
+  selected: "bg-primary-tint hover:bg-primary-tint-border",
 };
 
 export function DataTable<T>({
@@ -79,8 +82,8 @@ export function DataTable<T>({
                   key={rowIndex}
                   className={cn(
                     "border-b border-hair transition-colors last:border-b-0",
-                    tone === "danger" || tone === "warning"
-                      ? rowToneClasses[tone]
+                    tone === "danger" || tone === "warning" || tone === "selected"
+                      ? rowToneClasses[tone as "danger" | "warning" | "selected"]
                       : "hover:bg-muted/50",
                     onRowClick && "cursor-pointer"
                   )}
