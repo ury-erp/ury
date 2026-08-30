@@ -17,6 +17,9 @@ See RequirementsPage.tsx (line 21-42) for why honest "Not available" is
 preferred over invented numbers when warehouse data is missing.
 """
 
+import hashlib
+import json
+
 import frappe
 from frappe.utils import parse_json
 
@@ -63,6 +66,14 @@ def get_plan_stock_on_hand(branch=None, items=None):
 		items = parse_json(items)
 	if not items:
 		items = []
+
+	items_digest = hashlib.sha256(
+		json.dumps(items, sort_keys=True, default=str).encode("utf-8")
+	).hexdigest()
+	cache_key = f"ury_requirements_stock:{branch}:{items_digest}"
+	cached = frappe.cache().get_value(cache_key)
+	if cached:
+		return cached
 
 	# Resolve the central/POS-Profile warehouse for this branch
 	pos_profile_data = frappe.db.get_value(
@@ -143,8 +154,7 @@ def get_plan_stock_on_hand(branch=None, items=None):
 			"resolved_from": resolved_from,
 		})
 
-	# Cache the result with a short TTL (15 seconds to match common patterns)
-	cache_key = f"ury_requirements_stock:{branch}:{frappe.utils.hash_object(items)}"
+	# Cache the result with a short TTL (15 seconds, matching ury_service_line.py)
 	frappe.cache().set_value(cache_key, result, expires_in_sec=15)
 
 	return result
