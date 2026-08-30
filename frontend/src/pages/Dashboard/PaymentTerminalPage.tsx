@@ -23,29 +23,32 @@ const formatCurrency = (value?: number) => {
   }).format(value);
 };
 
+const TAG_BASE =
+  'inline-flex items-center gap-[5px] h-[19px] rounded-[5px] px-[7px] text-[11px] font-medium';
+
 const getStatusBadgeClass = (status: string) => {
   switch (status) {
     case 'Idle':
-      return 'inline-flex items-center rounded-full bg-success-tint px-2.5 py-0.5 text-xs font-medium text-success';
+      return `${TAG_BASE} bg-success-tint text-success`;
     case 'Busy':
-      return 'inline-flex items-center rounded-full bg-warning-tint px-2.5 py-0.5 text-xs font-medium text-warning';
+      return `${TAG_BASE} bg-warning-tint text-warning`;
     case 'Offline':
-      return 'inline-flex items-center rounded-full bg-destructive-tint px-2.5 py-0.5 text-xs font-medium text-destructive';
+      return `${TAG_BASE} bg-destructive-tint text-destructive`;
     default:
-      return 'inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-foreground';
+      return `${TAG_BASE} bg-muted text-foreground`;
   }
 };
 
 const getTransactionStatusBadgeClass = (status: string) => {
   switch (status) {
     case 'Success':
-      return 'inline-flex items-center rounded-full bg-success-tint px-2.5 py-0.5 text-xs font-medium text-success';
+      return `${TAG_BASE} bg-success-tint text-success`;
     case 'Failed':
-      return 'inline-flex items-center rounded-full bg-destructive-tint px-2.5 py-0.5 text-xs font-medium text-destructive';
+      return `${TAG_BASE} bg-destructive-tint text-destructive`;
     case 'Pending':
-      return 'inline-flex items-center rounded-full bg-warning-tint px-2.5 py-0.5 text-xs font-medium text-warning';
+      return `${TAG_BASE} bg-warning-tint text-warning`;
     default:
-      return 'inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-foreground';
+      return `${TAG_BASE} bg-muted text-foreground`;
   }
 };
 

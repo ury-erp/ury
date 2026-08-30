@@ -756,14 +756,14 @@ export const SelfOrderingProfilePage: React.FC = () => {
                       <th className="p-4 text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200">
+                  <tbody className="divide-y divide-hair">
                     {profiles.map((profile) => (
                       <tr key={profile.name} className="hover:bg-muted">
                         <td className="p-4 font-medium text-foreground">{profile.profile_name}</td>
                         <td className="p-4">{profile.branch}</td>
                         <td className="p-4">
                           <span
-                            className={`px-2.5 py-1 rounded-full text-xs font-medium ${
+                            className={`inline-flex h-[19px] items-center gap-[5px] rounded-[5px] px-[7px] text-[11px] font-medium ${
                               profile.enabled === 1
                                 ? 'bg-success-tint text-success'
                                 : 'bg-muted text-muted-foreground'
