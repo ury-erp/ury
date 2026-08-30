@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-white flex">
+  <div class="min-h-screen bg-[var(--bg)] flex">
 	<div class="mx-auto w-full max-w-sm lg:w-96">
 	  <form @submit.prevent="login" class="space-y-6">
 		<label for="email"> Username: </label>
@@ -9,7 +9,7 @@
 		<input type="password" v-model="password" />
 
 		<button
-		  class="bg-blue-500 block text-white p-2 hover:bg-blue-700"
+		  class="bg-[var(--ac)] block text-white p-2 hover:opacity-90 rounded-[7px]"
 		  type="submit"
 		>
 		  Sign in

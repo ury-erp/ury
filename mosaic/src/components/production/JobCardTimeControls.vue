@@ -2,21 +2,21 @@
   <div
     v-if="eligible"
     data-testid="job-card-time-controls"
-    class="bg-white rounded-2xl border border-gray-200 shadow-sm p-5"
+    class="bg-[var(--panel)] rounded-[9px] border border-[var(--hair)] p-5"
   >
     <div class="flex items-center gap-3">
       <div
-        class="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center text-xl"
+        class="w-10 h-10 rounded-xl bg-[var(--am-t)] flex items-center justify-center text-xl"
       >
         ⏱️
       </div>
 
       <div>
-        <h3 class="text-lg font-bold text-gray-800">
+        <h3 class="text-lg font-bold text-[var(--t1)]">
           Chef Time Logging
         </h3>
 
-        <p class="text-xs text-gray-500">
+        <p class="text-xs text-[var(--t3)]">
           {{ itemCode }} — selective Job Card usage (batch-eligible, opted in)
         </p>
       </div>
@@ -24,22 +24,22 @@
 
     <div class="grid grid-cols-2 gap-3 mt-4">
       <div>
-        <label class="block text-xs text-gray-500 mb-1">From</label>
+        <label class="block text-xs text-[var(--t3)] mb-1">From</label>
         <input
           v-model="fromTime"
           type="datetime-local"
           data-testid="from-time-input"
-          class="w-full border border-gray-200 rounded-lg px-2 py-1 text-sm"
+          class="w-full bg-[var(--panel)] border border-[var(--hair)] rounded-lg px-2 py-1 text-sm font-[var(--m)] [font-variant-numeric:tabular-nums]"
         />
       </div>
 
       <div>
-        <label class="block text-xs text-gray-500 mb-1">To</label>
+        <label class="block text-xs text-[var(--t3)] mb-1">To</label>
         <input
           v-model="toTime"
           type="datetime-local"
           data-testid="to-time-input"
-          class="w-full border border-gray-200 rounded-lg px-2 py-1 text-sm"
+          class="w-full bg-[var(--panel)] border border-[var(--hair)] rounded-lg px-2 py-1 text-sm font-[var(--m)] [font-variant-numeric:tabular-nums]"
         />
       </div>
     </div>
@@ -47,7 +47,7 @@
     <button
       type="button"
       data-testid="log-time-button"
-      class="mt-4 w-full bg-amber-500 text-white text-sm font-semibold rounded-lg py-2 hover:bg-amber-600 transition-colors"
+      class="mt-4 w-full h-[28px] bg-[var(--am)] text-white text-xs font-semibold rounded-[7px] hover:opacity-90 transition-opacity"
       @click="onLogTime"
     >
       Log Chef Time

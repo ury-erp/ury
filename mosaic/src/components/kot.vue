@@ -245,8 +245,8 @@
         'rounded',
         'text-white',
         {
-          'bg-green-500': isOnline,
-          'bg-red-500': !isOnline,
+          'bg-[var(--gr)]': isOnline,
+          'bg-[var(--rd)]': !isOnline,
         },
       ]"
       @transitionend="handleTransitionEnd"
@@ -700,9 +700,4 @@ export default {
   },
 };
 </script>
-<style>
-.bg-gray-100 {
-  background-color: rgba(0, 0, 0, 0.2);
-}
-</style>
 
