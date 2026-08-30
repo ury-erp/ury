@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
-import { Card, CardContent, CardHeader, CardTitle, KpiStrip, Select, Input, Page, Section } from '@ury/ui';
+import { KpiStrip, Select, Input, Page, Section, Panel, PanelHeader, PanelTitle } from '@ury/ui';
 import { AlertTriangle, ChevronDown } from 'lucide-react';
 import { useBranchContext } from '../../context/BranchContext';
 import { toApiDate } from '../../lib/reportDate';
@@ -103,22 +103,24 @@ function BreakupTable({
 }) {
   if (rows.length === 0) return null;
   return (
-    <Card className={className}>
-      <CardHeader>
-        <CardTitle className="text-base">{title}</CardTitle>
-      </CardHeader>
-      <CardContent className={twoColumn ? 'grid grid-cols-1 md:grid-cols-2 gap-x-8' : 'space-y-1'}>
-        {rows.map((r, i) => (
-          <div key={i} className="flex items-center justify-between text-sm py-1 border-b last:border-0">
-            <span className="text-muted-foreground">{r.label}</span>
-            <span className="font-medium">
-              {formatCurrency(r.amount)}{' '}
-              <span className="text-xs text-muted-foreground">({Number(r.percent).toFixed(1)}%)</span>
-            </span>
-          </div>
-        ))}
-      </CardContent>
-    </Card>
+    <div className={className}>
+      <PanelHeader>
+        <PanelTitle>{title}</PanelTitle>
+      </PanelHeader>
+      <Panel pad>
+        <div className={twoColumn ? 'grid grid-cols-1 md:grid-cols-2 gap-x-8' : 'space-y-1'}>
+          {rows.map((r, i) => (
+            <div key={i} className="flex items-center justify-between text-sm py-1 border-b last:border-0">
+              <span className="text-muted-foreground">{r.label}</span>
+              <span className="font-medium">
+                {formatCurrency(r.amount)}{' '}
+                <span className="text-xs text-muted-foreground">({Number(r.percent).toFixed(1)}%)</span>
+              </span>
+            </div>
+          ))}
+        </div>
+      </Panel>
+    </div>
   );
 }
 
@@ -250,32 +252,34 @@ export function DailyPnl() {
             )
           )}
 
-          <KpiStrip
-            items={[
-              { label: 'Gross Sales', value: formatCurrency(summaryMap.get('gross_sales')?.amount ?? 0) },
-              { label: 'Net Sales', value: formatCurrency(summaryMap.get('net_sales')?.amount ?? 0) },
-              {
-                label: 'Gross Profit',
-                value: `${formatCurrency(summaryMap.get('gross_profit')?.amount ?? 0)} (${Number(
-                  summaryMap.get('gross_profit')?.percent ?? 0
-                ).toFixed(1)}%)`,
-              },
-              {
-                label: 'Net Profit',
-                value: `${formatCurrency(summaryMap.get('net_profit')?.amount ?? 0)} (${Number(
-                  summaryMap.get('net_profit')?.percent ?? 0
-                ).toFixed(1)}%)`,
-                tone: (summaryMap.get('net_profit')?.amount ?? 0) >= 0 ? 'success' : 'danger',
-              },
-            ]}
-          />
+          <Section>
+            <KpiStrip
+              items={[
+                { label: 'Gross Sales', value: formatCurrency(summaryMap.get('gross_sales')?.amount ?? 0) },
+                { label: 'Net Sales', value: formatCurrency(summaryMap.get('net_sales')?.amount ?? 0) },
+                {
+                  label: 'Gross Profit',
+                  value: `${formatCurrency(summaryMap.get('gross_profit')?.amount ?? 0)} (${Number(
+                    summaryMap.get('gross_profit')?.percent ?? 0
+                  ).toFixed(1)}%)`,
+                },
+                {
+                  label: 'Net Profit',
+                  value: `${formatCurrency(summaryMap.get('net_profit')?.amount ?? 0)} (${Number(
+                    summaryMap.get('net_profit')?.percent ?? 0
+                  ).toFixed(1)}%)`,
+                  tone: (summaryMap.get('net_profit')?.amount ?? 0) >= 0 ? 'success' : 'danger',
+                },
+              ]}
+            />
+          </Section>
 
           <Section>
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">P&amp;L Statement</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-1">
+            <PanelHeader>
+              <PanelTitle className="text-base">P&amp;L Statement</PanelTitle>
+            </PanelHeader>
+            <Panel pad>
+              <div className="space-y-1">
                 {rest.map((r) => (
                   <div key={r.key} className="flex items-center justify-between text-sm py-1.5 border-b last:border-0">
                     <span>{r.label}</span>
@@ -285,8 +289,8 @@ export function DailyPnl() {
                     </span>
                   </div>
                 ))}
-              </CardContent>
-            </Card>
+              </div>
+            </Panel>
           </Section>
 
           <Section className="grid grid-cols-1 lg:grid-cols-2 gap-grid-gap items-start">
@@ -302,35 +306,33 @@ export function DailyPnl() {
 
           {data.cost_of_goods && data.cost_of_goods.length > 0 && (
             <Section>
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Cost of Goods Sold</CardTitle>
-                </CardHeader>
-                <CardContent className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-left text-muted-foreground border-b">
-                        <th className="py-1.5 pr-4">Item</th>
-                        <th className="py-1.5 pr-4">Group</th>
-                        <th className="py-1.5 pr-4">Qty</th>
-                        <th className="py-1.5 pr-4">Buying Price</th>
-                        <th className="py-1.5">Amount</th>
+              <PanelHeader>
+                <PanelTitle className="text-base">Cost of Goods Sold</PanelTitle>
+              </PanelHeader>
+              <Panel pad className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-muted-foreground border-b">
+                      <th className="py-1.5 pr-4">Item</th>
+                      <th className="py-1.5 pr-4">Group</th>
+                      <th className="py-1.5 pr-4">Qty</th>
+                      <th className="py-1.5 pr-4">Buying Price</th>
+                      <th className="py-1.5">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.cost_of_goods.map((r, i) => (
+                      <tr key={i} className="border-b last:border-0">
+                        <td className="py-1.5 pr-4">{r.item_name || r.item_code}</td>
+                        <td className="py-1.5 pr-4">{r.item_group || '—'}</td>
+                        <td className="py-1.5 pr-4">{r.qty}</td>
+                        <td className="py-1.5 pr-4">{formatCurrency(r.buying_price)}</td>
+                        <td className="py-1.5">{formatCurrency(r.amount)}</td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {data.cost_of_goods.map((r, i) => (
-                        <tr key={i} className="border-b last:border-0">
-                          <td className="py-1.5 pr-4">{r.item_name || r.item_code}</td>
-                          <td className="py-1.5 pr-4">{r.item_group || '—'}</td>
-                          <td className="py-1.5 pr-4">{r.qty}</td>
-                          <td className="py-1.5 pr-4">{formatCurrency(r.buying_price)}</td>
-                          <td className="py-1.5">{formatCurrency(r.amount)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </CardContent>
-              </Card>
+                    ))}
+                  </tbody>
+                </table>
+              </Panel>
             </Section>
           )}
         </>

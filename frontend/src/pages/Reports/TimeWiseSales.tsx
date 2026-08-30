@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
-import { KpiStrip, DataTable, type DataTableColumn, Select, Input } from '@ury/ui';
+import { KpiStrip, DataTable, type DataTableColumn, Select, Input, Page, Section } from '@ury/ui';
 import { useBranchContext } from '../../context/BranchContext';
 import { BarChartCard } from '../../components/reports/charts/BarChartCard';
 import { toApiDate } from '../../lib/reportDate';
@@ -70,7 +70,7 @@ export function TimeWiseSales() {
   }, [fetchData]);
 
   return (
-    <div className="space-y-6">
+    <Page>
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-semibold">Time Wise Sales</h1>
@@ -99,39 +99,49 @@ export function TimeWiseSales() {
       </div>
 
       {error && (
-        <div className="rounded-md border border-destructive-tint-border bg-destructive-tint px-4 py-3 text-sm text-destructive">
-          {error}
-        </div>
+        <Section>
+          <div className="rounded-md border border-destructive-tint-border bg-destructive-tint px-4 py-3 text-sm text-destructive">
+            {error}
+          </div>
+        </Section>
       )}
 
       {isLoading && !data ? (
-        <div className="text-sm text-muted-foreground">Loading...</div>
+        <Section>
+          <div className="text-sm text-muted-foreground">Loading...</div>
+        </Section>
       ) : data ? (
         <>
-          <KpiStrip
-            items={[
-              { label: 'Total Sales', value: formatCurrency(data.summary.total_sales) },
-              { label: 'Total Bills', value: data.summary.total_bills },
-              { label: 'Avg / Bill', value: formatCurrency(data.summary.avg_sale_per_bill) },
-              {
-                label: 'Peak Interval',
-                value: data.summary.peak_interval ?? '—',
-                hint: data.summary.peak_interval ? formatCurrency(data.summary.peak_interval_sales) : undefined,
-              },
-            ]}
-          />
+          <Section>
+            <KpiStrip
+              items={[
+                { label: 'Total Sales', value: formatCurrency(data.summary.total_sales) },
+                { label: 'Total Bills', value: data.summary.total_bills },
+                { label: 'Avg / Bill', value: formatCurrency(data.summary.avg_sale_per_bill) },
+                {
+                  label: 'Peak Interval',
+                  value: data.summary.peak_interval ?? '—',
+                  hint: data.summary.peak_interval ? formatCurrency(data.summary.peak_interval_sales) : undefined,
+                },
+              ]}
+            />
+          </Section>
 
-          <BarChartCard
-            title="Sales by Time of Day"
-            data={data.intervals}
-            xKey="interval_label"
-            yKeys={['sales']}
-            labels={{ sales: 'Sales' }}
-          />
+          <Section>
+            <BarChartCard
+              title="Sales by Time of Day"
+              data={data.intervals}
+              xKey="interval_label"
+              yKeys={['sales']}
+              labels={{ sales: 'Sales' }}
+            />
+          </Section>
 
-          <DataTable columns={columns} rows={data.intervals} isLoading={isLoading} />
+          <Section>
+            <DataTable columns={columns} rows={data.intervals} isLoading={isLoading} />
+          </Section>
         </>
       ) : null}
-    </div>
+    </Page>
   );
 }
