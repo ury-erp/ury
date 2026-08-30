@@ -38,9 +38,9 @@ const buttonVariants = cva(
         // real border/background pairing — swapping its box model risks
         // visible regressions we can't audit from this file alone.
         chrome:
-          "bg-card text-foreground shadow-[inset_0_0_0_1px_hsl(var(--hair2))] hover:bg-muted active:bg-muted active:shadow-[inset_0_0_0_1px_hsl(var(--hair2))]",
+          "bg-card text-foreground shadow-[inset_0_0_0_1px_hsl(var(--hair2))] hover:bg-muted active:bg-hair active:shadow-[inset_0_0_0_1px_hsl(var(--hair2))]",
         solid:
-          "bg-foreground text-background shadow-none hover:bg-foreground/90 active:bg-foreground",
+          "bg-foreground text-background shadow-none hover:bg-foreground/90 active:bg-foreground active:brightness-90",
         secondary:
           "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80 active:bg-secondary/60 active:shadow-none",
         ghost:
