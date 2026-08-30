@@ -5,3 +5,6 @@
 # Patches added in this section will be executed after doctypes are migrated
 ury.patches.v2_0.default_permissions
 ury.patches.v2_0.fix_waiter_order_slip_print_format
+ury.patches.v3_0.repair_waiter_user_values
+ury.patches.v3_0.backfill_invoice_employee_attribution
+ury.patches.v3_0.backfill_pos_invoice_item_entered_by
