@@ -64,7 +64,8 @@ def get_employee_sales(start_date, end_date, branch=None, sort_by="sales_amount"
 			e.`name` AS employee_id,
 			e.`full_name` AS employee_name,
 			COUNT(b.`name`) AS total_invoices,
-			ROUND(SUM(b.`grand_total`), 2) AS sales_amount
+			ROUND(SUM(b.`grand_total`), 2) AS sales_amount,
+			ROUND(SUM(b.`net_total`), 2) AS net_sales_amount
 		FROM {date_list}
 		LEFT JOIN `tabPOS Invoice` b ON ({invoice_join})
 		INNER JOIN `tabUser` e ON (e.`name` = b.`waiter`)
@@ -76,6 +77,19 @@ def get_employee_sales(start_date, end_date, branch=None, sort_by="sales_amount"
 		params,
 		as_dict=True,
 	)
+
+	unattributed = frappe.db.sql(
+		f"""
+		SELECT COUNT(b.`name`) AS invoices, ROUND(SUM(b.`grand_total`), 2) AS sales
+		FROM {date_list}
+		LEFT JOIN `tabPOS Invoice` b ON ({invoice_join})
+		LEFT JOIN `tabUser` e ON (e.`name` = b.`waiter`)
+		{join}
+		WHERE {condition} AND e.`name` IS NULL
+		""",
+		params,
+		as_dict=True,
+	)[0]
 
 	for i, r in enumerate(rows, start=1):
 		r["rank"] = i
@@ -93,6 +107,8 @@ def get_employee_sales(start_date, end_date, branch=None, sort_by="sales_amount"
 			"total_employees": len(rows),
 			"period_total_invoices": sum(r["total_invoices"] for r in rows),
 			"period_total_sales": round(sum(r["sales_amount"] for r in rows), 2),
+			"unattributed_invoices": unattributed["invoices"] or 0,
+			"unattributed_sales": unattributed["sales"] or 0,
 		},
 	}
 
