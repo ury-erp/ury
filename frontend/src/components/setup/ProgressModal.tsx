@@ -96,7 +96,7 @@ export function ProgressModal({
                     ) : isActive ? (
                       <Loader2 className="w-6 h-6 text-primary animate-spin" />
                     ) : (
-                      <Circle className="w-6 h-6 text-gray-200" />
+                      <Circle className="w-6 h-6 text-border" />
                     )}
                   </div>
                   <span className={`text-sm ${isActive ? 'font-medium text-foreground' : isDone ? 'text-foreground' : 'text-text-tertiary'}`}>

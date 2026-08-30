@@ -93,7 +93,7 @@ const MenuCard: FC<MenuCardProps> = ({
           </div>
         )}
         {unavailableMessage && (
-          <span className="absolute top-1 right-1 bg-gray-900/80 text-white text-[10px] font-medium px-2 py-0.5 rounded">
+          <span className="absolute top-1 right-1 bg-foreground/80 text-white text-[10px] font-medium px-2 py-0.5 rounded">
             {unavailableMessage}
           </span>
         )}

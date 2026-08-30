@@ -53,7 +53,7 @@ export default function OpenEntries() {
       <div className="max-w-6xl mx-auto">
         <h1 className="text-2xl font-semibold text-foreground mb-6">Open Sessions</h1>
 
-        <Card className="bg-white border border-border">
+        <Card className="bg-card border border-border">
           <CardContent className="p-6">
             {error ? (
               <div className="text-center py-8">

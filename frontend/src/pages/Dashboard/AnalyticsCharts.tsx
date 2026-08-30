@@ -124,12 +124,12 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
       {/* Top Grid: Sales Trend Line Chart + Peak Distribution Bar Chart */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
         {/* Sales Trend SVG Area Chart */}
-        <Card className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm lg:col-span-7">
+        <Card className="rounded-xl border border-border bg-card p-6 shadow-sm lg:col-span-7">
           <CardHeader className="p-0 pb-4">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-lg font-bold text-gray-900">Sales Trend</CardTitle>
-                <p className="text-xs text-gray-500 mt-1">Real-time revenue flow throughout operating hours</p>
+                <CardTitle className="text-lg font-bold text-foreground">Sales Trend</CardTitle>
+                <p className="text-xs text-text-tertiary mt-1">Real-time revenue flow throughout operating hours</p>
               </div>
               <Badge variant="outline" className="border-purple-200 bg-purple-50 text-purple-700 font-medium">
                 Peak: {peakTrend.time} ({formatCurrency(peakTrend.sales)})
@@ -142,7 +142,7 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
                 <Spinner className="w-6 h-6 text-primary" />
               </div>
             ) : trendData.length === 0 ? (
-              <div className="h-64 flex items-center justify-center border border-dashed border-gray-200 rounded-lg text-gray-400 text-xs">
+              <div className="h-64 flex items-center justify-center border border-dashed border-border rounded-lg text-text-tertiary text-xs">
                 No sales trend data available
               </div>
             ) : (
@@ -183,7 +183,7 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
                 </div>
 
                 {/* X-Axis Labels */}
-                <div className="mt-3 flex justify-between text-xs text-gray-400 font-medium px-1">
+                <div className="mt-3 flex justify-between text-xs text-text-tertiary font-medium px-1">
                   {trendData.map((d, i) => (
                     <span key={i}>{d.time}</span>
                   ))}
@@ -194,12 +194,12 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
         </Card>
 
         {/* Sales by Hour Peak Distribution Bar Chart */}
-        <Card className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm lg:col-span-5">
+        <Card className="rounded-xl border border-border bg-card p-6 shadow-sm lg:col-span-5">
           <CardHeader className="p-0 pb-4">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-lg font-bold text-gray-900">Peak Sales Distribution</CardTitle>
-                <p className="text-xs text-gray-500 mt-1">Hourly order volume density</p>
+                <CardTitle className="text-lg font-bold text-foreground">Peak Sales Distribution</CardTitle>
+                <p className="text-xs text-text-tertiary mt-1">Hourly order volume density</p>
               </div>
               <span className="text-xs font-semibold text-purple-600 bg-purple-50 px-2 py-1 rounded">Hourly Peak</span>
             </div>
@@ -210,7 +210,7 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
                 <Spinner className="w-6 h-6 text-primary" />
               </div>
             ) : hourlyDataWithPeak.length === 0 ? (
-              <div className="h-52 flex items-center justify-center border border-dashed border-gray-200 rounded-lg text-gray-400 text-xs">
+              <div className="h-52 flex items-center justify-center border border-dashed border-border rounded-lg text-text-tertiary text-xs">
                 No hourly data available
               </div>
             ) : (
@@ -227,7 +227,7 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
                     >
                       {/* Tooltip on hover */}
                       {isHovered && (
-                        <div className="absolute -top-12 z-20 rounded bg-gray-900 px-2 py-1 text-center text-xs text-white shadow-lg whitespace-nowrap">
+                        <div className="absolute -top-12 z-20 rounded bg-foreground px-2 py-1 text-center text-xs text-background shadow-lg whitespace-nowrap">
                           <p className="font-bold">{formatCurrency(item.sales)}</p>
                         </div>
                       )}
@@ -242,7 +242,7 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
                           }`}
                         />
                       </div>
-                      <span className="mt-2 text-[10px] text-gray-500 font-medium tracking-tighter truncate w-full text-center">
+                      <span className="mt-2 text-[10px] text-text-tertiary font-medium tracking-tighter truncate w-full text-center">
                         {item.hour}
                       </span>
                     </div>
@@ -257,10 +257,10 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
       {/* Middle Grid: Revenue by Branch + Payment Methods + Order Type Distribution */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
         {/* Revenue by Branch Comparative Bar Chart */}
-        <Card className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm lg:col-span-5">
+        <Card className="rounded-xl border border-border bg-card p-6 shadow-sm lg:col-span-5">
           <CardHeader className="p-0 pb-4">
-            <CardTitle className="text-lg font-bold text-gray-900">Revenue by Branch</CardTitle>
-            <p className="text-xs text-gray-500 mt-1">Comparative performance across outlets</p>
+            <CardTitle className="text-lg font-bold text-foreground">Revenue by Branch</CardTitle>
+            <p className="text-xs text-text-tertiary mt-1">Comparative performance across outlets</p>
           </CardHeader>
           <CardContent className="p-0 pt-2 space-y-4">
             {loading ? (
@@ -268,7 +268,7 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
                 <Spinner className="w-6 h-6 text-primary" />
               </div>
             ) : branchData.length === 0 ? (
-              <div className="py-8 flex items-center justify-center border border-dashed border-gray-200 rounded-lg text-gray-400 text-xs">
+              <div className="py-8 flex items-center justify-center border border-dashed border-border rounded-lg text-text-tertiary text-xs">
                 No branch data available
               </div>
             ) : (
@@ -278,16 +278,16 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
                 return (
                   <div key={i} className={`space-y-1.5 ${!isSelected ? 'opacity-40' : ''}`}>
                     <div className="flex items-center justify-between text-xs font-semibold">
-                      <span className="text-gray-800">{branch.name}</span>
+                      <span className="text-foreground">{branch.name}</span>
                       <span className="text-purple-700 font-bold">{formatCurrency(branch.revenue)}</span>
                     </div>
-                    <div className="relative h-3.5 w-full rounded-full bg-gray-100 overflow-hidden">
+                    <div className="relative h-3.5 w-full rounded-full bg-muted overflow-hidden">
                       <div
                         style={{ width: `${widthPct}%` }}
                         className="h-full rounded-full bg-gradient-to-r from-purple-600 to-indigo-500 transition-all duration-500"
                       />
                     </div>
-                    <div className="flex justify-between text-[11px] text-gray-400">
+                    <div className="flex justify-between text-[11px] text-text-tertiary">
                       <span>{branch.share}% total revenue</span>
                     </div>
                   </div>
@@ -298,10 +298,10 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
         </Card>
 
         {/* Payment Method Distribution Donut Chart */}
-        <Card className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm lg:col-span-3">
+        <Card className="rounded-xl border border-border bg-card p-6 shadow-sm lg:col-span-3">
           <CardHeader className="p-0 pb-4">
-            <CardTitle className="text-lg font-bold text-gray-900">Payment Breakdown</CardTitle>
-            <p className="text-xs text-gray-500 mt-1">Collection by payment mode</p>
+            <CardTitle className="text-lg font-bold text-foreground">Payment Breakdown</CardTitle>
+            <p className="text-xs text-text-tertiary mt-1">Collection by payment mode</p>
           </CardHeader>
           <CardContent className="p-0 pt-2 flex flex-col items-center">
             {loading ? (
@@ -309,7 +309,7 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
                 <Spinner className="w-6 h-6 text-primary" />
               </div>
             ) : paymentMethods.length === 0 ? (
-              <div className="py-12 flex flex-col items-center justify-center text-gray-400 text-xs gap-2">
+              <div className="py-12 flex flex-col items-center justify-center text-text-tertiary text-xs gap-2">
                 <div className="relative h-24 w-24">
                   <svg className="h-full w-full" viewBox="0 0 100 100">
                     <circle cx="50" cy="50" r="38" fill="none" stroke="hsl(var(--gray-100))" strokeWidth="14" />
@@ -339,8 +339,8 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
                     ))}
                   </svg>
                   <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                    <span className="text-[11px] font-semibold uppercase text-gray-400">Total</span>
-                    <span className="text-sm font-bold text-gray-900">{formatCurrency(totalPayment)}</span>
+                    <span className="text-[11px] font-semibold uppercase text-text-tertiary">Total</span>
+                    <span className="text-sm font-bold text-foreground">{formatCurrency(totalPayment)}</span>
                   </div>
                 </div>
 
@@ -350,9 +350,9 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
                     <div key={i} className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: pm.color }} />
-                        <span className="text-gray-700 font-medium">{pm.type}</span>
+                        <span className="text-muted-foreground font-medium">{pm.type}</span>
                       </div>
-                      <span className="font-bold text-gray-900">{pm.percentage}%</span>
+                      <span className="font-bold text-foreground">{pm.percentage}%</span>
                     </div>
                   ))}
                 </div>
@@ -362,10 +362,10 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
         </Card>
 
         {/* Order Type Distribution Donut Chart */}
-        <Card className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm lg:col-span-4">
+        <Card className="rounded-xl border border-border bg-card p-6 shadow-sm lg:col-span-4">
           <CardHeader className="p-0 pb-4">
-            <CardTitle className="text-lg font-bold text-gray-900">Order Type Split</CardTitle>
-            <p className="text-xs text-gray-500 mt-1">Dine In vs Takeaway vs Delivery</p>
+            <CardTitle className="text-lg font-bold text-foreground">Order Type Split</CardTitle>
+            <p className="text-xs text-text-tertiary mt-1">Dine In vs Takeaway vs Delivery</p>
           </CardHeader>
           <CardContent className="p-0 pt-2 flex flex-col items-center">
             {loading ? (
@@ -373,7 +373,7 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
                 <Spinner className="w-6 h-6 text-primary" />
               </div>
             ) : orderTypes.length === 0 ? (
-              <div className="py-12 flex flex-col items-center justify-center text-gray-400 text-xs gap-2">
+              <div className="py-12 flex flex-col items-center justify-center text-text-tertiary text-xs gap-2">
                 <div className="relative h-24 w-24">
                   <svg className="h-full w-full" viewBox="0 0 100 100">
                     <circle cx="50" cy="50" r="38" fill="none" stroke="hsl(var(--gray-100))" strokeWidth="14" />
@@ -403,22 +403,22 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
                     ))}
                   </svg>
                   <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                    <span className="text-xl font-bold text-gray-900">{totalOrdersCount}</span>
-                    <span className="text-[10px] uppercase font-semibold text-gray-400">Total Orders</span>
+                    <span className="text-xl font-bold text-foreground">{totalOrdersCount}</span>
+                    <span className="text-[10px] uppercase font-semibold text-text-tertiary">Total Orders</span>
                   </div>
                 </div>
 
                 {/* Order Type Legend & Counts */}
                 <div className="mt-4 w-full space-y-2 text-xs">
                   {orderTypes.map((ot, i) => (
-                    <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-gray-50">
+                    <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-muted">
                       <div className="flex items-center gap-2">
                         <span className="h-3 w-3 rounded-md" style={{ backgroundColor: ot.color }} />
-                        <span className="font-semibold text-gray-800">{ot.type}</span>
+                        <span className="font-semibold text-foreground">{ot.type}</span>
                       </div>
                       <div className="text-right">
-                        <span className="font-bold text-gray-900 mr-2">{ot.count} orders</span>
-                        <span className="text-gray-500 font-medium">({ot.percentage}%)</span>
+                        <span className="font-bold text-foreground mr-2">{ot.count} orders</span>
+                        <span className="text-text-tertiary font-medium">({ot.percentage}%)</span>
                       </div>
                     </div>
                   ))}
@@ -430,12 +430,12 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
       </div>
 
       {/* Bottom Grid: Top Selling Menu Items Ranked Horizontal Progress List */}
-      <Card className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+      <Card className="rounded-xl border border-border bg-card p-6 shadow-sm">
         <CardHeader className="p-0 pb-4">
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle className="text-lg font-bold text-gray-900">Top Selling Menu Items</CardTitle>
-              <p className="text-xs text-gray-500 mt-1">Highest grossing items ranked by order count & volume</p>
+              <CardTitle className="text-lg font-bold text-foreground">Top Selling Menu Items</CardTitle>
+              <p className="text-xs text-text-tertiary mt-1">Highest grossing items ranked by order count & volume</p>
             </div>
             <Badge variant="outline" className="border-purple-200 bg-purple-50 text-purple-700">
               Ranked Top {topItems.length}
@@ -448,7 +448,7 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
               <Spinner className="w-6 h-6 text-primary" />
             </div>
           ) : topItems.length === 0 ? (
-            <div className="py-12 flex items-center justify-center border border-dashed border-gray-200 rounded-lg text-gray-400 text-xs">
+            <div className="py-12 flex items-center justify-center border border-dashed border-border rounded-lg text-text-tertiary text-xs">
               No top items data available
             </div>
           ) : (
@@ -460,7 +460,7 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
                       item.rank === 1
                         ? 'bg-amber-100 text-amber-800 border border-amber-300'
                         : item.rank === 2
-                        ? 'bg-gray-100 text-gray-800 border border-gray-300'
+                        ? 'bg-muted text-foreground border border-border'
                         : item.rank === 3
                         ? 'bg-amber-800/10 text-amber-900 border border-amber-800/30'
                         : 'bg-purple-50 text-purple-700'
@@ -470,16 +470,16 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
                   </span>
                   <div className="flex-1 space-y-1">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="font-bold text-gray-900">{item.name}</span>
+                      <span className="font-bold text-foreground">{item.name}</span>
                       <span className="font-bold text-purple-700">{formatCurrency(item.revenue)}</span>
                     </div>
-                    <div className="relative h-2 w-full rounded-full bg-gray-100 overflow-hidden">
+                    <div className="relative h-2 w-full rounded-full bg-muted overflow-hidden">
                       <div
                         style={{ width: `${item.percentage}%` }}
                         className="h-full rounded-full bg-gradient-to-r from-purple-600 to-purple-400"
                       />
                     </div>
-                    <div className="flex justify-between text-[11px] text-gray-400">
+                    <div className="flex justify-between text-[11px] text-text-tertiary">
                       <span>Category: {item.category}</span>
                       <span>{item.count} items ordered</span>
                     </div>

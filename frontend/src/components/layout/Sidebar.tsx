@@ -213,7 +213,7 @@ const MainPanel: React.FC<{ isManager: boolean; isCollapsed: boolean }> = ({
             <BarChart3 className="w-4 h-4 shrink-0" />
             {!isCollapsed && <span>Reports</span>}
           </NavLink>
-          <div className="!mt-3 !mb-2 border-t border-gray-100" />
+          <div className="!mt-3 !mb-2 border-t border-border" />
         </>
       )}
       {NAV_GROUPS.map((group) => (
@@ -257,7 +257,7 @@ const MainPanel: React.FC<{ isManager: boolean; isCollapsed: boolean }> = ({
             </div>
             <ChevronDown
               className={`w-4 h-4 transition-transform duration-200 ${
-                isAdvancedOpen ? 'rotate-180 text-primary' : 'text-gray-400'
+                isAdvancedOpen ? 'rotate-180 text-primary' : 'text-text-tertiary'
               }`}
             />
           </button>
@@ -319,7 +319,7 @@ export const Sidebar: React.FC = () => {
           onClick={() => setIsCollapsed((prev) => !prev)}
           title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          className="p-1.5 rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+          className="p-1.5 rounded-md text-text-tertiary hover:bg-muted hover:text-muted-foreground transition-colors"
         >
           {isCollapsed ? (
             <PanelLeftOpen className="w-4 h-4" />

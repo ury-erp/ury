@@ -366,7 +366,7 @@ export const PosProfilePage: React.FC = () => {
 
       {/* Content */}
       {loading ? (
-        <div className="py-16 flex items-center justify-center bg-white rounded-lg border border-border">
+        <div className="py-16 flex items-center justify-center bg-card rounded-lg border border-border">
           <Spinner className="w-8 h-8 text-primary" />
         </div>
       ) : activeTab === 'production' ? (
@@ -380,12 +380,12 @@ export const PosProfilePage: React.FC = () => {
               <Spinner className="w-6 h-6 text-primary" />
             </div>
           ) : productionUnits.length === 0 ? (
-            <Card className="p-8 text-center rounded-lg border border-border bg-white">
+            <Card className="p-8 text-center rounded-lg border border-border bg-card">
               <p className="text-text-tertiary text-sm">No production units found for this branch.</p>
               <p className="text-xs text-text-tertiary mt-1">Configure production units from Frappe Desk under URY Production Unit.</p>
             </Card>
           ) : (
-            <div className="bg-white rounded-lg border border-border shadow-sm overflow-hidden">
+            <div className="bg-card rounded-lg border border-border shadow-sm overflow-hidden">
               <table className="w-full text-left text-sm text-muted-foreground">
                 <thead className="bg-muted border-b border-border text-xs text-text-tertiary font-semibold">
                   <tr>
@@ -409,14 +409,14 @@ export const PosProfilePage: React.FC = () => {
         /* Profiles list */
         <div className="space-y-4">
           {profiles.length === 0 ? (
-            <Card className="p-12 text-center rounded-lg border border-border bg-white">
+            <Card className="p-12 text-center rounded-lg border border-border bg-card">
               <p className="text-text-tertiary">No POS Profiles found for this branch.</p>
             </Card>
           ) : (
             profiles.map((p) => (
               <Card
                 key={p.name}
-                className="p-6 rounded-lg border border-border bg-white shadow-xs space-y-4 cursor-pointer hover:border-primary/30 transition-all"
+                className="p-6 rounded-lg border border-border bg-card shadow-xs space-y-4 cursor-pointer hover:border-primary/30 transition-all"
                 onClick={() => handleProfileSelect(p)}
               >
                 <div className="flex items-center justify-between border-b border-border pb-4">
@@ -442,37 +442,37 @@ export const PosProfilePage: React.FC = () => {
                     <div>
                       <h4 className="text-[11px] font-bold tracking-wide text-text-tertiary mb-2">Operations</h4>
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                        <div className="p-4 rounded-lg bg-primary/5 border border-primary/10 flex flex-col justify-between min-h-[72px]">
+                        <div className="p-4 rounded-lg bg-primary-tint border border-primary/10 flex flex-col justify-between min-h-[72px]">
                           <span className="font-semibold text-muted-foreground block">Item Discounts</span>
                           <span className="text-primary font-bold text-sm mt-1 block">
                             {!!p.custom_enable_discount ? 'Enabled' : 'Disabled'}
                           </span>
                         </div>
-                        <div className="p-4 rounded-lg bg-primary/5 border border-primary/10 flex flex-col justify-between min-h-[72px]">
+                        <div className="p-4 rounded-lg bg-primary-tint border border-primary/10 flex flex-col justify-between min-h-[72px]">
                           <span className="font-semibold text-muted-foreground block">KOT Reprint Option</span>
                           <span className="text-primary font-bold text-sm mt-1 block">
                             {!!p.custom_enable_kot_reprint ? 'Enabled' : 'Disabled'}
                           </span>
                         </div>
-                        <div className="p-4 rounded-lg bg-primary/5 border border-primary/10 flex flex-col justify-between min-h-[72px]">
+                        <div className="p-4 rounded-lg bg-primary-tint border border-primary/10 flex flex-col justify-between min-h-[72px]">
                           <span className="font-semibold text-muted-foreground block">Multi-Cashier Support</span>
                           <span className="text-primary font-bold text-sm mt-1 block">
                             {p.custom_multiple_cashier_configuration ? 'Configured' : 'Standard'}
                           </span>
                         </div>
-                        <div className="p-4 rounded-lg bg-primary/5 border border-primary/10 flex flex-col justify-between min-h-[72px]">
+                        <div className="p-4 rounded-lg bg-primary-tint border border-primary/10 flex flex-col justify-between min-h-[72px]">
                           <span className="font-semibold text-muted-foreground block">Order Type Edit</span>
                           <span className="text-primary font-bold text-sm mt-1 block">
                             {!!p.custom_edit_order_type ? 'Allowed' : 'Locked'}
                           </span>
                         </div>
-                        <div className="p-4 rounded-lg bg-primary/5 border border-primary/10 flex flex-col justify-between min-h-[72px]">
+                        <div className="p-4 rounded-lg bg-primary-tint border border-primary/10 flex flex-col justify-between min-h-[72px]">
                           <span className="font-semibold text-muted-foreground block">Reset Order Number Daily</span>
                           <span className="text-primary font-bold text-sm mt-1 block">
                             {!!p.custom_reset_order_number_daily ? 'Enabled' : 'Disabled'}
                           </span>
                         </div>
-                        <div className="p-4 rounded-lg bg-primary/5 border border-primary/10 flex flex-col justify-between min-h-[72px]">
+                        <div className="p-4 rounded-lg bg-primary-tint border border-primary/10 flex flex-col justify-between min-h-[72px]">
                           <span className="font-semibold text-muted-foreground block">Daily POS Closing</span>
                           <span className="text-primary font-bold text-sm mt-1 block">
                             {!!p.custom_daily_pos_close ? 'Required' : 'Not Required'}
@@ -683,8 +683,8 @@ export const PosProfilePage: React.FC = () => {
             className="absolute inset-0 bg-black/40 transition-opacity backdrop-blur-sm"
             onClick={() => setIsDrawerOpen(false)}
           />
-          <div className="relative h-fit max-h-[90vh] w-full max-w-4xl bg-white rounded-lg shadow-2xl z-[101] flex flex-col overflow-hidden">
-            <div className="flex items-center justify-between p-6 border-b border-border bg-gray-50/50">
+          <div className="relative h-fit max-h-[90vh] w-full max-w-4xl bg-card rounded-lg shadow-2xl z-[101] flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between p-6 border-b border-border bg-muted">
               <h2 className="text-xl font-semibold text-foreground">
                 {selectedProfile ? `Edit: ${selectedProfile.name}` : 'Edit POS Profile'}
               </h2>
@@ -699,7 +699,7 @@ export const PosProfilePage: React.FC = () => {
             </div>
 
             {/* Internal tabs — mirrors the read-only view's tab pattern */}
-            <div className="px-6 pt-4 border-b border-border bg-gray-50/50">
+            <div className="px-6 pt-4 border-b border-border bg-muted">
               <div className="flex items-center gap-1 p-1 bg-muted rounded-lg w-fit">
                 {[
                   { id: 'general' as const, label: 'General', icon: <Settings2 className="w-4 h-4" /> },
@@ -711,7 +711,7 @@ export const PosProfilePage: React.FC = () => {
                     type="button"
                     onClick={() => setEditModalTab(tab.id)}
                     className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
-                      editModalTab === tab.id ? 'bg-white text-primary shadow-xs' : 'text-muted-foreground hover:bg-muted hover:text-muted-foreground'
+                      editModalTab === tab.id ? 'bg-card text-primary shadow-xs' : 'text-muted-foreground hover:bg-muted hover:text-muted-foreground'
                     }`}
                   >
                     {tab.icon}
@@ -963,7 +963,7 @@ export const PosProfilePage: React.FC = () => {
                 )}
               </div>
 
-              <div className="p-6 pt-4 flex justify-end gap-3 border-t border-border bg-white">
+              <div className="p-6 pt-4 flex justify-end gap-3 border-t border-border bg-card">
                 <Button type="button" variant="outline" onClick={() => setIsDrawerOpen(false)}>
                   Cancel
                 </Button>

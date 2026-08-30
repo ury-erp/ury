@@ -380,9 +380,9 @@ export default function Orders() {
                   : order.rounded_total;
 
                 return (
-                <Card 
-                  key={order.name} 
-                  className={`p-0 bg-white hover:shadow-md transition-shadow flex flex-col overflow-hidden cursor-pointer ${
+                <Card
+                  key={order.name}
+                  className={`p-0 bg-card hover:shadow-md transition-shadow flex flex-col overflow-hidden cursor-pointer ${
                     selectedOrder?.name === order.name ? 'ring-2 ring-blue-500 shadow-lg' : ''
                   } ${splitBill || mergedBill ? 'border-s-4 border-s-primary-500' : ''}`}
                   onClick={() => handleOrderClick(order)}
@@ -503,7 +503,7 @@ export default function Orders() {
       </div>
 
       {/* Right Section - Order Details */}
-      <div className="w-96 bg-white border-s border-border flex flex-col h-[calc(100vh-4rem)] fixed end-0 z-10">
+      <div className="w-96 bg-card border-s border-border flex flex-col h-[calc(100vh-4rem)] fixed end-0 z-10">
         {!selectedOrder ? (
           <div className="text-center h-full flex flex-col items-center justify-center text-text-tertiary p-6">
             <p className="text-lg font-medium mb-2">{t('order.select_to_view')}</p>
@@ -521,7 +521,7 @@ export default function Orders() {
         ) : (
           <>
             {/* Fixed Header */}
-            <div className="sticky top-0 start-0 end-0 z-20 border-b border-border bg-white px-6 py-4">
+            <div className="sticky top-0 start-0 end-0 z-20 border-b border-border bg-card px-6 py-4">
               <div className="flex items-center justify-between gap-2">
                 <h2 className="min-w-0 flex-1 truncate text-xl font-semibold text-foreground">
                   {selectedOrder.name}

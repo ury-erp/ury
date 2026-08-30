@@ -48,7 +48,7 @@ const PhaseSegment: React.FC<PhaseSegmentProps> = ({ label, state }) => (
   <span
     title={label}
     className={`h-[3px] flex-1 rounded-sm ${
-      state === 'done' ? 'bg-success-500' : state === 'current' ? 'bg-primary' : 'bg-gray-200'
+      state === 'done' ? 'bg-success-500' : state === 'current' ? 'bg-primary' : 'bg-muted'
     }`}
   />
 );
@@ -109,11 +109,11 @@ export const DayStatusCard: React.FC<DayStatusCardProps> = ({ isCollapsed = fals
     return (
       <div
         title={loading ? 'Loading…' : error ? 'Status unavailable' : planStatus?.status ?? 'No plan yet'}
-        className="mx-2 mt-0.5 mb-2.5 p-1.5 rounded-lg border border-gray-200 bg-white flex flex-col items-center gap-1.5"
+        className="mx-2 mt-0.5 mb-2.5 p-1.5 rounded-lg border border-border bg-card flex flex-col items-center gap-1.5"
       >
         <span
           className={`inline-block w-1.5 h-1.5 rounded-full shrink-0 ${
-            loading ? 'bg-gray-300' : error ? 'bg-destructive' : 'bg-success-500'
+            loading ? 'bg-muted' : error ? 'bg-destructive' : 'bg-success-500'
           }`}
         />
         <div className="flex flex-col gap-[3px] w-full">
@@ -135,13 +135,13 @@ export const DayStatusCard: React.FC<DayStatusCardProps> = ({ isCollapsed = fals
   }
 
   return (
-    <div className="mx-2.5 mt-0.5 mb-2.5 p-2.5 rounded-lg border border-gray-200 bg-white">
+    <div className="mx-2.5 mt-0.5 mb-2.5 p-2.5 rounded-lg border border-border bg-card">
       <div className="flex items-baseline gap-1.5">
-        <span className="text-xs font-semibold text-gray-900">{formatCardDate(today)}</span>
-        <span className="ml-auto flex items-center gap-1 text-[10.5px] text-gray-500">
+        <span className="text-xs font-semibold text-foreground">{formatCardDate(today)}</span>
+        <span className="ml-auto flex items-center gap-1 text-[10.5px] text-muted-foreground">
           <span
             className={`inline-block w-1.5 h-1.5 rounded-full ${
-              loading ? 'bg-gray-300' : error ? 'bg-destructive' : 'bg-success-500'
+              loading ? 'bg-muted' : error ? 'bg-destructive' : 'bg-success-500'
             }`}
           />
           {loading ? 'Loading…' : error ? 'Status unavailable' : planStatus?.status ?? 'No plan yet'}
@@ -158,9 +158,9 @@ export const DayStatusCard: React.FC<DayStatusCardProps> = ({ isCollapsed = fals
         ))}
       </div>
 
-      <div className="flex items-center text-[11px] text-gray-500">
+      <div className="flex items-center text-[11px] text-muted-foreground">
         {loading ? (
-          <span className="text-gray-400">Loading…</span>
+          <span className="text-text-tertiary">Loading…</span>
         ) : (
           <>
             <Badge variant={attentionCount > 0 ? 'warning' : 'success'} size="sm">

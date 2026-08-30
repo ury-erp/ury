@@ -186,7 +186,7 @@ export default function CaptainTables() {
 
   return (
     <div className="flex min-h-screen flex-col bg-muted">
-      <div className="sticky top-0 z-10 border-b border-border bg-white p-3">
+      <div className="sticky top-0 z-10 border-b border-border bg-card p-3">
         <div className="flex items-center justify-between gap-2">
           <h1 className="text-lg font-bold text-foreground">Tables</h1>
           <Button variant="ghost" size="sm" onClick={refresh}>

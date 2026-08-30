@@ -382,7 +382,7 @@ export default function Dashboard() {
               {posProfile?.branch ? `${posProfile.branch} · ` : ''}Live floor status for the current shift
             </p>
           </div>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-xs font-medium text-muted-foreground ring-1 ring-gray-200">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-card px-2.5 py-1 text-xs font-medium text-muted-foreground ring-1 ring-gray-200">
             <span className="relative flex h-2 w-2">
               <span className="absolute inline-flex h-2 w-2 animate-ping rounded-full bg-success-500 opacity-60" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-success-600" />
@@ -398,7 +398,7 @@ export default function Dashboard() {
           median cover count.
         */}
         {needsAttentionError ? (
-          <div className="rounded-lg border border-border bg-white p-4 text-sm text-destructive">
+          <div className="rounded-lg border border-border bg-card p-4 text-sm text-destructive">
             Failed to load attention items
           </div>
         ) : needsAttentionLoading ? null : attentionResolved ? (
@@ -477,7 +477,7 @@ export default function Dashboard() {
             <div className="col-span-full text-sm text-destructive">Failed to load stats</div>
           ) : statsLoading ? (
             Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="h-[7.5rem] animate-pulse rounded-lg border border-border bg-white" />
+              <div key={i} className="h-[7.5rem] animate-pulse rounded-lg border border-border bg-card" />
             ))
           ) : (
             stats.map((stat, index) => {
@@ -563,7 +563,7 @@ export default function Dashboard() {
                       >
                         {table.minutes !== null ? table.minutes : ''}
                       </span>
-                      <div className="flex h-28 w-full items-end justify-center rounded-md bg-gray-100/70 p-1">
+                      <div className="flex h-28 w-full items-end justify-center rounded-md bg-muted/70 p-1">
                         <div
                           className={cn(
                             'w-full rounded-sm transition-all duration-200 ease-out',

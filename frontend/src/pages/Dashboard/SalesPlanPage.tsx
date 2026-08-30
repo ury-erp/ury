@@ -72,7 +72,7 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ item, onClose }) => {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="history-modal-title">
       <button className="absolute inset-0 bg-black/40 backdrop-blur-sm" aria-label="Close history" onClick={onClose} />
-      <div className="relative z-[101] w-full max-w-2xl overflow-hidden rounded-lg bg-white shadow-2xl">
+      <div className="relative z-[101] w-full max-w-2xl overflow-hidden rounded-lg bg-card shadow-2xl">
         <div className="flex items-center justify-between border-b border-border bg-muted px-6 py-4">
           <div>
             <h2 id="history-modal-title" className="text-lg font-semibold text-foreground">{item.item_name || item.item_code}</h2>
@@ -154,7 +154,7 @@ const LifecycleStepper: React.FC<LifecycleStepperProps> = ({ status }) => {
                   ? 'border-primary bg-primary/10 text-primary'
                   : isComplete
                     ? 'border-border bg-muted text-text-tertiary'
-                    : 'border-border bg-white text-text-tertiary'
+                    : 'border-border bg-card text-text-tertiary'
               }`}
             >
               {step.label}
