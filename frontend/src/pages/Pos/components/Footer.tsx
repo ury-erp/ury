@@ -17,7 +17,7 @@ import { t } from '../i18n';
  * whole application.
  *
  * Labels follow one rule: a single-word noun, the word a cashier would actually
- * say out loud. Icons are chosen for distinct silhouettes at 20px — the old set
+ * say out loud. Icons are chosen for distinct silhouettes at 18px — the old set
  * was four near-identical grid squares (LayoutDashboard / LayoutGrid / Table /
  * ClipboardList) that were indistinguishable mid-shift.
  */
@@ -38,42 +38,33 @@ const Footer = () => {
   ];
 
   return (
-    <div className="bg-card border-t border-border py-1.5 relative">
-      <nav className="max-w-screen-xl mx-auto px-4">
-        <div className="flex justify-center items-center gap-1">
-          {navItems.map((item) => (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              className={({ isActive }) =>
-                cn(
-                  // Same rhythm as the Reports rail: a 28px icon chip carrying
-                  // the active state, a 13px medium label, rounded-md hit area.
-                  'flex min-w-[4.5rem] flex-col items-center gap-1 rounded-md px-3 py-1.5 text-[13px] font-medium transition-colors',
-                  isActive
-                    ? 'text-primary font-semibold'
-                    : 'text-muted-foreground hover:bg-primary-50 hover:text-primary'
-                )
-              }
-            >
-              {({ isActive }) => (
-                <>
-                  <span
-                    className={cn(
-                      'flex h-7 w-7 items-center justify-center rounded-md transition-colors',
-                      isActive ? 'bg-primary text-white shadow-sm' : 'text-current'
-                    )}
-                  >
-                    <item.icon className="w-4 h-4 shrink-0" />
-                  </span>
-                  <span>{item.label}</span>
-                </>
+    <nav className="h-[60px] flex-none bg-card border-t border-hair flex items-stretch justify-center gap-[2px] px-3 relative">
+      {navItems.map((item) => (
+        <NavLink
+          key={item.path}
+          to={item.path}
+          className={({ isActive }) =>
+            cn(
+              'w-[92px] flex flex-col items-center justify-center gap-[3px] text-text-tertiary text-[11px] relative transition-colors hover:text-foreground',
+              isActive && 'text-primary font-[550]'
+            )
+          }
+        >
+          {({ isActive }) => (
+            <>
+              {isActive && (
+                <span
+                  className="absolute top-0 left-[22px] right-[22px] h-[2px] bg-primary rounded-b-[2px]"
+                  aria-hidden="true"
+                />
               )}
-            </NavLink>
-          ))}
-        </div>
-      </nav>
-    </div>
+              <item.icon className="w-[18px] h-[18px] shrink-0" />
+              <span>{item.label}</span>
+            </>
+          )}
+        </NavLink>
+      ))}
+    </nav>
   );
 };
 
