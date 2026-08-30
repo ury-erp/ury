@@ -251,7 +251,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
         <div className="md:w-1/2 p-6 overflow-y-auto">
           {/* Error Message */}
           {error && (
-            <div className="mb-4 p-3 bg-destructive-tint border border-destructive rounded-lg">
+            <div className="mb-4 p-3 bg-destructive-tint border border-destructive-tint-border rounded-lg">
               <p className="text-destructive text-sm">{error}</p>
             </div>
           )}

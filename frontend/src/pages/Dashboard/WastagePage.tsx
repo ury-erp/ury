@@ -372,10 +372,10 @@ const WastageContent: React.FC = () => {
         <>
           <KpiStrip items={kpis} />
 
-          {actionError && <Card className="border-destructive bg-destructive-tint p-4 text-sm text-destructive">{actionError}</Card>}
+          {actionError && <Card className="border-destructive-tint-border bg-destructive-tint p-4 text-sm text-destructive">{actionError}</Card>}
 
           {error ? (
-            <Card className="border-destructive bg-destructive-tint p-6 text-sm text-destructive">{error}</Card>
+            <Card className="border-destructive-tint-border bg-destructive-tint p-6 text-sm text-destructive">{error}</Card>
           ) : (
             <DataTable
               columns={columns}

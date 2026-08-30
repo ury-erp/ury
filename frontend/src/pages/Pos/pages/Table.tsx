@@ -581,7 +581,7 @@ const TableView = () => {
               <span>{t('tables.available')}</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-destructive-tint border border-destructive rounded"></div>
+              <div className="w-4 h-4 bg-destructive-tint border border-destructive-tint-border rounded"></div>
               <span>{t('tables.occupied')}</span>
             </div>
           </div>

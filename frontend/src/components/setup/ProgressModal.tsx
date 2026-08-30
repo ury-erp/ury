@@ -108,7 +108,7 @@ export function ProgressModal({
           </div>
 
           {error && (
-            <div className="mt-4 p-4 bg-destructive-tint text-destructive text-sm rounded-lg border border-destructive">
+            <div className="mt-4 p-4 bg-destructive-tint text-destructive text-sm rounded-lg border border-destructive-tint-border">
               {error}
             </div>
           )}

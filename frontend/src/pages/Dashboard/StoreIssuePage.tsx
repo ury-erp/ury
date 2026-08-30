@@ -233,7 +233,7 @@ const StoreIssueContent: React.FC = () => {
       {!activeBranchId || activeBranchId === 'all' ? (
         <Card className="p-10 text-center text-sm text-text-tertiary">Select a branch to view store issue data.</Card>
       ) : error ? (
-        <Card className="border-destructive bg-destructive-tint p-6 text-sm text-destructive">{error}</Card>
+        <Card className="border-destructive-tint-border bg-destructive-tint p-6 text-sm text-destructive">{error}</Card>
       ) : (
         <>
           <KpiStrip items={kpiItems} />

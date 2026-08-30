@@ -99,7 +99,7 @@ export function ItemWiseSales() {
       </div>
 
       {error && (
-        <div className="rounded-md border border-destructive bg-destructive-tint px-4 py-3 text-sm text-destructive">
+        <div className="rounded-md border border-destructive-tint-border bg-destructive-tint px-4 py-3 text-sm text-destructive">
           {error}
         </div>
       )}

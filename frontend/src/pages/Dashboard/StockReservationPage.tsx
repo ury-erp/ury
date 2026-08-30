@@ -253,7 +253,7 @@ const StockReservationContent: React.FC = () => {
           <Spinner className="h-8 w-8 text-primary" />
         </div>
       ) : error ? (
-        <Card className="border-destructive bg-destructive-tint p-6 text-sm text-destructive">{error}</Card>
+        <Card className="border-destructive-tint-border bg-destructive-tint p-6 text-sm text-destructive">{error}</Card>
       ) : reservations.length === 0 ? (
         <Card className="p-8 text-center text-sm text-text-tertiary">
           No active stock reservations for this branch right now.
