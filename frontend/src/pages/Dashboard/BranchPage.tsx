@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
 import { Save, ChevronDown, ChevronRight, Plus, X } from 'lucide-react';
-import { Card, Button, Input, Select, Spinner, showToast } from '@ury/ui';
+import { Page, Section, Panel, Card, Button, Input, Select, Spinner, showToast } from '@ury/ui';
 import SideDrawer from '../../components/layout/SideDrawer';
 import { call } from '@ury/core';
 import { dashboardService } from '../../services/dashboard';
@@ -273,11 +273,12 @@ export const BranchPage: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <Page>
       <h1 className="text-xl font-semibold text-foreground mb-6">Branches</h1>
 
-      {/* Save button */}
-      <div className="flex items-center justify-end gap-3 pb-3 border-b border-border -mx-6 px-6 -mt-6 pt-6">
+      <Section>
+        {/* Save button */}
+        <div className="flex items-center justify-end gap-3 pb-3 border-b border-border">
         <Button
           onClick={() => setIsAddDrawerOpen(true)}
           className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center space-x-1.5 shadow-xs"
@@ -293,10 +294,12 @@ export const BranchPage: React.FC = () => {
           {saving ? <Spinner className="w-4 h-4 mr-1.5" /> : <Save className="w-4 h-4 mr-1.5" />}
           <span>Save Settings</span>
         </Button>
-      </div>
+        </div>
+      </Section>
 
-      {/* Branch Details */}
-      <Card className="p-6 rounded-lg border-border bg-card shadow-sm">
+      <Section>
+        {/* Branch Details */}
+        <Panel pad>
         <h2 className="text-sm font-bold text-muted-foreground tracking-wider mb-6">Branch Details</h2>
 
         {/* Branch Info Section */}
@@ -374,10 +377,12 @@ export const BranchPage: React.FC = () => {
             </div>
           </div>
         </div>
-      </Card>
+        </Panel>
+      </Section>
 
-      {/* Menu Section */}
-      <div className="border border-border rounded-lg bg-card shadow-sm overflow-hidden">
+      <Section>
+        {/* Menu Section */}
+        <div className="border border-border rounded-lg bg-card shadow-sm overflow-hidden">
         <button
           onClick={() => setMenuSectionOpen(!menuSectionOpen)}
           className="w-full flex items-center justify-between p-4 border-b border-border hover:bg-muted transition-colors text-left"
@@ -470,10 +475,12 @@ export const BranchPage: React.FC = () => {
             )}
           </div>
         )}
-      </div>
+        </div>
+      </Section>
 
-      {/* Room Section */}
-      <div className="border border-border rounded-lg bg-card shadow-sm overflow-hidden">
+      <Section>
+        {/* Room Section */}
+        <div className="border border-border rounded-lg bg-card shadow-sm overflow-hidden">
         <button
           onClick={() => setRoomSectionOpen(!roomSectionOpen)}
           className="w-full flex items-center justify-between p-4 border-b border-border hover:bg-muted transition-colors text-left"
@@ -501,10 +508,12 @@ export const BranchPage: React.FC = () => {
             )}
           </div>
         )}
-      </div>
+        </div>
+      </Section>
 
-      {/* Order Type Menu Section */}
-      <div className="border border-border rounded-lg bg-card shadow-sm overflow-hidden">
+      <Section>
+        {/* Order Type Menu Section */}
+        <div className="border border-border rounded-lg bg-card shadow-sm overflow-hidden">
         <button
           onClick={() => setOrderTypeSectionOpen(!orderTypeSectionOpen)}
           className="w-full flex items-center justify-between p-4 border-b border-border hover:bg-muted transition-colors text-left"
@@ -579,7 +588,8 @@ export const BranchPage: React.FC = () => {
             )}
           </div>
         )}
-      </div>
+        </div>
+      </Section>
 
       {/* Add Branch Drawer */}
       <SideDrawer
@@ -625,7 +635,7 @@ export const BranchPage: React.FC = () => {
           </div>
         </form>
       </SideDrawer>
-    </div>
+    </Page>
   );
 };
 
