@@ -1,6 +1,7 @@
 import React from 'react';
 import { Spinner } from '@ury/ui';
 import { useCaptainContext } from '../hooks/useCaptainContext';
+import ServiceRequestPanel from './ServiceRequestPanel';
 
 interface Props {
   children: React.ReactNode;
@@ -27,7 +28,7 @@ interface Props {
  * check.
  */
 const CaptainRouteGuard: React.FC<Props> = ({ children }) => {
-  const { capabilities, isLoading, error } = useCaptainContext();
+  const { capabilities, branch, isLoading, error } = useCaptainContext();
 
   if (isLoading) {
     return (
@@ -63,7 +64,12 @@ const CaptainRouteGuard: React.FC<Props> = ({ children }) => {
     );
   }
 
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      <ServiceRequestPanel branch={branch} />
+    </>
+  );
 };
 
 export default CaptainRouteGuard;
