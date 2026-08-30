@@ -27,6 +27,7 @@ import {
   EggFried,
   Fish,
   FishSymbol,
+  Flame,
   GlassWater,
   Grape,
   Hamburger,
@@ -89,6 +90,7 @@ const CATEGORY_ICONS: Record<string, LucideIcon> = {
   EggFried,
   Fish,
   FishSymbol,
+  Flame,
   GlassWater,
   Grape,
   Hamburger,
@@ -179,6 +181,8 @@ export function fuzzyMatchIcon(courseName?: string): string | undefined {
     [/\bsoft[- ]?drinks?\b/, 'CupSoda'],
     [/\bsodas?\b/, 'CupSoda'],
     [/\bjuices?\b/, 'CupSoda'],
+    [/\bpepsi\b/, 'CupSoda'],
+    [/\bcolas?\b/, 'CupSoda'],
     [/\bwater\b/, 'GlassWater'],
     [/\bbeers?\b/, 'Beer'],
     [/\bwines?\b/, 'Wine'],
@@ -190,7 +194,7 @@ export function fuzzyMatchIcon(courseName?: string): string | undefined {
     [/\bvodka\b/, 'Wine'],
     [/\bsake\b/, 'Wine'],
     [/\bdrinks?\b/, 'CupSoda'],
-    [/\bbeverages?\b/, 'Coffee'],
+    [/\bbeverages?\b/, 'CupSoda'],
     // Desserts / baked goods
     [/\bcake[- ]?slices?\b/, 'CakeSlice'],
     [/\bcakes?\b/, 'Cake'],
@@ -209,6 +213,16 @@ export function fuzzyMatchIcon(courseName?: string): string | undefined {
     [/\bpopsicles?\b/, 'Popsicle'],
     [/\bdesserts?\b/, 'Dessert'],
     // Proteins / ingredients
+    // Cuisines / rice dishes (category-level names like "Chinese" or
+    // "Biryani & Rice" carry no dish keyword of their own, so they need
+    // explicit rules rather than relying on per-item fuzzy matches).
+    [/\bbiryani[s]?\b/, 'Wheat'],
+    [/\brices?\b/, 'Wheat'],
+    [/\bchinese\b/, 'Soup'],
+    [/\bnoodles?\b/, 'Soup'],
+    [/\bmanchurian\b/, 'Soup'],
+    [/\bstarters?\b/, 'Flame'],
+    [/\bappetizers?\b/, 'Flame'],
     [/\bshrimps?\b/, 'Shrimp'],
     [/\bseafood\b/, 'Fish'],
     [/\bfishes?\b/, 'Fish'],
@@ -248,7 +262,6 @@ export function fuzzyMatchIcon(courseName?: string): string | undefined {
     [/\bpaper[- ]?bags?\b/, 'ShoppingBag'],
     [/\bshopping[- ]?bags?\b/, 'ShoppingBag'],
     [/\bbuffets?\b/, 'HandPlatter'],
-    [/\bstarters?\b/, 'EggFried'],
     [/\bmain\b/, 'Utensils'],
     [/\bcourses?\b/, 'Utensils'],
     [/\bseasonal\b/, 'LeafyGreen'],

@@ -44,6 +44,8 @@ MENU_ITEMS = [
 	("Paneer Tikka", "Starters", 220),
 	("Tandoori Chicken (Half)", "Starters", 280),
 	("Chilli Paneer", "Starters", 210),
+	("Hara Bhara Kabab", "Starters", 190),
+	("Fish Amritsari", "Starters", 260),
 	# Main Course
 	("Dal Makhani", "Main Course", 220),
 	("Paneer Butter Masala", "Main Course", 240),
@@ -58,6 +60,8 @@ MENU_ITEMS = [
 	("Veg Biryani", "Biryani & Rice", 200),
 	("Jeera Rice", "Biryani & Rice", 150),
 	("Curd Rice", "Biryani & Rice", 140),
+	("Hyderabadi Prawn Biryani", "Biryani & Rice", 360),
+	("Ghee Rice", "Biryani & Rice", 160),
 	# Chinese
 	("Chicken Manchurian", "Chinese", 240),
 	("Veg Manchurian", "Chinese", 190),
@@ -72,9 +76,15 @@ MENU_ITEMS = [
 	("Masala Chai", "Beverages", 40),
 	("Filter Coffee", "Beverages", 50),
 	("Mango Lassi", "Beverages", 80),
+	("Cold Coffee", "Beverages", 90),
+	("Buttermilk (Chaas)", "Beverages", 40),
 	# Desserts
 	("Gulab Jamun (2 pcs)", "Desserts", 90),
 	("Ice Cream (2 scoops)", "Desserts", 110),
+	("Rasmalai (2 pcs)", "Desserts", 120),
+	("Kheer", "Desserts", 100),
+	("Chocolate Brownie", "Desserts", 130),
+	("Kulfi", "Desserts", 90),
 ]
 
 # (table_name, seats, shape)

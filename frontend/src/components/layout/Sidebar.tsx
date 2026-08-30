@@ -7,7 +7,7 @@ import { DayStatusCard } from './DayStatusCard';
 import {
   LayoutDashboard,
   Utensils,
-  Armchair,
+  Table2,
   DoorOpen,
   SlidersHorizontal,
   Users,
@@ -97,7 +97,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'Setup',
     items: [
       { label: 'Menu', path: '/menu', icon: Utensils },
-      { label: 'Tables', path: '/table', icon: Armchair },
+      { label: 'Tables', path: '/table', icon: Table2 },
       { label: 'Rooms', path: '/room', icon: DoorOpen },
       { label: 'POS Profile', path: '/pos-profile', icon: SlidersHorizontal },
       { label: 'Users', path: '/user', icon: Users },

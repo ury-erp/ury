@@ -2,9 +2,9 @@ import { NavLink } from 'react-router-dom';
 import {
   Gauge,
   ShoppingCart,
-  Armchair,
+  Table2,
   ReceiptText,
-  Wallet,
+  History,
   Settings,
 } from 'lucide-react';
 import { cn } from '@ury/ui';
@@ -31,9 +31,9 @@ const Footer = () => {
   const navItems = [
     { icon: Gauge, label: t('footer.dashboard'), path: '/pos/dashboard' },
     { icon: ShoppingCart, label: t('footer.pos'), path: '/pos/pos' },
-    { icon: Armchair, label: t('footer.tables'), path: '/pos/tables' },
+    { icon: Table2, label: t('footer.tables'), path: '/pos/tables' },
     { icon: ReceiptText, label: t('footer.orders'), path: '/pos/orders' },
-    { icon: Wallet, label: t('footer.sessions'), path: '/pos/open-entries' },
+    { icon: History, label: t('footer.sessions'), path: '/pos/open-entries' },
     { icon: Settings, label: t('footer.settings'), path: '/pos/settings' },
   ];
 
