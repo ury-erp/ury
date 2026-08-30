@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AttentionFeed, AttentionItemProps, Card, KpiStrip, Spinner } from '@ury/ui';
+import { Page, Section, Panel, AttentionFeed, AttentionItemProps, KpiStrip, Spinner } from '@ury/ui';
 import { useBranchContext } from '../../context/BranchContext';
 import {
   AVAILABILITY_REASON_MESSAGES,
@@ -153,8 +153,8 @@ export const MenuRoutingPage: React.FC = () => {
   );
 
   return (
-    <div className="space-y-6">
-      <div className="-mx-6 -mt-6 border-b border-border px-6 pb-4 pt-6">
+    <Page>
+      <div>
         <h1 className="text-xl font-semibold text-foreground">Menu Sellability</h1>
         <p className="mt-1 text-sm text-text-tertiary">
           Real per-item availability from the server (`get_item_availability`) -- which catalog items can&apos;t be
@@ -164,59 +164,67 @@ export const MenuRoutingPage: React.FC = () => {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center rounded-lg border border-border bg-card py-16">
-          <Spinner className="h-8 w-8 text-primary" />
-        </div>
+        <Section>
+          <div className="flex items-center justify-center rounded-lg border border-border bg-card py-16">
+            <Spinner className="h-8 w-8 text-primary" />
+          </div>
+        </Section>
       ) : error ? (
-        <Card className="border-destructive-tint-border bg-destructive-tint p-6 text-sm text-destructive">{error}</Card>
+        <Section>
+          <Panel className="border-destructive-tint-border bg-destructive-tint p-6 text-sm text-destructive" pad>{error}</Panel>
+        </Section>
       ) : (
         <>
-          <KpiStrip
-            items={[
-              {
-                label: 'Items checked',
-                value: checkedItems.length,
-                hint: catalogCount > checkedItems.length + failedCount
-                  ? `of ${catalogCount} in catalog (capped at ${ITEM_CHECK_LIMIT})`
-                  : `of ${catalogCount} in catalog`,
-              },
-              {
-                label: 'Sellable',
-                value: sellableCount,
-                tone: 'success',
-              },
-              {
-                label: 'Unsellable',
-                value: unsellableItems.length,
-                tone: unsellableItems.length > 0 ? 'danger' : 'default',
-                hint: `${reasonGroups.length} reason${reasonGroups.length === 1 ? '' : 's'}`,
-              },
-              {
-                label: 'Check failures',
-                value: failedCount,
-                tone: failedCount > 0 ? 'warning' : 'default',
-                hint: failedCount > 0 ? 'Errored while checking -- excluded above' : 'None',
-              },
-            ]}
-          />
+          <Section>
+            <KpiStrip
+              items={[
+                {
+                  label: 'Items checked',
+                  value: checkedItems.length,
+                  hint: catalogCount > checkedItems.length + failedCount
+                    ? `of ${catalogCount} in catalog (capped at ${ITEM_CHECK_LIMIT})`
+                    : `of ${catalogCount} in catalog`,
+                },
+                {
+                  label: 'Sellable',
+                  value: sellableCount,
+                  tone: 'success',
+                },
+                {
+                  label: 'Unsellable',
+                  value: unsellableItems.length,
+                  tone: unsellableItems.length > 0 ? 'danger' : 'default',
+                  hint: `${reasonGroups.length} reason${reasonGroups.length === 1 ? '' : 's'}`,
+                },
+                {
+                  label: 'Check failures',
+                  value: failedCount,
+                  tone: failedCount > 0 ? 'warning' : 'default',
+                  hint: failedCount > 0 ? 'Errored while checking -- excluded above' : 'None',
+                },
+              ]}
+            />
+          </Section>
 
-          <AttentionFeed
-            title="Unsellable items"
-            items={
-              attentionItems.length > 0
-                ? attentionItems
-                : [
-                    {
-                      severity: 'info',
-                      title: 'Every checked item is sellable',
-                      detail: `All ${checkedItems.length} checked item${checkedItems.length === 1 ? '' : 's'} came back sellable at this branch right now.`,
-                    },
-                  ]
-            }
-          />
+          <Section>
+            <AttentionFeed
+              title="Unsellable items"
+              items={
+                attentionItems.length > 0
+                  ? attentionItems
+                  : [
+                      {
+                        severity: 'info',
+                        title: 'Every checked item is sellable',
+                        detail: `All ${checkedItems.length} checked item${checkedItems.length === 1 ? '' : 's'} came back sellable at this branch right now.`,
+                      },
+                    ]
+              }
+            />
+          </Section>
         </>
       )}
-    </div>
+    </Page>
   );
 };
 
