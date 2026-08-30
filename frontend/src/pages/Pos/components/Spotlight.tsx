@@ -62,14 +62,14 @@ const Spotlight = () => {
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogContent className="bg-card border border-hair rounded-[9px] w-full max-w-2xl p-0 shadow-xl">
-        <div className="flex items-center border-b border-hair p-4 gap-[7px]">
-          <Search className="w-5 h-5 text-text-tertiary flex-none" />
+      <DialogContent className="bg-card rounded-lg shadow-xl w-full max-w-2xl p-0">
+        <div className="flex items-center border-b border-border p-4">
+          <Search className="w-5 h-5 text-text-tertiary me-3" />
           <Input
             ref={inputRef}
             type="text"
             placeholder="Search menu items..."
-            className="flex-1 outline-none text-sm border-0 shadow-none focus:ring-0 focus-visible:ring-0 bg-transparent"
+            className="flex-1 outline-none text-lg border-0 shadow-none focus:ring-0"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -77,50 +77,51 @@ const Spotlight = () => {
           <Button
             onClick={() => setIsOpen(false)}
             variant="ghost"
-            className="w-7 h-7 p-0 text-muted-foreground hover:text-foreground hover:bg-muted rounded-[7px] flex-none"
+            size="icon"
+            className="ms-3"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </Button>
         </div>
 
         <div className="max-h-96 overflow-y-auto">
           {filteredItems.length > 0 ? (
             filteredItems.map((item, index) => (
-              <button
+              <Button
                 key={item.id}
                 onClick={() => handleSelect(item)}
+                variant="ghost"
                 className={cn(
-                  'w-full flex items-center gap-3 p-4 text-left transition-colors',
-                  'hover:bg-muted',
+                  'w-full flex items-center p-4 hover:bg-muted transition-colors',
                   index === selectedIndex && 'bg-primary-tint'
                 )}
               >
                 <img
                   src={item.image ?? undefined}
                   alt={item.name}
-                  className="w-12 h-12 object-cover rounded flex-none"
+                  className="w-12 h-12 object-cover rounded me-4"
                 />
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-foreground">{item.name}</div>
-                  <div className="text-xs text-text-tertiary">{item.category}</div>
+                <div className="flex-1 text-start">
+                  <div className="font-medium">{item.name}</div>
+                  <div className="text-sm text-text-tertiary">{item.category}</div>
                 </div>
-                <div className="text-end font-mono text-sm text-muted-foreground flex-none">
-                  {formatCurrency(item.price)}
+                <div className="text-end">
+                  <div className="font-medium">{formatCurrency(item.price)}</div>
                 </div>
-              </button>
+              </Button>
             ))
           ) : (
-            <div className="p-4 text-center text-sm text-text-tertiary">
+            <div className="p-4 text-center text-text-tertiary">
               No items found
             </div>
           )}
         </div>
 
-        <div className="border-t border-hair p-4 text-[10.5px] uppercase tracking-[0.05em] text-text-tertiary font-medium">
+        <div className="border-t border-border p-4 text-sm text-text-tertiary">
           <div className="flex items-center justify-between">
             <span>Use ↑↓ to navigate, Enter to select</span>
-            <div className="flex items-center gap-1 font-mono text-xs">
-              <Command className="w-3.5 h-3.5" />
+            <div className="flex items-center gap-2">
+              <Command className="w-4 h-4" />
               <span>K</span>
             </div>
           </div>

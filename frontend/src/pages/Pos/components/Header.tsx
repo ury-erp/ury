@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { t } from '../i18n';
 import { Link, useLocation } from 'react-router-dom';
-import {
+import { 
   Command,
+  User,
   ChevronDown,
   ExternalLink,
   LogOut,
@@ -103,38 +104,36 @@ const Header = () => {
   };
 
   return (
-    <header className="bg-background border-b border-hair">
-      <div className="flex items-center justify-between h-[52px] px-[18px] gap-3">
+    <header className="bg-card border-b border-border">
+      <div className="flex items-center justify-between h-16 px-6">
         {/* Logo */}
         <div className="flex items-center">
-          <Link to="/pos/dashboard" className="flex items-center gap-3" aria-label={t('header.shift_overview')} title={t('header.shift_overview')}>
+        <Link to="/pos/dashboard" className="flex items-center gap-3" aria-label={t('header.shift_overview')} title={t('header.shift_overview')}>
             <img
               src="/assets/ury/pos/ury_pos.png"
-              alt="URY POS"
-              className="h-5 w-auto"
+              alt="URY POS" 
+              className="h-10 w-auto"
             />
           </Link>
         </div>
 
         {/* Search Bar */}
-        <div className="flex-1 flex items-center gap-[7px] h-7 px-[9px] bg-muted rounded-[7px] text-text-tertiary text-sm w-[280px]">
-          <Input
-            ref={searchInputRef}
-            placeholder={searchPlaceholder}
-            className="h-fit p-0 w-full bg-transparent border-0 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 text-sm placeholder:text-text-tertiary"
-            value={searchValue}
-            onChange={searchOnChange}
-          />
-          {location.pathname === '/pos' && (
-            <div className="flex items-center gap-[3px] font-mono text-[10px] text-text-quaternary ms-auto flex-none">
-              <Command className="w-3 h-3" />
+        <div className="px-4 py-2 flex-1 flex items-center max-w-2xl mx-8  bg-muted hover:bg-muted border border-input rounded-md">
+            <Input
+              ref={searchInputRef}
+              placeholder={searchPlaceholder}
+              className="h-fit p-0 w-full bg-transparent border-0 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
+              value={searchValue}
+              onChange={searchOnChange}
+            />
+            <div className="flex items-center gap-2 text-text-tertiary">
+              <Command className="w-4 h-4" />
               <span>K</span>
             </div>
-          )}
         </div>
 
         {/* Right side actions */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
           {/*
             Cross-app jump into the management SPA. Styled to mirror the
             management app's own "Open POS" button (solid primary + external
@@ -144,9 +143,9 @@ const Header = () => {
           <a
             href="/ury/dashboard"
             title={`${t('header.service_board')} (opens the management app)`}
-            className="inline-flex items-center gap-[6px] h-7 px-[10px] bg-primary text-white hover:brightness-95 rounded-[7px] text-xs font-medium transition-colors"
+            className="flex items-center gap-2 px-3 py-1.5 bg-primary text-white hover:bg-primary/90 rounded-md text-sm font-medium transition-colors"
           >
-            <ExternalLink className="w-3.5 h-3.5" />
+            <ExternalLink className="w-4 h-4" />
             <span>{t('header.service_board')}</span>
           </a>
 
@@ -155,26 +154,26 @@ const Header = () => {
             <Button
               onClick={handleUserMenuToggle}
               variant="ghost"
-              className="flex items-center gap-[7px] h-7 px-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-[7px]"
+              className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
             >
-              <div className="w-[22px] h-[22px] bg-primary-tint text-primary rounded-full flex items-center justify-center text-[10px] font-semibold flex-none">
-                {user?.full_name ? user.full_name.charAt(0).toUpperCase() : 'U'}
+              <div className="w-8 h-8 bg-primary-500 rounded-full flex items-center justify-center">
+                <User className="w-4 h-4 text-white" />
               </div>
-              <span className="text-xs font-medium">{user?.full_name || 'User'}</span>
-              <ChevronDown className="w-3 h-3 flex-none" />
+              <span className="text-sm font-medium">{user?.full_name || 'User'}</span>
+              <ChevronDown className="w-4 h-4" />
             </Button>
 
             {/* User dropdown */}
             {showUserMenu && (
-              <div className="absolute end-0 mt-2 w-56 bg-card rounded-[9px] shadow-lg border border-hair z-50">
-                <div className="p-4 border-b border-hair">
-                  <p className="text-xs font-medium text-foreground">{user?.full_name || 'User'}</p>
-                  <p className="text-xs text-text-tertiary">{user?.name || ''}</p>
+              <div className="absolute end-0 mt-2 w-56 bg-card rounded-lg shadow-lg border border-border z-50">
+                <div className="p-4 border-b border-border">
+                  <p className="text-sm font-medium text-foreground">{user?.full_name || 'User'}</p>
+                  <p className="text-sm text-text-tertiary">{user?.name || ''}</p>
                 </div>
                 <div className="py-2">
                   <Button
                     variant="ghost"
-                    className="flex justify-start items-center w-full px-4 py-2 text-xs text-muted-foreground hover:bg-muted transition-colors"
+                    className="flex justify-start items-center w-full px-4 py-2 text-sm text-muted-foreground hover:bg-muted transition-colors"
                     onClick={handleClearCache}
                   >
                     <RefreshCw className="w-4 h-4 me-3" />
@@ -182,7 +181,7 @@ const Header = () => {
                   </Button>
                   <Button
                     variant="ghost"
-                    className="flex justify-start items-center w-full px-4 py-2 text-xs text-destructive hover:bg-destructive-tint hover:text-destructive transition-colors"
+                    className="flex justify-start items-center w-full px-4 py-2 text-sm text-destructive hover:bg-destructive-tint hover:text-destructive transition-colors"
                     onClick={handleLogout}
                   >
                     <LogOut className="w-4 h-4 me-3" />
