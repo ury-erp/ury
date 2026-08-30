@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { Clock, User, UserCheck, Receipt, Printer, Pencil, X, GitBranch, GitMerge } from 'lucide-react';
-import { Badge, Button, Card, CardContent } from '@ury/ui';
+import { Badge, Button, DataTable, type DataTableColumn } from '@ury/ui';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@ury/ui';
 import { showToast } from '@ury/ui';
+import { cn } from '@ury/ui';
 import OrderStatusSidebar from '../components/OrderStatusSidebar';
 import { useRootStore } from '../store/root-store';
 import { formatCurrency } from '@ury/core';
@@ -46,6 +47,50 @@ function isSplitBill(order: Pick<POSInvoice, 'split_total' | 'custom_split_group
     (order.split_total ?? 0) >= 2 ||
     !!order.custom_split_group ||
     !!order.custom_split_from
+  );
+}
+
+type StatusTone = 'neutral' | 'success' | 'destructive';
+
+function getStatusTone(status: string): StatusTone {
+  if (status === 'Recently Paid' || status === 'Paid' || status === 'Consolidated') return 'success';
+  if (status === 'Return') return 'destructive';
+  return 'neutral';
+}
+
+const statusToneClasses: Record<StatusTone, string> = {
+  neutral: 'border-hair bg-muted text-muted-foreground',
+  success: 'border-success-tint-border bg-success-tint text-success',
+  destructive: 'border-destructive-tint-border bg-destructive-tint text-destructive',
+};
+
+const statusDotClasses: Record<StatusTone, string> = {
+  neutral: 'bg-muted-foreground',
+  success: 'bg-success',
+  destructive: 'bg-destructive',
+};
+
+function StatusTag({ status, label }: { status: string; label: string }) {
+  const tone = getStatusTone(status);
+  return (
+    <span
+      className={cn(
+        'inline-flex h-[19px] shrink-0 items-center gap-1.5 rounded-[5px] border px-[7px] text-[11px] font-medium whitespace-nowrap',
+        statusToneClasses[tone]
+      )}
+    >
+      <span className={cn('h-[5px] w-[5px] shrink-0 rounded-full', statusDotClasses[tone])} />
+      {label}
+    </span>
+  );
+}
+
+function LinkTag({ icon: Icon, children }: { icon: React.ComponentType<{ className?: string }>; children: React.ReactNode }) {
+  return (
+    <span className="inline-flex h-[19px] shrink-0 items-center gap-1 rounded-[5px] border border-primary-tint-border bg-primary-tint px-[7px] text-[11px] font-medium text-primary whitespace-nowrap">
+      <Icon className="h-2.5 w-2.5" />
+      {children}
+    </span>
   );
 }
 
@@ -340,6 +385,118 @@ export default function Orders() {
     await selectOrder(inList ?? mapSplitGroupInvoiceToPOSInvoice(sibling));
   }
 
+  const orderColumns: DataTableColumn<POSInvoice>[] = [
+    {
+      key: 'order',
+      header: 'Order',
+      render: (order) => {
+        const splitBill = isSplitBill(order);
+        const mergedBill = isMergedBill(order);
+        const isSelected = selectedOrder?.name === order.name;
+        return (
+          <div className="min-w-0 max-w-[13rem]">
+            <div className="flex items-center gap-1.5">
+              <span
+                className={cn(
+                  'truncate font-medium',
+                  isSelected ? 'text-primary' : 'text-foreground'
+                )}
+                title={order.name}
+              >
+                {order.name}
+              </span>
+              {mergedBill && <LinkTag icon={GitMerge}>{t('bill_merge.merged_bill')}</LinkTag>}
+              {splitBill && (
+                <LinkTag icon={GitBranch}>
+                  {(order.split_total ?? 0) >= 2
+                    ? t('bill_split.split_indicator', {
+                        index: order.split_index ?? 0,
+                        total: order.split_total ?? 0,
+                      })
+                    : t('bill_split.split_bill')}
+                </LinkTag>
+              )}
+            </div>
+            {mergedBill && order.custom_merged_pos_invoice && (
+              <p className="truncate text-[11px] text-text-tertiary">
+                {t('bill_merge.includes_bill', { invoice: order.custom_merged_pos_invoice })}
+              </p>
+            )}
+            {splitBill && order.custom_split_from && (
+              <p className="truncate text-[11px] text-text-tertiary">
+                {t('bill_split.split_from', { invoice: order.custom_split_from })}
+              </p>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      key: 'type',
+      header: 'Table / Type',
+      render: (order) => {
+        const tableLabel = getOrderTableLabel(order);
+        return (
+          <div className="min-w-0 max-w-[9rem]">
+            <p className="truncate text-foreground">
+              {t(`order_types.${order.order_type.toLowerCase().replace(/ /g, '_')}`)}
+            </p>
+            {tableLabel && (
+              <p className="truncate text-[11px] text-text-tertiary">
+                {`Table ${tableLabel}`}
+              </p>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      key: 'customer',
+      header: 'Customer',
+      render: (order) => <span className="block max-w-[8rem] truncate text-foreground">{order.customer}</span>,
+    },
+    {
+      key: 'waiter',
+      header: 'Server',
+      render: (order) => <span className="block max-w-[7rem] truncate text-muted-foreground">{order.waiter || '—'}</span>,
+    },
+    {
+      key: 'time',
+      header: 'Time',
+      render: (order) => (
+        <span className="whitespace-nowrap text-muted-foreground">
+          {formatDateTime(order.posting_date, order.posting_time)}
+        </span>
+      ),
+    },
+    {
+      key: 'amount',
+      header: 'Amount',
+      align: 'right',
+      render: (order) => {
+        const mergedBill = isMergedBill(order);
+        const rowTotal = mergedBill
+          ? order.rounded_total + Math.round(order.custom_merged_total ?? 0)
+          : order.rounded_total;
+        return (
+          <span className="font-mono tabular-nums text-foreground font-semibold">
+            {formatCurrency(rowTotal)}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      render: (order) => (
+        <StatusTag
+          status={order.status}
+          label={t(`order_status_types.${order.status.toLowerCase().replace(/ /g, '_')}`)}
+        />
+      ),
+    },
+  ];
+
   if (error) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -359,7 +516,7 @@ export default function Orders() {
         setSelectedStatus={setSelectedStatus}
       />
 
-      {/* Middle Section - Order Cards */}
+      {/* Middle Section - Order Table */}
       <div className="flex-1 flex flex-col h-screen overflow-hidden pe-96">
         <div className="flex-1 overflow-y-auto bg-muted p-4 pb-40">
           {orderLoading ? (
@@ -367,106 +524,19 @@ export default function Orders() {
               <Spinner  message={t('common.loading')} />
             </div>
           ) : orders.length === 0 ? (
-            <div className="text-center mt-10">
-              <p className="text-text-tertiary">{t('orders.no_orders_found')}</p>
+            <div className="panel flex items-center rounded-[9px] border border-hair bg-card px-4 py-[18px] text-xs text-text-tertiary max-w-screen-xl mx-auto">
+              {t('orders.no_orders_found')}
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-screen-xl mx-auto">
-              {orders.map((order) => {
-                const splitBill = isSplitBill(order);
-                const mergedBill = isMergedBill(order);
-                const cardTotal = mergedBill
-                  ? order.rounded_total + Math.round(order.custom_merged_total ?? 0)
-                  : order.rounded_total;
-
-                return (
-                <Card
-                  key={order.name}
-                  className={`p-0 bg-card hover:shadow-md transition-shadow flex flex-col overflow-hidden cursor-pointer ${
-                    selectedOrder?.name === order.name ? 'ring-2 ring-blue-500 shadow-lg' : ''
-                  } ${splitBill || mergedBill ? 'border-s-4 border-s-primary-500' : ''}`}
-                  onClick={() => handleOrderClick(order)}
-                >
-                  <CardContent className="p-0 flex flex-col h-full">
-                    <div className="p-3 bg-muted border-b">
-                    <div className="mb-1 flex items-center justify-between gap-2">
-                      <h3 className="font-medium text-foreground text-sm truncate" title={order.name}>
-                        {order.name}
-                      </h3>
-                      <div className="flex shrink-0 items-center gap-1">
-                        {mergedBill && (
-                          <Badge
-                            variant="outline"
-                            className="shrink-0 gap-1 border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-50"
-                          >
-                            <GitMerge className="h-3 w-3" />
-                            {t('bill_merge.merged_bill')}
-                          </Badge>
-                        )}
-                        {splitBill && (
-                        <Badge
-                          variant="outline"
-                          className="shrink-0 gap-1 border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-50"
-                        >
-                          <GitBranch className="h-3 w-3" />
-                          {(order.split_total ?? 0) >= 2
-                            ? t('bill_split.split_indicator', {
-                                index: order.split_index ?? 0,
-                                total: order.split_total ?? 0,
-                              })
-                            : t('bill_split.split_bill')}
-                        </Badge>
-                      )}
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="text-xs text-text-tertiary">
-                          {getOrderTableLabel(order)
-                            ? `Table ${getOrderTableLabel(order)} • `
-                            : ''}{t(`order_types.${order.order_type.toLowerCase().replace(/ /g, '_')}`)}
-                        </p>
-                      </div>
-                      <div className="flex shrink-0 items-center gap-1">
-                        <Badge variant={getBadgeVariant(order.status)}>
-                          {t(`order_status_types.${order.status.toLowerCase().replace(/ /g, '_')}`)}
-                        </Badge>
-                      </div>
-                    </div>
-                    {mergedBill && order.custom_merged_pos_invoice && (
-                      <p className="mt-2 text-xs text-primary-700">
-                        {t('bill_merge.includes_bill', { invoice: order.custom_merged_pos_invoice })}
-                      </p>
-                    )}
-                    {splitBill && order.custom_split_from && (
-                      <p className="mt-2 text-xs text-primary-700">
-                        {t('bill_split.split_from', { invoice: order.custom_split_from })}
-                      </p>
-                    )}
-                    </div>
-
-                    {/* Content section - matches MenuCard padding and structure */}
-                    <div className="flex-1 p-3 flex flex-col">
-                      <div className="">
-                        <p className="text-sm text-foreground">{order.customer}</p>
-                      </div>
-
-                      <div className="flex items-center gap-2 text-xs text-text-tertiary">
-                        <Clock className="w-3.5 h-3.5" />
-                        <span>{formatDateTime(order.posting_date, order.posting_time)}</span>
-                      </div>
-
-                      {/* Total - pushed to bottom like MenuCard */}
-                      <div className="mt-auto pt-2">
-                        <span className="text-sm font-semibold text-foreground tabular-nums">
-                          {formatCurrency(cardTotal)}
-                        </span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-                );
-              })}
+            <div className="max-w-screen-xl mx-auto">
+              <DataTable<POSInvoice>
+                columns={orderColumns}
+                rows={orders}
+                onRowClick={handleOrderClick}
+                rowTone={(order) => (getStatusTone(order.status) === 'destructive' ? 'danger' : undefined)}
+                emptyMessage={t('orders.no_orders_found')}
+                className="bg-card"
+              />
             </div>
           )}
           {/* Pagination Controls */}
@@ -505,18 +575,16 @@ export default function Orders() {
       {/* Right Section - Order Details */}
       <div className="w-96 bg-card border-s border-border flex flex-col h-[calc(100vh-4rem)] fixed end-0 z-10">
         {!selectedOrder ? (
-          <div className="text-center h-full flex flex-col items-center justify-center text-text-tertiary p-6">
-            <p className="text-lg font-medium mb-2">{t('order.select_to_view')}</p>
-            <p className="text-sm">{t('orders.click_to_view')}</p>
+          <div className="flex items-center px-4 py-[18px] text-xs text-text-tertiary">
+            {t('order.select_to_view')} — {t('orders.click_to_view')}
           </div>
         ) : selectedOrderLoading ? (
           <div className="flex items-center justify-center h-full">
             <Spinner  message={t('common.loading')} />
           </div>
         ) : selectedOrderError ? (
-          <div className="text-center h-full flex flex-col items-center justify-center text-destructive p-6">
-            <p className="text-lg font-medium mb-2">Failed to load order details</p>
-            <p className="text-sm">{selectedOrderError}</p>
+          <div className="flex items-center px-4 py-[18px] text-xs text-destructive">
+            Failed to load order details — {selectedOrderError}
           </div>
         ) : (
           <>
@@ -537,24 +605,28 @@ export default function Orders() {
                         showSplitBill={canSplitBill}
                         onSplitBill={() => setShowSplitDialog(true)}
                       />
-                      <button
+                      <Button
                         type="button"
-                        className="inline-flex items-center justify-center rounded-md p-2 bg-muted hover:bg-muted text-muted-foreground focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        variant="outline"
+                        size="icon"
+                        className="focus:ring-primary"
                         aria-label="Edit order"
                         onClick={handleEditOrder}
                         disabled={editLoading}
                       >
                         <Pencil className="w-4 h-4" />
                         {editLoading && <span className="ms-2 text-xs">{t('common.loading')}</span>}
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
-                        className="inline-flex items-center justify-center rounded-md p-2 bg-muted hover:bg-muted text-destructive focus:outline-none focus:ring-2 focus:ring-red-500"
+                        variant="outline"
+                        size="icon"
+                        className="text-destructive focus:ring-destructive"
                         aria-label="Cancel order"
                         onClick={() => setCancelDialogOpen(true)}
                       >
                         <X className="w-4 h-4" />
-                      </button>
+                      </Button>
                     </>
                   )}
                   <Badge variant={getBadgeVariant(selectedOrder.status)}>
@@ -569,7 +641,7 @@ export default function Orders() {
                   {(selectedOrder.split_total ?? 0) >= 2 || isSplitBill(selectedOrder) ? (
                     <Badge
                       variant="outline"
-                      className="gap-1 border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-50"
+                      className="gap-1 border-primary-tint-border bg-primary-tint text-primary hover:bg-primary-tint"
                     >
                       <GitBranch className="h-3 w-3" />
                       {(selectedOrder.split_total ?? 0) >= 2
@@ -583,7 +655,7 @@ export default function Orders() {
                   {isMergedBill(selectedOrder) ? (
                     <Badge
                       variant="outline"
-                      className="gap-1 border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-50"
+                      className="gap-1 border-primary-tint-border bg-primary-tint text-primary hover:bg-primary-tint"
                     >
                       <GitMerge className="h-3 w-3" />
                       {t('bill_merge.merged_bill')}
@@ -663,19 +735,17 @@ export default function Orders() {
 
               {/* Order Items */}
               <div className="mb-6">
-                <h3 className="text-lg font-semibold text-foreground mb-4">{t('order.items_title')}</h3>
-                <div className="space-y-3">
+                <h3 className="text-[10.5px] font-medium uppercase tracking-[0.05em] text-text-tertiary mb-2">{t('order.items_title')}</h3>
+                <div>
                   {selectedOrderItems.map((item, index) => (
-                    <div key={index} className="flex justify-between items-start py-2 border-b border-border">
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-foreground">{item.item_name}</p>
-                        <p className="text-xs text-text-tertiary">Qty: {item.qty}</p>
+                    <div key={index} className="flex py-1.5 border-b border-hair last:border-0">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">{item.item_name}</p>
+                        <p className="text-xs text-text-tertiary font-mono tabular-nums">Qty: {item.qty}</p>
                       </div>
-                      <div className="text-right">
-                        <p className="text-sm font-semibold text-foreground">
-                          {formatCurrency(item.amount)}
-                        </p>
-                      </div>
+                      <p className="ml-auto font-mono text-xs font-semibold text-foreground tabular-nums self-center">
+                        {formatCurrency(item.amount)}
+                      </p>
                     </div>
                   ))}
                 </div>
@@ -684,12 +754,12 @@ export default function Orders() {
               {/* Taxes */}
               {selectedOrderTaxes.length > 0 && (
                 <div className="mb-6">
-                  <h3 className="text-lg font-semibold text-foreground mb-4">{t('order.taxes_charges')}</h3>
-                  <div className="space-y-2">
+                  <h3 className="text-[10.5px] font-medium uppercase tracking-[0.05em] text-text-tertiary mb-2">{t('order.taxes_charges')}</h3>
+                  <div>
                     {selectedOrderTaxes.map((tax, index) => (
-                      <div key={index} className="flex justify-between items-center py-1">
+                      <div key={index} className="flex py-1.5 border-b border-hair last:border-0">
                         <span className="text-sm text-muted-foreground">{tax.description}</span>
-                        <span className="text-sm font-medium text-foreground">
+                        <span className="ml-auto font-mono text-xs font-medium text-foreground tabular-nums">
                           {formatCurrency(tax.rate)}
                         </span>
                       </div>
