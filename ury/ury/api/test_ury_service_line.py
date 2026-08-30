@@ -10,6 +10,11 @@ from ury.ury.api.ury_service_line import (
 
 class TestGetServiceLine(FrappeTestCase):
 
+    def setUp(self):
+        patcher = patch("ury.ury.api.ury_service_line.require_manager")
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     @patch("ury.ury.api.ury_service_line.frappe.cache")
     def test_cache_hit_returns_immediately(self, mock_cache_obj):
         mock_cache_instance = MagicMock()
@@ -198,6 +203,11 @@ class TestGetServiceLine(FrappeTestCase):
 
 
 class TestGetRunningLow(FrappeTestCase):
+
+    def setUp(self):
+        patcher = patch("ury.ury.api.ury_service_line.require_manager")
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
     @patch("ury.ury.api.ury_service_line.frappe.cache")
     def test_cache_hit_returns_immediately(self, mock_cache_obj):
