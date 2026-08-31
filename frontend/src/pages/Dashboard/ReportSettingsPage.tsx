@@ -589,7 +589,7 @@ export const ReportSettingsPage: React.FC = () => {
                     </Button>
                   </div>
 
-                  <div className="border border-border rounded-xl overflow-hidden">
+                  <div className="overflow-hidden">
                     <table className="w-full text-left text-sm text-muted-foreground">
                       <thead className="bg-card text-foreground font-medium border-b border-border">
                         <tr>
@@ -655,7 +655,7 @@ export const ReportSettingsPage: React.FC = () => {
                     </Button>
                   </div>
 
-                  <div className="border border-border rounded-xl overflow-hidden">
+                  <div className="overflow-hidden">
                     <table className="w-full text-left text-sm text-muted-foreground">
                       <thead className="bg-card text-foreground font-medium border-b border-border">
                         <tr>
@@ -721,7 +721,7 @@ export const ReportSettingsPage: React.FC = () => {
                     </Button>
                   </div>
 
-                  <div className="border border-border rounded-xl overflow-hidden">
+                  <div className="overflow-hidden">
                     <table className="w-full text-left text-sm text-muted-foreground">
                       <thead className="bg-card text-foreground font-medium border-b border-border">
                         <tr>
@@ -805,7 +805,7 @@ export const ReportSettingsPage: React.FC = () => {
                     </Button>
                   </div>
 
-                  <div className="border border-border rounded-xl overflow-hidden">
+                  <div className="overflow-hidden">
                     <table className="w-full text-left text-sm text-muted-foreground">
                       <thead className="bg-card text-foreground font-medium border-b border-border">
                         <tr>
@@ -871,7 +871,7 @@ export const ReportSettingsPage: React.FC = () => {
                     </Button>
                   </div>
 
-                  <div className="border border-border rounded-xl overflow-hidden">
+                  <div className="overflow-hidden">
                     <table className="w-full text-left text-sm text-muted-foreground">
                       <thead className="bg-card text-foreground font-medium border-b border-border">
                         <tr>
@@ -937,7 +937,7 @@ export const ReportSettingsPage: React.FC = () => {
                     </Button>
                   </div>
 
-                  <div className="border border-border rounded-xl overflow-hidden">
+                  <div className="overflow-hidden">
                     <table className="w-full text-left text-sm text-muted-foreground">
                       <thead className="bg-card text-foreground font-medium border-b border-border">
                         <tr>
