@@ -316,10 +316,7 @@ export const SelfOrderingProfilePage: React.FC = () => {
               <p className="text-sm text-text-tertiary">Manage QR & kiosk ordering configurations</p>
             </div>
           </div>
-          <Button
-            onClick={() => handleOpenForm()}
-            className="bg-primary text-white hover:bg-primary"
-          >
+          <Button onClick={() => handleOpenForm()}>
             <Plus className="w-4 h-4 mr-2" />
             New Profile
           </Button>
@@ -701,7 +698,7 @@ export const SelfOrderingProfilePage: React.FC = () => {
                 <Button
                   type="submit"
                   disabled={saving}
-                  className="bg-primary text-white hover:bg-primary flex items-center gap-2"
+                  className="flex items-center gap-2"
                 >
                   {saving ? (
                     <>
@@ -737,10 +734,7 @@ export const SelfOrderingProfilePage: React.FC = () => {
               <div className="p-12 text-center">
                 <Settings className="w-12 h-12 text-text-tertiary mx-auto mb-3" />
                 <p className="text-text-tertiary font-medium mb-4">No profiles configured yet</p>
-                <Button
-                  onClick={() => handleOpenForm()}
-                  className="bg-primary text-white hover:bg-primary"
-                >
+                <Button onClick={() => handleOpenForm()}>
                   <Plus className="w-4 h-4 mr-2" />
                   Create First Profile
                 </Button>

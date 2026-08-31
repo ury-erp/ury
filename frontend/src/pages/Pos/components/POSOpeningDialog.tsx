@@ -39,7 +39,7 @@ const POSOpeningDialog = ({ onReload, type }: POSOpeningDialogProps) => {
           <div className="space-y-3">
             <Button
               onClick={onReload}
-              className="w-full bg-primary hover:bg-primary text-white font-medium py-3 px-6 rounded-lg transition-colors duration-200"
+              className="w-full font-medium py-3 px-6 rounded-lg transition-colors duration-200"
             >
               <RefreshCw className="w-5 h-5 mr-2" />
               {t('pos.reload_page')}

@@ -8,7 +8,7 @@ import {
   LogOut,
   RefreshCw,
 } from 'lucide-react';
-import { Button, Input } from '@ury/ui';
+import { Button, Input, buttonVariants } from '@ury/ui';
 import { useRootStore } from '../store/root-store';
 import { usePOSStore } from '../store/pos-store';
 import type { RootState } from '../store/root-store';
@@ -144,7 +144,7 @@ const Header = () => {
           <a
             href="/ury/dashboard"
             title={`${t('header.service_board')} (opens the management app)`}
-            className="inline-flex items-center gap-[6px] h-7 px-[10px] bg-primary text-white hover:brightness-95 rounded-[7px] text-xs font-medium transition-colors"
+            className={buttonVariants({ variant: 'chrome', size: 'compact' })}
           >
             <ExternalLink className="w-3.5 h-3.5" />
             <span>{t('header.service_board')}</span>

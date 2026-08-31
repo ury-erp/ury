@@ -56,7 +56,7 @@ const Footer = () => {
                   <span
                     className={cn(
                       'flex h-7 w-7 items-center justify-center rounded-md transition-colors',
-                      isActive ? 'bg-primary text-white shadow-sm' : 'text-current'
+                      isActive ? 'bg-foreground text-background shadow-sm' : 'text-current'
                     )}
                   >
                     <item.icon className="w-4 h-4 shrink-0" />
