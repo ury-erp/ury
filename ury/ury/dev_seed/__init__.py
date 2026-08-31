@@ -17,6 +17,7 @@ from ury.ury.dev_seed import (
 	catalog,
 	daily_pnl_seed,
 	historical_sales,
+	kot_error_log_seed,
 	kot_seed,
 	more_seed,
 	operations,
@@ -43,6 +44,9 @@ def run_all():
 
 	print("=== dev_seed: kot_seed ===")
 	kot_seed.seed()
+
+	print("=== dev_seed: kot_error_log_seed ===")
+	kot_error_log_seed.seed()
 
 	print("=== dev_seed: purchasing_seed ===")
 	purchasing_seed.seed()
