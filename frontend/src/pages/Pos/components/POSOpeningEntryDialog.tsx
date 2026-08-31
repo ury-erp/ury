@@ -6,11 +6,12 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DataTable,
+  type DataTableColumn,
 } from '@ury/ui';
 import { Button } from '@ury/ui';
 import { Spinner } from '@ury/ui';
 import { Input } from '@ury/ui';
-import { db, formatCurrency } from '@ury/core';
 import { t } from '../i18n';
 import { usePOSStore } from '../store/pos-store';
 import { useRootStore } from '../store/root-store';
@@ -170,46 +171,32 @@ const POSOpeningEntryDialog = ({ open, onOpenChange, onOpeningSubmitted }: POSOp
           ) : loadError ? (
             <p className="py-8 text-center text-sm text-destructive">{loadError}</p>
           ) : rows.length > 0 ? (
-            <div className="w-full overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="border-b border-border bg-muted">
-                    <th className="text-left py-3 px-4 font-semibold text-foreground">
-                      Payment Mode
-                    </th>
-                    <th className="text-center py-3 px-4 font-semibold text-foreground">
-                      Opening Amount
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((row) => (
-                    <tr
-                      key={row.mode_of_payment}
-                      className="border-b border-border hover:bg-muted transition-colors"
-                    >
-                      <td className="py-3 px-4 text-foreground font-medium">
-                        {row.mode_of_payment}
-                      </td>
-                      <td className="py-3 px-4">
-                        <Input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={row.opening_amount > 0 ? String(row.opening_amount) : ''}
-                          onChange={(e) =>
-                            handleRowChange(row.mode_of_payment, parseFloat(e.target.value) || 0)
-                          }
-                          placeholder="0.00"
-                          className="w-full text-center"
-                          size="sm"
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <>
+              {(() => {
+                const paymentColumns: DataTableColumn<OpeningPaymentRow>[] = [
+                  { key: 'mode_of_payment', header: 'Payment Mode' },
+                  {
+                    key: 'opening_amount',
+                    header: 'Opening Amount',
+                    render: (row) => (
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={row.opening_amount > 0 ? String(row.opening_amount) : ''}
+                        onChange={(e) =>
+                          handleRowChange(row.mode_of_payment, parseFloat(e.target.value) || 0)
+                        }
+                        placeholder="0.00"
+                        className="w-full text-center"
+                        size="sm"
+                      />
+                    ),
+                  },
+                ];
+                return <DataTable columns={paymentColumns} rows={rows} />;
+              })()}
+            </>
           ) : (
             <p className="py-8 text-center text-sm text-text-tertiary">
               {t('pos_opening.no_payment_modes')}

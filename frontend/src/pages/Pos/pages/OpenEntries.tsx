@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Card, CardContent, Spinner } from '@ury/ui';
+import { Card, CardContent, Spinner, DataTable, type DataTableColumn } from '@ury/ui';
 import { usePOSStore } from '../store/pos-store';
 import { getOpenPosOpeningEntries, type OpenPosOpeningEntry } from '../lib/pos-closing-api';
 import { t } from '../i18n';
@@ -68,26 +68,16 @@ export default function OpenEntries() {
                 <span>No open POS sessions</span>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse">
-                  <thead>
-                    <tr className="border-b border-hair">
-                      <th className="text-left px-[14px] py-[7px] font-medium text-text-tertiary text-[11px]">User</th>
-                      <th className="text-left px-[14px] py-[7px] font-medium text-text-tertiary text-[11px]">Period Start Date</th>
-                      <th className="text-left px-[14px] py-[7px] font-medium text-text-tertiary text-[11px]">POS Profile</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {entries.map((entry) => (
-                      <tr key={entry.name} className="border-b border-hair hover:bg-muted transition-colors">
-                        <td className="px-[14px] py-2 text-foreground text-[12.5px]">{entry.user}</td>
-                        <td className="px-[14px] py-2 text-muted-foreground text-[12.5px]">{formatDate(entry.period_start_date)}</td>
-                        <td className="px-[14px] py-2 text-muted-foreground text-[12.5px]">{entry.pos_profile}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <>
+                {(() => {
+                  const entryColumns: DataTableColumn<OpenPosOpeningEntry>[] = [
+                    { key: 'user', header: 'User' },
+                    { key: 'period_start_date', header: 'Period Start Date', render: (entry) => formatDate(entry.period_start_date) },
+                    { key: 'pos_profile', header: 'POS Profile' },
+                  ];
+                  return <DataTable columns={entryColumns} rows={entries} emptyMessage="No open POS sessions" />;
+                })()}
+              </>
             )}
           </CardContent>
         </Card>

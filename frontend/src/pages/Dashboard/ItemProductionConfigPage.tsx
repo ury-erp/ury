@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
 import { Plus } from 'lucide-react';
-import { Page, Section, Button, Select, SelectItem, Spinner, showToast } from '@ury/ui';
+import { Page, Section, Button, Select, SelectItem, Spinner, showToast, DataTable } from '@ury/ui';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { dashboardService } from '../../services/dashboard';
 import { call } from '@ury/core';
@@ -258,36 +258,18 @@ export const ItemProductionConfigPage: React.FC = () => {
             </Button>
           </div>
         ) : (
-          <div className="bg-card border border-hair rounded-[9px] overflow-hidden overflow-x-auto">
-            <table className="w-full text-left text-sm text-muted-foreground">
-              <thead className="border-b border-hair">
-                <tr>
-                  <th className="px-[14px] py-[7px] text-[11px] font-medium text-text-tertiary text-left">Item</th>
-                  <th className="px-[14px] py-[7px] text-[11px] font-medium text-text-tertiary text-left">Branch</th>
-                  <th className="px-[14px] py-[7px] text-[11px] font-medium text-text-tertiary text-left">Department</th>
-                  <th className="px-[14px] py-[7px] text-[11px] font-medium text-text-tertiary text-left">Production Unit</th>
-                  <th className="px-[14px] py-[7px] text-[11px] font-medium text-text-tertiary text-left">Policy</th>
-                  <th className="px-[14px] py-[7px] text-[11px] font-medium text-text-tertiary text-center">Active</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-hair">
-                {configs.map((config) => (
-                  <tr
-                    key={config.name}
-                    className="transition-colors cursor-pointer hover:bg-muted"
-                    onClick={() => openEditDrawer(config)}
-                  >
-                    <td className="px-[14px] py-2 text-[12.5px] font-semibold text-foreground">{config.item}</td>
-                    <td className="px-[14px] py-2 text-[12.5px]">{config.branch}</td>
-                    <td className="px-[14px] py-2 text-[12.5px]">{config.department || '-'}</td>
-                    <td className="px-[14px] py-2 text-[12.5px]">{config.production_unit || '-'}</td>
-                    <td className="px-[14px] py-2 text-[12.5px]">{config.production_policy || '-'}</td>
-                    <td className="px-[14px] py-2 text-[12.5px] text-center">{config.active ? 'Yes' : 'No'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable<ItemProductionConfigRecord>
+            columns={[
+              { key: 'item', header: 'Item', render: (row) => <span className="font-semibold">{row.item}</span> },
+              { key: 'branch', header: 'Branch', render: (row) => row.branch },
+              { key: 'department', header: 'Department', render: (row) => row.department || '-' },
+              { key: 'production_unit', header: 'Production Unit', render: (row) => row.production_unit || '-' },
+              { key: 'production_policy', header: 'Policy', render: (row) => row.production_policy || '-' },
+              { key: 'active', header: 'Active', align: 'right', render: (row) => row.active ? 'Yes' : 'No' },
+            ]}
+            rows={configs}
+            onRowClick={openEditDrawer}
+          />
         )}
       </Section>
 

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarDays, CheckCircle2, History, Lock, Save, Search, Send, X } from 'lucide-react';
-import { AttentionFeed, Badge, Button, Card, Input, KpiStrip, Page, Section, Spinner } from '@ury/ui';
+import { AttentionFeed, Badge, Button, Card, DataTable, Input, KpiStrip, Page, Section, Spinner, type DataTableColumn } from '@ury/ui';
 import { useBranchContext } from '../../context/BranchContext';
 import { useAuth } from '../../store/useAuth';
 import {
@@ -103,26 +103,14 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ item, onClose }) => {
               No prior comparable weekday sales found for this item.
             </div>
           ) : (
-            <div className="overflow-hidden rounded-lg border border-border">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-muted text-xs font-semibold text-text-tertiary">
-                  <tr>
-                    <th className="px-4 py-3">Date</th>
-                    <th className="px-4 py-3 text-right">Net Qty</th>
-                    <th className="px-4 py-3 text-right">Invoices</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-hair">
-                  {item.history.map((day) => (
-                    <tr key={day.date}>
-                      <td className="px-4 py-3 font-medium text-foreground">{day.label || day.date}</td>
-                      <td className="px-4 py-3 text-right text-muted-foreground">{formatQty(day.qty)}</td>
-                      <td className="px-4 py-3 text-right text-text-tertiary">{day.invoices ?? '-'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            (() => {
+              const historyColumns: DataTableColumn<typeof item.history[0]>[] = [
+                { key: 'date', header: 'Date', render: (row) => row.label || row.date },
+                { key: 'qty', header: 'Net Qty', align: 'right', render: (row) => formatQty(row.qty) },
+                { key: 'invoices', header: 'Invoices', align: 'right', render: (row) => row.invoices ?? '-' },
+              ];
+              return <DataTable columns={historyColumns} rows={item.history} emptyMessage="No history found." />;
+            })()
           )}
         </div>
       </div>
@@ -492,67 +480,71 @@ export const SalesPlanPage: React.FC = () => {
                   {formatQty(departmentItems.reduce((total, item) => total + item.planned_qty, 0))} planned
                 </span>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[760px] text-left text-sm">
-                  <thead className="border-b border-border bg-card text-xs font-semibold text-text-tertiary">
-                    <tr>
-                      <th className="px-5 py-3">Item</th>
-                      <th className="px-5 py-3">History Insight</th>
-                      <th className="px-5 py-3">Production Unit</th>
-                      <th className="px-5 py-3 text-right">Plan</th>
-                      <th className="px-5 py-3 text-right">Variance</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-hair">
-                    {departmentItems.map((item) => {
-                      const variance = getVariance(item);
+              {(() => {
+                const departmentColumns: DataTableColumn<SalesPlanItem>[] = [
+                  {
+                    key: 'item_code',
+                    header: 'Item',
+                    render: (row) => (
+                      <div>
+                        <p className="font-semibold text-foreground">{row.item_name || row.item_code}</p>
+                        <p className="mt-0.5 text-xs text-text-tertiary">{row.item_code}</p>
+                      </div>
+                    ),
+                  },
+                  {
+                    key: 'average_qty',
+                    header: 'History Insight',
+                    render: (row) => (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedHistoryItem(row)}
+                        className="inline-flex items-center gap-2 rounded-md px-2 py-1 text-left text-primary hover:bg-primary-tint"
+                      >
+                        <History className="h-4 w-4" />
+                        <span>
+                          Last {row.sample_days} comparable days avg {formatQty(row.average_qty)} {row.stock_uom}
+                        </span>
+                      </button>
+                    ),
+                  },
+                  {
+                    key: 'production_unit',
+                    header: 'Production Unit',
+                    render: (row) => <span className="text-muted-foreground">{row.production_unit || 'Unassigned'}</span>,
+                  },
+                  {
+                    key: 'planned_qty',
+                    header: 'Plan',
+                    align: 'right',
+                    render: (row) => (
+                      <Input
+                        aria-label={`Plan quantity for ${row.item_name || row.item_code}`}
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={row.planned_qty}
+                        onChange={(event) => updatePlannedQty(row.item_code, Number(event.target.value))}
+                        className="ml-auto w-28 text-right"
+                      />
+                    ),
+                  },
+                  {
+                    key: 'variance',
+                    header: 'Variance',
+                    align: 'right',
+                    render: (row) => {
+                      const variance = getVariance(row);
                       return (
-                        <tr
-                          key={item.item_code}
-                          ref={(el) => {
-                            rowRefs.current[item.item_code] = el;
-                          }}
-                          className={`hover:bg-muted ${
-                            highlightedItemCode === item.item_code ? 'bg-warning-tint transition-colors' : ''
-                          }`}
-                        >
-                          <td className="px-5 py-4">
-                            <p className="font-semibold text-foreground">{item.item_name || item.item_code}</p>
-                            <p className="mt-0.5 text-xs text-text-tertiary">{item.item_code}</p>
-                          </td>
-                          <td className="px-5 py-4">
-                            <button
-                              type="button"
-                              onClick={() => setSelectedHistoryItem(item)}
-                              className="inline-flex items-center gap-2 rounded-md px-2 py-1 text-left text-primary hover:bg-primary-tint"
-                            >
-                              <History className="h-4 w-4" />
-                              <span>
-                                Last {item.sample_days} comparable days avg {formatQty(item.average_qty)} {item.stock_uom}
-                              </span>
-                            </button>
-                          </td>
-                          <td className="px-5 py-4 text-muted-foreground">{item.production_unit || 'Unassigned'}</td>
-                          <td className="px-5 py-4">
-                            <Input
-                              aria-label={`Plan quantity for ${item.item_name || item.item_code}`}
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={item.planned_qty}
-                              onChange={(event) => updatePlannedQty(item.item_code, Number(event.target.value))}
-                              className="ml-auto w-28 text-right"
-                            />
-                          </td>
-                          <td className={`px-5 py-4 text-right font-semibold ${variance < 0 ? 'text-warning' : 'text-success'}`}>
-                            {variance > 0 ? '+' : ''}{formatQty(variance)}
-                          </td>
-                        </tr>
+                        <span className={`font-semibold ${variance < 0 ? 'text-warning' : 'text-success'}`}>
+                          {variance > 0 ? '+' : ''}{formatQty(variance)}
+                        </span>
                       );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                    },
+                  },
+                ];
+                return <DataTable columns={departmentColumns} rows={departmentItems} emptyMessage="No items for this department." />;
+              })()}
             </div>
           ))}
           </div>

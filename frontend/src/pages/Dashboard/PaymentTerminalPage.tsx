@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Page, Section, Panel, Badge, Spinner } from '@ury/ui';
+import { Page, Section, Panel, Badge, Spinner, DataTable, type DataTableColumn } from '@ury/ui';
 import {
   paymentTerminalService,
   PaymentTerminal,
@@ -235,44 +235,30 @@ const PaymentTerminalContent: React.FC = () => {
               </div>
             </Panel>
           ) : (
-          <div className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="border-b border-border bg-muted text-xs font-semibold text-text-tertiary">
-                  <tr>
-                    <th className="px-4 py-3">Terminal ID</th>
-                    <th className="px-4 py-3">Device</th>
-                    <th className="px-4 py-3">Provider</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3">Last Seen</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {terminals.map((terminal) => (
-                    <tr key={terminal.name}>
-                      <td className="px-4 py-3 font-medium text-foreground">
-                        {terminal.terminal_id}
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground">
-                        {terminal.device || '-'}
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground">
-                        {terminal.provider || '-'}
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge size="tag" variant={getStatusBadgeVariant(terminal.status || 'Idle')}>
-                          {terminal.status || 'Idle'}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground text-xs">
-                        {formatDateTime(terminal.last_seen)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <>
+            {(() => {
+              const terminalColumns: DataTableColumn<PaymentTerminal>[] = [
+                { key: 'terminal_id', header: 'Terminal ID' },
+                { key: 'device', header: 'Device', render: (terminal) => terminal.device || '-' },
+                { key: 'provider', header: 'Provider', render: (terminal) => terminal.provider || '-' },
+                {
+                  key: 'status',
+                  header: 'Status',
+                  render: (terminal) => (
+                    <Badge size="tag" variant={getStatusBadgeVariant(terminal.status || 'Idle')}>
+                      {terminal.status || 'Idle'}
+                    </Badge>
+                  ),
+                },
+                {
+                  key: 'last_seen',
+                  header: 'Last Seen',
+                  render: (terminal) => formatDateTime(terminal.last_seen),
+                },
+              ];
+              return <DataTable columns={terminalColumns} rows={terminals} emptyMessage="No terminals found." />;
+            })()}
+          </>
         )}
         </div>
       </Section>
@@ -291,44 +277,35 @@ const PaymentTerminalContent: React.FC = () => {
               </div>
             </Panel>
           ) : (
-          <div className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="border-b border-border bg-muted text-xs font-semibold text-text-tertiary">
-                  <tr>
-                    <th className="px-4 py-3">Terminal</th>
-                    <th className="px-4 py-3">Invoice</th>
-                    <th className="px-4 py-3">Amount</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3">Created</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {transactions.map((tx) => (
-                    <tr key={tx.name}>
-                      <td className="px-4 py-3 font-medium text-foreground font-mono text-xs">
-                        {tx.terminal || '-'}
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground font-mono text-xs">
-                        {tx.invoice || '-'}
-                      </td>
-                      <td className="px-4 py-3 text-right text-muted-foreground">
-                        {formatCurrency(tx.amount)}
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge size="tag" variant={getTransactionStatusBadgeVariant(tx.status || 'Pending')}>
-                          {tx.status || 'Pending'}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground text-xs">
-                        {formatDateTime(tx.created_at)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <>
+            {(() => {
+              const transactionColumns: DataTableColumn<PaymentTerminalTransaction>[] = [
+                { key: 'terminal', header: 'Terminal', render: (tx) => <span className="font-mono text-xs">{tx.terminal || '-'}</span> },
+                { key: 'invoice', header: 'Invoice', render: (tx) => <span className="font-mono text-xs">{tx.invoice || '-'}</span> },
+                {
+                  key: 'amount',
+                  header: 'Amount',
+                  align: 'right',
+                  render: (tx) => formatCurrency(tx.amount),
+                },
+                {
+                  key: 'status',
+                  header: 'Status',
+                  render: (tx) => (
+                    <Badge size="tag" variant={getTransactionStatusBadgeVariant(tx.status || 'Pending')}>
+                      {tx.status || 'Pending'}
+                    </Badge>
+                  ),
+                },
+                {
+                  key: 'created_at',
+                  header: 'Created',
+                  render: (tx) => <span className="text-xs">{formatDateTime(tx.created_at)}</span>,
+                },
+              ];
+              return <DataTable columns={transactionColumns} rows={transactions} emptyMessage="No transactions found." />;
+            })()}
+          </>
         )}
         </div>
       </Section>

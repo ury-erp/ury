@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useBranchContext } from '../../context/BranchContext';
 import { Utensils, Search, Plus, LayoutGrid, List, Edit2, Check, X, Trash2 } from 'lucide-react';
-import { Card, Button, Badge, Input, Spinner, showToast } from '@ury/ui';
+import { Card, Button, Badge, Input, Spinner, showToast, DataTable, type DataTableColumn } from '@ury/ui';
 import { formatCurrency, call } from '@ury/core';
 import { dashboardService } from '../../services/dashboard';
 import SideDrawer from '../../components/layout/SideDrawer';
@@ -843,65 +843,79 @@ export const MenuPage: React.FC = () => {
           ))}
         </div>
       ) : (
-        <Card padding="none" className="rounded-xl overflow-hidden overflow-x-auto">
-          <table className="w-full text-left text-sm text-muted-foreground min-w-[600px]">
-            <thead className="bg-muted/50 border-b border-border text-xs uppercase text-muted-foreground font-bold tracking-wider">
-              <tr>
-                <th className="px-6 py-4">Item Name</th>
-                <th className="px-6 py-4">Course</th>
-                <th className="px-6 py-4">Standard Rate</th>
-                <th className="px-6 py-4 text-center">Special</th>
-                <th className="px-6 py-4 text-center">Disabled</th>
-                <th className="px-6 py-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {filteredItems.map((item, idx) => (
-                <tr key={item.name || idx} className="transition-colors">
-                  <td className="px-6 py-4 font-semibold text-foreground">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-md bg-muted flex items-center justify-center shrink-0 overflow-hidden border border-border">
-                        {getItemImage(item) ? (
-                          <img
-                            src={getItemImage(item)}
-                            alt={item.item_name}
-                            className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
-                            onClick={() => setPreviewImageUrl(getItemImage(item) || null)}
-                            title="Click to preview image"
-                          />
-                        ) : (
-                          <Utensils className="w-4 h-4 text-muted-foreground" />
-                        )}
-                      </div>
-                      {item.item_name}
+        <>
+          {(() => {
+            const itemColumns: DataTableColumn<MenuItemRecord>[] = [
+              {
+                key: 'item_name',
+                header: 'Item Name',
+                render: (item) => (
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-md bg-muted flex items-center justify-center shrink-0 overflow-hidden border border-border">
+                      {getItemImage(item) ? (
+                        <img
+                          src={getItemImage(item)}
+                          alt={item.item_name}
+                          className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                          onClick={() => setPreviewImageUrl(getItemImage(item) || null)}
+                          title="Click to preview image"
+                        />
+                      ) : (
+                        <Utensils className="w-4 h-4 text-muted-foreground" />
+                      )}
                     </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <Badge variant="outline" className="border-border bg-muted text-muted-foreground text-xs font-medium">
-                      {item.course || 'None'}
-                    </Badge>
-                  </td>
-                  <td className="px-6 py-4 font-bold text-primary">{formatCurrency(item.rate || 0)}</td>
-                  <td className="px-6 py-4">
-                    <div className="flex justify-center">
-                      {item.special_dish ? <Check className="w-4 h-4 text-green-500" /> : <X className="w-4 h-4 text-gray-300" />}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex justify-center">
-                      {item.disabled ? <Check className="w-4 h-4 text-red-500" /> : <X className="w-4 h-4 text-gray-300" />}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <Button variant="ghost" size="sm" onClick={() => openEditItemDrawer(item)} className="text-gray-500 hover:text-primary">
-                      <Edit2 className="w-4 h-4" />
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Card>
+                    {item.item_name}
+                  </div>
+                ),
+              },
+              {
+                key: 'course',
+                header: 'Course',
+                render: (item) => (
+                  <Badge variant="outline" className="border-border bg-muted text-muted-foreground text-xs font-medium">
+                    {item.course || 'None'}
+                  </Badge>
+                ),
+              },
+              {
+                key: 'rate',
+                header: 'Standard Rate',
+                align: 'right',
+                render: (item) => <span className="font-bold text-primary">{formatCurrency(item.rate || 0)}</span>,
+              },
+              {
+                key: 'special_dish',
+                header: 'Special',
+                render: (item) => (
+                  <div className="flex justify-center">
+                    {item.special_dish ? <Check className="w-4 h-4 text-green-500" /> : <X className="w-4 h-4 text-gray-300" />}
+                  </div>
+                ),
+              },
+              {
+                key: 'disabled',
+                header: 'Disabled',
+                render: (item) => (
+                  <div className="flex justify-center">
+                    {item.disabled ? <Check className="w-4 h-4 text-red-500" /> : <X className="w-4 h-4 text-gray-300" />}
+                  </div>
+                ),
+              },
+              {
+                key: 'name',
+                header: 'Actions',
+                align: 'right',
+                render: (item) => (
+                  <Button variant="ghost" size="sm" onClick={() => openEditItemDrawer(item)} className="text-gray-500 hover:text-primary">
+                    <Edit2 className="w-4 h-4" />
+                  </Button>
+                ),
+              },
+            ];
+
+            return <DataTable columns={itemColumns} rows={filteredItems} isLoading={loading} emptyMessage="No items found." />;
+          })()}
+        </>
       )}
 
       {/* Add/Edit Item Drawer */}

@@ -19,6 +19,7 @@ import {
 } from '@ury/ui';
 import { getLoggedUser, getUserRoles } from '@ury/core';
 import { useBranchContext } from '../../context/BranchContext';
+import { DeskLink } from '../../components/DeskLink';
 import { departmentStockService, DepartmentOption, WastageRow } from '../../services/departmentStock';
 
 /** Roles permitted to view wastage records. Mirrors
@@ -441,6 +442,12 @@ const WastageContent: React.FC = () => {
             {selectedRow.valuation_amount !== undefined && (
               <KeyValueRow label="Valuation amount" value={`Rs. ${formatCurrency(selectedRow.valuation_amount)}`} />
             )}
+            {/* This screen only ever approves/rejects; editing a wastage
+                record's fields still happens in the desk. Rendered only for
+                users whose desk permissions actually allow opening it. */}
+            <div className="pt-3">
+              <DeskLink doctype="URY Issue Wastage" name={selectedRow.name} label="Open in Desk" />
+            </div>
           </>
         )}
       </Drawer>

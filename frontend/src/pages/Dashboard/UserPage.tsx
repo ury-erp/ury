@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
 import { Users, Plus, ShieldCheck, Edit2 } from 'lucide-react';
-import { Card, Button, Badge, Input, Spinner, showToast } from '@ury/ui';
+import { Card, Button, Badge, Input, Spinner, showToast, DataTable, type DataTableColumn } from '@ury/ui';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { Switch } from '../../components/ui/switch';
 import { dashboardService } from '../../services/dashboard';
@@ -246,48 +246,52 @@ export const UserPage: React.FC = () => {
           </Button>
         </Card>
       ) : (
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-          <table className="w-full text-left text-sm text-gray-600">
-            <thead className="bg-gray-50 border-b border-gray-100 text-xs uppercase text-gray-500 font-semibold">
-              <tr>
-                <th className="px-6 py-4">User</th>
-                <th className="px-6 py-4">User ID</th>
-                <th className="px-6 py-4">Role</th>
-                <th className="px-6 py-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {users.map((user) => (
-                <tr key={user.name} className="hover:bg-primary/10 transition-colors">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-xs uppercase shrink-0">
-                        {(user.first_name || user.email || user.name || '?').charAt(0)}
+        <>
+          {users.length > 0 && (
+            <>
+              {(() => {
+                const columns: DataTableColumn<UserRecord>[] = [
+                  {
+                    key: 'name',
+                    header: 'User',
+                    render: (row) => (
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-xs uppercase shrink-0">
+                          {(row.first_name || row.email || row.name || '?').charAt(0)}
+                        </div>
+                        <div className="font-semibold text-gray-900">
+                          {row.first_name || row.full_name || row.name}
+                        </div>
                       </div>
-                      <div className="font-semibold text-gray-900">
-                        {user.first_name || user.full_name || user.name}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-gray-600 font-medium">
-                    {user.email}
-                  </td>
-                  <td className="px-6 py-4">
-                    <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary text-[10px]">
-                      <ShieldCheck className="w-3 h-3 mr-1" />
-                      {getDisplayRole(user)}
-                    </Badge>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <Button variant="ghost" size="sm" onClick={() => openEditDrawer(user)} className="text-gray-500 hover:text-primary">
-                      <Edit2 className="w-4 h-4" />
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                    )
+                  },
+                  { key: 'email', header: 'User ID', render: (row) => <span className="text-gray-600 font-medium">{row.email}</span> },
+                  {
+                    key: 'role',
+                    header: 'Role',
+                    render: (row) => (
+                      <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary text-[10px]">
+                        <ShieldCheck className="w-3 h-3 mr-1" />
+                        {getDisplayRole(row)}
+                      </Badge>
+                    )
+                  },
+                  {
+                    key: 'actions',
+                    header: 'Actions',
+                    align: 'right',
+                    render: (row) => (
+                      <Button variant="ghost" size="sm" onClick={() => openEditDrawer(row)} className="text-gray-500 hover:text-primary">
+                        <Edit2 className="w-4 h-4" />
+                      </Button>
+                    )
+                  },
+                ];
+                return <DataTable columns={columns} rows={users} />;
+              })()}
+            </>
+          )}
+        </>
       )}
 
       {/* Add/Edit SideDrawer */}

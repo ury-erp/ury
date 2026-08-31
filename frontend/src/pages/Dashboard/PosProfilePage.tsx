@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
 import { Printer, Shield, Settings2, Plus, X, ArrowLeft, Edit2, Eye, Layers, Save } from 'lucide-react';
-import { Card, Button, Badge, Input, Spinner, showToast } from '@ury/ui';
+import { Card, Button, Badge, Input, Spinner, showToast, DataTable, type DataTableColumn } from '@ury/ui';
 import { Switch } from '../../components/ui/switch';
 import { call } from '@ury/core';
 import SideDrawer from '../../components/layout/SideDrawer';
@@ -725,58 +725,56 @@ export const PosProfilePage: React.FC = () => {
           </Button>
         </Card>
       ) : (
-        <div className="bg-card rounded-lg border border-border shadow-sm overflow-hidden">
-          <table className="w-full text-left text-sm text-muted-foreground">
-            <thead className="bg-muted border-b border-border text-xs uppercase text-muted-foreground font-semibold">
-              <tr>
-                <th className="px-6 py-4">POS Profile</th>
-                <th className="px-6 py-4">Warehouse</th>
-                <th className="px-6 py-4">Price List</th>
-                <th className="px-6 py-4">Activation Status</th>
-                <th className="px-6 py-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {profiles.map((p) => (
-                <tr
-                  key={p.name}
-                  className="hover:bg-muted/50 transition-colors"
-                >
-                  <td className="px-6 py-4 font-semibold text-foreground">{p.name}</td>
-                  <td className="px-6 py-4 text-muted-foreground">{p.warehouse || p.company || '-'}</td>
-                  <td className="px-6 py-4 text-muted-foreground">{p.selling_price_list || 'Standard Selling'}</td>
-                  <td className="px-6 py-4">
-                    <Badge variant={!p.disabled ? "success" : "outline"} size="sm">
-                      {!p.disabled ? 'Active' : 'Inactive'}
-                    </Badge>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleProfileView(p)}
-                        className="text-muted-foreground hover:text-primary p-1.5 h-8 w-8"
-                        title="View Profile"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleProfileEdit(p)}
-                        className="text-muted-foreground hover:text-primary p-1.5 h-8 w-8"
-                        title="Edit Profile"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <>
+          {profiles.length > 0 && (
+            <>
+              {(() => {
+                const columns: DataTableColumn<PosProfileRecord>[] = [
+                  { key: 'name', header: 'POS Profile', render: (row) => <span className="font-semibold">{row.name}</span> },
+                  { key: 'warehouse', header: 'Warehouse', render: (row) => row.warehouse || row.company || '-' },
+                  { key: 'selling_price_list', header: 'Price List', render: (row) => row.selling_price_list || 'Standard Selling' },
+                  {
+                    key: 'disabled',
+                    header: 'Activation Status',
+                    render: (row) => (
+                      <Badge variant={!row.disabled ? "success" : "outline"} size="sm">
+                        {!row.disabled ? 'Active' : 'Inactive'}
+                      </Badge>
+                    )
+                  },
+                  {
+                    key: 'actions',
+                    header: 'Actions',
+                    align: 'right',
+                    render: (row) => (
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleProfileView(row)}
+                          className="text-muted-foreground hover:text-primary p-1.5 h-8 w-8"
+                          title="View Profile"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleProfileEdit(row)}
+                          className="text-muted-foreground hover:text-primary p-1.5 h-8 w-8"
+                          title="Edit Profile"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    )
+                  },
+                ];
+                return <DataTable columns={columns} rows={profiles} />;
+              })()}
+            </>
+          )}
+        </>
       )}
 
       {/* Add POS Profile Drawer */}

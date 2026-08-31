@@ -81,6 +81,22 @@ export const stockReservationService = {
     return (res?.message ?? res) || [];
   },
 
+  /**
+   * Transitions a `Reserved` reservation group to `Fulfilled`.
+   *
+   * `fulfil_reservation` was already whitelisted and permission-guarded
+   * server-side (it saves each row with `ignore_permissions=False`, same as
+   * release/cancel) but had no caller outside the desk, so managers had to
+   * leave `/ury` to settle a reservation. Takes no `reason`: the backend
+   * records the actor and event in the reservation's audit log itself.
+   */
+  async fulfilReservation(name: string): Promise<string[]> {
+    const res = await call<any>('ury.ury.api.ury_reservation_service.fulfil_reservation', {
+      reservation_name: name,
+    });
+    return (res?.message ?? res) || [];
+  },
+
   async cancelReservation(name: string, reason?: string): Promise<string[]> {
     const res = await call<any>('ury.ury.api.ury_reservation_service.cancel_reservation', {
       reservation_name: name,

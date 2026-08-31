@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
 import { Plus, Layers, Edit2 } from 'lucide-react';
-import { Card, Button, Badge, Input, Spinner, showToast } from '@ury/ui';
+import { Card, Button, Badge, Input, Spinner, showToast, DataTable, type DataTableColumn } from '@ury/ui';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { Switch } from '../../components/ui/switch';
 import { dashboardService } from '../../services/dashboard';
@@ -210,37 +210,36 @@ export const RoomPage: React.FC = () => {
           </Button>
         </Card>
       ) : (
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-          <table className="w-full text-left text-sm text-gray-600">
-            <thead className="bg-gray-50 border-b border-gray-100 text-xs uppercase text-gray-500 font-semibold">
-              <tr>
-                <th className="px-6 py-4">Room Name</th>
-                <th className="px-6 py-4">Room Type</th>
-                <th className="px-6 py-4">Branch</th>
-                <th className="px-6 py-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {rooms.map((room) => (
-                <tr key={room.name} className="hover:bg-primary/10 transition-colors">
-                  <td className="px-6 py-4 font-semibold text-gray-900">{room.name}</td>
-                  <td className="px-6 py-4">
-                    <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary text-[10px]">
-                      <Layers className="w-3 h-3 mr-1" />
-                      {room.room_type === 'NON-AC' ? 'Non-AC' : (room.room_type || 'General')}
-                    </Badge>
-                  </td>
-                  <td className="px-6 py-4">{room.branch || 'Main'}</td>
-                  <td className="px-6 py-4 text-right">
-                    <Button variant="ghost" size="sm" onClick={() => openEditDrawer(room)} className="text-gray-500 hover:text-primary">
-                      <Edit2 className="w-4 h-4" />
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <>
+          {(() => {
+            const roomColumns: DataTableColumn<UryRoomRecord>[] = [
+              { key: 'name', header: 'Room Name' },
+              {
+                key: 'room_type',
+                header: 'Room Type',
+                render: (room) => (
+                  <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary text-[10px]">
+                    <Layers className="w-3 h-3 mr-1" />
+                    {room.room_type === 'NON-AC' ? 'Non-AC' : (room.room_type || 'General')}
+                  </Badge>
+                ),
+              },
+              { key: 'branch', header: 'Branch', render: (room) => room.branch || 'Main' },
+              {
+                key: 'name',
+                header: 'Actions',
+                align: 'right',
+                render: (room) => (
+                  <Button variant="ghost" size="sm" onClick={() => openEditDrawer(room)} className="text-gray-500 hover:text-primary">
+                    <Edit2 className="w-4 h-4" />
+                  </Button>
+                ),
+              },
+            ];
+
+            return <DataTable columns={roomColumns} rows={rooms} isLoading={loading} emptyMessage="No rooms configured." />;
+          })()}
+        </>
       )}
 
       {/* Add/Edit SideDrawer */}

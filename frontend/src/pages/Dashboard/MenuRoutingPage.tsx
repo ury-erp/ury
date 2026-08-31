@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Page, Section, Panel, AttentionFeed, AttentionItemProps, KpiStrip, Spinner } from '@ury/ui';
 import { useBranchContext } from '../../context/BranchContext';
+import { DeskLink } from '../../components/DeskLink';
 import {
   AVAILABILITY_REASON_MESSAGES,
   AvailabilityReasonCode,
@@ -61,12 +62,6 @@ const groupByReasonCode = (items: ItemAvailability[]): ReasonGroup[] => {
   return Array.from(groups.entries())
     .map(([reasonCode, groupItems]) => ({ reasonCode, items: groupItems }))
     .sort((a, b) => b.items.length - a.items.length);
-};
-
-const formatItemList = (items: ItemAvailability[], max = 8): string => {
-  const codes = items.map((item) => item.item_code);
-  if (codes.length <= max) return codes.join(', ');
-  return `${codes.slice(0, max).join(', ')}, +${codes.length - max} more`;
 };
 
 export const MenuRoutingPage: React.FC = () => {
@@ -143,12 +138,27 @@ export const MenuRoutingPage: React.FC = () => {
 
   const attentionItems: AttentionItemProps[] = useMemo(
     () =>
-      reasonGroups.map((group) => ({
-        severity: severityForReasonCode(group.reasonCode),
-        title: `${reasonLabel(group.reasonCode)} (${group.reasonCode})`,
-        detail: formatItemList(group.items),
-        amount: `${group.items.length} item${group.items.length === 1 ? '' : 's'}`,
-      })),
+      reasonGroups.map((group) => {
+        const itemsToShow = group.items.slice(0, 8);
+        const hasMore = group.items.length > 8;
+        return {
+          severity: severityForReasonCode(group.reasonCode),
+          title: `${reasonLabel(group.reasonCode)} (${group.reasonCode})`,
+          detail: (
+            <div className="flex flex-wrap gap-1.5">
+              {itemsToShow.map((item) => (
+                <span key={item.item_code} className="inline-flex items-center gap-1.5">
+                  <span className="text-sm">{item.item_code}</span>
+                  {/* Link to the editable Item document in the desk. This screen is read-only. */}
+                  <DeskLink doctype="Item" name={item.item_code} iconOnly />
+                </span>
+              ))}
+              {hasMore && <span className="text-sm text-muted-foreground">+{group.items.length - 8} more</span>}
+            </div>
+          ),
+          amount: `${group.items.length} item${group.items.length === 1 ? '' : 's'}`,
+        };
+      }),
     [reasonGroups],
   );
 
