@@ -301,7 +301,7 @@ export const CommissionSettingsPage: React.FC = () => {
         </div>
 
         {/* Policy Card */}
-        <Card className="rounded-xl border border-border bg-card overflow-hidden shadow-xs">
+        <Card padding="none" className="rounded-xl overflow-hidden shadow-xs">
           <div className="px-6 py-4 border-b border-border">
             <h2 className="text-lg font-bold text-foreground">Commission Policy</h2>
             <p className="text-xs text-muted-foreground">Global settings for commission calculation.</p>
@@ -408,7 +408,7 @@ export const CommissionSettingsPage: React.FC = () => {
         </Card>
 
         {/* Rules Card */}
-        <Card className="rounded-xl border border-border bg-card overflow-hidden shadow-xs">
+        <Card padding="none" className="rounded-xl overflow-hidden shadow-xs">
           <div className="px-6 py-4 border-b border-border flex items-center justify-between">
             <div>
               <h2 className="text-lg font-bold text-foreground">Commission Rules</h2>

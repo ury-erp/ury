@@ -253,7 +253,7 @@ const ChatWidget = forwardRef<ChatWidgetHandle>(function ChatWidget(_props, ref)
           {/* Header — mirrors the mockup's HUF-branded "ask" chrome */}
           <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
             <div className="flex min-w-0 items-center gap-2">
-              <span className="rounded border border-[rgba(91,63,214,0.3)] bg-[rgba(91,63,214,0.06)] px-1.5 py-0.5 text-[10px] font-semibold tracking-wider text-[#5B3FD6]">
+              <span className="rounded border border-chat-accent/30 bg-chat-accent/6 px-1.5 py-0.5 text-[10px] font-semibold tracking-wider text-chat-accent">
                 HUF
               </span>
               <span className="truncate text-sm font-medium text-foreground">

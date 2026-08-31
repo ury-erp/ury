@@ -215,7 +215,7 @@ const BillMergeDialog = ({
                 'flex w-full items-center justify-between rounded-lg border p-3 text-left transition-colors',
                 isSelected
                   ? 'border-primary bg-primary-50/40'
-                  : 'border-gray-200 hover:border-gray-300'
+                  : 'border-border hover:border-border'
               )}
             >
               <div className="min-w-0">
@@ -269,7 +269,7 @@ const BillMergeDialog = ({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t('header.search_placeholder_orders')}
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
             disabled={isSubmitting}
           />
         </div>

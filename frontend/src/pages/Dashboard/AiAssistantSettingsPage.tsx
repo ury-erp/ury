@@ -238,7 +238,7 @@ export const AiAssistantSettingsPage: React.FC = () => {
     <div className="min-h-screen bg-background p-6 md:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-6 rounded-xl border border-border shadow-xs">
+        <Card padding="lg" className="flex flex-col md:flex-row md:items-center justify-between gap-4 rounded-xl shadow-xs">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-semibold shrink-0">
               <Bot className="w-6 h-6" />
@@ -250,10 +250,10 @@ export const AiAssistantSettingsPage: React.FC = () => {
               </p>
             </div>
           </div>
-        </div>
+        </Card>
 
         {/* Enable toggle */}
-        <Card className="rounded-xl border border-border bg-card overflow-hidden shadow-xs">
+        <Card padding="none" className="rounded-xl overflow-hidden shadow-xs">
           <div className="p-6">
             <div className="flex items-center justify-between p-4 bg-card rounded-xl border border-border">
               <div>
@@ -278,7 +278,7 @@ export const AiAssistantSettingsPage: React.FC = () => {
         </Card>
 
         {/* Assistant configuration */}
-        <Card className="rounded-xl border border-border bg-card overflow-hidden shadow-xs">
+        <Card padding="none" className="rounded-xl overflow-hidden shadow-xs">
           <div className="px-6 py-4 border-b border-border">
             <h2 className="text-lg font-bold text-foreground">Assistant Configuration</h2>
             <p className="text-xs text-muted-foreground">Provider, model, and response behavior for the assistant.</p>
@@ -388,7 +388,7 @@ export const AiAssistantSettingsPage: React.FC = () => {
                 </div>
 
                 {addingKey && (
-                  <div className="flex flex-col md:flex-row gap-3 md:items-end p-4 bg-card rounded-xl border border-border">
+                  <Card className="flex flex-col md:flex-row gap-3 md:items-end rounded-xl shadow-none">
                     <div className="flex-1">
                       <label className="block text-sm font-medium text-foreground mb-1.5">Provider</label>
                       <Select value={keyProvider} onValueChange={setKeyProvider}>
@@ -423,7 +423,7 @@ export const AiAssistantSettingsPage: React.FC = () => {
                         Save
                       </Button>
                     </div>
-                  </div>
+                  </Card>
                 )}
               </div>
             </div>

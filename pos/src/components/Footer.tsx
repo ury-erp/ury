@@ -33,7 +33,7 @@ const Footer = () => {
   ];
 
   return (
-    <div className="bg-white border-t border-gray-200 py-1.5 relative">
+    <div className="bg-white border-t border-border py-1.5 relative">
       <nav className="max-w-screen-xl mx-auto px-4">
         <div className="flex justify-center items-center gap-1">
           {navItems.map((item) => (

@@ -238,7 +238,7 @@ export const DayClosePage: React.FC = () => {
           <label className="text-xs text-muted-foreground">Service Date</label>
           <Input value={serviceDate} onChange={(e) => setServiceDate(e.target.value)} placeholder="YYYY-MM-DD" />
         </div>
-        <Button onClick={load}>Refresh</Button>
+        <Button onClick={load} variant="chrome">Refresh</Button>
       </div>
 
       {state === 'error' && (

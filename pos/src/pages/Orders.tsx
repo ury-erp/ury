@@ -518,7 +518,7 @@ export default function Orders() {
       </div>
 
       {/* Right Section - Order Details */}
-      <div className="w-96 bg-white border-s border-gray-200 flex flex-col h-[calc(100vh-4rem)] fixed end-0 z-10">
+      <div className="w-96 bg-white border-s border-border flex flex-col h-[calc(100vh-4rem)] fixed end-0 z-10">
         {!selectedOrder ? (
           <div className="text-center h-full flex flex-col items-center justify-center text-gray-500 p-6">
             <p className="text-lg font-medium mb-2">{t('order.select_to_view')}</p>
@@ -536,7 +536,7 @@ export default function Orders() {
         ) : (
           <>
             {/* Fixed Header */}
-            <div className="sticky top-0 start-0 end-0 z-20 border-b border-gray-200 bg-white px-6 py-4">
+            <div className="sticky top-0 start-0 end-0 z-20 border-b border-border bg-white px-6 py-4">
               <div className="flex items-center justify-between gap-2">
                 <h2 className="min-w-0 flex-1 truncate text-xl font-semibold text-gray-900">
                   {selectedOrder.name}
@@ -717,7 +717,7 @@ export default function Orders() {
             </div>
 
             {/* Sticky Bottom Section - Single Row: Print | Payment | Total */}
-            <div className="border-t border-gray-200 p-6 bg-gray-50 sticky bottom-0 start-0 end-0 z-10">
+            <div className="border-t border-border p-6 bg-gray-50 sticky bottom-0 start-0 end-0 z-10">
               <div className="flex items-center gap-3 w-full">
                 {/* Print Icon Button */}
                 <Button

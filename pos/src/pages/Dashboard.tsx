@@ -1,21 +1,15 @@
 import {
-  TrendingUp,
-  AlertTriangle,
   Bell,
   Users,
-  ShoppingCart,
-  Clock,
   LogOut,
-  Receipt,
-  CheckCircle2,
   Activity,
   Gauge,
   Sparkles,
   PackageSearch,
   ArrowRight,
 } from 'lucide-react';
-import { Card, CardContent, StatCard, cn } from '@ury/ui';
-import type { StatCardTone } from '@ury/ui';
+import { Card, CardContent, KpiStrip, AttentionFeed, cn } from '@ury/ui';
+import type { AttentionItemProps } from '@ury/ui';
 import { useState, useEffect } from 'react';
 import { usePOSStore } from '../store/pos-store';
 import { formatCurrency } from '@ury/core';
@@ -140,7 +134,7 @@ export default function Dashboard() {
   const [baseline, setBaseline] = useState<any>(null);
   const [floorLoad, setFloorLoad] = useState<any[]>([]);
   const [runningLow, setRunningLow] = useState<any[]>([]);
-  const [needsAttention, setNeedsAttention] = useState<any[]>([]);
+  const [needsAttention, setNeedsAttention] = useState<AttentionItemProps[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [openEntries, setOpenEntries] = useState<OpenPosOpeningEntry[]>([]);
   const [statsLoading, setStatsLoading] = useState(false);
@@ -174,36 +168,22 @@ export default function Dashboard() {
           branch: posProfile.branch
         });
         const statsData = statsRes.message;
-        const occupancy = statsData.total_tables
-          ? statsData.active_tables / statsData.total_tables
-          : 0;
         setStats([
           {
             label: "Today's Sales",
-            value: formatCurrency(statsData.todays_sales),
-            icon: TrendingUp,
-            tone: 'success' as StatCardTone
+            value: formatCurrency(statsData.todays_sales)
           },
           {
             label: 'Orders Today',
-            value: String(statsData.orders_today),
-            icon: ShoppingCart,
-            tone: 'primary' as StatCardTone
+            value: String(statsData.orders_today)
           },
           {
             label: 'Avg. Order Value',
-            value: formatCurrency(statsData.avg_order_value),
-            icon: Receipt,
-            tone: 'default' as StatCardTone
+            value: formatCurrency(statsData.avg_order_value)
           },
           {
             label: 'Active Tables',
-            value: `${statsData.active_tables} / ${statsData.total_tables}`,
-            icon: Users,
-            // A near-full floor is the one stat on this row that is actionable,
-            // so it earns the amber rail only when it actually matters.
-            tone: (occupancy >= 0.85 ? 'warning' : 'default') as StatCardTone,
-            hint: occupancy >= 0.85 ? 'Floor nearly full' : undefined
+            value: `${statsData.active_tables} / ${statsData.total_tables}`
           }
         ]);
       } catch (err) {
@@ -290,11 +270,9 @@ export default function Dashboard() {
         });
         const attentionData = attentionRes.message;
         if (Array.isArray(attentionData) && attentionData.length > 0) {
-          const processedAttention = attentionData.map((item, idx) => ({
-            id: idx,
-            message: item.message,
-            icon: item.severity === 'high' ? AlertTriangle : Clock,
-            severity: item.severity
+          const processedAttention: AttentionItemProps[] = attentionData.map((item) => ({
+            severity: item.severity === 'high' ? 'blocking' : 'warning',
+            title: item.message
           }));
           setNeedsAttention(processedAttention);
         } else {
@@ -370,9 +348,6 @@ export default function Dashboard() {
   }));
   const overCount = stageCounts.find((s) => s.key === 'over')?.count ?? 0;
 
-  const hasHighSeverity = needsAttention.some((item) => item.severity === 'high');
-  const attentionResolved = !needsAttentionLoading && !needsAttentionError && needsAttention.length === 0;
-
   return (
     <div className="h-full overflow-y-auto bg-gray-50">
       <div className="mx-auto max-w-screen-2xl p-6 space-y-5">
@@ -403,110 +378,26 @@ export default function Dashboard() {
             above the manual attention/stat rows below. */}
         <InsightFeed branch={posProfile?.branch} />
 
-        {/*
-          Attention comes first and full-width. The old page buried this in the
-          left column below three neutral panels, which meant the one thing a
-          cashier must act on had the same visual weight as a copy of yesterday's
-          median cover count.
-        */}
+        {/* Attention feed — uses V3 design system AttentionFeed component
+            for consistent styling and severity indicators. */}
         {needsAttentionError ? (
-          <div className="rounded-lg border border-gray-200 bg-white p-4 text-sm text-destructive">
+          <div className="rounded-lg border border-border bg-white p-4 text-sm text-destructive">
             Failed to load attention items
           </div>
-        ) : needsAttentionLoading ? null : attentionResolved ? (
-          <div className="flex items-center gap-2.5 rounded-lg border border-success-200 bg-success-50 px-4 py-2.5">
-            <CheckCircle2 className="h-4 w-4 shrink-0 text-success-600" />
-            <p className="text-sm font-medium text-success-800">All clear — nothing needs attention right now.</p>
-          </div>
-        ) : (
-          <div
-            className={cn(
-              'overflow-hidden rounded-xl border-l-4 shadow-sm',
-              hasHighSeverity
-                ? 'border-l-destructive bg-red-50 ring-1 ring-red-200'
-                : 'border-l-warning-400 bg-warning-50 ring-1 ring-warning-200'
-            )}
-          >
-            <div className="flex items-start gap-3 p-4">
-              <span
-                className={cn(
-                  'flex h-9 w-9 shrink-0 items-center justify-center rounded-full',
-                  hasHighSeverity ? 'bg-destructive text-white' : 'bg-warning-400 text-warning-foreground'
-                )}
-              >
-                <AlertTriangle className="h-5 w-5" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <h2
-                    className={cn(
-                      'text-sm font-semibold',
-                      hasHighSeverity ? 'text-red-900' : 'text-warning-900'
-                    )}
-                  >
-                    Needs Attention
-                  </h2>
-                  <span
-                    className={cn(
-                      'inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full px-1.5 text-xs font-bold tabular-nums',
-                      hasHighSeverity ? 'bg-destructive text-white' : 'bg-warning-400 text-warning-foreground'
-                    )}
-                  >
-                    {needsAttention.length}
-                  </span>
-                </div>
-                <ul className="mt-2 space-y-1.5">
-                  {needsAttention.map((item) => {
-                    const ItemIcon = item.icon;
-                    return (
-                      <li key={item.id} className="flex items-center gap-2.5">
-                        <ItemIcon
-                          className={cn(
-                            'h-4 w-4 shrink-0',
-                            item.severity === 'high' ? 'text-destructive' : 'text-warning-600'
-                          )}
-                        />
-                        <p
-                          className={cn(
-                            'text-sm',
-                            item.severity === 'high' ? 'font-medium text-red-900' : 'text-warning-900'
-                          )}
-                        >
-                          {item.message}
-                        </p>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            </div>
-          </div>
+        ) : needsAttentionLoading ? null : (
+          <AttentionFeed title="Needs Attention" items={needsAttention} />
         )}
 
         {/* Stat row */}
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {statsError ? (
-            <div className="col-span-full text-sm text-destructive">Failed to load stats</div>
-          ) : statsLoading ? (
-            Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="h-[7.5rem] animate-pulse rounded-lg border border-gray-200 bg-white" />
-            ))
-          ) : (
-            stats.map((stat, index) => {
-              const IconComponent = stat.icon;
-              return (
-                <StatCard
-                  key={index}
-                  label={stat.label}
-                  value={stat.value}
-                  tone={stat.tone}
-                  hint={stat.hint}
-                  icon={<IconComponent className="h-4 w-4" />}
-                />
-              );
-            })
-          )}
-        </div>
+        {statsError ? (
+          <div className="text-sm text-destructive">Failed to load stats</div>
+        ) : statsLoading ? (
+          <div className="h-12 animate-pulse rounded-lg border border-border bg-white" />
+        ) : (
+          <div className="border-b border-border pb-4">
+            <KpiStrip items={stats} />
+          </div>
+        )}
 
         {/* Service Line — the operational heart of the screen. */}
         <Panel
@@ -555,7 +446,7 @@ export default function Dashboard() {
               </div>
 
               {/* Bars */}
-              <div className="flex items-end gap-2 overflow-x-auto border-b border-gray-200 pb-3">
+              <div className="flex items-end gap-2 overflow-x-auto border-b border-border pb-3">
                 {serviceLine.map((table: any, idx: number) => {
                   const stage = STAGE_BY_KEY[table.stage as StageKey] ?? STAGE_BY_KEY.open;
                   const isOver = table.stage === 'over';
@@ -765,7 +656,7 @@ export default function Dashboard() {
                   )}
                   <a
                     href="/pos/open-entries"
-                    className="mt-3 flex items-center justify-center gap-1 border-t border-gray-200 pt-2.5 text-xs font-semibold text-primary hover:text-primary-600"
+                    className="mt-3 flex items-center justify-center gap-1 border-t border-border pt-2.5 text-xs font-semibold text-primary hover:text-primary-600"
                   >
                     View all
                     <ArrowRight className="h-3.5 w-3.5" />

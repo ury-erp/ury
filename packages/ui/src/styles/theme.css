@@ -115,6 +115,7 @@
     --gray-950: 240 1% 5%;
     --white: 0 0% 100%;
     --black: 0 0% 0%;
+    --chat-accent: 251 65% 54%;
     --order-panel-width: 24rem;
     --badge-min-width: 1.5rem;
     --dialog-max-width: 90rem;
@@ -256,6 +257,7 @@
     --gray-950: 240 1% 60%;
     --white: 0 0% 100%;
     --black: 0 0% 0%;
+    --chat-accent: 251 65% 54%;
     --order-panel-width: 24rem;
     --badge-min-width: 1.5rem;
     --dialog-max-width: 90rem;

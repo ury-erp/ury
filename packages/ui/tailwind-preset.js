@@ -127,6 +127,7 @@ export default {
         },
         white: "hsl(var(--white))",
         black: "hsl(var(--black))",
+        "chat-accent": "hsl(var(--chat-accent))",
       },
       fontFamily: {
         inter: ['Inter', 'sans-serif'],

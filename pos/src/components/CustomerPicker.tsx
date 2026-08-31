@@ -252,12 +252,12 @@ export function CustomerPicker({ value, onChange, disabled }: CustomerPickerProp
             onBlur={() => setTimeout(() => setIsOpen(false), 100)}
             onKeyDown={handleKeyDown}
             placeholder={t('customer.search_placeholder')}
-            className="h-10 w-full rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className="h-10 w-full rounded-lg border border-border px-4 py-2 text-sm font-medium text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
             autoComplete="off"
           />
           <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
           {isOpen && (
-            <div className="absolute z-50 mt-2 max-h-80 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+            <div className="absolute z-50 mt-2 max-h-80 w-full overflow-y-auto rounded-lg border border-border bg-white shadow-lg">
               {isSearching && (
                 <div className="flex items-center justify-center p-4 text-sm text-gray-500">
                   <Loader className="mr-2 h-4 w-4 animate-spin" /> {t('common.searching')}

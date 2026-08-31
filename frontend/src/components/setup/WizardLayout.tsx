@@ -1,5 +1,5 @@
 import { ReactNode } from 'react';
-import { Button } from '@ury/ui';
+import { Button, Card } from '@ury/ui';
 import { Check } from 'lucide-react';
 import uryLogo from '../../../Public/photo_2026-08-19_13-24-09.jpg';
 
@@ -50,7 +50,7 @@ export function WizardLayout({
 
       {/* Content */}
       <main className={`${SHELL_WIDTH} flex-1 w-full py-8`}>
-        <div className="rounded-xl border border-border bg-card p-6 md:p-8 shadow-sm">{children}</div>
+        <Card padding="none" className="rounded-xl p-6 md:p-8">{children}</Card>
       </main>
 
       {/* Footer nav bar */}

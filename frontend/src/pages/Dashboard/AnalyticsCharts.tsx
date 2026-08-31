@@ -138,7 +138,7 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ chartsData, lo
         a bar/line/pie chart — no equivalent among BarChartCard/LineChartCard/
         PieChartCard, so this section is left as its original hand-rolled markup.
       */}
-      <Card className="rounded-xl border border-border bg-card p-6 shadow-sm">
+      <Card padding="lg" className="rounded-xl">
         <CardHeader className="p-0 pb-4">
           <div className="flex items-center justify-between">
             <div>

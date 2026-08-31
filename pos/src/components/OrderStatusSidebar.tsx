@@ -24,11 +24,11 @@ const OrderStatusSidebar = ({
 
   return (
     <div className={cn(
-      "w-64 bg-white border-e border-gray-200 h-full flex flex-col",
+      "w-64 bg-white border-e border-border h-full flex flex-col",
       disabled && "opacity-50 pointer-events-none"
     )}>
       <nav className="flex-1 p-6 overflow-y-auto">
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+        <div className="bg-gray-50 border border-border rounded-lg p-4">
           {/* Section Title */}
           <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3 px-1">
             {t('orders.status_title')}

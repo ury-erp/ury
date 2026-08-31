@@ -327,7 +327,7 @@ export const SelfOrderingProfilePage: React.FC = () => {
 
         {/* Form */}
         {showForm && (
-          <Card className="rounded-xl border border-border bg-card shadow-sm">
+          <Card className="rounded-xl">
             <div className="p-6 border-b border-border flex items-center justify-between">
               <h2 className="text-lg font-bold text-foreground">
                 {editingProfile ? 'Edit Profile' : 'Create New Profile'}
@@ -732,7 +732,7 @@ export const SelfOrderingProfilePage: React.FC = () => {
 
         {/* Profiles List */}
         {!showForm && (
-          <Card className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+          <Card className="rounded-xl overflow-hidden">
             {profiles.length === 0 ? (
               <div className="p-12 text-center">
                 <Settings className="w-12 h-12 text-text-tertiary mx-auto mb-3" />

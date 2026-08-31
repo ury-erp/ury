@@ -88,8 +88,8 @@ const ServiceRequestPanel: React.FC<Props> = ({ branch }) => {
   return (
     <div className="fixed bottom-4 right-4 z-40 flex flex-col items-end gap-2">
       {isOpen && (
-        <div className="w-80 max-w-[90vw] rounded-lg border border-gray-200 bg-white shadow-lg">
-          <div className="flex items-center justify-between border-b border-gray-200 p-3">
+        <div className="w-80 max-w-[90vw] rounded-lg border border-border bg-white shadow-lg">
+          <div className="flex items-center justify-between border-b border-border p-3">
             <h2 className="text-sm font-semibold text-gray-900">Service Requests</h2>
             <button
               type="button"
@@ -161,7 +161,7 @@ const ServiceRequestPanel: React.FC<Props> = ({ branch }) => {
         aria-label="Toggle service requests"
         className={cn(
           'relative flex h-12 w-12 items-center justify-center rounded-full shadow-lg transition-colors',
-          count > 0 ? 'bg-amber-500 text-white' : 'bg-white text-gray-600 border border-gray-200'
+          count > 0 ? 'bg-amber-500 text-white' : 'bg-white text-gray-600 border border-border'
         )}
       >
         <Bell className="h-5 w-5" />

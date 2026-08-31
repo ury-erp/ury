@@ -103,7 +103,7 @@ const TableSelectionDialog: React.FC<Props> = ({ onClose }) => {
   return (
     <Dialog open onOpenChange={onClose}>
       <DialogContent className="bg-white rounded-lg w-full h-5/6 max-w-2xl mx-auto p-0 overflow-y-auto">
-        <div className="p-4 border-b border-gray-200 flex justify-between items-center">
+        <div className="p-4 border-b border-border flex justify-between items-center">
           <h2 className="text-lg font-semibold text-gray-900">{t('common.select_table_title')}</h2>
           <Button onClick={onClose} variant="ghost" size="icon">
             <X className="w-5 h-5" />
@@ -172,7 +172,7 @@ const TableSelectionDialog: React.FC<Props> = ({ onClose }) => {
                       ? 'border-primary-600 bg-primary-50'
                       : table.occupied === 1
                       ? 'border-amber-500 bg-amber-50 hover:border-amber-600 hover:bg-amber-100'
-                      : 'border-gray-200 hover:border-primary-300 hover:bg-gray-50',
+                      : 'border-border hover:border-primary-300 hover:bg-gray-50',
                     'focus-visible:ring-2 focus-visible:ring-primary-600',
                   )}
                 >
