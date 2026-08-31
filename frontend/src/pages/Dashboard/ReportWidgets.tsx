@@ -81,6 +81,7 @@ export const ReportWidgets: React.FC<ReportWidgetsProps> = ({ recentTransactions
           </div>
         ) : (
           <DataTable
+            className="rounded-none border-0"
             columns={columns}
             rows={recentTransactions}
             emptyMessage="No transactions recorded yet today."

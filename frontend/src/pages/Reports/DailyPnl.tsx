@@ -405,7 +405,7 @@ export function DailyPnl() {
                 <CardTitle className="text-base">Cost of Goods Sold</CardTitle>
               </CardHeader>
               <CardContent>
-                <DataTable columns={costOfGoodsColumns} rows={data.cost_of_goods} />
+                <DataTable className="rounded-none border-0" columns={costOfGoodsColumns} rows={data.cost_of_goods} />
               </CardContent>
             </Card>
           )}

@@ -314,6 +314,7 @@ export const ServicePage: React.FC = () => {
         <Card className="p-4" data-testid="service-departments-table">
         <h3 className="text-sm font-semibold mb-2">Departments</h3>
         <DataTable
+          className="rounded-none border-0"
           columns={departmentColumns}
           rows={departmentRows}
           emptyMessage="No department activity for today yet."
