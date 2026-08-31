@@ -29,7 +29,7 @@ const ClosingPaymentTable: React.FC<ClosingPaymentTableProps> = ({
     <div className="w-full overflow-x-auto">
       <table className="w-full border-collapse">
         <thead>
-          <tr className="border-b border-gray-300 bg-gray-50">
+          <tr className="border-b border-border bg-gray-50">
             <th className="text-left py-3 px-4 font-semibold text-gray-900">
               Payment Mode
             </th>
@@ -93,7 +93,7 @@ const ClosingPaymentTable: React.FC<ClosingPaymentTableProps> = ({
               <tr
                 key={row.mode_of_payment}
                 className={cn(
-                  'border-b border-gray-200 hover:bg-gray-50 transition-colors',
+                  'border-b border-border hover:bg-gray-50 transition-colors',
                   !isTouched && 'bg-amber-50/60'
                 )}
               >

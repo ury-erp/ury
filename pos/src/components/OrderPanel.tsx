@@ -204,8 +204,8 @@ const OrderPanel = () => {
   const isInteractionDisabled = isOrderInteractionDisabled() || isSubmitting;
 
   return (
-    <div className="w-96 bg-white border-s border-gray-200 flex flex-col h-[calc(100vh-4rem)] fixed end-0 z-10">
-      <div className="p-4 border-b border-gray-200 flex-shrink-0">
+    <div className="w-96 bg-white border-s border-border flex flex-col h-[calc(100vh-4rem)] fixed end-0 z-10">
+      <div className="p-4 border-b border-border flex-shrink-0">
         <OrderTypeSelect disabled={isInteractionDisabled} />
         <div className="mt-3"><CustomerSelect disabled={isInteractionDisabled} /></div>
         <div className="mt-3 flex items-center justify-between">
@@ -331,7 +331,7 @@ const OrderPanel = () => {
             )}
           </div>
           
-          <div className="p-4 border-t border-gray-200 flex-shrink-0 bg-white">
+          <div className="p-4 border-t border-border flex-shrink-0 bg-white">
             <div className="flex justify-between items-center mb-4">
               <div className="flex items-center gap-2">
                 <Button

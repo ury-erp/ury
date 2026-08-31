@@ -109,7 +109,7 @@ const CaptainActionsMenu = ({
       </Button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full z-50 mt-1 w-56 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+        <div className="absolute right-0 top-full z-50 mt-1 w-56 rounded-lg border border-border bg-white py-1 shadow-lg">
           {showReprintKot && (
             <Button
               variant="ghost"

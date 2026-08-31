@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
-import { StatCard, DataTable, type DataTableColumn } from '@ury/ui';
+import { StatCard, DataTable, type DataTableColumn, Input, Select } from '@ury/ui';
 import { IndianRupee, Receipt, TrendingUp, Trophy } from 'lucide-react';
 import { useBranchContext } from '../../context/BranchContext';
 import { BarChartCard } from '../../components/reports/charts/BarChartCard';
@@ -80,23 +80,23 @@ export function TimeWiseSales() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <select
+          <Select
             value={bucketSize}
             onChange={(e) => setBucketSize(Number(e.target.value))}
-            className="border border-input rounded-md px-3 py-1.5 text-sm"
+            size="sm"
           >
             {BUCKET_OPTIONS.map((b) => (
               <option key={b} value={b}>
                 {b}-hour buckets
               </option>
             ))}
-          </select>
-          <input
+          </Select>
+          <Input
             type="date"
             value={date}
             max={toApiDate(new Date())}
             onChange={(e) => setDate(e.target.value)}
-            className="border border-input rounded-md px-3 py-1.5 text-sm"
+            size="sm"
           />
         </div>
       </div>

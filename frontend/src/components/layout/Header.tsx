@@ -225,7 +225,7 @@ export const Header: React.FC = () => {
           {/* Open POS */}
           <a
             href="/pos"
-            className={buttonVariants({ variant: 'default', size: 'xs', className: 'rounded-[7px] gap-2' })}
+            className={buttonVariants({ variant: 'chrome', size: 'xs', className: 'gap-2' })}
           >
             <ExternalLink className="w-4 h-4" />
             <span>Open POS</span>

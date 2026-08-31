@@ -68,7 +68,7 @@ const MergedBillPanel = ({ order, onOpenSecondary }: MergedBillPanelProps) => {
         )}
       </div>
 
-      <div className="mb-3 flex items-center justify-between rounded-md border border-gray-200 bg-white px-3 py-2 text-sm">
+      <div className="mb-3 flex items-center justify-between rounded-md border border-border bg-white px-3 py-2 text-sm">
         <span className="font-medium text-gray-900">{secondaryName}</span>
         <span className="font-semibold text-gray-900 tabular-nums">
           {formatCurrency(Math.round(order.custom_merged_total ?? 0))}
@@ -86,7 +86,7 @@ const MergedBillPanel = ({ order, onOpenSecondary }: MergedBillPanelProps) => {
           {items.map((item) => (
             <div
               key={item.name}
-              className="flex items-center justify-between rounded-md border border-gray-200 bg-white px-3 py-2 text-sm"
+              className="flex items-center justify-between rounded-md border border-border bg-white px-3 py-2 text-sm"
             >
               <span className="truncate text-gray-900">{item.item_name}</span>
               <span className="ms-2 shrink-0 text-gray-600 tabular-nums">

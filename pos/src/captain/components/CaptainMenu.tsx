@@ -59,14 +59,14 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="sticky top-0 z-10 bg-white border-b border-gray-200 p-3 space-y-2">
+      <div className="sticky top-0 z-10 bg-white border-b border-border p-3 space-y-2">
         <div className="relative">
           <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search menu"
-            className="w-full ps-9 pe-3 py-3 rounded-lg border border-gray-200 bg-gray-50 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full ps-9 pe-3 py-3 rounded-lg border border-border bg-gray-50 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
 
@@ -77,7 +77,7 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
               'shrink-0 px-4 py-2 rounded-full text-sm font-medium border',
               selectedCategory === ''
                 ? 'bg-blue-600 text-white border-blue-600'
-                : 'bg-white text-gray-700 border-gray-200'
+                : 'bg-white text-gray-700 border-border'
             )}
           >
             All
@@ -90,7 +90,7 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
                 'shrink-0 px-4 py-2 rounded-full text-sm font-medium border',
                 selectedCategory === category.name
                   ? 'bg-blue-600 text-white border-blue-600'
-                  : 'bg-white text-gray-700 border-gray-200'
+                  : 'bg-white text-gray-700 border-border'
               )}
             >
               {category.label}

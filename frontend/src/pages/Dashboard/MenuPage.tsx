@@ -777,11 +777,11 @@ export const MenuPage: React.FC = () => {
 
       {/* Content Area */}
       {loading ? (
-        <div className="py-24 flex items-center justify-center bg-card rounded-xl border border-border shadow-sm">
+        <Card padding="none" className="py-24 flex items-center justify-center rounded-xl">
           <Spinner className="w-8 h-8 text-primary" />
-        </div>
+        </Card>
       ) : filteredItems.length === 0 ? (
-        <Card className="p-16 flex flex-col items-center justify-center text-center rounded-xl border border-border shadow-sm bg-card">
+        <Card padding="none" className="p-16 flex flex-col items-center justify-center text-center rounded-xl">
           <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-5">
             <Utensils className="w-8 h-8 text-primary" />
           </div>
@@ -843,7 +843,7 @@ export const MenuPage: React.FC = () => {
           ))}
         </div>
       ) : (
-        <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden overflow-x-auto">
+        <Card padding="none" className="rounded-xl overflow-hidden overflow-x-auto">
           <table className="w-full text-left text-sm text-muted-foreground min-w-[600px]">
             <thead className="bg-muted/50 border-b border-border text-xs uppercase text-muted-foreground font-bold tracking-wider">
               <tr>
@@ -901,7 +901,7 @@ export const MenuPage: React.FC = () => {
               ))}
             </tbody>
           </table>
-        </div>
+        </Card>
       )}
 
       {/* Add/Edit Item Drawer */}

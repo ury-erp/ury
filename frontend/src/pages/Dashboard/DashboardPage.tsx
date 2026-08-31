@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Page, Section } from '@ury/ui';
 import { useBranchContext } from '../../context/BranchContext';
 import KPIGrid from './KPIGrid';
 import AnalyticsCharts from './AnalyticsCharts';
@@ -41,16 +42,20 @@ export const DashboardPage: React.FC = () => {
   }, [activeBranchId]);
 
   return (
-    <div className="space-y-6">
+    <Page>
       {/* 1. KPI Stat Cards Grid */}
-      <KPIGrid summary={summary} loading={loading} />
+      <Section>
+        <KPIGrid summary={summary} loading={loading} />
+      </Section>
 
       {/* 2. Analytics & Distribution Charts (Commented out for now) */}
       {/* <AnalyticsCharts chartsData={chartsData} loading={loading} /> */}
 
       {/* 3. Live Recent Transactions */}
-      <ReportWidgets recentTransactions={recentTransactions} loading={loading} />
-    </div>
+      <Section>
+        <ReportWidgets recentTransactions={recentTransactions} loading={loading} />
+      </Section>
+    </Page>
   );
 };
 

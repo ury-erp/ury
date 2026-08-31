@@ -67,7 +67,7 @@ export default function FastMovingItems({ branch, windowDays = 1 }: FastMovingIt
   if (hidden) return null;
 
   return (
-    <Card className="bg-white border border-gray-200">
+    <Card className="bg-white border border-border">
       <CardContent className="p-6">
         <div className="flex items-center gap-2 mb-1">
           <Flame className="w-5 h-5 text-orange-600" />

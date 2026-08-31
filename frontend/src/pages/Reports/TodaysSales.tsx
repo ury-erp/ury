@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
-import { StatCard } from '@ury/ui';
+import { StatCard, Input } from '@ury/ui';
 import { Receipt, IndianRupee, Percent, Sigma, Equal, BadgePercent } from 'lucide-react';
 import { useBranchContext } from '../../context/BranchContext';
 import { toApiDate } from '../../lib/reportDate';
@@ -66,12 +66,12 @@ export function TodaysSales() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <input
+          <Input
             type="date"
             value={date}
             max={toApiDate(new Date())}
             onChange={(e) => setDate(e.target.value)}
-            className="border border-input rounded-md px-3 py-1.5 text-sm"
+            size="sm"
           />
           {data && (
             <span className="text-xs text-muted-foreground">

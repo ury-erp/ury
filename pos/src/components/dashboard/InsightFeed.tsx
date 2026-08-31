@@ -84,7 +84,7 @@ export default function InsightFeed({ branch }: InsightFeedProps) {
   if (hidden) return null;
 
   return (
-    <Card className="bg-white border border-gray-200">
+    <Card className="bg-white border border-border">
       <CardContent className="p-6">
         <div className="flex items-center justify-between gap-2 mb-4">
           <div className="flex items-center gap-2">

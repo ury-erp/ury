@@ -48,8 +48,6 @@ interface DailyPnlData {
   cost_of_goods?: CostOfGoodsRow[];
 }
 
-const HERO_KEYS = ['gross_sales', 'net_sales', 'gross_profit', 'net_profit'];
-
 const costOfGoodsColumns: DataTableColumn<CostOfGoodsRow>[] = [
   { key: 'item_name', header: 'Item', render: (r) => r.item_name || r.item_code },
   { key: 'item_group', header: 'Group', render: (r) => r.item_group || '—' },
@@ -100,35 +98,50 @@ function MissingPricesWarning({ sections }: { sections: MissingPriceSection[] })
   );
 }
 
-function BreakupTable({
-  title,
-  rows,
-  className,
-  twoColumn,
+/**
+ * One row of the P&L waterfall. `variant` controls visual weight:
+ * - 'line'      plain revenue/expense line item
+ * - 'nested'    a breakup child-table row, indented under its parent total
+ * - 'subtotal'  a running total (Direct Expenses / Employee Cost) — bold,
+ *               not highlighted, sits directly above its own breakup
+ * - 'highlight' a headline subtotal (Net Sales / Gross Profit / Total
+ *               Indirect Expenses / Net Profit) — bold with a tinted
+ *               background and top border, mirroring the desk print-view's
+ *               highlighted subtotal rows
+ */
+function WaterfallRow({
+  label,
+  amount,
+  percent,
+  variant = 'line',
 }: {
-  title: string;
-  rows: BreakupRow[];
-  className?: string;
-  twoColumn?: boolean;
+  label: string;
+  amount: number;
+  percent?: number;
+  variant?: 'line' | 'nested' | 'subtotal' | 'highlight';
 }) {
-  if (rows.length === 0) return null;
+  const isHighlight = variant === 'highlight';
+  const isSubtotal = variant === 'subtotal' || isHighlight;
   return (
-    <Card className={className}>
-      <CardHeader>
-        <CardTitle className="text-base">{title}</CardTitle>
-      </CardHeader>
-      <CardContent className={twoColumn ? 'grid grid-cols-1 md:grid-cols-2 gap-x-8' : 'space-y-1'}>
-        {rows.map((r, i) => (
-          <div key={i} className="flex items-center justify-between text-sm py-1 border-b last:border-0">
-            <span className="text-muted-foreground">{r.label}</span>
-            <span className="font-medium">
-              {formatCurrency(r.amount)}{' '}
-              <span className="text-xs text-muted-foreground">({Number(r.percent).toFixed(1)}%)</span>
-            </span>
-          </div>
-        ))}
-      </CardContent>
-    </Card>
+    <div
+      className={
+        'flex items-center justify-between gap-3 text-sm px-2 py-1.5 ' +
+        (variant === 'nested' ? 'pl-8 text-muted-foreground' : '') +
+        (isHighlight
+          ? ' mt-1 rounded-sm bg-muted/60 border-t border-b border-border font-semibold'
+          : ' border-b last:border-0 border-border/60')
+      }
+    >
+      <span className={isSubtotal ? 'font-semibold text-foreground' : undefined}>{label}</span>
+      <span className={isSubtotal ? 'font-semibold text-foreground' : 'font-medium'}>
+        {formatCurrency(amount)}
+        {percent !== undefined && (
+          <span className="ml-1 text-xs font-normal text-muted-foreground">
+            ({Number(percent).toFixed(1)}%)
+          </span>
+        )}
+      </span>
+    </div>
   );
 }
 
@@ -183,7 +196,6 @@ export function DailyPnl() {
   }, [fetchData]);
 
   const summaryMap = new Map((data?.summary ?? []).map((r) => [r.key, r]));
-  const rest = (data?.summary ?? []).filter((r) => !HERO_KEYS.includes(r.key));
 
   return (
     <div className="space-y-6">
@@ -299,30 +311,93 @@ export function DailyPnl() {
           <Card>
             <CardHeader>
               <CardTitle className="text-base">P&amp;L Statement</CardTitle>
+              <p className="text-xs text-muted-foreground">
+                Read top to bottom — each subtotal is a running reduction of the one above it.
+              </p>
             </CardHeader>
-            <CardContent className="space-y-1">
-              {rest.map((r) => (
-                <div key={r.key} className="flex items-center justify-between text-sm py-1.5 border-b last:border-0">
-                  <span>{r.label}</span>
-                  <span className="font-medium">
-                    {formatCurrency(r.amount)}{' '}
-                    <span className="text-xs text-muted-foreground">({Number(r.percent).toFixed(1)}%)</span>
-                  </span>
-                </div>
+            <CardContent className="space-y-0">
+              {/* Revenue → Net Sales */}
+              <WaterfallRow
+                label="Gross Sales"
+                amount={summaryMap.get('gross_sales')?.amount ?? 0}
+                percent={summaryMap.get('gross_sales')?.percent}
+              />
+              <WaterfallRow
+                label="Discounts & Round Offs"
+                amount={summaryMap.get('cash_discount_round_off')?.amount ?? 0}
+                percent={summaryMap.get('cash_discount_round_off')?.percent}
+              />
+              <WaterfallRow
+                label="Tax"
+                amount={summaryMap.get('tax')?.amount ?? 0}
+                percent={summaryMap.get('tax')?.percent}
+              />
+              <WaterfallRow
+                label="Net Sales"
+                amount={summaryMap.get('net_sales')?.amount ?? 0}
+                percent={summaryMap.get('net_sales')?.percent}
+                variant="highlight"
+              />
+
+              {/* Net Sales → Gross Profit/Loss */}
+              <WaterfallRow
+                label="Cost of Goods Sold"
+                amount={summaryMap.get('cogs')?.amount ?? 0}
+                percent={summaryMap.get('cogs')?.percent}
+              />
+              <WaterfallRow
+                label="Direct Expenses"
+                amount={summaryMap.get('total_direct_expenses')?.amount ?? 0}
+                percent={summaryMap.get('total_direct_expenses')?.percent}
+                variant="subtotal"
+              />
+              {(data.direct_expenses_breakup ?? []).map((r, i) => (
+                <WaterfallRow key={`de-${i}`} label={r.label} amount={r.amount} percent={r.percent} variant="nested" />
               ))}
+              <WaterfallRow
+                label="Gross Profit/Loss"
+                amount={summaryMap.get('gross_profit')?.amount ?? 0}
+                percent={summaryMap.get('gross_profit')?.percent}
+                variant="highlight"
+              />
+
+              {/* Gross Profit/Loss → Net Profit/Loss */}
+              <WaterfallRow
+                label="Employee Cost"
+                amount={summaryMap.get('total_employee_costs')?.amount ?? 0}
+                percent={summaryMap.get('total_employee_costs')?.percent}
+                variant="subtotal"
+              />
+              {(data.employee_costs_breakup ?? []).map((r, i) => (
+                <WaterfallRow key={`ec-${i}`} label={r.label} amount={r.amount} percent={r.percent} variant="nested" />
+              ))}
+              {(data.indirect_expenses_breakup ?? []).map((r, i) => (
+                <WaterfallRow key={`ie-${i}`} label={r.label} amount={r.amount} percent={r.percent} />
+              ))}
+              <WaterfallRow
+                label="Depreciation"
+                amount={summaryMap.get('depreciation')?.amount ?? 0}
+                percent={summaryMap.get('depreciation')?.percent}
+              />
+              <WaterfallRow
+                label="Other Expenses"
+                amount={summaryMap.get('total_other_expenses')?.amount ?? 0}
+                percent={summaryMap.get('total_other_expenses')?.percent}
+              />
+              <WaterfallRow
+                label="Total Indirect Expenses"
+                amount={summaryMap.get('total_indirect_expenses')?.amount ?? 0}
+                percent={summaryMap.get('total_indirect_expenses')?.percent}
+                variant="highlight"
+              />
+              <WaterfallRow
+                label="Net Profit/Loss"
+                amount={summaryMap.get('net_profit')?.amount ?? 0}
+                percent={summaryMap.get('net_profit')?.percent}
+                variant="highlight"
+              />
             </CardContent>
           </Card>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
-            <BreakupTable title="Direct Expenses" rows={data.direct_expenses_breakup ?? []} className="self-start" />
-            <BreakupTable title="Employee Costs" rows={data.employee_costs_breakup ?? []} className="self-start" />
-            <BreakupTable
-              title="Indirect Expenses"
-              rows={data.indirect_expenses_breakup ?? []}
-              className="lg:col-span-2"
-              twoColumn
-            />
-          </div>
 
           {data.cost_of_goods && data.cost_of_goods.length > 0 && (
             <Card>

@@ -35,7 +35,7 @@ export default function AskBar() {
       onClick={() => chatRef.current?.openAndFocus()}
       className="flex w-full max-w-md items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-left text-sm text-muted-foreground hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
-      <span className="rounded border border-[rgba(91,63,214,0.3)] bg-[rgba(91,63,214,0.06)] px-1.5 py-0.5 text-[10px] font-semibold tracking-wider text-[#5B3FD6]">
+      <span className="rounded border border-chat-accent/30 bg-chat-accent/6 px-1.5 py-0.5 text-[10px] font-semibold tracking-wider text-chat-accent">
         HUF
       </span>
       <span className="flex flex-1 items-center gap-1.5 truncate">

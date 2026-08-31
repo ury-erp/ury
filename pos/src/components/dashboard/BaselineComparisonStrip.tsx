@@ -78,7 +78,7 @@ export default function BaselineComparisonStrip({ branch }: BaselineComparisonSt
   if (hidden) return null;
 
   return (
-    <Card className="bg-white border border-gray-200">
+    <Card className="bg-white border border-border">
       <CardContent className="p-6">
         <h3 className="font-display text-lg font-semibold text-gray-900">Tonight vs a normal day</h3>
         <p className="text-xs text-gray-500 mb-4">

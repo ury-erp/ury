@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Page, Section, Panel, Spinner, Input, Button } from '@ury/ui';
+import { Page, Section, Panel, Spinner, Input, Button, Select } from '@ury/ui';
 import { call, getLoggedUser, getUserRoles } from '@ury/core';
 import { useBranchContext } from '../../context/BranchContext';
 import {
@@ -222,10 +222,9 @@ export const DepartmentProfitabilityPage: React.FC = () => {
           <label className="text-xs text-muted-foreground" htmlFor="profitability-department">
             Department (optional)
           </label>
-          <select
+          <Select
             id="profitability-department"
             aria-label="Department"
-            className="border rounded px-2 py-1 text-sm h-9"
             value={department}
             onChange={(e) => setDepartment(e.target.value)}
             data-testid="profitability-department-select"
@@ -236,9 +235,9 @@ export const DepartmentProfitabilityPage: React.FC = () => {
                 {dept.department_name}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
-        <Button onClick={load}>Refresh</Button>
+        <Button onClick={load} variant="chrome">Refresh</Button>
       </div>
 
       {state === 'error' && (

@@ -77,7 +77,7 @@ const CaptainOrderLine: React.FC<CaptainOrderLineProps> = ({
               type="button"
               onClick={onDecrement}
               disabled={disabled}
-              className="w-9 h-9 rounded-full border border-gray-300 flex items-center justify-center disabled:opacity-40"
+              className="w-9 h-9 rounded-full border border-border flex items-center justify-center disabled:opacity-40"
               aria-label="Decrease"
             >
               <Minus className="w-4 h-4" />
@@ -86,7 +86,7 @@ const CaptainOrderLine: React.FC<CaptainOrderLineProps> = ({
               type="button"
               onClick={onIncrement}
               disabled={disabled}
-              className="w-9 h-9 rounded-full border border-gray-300 flex items-center justify-center disabled:opacity-40"
+              className="w-9 h-9 rounded-full border border-border flex items-center justify-center disabled:opacity-40"
               aria-label="Increase"
             >
               <Plus className="w-4 h-4" />
@@ -99,7 +99,7 @@ const CaptainOrderLine: React.FC<CaptainOrderLineProps> = ({
             type="button"
             onClick={onDecrement}
             disabled={disabled}
-            className="w-9 h-9 rounded-full border border-gray-300 flex items-center justify-center disabled:opacity-40"
+            className="w-9 h-9 rounded-full border border-border flex items-center justify-center disabled:opacity-40"
             aria-label="Reduce quantity"
             title="Reduce quantity"
           >
@@ -125,7 +125,7 @@ const CaptainOrderLine: React.FC<CaptainOrderLineProps> = ({
             type="button"
             onClick={onRestore}
             disabled={disabled}
-            className="w-9 h-9 rounded-full border border-gray-300 flex items-center justify-center disabled:opacity-40"
+            className="w-9 h-9 rounded-full border border-border flex items-center justify-center disabled:opacity-40"
             aria-label="Undo reduction"
             title="Undo"
           >

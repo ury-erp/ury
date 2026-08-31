@@ -159,7 +159,7 @@ const TableTransferDialog = ({
                             'flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors h-auto',
                             isSelected
                               ? 'border-primary bg-primary-50/40'
-                              : 'border-gray-200 hover:border-gray-300'
+                              : 'border-border hover:border-border'
                           )}
                         >
                           <TableShapeIcon shape={table.table_shape || 'Rectangle'} />

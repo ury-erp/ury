@@ -53,7 +53,7 @@ export default function OpenEntries() {
       <div className="max-w-6xl mx-auto">
         <h1 className="text-2xl font-semibold text-gray-900 mb-6">Open Sessions</h1>
 
-        <Card className="bg-white border border-gray-200">
+        <Card className="bg-white border border-border">
           <CardContent className="p-6">
             {error ? (
               <div className="text-center py-8">
@@ -71,7 +71,7 @@ export default function OpenEntries() {
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse">
                   <thead>
-                    <tr className="border-b border-gray-200">
+                    <tr className="border-b border-border">
                       <th className="text-left px-4 py-3 font-semibold text-gray-700 text-sm">User</th>
                       <th className="text-left px-4 py-3 font-semibold text-gray-700 text-sm">Period Start Date</th>
                       <th className="text-left px-4 py-3 font-semibold text-gray-700 text-sm">POS Profile</th>

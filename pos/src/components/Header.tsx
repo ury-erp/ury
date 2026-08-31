@@ -110,7 +110,7 @@ const Header = () => {
   };
 
   return (
-    <header className="bg-white border-b border-gray-200">
+    <header className="bg-white border-b border-border">
       <div className="flex items-center justify-between h-16 px-6">
         {/* Logo */}
         <div className="flex items-center">
@@ -160,8 +160,8 @@ const Header = () => {
 
             {/* User dropdown */}
             {showUserMenu && (
-              <div className="absolute end-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
-                <div className="p-4 border-b border-gray-200">
+              <div className="absolute end-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-border z-50">
+                <div className="p-4 border-b border-border">
                   <p className="text-sm font-medium text-gray-900">{user?.full_name || 'User'}</p>
                   <p className="text-sm text-gray-500">{user?.name || ''}</p>
                 </div>

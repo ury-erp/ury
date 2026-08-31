@@ -431,7 +431,7 @@ const TableView = () => {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="p-4 bg-white border-b border-gray-200">
+      <div className="p-4 bg-white border-b border-border">
         <div className="max-w-screen-xl mx-auto">
           <div className="flex flex-col gap-3">
             <div className="flex justify-between items-start gap-4">
@@ -573,7 +573,7 @@ const TableView = () => {
       />
 
       {/* Status Legend */}
-      <div className="fixed bottom-[4.5rem] w-full p-4 bg-white border-t border-gray-200">
+      <div className="fixed bottom-[4.5rem] w-full p-4 bg-white border-t border-border">
         <div className="max-w-screen-xl mx-auto">
           <div className="flex items-center justify-center gap-6 text-sm">
             <div className="flex items-center gap-2">
