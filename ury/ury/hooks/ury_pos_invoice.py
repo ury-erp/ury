@@ -14,16 +14,49 @@ def validate(doc, method):
     validate_invoice(doc, method)
     validate_customer(doc, method)
     validate_price_list(doc, method)
+    set_commission_attribution(doc, method)
 
 
 def before_submit(doc, method):
     calculate_and_set_times(doc, method)
     validate_invoice_print(doc, method)
     ro_reload_submit(doc, method)
+    set_commission_attribution(doc, method)
 
 
 def on_trash(doc, method):
     table_status_delete(doc, method)
+
+
+def _employee_for_user(user):
+    if not user:
+        return None
+    # Prefer active employees, then oldest joiners, for deterministic selection.
+    rows = frappe.db.sql(
+        """
+        SELECT name, status
+        FROM `tabEmployee`
+        WHERE user_id = %s
+        ORDER BY CASE WHEN status = 'Active' THEN 0 ELSE 1 END,
+                 date_of_joining ASC,
+                 name ASC
+        LIMIT 1
+        """,
+        (user,),
+        as_dict=True,
+    )
+    return rows[0]["name"] if rows else None
+
+
+def set_commission_attribution(doc, method=None):
+    # Opener is sticky: never overwrite once set, so captain_transfer()
+    # reassigning `waiter` does not move historical credit.
+    if not doc.get("custom_waiter_employee"):
+        doc.custom_waiter_employee = _employee_for_user(doc.waiter)
+    doc.custom_closing_employee = _employee_for_user(doc.cashier) or doc.get("custom_closing_employee")
+    for item in doc.get("items") or []:
+        if not item.get("custom_entered_by_employee"):
+            item.custom_entered_by_employee = _employee_for_user(item.owner or frappe.session.user)
 
 
 def validate_invoice(doc, method):

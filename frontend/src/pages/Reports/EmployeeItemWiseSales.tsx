@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
-import { StatCard, DataTable, type DataTableColumn } from '@ury/ui';
-import { Package, IndianRupee, Search } from 'lucide-react';
+import { KpiStrip, type KpiItemProps, DataTable, type DataTableColumn } from '@ury/ui';
+import { Search } from 'lucide-react';
 import { useBranchContext } from '../../context/BranchContext';
 import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
 import { toApiDate } from '../../lib/reportDate';
@@ -140,18 +140,16 @@ export function EmployeeItemWiseSales() {
         <div className="text-sm text-muted-foreground">Search and select an employee to view their item breakdown.</div>
       )}
 
-      {isLoading && <div className="text-sm text-muted-foreground">Loading...</div>}
+      {isLoading && <div className="text-sm text-muted-foreground">Loading…</div>}
 
       {data && !isLoading && (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <StatCard label="Total Qty" value={data.summary.total_qty} icon={<Package className="w-4 h-4" />} />
-            <StatCard
-              label="Total Amount"
-              value={formatCurrency(data.summary.total_amount)}
-              icon={<IndianRupee className="w-4 h-4" />}
-            />
-          </div>
+          <KpiStrip
+            items={[
+              { label: 'Total Qty', value: data.summary.total_qty },
+              { label: 'Total Amount', value: formatCurrency(data.summary.total_amount) },
+            ] satisfies KpiItemProps[]}
+          />
           <DataTable columns={columns} rows={data.items} isLoading={isLoading} />
         </>
       )}

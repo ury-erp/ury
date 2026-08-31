@@ -1,0 +1,120 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "format:UIPC-{item}-{branch}",
+ "creation": "2023-10-01 00:00:00.000000",
+ "default_view": "List",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "active",
+  "item",
+  "branch",
+  "department",
+  "production_unit",
+  "production_policy",
+  "bom",
+  "controlled_by_sales_plan",
+  "allow_over_plan_sale",
+  "availability_mode",
+  "direct_retail_warehouse"
+ ],
+ "fields": [
+  {
+   "default": "1",
+   "fieldname": "active",
+   "fieldtype": "Check",
+   "label": "Active"
+  },
+  {
+   "fieldname": "item",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Item",
+   "options": "Item",
+   "reqd": 1
+  },
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Branch",
+   "options": "Branch",
+   "reqd": 1
+  },
+  {
+   "fieldname": "department",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Department",
+   "options": "URY Production Department"
+  },
+  {
+   "fieldname": "production_unit",
+   "fieldtype": "Link",
+   "label": "Production Unit",
+   "options": "URY Production Unit"
+  },
+  {
+   "fieldname": "production_policy",
+   "fieldtype": "Select",
+   "label": "Production Policy",
+   "options": "PRE_PRODUCED\nMADE_TO_ORDER\nDIRECT_RETAIL"
+  },
+  {
+   "fieldname": "bom",
+   "fieldtype": "Link",
+   "label": "BOM",
+   "options": "BOM"
+  },
+  {
+   "default": "0",
+   "fieldname": "controlled_by_sales_plan",
+   "fieldtype": "Check",
+   "label": "Controlled by Sales Plan"
+  },
+  {
+   "default": "0",
+   "fieldname": "allow_over_plan_sale",
+   "fieldtype": "Check",
+   "label": "Allow Over-Plan Sale",
+   "depends_on": "eval:doc.controlled_by_sales_plan==1"
+  },
+  {
+   "fieldname": "availability_mode",
+   "fieldtype": "Select",
+   "label": "Availability Mode",
+   "options": "Always Available\nStock Available\nPlan Available"
+  },
+  {
+   "fieldname": "direct_retail_warehouse",
+   "fieldtype": "Link",
+   "label": "Direct Retail Warehouse",
+   "options": "Warehouse"
+  }
+ ],
+ "links": [],
+ "modified": "2023-10-01 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY Item Production Configuration",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

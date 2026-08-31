@@ -2,7 +2,10 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useBranchContext } from '../../context/BranchContext';
 import { logout, call, getLoggedUser, getUserRoles } from '@ury/core';
-import uryLogo from '../../../Public/photo_2026-08-19_13-24-09.jpg';
+import { Breadcrumbs } from './Breadcrumbs';
+import uryLogo from '../../../Public/URY-bg.png';
+import { buttonVariants } from '@ury/ui';
+import AskBar from '../chat/AskBar';
 import {
   Bell,
   User,
@@ -16,7 +19,7 @@ import {
   Store,
   Building2,
   Check,
-  Monitor,
+  ExternalLink,
   RefreshCw
 } from 'lucide-react';
 
@@ -27,6 +30,16 @@ interface NotificationItem {
   timestamp: string;
   type: 'info' | 'warning' | 'success';
   read: boolean;
+}
+
+/**
+ * Frappe's Notification Log stores `email_content` as HTML (built for email
+ * rendering). Strip tags for the compact drawer preview instead of trusting
+ * dangerouslySetInnerHTML on system-generated content.
+ */
+function stripHtml(html: string): string {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  return (doc.body.textContent || '').replace(/\s+/g, ' ').trim();
 }
 
 
@@ -90,7 +103,7 @@ export const Header: React.FC = () => {
           const mapped = res.message.map((n: any) => ({
             id: n.name,
             title: n.subject || 'Notification',
-            message: n.email_content || '',
+            message: stripHtml(n.email_content || ''),
             timestamp: n.creation || '',
             type: 'info',
             read: !!n.read
@@ -128,33 +141,41 @@ export const Header: React.FC = () => {
   };
 
   return (
-    <header className="sticky top-0 z-40 w-full bg-white border-b border-gray-200 shadow-sm">
-      <div className="flex items-center justify-between h-16 px-4 md:px-6">
-        {/* Left Section: Logo & Brand */}
-        <div className="flex items-center space-x-3">
-          <Link to="/dashboard" className="flex items-center space-x-3 group">
-            <img src={uryLogo} alt="URY Logo" className="h-7 w-auto" />
+    <header className="sticky top-0 z-40 w-full bg-background border-b border-border">
+      <div className="flex items-center justify-between h-12 px-4 md:px-6">
+        {/* Left Section: Logo, Brand & Breadcrumb */}
+        <div className="flex items-center space-x-4 min-w-0">
+          <Link to="/dashboard" className="flex items-center space-x-3 group shrink-0">
+            <img src={uryLogo} alt="URY Logo" className="h-8 w-auto" />
           </Link>
+          <div className="hidden sm:block h-4 w-px bg-border shrink-0" />
+          <Breadcrumbs />
         </div>
 
         {/* Right Section: Actions, Notifications, Branch Selector, User Profile */}
         <div className="flex items-center space-x-3">
+          {/* Ask HUF bar (PLAN.md item 6) — opens the shared ChatWidget
+              pre-focused, also reachable via the global ⌘K shortcut. */}
+          <div className="hidden md:block w-56 lg:w-72">
+            <AskBar />
+          </div>
+
           {/* Branch Selector Dropdown */}
           <div className="relative" ref={branchMenuRef}>
             <button
               onClick={() => setIsBranchDropdownOpen(!isBranchDropdownOpen)}
-              className="flex items-center space-x-2 px-3 py-1.5 bg-blue-50 hover:bg-blue-100/80 border border-blue-200 rounded-md text-sm font-medium text-primary transition-colors"
+              className="flex items-center space-x-2 h-7 px-2.5 bg-muted hover:bg-muted/70 rounded-[7px] text-sm font-medium text-foreground transition-colors"
             >
-              <Building2 className="w-4 h-4 text-primary" />
+              <Building2 className="w-4 h-4 text-muted-foreground" />
               <span className="max-w-[120px] sm:max-w-[160px] truncate">
                 {activeBranchId === 'all' ? 'All Branches' : (activeBranch?.name || 'Select Branch')}
               </span>
-              <ChevronDown className={`w-4 h-4 transition-transform ${isBranchDropdownOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${isBranchDropdownOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {isBranchDropdownOpen && (
-              <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg border border-gray-200 py-1.5 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
-                <div className="px-3 py-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+              <div className="absolute right-0 mt-2 w-64 bg-card rounded-lg shadow-lg border border-border py-1.5 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="px-3 py-1.5 text-xs font-semibold text-text-tertiary uppercase tracking-wider">
                   Select Active Branch
                 </div>
 
@@ -165,8 +186,8 @@ export const Header: React.FC = () => {
                   }}
                   className={`w-full flex items-center justify-between px-3 py-2 text-sm text-left transition-colors ${
                     activeBranchId === 'all'
-                      ? 'bg-blue-50 text-primary font-semibold'
-                      : 'text-gray-700 hover:bg-gray-50'
+                      ? 'bg-primary-tint text-primary font-semibold'
+                      : 'text-foreground hover:bg-muted'
                   }`}
                 >
                   <div className="flex items-center space-x-2">
@@ -176,7 +197,7 @@ export const Header: React.FC = () => {
                   {activeBranchId === 'all' && <Check className="w-4 h-4 text-primary" />}
                 </button>
 
-                <div className="my-1 border-t border-gray-100" />
+                <div className="my-1 border-t border-border" />
 
                 {branches.map((b) => (
                   <button
@@ -187,8 +208,8 @@ export const Header: React.FC = () => {
                     }}
                     className={`w-full flex items-center justify-between px-3 py-2 text-sm text-left transition-colors ${
                       activeBranchId === b.id
-                        ? 'bg-blue-50 text-primary font-semibold'
-                        : 'text-gray-700 hover:bg-gray-50'
+                        ? 'bg-primary-tint text-primary font-semibold'
+                        : 'text-foreground hover:bg-muted'
                     }`}
                   >
                     <div className="flex items-center space-x-2 truncate">
@@ -201,15 +222,24 @@ export const Header: React.FC = () => {
             )}
           </div>
 
+          {/* Open POS */}
+          <a
+            href="/pos"
+            className={buttonVariants({ variant: 'chrome', size: 'xs', className: 'gap-2' })}
+          >
+            <ExternalLink className="w-4 h-4" />
+            <span>Open POS</span>
+          </a>
+
           {/* Notifications Bell */}
           <button
             onClick={() => setIsNotificationOpen(true)}
-            className="relative p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-colors"
+            className="relative flex items-center justify-center w-7 h-7 rounded-[7px] text-muted-foreground hover:bg-muted transition-colors"
             aria-label="Open notifications"
           >
-            <Bell className="w-5 h-5" />
+            <Bell className="w-4 h-4" />
             {unreadCount > 0 && (
-              <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-primary rounded-full ring-2 ring-white" />
+              <span className="absolute top-1 right-1 w-2 h-2 bg-primary rounded-full ring-2 ring-background" />
             )}
           </button>
 
@@ -217,40 +247,29 @@ export const Header: React.FC = () => {
           <div className="relative" ref={userMenuRef}>
             <button
               onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-              className="flex items-center gap-2 p-1 rounded-xl hover:bg-gray-100 transition-colors text-gray-600 hover:text-gray-900"
+              className="flex items-center gap-2 h-7 px-1 rounded-[7px] hover:bg-muted transition-colors text-foreground"
             >
-              <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-                <User className="w-4 h-4 text-white" />
+              <div className="w-6 h-6 bg-muted rounded-full flex items-center justify-center">
+                <User className="w-3.5 h-3.5 text-muted-foreground" />
               </div>
               <span className="text-sm font-medium">{userInfo.fullName}</span>
-              <ChevronDown className="w-4 h-4 text-gray-500" />
+              <ChevronDown className="w-4 h-4 text-muted-foreground" />
             </button>
 
             {isUserMenuOpen && (
-              <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
-                <div className="p-4 border-b border-gray-200">
-                  <p className="text-sm font-medium text-gray-900">{userInfo.fullName}</p>
-                  <p className="text-sm text-gray-500 truncate">{userInfo.email}</p>
+              <div className="absolute right-0 mt-2 w-56 bg-card rounded-lg shadow-lg border border-border z-50">
+                <div className="p-4 border-b border-border">
+                  <p className="text-sm font-medium text-foreground">{userInfo.fullName}</p>
+                  <p className="text-sm text-muted-foreground truncate">{userInfo.email}</p>
                 </div>
 
                 <div className="py-2">
                   <button
                     onClick={() => {
                       setIsUserMenuOpen(false);
-                      window.location.href = '/app';
-                    }}
-                    className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
-                  >
-                    <Monitor className="w-4 h-4" />
-                    <span>Switch To Desk</span>
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      setIsUserMenuOpen(false);
                       handleClearCache();
                     }}
-                    className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                    className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-foreground hover:bg-muted transition-colors"
                   >
                     <RefreshCw className="w-4 h-4" />
                     <span>Clear Cache</span>
@@ -258,9 +277,9 @@ export const Header: React.FC = () => {
 
                   <button
                     onClick={handleLogout}
-                    className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                    className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-destructive hover:bg-destructive-tint transition-colors"
                   >
-                    <LogOut className="w-4 h-4 text-red-500" />
+                    <LogOut className="w-4 h-4 text-destructive" />
                     <span>Logout</span>
                   </button>
                 </div>
@@ -279,12 +298,12 @@ export const Header: React.FC = () => {
           />
 
           <div className="fixed inset-y-0 right-0 pl-10 max-w-full flex">
-            <div className="w-screen max-w-md bg-white shadow-2xl flex flex-col border-l border-gray-200">
+            <div className="w-screen max-w-md bg-card shadow-2xl flex flex-col border-l border-border">
               {/* Drawer Header */}
-              <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-gray-50">
+              <div className="p-4 border-b border-border flex items-center justify-between bg-muted">
                 <div className="flex items-center space-x-2">
                   <Bell className="w-5 h-5 text-primary" />
-                  <h2 className="text-base font-semibold text-gray-900">Notifications</h2>
+                  <h2 className="text-base font-semibold text-foreground">Notifications</h2>
                   {unreadCount > 0 && (
                     <span className="px-2 py-0.5 text-xs font-bold bg-primary text-white rounded-full">
                       {unreadCount}
@@ -303,7 +322,7 @@ export const Header: React.FC = () => {
                   )}
                   <button
                     onClick={() => setIsNotificationOpen(false)}
-                    className="p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-200/50"
+                    className="p-1 rounded-lg text-text-tertiary hover:text-foreground hover:bg-muted"
                   >
                     <X className="w-5 h-5" />
                   </button>
@@ -311,9 +330,9 @@ export const Header: React.FC = () => {
               </div>
 
               {/* Drawer List */}
-              <div className="flex-1 overflow-y-auto divide-y divide-gray-100">
+              <div className="flex-1 overflow-y-auto divide-y divide-border">
                 {notifications.length === 0 ? (
-                  <div className="p-8 text-center text-gray-500">
+                  <div className="p-8 text-center text-muted-foreground">
                     No new notifications
                   </div>
                 ) : (
@@ -321,27 +340,37 @@ export const Header: React.FC = () => {
                     <div
                       key={item.id}
                       className={`p-4 transition-colors ${
-                        item.read ? 'bg-white' : 'bg-blue-50/40'
+                        item.read ? 'bg-card' : 'bg-primary-tint/40'
                       }`}
                     >
                       <div className="flex items-start space-x-3">
                         <div className="mt-0.5">
-                          {item.type === 'info' && <Info className="w-5 h-5 text-blue-500" />}
-                          {item.type === 'warning' && <AlertTriangle className="w-5 h-5 text-amber-500" />}
+                          {item.type === 'info' && <Info className="w-5 h-5 text-primary" />}
+                          {item.type === 'warning' && <AlertTriangle className="w-5 h-5 text-warning" />}
                           {item.type === 'success' && <CheckCircle2 className="w-5 h-5 text-emerald-500" />}
                         </div>
 
                         <div className="flex-1">
                           <div className="flex items-center justify-between">
-                            <p className="text-sm font-semibold text-gray-900">{item.title}</p>
-                            <span className="text-xs text-gray-400">{item.timestamp}</span>
+                            <p className="text-sm font-semibold text-foreground">{item.title}</p>
+                            <span className="text-xs text-text-tertiary">{item.timestamp}</span>
                           </div>
-                          <p className="text-xs text-gray-600 mt-1">{item.message}</p>
+                          <p className="text-xs text-muted-foreground mt-1">{item.message}</p>
                         </div>
                       </div>
                     </div>
                   ))
                 )}
+              </div>
+
+              {/* Drawer Footer */}
+              <div className="p-4 border-t border-border bg-muted text-center">
+                <button
+                  onClick={() => setIsNotificationOpen(false)}
+                  className="w-full py-2 text-sm font-medium text-muted-foreground hover:text-foreground border border-border rounded-lg bg-card hover:bg-muted transition-colors"
+                >
+                  Close
+                </button>
               </div>
             </div>
           </div>

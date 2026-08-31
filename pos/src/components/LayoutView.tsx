@@ -7,7 +7,6 @@ import { getTableOrder, POSInvoice } from '../lib/order-api';
 import { getCombinedOrderTotals } from '../lib/invoice-api';
 import { Button, Input, Select, SelectItem } from '@ury/ui';
 import { t } from '../i18n';
-import { TABLE_STATE_STYLES } from './TableCard';
 
 
 
@@ -182,7 +181,9 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
   };
 
   const getTableStatusColor = (occupied: number) => {
-    return occupied ? TABLE_STATE_STYLES.occupied : TABLE_STATE_STYLES.available;
+    return occupied
+      ? 'bg-warning-100 border-warning-300 text-warning-900 shadow-sm'
+      : 'bg-success-50 border-success-200 text-success-800 hover:shadow-md';
   };
 
   const handleMouseDown = (e: React.MouseEvent, table: typeof tablesWithPosition[0]) => {
@@ -234,9 +235,9 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
     const baseClasses = cn(
       'absolute border-2 flex items-center justify-center text-sm font-semibold cursor-pointer transition-all select-none',
       getTableStatusColor(table.occupied),
-      isEditMode && 'hover:ring-2 hover:ring-blue-400 cursor-move',
+      isEditMode && 'hover:ring-2 hover:ring-primary-400 cursor-move',
       draggedTable === table.name && 'shadow-xl scale-105 z-20',
-      selectedTable === table.name && 'ring-2 ring-blue-600 z-10'
+      selectedTable === table.name && 'ring-2 ring-primary-600 z-10'
     );
 
     const style = {
@@ -272,7 +273,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
         </div>
         {isEditMode && (
           <>
-            <div className="absolute -top-1 -right-1 bg-blue-500 text-white rounded-full p-0.5 shadow-sm">
+            <div className="absolute -top-1 -right-1 bg-primary-500 text-white rounded-full p-0.5 shadow-sm">
               <Move className="w-2 h-2" />
             </div>
           </>
@@ -328,7 +329,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
   return (
     <div className="flex flex-col h-full bg-gray-50">
       {/* Header Controls */}
-      <div className="bg-white border-b border-gray-200 p-4">
+      <div className="bg-white border-b border-border p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Button
@@ -396,7 +397,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
           >
             <RotateCcw className="w-5 h-5" />
           </Button>
-          <div className="px-2 py-1 bg-white rounded-lg shadow-lg border border-gray-200 text-xs font-medium text-gray-600">
+          <div className="px-2 py-1 bg-white rounded-lg shadow-lg border border-border text-xs font-medium text-gray-600">
             {Math.round(zoom * 100)}%
           </div>
         </div>
@@ -404,13 +405,13 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
         {/* Instructions */}
         <div className="absolute bottom-4 right-4 z-30 pointer-events-none">
           {isEditMode ? (
-            <div className="bg-blue-50/90 backdrop-blur border border-blue-200 rounded-lg p-3 text-sm text-blue-800 shadow-lg">
+            <div className="bg-primary-50/90 backdrop-blur border border-primary-200 rounded-lg p-3 text-sm text-primary-800 shadow-lg">
               <div className="font-medium mb-1">{t('tables.editing_layout_hint_title')}</div>
               <div>{t('tables.drag_tables_hint')}</div>
               <div>{t('tables.autosave_hint')}</div>
             </div>
           ) : (
-            <div className="bg-white/80 backdrop-blur border border-gray-200 rounded-lg p-2 text-xs text-gray-500 shadow-sm">
+            <div className="bg-white/80 backdrop-blur border border-border rounded-lg p-2 text-xs text-gray-500 shadow-sm">
               {t('tables.zoom_pan_hint')}
             </div>
           )}
@@ -448,7 +449,7 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
 
       {/* Table Properties Panel */}
       {selectedTable && selectedTableData && (
-        <div className={cn("absolute bottom-0 top-36 bg-white rounded-t-lg shadow-xl border-t border-l border-gray-200 p-4 w-full max-w-xs z-40 max-h-[72vh] overflow-y-auto", isRTL ? "left-0 border-r" : "right-0")}>
+        <div className={cn("absolute bottom-0 top-36 bg-white rounded-t-lg shadow-xl border-t border-l border-border p-4 w-full max-w-xs z-40 max-h-[72vh] overflow-y-auto", isRTL ? "left-0 border-r" : "right-0")}>
           <div className="flex justify-between items-center mb-3">
             <h4 className="font-semibold text-gray-900">
               {isEditMode ? t('tables.edit_settings') : t('tables.table_info')}
@@ -503,13 +504,13 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
 
             <div>
               <label className="block text-sm font-medium mb-1">{t('tables.status')}</label>
-              <div className="w-full px-3 py-2 border border-gray-200 bg-gray-50 rounded-md text-sm cursor-not-allowed capitalize">
+              <div className="w-full px-3 py-2 border border-border bg-gray-50 rounded-md text-sm cursor-not-allowed capitalize">
                 {selectedTableData.occupied ? t('tables.occupied') : t('tables.available')}
               </div>
             </div>
 
             {/* Position Information */}
-            <div className="pt-3 border-t border-gray-200">
+            <div className="pt-3 border-t border-border">
               <label className="block text-sm font-medium mb-2">{t('tables.position')}</label>
               <div className={cn("grid grid-cols-2 gap-2 text-sm", isRTL && "flex-row-reverse")}>
                 <div>
@@ -540,17 +541,17 @@ const LayoutView: React.FC<Props> = ({ selectedRoom, tables, onBackToGrid, onRef
 
             {/* Show current bill info if table is occupied */}
             {selectedTableData.latest_invoice_time && (
-              <div className="pt-3 border-t border-gray-200">
+              <div className="pt-3 border-t border-border">
                 <label className="block text-sm font-medium mb-2">{t('tables.current_bill')}</label>
-                <div className="bg-blue-50 p-3 rounded-md text-sm">
+                <div className="bg-primary-50 p-3 rounded-md text-sm">
                   <div className="flex justify-between mb-1">
                     <span>{t('tables.started_at')}</span>
                     <span>{formatInvoiceTime(selectedTableData.latest_invoice_time)}</span>
                   </div>
                   {selectedTableOrder && (
-                    <div className="flex justify-between items-center pt-2 mt-2 border-t border-blue-200">
+                    <div className="flex justify-between items-center pt-2 mt-2 border-t border-primary-200">
                       <span>{t('tables.total_amount')}</span>
-                      <span className="font-bold text-lg text-blue-800">
+                      <span className="font-bold text-lg text-primary-800">
                         {getCombinedOrderTotals(selectedTableOrder).roundedTotal.toFixed(2)}
                       </span>
                     </div>

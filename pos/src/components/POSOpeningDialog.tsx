@@ -54,7 +54,10 @@ const POSOpeningDialog = ({
   onCloseNow,
 }: POSOpeningDialogProps) => {
   const handleSwitchToDesk = () => {
-    window.open(`${window.location.origin}/app`, '_blank');
+    // Opens in a new tab, so the POS tab itself is still there to come back
+    // to -- but the desk tab still gets a "Back to POS" chip via the return
+    // context, since users routinely lose track of which tab is which.
+    window.open(`${window.location.origin}${withReturnContext('/app')}`, '_blank');
   };
 
   const stateConfig: Record<OpeningBlockingState, StateConfig> = {
@@ -156,7 +159,7 @@ const POSOpeningDialog = ({
               <Button
                 onClick={handleSwitchToDesk}
                 variant="outline"
-                className="w-full border-gray-300 text-gray-700 hover:bg-gray-50 font-medium py-3 px-6 rounded-lg transition-colors duration-200"
+                className="w-full border-border text-gray-700 hover:bg-gray-50 font-medium py-3 px-6 rounded-lg transition-colors duration-200"
               >
                 <Monitor className="w-5 h-5 mr-2" />
                 {t('pos.switch_to_desk')}

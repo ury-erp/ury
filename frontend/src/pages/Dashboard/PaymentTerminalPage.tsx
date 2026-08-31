@@ -1,0 +1,320 @@
+import React, { useEffect, useState } from 'react';
+import { Page, Section, Panel, Badge, Spinner, DataTable, type DataTableColumn } from '@ury/ui';
+import {
+  paymentTerminalService,
+  PaymentTerminal,
+  PaymentTerminalTransaction,
+} from '../../services/paymentTerminal';
+
+const PROVIDERS = ['Simulated', 'Ingenico', 'PAX', 'Verifone', 'Other'];
+
+const formatDateTime = (value?: string) => {
+  if (!value) return '';
+  const d = new Date(value);
+  return d.toLocaleString();
+};
+
+const formatCurrency = (value?: number) => {
+  if (value === undefined) return '';
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+  }).format(value);
+};
+
+const getStatusBadgeVariant = (status: string) => {
+  switch (status) {
+    case 'Idle':
+      return 'tagSuccess' as const;
+    case 'Busy':
+      return 'tagWarning' as const;
+    case 'Offline':
+      return 'tagDestructive' as const;
+    default:
+      return 'cancelled' as const;
+  }
+};
+
+const getTransactionStatusBadgeVariant = (status: string) => {
+  switch (status) {
+    case 'Success':
+      return 'tagSuccess' as const;
+    case 'Failed':
+      return 'tagDestructive' as const;
+    case 'Pending':
+      return 'tagWarning' as const;
+    default:
+      return 'cancelled' as const;
+  }
+};
+
+const PaymentTerminalContent: React.FC = () => {
+  const [terminals, setTerminals] = useState<PaymentTerminal[]>([]);
+  const [transactions, setTransactions] = useState<PaymentTerminalTransaction[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [transactionLoading, setTransactionLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [createLoading, setCreateLoading] = useState(false);
+
+  const [formData, setFormData] = useState({
+    terminal_id: '',
+    device: '',
+    provider: 'Simulated',
+  });
+
+  const loadTerminals = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await paymentTerminalService.listTerminals();
+      setTerminals(data);
+    } catch (err) {
+      setTerminals([]);
+      setError('Unable to load payment terminals.');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadTransactions = async () => {
+    setTransactionLoading(true);
+    try {
+      const data = await paymentTerminalService.listTerminalTransactions();
+      setTransactions(data);
+    } catch (err) {
+      setTransactions([]);
+      console.error(err);
+    } finally {
+      setTransactionLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadTerminals();
+    loadTransactions();
+  }, []);
+
+  const handleCreateTerminal = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!formData.terminal_id) {
+      setCreateError('Terminal ID is required');
+      return;
+    }
+
+    setCreateLoading(true);
+    setCreateError(null);
+
+    try {
+      await paymentTerminalService.createTerminal({
+        terminal_id: formData.terminal_id,
+        device: formData.device || undefined,
+        provider: formData.provider,
+      });
+
+      setFormData({
+        terminal_id: '',
+        device: '',
+        provider: 'Simulated',
+      });
+
+      await loadTerminals();
+    } catch (err: any) {
+      setCreateError(err.message || 'Failed to create terminal');
+      console.error(err);
+    } finally {
+      setCreateLoading(false);
+    }
+  };
+
+  return (
+    <Page>
+      <div>
+        <h1 className="text-xl font-semibold text-foreground">Payment Terminals</h1>
+        <p className="mt-1 text-sm text-text-tertiary">
+          Register and manage payment terminal devices. Monitor terminal status and view transaction history.
+        </p>
+      </div>
+
+      <Section>
+        <div>
+          <h2 className="text-lg font-semibold text-foreground mb-4">Register New Terminal</h2>
+          <Panel pad>
+          <form onSubmit={handleCreateTerminal} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="flex flex-col">
+                <label className="text-sm font-medium text-muted-foreground mb-1">
+                  Terminal ID <span className="text-destructive">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.terminal_id}
+                  onChange={(e) =>
+                    setFormData({ ...formData, terminal_id: e.target.value })
+                  }
+                  placeholder="e.g., TERM-001"
+                  className="rounded-md border border-border px-3 py-2 text-sm text-foreground placeholder-text-tertiary focus:border-primary focus:outline-none"
+                  disabled={createLoading}
+                />
+              </div>
+
+              <div className="flex flex-col">
+                <label className="text-sm font-medium text-muted-foreground mb-1">
+                  Device
+                </label>
+                <input
+                  type="text"
+                  value={formData.device}
+                  onChange={(e) =>
+                    setFormData({ ...formData, device: e.target.value })
+                  }
+                  placeholder="e.g., Ingenico iCT2X0"
+                  className="rounded-md border border-border px-3 py-2 text-sm text-foreground placeholder-text-tertiary focus:border-primary focus:outline-none"
+                  disabled={createLoading}
+                />
+              </div>
+
+              <div className="flex flex-col">
+                <label className="text-sm font-medium text-muted-foreground mb-1">
+                  Provider
+                </label>
+                <select
+                  value={formData.provider}
+                  onChange={(e) =>
+                    setFormData({ ...formData, provider: e.target.value })
+                  }
+                  className="rounded-md border border-border px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
+                  disabled={createLoading}
+                >
+                  {PROVIDERS.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-end">
+                <button
+                  type="submit"
+                  disabled={createLoading}
+                  className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {createLoading ? 'Creating...' : 'Register Terminal'}
+                </button>
+              </div>
+            </div>
+
+            {createError && (
+              <div className="text-sm text-destructive bg-destructive-tint rounded-md p-3">
+                {createError}
+              </div>
+            )}
+          </form>
+          </Panel>
+        </div>
+      </Section>
+
+      <Section>
+        <div>
+          <h2 className="text-lg font-semibold text-foreground mb-4">Registered Terminals</h2>
+          {loading ? (
+            <div className="flex items-center justify-center rounded-lg border border-border bg-card py-16">
+              <Spinner className="h-8 w-8 text-primary" />
+            </div>
+          ) : error ? (
+            <Panel className="border-destructive-tint-border bg-destructive-tint text-sm text-destructive" pad>
+              {error}
+            </Panel>
+          ) : terminals.length === 0 ? (
+            <Panel pad>
+              <div className="text-center text-sm text-text-tertiary">
+                No payment terminals registered yet. Create one using the form above.
+              </div>
+            </Panel>
+          ) : (
+          <>
+            {(() => {
+              const terminalColumns: DataTableColumn<PaymentTerminal>[] = [
+                { key: 'terminal_id', header: 'Terminal ID' },
+                { key: 'device', header: 'Device', render: (terminal) => terminal.device || '-' },
+                { key: 'provider', header: 'Provider', render: (terminal) => terminal.provider || '-' },
+                {
+                  key: 'status',
+                  header: 'Status',
+                  render: (terminal) => (
+                    <Badge size="tag" variant={getStatusBadgeVariant(terminal.status || 'Idle')}>
+                      {terminal.status || 'Idle'}
+                    </Badge>
+                  ),
+                },
+                {
+                  key: 'last_seen',
+                  header: 'Last Seen',
+                  render: (terminal) => formatDateTime(terminal.last_seen),
+                },
+              ];
+              return <DataTable columns={terminalColumns} rows={terminals} emptyMessage="No terminals found." />;
+            })()}
+          </>
+        )}
+        </div>
+      </Section>
+
+      <Section>
+        <div>
+          <h2 className="text-lg font-semibold text-foreground mb-4">Transaction Log</h2>
+          {transactionLoading ? (
+            <div className="flex items-center justify-center rounded-lg border border-border bg-card py-16">
+              <Spinner className="h-8 w-8 text-primary" />
+            </div>
+          ) : transactions.length === 0 ? (
+            <Panel pad>
+              <div className="text-center text-sm text-text-tertiary">
+                No transactions recorded yet.
+              </div>
+            </Panel>
+          ) : (
+          <>
+            {(() => {
+              const transactionColumns: DataTableColumn<PaymentTerminalTransaction>[] = [
+                { key: 'terminal', header: 'Terminal', render: (tx) => <span className="font-mono text-xs">{tx.terminal || '-'}</span> },
+                { key: 'invoice', header: 'Invoice', render: (tx) => <span className="font-mono text-xs">{tx.invoice || '-'}</span> },
+                {
+                  key: 'amount',
+                  header: 'Amount',
+                  align: 'right',
+                  render: (tx) => formatCurrency(tx.amount),
+                },
+                {
+                  key: 'status',
+                  header: 'Status',
+                  render: (tx) => (
+                    <Badge size="tag" variant={getTransactionStatusBadgeVariant(tx.status || 'Pending')}>
+                      {tx.status || 'Pending'}
+                    </Badge>
+                  ),
+                },
+                {
+                  key: 'created_at',
+                  header: 'Created',
+                  render: (tx) => <span className="text-xs">{formatDateTime(tx.created_at)}</span>,
+                },
+              ];
+              return <DataTable columns={transactionColumns} rows={transactions} emptyMessage="No transactions found." />;
+            })()}
+          </>
+        )}
+        </div>
+      </Section>
+    </Page>
+  );
+};
+
+export const PaymentTerminalPage: React.FC = () => (
+  <PaymentTerminalContent />
+);
+
+export default PaymentTerminalPage;

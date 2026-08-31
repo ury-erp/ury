@@ -1,0 +1,52 @@
+{
+ "actions": [],
+ "creation": "2026-08-28 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "pos_stock_authority_v2",
+  "pos_stock_authority_v2_help"
+ ],
+ "fields": [
+  {
+   "default": "0",
+   "description": "V3-73 kill switch for routing POS Invoice stock authority through the new fulfilment services (V3-71/V3-72) instead of ERPNext's native update_stock=1 posting. MUST stay unchecked (0/False) in every real deployment until the evidence bar in V3-70-fulfilment-accounting-transition-checklist.md Section 6 is met and a human has explicitly signed off per Section 7. Toggling this on is a deliberate, out-of-band admin action only — it is never set by any code path in this app.",
+   "fieldname": "pos_stock_authority_v2",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "POS Stock Authority V2 Enabled"
+  },
+  {
+   "fieldname": "pos_stock_authority_v2_help",
+   "fieldtype": "HTML",
+   "label": "Warning",
+   "options": "<div class=\"text-muted\">This flag routes real POS invoices away from ERPNext's native stock posting into the new (not yet fully integration-tested) fulfilment services. Leave OFF unless you have explicitly been told to enable it as part of a signed-off rollout. See V3-70-fulfilment-accounting-transition-checklist.md.</div>"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-08-28 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY Feature Flags",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

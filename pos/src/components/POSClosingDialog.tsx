@@ -472,7 +472,7 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
           stranded if they can't complete the checklist right now.
         */}
         <div className="fixed inset-x-0 bottom-6 z-[60] flex justify-center px-4">
-          <div className="flex flex-wrap items-center justify-center gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-xl">
+          <div className="flex flex-wrap items-center justify-center gap-3 rounded-lg border border-border bg-white px-4 py-3 shadow-xl">
             <p className="text-sm text-gray-700">{t('pos_closing.checklist_skip_hint')}</p>
             <Button variant="outline" size="sm" onClick={handleSkipClosingChecklist}>
               {t('pos_closing.checklist_skip')}
@@ -506,23 +506,23 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
           ) : (
             <>
               <div className="mb-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
-                <div className="rounded-lg border border-gray-200 p-3">
+                <div className="rounded-lg border border-border p-3">
                   <p className="text-xs text-gray-500">{t('pos_closing.grand_total')}</p>
                   <p className="text-lg font-semibold text-gray-900">
                     {formatCurrency(totals.grandTotal)}
                   </p>
                 </div>
-                <div className="rounded-lg border border-gray-200 p-3">
+                <div className="rounded-lg border border-border p-3">
                   <p className="text-xs text-gray-500">{t('pos_closing.net_total')}</p>
                   <p className="text-lg font-semibold text-gray-900">
                     {formatCurrency(totals.netTotal)}
                   </p>
                 </div>
-                <div className="rounded-lg border border-gray-200 p-3">
+                <div className="rounded-lg border border-border p-3">
                   <p className="text-xs text-gray-500">{t('pos_closing.total_qty')}</p>
                   <p className="text-lg font-semibold text-gray-900">{totals.totalQty}</p>
                 </div>
-                <div className="rounded-lg border border-gray-200 p-3">
+                <div className="rounded-lg border border-border p-3">
                   <p className="text-xs text-gray-500">{t('pos_closing.total_invoices')}</p>
                   <p className="text-lg font-semibold text-gray-900">{invoiceCount}</p>
                 </div>

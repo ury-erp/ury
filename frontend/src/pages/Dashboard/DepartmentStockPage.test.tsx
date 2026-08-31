@@ -1,0 +1,231 @@
+import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import DepartmentStockPage from './DepartmentStockPage';
+import { departmentStockService } from '../../services/departmentStock';
+
+vi.mock('../../context/BranchContext', () => ({
+  useBranchContext: () => ({
+    activeBranchId: 'Kozhikode',
+    branches: [{ id: 'Kozhikode', name: 'Kozhikode', department: 'Indian' }],
+  }),
+}));
+
+vi.mock('../../services/departmentStock', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../services/departmentStock')>();
+  return {
+    ...actual,
+    departmentStockService: {
+      listDepartments: vi.fn().mockResolvedValue([
+        { name: 'Indian', department_name: 'Indian' },
+      ]),
+      listIssueAuthorizations: vi.fn(),
+      listStockMovements: vi.fn(),
+      listWastage: vi.fn(),
+      captureWastage: vi.fn(),
+      approveWastage: vi.fn(),
+      rejectWastage: vi.fn(),
+      createIssueAuthorization: vi.fn(),
+    },
+  };
+});
+
+const mockGetLoggedUser = vi.fn();
+const mockGetUserRoles = vi.fn();
+
+vi.mock('@ury/core', async (importOriginal) => {
+  const actual = await importOriginal<any>();
+  return {
+    ...actual,
+    getLoggedUser: (...args: unknown[]) => mockGetLoggedUser(...args),
+    getUserRoles: (...args: unknown[]) => mockGetUserRoles(...args),
+  };
+});
+
+const authorizationRows = [
+  {
+    name: 'IA-0001',
+    plan: 'PLAN-0001',
+    department: 'Indian',
+    component_item: 'RAW-CHICKEN',
+    component_item_name: 'Chicken (Raw)',
+    branch: 'Kozhikode',
+    status: 'Authorized',
+    required_qty: 100,
+    authorized_qty: 60,
+    remaining_after_qty: 40,
+    stock_uom: 'Kg',
+  },
+];
+
+const movementRows = [
+  {
+    name: 'SM-0001',
+    issue_authorization: 'IA-0001',
+    movement_type: 'Transfer' as const,
+    department: 'Indian',
+    component_item: 'RAW-CHICKEN',
+    branch: 'Kozhikode',
+    qty: 30,
+    stock_uom: 'Kg',
+    from_location: 'Central Store',
+    to_location: 'Indian',
+    posting_datetime: '2026-08-28 10:00:00',
+  },
+];
+
+const wastageRows = [
+  {
+    name: 'IW-0001',
+    component_item: 'RAW-CHICKEN',
+    wasted_qty: 5,
+    status: 'Draft',
+    department: 'Indian',
+    branch: 'Kozhikode',
+  },
+];
+
+const grantAccess = (roles: string[] = ['Production Manager']) => {
+  mockGetLoggedUser.mockResolvedValue('manager@ury.test');
+  mockGetUserRoles.mockResolvedValue({ roles, full_name: 'Test Manager' });
+};
+
+describe('DepartmentStockPage', () => {
+  beforeEach(() => {
+    cleanup();
+    vi.mocked(departmentStockService.listIssueAuthorizations).mockResolvedValue(authorizationRows as any);
+    vi.mocked(departmentStockService.listStockMovements).mockResolvedValue(movementRows as any);
+    vi.mocked(departmentStockService.listWastage).mockResolvedValue(wastageRows as any);
+    mockGetLoggedUser.mockReset();
+    mockGetUserRoles.mockReset();
+  });
+
+  it('denies access for a role outside the allowed set', async () => {
+    mockGetLoggedUser.mockResolvedValue('cashier@ury.test');
+    mockGetUserRoles.mockResolvedValue({ roles: ['URY Cashier'], full_name: 'Cashier' });
+
+    render(<DepartmentStockPage />);
+
+    expect(await screen.findByTestId('department-stock-access-denied')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Department')).not.toBeInTheDocument();
+  });
+
+  it('shows a loading state while the role check resolves', async () => {
+    let resolveRoles: (value: { roles: string[]; full_name: string }) => void = () => {};
+    mockGetLoggedUser.mockResolvedValue('manager@ury.test');
+    mockGetUserRoles.mockReturnValue(
+      new Promise((resolve) => {
+        resolveRoles = resolve;
+      }),
+    );
+
+    render(<DepartmentStockPage />);
+
+    expect(screen.getByTestId('department-stock-role-loading')).toBeInTheDocument();
+
+    resolveRoles({ roles: ['System Manager'], full_name: 'Sys Manager' });
+    await waitFor(() => expect(screen.queryByTestId('department-stock-role-loading')).not.toBeInTheDocument());
+  });
+
+  it('renders a populated table of issue authorizations and stock movements once a department is chosen', async () => {
+    grantAccess();
+    render(<DepartmentStockPage />);
+
+    await screen.findByRole('option', { name: 'Indian' });
+    await userEvent.selectOptions(screen.getByLabelText('Department'), 'Indian');
+
+    expect(await screen.findByText('PLAN-0001')).toBeInTheDocument();
+    expect(screen.getByText('Chicken (Raw)')).toBeInTheDocument();
+    // Match only the <span> that carries the qty text, not its ancestor <td>
+    // (which shares the same textContent since the span is its only child).
+    expect(screen.getByText((_, el) => el?.tagName === 'SPAN' && el.textContent === '40 Kg')).toBeInTheDocument();
+    expect(screen.getByText('Transfer')).toBeInTheDocument();
+    expect(screen.getByText((_, el) => el?.tagName === 'SPAN' && el.textContent === '30 Kg')).toBeInTheDocument();
+  });
+
+  it('shows empty states when no data is returned for the selected department', async () => {
+    grantAccess();
+    vi.mocked(departmentStockService.listIssueAuthorizations).mockResolvedValue([]);
+    vi.mocked(departmentStockService.listStockMovements).mockResolvedValue([]);
+    vi.mocked(departmentStockService.listWastage).mockResolvedValue([]);
+
+    render(<DepartmentStockPage />);
+
+    await screen.findByRole('option', { name: 'Indian' });
+    await userEvent.selectOptions(screen.getByLabelText('Department'), 'Indian');
+
+    expect(
+      await screen.findByText('No issue authorizations found for this department and date range.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('No transfers, receipts, or returns found for this department and date range.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('No wastage records found for this department and date range.'),
+    ).toBeInTheDocument();
+  });
+
+  it('shows capture wastage and request authorization controls for a Production Manager', async () => {
+    grantAccess(['Production Manager']);
+    render(<DepartmentStockPage />);
+
+    await screen.findByRole('option', { name: 'Indian' });
+    await userEvent.selectOptions(screen.getByLabelText('Department'), 'Indian');
+    await screen.findByText('PLAN-0001');
+
+    expect(screen.getByRole('button', { name: 'Request Authorization' })).toBeInTheDocument();
+
+    // Capture Wastage is a per-row action rendered in the authorization's
+    // detail drawer footer, so the drawer must be opened first.
+    await userEvent.click(screen.getByText('PLAN-0001'));
+    expect(await screen.findByRole('button', { name: 'Capture Wastage' })).toBeInTheDocument();
+    // Production Manager is not in APPROVE_ROLES, so no approve/reject controls.
+    expect(screen.queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Reject' })).not.toBeInTheDocument();
+  });
+
+  it('shows approve/reject controls for a Stock Manager and calls the service on click', async () => {
+    grantAccess(['Stock Manager']);
+    vi.mocked(departmentStockService.approveWastage).mockResolvedValue(wastageRows[0] as any);
+    render(<DepartmentStockPage />);
+
+    await screen.findByRole('option', { name: 'Indian' });
+    await userEvent.selectOptions(screen.getByLabelText('Department'), 'Indian');
+
+    // Approve/Reject are per-row actions rendered in the wastage entry's
+    // detail drawer footer, so the drawer must be opened first by clicking
+    // the row.
+    // Both the wastage row and the stock movement row show component
+    // 'RAW-CHICKEN', so click via the wastage-only 'Draft' status badge to
+    // unambiguously target the wastage row.
+    await userEvent.click(await screen.findByText('Draft'));
+    const approveButton = await screen.findByRole('button', { name: 'Approve' });
+    await userEvent.click(approveButton);
+    // Clicking Approve moves the footer into a confirm step.
+    await userEvent.click(await screen.findByRole('button', { name: 'Confirm' }));
+
+    await waitFor(() => expect(departmentStockService.approveWastage).toHaveBeenCalledWith('IW-0001'));
+  });
+
+  it('submits a capture wastage form calling captureWastage with the expected params', async () => {
+    grantAccess(['Production Manager']);
+    vi.mocked(departmentStockService.captureWastage).mockResolvedValue({} as any);
+    render(<DepartmentStockPage />);
+
+    await screen.findByRole('option', { name: 'Indian' });
+    await userEvent.selectOptions(screen.getByLabelText('Department'), 'Indian');
+    // Capture Wastage is a per-row action rendered in the authorization's
+    // detail drawer footer, so the drawer must be opened first.
+    await userEvent.click(await screen.findByText('PLAN-0001'));
+    await userEvent.click(await screen.findByRole('button', { name: 'Capture Wastage' }));
+
+    await userEvent.type(screen.getByLabelText('Wasted quantity'), '2');
+    await userEvent.click(screen.getByRole('button', { name: 'Submit Wastage' }));
+
+    await waitFor(() =>
+      expect(departmentStockService.captureWastage).toHaveBeenCalledWith(
+        expect.objectContaining({ issue_authorization: 'IA-0001', wasted_qty: 2 }),
+      ),
+    );
+  });
+});

@@ -5,11 +5,13 @@ import {
   createPaymentRequest,
   getCurrentOrder,
   getMenu,
+  getStatus,
   getStoredContext,
   requestBill,
   type CustomerOrder,
   type MenuItem,
   type OrderingContext,
+  type OrderStatus,
   type PaymentRequestResult,
 } from '../lib/api'
 
@@ -19,7 +21,31 @@ import {
 const SESSION_KEY = 'ury_order_session'
 const CONTEXT_KEY = 'ury_order_context'
 
-type Cart = Record<string, { item: MenuItem; qty: number }>
+// `comment`/`variant`/`addons` extend the original `{item, qty}` shape so a
+// cart line can carry the per-item note the backend already accepts
+// (`add_customer_items`'s `items[].comment`, see api.ts's `addItems`) plus
+// the variant/add-on selections a Phase 1 product-detail screen will let
+// customers pick. Only `comment` has a server-side field today — `variant`/
+// `addons` are carried for display/UI purposes in this cart model and are
+// NOT sent to `add_customer_items` (which has no such params); see
+// self_ordering.py's `add_customer_items` docstring for the exact payload
+// shape it accepts.
+export interface CartEntry {
+  item: MenuItem
+  qty: number
+  comment?: string
+  variant?: string
+  addons?: string[]
+}
+
+type Cart = Record<string, CartEntry>
+
+// Screen state machine shared by all 4 layout shells (Mobile/Tablet/
+// Landscape Kiosk/Portrait Kiosk) instead of a router — deliberate per the
+// plan: react-router-dom is present in package.json but unused, and a
+// single hook composed by every layout is simpler than a router shared
+// across layout shells that each render a completely different chrome.
+export type Screen = 'menu' | 'detail' | 'cart' | 'checkout' | 'status'
 
 function useQueryToken(): string | null {
   const params = new URLSearchParams(window.location.search)
@@ -43,6 +69,7 @@ export function useOrderingSession(initialContext?: OrderingContext) {
   const [context, setContext] = useState<OrderingContext | null>(null)
   const [menu, setMenu] = useState<MenuItem[]>([])
   const [order, setOrder] = useState<CustomerOrder | null>(null)
+  const [orderStatus, setOrderStatus] = useState<OrderStatus | null>(null)
   const [cart, setCart] = useState<Cart>({})
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -50,6 +77,11 @@ export function useOrderingSession(initialContext?: OrderingContext) {
   const [billRequested, setBillRequested] = useState(false)
   const [paymentRequest, setPaymentRequest] = useState<PaymentRequestResult | null>(null)
   const [payingOnline, setPayingOnline] = useState(false)
+  const [screen, setScreen] = useState<Screen>('menu')
+  // The item a `detail` screen should render for — set by goToDetail,
+  // cleared whenever navigation leaves `detail` so a stale item never
+  // lingers into the next detail visit.
+  const [detailItemCode, setDetailItemCode] = useState<string | null>(null)
 
   const loadOrder = useCallback(async (session: string) => {
     const current = await getCurrentOrder(session)
@@ -120,6 +152,7 @@ export function useOrderingSession(initialContext?: OrderingContext) {
     sessionStorage.removeItem(CONTEXT_KEY)
     setCart({})
     setOrder(null)
+    setOrderStatus(null)
     setBillRequested(false)
     setPaymentRequest(null)
     setPayingOnline(false)
@@ -127,14 +160,66 @@ export function useOrderingSession(initialContext?: OrderingContext) {
     setError(null)
     setContext(null)
     setMenu([])
+    setScreen('menu')
+    setDetailItemCode(null)
     init()
   }, [init])
 
-  function addToCart(item: MenuItem) {
+  function addToCart(
+    item: MenuItem,
+    options?: { comment?: string; variant?: string; addons?: string[] },
+  ) {
     setCart((prev) => {
       const existing = prev[item.item]
-      return { ...prev, [item.item]: { item, qty: (existing?.qty ?? 0) + 1 } }
+      return {
+        ...prev,
+        [item.item]: {
+          item,
+          qty: (existing?.qty ?? 0) + 1,
+          comment: options?.comment ?? existing?.comment,
+          variant: options?.variant ?? existing?.variant,
+          addons: options?.addons ?? existing?.addons,
+        },
+      }
     })
+  }
+
+  // --- screen navigation -----------------------------------------------
+  function goToMenu() {
+    setDetailItemCode(null)
+    setScreen('menu')
+  }
+
+  function goToDetail(itemCode: string) {
+    setDetailItemCode(itemCode)
+    setScreen('detail')
+  }
+
+  function goToCart() {
+    setScreen('cart')
+  }
+
+  function goToCheckout() {
+    setScreen('checkout')
+  }
+
+  // Order status (session_status/invoice/billed/submitted/open_requests) is
+  // fetched from the real `get_order_status` endpoint rather than derived
+  // from `CustomerOrder` — `open_requests` (service requests) has no
+  // equivalent on `CustomerOrder` and can't be reconstructed client-side.
+  const loadStatus = useCallback(async () => {
+    if (!context) return
+    try {
+      const latest = await getStatus(context.session)
+      setOrderStatus(latest)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not load order status.')
+    }
+  }, [context])
+
+  function goToStatus() {
+    setScreen('status')
+    loadStatus()
   }
 
   function decrementCart(itemCode: string) {
@@ -154,17 +239,30 @@ export function useOrderingSession(initialContext?: OrderingContext) {
   const cartCount = cartItems.reduce((sum, entry) => sum + entry.qty, 0)
   const cartTotal = cartItems.reduce((sum, entry) => sum + entry.qty * entry.item.rate, 0)
 
-  async function submitCart() {
-    if (!context || cartItems.length === 0) return
+  // Returns whether the order actually reached the backend, so callers can
+  // gate post-submit navigation (e.g. to the status screen) on real success
+  // instead of on the promise merely settling — this function intentionally
+  // never rethrows (errors are surfaced via `error` state for the checkout
+  // screen to render inline), so a caller doing `submitCart().then(...)`
+  // without checking this return value would navigate to "Order confirmed"
+  // even when submission failed.
+  async function submitCart(): Promise<boolean> {
+    if (!context || cartItems.length === 0) return false
     setSubmitting(true)
     setError(null)
     try {
-      const payload = cartItems.map((entry) => ({ item: entry.item.item, qty: entry.qty }))
+      const payload = cartItems.map((entry) => ({
+        item: entry.item.item,
+        qty: entry.qty,
+        comment: entry.comment,
+      }))
       const updated = await addItems(context.session, payload)
       setOrder(updated)
       setCart({})
+      return true
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not place the order. Please try again.')
+      return false
     } finally {
       setSubmitting(false)
     }
@@ -203,6 +301,7 @@ export function useOrderingSession(initialContext?: OrderingContext) {
     context,
     menu,
     order,
+    orderStatus,
     cart,
     loading,
     submitting,
@@ -219,5 +318,14 @@ export function useOrderingSession(initialContext?: OrderingContext) {
     cartItems,
     cartCount,
     cartTotal,
+    // Screen state machine
+    screen,
+    setScreen,
+    detailItemCode,
+    goToMenu,
+    goToDetail,
+    goToCart,
+    goToCheckout,
+    goToStatus,
   }
 }

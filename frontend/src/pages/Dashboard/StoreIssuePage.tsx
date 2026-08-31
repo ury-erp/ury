@@ -1,0 +1,313 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { Badge, Card, DataTable, KpiStrip, Page, Section, Spinner, numericCellClass } from '@ury/ui';
+import type { DataTableColumn } from '@ury/ui';
+import { useBranchContext } from '../../context/BranchContext';
+import { DeskLink } from '../../components/DeskLink';
+import {
+  departmentStockService,
+  DepartmentOption,
+  IssueAuthorizationRow,
+} from '../../services/departmentStock';
+
+const getDefaultFromDate = () => {
+  const d = new Date();
+  d.setDate(d.getDate() - 7);
+  return d.toISOString().slice(0, 10);
+};
+
+const getToday = () => new Date().toISOString().slice(0, 10);
+
+const formatQty = (value: number) => (Number.isInteger(value) ? String(value) : value.toFixed(2));
+
+/**
+ * A row is "fully issued" once nothing remains against its authorized
+ * quantity. `remaining_after_qty` is the backend's own running entitlement
+ * balance, so this reuses it rather than re-deriving issue state.
+ */
+const isFullyIssued = (row: IssueAuthorizationRow) => row.remaining_after_qty <= 0;
+
+/**
+ * `IssueAuthorizationRow` has no separate "issued qty" field -- only
+ * `authorized_qty` (what was authorized) and `remaining_after_qty` (what's
+ * still left to draw). "Issued so far" is the difference between the two,
+ * computed here rather than fabricated as a distinct backend field.
+ */
+const issuedQty = (row: IssueAuthorizationRow) =>
+  Math.max(0, row.authorized_qty - row.remaining_after_qty);
+
+const statusBadgeVariant = (status: string): 'success' | 'warning' | 'pending' | 'cancelled' => {
+  const normalized = status.toLowerCase();
+  if (normalized === 'authorized') return 'success';
+  if (normalized === 'cancelled' || normalized === 'rejected') return 'cancelled';
+  if (normalized === 'draft' || normalized === 'pending') return 'pending';
+  return 'warning';
+};
+
+const StoreIssueContent: React.FC = () => {
+  const { activeBranchId } = useBranchContext();
+  const [fromDate, setFromDate] = useState(getDefaultFromDate);
+  const [toDate, setToDate] = useState(getToday);
+  const [departmentOptions, setDepartmentOptions] = useState<DepartmentOption[]>([]);
+  const [rows, setRows] = useState<IssueAuthorizationRow[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!activeBranchId || activeBranchId === 'all') {
+      setDepartmentOptions([]);
+      return;
+    }
+    departmentStockService
+      .listDepartments(activeBranchId)
+      .then((options) => {
+        if (!cancelled) setDepartmentOptions(options);
+      })
+      .catch(() => {
+        if (!cancelled) setDepartmentOptions([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeBranchId]);
+
+  useEffect(() => {
+    if (!activeBranchId || activeBranchId === 'all' || departmentOptions.length === 0) {
+      setRows([]);
+      return;
+    }
+
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+
+    (async () => {
+      try {
+        const perDepartment = await Promise.all(
+          departmentOptions.map((option) =>
+            departmentStockService.listIssueAuthorizations({
+              branch: activeBranchId,
+              department: option.name,
+              from_date: fromDate,
+              to_date: toDate,
+            })
+          )
+        );
+        if (cancelled) return;
+        setRows(perDepartment.flat());
+      } catch {
+        if (!cancelled) {
+          setRows([]);
+          setError('Unable to load store issue data.');
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeBranchId, departmentOptions, fromDate, toDate]);
+
+  const kpiItems = useMemo(() => {
+    const fullyIssuedCount = rows.filter(isFullyIssued).length;
+    const departmentsWithRows = new Set(rows.map((row) => row.department));
+    return [
+      { label: 'Lines Authorised', value: rows.length },
+      { label: 'Fully Issued', value: fullyIssuedCount },
+      { label: 'Departments Covered', value: departmentsWithRows.size },
+    ];
+  }, [rows]);
+
+  const departmentChips = useMemo(() => {
+    const byDepartment = new Map<string, { name: string; total: number; issued: number }>();
+    rows.forEach((row) => {
+      const label =
+        departmentOptions.find((option) => option.name === row.department)?.department_name ||
+        row.department;
+      const existing = byDepartment.get(row.department) || { name: label, total: 0, issued: 0 };
+      existing.total += 1;
+      if (isFullyIssued(row)) existing.issued += 1;
+      byDepartment.set(row.department, existing);
+    });
+    return Array.from(byDepartment.entries()).map(([department, summary]) => ({ department, ...summary }));
+  }, [rows, departmentOptions]);
+
+  const columns: DataTableColumn<IssueAuthorizationRow>[] = [
+    {
+      key: 'component_item',
+      header: 'Material',
+      render: (row) => (
+        <span className="inline-flex items-center gap-1.5">
+          <span className="font-medium text-foreground">{row.component_item_name || row.component_item}</span>
+          {/* Open in desk points at the editable URY Issue Authorization document since this screen is read-only */}
+          <DeskLink doctype="URY Issue Authorization" name={row.name} iconOnly />
+        </span>
+      ),
+    },
+    {
+      key: 'department',
+      header: 'Department',
+      render: (row) =>
+        departmentOptions.find((option) => option.name === row.department)?.department_name || row.department,
+    },
+    {
+      key: 'authorized_qty',
+      header: 'Authorised Qty',
+      align: 'right',
+      render: (row) => (
+        <span className={numericCellClass}>
+          {formatQty(row.authorized_qty)} {row.stock_uom}
+        </span>
+      ),
+    },
+    {
+      key: 'issued_qty',
+      header: 'Issued Qty',
+      align: 'right',
+      render: (row) => (
+        <span className={numericCellClass}>
+          {formatQty(issuedQty(row))} {row.stock_uom}
+        </span>
+      ),
+    },
+    {
+      key: 'balance',
+      header: 'Balance',
+      align: 'right',
+      render: (row) => (
+        <span className={numericCellClass}>
+          {formatQty(row.remaining_after_qty)} {row.stock_uom}
+        </span>
+      ),
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      render: (row) => <Badge variant={statusBadgeVariant(row.status)}>{row.status}</Badge>,
+    },
+    {
+      key: 'view',
+      header: '',
+      render: (row) => (
+        <Link
+          to="/department-stock"
+          className="text-xs font-semibold text-primary hover:underline"
+          title={`Open ${row.department} in Department Stock`}
+        >
+          View
+        </Link>
+      ),
+    },
+  ];
+
+  return (
+    <Page>
+      <div className="-mx-page-x -mt-page-top border-b border-border px-page-x pb-4 pt-page-top">
+        <h1 className="text-xl font-semibold text-foreground">Store Issue</h1>
+        <p className="mt-1 text-sm text-text-tertiary">
+          Read-only view of issue authorizations across every department for this branch and date range.
+        </p>
+
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+          <label className="flex flex-col text-xs font-medium text-muted-foreground">
+            From
+            <input
+              aria-label="From date"
+              type="date"
+              value={fromDate}
+              onChange={(event) => setFromDate(event.target.value)}
+              className="mt-1 rounded-md border border-border px-2 py-1.5 text-sm text-foreground"
+            />
+          </label>
+          <label className="flex flex-col text-xs font-medium text-muted-foreground">
+            To
+            <input
+              aria-label="To date"
+              type="date"
+              value={toDate}
+              onChange={(event) => setToDate(event.target.value)}
+              className="mt-1 rounded-md border border-border px-2 py-1.5 text-sm text-foreground"
+            />
+          </label>
+        </div>
+      </div>
+
+      {!activeBranchId || activeBranchId === 'all' ? (
+        <Section>
+          <Card className="p-10 text-center text-sm text-text-tertiary">Select a branch to view store issue data.</Card>
+        </Section>
+      ) : error ? (
+        <Section>
+          <Card className="border-destructive-tint-border bg-destructive-tint p-6 text-sm text-destructive">{error}</Card>
+        </Section>
+      ) : (
+        <Section>
+          <KpiStrip items={kpiItems} />
+
+          {departmentChips.length > 0 && (
+            <div data-testid="store-issue-department-chips">
+              <div className="mb-1.5 text-[10.5px] font-medium uppercase tracking-wide text-muted-foreground">
+                Issued by department
+              </div>
+              {/*
+                One pill per department carrying the whole sentence
+                ("Dept: 1/3 issued") stops being scannable past a handful of
+                departments — it reads as a wall of pill text with no
+                hierarchy. This mirrors the `.kv` pattern instead (label
+                left, value right, hairline rule) laid out as a fixed-column
+                grid, so the department names align in a column and the
+                counts align in their own: at 3 departments it is a short
+                list, at 15 it is still a scannable ledger rather than an
+                ever-growing wrap. The count keeps its own tinted chip, so
+                fully-issued vs outstanding stays readable at a glance
+                without tinting the whole row.
+              */}
+              <div className="grid grid-cols-1 gap-x-6 sm:grid-cols-2 xl:grid-cols-3">
+                {departmentChips.map((chip) => {
+                  const complete = chip.issued === chip.total;
+                  return (
+                    <div
+                      key={chip.department}
+                      className="flex items-center justify-between gap-3 border-b border-border py-1.5 text-[12.5px]"
+                    >
+                      <span className="min-w-0 truncate text-muted-foreground" title={chip.name}>
+                        {chip.name}
+                      </span>
+                      <Badge
+                        size="tag"
+                        variant={complete ? 'tagSuccess' : 'tagWarning'}
+                        className="tabular-nums"
+                        aria-label={`${chip.name}: ${chip.issued} of ${chip.total} issued`}
+                      >
+                        {chip.issued}/{chip.total}
+                      </Badge>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {loading ? (
+            <div className="flex items-center justify-center rounded-lg border border-border bg-card py-16">
+              <Spinner className="h-8 w-8 text-primary" />
+            </div>
+          ) : (
+            <DataTable
+              columns={columns}
+              rows={rows}
+              emptyMessage="No issue authorizations found for this branch and date range."
+            />
+          )}
+        </Section>
+      )}
+    </Page>
+  );
+};
+
+export const StoreIssuePage: React.FC = () => <StoreIssueContent />;
+
+export default StoreIssuePage;

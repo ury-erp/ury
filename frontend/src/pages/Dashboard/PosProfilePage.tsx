@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
 import { Printer, Shield, Settings2, Plus, X, ArrowLeft, Edit2, Eye, Layers, Save } from 'lucide-react';
-import { Card, Button, Badge, Input, Spinner, showToast } from '@ury/ui';
+import { Card, Button, Badge, Input, Spinner, showToast, DataTable, type DataTableColumn } from '@ury/ui';
 import { Switch } from '../../components/ui/switch';
 import { call } from '@ury/core';
 import SideDrawer from '../../components/layout/SideDrawer';
@@ -327,21 +327,21 @@ export const PosProfilePage: React.FC = () => {
     return (
       <div className="space-y-6">
         {/* Navigation & Action Header */}
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-4 border-b border-gray-200">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-4 border-b border-border">
           <div className="flex items-center gap-3">
             <Button
               variant="outline"
               size="sm"
               onClick={() => setSelectedProfile(null)}
-              className="text-gray-700 hover:text-primary flex items-center gap-1.5 shadow-2xs"
+              className="text-foreground hover:text-primary flex items-center gap-1.5 shadow-2xs"
             >
               <ArrowLeft className="w-4 h-4" />
               <span>Back</span>
             </Button>
-            <div className="h-5 w-px bg-gray-200" />
+            <div className="h-5 w-px bg-muted" />
             <div>
-              <h2 className="text-lg font-bold text-gray-900">POS Profile: {selectedProfile.name}</h2>
-              <p className="text-xs text-gray-500">
+              <h2 className="text-lg font-bold text-foreground">POS Profile: {selectedProfile.name}</h2>
+              <p className="text-xs text-muted-foreground">
                 Company: {selectedProfile.company || 'URY Restaurant'} &bull; Branch: {selectedProfile.branch || 'Main Branch'}
               </p>
             </div>
@@ -369,11 +369,11 @@ export const PosProfilePage: React.FC = () => {
         </div>
 
         {/* Detail Tabs */}
-        <div className="flex items-center gap-1 p-1 bg-gray-100 rounded-lg w-fit">
+        <div className="flex items-center gap-1 p-1 bg-muted rounded-lg w-fit">
           <button
             onClick={() => setActiveDetailTab('details')}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
-              activeDetailTab === 'details' ? 'bg-white text-primary shadow-xs font-bold' : 'text-gray-600 hover:bg-gray-200/60'
+              activeDetailTab === 'details' ? 'bg-card text-primary shadow-xs font-bold' : 'text-muted-foreground hover:bg-muted'
             }`}
           >
             <Settings2 className="w-4 h-4" />
@@ -382,7 +382,7 @@ export const PosProfilePage: React.FC = () => {
           <button
             onClick={() => setActiveDetailTab('print_settings')}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
-              activeDetailTab === 'print_settings' ? 'bg-white text-primary shadow-xs font-bold' : 'text-gray-600 hover:bg-gray-200/60'
+              activeDetailTab === 'print_settings' ? 'bg-card text-primary shadow-xs font-bold' : 'text-muted-foreground hover:bg-muted'
             }`}
           >
             <Printer className="w-4 h-4" />
@@ -391,7 +391,7 @@ export const PosProfilePage: React.FC = () => {
           <button
             onClick={() => setActiveDetailTab('users_payments')}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
-              activeDetailTab === 'users_payments' ? 'bg-white text-primary shadow-xs font-bold' : 'text-gray-600 hover:bg-gray-200/60'
+              activeDetailTab === 'users_payments' ? 'bg-card text-primary shadow-xs font-bold' : 'text-muted-foreground hover:bg-muted'
             }`}
           >
             <Shield className="w-4 h-4" />
@@ -400,18 +400,18 @@ export const PosProfilePage: React.FC = () => {
         </div>
 
         {/* Tab Contents */}
-        <Card className="p-6 bg-white border border-gray-200 rounded-lg shadow-xs">
+        <Card className="p-6 bg-card border border-border rounded-lg shadow-xs">
           <form onSubmit={handleSaveProfile} className="space-y-6 text-sm">
             {/* DETAILS TAB */}
             {activeDetailTab === 'details' && (
               <div className="space-y-6">
                 <div>
-                  <h4 className="font-bold text-gray-700 text-xs uppercase tracking-wider mb-3 pb-2 border-b border-gray-100">
+                  <h4 className="font-bold text-foreground text-xs uppercase tracking-wider mb-3 pb-2 border-b border-border">
                     General Settings
                   </h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
-                      <label className="block font-semibold text-gray-700 mb-1.5">Company</label>
+                      <label className="block font-semibold text-foreground mb-1.5">Company</label>
                       <SearchableSelect
                         id="profile_company"
                         disabled={!isEditMode}
@@ -425,7 +425,7 @@ export const PosProfilePage: React.FC = () => {
                       />
                     </div>
                     <div>
-                      <label className="block font-semibold text-gray-700 mb-1.5">Warehouse</label>
+                      <label className="block font-semibold text-foreground mb-1.5">Warehouse</label>
                       <SearchableSelect
                         id="profile_warehouse"
                         disabled={!isEditMode}
@@ -441,7 +441,7 @@ export const PosProfilePage: React.FC = () => {
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block font-semibold text-gray-700 mb-1.5">Price List</label>
+                      <label className="block font-semibold text-foreground mb-1.5">Price List</label>
                       <Input
                         disabled={!isEditMode}
                         value={profileForm.selling_price_list || ''}
@@ -450,7 +450,7 @@ export const PosProfilePage: React.FC = () => {
                       />
                     </div>
                     <div>
-                      <label className="block font-semibold text-gray-700 mb-1.5">Print Format</label>
+                      <label className="block font-semibold text-foreground mb-1.5">Print Format</label>
                       <Input
                         disabled={!isEditMode}
                         value={profileForm.print_format || ''}
@@ -462,7 +462,7 @@ export const PosProfilePage: React.FC = () => {
                 </div>
 
                 <div>
-                  <h4 className="font-bold text-gray-700 text-xs uppercase tracking-wider mb-3 pb-2 border-b border-gray-100">
+                  <h4 className="font-bold text-foreground text-xs uppercase tracking-wider mb-3 pb-2 border-b border-border">
                     Feature Toggles
                   </h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -474,26 +474,26 @@ export const PosProfilePage: React.FC = () => {
                       { key: 'custom_edit_order_type', label: 'Enable Order Type Edit' },
                       { key: 'custom_reset_order_number_daily', label: 'Reset Order Number Daily' },
                     ].map(({ key, label }) => (
-                      <div key={key} className="flex items-center gap-2 p-3 rounded-lg border border-gray-100 bg-gray-50/50">
+                      <div key={key} className="flex items-center gap-2 p-3 rounded-lg border border-border bg-muted/50">
                         <Switch
                           id={key}
                           disabled={!isEditMode}
                           checked={!!profileForm[key]}
                           onCheckedChange={(checked) => setProfileForm(p => ({ ...p, [key]: checked ? 1 : 0 }))}
                         />
-                        <label htmlFor={key} className="font-medium text-gray-700 cursor-pointer text-xs">{label}</label>
+                        <label htmlFor={key} className="font-medium text-foreground cursor-pointer text-xs">{label}</label>
                       </div>
                     ))}
                   </div>
                 </div>
 
                 <div>
-                  <h4 className="font-bold text-gray-700 text-xs uppercase tracking-wider mb-3 pb-2 border-b border-gray-100">
+                  <h4 className="font-bold text-foreground text-xs uppercase tracking-wider mb-3 pb-2 border-b border-border">
                     Numeric Settings
                   </h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block font-semibold text-gray-700 mb-1.5">Show Limited Paid Invoices (Number)</label>
+                      <label className="block font-semibold text-foreground mb-1.5">Show Limited Paid Invoices (Number)</label>
                       <Input
                         type="number"
                         disabled={!isEditMode}
@@ -503,7 +503,7 @@ export const PosProfilePage: React.FC = () => {
                       />
                     </div>
                     <div>
-                      <label className="block font-semibold text-gray-700 mb-1.5">Table Attention Time (minutes)</label>
+                      <label className="block font-semibold text-foreground mb-1.5">Table Attention Time (minutes)</label>
                       <Input
                         type="number"
                         disabled={!isEditMode}
@@ -521,12 +521,12 @@ export const PosProfilePage: React.FC = () => {
             {activeDetailTab === 'print_settings' && (
               <div className="space-y-6">
                 <div>
-                  <h4 className="font-bold text-gray-700 text-xs uppercase tracking-wider mb-3 pb-2 border-b border-gray-100">
+                  <h4 className="font-bold text-foreground text-xs uppercase tracking-wider mb-3 pb-2 border-b border-border">
                     Printer & QZ Configuration
                   </h4>
                   <div className="space-y-4">
                     <div>
-                      <label className="block font-semibold text-gray-700 mb-1.5">Default Print Format</label>
+                      <label className="block font-semibold text-foreground mb-1.5">Default Print Format</label>
                       <Input
                         disabled={!isEditMode}
                         value={profileForm.print_format || ''}
@@ -535,9 +535,9 @@ export const PosProfilePage: React.FC = () => {
                       />
                     </div>
 
-                    <div className="p-4 rounded-lg bg-gray-50 border border-gray-200 text-xs space-y-3">
+                    <div className="p-4 rounded-lg bg-muted border border-border text-xs space-y-3">
                       <div className="flex items-center justify-between">
-                        <span className="font-bold text-gray-900 flex items-center gap-1.5">
+                        <span className="font-bold text-foreground flex items-center gap-1.5">
                           <Printer className="w-4 h-4 text-primary" />
                           QZ Tray Hardware Printing & KOT Routing
                         </span>
@@ -545,7 +545,7 @@ export const PosProfilePage: React.FC = () => {
                           Direct Thermal Ready
                         </Badge>
                       </div>
-                      <p className="text-gray-600">
+                      <p className="text-muted-foreground">
                         Bill printer and KOT kitchen printer configuration are loaded automatically from POS Profile events and URY Printer Mappings.
                       </p>
                     </div>
@@ -559,7 +559,7 @@ export const PosProfilePage: React.FC = () => {
               <div className="space-y-6">
                 {/* Applicable For Users */}
                 <div>
-                  <h4 className="font-bold text-gray-700 text-xs uppercase tracking-wider mb-3 pb-2 border-b border-gray-100">
+                  <h4 className="font-bold text-foreground text-xs uppercase tracking-wider mb-3 pb-2 border-b border-border">
                     Applicable For Users
                   </h4>
                   <div className="space-y-2 mb-3">
@@ -582,7 +582,7 @@ export const PosProfilePage: React.FC = () => {
                             placeholder="Select User"
                           />
                         </div>
-                        <div className="flex items-center gap-1.5 text-xs text-gray-600">
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                           <Switch
                             disabled={!isEditMode}
                             checked={row.default === 1}
@@ -595,7 +595,7 @@ export const PosProfilePage: React.FC = () => {
                           <span>Default</span>
                         </div>
                         {isEditMode && (
-                          <button type="button" className="text-gray-400 hover:text-red-500 p-1" onClick={() => {
+                          <button type="button" className="text-muted-foreground hover:text-red-500 p-1" onClick={() => {
                             const newRows = (profileForm.applicable_for_users || []).filter((_: any, i: number) => i !== idx);
                             setProfileForm({...profileForm, applicable_for_users: newRows});
                           }}>
@@ -621,7 +621,7 @@ export const PosProfilePage: React.FC = () => {
 
                 {/* Mode of Payment */}
                 <div>
-                  <h4 className="font-bold text-gray-700 text-xs uppercase tracking-wider mb-3 pb-2 border-b border-gray-100">
+                  <h4 className="font-bold text-foreground text-xs uppercase tracking-wider mb-3 pb-2 border-b border-border">
                     Mode of Payment
                   </h4>
                   <div className="space-y-2 mb-3">
@@ -644,7 +644,7 @@ export const PosProfilePage: React.FC = () => {
                             placeholder="Select Payment Mode"
                           />
                         </div>
-                        <div className="flex items-center gap-1.5 text-xs text-gray-600">
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                           <Switch
                             disabled={!isEditMode}
                             checked={row.default === 1}
@@ -657,7 +657,7 @@ export const PosProfilePage: React.FC = () => {
                           <span>Default</span>
                         </div>
                         {isEditMode && (
-                          <button type="button" className="text-gray-400 hover:text-red-500 p-1" onClick={() => {
+                          <button type="button" className="text-muted-foreground hover:text-red-500 p-1" onClick={() => {
                             const newRows = (profileForm.payments || []).filter((_: any, i: number) => i !== idx);
                             setProfileForm({...profileForm, payments: newRows});
                           }}>
@@ -692,7 +692,7 @@ export const PosProfilePage: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Toolbar */}
-      <div className="flex flex-col md:flex-row items-center justify-end gap-4 pb-3 border-b border-gray-200 -mx-6 px-6 -mt-6 pt-6">
+      <div className="flex flex-col md:flex-row items-center justify-end gap-4 pb-3 border-b border-border -mx-6 px-6 -mt-6 pt-6">
         <Button
           onClick={openAddDrawer}
           className="bg-primary hover:bg-primary/90 text-white font-semibold flex items-center space-x-1.5 shadow-xs"
@@ -704,16 +704,16 @@ export const PosProfilePage: React.FC = () => {
 
       {/* Profiles List View */}
       {loading ? (
-        <div className="py-16 flex items-center justify-center bg-white rounded-lg border border-gray-200">
+        <div className="py-16 flex items-center justify-center bg-card rounded-lg border border-border">
           <Spinner className="w-8 h-8 text-primary" />
         </div>
       ) : profiles.length === 0 ? (
-        <Card className="p-12 flex flex-col items-center justify-center text-center rounded-lg border border-gray-200 shadow-sm bg-white">
+        <Card className="p-12 flex flex-col items-center justify-center text-center rounded-lg border border-border shadow-sm bg-card">
           <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
             <Layers className="w-6 h-6 text-primary" />
           </div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-1">No POS Profiles Configured</h3>
-          <p className="text-gray-500 mb-6 max-w-sm">
+          <h3 className="text-lg font-semibold text-foreground mb-1">No POS Profiles Configured</h3>
+          <p className="text-muted-foreground mb-6 max-w-sm">
             Create a POS Profile to manage billing terminals and cashier permissions.
           </p>
           <Button
@@ -725,58 +725,56 @@ export const PosProfilePage: React.FC = () => {
           </Button>
         </Card>
       ) : (
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-          <table className="w-full text-left text-sm text-gray-600">
-            <thead className="bg-gray-50 border-b border-gray-100 text-xs uppercase text-gray-500 font-semibold">
-              <tr>
-                <th className="px-6 py-4">POS Profile</th>
-                <th className="px-6 py-4">Warehouse</th>
-                <th className="px-6 py-4">Price List</th>
-                <th className="px-6 py-4">Activation Status</th>
-                <th className="px-6 py-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {profiles.map((p) => (
-                <tr
-                  key={p.name}
-                  className="hover:bg-gray-50/50 transition-colors"
-                >
-                  <td className="px-6 py-4 font-semibold text-gray-900">{p.name}</td>
-                  <td className="px-6 py-4 text-gray-600">{p.warehouse || p.company || '-'}</td>
-                  <td className="px-6 py-4 text-gray-600">{p.selling_price_list || 'Standard Selling'}</td>
-                  <td className="px-6 py-4">
-                    <Badge variant={!p.disabled ? "success" : "outline"} size="sm">
-                      {!p.disabled ? 'Active' : 'Inactive'}
-                    </Badge>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleProfileView(p)}
-                        className="text-gray-500 hover:text-primary p-1.5 h-8 w-8"
-                        title="View Profile"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleProfileEdit(p)}
-                        className="text-gray-500 hover:text-primary p-1.5 h-8 w-8"
-                        title="Edit Profile"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <>
+          {profiles.length > 0 && (
+            <>
+              {(() => {
+                const columns: DataTableColumn<PosProfileRecord>[] = [
+                  { key: 'name', header: 'POS Profile', render: (row) => <span className="font-semibold">{row.name}</span> },
+                  { key: 'warehouse', header: 'Warehouse', render: (row) => row.warehouse || row.company || '-' },
+                  { key: 'selling_price_list', header: 'Price List', render: (row) => row.selling_price_list || 'Standard Selling' },
+                  {
+                    key: 'disabled',
+                    header: 'Activation Status',
+                    render: (row) => (
+                      <Badge variant={!row.disabled ? "success" : "outline"} size="sm">
+                        {!row.disabled ? 'Active' : 'Inactive'}
+                      </Badge>
+                    )
+                  },
+                  {
+                    key: 'actions',
+                    header: 'Actions',
+                    align: 'right',
+                    render: (row) => (
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleProfileView(row)}
+                          className="text-muted-foreground hover:text-primary p-1.5 h-8 w-8"
+                          title="View Profile"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleProfileEdit(row)}
+                          className="text-muted-foreground hover:text-primary p-1.5 h-8 w-8"
+                          title="Edit Profile"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    )
+                  },
+                ];
+                return <DataTable columns={columns} rows={profiles} />;
+              })()}
+            </>
+          )}
+        </>
       )}
 
       {/* Add POS Profile Drawer */}
@@ -787,12 +785,12 @@ export const PosProfilePage: React.FC = () => {
       >
         <form onSubmit={handleAddProfile} className="space-y-6 text-sm">
           <div>
-            <label className="block font-semibold text-gray-700 mb-1.5">Profile Name <span className="text-red-500">*</span></label>
+            <label className="block font-semibold text-foreground mb-1.5">Profile Name <span className="text-red-500">*</span></label>
             <Input required value={addForm.name} onChange={e => setAddForm({...addForm, name: e.target.value})} />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block font-semibold text-gray-700 mb-1.5">Company <span className="text-red-500">*</span></label>
+              <label className="block font-semibold text-foreground mb-1.5">Company <span className="text-red-500">*</span></label>
               <SearchableSelect
                 id="add_profile_company"
                 value={addForm.company}
@@ -805,7 +803,7 @@ export const PosProfilePage: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block font-semibold text-gray-700 mb-1.5">Branch</label>
+              <label className="block font-semibold text-foreground mb-1.5">Branch</label>
               {activeBranchId === 'all' ? (
                 <SearchableSelect
                   id="add_profile_branch"
@@ -824,7 +822,7 @@ export const PosProfilePage: React.FC = () => {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block font-semibold text-gray-700 mb-1.5">Warehouse</label>
+              <label className="block font-semibold text-foreground mb-1.5">Warehouse</label>
               <SearchableSelect
                 id="add_profile_warehouse"
                 value={addForm.warehouse}
@@ -837,24 +835,24 @@ export const PosProfilePage: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block font-semibold text-gray-700 mb-1.5">KOT Naming Series</label>
+              <label className="block font-semibold text-foreground mb-1.5">KOT Naming Series</label>
               <Input value={addForm.custom_kot_naming_series} onChange={e => setAddForm({...addForm, custom_kot_naming_series: e.target.value})} placeholder="e.g. KOT-.YYYY.-" />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block font-semibold text-gray-700 mb-1.5">Price List</label>
+              <label className="block font-semibold text-foreground mb-1.5">Price List</label>
               <Input value={addForm.selling_price_list} onChange={e => setAddForm({...addForm, selling_price_list: e.target.value})} placeholder="Standard Selling" />
             </div>
             <div>
-              <label className="block font-semibold text-gray-700 mb-1.5">Print Format</label>
+              <label className="block font-semibold text-foreground mb-1.5">Print Format</label>
               <Input value={addForm.print_format} onChange={e => setAddForm({...addForm, print_format: e.target.value})} placeholder="Default" />
             </div>
           </div>
 
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="font-semibold text-gray-700">Applicable For Users</label>
+              <label className="font-semibold text-foreground">Applicable For Users</label>
             </div>
             <div className="space-y-2 mb-3">
               {addForm.applicable_for_users.map((row, idx) => (
@@ -875,7 +873,7 @@ export const PosProfilePage: React.FC = () => {
                       placeholder="Select User"
                     />
                   </div>
-                  <div className="flex items-center gap-1.5 text-xs text-gray-600">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                     <Switch
                       checked={row.default === 1}
                       onCheckedChange={checked => {
@@ -886,7 +884,7 @@ export const PosProfilePage: React.FC = () => {
                     />
                     <span>Default</span>
                   </div>
-                  <button type="button" className="text-gray-400 hover:text-red-500 p-1" onClick={() => {
+                  <button type="button" className="text-muted-foreground hover:text-red-500 p-1" onClick={() => {
                     const newRows = addForm.applicable_for_users.filter((_, i) => i !== idx);
                     setAddForm({...addForm, applicable_for_users: newRows});
                   }}><X className="w-4 h-4" /></button>
@@ -907,7 +905,7 @@ export const PosProfilePage: React.FC = () => {
 
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="font-semibold text-gray-700">Mode of Payment</label>
+              <label className="font-semibold text-foreground">Mode of Payment</label>
             </div>
             <div className="space-y-2 mb-3">
               {addForm.payments.map((row, idx) => (
@@ -928,7 +926,7 @@ export const PosProfilePage: React.FC = () => {
                       placeholder="Select Payment Mode"
                     />
                   </div>
-                  <div className="flex items-center gap-1.5 text-xs text-gray-600">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                     <Switch
                       checked={row.default === 1}
                       onCheckedChange={checked => {
@@ -939,7 +937,7 @@ export const PosProfilePage: React.FC = () => {
                     />
                     <span>Default</span>
                   </div>
-                  <button type="button" className="text-gray-400 hover:text-red-500 p-1" onClick={() => {
+                  <button type="button" className="text-muted-foreground hover:text-red-500 p-1" onClick={() => {
                     const newRows = addForm.payments.filter((_, i) => i !== idx);
                     setAddForm({...addForm, payments: newRows});
                   }}><X className="w-4 h-4" /></button>
@@ -958,7 +956,7 @@ export const PosProfilePage: React.FC = () => {
             </Button>
           </div>
 
-          <div className="pt-6 flex justify-end gap-3 border-t border-gray-100">
+          <div className="pt-6 flex justify-end gap-3 border-t border-border">
             <Button type="button" variant="outline" onClick={() => setIsAddDrawerOpen(false)}>Cancel</Button>
             <Button type="submit" disabled={saving} className="bg-primary hover:bg-primary/90 text-white">
               Save

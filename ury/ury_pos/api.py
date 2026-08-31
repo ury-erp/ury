@@ -204,6 +204,33 @@ def getModeOfPayment():
     return modeOfPayments
 
 
+@frappe.whitelist()
+def get_production_units_for_branch():
+	"""Fetch all production unit names for the current user's branch.
+
+	Returns a list of production unit names that should be subscribed to for
+	KOT error channels on the POS terminal.
+	"""
+	try:
+		branch = getBranch()
+	except frappe.exceptions.ValidationError:
+		# Fallback if getBranch() throws (e.g., Administrator with no branch)
+		return {"production_units": []}
+
+	if not branch:
+		return {"production_units": []}
+
+	productions = frappe.get_all(
+		"URY Production Unit",
+		filters={"branch": branch},
+		fields=["name"]
+	)
+
+	production_names = [p.name for p in productions]
+
+	return {"production_units": production_names}
+
+
 def format_merged_table_label(primary, merged_tables=None):
     if not primary:
         return ""
@@ -975,22 +1002,56 @@ def get_open_pos_opening_entries(pos_profile):
     Close Shift dialog failed outright with "no attribute
     'get_open_pos_opening_entries'").
 
-    Read-only, no cross-branch/company filtering beyond `pos_profile` itself
-    -- matches this file's existing convention for closing-flow helpers
-    (validate_pos_close, _get_main_cashier_status), which likewise scope by
-    pos_profile alone and rely on frappe.has_permission on the returned
-    POS Invoice-adjacent data downstream for anything more granular.
+    Scoped by branch (the POS Profile must belong to the session user's
+    branch) and, for non-supervisors, by user (only their own open entries
+    are returned) -- matches this file's existing getBranch()/System Manager
+    supervisor-bypass convention used elsewhere (e.g. searchPosInvoice,
+    fav_items).
     """
     if not frappe.has_permission("POS Opening Entry", "read"):
         frappe.throw(_("Not permitted to view POS Opening Entries."), frappe.PermissionError)
 
+    session_user = frappe.session.user
+    is_supervisor = session_user == "Administrator" or "System Manager" in frappe.get_roles()
+
+    try:
+        session_branch = getBranch()
+    except frappe.ValidationError:
+        if is_supervisor:
+            # Supervisors may not be mapped to a branch
+            session_branch = None
+        else:
+            raise
+
+    profile_branch = frappe.db.get_value("POS Profile", pos_profile, "branch")
+
+    if not profile_branch:
+        frappe.throw(
+            _("POS Profile {0} not found.").format(pos_profile),
+            frappe.DoesNotExistError,
+        )
+
+    if session_branch and profile_branch != session_branch:
+        frappe.throw(
+            _("You do not have permission to access opening entries for POS Profile {0}.").format(
+                pos_profile
+            ),
+            frappe.PermissionError,
+        )
+
+    filters = {
+        "pos_profile": pos_profile,
+        "status": "Open",
+        "docstatus": 1,
+    }
+
+    # Non-supervisors only see their own open entries
+    if not is_supervisor:
+        filters["user"] = session_user
+
     return frappe.get_all(
         "POS Opening Entry",
-        filters={
-            "pos_profile": pos_profile,
-            "status": "Open",
-            "docstatus": 1,
-        },
+        filters=filters,
         fields=["name", "period_start_date", "user", "pos_profile"],
     )
 
@@ -1307,8 +1368,6 @@ def get_pos_opening_screen_data() -> dict:
     }
 
 
-@frappe.whitelist()
-
 def _validate_checklist_branch(pos_profile):
     """Ensure the session user's branch matches the given POS Profile's branch."""
     session_branch = getBranch()
@@ -1393,17 +1452,10 @@ def submit_checklist(pos_profile, checklist_type, items, pos_opening_entry=None)
         filters={"parent": pos_profile, "applies_to": ["in", [checklist_type, "Both"]]},
         parent_doctype="POS Profile",
     )
-    
-    if not configured_items:
-        return {
-            "status": "Complete",
-            "name": None,
-        }
-    mandatory_by_label = {row.item_label: row.is_mandatory for row in configured_items}
 
     existing_log = frappe.get_all(
         "URY POS Checklist Log",
-        fields=["name"],
+        fields=["name", "status"],
         filters={
             "pos_profile": pos_profile,
             "checklist_type": checklist_type,
@@ -1411,6 +1463,22 @@ def submit_checklist(pos_profile, checklist_type, items, pos_opening_entry=None)
         },
         limit=1,
     )
+
+    if not configured_items:
+        # Mirror get_checklist: a pre-existing log for today still reflects
+        # the real state (e.g. "In Progress") even if the checklist type's
+        # items were since removed/reconfigured. Only default to "Complete"
+        # when there is genuinely no prior log to contradict.
+        if existing_log:
+            return {
+                "status": existing_log[0].status,
+                "name": existing_log[0].name,
+            }
+        return {
+            "status": "Complete",
+            "name": None,
+        }
+    mandatory_by_label = {row.item_label: row.is_mandatory for row in configured_items}
 
     if existing_log:
         log_doc = frappe.get_doc("URY POS Checklist Log", existing_log[0].name)

@@ -1,8 +1,35 @@
 import frappe
 
 
+def _employee_for_user(user):
+    if not user:
+        return None
+    rows = frappe.db.sql(
+        """
+        SELECT name, status
+        FROM `tabEmployee`
+        WHERE user_id = %s
+        ORDER BY CASE WHEN status = 'Active' THEN 0 ELSE 1 END,
+                 date_of_joining ASC,
+                 name ASC
+        LIMIT 1
+        """,
+        (user,),
+        as_dict=True,
+    )
+    return rows[0]["name"] if rows else None
+
+
+def set_sales_invoice_commission_attribution(doc, method=None):
+    # Opener is sticky: never overwrite once set
+    if not doc.get("custom_waiter_employee"):
+        doc.custom_waiter_employee = _employee_for_user(doc.waiter)
+    doc.custom_closing_employee = _employee_for_user(doc.cashier) or doc.get("custom_closing_employee")
+
+
 def before_insert(doc, method):
     sales_invoice_naming(doc, method)
+    set_sales_invoice_commission_attribution(doc, method)
 
 def on_update(doc,method):
     aggregator_unpaid(doc,method)

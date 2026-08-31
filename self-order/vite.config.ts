@@ -23,4 +23,8 @@ export default defineConfig({
     outDir: "../ury/public/order",
     emptyOutDir: true,
   },
+  test: {
+    environment: 'jsdom',
+    setupFiles: './src/test/setup.ts',
+  },
 })

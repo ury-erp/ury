@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { call } from '@ury/core';
 import SetupPage from './pages/Setup/SetupPage';
@@ -12,11 +12,35 @@ import { PosProfilePage } from './pages/Dashboard/PosProfilePage';
 import { UserPage } from './pages/Dashboard/UserPage';
 import { BranchPage } from './pages/Dashboard/BranchPage';
 import { ReportSettingsPage } from './pages/Dashboard/ReportSettingsPage';
+import { AiAssistantSettingsPage } from './pages/Dashboard/AiAssistantSettingsPage';
+import { CommissionSettingsPage } from './pages/Dashboard/CommissionSettingsPage';
+import { SelfOrderingProfilePage } from './pages/Dashboard/SelfOrderingProfilePage';
 import ProductionUnitPage from './pages/Dashboard/ProductionUnitPage';
+import ProductionDepartmentPage from './pages/Dashboard/ProductionDepartmentPage';
+import ItemProductionConfigPage from './pages/Dashboard/ItemProductionConfigPage';
 import AggregatorPage from './pages/Dashboard/AggregatorPage';
+import SalesPlanPage from './pages/Dashboard/SalesPlanPage';
+import RequirementsPage from './pages/Dashboard/RequirementsPage';
+import MenuRoutingPage from './pages/Dashboard/MenuRoutingPage';
+import { ServicePage } from './pages/Dashboard/ServicePage';
+import { DepartmentStockPage } from './pages/Dashboard/DepartmentStockPage';
+import { StoreIssuePage } from './pages/Dashboard/StoreIssuePage';
+import { WastagePage } from './pages/Dashboard/WastagePage';
+import { DepartmentProfitabilityPage } from './pages/Dashboard/DepartmentProfitabilityPage';
+import { DayClosePage } from './pages/Dashboard/DayClosePage';
+import { KotErrorLogPage } from './pages/Dashboard/KotErrorLogPage';
+import { StockReservationPage } from './pages/Dashboard/StockReservationPage';
+import { PaymentTerminalPage } from './pages/Dashboard/PaymentTerminalPage';
 import { RoleGuard } from './components/RoleGuard';
 import { AuthGuard } from './components/AuthGuard';
+import { Landing } from './components/Landing';
 import { ReportsLayout } from './pages/Reports/ReportsLayout';
+import { ActiveReportProvider } from './components/chat/ActiveReportContext';
+import ChatWidget, {
+  ChatWidgetRefProvider,
+  AiEnabledProvider,
+  type ChatWidgetHandle,
+} from './components/chat/ChatWidget';
 import { ReportsHome } from './pages/Reports/ReportsHome';
 import { TodaysSales } from './pages/Reports/TodaysSales';
 import { DaywiseSales } from './pages/Reports/DaywiseSales';
@@ -32,9 +56,38 @@ import { CustomerData } from './pages/Reports/CustomerData';
 import { DaywiseCustomerDetails } from './pages/Reports/DaywiseCustomerDetails';
 import { RepeatedCustomers } from './pages/Reports/RepeatedCustomers';
 import { EmployeeSales } from './pages/Reports/EmployeeSales';
+import { EmployeeCommission } from './pages/Reports/EmployeeCommission';
 import { EmployeeItemWiseSales } from './pages/Reports/EmployeeItemWiseSales';
 import { CompletedWorkOrders } from './pages/Reports/CompletedWorkOrders';
 import { DailyPnl } from './pages/Reports/DailyPnl';
+
+// `/ury/pos/*` — pos/ route tree merged in per PLAN.md
+// tracks/sa-app-consolidation §7 Phase 1. Lazy-loaded per route (not just
+// per subtree) so admin-report chunks (recharts, @json-render/*, the 18
+// report pages) never ship to cashier/waiter hardware on first load, and
+// vice versa (§6's bundle-size risk) — `frontend/`'s existing routes above
+// are NOT retrofitted to lazy-loading, only these new ones.
+const PosLayout = lazy(() => import('./pages/Pos/PosLayout'));
+const PosDashboard = lazy(() => import('./pages/Pos/pages/Dashboard'));
+const PosPOS = lazy(() => import('./pages/Pos/pages/POS'));
+const PosTable = lazy(() => import('./pages/Pos/pages/Table'));
+const PosOrders = lazy(() => import('./pages/Pos/pages/Orders'));
+const PosSettings = lazy(() => import('./pages/Pos/pages/Settings'));
+const PosOpenEntries = lazy(() => import('./pages/Pos/pages/OpenEntries'));
+const CaptainRouteGuard = lazy(() => import('./pages/Pos/captain/components/CaptainRouteGuard'));
+const CaptainTables = lazy(() => import('./pages/Pos/captain/pages/CaptainTables'));
+const CaptainOrder = lazy(() => import('./pages/Pos/captain/pages/CaptainOrder'));
+
+function PosRouteFallback() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="flex flex-col items-center gap-3">
+        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+        <p className="text-sm text-muted-foreground">Loading…</p>
+      </div>
+    </div>
+  );
+}
 
 interface WizardStatus {
   step1_complete: boolean;
@@ -105,22 +158,77 @@ function SetupGuard() {
   return <Outlet />;
 }
 
+function useAiSettings() {
+  // Fail-closed: no AI surface renders until the backend explicitly says
+  // {enabled: true}. Any fetch failure (network, permissions, etc.) leaves
+  // this false rather than defaulting open.
+  const [aiEnabled, setAiEnabled] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const { call } = await import('@ury/core');
+        const res = await call.get('ury.ury.api.ury_ai_settings.get_ai_settings');
+        const data = res?.message ?? res;
+        if (!cancelled && data?.enabled === true) {
+          setAiEnabled(true);
+        }
+      } catch (err) {
+        console.error('Error fetching AI settings:', err);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return aiEnabled;
+}
+
 function App() {
+  const chatRef = useRef<ChatWidgetHandle>(null);
+  const aiEnabled = useAiSettings();
+
+  return (
+    <ActiveReportProvider>
+      <AiEnabledProvider enabled={aiEnabled}>
+        <ChatWidgetRefProvider chatRef={chatRef}>
+          <AppRoutes />
+          {aiEnabled && <ChatWidget ref={chatRef} />}
+        </ChatWidgetRefProvider>
+      </AiEnabledProvider>
+    </ActiveReportProvider>
+  );
+}
+
+function AppRoutes() {
   return (
     <Routes>
       <Route element={<SetupGuard />}>
         <Route path="setup-wizard/0" element={<SetupPage />} />
         <Route path="setup-wizard/1" element={<ConfigurePage />} />
 
+        {/*
+          No `path` prop here (was `path="/"`): a route with `path="/"` still
+          matches the bare root URL even with no `index` child -- it just
+          renders this layout element with an empty `<Outlet/>` (sidebar
+          shows, main content area is blank), which is exactly the bug this
+          fix addresses. Only `Landing`'s route below should own the exact
+          "/" match. A pathless layout route doesn't consume a URL segment,
+          so its children ("dashboard", "menu", etc.) still resolve to
+          "/dashboard", "/menu", etc. exactly as before -- this only removes
+          this route's own (incorrect) claim on bare "/".
+        */}
         <Route
-          path="/"
           element={
             <RoleGuard>
               <DashboardLayout />
             </RoleGuard>
           }
         >
-          <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="menu" element={<MenuPage />} />
           <Route path="table" element={<TablePage />} />
@@ -129,8 +237,32 @@ function App() {
           <Route path="user" element={<UserPage />} />
           <Route path="branch" element={<BranchPage />} />
           <Route path="report-settings" element={<ReportSettingsPage />} />
+          <Route path="ai-settings" element={<AiAssistantSettingsPage />} />
+          <Route path="commission-settings" element={<CommissionSettingsPage />} />
+          <Route path="self-ordering-profile" element={<SelfOrderingProfilePage />} />
           <Route path="production-unit" element={<ProductionUnitPage />} />
+          <Route path="production-department" element={<ProductionDepartmentPage />} />
+          <Route path="item-production-config" element={<ItemProductionConfigPage />} />
           <Route path="aggregator" element={<AggregatorPage />} />
+          <Route path="sales-plan" element={<SalesPlanPage />} />
+          <Route path="requirements" element={<RequirementsPage />} />
+          <Route path="service" element={<ServicePage />} />
+          <Route path="department-stock" element={<DepartmentStockPage />} />
+          <Route path="menu-routing" element={<MenuRoutingPage />} />
+          <Route path="store-issue" element={<StoreIssuePage />} />
+          <Route path="wastage" element={<WastagePage />} />
+          <Route
+            path="department-profitability"
+            element={<DepartmentProfitabilityPage />}
+          />
+          <Route path="close-day" element={<DayClosePage />} />
+
+          <Route
+            path="kot-error-log"
+            element={<KotErrorLogPage />}
+          />
+          <Route path="stock-reservations" element={<StockReservationPage />} />
+          <Route path="payment-terminals" element={<PaymentTerminalPage />} />
 
           <Route
             path="reports/*"
@@ -163,6 +295,7 @@ function App() {
             />
             <Route path="repeated-customers" element={<RepeatedCustomers />} />
             <Route path="employee-sales" element={<EmployeeSales />} />
+            <Route path="employee-commission" element={<EmployeeCommission />} />
             <Route
               path="employee-item-wise-sales"
               element={<EmployeeItemWiseSales />}
@@ -173,8 +306,83 @@ function App() {
             />
             <Route path="daily-pnl" element={<DailyPnl />} />
           </Route>
+
         </Route>
       </Route>
+
+      {/*
+        Phase 3 (PLAN.md tracks/sa-app-consolidation §7 Phase 3): a
+        client-side-only role-aware landing redirect for the bare root URL.
+        This is a SIBLING of the `SetupGuard` route above (same nesting
+        level as the `/ury/pos/*` carve-out below), i.e. it sits OUTSIDE
+        `RoleGuard`/`SetupGuard` entirely so a non-manager (e.g. a cashier)
+        never hits `RoleGuard`'s dead-end "Access Denied" card just from
+        loading "/". `Landing` only decides which area to send the user to
+        (`/dashboard` vs `/pos/dashboard`) via `useAuth`'s `isManager` — it
+        does not replace any real auth/permission check: `RoleGuard` still
+        guards every route under it (including anyone who bookmarks or
+        types `/ury/dashboard` directly, bypassing Landing), and pos/'s own
+        `AuthGuard` still guards the POS routes. Because this route owns
+        the exact "/" match, the `RoleGuard`-wrapped "/" layout route above
+        no longer declares an `index` child — it only matches its explicit
+        child paths (`dashboard`, `menu`, etc.), never bare "/".
+      */}
+      <Route path="/" element={<Landing />} />
+
+      {/*
+        Phase 2 (PLAN.md tracks/sa-app-consolidation §7 Phase 2): the
+        `/ury/pos/*` subtree is a SIBLING of the `SetupGuard` route above,
+        not nested inside it. Per the Opus review (§7.5 point 2), SetupGuard
+        sits above RoleGuard in the tree and falls back to redirecting into
+        the setup wizard on ANY exception from
+        `setup_organization.get_wizard_status` — including a cashier session
+        that lacks permission on that manager-oriented endpoint. Composing
+        pos/'s own guards *underneath* SetupGuard/RoleGuard would still let
+        SetupGuard intercept and redirect a cashier before pos/'s guards
+        ever ran. So this subtree is carved out to bypass
+        SetupGuard/RoleGuard/frontend's AuthGuard entirely and is instead
+        gated by pos/'s own POS-Profile-aware `AuthGuard` +
+        `POSOpeningProvider` (mounted inside `PosLayout`, see
+        pages/Pos/PosLayout.tsx) — cashier/waiter-role-driven, not
+        'URY Manager'-driven. Every other route above keeps the original
+        SetupGuard -> RoleGuard -> AuthGuard chain unchanged.
+      */}
+      <Route
+        path="pos"
+        element={
+          <Suspense fallback={<PosRouteFallback />}>
+            <PosLayout />
+          </Suspense>
+        }
+      >
+        <Route index element={<Navigate to="dashboard" replace />} />
+        <Route path="dashboard" element={<PosDashboard />} />
+        <Route path="pos" element={<PosPOS />} />
+        <Route path="tables" element={<PosTable />} />
+        <Route path="orders" element={<PosOrders />} />
+        <Route path="settings" element={<PosSettings />} />
+        <Route path="open-entries" element={<PosOpenEntries />} />
+      </Route>
+      <Route
+        path="pos/order"
+        element={
+          <Suspense fallback={<PosRouteFallback />}>
+            <CaptainRouteGuard>
+              <CaptainTables />
+            </CaptainRouteGuard>
+          </Suspense>
+        }
+      />
+      <Route
+        path="pos/order/table/:table"
+        element={
+          <Suspense fallback={<PosRouteFallback />}>
+            <CaptainRouteGuard>
+              <CaptainOrder />
+            </CaptainRouteGuard>
+          </Suspense>
+        }
+      />
 
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>

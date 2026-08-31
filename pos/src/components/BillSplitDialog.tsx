@@ -176,14 +176,14 @@ const BillSplitDialog = ({
                 className={cn(
                   'rounded-lg border p-3 transition-colors',
                   isSubmitting ? 'cursor-default' : 'cursor-pointer',
-                  isSelected ? 'border-primary bg-primary-50/40' : 'border-gray-200 hover:border-gray-300'
+                  isSelected ? 'border-primary bg-primary-50/40' : 'border-border hover:border-border'
                 )}
               >
                 <div className="flex items-start gap-3">
                   <div
                     className={cn(
                       'mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border',
-                      isSelected ? 'border-primary bg-primary text-white' : 'border-gray-300 bg-white'
+                      isSelected ? 'border-foreground bg-foreground text-background' : 'border-border bg-white'
                     )}
                     aria-hidden
                   >
@@ -247,7 +247,7 @@ const BillSplitDialog = ({
           })}
         </div>
 
-        <div className="mx-6 mb-4 space-y-3 rounded-lg border border-gray-200 p-4">
+        <div className="mx-6 mb-4 space-y-3 rounded-lg border border-border p-4">
           <p className="text-sm font-medium text-gray-900">{t('bill_split.customer_for_new_bill')}</p>
           <label className="flex items-center gap-2 text-sm text-gray-700">
             <input

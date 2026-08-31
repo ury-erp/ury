@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call } from '@ury/core';
-import { StatCard, DataTable, type DataTableColumn } from '@ury/ui';
-import { Users, UserPlus, Repeat, Percent } from 'lucide-react';
+import { KpiStrip, type KpiItemProps, DataTable, type DataTableColumn } from '@ury/ui';
 import { useBranchContext } from '../../context/BranchContext';
 import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
 import { BarChartCard } from '../../components/reports/charts/BarChartCard';
@@ -85,19 +84,17 @@ export function RepeatedCustomers() {
       )}
 
       {isLoading && !data ? (
-        <div className="text-sm text-muted-foreground">Loading...</div>
+        <div className="text-sm text-muted-foreground">Loading…</div>
       ) : data ? (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatCard label="Total Visits" value={data.summary.total_customers} icon={<Users className="w-4 h-4" />} />
-            <StatCard label="New Customers" value={data.summary.new_customers} icon={<UserPlus className="w-4 h-4" />} />
-            <StatCard label="Repeat Visits" value={data.summary.repeat_customers} icon={<Repeat className="w-4 h-4" />} />
-            <StatCard
-              label="Avg Repeat Rate"
-              value={`${data.summary.avg_repeat_rate_percent}%`}
-              icon={<Percent className="w-4 h-4" />}
-            />
-          </div>
+          <KpiStrip
+            items={[
+              { label: 'Total Visits', value: data.summary.total_customers },
+              { label: 'New Customers', value: data.summary.new_customers },
+              { label: 'Repeat Visits', value: data.summary.repeat_customers },
+              { label: 'Avg Repeat Rate', value: `${data.summary.avg_repeat_rate_percent}%` },
+            ] satisfies KpiItemProps[]}
+          />
 
           <BarChartCard
             title="New vs Repeat Visits"

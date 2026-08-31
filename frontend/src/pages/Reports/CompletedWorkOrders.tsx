@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call } from '@ury/core';
-import { StatCard, DataTable, type DataTableColumn } from '@ury/ui';
-import { Factory, Package } from 'lucide-react';
+import { KpiStrip, type KpiItemProps, DataTable, type DataTableColumn } from '@ury/ui';
 import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
+import { DeskLink } from '../../components/DeskLink';
 import { toApiDate } from '../../lib/reportDate';
 import { subMonths, endOfDay } from 'date-fns';
 
@@ -22,7 +22,17 @@ interface CompletedWorkOrdersData {
 }
 
 const columns: DataTableColumn<WorkOrderRow>[] = [
-  { key: 'name', header: 'Work Order' },
+  {
+    key: 'name',
+    header: 'Work Order',
+    render: (r) => (
+      <span className="inline-flex items-center gap-1.5">
+        {r.name}
+        {/* Link to editable desk document; this report is read-only */}
+        <DeskLink doctype="Work Order" name={r.name} iconOnly />
+      </span>
+    ),
+  },
   { key: 'item_name', header: 'Item', render: (r) => r.item_name || r.production_item },
   { key: 'qty', header: 'Planned Qty', align: 'right' },
   { key: 'produced_qty', header: 'Produced Qty', align: 'right' },
@@ -78,10 +88,12 @@ export function CompletedWorkOrders() {
       )}
 
       {data && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <StatCard label="Completed" value={data.summary.total_completed} icon={<Factory className="w-4 h-4" />} />
-          <StatCard label="Qty Produced" value={data.summary.total_qty_produced} icon={<Package className="w-4 h-4" />} />
-        </div>
+        <KpiStrip
+          items={[
+            { label: 'Completed', value: data.summary.total_completed },
+            { label: 'Qty Produced', value: data.summary.total_qty_produced },
+          ] satisfies KpiItemProps[]}
+        />
       )}
 
       <DataTable

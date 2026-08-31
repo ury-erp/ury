@@ -7,7 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@ury/ui';
-import { Button } from '@ury/ui';
+import { Button, Input } from '@ury/ui';
 import { cn } from '@ury/ui';
 import { t } from '../i18n';
 import { Spinner } from '@ury/ui';
@@ -114,19 +114,21 @@ const TableTransferDialog = ({
           <label className="mb-1 block text-sm font-medium text-gray-700">
             {t('tables.current_table')}
           </label>
-          <input
+          <Input
             type="text"
             readOnly
             value={sourceTable?.name ?? ''}
-            className="mb-4 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700"
+            variant="search"
+            className="mb-4"
           />
 
-          <input
+          <Input
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t('tables.search_transfer_placeholder')}
-            className="mb-3 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+            variant="search"
+            className="mb-3"
             disabled={isSubmitting || loading}
           />
 
@@ -147,16 +149,17 @@ const TableTransferDialog = ({
                     {group.tables.map((table) => {
                       const isSelected = selected === table.name;
                       return (
-                        <button
+                        <Button
                           key={table.name}
                           type="button"
                           disabled={isSubmitting}
                           onClick={() => setSelected(table.name)}
+                          variant="ghost"
                           className={cn(
-                            'flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors',
+                            'flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors h-auto',
                             isSelected
                               ? 'border-primary bg-primary-50/40'
-                              : 'border-gray-200 hover:border-gray-300'
+                              : 'border-border hover:border-border'
                           )}
                         >
                           <TableShapeIcon shape={table.table_shape || 'Rectangle'} />
@@ -168,7 +171,7 @@ const TableTransferDialog = ({
                                 : ''}
                             </p>
                           </div>
-                        </button>
+                        </Button>
                       );
                     })}
                   </div>

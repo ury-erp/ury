@@ -16,8 +16,10 @@ export function PieChartCard({ title, data, dataKey, nameKey, colors }: PieChart
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="text-base">{title}</CardTitle>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          {title}
+        </CardTitle>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={300}>
@@ -32,6 +34,7 @@ export function PieChartCard({ title, data, dataKey, nameKey, colors }: PieChart
               endAngle={360}
               isAnimationActive={false}
               label={({ percent }) => `${((percent ?? 0) * 100).toFixed(0)}%`}
+              style={{ fontFamily: "var(--font-mono)", fontSize: 11 }}
             >
               {data.map((_, index) => (
                 <Cell key={`cell-${index}`} fill={palette[index % palette.length]} />

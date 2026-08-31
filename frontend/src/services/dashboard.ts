@@ -143,3 +143,126 @@ export const dashboardService = {
     }
   },
 };
+
+export interface DashboardStats {
+  todays_sales: number;
+  orders_today: number;
+  avg_order_value: number;
+  active_tables: number;
+  total_tables: number;
+}
+
+export interface NeedsAttentionReference {
+  doctype: string;
+  names: string[];
+}
+
+export interface NeedsAttentionItem {
+  type: string;
+  message: string;
+  severity: string;
+  reference?: NeedsAttentionReference | null;
+}
+
+export interface BaselineStats {
+  sample_days: number;
+  median_sales: number;
+  median_covers: number;
+}
+
+export interface ShiftMetrics {
+  sales: number;
+  covers: number;
+  avg_per_cover: number;
+  avg_ticket_minutes: number;
+}
+
+export interface DailyPnlSummaryField {
+  key: string;
+  label: string;
+  amount: number;
+  percent: number;
+}
+
+export interface DailyPnlSummary {
+  exists: boolean;
+  branch?: string;
+  date?: string;
+  summary?: DailyPnlSummaryField[];
+}
+
+export interface PlanStatus {
+  name: string | null;
+  status: string | null;
+}
+
+const unwrap = <T,>(res: unknown): T => ((res as any)?.message ?? res) as T;
+
+export interface CloseDayChecklistItem {
+  key: string;
+  label: string;
+  count: number;
+  blocking: boolean;
+  scope_note?: string;
+}
+
+export interface CloseDayChecklist {
+  branch: string;
+  service_date: string;
+  items: CloseDayChecklistItem[];
+  has_pos_profile: boolean;
+  unposted_production_is_company_wide: boolean;
+}
+
+export const uryDashboardService = {
+  async getCancelledInvoicesCount(branch?: string): Promise<number> {
+    const res = await call.get<number>('ury.ury.api.ury_dashboard.get_cancelled_invoices_count', { branch });
+    return unwrap<number>(res) ?? 0;
+  },
+
+  async getDailyPnlSummary(branch: string, date: string): Promise<DailyPnlSummary> {
+    const res = await call.get<DailyPnlSummary>('ury.ury.report_api.financial.get_daily_pnl', {
+      branch,
+      date,
+    });
+    return unwrap<DailyPnlSummary>(res);
+  },
+
+
+  async getDashboardStats(branch?: string): Promise<DashboardStats> {
+    const res = await call.get<DashboardStats>('ury.ury.api.ury_dashboard.get_dashboard_stats', { branch });
+    return unwrap<DashboardStats>(res);
+  },
+
+  async getNeedsAttention(branch?: string): Promise<NeedsAttentionItem[]> {
+    const res = await call.get<NeedsAttentionItem[]>('ury.ury.api.ury_dashboard.get_needs_attention', { branch });
+    const unwrapped = unwrap<NeedsAttentionItem[]>(res);
+    return Array.isArray(unwrapped) ? unwrapped : [];
+  },
+
+  async getBaseline(branch?: string): Promise<BaselineStats> {
+    const res = await call.get<BaselineStats>('ury.ury.api.ury_dashboard.get_baseline', { branch });
+    return unwrap<BaselineStats>(res);
+  },
+
+  async getShiftMetrics(branch?: string): Promise<ShiftMetrics> {
+    const res = await call.get<ShiftMetrics>('ury.ury.api.ury_dashboard.get_shift_metrics', { branch });
+    return unwrap<ShiftMetrics>(res);
+  },
+
+  async getPlanStatus(branch: string, planDate: string): Promise<PlanStatus> {
+    const res = await call.get<PlanStatus>('ury.ury.api.ury_sales_plan.get_plan_status', {
+      branch,
+      plan_date: planDate,
+    });
+    return unwrap<PlanStatus>(res);
+  },
+
+  async getCloseDayChecklist(branch: string, serviceDate: string): Promise<CloseDayChecklist> {
+    const res = await call.get<CloseDayChecklist>('ury.ury.report_api.day_close.get_close_day_checklist', {
+      branch,
+      service_date: serviceDate,
+    });
+    return unwrap<CloseDayChecklist>(res);
+  },
+};

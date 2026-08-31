@@ -8,9 +8,16 @@ export default {
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
+        rail: "hsl(var(--rail))",
+        hair: "hsl(var(--hair))",
+        hair2: "hsl(var(--hair2))",
+        "text-tertiary": "hsl(var(--text-tertiary))",
+        "text-quaternary": "hsl(var(--text-quaternary))",
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
+          tint: "hsl(var(--primary-tint))",
+          "tint-border": "hsl(var(--primary-tint-border))",
           50: "hsl(var(--primary-50))",
           100: "hsl(var(--primary-100))",
           200: "hsl(var(--primary-200))",
@@ -30,6 +37,19 @@ export default {
         destructive: {
           DEFAULT: "hsl(var(--destructive))",
           foreground: "hsl(var(--destructive-foreground))",
+          tint: "hsl(var(--destructive-tint))",
+          "tint-border": "hsl(var(--destructive-tint-border))",
+          50: "hsl(var(--destructive-50))",
+          100: "hsl(var(--destructive-100))",
+          200: "hsl(var(--destructive-200))",
+          300: "hsl(var(--destructive-300))",
+          400: "hsl(var(--destructive-400))",
+          500: "hsl(var(--destructive-500))",
+          600: "hsl(var(--destructive-600))",
+          700: "hsl(var(--destructive-700))",
+          800: "hsl(var(--destructive-800))",
+          900: "hsl(var(--destructive-900))",
+          950: "hsl(var(--destructive-950))",
         },
         muted: {
           DEFAULT: "hsl(var(--muted))",
@@ -49,6 +69,40 @@ export default {
           800: "hsl(var(--accent-800))",
           900: "hsl(var(--accent-900))",
           950: "hsl(var(--accent-950))",
+        },
+        warning: {
+          DEFAULT: "hsl(var(--warning))",
+          foreground: "hsl(var(--warning-foreground))",
+          tint: "hsl(var(--warning-tint))",
+          "tint-border": "hsl(var(--warning-tint-border))",
+          50: "hsl(var(--warning-50))",
+          100: "hsl(var(--warning-100))",
+          200: "hsl(var(--warning-200))",
+          300: "hsl(var(--warning-300))",
+          400: "hsl(var(--warning-400))",
+          500: "hsl(var(--warning-500))",
+          600: "hsl(var(--warning-600))",
+          700: "hsl(var(--warning-700))",
+          800: "hsl(var(--warning-800))",
+          900: "hsl(var(--warning-900))",
+          950: "hsl(var(--warning-950))",
+        },
+        success: {
+          DEFAULT: "hsl(var(--success))",
+          foreground: "hsl(var(--success-foreground))",
+          tint: "hsl(var(--success-tint))",
+          "tint-border": "hsl(var(--success-tint-border))",
+          50: "hsl(var(--success-50))",
+          100: "hsl(var(--success-100))",
+          200: "hsl(var(--success-200))",
+          300: "hsl(var(--success-300))",
+          400: "hsl(var(--success-400))",
+          500: "hsl(var(--success-500))",
+          600: "hsl(var(--success-600))",
+          700: "hsl(var(--success-700))",
+          800: "hsl(var(--success-800))",
+          900: "hsl(var(--success-900))",
+          950: "hsl(var(--success-950))",
         },
         gray: {
           50: "hsl(var(--gray-50))",
@@ -73,9 +127,17 @@ export default {
         },
         white: "hsl(var(--white))",
         black: "hsl(var(--black))",
+        "chat-accent": "hsl(var(--chat-accent))",
       },
       fontFamily: {
         inter: ['Inter', 'sans-serif'],
+        // Geist / Geist Mono (https://github.com/vercel/geist-font),
+        // self-hosted via @fontsource — matches ury-app.html's type system.
+        // Redefines the default `font-sans`/`font-mono` utilities so every
+        // existing `font-mono` call site (numeric table cells, amounts)
+        // picks up Geist Mono without call-site changes.
+        sans: ['Geist', 'ui-sans-serif', 'system-ui', '-apple-system', 'sans-serif'],
+        mono: ['Geist Mono', 'ui-monospace', 'SFMono-Regular', 'monospace'],
       },
       borderRadius: {
         xl: "calc(var(--radius) + 4px)",
@@ -126,6 +188,38 @@ export default {
         'badge-min': 'var(--badge-min-width)',
         'dialog-max-w': 'var(--dialog-max-width)',
         'dialog-max-h': 'var(--dialog-max-height)',
+        // Density-discipline scale, ported from `ury-pos.html` (the tighter,
+        // tablet-constrained mockup — standardised on deliberately over
+        // `ury-app.html`, whose numbers differ slightly; see
+        // DENSITY_PLAN.md §1 for the reasoning). One named key per rhythm
+        // tier so call sites stop reaching for a single ad-hoc `space-y-6`/
+        // `p-3`/`p-4` for every gap, which is the density problem this scale
+        // exists to fix. Purely additive — no existing key is touched.
+        section: '24px', // `.sec` margin-top: gap between stacked sections
+        sect: '9px', // `.sect` margin-bottom: section header -> content
+        'stats-mb': '20px', // `.stats` margin-bottom
+        'stats-pb': '16px', // `.stats` padding-bottom
+        'grid-gap': '14px', // `.grid`/`.gridN` gap
+        'page-x': '22px', // `.page` left/right padding
+        'page-top': '20px', // `.page` top padding
+        'page-bottom': '34px', // `.page` bottom padding (POS base value;
+        // ury-app.html's dashboard uses 90px to reserve room below the fold
+        // for something this app doesn't have — pages needing that clearance
+        // should override pb-* locally rather than inflating the shared base)
+        //
+        // `.panel.pad` (14px 16px) is two-axis and a single Tailwind spacing
+        // key can only express one number, so it's split into a pair rather
+        // than one `panel` key: `panelX` (16px, left/right) and `panelY`
+        // (14px, top/bottom). Consumed together as `px-panelX py-panelY` by
+        // <Panel pad> in panel.tsx. A pair was chosen over a small plugin
+        // utility (e.g. a `.panel-pad` custom utility class) because it stays
+        // inside the existing `theme.extend.spacing` mechanism every other
+        // token here uses — no new plugin, no new class name vocabulary to
+        // learn, and `px-panelX`/`py-panelY` compose normally with
+        // Tailwind's existing arbitrary overrides if a call site ever needs
+        // one axis but not the other.
+        panelX: '16px',
+        panelY: '14px',
       },
     },
   },

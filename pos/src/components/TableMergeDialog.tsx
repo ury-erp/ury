@@ -137,15 +137,15 @@ const TableMergeDialog = ({
                           'flex items-center gap-2 rounded-lg border-2 p-3 text-left transition-all',
                           isSelected
                             ? 'border-primary bg-primary-50'
-                            : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                            : 'border-border hover:border-border hover:bg-gray-50'
                         )}
                       >
                         <div
                           className={cn(
                             'flex h-4 w-4 shrink-0 items-center justify-center rounded border',
                             isSelected
-                              ? 'border-primary bg-primary text-white'
-                              : 'border-gray-300 bg-white'
+                              ? 'border-foreground bg-foreground text-background'
+                              : 'border-border bg-white'
                           )}
                         >
                           {isSelected && <Check className="h-3 w-3" />}

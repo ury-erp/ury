@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
-import { StatCard, DataTable, type DataTableColumn } from '@ury/ui';
-import { Receipt, IndianRupee, TrendingUp, Search } from 'lucide-react';
+import { KpiStrip, type KpiItemProps, DataTable, type DataTableColumn } from '@ury/ui';
+import { Search } from 'lucide-react';
 import { useBranchContext } from '../../context/BranchContext';
 import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
 import { toApiDate } from '../../lib/reportDate';
@@ -103,7 +103,7 @@ export function CustomerData() {
       </div>
 
       <div className="relative max-w-sm">
-        <div className="flex items-center border border-input rounded-md px-3 py-2 gap-2">
+        <div className="flex items-center border border-input rounded-md px-3.5 py-2 gap-2">
           <Search className="w-4 h-4 text-muted-foreground shrink-0" />
           <input
             type="text"
@@ -147,23 +147,17 @@ export function CustomerData() {
         <div className="text-sm text-muted-foreground">Search and select a customer to view their history.</div>
       )}
 
-      {isLoading && <div className="text-sm text-muted-foreground">Loading...</div>}
+      {isLoading && <div className="text-sm text-muted-foreground">Loading…</div>}
 
       {data && !isLoading && (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <StatCard label="Visits" value={data.summary.visit_count} icon={<Receipt className="w-4 h-4" />} />
-            <StatCard
-              label="Total Spend"
-              value={formatCurrency(data.summary.total_spend)}
-              icon={<IndianRupee className="w-4 h-4" />}
-            />
-            <StatCard
-              label="Avg Spend / Visit"
-              value={formatCurrency(data.summary.avg_spend)}
-              icon={<TrendingUp className="w-4 h-4" />}
-            />
-          </div>
+          <KpiStrip
+            items={[
+              { label: 'Visits', value: data.summary.visit_count },
+              { label: 'Total Spend', value: formatCurrency(data.summary.total_spend) },
+              { label: 'Avg Spend / Visit', value: formatCurrency(data.summary.avg_spend) },
+            ] satisfies KpiItemProps[]}
+          />
           <DataTable columns={columns} rows={data.invoices} isLoading={isLoading} />
         </>
       )}

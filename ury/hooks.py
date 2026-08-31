@@ -27,7 +27,10 @@ app_include_js = [
     "/assets/ury/js/quick_entry.js",
     "/assets/ury/js/pos_print.js",
     "/assets/ury/js/restrict_qty_edit_pos.js",
-    "/assets/ury/js/ury_pos_kot.js"
+    "/assets/ury/js/ury_pos_kot.js",
+    # Floating "Back to <App>" chip for users a URY SPA sent into the desk.
+    # See ury/public/js/return_to_app.js and packages/core/src/frappe/deskLink.ts.
+    "/assets/ury/js/return_to_app.js"
 ]
 
 # include js, css files in header of web template
@@ -55,10 +58,17 @@ website_context = {"splash_image": "/assets/ury/Images/ury-logo.jpg"}
 
 website_route_rules = [
     {"from_route": "/urypos/<path:app_path>", "to_route": "urypos"},
+    # /order kept as a redirect-compatible alias below; /ury/order is the
+    # canonical route going forward (new app, no live QR codes/bookmarks
+    # to break). Established routes (urypos, pos, mosaic) are intentionally
+    # NOT renamed here -- that would risk breaking printed QR codes or
+    # staff muscle memory on a system that may already be in real use;
+    # renaming those needs its own deliberate, communicated migration.
+    {"from_route": "/order/<path:app_path>", "to_route": "order"},
+    {"from_route": "/ury/order/<path:app_path>", "to_route": "order"},
     {"from_route": "/mosaic/<path:app_path>", "to_route": "mosaic"},
     {"from_route": "/ury/<path:app_path>", "to_route": "ury"},
     {"from_route": "/setup-wizard", "to_route": "ury"},
-    {"from_route": "/order/<path:app_path>", "to_route": "order"},
     {"from_route": "/pos/<path:app_path>", "to_route": "pos"},
 ]
 
@@ -165,6 +175,11 @@ before_uninstall = "ury.uninstall.uninstall"
 # 	"ToDo": "custom_app.overrides.CustomToDo"
 # }
 
+# HUF-optional: seeds/self-heals the "URY Dashboard Assistant" Agent record
+# on every migrate. Safe to define even when huf is not installed — the
+# function itself no-ops when "huf" isn't in the installed apps list.
+after_migrate = ["ury.ury.ai_tools.agent_seeding.after_migrate"]
+
 # Document Events
 # ---------------
 # Hook on document methods and events
@@ -175,7 +190,10 @@ doc_events = {
         "validate": "ury.ury.hooks.ury_pos_invoice.validate",
         "after_insert":"ury.ury.api.ury_kot_order_number.set_order_number",
         "before_submit": "ury.ury.hooks.ury_pos_invoice.before_submit",
-        "on_submit": "ury.ury.hooks.ury_pos_invoice.on_submit",
+        "on_submit": [
+            "ury.ury.hooks.ury_pos_invoice.on_submit",
+            "ury.ury.api.ury_feature_flags.maybe_wire_fulfilment_on_submit",
+        ],
         "on_update": "ury.ury.hooks.ury_pos_invoice.on_update",
         "on_cancel": "ury.ury.hooks.ury_pos_invoice.on_trash",
         "on_trash": "ury.ury.hooks.ury_pos_invoice.on_trash",
@@ -197,7 +215,8 @@ doc_events = {
         },
     "URY Menu Course": {
 		"validate": "ury.ury.api.ury_menu_course_validation.validate_priority",
-	}    
+	},
+    "AI Provider": {"on_update": "ury.ury.ai_tools.agent_seeding.on_ai_provider_update"},
 }
 
 # Scheduled Tasks
@@ -315,6 +334,15 @@ extend_bootinfo = [
 # 	"ury.auth.validate"
 # ]
 
+# HUF (AI assistant app) tool registration — read only if huf is installed
+# alongside this app. HUF's own `huf.ai.tool_registry.sync_app_tools`
+# (registered under HUF's `after_migrate`) reads this hook across every
+# installed app on `bench migrate` and syncs the listed tools into
+# `Agent Tool`/`Agent Tool Function` records. Safe to define even when huf is
+# not installed — an unused hook value is simply never read.
+# See tracks/sa-ai-reports-dashboard/HUF_API_NOTES.md for how this was confirmed.
+huf_tools = "ury.ury.ai_tools.ury_tools_registry.ALL_URY_TOOLS"
+
 fixtures = [
     {
         "doctype": "Custom Field",
@@ -328,6 +356,8 @@ fixtures = [
                     "POS Invoice-order_info",
                     "POS Invoice-order_type",
                     "POS Invoice-waiter",
+                    "POS Invoice-custom_waiter_employee",
+                    "POS Invoice-custom_closing_employee",
                     "POS Invoice-column_break_rwbwf",
                     "POS Invoice-no_of_pax",
                     "POS Invoice-cashier",
@@ -352,10 +382,13 @@ fixtures = [
                     "POS Invoice-custom_merged_pos_invoice_details",
                     "POS Invoice-custom_merged_pos_invoice",
                     "POS Invoice-custom_bill_merge_details_section",
+                    "POS Invoice Item-custom_entered_by_employee",
                     "Sales Invoice-mobile_number",
                     "Sales Invoice-order_info",
                     "Sales Invoice-order_type",
                     "Sales Invoice-waiter",
+                    "Sales Invoice-custom_waiter_employee",
+                    "Sales Invoice-custom_closing_employee",
                     "Sales Invoice-column_break_bc56k",
                     "Sales Invoice-no_of_pax",
                     "Sales Invoice-cashier",
@@ -396,6 +429,7 @@ fixtures = [
                     "POS Opening Entry-branch",
                     "POS Opening Entry-custom_room",
                     "Branch-user",
+                    "Branch-company",
                     "Branch-custom_aggregator_settings",
                     "Branch-custom_aggregators",
                     "Branch-custom_make_unpaid",

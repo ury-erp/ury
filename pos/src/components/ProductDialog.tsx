@@ -323,7 +323,6 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
               src={itemDoc.image}
               alt={itemDoc.name}
               className="w-full min-h-96 h-full object-cover rounded-t-lg md:rounded-l-lg md:rounded-tr-none filter saturate-75 brightness-95"
-              style={{ filter: 'saturate(0.7) brightness(0.95)' }}
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
                 target.style.display = 'none';
@@ -419,19 +418,20 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
                 {variantDetails.map((variant: any) => {
                   const menuVariant = menuItems.find((m: any) => m.item === variant.id);
                   return (
-                    <button
+                    <Button
                       key={variant.id}
                       onClick={() => handleVariantClick(variant.id)}
+                      variant="outline"
                       className={cn(
-                        'p-2 rounded-lg border text-left w-full flex justify-between items-center',
+                        'p-2 rounded-lg text-left w-full flex justify-between items-center',
                         variant.id === itemDoc?.item
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-gray-200 hover:border-blue-200'
+                          ? 'border-blue-500 bg-blue-50 hover:border-blue-500'
+                          : 'border-border hover:border-blue-200'
                       )}
                     >
                       <div className="font-medium">{variant.name}</div>
                       <div className="text-sm text-gray-500">{formatCurrency(menuVariant ? Number(menuVariant.price) : 0)}</div>
-                    </button>
+                    </Button>
                   );
                 })}
               </div>
@@ -441,7 +441,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
 
 
         {/* Right Column - Add-ons and Order Button */}
-        <div className="h-auto md:w-1/3 p-6 border-t md:border-t-0 md:border-l border-gray-200 overflow-y-auto flex flex-col">
+        <div className="h-auto md:w-1/3 p-6 border-t md:border-t-0 md:border-l border-border overflow-y-auto flex flex-col">
           <div className="overflow-y-auto mb-6">
             {isAddonLoading ? (
               <div className="mb-6 flex items-center justify-center text-gray-500">{t('product_dialog.loading_addons')}</div>
@@ -452,21 +452,22 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
                 <h3 className="text-lg font-semibold mb-3">{t('product_dialog.addons')}</h3>
                 <div className="space-y-2">
                   {addonDetails.map((addon: any) => (
-                    <button
+                    <Button
                       key={addon.id}
                       onClick={() => handleAddonToggle({ id: addon.id, name: addon.name, price: Number(addon.price) })}
+                      variant="outline"
                       className={cn(
-                        'w-full p-3 rounded-lg border text-left',
+                        'w-full p-3 rounded-lg text-left',
                         selectedAddons.some(item => item.id === addon.id)
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-gray-200 hover:border-blue-200'
+                          ? 'border-blue-500 bg-blue-50 hover:border-blue-500'
+                          : 'border-border hover:border-blue-200'
                       )}
                     >
                       <div className="flex justify-between items-center">
                         <span>{addon.name}</span>
                         <span className="text-sm text-gray-500">+{formatCurrency(Number(addon.price))}</span>
                       </div>
-                    </button>
+                    </Button>
                   ))}
                 </div>
               </div>
@@ -475,7 +476,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
             )}
           </div>
           {/* Always show total section at the end */}
-          <div className="mt-auto pt-2 border-t border-gray-200">
+          <div className="mt-auto pt-2 border-t border-border">
             <div className="flex justify-between items-center text-lg font-semibold">
               <span>{t('product_dialog.total')}&nbsp;</span>
               <span>{formatCurrency(total)}</span>

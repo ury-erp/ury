@@ -37,7 +37,7 @@ const POSOpeningPaymentTable = ({
         {t('pos_opening.opening_balance_help')}
       </p>
 
-      <div className="border border-gray-200 rounded-lg overflow-hidden">
+      <div className="border border-border rounded-lg overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-gray-50">
             <tr>

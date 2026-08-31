@@ -69,7 +69,7 @@ const OrderTypeSelect = ({ disabled }: OrderTypeSelectProps) => {
                 'h-fit flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap bg-white border transition-colors',
                 selectedOrderType === value
                 ? 'text-primary-700 bg-primary-50 border-primary-600 hover:bg-primary-50'
-                : 'text-gray-700 border-gray-200 hover:bg-gray-50',
+                : 'text-gray-700 border-border hover:bg-gray-50',
                 isDisabled && 'opacity-50 cursor-not-allowed'
               )}
               disabled={isDisabled}

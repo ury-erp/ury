@@ -314,7 +314,7 @@ function ConfigurePageContent() {
     >
       <div className="space-y-4 h-full">
         {error && (
-          <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3 text-red-700">
+          <div className="p-4 bg-destructive-tint border border-destructive-tint-border rounded-lg flex items-start gap-3 text-destructive">
             <div className="flex-1 text-sm font-medium">
               <span className="font-bold block mb-1">
                 Configuration Error:
@@ -324,7 +324,7 @@ function ConfigurePageContent() {
 
             <button
               onClick={() => setError(null)}
-              className="text-xs text-red-500 hover:text-red-700 font-semibold underline shrink-0"
+              className="text-xs text-destructive hover:text-destructive font-semibold underline shrink-0"
             >
               Dismiss
             </button>

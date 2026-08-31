@@ -25,24 +25,50 @@ const buttonVariants = cva(
         // Press always reads *darker* than hover. Where the token ramp has a
         // darker step, use it; where it doesn't, `brightness-95` gets the same
         // result without inventing a colour.
+        //
+        // `default` is the mockup's `.btn.p`: solid near-black, used for the
+        // one deliberate primary action on a page. It used to be bright blue
+        // (`bg-primary`) — that read as "everything important is blue" across
+        // the whole app, when the reference design reserves colour for the
+        // rare, genuinely different case. Reuses the same `foreground`/
+        // `background` tokens as `solid` below (kept as a back-compat alias —
+        // do not diverge the two).
         default:
+          "bg-foreground text-background shadow-sm hover:bg-foreground/90 active:bg-foreground active:brightness-90 active:shadow-none",
+        // The rare, deliberate blue call-to-action — opt in explicitly by
+        // name. This is what `default` used to render as; anything that
+        // still wants that accent treatment (not "this is the primary
+        // action," but "this specific action is highlighted in colour on
+        // purpose") should use `variant="accent"` instead of relying on the
+        // old default.
+        accent:
           "bg-primary text-white shadow-sm hover:bg-primary/90 active:bg-primary-600 active:shadow-none",
         destructive:
           "bg-destructive text-white shadow-sm hover:bg-destructive/90 active:bg-destructive active:brightness-95 active:shadow-none",
         outline:
-          "border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground hover:border-gray-300 active:bg-gray-100 active:shadow-none",
+          "border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground hover:border-border active:bg-accent/80 active:shadow-none",
+        // Mockup's default `.btn`: inset 1px ring on a card surface instead
+        // of a real border, so it sits flush against adjacent chrome. Kept
+        // separate from `outline` (rather than changing it in place) because
+        // `outline` is used broadly across existing call sites that expect a
+        // real border/background pairing — swapping its box model risks
+        // visible regressions we can't audit from this file alone.
+        chrome:
+          "bg-card text-foreground shadow-[inset_0_0_0_1px_hsl(var(--hair2))] hover:bg-muted active:bg-hair active:shadow-[inset_0_0_0_1px_hsl(var(--hair2))]",
+        solid:
+          "bg-foreground text-background shadow-none hover:bg-foreground/90 active:bg-foreground active:brightness-90",
         secondary:
-          "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80 active:bg-gray-200 active:shadow-none",
+          "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80 active:bg-secondary/60 active:shadow-none",
         ghost:
-          "hover:bg-accent hover:text-accent-foreground active:bg-gray-200",
+          "hover:bg-accent hover:text-accent-foreground active:bg-accent/80",
         link: "underline-offset-4 hover:underline text-primary active:scale-100 active:text-primary-600",
         tab: "bg-gray-100 text-gray-700 font-medium border-0 hover:bg-gray-200 active:bg-gray-300 data-[selected=true]:bg-primary-50 data-[selected=true]:text-primary-700 data-[selected=true]:hover:bg-primary-100",
         success:
-          "bg-green-600 text-white shadow-sm hover:bg-green-700 active:bg-green-800 active:shadow-none",
+          "bg-success-600 text-white shadow-sm hover:bg-success-700 active:bg-success-800 active:shadow-none",
         warning:
-          "bg-orange-600 text-white shadow-sm hover:bg-orange-700 active:bg-orange-800 active:shadow-none",
+          "bg-warning-600 text-white shadow-sm hover:bg-warning-700 active:bg-warning-800 active:shadow-none",
         danger:
-          "bg-red-600 text-white shadow-sm hover:bg-red-700 active:bg-red-800 active:shadow-none",
+          "bg-destructive text-white shadow-sm hover:bg-destructive/90 active:bg-destructive active:brightness-95 active:shadow-none",
       },
       // Control height scale, shared with Input/Select so a button always
       // lines up with the field next to it: xs 32 / sm 36 / default 44 / lg 48.
@@ -54,6 +80,12 @@ const buttonVariants = cva(
         lg: "h-12 px-6 text-base rounded-md",
         icon: "h-11 w-11 p-0",
         xs: "h-8 px-2.5 text-xs rounded-sm",
+        // Mockup's dense `.btn` scale (28/24/36px), additive alongside the
+        // touch-target-first defaults above — for chrome/toolbars, not
+        // primary POS actions.
+        compact: "h-7 px-2.5 text-xs rounded-[7px] gap-1.5",
+        compactSm: "h-6 px-2 text-[11.5px] rounded-[7px] gap-1.5",
+        compactLg: "h-9 px-3.5 text-[13px] rounded-[7px] gap-1.5",
       },
     },
     defaultVariants: {
