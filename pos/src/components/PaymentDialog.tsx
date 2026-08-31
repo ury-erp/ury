@@ -86,8 +86,17 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   const showAdjustment = Math.abs(roundedAdjustment) > 0.001;
   const totalDiscount = appliedDiscount;
   const discountedTotal = Math.max(0, subtotal - totalDiscount);
+  // Rounding can be turned off (POS Profile / Global Defaults -> disable_rounded_total).
+  // When it is off the exact total must be charged: rounding it here would collect
+  // more than the invoice says, and the difference is never sent to the server, so
+  // it silently ends up as change the cashier is not told to give back.
+  const disableRoundedTotal = Boolean(storePosProfile?.disable_rounded_total);
   // If discount is applied, round up; else, round normally
-  const finalTotal = appliedDiscount > 0 ? Math.ceil(discountedTotal) : Math.round(discountedTotal);
+  const finalTotal = disableRoundedTotal
+    ? discountedTotal
+    : appliedDiscount > 0
+      ? Math.ceil(discountedTotal)
+      : Math.round(discountedTotal);
 
   // Calculate split payment total
   const payments = paymentModes
