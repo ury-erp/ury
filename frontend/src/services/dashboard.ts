@@ -198,6 +198,22 @@ export interface PlanStatus {
 
 const unwrap = <T,>(res: unknown): T => ((res as any)?.message ?? res) as T;
 
+export interface CloseDayChecklistItem {
+  key: string;
+  label: string;
+  count: number;
+  blocking: boolean;
+  scope_note?: string;
+}
+
+export interface CloseDayChecklist {
+  branch: string;
+  service_date: string;
+  items: CloseDayChecklistItem[];
+  has_pos_profile: boolean;
+  unposted_production_is_company_wide: boolean;
+}
+
 export const uryDashboardService = {
   async getCancelledInvoicesCount(branch?: string): Promise<number> {
     const res = await call.get<number>('ury.ury.api.ury_dashboard.get_cancelled_invoices_count', { branch });
@@ -240,5 +256,13 @@ export const uryDashboardService = {
       plan_date: planDate,
     });
     return unwrap<PlanStatus>(res);
+  },
+
+  async getCloseDayChecklist(branch: string, serviceDate: string): Promise<CloseDayChecklist> {
+    const res = await call.get<CloseDayChecklist>('ury.ury.report_api.day_close.get_close_day_checklist', {
+      branch,
+      service_date: serviceDate,
+    });
+    return unwrap<CloseDayChecklist>(res);
   },
 };

@@ -7,17 +7,22 @@ import {
   PlanVsActualResult,
   PlanVsActualRow,
 } from '../../services/departmentProfitability';
-import { uryDashboardService, DailyPnlSummary, PlanStatus } from '../../services/dashboard';
+import { uryDashboardService, DailyPnlSummary, PlanStatus, CloseDayChecklist } from '../../services/dashboard';
 
 /**
- * Day-close overview page. Ties together three things:
+ * Day-close overview page. Ties together:
  *  - a real KPI strip from `getDailyPnlSummary` / `getPlanStatus`
  *  - a real plan-vs-actual DataTable from `getPlanVsActual` (same backend
  *    and visual language as DepartmentProfitabilityPage.tsx)
- *  - two HONEST STUB sections: a close-day blocker checklist and an
- *    "Apply to next plan" action. Neither has a backend endpoint anywhere
- *    in `frontend/src/services` as of this writing -- they are rendered as
- *    explicit "not yet available" placeholders, not fake-functional UI.
+ *  - a real close-day blocker checklist from `getCloseDayChecklist`,
+ *    assembled from existing data (URY Table occupancy, Work Order status,
+ *    POS Closing Entry, URY Issue Wastage sign-off) -- see
+ *    ury/ury/report_api/day_close.py for the exact sourcing.
+ *  - one HONEST "coming soon" section: carrying today's variance into
+ *    tomorrow's sales plan. That is a real product feature requiring
+ *    business-logic decisions about how variance should carry forward,
+ *    not a thin read -- it is intentionally not half-built here, and the
+ *    UI never mentions backend/API/endpoint internals to end users.
  *
  * Company is derived from the selected branch (same pattern as
  * DepartmentProfitabilityPage.tsx / DepartmentStockPage.tsx), never free
@@ -100,6 +105,8 @@ export const DayClosePage: React.FC = () => {
   const [pnlSummary, setPnlSummary] = useState<DailyPnlSummary | null>(null);
   const [planStatus, setPlanStatus] = useState<PlanStatus | null>(null);
   const [planVsActual, setPlanVsActual] = useState<PlanVsActualResult | null>(null);
+  const [checklist, setChecklist] = useState<CloseDayChecklist | null>(null);
+  const [checklistError, setChecklistError] = useState<string>('');
   const [state, setState] = useState<LoadState>('loading');
   const [errorMessage, setErrorMessage] = useState<string>('');
 
@@ -162,6 +169,15 @@ export const DayClosePage: React.FC = () => {
       const message = err instanceof Error ? err.message : 'Failed to load day-close data';
       setErrorMessage(message);
       setState('error');
+    }
+
+    try {
+      setChecklistError('');
+      const checklistResult = await uryDashboardService.getCloseDayChecklist(branch, serviceDate);
+      setChecklist(checklistResult);
+    } catch (err) {
+      setChecklist(null);
+      setChecklistError(err instanceof Error ? err.message : 'Failed to load close-day checklist');
     }
   };
 
@@ -278,32 +294,54 @@ export const DayClosePage: React.FC = () => {
         </Section>
       )}
 
-      {/* Honest stub: no close-day blocker checklist endpoint exists yet
-          anywhere in frontend/src/services. Do not fabricate checklist
-          items or interactive checkboxes that would not persist. */}
       <Section>
-        <Panel pad data-testid="close-day-checklist-stub">
+        <Panel pad data-testid="close-day-checklist">
           <h3 className="text-sm font-semibold mb-2">Close Day Checklist</h3>
-          <p className="text-sm text-muted-foreground">
-            The close-day blocker checklist (open tables, unposted production, closing counts, wastage sign-off) is not
-            yet available -- there is no backend endpoint for it. This section will populate once that API exists.
-          </p>
+          {checklistError && (
+            <p className="text-sm text-destructive" data-testid="close-day-checklist-error">
+              {checklistError}
+            </p>
+          )}
+          {!checklistError && !checklist && (
+            <p className="text-sm text-muted-foreground">Loading checklist…</p>
+          )}
+          {!checklistError && checklist && (
+            <ul className="flex flex-col gap-2">
+              {checklist.items.map((item) => (
+                <li key={item.key} className="flex items-center justify-between gap-3 text-sm" data-testid={`close-day-checklist-item-${item.key}`}>
+                  <span className="inline-flex items-center gap-2">
+                    <StatusDot tone={item.blocking ? 'warning' : 'success'} />
+                    {item.label}
+                    {item.scope_note && (
+                      <span className="text-xs text-muted-foreground">({item.scope_note})</span>
+                    )}
+                  </span>
+                  <span className={numericCellClass}>
+                    {item.blocking ? `${item.count} open` : 'Clear'}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </Panel>
       </Section>
 
-      {/* Honest stub: no "apply to next plan" mutation endpoint exists yet.
-          Disabled button, not a functional-looking no-op. */}
+      {/* Product decision: carrying today's variance into tomorrow's sales
+          plan needs real business-logic decisions (which variance sources
+          count, how much to carry, manager override rules) that are out of
+          scope here. This is an honest "coming soon" state, not a
+          backend-availability note -- it never mentions APIs/endpoints. */}
       <Section>
         <Panel pad data-testid="close-day-apply-to-plan-stub">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div>
               <h3 className="text-sm font-semibold mb-1">Apply to Next Plan</h3>
               <p className="text-sm text-muted-foreground">
-                Carrying today's variance into tomorrow's sales plan is not wired up yet -- no backend endpoint exists
-                for it.
+                Coming soon. Carrying today's variance into tomorrow's sales plan will let you apply today's results
+                directly when planning tomorrow's service.
               </p>
             </div>
-            <Button disabled title="Not yet available: no backend endpoint exists for this action" data-testid="close-day-apply-to-plan-button">
+            <Button disabled title="Coming soon" data-testid="close-day-apply-to-plan-button">
               Apply to Next Plan
             </Button>
           </div>
