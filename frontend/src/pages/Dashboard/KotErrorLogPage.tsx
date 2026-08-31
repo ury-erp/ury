@@ -127,9 +127,14 @@ export const KotErrorLogPage: React.FC = () => {
           <Select
             value={selectedProfile}
             onChange={(e) => setSelectedProfile(e.target.value)}
-            options={profiles.map((p) => ({ label: p.name, value: p.name }))}
             placeholder="Select a POS Profile"
-          />
+          >
+            {profiles.map((p) => (
+              <option key={p.name} value={p.name}>
+                {p.name}
+              </option>
+            ))}
+          </Select>
         </Card>
       )}
 
