@@ -6,6 +6,9 @@ import {
   Select,
   SelectItem,
   Card,
+  Checkbox,
+  Page,
+  Section,
   Spinner,
   showToast,
 } from '@ury/ui';
@@ -288,18 +291,20 @@ export const CommissionSettingsPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background p-6 md:p-8">
-      <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-6 rounded-xl border border-border shadow-xs">
+    <Page>
+      {/* Header */}
+      <Section className="!mt-0">
+        <Card padding="lg" className="flex flex-col md:flex-row md:items-center justify-between gap-4 rounded-xl shadow-xs">
           <div>
             <h1 className="text-2xl font-bold text-foreground tracking-tight">Commission Settings</h1>
             <p className="text-sm text-muted-foreground">
               Configure commission rules, attribution modes, and calculation bases.
             </p>
           </div>
-        </div>
+        </Card>
+      </Section>
 
+      <Section>
         {/* Policy Card */}
         <Card padding="none" className="rounded-xl overflow-hidden shadow-xs">
           <div className="px-6 py-4 border-b border-border">
@@ -418,8 +423,9 @@ export const CommissionSettingsPage: React.FC = () => {
             </div>
             <Button
               size="sm"
+              variant="outline"
               onClick={addRule}
-              className="bg-primary hover:bg-primary/90 text-white inline-flex items-center gap-1.5"
+              className="inline-flex items-center gap-1.5"
             >
               <Plus className="w-3.5 h-3.5" />
               Add Rule
@@ -436,11 +442,10 @@ export const CommissionSettingsPage: React.FC = () => {
                 <div key={ruleIdx} className="p-4 bg-card rounded-lg border border-border space-y-4">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
+                      <Checkbox
+                        size="sm"
                         checked={rule.disabled}
                         onChange={(e) => updateRule(ruleIdx, { disabled: e.target.checked })}
-                        className="mt-1"
                       />
                       <label className="text-xs text-muted-foreground">Disabled</label>
                     </div>
@@ -635,20 +640,16 @@ export const CommissionSettingsPage: React.FC = () => {
             )}
           </div>
         </Card>
+      </Section>
 
-        {/* Save Button */}
-        <div className="flex justify-end">
-          <Button
-            onClick={handleSave}
-            disabled={saving}
-            className="bg-primary hover:bg-primary/90 text-white flex items-center gap-2"
-          >
-            {saving ? <Spinner className="w-4 h-4" /> : <Save className="w-4 h-4" />}
-            Save Commission Settings
-          </Button>
-        </div>
-      </div>
-    </div>
+      {/* Save Button */}
+      <Section className="flex justify-end">
+        <Button onClick={handleSave} disabled={saving} className="gap-2">
+          {saving ? <Spinner className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+          Save Commission Settings
+        </Button>
+      </Section>
+    </Page>
   );
 };
 

@@ -6,6 +6,8 @@ import {
   Select,
   SelectItem,
   Card,
+  Page,
+  Section,
   Spinner,
   showToast,
 } from '@ury/ui';
@@ -235,9 +237,9 @@ export const AiAssistantSettingsPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background p-6 md:p-8">
-      <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header */}
+    <Page>
+      {/* Header */}
+      <Section className="!mt-0">
         <Card padding="lg" className="flex flex-col md:flex-row md:items-center justify-between gap-4 rounded-xl shadow-xs">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-semibold shrink-0">
@@ -251,8 +253,10 @@ export const AiAssistantSettingsPage: React.FC = () => {
             </div>
           </div>
         </Card>
+      </Section>
 
-        {/* Enable toggle */}
+      {/* Enable toggle */}
+      <Section>
         <Card padding="none" className="rounded-xl overflow-hidden shadow-xs">
           <div className="p-6">
             <div className="flex items-center justify-between p-4 bg-card rounded-xl border border-border">
@@ -276,8 +280,10 @@ export const AiAssistantSettingsPage: React.FC = () => {
             </div>
           </div>
         </Card>
+      </Section>
 
-        {/* Assistant configuration */}
+      {/* Assistant configuration */}
+      <Section>
         <Card padding="none" className="rounded-xl overflow-hidden shadow-xs">
           <div className="px-6 py-4 border-b border-border">
             <h2 className="text-lg font-bold text-foreground">Assistant Configuration</h2>
@@ -360,7 +366,7 @@ export const AiAssistantSettingsPage: React.FC = () => {
                 <Button
                   onClick={handleSaveConfig}
                   disabled={saving || !selectedModel}
-                  className="bg-primary hover:bg-primary/90 text-white flex items-center gap-2"
+                  className="gap-2"
                 >
                   {saving ? <Spinner className="w-4 h-4" /> : <Save className="w-4 h-4" />}
                   Save Configuration
@@ -417,7 +423,7 @@ export const AiAssistantSettingsPage: React.FC = () => {
                         type="button"
                         onClick={handleSaveKey}
                         disabled={savingKey || !keyProvider || !apiKeyInput.trim()}
-                        className="bg-primary hover:bg-primary/90 text-white inline-flex items-center gap-1.5"
+                        className="inline-flex items-center gap-1.5"
                       >
                         {savingKey ? <Spinner className="w-4 h-4" /> : <KeyRound className="w-3.5 h-3.5" />}
                         Save
@@ -429,8 +435,8 @@ export const AiAssistantSettingsPage: React.FC = () => {
             </div>
           )}
         </Card>
-      </div>
-    </div>
+      </Section>
+    </Page>
   );
 };
 
