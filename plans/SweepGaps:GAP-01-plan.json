@@ -1,0 +1,21 @@
+{
+  "subtasks": [
+    {
+      "objective": "Move KOT delay alerts out of the URYMosaic client timer and into a backend scheduled alert pipeline that scans unserved URY KOT records past the POS Profile warning threshold, fixes the URY KOT Items parenttype filter, and supports repeatable deduplicated notifications through pluggable delivery channels.",
+      "acceptance": "A scheduled backend job detects delayed non-cancelled, unserved URY KOT records even when no KDS screen is open; alerts are deduplicated per KOT and can repeat on a documented interval until the KOT is no longer alertable; existing desk Notification Log delivery still works through a channel abstraction; the items query returns URY KOT Items by using the correct parenttype; scheduler registration is present; focused tests or bench-console verification cover alert eligibility, dedupe/repeat behavior, recipient lookup, and the parenttype fix.",
+      "scope": [
+        "ury/hooks.py",
+        "ury/ury/api/ury_kot_notification.py",
+        "ury/patches.txt",
+        "ury/patches/**/*.py",
+        "ury/ury/doctype/ury_kot/**/*.json",
+        "ury/ury/doctype/ury_kot/**/*.py"
+      ],
+      "task_type": "impl",
+      "difficulty": 4,
+      "risk": 4,
+      "uncertainty": 3,
+      "priority": 100
+    }
+  ]
+}
