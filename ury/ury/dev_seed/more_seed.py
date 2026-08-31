@@ -228,7 +228,7 @@ def _ensure_demo_issue_authorization(plan_name, branch_name, company_name, depar
             {
                 "doctype": "URY Issue Authorization",
                 "plan": plan_name,
-                "plan_approval_hash": "dev-seed-more-seed",
+                "plan_approval_hash": frappe.generate_hash(length=20),
                 "branch": branch_name,
                 "company": company_name,
                 "department": department,
@@ -356,7 +356,7 @@ def _seed_stock_reservations(branch_name, company_name, warehouse, items, actor)
         component_item = items[(i + 1) % len(items)]
         status = RESERVATION_STATUSES[i % len(RESERVATION_STATUSES)]
         qty = 3 + (i % 5)
-        order_ref = f"dev-seed-order-{i + 1}"
+        order_ref = f"ORD-{2000 + i + 1}"
 
         if frappe.db.exists(
             "URY Stock Reservation",
@@ -372,7 +372,7 @@ def _seed_stock_reservations(branch_name, company_name, warehouse, items, actor)
                     "order_ref": order_ref,
                     "policy": "SOFT",
                     "status": status,
-                    "reason": "Dev-seed demo reservation" if status != "Reserved" else None,
+                    "reason": "Held for dine-in order" if status != "Reserved" else None,
                     "branch": branch_name,
                     "company": company_name,
                     "warehouse": warehouse,

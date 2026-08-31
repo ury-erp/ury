@@ -362,7 +362,7 @@ def _kot_exists(production, label):
 		"URY KOT",
 		{
 			"production": production,
-			"comments": f"dev_seed:{label}",
+			"comments": f"Kitchen note: {label}",
 			"docstatus": 1,
 		},
 	)
@@ -409,7 +409,7 @@ def _create_kot(
 			"type": kot_type,
 			"order_status": order_status,
 			"verified": verified,
-			"comments": f"dev_seed:{label}",
+			"comments": f"Kitchen note: {label}",
 			"date": created_at.date(),
 			"time": created_at.time(),
 			"table_takeaway": 0,

@@ -240,35 +240,60 @@ def _get_staff_users(role):
 	return sorted({r.parent for r in rows if r.parent not in ("Administrator", "Guest")})
 
 
+# Realistic staff name pools, keyed by the same `name_prefix` values callers
+# already pass ("cashier", "waiter") -- swapped in for the old
+# "Dev Seed <Role> <N>" placeholder names, which leaked into
+# EmployeeSales/EmployeeItemWiseSales reports and the POS UI.
+STAFF_NAME_POOLS = {
+	"cashier": [
+		("Ramesh", "Nair"),
+		("Deepak", "Menon"),
+		("Farah", "Sheikh"),
+		("Vikas", "Choudhary"),
+	],
+	"waiter": [
+		("Suraj", "Yadav"),
+		("Imran", "Ansari"),
+		("Ganesh", "Naidu"),
+		("Tarun", "Bhatia"),
+	],
+}
+
+
 def _ensure_min_staff(role, min_count, name_prefix):
 	"""Make sure at least `min_count` real Users hold `role`, so EmployeeSales
 	(which INNER JOINs POS Invoice.cashier/waiter to tabUser) has more than
 	one row to rank. Reuses whatever Users already have the role; creates
-	simple demo Users (idempotent by email) only to fill the gap -- never
-	removes or reassigns existing ones.
+	Users with realistic staff names (idempotent by email) only to fill the
+	gap -- never removes or reassigns existing ones.
 	"""
 	users = _get_staff_users(role)
 	needed = min_count - len(users)
 	if needed <= 0:
 		return users
 
+	pool = STAFF_NAME_POOLS.get(name_prefix, [("Staff", "Member")])
+
 	for i in range(1, needed + 1):
-		email = f"dev-seed-{name_prefix}-{i}@ury.local"
+		first_name, last_name = pool[(i - 1) % len(pool)]
+		suffix = "" if i <= len(pool) else str(i)
+		email = f"{first_name.lower()}.{last_name.lower()}{suffix}@ury.local"
 		if not frappe.db.exists("User", email):
 			try:
 				user = frappe.get_doc(
 					{
 						"doctype": "User",
 						"email": email,
-						"first_name": f"Dev Seed {name_prefix.title()} {i}",
+						"first_name": first_name,
+						"last_name": f"{last_name}{suffix}" if suffix else last_name,
 						"send_welcome_email": 0,
 						"roles": [{"role": role}],
 					}
 				)
 				user.insert(ignore_permissions=True)
-				print(f"Created demo User '{email}' with role '{role}' for staff-sales seeding")
+				print(f"Created User '{email}' with role '{role}' for staff-sales seeding")
 			except Exception as e:
-				print(f"  ! Failed to create demo User '{email}': {e}")
+				print(f"  ! Failed to create User '{email}': {e}")
 				continue
 		elif not frappe.db.exists("Has Role", {"parent": email, "role": role}):
 			try:
@@ -541,7 +566,7 @@ def _ensure_demo_employee(branch_name):
 	# HR-EMP-NNNNN row -- and therefore a new demo Employee -- on every
 	# single `seed()` call). Look it up by `employee_name` instead, per this
 	# module's own documented "known trap" for hash-autonamed doctypes.
-	existing = frappe.db.get_value("Employee", {"employee_name": "Dev Seed Staff"}, "name")
+	existing = frappe.db.get_value("Employee", {"employee_name": "Suresh Pillai"}, "name")
 	if existing:
 		return existing
 
@@ -549,7 +574,8 @@ def _ensure_demo_employee(branch_name):
 		doc = frappe.get_doc(
 			{
 				"doctype": "Employee",
-				"first_name": "Dev Seed Staff",
+				"first_name": "Suresh",
+				"last_name": "Pillai",
 				"gender": "Male",
 				"date_of_birth": "1995-01-01",
 				"date_of_joining": today(),
@@ -564,7 +590,7 @@ def _ensure_demo_employee(branch_name):
 			}
 		)
 		doc.insert(ignore_permissions=True)
-		print(f"Created demo Employee for Daily P&L seeding: {doc.name}")
+		print(f"Created Employee for Daily P&L seeding: {doc.name}")
 		return doc.name
 	except Exception as e:
 		print(f"  ! Failed to create demo Employee for Daily P&L seeding: {e}")
