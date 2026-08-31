@@ -4,8 +4,9 @@ import './index.css'
 import App from './App.tsx'
 import { mountLanguageSwitcher, startDomI18n } from '@ury/core'
 import russianTranslations from './i18n/ru.json'
+import kazakhTranslations from './i18n/kk.json'
 
-startDomI18n(russianTranslations)
+startDomI18n({ ru: russianTranslations, kk: kazakhTranslations })
 mountLanguageSwitcher()
 
 createRoot(document.getElementById('root')!).render(

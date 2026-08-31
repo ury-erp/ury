@@ -97,7 +97,7 @@ const Header = () => {
     }
   };
 
-  const handleLanguageChange = (language: 'en' | 'ru') => {
+  const handleLanguageChange = (language: 'en' | 'ru' | 'kk') => {
     setShowUserMenu(false);
     if (language === activeLanguage) return;
 
@@ -180,7 +180,7 @@ const Header = () => {
                     <Languages className="w-4 h-4" />
                     <span>{t('header.language')}</span>
                   </div>
-                  <div className="grid grid-cols-2 gap-2 mt-2">
+                  <div className="grid grid-cols-3 gap-2 mt-2">
                     <Button
                       type="button"
                       size="xs"
@@ -198,6 +198,15 @@ const Header = () => {
                       onClick={() => handleLanguageChange('ru')}
                     >
                       {t('header.russian')}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="xs"
+                      variant={activeLanguage === 'kk' ? 'default' : 'outline'}
+                      aria-pressed={activeLanguage === 'kk'}
+                      onClick={() => handleLanguageChange('kk')}
+                    >
+                      {t('header.kazakh')}
                     </Button>
                   </div>
                 </div>

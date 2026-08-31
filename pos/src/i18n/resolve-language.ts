@@ -16,6 +16,7 @@ type FrappeWindow = Window & {
 
 function normalizeLanguage(language?: string | null): string | undefined {
   const normalized = language?.toLowerCase().split(/[-_]/)[0];
+  if (normalized === 'kz') return 'kk';
   return normalized && SUPPORTED_LANGUAGES[normalized] ? normalized : undefined;
 }
 

@@ -1,8 +1,9 @@
-export type UryLanguage = 'en' | 'ru';
+export type UryLanguage = 'en' | 'ru' | 'kk';
 
 export const URY_LANGUAGES: Record<UryLanguage, string> = {
   en: 'English',
   ru: 'Русский',
+  kk: 'Қазақша',
 };
 
 export const URY_LANGUAGE_STORAGE_KEY = 'ury_language';
@@ -16,6 +17,7 @@ type FrappeWindow = Window & {
 };
 
 type TranslationDictionary = Record<string, string>;
+type TranslationCatalog = Partial<Record<Exclude<UryLanguage, 'en'>, TranslationDictionary>>;
 
 type TemplateTranslation = {
   pattern: RegExp;
@@ -25,7 +27,8 @@ type TemplateTranslation = {
 
 function normalizeLanguage(language?: string | null): UryLanguage | undefined {
   const normalized = language?.toLowerCase().split(/[-_]/)[0];
-  return normalized === 'en' || normalized === 'ru' ? normalized : undefined;
+  if (normalized === 'kz') return 'kk';
+  return normalized === 'en' || normalized === 'ru' || normalized === 'kk' ? normalized : undefined;
 }
 
 export function resolveUryLanguage(): UryLanguage {
@@ -45,7 +48,7 @@ export function setUryLanguage(language: UryLanguage, reload = true): void {
   if (reload) window.location.reload();
 }
 
-/** Adds a compact EN/RU switch for apps that do not yet have a native header control. */
+/** Adds a compact language switch for apps that do not yet have a native control. */
 export function mountLanguageSwitcher(): () => void {
   if (typeof document === 'undefined') return () => undefined;
 
@@ -56,7 +59,14 @@ export function mountLanguageSwitcher(): () => void {
     const wrapper = document.createElement('div');
     wrapper.dataset.uryLanguageSwitcher = 'true';
     wrapper.setAttribute('role', 'group');
-    wrapper.setAttribute('aria-label', activeLanguage === 'ru' ? 'Выбор языка' : 'Language selection');
+    wrapper.setAttribute(
+      'aria-label',
+      activeLanguage === 'ru'
+        ? 'Выбор языка'
+        : activeLanguage === 'kk'
+          ? 'Тілді таңдау'
+          : 'Language selection',
+    );
     Object.assign(wrapper.style, {
       position: 'fixed',
       right: '12px',
@@ -72,7 +82,7 @@ export function mountLanguageSwitcher(): () => void {
       fontFamily: 'system-ui, sans-serif',
     });
 
-    for (const language of ['en', 'ru'] as const) {
+    for (const language of Object.keys(URY_LANGUAGES) as UryLanguage[]) {
       const button = document.createElement('button');
       button.type = 'button';
       button.textContent = language.toUpperCase();
@@ -104,6 +114,21 @@ export function mountLanguageSwitcher(): () => void {
     document.removeEventListener('DOMContentLoaded', mount);
     document.querySelector('[data-ury-language-switcher]')?.remove();
   };
+}
+
+function resolveDomDictionary(
+  dictionaryOrCatalog: TranslationDictionary | TranslationCatalog,
+  activeLanguage: UryLanguage,
+): TranslationDictionary | undefined {
+  if (activeLanguage === 'en') return undefined;
+
+  const catalogCandidate = dictionaryOrCatalog as TranslationCatalog;
+  const languageDictionary = catalogCandidate[activeLanguage as Exclude<UryLanguage, 'en'>];
+  if (languageDictionary && typeof languageDictionary === 'object') {
+    return languageDictionary;
+  }
+
+  return dictionaryOrCatalog as TranslationDictionary;
 }
 
 function normalizeText(value: string): string {
@@ -159,12 +184,20 @@ const IGNORED_ELEMENTS = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'CODE', 'PRE'])
  * incrementally moved to key-based i18n. The dictionary is owned by the
  * consuming app; this module only provides the framework-neutral DOM bridge.
  */
-export function startDomI18n(dictionary: TranslationDictionary): () => void {
-  if (typeof document === 'undefined' || resolveUryLanguage() !== 'ru') {
+export function startDomI18n(
+  dictionaryOrCatalog: TranslationDictionary | TranslationCatalog,
+): () => void {
+  if (typeof document === 'undefined') {
     return () => undefined;
   }
 
-  document.documentElement.lang = 'ru';
+  const activeLanguage = resolveUryLanguage();
+  const dictionary = resolveDomDictionary(dictionaryOrCatalog, activeLanguage);
+  if (!dictionary) {
+    return () => undefined;
+  }
+
+  document.documentElement.lang = activeLanguage;
   document.documentElement.dir = 'ltr';
   const templates = compileTemplateTranslations(dictionary);
 
