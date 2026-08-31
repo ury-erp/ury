@@ -16,6 +16,7 @@ patching an existing profile).
 """
 
 import frappe
+from frappe.utils import now, today
 
 
 def seed():
@@ -29,6 +30,7 @@ def seed():
     restaurant_name = _get_demo_restaurant(branch_name)
 
     pos_profile_name = _seed_pos_profile(company_name, branch_name, restaurant_name)
+    _ensure_pos_opening_entry(company_name, branch_name, pos_profile_name)
     _seed_self_ordering_profile(pos_profile_name, branch_name, restaurant_name)
 
 
@@ -85,12 +87,44 @@ def _get_demo_restaurant(branch_name):
     return restaurant_doc.name
 
 
-def _ensure_mode_of_payment(name):
+def _ensure_mode_of_payment(name, company_name=None):
     if not frappe.db.exists("Mode of Payment", name):
-        frappe.get_doc({"doctype": "Mode of Payment", "mode_of_payment": name, "type": "General"}).insert(
-            ignore_permissions=True
-        )
+        doc = frappe.get_doc({"doctype": "Mode of Payment", "mode_of_payment": name, "type": "General"})
+        if company_name:
+            account = _default_mop_account(name, company_name)
+            if account:
+                doc.append("accounts", {"company": company_name, "default_account": account})
+        doc.insert(ignore_permissions=True)
+        return doc.name
+
+    if not company_name:
+        return name
+
+    mop_doc = frappe.get_doc("Mode of Payment", name)
+    existing = [row.company for row in mop_doc.get("accounts", [])]
+    if company_name not in existing:
+        account = _default_mop_account(name, company_name)
+        if account:
+            mop_doc.append("accounts", {"company": company_name, "default_account": account})
+            mop_doc.save(ignore_permissions=True)
     return name
+
+
+def _default_mop_account(name, company_name):
+    """Pick a sensible default account for a Mode of Payment."""
+    if name == "Cash":
+        account_type = "Cash"
+    else:
+        account_type = "Bank"
+    account = frappe.db.get_value(
+        "Account", {"company": company_name, "account_type": account_type, "is_group": 0}, "name"
+    )
+    if not account and account_type == "Bank":
+        # Fall back to Cash if no Bank account exists.
+        account = frappe.db.get_value(
+            "Account", {"company": company_name, "account_type": "Cash", "is_group": 0}, "name"
+        )
+    return account
 
 
 def _ensure_warehouse(company_name):
@@ -137,9 +171,9 @@ def _seed_pos_profile(company_name, branch_name, restaurant_name):
     warehouse_name = _ensure_warehouse(company_name)
     selling_price_list = _ensure_price_list()
 
-    cash_mode = _ensure_mode_of_payment("Cash")
-    card_mode = _ensure_mode_of_payment("Card")
-    upi_mode = _ensure_mode_of_payment("UPI")
+    cash_mode = _ensure_mode_of_payment("Cash", company_name)
+    card_mode = _ensure_mode_of_payment("Card", company_name)
+    upi_mode = _ensure_mode_of_payment("UPI", company_name)
 
     customer = frappe.db.get_value("Customer", {}, "name")
 
@@ -159,6 +193,10 @@ def _seed_pos_profile(company_name, branch_name, restaurant_name):
         {"item_label": "Shift Handover Notes Logged", "applies_to": "Both", "is_mandatory": 0},
     ]
 
+    # MultiSelect table fields on POS Profile require a list of child rows,
+    # not a plain string.
+    role_permitted_rows = {"role_allowed_for_billing": "URY Cashier", "transfer_role_permissions": "URY Manager"}
+
     fields = {
         "company": company_name,
         "warehouse": warehouse_name,
@@ -176,8 +214,6 @@ def _seed_pos_profile(company_name, branch_name, restaurant_name):
         "restaurant": restaurant_name,
         "paid_limit": 50000,
         "table_attention_time": 30,
-        "role_allowed_for_billing": "URY Cashier",
-        "transfer_role_permissions": "URY Manager",
         "custom_kot_naming_series": "KOT-URY-",
         "custom_enable_discount": 1,
         "custom_multiple_cashier_configuration": 0,
@@ -191,22 +227,34 @@ def _seed_pos_profile(company_name, branch_name, restaurant_name):
     meta = frappe.get_meta("POS Profile")
     fields = {k: v for k, v in fields.items() if meta.has_field(k) and v not in (None, "")}
 
+    def _role_rows(role):
+        return [{"doctype": "Role Permitted", "role": role}]
+
     if not frappe.db.exists("POS Profile", pos_profile_name):
-        doc_dict = {"doctype": "POS Profile", "name": pos_profile_name, **fields}
+        doc_dict = {"doctype": "POS Profile", **fields}
         doc_dict["payments"] = [
-            {"mode_of_payment": cash_mode, "default": 1},
-            {"mode_of_payment": card_mode, "default": 0},
-            {"mode_of_payment": upi_mode, "default": 0},
+            {"doctype": "POS Payment Method", "mode_of_payment": cash_mode, "default": 1},
+            {"doctype": "POS Payment Method", "mode_of_payment": card_mode, "default": 0},
+            {"doctype": "POS Payment Method", "mode_of_payment": upi_mode, "default": 0},
         ]
         if meta.has_field("applicable_for_users") and cashier_emails:
+            # Demo profiles do not claim the per-user default slot; only one
+            # POS Profile can be default for a user across the site.
             doc_dict["applicable_for_users"] = [
-                {"user": email, "default": 1 if i == 0 else 0} for i, email in enumerate(cashier_emails)
+                {"doctype": "POS Profile User", "user": email, "default": 0}
+                for email in cashier_emails
             ]
         if meta.has_field("custom_checklist_items"):
-            doc_dict["custom_checklist_items"] = checklist_items
+            doc_dict["custom_checklist_items"] = [
+                {"doctype": "URY Checklist Item", **row} for row in checklist_items
+            ]
+        for fieldname, role in role_permitted_rows.items():
+            if meta.has_field(fieldname):
+                doc_dict[fieldname] = _role_rows(role)
 
         pos_doc = frappe.get_doc(doc_dict)
-        pos_doc.insert(ignore_permissions=True)
+        pos_doc.name = pos_profile_name
+        pos_doc.insert(ignore_permissions=True, ignore_if_duplicate=True)
         return pos_doc.name
 
     # Existing profile (e.g. created by the setup wizard's "Just show me a demo" flow):
@@ -217,6 +265,11 @@ def _seed_pos_profile(company_name, branch_name, restaurant_name):
     for fieldname, value in fields.items():
         if not pos_doc.get(fieldname):
             pos_doc.set(fieldname, value)
+            dirty = True
+
+    for fieldname, role in role_permitted_rows.items():
+        if meta.has_field(fieldname) and not pos_doc.get(fieldname):
+            pos_doc.set(fieldname, _role_rows(role))
             dirty = True
 
     if not pos_doc.get("payments"):
@@ -233,18 +286,89 @@ def _seed_pos_profile(company_name, branch_name, restaurant_name):
     if meta.has_field("applicable_for_users") and not pos_doc.get("applicable_for_users") and cashier_emails:
         pos_doc.set(
             "applicable_for_users",
-            [{"user": email, "default": 1 if i == 0 else 0} for i, email in enumerate(cashier_emails)],
+            [{"doctype": "POS Profile User", "user": email, "default": 0} for email in cashier_emails],
         )
         dirty = True
 
     if meta.has_field("custom_checklist_items") and not pos_doc.get("custom_checklist_items"):
-        pos_doc.set("custom_checklist_items", checklist_items)
+        pos_doc.set("custom_checklist_items", [{"doctype": "URY Checklist Item", **row} for row in checklist_items])
         dirty = True
 
     if dirty:
         pos_doc.save(ignore_permissions=True)
 
     return pos_doc.name
+
+
+def _get_demo_cashier_user():
+    """Return a URY Cashier user for demo POS Opening Entry, or Administrator."""
+    cashier_users = frappe.get_all(
+        "Has Role", filters={"role": "URY Cashier", "parenttype": "User"}, fields=["parent"]
+    )
+    for row in cashier_users:
+        if row.parent in ("Administrator", "Guest"):
+            continue
+        if frappe.db.get_value("User", row.parent, "enabled"):
+            return row.parent
+    return "Administrator"
+
+
+def _ensure_pos_opening_entry(company_name, branch_name, pos_profile_name):
+    """Create an open POS Opening Entry for the demo POS Profile.
+
+    ERPNext validates that a submitted POS Invoice belongs to a POS Profile
+    with an open POS Opening Entry, so historical_sales/kot_seed cannot
+    submit invoices without one. This step is idempotent: it reuses any
+    existing Open entry for the profile.
+    """
+    if not pos_profile_name:
+        return None
+
+    existing = frappe.db.exists(
+        "POS Opening Entry",
+        {"pos_profile": pos_profile_name, "status": "Open", "docstatus": 1},
+    )
+    if existing:
+        return existing
+
+    pos_doc = frappe.get_doc("POS Profile", pos_profile_name)
+    modes = [p.mode_of_payment for p in pos_doc.get("payments", []) if p.mode_of_payment]
+    if not modes:
+        modes = ["Cash"]
+
+    balance_details = []
+    for mode in modes:
+        balance_details.append(
+            {
+                "doctype": "POS Opening Entry Detail",
+                "mode_of_payment": mode,
+                "opening_amount": 1000 if mode == "Cash" else 0,
+            }
+        )
+
+    doc_dict = {
+        "doctype": "POS Opening Entry",
+        "company": company_name,
+        "pos_profile": pos_profile_name,
+        "user": _get_demo_cashier_user(),
+        "period_start_date": now(),
+        "posting_date": today(),
+        "balance_details": balance_details,
+    }
+
+    meta = frappe.get_meta("POS Opening Entry")
+    if meta.has_field("branch"):
+        doc_dict["branch"] = branch_name
+
+    try:
+        doc = frappe.get_doc(doc_dict)
+        doc.insert(ignore_permissions=True)
+        doc.submit()
+        print(f"Created POS Opening Entry {doc.name} for profile {pos_profile_name}")
+        return doc.name
+    except Exception as e:
+        print(f"  ! Failed to create POS Opening Entry for {pos_profile_name}: {e}")
+        return None
 
 
 # ---------------------------------------------------------------------------

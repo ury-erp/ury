@@ -566,8 +566,14 @@ def _ensure_demo_employee(branch_name):
 	# HR-EMP-NNNNN row -- and therefore a new demo Employee -- on every
 	# single `seed()` call). Look it up by `employee_name` instead, per this
 	# module's own documented "known trap" for hash-autonamed doctypes.
+	# Joining date must be before the oldest historical attendance date.
+	earliest_joining = add_days(today(), -(HISTORICAL_DAYS + 5))
+
 	existing = frappe.db.get_value("Employee", {"employee_name": "Suresh Pillai"}, "name")
 	if existing:
+		current_joining = frappe.db.get_value("Employee", existing, "date_of_joining")
+		if not current_joining or getdate(current_joining) > getdate(earliest_joining):
+			frappe.db.set_value("Employee", existing, "date_of_joining", earliest_joining)
 		return existing
 
 	try:
@@ -578,7 +584,7 @@ def _ensure_demo_employee(branch_name):
 				"last_name": "Pillai",
 				"gender": "Male",
 				"date_of_birth": "1995-01-01",
-				"date_of_joining": today(),
+				"date_of_joining": earliest_joining,
 				"status": "Active",
 				"branch": branch_name,
 				"company": frappe.db.get_value("Branch", branch_name, "company") or branch_name,
@@ -876,6 +882,12 @@ def seed():
 			print("historical_sales.seed: no free tables available for draft/open orders — skipping.")
 	else:
 		print("historical_sales.seed: no tables available — skipping draft/open orders.")
+
+	# Seed Daily P&L for today as well (historical loop only covers past dates).
+	if demo_employee and today_created:
+		if _seed_daily_pnl(branch_name, today_date, demo_employee):
+			pnl_created += 1
+			print(f"Seeded URY Daily P and L for today ({today_date})")
 
 	frappe.db.commit()
 
