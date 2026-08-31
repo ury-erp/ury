@@ -1,31 +1,31 @@
 <template>
-  <header class="bg-white p-4 flex justify-between items-center border-b border-gray-200">
+  <header class="sticky top-0 z-40 bg-white h-12 px-4 md:px-6 flex justify-between items-center border-b border-gray-200">
     <router-link to="/" class="flex items-center cursor-pointer">
-      <img :src="imagePath" alt="Logo" class="ml-20 w-40 h-15 mr-2">
+      <img :src="imagePath" alt="Logo" class="ml-20 h-8 w-auto mr-2">
     </router-link>
-    <div class="flex items-center gap-4">
-      <button 
-        class="flex justify-center items-center h-12 w-12 rounded-xl hover:bg-slate-200 transition-colors text-blue-800" 
+    <div class="flex items-center gap-3">
+      <button
+        class="flex justify-center items-center h-7 w-7 rounded-[7px] hover:bg-slate-200 transition-colors text-blue-800"
         @click="reloadKOT"
       >
-        <svg class="w-6 h-6" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 18 20">
+        <svg class="w-4 h-4" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 18 20">
           <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 1v5h-5M2 19v-5h5m10-4a8 8 0 0 1-14.947 3.97M1 10a8 8 0 0 1 14.947-3.97"/>
-        </svg> 
+        </svg>
       </button>
 
       <!-- Reused POS User Dropdown -->
       <div class="relative" ref="userMenuRef">
         <button
           @click="toggleUserMenu"
-          class="flex items-center gap-2 px-4 h-12 rounded-xl hover:bg-slate-200 transition-colors text-gray-700 hover:text-gray-900"
+          class="flex items-center gap-2 px-2.5 h-7 rounded-[7px] hover:bg-slate-200 transition-colors text-gray-700 hover:text-gray-900"
         >
-          <div class="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
-            <svg class="w-4 h-4 text-white" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <div class="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center">
+            <svg class="w-3.5 h-3.5 text-white" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/>
               <circle cx="12" cy="7" r="4"/>
             </svg>
           </div>
-          <span class="text-sm font-semibold">{{ userName }}</span>
+          <span class="text-sm font-medium">{{ userName }}</span>
           <svg class="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
           </svg>

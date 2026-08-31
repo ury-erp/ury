@@ -110,22 +110,22 @@ const Header = () => {
   };
 
   return (
-    <header className="bg-white border-b border-border">
-      <div className="flex items-center justify-between h-16 px-6">
+    <header className="sticky top-0 z-40 bg-white border-b border-border">
+      <div className="flex items-center justify-between h-12 px-4 md:px-6">
         {/* Logo */}
         <div className="flex items-center">
         <Link to="/dashboard" className="flex items-center gap-3">
             <img
               src="/assets/ury/pos/ury_pos.png"
-              alt="URY POS" 
-              className="h-10 w-auto"
+              alt="URY POS"
+              className="h-8 w-auto"
             />
           </Link>
         </div>
 
         {/* Search Bar */}
         {location.pathname !== '/dashboard' ? (
-          <div className="px-4 py-2 flex-1 flex items-center max-w-2xl mx-8 bg-gray-50 hover:bg-gray-100 border border-input rounded-md">
+          <div className="px-3 py-1 h-7 flex-1 flex items-center max-w-2xl mx-8 bg-gray-50 hover:bg-gray-100 border border-input rounded-md text-sm">
             <Input
               ref={searchInputRef}
               placeholder={searchPlaceholder}
@@ -149,10 +149,10 @@ const Header = () => {
             <Button
               onClick={handleUserMenuToggle}
               variant="ghost"
-              className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
+              className="flex items-center gap-2 h-7 text-gray-600 hover:text-gray-900"
             >
-              <div className="w-8 h-8 bg-primary-500 rounded-full flex items-center justify-center">
-                <User className="w-4 h-4 text-white" />
+              <div className="w-6 h-6 bg-primary-500 rounded-full flex items-center justify-center">
+                <User className="w-3.5 h-3.5 text-white" />
               </div>
               <span className="text-sm font-medium">{user?.full_name || 'User'}</span>
               <ChevronDown className="w-4 h-4" />
