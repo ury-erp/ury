@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
 import { Factory, Plus, Trash2, Edit2 } from 'lucide-react';
-import { Card, Button, Input, Spinner, showToast } from '@ury/ui';
+import { Card, Button, Input, Spinner, showToast, DataTable } from '@ury/ui';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { dashboardService } from '../../services/dashboard';
 import { call } from '@ury/core';
@@ -279,46 +279,33 @@ export const ProductionUnitPage: React.FC = () => {
           </Button>
         </Card>
       ) : (
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-          <table className="w-full text-left text-sm text-gray-600">
-            <thead className="bg-gray-50 border-b border-gray-100 text-xs uppercase text-gray-500 font-semibold">
-              <tr>
-                <th className="px-6 py-4">Production Unit</th>
-                <th className="px-6 py-4">Branch</th>
-                <th className="px-6 py-4">Item Groups</th>
-                <th className="px-6 py-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {units.map((unit) => {
-                let itemGroupsStr = '';
-                if (Array.isArray(unit.item_groups)) {
-                  itemGroupsStr = unit.item_groups.map((ig: any) => ig.item_group).join(', ');
-                } else if (typeof unit.item_groups === 'string') {
-                  itemGroupsStr = unit.item_groups;
-                }
-                return (
-                  <tr key={unit.name} className="transition-colors hover:bg-gray-50/50">
-                    <td className="px-6 py-4 font-semibold text-gray-900">{unit.production || unit.production_unit_name || unit.name}</td>
-                    <td className="px-6 py-4">{unit.branch || 'Main'}</td>
-                    <td className="px-6 py-4">{itemGroupsStr || '-'}</td>
-                    <td className="px-6 py-4 text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => openEditDrawer(unit)}
-                        className="text-gray-500 hover:text-primary"
-                        title="Edit Production Unit"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </Button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <DataTable<ProductionUnitRecord>
+          columns={[
+            { key: 'production', header: 'Production Unit', render: (row) => <span className="font-semibold">{row.production || row.production_unit_name || row.name}</span> },
+            { key: 'branch', header: 'Branch', render: (row) => row.branch || 'Main' },
+            { key: 'item_groups', header: 'Item Groups', render: (row) => {
+              let itemGroupsStr = '';
+              if (Array.isArray(row.item_groups)) {
+                itemGroupsStr = row.item_groups.map((ig: any) => ig.item_group).join(', ');
+              } else if (typeof row.item_groups === 'string') {
+                itemGroupsStr = row.item_groups;
+              }
+              return itemGroupsStr || '-';
+            }},
+            { key: 'actions', header: 'Actions', align: 'right', render: (row) => (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => openEditDrawer(row)}
+                className="text-gray-500 hover:text-primary"
+                title="Edit Production Unit"
+              >
+                <Edit2 className="w-4 h-4" />
+              </Button>
+            )},
+          ]}
+          rows={units}
+        />
       )}
 
       {/* Add/Edit SideDrawer */}

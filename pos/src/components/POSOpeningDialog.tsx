@@ -54,7 +54,10 @@ const POSOpeningDialog = ({
   onCloseNow,
 }: POSOpeningDialogProps) => {
   const handleSwitchToDesk = () => {
-    window.open(`${window.location.origin}/app`, '_blank');
+    // Opens in a new tab, so the POS tab itself is still there to come back
+    // to -- but the desk tab still gets a "Back to POS" chip via the return
+    // context, since users routinely lose track of which tab is which.
+    window.open(`${window.location.origin}${withReturnContext('/app')}`, '_blank');
   };
 
   const stateConfig: Record<OpeningBlockingState, StateConfig> = {

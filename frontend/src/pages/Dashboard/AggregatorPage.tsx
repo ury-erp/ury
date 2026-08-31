@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
 import { Plus, Store, Edit2 } from 'lucide-react';
-import { Card, Button, Input, Spinner, showToast, Dialog, DialogContent, DialogHeader, DialogTitle } from '@ury/ui';
+import { Card, Button, Input, Spinner, showToast, Dialog, DialogContent, DialogHeader, DialogTitle, DataTable, type DataTableColumn } from '@ury/ui';
 import { call } from '@ury/core';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
 
@@ -332,43 +332,43 @@ export const AggregatorPage: React.FC = () => {
           </Button>
         </Card>
       ) : (
-        <div className="bg-card rounded-lg border border-border shadow-sm overflow-hidden">
-          <table className="w-full text-left text-sm text-muted-foreground">
-            <thead className="bg-card border-b border-border text-xs uppercase text-muted-foreground font-semibold">
-              <tr>
-                <th className="px-6 py-4">Aggregator</th>
-                <th className="px-6 py-4">Price List</th>
-                <th className="px-6 py-4">Mode of Payment</th>
-                <th className="px-6 py-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {aggregators.map((item, idx) => {
-                const name = item.aggregator || item.customer || item.name || '-';
-                const pl = item.price_list || '-';
-                const mop = item.mode_of_payments || item.mode_of_payment || '-';
-                return (
-                  <tr key={idx} className="hover:bg-primary/10 transition-colors">
-                    <td className="px-6 py-4 font-semibold text-foreground">{name}</td>
-                    <td className="px-6 py-4">{pl}</td>
-                    <td className="px-6 py-4">{mop}</td>
-                    <td className="px-6 py-4 text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleEditAggregator(item, idx)}
-                        className="text-muted-foreground hover:text-primary p-1.5 h-8 w-8"
-                        title="Edit Aggregator"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </Button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <>
+          {aggregators.length > 0 && (
+            <>
+              {(() => {
+                const columns: DataTableColumn<AggregatorSetting>[] = [
+                  {
+                    key: 'aggregator',
+                    header: 'Aggregator',
+                    render: (row) => <span className="font-semibold text-foreground">{row.aggregator || row.customer || row.name || '-'}</span>
+                  },
+                  { key: 'price_list', header: 'Price List', render: (row) => row.price_list || '-' },
+                  { key: 'mode_of_payment', header: 'Mode of Payment', render: (row) => row.mode_of_payments || row.mode_of_payment || '-' },
+                  {
+                    key: 'actions',
+                    header: 'Actions',
+                    align: 'right',
+                    render: (row) => {
+                      const idx = aggregators.findIndex(item => item.aggregator === row.aggregator);
+                      return (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEditAggregator(row, idx)}
+                          className="text-muted-foreground hover:text-primary p-1.5 h-8 w-8"
+                          title="Edit Aggregator"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </Button>
+                      );
+                    }
+                  },
+                ];
+                return <DataTable columns={columns} rows={aggregators} />;
+              })()}
+            </>
+          )}
+        </>
       )}
 
       {/* Add Modal */}

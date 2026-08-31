@@ -8,7 +8,10 @@ type Severity = "blocking" | "warning" | "info"
 export interface AttentionItemProps {
   severity: Severity
   title: string
-  detail?: string
+  /** Secondary line. A node, not just a string, so callers can embed links
+   *  (e.g. an "open in desk" affordance per listed item). Rendered inside a
+   *  `div`, so block-level content is safe here. */
+  detail?: React.ReactNode
   amount?: string
   action?: {
     label: string

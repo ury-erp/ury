@@ -10,7 +10,7 @@ import {
   X,
   Loader
 } from 'lucide-react';
-import { Badge, Button, Input, Card, Spinner, showToast } from '@ury/ui';
+import { Badge, Button, Input, Card, Spinner, showToast, DataTable } from '@ury/ui';
 import { call } from '@ury/core';
 import { SearchableSelect, Option } from '../../components/common/SearchableSelect';
 import { dashboardService } from '../../services/dashboard';
@@ -746,45 +746,34 @@ export const SelfOrderingProfilePage: React.FC = () => {
                 </Button>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm text-muted-foreground">
-                  <thead className="bg-muted text-muted-foreground font-medium border-b border-border">
-                    <tr>
-                      <th className="p-4">Profile Name</th>
-                      <th className="p-4">Branch</th>
-                      <th className="p-4">Status</th>
-                      <th className="p-4 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-hair">
-                    {profiles.map((profile) => (
-                      <tr key={profile.name} className="hover:bg-muted">
-                        <td className="p-4 font-medium text-foreground">{profile.profile_name}</td>
-                        <td className="p-4">{profile.branch}</td>
-                        <td className="p-4">
-                          <Badge size="tag" variant={profile.enabled === 1 ? 'tagSuccess' : 'cancelled'}>
-                            {profile.enabled === 1 ? 'Enabled' : 'Disabled'}
-                          </Badge>
-                        </td>
-                        <td className="p-4 text-right space-x-2 flex justify-end">
-                          <button
-                            onClick={() => handleOpenForm(profile)}
-                            className="p-1.5 text-primary hover:bg-primary-tint rounded-md transition-colors"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteProfile(profile)}
-                            className="p-1.5 text-destructive hover:bg-destructive-tint rounded-md transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <DataTable<SelfOrderingProfile>
+                columns={[
+                  { key: 'profile_name', header: 'Profile Name', render: (row) => <span className="font-medium">{row.profile_name}</span> },
+                  { key: 'branch', header: 'Branch', render: (row) => row.branch },
+                  { key: 'enabled', header: 'Status', render: (row) => (
+                    <Badge size="tag" variant={row.enabled === 1 ? 'tagSuccess' : 'cancelled'}>
+                      {row.enabled === 1 ? 'Enabled' : 'Disabled'}
+                    </Badge>
+                  )},
+                  { key: 'actions', header: 'Actions', align: 'right', render: (row) => (
+                    <div className="space-x-2 flex justify-end">
+                      <button
+                        onClick={() => handleOpenForm(row)}
+                        className="p-1.5 text-primary hover:bg-primary-tint rounded-md transition-colors"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteProfile(row)}
+                        className="p-1.5 text-destructive hover:bg-destructive-tint rounded-md transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )},
+                ]}
+                rows={profiles}
+              />
             )}
           </Card>
         )}

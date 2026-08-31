@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Page, Section, Panel, Spinner, Input, Button, Select } from '@ury/ui';
+import { Page, Section, Panel, Spinner, Input, Button, Select, DataTable, type DataTableColumn } from '@ury/ui';
 import { call, getLoggedUser, getUserRoles } from '@ury/core';
 import { useBranchContext } from '../../context/BranchContext';
 import {
@@ -267,44 +267,37 @@ export const DepartmentProfitabilityPage: React.FC = () => {
                 {profitability.reason}
               </p>
             )}
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-xs text-muted-foreground">
-                    <th className="p-2">Department</th>
-                    <th className="p-2">Item</th>
-                    <th className="p-2">Net Revenue</th>
-                    {canSeeCost && <th className="p-2">Posted Cost</th>}
-                    {canSeeCost && <th className="p-2">Theoretical Cost</th>}
-                    {canSeeCost && (
-                      <th className="p-2" title="Gross profit using today's actual recorded cost for this item">
-                        Posted GP
-                      </th>
-                    )}
-                    {canSeeCost && (
-                      <th className="p-2" title="Gross profit if cost matched the standard recipe (BOM) cost exactly">
-                        Theoretical GP
-                      </th>
-                    )}
-                    {canSeeCost && <th className="p-2">Variance</th>}
-                  </tr>
-                </thead>
-                <tbody>
-                  {profitability.rows.map((row: ProfitabilityRow, idx: number) => (
-                    <tr key={`${row.item_or_component}-${idx}`} className="border-t">
-                      <td className="p-2">{row.department}</td>
-                      <td className="p-2">{row.item_or_component}</td>
-                      <td className="p-2">{formatCurrency(row.net_revenue)}</td>
-                      {canSeeCost && <td className="p-2">{formatCurrency(row.posted_cost)}</td>}
-                      {canSeeCost && <td className="p-2">{formatCurrency(row.theoretical_cost)}</td>}
-                      {canSeeCost && <td className="p-2">{formatCurrency(row.posted_gross_profit)}</td>}
-                      {canSeeCost && <td className="p-2">{formatCurrency(row.theoretical_gross_profit)}</td>}
-                      {canSeeCost && <td className="p-2">{formatCurrency(row.variance)}</td>}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            {(() => {
+              const baseProfitColumns: DataTableColumn<ProfitabilityRow>[] = [
+                { key: 'department', header: 'Department' },
+                { key: 'item_or_component', header: 'Item' },
+                { key: 'net_revenue', header: 'Net Revenue', render: (row) => formatCurrency(row.net_revenue) },
+              ];
+              const costColumns: DataTableColumn<ProfitabilityRow>[] = canSeeCost
+                ? [
+                    { key: 'posted_cost', header: 'Posted Cost', render: (row) => formatCurrency(row.posted_cost) },
+                    { key: 'theoretical_cost', header: 'Theoretical Cost', render: (row) => formatCurrency(row.theoretical_cost) },
+                    {
+                      key: 'posted_gross_profit',
+                      header: 'Posted GP',
+                      render: (row) => formatCurrency(row.posted_gross_profit),
+                    },
+                    {
+                      key: 'theoretical_gross_profit',
+                      header: 'Theoretical GP',
+                      render: (row) => formatCurrency(row.theoretical_gross_profit),
+                    },
+                    { key: 'variance', header: 'Variance', render: (row) => formatCurrency(row.variance) },
+                  ]
+                : [];
+              return (
+                <DataTable
+                  columns={[...baseProfitColumns, ...costColumns]}
+                  rows={profitability.rows}
+                  emptyMessage="No profitability data found."
+                />
+              );
+            })()}
           </Panel>
         </Section>
       )}
@@ -313,30 +306,22 @@ export const DepartmentProfitabilityPage: React.FC = () => {
         <Section>
           <Panel pad data-testid="plan-vs-actual-table">
             <h3 className="text-sm font-semibold mb-2">Plan vs Actual</h3>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-xs text-muted-foreground">
-                    <th className="p-2">Department</th>
-                    <th className="p-2">Item</th>
-                    <th className="p-2">Planned Qty</th>
-                    <th className="p-2">Actual Qty</th>
-                    <th className="p-2">Variance</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {planVsActual.rows.map((row, idx) => (
-                    <tr key={`${row.item_or_component}-${idx}`} className="border-t">
-                      <td className="p-2">{row.department}</td>
-                      <td className="p-2">{row.item_or_component}</td>
-                      <td className="p-2">{row.planned_qty}</td>
-                      <td className="p-2">{row.actual_qty}</td>
-                      <td className="p-2">{row.qty_variance}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            {(() => {
+              const planVsActualColumns: DataTableColumn<(typeof planVsActual.rows)[0]>[] = [
+                { key: 'department', header: 'Department' },
+                { key: 'item_or_component', header: 'Item' },
+                { key: 'planned_qty', header: 'Planned Qty' },
+                { key: 'actual_qty', header: 'Actual Qty' },
+                { key: 'qty_variance', header: 'Variance' },
+              ];
+              return (
+                <DataTable
+                  columns={planVsActualColumns}
+                  rows={planVsActual.rows}
+                  emptyMessage="No plan vs actual data found."
+                />
+              );
+            })()}
           </Panel>
         </Section>
       )}

@@ -4,6 +4,7 @@ import { AlertTriangle } from "lucide-react";
 import { call } from "@ury/core";
 import { useBranchContext } from "../../context/BranchContext";
 import { kotErrorLogService, KotErrorLogRow } from "../../services/kotErrorLog";
+import { DeskLink } from "../../components/DeskLink";
 
 interface PosProfileOption {
   name: string;
@@ -12,8 +13,28 @@ interface PosProfileOption {
 type LoadState = "loading" | "empty" | "populated" | "error" | "select-profile";
 
 const columns: DataTableColumn<KotErrorLogRow>[] = [
-  { key: "kot", header: "KOT", render: (row) => <span className="font-mono text-xs">{row.kot}</span> },
-  { key: "invoice", header: "Invoice" },
+  {
+    key: "kot",
+    header: "KOT",
+    render: (row) => (
+      <span className="inline-flex items-center gap-1.5">
+        <span className="font-mono text-xs">{row.kot}</span>
+        {/* Link to the editable URY KOT document in the desk. This screen is read-only. */}
+        {row.kot && <DeskLink doctype="URY KOT" name={row.kot} iconOnly />}
+      </span>
+    ),
+  },
+  {
+    key: "invoice",
+    header: "Invoice",
+    render: (row) => (
+      <span className="inline-flex items-center gap-1.5">
+        <span>{row.invoice}</span>
+        {/* Link to the editable POS Invoice document in the desk. This screen is read-only. */}
+        {row.invoice && <DeskLink doctype="POS Invoice" name={row.invoice} iconOnly />}
+      </span>
+    ),
+  },
   {
     key: "invoice_creation_time",
     header: "Date/Time",

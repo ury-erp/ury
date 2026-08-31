@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
 import { Grid, Plus, Users, Square, List, Edit2, LayoutTemplate } from 'lucide-react';
-import { Card, Button, Badge, Input, Spinner, showToast } from '@ury/ui';
+import { Card, Button, Badge, Input, Spinner, showToast, DataTable, type DataTableColumn } from '@ury/ui';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { Switch } from '../../components/ui/switch';
 import { dashboardService } from '../../services/dashboard';
@@ -24,7 +24,7 @@ interface UryTableRecord {
 }
 
 export const TablePage: React.FC = () => {
-  const { activeBranchId, activeBranch } = useBranchContext();
+  const { activeBranchId } = useBranchContext();
   const [tables, setTables] = useState<UryTableRecord[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
@@ -322,44 +322,45 @@ export const TablePage: React.FC = () => {
           ))}
         </div>
       ) : (
-        <div className="bg-card rounded-lg border border-border shadow-sm overflow-hidden">
-          <table className="w-full text-left text-sm text-muted-foreground">
-            <thead className="bg-muted border-b border-border text-xs uppercase text-muted-foreground font-semibold">
-              <tr>
-                <th className="px-6 py-4">Table Name</th>
-                <th className="px-6 py-4">Room</th>
-                <th className="px-6 py-4">Seats</th>
-                <th className="px-6 py-4">Shape</th>
-                <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {tables.map((t) => (
-                <tr key={t.name} className="hover:bg-primary/10 transition-colors">
-                  <td className="px-6 py-4 font-semibold text-foreground">{t.table_name || t.name}</td>
-                  <td className="px-6 py-4">{t.restaurant_room || 'Main Hall'}</td>
-                  <td className="px-6 py-4 font-mono">{t.no_of_seats || 4}</td>
-                  <td className="px-6 py-4">
-                    <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary text-[10px]">
-                      {t.table_shape || 'Square'}
-                    </Badge>
-                  </td>
-                  <td className="px-6 py-4">
-                    <Badge variant={t.status === 'Occupied' ? 'warning' : 'success'} size="sm">
-                      {t.status || 'Available'}
-                    </Badge>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <Button variant="ghost" size="sm" onClick={() => openEditDrawer(t)} className="text-gray-500 hover:text-primary">
-                      <Edit2 className="w-4 h-4" />
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <>
+          {(() => {
+            const tableColumns: DataTableColumn<UryTableRecord>[] = [
+              { key: 'table_name', header: 'Table Name', render: (t) => t.table_name || t.name },
+              { key: 'restaurant_room', header: 'Room', render: (t) => t.restaurant_room || 'Main Hall' },
+              { key: 'no_of_seats', header: 'Seats', render: (t) => t.no_of_seats || 4 },
+              {
+                key: 'table_shape',
+                header: 'Shape',
+                render: (t) => (
+                  <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary text-[10px]">
+                    {t.table_shape || 'Square'}
+                  </Badge>
+                ),
+              },
+              {
+                key: 'status',
+                header: 'Status',
+                render: (t) => (
+                  <Badge variant={t.status === 'Occupied' ? 'warning' : 'success'} size="sm">
+                    {t.status || 'Available'}
+                  </Badge>
+                ),
+              },
+              {
+                key: 'name',
+                header: 'Actions',
+                align: 'right',
+                render: (t) => (
+                  <Button variant="ghost" size="sm" onClick={() => openEditDrawer(t)} className="text-gray-500 hover:text-primary">
+                    <Edit2 className="w-4 h-4" />
+                  </Button>
+                ),
+              },
+            ];
+
+            return <DataTable columns={tableColumns} rows={tables} isLoading={loading} emptyMessage="No tables configured." />;
+          })()}
+        </>
       )}
 
       {/* Add/Edit SideDrawer */}

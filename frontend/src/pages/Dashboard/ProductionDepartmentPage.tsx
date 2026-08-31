@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
 import { Plus } from 'lucide-react';
-import { Badge, Button, Input, Page, Panel, Select, Spinner, showToast } from '@ury/ui';
+import { Badge, Button, DataTable, Input, Page, Panel, Select, Spinner, showToast, type DataTableColumn } from '@ury/ui';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
 import { dashboardService } from '../../services/dashboard';
 import { call } from '@ury/core';
@@ -225,33 +225,48 @@ export const ProductionDepartmentPage: React.FC = () => {
           </Button>
         </div>
       ) : (
-        <Panel className="mt-section overflow-hidden">
-          <table className="w-full text-left text-sm text-muted-foreground">
-            <thead className="border-b border-hair">
-              <tr>
-                <th className="px-[14px] py-[7px] text-[11px] font-medium text-text-tertiary text-left">Department</th>
-                <th className="px-[14px] py-[7px] text-[11px] font-medium text-text-tertiary text-left">Company</th>
-                <th className="px-[14px] py-[7px] text-[11px] font-medium text-text-tertiary text-left">Branch</th>
-                <th className="px-[14px] py-[7px] text-[11px] font-medium text-text-tertiary text-left">Warehouse</th>
-                <th className="px-[14px] py-[7px] text-[11px] font-medium text-text-tertiary text-left">Policy</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-hair">
-              {departments.map((dept) => (
-                <tr key={dept.name} className="transition-colors cursor-pointer hover:bg-muted" onClick={() => openEditDrawer(dept)}>
-                  <td className="px-[14px] py-2 text-[12.5px] font-semibold text-foreground">{dept.department_name || dept.name}</td>
-                  <td className="px-[14px] py-2 text-[12.5px]">{dept.company || '-'}</td>
-                  <td className="px-[14px] py-2 text-[12.5px]">{dept.branch || '-'}</td>
-                  <td className="px-[14px] py-2 text-[12.5px]">{dept.department_warehouse || '-'}</td>
-                  <td className="px-[14px] py-2 text-[12.5px]">
-                    <Badge size="tag" variant="cancelled">
-                      {dept.issue_control_policy || 'Plan Controlled'}
-                    </Badge>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <Panel className="mt-section">
+          {(() => {
+            const departmentColumns: DataTableColumn<ProductionDepartmentRecord>[] = [
+              {
+                key: 'department_name',
+                header: 'Department',
+                render: (row) => <span className="font-semibold text-foreground">{row.department_name || row.name}</span>,
+              },
+              {
+                key: 'company',
+                header: 'Company',
+                render: (row) => <span>{row.company || '-'}</span>,
+              },
+              {
+                key: 'branch',
+                header: 'Branch',
+                render: (row) => <span>{row.branch || '-'}</span>,
+              },
+              {
+                key: 'department_warehouse',
+                header: 'Warehouse',
+                render: (row) => <span>{row.department_warehouse || '-'}</span>,
+              },
+              {
+                key: 'issue_control_policy',
+                header: 'Policy',
+                render: (row) => (
+                  <Badge size="tag" variant="cancelled">
+                    {row.issue_control_policy || 'Plan Controlled'}
+                  </Badge>
+                ),
+              },
+            ];
+            return (
+              <DataTable
+                columns={departmentColumns}
+                rows={departments}
+                emptyMessage="No production departments found."
+                onRowClick={(row) => openEditDrawer(row)}
+              />
+            );
+          })()}
         </Panel>
       )}
 

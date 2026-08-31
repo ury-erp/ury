@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Badge, Button, Card, Page, Section, Spinner, Textarea } from '@ury/ui';
+import { Badge, Button, Card, DataTable, Page, Section, Spinner, Textarea, type DataTableColumn } from '@ury/ui';
 import { getLoggedUser, getUserRoles } from '@ury/core';
 import { useBranchContext } from '../../context/BranchContext';
+import { DeskLink } from '../../components/DeskLink';
 import {
   stockReservationService,
   StockReservationRow,
@@ -112,6 +113,10 @@ const ActionModal: React.FC<ActionModalProps> = ({
 
   if (!isOpen) return null;
 
+  // `fulfil_reservation` has no `reason` parameter, so offering the field for
+  // that action would silently discard whatever the user typed.
+  const showReason = action !== 'Fulfil';
+
   const handleConfirm = async () => {
     setLoading(true);
     setError(null);
@@ -131,16 +136,24 @@ const ActionModal: React.FC<ActionModalProps> = ({
       <Card className="w-full max-w-md p-6">
         <h2 className="mb-4 text-lg font-semibold text-foreground">{title}</h2>
         <div className="mb-4 space-y-3">
-          <label className="flex flex-col text-sm font-medium text-muted-foreground">
-            Reason (optional)
-            <Textarea
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder="Enter reason for this action..."
-              className="mt-1"
-              disabled={loading}
-            />
-          </label>
+          {showReason ? (
+            <label className="flex flex-col text-sm font-medium text-muted-foreground">
+              Reason (optional)
+              <Textarea
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="Enter reason for this action..."
+                className="mt-1"
+                disabled={loading}
+              />
+            </label>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Mark this reservation group as fulfilled. Its held capacity stops being
+              counted as available and the transition is written to the reservation's
+              audit log. This cannot be undone from here.
+            </p>
+          )}
           {error && (
             <div className="text-sm text-destructive">{error}</div>
           )}
@@ -210,19 +223,27 @@ const StockReservationContent: React.FC = () => {
     };
   }, [activeBranchId]);
 
-  const handleActionClick = (rowId: string, action: string) => {
-    const title = action === 'release' ? 'Release Reservation' : 'Cancel Reservation';
+  const handleActionClick = (rowId: string, action: 'fulfil' | 'release' | 'cancel') => {
+    const config = {
+      fulfil: { title: 'Fulfil Reservation', action: 'Fulfil' },
+      release: { title: 'Release Reservation', action: 'Release' },
+      cancel: { title: 'Cancel Reservation', action: 'Cancel' },
+    }[action];
     setActionModal({
       isOpen: true,
-      title,
-      action: action === 'release' ? 'Release' : 'Cancel',
+      title: config.title,
+      action: config.action,
       rowId,
     });
   };
 
   const handleConfirmAction = async (reason: string) => {
     try {
-      if (actionModal.action === 'Release') {
+      if (actionModal.action === 'Fulfil') {
+        // `fulfil_reservation` takes no reason -- the backend records the
+        // actor and event in the reservation's audit log itself.
+        await stockReservationService.fulfilReservation(actionModal.rowId);
+      } else if (actionModal.action === 'Release') {
         await stockReservationService.releaseReservation(actionModal.rowId, reason || undefined);
       } else {
         await stockReservationService.cancelReservation(actionModal.rowId, reason || undefined);
@@ -239,8 +260,9 @@ const StockReservationContent: React.FC = () => {
       <div className="-mx-6 -mt-6 border-b border-border px-6 pb-4 pt-6">
         <h1 className="text-xl font-semibold text-foreground">Stock Reservations</h1>
         <p className="mt-1 text-sm text-text-tertiary">
-          Monitor active stock reservations and manage capacity holds. Managers can release or cancel
-          Reserved status reservations to restore inventory availability.
+          Monitor active stock reservations and manage capacity holds. Managers can fulfil, release,
+          or cancel Reserved status reservations; releasing and cancelling restore inventory
+          availability, fulfilling settles the hold.
         </p>
       </div>
 
@@ -268,67 +290,85 @@ const StockReservationContent: React.FC = () => {
         </Section>
       ) : (
         <Section>
-          <div className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="border-b border-border bg-muted text-xs font-semibold text-text-tertiary">
-                <tr>
-                  <th className="px-4 py-3">Item</th>
-                  <th className="px-4 py-3 text-right">Qty</th>
-                  <th className="px-4 py-3">Warehouse</th>
-                  <th className="px-4 py-3">Order Ref</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Expires</th>
-                  <th className="px-4 py-3">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-hair">
-                {reservations.map((row) => (
-                  <tr key={row.name}>
-                    <td className="px-4 py-3 font-medium text-foreground">
-                      {row.component_item}
-                    </td>
-                    <td className="px-4 py-3 text-right text-muted-foreground">
-                      {formatQty(row.qty)}
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">{row.warehouse}</td>
-                    <td className="px-4 py-3 text-muted-foreground font-mono text-xs">
-                      {row.order_ref}
-                    </td>
-                    <td className="px-4 py-3">
-                      <Badge size="tag" variant={getStatusBadgeVariant(row.status)}>
-                        {row.status}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">
-                      {formatDateTime(row.expires_at)}
-                    </td>
-                    <td className="px-4 py-3">
-                      {row.status === 'Reserved' && (
-                        <div className="flex gap-2">
-                          <Button
-                            onClick={() => handleActionClick(row.name, 'release')}
-                            variant="secondary"
-                            size="xs"
-                          >
-                            Release
-                          </Button>
-                          <Button
-                            onClick={() => handleActionClick(row.name, 'cancel')}
-                            variant="secondary"
-                            size="xs"
-                          >
-                            Cancel
-                          </Button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          </div>
+          {(() => {
+            const reservationColumns: DataTableColumn<StockReservationRow>[] = [
+              {
+                key: 'component_item',
+                header: 'Item',
+                render: (row) => <span className="font-medium text-foreground">{row.component_item}</span>,
+              },
+              {
+                key: 'qty',
+                header: 'Qty',
+                align: 'right',
+                render: (row) => <span className="text-muted-foreground">{formatQty(row.qty)}</span>,
+              },
+              {
+                key: 'warehouse',
+                header: 'Warehouse',
+                render: (row) => <span className="text-muted-foreground">{row.warehouse}</span>,
+              },
+              {
+                key: 'order_ref',
+                header: 'Order Ref',
+                render: (row) => <span className="font-mono text-xs text-muted-foreground">{row.order_ref}</span>,
+              },
+              {
+                key: 'status',
+                header: 'Status',
+                render: (row) => (
+                  <Badge size="tag" variant={getStatusBadgeVariant(row.status)}>
+                    {row.status}
+                  </Badge>
+                ),
+              },
+              {
+                key: 'expires_at',
+                header: 'Expires',
+                render: (row) => <span className="text-muted-foreground">{formatDateTime(row.expires_at)}</span>,
+              },
+              {
+                key: 'actions',
+                header: 'Actions',
+                render: (row) => (
+                  <div className="flex items-center gap-2">
+                    {/* Open in desk points at the editable URY Stock Reservation
+                        document, since this screen only performs status
+                        transitions and never edits a reservation's fields.
+                        Shown for every status -- a released/expired row is
+                        exactly the kind you want to inspect in the desk. */}
+                    <DeskLink doctype="URY Stock Reservation" name={row.name} iconOnly />
+                    {row.status === 'Reserved' && (
+                      <>
+                        <Button
+                          onClick={() => handleActionClick(row.name, 'fulfil')}
+                          variant="secondary"
+                          size="xs"
+                        >
+                          Fulfil
+                        </Button>
+                        <Button
+                          onClick={() => handleActionClick(row.name, 'release')}
+                          variant="secondary"
+                          size="xs"
+                        >
+                          Release
+                        </Button>
+                        <Button
+                          onClick={() => handleActionClick(row.name, 'cancel')}
+                          variant="secondary"
+                          size="xs"
+                        >
+                          Cancel
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                ),
+              },
+            ];
+            return <DataTable columns={reservationColumns} rows={reservations} emptyMessage="No reservations found." />;
+          })()}
         </Section>
       )}
 
