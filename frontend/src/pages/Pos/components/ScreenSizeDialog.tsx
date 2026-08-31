@@ -52,7 +52,7 @@ const ScreenSizeDialog = () => {
             </p>
             <Button
               onClick={handleSwitchToVersion1}
-              className="w-full bg-primary hover:bg-primary text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 text-sm"
+              className="w-full font-medium py-2 px-4 rounded-lg transition-colors duration-200 text-sm"
             >
               <ExternalLink className="w-4 h-4 mr-2" />
               Switch to Version 1

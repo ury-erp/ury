@@ -10,7 +10,7 @@ import {
 } from 'react';
 import { MessageCircle, X, Send, Sparkles } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { cn } from '@ury/ui';
+import { cn, buttonVariants } from '@ury/ui';
 import { useActiveReportContext } from './ActiveReportContext';
 import { resolveReportNavigation, navigateToReportSlug } from './reportNavigation';
 
@@ -352,7 +352,10 @@ const ChatWidget = forwardRef<ChatWidgetHandle>(function ChatWidget(_props, ref)
         <button
           type="button"
           onClick={handleOpen}
-          className="flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105"
+          className={cn(
+            buttonVariants({ variant: 'default' }),
+            'h-14 w-14 rounded-full p-0 shadow-lg transition-transform hover:scale-105'
+          )}
           aria-label="Open assistant chat"
         >
           <MessageCircle className="h-6 w-6" />
