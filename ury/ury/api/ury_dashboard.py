@@ -111,17 +111,33 @@ def _wrap_comparable_weekday_history(plan_date, branch, company, rows):
 		):
 			item_meta[meta["item_code"]] = meta
 
+	# Each item's department/production_unit come from ``URY Item Production
+	# Configuration`` (see ury/ury/dev_seed/operations.py's seeding of this
+	# doctype) rather than being hardcoded — the frontend's
+	# normalizeHistoryResponse (frontend/src/services/salesPlan.ts) falls
+	# back to "Unassigned" whenever this comes back empty, which is exactly
+	# the "Needs Attention" signal on the Sales Plan page.
+	production_config_map = {}
+	if item_codes:
+		for cfg in frappe.db.get_all(
+			"URY Item Production Configuration",
+			filters={"item": ["in", item_codes], "branch": branch},
+			fields=["item", "department", "production_unit"],
+		):
+			production_config_map[cfg["item"]] = cfg
+
 	items = []
 	for item_code, entry in items_by_code.items():
 		sample_days = len(entry["history"])
 		average_qty = (entry["total_qty"] / sample_days) if sample_days else 0
 		meta = item_meta.get(item_code, {})
+		config = production_config_map.get(item_code, {})
 		items.append({
 			"item_code": item_code,
 			"item_name": meta.get("item_name") or item_code,
 			"stock_uom": meta.get("stock_uom") or "Nos",
-			"department": None,
-			"production_unit": None,
+			"department": config.get("department"),
+			"production_unit": config.get("production_unit"),
 			"average_qty": average_qty,
 			"sample_days": sample_days,
 			"total_qty": entry["total_qty"],
