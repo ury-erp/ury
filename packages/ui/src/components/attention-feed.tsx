@@ -94,7 +94,7 @@ const AttentionFeed = React.forwardRef<HTMLDivElement, AttentionFeedProps>(
     return (
       <Card ref={ref} padding="none" variant="outlined" className="border shadow-none rounded-[9px]">
         {title && (
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 py-[9px] px-[2px]">
+          <CardHeader className="flex flex-row items-center gap-2 space-y-0 py-[9px] px-3">
             <CardTitle className="text-[12.5px] font-semibold">{title}</CardTitle>
             <Badge variant="secondary" size="sm">
               {items.length}
