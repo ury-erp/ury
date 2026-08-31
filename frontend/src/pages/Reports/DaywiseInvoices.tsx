@@ -4,6 +4,7 @@ import { DataTable, type DataTableColumn, Button } from '@ury/ui';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useBranchContext } from '../../context/BranchContext';
 import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
+import { DeskLink } from '../../components/DeskLink';
 import { startOfMonth, endOfDay } from 'date-fns';
 import { toApiDate } from '../../lib/reportDate';
 
@@ -30,7 +31,17 @@ interface DaywiseInvoicesData {
 const columns: DataTableColumn<InvoiceRow>[] = [
   { key: 'date', header: 'Date' },
   { key: 'time', header: 'Time' },
-  { key: 'invoice', header: 'Invoice' },
+  {
+    key: 'invoice',
+    header: 'Invoice',
+    render: (r) => (
+      <span className="inline-flex items-center gap-1.5">
+        {r.invoice}
+        {/* Link to editable desk document; this report is read-only */}
+        <DeskLink doctype="POS Invoice" name={r.invoice} iconOnly />
+      </span>
+    ),
+  },
   { key: 'item_total', header: 'Item Total', render: (r) => formatCurrency(r.item_total), align: 'right' },
   { key: 'total_taxes', header: 'Taxes', render: (r) => formatCurrency(r.total_taxes), align: 'right' },
   { key: 'grand_total', header: 'Grand Total', render: (r) => formatCurrency(r.grand_total), align: 'right' },

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Badge, Card, DataTable, KpiStrip, Page, Section, Spinner, numericCellClass } from '@ury/ui';
 import type { DataTableColumn } from '@ury/ui';
 import { useBranchContext } from '../../context/BranchContext';
+import { DeskLink } from '../../components/DeskLink';
 import {
   departmentStockService,
   DepartmentOption,
@@ -139,7 +140,11 @@ const StoreIssueContent: React.FC = () => {
       key: 'component_item',
       header: 'Material',
       render: (row) => (
-        <span className="font-medium text-foreground">{row.component_item_name || row.component_item}</span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="font-medium text-foreground">{row.component_item_name || row.component_item}</span>
+          {/* Open in desk points at the editable URY Issue Authorization document since this screen is read-only */}
+          <DeskLink doctype="URY Issue Authorization" name={row.name} iconOnly />
+        </span>
       ),
     },
     {
@@ -243,12 +248,46 @@ const StoreIssueContent: React.FC = () => {
           <KpiStrip items={kpiItems} />
 
           {departmentChips.length > 0 && (
-            <div className="flex flex-wrap gap-2" data-testid="store-issue-department-chips">
-              {departmentChips.map((chip) => (
-                <Badge key={chip.department} variant={chip.issued === chip.total ? 'success' : 'pending'}>
-                  {chip.name}: {chip.issued}/{chip.total} issued
-                </Badge>
-              ))}
+            <div data-testid="store-issue-department-chips">
+              <div className="mb-1.5 text-[10.5px] font-medium uppercase tracking-wide text-muted-foreground">
+                Issued by department
+              </div>
+              {/*
+                One pill per department carrying the whole sentence
+                ("Dept: 1/3 issued") stops being scannable past a handful of
+                departments — it reads as a wall of pill text with no
+                hierarchy. This mirrors the `.kv` pattern instead (label
+                left, value right, hairline rule) laid out as a fixed-column
+                grid, so the department names align in a column and the
+                counts align in their own: at 3 departments it is a short
+                list, at 15 it is still a scannable ledger rather than an
+                ever-growing wrap. The count keeps its own tinted chip, so
+                fully-issued vs outstanding stays readable at a glance
+                without tinting the whole row.
+              */}
+              <div className="grid grid-cols-1 gap-x-6 sm:grid-cols-2 xl:grid-cols-3">
+                {departmentChips.map((chip) => {
+                  const complete = chip.issued === chip.total;
+                  return (
+                    <div
+                      key={chip.department}
+                      className="flex items-center justify-between gap-3 border-b border-border py-1.5 text-[12.5px]"
+                    >
+                      <span className="min-w-0 truncate text-muted-foreground" title={chip.name}>
+                        {chip.name}
+                      </span>
+                      <Badge
+                        size="tag"
+                        variant={complete ? 'tagSuccess' : 'tagWarning'}
+                        className="tabular-nums"
+                        aria-label={`${chip.name}: ${chip.issued} of ${chip.total} issued`}
+                      >
+                        {chip.issued}/{chip.total}
+                      </Badge>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
 

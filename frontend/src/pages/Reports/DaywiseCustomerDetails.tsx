@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call } from '@ury/core';
-import { StatCard, DataTable, type DataTableColumn } from '@ury/ui';
-import { Users } from 'lucide-react';
+import { KpiStrip, DataTable, type DataTableColumn, type KpiItemProps } from '@ury/ui';
 import { useBranchContext } from '../../context/BranchContext';
 import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
 import { toApiDate } from '../../lib/reportDate';
@@ -102,7 +101,11 @@ export function DaywiseCustomerDetails() {
         </div>
       )}
 
-      {data && <StatCard label="Unique Customers" value={data.total_count} icon={<Users className="w-4 h-4" />} />}
+      {data && (
+        <KpiStrip
+          items={[{ label: 'Unique Customers', value: data.total_count }] satisfies KpiItemProps[]}
+        />
+      )}
 
       <DataTable columns={columns} rows={data?.customers ?? []} isLoading={isLoading} />
     </div>

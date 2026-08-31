@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { call, formatCurrency } from '@ury/core';
-import { StatCard, DataTable, type DataTableColumn } from '@ury/ui';
-import { DollarSign, Users, TrendingUp, Percent, ChevronDown, ChevronUp } from 'lucide-react';
+import { KpiStrip, type KpiItemProps, DataTable, type DataTableColumn } from '@ury/ui';
+import { DollarSign, ChevronUp } from 'lucide-react';
 import { useBranchContext } from '../../context/BranchContext';
 import { DateRangeFilter, type DateRangeValue } from '../../components/reports/DateRangeFilter';
 import { BarChartCard } from '../../components/reports/charts/BarChartCard';
@@ -208,12 +208,14 @@ export function EmployeeCommission() {
           </div>
 
           {/* Stat cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-            <StatCard label="Total Commission" value={formatCurrency(data.summary.total_commission)} icon={<DollarSign className="w-4 h-4" />} />
-            <StatCard label="Total Attributed Base" value={formatCurrency(data.summary.total_base)} icon={<TrendingUp className="w-4 h-4" />} />
-            <StatCard label="Employees Earning" value={data.summary.total_employees} icon={<Users className="w-4 h-4" />} />
-            <StatCard label="Effective Blended Rate" value={`${blendedRate.toFixed(2)}%`} icon={<Percent className="w-4 h-4" />} />
-          </div>
+          <KpiStrip
+            items={[
+              { label: 'Total Commission', value: formatCurrency(data.summary.total_commission) },
+              { label: 'Total Attributed Base', value: formatCurrency(data.summary.total_base) },
+              { label: 'Employees Earning', value: data.summary.total_employees },
+              { label: 'Effective Blended Rate', value: `${blendedRate.toFixed(2)}%` },
+            ] satisfies KpiItemProps[]}
+          />
 
           {/* Top 10 chart */}
           {top10.length >= 2 && (

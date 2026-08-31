@@ -19,6 +19,7 @@ import {
 } from '@ury/ui';
 import { getLoggedUser, getUserRoles } from '@ury/core';
 import { useBranchContext } from '../../context/BranchContext';
+import { DeskLink } from '../../components/DeskLink';
 import {
   departmentStockService,
   DepartmentOption,
@@ -475,7 +476,15 @@ const DepartmentStockContent: React.FC = () => {
     departmentStockService
       .listDepartments(activeBranchId)
       .then((rows) => {
-        if (!cancelled) setDepartmentOptions(rows);
+        if (cancelled) return;
+        setDepartmentOptions(rows);
+        // Default to the first department so the page loads with real data
+        // instead of an empty state; only when nothing is selected yet, or
+        // the previously selected department isn't valid for this branch.
+        setDepartment((current) => {
+          if (current && rows.some((row) => row.name === current)) return current;
+          return rows[0]?.name || '';
+        });
       })
       .catch(() => {
         if (!cancelled) setDepartmentOptions([]);
@@ -976,6 +985,11 @@ const DepartmentStockContent: React.FC = () => {
             <KeyValueRow label="Issue authorization" value={selectedMovement.issue_authorization} />
             {selectedMovement.branch && <KeyValueRow label="Branch" value={selectedMovement.branch} />}
             {selectedMovement.company && <KeyValueRow label="Company" value={selectedMovement.company} />}
+
+            {/* Link to the editable URY Stock Movement document in the desk. This screen is read-only. */}
+            <div className="pt-3">
+              <DeskLink doctype="URY Stock Movement" name={selectedMovement.name} label="Open in Desk" />
+            </div>
           </>
         )}
       </Drawer>
