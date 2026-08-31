@@ -18,6 +18,7 @@ The patch is idempotent and only fills blanks, never overwrites a manual correct
 Idempotent: WHERE IFNULL(..., '') = '' guards ensure this is a no-op on re-run.
 """
 import frappe
+from frappe.utils.fixtures import sync_fixtures
 
 _PICK = """
     SELECT e.user_id, e.name AS employee
@@ -39,6 +40,19 @@ _PICK = """
 
 
 def execute():
+    # custom_waiter_employee/custom_closing_employee are fixture-declared
+    # custom fields (ury/fixtures/custom_field.json). bench migrate runs
+    # post_model_sync patches (this one included) BEFORE syncing fixtures,
+    # so on a genuinely fresh install these columns don't exist yet when
+    # this patch first runs. Sync fixtures here so the columns are always
+    # present before the raw SQL below touches them -- sync_fixtures is
+    # itself idempotent, so this is a no-op on later re-runs.
+    for dt in ("POS Invoice", "Sales Invoice"):
+        for dest in ("custom_waiter_employee", "custom_closing_employee"):
+            if not frappe.db.has_column(dt, dest):
+                sync_fixtures(app="ury")
+                break
+
     for dt in ("POS Invoice", "Sales Invoice"):
         for src, dest in (("waiter", "custom_waiter_employee"),
                           ("cashier", "custom_closing_employee")):
