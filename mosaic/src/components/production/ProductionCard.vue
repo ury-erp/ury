@@ -12,9 +12,7 @@
       <div
         class="w-10 h-10 rounded-lg flex items-center justify-center text-xl"
         style="background: var(--ac-t)"
-      >
-        🍳
-      </div>
+      ></div>
 
       <div>
         <h2 class="text-base font-semibold" style="color: var(--t1)">
