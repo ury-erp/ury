@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { Card, Spinner, Select } from "@ury/ui";
+import { Card, Spinner, Select, DataTable, EmptyState, type DataTableColumn } from "@ury/ui";
+import { AlertTriangle } from "lucide-react";
 import { call } from "@ury/core";
 import { useBranchContext } from "../../context/BranchContext";
 import { kotErrorLogService, KotErrorLogRow } from "../../services/kotErrorLog";
@@ -9,6 +10,17 @@ interface PosProfileOption {
 }
 
 type LoadState = "loading" | "empty" | "populated" | "error" | "select-profile";
+
+const columns: DataTableColumn<KotErrorLogRow>[] = [
+  { key: "kot", header: "KOT", render: (row) => <span className="font-mono text-xs">{row.kot}</span> },
+  { key: "invoice", header: "Invoice" },
+  {
+    key: "invoice_creation_time",
+    header: "Date/Time",
+    render: (row) => <span className="text-xs">{row.invoice_creation_time || "—"}</span>,
+  },
+  { key: "production", header: "Department" },
+];
 
 export const KotErrorLogPage: React.FC = () => {
   const { activeBranchId } = useBranchContext();
@@ -38,8 +50,8 @@ export const KotErrorLogPage: React.FC = () => {
           setState("empty");
         } else if (records.length === 1) {
           setSelectedProfile(records[0].name);
-          setState("loading");
         } else {
+          setSelectedProfile("");
           setState("select-profile");
         }
       } catch (err: any) {
@@ -67,7 +79,19 @@ export const KotErrorLogPage: React.FC = () => {
     loadLogs();
   }, [selectedProfile]);
 
-  if (state === "loading") {
+  if (activeBranchId === "all") {
+    return (
+      <Card className="p-6">
+        <EmptyState
+          icon={AlertTriangle}
+          title="Select a branch"
+          description="Please select a specific branch to view KOT error logs."
+        />
+      </Card>
+    );
+  }
+
+  if (state === "loading" && profiles.length === 0) {
     return (
       <div className="flex items-center justify-center p-12">
         <Spinner />
@@ -75,22 +99,14 @@ export const KotErrorLogPage: React.FC = () => {
     );
   }
 
-  if (activeBranchId === "all") {
-    return (
-      <Card className="p-6">
-        <p className="text-sm text-muted-foreground">
-          Please select a specific branch to view KOT error logs.
-        </p>
-      </Card>
-    );
-  }
-
   if (state === "empty" && profiles.length === 0) {
     return (
       <Card className="p-6">
-        <p className="text-sm text-muted-foreground">
-          No POS Profiles found for this branch.
-        </p>
+        <EmptyState
+          icon={AlertTriangle}
+          title="No POS Profiles found"
+          description="This branch has no POS Profile configured yet. Set one up to start tracking KOT errors."
+        />
       </Card>
     );
   }
@@ -105,42 +121,34 @@ export const KotErrorLogPage: React.FC = () => {
 
   return (
     <div className="space-y-4 p-4">
-      <Card className="p-4">
-        <label className="text-xs text-muted-foreground block mb-2">POS Profile</label>
-        <Select
-          value={selectedProfile}
-          onChange={(e) => setSelectedProfile(e.target.value)}
-          options={profiles.map((p) => ({ label: p.name, value: p.name }))}
-          placeholder="Select a POS Profile"
-        />
-      </Card>
-      {state === "populated" && (
+      {profiles.length > 1 && (
         <Card className="p-4">
-          <h3 className="text-sm font-semibold mb-4">KOT Error Logs</h3>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-xs text-muted-foreground border-b">
-                  <th className="p-3">KOT</th>
-                  <th className="p-3">Invoice</th>
-                  <th className="p-3">DateTime</th>
-                  <th className="p-3">Production</th>
-                </tr>
-              </thead>
-              <tbody>
-                {logs.map((log, idx) => (
-                  <tr key={`${log.kot}-${idx}`} className="border-b hover:bg-muted/50">
-                    <td className="p-3 font-mono text-xs">{log.kot}</td>
-                    <td className="p-3">{log.invoice}</td>
-                    <td className="p-3 text-xs">{log.invoice_creation_time || "—"}</td>
-                    <td className="p-3">{log.production}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <label className="text-xs text-muted-foreground block mb-2">POS Profile</label>
+          <Select
+            value={selectedProfile}
+            onChange={(e) => setSelectedProfile(e.target.value)}
+            options={profiles.map((p) => ({ label: p.name, value: p.name }))}
+            placeholder="Select a POS Profile"
+          />
         </Card>
       )}
+
+      <Card className="p-4">
+        <h3 className="text-sm font-semibold mb-4">KOT Error Logs</h3>
+        {state === "loading" ? (
+          <div className="flex items-center justify-center p-8">
+            <Spinner />
+          </div>
+        ) : logs.length > 0 ? (
+          <DataTable columns={columns} rows={logs} />
+        ) : (
+          <EmptyState
+            icon={AlertTriangle}
+            title="No KOT errors"
+            description="No duplicate or failed Kitchen Order Ticket events have been recorded for this POS Profile yet."
+          />
+        )}
+      </Card>
     </div>
   );
 };
