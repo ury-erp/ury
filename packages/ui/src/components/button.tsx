@@ -25,7 +25,23 @@ const buttonVariants = cva(
         // Press always reads *darker* than hover. Where the token ramp has a
         // darker step, use it; where it doesn't, `brightness-95` gets the same
         // result without inventing a colour.
+        //
+        // `default` is the mockup's `.btn.p`: solid near-black, used for the
+        // one deliberate primary action on a page. It used to be bright blue
+        // (`bg-primary`) — that read as "everything important is blue" across
+        // the whole app, when the reference design reserves colour for the
+        // rare, genuinely different case. Reuses the same `foreground`/
+        // `background` tokens as `solid` below (kept as a back-compat alias —
+        // do not diverge the two).
         default:
+          "bg-foreground text-background shadow-sm hover:bg-foreground/90 active:bg-foreground active:brightness-90 active:shadow-none",
+        // The rare, deliberate blue call-to-action — opt in explicitly by
+        // name. This is what `default` used to render as; anything that
+        // still wants that accent treatment (not "this is the primary
+        // action," but "this specific action is highlighted in colour on
+        // purpose") should use `variant="accent"` instead of relying on the
+        // old default.
+        accent:
           "bg-primary text-white shadow-sm hover:bg-primary/90 active:bg-primary-600 active:shadow-none",
         destructive:
           "bg-destructive text-white shadow-sm hover:bg-destructive/90 active:bg-destructive active:brightness-95 active:shadow-none",

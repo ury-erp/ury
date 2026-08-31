@@ -15,8 +15,12 @@ const badgeVariants = cva(
   {
     variants: {
       variant: {
+        // Was `bg-primary` (blue) — every badge without an explicit variant
+        // read as a colour signal, when most badges carry no severity
+        // meaning at all. Neutral by default; reach for `info`/`tagAccent`
+        // (still blue) when a badge is deliberately calling out something.
         default:
-          "border-transparent bg-primary text-primary-foreground hover:bg-primary/80",
+          "border-transparent bg-muted text-muted-foreground hover:bg-muted/80",
         secondary:
           "border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80",
         destructive:

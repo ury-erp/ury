@@ -378,7 +378,7 @@ export const SalesPlanPage: React.FC = () => {
                 className="pl-9"
               />
             </label>
-            <Button onClick={saveDraft} disabled={loading || saving || !draftKey} variant="secondary" className="gap-2">
+            <Button onClick={saveDraft} disabled={loading || saving || !draftKey} variant="chrome" size="compactLg" className="gap-2">
               <Save className="h-4 w-4" />
               <span>{saving ? 'Saving...' : 'Save Draft'}</span>
             </Button>
@@ -387,6 +387,7 @@ export const SalesPlanPage: React.FC = () => {
                 onClick={runTransition}
                 disabled={!canTransition || transitioning || actionBlockedByRole}
                 title={actionBlockedByRole ? 'Only managers can approve a Sales Plan.' : undefined}
+                size="compactLg"
                 className="gap-2"
               >
                 <currentAction.icon className="h-4 w-4" />
