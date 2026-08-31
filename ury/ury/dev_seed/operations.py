@@ -111,6 +111,12 @@ AGGREGATORS = ["Zomato", "Swiggy", "Direct"]
 # rather than a systemic one.
 NEEDS_ATTENTION_DEMO_ITEMS = {"Kulfi", "Buttermilk (Chaas)"}
 
+# Department to fall back to for a stray history item whose item_group isn't
+# in ITEM_GROUP_TO_DEPARTMENT at all (see
+# _ensure_item_production_configurations_for_stray_history_items).
+FALLBACK_DEPARTMENT_FOR_UNMAPPED_ITEM_GROUP = "Indian Kitchen"
+BEVERAGE_NAME_KEYWORDS = ("coffee", "tea", "juice", "soda", "shake", "lassi", "chai")
+
 
 def _get_branch():
 	branch_name = frappe.db.get_value("Branch", {}, "name")
@@ -364,6 +370,69 @@ def _ensure_item_production_configurations(branch_name, dept_names):
 	return created
 
 
+def _ensure_item_production_configurations_for_stray_history_items(branch_name, dept_names):
+	"""Covers Items with real POS Invoice history on this branch that aren't
+	part of catalog.py's MENU_ITEMS (e.g. legacy/manually created test items
+	such as "Burger"/"Fries"/"Pizza"/"Wings"/"Coffee" seen on this bench).
+	``get_comparable_weekday_history`` (ury/ury/api/ury_dashboard.py) surfaces
+	*any* item with matching-weekday POS Invoice history, not just catalog
+	items, so without this such items show up on the Sales Plan page's
+	"Needs Attention" list even though the only intended gap is
+	``NEEDS_ATTENTION_DEMO_ITEMS``. Assigns each a sensible production unit
+	via ITEM_GROUP_TO_DEPARTMENT, falling back to a beverage-keyword check
+	and then FALLBACK_DEPARTMENT_FOR_UNMAPPED_ITEM_GROUP, so only the two
+	intentional demo items remain unassigned.
+	"""
+	from ury.ury.dev_seed.catalog import MENU_ITEMS
+
+	menu_item_names = {name for name, _group, _rate in MENU_ITEMS}
+
+	item_codes = frappe.db.sql_list(
+		"""
+		SELECT DISTINCT pii.item_code
+		FROM `tabPOS Invoice Item` pii
+		INNER JOIN `tabPOS Invoice` pi ON pi.name = pii.parent
+		WHERE pi.branch = %(branch)s AND pi.docstatus = 1
+		""",
+		{"branch": branch_name},
+	)
+
+	created = []
+	for item_code in item_codes:
+		if item_code in menu_item_names or item_code in NEEDS_ATTENTION_DEMO_ITEMS:
+			continue
+		if frappe.db.exists("URY Item Production Configuration", {"item": item_code}):
+			continue
+
+		item_group = frappe.db.get_value("Item", item_code, "item_group")
+		dept_key = ITEM_GROUP_TO_DEPARTMENT.get(item_group)
+		if not dept_key and any(k in item_code.lower() for k in BEVERAGE_NAME_KEYWORDS):
+			dept_key = "Beverage Station"
+		if not dept_key:
+			dept_key = FALLBACK_DEPARTMENT_FOR_UNMAPPED_ITEM_GROUP
+		department = dept_names.get(dept_key)
+		production_policy = "MADE_TO_ORDER" if dept_key == "Beverage Station" else "PRE_PRODUCED"
+
+		doc = frappe.get_doc(
+			{
+				"doctype": "URY Item Production Configuration",
+				"item": item_code,
+				"branch": branch_name,
+				"department": department,
+				"production_unit": dept_key,
+				"production_policy": production_policy,
+				"active": 1,
+			}
+		)
+		try:
+			doc.insert(ignore_permissions=True)
+			created.append(doc.name)
+			print(f"Created Item Production Configuration for stray history item {item_code} -> {dept_key}")
+		except Exception as e:
+			print(f"Skipped stray history item {item_code}: {e}")
+	return created
+
+
 # ---------------------------------------------------------------------------
 # URY Report Settings
 # ---------------------------------------------------------------------------
@@ -503,6 +572,9 @@ def seed():
 	production_units_created = _ensure_production_units(dept_names, branch_name)
 	production_item_groups_updated = _ensure_production_item_groups()
 	item_configs_created = _ensure_item_production_configurations(branch_name, dept_names)
+	item_configs_created += _ensure_item_production_configurations_for_stray_history_items(
+		branch_name, dept_names
+	)
 	report_settings = _ensure_report_settings(branch_name)
 	aggregators_created = _ensure_aggregators(branch_name)
 
