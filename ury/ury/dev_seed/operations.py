@@ -103,6 +103,14 @@ ITEM_GROUP_TO_POLICY = {
 # Aggregators to seed on the Branch's custom_aggregator_settings child table.
 AGGREGATORS = ["Zomato", "Swiggy", "Direct"]
 
+# Deliberately left WITHOUT a production unit so the Sales Plan page's
+# "Needs Attention" list (frontend/src/pages/Dashboard/SalesPlanPage.tsx,
+# `missingProductionUnit`) has a small, realistic number of gaps to
+# demonstrate that UX -- not the whole 41-item catalog. Two low-volume,
+# unrelated items are picked on purpose so this reads as an onboarding gap
+# rather than a systemic one.
+NEEDS_ATTENTION_DEMO_ITEMS = {"Kulfi", "Buttermilk (Chaas)"}
+
 
 def _get_branch():
 	branch_name = frappe.db.get_value("Branch", {}, "name")
@@ -286,24 +294,50 @@ def _ensure_item_production_configurations(branch_name, dept_names):
 	seeds items with is_stock_item=0 (they're menu/sales items, not stock
 	items) — the ``is_stock_item=1`` filter seed_v3_demo.py uses would match
 	none of them.
+
+	Every item except ``NEEDS_ATTENTION_DEMO_ITEMS`` gets a real
+	department/production_unit. Those two are backfilled to a *cleared*
+	production_unit/department even if a config row already exists (e.g.
+	from an older run of this seed, before this gap was made deliberate),
+	so re-running this function always converges on "41 assigned, 2 not"
+	rather than leaving stale full assignments in place.
 	"""
 	# Local import to avoid a hard import-time dependency cycle; catalog.py
 	# has no side effects at import time.
 	from ury.ury.dev_seed.catalog import MENU_ITEMS
 
 	created = []
+	updated = []
 	skipped = []
 	for item_name, item_group, _rate in MENU_ITEMS:
 		if not frappe.db.exists("Item", item_name):
 			skipped.append(item_name)
 			continue
-		if frappe.db.exists("URY Item Production Configuration", {"item": item_name}):
-			continue
 
 		dept_key = ITEM_GROUP_TO_DEPARTMENT.get(item_group)
-		department = dept_names.get(dept_key) if dept_key else None
-		production_unit = dept_key  # production_unit names mirror department names here
+		is_demo_gap = item_name in NEEDS_ATTENTION_DEMO_ITEMS
+		department = dept_names.get(dept_key) if dept_key and not is_demo_gap else None
+		# production_unit names mirror department names here.
+		production_unit = dept_key if not is_demo_gap else None
 		production_policy = ITEM_GROUP_TO_POLICY.get(item_group, "PRE_PRODUCED")
+
+		existing_name = frappe.db.exists("URY Item Production Configuration", {"item": item_name})
+		if existing_name:
+			current = frappe.db.get_value(
+				"URY Item Production Configuration",
+				existing_name,
+				["department", "production_unit"],
+				as_dict=True,
+			)
+			if current.department != department or current.production_unit != production_unit:
+				frappe.db.set_value(
+					"URY Item Production Configuration",
+					existing_name,
+					{"department": department, "production_unit": production_unit},
+				)
+				updated.append(item_name)
+				print(f"Updated Item Production Configuration for {item_name} -> production_unit={production_unit}")
+			continue
 
 		doc = frappe.get_doc(
 			{
@@ -325,6 +359,8 @@ def _ensure_item_production_configurations(branch_name, dept_names):
 
 	if skipped:
 		print(f"Skipped {len(skipped)} MENU_ITEMS not found as Items (run catalog.seed() first): {skipped}")
+	if updated:
+		print(f"Updated {len(updated)} existing Item Production Configurations: {updated}")
 	return created
 
 
