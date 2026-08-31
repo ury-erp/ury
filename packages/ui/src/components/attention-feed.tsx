@@ -2,6 +2,7 @@ import * as React from "react"
 import { cn } from "../lib/cn"
 import { Card, CardHeader, CardTitle, CardContent } from "./card"
 import { Badge } from "./badge"
+import { buttonVariants } from "./button"
 
 type Severity = "blocking" | "warning" | "info"
 
@@ -69,13 +70,7 @@ const AttentionItem = React.forwardRef<HTMLDivElement, AttentionItemProps>(
                 e.stopPropagation()
                 action.onClick()
               }}
-              className={cn(
-                "px-3 py-1.5 rounded-md text-xs font-medium",
-                "bg-primary text-primary-foreground",
-                "hover:bg-primary/90",
-                "transition-colors duration-150",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              )}
+              className={buttonVariants({ variant: "chrome", size: "compact" })}
             >
               {action.label}
             </button>
