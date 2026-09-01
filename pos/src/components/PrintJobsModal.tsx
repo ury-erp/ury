@@ -178,8 +178,6 @@ export function PrintJobsModal({
                       <span>{job.printer_name || job.printer || 'Unknown printer'}</span>
                       <span className="text-gray-300">•</span>
                       <span className="text-gray-500">{formatJobTime(job.created_at)}</span>
-                      <span className="text-gray-300">•</span>
-                      <span>Job Owner: {job.job_owner || '--'}</span>
                       {job.table && (
                         <>
                           <span className="text-gray-300">•</span>
