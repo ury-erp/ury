@@ -185,12 +185,6 @@ export function PrintJobsModal({
                         </>
                       )}
                     </div>
-
-                    {job.status === 'FAILED' && job.failure_reason && (
-                      <div className="mt-1.5 text-xs text-red-600">
-                        {job.failure_reason}
-                      </div>
-                    )}
                   </li>
                 );
               })}
