@@ -14,7 +14,7 @@
   "job_type",
   "invoice",
   "table",
-  "owner",
+  "job_owner",
   "reference_doctype",
   "reference_name",
   "production",
@@ -84,11 +84,11 @@
    "read_only": 1
   },
   {
-   "fieldname": "owner",
+   "fieldname": "job_owner",
    "fieldtype": "Link",
    "in_list_view": 1,
    "in_standard_filter": 1,
-   "label": "Owner",
+   "label": "Job Owner",
    "options": "User",
    "read_only": 1
   },

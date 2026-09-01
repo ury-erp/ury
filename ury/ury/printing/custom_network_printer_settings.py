@@ -83,7 +83,8 @@ class CustomNetworkPrinterSettings(NetworkPrinterSettings):
             print_job_id = _make_print_job_id(self.printer_name, cups_job_id)
 
             user_owner = (
-                (extra_metadata.get("owner") or extra_metadata.get("user")) if extra_metadata else None
+                (extra_metadata.get("job_owner") or extra_metadata.get("owner") or extra_metadata.get("user"))
+                if extra_metadata else None
             )
             if not user_owner:
                 session_user = getattr(frappe, "session", None) and getattr(frappe.session, "user", None)
@@ -107,7 +108,7 @@ class CustomNetworkPrinterSettings(NetworkPrinterSettings):
                 "file_path": file_path,
                 "status": "SUBMITTED",
                 "created_at": frappe.utils.now(),
-                "owner": user_owner,
+                "job_owner": user_owner,
                 "table": table_name,
                 "restaurant_table": table_name,
             }

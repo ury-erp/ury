@@ -112,8 +112,10 @@ def _serialize_for_document(data):
     out.doctype = "URY Print Job"
 
     # Ensure list-view / document contract fields are present.
-    out.owner = out.get("owner") or out.get("user") or "Administrator"
-    out.modified_by = out.get("modified_by") or out.owner
+    job_owner = out.get("job_owner") or out.get("owner") or out.get("user") or "Administrator"
+    out.job_owner = job_owner
+    out.owner = out.get("owner") or job_owner
+    out.modified_by = out.get("modified_by") or job_owner
     out.creation = out.get("created_at") or out.get("creation") or frappe.utils.now()
     out.modified = out.get("last_checked_at") or out.get("modified") or out.creation
     out._comment_count = out.get("_comment_count", 0)

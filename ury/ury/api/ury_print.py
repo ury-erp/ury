@@ -43,7 +43,7 @@ def network_printing(
             "invoice": name,
             "table": restaurant_table,
             "restaurant_table": restaurant_table,
-            "owner": frappe.session.user,
+            "job_owner": frappe.session.user,
         },
     )
 

@@ -65,7 +65,7 @@ class TestURYPrint(FrappeTestCase):
                 "invoice": "INV-001",
                 "table": "T-01",
                 "restaurant_table": "T-01",
-                "owner": "Administrator",
+                "job_owner": "Administrator",
             },
         )
 
