@@ -160,7 +160,7 @@ def notify_print_failure(
             "job_owner": job_owner,
         }
 
-    frappe.publish_realtime("print_failure_alert", payload)
+    frappe.publish_realtime("print_failure_alert", payload, user=job_owner)
 
     frappe.logger("printing").info(
         {
