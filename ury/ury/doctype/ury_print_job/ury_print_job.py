@@ -26,14 +26,37 @@ class URYPrintJob(Document):
     def db_insert(self, *args, **kwargs):
         """Persist new job to file store."""
         data = self.as_dict()
+        if getattr(self, "modified", None):
+            data["modified"] = str(self.modified)
+        if getattr(self, "creation", None):
+            data["creation"] = str(self.creation)
         save_job(self.name, data)
 
     def db_update(self, *args, **kwargs):
         """Persist updated job to file store."""
         existing = get_job(self.name) or {}
+        old_status = existing.get("status")
         data = self.as_dict()
         existing.update(data)
+        if getattr(self, "modified", None):
+            existing["modified"] = str(self.modified)
         save_job(self.name, existing)
+
+        # If status transitioned to FAILED, publish failure alert to job_owner
+        new_status = existing.get("status")
+        if new_status == "FAILED" and old_status != "FAILED":
+            from ury.ury.printing.notifications import notify_print_failure
+
+            notify_print_failure(
+                invoice=existing.get("invoice") or existing.get("reference_name"),
+                print_job_id=self.name,
+                printer_name=existing.get("printer_name") or existing.get("printer"),
+                reason=existing.get("failure_reason") or "Manual status update to FAILED",
+                job_type=existing.get("job_type", "BILL"),
+                reference_doctype=existing.get("reference_doctype"),
+                reference_name=existing.get("reference_name"),
+                job_owner=existing.get("job_owner") or existing.get("owner"),
+            )
 
     def delete(self, *args, **kwargs):
         """Delete the JSON file instead of removing a DB row."""
@@ -116,8 +139,8 @@ def _serialize_for_document(data):
     out.job_owner = job_owner
     out.owner = out.get("owner") or job_owner
     out.modified_by = out.get("modified_by") or job_owner
-    out.creation = out.get("created_at") or out.get("creation") or frappe.utils.now()
-    out.modified = out.get("last_checked_at") or out.get("modified") or out.creation
+    out.creation = out.get("created_at") or out.get("creation") or "2026-01-01 00:00:00"
+    out.modified = out.get("modified") or out.get("last_checked_at") or out.creation
     out._comment_count = out.get("_comment_count", 0)
 
     # Normalize the invoice identifier so filters on `invoice` work for all

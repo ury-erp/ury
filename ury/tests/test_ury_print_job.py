@@ -2,6 +2,7 @@
 # For license information, please see license.txt
 
 import unittest
+from unittest.mock import patch
 import frappe
 from ury.ury.printing.file_store import save_job, delete_job
 
@@ -148,3 +149,42 @@ class TestURYPrintJobDocType(unittest.TestCase):
         )
         doc = frappe.get_doc("URY Print Job", job_id)
         self.assertEqual(doc.job_owner, "legacy@test.com")
+
+    @patch("ury.ury.printing.notifications.notify_print_failure")
+    def test_manual_status_update_to_failed_triggers_notification_once(self, mock_notify):
+        """Transitioning status to FAILED via doc.save() triggers notification exactly once."""
+        job_id = "test-doc-manual-fail-job"
+        self._save_extra_job(
+            job_id,
+            {
+                "print_job_id": job_id,
+                "status": "QUEUED",
+                "printer": "Kitchen_Printer",
+                "job_type": "BILL",
+                "invoice": "INV-TEST-001",
+                "job_owner": "cashier@test.com",
+            },
+        )
+        doc = frappe.get_doc("URY Print Job", job_id)
+        doc.status = "FAILED"
+        doc.failure_reason = "Manual printer error"
+        doc.flags.ignore_links = True
+        doc.save()
+
+        mock_notify.assert_called_once_with(
+            invoice="INV-TEST-001",
+            print_job_id=job_id,
+            printer_name="Kitchen_Printer",
+            reason="Manual printer error",
+            job_type="BILL",
+            reference_doctype=None,
+            reference_name=None,
+            job_owner="cashier@test.com",
+        )
+
+        # Saving again while already FAILED must not trigger notification again
+        mock_notify.reset_mock()
+        doc.failure_reason = "Another edit"
+        doc.flags.ignore_links = True
+        doc.save()
+        mock_notify.assert_not_called()
