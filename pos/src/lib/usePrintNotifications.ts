@@ -55,8 +55,10 @@ export function usePrintNotifications(activeInvoiceName?: string) {
       reference_doctype?: string;
       reference_name?: string;
     }) => {
+      console.log('[usePrintNotifications] Received print_failure_alert:', data);
       const currentUser = usePOSStore.getState().user?.name;
       if (data.job_owner && currentUser && data.job_owner !== currentUser) {
+        console.log('[usePrintNotifications] Dropped alert not targeted to current user', { target: data.job_owner, current: currentUser });
         return; // targeted to another user
       }
 
@@ -75,7 +77,7 @@ export function usePrintNotifications(activeInvoiceName?: string) {
         },
       }));
 
-      if (!activeInvoiceName || data.invoice === activeInvoiceName) {
+      if (!activeInvoiceName || data.invoice === activeInvoiceName || data.reference_name === activeInvoiceName || data.print_job_id === activeInvoiceName) {
         showToast.error(`Printing Failed for ${invoiceOrDoc}: ${data.reason || 'Printer Error'}`);
       }
     };
