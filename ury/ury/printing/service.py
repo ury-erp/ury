@@ -93,7 +93,8 @@ def submit_and_monitor_print_job(
 
         # Determine owner: extra_metadata -> frappe.session.user -> target_doc.owner -> Administrator
         user_owner = (
-            (extra_metadata.get("owner") or extra_metadata.get("user")) if extra_metadata else None
+            (extra_metadata.get("job_owner") or extra_metadata.get("owner") or extra_metadata.get("user"))
+            if extra_metadata else None
         )
         if not user_owner:
             session_user = getattr(frappe, "session", None) and getattr(frappe.session, "user", None)
@@ -120,7 +121,7 @@ def submit_and_monitor_print_job(
             "file_path": file_path,
             "status": "SUBMITTED",
             "created_at": frappe.utils.now(),
-            "owner": user_owner,
+            "job_owner": user_owner,
             "table": table_name,
             "restaurant_table": table_name,
         }

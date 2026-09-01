@@ -169,6 +169,13 @@ def _finalize_bill(print_job_id, final_state, metadata, failure_reason):
         }
 
     if final_state in (FAILED, CANCELED, UNKNOWN):
+        job_owner = (
+            metadata.get("job_owner")
+            or metadata.get("owner")
+            or metadata.get("user")
+            or "Administrator"
+        )
+
         if invoice:
             frappe.db.set_value("POS Invoice", invoice, "invoice_printed", 0)
 
@@ -180,6 +187,7 @@ def _finalize_bill(print_job_id, final_state, metadata, failure_reason):
                 printer_name=metadata.get("printer_name"),
                 reason=failure_reason or metadata.get("cups_state_reason") or "unknown",
                 job_type="BILL",
+                job_owner=job_owner,
             )
         elif final_state == CANCELED:
             event_name = "print_job_finalized_canceled"
@@ -192,7 +200,9 @@ def _finalize_bill(print_job_id, final_state, metadata, failure_reason):
                 "invoice": invoice,
                 "print_job_id": print_job_id,
                 "reason": failure_reason,
+                "job_owner": job_owner,
             },
+            user=job_owner,
         )
 
         frappe.logger("printing").info(
@@ -266,6 +276,13 @@ def _finalize_kot(print_job_id, final_state, metadata, failure_reason):
             }
         )
     else:
+        job_owner = (
+            metadata.get("job_owner")
+            or metadata.get("owner")
+            or metadata.get("user")
+            or "Administrator"
+        )
+
         frappe.publish_realtime(
             "kot_print_failed",
             {
@@ -274,7 +291,9 @@ def _finalize_kot(print_job_id, final_state, metadata, failure_reason):
                 "invoice": invoice,
                 "print_job_id": print_job_id,
                 "reason": failure_reason,
+                "job_owner": job_owner,
             },
+            user=job_owner,
         )
         frappe.logger("printing").info(
             {
@@ -283,6 +302,7 @@ def _finalize_kot(print_job_id, final_state, metadata, failure_reason):
                 "print_job_id": print_job_id,
                 "kot": kot_name,
                 "reason": failure_reason,
+                "job_owner": job_owner,
             }
         )
 
@@ -295,6 +315,7 @@ def _finalize_kot(print_job_id, final_state, metadata, failure_reason):
                 job_type="KOT",
                 reference_doctype=reference_doctype,
                 reference_name=kot_name,
+                job_owner=job_owner,
             )
 
     return {
@@ -317,14 +338,30 @@ def _finalize_waiter_slip(print_job_id, final_state, metadata, failure_reason):
     reference_name = metadata.get("reference_name")
 
     event = "waiter_print_completed" if final_state == COMPLETED else "waiter_print_failed"
+
+    if final_state == FAILED:
+        job_owner = (
+            metadata.get("job_owner")
+            or metadata.get("owner")
+            or metadata.get("user")
+            or "Administrator"
+        )
+    else:
+        job_owner = None
+
+    payload = {
+        "invoice": invoice,
+        "kot_names": kot_names,
+        "print_job_id": print_job_id,
+        "reason": failure_reason,
+    }
+    if job_owner:
+        payload["job_owner"] = job_owner
+
     frappe.publish_realtime(
         event,
-        {
-            "invoice": invoice,
-            "kot_names": kot_names,
-            "print_job_id": print_job_id,
-            "reason": failure_reason,
-        },
+        payload,
+        user=job_owner,
     )
 
     frappe.logger("printing").info(
@@ -333,6 +370,7 @@ def _finalize_waiter_slip(print_job_id, final_state, metadata, failure_reason):
             "job_type": "WAITER_SLIP",
             "print_job_id": print_job_id,
             "invoice": invoice,
+            "job_owner": job_owner,
         }
     )
 
@@ -345,6 +383,7 @@ def _finalize_waiter_slip(print_job_id, final_state, metadata, failure_reason):
             job_type="WAITER_SLIP",
             reference_doctype=reference_doctype,
             reference_name=reference_name,
+            job_owner=job_owner,
         )
 
     return {
@@ -365,13 +404,29 @@ def _finalize_kot_reprint(print_job_id, final_state, metadata, failure_reason):
     reference_name = metadata.get("reference_name")
 
     event = "kot_reprint_completed" if final_state == COMPLETED else "kot_reprint_failed"
+
+    if final_state == FAILED:
+        job_owner = (
+            metadata.get("job_owner")
+            or metadata.get("owner")
+            or metadata.get("user")
+            or "Administrator"
+        )
+    else:
+        job_owner = None
+
+    payload = {
+        "invoice": invoice,
+        "print_job_id": print_job_id,
+        "reason": failure_reason,
+    }
+    if job_owner:
+        payload["job_owner"] = job_owner
+
     frappe.publish_realtime(
         event,
-        {
-            "invoice": invoice,
-            "print_job_id": print_job_id,
-            "reason": failure_reason,
-        },
+        payload,
+        user=job_owner,
     )
 
     frappe.logger("printing").info(
@@ -380,6 +435,7 @@ def _finalize_kot_reprint(print_job_id, final_state, metadata, failure_reason):
             "job_type": "KOT_REPRINT",
             "print_job_id": print_job_id,
             "invoice": invoice,
+            "job_owner": job_owner,
         }
     )
 
@@ -392,6 +448,7 @@ def _finalize_kot_reprint(print_job_id, final_state, metadata, failure_reason):
             job_type="KOT_REPRINT",
             reference_doctype=reference_doctype,
             reference_name=reference_name,
+            job_owner=job_owner,
         )
 
     return {

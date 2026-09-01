@@ -231,9 +231,7 @@ class TestPrintJobMonitoring(FrappeTestCase):
             self.assertEqual(self.fake.zsets[MONITOR_ZSET][job_id], next_check)
 
     def test_schedule_next_check_terminal_states_stop_monitoring(self):
-        """Terminal states stop monitoring but retain metadata with a 24h TTL."""
-        from ury.ury.printing.print_job_monitor import _job_key
-
+        """Terminal states stop active monitoring but retain metadata in the file store."""
         for state in (COMPLETED, FAILED, CANCELED):
             job_id = f"PJ-{state.lower()}"
             register_print_job(self._sample_metadata(job_id))
@@ -245,7 +243,6 @@ class TestPrintJobMonitoring(FrappeTestCase):
             metadata = get_print_job(job_id)
             self.assertIsNotNone(metadata)
             self.assertEqual(metadata["status"], state)
-            self.assertEqual(self.fake.ttls.get(_job_key(job_id)), 86400)
 
     def test_remove_print_job_cleans_all_keys(self):
         """Removing a job deletes metadata, monitor entry, and lock."""
@@ -259,7 +256,12 @@ class TestPrintJobMonitoring(FrappeTestCase):
         self.assertNotIn("print_job_lock:PJ-001", self.fake.strings)
 
     def test_redis_connection_errors_fall_back_gracefully(self):
-        """All public functions degrade safely when Redis is unreachable."""
+        """All public functions degrade safely when Redis is unreachable.
+
+        The file store is authoritative, so persistence calls that succeed on
+        disk must still return a valid result even if the Redis scheduler is
+        down.
+        """
         bad_cache = MagicMock()
         bad_cache.hset.side_effect = redis.exceptions.ConnectionError
         bad_cache.zadd.side_effect = redis.exceptions.ConnectionError
@@ -273,10 +275,13 @@ class TestPrintJobMonitoring(FrappeTestCase):
             "ury.ury.printing.print_job_monitor._redis",
             return_value=bad_cache,
         ):
-            self.assertIsNone(register_print_job({"print_job_id": "PJ-bad"}))
+            # File-store persistence succeeds even when Redis scheduling fails.
+            self.assertEqual(register_print_job({"print_job_id": "PJ-bad"}), "PJ-bad")
             self.assertEqual(get_due_print_jobs(now_ts=1), [])
             self.assertFalse(acquire_job_lock("PJ-bad"))
-            self.assertIsNone(update_print_job("PJ-bad", {"status": PROCESSING}))
+            updated = update_print_job("PJ-bad", {"status": PROCESSING})
+            self.assertIsNotNone(updated)
+            self.assertEqual(updated["status"], PROCESSING)
             self.assertIsNone(schedule_next_check("PJ-bad", SUBMITTED))
 
             # remove / release should not raise despite Redis errors.

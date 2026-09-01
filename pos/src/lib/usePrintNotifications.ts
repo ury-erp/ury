@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getFrappeSocket } from './socket';
 import { showToast } from '@ury/ui';
+import { usePOSStore } from '../store/pos-store';
 
 export interface PrintJobStatusPayload {
   invoice: string;
@@ -9,6 +10,8 @@ export interface PrintJobStatusPayload {
   printer_name: string;
   status: 'QUEUED' | 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED' | 'CANCELED';
   reason?: string;
+  job_owner?: string;
+  table?: string;
 }
 
 export function usePrintNotifications(activeInvoiceName?: string) {
@@ -42,21 +45,43 @@ export function usePrintNotifications(activeInvoiceName?: string) {
     };
 
     // 3. Print Failure Alert Listener (Fired on CUPS failure or max retries)
-    const handlePrintFailure = (data: { invoice: string; print_job_id: string; printer_name: string; reason?: string }) => {
+    const handlePrintFailure = (data: {
+      invoice?: string;
+      print_job_id: string;
+      printer_name?: string;
+      reason?: string;
+      job_type?: string;
+      job_owner?: string;
+      reference_doctype?: string;
+      reference_name?: string;
+    }) => {
+      console.log('[usePrintNotifications] Received print_failure_alert:', data);
+      const currentUser = usePOSStore.getState().user?.name;
+      if (data.job_owner && currentUser && data.job_owner !== currentUser) {
+        console.log('[usePrintNotifications] Dropped alert not targeted to current user', { target: data.job_owner, current: currentUser });
+        return; // targeted to another user
+      }
+
+      const invoiceOrDoc = data.invoice || data.reference_name || data.print_job_id;
+
       setActivePrintJobs((prev) => ({
         ...prev,
         [data.print_job_id]: {
           ...prev[data.print_job_id],
-          invoice: data.invoice,
+          invoice: invoiceOrDoc,
           print_job_id: data.print_job_id,
           printer_name: data.printer_name,
           status: 'FAILED',
           reason: data.reason,
+          job_owner: data.job_owner,
         },
       }));
 
-      if (!activeInvoiceName || data.invoice === activeInvoiceName) {
-        showToast.error(`Printing Failed for ${data.invoice}: ${data.reason || 'Printer Error'}`);
+      if (!activeInvoiceName || data.invoice === activeInvoiceName || data.reference_name === activeInvoiceName || data.print_job_id === activeInvoiceName) {
+        showToast.error(`Printing Failed for ${invoiceOrDoc}: ${data.reason || 'Printer Error'}`, {
+          autoClose: false,
+          closeOnClick: true,
+        });
       }
     };
 

@@ -179,7 +179,7 @@ def reconcile_active_print_jobs():
                 "status": "SUBMITTED",
                 "table": table_val,
                 "restaurant_table": table_val,
-                "owner": inv_owner,
+                "job_owner": inv_owner,
                 "recovered": True,
             }
 

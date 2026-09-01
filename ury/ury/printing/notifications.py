@@ -8,6 +8,8 @@ in Redis so repeated failures or unchanged health states do not spam users.
 import frappe
 import redis.exceptions
 
+from ury.ury.printing.file_store import get_job
+
 PRINT_FAILURE_NOTIFIED_PREFIX = "print_failure_notified:"
 PRINT_FAILURE_TTL_SECONDS = 86400  # 24 hours
 LONG_RUNNING_NOTIFIED_PREFIX = "print_long_running_notified:"
@@ -60,11 +62,15 @@ def notify_print_failure(
     job_type="BILL",
     reference_doctype=None,
     reference_name=None,
+    job_owner=None,
 ):
     """Publish a print-failure alert exactly once per print job.
 
     Deduplication is enforced via Redis key
     ``print_failure_notified:<print_job_id>`` with a 24-hour TTL.
+
+    The alert is published only to ``job_owner`` so users do not receive
+    failure notifications for print jobs initiated by other stations.
 
     Args:
         invoice: The POS Invoice identifier associated with the failed job.
@@ -76,17 +82,32 @@ def notify_print_failure(
             ``KOT_REPRINT``). Defaults to ``BILL``.
         reference_doctype: Generic source DocType for non-bill alerts.
         reference_name: Generic source document name for non-bill alerts.
+        job_owner: User ID that should receive the alert. Resolved from the
+            print job metadata when omitted; falls back to ``Administrator``.
 
     Returns:
         True if the alert was newly published, False if it was already sent
         or Redis is unavailable.
     """
+    if not job_owner:
+        job_data = get_job(print_job_id)
+        job_owner = (
+            job_data.get("job_owner")
+            or job_data.get("owner")
+            or job_data.get("user")
+            if job_data
+            else None
+        )
+    if not job_owner:
+        job_owner = "Administrator"
+
     cache = _redis()
     if not cache:
         frappe.logger("printing").warning(
             {
                 "event": "notify_print_failure_redis_unavailable",
                 "print_job_id": print_job_id,
+                "job_owner": job_owner,
             }
         )
         return False
@@ -126,6 +147,7 @@ def notify_print_failure(
             "print_job_id": print_job_id,
             "printer_name": printer_name,
             "reason": reason,
+            "job_owner": job_owner,
         }
     else:
         payload = {
@@ -135,9 +157,10 @@ def notify_print_failure(
             "job_type": job_type,
             "reference_doctype": reference_doctype,
             "reference_name": reference_name,
+            "job_owner": job_owner,
         }
 
-    frappe.publish_realtime("print_failure_alert", payload)
+    frappe.publish_realtime("print_failure_alert", payload, user=job_owner)
 
     frappe.logger("printing").info(
         {
@@ -149,6 +172,7 @@ def notify_print_failure(
             "print_job_id": print_job_id,
             "printer_name": printer_name,
             "reason": reason,
+            "job_owner": job_owner,
         }
     )
 
