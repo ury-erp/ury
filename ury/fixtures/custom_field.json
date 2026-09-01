@@ -12646,7 +12646,7 @@
 	"fetch_from": null,
 	"fetch_if_empty": 0,
 	"fieldname": "custom_printing_time",
-	"fieldtype": "Time",
+	"fieldtype": "Datetime",
 	"hidden": 0,
 	"hide_border": 0,
 	"hide_days": 0,
