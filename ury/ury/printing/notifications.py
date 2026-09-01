@@ -151,6 +151,7 @@ def notify_print_failure(
         }
     else:
         payload = {
+            "invoice": invoice,
             "print_job_id": print_job_id,
             "printer_name": printer_name,
             "reason": reason,

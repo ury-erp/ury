@@ -30,6 +30,7 @@ class URYKOT(Document):
                         "invoice": self.invoice,
                         "restaurant_table": self.restaurant_table,
                         "production": self.production,
+                        "job_owner": self.owner or getattr(frappe.session, "user", "Administrator"),
                     },
                 )
             except Exception:

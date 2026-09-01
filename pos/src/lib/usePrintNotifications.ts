@@ -70,6 +70,7 @@ export function usePrintNotifications(activeInvoiceName?: string) {
       }
 
       const invoiceOrDoc = data.invoice || data.reference_name || data.print_job_id;
+      const typeLabel = data.job_type === 'KOT' ? 'KOT' : 'Invoice';
 
       setActivePrintJobs((prev) => ({
         ...prev,
@@ -85,7 +86,7 @@ export function usePrintNotifications(activeInvoiceName?: string) {
       }));
 
       if (!activeInvoiceName || data.invoice === activeInvoiceName || data.reference_name === activeInvoiceName || data.print_job_id === activeInvoiceName) {
-        showToast.error(`Printing Failed for ${invoiceOrDoc}: ${data.reason || 'Printer Error'}`, {
+        showToast.error(`${typeLabel} Printing Failed for ${invoiceOrDoc}: ${data.reason || 'Printer Error'}`, {
           autoClose: false,
           closeOnClick: true,
         });

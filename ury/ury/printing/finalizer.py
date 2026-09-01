@@ -308,7 +308,7 @@ def _finalize_kot(print_job_id, final_state, metadata, failure_reason):
 
         if final_state == FAILED:
             notify_print_failure(
-                invoice=None,
+                invoice=invoice,
                 print_job_id=print_job_id,
                 printer_name=metadata.get("printer_name"),
                 reason=failure_reason or metadata.get("cups_state_reason") or "unknown",
