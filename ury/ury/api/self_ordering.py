@@ -26,6 +26,7 @@ import base64
 import hashlib
 import hmac
 import json
+from contextlib import contextmanager
 
 import frappe
 from frappe import _
@@ -61,7 +62,8 @@ class _elevated:
         return False
 
 
-def _ensure_admin_branch_mapping(branch):
+@contextmanager
+def _branch_context(branch):
     """`getBranch()` (ury/ury_pos/api.py) — used deep inside the shared KOT
     pipeline (`create_kot_doc`) that `kot_execute()` calls — resolves branch
     from a `URY User` child-table row on `Branch` matching
@@ -73,20 +75,20 @@ def _ensure_admin_branch_mapping(branch):
     this was silent instead of loud — caught only by an actual end-to-end
     order placement, not by the mocked unit tests).
 
-    Idempotently register Administrator against `branch` so `getBranch()`
-    resolves during elevation, without touching the shared KOT/getBranch
-    code itself. Administrator is used (not a new technical user) because
-    kot_execute()/create_kot_doc() also perform frappe.has_permission()
-    checks that a fresh no-role user would fail.
+    This previously registered Administrator against `branch` permanently, so
+    an unauthenticated diner's order wrote to a configuration document. Hand
+    `getBranch()` a request-scoped override for the duration of the block
+    instead — nothing is persisted. `branch` comes from the ordering profile
+    resolved from an already-verified session token, never from request data,
+    so a caller still cannot choose its own branch.
     """
-    if not branch:
-        return
-    already_mapped = frappe.db.exists("URY User", {"parent": branch, "parenttype": "Branch", "user": "Administrator"})
-    if already_mapped:
-        return
-    branch_doc = frappe.get_doc("Branch", branch)
-    branch_doc.append("user", {"user": "Administrator"})
-    branch_doc.save(ignore_permissions=True)
+    previous = frappe.flags.get("ury_branch_override")
+    if branch:
+        frappe.flags.ury_branch_override = branch
+    try:
+        yield
+    finally:
+        frappe.flags.ury_branch_override = previous
 
 
 # ---------------------------------------------------------------------------
@@ -563,9 +565,7 @@ def add_customer_items(session, items):
 
     order_type = "Dine In" if session.table else "Take Away"
 
-    with _elevated():
-        _ensure_admin_branch_mapping(profile.branch)
-
+    with _elevated(), _branch_context(profile.branch):
         invoice, invoice_name = _resolve_or_create_pos_invoice(
             table=session.table, invoiceNo=session.invoice, order_type=order_type, is_payment=None,
             check_permission=False, override_branch=profile.branch,

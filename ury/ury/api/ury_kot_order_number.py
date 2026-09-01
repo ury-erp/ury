@@ -84,17 +84,21 @@ def set_order_number(doc, event):
 
 
 def set_last_invoice_in_pos_open(doc, event):
+    # A profile with no prior invoice is the normal first-open case, so
+    # DoesNotExistError is expected and ignored. A bare except here would also
+    # swallow real database errors (and KeyboardInterrupt/SystemExit), leaving
+    # the field silently unset with no trace.
     try:
         invoice = frappe.get_last_doc(
             "POS Invoice", filters={"pos_profile": doc.pos_profile,"order_type": ["!=", "Aggregators"]}
         )
         doc.custom_ury_last_invoice = invoice.name
-    except:
-        pass 
+    except frappe.DoesNotExistError:
+        pass
     try:
         aggregator_invoice =frappe.get_last_doc(
             "POS Invoice", filters={"pos_profile": doc.pos_profile,"order_type": "Aggregators"}
         )
         doc.custom_ury_last_aggregator_invoice = aggregator_invoice.name
-    except:
+    except frappe.DoesNotExistError:
         pass

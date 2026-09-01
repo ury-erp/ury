@@ -126,6 +126,15 @@ def getMenuCourses():
 
 @frappe.whitelist()
 def getBranch():
+    # Server-set, request-scoped override used by the self-ordering flow, where
+    # the acting user is a briefly-elevated Administrator with no URY User row
+    # rather than a staff member. It is only ever set from a branch already
+    # resolved server-side from a verified ordering session — never from
+    # request data, so this does not let a caller choose its own branch.
+    override = frappe.flags.get("ury_branch_override")
+    if override:
+        return override
+
     user = frappe.session.user
     sql_query = """
         SELECT b.branch

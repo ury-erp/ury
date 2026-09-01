@@ -131,7 +131,7 @@ ury_demo_transaction_doctypes = [
 # ------------
 
 # before_install = "ury.install.before_install"
-# after_install = "ury.install.after_install"
+after_install = "ury.install.after_install"
 
 # Uninstallation
 # ------------
