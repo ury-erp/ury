@@ -70,6 +70,8 @@ export function PrintJobsModal({
           'reference_name',
           'printer',
           'printer_name',
+          'job_owner',
+          'table',
           'failure_reason',
           'created_at',
           'retry_count',
@@ -176,7 +178,21 @@ export function PrintJobsModal({
                       <span>{job.printer_name || job.printer || 'Unknown printer'}</span>
                       <span className="text-gray-300">•</span>
                       <span className="text-gray-500">{formatJobTime(job.created_at)}</span>
+                      <span className="text-gray-300">•</span>
+                      <span>Job Owner: {job.job_owner || '--'}</span>
+                      {job.table && (
+                        <>
+                          <span className="text-gray-300">•</span>
+                          <span>Table: {job.table}</span>
+                        </>
+                      )}
                     </div>
+
+                    {job.status === 'FAILED' && job.failure_reason && (
+                      <div className="mt-1.5 text-xs text-red-600">
+                        {job.failure_reason}
+                      </div>
+                    )}
                   </li>
                 );
               })}
