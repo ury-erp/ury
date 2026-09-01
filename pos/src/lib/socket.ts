@@ -2,24 +2,40 @@ import { io, Socket } from 'socket.io-client';
 
 let socket: Socket | null = null;
 
-function getSiteName(): string {
+function getSocketEndpoint(hostUrl?: string): string {
   if (typeof window === 'undefined') return '';
-  const bootSite = (window as any).frappe?.boot?.sitename || (window as any).site_name;
-  if (bootSite) return bootSite;
-  const hostname = window.location.hostname;
-  if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    return 'ury.localhost';
+
+  const siteName =
+    (window as any).frappe?.boot?.sitename ||
+    (window as any).site_name ||
+    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+      ? 'ury.localhost'
+      : window.location.hostname);
+
+  if (hostUrl) {
+    return `${hostUrl}/${siteName}`;
   }
-  return hostname;
+
+  const protocol = window.location.protocol;
+  const hostname = window.location.hostname;
+  const currentPort = window.location.port;
+
+  let baseOrigin = window.location.origin;
+
+  // In Frappe development (bench start), webserver runs on port 8000 while Socket.IO server runs on port 9000
+  if (currentPort === '8000' || (window as any).dev_server) {
+    const socketioPort = (window as any).frappe?.boot?.socketio_port || '9000';
+    baseOrigin = `${protocol}//${hostname}:${socketioPort}`;
+  }
+
+  return `${baseOrigin}/${siteName}`;
 }
 
 export function getFrappeSocket(hostUrl?: string): Socket {
   if (!socket) {
-    const origin = hostUrl || import.meta.env?.VITE_FRAPPE_BASE_URL || window.location.origin;
-    const siteName = getSiteName();
-    const namespaceUrl = siteName ? `${origin}/${siteName}` : origin;
+    const endpoint = getSocketEndpoint(hostUrl);
 
-    socket = io(namespaceUrl, {
+    socket = io(endpoint, {
       withCredentials: true,
       transports: ['websocket', 'polling'],
       path: '/socket.io',
@@ -29,11 +45,11 @@ export function getFrappeSocket(hostUrl?: string): Socket {
     });
 
     socket.on('connect', () => {
-      console.log('[Frappe Realtime Socket] Connected:', socket?.id, 'Namespace:', namespaceUrl);
+      console.log('[Frappe Realtime Socket] Connected successfully:', socket?.id, 'Endpoint:', endpoint);
     });
 
     socket.on('connect_error', (error) => {
-      console.error('[Frappe Realtime Socket] Connection error:', error);
+      console.error('[Frappe Realtime Socket] Connection error:', error?.message || error);
     });
 
     socket.on('disconnect', (reason) => {

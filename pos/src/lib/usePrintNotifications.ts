@@ -78,7 +78,10 @@ export function usePrintNotifications(activeInvoiceName?: string) {
       }));
 
       if (!activeInvoiceName || data.invoice === activeInvoiceName || data.reference_name === activeInvoiceName || data.print_job_id === activeInvoiceName) {
-        showToast.error(`Printing Failed for ${invoiceOrDoc}: ${data.reason || 'Printer Error'}`);
+        showToast.error(`Printing Failed for ${invoiceOrDoc}: ${data.reason || 'Printer Error'}`, {
+          autoClose: false,
+          closeOnClick: true,
+        });
       }
     };
 
