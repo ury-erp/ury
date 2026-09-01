@@ -90,11 +90,15 @@ export function useOrdersPrintJobs() {
     socket.on('print_job_status_updated', fetchFailedJobs);
     socket.on('print_failure_alert', fetchFailedJobs);
     socket.on('invoice_print_completed', fetchFailedJobs);
+    socket.on('kot_print_completed', fetchFailedJobs);
+    socket.on('kot_print_failed', fetchFailedJobs);
 
     return () => {
       socket.off('print_job_status_updated', fetchFailedJobs);
       socket.off('print_failure_alert', fetchFailedJobs);
       socket.off('invoice_print_completed', fetchFailedJobs);
+      socket.off('kot_print_completed', fetchFailedJobs);
+      socket.off('kot_print_failed', fetchFailedJobs);
     };
   }, [fetchFailedJobs]);
 
