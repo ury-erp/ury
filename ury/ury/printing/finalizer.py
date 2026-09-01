@@ -202,7 +202,6 @@ def _finalize_bill(print_job_id, final_state, metadata, failure_reason):
                 "reason": failure_reason,
                 "job_owner": job_owner,
             },
-            user=job_owner,
         )
 
         frappe.logger("printing").info(

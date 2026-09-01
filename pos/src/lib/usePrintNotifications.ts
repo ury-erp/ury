@@ -56,12 +56,6 @@ export function usePrintNotifications(activeInvoiceName?: string) {
       reference_name?: string;
     }) => {
       console.log('[usePrintNotifications] Received print_failure_alert:', data);
-      const currentUser = usePOSStore.getState().user?.name;
-      if (data.job_owner && currentUser && data.job_owner !== currentUser) {
-        console.log('[usePrintNotifications] Dropped alert not targeted to current user', { target: data.job_owner, current: currentUser });
-        return; // targeted to another user
-      }
-
       const invoiceOrDoc = data.invoice || data.reference_name || data.print_job_id;
 
       setActivePrintJobs((prev) => ({
