@@ -93,6 +93,7 @@ class FakeCache:
 class TestPrintJobRecovery(FrappeTestCase):
     def setUp(self):
         super().setUp()
+        self._cleanup_print_job_files()
         self.fake = FakeCache()
         self.redis_patch = patch(
             "ury.ury.printing.print_job_monitor._redis",
@@ -102,7 +103,21 @@ class TestPrintJobRecovery(FrappeTestCase):
 
     def tearDown(self):
         self.redis_patch.stop()
+        self._cleanup_print_job_files()
         super().tearDown()
+
+    def _cleanup_print_job_files(self):
+        import os
+
+        from ury.ury.printing.file_store import get_print_jobs_dir
+
+        jobs_dir = get_print_jobs_dir()
+        for fname in os.listdir(jobs_dir):
+            if fname.endswith(".json"):
+                try:
+                    os.unlink(os.path.join(jobs_dir, fname))
+                except Exception:
+                    pass
 
     def _sample_printer_settings(self):
         return [

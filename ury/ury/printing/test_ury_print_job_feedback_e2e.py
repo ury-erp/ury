@@ -113,6 +113,7 @@ class TestURYPrintJobFeedbackE2E(FrappeTestCase):
         self.patches = [
             patch("ury.ury.printing.print_job_monitor._redis", return_value=self.fake),
             patch("ury.ury.printing.finalizer._redis", return_value=self.fake),
+            patch("ury.ury.printing.notifications._redis", return_value=self.fake),
         ]
         for p in self.patches:
             p.start()
@@ -255,3 +256,37 @@ class TestURYPrintJobFeedbackE2E(FrappeTestCase):
         self.assertEqual(event_name, "invoice_print_completed")
         self.assertEqual(payload["invoice"], "AC-2026-001")
         self.assertEqual(payload["print_job_id"], job_id)
+
+    @patch("ury.ury.printing.notifications.frappe.publish_realtime")
+    def test_failure_alert_targets_job_owner_and_deduplicates(self, mock_publish):
+        """Failure alert is sent only to the job owner and deduplicated by Redis."""
+        job_id = "PJ-FEEDBACK-OWNER-TARGET"
+        owner = "user_a@test.com"
+        metadata = self._create_metadata(job_id, status=SUBMITTED)
+        metadata["job_owner"] = owner
+        register_print_job(metadata)
+
+        # First failure should publish exactly once to the job owner.
+        first = notify_print_failure(
+            invoice="AC-2026-001",
+            print_job_id=job_id,
+            printer_name="Thermal Receipt Printer",
+            reason="Paper jam",
+        )
+        self.assertTrue(first)
+        mock_publish.assert_called_once()
+        event, payload = mock_publish.call_args.args
+        self.assertEqual(event, "print_failure_alert")
+        self.assertEqual(payload["job_owner"], owner)
+        self.assertEqual(mock_publish.call_args.kwargs.get("user"), owner)
+
+        # Second failure for the same job must be deduplicated.
+        mock_publish.reset_mock()
+        second = notify_print_failure(
+            invoice="AC-2026-001",
+            print_job_id=job_id,
+            printer_name="Thermal Receipt Printer",
+            reason="Paper jam",
+        )
+        self.assertFalse(second)
+        mock_publish.assert_not_called()

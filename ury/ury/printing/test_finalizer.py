@@ -215,6 +215,8 @@ class TestPrintJobFinalizer(FrappeTestCase):
             print_job_id=job_id,
             printer_name="Test Printer",
             reason="job-stopped",
+            job_type="BILL",
+            job_owner="Administrator",
         )
 
         mock_publish.assert_called_once()
@@ -223,6 +225,8 @@ class TestPrintJobFinalizer(FrappeTestCase):
         self.assertEqual(payload["invoice"], "INV-004")
         self.assertEqual(payload["print_job_id"], job_id)
         self.assertEqual(payload["reason"], "job-stopped")
+        self.assertEqual(payload["job_owner"], "Administrator")
+        self.assertEqual(mock_publish.call_args.kwargs.get("user"), "Administrator")
 
     @patch("ury.ury.printing.finalizer.frappe.publish_realtime")
     @patch("ury.ury.printing.finalizer.release_merge_cluster_tables")
