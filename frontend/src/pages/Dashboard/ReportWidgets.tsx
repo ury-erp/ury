@@ -24,7 +24,7 @@ export const ReportWidgets: React.FC<ReportWidgetsProps> = ({ recentTransactions
               Live POS Transactions
             </CardTitle>
             <p className="text-xs text-gray-500 mt-0.5">
-              Real-time billing transactions from Frappe desk for {activeBranchName}
+              Real-time sales and active checkouts
             </p>
           </div>
         </CardHeader>

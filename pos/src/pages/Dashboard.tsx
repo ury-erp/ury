@@ -1,8 +1,9 @@
-import { TrendingUp, AlertTriangle, Bell, Users, ShoppingCart, Clock } from 'lucide-react';
+import { TrendingUp, ShoppingCart, Clock, Users, AlertTriangle, Bell } from 'lucide-react';
 import { Card, CardContent } from '@ury/ui';
 import { useState, useEffect } from 'react';
 import { usePOSStore } from '../store/pos-store';
-import { formatCurrency } from '@ury/core';
+import { formatCurrency, call } from '@ury/core';
+import HufLogo from '../components/HufLogo';
 
 // Helper function to format relative time
 function getRelativeTime(creationDate: string): string {
@@ -57,7 +58,6 @@ export default function Dashboard() {
     if (!posProfile?.branch) return;
 
     const fetchDashboardData = async () => {
-      const { call } = await import('@ury/core');
 
       // Fetch dashboard stats
       setStatsLoading(true);
@@ -231,11 +231,10 @@ export default function Dashboard() {
   const maxTableCount = Math.max(...floorLoad.map((f: any) => f.table_count), 1);
 
   return (
-    <div className="h-full overflow-y-auto p-6 bg-gray-50">
-      {/* Stat Cards Row */}
-      <div className="mb-6">
-        <h2 className="text-2xl font-semibold text-gray-900 mb-4">Dashboard</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="h-full overflow-y-auto p-6 bg-gray-50 space-y-6">
+      {/* 1. Stat Cards Row (Aligned with Core UI & Icons Preserved) */}
+      <section className="w-full">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {statsError ? (
             <div className="col-span-full text-red-600 text-sm">Failed to load stats</div>
           ) : statsLoading ? (
@@ -244,23 +243,24 @@ export default function Dashboard() {
             stats.map((stat, index) => {
               const IconComponent = stat.icon;
               return (
-                <Card key={index} className="bg-white border border-gray-200">
-                  <CardContent className="p-6">
-                    <div className="flex items-start justify-between mb-3">
-                      <h3 className="text-sm font-medium text-gray-600">{stat.label}</h3>
-                      <IconComponent className={`w-5 h-5 ${stat.color}`} />
-                    </div>
-                    <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
-                  </CardContent>
+                <Card
+                  key={index}
+                  className="rounded-lg border border-gray-200 bg-white p-5 shadow-xs transition-all duration-200 hover:shadow-md hover:border-primary/20"
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs font-medium text-gray-600">{stat.label}</span>
+                    {IconComponent && <IconComponent className={`w-4 h-4 ${stat.color}`} />}
+                  </div>
+                  <p className="text-2xl font-bold text-gray-900 tracking-tight">{stat.value}</p>
                 </Card>
               );
             })
           )}
         </div>
-      </div>
+      </section>
 
-      {/* Service Line Section */}
-      <div className="mb-6">
+      {/* 2. Service Line Section (v3-test design) */}
+      <div>
         <Card className="bg-white border border-gray-200">
           <CardContent className="p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Service Line</h3>
@@ -335,7 +335,7 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* Two-column layout */}
+      {/* 3. Two-column layout (v3-test design) */}
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
         {/* Left column - stacked sections */}
         <div className="space-y-6">
@@ -501,17 +501,17 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          {/* Shift Brief Section */}
+          {/* Shift Brief Section (with HUF Logo) */}
           <Card className="bg-white border border-gray-200">
             <CardContent className="p-6">
               <div className="flex items-center justify-between gap-2 mb-4">
                 <h3 className="text-lg font-semibold text-gray-900">Shift Brief</h3>
-                <span className="inline-block text-xs font-semibold px-2 py-1 bg-purple-50 text-purple-700 border border-purple-200 rounded">
-                  HUF
+                <span className="inline-flex items-center justify-center px-2 py-1 bg-purple-50 text-purple-700 border border-purple-200 rounded">
+                  <HufLogo className="h-3.5 w-auto" />
                 </span>
               </div>
               <p className="text-sm text-gray-600">
-                AI-written shift summaries are not yet connected. This panel will show HUF's shift observations once integrated.
+                AI-written shift summaries are not yet connected. This panel will show HUF&apos;s shift observations once integrated.
               </p>
             </CardContent>
           </Card>

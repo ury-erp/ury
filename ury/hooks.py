@@ -23,6 +23,7 @@ add_to_apps_screen = [
 # include js, css files in header of desk.html
 # app_include_css = "/assets/ury/css/ury.css"
 app_include_js = [
+    "/assets/ury/js/setup_redirect.js",
     "/assets/ury/js/quick_entry.js",
     "/assets/ury/js/pos_print.js",
     "/assets/ury/js/restrict_qty_edit_pos.js",
@@ -59,6 +60,46 @@ website_route_rules = [
     {"from_route": "/setup-wizard", "to_route": "ury"},
     {"from_route": "/order/<path:app_path>", "to_route": "order"},
     {"from_route": "/pos/<path:app_path>", "to_route": "pos"},
+]
+
+setup_wizard_requires = [
+    "assets/erpnext/js/setup_wizard.js",
+    "assets/ury/js/setup_wizard.js",
+]
+
+setup_wizard_stages = "ury.setup.setup_wizard.get_setup_stages"
+
+ury_demo_master_doctypes = [
+    "Gender",
+    "Item Group",
+    "Item",
+    "Item Price",
+    "Customer Group",
+    "Customer",
+    "User",
+    "Employee",
+    "BOM",
+    "Supplier Group",
+    "Supplier",
+    "Branch",
+    "URY Menu Course",
+    "URY Menu",
+    "URY Room",
+    "URY Restaurant",
+    "URY Table",
+    "Product Bundle",
+    "URY Production Unit",
+    "URY Report Settings",
+    "POS Profile"
+]
+
+ury_demo_transaction_doctypes = [
+    "Production Plan",
+    "Material Request",
+    "Purchase Order",
+    "Sales Order",
+    "Journal Entry",
+    "Payment Entry"
 ]
 # Home Pages
 # ----------
@@ -193,9 +234,9 @@ scheduler_events = {
 # Overriding Methods
 # ------------------------------
 #
-# override_whitelisted_methods = {
-# 	"frappe.desk.doctype.event.event.get_events": "ury.event.get_events"
-# }
+override_whitelisted_methods = {
+	"erpnext.setup.demo.clear_demo_data": "ury.setup.demo.clear_demo_data"
+}
 #
 # each overriding function accepts a `data` argument;
 # generated from the base implementation of the doctype dashboard,
@@ -219,10 +260,24 @@ on_session_creation = [
 
 # Request Events
 # ----------------
-before_request = [
-    "ury.ury.controllers.setup_redirect.redirect_to_setup"
+# before_request cannot issue a real HTTP redirect for Desk page GETs.
+# website_path_resolver runs inside PathResolver, which handles frappe.Redirect.
+website_path_resolver = [
+    "ury.ury.controllers.setup_redirect.website_path_resolver"
 ]
 # after_request = ["ury.utils.after_request"]
+
+website_redirects = [
+    {
+        "source": "/setup-wizard",
+        "target": "/ury/setup-wizard/0",
+        "redirect_http_status": 302,
+    }
+]
+
+extend_bootinfo = [
+    "ury.ury.controllers.setup_redirect.extend_bootinfo"
+]
 
 # Job Events
 # ----------
@@ -398,5 +453,6 @@ fixtures = [
         ],
     },
     {"dt": "Role", "filters": [["role_name", "like", "URY %"]]},
+    {"doctype": "Role", "filters": [["role_name", "in", ["Self Ordering Manager"]]]},
     "Client Script",
 ]

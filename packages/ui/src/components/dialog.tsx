@@ -78,15 +78,103 @@ export interface DialogProps
     VariantProps<typeof dialogVariants> {
   open?: boolean
   onOpenChange?: (open: boolean) => void
+  /** Whether pressing Escape closes the dialog. Defaults to true; set to
+   * false for blocking gates (e.g. ChecklistGateDialog) that must not be
+   * dismissible via Escape. */
+  closeOnEscape?: boolean
+}
+
+// Elements considered reachable via Tab, used both to seed initial focus and
+// to compute the wrap points for the focus trap.
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
+const DialogTitleContext = React.createContext<string | undefined>(undefined)
+
+function mergeRefs<T>(
+  ...refs: Array<React.Ref<T> | undefined>
+): (node: T | null) => void {
+  return (node) => {
+    refs.forEach((ref) => {
+      if (!ref) return
+      if (typeof ref === "function") ref(node)
+      else (ref as React.MutableRefObject<T | null>).current = node
+    })
+  }
 }
 
 const Dialog = React.forwardRef<HTMLDivElement, DialogProps>(
-  ({ className, variant, open, onOpenChange, children, ...props }, ref) => {
+  (
+    { className, variant, open, onOpenChange, closeOnEscape = true, children, ...props },
+    ref
+  ) => {
+    const titleId = React.useId()
+    const containerRef = React.useRef<HTMLDivElement | null>(null)
+    const previousActiveElementRef = React.useRef<HTMLElement | null>(null)
+
+    // Remember what had focus before the dialog opened, lock body scroll
+    // while it's open, move focus into the dialog, and restore both on
+    // close/unmount.
+    React.useEffect(() => {
+      if (!open) return
+
+      previousActiveElementRef.current = document.activeElement as HTMLElement | null
+      const previousOverflow = document.body.style.overflow
+      document.body.style.overflow = "hidden"
+
+      const node = containerRef.current
+      const focusable = node?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR)
+      ;(focusable ?? node)?.focus()
+
+      return () => {
+        document.body.style.overflow = previousOverflow
+        previousActiveElementRef.current?.focus?.()
+      }
+    }, [open])
+
+    // Escape-to-close (the one place this is handled) and a basic Tab focus
+    // trap that keeps focus cycling within the dialog.
+    React.useEffect(() => {
+      if (!open) return
+
+      function handleKeyDown(event: KeyboardEvent) {
+        if (event.key === "Escape") {
+          if (closeOnEscape) onOpenChange?.(false)
+          return
+        }
+
+        if (event.key === "Tab") {
+          const node = containerRef.current
+          if (!node) return
+          const focusableEls = node.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)
+          if (focusableEls.length === 0) {
+            event.preventDefault()
+            return
+          }
+          const first = focusableEls[0]
+          const last = focusableEls[focusableEls.length - 1]
+          if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault()
+            last.focus()
+          } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault()
+            first.focus()
+          }
+        }
+      }
+
+      document.addEventListener("keydown", handleKeyDown)
+      return () => document.removeEventListener("keydown", handleKeyDown)
+    }, [open, closeOnEscape, onOpenChange])
+
     if (!open) return null
 
     return (
       <div
-        ref={ref}
+        ref={mergeRefs(ref, containerRef)}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
         className={cn(dialogVariants({ variant, className }))}
         {...props}
       >
@@ -94,7 +182,9 @@ const Dialog = React.forwardRef<HTMLDivElement, DialogProps>(
           className={cn(overlayVariants({ variant }))}
           onClick={() => onOpenChange?.(false)}
         />
-        {children}
+        <DialogTitleContext.Provider value={titleId}>
+          {children}
+        </DialogTitleContext.Provider>
       </div>
     )
   }
@@ -165,13 +255,17 @@ DialogFooter.displayName = "DialogFooter"
 const DialogTitle = React.forwardRef<
   HTMLParagraphElement,
   React.HTMLAttributes<HTMLHeadingElement>
->(({ className, ...props }, ref) => (
-  <h2
-    ref={ref}
-    className={cn("text-lg font-semibold leading-tight tracking-tight", className)}
-    {...props}
-  />
-))
+>(({ className, id, ...props }, ref) => {
+  const contextTitleId = React.useContext(DialogTitleContext)
+  return (
+    <h2
+      ref={ref}
+      id={id ?? contextTitleId}
+      className={cn("text-lg font-semibold leading-tight tracking-tight", className)}
+      {...props}
+    />
+  )
+})
 DialogTitle.displayName = "DialogTitle"
 
 const DialogDescription = React.forwardRef<

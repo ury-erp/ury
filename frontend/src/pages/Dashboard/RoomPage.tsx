@@ -3,6 +3,7 @@ import { useBranchContext } from '../../context/BranchContext';
 import { Plus, Layers, Edit2 } from 'lucide-react';
 import { Card, Button, Badge, Input, Spinner, showToast } from '@ury/ui';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
+import { Switch } from '../../components/ui/switch';
 import { dashboardService } from '../../services/dashboard';
 import { call } from '@ury/core';
 import SideDrawer from '../../components/layout/SideDrawer';
@@ -12,6 +13,9 @@ interface UryRoomRecord {
   room_name?: string;
   room_type?: string;
   branch?: string;
+  kot_printing?: number;
+  print_format?: string;
+  block_takeaway?: number;
 }
 
 export const RoomPage: React.FC = () => {
@@ -97,9 +101,48 @@ export const RoomPage: React.FC = () => {
     setSaving(true);
     try {
       if (editingRoom) {
+        // Derive display name from room.name, stripping branch suffix if present
+        let originalDisplayName = editingRoom.name;
+        if (editingRoom.branch && originalDisplayName.endsWith(` - ${editingRoom.branch}`)) {
+          originalDisplayName = originalDisplayName.substring(0, originalDisplayName.length - (` - ${editingRoom.branch}`).length);
+        }
+
+        const original = {
+          room_name: originalDisplayName || '',
+          room_type: editingRoom.room_type || 'AC',
+          branch: editingRoom.branch || '',
+          kot_printing: editingRoom.kot_printing === 1 ? 1 : 0,
+          print_format: editingRoom.print_format || '',
+          block_takeaway: editingRoom.block_takeaway === 1 ? 1 : 0,
+        };
+        const current = {
+          room_name: newRoom.room_name || '',
+          room_type: newRoom.room_type || 'AC',
+          branch: newRoom.branch || '',
+          kot_printing: newRoom.kot_printing ? 1 : 0,
+          print_format: newRoom.print_format || '',
+          block_takeaway: newRoom.block_takeaway ? 1 : 0,
+        };
+        if (JSON.stringify(original) === JSON.stringify(current)) {
+          showToast.warning('No changes in document');
+          setSaving(false);
+          return;
+        }
+
+        let currentName = editingRoom.name;
+        const newDocName = newRoom.branch ? `${newRoom.room_name} - ${newRoom.branch}` : newRoom.room_name;
+        if (newDocName !== editingRoom.name) {
+          await call('frappe.client.rename_doc', {
+            doctype: 'URY Room',
+            old_name: editingRoom.name,
+            new_name: newDocName,
+          });
+          currentName = newDocName;
+        }
+
         await call('frappe.client.set_value', {
           doctype: 'URY Room',
-          name: editingRoom.name,
+          name: currentName,
           fieldname: {
             room_type: newRoom.room_type,
             branch: newRoom.branch,
@@ -184,7 +227,7 @@ export const RoomPage: React.FC = () => {
                   <td className="px-6 py-4">
                     <Badge variant="outline" className="border-primary/20 bg-primary/10 text-primary text-[10px]">
                       <Layers className="w-3 h-3 mr-1" />
-                      {room.room_type || 'General'}
+                      {room.room_type === 'NON-AC' ? 'Non-AC' : (room.room_type || 'General')}
                     </Badge>
                   </td>
                   <td className="px-6 py-4">{room.branch || 'Main'}</td>
@@ -212,12 +255,8 @@ export const RoomPage: React.FC = () => {
             <Input
               value={newRoom.room_name}
               onChange={(e) => setNewRoom({ ...newRoom, room_name: e.target.value })}
-              disabled={!!editingRoom}
-              required={!editingRoom}
+              required
             />
-            {editingRoom && (
-              <p className="text-xs text-gray-500 mt-1">Room name cannot be changed after creation</p>
-            )}
           </div>
 
           <div>
@@ -228,10 +267,7 @@ export const RoomPage: React.FC = () => {
               onChange={(_, value) => setNewRoom({ ...newRoom, room_type: value })}
               options={[
                 { value: 'AC', label: 'AC' },
-                { value: 'Non-AC', label: 'Non-AC' },
-                { value: 'Rooftop', label: 'Rooftop' },
-                { value: 'Outdoor', label: 'Outdoor' },
-                { value: 'Bar', label: 'Bar' },
+                { value: 'NON-AC', label: 'Non-AC' },
               ]}
             />
           </div>
@@ -253,15 +289,14 @@ export const RoomPage: React.FC = () => {
           <div className="pt-4 border-t border-gray-100">
             <h3 className="font-semibold text-gray-900 mb-3">Printer Configuration</h3>
             <div className="space-y-3">
-              <label className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="kot_printing"
                   checked={newRoom.kot_printing}
-                  onChange={(e) => setNewRoom({ ...newRoom, kot_printing: e.target.checked })}
-                  className="rounded text-primary border-gray-300 focus:ring-primary"
+                  onCheckedChange={(checked) => setNewRoom({ ...newRoom, kot_printing: checked })}
                 />
-                <span className="text-gray-700">Enable KOT Printing for this room</span>
-              </label>
+                <label htmlFor="kot_printing" className="text-gray-700 cursor-pointer">Enable KOT Printing for this room</label>
+              </div>
 
               {newRoom.kot_printing && (
                 <div>
@@ -273,15 +308,14 @@ export const RoomPage: React.FC = () => {
                 </div>
               )}
 
-              <label className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="block_takeaway"
                   checked={newRoom.block_takeaway}
-                  onChange={(e) => setNewRoom({ ...newRoom, block_takeaway: e.target.checked })}
-                  className="rounded text-primary border-gray-300 focus:ring-primary"
+                  onCheckedChange={(checked) => setNewRoom({ ...newRoom, block_takeaway: checked })}
                 />
-                <span className="text-gray-700">Block Takeaway / Delivery Printing</span>
-              </label>
+                <label htmlFor="block_takeaway" className="text-gray-700 cursor-pointer">Block Takeaway / Delivery Printing</label>
+              </div>
             </div>
           </div>
 
@@ -290,7 +324,6 @@ export const RoomPage: React.FC = () => {
               Cancel
             </Button>
             <Button type="submit" disabled={saving} className="bg-primary hover:bg-primary/90 text-white">
-              {saving ? <Spinner className="w-4 h-4 mr-1.5" /> : null}
               {editingRoom ? 'Save Changes' : 'Save Room'}
             </Button>
           </div>

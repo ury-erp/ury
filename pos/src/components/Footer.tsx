@@ -16,8 +16,8 @@ const Footer = () => {
     { icon: LayoutGrid, label: t('footer.pos'), path: '/pos' },
     { icon: Table, label: t('footer.tables'), path: '/tables' },
     { icon: ClipboardList, label: t('footer.orders'), path: '/orders' },
-    { icon: Settings, label: t('footer.settings'), path: '/settings' },
-  ];
+    { icon: Settings, label: t('footer.settings'), path: '/settings', hidden: true },
+  ].filter((item) => !item.hidden);
 
   return (
     <div className="bg-white border-t border-gray-200 py-2 relative">

@@ -11,7 +11,7 @@ import {
 } from '../../services/dashboard';
 
 export const DashboardPage: React.FC = () => {
-  const { activeBranchId, refreshTrigger } = useBranchContext();
+  const { activeBranchId } = useBranchContext();
 
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [chartsData, setChartsData] = useState<DashboardChartsData | null>(null);
@@ -38,15 +38,15 @@ export const DashboardPage: React.FC = () => {
 
   useEffect(() => {
     fetchDashboardData();
-  }, [activeBranchId, refreshTrigger]);
+  }, [activeBranchId]);
 
   return (
     <div className="space-y-6">
       {/* 1. KPI Stat Cards Grid */}
       <KPIGrid summary={summary} loading={loading} />
 
-      {/* 2. Analytics & Distribution Charts */}
-      <AnalyticsCharts chartsData={chartsData} loading={loading} />
+      {/* 2. Analytics & Distribution Charts (Commented out for now) */}
+      {/* <AnalyticsCharts chartsData={chartsData} loading={loading} /> */}
 
       {/* 3. Live Recent Transactions */}
       <ReportWidgets recentTransactions={recentTransactions} loading={loading} />

@@ -1,7 +1,13 @@
+import { useRef, useState } from 'react'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@ury/ui'
+import { useIdleReset } from '../hooks/useIdleReset'
 import { useOrderingSession } from '../hooks/useOrderingSession'
 import type { OrderingContext } from '../lib/api'
 import CartPanel from './shared/CartPanel'
 import MenuGrid from './shared/MenuGrid'
+
+const IDLE_WARN_MS = 60000
+const IDLE_RESET_GRACE_MS = 15000
 
 interface LayoutProps {
   initialContext?: OrderingContext
@@ -13,8 +19,7 @@ interface LayoutProps {
  * customer. Wider menu grid than TabletLayout (more columns, bigger touch
  * targets, more spacing) with a persistent cart panel always visible on the
  * right so the order is a one-glance affair. Pure presentation over
- * useOrderingSession — no table selector, device provisioning, or
- * idle-timeout UI here.
+ * useOrderingSession — no table selector or device provisioning here.
  */
 function LandscapeKioskLayout({ initialContext }: LayoutProps) {
   const {
@@ -32,10 +37,40 @@ function LandscapeKioskLayout({ initialContext }: LayoutProps) {
     submitCart,
     handleRequestBill,
     payOnline,
+    resetSession,
     cartItems,
     cartCount,
     cartTotal,
   } = useOrderingSession(initialContext)
+
+  const [showIdleWarning, setShowIdleWarning] = useState(false)
+  const idleResetTimerRef = useRef<ReturnType<typeof setTimeout>>()
+
+  function handleReset() {
+    if (window.confirm('Start a new order? Current cart will be cleared.')) {
+      resetSession()
+    }
+  }
+
+  // Unattended-kiosk protection: warn after IDLE_WARN_MS of no interaction,
+  // then reset after an additional IDLE_RESET_GRACE_MS if the guest doesn't
+  // respond. Never fires mid-checkout — submitting/payingOnline gate both
+  // the warning and the reset itself.
+  useIdleReset(() => {
+    if (submitting || payingOnline) return
+    setShowIdleWarning(true)
+    idleResetTimerRef.current = setTimeout(() => {
+      setShowIdleWarning(false)
+      if (!submitting && !payingOnline) {
+        resetSession()
+      }
+    }, IDLE_RESET_GRACE_MS)
+  }, IDLE_WARN_MS)
+
+  function handleStillHere() {
+    clearTimeout(idleResetTimerRef.current)
+    setShowIdleWarning(false)
+  }
 
   if (loading) {
     return (
@@ -55,10 +90,16 @@ function LandscapeKioskLayout({ initialContext }: LayoutProps) {
 
   return (
     <div className="flex h-screen flex-col overflow-hidden text-lg">
-      <header className="border-b bg-background/95 px-10 py-6">
+      <header className="flex items-center justify-between border-b bg-background/95 px-10 py-6">
         <h1 className="text-3xl font-semibold">
           {context?.table ? `Table ${context.table}` : 'Order for Pickup'}
         </h1>
+        <button
+          onClick={handleReset}
+          className="rounded-md border px-4 py-2 text-base font-medium text-muted-foreground"
+        >
+          New Order
+        </button>
       </header>
 
       {error && (
@@ -95,6 +136,22 @@ function LandscapeKioskLayout({ initialContext }: LayoutProps) {
           className="flex w-[420px] shrink-0 flex-col overflow-hidden border-l bg-background p-6 text-base"
         />
       </div>
+
+      <Dialog open={showIdleWarning} onOpenChange={(open) => !open && handleStillHere()}>
+        <DialogContent onClose={handleStillHere}>
+          <DialogHeader>
+            <DialogTitle>Still there?</DialogTitle>
+          </DialogHeader>
+          <DialogFooter>
+            <button
+              onClick={handleStillHere}
+              className="w-full rounded-md bg-primary py-3 text-base font-medium text-primary-foreground"
+            >
+              I'm still here
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

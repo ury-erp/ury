@@ -55,6 +55,10 @@ export interface CustomerOrder {
   invoice: string | null
   table?: string | null
   order_type?: string
+  // Pickup reference code (derived from the invoice name) — the only
+  // identifier a QR Pickup customer has, since there's no table to point
+  // to. Present (possibly null before an order exists) on every response.
+  pickup_code?: string | null
   items: OrderItem[]
   grand_total: number
   billed: boolean
@@ -119,6 +123,22 @@ export async function bootstrapDevice(deviceId: string, deviceCredential: string
   const response = await call.get<FrappeResponse<OrderingContext>>(`${M}.get_ordering_context`, {
     device_id: deviceId,
     device_credential: deviceCredential,
+  })
+  storeContext(response.message)
+  return response.message
+}
+
+export async function assignDeviceTable(
+  deviceId: string,
+  deviceCredential: string,
+  staffPin: string,
+  table: string,
+): Promise<OrderingContext> {
+  const response = await call.post<FrappeResponse<OrderingContext>>(`${M}.assign_device_table`, {
+    device_id: deviceId,
+    device_credential: deviceCredential,
+    staff_pin: staffPin,
+    table,
   })
   storeContext(response.message)
   return response.message
