@@ -62,6 +62,7 @@ interface PrinterWatchContextValue {
   close: () => void;
   printers: PrinterHealth[];
   loadState: LoadState;
+  isSyncing: boolean;
   lastUpdated: string | null;
   hasIssue: boolean;
   refresh: () => void;
@@ -84,6 +85,7 @@ export function PrinterWatchProvider({ children }: { children: React.ReactNode }
   const [printers, setPrinters] = useState<PrinterHealth[]>([]);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [loadState, setLoadState] = useState<LoadState>('idle');
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [staleError, setStaleError] = useState<string | null>(null);
 
   const isCheckedRef = useRef(false);
@@ -136,6 +138,11 @@ export function PrinterWatchProvider({ children }: { children: React.ReactNode }
     if (!isInstalled) return;
     const seq = ++latestSeq.current;
 
+    setIsSyncing(true);
+    if (loadStateRef.current !== 'success') {
+      setLoadState('loading');
+    }
+
     try {
       const response = await call.get<any>(
         'ury_printer_watch.api.printer_health.get_printer_health'
@@ -159,45 +166,26 @@ export function PrinterWatchProvider({ children }: { children: React.ReactNode }
           : 'earlier';
         setStaleError(`Unable to refresh. Displaying last status from ${timeLabel}.`);
       }
+    } finally {
+      if (seq === latestSeq.current) {
+        setIsSyncing(false);
+      }
     }
   }, [isInstalled]);
 
-  // Initial fetch on POS load as soon as app is confirmed installed, plus background polling
+  // Initial one-time fetch on POS load (no recurring polling intervals)
   useEffect(() => {
     if (!isInstalled) return;
-
-    // Fetch immediately on initial POS page load
     fetchHealth();
-
-    // Background polling every 30s to keep status pointer updated
-    const intervalId = setInterval(fetchHealth, 30000);
-    return () => clearInterval(intervalId);
   }, [isInstalled, fetchHealth]);
 
-  // Active polling while the modal dialog is open
-  useEffect(() => {
-    if (!isInstalled || !isOpen) return;
-
+  // Trigger fresh fetch whenever the user opens the dialog
+  const open = useCallback(() => {
+    setIsOpen(true);
     setStaleError(null);
-    if (loadStateRef.current !== 'success') {
-      setLoadState('loading');
-      loadStateRef.current = 'loading';
-    }
     fetchHealth();
+  }, [fetchHealth]);
 
-    const intervalId = setInterval(fetchHealth, 10000);
-    return () => clearInterval(intervalId);
-  }, [isInstalled, isOpen, fetchHealth]);
-
-  const handleRetry = () => {
-    if (!isInstalled) return;
-    setStaleError(null);
-    setLoadState('loading');
-    loadStateRef.current = 'loading';
-    fetchHealth();
-  };
-
-  const open = useCallback(() => setIsOpen(true), []);
   const close = useCallback(() => setIsOpen(false), []);
 
   const value: PrinterWatchContextValue = {
@@ -207,9 +195,10 @@ export function PrinterWatchProvider({ children }: { children: React.ReactNode }
     close,
     printers,
     loadState,
+    isSyncing,
     lastUpdated,
     hasIssue,
-    refresh: handleRetry,
+    refresh: fetchHealth,
   };
 
   return (
@@ -221,9 +210,11 @@ export function PrinterWatchProvider({ children }: { children: React.ReactNode }
           onOpenChange={setIsOpen}
           printers={printers}
           loadState={loadState}
+          isSyncing={isSyncing}
           lastUpdated={lastUpdated}
           staleError={staleError}
-          onRetry={handleRetry}
+          onSync={fetchHealth}
+          onRetry={fetchHealth}
         />
       )}
     </PrinterWatchContext.Provider>
@@ -295,8 +286,10 @@ interface PrinterWatchDialogProps {
   onOpenChange: (open: boolean) => void;
   printers: PrinterHealth[];
   loadState: LoadState;
+  isSyncing: boolean;
   lastUpdated: string | null;
   staleError: string | null;
+  onSync: () => void;
   onRetry: () => void;
 }
 
@@ -305,7 +298,10 @@ function PrinterWatchDialog({
   onOpenChange,
   printers,
   loadState,
+  isSyncing,
+  lastUpdated,
   staleError,
+  onSync,
   onRetry,
 }: PrinterWatchDialogProps) {
   return (
@@ -316,12 +312,27 @@ function PrinterWatchDialog({
         onClose={() => onOpenChange(false)}
       >
         <DialogHeader className="border-b border-gray-200 p-4">
-          <DialogTitle className="text-xl font-semibold text-gray-900">
-            Printer Health
-          </DialogTitle>
-          <DialogDescription className="text-sm text-gray-500">
-            Live printer status and connectivity
-          </DialogDescription>
+          <div className="flex items-center justify-between pr-8">
+            <div>
+              <DialogTitle className="text-xl font-semibold text-gray-900">
+                Printer Health
+              </DialogTitle>
+              <DialogDescription className="text-sm text-gray-500 mt-0.5">
+                {lastUpdated ? `Last synced: ${formatTime(lastUpdated)}` : 'Live printer status and connectivity'}
+              </DialogDescription>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={onSync}
+              disabled={isSyncing || loadState === 'loading'}
+              className="h-8 gap-1.5 px-3 text-xs font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900 shrink-0"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 text-gray-500 ${isSyncing ? 'animate-spin text-primary' : ''}`} />
+              <span>{isSyncing ? 'Syncing...' : 'Sync Now'}</span>
+            </Button>
+          </div>
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto p-4">
@@ -332,13 +343,15 @@ function PrinterWatchDialog({
             </div>
           )}
 
-          {loadState === 'loading' && (
-            <div className="py-8 text-center text-gray-600">
-              Loading printer status...
+          {loadState === 'loading' && printers.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-12 text-center text-gray-500">
+              <RefreshCw className="h-8 w-8 animate-spin text-gray-400 mb-3" />
+              <p className="text-sm font-medium text-gray-700">Loading printer status...</p>
+              <p className="text-xs text-gray-400 mt-1">Connecting to printer watch service</p>
             </div>
           )}
 
-          {loadState === 'error' && (
+          {loadState === 'error' && printers.length === 0 && (
             <div className="py-8 text-center">
               <p className="mb-4 text-gray-700">Unable to fetch printer health.</p>
               <Button onClick={onRetry} variant="outline" size="sm">
@@ -348,11 +361,11 @@ function PrinterWatchDialog({
             </div>
           )}
 
-          {loadState === 'success' && printers.length === 0 && (
+          {((loadState === 'success' || printers.length > 0) && printers.length === 0) && (
             <div className="py-8 text-center text-gray-600">No printers found.</div>
           )}
 
-          {loadState === 'success' && printers.length > 0 && (
+          {printers.length > 0 && (
             <ul className="space-y-3">
               {printers.map((printer, index) => {
                 const status = STATUS_VARIANTS[printer.status] || STATUS_VARIANTS.critical;
