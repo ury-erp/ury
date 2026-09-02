@@ -2,7 +2,7 @@
  "actions": [],
  "allow_rename": 1,
  "autoname": "prompt",
- "creation": "2026-08-19 00:00:00.000000",
+ "creation": "2026-08-19 00:00:00",
  "default_view": "List",
  "doctype": "DocType",
  "editable_grid": 1,
@@ -205,9 +205,9 @@
    "fieldtype": "Data",
    "hidden": 1,
    "label": "QR Signing Secret",
-   "read_only": 1,
    "no_copy": 1,
    "print_hide": 1,
+   "read_only": 1,
    "report_hide": 1
   },
   {
@@ -222,7 +222,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-08-19 00:00:00.000000",
+ "modified": "2026-09-02 19:24:59.922860",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Self Ordering Profile",
@@ -271,6 +271,19 @@
    "read": 1,
    "report": 1,
    "role": "Self Ordering Manager",
+   "select": 1,
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "URY Admin",
    "select": 1,
    "share": 1,
    "write": 1
