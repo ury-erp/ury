@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getFrappeSocket } from './socket';
 import { showToast } from '@ury/ui';
-import { usePOSStore } from '../store/pos-store';
+import { useRootStore } from '../store/root-store';
 
 export interface PrintJobStatusPayload {
   invoice: string;
@@ -37,7 +37,7 @@ export function usePrintNotifications(activeInvoiceName?: string) {
       });
     };
 
-    // 2. Long Running Listener (Fired after 30 seconds observation)
+    // 2. Long Running Listener (Fired after observation)
     const handleLongRunning = (data: { invoice: string; print_job_id: string; printer_name: string }) => {
       if (!activeInvoiceName || data.invoice === activeInvoiceName) {
         showToast.info(`Invoice ${data.invoice} is still printing on ${data.printer_name}`);
@@ -56,7 +56,7 @@ export function usePrintNotifications(activeInvoiceName?: string) {
       reference_name?: string;
     }) => {
       console.log('[usePrintNotifications] Received print_failure_alert:', data);
-      const currentUser = usePOSStore.getState().user?.name;
+      const currentUser = useRootStore.getState().user?.name;
       if (
         data.job_owner &&
         currentUser &&
@@ -111,17 +111,36 @@ export function usePrintNotifications(activeInvoiceName?: string) {
       }
     };
 
+    // 5. KOT Print Completed Listener
+    const handleKotCompleted = (data: { kot: string; invoice?: string; print_job_id: string; production?: string }) => {
+      setActivePrintJobs((prev) => ({
+        ...prev,
+        [data.print_job_id]: {
+          ...prev[data.print_job_id],
+          invoice: data.invoice || data.kot,
+          print_job_id: data.print_job_id,
+          status: 'COMPLETED',
+        },
+      }));
+
+      if (!activeInvoiceName || data.invoice === activeInvoiceName || data.kot === activeInvoiceName) {
+        showToast.success(`KOT ${data.kot} printed successfully!`);
+      }
+    };
+
     // Register Frappe Realtime Sockets
     socket.on('print_job_status_updated', handleStatusUpdate);
     socket.on('invoice_print_long_running', handleLongRunning);
     socket.on('print_failure_alert', handlePrintFailure);
     socket.on('invoice_print_completed', handlePrintCompleted);
+    socket.on('kot_print_completed', handleKotCompleted);
 
     return () => {
       socket.off('print_job_status_updated', handleStatusUpdate);
       socket.off('invoice_print_long_running', handleLongRunning);
       socket.off('print_failure_alert', handlePrintFailure);
       socket.off('invoice_print_completed', handlePrintCompleted);
+      socket.off('kot_print_completed', handleKotCompleted);
     };
   }, [activeInvoiceName]);
 
