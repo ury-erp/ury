@@ -184,43 +184,7 @@ def poll_single_print_job(print_job_id):
                 stop_monitoring_print_job(print_job_id)
                 return
 
-            # Check 60-second observation deadline AFTER CUPS query
-            if monitoring_deadline and time.time() > monitoring_deadline:
-                failure_reason = "Observation timeout exceeded"
-                metadata["status"] = FAILED
-                metadata["failure_reason"] = failure_reason
-                metadata["cups_state_reason"] = failure_reason
-                metadata["observation_timed_out"] = True
-                if not long_running_sent:
-                    metadata["long_running_notification_sent"] = True
-                    notify_long_running_print(
-                        invoice=metadata.get("invoice"),
-                        print_job_id=print_job_id,
-                        printer_name=metadata.get("printer_name"),
-                        job_type=metadata.get("job_type", "BILL"),
-                        reference_doctype=metadata.get("reference_doctype"),
-                        reference_name=metadata.get("reference_name"),
-                    )
-                update_print_job(print_job_id, metadata)
-                _publish_status_update(metadata)
-                finalize_print_job(
-                    print_job_id,
-                    FAILED,
-                    failure_reason=failure_reason,
-                )
-                frappe.logger("printing").info(
-                    {
-                        "event": "print_job_observation_timeout",
-                        "print_job_id": print_job_id,
-                        "invoice": metadata.get("invoice"),
-                        "current_state": current_state,
-                        "status": FAILED,
-                    }
-                )
-                stop_monitoring_print_job(print_job_id)
-                return
-
-            # Non-terminal and within deadline -> schedule next check & re-enqueue
+            # Non-terminal -> schedule next check & re-enqueue background worker
             schedule_next_check(print_job_id, new_state, retry_count)
             if not frappe.flags.in_test:
                 frappe.enqueue(

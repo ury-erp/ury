@@ -389,43 +389,38 @@ class TestCupsPoller(FrappeTestCase):
     @patch("ury.ury.printing.print_job_poller.get_cups_job_attributes")
     @patch("ury.ury.printing.print_job_poller.finalize_print_job")
     @patch("ury.ury.printing.print_job_poller.frappe.publish_realtime")
-    def test_observation_timeout_stops_monitoring(self, mock_publish, mock_finalize, mock_get_attrs):
-        """CUPS is queried first; only then does the expired deadline mark FAILED and stop monitoring."""
-        job_id = "PJ-timeout"
+    def test_active_job_continues_monitoring_without_timeout(
+        self, mock_publish, mock_finalize, mock_get_attrs
+    ):
+        """Active jobs continue monitoring without being artificially timed out."""
+        job_id = "PJ-active"
         metadata = self._sample_metadata(job_id, status=PROCESSING, retry_count=0)
-        metadata["monitoring_deadline"] = time.time() - 1
         register_print_job(metadata)
 
-        mock_get_attrs.return_value = None
+        mock_get_attrs.return_value = {
+            "job_state": IPP_JOB_PROCESSING,
+            "job_state_reasons": ["job-printing"],
+            "printer_uri": "ipp://127.0.0.1:631/printers/Printer-A",
+            "time_at_completed": None,
+        }
 
         poll_single_print_job(job_id)
 
         metadata = get_print_job(job_id)
         self.assertIsNotNone(metadata)
-        self.assertEqual(metadata["status"], FAILED)
-        self.assertEqual(metadata["failure_reason"], "Observation timeout exceeded")
-        # retry_count incremented proves CUPS was queried before the deadline check.
-        self.assertEqual(metadata["retry_count"], 1)
-        self.assertTrue(metadata.get("long_running_notification_sent"))
-        self.assertTrue(metadata.get("observation_timed_out"))
-        self.assertNotIn(job_id, self.fake.zsets.get(MONITOR_ZSET, {}))
-
-        mock_get_attrs.assert_called_once_with("127.0.0.1", 631, 123)
-        self.assertEqual(mock_publish.call_count, 2)
-        mock_finalize.assert_called_once_with(
-            job_id, FAILED, failure_reason="Observation timeout exceeded"
-        )
+        self.assertEqual(metadata["status"], PROCESSING)
+        self.assertIn(job_id, self.fake.zsets.get(MONITOR_ZSET, {}))
+        mock_finalize.assert_not_called()
 
     @patch("ury.ury.printing.print_job_poller.finalize_print_job")
     @patch("ury.ury.printing.print_job_poller.frappe.publish_realtime")
     @patch("ury.ury.printing.print_job_poller.get_cups_job_attributes")
-    def test_completed_after_monitoring_deadline_finalizes(
+    def test_completed_job_finalizes_successfully(
         self, mock_get_attrs, mock_publish, mock_finalize
     ):
-        """A CUPS COMPLETED response wins over an expired monitoring_deadline."""
-        job_id = "PJ-completed-after-deadline"
+        """A CUPS COMPLETED response cleanly finalizes the job."""
+        job_id = "PJ-completed-job"
         metadata = self._sample_metadata(job_id, status=PROCESSING, retry_count=0)
-        metadata["monitoring_deadline"] = time.time() - 1
         register_print_job(metadata)
 
         mock_get_attrs.return_value = {
