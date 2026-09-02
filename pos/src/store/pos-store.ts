@@ -186,7 +186,8 @@ interface POSStore extends POSState {
 const generateUniqueId = (item: OrderItem): string => {
   const variantId = item.selectedVariant?.id || 'default';
   const addonIds = item.selectedAddons?.map(addon => addon.id).sort().join('-') || 'no-addons';
-  return `${item.id}-${variantId}-${addonIds}`;
+  const commentStr = item.comment ? item.comment.trim() : '';
+  return `${item.id}-${variantId}-${addonIds}-${commentStr}`;
 };
 
 const calculateItemPrice = (item: OrderItem): number => {

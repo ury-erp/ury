@@ -250,7 +250,7 @@ const OrderPanel = () => {
                 )}
               >
                 <div className="flex items-center justify-between">
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
                       <h3 className="font-medium text-gray-900 text-sm">{item.name}</h3>
                     </div>
@@ -260,6 +260,11 @@ const OrderPanel = () => {
                     {item.selectedAddons && item.selectedAddons.length > 0 && (
                       <p className="text-sm text-gray-500">
                         {item.selectedAddons.map(addon => addon.name).join(', ')}
+                      </p>
+                    )}
+                    {item.comment && item.comment.trim() && (
+                      <p className="text-xs text-gray-500 italic mt-0.5 truncate">
+                        "{item.comment.trim()}"
                       </p>
                     )}
                     <p className="text-gray-600 text-sm">{formatCurrency(calculateItemTotal(item))}</p>
