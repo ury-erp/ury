@@ -184,7 +184,7 @@ def poll_single_print_job(print_job_id):
                 stop_monitoring_print_job(print_job_id)
                 return
 
-            # Check 30-second observation deadline AFTER CUPS query
+            # Check 60-second observation deadline AFTER CUPS query
             if monitoring_deadline and time.time() > monitoring_deadline:
                 failure_reason = "Observation timeout exceeded"
                 metadata["status"] = FAILED

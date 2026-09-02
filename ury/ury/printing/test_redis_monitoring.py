@@ -141,7 +141,7 @@ class TestPrintJobMonitoring(FrappeTestCase):
         self.assertEqual(stored["status"], SUBMITTED)
         self.assertIn("monitoring_deadline", stored)
         self.assertAlmostEqual(
-            stored["monitoring_deadline"], time.time() + 30, delta=1
+            stored["monitoring_deadline"], time.time() + 60, delta=1
         )
         self.assertEqual(stored["long_running_notification_sent"], False)
         self.assertIn("PJ-001", self.fake.zsets.get(MONITOR_ZSET, {}))
