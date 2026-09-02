@@ -1,0 +1,20 @@
+{
+  "subtasks": [
+    {
+      "objective": "Make POS v2 table and order views live by subscribing to Frappe realtime order reload events and refreshing stale table/order state.",
+      "acceptance": "POS v2 registers and cleans up a `reload_ro` realtime listener when the Table and Orders views are mounted; receiving `reload_ro` invalidates table-related caches for the active branch/room, refetches the visible table list and room counts without using cached values, and refetches the visible orders/selected order state so table occupancy and order lists update without manual reload. Existing table operations still refresh explicitly, no duplicate realtime handlers accumulate across navigation, and `yarn workspace pos typecheck` or the repository's equivalent POS typecheck/build passes.",
+      "scope": [
+        "pos/src/pages/Table.tsx",
+        "pos/src/pages/Orders.tsx",
+        "pos/src/**/*.ts",
+        "pos/src/**/*.tsx",
+        "packages/core/src/**/*.ts"
+      ],
+      "task_type": "impl",
+      "difficulty": 3,
+      "risk": 3,
+      "uncertainty": 3,
+      "priority": 88
+    }
+  ]
+}
