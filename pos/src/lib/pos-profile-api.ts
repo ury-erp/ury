@@ -67,6 +67,7 @@ export interface PosProfileFull {
   role_restricted_for_table_order?: RolePermission[];
   transfer_role_permissions?: RolePermission[];
   paid_limit?: number;
+  custom_disable_pos_invoice_cancellation_after_printing?: number;
 }
 
 // Combined POS Profile with both limited and full fields
@@ -141,6 +142,7 @@ export async function getCombinedPosProfile(): Promise<PosProfileCombined> {
     edit_order_type: limitedProfile.edit_order_type,
     enable_kot_reprint: limitedProfile.enable_kot_reprint,
     custom_invoice_warning_time: limitedProfile.custom_invoice_warning_time ?? (fullProfile as any).custom_invoice_warning_time,
+    custom_disable_pos_invoice_cancellation_after_printing: (fullProfile as any).custom_disable_pos_invoice_cancellation_after_printing,
   };
 
   return combinedProfile;
