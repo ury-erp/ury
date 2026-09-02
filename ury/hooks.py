@@ -520,6 +520,7 @@ doc_events = {
         "on_submit": "ury.ury.hooks.ury_pos_invoice.on_submit",
         "on_update": "ury.ury.hooks.ury_pos_invoice.on_update",
         "on_cancel": "ury.ury.hooks.ury_pos_invoice.on_trash",
+        "before_cancel": "ury.ury.hooks.ury_pos_invoice.before_cancel",
         "on_trash": "ury.ury.hooks.ury_pos_invoice.on_trash",
     },
     "POS Profile": {"validate": "ury.ury.hooks.ury_pos_profile.validate"},
@@ -773,7 +774,8 @@ fixtures = [
                     "POS Profile-custom_captain_access_to_other_profiles",
                     "POS Profile-custom_cashier_access_to_other_profiles",
                     "POS Profile-custom_captain_accessible_profiles",
-                    "POS Profile-custom_cashier_accessible_profiles"
+                    "POS Profile-custom_cashier_accessible_profiles",
+                    "POS Profile-custom_disable_pos_invoice_cancellation_after_printing"
                 },
             ]
         ],

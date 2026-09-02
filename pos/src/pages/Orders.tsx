@@ -7,7 +7,7 @@ import OrderStatusSidebar from '../components/OrderStatusSidebar';
 import PrintJobsModal from '../components/PrintJobsModal';
 import { useOrdersPrintJobs } from '../hooks/useOrdersPrintJobs';
 import { useRootStore } from '../store/root-store';
-import { formatCurrency, parseFrappeError } from '@ury/core';
+import { formatCurrency, parseFrappeError, isUserRestrictedFromTableOrders } from '@ury/core';
 import { Spinner } from '@ury/ui';
 import { Textarea } from '@ury/ui';
 import { usePOSStore } from '../store/pos-store';
@@ -94,6 +94,7 @@ function getElapsedTimeFormatted(
 
 export default function Orders() {
   const { 
+    user,
     orders,
     orderLoading,
     error,
@@ -136,6 +137,14 @@ export default function Orders() {
 
   React.useEffect(() => {
     if (selectedOrder?.name) {
+      if (selectedOrder.order_type === 'Dine In' && isUserRestrictedFromTableOrders(user, posStore.posProfile)) {
+        setCanCancelInvoice(false);
+        return;
+      }
+      if (posStore.posProfile?.custom_disable_pos_invoice_cancellation_after_printing === 1 && selectedOrder.invoice_printed === 1) {
+        setCanCancelInvoice(false);
+        return;
+      }
       call.get('frappe.client.has_permission', { doctype: 'POS Invoice', docname: selectedOrder.name, perm_type: 'cancel' })
         .then((res: any) => {
           setCanCancelInvoice(res?.message?.has_permission === true);
@@ -146,7 +155,7 @@ export default function Orders() {
     } else {
       setCanCancelInvoice(false);
     }
-  }, [selectedOrder?.name]);
+  }, [selectedOrder?.name, selectedOrder?.order_type, selectedOrder?.invoice_printed, user, posStore.posProfile]);
 
   const canSplitBill = useMemo(() => {
     if (!selectedOrder || selectedOrderItems.length === 0) return false;
