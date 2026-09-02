@@ -21,6 +21,8 @@ def before_submit(doc, method):
     validate_invoice_print(doc, method)
     ro_reload_submit(doc, method)
 
+def before_cancel(doc, method):
+    validate_cancellation(doc)
 
 def on_trash(doc, method):
     table_status_delete(doc, method)
@@ -345,3 +347,19 @@ def release_merged_tables(doc):
             },
             update_modified=False,
         )
+
+def validate_cancellation(doc):
+    if not doc.pos_profile:
+        return
+        
+    pos_profile = frappe.get_doc("POS Profile", doc.pos_profile)
+    
+    # 1. Role-based Table Order Restriction
+    if doc.order_type == "Dine In" and pos_profile.get("role_restricted_for_table_order"):
+        restricted_roles = [r.role for r in pos_profile.role_restricted_for_table_order]
+        user_roles = frappe.get_roles(frappe.session.user)
+        if set(user_roles).intersection(set(restricted_roles)):
+            frappe.throw("You do not have permission to cancel this Table Order.")
+    # 2. Disable cancellation after printing check
+    if pos_profile.get("custom_disable_pos_invoice_cancellation_after_printing") == 1 and doc.invoice_printed == 1:
+        frappe.throw("Cannot cancel POS Invoice after it has been printed.")
