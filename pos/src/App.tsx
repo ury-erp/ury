@@ -16,15 +16,23 @@ import { ToastProvider } from '@ury/ui';
 import { usePOSStore } from './store/pos-store';
 import { useEffect } from 'react';
 import { getActiveLanguage } from './i18n';
+import { useRootStore } from './store/root-store';
 
 function App() {
   const {
     initializeApp
   } = usePOSStore();
+  const user = useRootStore((state) => state.user);
+  const configuredProfile = useRootStore((state) => state.posProfile);
   
   useEffect(() => {
-    initializeApp();
-  }, [initializeApp]);
+    // Do not fire protected POS APIs while the browser is still Guest on the
+    // optional PIN screen. Waiting for AuthGuard's profile also preserves the
+    // existing initialization order for password-authenticated users.
+    if (user && configuredProfile) {
+      initializeApp();
+    }
+  }, [configuredProfile, initializeApp, user]);
 
   useEffect(() => {
     const lang = getActiveLanguage();
