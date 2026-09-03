@@ -28,8 +28,6 @@ interface TableCardProps {
   onPrint: (event: MouseEvent<HTMLButtonElement>) => void;
   isPrinting: boolean;
   onReserve?: () => void;
-  onEditReservation?: () => void;
-  onCancelReservation?: () => void;
 }
 
 const TableCard = ({
@@ -52,11 +50,8 @@ const TableCard = ({
   onPrint,
   isPrinting,
   onReserve,
-  onEditReservation,
-  onCancelReservation,
 }: TableCardProps) => {
   const isOccupied = table.occupied === 1;
-  const isLockActive = !isOccupied && isReserved;
 
   return (
     <div
@@ -71,8 +66,6 @@ const TableCard = ({
         'relative flex min-h-[15.5rem] flex-col rounded-lg border-2 bg-white p-4 transition-all',
         isOccupied
           ? 'border-amber-400 bg-amber-50 text-amber-900'
-          : isLockActive
-          ? 'cursor-pointer border-indigo-400 bg-indigo-50/70 text-indigo-950 hover:border-indigo-500 hover:shadow-md'
           : 'cursor-pointer border-emerald-300 bg-emerald-50 text-emerald-900 hover:border-emerald-400 hover:shadow-md',
         menuOpen ? 'z-20' : 'z-0',
         className
@@ -93,10 +86,6 @@ const TableCard = ({
               <Badge variant="warning" className="whitespace-nowrap">
                 {t('tables.occupied')}
               </Badge>
-            ) : isLockActive ? (
-              <Badge variant="outline" className="whitespace-nowrap bg-indigo-100 text-indigo-800 border-indigo-300 font-semibold">
-                Reserved
-              </Badge>
             ) : (
               <Badge variant="success" className="whitespace-nowrap">
                 {t('tables.available')}
@@ -115,8 +104,6 @@ const TableCard = ({
               onTransferCaptain={onTransferCaptain}
               showCaptainTransfer={showCaptainTransfer}
               onReserve={onReserve}
-              onEditReservation={onEditReservation}
-              onCancelReservation={onCancelReservation}
             />
           </div>
         </div>

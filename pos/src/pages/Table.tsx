@@ -591,8 +591,6 @@ const TableView = () => {
         onTransferCaptain={() => void handleOpenCaptainTransfer(table)}
         showCaptainTransfer={showCaptainTransfer}
         onReserve={() => setReservationTable(table)}
-        onEditReservation={() => void handleEditReservationOpen(table.name)}
-        onCancelReservation={() => void handleCancelReservation(table.name)}
         onNavigate={() => handleNavigateToPOS(table.name)}
         onPreview={(event) => handlePreviewTable(table, event)}
         onPrint={(event) => handlePrintTable(table, event)}
@@ -794,16 +792,6 @@ const TableView = () => {
         onConfirm={handleReserveConfirm}
       />
 
-      <TableReservationEditDialog
-        open={editReservation !== null}
-        reservation={editReservation}
-        availableTables={allBranchTables.length > 0 ? allBranchTables : tables}
-        onOpenChange={(open) => {
-          if (!open) setEditReservation(null);
-        }}
-        onConfirm={handleEditReservationConfirm}
-      />
-
       <TableReservationWarningDialog
         open={reservationWarningOpen}
         reservation={reservationInfo}
@@ -811,18 +799,6 @@ const TableView = () => {
         loading={confirmArrivalLoading}
         onConfirmArrival={handleReservationContinue}
         onCancel={handleReservationCancel}
-      />
-
-      <TableReservationCancelDialog
-        open={cancelReservationTable !== null}
-        reservation={cancelReservationInfo}
-        tableName={cancelReservationTable ?? ''}
-        loading={cancelReservationLoading}
-        onConfirm={handleCancelReservationConfirm}
-        onClose={() => {
-          setCancelReservationTable(null);
-          setCancelReservationInfo(null);
-        }}
       />
 
       {/* Status Legend */}
@@ -834,11 +810,7 @@ const TableView = () => {
               <span>{t('tables.available')}</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-indigo-100 border border-indigo-300 rounded"></div>
-              <span>Reserved</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-red-100 border border-red-300 rounded"></div>
+              <div className="w-4 h-4 bg-amber-100 border border-amber-300 rounded"></div>
               <span>{t('tables.occupied')}</span>
             </div>
           </div>
