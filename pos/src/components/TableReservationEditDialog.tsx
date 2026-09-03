@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { CalendarClock, Phone, Users } from 'lucide-react';
+import { Clock, Phone, Users } from 'lucide-react';
 
 import {
   Dialog,
@@ -8,15 +8,15 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
+  Button,
+  Input,
+  Textarea,
 } from '@ury/ui';
 
-import { Button } from '@ury/ui';
-import { Input } from '@ury/ui';
-import { Textarea } from '@ury/ui';
-
 import { CustomerPicker } from './CustomerPicker';
+import { DatePicker } from './DatePicker';
 import type { Table, TableReservation } from '../lib/table-api';
-import type { Customer } from '../store/pos-store';
+import type { Customer } from '../lib/customer-api';
 
 export interface EditReservationFormData {
   reservation_name: string;
@@ -48,7 +48,8 @@ const TableReservationEditDialog = ({
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [customerPhone, setCustomerPhone] = useState('');
   const [noOfPax, setNoOfPax] = useState<number>(1);
-  const [reservedAt, setReservedAt] = useState('');
+  const [reservationDate, setReservationDate] = useState('');
+  const [reservationTime, setReservationTime] = useState('');
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -68,13 +69,11 @@ const TableReservationEditDialog = ({
     setValidationError(null);
 
     if (reservation.reserved_at) {
-      const dt = new Date(reservation.reserved_at.replace(' ', 'T'));
-      if (!isNaN(dt.getTime())) {
-        dt.setMinutes(dt.getMinutes() - dt.getTimezoneOffset());
-        setReservedAt(dt.toISOString().slice(0, 16));
-      } else {
-        setReservedAt(reservation.reserved_at.slice(0, 16));
-      }
+      let raw = reservation.reserved_at;
+      if (raw.includes('T')) raw = raw.replace('T', ' ');
+      const parts = raw.split(' ');
+      setReservationDate(parts[0] || '');
+      setReservationTime(parts[1] ? parts[1].slice(0, 5) : '19:00');
     }
   }, [open, reservation]);
 
@@ -110,7 +109,12 @@ const TableReservationEditDialog = ({
       return;
     }
 
-    if (!reservedAt) {
+    if (!reservationDate) {
+      setValidationError('Please select a reservation date.');
+      return;
+    }
+
+    if (!reservationTime) {
       setValidationError('Please select a reservation time.');
       return;
     }
@@ -118,6 +122,8 @@ const TableReservationEditDialog = ({
     setLoading(true);
 
     try {
+      const reservedAt = `${reservationDate} ${reservationTime}`;
+
       await onConfirm({
         reservation_name: reservation.name,
         table: selectedTable,
@@ -145,19 +151,19 @@ const TableReservationEditDialog = ({
         className="p-0 flex flex-col max-h-[90vh] overflow-hidden"
       >
         {/* Header */}
-        <DialogHeader className="px-8 pt-8 pb-5 shrink-0">
+        <DialogHeader className="px-8 pt-8 pb-5 shrink-0 border-b border-gray-100">
           <div>
-            <DialogTitle className="text-2xl">
+            <DialogTitle className="text-2xl font-bold text-gray-900">
               Edit Reservation ({reservation.name})
             </DialogTitle>
-            <DialogDescription className="mt-1">
+            <DialogDescription className="mt-1 text-sm font-medium text-gray-500">
               Update reservation details for this table.
             </DialogDescription>
           </div>
         </DialogHeader>
 
         {/* Body */}
-        <div className="px-8 pb-8 space-y-6 overflow-y-auto min-h-0">
+        <div className="px-8 py-6 space-y-6 overflow-y-auto min-h-0">
           {validationError && (
             <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">
               {validationError}
@@ -198,26 +204,25 @@ const TableReservationEditDialog = ({
               />
             </div>
 
-            {/* Customer Phone */}
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-gray-700">
-                Phone Number <span className="text-red-500">*</span>
-              </label>
-
-              <div className="relative">
-                <Phone className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <Input
-                  className="pl-10"
-                  type="tel"
-                  value={customerPhone}
-                  onChange={(e) => setCustomerPhone(e.target.value)}
-                  disabled={loading}
-                />
-              </div>
-            </div>
-
-            {/* Number of Persons & Reservation Time */}
+            {/* Phone Number & Number of Persons */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-gray-700">
+                  Phone Number <span className="text-red-500">*</span>
+                </label>
+
+                <div className="relative">
+                  <Phone className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <Input
+                    className="pl-10"
+                    type="tel"
+                    value={customerPhone}
+                    onChange={(e) => setCustomerPhone(e.target.value)}
+                    disabled={loading}
+                  />
+                </div>
+              </div>
+
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-gray-700">
                   Number of Persons <span className="text-red-500">*</span>
@@ -235,6 +240,22 @@ const TableReservationEditDialog = ({
                   />
                 </div>
               </div>
+            </div>
+
+            {/* Reservation Date & Reservation Time */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-gray-700">
+                  Reservation Date <span className="text-red-500">*</span>
+                </label>
+
+                <DatePicker
+                  id="edit-reservation-date"
+                  value={reservationDate}
+                  onChange={(_id, val) => setReservationDate(val)}
+                  disabled={loading}
+                />
+              </div>
 
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-gray-700">
@@ -242,12 +263,12 @@ const TableReservationEditDialog = ({
                 </label>
 
                 <div className="relative">
-                  <CalendarClock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <Clock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                   <Input
                     className="pl-10"
-                    type="datetime-local"
-                    value={reservedAt}
-                    onChange={(e) => setReservedAt(e.target.value)}
+                    type="time"
+                    value={reservationTime}
+                    onChange={(e) => setReservationTime(e.target.value)}
                     disabled={loading}
                   />
                 </div>
