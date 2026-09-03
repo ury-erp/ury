@@ -20,6 +20,33 @@ export interface Table {
   minimum_seating?: number;
 }
 
+export interface BranchReservationSettings {
+  enable_reservation: number;
+  buffer_time: number;
+  grace_period: number;
+  avg_table_time_last_day: number;
+  avg_table_time_last_week: number;
+  calculated_duration: number;
+}
+
+export interface TableReservation {
+  name: string;
+  branch: string;
+  reserved_table: string;
+  customer: string;
+  customer_name?: string;
+  customer_phone?: string;
+  no_of_pax?: number;
+  reserved_at: string;
+  comments?: string;
+  status: 'Requested' | 'Confirmed' | 'Completed' | 'Cancelled' | 'No Show';
+  is_lock_window_active?: boolean;
+  buffer_minutes?: number;
+  grace_minutes?: number;
+  duration_minutes?: number;
+  lock_start_time?: string;
+}
+
 
 export async function getRestaurantMenu(posProfile: string, room?: string | null) {
   const { call } = await import('@ury/core');
@@ -137,7 +164,25 @@ export async function unmergeTables(table: string) {
   });
 }
 
-export async function checkTableReservation(table: string): Promise<any> {
+export async function getBranchReservationSettings(branch: string): Promise<BranchReservationSettings> {
+  const { call } = await import('@ury/core');
+
+  const response = await call.get(
+    'ury.ury.api.table_reservation.get_branch_reservation_settings',
+    { branch }
+  );
+
+  return response.message ?? {
+    enable_reservation: 0,
+    buffer_time: 30,
+    grace_period: 15,
+    avg_table_time_last_day: 0,
+    avg_table_time_last_week: 0,
+    calculated_duration: 90,
+  };
+}
+
+export async function checkTableReservation(table: string): Promise<TableReservation | null> {
   const { call } = await import('@ury/core');
 
   const response = await call.get(
@@ -151,8 +196,12 @@ export async function checkTableReservation(table: string): Promise<any> {
 export async function createTableReservation(data: {
   table: string;
   customer: string;
+  customer_name?: string;
+  customer_phone: string;
+  no_of_pax: number;
   reserved_at: string;
   notes?: string;
+  branch?: string;
 }) {
   const { call } = await import('@ury/core');
 
@@ -161,15 +210,40 @@ export async function createTableReservation(data: {
     {
       table: data.table,
       customer: data.customer,
+      customer_name: data.customer_name,
+      customer_phone: data.customer_phone,
+      no_of_pax: data.no_of_pax,
       reserved_at: data.reserved_at,
       notes: data.notes,
+      branch: data.branch,
     }
   );
 
   return response.message;
 }
 
-export async function updateTableReservationStatus(reservationName: string, status: string) {
+export async function updateTableReservation(data: {
+  reservation_name: string;
+  table?: string;
+  customer?: string;
+  customer_name?: string;
+  customer_phone?: string;
+  no_of_pax?: number;
+  reserved_at?: string;
+  notes?: string;
+  branch?: string;
+}) {
+  const { call } = await import('@ury/core');
+
+  const response = await call.post(
+    'ury.ury.api.table_reservation.update_table_reservation',
+    data
+  );
+
+  return response.message;
+}
+
+export async function updateTableReservationStatus(reservationName: string, status: string, posInvoice?: string) {
   const { call } = await import('@ury/core');
   
   const response = await call.post(
@@ -177,15 +251,18 @@ export async function updateTableReservationStatus(reservationName: string, stat
     {
       reservation_name: reservationName,
       status,
+      pos_invoice: posInvoice,
     }
   );
 
   return response.message;
 }
 
-export async function getActiveReservations(): Promise<string[]> {
+export async function getActiveReservations(branch?: string): Promise<TableReservation[]> {
   const { call } = await import('@ury/core');
   
-  const response = await call.get('ury.ury.api.table_reservation.get_active_reservations');
+  const response = await call.get('ury.ury.api.table_reservation.get_active_reservations', {
+    branch: branch || undefined,
+  });
   return response.message ?? [];
 }
