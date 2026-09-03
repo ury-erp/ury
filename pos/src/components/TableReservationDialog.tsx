@@ -246,14 +246,15 @@ const TableReservationDialog = ({
                   </label>
 
                   <div className="relative">
-                    <Clock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                     <Input
-                      className="pl-10"
                       type="time"
+                      step="60"
+                      className="pr-10 bg-white border border-gray-200 text-gray-700 font-medium [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
                       value={reservationTime}
                       onChange={(e) => setReservationTime(e.target.value)}
                       disabled={loading}
                     />
+                    <Clock className="absolute right-3 top-3 h-4 w-4 text-gray-400 pointer-events-none" />
                   </div>
                 </div>
               </div>
