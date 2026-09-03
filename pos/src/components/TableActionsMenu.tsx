@@ -109,7 +109,7 @@ const TableActionsMenu = ({
 
       {isOpen && (
         <div className="absolute right-0 top-full z-50 mt-1 w-52 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
-          {reservationEnabled && onReserve && isAvailable && (
+          {reservationEnabled && onReserve && (
             <>
               <Button
                 variant="ghost"

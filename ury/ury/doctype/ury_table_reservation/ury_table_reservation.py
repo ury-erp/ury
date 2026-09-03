@@ -98,14 +98,15 @@ class URYTableReservation(Document):
             )
 
     def validate_conflicts(self):
-        # Only Confirmed / Active reservations require conflict validation
-        if self.status not in ("Confirmed", "Active"):
+        # Only Confirmed / Active / Requested reservations require validation rules
+        if self.status not in ("Confirmed", "Active", "Requested"):
             return
 
-        from ury.ury.api.table_reservation import validate_reservation_conflicts
-        validate_reservation_conflicts(
+        from ury.ury.api.table_reservation import validate_reservation_rules
+        validate_reservation_rules(
             table=self.reserved_table,
             branch=self.branch,
             reserved_at=self.reserved_at,
+            no_of_pax=self.no_of_pax,
             exclude_name=self.name,
         )

@@ -11,12 +11,44 @@ from frappe.utils import (
     cint,
     get_time,
 )
-from datetime import timedelta
+from datetime import datetime, timedelta, time
 from ury.ury.report.average_table_time.average_table_time import (
     get_branch_last_day_avg_time,
     get_branch_last_week_avg_time,
     get_branch_reservation_duration,
 )
+
+
+def parse_to_datetime(val, default_now=None):
+    """
+    Safely converts any datetime, date, time, timedelta, or string input into a valid datetime object.
+    If input is a time or timedelta (seconds since midnight from MySQL Time field), combines it with default_now date.
+    """
+    if not default_now:
+        default_now = now_datetime()
+
+    if not val:
+        return default_now
+
+    if isinstance(val, datetime):
+        return val
+
+    if isinstance(val, timedelta):
+        t_time = (datetime.min + val).time()
+        return datetime.combine(default_now.date(), t_time)
+
+    if isinstance(val, time):
+        return datetime.combine(default_now.date(), val)
+
+    if isinstance(val, str):
+        val_str = val.replace("T", " ").strip()
+        if " " in val_str:
+            return get_datetime(val_str)
+        else:
+            t_obj = get_time(val_str)
+            return datetime.combine(default_now.date(), t_obj)
+
+    return get_datetime(val)
 
 
 @frappe.whitelist()
@@ -86,17 +118,13 @@ def validate_reservation_conflicts(table, branch, reserved_at, exclude_name=None
       - Start Time: T_start
       - Expected Duration: D (from Average Table Time calculation)
       - Buffer Time: B (from Branch settings)
-      - Lock window: [T_start - B, T_start + D]
+      - Protection window overlap
     """
     if not table or not reserved_at:
         return
 
-    if isinstance(reserved_at, str):
-        if "T" in reserved_at:
-            reserved_at = reserved_at.replace("T", " ")
-        new_start = get_datetime(reserved_at)
-    else:
-        new_start = reserved_at
+    current_now = now_datetime()
+    new_start = parse_to_datetime(reserved_at, current_now)
 
     if not branch:
         branch = frappe.db.get_value("URY Table", table, "branch")
@@ -112,7 +140,7 @@ def validate_reservation_conflicts(table, branch, reserved_at, exclude_name=None
         SELECT name, reserved_at, branch
         FROM `tabURY Table Reservation`
         WHERE reserved_table = %s
-          AND status IN ('Confirmed', 'Active')
+          AND status IN ('Confirmed', 'Active', 'Requested')
     """
     params = [table]
 
@@ -123,7 +151,7 @@ def validate_reservation_conflicts(table, branch, reserved_at, exclude_name=None
     existing_reservations = frappe.db.sql(query, tuple(params), as_dict=True)
 
     for ex in existing_reservations:
-        ex_start = get_datetime(ex.reserved_at)
+        ex_start = parse_to_datetime(ex.reserved_at, current_now)
         ex_branch = ex.branch or branch
         ex_settings = get_branch_reservation_settings(ex_branch)
         ex_buffer = cint(ex_settings.get("buffer_time", 30))
@@ -134,14 +162,84 @@ def validate_reservation_conflicts(table, branch, reserved_at, exclude_name=None
 
         # Conflict occurs if the active dining window of one overlaps with the protection window of the other
         if (ex_end > new_protect_start and ex_start < new_end) or (new_end > ex_protect_start and new_start < ex_end):
-            if new_start == ex_start:
-                frappe.throw(_("This table is already reserved for the selected time."))
-            else:
-                frappe.throw(
-                    _("This table is not available for the selected reservation time due to an existing reservation window ({0} - {1}).").format(
-                        ex_start.strftime("%I:%M %p"), ex_end.strftime("%I:%M %p")
-                    )
+            frappe.throw(
+                _("Table {0} already has a reservation during the selected time. Please select a different reservation time.").format(table)
+            )
+
+
+def validate_reservation_rules(table, branch, reserved_at, no_of_pax=1, exclude_name=None):
+    """
+    Comprehensive validation order:
+    1. Mandatory table check
+    2. Capacity check (no_of_pax <= table.no_of_seats)
+    3. Past datetime check (reserved_at >= now_datetime())
+    4. Occupancy check & expected release calculation
+    5. Overlapping reservation window conflicts check
+    """
+    if not table:
+        frappe.throw(_("Please select a table."))
+
+    table_data = frappe.db.get_value(
+        "URY Table",
+        table,
+        ["name", "no_of_seats", "occupied", "latest_invoice_time", "branch", "restaurant_room"],
+        as_dict=True,
+    )
+    if not table_data:
+        frappe.throw(_("Table {0} does not exist.").format(table))
+
+    if not branch:
+        branch = table_data.branch
+        if not branch and table_data.restaurant_room:
+            branch = frappe.db.get_value("URY Room", table_data.restaurant_room, "branch")
+
+    # 1. Capacity Validation
+    table_seats = cint(table_data.get("no_of_seats") or 0)
+    pax = cint(no_of_pax or 1)
+    if table_seats > 0 and pax > table_seats:
+        frappe.throw(_("Number of persons cannot exceed the table capacity of {0}.").format(table_seats))
+
+    # 2. Past Datetime Validation
+    if not reserved_at:
+        frappe.throw(_("Please select a reservation time."))
+
+    current_now = now_datetime()
+    res_start = parse_to_datetime(reserved_at, current_now)
+
+    # Allow 1-minute grace margin for frontend-backend network latency
+    if res_start < (current_now - timedelta(minutes=1)):
+        frappe.throw(_("Reservation date and time cannot be in the past."))
+
+    # 3. Buffer-Time & Table Occupancy Validation
+    # Case A: Table is free (occupied == 0) -> proceed
+    # Case B: Table is occupied (occupied == 1) -> check expected finish time
+    if cint(table_data.get("occupied") or 0) == 1:
+        active_inv_creation = frappe.db.get_value(
+            "POS Invoice",
+            {"restaurant_table": table, "docstatus": 0},
+            "creation",
+        )
+        occupied_start_raw = active_inv_creation or table_data.get("latest_invoice_time") or current_now
+        occupied_start_dt = parse_to_datetime(occupied_start_raw, current_now)
+
+        expected_duration = get_branch_reservation_duration(branch)
+        expected_finish = occupied_start_dt + timedelta(minutes=expected_duration)
+
+        if expected_finish > res_start:
+            formatted_time = expected_finish.strftime("%I:%M %p").lstrip("0")
+            frappe.throw(
+                _("Table {0} is currently occupied and is expected to be available after {1}. Please select a later reservation time.").format(
+                    table, formatted_time
                 )
+            )
+
+    # 4. Reservation Window Conflict Validation
+    validate_reservation_conflicts(
+        table=table,
+        branch=branch,
+        reserved_at=res_start,
+        exclude_name=exclude_name,
+    )
 
 
 @frappe.whitelist()
