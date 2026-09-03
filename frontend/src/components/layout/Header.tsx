@@ -293,7 +293,7 @@ export const Header: React.FC = () => {
       {isNotificationOpen && (
         <div className="fixed inset-0 z-50 overflow-hidden">
           <div
-            className="absolute inset-0 bg-gray-900/30 backdrop-blur-xs transition-opacity"
+            className="absolute inset-0 bg-gray-900/30 backdrop-blur-sm transition-opacity"
             onClick={() => setIsNotificationOpen(false)}
           />
 
