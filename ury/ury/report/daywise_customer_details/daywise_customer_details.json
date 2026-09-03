@@ -1,5 +1,6 @@
 {
  "add_total_row": 0,
+ "add_translate_data": 0,
  "columns": [],
  "creation": "2024-08-23 15:24:43.592459",
  "disabled": 0,
@@ -31,8 +32,8 @@
  ],
  "idx": 6,
  "is_standard": "Yes",
- "letterhead": null,
- "modified": "2024-09-08 13:42:35.264877",
+ "letter_head": null,
+ "modified": "2026-09-02 19:16:37.576458",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "Daywise Customer Details",
@@ -51,6 +52,10 @@
   },
   {
    "role": "Accounts User"
+  },
+  {
+   "role": "URY Admin"
   }
- ]
+ ],
+ "timeout": 0
 }

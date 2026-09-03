@@ -1,8 +1,8 @@
 {
  "add_total_row": 1,
+ "add_translate_data": 0,
  "columns": [],
  "creation": "2023-09-29 14:46:17.686947",
- "disable_prepared_report": 0,
  "disabled": 0,
  "docstatus": 0,
  "doctype": "Report",
@@ -32,7 +32,8 @@
  ],
  "idx": 0,
  "is_standard": "Yes",
- "modified": "2023-12-06 10:43:35.653786",
+ "letter_head": null,
+ "modified": "2026-09-02 19:18:52.832128",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "Daywise Sales",
@@ -51,6 +52,10 @@
   },
   {
    "role": "URY Manager"
+  },
+  {
+   "role": "URY Admin"
   }
- ]
+ ],
+ "timeout": 0
 }
