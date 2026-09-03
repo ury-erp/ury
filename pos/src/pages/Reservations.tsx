@@ -1,14 +1,15 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import {
   BookOpenCheck,
   CalendarClock,
+  ChevronDown,
+  Filter,
   MoreVertical,
   Pencil,
   Phone,
-  RefreshCw,
-  Search,
   User,
   Users,
+  X,
   XCircle,
 } from 'lucide-react';
 import {
@@ -16,7 +17,6 @@ import {
   Button,
   Card,
   CardContent,
-  Input,
   Select,
   SelectItem,
 } from '@ury/ui';
@@ -37,16 +37,18 @@ import TableReservationEditDialog, {
 import TableReservationCancelDialog from '../components/TableReservationCancelDialog';
 
 export default function Reservations() {
-  const { posProfile } = usePOSStore();
+  const { posProfile, searchQuery } = usePOSStore();
   const branch = posProfile?.branch ?? '';
 
   const [reservations, setReservations] = useState<TableReservation[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [availableTables, setAvailableTables] = useState<Table[]>([]);
   const [selectedRoom, setSelectedRoom] = useState<string>('all');
-  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [selectedTableFilter, setSelectedTableFilter] = useState<string>('all');
+  const [isFilterOpen, setIsFilterOpen] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
-  const [refreshing, setRefreshing] = useState<boolean>(false);
+
+  const filterRef = useRef<HTMLDivElement>(null);
 
   // Active action menu popover state
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
@@ -56,6 +58,26 @@ export default function Reservations() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState<boolean>(false);
   const [cancelReservation, setCancelReservation] = useState<TableReservation | null>(null);
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState<boolean>(false);
+
+  // Click outside to close filter popover (ignoring Radix Select portals)
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element | null;
+      if (!target) return;
+
+      if (
+        filterRef.current?.contains(target) ||
+        target.closest?.('[data-radix-popper-content-wrapper]') ||
+        target.closest?.('[role="listbox"]')
+      ) {
+        return;
+      }
+
+      setIsFilterOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const fetchReservationsData = useCallback(async () => {
     if (!branch) return;
@@ -76,7 +98,11 @@ export default function Reservations() {
       let allTables: Table[] = [];
       for (const r of roomList) {
         const roomTables = await getTables(r.name);
-        allTables = [...allTables, ...roomTables];
+        const mappedTables = (roomTables || []).map((tbl) => ({
+          ...tbl,
+          restaurant_room: tbl.restaurant_room || r.name,
+        }));
+        allTables = [...allTables, ...mappedTables];
       }
       setAvailableTables(allTables);
 
@@ -86,17 +112,11 @@ export default function Reservations() {
     } finally {
       setLoading(false);
     }
-  }, [fetchReservationsData]);
+  }, [branch, fetchReservationsData]);
 
   useEffect(() => {
     loadInitialData();
   }, [loadInitialData]);
-
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    await fetchReservationsData();
-    setRefreshing(false);
-  };
 
   const handleOpenEdit = (res: TableReservation) => {
     setEditReservation(res);
@@ -119,7 +139,7 @@ export default function Reservations() {
         customer_name: data.customer_name,
         customer_phone: data.customer_phone,
         no_of_pax: data.no_of_pax,
-        reservedAt: data.reservedAt,
+        reserved_at: data.reservedAt,
         notes: data.notes,
       });
       await fetchReservationsData();
@@ -140,25 +160,54 @@ export default function Reservations() {
     }
   };
 
-  // Filter reservations
-  const filteredReservations = reservations.filter((res) => {
-    if (selectedRoom !== 'all') {
-      const matchedTable = availableTables.find((t) => t.name === res.reserved_table);
-      if (!matchedTable || matchedTable.restaurant_room !== selectedRoom) {
-        return false;
+  const hasActiveFilter = selectedRoom !== 'all' || selectedTableFilter !== 'all';
+  const activeFilterCount = (selectedRoom !== 'all' ? 1 : 0) + (selectedTableFilter !== 'all' ? 1 : 0);
+
+  const handleClearFilters = () => {
+    setSelectedRoom('all');
+    setSelectedTableFilter('all');
+  };
+
+  // Tables list for the Table filter dropdown (filtered by selected Room if set)
+  const filteredTablesForFilter = useMemo(() => {
+    if (selectedRoom === 'all') return availableTables;
+    return availableTables.filter((t) => t.restaurant_room === selectedRoom);
+  }, [availableTables, selectedRoom]);
+
+  // Filter reservations based on Room filter, Table filter, and global Search query
+  const filteredReservations = useMemo(() => {
+    return reservations.filter((res) => {
+      const resTable = res.reserved_table || (res as any).table || '';
+
+      // 1. Room filter
+      if (selectedRoom !== 'all') {
+        const matchedTable = availableTables.find((t) => t.name === resTable);
+        if (!matchedTable || matchedTable.restaurant_room !== selectedRoom) {
+          return false;
+        }
       }
-    }
 
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      const tableName = (res.reserved_table || '').toLowerCase();
-      const custName = (res.customer_name || res.customer || '').toLowerCase();
-      const custPhone = (res.customer_phone || '').toLowerCase();
-      return tableName.includes(q) || custName.includes(q) || custPhone.includes(q);
-    }
+      // 2. Table filter
+      if (selectedTableFilter !== 'all') {
+        if (resTable !== selectedTableFilter) {
+          return false;
+        }
+      }
 
-    return true;
-  });
+      // 3. Search Query from global POS header
+      if (searchQuery.trim()) {
+        const q = searchQuery.trim().toLowerCase();
+        const tableName = resTable.toLowerCase();
+        const custName = (res.customer_name || res.customer || '').toLowerCase();
+        const custPhone = (res.customer_phone || '').toLowerCase();
+        const matchesSearch =
+          tableName.includes(q) || custName.includes(q) || custPhone.includes(q);
+        if (!matchesSearch) return false;
+      }
+
+      return true;
+    });
+  }, [reservations, availableTables, selectedRoom, selectedTableFilter, searchQuery]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -206,53 +255,86 @@ export default function Reservations() {
           </div>
           <div>
             <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-              Table Reservations
+              Reservations
               <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-700">
                 {filteredReservations.length}
               </span>
             </h1>
-            <p className="text-xs text-gray-500 mt-0.5">
-              Manage all upcoming and active table reservations
-            </p>
           </div>
         </div>
 
-        {/* Controls */}
-        <div className="flex items-center gap-3">
-          {/* Room Selector */}
-          <div className="w-44">
-            <Select value={selectedRoom} onValueChange={setSelectedRoom} placeholder="All Rooms">
-              <SelectItem value="all">All Rooms</SelectItem>
-              {rooms.map((r) => (
-                <SelectItem key={r.name} value={r.name}>
-                  {r.name}
-                </SelectItem>
-              ))}
-            </Select>
-          </div>
-
-          {/* Search */}
-          <div className="relative w-64">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-            <Input
-              className="pl-9 text-sm"
-              placeholder="Search table, customer..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-
-          {/* Refresh Button */}
+        {/* Reservations Filter Dropdown */}
+        <div className="relative" ref={filterRef}>
           <Button
-            variant="outline"
+            variant={hasActiveFilter ? 'default' : 'outline'}
             size="sm"
-            onClick={handleRefresh}
-            disabled={refreshing}
-            className="flex items-center gap-1.5"
+            onClick={() => setIsFilterOpen(!isFilterOpen)}
+            className="flex items-center gap-2"
           >
-            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-            <span>Refresh</span>
+            <Filter className="w-4 h-4" />
+            <span>Filter</span>
+            {hasActiveFilter && (
+              <span className="ml-1 rounded-full bg-white/20 px-1.5 py-0.5 text-xs font-bold text-white">
+                {activeFilterCount}
+              </span>
+            )}
+            <ChevronDown className="w-3.5 h-3.5 opacity-60" />
           </Button>
+
+          {isFilterOpen && (
+            <div className="absolute right-0 mt-2 w-72 rounded-xl border border-gray-200 bg-white p-4 shadow-xl z-50 space-y-4">
+              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                <span className="text-sm font-bold text-gray-900">Filter Reservations</span>
+                {hasActiveFilter && (
+                  <button
+                    type="button"
+                    onClick={handleClearFilters}
+                    className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                  >
+                    <X className="w-3 h-3" />
+                    Clear filters
+                  </button>
+                )}
+              </div>
+
+              {/* Room Filter */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-gray-600">Room</label>
+                <Select
+                  value={selectedRoom}
+                  onValueChange={(val) => {
+                    setSelectedRoom(val);
+                    if (val !== 'all' && selectedTableFilter !== 'all') {
+                      const tbl = availableTables.find((t) => t.name === selectedTableFilter);
+                      if (tbl && tbl.restaurant_room !== val) {
+                        setSelectedTableFilter('all');
+                      }
+                    }
+                  }}
+                >
+                  <SelectItem value="all">All Rooms</SelectItem>
+                  {rooms.map((r) => (
+                    <SelectItem key={r.name} value={r.name}>
+                      {r.name}
+                    </SelectItem>
+                  ))}
+                </Select>
+              </div>
+
+              {/* Table Filter */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-gray-600">Table</label>
+                <Select value={selectedTableFilter} onValueChange={setSelectedTableFilter}>
+                  <SelectItem value="all">All Tables</SelectItem>
+                  {filteredTablesForFilter.map((t) => (
+                    <SelectItem key={t.name} value={t.name}>
+                      {t.name} ({t.restaurant_room})
+                    </SelectItem>
+                  ))}
+                </Select>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
