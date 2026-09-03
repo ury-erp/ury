@@ -4,7 +4,7 @@ import {
   LayoutGrid, 
   ClipboardList, 
   Table,
-  BookOpenCheck,
+  BookLock,
 } from 'lucide-react';
 import { cn } from '@ury/ui';
 import { t } from '../i18n';
@@ -44,7 +44,7 @@ const Footer = () => {
     { icon: LayoutGrid, label: t('footer.pos'), path: '/' },
     { icon: Table, label: t('footer.table'), path: '/table' },
     ...(reservationEnabled
-      ? [{ icon: BookOpenCheck, label: 'Reservations', path: '/reservations' }]
+      ? [{ icon: BookLock, label: 'Reservations', path: '/reservations' }]
       : []),
     { icon: ClipboardList, label: t('footer.orders'), path: '/orders' },
   ];
