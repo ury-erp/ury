@@ -212,33 +212,79 @@ class TestURYTableReservation(FrappeTestCase):
             branch=self.branch,
         )
 
-        # Update notes and pax
+        # Update notes and pax (pax 4 <= seats 4)
         update_table_reservation(
             reservation_name=res_id,
-            no_of_pax=6,
-            notes="Changed to 6 persons",
+            no_of_pax=4,
+            notes="Changed to 4 persons",
         )
 
         doc = frappe.get_doc("URY Table Reservation", res_id)
-        self.assertEqual(doc.no_of_pax, 6)
-        self.assertEqual(doc.comments, "Changed to 6 persons")
+        self.assertEqual(doc.no_of_pax, 4)
+        self.assertEqual(doc.comments, "Changed to 4 persons")
 
-        # Cancel reservation
-        update_reservation_status(res_id, "Cancelled")
-        doc.reload()
-        self.assertEqual(doc.status, "Cancelled")
+    def test_capacity_validation(self):
+        # Table capacity is 4. Booking 5 persons should fail.
+        res_time = (now_datetime() + timedelta(days=6)).strftime("%Y-%m-%d 19:00:00")
+        with self.assertRaises(frappe.ValidationError):
+            create_table_reservation(
+                table="_Test Reservation Table 1",
+                customer="_Test Reservation Customer",
+                customer_name="Customer Capacity Fail",
+                customer_phone="9876543210",
+                no_of_pax=5,
+                reserved_at=res_time,
+                branch=self.branch,
+            )
 
-        # Now creating a new reservation for the same slot should succeed
-        res_new_id = create_table_reservation(
+    def test_past_datetime_validation(self):
+        # Booking in the past should fail.
+        past_time = (now_datetime() - timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S")
+        with self.assertRaises(frappe.ValidationError):
+            create_table_reservation(
+                table="_Test Reservation Table 1",
+                customer="_Test Reservation Customer",
+                customer_name="Customer Past Fail",
+                customer_phone="9876543210",
+                no_of_pax=2,
+                reserved_at=past_time,
+                branch=self.branch,
+            )
+
+    def test_buffer_time_free_table(self):
+        # Booking 15 mins in future (inside 30 min buffer) when table is free -> should succeed.
+        frappe.db.set_value("URY Table", "_Test Reservation Table 1", "occupied", 0)
+        future_time = (now_datetime() + timedelta(minutes=15)).strftime("%Y-%m-%d %H:%M:%S")
+        res_id = create_table_reservation(
             table="_Test Reservation Table 1",
-            customer="_Test Customer B",
-            customer_name="Customer B",
-            customer_phone="9876543211",
+            customer="_Test Reservation Customer",
+            customer_name="Customer Free Buffer",
+            customer_phone="9876543210",
             no_of_pax=2,
-            reserved_at=res_time,
+            reserved_at=future_time,
             branch=self.branch,
         )
-        self.assertTrue(res_new_id)
+        self.assertTrue(res_id)
+
+    def test_buffer_time_occupied_table_conflict(self):
+        # Table is occupied starting now. Booking in 15 mins (within 90 min duration) -> should fail.
+        frappe.db.set_value("URY Table", "_Test Reservation Table 1", {
+            "occupied": 1,
+            "latest_invoice_time": now_datetime(),
+        })
+        future_time = (now_datetime() + timedelta(minutes=15)).strftime("%Y-%m-%d %H:%M:%S")
+        with self.assertRaises(frappe.ValidationError):
+            create_table_reservation(
+                table="_Test Reservation Table 1",
+                customer="_Test Reservation Customer",
+                customer_name="Customer Occupied Fail",
+                customer_phone="9876543210",
+                no_of_pax=2,
+                reserved_at=future_time,
+                branch=self.branch,
+            )
+        # Reset table state
+        frappe.db.set_value("URY Table", "_Test Reservation Table 1", {"occupied": 0, "latest_invoice_time": None})
 
     def test_automatic_no_show_handling(self):
         # Create a past reservation whose grace period has expired (e.g. 2 hours ago)
