@@ -25,7 +25,7 @@
    "hidden": 0,
    "is_query_report": 0,
    "label": "URY Setup",
-   "link_count": 8,
+   "link_count": 9,
    "link_type": "DocType",
    "onboard": 0,
    "type": "Card Break"
@@ -96,6 +96,16 @@
    "label": "URY Room",
    "link_count": 0,
    "link_to": "URY Room",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "URY POS PIN Settings",
+   "link_count": 0,
+   "link_to": "URY POS PIN Settings",
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"

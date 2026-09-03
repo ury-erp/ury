@@ -4,6 +4,7 @@ import { Button } from '@ury/ui';
 import { Spinner } from '@ury/ui';
 import { RefreshCw } from 'lucide-react';
 import { t } from '../i18n'
+import PinLoginScreen from './PinLoginScreen';
 
 interface Props {
   children: React.ReactNode;
@@ -21,6 +22,9 @@ const AuthGuard: React.FC<Props> = ({ children }) => {
     error: configError,
     hasAccess,
     allowedRoles,
+    requiresPinLogin,
+    pinMinLength,
+    pinMaxLength,
   } = useRootStore();
 
   // State to track if we're rechecking permissions
@@ -45,6 +49,10 @@ const AuthGuard: React.FC<Props> = ({ children }) => {
         <Spinner  message={t('common.loading')} />
       </div>
     );
+  }
+
+  if (requiresPinLogin) {
+    return <PinLoginScreen minLength={pinMinLength} maxLength={pinMaxLength} />;
   }
 
   if (authError || configError) {
@@ -107,4 +115,4 @@ const AuthGuard: React.FC<Props> = ({ children }) => {
   return <>{children}</>;
 };
 
-export default AuthGuard; 
+export default AuthGuard;
