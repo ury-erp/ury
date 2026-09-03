@@ -867,6 +867,20 @@ def create_customer(customer_name, mobile_number=None, customer_group="Individua
     except Exception:
         frappe.throw("Invalid mobile number format")
 
+    if not territory or not frappe.db.exists("Territory", territory):
+        territory = (
+            frappe.db.get_default("territory")
+            or frappe.db.get_value("Territory", {"is_group": 0}, "name")
+            or "All Territories"
+        )
+
+    if not customer_group or not frappe.db.exists("Customer Group", customer_group):
+        customer_group = (
+            frappe.db.get_default("customer_group")
+            or frappe.db.get_value("Customer Group", {"is_group": 0}, "name")
+            or "Individual"
+        )
+
     """Create a new customer"""
     try:
         customer = frappe.get_doc({
