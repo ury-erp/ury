@@ -70,7 +70,7 @@ export default function Reservations() {
   const loadInitialData = useCallback(async () => {
     setLoading(true);
     try {
-      const roomList = await getRooms();
+      const roomList = await getRooms(branch);
       setRooms(roomList || []);
 
       let allTables: Table[] = [];
