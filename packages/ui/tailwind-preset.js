@@ -220,6 +220,12 @@ export default {
         // one axis but not the other.
         panelX: '16px',
         panelY: '14px',
+        // Tailwind 3.4's default scale stops at 3.5 for half-steps; drawer.tsx
+        // (`px-4.5`) and key-value-row.tsx (`mt-4.5`) assumed a 4.5 step that
+        // does not exist, so those utilities emitted no CSS and the Drawer
+        // rendered with zero horizontal padding. 18px = the 0.25rem-scale
+        // step between 4 (16px) and 5 (20px).
+        '4.5': '1.125rem',
       },
     },
   },
