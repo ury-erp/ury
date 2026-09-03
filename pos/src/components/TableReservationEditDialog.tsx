@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Clock, Phone, Users } from 'lucide-react';
 
 import {
@@ -11,13 +11,16 @@ import {
   Button,
   Input,
   Textarea,
+  Select,
+  SelectItem,
 } from '@ury/ui';
 
 import { TableShapeIcon } from './TableShapeIcon';
 import { CustomerPicker } from './CustomerPicker';
 import { DatePicker } from './DatePicker';
-import type { Table, TableReservation } from '../lib/table-api';
+import { getRooms, getTables, type Table, type TableReservation } from '../lib/table-api';
 import type { Customer } from '../lib/customer-api';
+import { usePOSStore } from '../store/pos-store';
 
 export interface EditReservationFormData {
   reservation_name: string;
@@ -45,7 +48,11 @@ const TableReservationEditDialog = ({
   onOpenChange,
   onConfirm,
 }: TableReservationEditDialogProps) => {
+  const { posProfile } = usePOSStore();
+  const branch = posProfile?.branch ?? '';
+
   const [selectedTable, setSelectedTable] = useState('');
+  const [internalTables, setInternalTables] = useState<Table[]>([]);
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [customerPhone, setCustomerPhone] = useState('');
   const [noOfPax, setNoOfPax] = useState<number>(1);
@@ -55,10 +62,57 @@ const TableReservationEditDialog = ({
   const [loading, setLoading] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
 
+  // Fetch tables if availableTables prop is empty
+  useEffect(() => {
+    if (!open) return;
+    if (availableTables && availableTables.length > 0) return;
+
+    let isMounted = true;
+    (async () => {
+      try {
+        const roomList = await getRooms(branch);
+        let allTables: Table[] = [];
+        for (const r of roomList) {
+          const roomTables = await getTables(r.name);
+          allTables = [...allTables, ...roomTables];
+        }
+        if (isMounted) {
+          setInternalTables(allTables);
+        }
+      } catch (err) {
+        console.error('Failed to load tables for edit reservation dialog:', err);
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [open, availableTables, branch]);
+
+  // Combine tables and guarantee existing reserved_table is included
+  const tablesList = useMemo(() => {
+    const source = availableTables && availableTables.length > 0 ? availableTables : internalTables;
+    const list = [...source];
+    const targetTable = reservation?.reserved_table;
+    if (targetTable && !list.some((t) => t.name === targetTable)) {
+      list.unshift({
+        name: targetTable,
+        restaurant_room: 'Current Table',
+        no_of_seats: reservation?.no_of_pax || 2,
+        table_shape: 'Rectangle',
+        occupied: 0,
+        is_take_away: 0,
+        latest_invoice_time: null,
+      });
+    }
+    return list;
+  }, [availableTables, internalTables, reservation]);
+
   useEffect(() => {
     if (!open || !reservation) return;
 
-    setSelectedTable(reservation.reserved_table || '');
+    const initialTable = reservation.reserved_table || '';
+    setSelectedTable(initialTable);
     setCustomer({
       id: reservation.customer,
       name: reservation.customer_name || reservation.customer,
@@ -87,10 +141,10 @@ const TableReservationEditDialog = ({
 
   if (!reservation) return null;
 
-  const currentTableObj = availableTables.find((t) => t.name === selectedTable) || {
+  const currentTableObj = tablesList.find((t) => t.name === selectedTable) || {
     name: selectedTable || reservation.reserved_table,
     no_of_seats: reservation.no_of_pax || 2,
-    table_shape: 'Rectangle',
+    table_shape: 'Rectangle' as const,
   };
 
   const handleSubmit = async () => {
@@ -185,24 +239,24 @@ const TableReservationEditDialog = ({
           )}
 
           <div className="rounded-xl border border-gray-200 bg-gray-50 p-6 space-y-5">
-            {/* Table Selection */}
+            {/* Table Selection - Using Standard URY @ury/ui Select Dropdown */}
             <div className="space-y-2">
               <label className="text-sm font-semibold text-gray-700">
                 Table <span className="text-red-500">*</span>
               </label>
 
-              <select
-                className="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-900 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100 disabled:bg-gray-100"
+              <Select
                 value={selectedTable}
-                onChange={(e) => setSelectedTable(e.target.value)}
+                onValueChange={setSelectedTable}
                 disabled={loading}
+                placeholder="Select a table"
               >
-                {availableTables.map((t) => (
-                  <option key={t.name} value={t.name}>
+                {tablesList.map((t) => (
+                  <SelectItem key={t.name} value={t.name}>
                     {t.name} ({t.restaurant_room} - {t.no_of_seats || 0} seats)
-                  </option>
+                  </SelectItem>
                 ))}
-              </select>
+              </Select>
             </div>
 
             {/* Customer */}
