@@ -115,10 +115,10 @@ export class OrderRepository
     const syncedPaid = await this.table
       .filter(
         order =>
-          (order.status === 'Paid' ||
-            order.status === 'Cancelled' ||
-            order.status === 'Consolidated' ||
-            order.status === 'Return') &&
+          ((order.status as string) === 'Paid' ||
+            (order.status as string) === 'Cancelled' ||
+            (order.status as string) === 'Consolidated' ||
+            (order.status as string) === 'Return') &&
           (order.sync_status === 'synced' || !order.sync_status)
       )
       .toArray();

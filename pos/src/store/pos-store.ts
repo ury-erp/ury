@@ -4,6 +4,7 @@ import { storage } from '@ury/core';
 import { getRestaurantMenu, getAggregatorMenu, MenuItem as APIMenuItem } from '../lib/menu-api';
 import { queryClient } from '../lib/query-client';
 import { getAggregators } from '../lib/aggregator-api';
+import { getMenuQueryKey } from '../hooks/useMenu';
 import { getCurrencyInfo, PosProfileCombined, getCombinedPosProfile } from '../lib/pos-profile-api';
 import { getCustomerGroups, getCustomerTerritories } from '../lib/customer-api';
 import { DEFAULT_ORDER_TYPE, OrderType } from '../data/order-types';
@@ -284,13 +285,18 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   },
 
   fetchMenuItems: async () => {
-    const { posProfile, selectedRoom, selectedOrderType } = get();
+    const { posProfile, selectedRoom, selectedOrderType, selectedAggregator } = get();
     if (!posProfile?.restaurant) return;
 
     try {
       set({ menuLoading: true, error: null });
       const items = await queryClient.fetchQuery({
-        queryKey: ['restaurantMenu', posProfile.name, selectedRoom, selectedOrderType],
+        queryKey: getMenuQueryKey(
+          posProfile.name,
+          selectedRoom,
+          selectedOrderType,
+          selectedOrderType === 'Aggregators' ? selectedAggregator?.customer : null
+        ),
         queryFn: () => getRestaurantMenu(posProfile.name, selectedRoom, selectedOrderType),
       });
       

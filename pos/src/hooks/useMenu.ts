@@ -5,11 +5,31 @@ import { usePOSStore, MenuItem } from '../store/pos-store';
 const MENU_STALE_TIME = 1000 * 60 * 15; // 15 minutes
 const MENU_GC_TIME = 1000 * 60 * 60 * 24; // 24 hours
 
+export function getMenuQueryKey(
+  posProfileName?: string | null,
+  room?: string | null,
+  orderType?: string | null,
+  aggregatorCustomer?: string | null
+) {
+  return [
+    'restaurantMenu',
+    posProfileName ?? null,
+    room ?? null,
+    orderType ?? null,
+    orderType === 'Aggregators' ? (aggregatorCustomer ?? null) : null,
+  ] as const;
+}
+
 export function useMenu() {
   const { posProfile, selectedRoom, selectedOrderType, selectedAggregator } = usePOSStore();
   
   return useQuery({
-    queryKey: ['restaurantMenu', posProfile?.name, selectedRoom, selectedOrderType, selectedOrderType === 'Aggregators' ? selectedAggregator?.customer : null],
+    queryKey: getMenuQueryKey(
+      posProfile?.name,
+      selectedRoom,
+      selectedOrderType,
+      selectedOrderType === 'Aggregators' ? selectedAggregator?.customer : null
+    ),
     queryFn: async () => {
       if (!posProfile?.name) return [];
       
