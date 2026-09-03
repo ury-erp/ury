@@ -1,6 +1,45 @@
 import { DOCTYPES } from '../data/doctypes';
 import { db } from '@ury/core';
 
+export function extractErrorMessage(error: any, fallback = 'Failed to process reservation.'): string {
+  if (!error) return fallback;
+
+  if (typeof error === 'object' && error !== null) {
+    if ('_server_messages' in error && typeof (error as any)._server_messages === 'string') {
+      try {
+        const messages = JSON.parse((error as any)._server_messages);
+        if (Array.isArray(messages) && messages.length > 0) {
+          const messageObj = typeof messages[0] === 'string' ? JSON.parse(messages[0]) : messages[0];
+          if (messageObj && messageObj.message) {
+            return messageObj.message.replace(/<[^>]*>?/gm, '').trim();
+          }
+        }
+      } catch {}
+    }
+
+    if ('message' in error && typeof (error as any).message === 'string') {
+      const msg = (error as any).message;
+      if (msg.includes('_server_messages')) {
+        try {
+          const parsed = JSON.parse(msg);
+          return extractErrorMessage(parsed, fallback);
+        } catch {}
+      }
+      return msg.replace(/<[^>]*>?/gm, '').trim();
+    }
+  }
+
+  if (error instanceof Error && error.message) {
+    return error.message.replace(/<[^>]*>?/gm, '').trim();
+  }
+
+  if (typeof error === 'string') {
+    return error.replace(/<[^>]*>?/gm, '').trim();
+  }
+
+  return fallback;
+}
+
 export interface Room {
   name: string;
   branch: string;

@@ -17,8 +17,8 @@ import { TableShapeIcon } from './TableShapeIcon';
 import { CustomerPicker } from './CustomerPicker';
 import { DatePicker } from './DatePicker';
 
-import type { Table } from '../lib/table-api';
-import type { Customer } from '../lib/customer-api';
+import { type Table, extractErrorMessage } from '../lib/table-api';
+import type { Customer } from '../store/pos-store';
 
 export interface ReservationFormData {
   customer: string;
@@ -103,6 +103,11 @@ const TableReservationDialog = ({
       return;
     }
 
+    if (table?.no_of_seats && Number(noOfPax) > table.no_of_seats) {
+      setValidationError(`Number of persons cannot exceed the table capacity of ${table.no_of_seats}.`);
+      return;
+    }
+
     if (!reservationDate) {
       setValidationError('Please select a reservation date.');
       return;
@@ -110,6 +115,13 @@ const TableReservationDialog = ({
 
     if (!reservationTime) {
       setValidationError('Please select a reservation time.');
+      return;
+    }
+
+    const selectedDt = new Date(`${reservationDate}T${reservationTime}:00`);
+    const nowMargin = new Date(Date.now() - 60000); // 1-min grace margin
+    if (!isNaN(selectedDt.getTime()) && selectedDt < nowMargin) {
+      setValidationError('Reservation date and time cannot be in the past.');
       return;
     }
 
@@ -129,7 +141,7 @@ const TableReservationDialog = ({
 
       onOpenChange(false);
     } catch (err: any) {
-      setValidationError(err.message || 'Failed to reserve table.');
+      setValidationError(extractErrorMessage(err, 'Failed to reserve table.'));
     } finally {
       setLoading(false);
     }

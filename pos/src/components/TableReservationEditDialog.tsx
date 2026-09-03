@@ -18,8 +18,8 @@ import {
 import { TableShapeIcon } from './TableShapeIcon';
 import { CustomerPicker } from './CustomerPicker';
 import { DatePicker } from './DatePicker';
-import { getRooms, getTables, type Table, type TableReservation } from '../lib/table-api';
-import type { Customer } from '../lib/customer-api';
+import { getRooms, getTables, extractErrorMessage, type Table, type TableReservation } from '../lib/table-api';
+import type { Customer } from '../store/pos-store';
 import { usePOSStore } from '../store/pos-store';
 
 export interface EditReservationFormData {
@@ -170,6 +170,12 @@ const TableReservationEditDialog = ({
       return;
     }
 
+    const targetTableObj = tablesList.find((t) => t.name === selectedTable);
+    if (targetTableObj?.no_of_seats && Number(noOfPax) > targetTableObj.no_of_seats) {
+      setValidationError(`Number of persons cannot exceed the table capacity of ${targetTableObj.no_of_seats}.`);
+      return;
+    }
+
     if (!reservationDate) {
       setValidationError('Please select a reservation date.');
       return;
@@ -177,6 +183,13 @@ const TableReservationEditDialog = ({
 
     if (!reservationTime) {
       setValidationError('Please select a reservation time.');
+      return;
+    }
+
+    const selectedDt = new Date(`${reservationDate}T${reservationTime}:00`);
+    const nowMargin = new Date(Date.now() - 60000); // 1-min grace margin
+    if (!isNaN(selectedDt.getTime()) && selectedDt < nowMargin) {
+      setValidationError('Reservation date and time cannot be in the past.');
       return;
     }
 
@@ -198,7 +211,7 @@ const TableReservationEditDialog = ({
 
       onOpenChange(false);
     } catch (err: any) {
-      setValidationError(err.message || 'Failed to update reservation.');
+      setValidationError(extractErrorMessage(err, 'Failed to update reservation.'));
     } finally {
       setLoading(false);
     }
