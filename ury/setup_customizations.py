@@ -4,15 +4,17 @@ import click
 from frappe import _
 
 from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
+from ury.role_permissions import setup_role_permissions
 
 def after_install():
     create_custom_fields(get_custom_fields())
     add_roles_to_administrator()
+    setup_role_permissions()
 
 def add_roles_to_administrator():
     try:
         user = frappe.get_doc("User", "Administrator")
-        user.add_roles("URY Cashier", "URY Manager", "URY Captain")
+        user.add_roles("URY Cashier", "URY Manager", "URY Captain","URY Admin")
     except Exception as e:
         frappe.log_error(f"Failed to add URY roles to Administrator: {e}", "URY Setup Error")
         
@@ -422,7 +424,7 @@ def get_custom_fields():
 			},
 		],
 
-		"POS Invoice Iten": [
+		"POS Invoice Item": [
 			{
 				"fieldname": "comment",
 				"fieldtype": "Data",
