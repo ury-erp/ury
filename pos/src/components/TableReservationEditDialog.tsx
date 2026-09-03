@@ -13,6 +13,7 @@ import {
   Textarea,
 } from '@ury/ui';
 
+import { TableShapeIcon } from './TableShapeIcon';
 import { CustomerPicker } from './CustomerPicker';
 import { DatePicker } from './DatePicker';
 import type { Table, TableReservation } from '../lib/table-api';
@@ -86,6 +87,12 @@ const TableReservationEditDialog = ({
 
   if (!reservation) return null;
 
+  const currentTableObj = availableTables.find((t) => t.name === selectedTable) || {
+    name: selectedTable || reservation.reserved_table,
+    no_of_seats: reservation.no_of_pax || 2,
+    table_shape: 'Rectangle',
+  };
+
   const handleSubmit = async () => {
     setValidationError(null);
 
@@ -150,15 +157,22 @@ const TableReservationEditDialog = ({
         size="2xl"
         className="p-0 flex flex-col max-h-[90vh] overflow-hidden"
       >
-        {/* Header */}
+        {/* Header - Matches Reservation Dialog Header style: Table Name & Seat Count */}
         <DialogHeader className="px-8 pt-8 pb-5 shrink-0 border-b border-gray-100">
-          <div>
-            <DialogTitle className="text-2xl font-bold text-gray-900">
-              Edit Reservation ({reservation.name})
-            </DialogTitle>
-            <DialogDescription className="mt-1 text-sm font-medium text-gray-500">
-              Update reservation details for this table.
-            </DialogDescription>
+          <div className="flex items-center gap-4">
+            <div className="rounded-xl bg-emerald-100 p-3 text-emerald-700">
+              <TableShapeIcon shape={currentTableObj.table_shape || 'Rectangle'} />
+            </div>
+
+            <div>
+              <DialogTitle className="text-2xl font-bold text-gray-900">
+                {currentTableObj.name}
+              </DialogTitle>
+
+              <DialogDescription className="mt-0.5 text-sm font-medium text-gray-500">
+                {currentTableObj.no_of_seats ?? '-'} seats
+              </DialogDescription>
+            </div>
           </div>
         </DialogHeader>
 
