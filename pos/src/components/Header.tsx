@@ -35,7 +35,7 @@ const Header = () => {
     searchPlaceholder = t('header.search_placeholder_orders');
     searchValue = orderSearchInput;
     searchOnChange = (e) => setOrderSearchInput(e.target.value);
-  } else if (location.pathname === '/pos') {
+  } else if (location.pathname === '/register') {
     searchPlaceholder = t('header.search_placeholder_menu');
     searchValue = searchQuery;
     searchOnChange = (e) => setSearchQuery(e.target.value);
