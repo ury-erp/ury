@@ -9,16 +9,12 @@ import {
 
 import { Button } from "@ury/ui";
 import { Badge } from "@ury/ui";
-import { CalendarClock, User } from "lucide-react";
-
-interface Reservation {
-    customer: string;
-    reserved_at: string;
-}
+import { CalendarClock, Phone, User, Users } from "lucide-react";
+import type { TableReservation } from '../lib/table-api';
 
 interface Props {
     open: boolean;
-    reservation: Reservation | null;
+    reservation: TableReservation | null;
     tableName: string;
     onConfirm: () => void;
     onClose: () => void;
@@ -34,6 +30,8 @@ const TableReservationCancelDialog = ({
     loading = false,
 }: Props) => {
     if (!reservation) return null;
+
+    const formattedTime = reservation.reserved_at ? reservation.reserved_at.replace('T', ' ') : '-';
 
     return (
         <Dialog open={open} onOpenChange={(open) => !open && !loading && onClose()}>
@@ -52,7 +50,7 @@ const TableReservationCancelDialog = ({
                 <div className="px-8 pb-8 space-y-5 overflow-y-auto min-h-0">
                     <div className="rounded-xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
 
-                        <div className="mb-5 flex items-start justify-between">
+                        <div className="mb-4 flex items-start justify-between">
                             <div>
                                 <p className="text-xs uppercase tracking-wide text-gray-500">
                                     Table
@@ -68,10 +66,9 @@ const TableReservationCancelDialog = ({
                             </Badge>
                         </div>
 
-                        <div className="space-y-4">
-
+                        <div className="space-y-3">
                             <div className="flex items-center gap-3">
-                                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white">
+                                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white shadow-sm">
                                     <User className="h-4 w-4 text-gray-500" />
                                 </div>
 
@@ -80,14 +77,50 @@ const TableReservationCancelDialog = ({
                                         Customer
                                     </p>
 
-                                    <p className="font-medium text-gray-900">
-                                        {reservation.customer}
+                                    <p className="font-semibold text-gray-900">
+                                        {reservation.customer_name || reservation.customer}
                                     </p>
                                 </div>
                             </div>
 
+                            {reservation.customer_phone && (
+                                <div className="flex items-center gap-3">
+                                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white shadow-sm">
+                                        <Phone className="h-4 w-4 text-gray-500" />
+                                    </div>
+
+                                    <div>
+                                        <p className="text-xs text-gray-500">
+                                            Phone Number
+                                        </p>
+
+                                        <p className="font-medium text-gray-900">
+                                            {reservation.customer_phone}
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {reservation.no_of_pax && (
+                                <div className="flex items-center gap-3">
+                                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white shadow-sm">
+                                        <Users className="h-4 w-4 text-gray-500" />
+                                    </div>
+
+                                    <div>
+                                        <p className="text-xs text-gray-500">
+                                            Number of Persons
+                                        </p>
+
+                                        <p className="font-medium text-gray-900">
+                                            {reservation.no_of_pax} guest{reservation.no_of_pax > 1 ? 's' : ''}
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+
                             <div className="flex items-center gap-3">
-                                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white">
+                                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white shadow-sm">
                                     <CalendarClock className="h-4 w-4 text-gray-500" />
                                 </div>
 
@@ -97,7 +130,7 @@ const TableReservationCancelDialog = ({
                                     </p>
 
                                     <p className="font-medium text-gray-900">
-                                        {reservation.reserved_at}
+                                        {formattedTime}
                                     </p>
                                 </div>
                             </div>
@@ -108,9 +141,9 @@ const TableReservationCancelDialog = ({
 
                     <div className="rounded-xl border border-red-200 bg-red-50 p-4">
                         <p className="text-sm leading-6 text-red-700">
-                            This action cannot be undone.
+                            This action will release the table for new reservations and walk-ins.
                             <br />
-                            The reservation will be permanently marked as cancelled.
+                            The reservation record will be marked as Cancelled.
                         </p>
                     </div>
 
@@ -129,7 +162,7 @@ const TableReservationCancelDialog = ({
                         onClick={onConfirm}
                         disabled={loading}
                     >
-                        {loading ? "Cancelling..." : "Cancel Reservation"}
+                        {loading ? "Cancelling..." : "Confirm Cancellation"}
                     </Button>
                 </DialogFooter>
             </DialogContent>
