@@ -34,6 +34,14 @@ ITEM_GROUPS = [
 	"Chinese",
 	"Beverages",
 	"Desserts",
+	"Soups",
+	"Salads",
+	"South Indian",
+	"Breads",
+	"Pizza",
+	"Burgers & Sandwiches",
+	"Pasta",
+	"Ice Cream",
 ]
 
 # (item_name, item_group, standard_rate)
@@ -46,6 +54,7 @@ MENU_ITEMS = [
 	("Chilli Paneer", "Starters", 210),
 	("Hara Bhara Kabab", "Starters", 190),
 	("Fish Amritsari", "Starters", 260),
+	("Onion Pakora", "Starters", 170),
 	# Main Course
 	("Dal Makhani", "Main Course", 220),
 	("Paneer Butter Masala", "Main Course", 240),
@@ -54,6 +63,7 @@ MENU_ITEMS = [
 	("Palak Paneer", "Main Course", 220),
 	("Mutton Rogan Josh", "Main Course", 350),
 	("Malai Kofta", "Main Course", 230),
+	("Shahi Tukda", "Main Course", 280),
 	# Biryani & Rice
 	("Chicken Biryani", "Biryani & Rice", 260),
 	("Mutton Biryani", "Biryani & Rice", 340),
@@ -62,6 +72,7 @@ MENU_ITEMS = [
 	("Curd Rice", "Biryani & Rice", 140),
 	("Hyderabadi Prawn Biryani", "Biryani & Rice", 360),
 	("Ghee Rice", "Biryani & Rice", 160),
+	("Lucknowi Biryani", "Biryani & Rice", 280),
 	# Chinese
 	("Chicken Manchurian", "Chinese", 240),
 	("Veg Manchurian", "Chinese", 190),
@@ -70,6 +81,7 @@ MENU_ITEMS = [
 	("Veg Fried Rice", "Chinese", 170),
 	("Chicken Fried Rice", "Chinese", 210),
 	("Spring Rolls (Chicken)", "Chinese", 190),
+	("Szechuan Paneer", "Chinese", 220),
 	# Beverages
 	("Pepsi", "Beverages", 50),
 	("Fresh Lime Soda", "Beverages", 60),
@@ -78,6 +90,7 @@ MENU_ITEMS = [
 	("Mango Lassi", "Beverages", 80),
 	("Cold Coffee", "Beverages", 90),
 	("Buttermilk (Chaas)", "Beverages", 40),
+	("Iced Tea", "Beverages", 50),
 	# Desserts
 	("Gulab Jamun (2 pcs)", "Desserts", 90),
 	("Ice Cream (2 scoops)", "Desserts", 110),
@@ -85,6 +98,80 @@ MENU_ITEMS = [
 	("Kheer", "Desserts", 100),
 	("Chocolate Brownie", "Desserts", 130),
 	("Kulfi", "Desserts", 90),
+	("Jalebi", "Desserts", 80),
+	("Barfi", "Desserts", 100),
+	# Soups
+	("Tomato Soup", "Soups", 120),
+	("Corn Soup", "Soups", 140),
+	("Mulligatawny Soup", "Soups", 160),
+	("Hot & Sour Soup", "Soups", 150),
+	("Cream of Mushroom", "Soups", 180),
+	("Chicken Soup", "Soups", 170),
+	("Lentil Soup", "Soups", 140),
+	("Clear Soup", "Soups", 160),
+	# Salads
+	("Greek Salad", "Salads", 180),
+	("Caesar Salad", "Salads", 200),
+	("Garden Salad", "Salads", 150),
+	("Coleslaw", "Salads", 140),
+	("Beetroot Salad", "Salads", 160),
+	("Rocket Salad", "Salads", 190),
+	("Tandoori Paneer Salad", "Salads", 220),
+	("Chickpea Salad", "Salads", 170),
+	# South Indian
+	("Dosa", "South Indian", 140),
+	("Idli", "South Indian", 100),
+	("Vada", "South Indian", 120),
+	("Sambar", "South Indian", 130),
+	("Rasam", "South Indian", 120),
+	("Uttapam", "South Indian", 150),
+	("Appam", "South Indian", 130),
+	("Pongal", "South Indian", 140),
+	# Breads
+	("Naan", "Breads", 60),
+	("Roti", "Breads", 40),
+	("Kulcha", "Breads", 70),
+	("Paratha", "Breads", 80),
+	("Puri", "Breads", 60),
+	("Bhatura", "Breads", 90),
+	("Rumali Roti", "Breads", 50),
+	("Tandoori Roti", "Breads", 65),
+	# Pizza
+	("Margherita Pizza", "Pizza", 250),
+	("Pepperoni Pizza", "Pizza", 280),
+	("Veggie Pizza", "Pizza", 240),
+	("BBQ Chicken Pizza", "Pizza", 320),
+	("Paneer Tikka Pizza", "Pizza", 300),
+	("Four Cheese Pizza", "Pizza", 290),
+	("Spicy Chicken Pizza", "Pizza", 310),
+	("Tandoori Chicken Pizza", "Pizza", 330),
+	# Burgers & Sandwiches
+	("Veg Burger", "Burgers & Sandwiches", 180),
+	("Chicken Burger", "Burgers & Sandwiches", 220),
+	("Paneer Burger", "Burgers & Sandwiches", 210),
+	("Tandoori Chicken Burger", "Burgers & Sandwiches", 250),
+	("Mutton Burger", "Burgers & Sandwiches", 240),
+	("Grilled Cheese Sandwich", "Burgers & Sandwiches", 160),
+	("Paneer Tikka Sandwich", "Burgers & Sandwiches", 200),
+	("Tandoori Paneer Wrap", "Burgers & Sandwiches", 210),
+	# Pasta
+	("Penne Arrabbiata", "Pasta", 240),
+	("Fettuccine Alfredo", "Pasta", 260),
+	("Spaghetti Bolognese", "Pasta", 280),
+	("Penne Vodka", "Pasta", 270),
+	("Mac & Cheese", "Pasta", 230),
+	("Linguine Aglio e Olio", "Pasta", 220),
+	("Creamy Mushroom Pasta", "Pasta", 250),
+	("Chicken Alfredo Pasta", "Pasta", 300),
+	# Ice Cream
+	("Vanilla Ice Cream", "Ice Cream", 80),
+	("Chocolate Ice Cream", "Ice Cream", 80),
+	("Strawberry Ice Cream", "Ice Cream", 80),
+	("Mango Ice Cream", "Ice Cream", 90),
+	("Pistachio Ice Cream", "Ice Cream", 90),
+	("Butterscotch Ice Cream", "Ice Cream", 90),
+	("Mint Chocolate Chip", "Ice Cream", 90),
+	("Cookie Dough Ice Cream", "Ice Cream", 100),
 ]
 
 # (table_name, seats, shape)
@@ -120,6 +207,25 @@ CUSTOMERS = [
 SHAPE_MAP = {"Round": "Circle", "Square": "Square", "Rectangle": "Rectangle", "Circle": "Circle"}
 
 UOM = "Unit"
+
+
+def _image_slug(item_name):
+	"""Convert item name to a URL-safe slug for picsum.photos.
+
+	Lowercases, replaces spaces/parens/ampersands with hyphens,
+	strips other non-alphanumeric characters.
+	"""
+	import re
+	slug = item_name.lower()
+	# Replace spaces, parentheses, ampersands with hyphens
+	slug = re.sub(r'[\s()&]', '-', slug)
+	# Remove any remaining non-alphanumeric except hyphens
+	slug = re.sub(r'[^a-z0-9-]', '', slug)
+	# Collapse multiple hyphens
+	slug = re.sub(r'-+', '-', slug)
+	# Strip leading/trailing hyphens
+	slug = slug.strip('-')
+	return slug
 
 
 def _get_branch():
@@ -167,8 +273,14 @@ def _ensure_item_groups():
 
 def _ensure_items():
 	created = []
+	image_url = lambda name: f"https://picsum.photos/seed/{_image_slug(name)}/400/400"
+
 	for item_name, item_group, rate in MENU_ITEMS:
 		if frappe.db.exists("Item", item_name):
+			# Backfill image for existing items that don't have one
+			if not frappe.db.get_value("Item", item_name, "image"):
+				frappe.db.set_value("Item", item_name, "image", image_url(item_name))
+				print(f"Added image to existing Item: {item_name}")
 			continue
 		doc = frappe.get_doc(
 			{
@@ -180,6 +292,7 @@ def _ensure_items():
 				"standard_rate": rate,
 				"is_stock_item": 0,
 				"is_sales_item": 1,
+				"image": image_url(item_name),
 			}
 		)
 		doc.insert(ignore_permissions=True)
