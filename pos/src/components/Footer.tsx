@@ -25,7 +25,7 @@ const Footer = () => {
 
   const navItems = [
     { icon: Gauge, label: t('footer.dashboard'), path: '/dashboard' },
-    { icon: ShoppingCart, label: t('footer.pos'), path: '/pos' },
+    { icon: ShoppingCart, label: t('footer.pos'), path: '/register' },
     { icon: Armchair, label: t('footer.tables'), path: '/tables' },
     { icon: ReceiptText, label: t('footer.orders'), path: '/orders' },
     { icon: Wallet, label: t('footer.sessions'), path: '/open-entries' },
