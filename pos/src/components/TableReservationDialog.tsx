@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { CalendarClock } from 'lucide-react';
+import { CalendarClock, Phone, Users } from 'lucide-react';
 
 import {
   Dialog,
@@ -20,8 +20,11 @@ import { CustomerPicker } from './CustomerPicker';
 import type { Table } from '../lib/table-api';
 import type { Customer } from '../store/pos-store';
 
-interface ReservationData {
+export interface ReservationFormData {
   customer: string;
+  customer_name: string;
+  customer_phone: string;
+  no_of_pax: number;
   reservedAt: string;
   notes: string;
 }
@@ -30,7 +33,7 @@ interface TableReservationDialogProps {
   open: boolean;
   table: Table | null;
   onOpenChange: (open: boolean) => void;
-  onConfirm: (data: ReservationData) => Promise<void>;
+  onConfirm: (data: ReservationFormData) => Promise<void>;
 }
 
 const TableReservationDialog = ({
@@ -40,37 +43,75 @@ const TableReservationDialog = ({
   onConfirm,
 }: TableReservationDialogProps) => {
   const [customer, setCustomer] = useState<Customer | null>(null);
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [noOfPax, setNoOfPax] = useState<number>(1);
   const [reservedAt, setReservedAt] = useState('');
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
 
     setCustomer(null);
+    setCustomerPhone('');
+    setNoOfPax(table?.no_of_seats || 1);
     setNotes('');
+    setValidationError(null);
 
     const now = new Date();
     now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
 
     setReservedAt(now.toISOString().slice(0, 16));
-  }, [open]);
+  }, [open, table]);
+
+  const handleCustomerChange = (selected: Customer | null) => {
+    setCustomer(selected);
+    if (selected?.phone) {
+      setCustomerPhone(selected.phone);
+    }
+  };
 
   if (!table) return null;
 
   const handleSubmit = async () => {
-    if (!customer) return;
+    setValidationError(null);
+
+    if (!customer) {
+      setValidationError('Please select a customer.');
+      return;
+    }
+
+    if (!customerPhone.trim()) {
+      setValidationError("Please enter the customer's phone number.");
+      return;
+    }
+
+    if (!noOfPax || noOfPax < 1) {
+      setValidationError('Please enter a valid number of persons (minimum 1).');
+      return;
+    }
+
+    if (!reservedAt) {
+      setValidationError('Please select a reservation time.');
+      return;
+    }
 
     setLoading(true);
 
     try {
       await onConfirm({
         customer: customer.id,
+        customer_name: customer.name || customer.id,
+        customer_phone: customerPhone.trim(),
+        no_of_pax: Number(noOfPax),
         reservedAt,
         notes,
       });
 
       onOpenChange(false);
+    } catch (err: any) {
+      setValidationError(err.message || 'Failed to reserve table.');
     } finally {
       setLoading(false);
     }
@@ -104,6 +145,11 @@ const TableReservationDialog = ({
 
         {/* Body */}
         <div className="px-8 pb-8 space-y-6 overflow-y-auto min-h-0">
+          {validationError && (
+            <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">
+              {validationError}
+            </div>
+          )}
 
           {/* Table Card */}
           <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-6 py-5">
@@ -132,53 +178,91 @@ const TableReservationDialog = ({
 
           {/* Form Card */}
           <div className="rounded-xl border border-gray-200 bg-gray-50 p-6">
-
-            <div className="space-y-6">
-
+            <div className="space-y-5">
+              {/* Customer */}
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-gray-700">
-                  Customer
+                  Customer <span className="text-red-500">*</span>
                 </label>
 
                 <CustomerPicker
                   value={customer}
-                  onChange={setCustomer}
+                  onChange={handleCustomerChange}
                   disabled={loading}
                 />
               </div>
 
+              {/* Customer Phone */}
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-gray-700">
-                  Reservation Time
+                  Phone Number <span className="text-red-500">*</span>
                 </label>
 
                 <div className="relative">
-                  <CalendarClock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-
+                  <Phone className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                   <Input
                     className="pl-10"
-                    type="datetime-local"
-                    value={reservedAt}
-                    onChange={(e) => setReservedAt(e.target.value)}
+                    type="tel"
+                    placeholder="e.g. +1 555-0199"
+                    value={customerPhone}
+                    onChange={(e) => setCustomerPhone(e.target.value)}
                     disabled={loading}
                   />
                 </div>
               </div>
 
+              {/* Number of Persons & Reservation Time */}
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-gray-700">
+                    Number of Persons <span className="text-red-500">*</span>
+                  </label>
+
+                  <div className="relative">
+                    <Users className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                    <Input
+                      className="pl-10"
+                      type="number"
+                      min={1}
+                      value={noOfPax}
+                      onChange={(e) => setNoOfPax(Math.max(1, parseInt(e.target.value) || 1))}
+                      disabled={loading}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-gray-700">
+                    Reservation Time <span className="text-red-500">*</span>
+                  </label>
+
+                  <div className="relative">
+                    <CalendarClock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                    <Input
+                      className="pl-10"
+                      type="datetime-local"
+                      value={reservedAt}
+                      onChange={(e) => setReservedAt(e.target.value)}
+                      disabled={loading}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Notes */}
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-gray-700">
-                  Notes
+                  Notes / Special Requests
                 </label>
 
                 <Textarea
-                  rows={4}
+                  rows={3}
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Special requests, occasion, seating preference..."
+                  placeholder="Special requests, occasion, dietary requirements..."
                   disabled={loading}
                 />
               </div>
-
             </div>
           </div>
         </div>
@@ -195,7 +279,7 @@ const TableReservationDialog = ({
 
           <Button
             onClick={handleSubmit}
-            disabled={loading || !customer}
+            disabled={loading || !customer || !customerPhone.trim()}
           >
             {loading ? 'Creating Reservation...' : 'Reserve Table'}
           </Button>
