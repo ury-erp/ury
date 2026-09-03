@@ -4,6 +4,7 @@ import Header from './components/Header';
 import Orders from './pages/Orders';
 import POS from './pages/POS';
 import Table from './pages/Table';
+import Reservations from './pages/Reservations';
 import AuthGuard from './components/AuthGuard';
 import POSOpeningProvider from './components/POSOpeningProvider';
 import ScreenSizeProvider from './components/ScreenSizeProvider';
@@ -27,6 +28,7 @@ function App() {
     document.documentElement.dir = isRtl ? 'rtl' : 'ltr';
     document.documentElement.lang = lang || 'en';
   }, []);
+
   return (
     <>
       <ToastProvider />
@@ -41,6 +43,7 @@ function App() {
                     <Route path="/" element={<POS/>} />
                     <Route path="/orders" element={<Orders />} />
                     <Route path="/table" element={<Table />} />
+                    <Route path="/reservations" element={<Reservations />} />
                   </Routes>
                 </div>
                 <Footer />
