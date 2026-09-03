@@ -20,28 +20,17 @@ export function usePrintNotifications(activeInvoiceName?: string) {
   useEffect(() => {
     const socket = getFrappeSocket();
 
-    // 1. Status Update Listener (Fired every 3s polling cycle)
+    // 1. Status Update Listener (Fired on job status transition)
     const handleStatusUpdate = (data: PrintJobStatusPayload) => {
-      setActivePrintJobs((prev) => {
-        const prevJob = prev[data.print_job_id];
-        // Only trigger info toast when transitioning into QUEUED, PENDING or PROCESSING for the first time
-        if (!prevJob && (data.status === 'QUEUED' || data.status === 'PENDING' || data.status === 'PROCESSING')) {
-          if (!activeInvoiceName || data.invoice === activeInvoiceName) {
-            showToast.info(`Invoice ${data.invoice} printing submitted (${data.status})...`);
-          }
-        }
-        return {
-          ...prev,
-          [data.print_job_id]: data,
-        };
-      });
+      setActivePrintJobs((prev) => ({
+        ...prev,
+        [data.print_job_id]: data,
+      }));
     };
 
     // 2. Long Running Listener (Fired after observation)
-    const handleLongRunning = (data: { invoice: string; print_job_id: string; printer_name: string }) => {
-      if (!activeInvoiceName || data.invoice === activeInvoiceName) {
-        showToast.info(`Invoice ${data.invoice} is still printing on ${data.printer_name}`);
-      }
+    const handleLongRunning = (_data: { invoice: string; print_job_id: string; printer_name: string }) => {
+      // Long-running info toast removed per UX spec (preserve only failure alerts)
     };
 
     // 3. Print Failure Alert Listener (Fired on CUPS failure or max retries)
@@ -105,10 +94,6 @@ export function usePrintNotifications(activeInvoiceName?: string) {
           status: 'COMPLETED',
         },
       }));
-
-      if (!activeInvoiceName || data.invoice === activeInvoiceName) {
-        showToast.success(`Invoice ${data.invoice} printed successfully!`);
-      }
     };
 
     // 5. KOT Print Completed Listener
@@ -122,10 +107,6 @@ export function usePrintNotifications(activeInvoiceName?: string) {
           status: 'COMPLETED',
         },
       }));
-
-      if (!activeInvoiceName || data.invoice === activeInvoiceName || data.kot === activeInvoiceName) {
-        showToast.success(`KOT ${data.kot} printed successfully!`);
-      }
     };
 
     // Register Frappe Realtime Sockets
