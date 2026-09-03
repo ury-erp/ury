@@ -1262,7 +1262,7 @@ export const MenuPage: React.FC = () => {
       {/* Reusable Image Preview Modal */}
       {previewImageUrl && createPortal(
         <div
-          className="fixed inset-0 bg-black/80 backdrop-blur-xs z-[9999] flex items-center justify-center p-4 animate-in fade-in duration-200"
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 animate-in fade-in duration-200"
           onClick={() => setPreviewImageUrl(null)}
         >
           <div
