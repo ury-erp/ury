@@ -442,6 +442,100 @@ def _ensure_customers():
 	return created
 
 
+def _ensure_menu_items(branch_name):
+	"""Wire seeded Items into URY Menu and URY Menu Course records.
+
+	Creates or updates the active URY Menu for this branch with all seeded
+	MENU_ITEMS, ensuring each course (item_group) has a corresponding URY Menu
+	Course record. Idempotent: safe to rerun — skips existing courses and menu
+	items, only creating new ones.
+
+	Returns a dict with keys:
+	  - menu_courses_created: count of new URY Menu Course records created
+	  - menu_items_added: count of items added to the menu's child table
+	"""
+	# Find the URY Restaurant linked to this branch
+	restaurant_name = frappe.db.get_value("URY Restaurant", {"branch": branch_name}, "name")
+	if not restaurant_name:
+		print(f"  ! Skipping menu wiring: no URY Restaurant found for branch '{branch_name}'")
+		return {"menu_courses_created": 0, "menu_items_added": 0}
+
+	# Get or create the active menu
+	active_menu = frappe.db.get_value("URY Restaurant", restaurant_name, "active_menu")
+	if not active_menu:
+		# Look for an existing URY Menu for this branch
+		active_menu = frappe.db.get_value("URY Menu", {"branch": branch_name}, "name")
+		if not active_menu:
+			# Create a new default menu
+			active_menu = "Default Menu"
+			if not frappe.db.exists("URY Menu", active_menu):
+				menu_doc = frappe.get_doc(
+					{
+						"doctype": "URY Menu",
+						"name": active_menu,
+						"branch": branch_name,
+						"enabled": 1,
+						"items": [],
+					}
+				)
+				menu_doc.insert(ignore_permissions=True)
+				print(f"Created URY Menu: {active_menu}")
+		# Set it as active on the restaurant
+		frappe.db.set_value("URY Restaurant", restaurant_name, "active_menu", active_menu)
+
+	# Load the menu document
+	menu_doc = frappe.get_doc("URY Menu", active_menu)
+
+	# Track existing items in the menu to avoid duplicates
+	existing_item_codes = {row.item for row in menu_doc.items}
+
+	# Track which courses we've already created in this session
+	existing_courses = set(frappe.get_all("URY Menu Course", pluck="name"))
+
+	menu_courses_created = 0
+	menu_items_added = 0
+
+	# Iterate through all seeded menu items
+	for item_name, item_group, rate in MENU_ITEMS:
+		# Only process items that actually exist in the Item doctype
+		if not frappe.db.exists("Item", item_name):
+			continue
+
+		# Ensure the URY Menu Course exists for this item_group
+		if item_group not in existing_courses:
+			course_doc = frappe.get_doc(
+				{"doctype": "URY Menu Course", "course": item_group}
+			)
+			course_doc.insert(ignore_permissions=True)
+			existing_courses.add(item_group)
+			menu_courses_created += 1
+			print(f"Created URY Menu Course: {item_group}")
+
+		# Add the item to the menu if not already present
+		if item_name not in existing_item_codes:
+			menu_doc.append(
+				"items",
+				{
+					"item": item_name,
+					"item_name": item_name,
+					"rate": rate,
+					"course": item_group,
+				},
+			)
+			existing_item_codes.add(item_name)
+			menu_items_added += 1
+
+	# Save the menu document once if items were added
+	if menu_items_added > 0:
+		menu_doc.save(ignore_permissions=True)
+		print(f"Updated URY Menu '{active_menu}': added {menu_items_added} items")
+
+	return {
+		"menu_courses_created": menu_courses_created,
+		"menu_items_added": menu_items_added,
+	}
+
+
 def seed():
 	"""Idempotent entrypoint — safe to call repeatedly, e.g. via
 	``bench execute ury.ury.dev_seed.catalog.seed``.
@@ -455,6 +549,7 @@ def seed():
 	item_prices = _ensure_item_prices()
 	tables = _ensure_tables(branch_name, company_name)
 	customers = _ensure_customers()
+	menu_result = _ensure_menu_items(branch_name)
 
 	frappe.db.commit()
 
@@ -466,6 +561,8 @@ def seed():
 		"item_prices_created": len(item_prices),
 		"tables_created": len(tables),
 		"customers_created": len(customers),
+		"menu_courses_created": menu_result["menu_courses_created"],
+		"menu_items_added": menu_result["menu_items_added"],
 	}
 	print(f"Catalog seed complete: {summary}")
 	return summary
