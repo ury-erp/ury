@@ -1,5 +1,5 @@
 import { useEffect, useRef, type MouseEvent as ReactMouseEvent } from 'react';
-import { ArrowRightLeft, Link2, MoreVertical, Unlink, UserRound } from 'lucide-react';
+import { ArrowRightLeft, Calendar, Edit3, Link2, MoreVertical, Unlink, UserRound, XCircle } from 'lucide-react';
 import { Button } from '@ury/ui';
 import { t } from '../i18n';
 import { isMergedTable } from '../lib/table-utils';
@@ -8,6 +8,8 @@ import type { Table } from '../lib/table-api';
 interface TableActionsMenuProps {
   table: Table;
   isReserved?: boolean;
+  hasUpcomingReservation?: boolean;
+  reservationEnabled?: boolean;
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   onMerge?: () => void;
@@ -16,12 +18,15 @@ interface TableActionsMenuProps {
   onTransferCaptain?: () => void;
   showCaptainTransfer?: boolean;
   onReserve?: () => void;
+  onEditReservation?: () => void;
   onCancelReservation?: () => void;
 }
 
 const TableActionsMenu = ({
   table,
   isReserved = false,
+  hasUpcomingReservation = false,
+  reservationEnabled = true,
   isOpen,
   onOpenChange,
   onMerge,
@@ -30,6 +35,7 @@ const TableActionsMenu = ({
   onTransferCaptain,
   showCaptainTransfer = false,
   onReserve,
+  onEditReservation,
   onCancelReservation,
 }: TableActionsMenuProps) => {
   const menuRef = useRef<HTMLDivElement>(null);
@@ -37,6 +43,8 @@ const TableActionsMenu = ({
   const isOccupied = table.occupied === 1;
   const isMerged = isMergedTable(table);
   const canUnmerge = isMerged && isAvailable;
+
+  const hasReservationRecord = isReserved || hasUpcomingReservation;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -86,6 +94,12 @@ const TableActionsMenu = ({
     onReserve?.();
   };
 
+  const handleEditReservation = (event: ReactMouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    onOpenChange(false);
+    onEditReservation?.();
+  };
+
   const handleCancelReservation = (event: ReactMouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
     onOpenChange(false);
@@ -114,29 +128,53 @@ const TableActionsMenu = ({
       </Button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+        <div className="absolute right-0 top-full z-50 mt-1 w-52 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+          {reservationEnabled && (
+            <>
+              {hasReservationRecord ? (
+                <>
+                  {onEditReservation && (
+                    <Button
+                      variant="ghost"
+                      className="flex h-auto w-full justify-start gap-2 rounded-none px-4 py-2 text-sm font-normal text-indigo-700 hover:bg-indigo-50"
+                      onClick={handleEditReservation}
+                    >
+                      <Edit3 className="h-4 w-4 shrink-0 text-indigo-600" />
+                      Edit Reservation
+                    </Button>
+                  )}
+                  {onCancelReservation && (
+                    <Button
+                      variant="ghost"
+                      className="flex h-auto w-full justify-start gap-2 rounded-none px-4 py-2 text-sm font-normal text-red-600 hover:bg-red-50"
+                      onClick={handleCancelReservation}
+                    >
+                      <XCircle className="h-4 w-4 shrink-0 text-red-500" />
+                      Cancel Reservation
+                    </Button>
+                  )}
+                  <div className="my-1 border-t border-gray-100" />
+                </>
+              ) : (
+                <>
+                  {onReserve && (
+                    <Button
+                      variant="ghost"
+                      className="flex h-auto w-full justify-start gap-2 rounded-none px-4 py-2 text-sm font-normal text-gray-700 hover:bg-gray-100"
+                      onClick={handleReserve}
+                    >
+                      <Calendar className="h-4 w-4 shrink-0 text-emerald-600" />
+                      Reserve Table
+                    </Button>
+                  )}
+                  <div className="my-1 border-t border-gray-100" />
+                </>
+              )}
+            </>
+          )}
+
           {isAvailable && (
             <>
-              {!isReserved && (
-                <Button
-                  variant="ghost"
-                  className="flex h-auto w-full justify-start gap-2 rounded-none px-4 py-2 text-sm font-normal text-gray-700 hover:bg-gray-100"
-                  onClick={handleReserve}
-                >
-                  📅 Reserve Table
-                </Button>
-              )}
-
-              {isReserved && (
-                <Button
-                  variant="ghost"
-                  className="flex h-auto w-full justify-start gap-2 rounded-none px-4 py-2 text-sm font-normal text-red-600 hover:bg-red-50"
-                  onClick={handleCancelReservation}
-                >
-                  🚫 Cancel Reservation
-                </Button>
-              )}
-
               <Button
                 variant="ghost"
                 className="flex h-auto w-full justify-start gap-2 rounded-none px-4 py-2 text-sm font-normal text-gray-700 hover:bg-gray-100"
@@ -163,26 +201,6 @@ const TableActionsMenu = ({
 
           {isOccupied && (
             <>
-              {!isReserved && (
-                <Button
-                  variant="ghost"
-                  className="flex h-auto w-full justify-start gap-2 rounded-none px-4 py-2 text-sm font-normal text-gray-700 hover:bg-gray-100"
-                  onClick={handleReserve}
-                >
-                  📅 Reserve Table
-                </Button>
-              )}
-
-              {isReserved && (
-                <Button
-                  variant="ghost"
-                  className="flex h-auto w-full justify-start gap-2 rounded-none px-4 py-2 text-sm font-normal text-red-600 hover:bg-red-50"
-                  onClick={handleCancelReservation}
-                >
-                  🚫 Cancel Reservation
-                </Button>
-              )}
-
               <Button
                 variant="ghost"
                 className="flex h-auto w-full justify-start gap-2 rounded-none px-4 py-2 text-sm font-normal text-gray-700 hover:bg-gray-100"
