@@ -230,20 +230,6 @@ const TableView = () => {
       .then((tList) => setAllBranchTables(tList))
       .catch(console.error);
   }, [branch]);
-  const handleNavigateToPOS = (tableName: string) => {
-    if (!selectedRoom) return;
-
-    // Check if user is restricted from taking table orders
-    if (isUserRestrictedFromTableOrders(user, posProfile)) {
-      showToast.error(t('errors.dine_in_restricted') || 'Dine In is not available for your role');
-      return;
-    }
-
-    setSelectedOrderType(DINE_IN);
-    setSelectedTable(tableName, selectedRoom);
-    navigate('/pos');
-  };
-
   // Derived reservation maps
   const { lockActiveReservationsByTable, upcomingReservationsByTable, allReservationsByTable } = useMemo(() => {
     const lockMap = new Map<string, TableReservation>();
@@ -274,6 +260,12 @@ const TableView = () => {
 
   const handleNavigateToPOS = async (tableName: string) => {
     if (!selectedRoom) return;
+
+    // Check if user is restricted from taking table orders
+    if (isUserRestrictedFromTableOrders(user, posProfile)) {
+      showToast.error(t('errors.dine_in_restricted') || 'Dine In is not available for your role');
+      return;
+    }
 
     // Check if table is under active reservation lock window
     const activeLockRes = lockActiveReservationsByTable.get(tableName);
@@ -609,25 +601,8 @@ const TableView = () => {
         onPreview={(event) => handlePreviewTable(table, event)}
         onPrint={(event) => handlePrintTable(table, event)}
         isPrinting={printingTable === table.name}
+        isRestricted={isRestricted}
       />
-    <TableCard
-      key={table.name}
-      table={table}
-      mergeGroupLabel={mergeGroupLabel}
-      className={className}
-      menuOpen={menuOpenForTable === table.name}
-      onMenuOpenChange={(open) => setMenuOpenForTable(open ? table.name : null)}
-      onMerge={() => setMergeSourceTable(table)}
-      onUnmerge={() => setUnmergeSourceTable(table)}
-      onTransferTable={canTransferTable ? () => void handleOpenTransferTable(table) : undefined}
-      onTransferCaptain={() => void handleOpenCaptainTransfer(table)}
-      showCaptainTransfer={showCaptainTransfer}
-      onNavigate={() => handleNavigateToPOS(table.name)}
-      onPreview={(event) => handlePreviewTable(table, event)}
-      onPrint={(event) => handlePrintTable(table, event)}
-      isPrinting={printingTable === table.name}
-      isRestricted={isRestricted}
-    />
     );
   };
 
