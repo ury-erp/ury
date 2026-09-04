@@ -16,6 +16,7 @@
   "status",
   "pos_invoice",
   "reserved_by",
+  "pos_opening_entry",
   "section_break_lboi",
   "comments"
  ],
@@ -103,6 +104,13 @@
    "fieldtype": "Link",
    "label": "Reserved By",
    "options": "User"
+  },
+  {
+   "fieldname": "pos_opening_entry",
+   "fieldtype": "Link",
+   "label": "POS Opening Entry",
+   "options": "POS Opening Entry",
+   "read_only": 1
   },
   {
    "fieldname": "section_break_lboi",
