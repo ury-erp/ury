@@ -3,12 +3,17 @@ import {
   Clock,
   CheckCircle2,
   ArrowRight,
+  CircleAlert,
 } from 'lucide-react';
-import { Card, CardContent, KpiStrip, cn } from '@ury/ui';
+import { Badge, Card, CardContent, KpiStrip, cn } from '@ury/ui';
 import { useState, useEffect } from 'react';
 import { usePOSStore } from '../store/pos-store';
 import { formatCurrency } from '@ury/core';
 import { getOpenPosOpeningEntries, type OpenPosOpeningEntry } from '../lib/pos-closing-api';
+import {
+  getBranchOperationalState,
+  type BranchOperationalState,
+} from '../lib/branch-operational-state-api';
 
 // Helper function to format relative time
 function getRelativeTime(creationDate: string): string {
@@ -107,8 +112,147 @@ function PanelState({ kind, children }: { kind: 'loading' | 'error' | 'empty'; c
   );
 }
 
+const phaseLabels: Record<string, string> = {
+  OFF_HOURS: 'Closed now',
+  NOT_CONFIGURED: 'Schedule not configured',
+  PREOPEN_NO_PLAN: 'Plan needed',
+  PLANNING: 'Planning',
+  ISSUING: 'Issuing stock',
+  PRE_PRODUCTION: 'Pre-production',
+  READY_TO_OPEN: 'Ready to open',
+  SERVICE_OPEN: 'Service open',
+  CLOSING: 'Closing',
+  RECONCILING: 'Reconciling',
+  CLOSED: 'Closed',
+  DAY_COMPLETE: 'Day complete',
+};
+
+const progressLabels: Record<string, string> = {
+  plan: 'Plan',
+  issue: 'Issue',
+  preproduction: 'Prep',
+  shift: 'Shift',
+  service: 'Service',
+  close: 'Close',
+  reconciliation: 'Reconcile',
+};
+
+const formatStateLabel = (value: string | undefined): string =>
+  value
+    ? phaseLabels[value] ?? value.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (char: string) => char.toUpperCase())
+    : 'Unknown';
+
+const getHealthVariant = (health: string | undefined): 'success' | 'warning' | 'danger' | 'info' => {
+  const normalized = health?.toLowerCase() ?? '';
+  if (normalized === 'healthy') return 'success';
+  if (normalized === 'warning') return 'warning';
+  if (normalized === 'critical' || normalized === 'blocking' || normalized === 'error') return 'danger';
+  return 'info';
+};
+
+function BranchOperationalStatePanel({
+  state,
+  loading,
+  error,
+}: {
+  state: BranchOperationalState | null;
+  loading: boolean;
+  error: string | null;
+}) {
+  if (error) {
+    return (
+      <Panel title="Branch Status">
+        <PanelState kind="error">{error}</PanelState>
+      </Panel>
+    );
+  }
+
+  if (loading) {
+    return (
+      <Panel title="Branch Status">
+        <PanelState kind="loading">Loading…</PanelState>
+      </Panel>
+    );
+  }
+
+  if (!state) {
+    return (
+      <Panel title="Branch Status">
+        <PanelState kind="empty">No branch status available.</PanelState>
+      </Panel>
+    );
+  }
+
+  const blockers = state.blockers ?? [];
+  const nextActions = state.next_actions ?? [];
+  const progress = Object.entries(state.progress ?? {});
+  const phaseLabel = formatStateLabel(state.primary_phase || state.phase || state.state);
+  const healthVariant = getHealthVariant(state.health);
+
+  return (
+    <Panel
+      title="Branch Status"
+      meta={
+        <Badge variant={healthVariant} size="tag">
+          {formatStateLabel(state.health)}
+        </Badge>
+      }
+    >
+      <div data-testid="branch-operational-state" className="space-y-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-lg font-semibold leading-tight text-foreground">{phaseLabel}</p>
+            <p className="mt-1 text-sm text-text-tertiary">
+              {state.summary || (state.inside_business_hours ? 'Inside service hours' : 'Outside service hours')}
+            </p>
+          </div>
+          <Badge variant={state.inside_business_hours ? 'success' : 'default'} size="tag">
+            {state.inside_business_hours ? 'In hours' : 'Off hours'}
+          </Badge>
+        </div>
+
+        {progress.length > 0 && (
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+            {progress.map(([key, value]) => (
+              <div key={key} className="rounded-[7px] border border-hair bg-muted px-2.5 py-2">
+                <p className="text-[11px] font-medium text-text-tertiary">{progressLabels[key] ?? formatStateLabel(key)}</p>
+                <p className="mt-1 truncate text-xs font-semibold text-foreground">{formatStateLabel(value)}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {blockers.length > 0 && (
+          <div className="space-y-1.5">
+            {blockers.slice(0, 3).map((blocker, index) => (
+              <div key={`${blocker.code ?? blocker.message ?? index}`} className="flex items-start gap-2 rounded-[7px] bg-destructive-tint px-2.5 py-2 text-destructive">
+                <CircleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <p className="text-xs font-medium">
+                  {blocker.message || blocker.action || formatStateLabel(blocker.code)}
+                  {typeof blocker.count === 'number' && blocker.count > 0 ? ` (${blocker.count})` : ''}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {nextActions.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {nextActions.slice(0, 3).map((action, index) => (
+              <Badge key={`${action.label ?? action.action ?? index}`} variant="info" size="tag">
+                {action.label || action.action || 'Review next step'}
+              </Badge>
+            ))}
+          </div>
+        )}
+      </div>
+    </Panel>
+  );
+}
+
 export default function Dashboard() {
   const { posProfile } = usePOSStore();
+  const [operationalState, setOperationalState] = useState<BranchOperationalState | null>(null);
   const [stats, setStats] = useState<any[]>([]);
   const [serviceLine, setServiceLine] = useState<any[]>([]);
   const [shiftMetrics, setShiftMetrics] = useState<any>(null);
@@ -118,6 +262,7 @@ export default function Dashboard() {
   const [needsAttention, setNeedsAttention] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [openEntries, setOpenEntries] = useState<OpenPosOpeningEntry[]>([]);
+  const [operationalStateLoading, setOperationalStateLoading] = useState(false);
   const [statsLoading, setStatsLoading] = useState(false);
   const [serviceLineLoading, setServiceLineLoading] = useState(false);
   const [metricsLoading, setMetricsLoading] = useState(false);
@@ -134,11 +279,25 @@ export default function Dashboard() {
   const [needsAttentionError, setNeedsAttentionError] = useState<string | null>(null);
   const [notificationsError, setNotificationsError] = useState<string | null>(null);
   const [openEntriesError, setOpenEntriesError] = useState<string | null>(null);
+  const [operationalStateError, setOperationalStateError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!posProfile?.branch) return;
 
     const fetchDashboardData = async () => {
+      setOperationalStateLoading(true);
+      setOperationalStateError(null);
+      try {
+        const branchState = await getBranchOperationalState(posProfile.branch);
+        setOperationalState(branchState);
+      } catch (err) {
+        setOperationalState(null);
+        setOperationalStateError('Failed to load branch status');
+        console.error('Error fetching branch operational state:', err);
+      } finally {
+        setOperationalStateLoading(false);
+      }
+
       const { call } = await import('@ury/core');
 
       // Fetch dashboard stats
@@ -361,6 +520,12 @@ export default function Dashboard() {
             Live
           </span>
         </div>
+
+        <BranchOperationalStatePanel
+          state={operationalState}
+          loading={operationalStateLoading}
+          error={operationalStateError}
+        />
 
         {/*
           Attention comes first and full-width. The old page buried this in the
