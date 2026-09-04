@@ -116,6 +116,12 @@ def _reservation_rows(order_ref, item_code, branch, company):
 			"RESERVATION_NOT_FOUND",
 			_("No Reserved stock reservation found for order {0}, item {1}").format(order_ref, item_code),
 		)
+	groups = {row.get("reservation_group") or row.get("name") for row in rows}
+	if len(groups) > 1:
+		raise FulfilmentPostingError(
+			"AMBIGUOUS_RESERVATION_BINDING",
+			_("KOT item {0} maps to multiple reservation groups; posting is blocked until the line is resolved").format(item_code),
+		)
 	return rows
 
 
