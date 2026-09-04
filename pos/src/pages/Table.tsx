@@ -675,11 +675,10 @@ const TableView = () => {
                     variant="tab"
                     data-selected={selectedRoom === room.name}
                     onClick={() => handleRoomChange(room.name)}
-                    className="h-fit"
                   >
                     {room.name}
                     {typeof roomCounts[room.name] === 'number' ? (
-                      <Badge variant="outline" className="ml-2 bg-white/60">
+                      <Badge variant="outline" className="ml-2 bg-white/80 border-gray-200 text-gray-700 font-semibold">
                         {roomCounts[room.name]}
                       </Badge>
                     ) : null}
@@ -821,12 +820,8 @@ const TableView = () => {
               <span>{t('tables.available')}</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-amber-100 border border-amber-300 rounded"></div>
+              <div className="w-4 h-4 bg-amber-50 border border-amber-400 rounded"></div>
               <span>{t('tables.occupied')}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-blue-50/40 border border-blue-200/70 rounded"></div>
-              <span>{t('tables.merged')}</span>
             </div>
           </div>
         </div>
