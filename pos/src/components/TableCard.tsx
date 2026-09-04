@@ -87,7 +87,7 @@ const TableCard = ({
             <div className="shrink-0">
               <TableShapeIcon shape={table.table_shape || 'Rectangle'} />
             </div>
-            <span className="truncate text-lg font-semibold text-gray-900" title={mergeGroupLabel ?? table.name}>
+            <span className="shrink-0 text-lg font-semibold text-gray-900" title={mergeGroupLabel ?? table.name}>
               {table.name}
             </span>
           </div>
