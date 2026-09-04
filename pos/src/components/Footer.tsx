@@ -1,17 +1,53 @@
+import { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard,
   LayoutGrid,
   ClipboardList,
   Table,
+  BookLock,
   Settings,
 } from 'lucide-react';
 import { cn } from '@ury/ui';
 import { t } from '../i18n';
+import { usePOSStore } from '../store/pos-store';
+import { getBranchReservationSettings } from '../lib/table-api';
 
 const Footer = () => {
+  const { posProfile } = usePOSStore();
+  const branch = posProfile?.branch ?? null;
+  const [reservationEnabled, setReservationEnabled] = useState(false);
+
+  useEffect(() => {
+    if (!branch) {
+      setReservationEnabled(false);
+      return;
+    }
+
+    let isMounted = true;
+    getBranchReservationSettings(branch)
+      .then((settings) => {
+        if (isMounted) {
+          setReservationEnabled(settings.enable_reservation !== 0);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setReservationEnabled(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [branch]);
 
   const navItems = [
+    { icon: LayoutGrid, label: t('footer.pos'), path: '/' },
+    { icon: Table, label: t('footer.table'), path: '/table' },
+    ...(reservationEnabled
+      ? [{ icon: BookLock, label: 'Reservations', path: '/reservations' }]
+      : []),
     { icon: LayoutDashboard, label: t('footer.dashboard'), path: '/dashboard' },
     { icon: LayoutGrid, label: t('footer.pos'), path: '/pos' },
     { icon: Table, label: t('footer.tables'), path: '/tables' },
@@ -44,4 +80,4 @@ const Footer = () => {
   );
 };
 
-export default Footer; 
+export default Footer;

@@ -2,7 +2,7 @@ import { type MouseEvent } from 'react';
 import { Eye, Loader2, Printer, Users } from 'lucide-react';
 import { cn } from '@ury/ui';
 import { formatInvoiceTime } from '@ury/core';
-import type { Table } from '../lib/table-api';
+import type { Table, TableReservation } from '../lib/table-api';
 import { Badge } from '@ury/ui';
 import { TableShapeIcon } from './TableShapeIcon';
 import TableActionsMenu from './TableActionsMenu';
@@ -16,6 +16,10 @@ export const TABLE_STATE_STYLES = {
 
 interface TableCardProps {
   table: Table;
+  isReserved?: boolean;
+  upcomingReservation?: TableReservation | null;
+  activeReservation?: TableReservation | null;
+  reservationEnabled?: boolean;
   mergeGroupLabel?: string;
   className?: string;
   menuOpen: boolean;
@@ -29,11 +33,16 @@ interface TableCardProps {
   onPreview: (event: MouseEvent<HTMLButtonElement>) => void;
   onPrint: (event: MouseEvent<HTMLButtonElement>) => void;
   isPrinting: boolean;
+  onReserve?: () => void;
   isRestricted?: boolean;
 }
 
 const TableCard = ({
   table,
+  isReserved = false,
+  upcomingReservation = null,
+  activeReservation = null,
+  reservationEnabled = true,
   mergeGroupLabel,
   className,
   menuOpen,
@@ -47,6 +56,7 @@ const TableCard = ({
   onPreview,
   onPrint,
   isPrinting,
+  onReserve,
   isRestricted = false,
 }: TableCardProps) => {
   const isOccupied = table.occupied === 1;
@@ -82,11 +92,20 @@ const TableCard = ({
             </span>
           </div>
           <div className="flex shrink-0 items-center gap-1">
-            <Badge variant={isOccupied ? 'warning' : 'success'} className="whitespace-nowrap">
-              {isOccupied ? t('tables.occupied') : t('tables.available')}
-            </Badge>
+            {isOccupied ? (
+              <Badge variant="warning" className="whitespace-nowrap">
+                {t('tables.occupied')}
+              </Badge>
+            ) : (
+              <Badge variant="success" className="whitespace-nowrap">
+                {t('tables.available')}
+              </Badge>
+            )}
             <TableActionsMenu
               table={table}
+              isReserved={isReserved}
+              hasUpcomingReservation={!!upcomingReservation}
+              reservationEnabled={reservationEnabled}
               isOpen={menuOpen}
               onOpenChange={onMenuOpenChange}
               onMerge={onMerge}
@@ -94,6 +113,7 @@ const TableCard = ({
               onTransferTable={onTransferTable}
               onTransferCaptain={onTransferCaptain}
               showCaptainTransfer={showCaptainTransfer}
+              onReserve={onReserve}
             />
           </div>
         </div>
