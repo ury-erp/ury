@@ -31,6 +31,7 @@ import TableReservationEditDialog, {
   EditReservationFormData,
 } from '../components/TableReservationEditDialog';
 import TableReservationCancelDialog from '../components/TableReservationCancelDialog';
+import TableReservationCompleteDialog from '../components/TableReservationCompleteDialog';
 
 export default function Reservations() {
   const { posProfile, searchQuery } = usePOSStore();
@@ -51,6 +52,9 @@ export default function Reservations() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState<boolean>(false);
   const [cancelReservation, setCancelReservation] = useState<TableReservation | null>(null);
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState<boolean>(false);
+  const [completeReservation, setCompleteReservation] = useState<TableReservation | null>(null);
+  const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState<boolean>(false);
+  const [completeLoading, setCompleteLoading] = useState<boolean>(false);
 
   const fetchReservationsData = useCallback(async () => {
     if (!branch) return;
@@ -103,6 +107,12 @@ export default function Reservations() {
     setMenuOpenId(null);
   };
 
+  const handleOpenComplete = (res: TableReservation) => {
+    setCompleteReservation(res);
+    setIsCompleteDialogOpen(true);
+    setMenuOpenId(null);
+  };
+
   const handleConfirmEdit = async (data: EditReservationFormData) => {
     try {
       await updateTableReservation({
@@ -133,13 +143,19 @@ export default function Reservations() {
     }
   };
 
-  const handleCompleteReservation = async (res: TableReservation) => {
+  const handleConfirmComplete = async () => {
+    if (!completeReservation) return;
+    setCompleteLoading(true);
     try {
-      await updateTableReservationStatus(res.name, 'Completed');
-      setMenuOpenId(null);
+      await updateTableReservationStatus(completeReservation.name, 'Completed');
       await fetchReservationsData();
+      setIsCompleteDialogOpen(false);
+      setCompleteReservation(null);
     } catch (err) {
-      console.error('Failed to complete reservation:', err);
+      console.error('Failed to confirm customer arrival:', err);
+      throw err;
+    } finally {
+      setCompleteLoading(false);
     }
   };
 
@@ -351,7 +367,7 @@ export default function Reservations() {
                                 {['Confirmed', 'Active'].includes(res.status) && (
                                   <button
                                     type="button"
-                                    onClick={() => handleCompleteReservation(res)}
+                                    onClick={() => handleOpenComplete(res)}
                                     className="w-full text-left px-4 py-2 text-xs font-medium text-emerald-700 hover:bg-emerald-50 flex items-center gap-2"
                                   >
                                     <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
@@ -428,6 +444,18 @@ export default function Reservations() {
         availableTables={availableTables}
         onOpenChange={setIsEditDialogOpen}
         onConfirm={handleConfirmEdit}
+      />
+
+      {/* Customer Arrival Confirmation Dialog */}
+      <TableReservationCompleteDialog
+        open={isCompleteDialogOpen}
+        reservation={completeReservation}
+        onClose={() => {
+          setIsCompleteDialogOpen(false);
+          setCompleteReservation(null);
+        }}
+        onConfirm={handleConfirmComplete}
+        loading={completeLoading}
       />
 
       {/* Cancel Dialog */}
