@@ -16,13 +16,14 @@ add_to_apps_screen = [
     "name": "ury",
     "logo": "/assets/ury/Images/ury.png",
     "title": "URY",
-    "route": "/app/ury",
+    "route": "/ury",
     "has_permission": "ury.permission.check_app_permission"
   }
 ]
 # include js, css files in header of desk.html
 # app_include_css = "/assets/ury/css/ury.css"
 app_include_js = [
+    "/assets/ury/js/setup_redirect.js",
     "/assets/ury/js/quick_entry.js",
     "/assets/ury/js/pos_print.js",
     "/assets/ury/js/restrict_qty_edit_pos.js",
@@ -53,10 +54,52 @@ page_js = {"point-of-sale": ["public/js/pos_extend.js"]}
 website_context = {"splash_image": "/assets/ury/Images/ury-logo.jpg"}
 
 website_route_rules = [
-    {"from_route": "/pos/<path:app_path>", "to_route": "pos"},
     {"from_route": "/urypos/<path:app_path>", "to_route": "urypos"},
-    {"from_route": "/URYMosaic/<path:app_path>", "to_route": "URYMosaic"},
+    {"from_route": "/mosaic/<path:app_path>", "to_route": "mosaic"},
     {"from_route": "/ury/<path:app_path>", "to_route": "ury"},
+    {"from_route": "/setup-wizard", "to_route": "ury"},
+    {"from_route": "/order/<path:app_path>", "to_route": "order"},
+    {"from_route": "/pos/<path:app_path>", "to_route": "pos"},
+]
+
+setup_wizard_requires = [
+    "assets/erpnext/js/setup_wizard.js",
+    "assets/ury/js/setup_wizard.js",
+]
+
+setup_wizard_stages = "ury.setup.setup_wizard.get_setup_stages"
+
+ury_demo_master_doctypes = [
+    "Gender",
+    "Item Group",
+    "Item",
+    "Item Price",
+    "Customer Group",
+    "Customer",
+    "User",
+    "Employee",
+    "BOM",
+    "Supplier Group",
+    "Supplier",
+    "Branch",
+    "URY Menu Course",
+    "URY Menu",
+    "URY Room",
+    "URY Restaurant",
+    "URY Table",
+    "Product Bundle",
+    "URY Production Unit",
+    "URY Report Settings",
+    "POS Profile"
+]
+
+ury_demo_transaction_doctypes = [
+    "Production Plan",
+    "Material Request",
+    "Purchase Order",
+    "Sales Order",
+    "Journal Entry",
+    "Payment Entry"
 ]
 # Home Pages
 # ----------
@@ -88,7 +131,7 @@ website_route_rules = [
 # ------------
 
 # before_install = "ury.install.before_install"
-# after_install = "ury.install.after_install"
+after_install = "ury.install.after_install"
 
 # Uninstallation
 # ------------
@@ -192,9 +235,9 @@ scheduler_events = {
 # Overriding Methods
 # ------------------------------
 #
-# override_whitelisted_methods = {
-# 	"frappe.desk.doctype.event.event.get_events": "ury.event.get_events"
-# }
+override_whitelisted_methods = {
+	"erpnext.setup.demo.clear_demo_data": "ury.setup.demo.clear_demo_data"
+}
 #
 # each overriding function accepts a `data` argument;
 # generated from the base implementation of the doctype dashboard,
@@ -212,10 +255,30 @@ scheduler_events = {
 
 # ignore_links_on_delete = ["Communication", "ToDo"]
 
+on_session_creation = [
+    "ury.ury.controllers.setup_redirect.on_session_creation"
+]
+
 # Request Events
 # ----------------
-# before_request = ["ury.utils.before_request"]
+# before_request cannot issue a real HTTP redirect for Desk page GETs.
+# website_path_resolver runs inside PathResolver, which handles frappe.Redirect.
+website_path_resolver = [
+    "ury.ury.controllers.setup_redirect.website_path_resolver"
+]
 # after_request = ["ury.utils.after_request"]
+
+website_redirects = [
+    {
+        "source": "/setup-wizard",
+        "target": "/ury/setup-wizard/0",
+        "redirect_http_status": 302,
+    }
+]
+
+extend_bootinfo = [
+    "ury.ury.controllers.setup_redirect.extend_bootinfo"
+]
 
 # Job Events
 # ----------
@@ -325,6 +388,7 @@ fixtures = [
                     "POS Profile-restaurant_prefix",
                     "POS Profile-show_image",
                     "POS Profile-custom_daily_pos_close",
+                    "POS Profile-custom_checklist_items",
                     "POS Profile-paid_limit",
                     "POS Profile-table_attention_time",
                     "POS Opening Entry-restaurant_info",
@@ -364,6 +428,8 @@ fixtures = [
                     "POS Profile-custom_notify_kot_delay",
                     "POS Profile-custom_recipients",
                     "URY Printer Settings-custom_block_takeaway_kot",
+                    "URY Printer Settings-custom_waiter_print",
+                    "URY Printer Settings-custom_waiter_print_format",
                     "POS Opening Entry-custom_ury_last_invoice",
                     "POS Opening Entry-custom_ury_last_aggregator_invoice",
                     "POS Profile-custom_reset_order_number_daily",
@@ -394,5 +460,6 @@ fixtures = [
         ],
     },
     {"dt": "Role", "filters": [["role_name", "like", "URY %"]]},
+    {"doctype": "Role", "filters": [["role_name", "in", ["Self Ordering Manager"]]]},
     "Client Script",
 ]

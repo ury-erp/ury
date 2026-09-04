@@ -93,7 +93,9 @@ def calculate_and_set_times(doc, method):
     
     current_time = datetime.strptime(current_time_str, "%Y-%m-%d %H:%M:%S.%f")
     
-    time_difference = current_time - doc.creation
+    creation_time = datetime.strptime(doc.creation, "%Y-%m-%d %H:%M:%S.%f")
+    
+    time_difference = current_time - creation_time
     
     total_seconds = int(time_difference.total_seconds())
     hours, remainder = divmod(total_seconds, 3600)

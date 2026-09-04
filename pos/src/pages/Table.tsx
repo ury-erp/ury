@@ -29,7 +29,7 @@ import { DINE_IN } from '../data/order-types';
 import { captainTransfer, getTableOrder, tableTransfer } from '../lib/order-api';
 import { printOrder } from '../lib/print';
 import { resolvePrintFormat } from '../lib/invoice-api';
-import { canCaptainTransfer } from '@ury/core';
+import { canCaptainTransfer, isUserRestrictedFromTableOrders } from '@ury/core';
 import { showToast } from '@ury/ui';
 import { t } from '../i18n';
 import LayoutView from '../components/LayoutView';
@@ -37,7 +37,7 @@ import TableMergeDialog from '../components/TableMergeDialog';
 import TableUnmergeDialog from '../components/TableUnmergeDialog';
 import TableTransferDialog from '../components/TableTransferDialog';
 import CaptainTransferDialog from '../components/CaptainTransferDialog';
-import TableCard from '../components/TableCard';
+import TableCard, { TABLE_STATE_STYLES } from '../components/TableCard';
 import MergeLinkConnector from '../components/MergeLinkConnector';
 import TableReservationDialog, { type ReservationFormData } from '../components/TableReservationDialog';
 import TableReservationEditDialog, { type EditReservationFormData } from '../components/TableReservationEditDialog';
@@ -49,6 +49,7 @@ const TableView = () => {
   const { posProfile, setSelectedTable, setSelectedCustomer, setSelectedOrderType } = usePOSStore();
   const user = useRootStore((state) => state.user);
   const showCaptainTransfer = canCaptainTransfer(user, posProfile);
+  const isRestricted = isUserRestrictedFromTableOrders(user, posProfile);
 
   const branch = posProfile?.branch ?? null;
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -229,6 +230,19 @@ const TableView = () => {
       .then((tList) => setAllBranchTables(tList))
       .catch(console.error);
   }, [branch]);
+  const handleNavigateToPOS = (tableName: string) => {
+    if (!selectedRoom) return;
+
+    // Check if user is restricted from taking table orders
+    if (isUserRestrictedFromTableOrders(user, posProfile)) {
+      showToast.error(t('errors.dine_in_restricted') || 'Dine In is not available for your role');
+      return;
+    }
+
+    setSelectedOrderType(DINE_IN);
+    setSelectedTable(tableName, selectedRoom);
+    navigate('/pos');
+  };
 
   // Derived reservation maps
   const { lockActiveReservationsByTable, upcomingReservationsByTable, allReservationsByTable } = useMemo(() => {
@@ -596,6 +610,24 @@ const TableView = () => {
         onPrint={(event) => handlePrintTable(table, event)}
         isPrinting={printingTable === table.name}
       />
+    <TableCard
+      key={table.name}
+      table={table}
+      mergeGroupLabel={mergeGroupLabel}
+      className={className}
+      menuOpen={menuOpenForTable === table.name}
+      onMenuOpenChange={(open) => setMenuOpenForTable(open ? table.name : null)}
+      onMerge={() => setMergeSourceTable(table)}
+      onUnmerge={() => setUnmergeSourceTable(table)}
+      onTransferTable={canTransferTable ? () => void handleOpenTransferTable(table) : undefined}
+      onTransferCaptain={() => void handleOpenCaptainTransfer(table)}
+      showCaptainTransfer={showCaptainTransfer}
+      onNavigate={() => handleNavigateToPOS(table.name)}
+      onPreview={(event) => handlePreviewTable(table, event)}
+      onPrint={(event) => handlePrintTable(table, event)}
+      isPrinting={printingTable === table.name}
+      isRestricted={isRestricted}
+    />
     );
   };
 
@@ -806,12 +838,16 @@ const TableView = () => {
         <div className="max-w-screen-xl mx-auto">
           <div className="flex items-center justify-center gap-6 text-sm">
             <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-green-100 border border-green-300 rounded"></div>
+              <div className="w-4 h-4 bg-emerald-50 border border-emerald-300 rounded"></div>
               <span>{t('tables.available')}</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 bg-amber-100 border border-amber-300 rounded"></div>
               <span>{t('tables.occupied')}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 bg-blue-50/40 border border-blue-200/70 rounded"></div>
+              <span>{t('tables.merged')}</span>
             </div>
           </div>
         </div>

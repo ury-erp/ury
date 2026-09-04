@@ -148,7 +148,7 @@ A POS Closing Entry must be created at the end of each day to complete the daily
 	- Each production unit has its own dedicated web-based interface, displaying specific items.
 	- Printers can be configured separately for each production unit.
 	- KDS displays are organised by these units , access KDS via 
-		`/URYMosaic/<URY_Production_Unit>`   
+		`/mosaic/<URY_Production_Unit>`   
     
 - **KOT Display**
 	- KDS make easy to monitor kitchen orders (KOTs) on a screen..

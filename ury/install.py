@@ -1,6 +1,6 @@
 import click
 
-from ury.setup import after_install as setup
+from ury.setup_customizations import after_install as setup
 
 
 def after_install():
@@ -11,6 +11,6 @@ def after_install():
         click.secho("Thank you for installing URY App!", fg="green")
 
         
-    except:
+    except Exception as e:
+        print(f"Error during installation: {e}")
         pass
-     

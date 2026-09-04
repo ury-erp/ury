@@ -69,13 +69,13 @@ class SubPOSClosing(Document):
     
     def on_submit(self):
         opening_entry = frappe.get_doc("POS Opening Entry", self.pos_opening_entry)
-        opening_entry.custom_sub_pos_close = self.name
+        opening_entry.custom_sub_pos_close_entry = self.name
         opening_entry.status = "Closed"
         opening_entry.save()
     
     def on_cancel(self):
         opening_entry = frappe.get_doc("POS Opening Entry", self.pos_opening_entry)
-        opening_entry.custom_sub_pos_close = self.name
+        opening_entry.custom_sub_pos_close_entry = self.name
         opening_entry.status = "Open"
         opening_entry.save()
 
@@ -96,8 +96,50 @@ def get_cashiers(doctype, txt, searchfield, start, page_len, filters):
     return [c for c in cashiers_list]
 
 
+SUPERVISOR_ROLES = {"URY Manager", "System Manager"}
+
+
 @frappe.whitelist()
 def get_pos_invoices(start, end, pos_profile, user):
+    frappe.has_permission("POS Invoice", "read", throw=True)
+
+    session_user = frappe.session.user
+    is_supervisor = session_user == "Administrator" or bool(
+        set(frappe.get_roles(session_user)) & SUPERVISOR_ROLES
+    )
+
+    # Non-supervisors may only query their own invoices
+    if not is_supervisor:
+        user = session_user
+
+    # Branch scoping: the POS Profile must belong to the session user's branch
+    try:
+        session_branch = getBranch()
+    except Exception:
+        if is_supervisor:
+            # Supervisors may not be mapped to a branch
+            session_branch = None
+        else:
+            raise
+
+    profile_branch = frappe.db.get_value(
+        "POS Profile", pos_profile, "branch"
+    )
+
+    if not profile_branch:
+        frappe.throw(
+            _("POS Profile {0} not found.").format(pos_profile),
+            frappe.DoesNotExistError,
+        )
+
+    if session_branch and profile_branch != session_branch:
+        frappe.throw(
+            _("You do not have permission to access invoices for POS Profile {0}.").format(
+                pos_profile
+            ),
+            frappe.PermissionError,
+        )
+
     data = frappe.db.sql(
         """
         select

@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { 
-  LayoutGrid, 
-  ClipboardList, 
+import {
+  LayoutDashboard,
+  LayoutGrid,
+  ClipboardList,
   Table,
   BookLock,
+  Settings,
 } from 'lucide-react';
 import { cn } from '@ury/ui';
 import { t } from '../i18n';
@@ -46,8 +48,12 @@ const Footer = () => {
     ...(reservationEnabled
       ? [{ icon: BookLock, label: 'Reservations', path: '/reservations' }]
       : []),
+    { icon: LayoutDashboard, label: t('footer.dashboard'), path: '/dashboard' },
+    { icon: LayoutGrid, label: t('footer.pos'), path: '/pos' },
+    { icon: Table, label: t('footer.tables'), path: '/tables' },
     { icon: ClipboardList, label: t('footer.orders'), path: '/orders' },
-  ];
+    { icon: Settings, label: t('footer.settings'), path: '/settings', hidden: true },
+  ].filter((item) => !item.hidden);
 
   return (
     <div className="bg-white border-t border-gray-200 py-2 relative">

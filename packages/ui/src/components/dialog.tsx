@@ -19,7 +19,10 @@ const dialogVariants = cva(
 )
 
 const overlayVariants = cva(
-  "fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity",
+  // The overlay fades in rather than snapping on. `transition-opacity` did
+  // nothing here — the node is mounted at its final opacity — so this needed
+  // to be a keyframe, not a transition.
+  "fixed inset-0 bg-black/50 backdrop-blur-sm animate-overlay-in",
   {
     variants: {
       variant: {
@@ -34,7 +37,14 @@ const overlayVariants = cva(
 )
 
 const contentVariants = cva(
-  "relative bg-white rounded-lg shadow-lg max-h-[90vh] overflow-hidden",
+  [
+    // A modal is the topmost surface in the app, so it takes the top of the
+    // elevation scale (xl) and one radius step above a Card (xl vs lg) — the
+    // two together are what make it read as floating over the page rather
+    // than pasted onto it.
+    "relative bg-card text-card-foreground rounded-xl shadow-xl",
+    "max-h-[90vh] overflow-hidden animate-dialog-in",
+  ],
   {
     variants: {
       variant: {
@@ -68,15 +78,103 @@ export interface DialogProps
     VariantProps<typeof dialogVariants> {
   open?: boolean
   onOpenChange?: (open: boolean) => void
+  /** Whether pressing Escape closes the dialog. Defaults to true; set to
+   * false for blocking gates (e.g. ChecklistGateDialog) that must not be
+   * dismissible via Escape. */
+  closeOnEscape?: boolean
+}
+
+// Elements considered reachable via Tab, used both to seed initial focus and
+// to compute the wrap points for the focus trap.
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
+const DialogTitleContext = React.createContext<string | undefined>(undefined)
+
+function mergeRefs<T>(
+  ...refs: Array<React.Ref<T> | undefined>
+): (node: T | null) => void {
+  return (node) => {
+    refs.forEach((ref) => {
+      if (!ref) return
+      if (typeof ref === "function") ref(node)
+      else (ref as React.MutableRefObject<T | null>).current = node
+    })
+  }
 }
 
 const Dialog = React.forwardRef<HTMLDivElement, DialogProps>(
-  ({ className, variant, open, onOpenChange, children, ...props }, ref) => {
+  (
+    { className, variant, open, onOpenChange, closeOnEscape = true, children, ...props },
+    ref
+  ) => {
+    const titleId = React.useId()
+    const containerRef = React.useRef<HTMLDivElement | null>(null)
+    const previousActiveElementRef = React.useRef<HTMLElement | null>(null)
+
+    // Remember what had focus before the dialog opened, lock body scroll
+    // while it's open, move focus into the dialog, and restore both on
+    // close/unmount.
+    React.useEffect(() => {
+      if (!open) return
+
+      previousActiveElementRef.current = document.activeElement as HTMLElement | null
+      const previousOverflow = document.body.style.overflow
+      document.body.style.overflow = "hidden"
+
+      const node = containerRef.current
+      const focusable = node?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR)
+      ;(focusable ?? node)?.focus()
+
+      return () => {
+        document.body.style.overflow = previousOverflow
+        previousActiveElementRef.current?.focus?.()
+      }
+    }, [open])
+
+    // Escape-to-close (the one place this is handled) and a basic Tab focus
+    // trap that keeps focus cycling within the dialog.
+    React.useEffect(() => {
+      if (!open) return
+
+      function handleKeyDown(event: KeyboardEvent) {
+        if (event.key === "Escape") {
+          if (closeOnEscape) onOpenChange?.(false)
+          return
+        }
+
+        if (event.key === "Tab") {
+          const node = containerRef.current
+          if (!node) return
+          const focusableEls = node.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)
+          if (focusableEls.length === 0) {
+            event.preventDefault()
+            return
+          }
+          const first = focusableEls[0]
+          const last = focusableEls[focusableEls.length - 1]
+          if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault()
+            last.focus()
+          } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault()
+            first.focus()
+          }
+        }
+      }
+
+      document.addEventListener("keydown", handleKeyDown)
+      return () => document.removeEventListener("keydown", handleKeyDown)
+    }, [open, closeOnEscape, onOpenChange])
+
     if (!open) return null
 
     return (
       <div
-        ref={ref}
+        ref={mergeRefs(ref, containerRef)}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
         className={cn(dialogVariants({ variant, className }))}
         {...props}
       >
@@ -84,7 +182,9 @@ const Dialog = React.forwardRef<HTMLDivElement, DialogProps>(
           className={cn(overlayVariants({ variant }))}
           onClick={() => onOpenChange?.(false)}
         />
-        {children}
+        <DialogTitleContext.Provider value={titleId}>
+          {children}
+        </DialogTitleContext.Provider>
       </div>
     )
   }
@@ -108,8 +208,13 @@ const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps>(
     >
       {showCloseButton && onClose && (
         <button
+          type="button"
           onClick={onClose}
-          className="absolute top-4 right-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"
+          aria-label="Close"
+          // Was a bare 16px icon — a ~16px touch target on a tablet. Now a
+          // 36px tappable square with a real hover surface, matching the
+          // ghost button's interaction language.
+          className="absolute top-3 right-3 inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 ease-out hover:bg-accent hover:text-foreground active:bg-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background disabled:pointer-events-none"
         >
           <X className="h-4 w-4" />
           <span className="sr-only">Close</span>
@@ -127,7 +232,7 @@ const DialogHeader = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn("flex flex-col space-y-1.5 text-center sm:text-left p-6", className)}
+    className={cn("flex flex-col space-y-1 text-center sm:text-left p-6", className)}
     {...props}
   />
 ))
@@ -139,7 +244,9 @@ const DialogFooter = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn("flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 p-6 pt-0", className)}
+    // `gap-2` rather than `sm:space-x-2`: the stacked mobile layout previously
+    // had no gap at all between its buttons.
+    className={cn("flex flex-col-reverse gap-2 sm:flex-row sm:justify-end p-6 pt-0", className)}
     {...props}
   />
 ))
@@ -148,13 +255,17 @@ DialogFooter.displayName = "DialogFooter"
 const DialogTitle = React.forwardRef<
   HTMLParagraphElement,
   React.HTMLAttributes<HTMLHeadingElement>
->(({ className, ...props }, ref) => (
-  <h2
-    ref={ref}
-    className={cn("text-lg font-semibold leading-none tracking-tight", className)}
-    {...props}
-  />
-))
+>(({ className, id, ...props }, ref) => {
+  const contextTitleId = React.useContext(DialogTitleContext)
+  return (
+    <h2
+      ref={ref}
+      id={id ?? contextTitleId}
+      className={cn("text-lg font-semibold leading-tight tracking-tight", className)}
+      {...props}
+    />
+  )
+})
 DialogTitle.displayName = "DialogTitle"
 
 const DialogDescription = React.forwardRef<
@@ -163,7 +274,7 @@ const DialogDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <p
     ref={ref}
-    className={cn("text-sm text-muted-foreground", className)}
+    className={cn("text-sm leading-normal text-muted-foreground", className)}
     {...props}
   />
 ))

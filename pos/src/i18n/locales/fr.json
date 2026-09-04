@@ -27,6 +27,7 @@
     "search_placeholder_default": "Rechercher commandes, articles ou clients...",
     "search_placeholder_orders": "Rechercher des commandes",
     "search_placeholder_menu": "Rechercher dans le menu",
+    "close_shift": "Clôturer la session",
     "switch_to_desk": "Accéder au bureau",
     "clear_cache": "Vider le cache",
     "logout": "Déconnexion"
@@ -52,7 +53,8 @@
     "loading_order": "Chargement des détails de la commande...",
     "edit_item": "Modifier l'article",
     "add_comment": "Ajouter un commentaire",
-    "edit_comment": "Modifier le commentaire"
+    "edit_comment": "Modifier le commentaire",
+    "pax": "Couverts"
   },
   "order": {
     "select_to_view": "Sélectionnez une commande pour voir les détails",
@@ -77,7 +79,10 @@
     "adjustment": "Ajustement",
     "total": "Total",
     "pay_button": "Payer {{amount}}",
-    "processing": "Traitement..."
+    "processing": "Traitement...",
+    "short_by": "Manque {{amount}}",
+    "change_due": "Monnaie à rendre : {{amount}}",
+    "success": "Paiement réussi : {{amount}} reçu"
   },
   "pos": {
     "not_opened_title": "PDV non ouvert",
@@ -85,7 +90,75 @@
     "not_closed_title": "PDV précédent non fermé",
     "not_closed_message": "Veuillez fermer l'entrée PDV précédente pour continuer.",
     "reload_page": "Recharger la page",
-    "switch_to_desk": "Accéder au bureau"
+    "switch_to_desk": "Accéder au bureau",
+    "opening": {
+      "title": "Ouvrir la session PDV",
+      "session_details": "Détails de la session",
+      "opening_balance": "Solde d'ouverture",
+      "payment_mode": "Mode de paiement",
+      "opening_amount": "Montant d'ouverture",
+      "open_session_button": "Ouvrir la session PDV",
+      "loading": "Chargement des détails d'ouverture...",
+      "retry": "Réessayer",
+      "continue_to_pos": "Continuer vers le PDV",
+      "contact_manager": "Contactez votre responsable",
+      "daily_close_pending_actionable": "La session d'hier est toujours ouverte et doit être clôturée avant d'en démarrer une nouvelle.",
+      "close_now": "Clôturer la session précédente",
+      "session_exists_title": "Session déjà ouverte",
+      "session_exists_message": "Une session est déjà ouverte pour ce terminal.",
+      "session_elsewhere_title": "Session ouverte ailleurs",
+      "session_elsewhere_message": "Vous avez une session ouverte à {{location}}. Continuer ?"
+    }
+  },
+  "pos_opening": {
+    "title": "Ouvrir la session PDV",
+    "subtitle": "Démarrez une nouvelle session PDV pour commencer à prendre des commandes",
+    "session_details": "Détails de la session",
+    "company": "Société",
+    "pos_profile": "Profil PDV",
+    "cashier": "Caissier",
+    "branch": "Succursale",
+    "restaurant": "Restaurant",
+    "session_start": "Début de session",
+    "select_profile": "Sélectionnez un profil PDV",
+    "opening_balance": "Solde d'ouverture",
+    "mode_of_payment": "Mode de paiement",
+    "opening_amount": "Montant d'ouverture",
+    "total_opening_balance": "Solde d'ouverture total",
+    "open_session": "Ouvrir la session PDV",
+    "opening": "Ouverture...",
+    "loading": "Chargement des données d'ouverture...",
+    "no_profiles": "Aucun profil PDV n'est disponible pour votre utilisateur dans cette succursale. Contactez votre responsable.",
+    "no_payment_modes": "Aucun mode de paiement n'est configuré sur ce terminal. Contactez votre responsable.",
+    "no_permission": "Vous n'avez pas la permission d'ouvrir une session. Contactez votre responsable.",
+    "previous_day_not_closed": "La session d'hier n'a pas été fermée. Contactez votre responsable pour la fermer avant d'ouvrir aujourd'hui.",
+    "main_cashier_not_open": "Le caissier principal n'a pas encore ouvert la caisse. Veuillez patienter ou contacter votre caissier principal.",
+    "main_cashier_not_configured": "Aucun caissier principal n'est configuré pour ce terminal. Contactez votre responsable.",
+    "session_already_open": "Une session est déjà ouverte pour ce terminal.",
+    "user_already_assigned": "Vous avez déjà une session ouverte ailleurs.",
+    "payment_mode_misconfigured": "Un mode de paiement n'est pas entièrement configuré. Contactez votre responsable.",
+    "contact_manager": "Contactez votre responsable",
+    "retry": "Réessayer",
+    "error_loading": "Échec du chargement des données d'ouverture. Veuillez réessayer.",
+    "error_opening": "Échec de l'ouverture de la session PDV. Veuillez réessayer.",
+    "opening_balance_help": "Le solde d'ouverture est le montant de départ en espèces/paiement que vous déclarez pour cette équipe. Il sert à rapprocher les ventes à la fermeture.",
+    "zero_balance_warning": "Vous ouvrez avec 0 ₹ sur tous les modes de paiement. Appuyez à nouveau sur « Confirmer et ouvrir » pour continuer quand même.",
+    "confirm_zero_balance": "Confirmer et ouvrir",
+    "session_opened_success": "Session PDV ouverte"
+  },
+  "pos_closing": {
+    "help_expected": "Le montant attendu par le systeme pour ce mode de paiement, base sur les factures du jour.",
+    "help_closing": "Saisissez le montant reel compte pour ce mode de paiement.",
+    "help_difference": "Montant compte moins montant attendu. Positif signifie un excedent, negatif un manque.",
+    "validation_missing_rows": "Saisissez un montant de cloture pour chaque mode de paiement avant de valider.",
+    "validation_all_zero": "Le montant total de cloture ne peut pas etre nul. Saisissez les montants comptes.",
+    "validation_zero_row_warning": "Un ou plusieurs modes de paiement sont restes a 0 alors qu'il y a eu de l'activite aujourd'hui. Verifiez avant de valider.",
+    "confirm_title": "Confirmer la cloture PDV",
+    "confirm_message": "Cette action soumettra l'ecriture de cloture et est irreversible. Voulez-vous vraiment continuer ?",
+    "confirm_submit": "Oui, cloturer le PDV",
+    "confirm_back": "Retour",
+    "checklist_skip": "Ignorer pour l'instant",
+    "checklist_skip_hint": "La cloture PDV a deja ete soumise. Vous pourrez terminer cette liste de controle plus tard."
   },
   "customer": {
     "search_placeholder": "Rechercher un client...",
@@ -136,7 +209,21 @@
     "discount_exceeds_max": "La remise en pourcentage ne peut pas dépasser 100 %",
     "please_print_first": "Veuillez imprimer la facture avant d'effectuer le paiement",
     "enter_cancel_reason": "Veuillez entrer un motif d'annulation.",
-    "dine_in_restricted": "La consommation sur place n'est pas disponible pour votre rôle"
+    "dine_in_restricted": "La consommation sur place n'est pas disponible pour votre rôle",
+    "order_modified": "Cette commande a été modifiée. Veuillez recharger la page pour récupérer les dernières modifications.",
+    "order_sync_failed": "Impossible de synchroniser cette commande. Veuillez recharger la page et réessayer.",
+    "posOpening": {
+      "permission_denied": "Vous n'avez pas la permission d'ouvrir une session. Contactez votre responsable.",
+      "daily_close_pending": "La session d'hier n'a pas été fermée. Contactez votre responsable pour la fermer avant d'ouvrir aujourd'hui.",
+      "main_cashier_not_open": "Le caissier principal n'a pas encore ouvert la caisse. Veuillez patienter ou contacter votre caissier principal.",
+      "main_cashier_not_configured": "Aucun caissier principal n'est configuré pour ce terminal. Contactez votre responsable.",
+      "no_payment_modes": "Aucun mode de paiement n'est configuré pour ce terminal. Contactez votre responsable.",
+      "payment_mode_missing_account": "Un mode de paiement n'est pas entièrement configuré ({{mode}}). Contactez votre responsable.",
+      "session_exists": "Une session est déjà ouverte pour ce terminal.",
+      "session_elsewhere": "Vous avez déjà une session ouverte ailleurs.",
+      "generic": "Impossible d'ouvrir la session PDV. {{message}}",
+      "load_failed": "Impossible de vérifier l'état de la session PDV. Veuillez réessayer."
+    }
   },
   "success": {
     "order_cancelled": "Commande annulée avec succès",
@@ -222,6 +309,7 @@
     "transfer_captain": "Transférer le capitaine",
     "select_destination_table": "Déplacer la commande de {{table}} vers toute table libre de l'établissement",
     "search_transfer_placeholder": "Rechercher par table ou salle",
+    "search_table_placeholder": "Rechercher une table",
     "current_table": "Table actuelle",
     "current_captain": "Capitaine actuel",
     "select_new_captain": "Choisir un nouveau capitaine pour cette commande",
@@ -279,9 +367,11 @@
     "merged_items": "Articles de l'addition fusionnée"
   },
   "footer": {
+    "dashboard": "Tableau de bord",
     "pos": "PDV",
-    "table": "Table",
-    "orders": "Commandes"
+    "tables": "Tables",
+    "orders": "Commandes",
+    "settings": "Paramètres"
   },
   "product_dialog": {
     "special_instructions": "Instructions spéciales",
