@@ -216,6 +216,9 @@ doc_events = {
     "URY Menu Course": {
 		"validate": "ury.ury.api.ury_menu_course_validation.validate_priority",
 	},
+    "URY KOT": {
+        "on_submit": "ury.ury.api.ury_kot_item_execution_service.seed_kot_item_executions_on_submit",
+    },
     "AI Provider": {"on_update": "ury.ury.ai_tools.agent_seeding.on_ai_provider_update"},
 }
 
@@ -225,7 +228,8 @@ doc_events = {
 scheduler_events = {
     "cron":{
 		"* * * * *":[
-			"ury.ury.api.ury_kot_validation.kotValidationThread"
+			"ury.ury.api.ury_kot_validation.kotValidationThread",
+			"ury.ury.api.ury_fulfilment_posting_service.recover_pending_posting_intents",
 		]
 	}
 # 	"all": [
