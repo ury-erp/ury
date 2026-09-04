@@ -5,10 +5,15 @@ import {
   Table,
 } from 'lucide-react';
 import { cn } from '@ury/ui';
+import { isPrintStatusDisabled } from '@ury/core';
 import { t } from '../i18n';
 import { PrinterStatusButton } from './PrinterWatch';
+import { usePOSStore } from '../store/pos-store';
 
 const Footer = () => {
+  const { posProfile } = usePOSStore();
+  const printStatusDisabled = isPrintStatusDisabled(posProfile);
+
   const navItems = [
     { icon: LayoutGrid, label: t('footer.pos'), path: '/' },
     { icon: Table, label: t('footer.table'), path: '/table' },
@@ -21,7 +26,7 @@ const Footer = () => {
         <div className="grid grid-cols-3 items-center">
           {/* Left: Printer Status aligned to the left edge */}
           <div className="flex justify-start items-center">
-            <PrinterStatusButton />
+            {!printStatusDisabled && <PrinterStatusButton />}
           </div>
 
           {/* Center: POS / Table / Orders navigation */}

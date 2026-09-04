@@ -52,17 +52,23 @@ def _build_active_cups_job_index():
 
 
 def _get_unprinted_invoice_names(invoice_names):
-    """Return the subset of invoice names that are unprinted POS Invoices."""
+    """Return the subset of invoice names that are unprinted POS Invoices and have tracking enabled."""
     if not invoice_names:
-        return set()
+        return {}
 
     unique_names = list(set(invoice_names))
     rows = frappe.get_all(
         "POS Invoice",
         filters={"name": ["in", unique_names], "invoice_printed": 0},
-        fields=["name", "restaurant_table"],
+        fields=["name", "restaurant_table", "pos_profile"],
     )
-    return {row["name"]: row.get("restaurant_table") for row in rows}
+    from ury.ury.printing.service import is_print_status_tracking_disabled
+
+    valid_invoices = {}
+    for row in rows:
+        if not is_print_status_tracking_disabled(row.get("pos_profile")):
+            valid_invoices[row["name"]] = row.get("restaurant_table")
+    return valid_invoices
 
 
 @frappe.whitelist()

@@ -8,6 +8,15 @@ from frappe.www.printview import validate_print_permission
 from ury.ury.printing.print_job_monitor import register_print_job
 
 
+def is_print_status_tracking_disabled(pos_profile: Optional[str] = None) -> bool:
+    """Check whether print status and printer monitoring are disabled for the given profile or globally."""
+    if pos_profile:
+        return bool(frappe.db.get_value("POS Profile", pos_profile, "custom_disable_print_status_tracking"))
+    
+    # If no specific profile was given, check active user's pos_profile if available in session
+    return False
+
+
 def _make_print_job_id(printer_name: str = "Printer", cups_job_id: Optional[int] = None) -> str:
     """Generate a unique URY Print Job identity formatted as Printer Name + CUPS Job ID."""
     clean_printer = str(printer_name or "Printer").strip().replace(" ", "_")
@@ -136,6 +145,33 @@ def submit_and_monitor_print_job(
                 **metadata,
             }
         )
+
+        # Check if tracking is disabled for the profile
+        pos_profile = (
+            (extra_metadata.get("pos_profile") if extra_metadata else None)
+            or getattr(target_doc, "pos_profile", None)
+            or (frappe.db.get_value("POS Invoice", name, "pos_profile") if doctype == "POS Invoice" else None)
+        )
+        if is_print_status_tracking_disabled(pos_profile):
+            frappe.logger("printing").info(
+                {
+                    "event": "print_job_submitted_tracking_disabled",
+                    "job_type": job_type,
+                    "printer": printer_setting,
+                    "pos_profile": pos_profile,
+                    "cups_job_id": cups_job_id,
+                }
+            )
+            return {
+                "status": "Success",
+                "cups_job_id": cups_job_id,
+                "print_job_id": print_job_id,
+                "printer": printer_setting,
+                "job_type": job_type,
+                "reference_doctype": doctype,
+                "reference_name": name,
+                "file_path": file_path,
+            }
 
         try:
             # File-store persistence and Redis monitor registration are handled

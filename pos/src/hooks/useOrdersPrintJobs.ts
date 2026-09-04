@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getFrappeSocket } from '../lib/socket';
+import { usePOSStore } from '../store/pos-store';
+import { isPrintStatusDisabled } from '@ury/core';
 
 export interface URYPrintJob {
   name: string;
@@ -47,6 +49,9 @@ function removeIdsFromPayload(payload: SocketPayload, target: Set<string>) {
 }
 
 export function useOrdersPrintJobs() {
+  const { posProfile } = usePOSStore();
+  const printStatusDisabled = isPrintStatusDisabled(posProfile);
+
   const [failedInvoiceIds, setFailedInvoiceIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -54,6 +59,12 @@ export function useOrdersPrintJobs() {
   const socketSeenConnectedRef = useRef(false);
 
   const fetchFailedJobs = useCallback(async () => {
+    if (printStatusDisabled) {
+      setFailedInvoiceIds(new Set());
+      setLoading(false);
+      return;
+    }
+
     if (initialLoadRef.current) {
       setLoading(true);
     }
@@ -103,7 +114,7 @@ export function useOrdersPrintJobs() {
         setLoading(false);
       }
     }
-  }, []);
+  }, [printStatusDisabled]);
 
   // Initial load only. Socket events fire on transitions and are not replayed,
   // so jobs that FAILED before this screen opened would otherwise never show.
