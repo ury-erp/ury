@@ -28,7 +28,7 @@ def _exists(doctype, name=None):
 
 
 def _kot_doc(*args, **kwargs):
-	arg = args[0] if args else kwargs.get("arg1")
+	arg = args[1] if len(args) > 1 else kwargs.get("name") or kwargs.get("arg1")
 	if arg == "URY KOT-1":
 		items = [frappe._dict({"name": "KOTITEM-1"}), frappe._dict({"name": "KOTITEM-2"})]
 		doc = frappe._dict({"kot_items": items})
