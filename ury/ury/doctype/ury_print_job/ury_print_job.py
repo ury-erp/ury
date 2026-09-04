@@ -42,8 +42,28 @@ class URYPrintJob(Document):
             existing["modified"] = str(self.modified)
         save_job(self.name, existing)
 
-        # If status transitioned to FAILED, publish failure alert to job_owner
+        # Any status transition (including desk edits) emits the same event the
+        # CUPS poller publishes, so POS clients stay in sync without polling.
         new_status = existing.get("status")
+        if new_status != old_status:
+            frappe.publish_realtime(
+                "print_job_status_updated",
+                {
+                    "print_job_id": self.name,
+                    "job_type": existing.get("job_type"),
+                    "reference_doctype": existing.get("reference_doctype"),
+                    "reference_name": existing.get("reference_name"),
+                    "invoice": existing.get("invoice")
+                    or (
+                        existing.get("reference_name")
+                        if existing.get("reference_doctype") == "POS Invoice"
+                        else None
+                    ),
+                    "status": new_status,
+                },
+            )
+
+        # If status transitioned to FAILED, publish failure alert to job_owner
         if new_status == "FAILED" and old_status != "FAILED":
             from ury.ury.printing.notifications import notify_print_failure
 

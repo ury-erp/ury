@@ -57,6 +57,31 @@ class TestURYPrintJobDocType(unittest.TestCase):
         found = any(j.get("name") == self.job_id for j in job_list)
         self.assertTrue(found)
 
+    def test_db_update_publishes_status_transition(self):
+        # The test job references KOT-0001 which does not exist in the test DB;
+        # skip link validation (the publish-under-test happens in db_update).
+        from frappe.model.document import Document
+
+        with (
+            patch.object(Document, "_validate_links", lambda self: None),
+            patch("frappe.publish_realtime") as mock_publish,
+        ):
+            doc = frappe.get_doc("URY Print Job", self.job_id)
+            doc.status = "FAILED"
+            doc.save()
+
+        events = [c.args[0] for c in mock_publish.call_args_list]
+        self.assertIn("print_job_status_updated", events)
+        status_payload = next(
+            c.args[1] for c in mock_publish.call_args_list if c.args[0] == "print_job_status_updated"
+        )
+        self.assertEqual(status_payload["status"], "FAILED")
+        self.assertEqual(status_payload["print_job_id"], self.job_id)
+        self.assertEqual(status_payload["reference_name"], "KOT-0001")
+
+        persisted = frappe.get_doc("URY Print Job", self.job_id)
+        self.assertEqual(persisted.status, "FAILED")
+
     def test_get_list_filters_by_status(self):
         failed_job_id = "test-doc-controller-failed-job"
         self._save_extra_job(

@@ -23,10 +23,6 @@ export interface URYPrintJob {
 // invoice leaves the failed set (parity with the old refetch behaviour).
 const TERMINAL_NON_FAILED_STATUSES = new Set(['COMPLETED', 'CANCELED', 'UNKNOWN']);
 
-// Debounce for list_update-triggered refetches so a burst of saves (e.g. bulk
-// desk edits) collapses into a single FAILED query.
-const LIST_UPDATE_DEBOUNCE_MS = 500;
-
 // Payload keys that identify the document an order card represents.
 const ID_KEYS = ['invoice', 'reference_name', 'kot'] as const;
 
@@ -148,18 +144,6 @@ export function useOrdersPrintJobs() {
       });
     };
 
-    // Desk edits and other out-of-band saves only emit Frappe's generic
-    // list_update; converge with a debounced refetch (saves are rare).
-    let listUpdateTimer: ReturnType<typeof setTimeout> | null = null;
-    const handleListUpdate = (payload: { doctype?: string }) => {
-      if (payload?.doctype !== 'URY Print Job') return;
-      if (listUpdateTimer) clearTimeout(listUpdateTimer);
-      listUpdateTimer = setTimeout(() => {
-        listUpdateTimer = null;
-        fetchFailedJobs();
-      }, LIST_UPDATE_DEBOUNCE_MS);
-    };
-
     // Events fired while the socket was down are lost; resync on reconnect.
     const handleConnect = () => {
       if (socketSeenConnectedRef.current) {
@@ -178,7 +162,6 @@ export function useOrdersPrintJobs() {
     socket.on('invoice_print_completed', handleCompleted);
     socket.on('kot_print_completed', handleCompleted);
     socket.on('kot_print_failed', handleFailure);
-    socket.on('list_update', handleListUpdate);
     socket.on('connect', handleConnect);
 
     return () => {
@@ -187,9 +170,7 @@ export function useOrdersPrintJobs() {
       socket.off('invoice_print_completed', handleCompleted);
       socket.off('kot_print_completed', handleCompleted);
       socket.off('kot_print_failed', handleFailure);
-      socket.off('list_update', handleListUpdate);
       socket.off('connect', handleConnect);
-      if (listUpdateTimer) clearTimeout(listUpdateTimer);
     };
   }, [fetchFailedJobs]);
 
