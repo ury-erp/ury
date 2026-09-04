@@ -464,6 +464,16 @@ def update_reservation_status(reservation_name, status, pos_invoice=None):
     if pos_invoice:
         doc.pos_invoice = pos_invoice
 
+    if status == "Completed" and doc.reserved_table:
+        frappe.db.set_value(
+            "URY Table",
+            doc.reserved_table,
+            {
+                "occupied": 1,
+                "latest_invoice_time": now_datetime(),
+            },
+        )
+
     doc.save(ignore_permissions=True)
     frappe.db.commit()
     return True
