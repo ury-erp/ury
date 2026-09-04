@@ -301,6 +301,7 @@ class TestURYTableReservation(FrappeTestCase):
             "reserved_at": past_time,
             "status": "Confirmed",
         })
+        doc.flags.ignore_validate = True
         doc.insert(ignore_permissions=True, ignore_links=True)
         frappe.db.commit()
 
@@ -309,3 +310,62 @@ class TestURYTableReservation(FrappeTestCase):
 
         doc.reload()
         self.assertEqual(doc.status, "No Show")
+
+    def test_completed_status_transition(self):
+        res_time = (now_datetime() + timedelta(days=1)).strftime("%Y-%m-%d 18:00:00")
+        res_id = create_table_reservation(
+            table="_Test Reservation Table 1",
+            customer="_Test Reservation Customer",
+            customer_name="Customer Complete",
+            customer_phone="9876543210",
+            no_of_pax=2,
+            reserved_at=res_time,
+            branch=self.branch,
+        )
+        update_reservation_status(res_id, "Completed")
+        doc = frappe.get_doc("URY Table Reservation", res_id)
+        self.assertEqual(doc.status, "Completed")
+
+    def test_cancelled_status_persistence_and_table_release(self):
+        res_time = (now_datetime() + timedelta(days=2)).strftime("%Y-%m-%d 18:00:00")
+        res1_id = create_table_reservation(
+            table="_Test Reservation Table 1",
+            customer="_Test Reservation Customer",
+            customer_name="Customer Cancel",
+            customer_phone="9876543210",
+            no_of_pax=2,
+            reserved_at=res_time,
+            branch=self.branch,
+        )
+        # Cancel reservation
+        update_reservation_status(res1_id, "Cancelled")
+        doc1 = frappe.get_doc("URY Table Reservation", res1_id)
+        self.assertEqual(doc1.status, "Cancelled")
+
+        # Booking same table & time after cancellation should succeed because table is released
+        res2_id = create_table_reservation(
+            table="_Test Reservation Table 1",
+            customer="_Test Customer B",
+            customer_name="Customer New Booking",
+            customer_phone="9876543211",
+            no_of_pax=2,
+            reserved_at=res_time,
+            branch=self.branch,
+        )
+        self.assertTrue(res2_id)
+
+    def test_invalid_status_transition(self):
+        res_time = (now_datetime() + timedelta(days=3)).strftime("%Y-%m-%d 18:00:00")
+        res_id = create_table_reservation(
+            table="_Test Reservation Table 1",
+            customer="_Test Reservation Customer",
+            customer_name="Customer Invalid Transition",
+            customer_phone="9876543210",
+            no_of_pax=2,
+            reserved_at=res_time,
+            branch=self.branch,
+        )
+        update_reservation_status(res_id, "Cancelled")
+        with self.assertRaises(frappe.ValidationError):
+            update_reservation_status(res_id, "Completed")
+

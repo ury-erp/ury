@@ -320,6 +320,28 @@ def check_table_reservation(table):
         return None
 
 
+def get_current_pos_opening_entry(branch):
+    """
+    Returns the active POS Opening Entry document for a branch if currently open.
+    """
+    if not branch:
+        return None
+    openings = frappe.db.get_all(
+        "POS Opening Entry",
+        filters={
+            "branch": branch,
+            "status": "Open",
+            "docstatus": 1,
+        },
+        fields=["name", "period_start_date", "creation"],
+        order_by="creation desc",
+        limit=1,
+    )
+    if openings:
+        return openings[0]
+    return None
+
+
 @frappe.whitelist()
 def create_table_reservation(
     table,
@@ -333,6 +355,7 @@ def create_table_reservation(
 ):
     """
     Creates a new table reservation with status 'Confirmed' after validating conflicts.
+    Associates the reservation with the active POS session if one exists.
     """
     if isinstance(reserved_at, str) and "T" in reserved_at:
         reserved_at = reserved_at.replace("T", " ")
@@ -346,7 +369,9 @@ def create_table_reservation(
     if not customer_phone and customer:
         customer_phone = frappe.db.get_value("Customer", customer, "mobile_number") or ""
 
-    doc = frappe.get_doc({
+    active_opening = get_current_pos_opening_entry(branch)
+
+    doc_dict = {
         "doctype": "URY Table Reservation",
         "branch": branch,
         "reserved_table": table,
@@ -357,8 +382,11 @@ def create_table_reservation(
         "reserved_at": reserved_at,
         "comments": notes,
         "status": "Confirmed",
-    })
+    }
+    if active_opening:
+        doc_dict["pos_opening_entry"] = active_opening.name
 
+    doc = frappe.get_doc(doc_dict)
     doc.insert(ignore_permissions=True, ignore_links=True)
     frappe.db.commit()
     return doc.name
@@ -416,12 +444,22 @@ def update_table_reservation(
 @frappe.whitelist()
 def update_reservation_status(reservation_name, status, pos_invoice=None):
     """
-    Updates the status of a reservation (Completed, Cancelled, No Show) and optionally links POS Invoice.
+    Updates the status of a reservation (Completed, Cancelled, No Show) with validation.
     """
     if not reservation_name:
         frappe.throw(_("Reservation ID is required."))
 
     doc = frappe.get_doc("URY Table Reservation", reservation_name)
+
+    # Validate status transitions
+    if status == "Completed":
+        if doc.status in ("Cancelled", "No Show"):
+            frappe.throw(_("Cannot mark a {0} reservation as Completed.").format(doc.status))
+
+    if status == "Cancelled":
+        if doc.status == "Completed":
+            frappe.throw(_("Cannot cancel a reservation that is already Completed."))
+
     doc.status = status
     if pos_invoice:
         doc.pos_invoice = pos_invoice
@@ -434,37 +472,55 @@ def update_reservation_status(reservation_name, status, pos_invoice=None):
 @frappe.whitelist()
 def get_active_reservations(branch=None):
     """
-    Returns all Confirmed reservations for a branch, enriched with lock window status.
+    Returns reservations for the current active POS session for a branch.
+    Auto-processes past-due Confirmed reservations to 'No Show' server-side.
     """
     try:
-        filters = {"status": ["in", ["Confirmed", "Active"]]}
-        if branch:
-            filters["branch"] = branch
+        from ury.ury.api.reservation_scheduler import process_reservation_no_shows
+        process_reservation_no_shows()
 
-        reservations = frappe.db.get_all(
-            "URY Table Reservation",
-            filters=filters,
-            fields=[
-                "name",
-                "branch",
-                "reserved_table",
-                "customer",
-                "customer_name",
-                "customer_phone",
-                "no_of_pax",
-                "reserved_at",
-                "comments",
-                "status",
-            ],
-            order_by="reserved_at asc",
-        )
+        if not branch:
+            return []
+
+        active_opening = get_current_pos_opening_entry(branch)
+        session_clause = ""
+        params = [branch]
+
+        if active_opening:
+            session_name = active_opening.name
+            session_start = parse_to_datetime(
+                active_opening.get("period_start_date") or active_opening.get("creation"),
+                now_datetime()
+            )
+            session_clause = """
+                AND (
+                    pos_opening_entry = %s
+                    OR (
+                        (pos_opening_entry IS NULL OR pos_opening_entry = '')
+                        AND reserved_at >= %s
+                    )
+                )
+            """
+            params.extend([session_name, session_start])
+
+        query = f"""
+            SELECT
+                name, branch, reserved_table, customer, customer_name,
+                customer_phone, no_of_pax, reserved_at, comments, status, pos_opening_entry
+            FROM `tabURY Table Reservation`
+            WHERE branch = %s
+              {session_clause}
+            ORDER BY reserved_at ASC
+        """
+
+        reservations = frappe.db.sql(query, tuple(params), as_dict=True)
 
         now = now_datetime()
         branch_settings_cache = {}
 
         result = []
         for res in reservations:
-            b = res.branch
+            b = res.branch or branch
             if b not in branch_settings_cache:
                 branch_settings_cache[b] = get_branch_reservation_settings(b)
 
@@ -477,7 +533,8 @@ def get_active_reservations(branch=None):
             lock_start = res_time - timedelta(minutes=buf)
             grace_end = res_time + timedelta(minutes=grace)
 
-            res["is_lock_window_active"] = (lock_start <= now <= grace_end)
+            is_active_status = res.get("status") in ("Confirmed", "Active")
+            res["is_lock_window_active"] = is_active_status and (lock_start <= now <= grace_end)
             res["buffer_minutes"] = buf
             res["grace_minutes"] = grace
             res["duration_minutes"] = duration
