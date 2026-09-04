@@ -79,13 +79,18 @@ def get_branch_reservation_settings(branch):
         ) or {}
 
         enable_reservation = cint(branch_doc.get("custom_enable_reservation") or 0)
-        buffer_time = cint(branch_doc.get("custom_buffer_time") or 30)
+        buffer_time_raw = branch_doc.get("custom_buffer_time")
+        buffer_time = cint(buffer_time_raw) if buffer_time_raw is not None and str(buffer_time_raw).strip() != "" else 30
         if buffer_time <= 0:
             buffer_time = 30
 
-        grace_period = cint(branch_doc.get("custom_grace_period") or 15)
-        if grace_period <= 0:
+        grace_period_raw = branch_doc.get("custom_grace_period")
+        if grace_period_raw is None or str(grace_period_raw).strip() == "":
             grace_period = 15
+        else:
+            grace_period = cint(grace_period_raw)
+            if grace_period < 0:
+                grace_period = 0
 
         last_day_avg = get_branch_last_day_avg_time(branch)
         last_week_avg = get_branch_last_week_avg_time(branch)

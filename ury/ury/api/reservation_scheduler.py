@@ -29,6 +29,9 @@ def process_reservation_no_shows():
 
     for res in confirmed_reservations:
         b = res.branch
+        if not b and res.reserved_table:
+            b = frappe.db.get_value("URY Table", res.reserved_table, "branch")
+
         if b not in branch_settings_cache:
             branch_settings_cache[b] = get_branch_reservation_settings(b)
 
