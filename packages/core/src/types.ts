@@ -55,4 +55,9 @@ export interface PosProfileCombined {
   edit_order_type?: number;
   view_all_status?: number;
   custom_daily_pos_close?: number;
+  custom_disable_print_status_tracking?: number | boolean;
 }
+
+export const isPrintStatusDisabled = (posProfile?: Partial<PosProfileCombined> | null): boolean => {
+  return Boolean(posProfile?.custom_disable_print_status_tracking);
+};

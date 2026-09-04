@@ -116,6 +116,18 @@ class CustomNetworkPrinterSettings(NetworkPrinterSettings):
             if extra_metadata:
                 metadata.update(extra_metadata)
 
+            from ury.ury.printing.service import is_print_status_tracking_disabled
+
+            pos_profile = extra_metadata.get("pos_profile") if extra_metadata else None
+            if is_print_status_tracking_disabled(pos_profile):
+                return {
+                    "status": "Success",
+                    "cups_job_id": cups_job_id,
+                    "print_job_id": print_job_id,
+                    "printer": self.name,
+                    "file_path": file_path,
+                }
+
             from ury.ury.printing.print_job_monitor import register_print_job
 
             register_print_job(metadata)
