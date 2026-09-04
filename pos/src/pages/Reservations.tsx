@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   BookLock,
   CalendarClock,
+  CheckCircle,
   MoreVertical,
   Pencil,
   Phone,
@@ -132,6 +133,16 @@ export default function Reservations() {
     }
   };
 
+  const handleCompleteReservation = async (res: TableReservation) => {
+    try {
+      await updateTableReservationStatus(res.name, 'Completed');
+      setMenuOpenId(null);
+      await fetchReservationsData();
+    } catch (err) {
+      console.error('Failed to complete reservation:', err);
+    }
+  };
+
   const handleRoomChange = (val: string) => {
     setSelectedRoom(val);
     if (val !== 'all' && selectedTableFilter !== 'all') {
@@ -192,11 +203,11 @@ export default function Reservations() {
       case 'Requested':
         return <Badge variant="outline">Requested</Badge>;
       case 'Completed':
-        return <Badge variant="default">Completed</Badge>;
+        return <Badge variant="completed">Completed</Badge>;
       case 'Cancelled':
-        return <Badge variant="destructive">Cancelled</Badge>;
+        return <Badge variant="cancelled">Cancelled</Badge>;
       case 'No Show':
-        return <Badge variant="destructive">No Show</Badge>;
+        return <Badge variant="danger">No Show</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
@@ -309,44 +320,57 @@ export default function Reservations() {
                       <div className="flex items-center gap-2">
                         {getStatusBadge(res.status)}
 
-                        {/* Three-Dot Action Menu */}
-                        <div className="relative">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setMenuOpenId(isMenuOpen ? null : res.name);
-                            }}
-                            className="p-1.5 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors focus:outline-none"
-                          >
-                            <MoreVertical className="w-4 h-4" />
-                          </button>
-
-                          {isMenuOpen && (
-                            <div
-                              className="absolute right-0 mt-1 w-44 bg-white border border-gray-200 rounded-lg shadow-lg z-50 py-1"
-                              onClick={(e) => e.stopPropagation()}
+                        {/* Three-Dot Action Menu (Only for actionable statuses) */}
+                        {['Confirmed', 'Active', 'Requested'].includes(res.status) && (
+                          <div className="relative">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setMenuOpenId(isMenuOpen ? null : res.name);
+                              }}
+                              className="p-1.5 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors focus:outline-none"
                             >
-                              <button
-                                type="button"
-                                onClick={() => handleOpenEdit(res)}
-                                className="w-full text-left px-4 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                              >
-                                <Pencil className="w-3.5 h-3.5 text-blue-600" />
-                                <span>Edit Reservation</span>
-                              </button>
+                              <MoreVertical className="w-4 h-4" />
+                            </button>
 
-                              <button
-                                type="button"
-                                onClick={() => handleOpenCancel(res)}
-                                className="w-full text-left px-4 py-2 text-xs font-medium text-red-600 hover:bg-red-50 flex items-center gap-2"
+                            {isMenuOpen && (
+                              <div
+                                className="absolute right-0 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50 py-1"
+                                onClick={(e) => e.stopPropagation()}
                               >
-                                <XCircle className="w-3.5 h-3.5 text-red-600" />
-                                <span>Cancel Reservation</span>
-                              </button>
-                            </div>
-                          )}
-                        </div>
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEdit(res)}
+                                  className="w-full text-left px-4 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                                >
+                                  <Pencil className="w-3.5 h-3.5 text-blue-600" />
+                                  <span>Edit Reservation</span>
+                                </button>
+
+                                {['Confirmed', 'Active'].includes(res.status) && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCompleteReservation(res)}
+                                    className="w-full text-left px-4 py-2 text-xs font-medium text-emerald-700 hover:bg-emerald-50 flex items-center gap-2"
+                                  >
+                                    <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
+                                    <span>Complete Reservation</span>
+                                  </button>
+                                )}
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenCancel(res)}
+                                  className="w-full text-left px-4 py-2 text-xs font-medium text-red-600 hover:bg-red-50 flex items-center gap-2"
+                                >
+                                  <XCircle className="w-3.5 h-3.5 text-red-600" />
+                                  <span>Cancel Reservation</span>
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
 
