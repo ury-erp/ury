@@ -5,9 +5,7 @@
       "command": "codegraph",
       "args": [
         "serve",
-        "--mcp",
-        "--path",
-        "C:\\Users\\Admin\\Source\\repos\\bron"
+        "--mcp"
       ]
     }
   }
