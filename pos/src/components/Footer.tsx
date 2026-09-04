@@ -43,14 +43,12 @@ const Footer = () => {
   }, [branch]);
 
   const navItems = [
-    { icon: LayoutGrid, label: t('footer.pos'), path: '/' },
-    { icon: Table, label: t('footer.table'), path: '/table' },
-    ...(reservationEnabled
-      ? [{ icon: BookLock, label: 'Reservations', path: '/reservations' }]
-      : []),
     { icon: LayoutDashboard, label: t('footer.dashboard'), path: '/dashboard' },
     { icon: LayoutGrid, label: t('footer.pos'), path: '/pos' },
     { icon: Table, label: t('footer.tables'), path: '/tables' },
+    ...(reservationEnabled
+      ? [{ icon: BookLock, label: t('footer.reservations') || 'Reservations', path: '/reservations' }]
+      : []),
     { icon: ClipboardList, label: t('footer.orders'), path: '/orders' },
     { icon: Settings, label: t('footer.settings'), path: '/settings', hidden: true },
   ].filter((item) => !item.hidden);
