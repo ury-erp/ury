@@ -11,8 +11,7 @@ import {
   Button,
   Input,
   Textarea,
-  Select,
-  SelectItem,
+  SearchableSelect,
 } from '@ury/ui';
 
 import { TableShapeIcon } from './TableShapeIcon';
@@ -258,18 +257,18 @@ const TableReservationEditDialog = ({
                 Table <span className="text-red-500">*</span>
               </label>
 
-              <Select
+              <SearchableSelect
+                id="edit-reservation-table"
                 value={selectedTable}
-                onValueChange={setSelectedTable}
-                disabled={loading}
+                options={tablesList.map((t) => ({
+                  value: t.name,
+                  label: `${t.name} (${t.restaurant_room} - ${t.no_of_seats || 0} seats)`,
+                }))}
                 placeholder="Select a table"
-              >
-                {tablesList.map((t) => (
-                  <SelectItem key={t.name} value={t.name}>
-                    {t.name} ({t.restaurant_room} - {t.no_of_seats || 0} seats)
-                  </SelectItem>
-                ))}
-              </Select>
+                onChange={(_, val) => setSelectedTable(val)}
+                disabled={loading}
+                strict
+              />
             </div>
 
             {/* Customer */}

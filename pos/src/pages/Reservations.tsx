@@ -13,8 +13,7 @@ import {
   Badge,
   Card,
   CardContent,
-  Select,
-  SelectItem,
+  SearchableSelect,
 } from '@ury/ui';
 import { usePOSStore } from '../store/pos-store';
 import {
@@ -241,25 +240,31 @@ export default function Reservations() {
         {/* Separate Room and Table Dropdowns */}
         <div className="flex items-center gap-3">
           <div className="w-44">
-            <Select size="sm" value={selectedRoom} onValueChange={handleRoomChange}>
-              <SelectItem value="all">All Rooms</SelectItem>
-              {rooms.map((r) => (
-                <SelectItem key={r.name} value={r.name}>
-                  {r.name}
-                </SelectItem>
-              ))}
-            </Select>
+            <SearchableSelect
+              id="room-filter"
+              value={selectedRoom}
+              options={[
+                { value: 'all', label: 'All Rooms' },
+                ...rooms.map((r) => ({ value: r.name, label: r.name })),
+              ]}
+              placeholder="All Rooms"
+              onChange={(_, val) => handleRoomChange(val)}
+              strict
+            />
           </div>
 
           <div className="w-44">
-            <Select size="sm" value={selectedTableFilter} onValueChange={setSelectedTableFilter}>
-              <SelectItem value="all">All Tables</SelectItem>
-              {filteredTablesForFilter.map((t) => (
-                <SelectItem key={t.name} value={t.name}>
-                  {t.name}
-                </SelectItem>
-              ))}
-            </Select>
+            <SearchableSelect
+              id="table-filter"
+              value={selectedTableFilter}
+              options={[
+                { value: 'all', label: 'All Tables' },
+                ...filteredTablesForFilter.map((t) => ({ value: t.name, label: t.name })),
+              ]}
+              placeholder="All Tables"
+              onChange={(_, val) => setSelectedTableFilter(val)}
+              strict
+            />
           </div>
         </div>
       </div>
