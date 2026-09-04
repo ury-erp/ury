@@ -1,20 +1,16 @@
-import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import {
-  BookOpenCheck,
+  BookLock,
   CalendarClock,
-  ChevronDown,
-  Filter,
   MoreVertical,
   Pencil,
   Phone,
   User,
   Users,
-  X,
   XCircle,
 } from 'lucide-react';
 import {
   Badge,
-  Button,
   Card,
   CardContent,
   Select,
@@ -45,10 +41,7 @@ export default function Reservations() {
   const [availableTables, setAvailableTables] = useState<Table[]>([]);
   const [selectedRoom, setSelectedRoom] = useState<string>('all');
   const [selectedTableFilter, setSelectedTableFilter] = useState<string>('all');
-  const [isFilterOpen, setIsFilterOpen] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
-
-  const filterRef = useRef<HTMLDivElement>(null);
 
   // Active action menu popover state
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
@@ -58,26 +51,6 @@ export default function Reservations() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState<boolean>(false);
   const [cancelReservation, setCancelReservation] = useState<TableReservation | null>(null);
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState<boolean>(false);
-
-  // Click outside to close filter popover (ignoring Radix Select portals)
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Element | null;
-      if (!target) return;
-
-      if (
-        filterRef.current?.contains(target) ||
-        target.closest?.('[data-radix-popper-content-wrapper]') ||
-        target.closest?.('[role="listbox"]')
-      ) {
-        return;
-      }
-
-      setIsFilterOpen(false);
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
 
   const fetchReservationsData = useCallback(async () => {
     if (!branch) return;
@@ -160,12 +133,14 @@ export default function Reservations() {
     }
   };
 
-  const hasActiveFilter = selectedRoom !== 'all' || selectedTableFilter !== 'all';
-  const activeFilterCount = (selectedRoom !== 'all' ? 1 : 0) + (selectedTableFilter !== 'all' ? 1 : 0);
-
-  const handleClearFilters = () => {
-    setSelectedRoom('all');
-    setSelectedTableFilter('all');
+  const handleRoomChange = (val: string) => {
+    setSelectedRoom(val);
+    if (val !== 'all' && selectedTableFilter !== 'all') {
+      const tbl = availableTables.find((t) => t.name === selectedTableFilter);
+      if (tbl && tbl.restaurant_room !== val) {
+        setSelectedTableFilter('all');
+      }
+    }
   };
 
   // Tables list for the Table filter dropdown (filtered by selected Room if set)
@@ -251,7 +226,7 @@ export default function Reservations() {
       <div className="bg-white border-b border-gray-200 px-6 py-4 flex flex-wrap items-center justify-between gap-4 shrink-0">
         <div className="flex items-center gap-3">
           <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl">
-            <BookOpenCheck className="w-6 h-6" />
+            <BookLock className="w-6 h-6" />
           </div>
           <div>
             <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
@@ -263,78 +238,29 @@ export default function Reservations() {
           </div>
         </div>
 
-        {/* Reservations Filter Dropdown */}
-        <div className="relative" ref={filterRef}>
-          <Button
-            variant={hasActiveFilter ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setIsFilterOpen(!isFilterOpen)}
-            className="flex items-center gap-2"
-          >
-            <Filter className="w-4 h-4" />
-            <span>Filter</span>
-            {hasActiveFilter && (
-              <span className="ml-1 rounded-full bg-white/20 px-1.5 py-0.5 text-xs font-bold text-white">
-                {activeFilterCount}
-              </span>
-            )}
-            <ChevronDown className="w-3.5 h-3.5 opacity-60" />
-          </Button>
+        {/* Separate Room and Table Dropdowns */}
+        <div className="flex items-center gap-3">
+          <div className="w-44">
+            <Select size="sm" value={selectedRoom} onValueChange={handleRoomChange}>
+              <SelectItem value="all">All Rooms</SelectItem>
+              {rooms.map((r) => (
+                <SelectItem key={r.name} value={r.name}>
+                  {r.name}
+                </SelectItem>
+              ))}
+            </Select>
+          </div>
 
-          {isFilterOpen && (
-            <div className="absolute right-0 mt-2 w-72 rounded-xl border border-gray-200 bg-white p-4 shadow-xl z-50 space-y-4">
-              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-                <span className="text-sm font-bold text-gray-900">Filter Reservations</span>
-                {hasActiveFilter && (
-                  <button
-                    type="button"
-                    onClick={handleClearFilters}
-                    className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1"
-                  >
-                    <X className="w-3 h-3" />
-                    Clear filters
-                  </button>
-                )}
-              </div>
-
-              {/* Room Filter */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-gray-600">Room</label>
-                <Select
-                  value={selectedRoom}
-                  onValueChange={(val) => {
-                    setSelectedRoom(val);
-                    if (val !== 'all' && selectedTableFilter !== 'all') {
-                      const tbl = availableTables.find((t) => t.name === selectedTableFilter);
-                      if (tbl && tbl.restaurant_room !== val) {
-                        setSelectedTableFilter('all');
-                      }
-                    }
-                  }}
-                >
-                  <SelectItem value="all">All Rooms</SelectItem>
-                  {rooms.map((r) => (
-                    <SelectItem key={r.name} value={r.name}>
-                      {r.name}
-                    </SelectItem>
-                  ))}
-                </Select>
-              </div>
-
-              {/* Table Filter */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-gray-600">Table</label>
-                <Select value={selectedTableFilter} onValueChange={setSelectedTableFilter}>
-                  <SelectItem value="all">All Tables</SelectItem>
-                  {filteredTablesForFilter.map((t) => (
-                    <SelectItem key={t.name} value={t.name}>
-                      {t.name} ({t.restaurant_room})
-                    </SelectItem>
-                  ))}
-                </Select>
-              </div>
-            </div>
-          )}
+          <div className="w-44">
+            <Select size="sm" value={selectedTableFilter} onValueChange={setSelectedTableFilter}>
+              <SelectItem value="all">All Tables</SelectItem>
+              {filteredTablesForFilter.map((t) => (
+                <SelectItem key={t.name} value={t.name}>
+                  {t.name}
+                </SelectItem>
+              ))}
+            </Select>
+          </div>
         </div>
       </div>
 
@@ -347,7 +273,7 @@ export default function Reservations() {
         ) : filteredReservations.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 text-center">
             <div className="p-4 bg-gray-100 rounded-full text-gray-400 mb-3">
-              <BookOpenCheck className="w-8 h-8" />
+              <BookLock className="w-8 h-8" />
             </div>
             <h3 className="text-base font-semibold text-gray-800">No Reservations Found</h3>
             <p className="text-xs text-gray-500 mt-1 max-w-sm">
