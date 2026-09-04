@@ -424,6 +424,10 @@ const TableView = () => {
   };
 
   const handleReservationCancel = () => {
+    if (pendingTable && reservationInfo) {
+      const formattedTime = reservationInfo.reserved_at ? reservationInfo.reserved_at.replace('T', ' ') : '';
+      showToast.error(`Table ${pendingTable} is reserved for ${formattedTime}.`);
+    }
     setReservationWarningOpen(false);
     setPendingTable(null);
     setReservationInfo(null);

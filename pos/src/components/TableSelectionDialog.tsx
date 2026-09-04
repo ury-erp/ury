@@ -1,12 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { X, Square, AlertTriangle } from 'lucide-react';
 import { usePOSStore } from '../store/pos-store';
-import { Dialog, DialogContent } from '@ury/ui';
-import { Button } from '@ury/ui';
-import { cn } from '@ury/ui';
-import { getRooms, getTables, Room, Table } from '../lib/table-api';
-import { Badge } from '@ury/ui';
-import { Spinner } from '@ury/ui';
+import { Dialog, DialogContent, Button, Badge, Spinner, showToast, cn } from '@ury/ui';
+import { getRooms, getTables, getActiveReservations, Room, Table, TableReservation } from '../lib/table-api';
 import { TableShapeIcon } from './TableShapeIcon';
 import { getMergeGroupMembers, formatMergedTableLabelFromGroup } from '../lib/table-utils';
 import { t } from '../i18n';
@@ -19,6 +15,7 @@ const TableSelectionDialog: React.FC<Props> = ({ onClose }) => {
   const { selectedTable, setSelectedTable, posProfile } = usePOSStore();
   const [rooms, setRooms] = useState<Room[]>([]);
   const [tables, setTables] = useState<Table[]>([]);
+  const [activeReservationsList, setActiveReservationsList] = useState<TableReservation[]>([]);
   const [tablesCache, setTablesCache] = useState<Record<string, Table[]>>({});
   const [selectedRoom, setSelectedRoom] = useState<string | null>(null);
   const [loadingRooms, setLoadingRooms] = useState(false);
@@ -29,6 +26,36 @@ const TableSelectionDialog: React.FC<Props> = ({ onClose }) => {
     return [...tables].sort((a, b) => a.name.localeCompare(b.name));
   };
 
+  // Fetch active reservations for the branch
+  useEffect(() => {
+    if (!posProfile?.branch) return;
+    getActiveReservations(posProfile.branch)
+      .then((res) => setActiveReservationsList(res || []))
+      .catch(() => setActiveReservationsList([]));
+  }, [posProfile?.branch]);
+
+  const lockActiveReservationsByTable = useMemo(() => {
+    const map = new Map<string, TableReservation>();
+    for (const res of activeReservationsList) {
+      if (res.is_lock_window_active && res.status === 'Confirmed') {
+        map.set(res.reserved_table, res);
+      }
+    }
+    return map;
+  }, [activeReservationsList]);
+
+  const formatReservedLabel = (reservedAt?: string) => {
+    if (!reservedAt) return 'Reserved';
+    try {
+      const d = new Date(reservedAt.replace(' ', 'T'));
+      if (isNaN(d.getTime())) return `Reserved for ${reservedAt}`;
+      const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      return `Reserved for ${timeStr}`;
+    } catch {
+      return `Reserved for ${reservedAt}`;
+    }
+  };
+
   // Fetch rooms on mount with session storage
   useEffect(() => {
     async function fetchRooms() {
@@ -37,7 +64,6 @@ const TableSelectionDialog: React.FC<Props> = ({ onClose }) => {
       setError(null);
 
       try {
-        // Try to get rooms from session storage first
         const sessionKey = `ury_rooms_${posProfile.branch}`;
         const cachedRooms = sessionStorage.getItem(sessionKey);
         
@@ -48,13 +74,11 @@ const TableSelectionDialog: React.FC<Props> = ({ onClose }) => {
             setSelectedRoom(parsedRooms[0].name);
           }
         } else {
-          // If not in session storage, fetch from API
           const fetchedRooms = await getRooms(posProfile.branch);
           setRooms(fetchedRooms);
           if (fetchedRooms.length > 0) {
             setSelectedRoom(fetchedRooms[0].name);
           }
-          // Store in session storage
           sessionStorage.setItem(sessionKey, JSON.stringify(fetchedRooms));
         }
       } catch (e) {
@@ -71,7 +95,6 @@ const TableSelectionDialog: React.FC<Props> = ({ onClose }) => {
     async function fetchTables() {
       if (!selectedRoom) return;
       setError(null);
-      // If already cached, use cache
       if (tablesCache[selectedRoom]) {
         setTables(sortTables(tablesCache[selectedRoom]));
         setLoadingTables(false);
@@ -158,51 +181,87 @@ const TableSelectionDialog: React.FC<Props> = ({ onClose }) => {
             </div>
           ) : (
             <div className="grid grid-cols-3 gap-6">
-              {tables.map(table => (
-                <Button
-                  key={table.name}
-                  onClick={() => {
-                    setSelectedTable(table.name, selectedRoom);
-                    onClose();
-                  }}
-                  variant="outline"
-                  className={cn(
-                    'h-fit p-4 rounded-lg border-2 flex flex-col items-center gap-2 transition-colors relative',
-                    selectedTable === table.name
-                      ? 'border-primary-600 bg-primary-50'
-                      : table.occupied === 1
-                      ? 'border-amber-500 bg-amber-50 hover:border-amber-600 hover:bg-amber-100'
-                      : 'border-gray-200 hover:border-primary-300 hover:bg-gray-50',
-                    'focus-visible:ring-2 focus-visible:ring-primary-600',
-                  )}
-                >
-                  <TableShapeIcon
-                    shape={table.table_shape}
+              {tables.map(table => {
+                const activeRes = lockActiveReservationsByTable.get(table.name);
+                const isReserved = !!activeRes;
+
+                return (
+                  <Button
+                    key={table.name}
+                    onClick={() => {
+                      if (isReserved) {
+                        let timeStr = '';
+                        if (activeRes?.reserved_at) {
+                          try {
+                            const d = new Date(activeRes.reserved_at.replace(' ', 'T'));
+                            timeStr = !isNaN(d.getTime())
+                              ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                              : activeRes.reserved_at;
+                          } catch {
+                            timeStr = activeRes.reserved_at;
+                          }
+                        }
+                        showToast.error(`Table ${table.name} is reserved for ${timeStr}.`);
+                        return;
+                      }
+                      setSelectedTable(table.name, selectedRoom);
+                      onClose();
+                    }}
+                    variant="outline"
                     className={cn(
-                      'w-8 h-8',
-                      table.occupied === 1 ? 'text-amber-500' : 'text-gray-500'
+                      'h-fit p-4 rounded-lg border-2 flex flex-col items-center gap-2 transition-colors relative',
+                      selectedTable === table.name
+                        ? 'border-primary-600 bg-primary-50'
+                        : table.occupied === 1
+                        ? 'border-amber-500 bg-amber-50 hover:border-amber-600 hover:bg-amber-100'
+                        : isReserved
+                        ? 'border-indigo-400 bg-indigo-50 hover:border-indigo-500 hover:bg-indigo-100'
+                        : 'border-gray-200 hover:border-primary-300 hover:bg-gray-50',
+                      'focus-visible:ring-2 focus-visible:ring-primary-600'
                     )}
-                  />
-                  <div className="text-center">
-                    <div className="font-medium">{table.name}</div>
-                    {(() => {
-                      const members = getMergeGroupMembers(table, tables);
-                      const label =
-                        members.length > 1 ? formatMergedTableLabelFromGroup(members) : null;
-                      return label && label !== table.name ? (
-                        <div className="mt-0.5 truncate text-xs text-primary-700">{label}</div>
-                      ) : null;
-                    })()}
-                    <div className="mt-2 h-4">
-                      {table.occupied === 1 && (
-                        <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-700 hover:bg-amber-100">
-                          {t('tables.occupied')}
-                        </Badge>
+                  >
+                    <TableShapeIcon
+                      shape={table.table_shape}
+                      className={cn(
+                        'w-8 h-8',
+                        table.occupied === 1
+                          ? 'text-amber-500'
+                          : isReserved
+                          ? 'text-indigo-600'
+                          : 'text-gray-500'
                       )}
+                    />
+                    <div className="text-center">
+                      <div className="font-medium">{table.name}</div>
+                      {(() => {
+                        const members = getMergeGroupMembers(table, tables);
+                        const label =
+                          members.length > 1 ? formatMergedTableLabelFromGroup(members) : null;
+                        return label && label !== table.name ? (
+                          <div className="mt-0.5 truncate text-xs text-primary-700">{label}</div>
+                        ) : null;
+                      })()}
+                      <div className="mt-2 min-h-4">
+                        {table.occupied === 1 ? (
+                          <Badge
+                            variant="secondary"
+                            className="text-xs bg-amber-100 text-amber-700 hover:bg-amber-100"
+                          >
+                            {t('tables.occupied')}
+                          </Badge>
+                        ) : isReserved ? (
+                          <Badge
+                            variant="outline"
+                            className="text-xs border-indigo-200 bg-indigo-100 text-indigo-800 hover:bg-indigo-100 font-medium"
+                          >
+                            {formatReservedLabel(activeRes?.reserved_at)}
+                          </Badge>
+                        ) : null}
+                      </div>
                     </div>
-                  </div>
-                </Button>
-              ))}
+                  </Button>
+                );
+              })}
             </div>
           )}
         </div>
@@ -211,4 +270,5 @@ const TableSelectionDialog: React.FC<Props> = ({ onClose }) => {
   );
 };
 
-export default TableSelectionDialog; 
+export default TableSelectionDialog;
+ 
