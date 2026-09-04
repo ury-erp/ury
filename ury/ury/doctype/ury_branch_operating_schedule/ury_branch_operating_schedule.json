@@ -1,0 +1,26 @@
+{
+ "doctype": "DocType",
+ "name": "URY Branch Operating Schedule",
+ "module": "URY",
+ "autoname": "field:branch",
+ "fields": [
+  {"fieldname": "branch", "fieldtype": "Link", "label": "Branch", "options": "Branch", "reqd": 1, "unique": 1},
+  {"fieldname": "enabled", "fieldtype": "Check", "label": "Enabled", "default": "1"},
+  {"fieldname": "timezone", "fieldtype": "Data", "label": "Timezone", "default": "Asia/Dubai"},
+  {"fieldname": "pre_open_time", "fieldtype": "Time", "label": "Pre-open Time"},
+  {"fieldname": "close_grace_minutes", "fieldtype": "Int", "label": "Close Grace (Minutes)", "default": "0"},
+  {"fieldname": "reconciliation_start_time", "fieldtype": "Time", "label": "Reconciliation Start Time"},
+  {"fieldname": "reconciliation_end_time", "fieldtype": "Time", "label": "Reconciliation End Time"},
+  {"fieldname": "monday", "fieldtype": "Table", "label": "Monday", "options": "URY Branch Service Window"},
+  {"fieldname": "tuesday", "fieldtype": "Table", "label": "Tuesday", "options": "URY Branch Service Window"},
+  {"fieldname": "wednesday", "fieldtype": "Table", "label": "Wednesday", "options": "URY Branch Service Window"},
+  {"fieldname": "thursday", "fieldtype": "Table", "label": "Thursday", "options": "URY Branch Service Window"},
+  {"fieldname": "friday", "fieldtype": "Table", "label": "Friday", "options": "URY Branch Service Window"},
+  {"fieldname": "saturday", "fieldtype": "Table", "label": "Saturday", "options": "URY Branch Service Window"},
+  {"fieldname": "sunday", "fieldtype": "Table", "label": "Sunday", "options": "URY Branch Service Window"}
+ ],
+ "permissions": [
+  {"role": "System Manager", "read": 1, "write": 1, "create": 1, "delete": 1},
+  {"role": "URY Manager", "read": 1, "write": 1, "create": 1, "delete": 1}
+ ]
+}

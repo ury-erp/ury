@@ -37,6 +37,7 @@ MANAGER_ROLES = {"URY Manager", "URY Admin", "System Manager"}
 
 NOT_PERMITTED = "NOT_PERMITTED"
 KOT_NOT_FOUND = "KOT_NOT_FOUND"
+ITEM_EXECUTION_DOCTYPE_NOT_FOUND = "ITEM_EXECUTION_DOCTYPE_NOT_FOUND"
 KOT_ITEM_NOT_FOUND = "KOT_ITEM_NOT_FOUND"
 INVALID_EXECUTION_TRANSITION = "INVALID_EXECUTION_TRANSITION"
 
@@ -49,7 +50,7 @@ class ItemExecutionError(frappe.ValidationError):
 
 def _require_item_execution_doctype():
 	if not frappe.db.exists("DocType", ITEM_EXECUTION_DOCTYPE):
-		raise ItemExecutionError(KOT_NOT_FOUND, _("{0} is not available on this site").format(ITEM_EXECUTION_DOCTYPE))
+		raise ItemExecutionError(ITEM_EXECUTION_DOCTYPE_NOT_FOUND, _("{0} is not available on this site").format(ITEM_EXECUTION_DOCTYPE))
 
 
 def _require_kot_item(kot_item):

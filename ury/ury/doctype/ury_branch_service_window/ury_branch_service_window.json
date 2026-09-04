@@ -1,0 +1,14 @@
+{
+ "doctype": "DocType",
+ "name": "URY Branch Service Window",
+ "module": "URY",
+ "istable": 1,
+ "editable_grid": 1,
+ "fields": [
+  {"fieldname": "service_name", "fieldtype": "Data", "label": "Service Name", "reqd": 1},
+  {"fieldname": "open_time", "fieldtype": "Time", "label": "Open Time", "reqd": 1},
+  {"fieldname": "close_time", "fieldtype": "Time", "label": "Close Time", "reqd": 1},
+  {"fieldname": "enabled", "fieldtype": "Check", "label": "Enabled", "default": "1"}
+ ],
+ "permissions": []
+}

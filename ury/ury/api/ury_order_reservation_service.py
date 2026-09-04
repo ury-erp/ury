@@ -23,6 +23,7 @@ from ury.ury.api.ury_reservation_service import (
 RESERVATION_DOCTYPE = "URY Stock Reservation"
 
 LINE_REF_FIELDS = (
+	"reservation_line_key",
 	"reservation_line_ref",
 	"line_ref",
 	"pos_line_ref",
