@@ -48,7 +48,7 @@ const TableReservationCancelDialog = ({
                     </DialogDescription>
                 </DialogHeader>
                 <div className="px-8 pb-8 space-y-5 overflow-y-auto min-h-0">
-                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
+                    <div className="rounded-xl border border-red-200 bg-red-50 p-5 shadow-sm">
 
                         <div className="mb-4 flex items-start justify-between">
                             <div>
@@ -138,15 +138,6 @@ const TableReservationCancelDialog = ({
                         </div>
 
                     </div>
-
-                    <div className="rounded-xl border border-red-200 bg-red-50 p-4">
-                        <p className="text-sm leading-6 text-red-700">
-                            This action will release the table for new reservations and walk-ins.
-                            <br />
-                            The reservation record will be marked as Cancelled.
-                        </p>
-                    </div>
-
                 </div>
                 <DialogFooter className="border-t bg-white px-8 py-5 shrink-0">
                     <Button

@@ -55,6 +55,7 @@ export default function Reservations() {
   const [completeReservation, setCompleteReservation] = useState<TableReservation | null>(null);
   const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState<boolean>(false);
   const [completeLoading, setCompleteLoading] = useState<boolean>(false);
+  const [cancelLoading, setCancelLoading] = useState<boolean>(false);
 
   const fetchReservationsData = useCallback(async () => {
     if (!branch) return;
@@ -134,12 +135,17 @@ export default function Reservations() {
 
   const handleConfirmCancel = async () => {
     if (!cancelReservation) return;
+    setCancelLoading(true);
     try {
       await updateTableReservationStatus(cancelReservation.name, 'Cancelled');
       await fetchReservationsData();
+      setIsCancelDialogOpen(false);
+      setCancelReservation(null);
     } catch (err) {
       console.error('Failed to cancel reservation:', err);
       throw err;
+    } finally {
+      setCancelLoading(false);
     }
   };
 
@@ -223,7 +229,7 @@ export default function Reservations() {
       case 'Cancelled':
         return <Badge variant="cancelled">Cancelled</Badge>;
       case 'No Show':
-        return <Badge variant="danger">No Show</Badge>;
+        return <Badge variant="noshow">No Show</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
@@ -463,8 +469,12 @@ export default function Reservations() {
         open={isCancelDialogOpen}
         reservation={cancelReservation}
         tableName={cancelReservation?.reserved_table || ''}
-        onClose={() => setIsCancelDialogOpen(false)}
+        onClose={() => {
+          setIsCancelDialogOpen(false);
+          setCancelReservation(null);
+        }}
         onConfirm={handleConfirmCancel}
+        loading={cancelLoading}
       />
     </div>
   );
