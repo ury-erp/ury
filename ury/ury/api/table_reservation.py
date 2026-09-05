@@ -328,12 +328,18 @@ def check_table_reservation(table):
 @frappe.whitelist()
 def get_completed_reservation_for_table(table, branch=None):
     """
-    Returns the recent completed reservation for a table if the customer has arrived
-    and no submitted invoice exists yet for that reservation.
+    Returns the recent completed reservation for a table ONLY IF the table is currently
+    Occupied (occupied = 1) and no submitted invoice exists yet for that reservation.
+    If the table is Available (occupied = 0), returns None.
     """
     if not table:
         return None
     try:
+        # Check current table state - MUST be currently occupied
+        is_occupied = frappe.db.get_value("URY Table", table, "occupied")
+        if not is_occupied or cint(is_occupied) != 1:
+            return None
+
         now = now_datetime()
         filters = {
             "reserved_table": table,
@@ -361,6 +367,7 @@ def get_completed_reservation_for_table(table, branch=None):
     except Exception as e:
         frappe.log_error(f"Error in get_completed_reservation_for_table: {str(e)}", "Reservation Lookup Error")
         return None
+
 
 
 def get_current_pos_opening_entry(branch):

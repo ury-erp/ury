@@ -793,6 +793,8 @@ def _resolve_or_create_pos_invoice(table, invoiceNo, order_type, is_payment, che
                     invoice.mobile_number = completed_res.get("customer_phone")
                 if completed_res.get("no_of_pax"):
                     invoice.no_of_pax = completed_res.get("no_of_pax")
+                if completed_res.get("name") and not completed_res.get("pos_invoice") and invoice_name:
+                    frappe.db.set_value("URY Table Reservation", completed_res.get("name"), "pos_invoice", invoice_name)
 
         if invoice_name and invoice.restaurant_table:
             _reconcile_invoice_merged_tables(invoice, persist=True)
