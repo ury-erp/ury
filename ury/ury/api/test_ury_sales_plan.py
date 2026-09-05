@@ -86,12 +86,26 @@ class TestURYSalesPlanEndpoints(FrappeTestCase):
                 }
             ).insert()
 
+    def _ensure_item(self, item_code):
+        if not frappe.db.exists("Item", item_code):
+            frappe.get_doc(
+                {
+                    "doctype": "Item",
+                    "item_code": item_code,
+                    "item_name": item_code,
+                    "item_group": "All Item Groups",
+                    "stock_uom": "Nos",
+                    "is_stock_item": 1,
+                }
+            ).insert()
+
     def setUp(self):
         self.company = "Sales Plan Test Co"
         self.branch = "Sales Plan Test Branch"
         self.plan_date = "2026-09-20"
         self._ensure_company(self.company, "SPT")
         self._ensure_branch(self.branch, self.company)
+        self._ensure_item("MTPL")
         frappe.db.delete(
             "URY Sales Plan",
             {"branch": self.branch, "company": self.company, "plan_date": self.plan_date},

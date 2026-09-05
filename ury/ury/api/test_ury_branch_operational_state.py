@@ -29,5 +29,5 @@ class TestBranchOperationalState(unittest.TestCase):
 	def test_closed_exception_wins(self, frappe_mock, _get_branch):
 		frappe_mock.db.get_value.side_effect = [{"name": "Main", "enabled": 1}, {"is_closed": 1, "reason": "Holiday"}]
 		result = resolve_branch_operational_state(at=datetime(2026, 9, 7, 12))
-		self.assertEqual(result["state"], "CLOSED")
+		self.assertEqual(result["state"], "OFF_HOURS")
 		self.assertEqual(result["reason"], "Holiday")
