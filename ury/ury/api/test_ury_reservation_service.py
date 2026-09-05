@@ -371,7 +371,7 @@ class TestReleaseFulfilCancel(FrappeTestCase):
         with patch(f"{MODULE}.frappe.get_all", return_value=[]) as get_all:
             result = _active_reservation_qty("ITEM-1", "WH-1", "Company")
         self.assertEqual(result, 0)
-        self.assertEqual(get_all.call_args.kwargs["filters"]["status"], {"in": [RESERVED]})
+        self.assertEqual(get_all.call_args.kwargs["filters"]["status"], ["in", [RESERVED]])
 
     def test_release_restores_capacity_for_subsequent_reservation(self):
         """Releasing a Reserved row transitions it to Released.
