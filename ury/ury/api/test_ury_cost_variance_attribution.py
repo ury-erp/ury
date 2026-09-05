@@ -153,17 +153,18 @@ class TestComputeVariance(unittest.TestCase):
         self.addCleanup(manager_patcher.stop)
 
     @patch(f"{MOD}.compute_theoretical_cost")
-    def test_variance_vs_theoretical_is_zero_when_posted_equals_theoretical(self, mock_theoretical):
+    def test_variance_is_provisional_until_posting_exists(self, mock_theoretical):
         mock_theoretical.return_value = {"theoretical_cost": 240.0}
 
         result = compute_variance("Burger", 10, "URY Co")
 
         self.assertEqual(result["theoretical_cost"], 240.0)
-        self.assertEqual(result["posted_cost"], 240.0)
-        self.assertEqual(result["variance_vs_theoretical"], 0.0)
+        self.assertIsNone(result["posted_cost"])
+        self.assertIsNone(result["variance_vs_theoretical"])
         self.assertIsNone(result["counted_qty"])
         self.assertIsNone(result["variance_vs_counted"])
-        self.assertIn("theoretical-equivalent", result["reason"])
+        self.assertEqual(result["reason"], "FULFILMENT_POSTING_REQUIRED")
+        self.assertTrue(result["provisional"])
 
     @patch(f"{MOD}.compute_theoretical_cost")
     def test_positive_variance_when_counted_qty_exceeds_expected(self, mock_theoretical):
