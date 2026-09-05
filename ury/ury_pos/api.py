@@ -966,6 +966,13 @@ def create_customer(customer_name, mobile_number=None, customer_group="Individua
 
     """Create a new customer"""
     try:
+        if territory and not frappe.db.exists("Territory", territory):
+            fallback_territory = frappe.db.get_single_value("Selling Settings", "territory")
+            if fallback_territory and frappe.db.exists("Territory", fallback_territory):
+                territory = fallback_territory
+            else:
+                territory = frappe.db.get_value("Territory", {"is_group": 1}, "name") or territory
+
         customer = frappe.get_doc({
             "doctype": "Customer",
             "customer_name": customer_name,
