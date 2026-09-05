@@ -403,7 +403,7 @@ def getInvoiceForCashier(status, cashier, limit, limit_start):
                 posting_date, rounded_total, order_type 
             FROM `tabPOS Invoice` 
             WHERE branch = %s AND status = %s AND cashier = %s
-            AND (invoice_printed = 1 OR (invoice_printed = 0 AND COALESCE(restaurant_table, '') = ''))
+            AND invoice_printed = 0
             ORDER BY modified desc
             LIMIT %s OFFSET %s
             """,
@@ -423,7 +423,7 @@ def getInvoiceForCashier(status, cashier, limit, limit_start):
                 posting_date, rounded_total, order_type 
             FROM `tabPOS Invoice` 
             WHERE branch = %s AND status = %s AND cashier = %s
-            AND (invoice_printed = 0 AND restaurant_table IS NOT NULL)
+            AND invoice_printed = 1
             ORDER BY modified desc
             LIMIT %s OFFSET %s
             """,
@@ -496,7 +496,7 @@ def getPosInvoice(status, limit, limit_start):
                 additional_discount_percentage, discount_amount
             FROM `tabPOS Invoice` 
             WHERE branch = %s AND status = %s 
-            AND (invoice_printed = 1 OR (invoice_printed = 0 AND COALESCE(restaurant_table, '') = ''))
+            AND invoice_printed = 0
             ORDER BY modified desc
             LIMIT %s OFFSET %s
             """,
@@ -519,7 +519,7 @@ def getPosInvoice(status, limit, limit_start):
                 additional_discount_percentage, discount_amount
             FROM `tabPOS Invoice` 
             WHERE branch = %s AND status = %s 
-            AND (invoice_printed = 0 AND restaurant_table IS NOT NULL)
+            AND invoice_printed = 1
             ORDER BY modified desc
             LIMIT %s OFFSET %s
             """,
@@ -598,9 +598,13 @@ def searchPosInvoice(query,status):
     # Add additional conditions for Unbilled status
     if status == "Unbilled":
         filters.update({
-            "status":"draft",
-            "restaurant_table": ["not in", [None, ""]],  # Check if restaurant_table has value
-            "invoice_printed": 0  # Check if invoice_printed is 0
+            "status": "draft",
+            "invoice_printed": 1
+        })
+    elif status == "Draft":
+        filters.update({
+            "status": "draft",
+            "invoice_printed": 0
         })
     pos_invoices = frappe.get_all(
         "POS Invoice",

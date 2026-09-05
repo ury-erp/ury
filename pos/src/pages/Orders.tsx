@@ -267,9 +267,10 @@ export default function Orders() {
         selectOrder({ ...selectedOrder, invoice_printed: 1 });
       }
       // If order was Unbilled, set to Draft and reload draft orders
-      if (selectedStatus === 'Unbilled') {
-        showToast.info(t('success.order_moved_to_draft'));
-        setSelectedStatus('Draft');
+      if (selectedStatus === 'Draft') {
+        setSelectedStatus('Unbilled');
+        fetchOrders();
+      } else {
         fetchOrders();
       }
     } catch (err: any) {
