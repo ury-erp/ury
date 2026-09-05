@@ -142,7 +142,7 @@ def _aggregate_state(rows):
 		return QUEUED
 	if all(state == SERVED for state in states):
 		return SERVED
-	if any(state == READY for state in states):
+	if any(state in (READY, SERVED) for state in states):
 		return READY
 	if any(state == IN_PREPARATION for state in states):
 		return IN_PREPARATION
