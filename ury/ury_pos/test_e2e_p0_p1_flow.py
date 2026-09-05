@@ -27,7 +27,7 @@ from ury.ury_pos.api import (
 from ury.ury.api.ury_kot_validation import get_kot_errors
 from ury.ury.doctype.sub_pos_closing.sub_pos_closing import get_pos_invoices
 
-TEST_COMPANY = "URY"
+TEST_COMPANY = "_Test Company"
 TEST_MODE_OF_PAYMENT = "Cash"
 TEST_BRANCH = "_Test E2E P0P1 Branch"
 TEST_ROOM = "_Test E2E P0P1 Room"

@@ -75,6 +75,7 @@ class TestURYProductionDepartment(FrappeTestCase):
 		self.make_cost_center(cost_center_name, company2)
 		foreign_cost_center = "Test Cost Center 2B - T2"
 		self.make_cost_center(foreign_cost_center, company2)
+		self.make_branch("Test Branch", company1)
 
 		dept = self.make_department("Test Dept 2", company1, "Test Branch", warehouse_name, cost_center_name)
 		dept.insert()
