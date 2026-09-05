@@ -48,7 +48,7 @@ const TableReservationCompleteDialog: React.FC<Props> = ({
       >
         <DialogHeader className="px-8 pt-8 pb-5 shrink-0">
           <DialogTitle className="text-xl flex items-center gap-2">
-            <CheckCircle2 className="w-6 h-6 text-emerald-600" />
+            <CheckCircle2 className="w-6 h-6 text-blue-600" />
             Confirm Reservation
           </DialogTitle>
 
@@ -60,7 +60,7 @@ const TableReservationCompleteDialog: React.FC<Props> = ({
         </DialogHeader>
 
         <div className="px-8 pb-8 space-y-5 overflow-y-auto min-h-0">
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-5 shadow-sm">
+          <div className="rounded-xl border border-blue-200 bg-blue-50/60 p-5 shadow-sm">
             <div className="mb-4 flex items-start justify-between">
               <div>
                 <p className="text-xs uppercase tracking-wide text-gray-500">Table</p>
@@ -73,7 +73,7 @@ const TableReservationCompleteDialog: React.FC<Props> = ({
             <div className="space-y-3">
               <div className="flex items-center gap-3">
                 <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white shadow-sm">
-                  <User className="h-4 w-4 text-emerald-600" />
+                  <User className="h-4 w-4 text-blue-600" />
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">Customer</p>
@@ -86,7 +86,7 @@ const TableReservationCompleteDialog: React.FC<Props> = ({
               {reservation.customer_phone && (
                 <div className="flex items-center gap-3">
                   <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white shadow-sm">
-                    <Phone className="h-4 w-4 text-emerald-600" />
+                    <Phone className="h-4 w-4 text-blue-600" />
                   </div>
                   <div>
                     <p className="text-xs text-gray-500">Phone Number</p>
@@ -98,7 +98,7 @@ const TableReservationCompleteDialog: React.FC<Props> = ({
               {reservation.no_of_pax && (
                 <div className="flex items-center gap-3">
                   <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white shadow-sm">
-                    <Users className="h-4 w-4 text-emerald-600" />
+                    <Users className="h-4 w-4 text-blue-600" />
                   </div>
                   <div>
                     <p className="text-xs text-gray-500">Number of Persons</p>
@@ -111,7 +111,7 @@ const TableReservationCompleteDialog: React.FC<Props> = ({
 
               <div className="flex items-center gap-3">
                 <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white shadow-sm">
-                  <CalendarClock className="h-4 w-4 text-emerald-600" />
+                  <CalendarClock className="h-4 w-4 text-blue-600" />
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">Reservation Time</p>
@@ -130,9 +130,9 @@ const TableReservationCompleteDialog: React.FC<Props> = ({
           <Button
             onClick={onConfirm}
             disabled={loading}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white"
+            className="bg-blue-600 hover:bg-blue-700 text-white"
           >
-            {loading ? 'Confirming...' : 'Confirm Arrival'}
+            {loading ? 'Completing...' : 'Completed'}
           </Button>
         </DialogFooter>
       </DialogContent>
