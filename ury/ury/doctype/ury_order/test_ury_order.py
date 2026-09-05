@@ -8,7 +8,7 @@ from types import SimpleNamespace
 from frappe.tests.utils import FrappeTestCase
 from unittest.mock import patch, MagicMock
 
-from ury.ury.doctype.ury_order.ury_order import sync_order, price_items_for_invoice, reconcile_order_reservations
+from ury.ury.doctype.ury_order.ury_order import cancel_order, sync_order, price_items_for_invoice, reconcile_order_reservations
 
 from unittest.mock import patch, MagicMock
 from ury.ury.doctype.ury_order.ury_order import get_order_invoice
@@ -205,6 +205,7 @@ class TestURYOrder(FrappeTestCase):
             self.assertEqual(mock_invoice.cashier, "newuser@example.com")
             self.assertEqual(mock_invoice.waiter, "newuser@example.com")
 
+    @patch("ury.ury.doctype.ury_order.ury_order.getBranch")
     @patch("ury.ury.doctype.ury_order.ury_order.reconcile_order_reservations")
     @patch("ury.ury.doctype.ury_order.ury_order.kot_execute")
     @patch("ury.ury.doctype.ury_order.ury_order.price_items_for_invoice")
@@ -214,7 +215,7 @@ class TestURYOrder(FrappeTestCase):
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_doc")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_roles")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.session")
-    def test_sync_order_reconciles_reservations_for_delta(self, mock_session, mock_get_roles, mock_get_doc, mock_get_value, mock_has_permission, mock_get_order_invoice, mock_price_items, mock_kot_execute, mock_reconcile):
+    def test_sync_order_reconciles_reservations_for_delta(self, mock_session, mock_get_roles, mock_get_doc, mock_get_value, mock_has_permission, mock_get_order_invoice, mock_price_items, mock_kot_execute, mock_reconcile, mock_get_branch):
         events = []
         mock_invoice = MagicMock()
         mock_invoice.name = "POS-INV-001"
@@ -223,7 +224,11 @@ class TestURYOrder(FrappeTestCase):
         mock_invoice.restaurant_table = "Table 1"
         mock_invoice.invoice_printed = 0
         mock_invoice.invoice_created = 1
-        mock_invoice.items = [MagicMock(item_code="ITEM-1", qty=1)]
+        previous_item = MagicMock(item_code="ITEM-1", item_name="Item 1", qty=1, name="INVITEM-1")
+        previous_item.get.side_effect = lambda field, default=None: {
+            "reservation_line_key": "INVITEM-1",
+        }.get(field, default)
+        mock_invoice.items = [previous_item]
         mock_invoice.waiter = "existing_waiter"
         mock_invoice.creation = "2026-09-03 10:00:00"
         mock_invoice.selling_price_list = "Standard Selling"
@@ -241,6 +246,7 @@ class TestURYOrder(FrappeTestCase):
         mock_get_roles.return_value = ["URY Manager"]
         mock_session.user = "manager@example.com"
         mock_has_permission.return_value = True
+        mock_get_branch.return_value = "Test Branch"
 
         def get_value_side_effect(doctype, filters=None, fieldname=None):
             if doctype == "URY Table" and fieldname == ["branch", "restaurant_room"]:
@@ -267,7 +273,13 @@ class TestURYOrder(FrappeTestCase):
 
         mock_reconcile.assert_called_once_with(
             order_ref="POS-INV-001",
-            previous_items=[{"item_code": "ITEM-1", "qty": 1, "comments": ""}],
+            previous_items=[{
+                "reservation_line_key": "INVITEM-1",
+                "item_code": "ITEM-1",
+                "item_name": "Item 1",
+                "qty": 1,
+                "comments": "",
+            }],
             accepted_items=[{"item": "ITEM-1", "qty": 3}],
             branch="Test Branch",
             company="Company A",
@@ -458,6 +470,7 @@ class TestPriceItemsForInvoicePhase1(unittest.TestCase):
                 "Standard Selling", "Test Profile", "Branch A", "Menu A",
             )
 
+    @patch("ury.ury.doctype.ury_order.ury_order.reconcile_order_reservations")
     @patch("ury.ury.doctype.ury_order.ury_order.get_order_invoice")
     @patch("ury.ury.doctype.ury_order.ury_order.price_items_for_invoice")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.has_permission")
@@ -467,12 +480,12 @@ class TestPriceItemsForInvoicePhase1(unittest.TestCase):
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.session")
     def test_sync_order_delegates_pricing(
         self, mock_session, mock_get_roles, mock_get_doc, mock_get_value, mock_has_permission,
-        mock_price_items, mock_get_order_invoice,
+        mock_price_items, mock_get_order_invoice, mock_reconcile,
     ):
         mock_invoice = MagicMock()
         mock_invoice.name = "POS-INV-002"
         mock_invoice.branch = "Test Branch"
-        mock_invoice.restaurant_table = "Table 1"
+        mock_invoice.restaurant_table = None
         mock_invoice.invoice_printed = 0
         mock_invoice.invoice_created = 1
         mock_invoice.items = []
@@ -497,20 +510,23 @@ class TestPriceItemsForInvoicePhase1(unittest.TestCase):
         priced = [{"item_code": "Biryani", "item_name": "Biryani", "qty": 1, "comment": None,
                    "rate": 150, "price_list_rate": 150, "base_price_list_rate": 150, "cost_center": "CC-1"}]
         mock_price_items.return_value = priced
+        mock_reconcile.return_value = {"status": "ok"}
 
         with patch("ury.ury.doctype.ury_order.ury_order.frappe.db.sql"):
-            try:
-                sync_order(
-                    items=[{"item": "Biryani", "qty": 1}],
-                    cashier="fake_cashier", owner="fake_owner", mode_of_payment="Cash",
-                    customer="Test Customer", no_of_pax=2, last_invoice=None,
-                    waiter="fake_waiter", pos_profile="Test Profile",
-                )
-            except Exception:
-                pass
+            sync_order(
+                items=[{"item": "Biryani", "qty": 1}],
+                cashier="fake_cashier", owner="fake_owner", mode_of_payment="Cash",
+                customer="Test Customer", no_of_pax=2, last_invoice=None,
+                waiter="fake_waiter", pos_profile="Test Profile",
+            )
 
         mock_price_items.assert_called_once()
-        mock_invoice.append.assert_any_call("items", priced[0])
+        appended_items = [
+            call.args[1]
+            for call in mock_invoice.append.call_args_list
+            if call.args and call.args[0] == "items"
+        ]
+        self.assertEqual(appended_items, priced)
 
 
 class TestGetTableOrderContext(FrappeTestCase):
