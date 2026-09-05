@@ -30,11 +30,12 @@ class TestSubPOSClosingSEC09(FrappeTestCase):
         called_args = mock_sql.call_args[0]
         self.assertEqual(called_args[1][0], "normal_cashier@test.com")
 
+    @patch("ury.ury.doctype.sub_pos_closing.sub_pos_closing.frappe.has_permission")
     @patch("ury.ury.doctype.sub_pos_closing.sub_pos_closing.getBranch")
     @patch("ury.ury.doctype.sub_pos_closing.sub_pos_closing.frappe.db.get_value")
     @patch("ury.ury.doctype.sub_pos_closing.sub_pos_closing.frappe.get_roles")
     @patch("ury.ury.doctype.sub_pos_closing.sub_pos_closing.frappe.session")
-    def test_normal_cashier_other_branch(self, mock_session, mock_get_roles, mock_get_value, mock_get_branch):
+    def test_normal_cashier_other_branch(self, mock_session, mock_get_roles, mock_get_value, mock_get_branch, mock_has_permission):
         # 2. Normal cashier requests another branch's POS Profile
         # Result: PermissionError.
         mock_session.user = "normal_cashier@test.com"
