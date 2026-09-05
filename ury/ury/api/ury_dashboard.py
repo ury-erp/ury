@@ -10,6 +10,14 @@ def _has_dashboard_cross_branch_access():
 	return frappe.session.user == "Administrator" or "System Manager" in frappe.get_roles()
 
 
+def _row_value(row, field, default=None):
+	if row is None:
+		return default
+	if hasattr(row, "get"):
+		return row.get(field, default)
+	return getattr(row, field, default)
+
+
 def _validate_comparable_history_access(branch, company):
 	if not frappe.has_permission("POS Invoice", "read"):
 		frappe.throw(_("Not permitted to read POS Invoice history"), frappe.PermissionError)
@@ -89,9 +97,9 @@ def _wrap_comparable_weekday_history(plan_date, branch, company, rows):
 	sample_dates = set()
 
 	for row in rows:
-		item_code = row["item_code"]
-		posting_date = row["posting_date"]
-		net_qty = row["net_qty"] or 0
+		item_code = _row_value(row, "item_code")
+		posting_date = _row_value(row, "posting_date")
+		net_qty = _row_value(row, "net_qty") or 0
 		sample_dates.add(str(posting_date))
 
 		entry = items_by_code.setdefault(
@@ -124,7 +132,8 @@ def _wrap_comparable_weekday_history(plan_date, branch, company, rows):
 			filters={"item": ["in", item_codes], "branch": branch},
 			fields=["item", "department", "production_unit"],
 		):
-			production_config_map[cfg["item"]] = cfg
+			item_key = _row_value(cfg, "item") or _row_value(cfg, "item_code")
+			production_config_map[item_key] = cfg
 
 	items = []
 	for item_code, entry in items_by_code.items():
