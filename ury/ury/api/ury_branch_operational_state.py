@@ -25,6 +25,14 @@ def _window_state(window, current_time):
 	return {"service_name": window.get("service_name"), "open_time": str(open_time), "close_time": str(close_time), "active": active}
 
 
+def _row_value(row, field, default=None):
+	if row is None:
+		return default
+	if hasattr(row, "get"):
+		return row.get(field, default)
+	return getattr(row, field, default)
+
+
 def resolve_branch_operational_state(branch=None, at=None):
 	"""Return branch state; branch is always session-scoped unless privileged."""
 	requested = branch
@@ -38,15 +46,15 @@ def resolve_branch_operational_state(branch=None, at=None):
 		frappe.throw(_("A concrete branch is required for operational state."), frappe.ValidationError)
 	when = get_datetime(at) if at else now_datetime()
 	schedule = frappe.db.get_value("URY Branch Operating Schedule", {"branch": branch}, ["name", "enabled"], as_dict=True)
-	if not schedule or not schedule.enabled:
+	if not schedule or not _row_value(schedule, "enabled"):
 		return _snapshot(branch, when, "NOT_CONFIGURED", False, [], "No enabled operating schedule", "WARNING")
 	day_field = when.strftime("%A").lower()
-	windows = frappe.get_all("URY Branch Service Window", filters={"parent": schedule.name, "parentfield": day_field, "parenttype": "URY Branch Operating Schedule"}, fields=["service_name", "open_time", "close_time", "enabled"], order_by="idx asc")
+	windows = frappe.get_all("URY Branch Service Window", filters={"parent": _row_value(schedule, "name"), "parentfield": day_field, "parenttype": "URY Branch Operating Schedule"}, fields=["service_name", "open_time", "close_time", "enabled"], order_by="idx asc")
 	exception = frappe.db.get_value("URY Branch Operating Exception", {"branch": branch, "exception_date": getdate(when)}, ["is_closed", "open_time", "close_time", "reason"], as_dict=True)
-	if exception and exception.is_closed:
-		return _snapshot(branch, when, "OFF_HOURS", False, [], exception.reason or "Operating exception", "HEALTHY")
-	if exception and exception.open_time and exception.close_time:
-		windows = [{"service_name": "Branch", "open_time": exception.open_time, "close_time": exception.close_time, "enabled": 1}]
+	if exception and _row_value(exception, "is_closed"):
+		return _snapshot(branch, when, "OFF_HOURS", False, [], _row_value(exception, "reason") or "Operating exception", "HEALTHY")
+	if exception and _row_value(exception, "open_time") and _row_value(exception, "close_time"):
+		windows = [{"service_name": "Branch", "open_time": _row_value(exception, "open_time"), "close_time": _row_value(exception, "close_time"), "enabled": 1}]
 	states = [state for window in windows if (state := _window_state(window, when.time()))]
 	active = [state["service_name"] for state in states if state["active"]]
 	phase = "SERVICE_OPEN" if active else "OFF_HOURS"
