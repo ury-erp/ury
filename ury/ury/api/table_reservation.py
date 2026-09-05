@@ -485,14 +485,102 @@ def update_reservation_status(reservation_name, status, pos_invoice=None):
 
 
 @frappe.whitelist()
+def sync_branch_table_occupancy(branch=None):
+    """
+    Ensures table occupied flags in `tabURY Table` accurately reflect active state.
+    A table should be `occupied = 1` ONLY IF:
+      1. An active draft POS Invoice (docstatus = 0) exists for the table, OR
+      2. An active lock-window reservation exists for the table, OR
+      3. A guest arrival confirmation (status = 'Completed') occurred recently within the active dining window without an order created yet.
+    Otherwise, if no active draft invoice and no active reservation lock exists, reset occupied = 0.
+    """
+    try:
+        filters = {"occupied": 1}
+        if branch:
+            filters["branch"] = branch
+
+        occupied_tables = frappe.db.get_all(
+            "URY Table",
+            filters=filters,
+            fields=["name", "branch"]
+        )
+
+        if not occupied_tables:
+            return
+
+        now = now_datetime()
+
+        for t in occupied_tables:
+            table_name = t.name
+
+            # 1. Check for active draft POS Invoice (docstatus = 0)
+            has_draft_invoice = frappe.db.exists(
+                "POS Invoice",
+                {
+                    "docstatus": 0,
+                    "restaurant_table": table_name
+                }
+            )
+
+            if not has_draft_invoice:
+                # Check merged tables field as well
+                merged_draft = frappe.db.sql(
+                    """
+                    SELECT name FROM `tabPOS Invoice`
+                    WHERE docstatus = 0 AND custom_merged_tables LIKE %s
+                    LIMIT 1
+                    """,
+                    (f"%{table_name}%",),
+                    as_dict=True
+                )
+                has_draft_invoice = bool(merged_draft)
+
+            if has_draft_invoice:
+                continue
+
+            # 2. Check for active lock-window reservation
+            active_res = check_table_reservation(table_name)
+            if active_res and active_res.get("is_lock_window_active") and active_res.get("status") in ("Confirmed", "Active"):
+                continue
+
+            # 3. Check for recent guest arrival (Completed status within last 30 minutes without invoice created yet)
+            completed_res = frappe.db.get_all(
+                "URY Table Reservation",
+                filters={
+                    "reserved_table": table_name,
+                    "status": "Completed",
+                    "modified": [">", add_to_date(now, minutes=-30)]
+                },
+                limit=1
+            )
+            if completed_res:
+                continue
+
+            # If no draft invoice, no active lock window, and no recent guest arrival -> table is NOT occupied
+            frappe.db.set_value(
+                "URY Table",
+                table_name,
+                {
+                    "occupied": 0,
+                    "latest_invoice_time": None
+                },
+                update_modified=False
+            )
+    except Exception as e:
+        frappe.log_error(f"Error in sync_branch_table_occupancy: {str(e)}", "Table Sync Error")
+
+
+@frappe.whitelist()
 def get_active_reservations(branch=None):
     """
     Returns reservations for the current active POS session for a branch.
     Auto-processes past-due Confirmed reservations to 'No Show' server-side.
+    Cleans up stale table occupied flags if no open invoice/reservation exists.
     """
     try:
         from ury.ury.api.reservation_scheduler import process_reservation_no_shows
         process_reservation_no_shows()
+        sync_branch_table_occupancy(branch)
 
         if not branch:
             return []
