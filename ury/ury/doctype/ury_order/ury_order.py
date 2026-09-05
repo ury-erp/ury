@@ -782,6 +782,18 @@ def _resolve_or_create_pos_invoice(table, invoiceNo, order_type, is_payment, che
             "Price List", dict(restaurant_menu=menu_name, enabled=1)
         )
 
+        if not getattr(invoice, "customer", None) or invoice.customer == "Guest":
+            from ury.ury.api.table_reservation import get_completed_reservation_for_table
+            completed_res = get_completed_reservation_for_table(table, branch)
+            if completed_res and completed_res.get("customer"):
+                invoice.customer = completed_res.get("customer")
+                if completed_res.get("customer_name"):
+                    invoice.customer_name = completed_res.get("customer_name")
+                if completed_res.get("customer_phone"):
+                    invoice.mobile_number = completed_res.get("customer_phone")
+                if completed_res.get("no_of_pax"):
+                    invoice.no_of_pax = completed_res.get("no_of_pax")
+
         if invoice_name and invoice.restaurant_table:
             _reconcile_invoice_merged_tables(invoice, persist=True)
 

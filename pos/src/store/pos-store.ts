@@ -666,14 +666,18 @@ export const usePOSStore = create<POSStore>((set, get) => ({
         });
       } else {
         set({
-          tableOrder: null,
+          tableOrder: order ? response : null,
           activeOrders: [],
-          selectedCustomer: null,
+          selectedCustomer: order && order.customer ? {
+            id: order.customer,
+            name: order.customer_name || order.customer,
+            phone: order.mobile_number || '',
+          } : null,
           isUpdatingOrder: false,
-          orderId: null,
-          noOfPax: 1,
-          lastModifiedTime: null,
-          orderComment: '',
+          orderId: order?.name || null,
+          noOfPax: order?.no_of_pax || 1,
+          lastModifiedTime: order?.modified || null,
+          orderComment: order?.custom_comments || '',
         });
       }
     } catch (error) {

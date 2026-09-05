@@ -288,11 +288,11 @@ const TableView = () => {
 
       setSelectedOrderType(DINE_IN);
       setSelectedTable(tableName, selectedRoom);
-      navigate('/');
+      navigate('/pos');
     } catch {
       setSelectedOrderType(DINE_IN);
       setSelectedTable(tableName, selectedRoom);
-      navigate('/');
+      navigate('/pos');
     }
   };
 
@@ -318,7 +318,7 @@ const TableView = () => {
       showToast.success('Customer arrival confirmed. Table is now occupied.');
       setSelectedOrderType(DINE_IN);
       setSelectedTable(pendingTable, selectedRoom);
-      navigate('/');
+      navigate('/pos');
     } catch (error) {
       console.error(error);
       showToast.error(error instanceof Error ? error.message : 'Failed to confirm arrival');
@@ -440,17 +440,34 @@ const TableView = () => {
 
   const handlePrintTable = async (table: Table, event?: MouseEvent<HTMLButtonElement>) => {
     event?.stopPropagation();
+
+    if (!posProfile) {
+      showToast.error('POS profile not loaded yet');
+      return;
+    }
+
     setPrintingTable(table.name);
     try {
-      const order = await getTableOrder(table.name);
-      if (!order) {
+      const orderResponse = await getTableOrder(table.name);
+      const invoiceId = orderResponse.message?.name;
+
+      if (!invoiceId) {
         showToast.error('No active order found for this table');
         return;
       }
 
-      const printFormatName = await resolvePrintFormat(order.order_type);
-      await printOrder(order.name, printFormatName);
-      showToast.success('Order sent to printer');
+      await printOrder({
+        orderId: invoiceId,
+        posProfile,
+        printFormat: resolvePrintFormat(
+          orderResponse.message ?? {},
+          posProfile.print_format
+        ),
+      });
+      showToast.success('Printed successfully');
+      if (selectedRoom) {
+        await loadTables(selectedRoom, { useCache: false });
+      }
     } catch (error) {
       showToast.error(error instanceof Error ? error.message : 'Failed to print order');
     } finally {
@@ -458,70 +475,96 @@ const TableView = () => {
     }
   };
 
+  const validateActiveTableOrder = async (tableName: string) => {
+    const orderResponse = await getTableOrder(tableName);
+    const invoice = orderResponse.message;
+
+    if (!invoice?.name) {
+      throw new Error(t('tables.no_active_order'));
+    }
+    if (invoice.invoice_printed === 1) {
+      throw new Error(t('tables.order_already_billed'));
+    }
+
+    return invoice;
+  };
+
   const handleOpenTransferTable = async (table: Table) => {
-    if (!branch) return;
+    if (getMergeGroupMembers(table, tables).length > 1) {
+      showToast.error(t('tables.transfer_not_for_merged'));
+      return;
+    }
+
+    if (!branch) {
+      showToast.error(t('tables.transfer_failed'));
+      return;
+    }
+
     setTransferSourceTable(table);
+    setTransferInvoiceName(null);
+    setTransferDestinationTables([]);
     setTransferDestinationsLoading(true);
 
     try {
-      const [order, vacantTables] = await Promise.all([
-        getTableOrder(table.name),
-        getVacantTablesForBranch(branch, table.name),
-      ]);
-
-      setTransferInvoiceName(order?.name ?? null);
-      setTransferDestinationTables(vacantTables);
+      const invoice = await validateActiveTableOrder(table.name);
+      const destinations = await getVacantTablesForBranch(branch, table.name);
+      setTransferDestinationTables(destinations);
+      setTransferInvoiceName(invoice.name);
     } catch (error) {
-      showToast.error(error instanceof Error ? error.message : 'Failed to prepare table transfer');
       setTransferSourceTable(null);
+      setTransferInvoiceName(null);
+      setTransferDestinationTables([]);
+      showToast.error(error instanceof Error ? error.message : t('tables.transfer_failed'));
     } finally {
       setTransferDestinationsLoading(false);
     }
   };
 
-  const handleTableTransferConfirm = async (targetTable: string) => {
-    if (!transferSourceTable) return;
-    try {
-      await tableTransfer(transferSourceTable.name, targetTable);
-      showToast.success(`Table transferred from ${transferSourceTable.name} to ${targetTable}`);
-      if (selectedRoom) {
-        await loadTables(selectedRoom, { useCache: false });
-      }
-      setTransferSourceTable(null);
-      setTransferInvoiceName(null);
-    } catch (error) {
-      showToast.error(error instanceof Error ? error.message : 'Failed to transfer table');
-    }
-  };
-
   const handleOpenCaptainTransfer = async (table: Table) => {
     try {
-      const order = await getTableOrder(table.name);
-      if (!order) {
-        showToast.error('No active order found for this table');
-        return;
+      const invoice = await validateActiveTableOrder(table.name);
+      if (!invoice.waiter) {
+        throw new Error(t('tables.no_active_order'));
       }
       setCaptainTransferContext({
         table,
-        invoiceName: order.name,
-        currentCaptain: order.captain ?? '',
+        invoiceName: invoice.name,
+        currentCaptain: invoice.waiter,
       });
     } catch (error) {
-      showToast.error(error instanceof Error ? error.message : 'Failed to fetch order details');
+      showToast.error(error instanceof Error ? error.message : t('tables.transfer_failed'));
+    }
+  };
+
+  const handleTableTransferConfirm = async (newTable: string) => {
+    if (!transferSourceTable || !transferInvoiceName) return;
+
+    try {
+      await tableTransfer(transferSourceTable.name, newTable, transferInvoiceName);
+      if (selectedRoom) {
+        await loadTables(selectedRoom, { useCache: false });
+      }
+      showToast.success(t('tables.transfer_success'));
+    } catch (error) {
+      showToast.error(error instanceof Error ? error.message : t('tables.transfer_failed'));
+      throw error;
     }
   };
 
   const handleCaptainTransferConfirm = async (newCaptain: string) => {
     if (!captainTransferContext) return;
+
+    const { currentCaptain, invoiceName } = captainTransferContext;
+
     try {
-      await captainTransfer(captainTransferContext.invoiceName, newCaptain);
-      showToast.success(`Captain transferred to ${newCaptain}`);
+      await captainTransfer(currentCaptain, newCaptain, invoiceName);
       if (selectedRoom) {
         await loadTables(selectedRoom, { useCache: false });
       }
-      setCaptainTransferContext(null);
+      showToast.success(t('tables.captain_transfer_success'));
     } catch (error) {
-      showToast.error(error instanceof Error ? error.message : 'Failed to transfer captain');
+      showToast.error(error instanceof Error ? error.message : t('tables.transfer_failed'));
+      throw error;
     }
   };
 

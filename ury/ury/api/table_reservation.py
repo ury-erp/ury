@@ -325,6 +325,44 @@ def check_table_reservation(table):
         return None
 
 
+@frappe.whitelist()
+def get_completed_reservation_for_table(table, branch=None):
+    """
+    Returns the recent completed reservation for a table if the customer has arrived
+    and no submitted invoice exists yet for that reservation.
+    """
+    if not table:
+        return None
+    try:
+        now = now_datetime()
+        filters = {
+            "reserved_table": table,
+            "status": "Completed",
+            "modified": [">", add_to_date(now, hours=-12)],
+        }
+        if branch:
+            filters["branch"] = branch
+
+        reservations = frappe.db.get_all(
+            "URY Table Reservation",
+            filters=filters,
+            fields=["name", "customer", "customer_name", "customer_phone", "no_of_pax", "reserved_at", "pos_invoice"],
+            order_by="modified desc",
+            limit=1,
+        )
+        if reservations:
+            res = reservations[0]
+            if res.get("pos_invoice"):
+                inv_status = frappe.db.get_value("POS Invoice", res.get("pos_invoice"), "docstatus")
+                if inv_status == 1:
+                    return None
+            return res
+        return None
+    except Exception as e:
+        frappe.log_error(f"Error in get_completed_reservation_for_table: {str(e)}", "Reservation Lookup Error")
+        return None
+
+
 def get_current_pos_opening_entry(branch):
     """
     Returns the active POS Opening Entry document for a branch if currently open.
