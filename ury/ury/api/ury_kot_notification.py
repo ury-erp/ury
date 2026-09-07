@@ -2,12 +2,43 @@ import frappe
 from frappe.utils import add_to_date, now_datetime
 
 
-def get_users_with_role(role_name):
+def get_users_with_role(role_name, branch=None):
+    """
+    Get users holding a specific role, optionally scoped to a branch.
+
+    When branch is provided, returns only users who are both:
+    - Assigned to that branch (via URY User child table on Branch)
+    - Hold the specified role
+
+    Args:
+        role_name: Name of the role to look up
+        branch: Optional branch name to scope results (system-wide if None)
+
+    Returns:
+        List of dicts with keys: name, full_name, email
+    """
     users_with_role = frappe.get_all(
         "Has Role", filters={"role": role_name}, fields=["parent as user"]
     )
 
     user_ids = [user["user"] for user in users_with_role]
+
+    if branch and user_ids:
+        # Filter to users assigned to the specified branch
+        branch_users = frappe.db.sql(
+            """
+            SELECT DISTINCT user
+            FROM `tabURY User`
+            WHERE parent = %s AND parenttype = 'Branch' AND user IN ({})
+            """.format(",".join(["%s"] * len(user_ids))),
+            [branch] + user_ids,
+            as_dict=False
+        )
+        user_ids = [user[0] for user in branch_users]
+
+    if not user_ids:
+        return []
+
     user_details = frappe.get_all(
         "User",
         filters={"name": ("in", user_ids)},
