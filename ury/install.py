@@ -11,6 +11,6 @@ def after_install():
         click.secho("Thank you for installing URY App!", fg="green")
 
         
-    except:
+    except Exception as e:
+        print(f"Error during installation: {e}")
         pass
-     

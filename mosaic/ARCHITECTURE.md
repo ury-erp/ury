@@ -1,4 +1,6 @@
-# mosaic — Agent Documentation
+# mosaic Architecture
+
+Repository-wide engineering rules are defined in `../docs/AI_ENGINEERING_GUIDE.md`.
 
 ## 1. Overview
 

@@ -1,4 +1,6 @@
-# @ury/core — Agent Documentation
+# @ury/core Architecture
+
+Repository-wide engineering rules are defined in `../../docs/AI_ENGINEERING_GUIDE.md`.
 
 ## 1. Overview
 
@@ -24,6 +26,8 @@ packages/core/src/
 ├── storage.ts          ← storage: localStorage wrapper (+ POS-profile helpers)
 ├── format.ts           ← formatCurrency(), formatInvoiceTime()
 ├── i18n.ts             ← EN/RU resolution, switcher, residual DOM translation bridge
+├── utils/
+│   └── validateField.ts ← shared field validation
 └── print/
     └── qz.ts           ← initPrinting(), loadQzPrinter(), printWithQz(), disconnectQzPrinter()
 ```
@@ -87,11 +91,11 @@ import { privateKey } from '../privateKey';
 initPrinting({ signKey: privateKey });
 ```
 
-## 4. Rules for agents
+## 4. Engineering Constraints
 
 - **Import only from the barrel** `'@ury/core'`, never deep paths into `src/`.
 - **Keep it framework-agnostic**: no React, no JSX, no app state, no domain API wrappers (order/table/invoice APIs belong in the app, e.g. `pos/src/lib/`).
 - **Peer deps**: anything imported at module level here must be a `peerDependency` (with a matching `devDependency` for standalone typecheck), and every consuming app must declare it — the barrel pulls all modules, so even a non-printing app currently needs `qz-tray`/`jsrsasign`/`axios` at build time. If that becomes painful, split subpath exports (e.g. `@ury/core/print`) rather than dropping the peers.
 - **No secrets**: keys, certs, and credentials stay in consuming apps and are injected (the `initPrinting` pattern).
-- **Don't rename exports** without updating all consumers (`pos/`, `frontend/`) in the same change; run `yarn workspace @ury/core typecheck` plus each app's `tsc -b` and `yarn build`.
+- **Don't rename exports** without updating all consumers (`pos/`, `frontend/`, `self-order/`) in the same change; run `yarn workspace @ury/core typecheck` plus each affected app's typecheck/build.
 - `import.meta.env` usage is confined to `frappe/client.ts` — keep it that way (it ties the file to Vite consumers; the factory's explicit `baseUrl` parameter is the escape hatch).

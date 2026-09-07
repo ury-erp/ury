@@ -19,7 +19,7 @@ def uninstall():
 	except Exception as e:
 		print(f"Failed To Remove Customizations: {e}")
 
-	ROLES = ["URY Manager", "URY Captain", "URY Cashier"]
+	ROLES = ["URY Manager", "URY Captain", "URY Cashier", "URY Admin"]
 
 	frappe.db.delete("Custom DocPerm",{"role": ["in", ROLES]})
 

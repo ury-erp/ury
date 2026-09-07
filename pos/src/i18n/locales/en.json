@@ -31,9 +31,22 @@
     "language": "Language",
     "english": "English",
     "russian": "Russian",
+    "lock_pos": "Lock / Switch User",
     "switch_to_desk": "Switch To Desk",
     "clear_cache": "Clear Cache",
     "logout": "Logout"
+  },
+  "pin_login": {
+    "title": "Enter your PIN",
+    "subtitle": "Use your personal POS PIN to start your secure cashier session.",
+    "pin_progress": "{{count}} PIN digits entered",
+    "delete_digit": "Delete last digit",
+    "sign_in": "Sign in",
+    "invalid_pin": "The PIN is incorrect or not enabled. Try again.",
+    "too_many_attempts": "Too many attempts. Wait a minute and try again.",
+    "use_password": "Sign in with email and password",
+    "manager_hint": "A manager can enable or disable personal PIN access for each POS account.",
+    "active_order_lock": "Finish or clear the current order before switching users."
   },
   "menu": {
     "special_items": "Special Items"
@@ -339,6 +352,7 @@
     "transfer_captain": "Transfer captain",
     "select_destination_table": "Move order from {{table}} to any vacant table in this branch",
     "search_transfer_placeholder": "Search by table or room",
+    "search_table_placeholder": "Search table",
     "current_table": "Current table",
     "current_captain": "Current captain",
     "select_new_captain": "Choose a new captain for this order",

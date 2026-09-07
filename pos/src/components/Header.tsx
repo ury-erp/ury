@@ -22,9 +22,10 @@ const Header = () => {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const user = useRootStore((state: RootState) => state.user);
+  const pinLoginAvailable = useRootStore((state: RootState) => state.pinLoginAvailable);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const location = useLocation();
-  const { searchQuery, setSearchQuery, setShowVoluntaryClosing } = usePOSStore();
+  const { searchQuery, setSearchQuery, setShowVoluntaryClosing, activeOrders } = usePOSStore();
   const { orderSearchQuery, setOrderSearchQuery } = useRootStore();
   const [orderSearchInput, setOrderSearchInput] = useState(orderSearchQuery);
   const activeLanguage = getActiveLanguage();
@@ -91,7 +92,25 @@ const Header = () => {
   const handleLogout = async () => {
     try {
       await logout();
+      sessionStorage.clear();
       window.location.href = '/login?redirect-to=%2Fpos';
+    } catch {
+      showToast.error(t('errors.failed_logout'));
+    }
+  };
+
+  const handleLockPOS = async () => {
+    if (activeOrders.length > 0) {
+      setShowUserMenu(false);
+      showToast.warning(t('pin_login.active_order_lock'));
+      return;
+    }
+
+    try {
+      await logout();
+      // Cached profiles and permissions belong to the previous operator.
+      sessionStorage.clear();
+      window.location.href = '/pos';
     } catch {
       showToast.error(t('errors.failed_logout'));
     }
@@ -127,7 +146,7 @@ const Header = () => {
         <Link to="/dashboard" className="flex items-center gap-3">
             <img
               src="/assets/ury/pos/ury_pos.png"
-              alt="URY POS" 
+              alt="URY POS"
               className="h-10 w-auto"
             />
           </Link>
@@ -202,6 +221,16 @@ const Header = () => {
                   </div>
                 </div>
                 <div className="py-2">
+                  {pinLoginAvailable && (
+                    <Button
+                      variant="ghost"
+                      className="flex justify-start items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                      onClick={handleLockPOS}
+                    >
+                      <Lock className="w-4 h-4 me-3" />
+                      {t('header.lock_pos')}
+                    </Button>
+                  )}
                   <Button
                     variant="ghost"
                     className="flex justify-start items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
