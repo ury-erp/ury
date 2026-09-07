@@ -3,6 +3,7 @@ import AppLayout from './components/AppLayout';
 import Orders from './pages/Orders';
 import POS from './pages/POS';
 import Table from './pages/Table';
+import Reservations from './pages/Reservations';
 import Dashboard from './pages/Dashboard';
 import Settings from './pages/Settings';
 import AuthGuard from './components/AuthGuard';
@@ -32,6 +33,7 @@ function App() {
     document.documentElement.dir = isRtl ? 'rtl' : 'ltr';
     document.documentElement.lang = lang || 'en';
   }, []);
+
   return (
     <>
       <ToastProvider />
@@ -40,6 +42,18 @@ function App() {
         <AuthGuard>
           <POSOpeningProvider>
             <Router basename="/pos">
+              <div className="flex flex-col h-screen bg-gray-100 font-inter">
+                <Header />
+                <div className="flex-1 overflow-hidden">
+                  <Routes>
+                    <Route path="/" element={<POS/>} />
+                    <Route path="/orders" element={<Orders />} />
+                    <Route path="/table" element={<Table />} />
+                    <Route path="/reservations" element={<Reservations />} />
+                  </Routes>
+                </div>
+                <Footer />
+              </div>
               <Routes>
                 <Route element={<AppLayout />}>
                   <Route index element={<Navigate to="/dashboard" replace />} />

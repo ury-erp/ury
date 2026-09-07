@@ -1,0 +1,176 @@
+{
+ "actions": [],
+ "autoname": "TR-.YYYY.-.#####",
+ "creation": "2026-07-22 21:55:03.871477",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "branch",
+  "reserved_table",
+  "customer",
+  "customer_name",
+  "customer_phone",
+  "column_break_qgwh",
+  "no_of_pax",
+  "reserved_at",
+  "status",
+  "pos_invoice",
+  "reserved_by",
+  "section_break_lboi",
+  "comments"
+ ],
+ "fields": [
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "in_filter": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Branch",
+   "options": "Branch",
+   "reqd": 1
+  },
+  {
+   "fieldname": "reserved_table",
+   "fieldtype": "Link",
+   "in_filter": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Table",
+   "options": "URY Table",
+   "reqd": 1
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "label": "Customer",
+   "options": "Customer",
+   "reqd": 1
+  },
+  {
+   "fieldname": "customer_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Customer Name",
+   "reqd": 1
+  },
+  {
+   "fieldname": "customer_phone",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Customer Phone Number",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_qgwh",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "fieldname": "no_of_pax",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Number of Persons",
+   "reqd": 1
+  },
+  {
+   "fieldname": "reserved_at",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "label": "Reservation Time",
+   "reqd": 1
+  },
+  {
+   "default": "Confirmed",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_filter": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Requested\nConfirmed\nCompleted\nCancelled\nNo Show",
+   "reqd": 1
+  },
+  {
+   "fieldname": "pos_invoice",
+   "fieldtype": "Link",
+   "label": "POS Invoice",
+   "options": "POS Invoice",
+   "read_only": 1
+  },
+  {
+   "fieldname": "reserved_by",
+   "fieldtype": "Link",
+   "label": "Reserved By",
+   "options": "User"
+  },
+  {
+   "fieldname": "section_break_lboi",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "comments",
+   "fieldtype": "Small Text",
+   "label": "Comments / Notes"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-09-03 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY Table Reservation",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "URY Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "URY Captain",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "URY Cashier",
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "reserved_at",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}
