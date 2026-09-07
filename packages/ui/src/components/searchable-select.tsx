@@ -26,6 +26,7 @@ export interface SearchableSelectProps {
   strict?: boolean;
   disabled?: boolean;
   className?: string;
+  openOnFocus?: boolean;
 }
 
 export function SearchableSelect({
@@ -39,6 +40,7 @@ export function SearchableSelect({
   strict = false,
   disabled = false,
   className,
+  openOnFocus = true,
 }: SearchableSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -169,8 +171,15 @@ export function SearchableSelect({
   };
 
   const handleFocus = () => {
+    if (!disabled && openOnFocus) {
+      setIsOpen(true);
+    }
+  };
+
+  const handleClick = () => {
     if (!disabled) {
       setIsOpen(true);
+      if (!isOpen) setIsTyping(false);
     }
   };
 
@@ -234,6 +243,7 @@ export function SearchableSelect({
           value={searchTerm}
           onChange={handleInputChange}
           onFocus={handleFocus}
+          onClick={handleClick}
           placeholder={placeholder}
           error={error}
           disabled={disabled}
