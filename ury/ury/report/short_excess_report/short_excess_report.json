@@ -1,0 +1,63 @@
+{
+ "add_total_row": 0,
+ "columns": [],
+ "creation": "2026-09-08 00:00:00.000000",
+ "disable_prepared_report": 0,
+ "disabled": 0,
+ "docstatus": 0,
+ "doctype": "Report",
+ "filters": [
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "label": "Branch",
+   "mandatory": 1,
+   "options": "Branch",
+   "wildcard_filter": 0
+  },
+  {
+   "fieldname": "start_date",
+   "fieldtype": "Date",
+   "label": "From Date",
+   "mandatory": 1,
+   "wildcard_filter": 0
+  },
+  {
+   "fieldname": "end_date",
+   "fieldtype": "Date",
+   "label": "To Date",
+   "mandatory": 1,
+   "wildcard_filter": 0
+  },
+  {
+   "fieldname": "warehouse",
+   "fieldtype": "Link",
+   "label": "Warehouse",
+   "options": "Warehouse",
+   "wildcard_filter": 0
+  }
+ ],
+ "idx": 0,
+ "is_standard": "Yes",
+ "modified": "2026-09-08 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "Short-Excess Report",
+ "owner": "Administrator",
+ "prepared_report": 0,
+ "query": "SELECT\n    sc.name AS \"Stock Correction\",\n    sci.item_code AS \"Item Code\",\n    sci.item_name AS \"Item Name\",\n    sci.warehouse AS \"Warehouse\",\n    ROUND(sci.qty, 3) AS \"Quantity (Delta)\",\n    sci.uom AS \"UOM\",\n    sc.branch AS \"Branch\",\n    sc.posting_date AS \"Posting Date\",\n    CASE\n        WHEN sci.qty < 0 THEN ROUND(ABS(sci.qty), 3)\n        ELSE 0\n    END AS \"Short\",\n    CASE\n        WHEN sci.qty > 0 THEN ROUND(sci.qty, 3)\n        ELSE 0\n    END AS \"Excess\",\n    CASE\n        WHEN sci.qty < 0 THEN 'Short'\n        WHEN sci.qty > 0 THEN 'Excess'\n        ELSE 'No Change'\n    END AS \"Type\"\nFROM `tabStock Correction` sc\nJOIN `tabStock Correction Item` sci ON (\n    sc.name = sci.parent\n)\nWHERE\n    sc.branch = %(branch)s\n    AND sc.posting_date >= %(start_date)s\n    AND sc.posting_date <= %(end_date)s\n    AND sc.docstatus = 1\n    AND (%(warehouse)s IS NULL OR sci.warehouse = %(warehouse)s)\nORDER BY\n    sc.posting_date DESC,\n    sci.item_code",
+ "ref_doctype": "Stock Correction",
+ "report_name": "Short-Excess Report",
+ "report_type": "Query Report",
+ "roles": [
+  {
+   "role": "Stock Manager"
+  },
+  {
+   "role": "Stock User"
+  },
+  {
+   "role": "URY Manager"
+  }
+ ]
+}
