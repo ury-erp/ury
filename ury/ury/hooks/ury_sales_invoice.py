@@ -88,11 +88,18 @@ def round_off_journal_entry(doc, method=None):
     between rounded_total and paid_amount, posted against the POS Profile's
     configured cash discount account. Best-effort: never blocks submission."""
     try:
-        if not doc.pos_profile:
+        if not doc.is_pos or not flt(doc.rounded_total) or not flt(doc.paid_amount):
             return
 
         diff = flt(doc.rounded_total) - flt(doc.paid_amount)
         if abs(diff) < 0.005:
+            return
+
+        # Safety ceiling, not a business rule: a genuine rounding/cash-discount
+        # difference should be a small fraction of the invoice. If it's larger
+        # than this, something is misconfigured (e.g. rounding disabled or an
+        # unpaid consolidated invoice) — skip rather than write off the invoice.
+        if abs(diff) > flt(doc.grand_total) * 0.1:
             return
 
         cash_discount_account = frappe.db.get_value(
@@ -141,20 +148,25 @@ def round_off_journal_entry(doc, method=None):
                 },
             ]
 
-        journal_entry = frappe.get_doc(
-            {
-                "doctype": "Journal Entry",
-                "voucher_type": "Journal Entry",
-                "company": doc.company,
-                "posting_date": doc.posting_date,
-                "user_remark": f"Cash discount/round-off adjustment for Sales Invoice {doc.name}",
-                "accounts": accounts,
-            }
-        )
-        journal_entry.insert(ignore_permissions=True)
-        journal_entry.submit()
+        frappe.db.savepoint("round_off_je")
+        try:
+            journal_entry = frappe.get_doc(
+                {
+                    "doctype": "Journal Entry",
+                    "voucher_type": "Journal Entry",
+                    "company": doc.company,
+                    "posting_date": doc.posting_date,
+                    "user_remark": f"Cash discount/round-off adjustment for Sales Invoice {doc.name}",
+                    "accounts": accounts,
+                }
+            )
+            journal_entry.insert(ignore_permissions=True)
+            journal_entry.submit()
 
-        doc.db_set("cash_discount_journal_entry", journal_entry.name)
+            doc.db_set("cash_discount_journal_entry", journal_entry.name)
+        except Exception:
+            frappe.db.rollback(save_point="round_off_je")
+            raise
     except Exception:
         frappe.log_error(
             frappe.get_traceback(),
@@ -170,11 +182,16 @@ def journal_entry_cancel(doc, method=None):
         if not je_name:
             return
 
-        journal_entry = frappe.get_doc("Journal Entry", je_name)
-        if journal_entry.docstatus == 1:
-            journal_entry.cancel()
+        frappe.db.savepoint("round_off_je_cancel")
+        try:
+            journal_entry = frappe.get_doc("Journal Entry", je_name)
+            if journal_entry.docstatus == 1:
+                journal_entry.cancel()
 
-        doc.db_set("cash_discount_journal_entry", None)
+            doc.db_set("cash_discount_journal_entry", None)
+        except Exception:
+            frappe.db.rollback(save_point="round_off_je_cancel")
+            raise
     except Exception:
         frappe.log_error(
             frappe.get_traceback(),
