@@ -1,7 +1,8 @@
 import frappe
 from datetime import datetime
-from frappe.utils import now_datetime, get_time, now, flt
+from frappe.utils import now_datetime, get_time, now, flt, getdate, get_first_day, get_last_day
 from ury.ury.doctype.ury_order.ury_order import release_merge_cluster_tables
+from ury.ury.doctype.staff_discount_policy.staff_discount_policy import get_applicable_policy
 
 
 def before_insert(doc, method):
@@ -23,6 +24,7 @@ def before_submit(doc, method):
     ro_reload_submit(doc, method)
     set_commission_attribution(doc, method)
     apply_disposable_items(doc, method)
+    apply_staff_discount_policy(doc, method)
 
 
 def on_trash(doc, method):
@@ -163,6 +165,158 @@ def apply_disposable_items(doc, method=None):
                 "cost_center": pos_profile.get("cost_center"),
             },
         )
+
+
+def _period_window(period):
+    """Return (start_date, end_date) for the given policy period, as of today."""
+    on_date = getdate(frappe.utils.today())
+    if period == "Daily":
+        return on_date, on_date
+    if period == "Weekly":
+        # Week starts Monday.
+        start = frappe.utils.add_days(on_date, -on_date.weekday())
+        end = frappe.utils.add_days(start, 6)
+        return start, end
+    if period == "Monthly":
+        return get_first_day(on_date), get_last_day(on_date)
+    return None, None
+
+
+def _period_to_date_discount(policy_name, doc_name, customer_group=None, employee=None, period=None):
+    """Sum discount_amount already applied under `policy_name` on SUBMITTED
+    (docstatus == 1) POS Invoices within the current period window, for the
+    same customer group (Customer Group policies) or the same cashier
+    employee (Role / Employee Group policies). Excludes the invoice
+    currently being validated. Cancelled (docstatus == 2) and draft
+    (docstatus == 0) invoices are naturally excluded by the docstatus filter.
+    """
+    if not period or period == "None":
+        return 0
+
+    start, end = _period_window(period)
+    if not start:
+        return 0
+
+    conditions = ["pi.docstatus = 1", "pi.staff_discount_policy = %(policy)s", "pi.name != %(doc_name)s"]
+    conditions.append("pi.posting_date BETWEEN %(start)s AND %(end)s")
+
+    values = {
+        "policy": policy_name,
+        "doc_name": doc_name or "",
+        "start": start,
+        "end": end,
+    }
+
+    joins = ""
+    if customer_group:
+        joins = "INNER JOIN `tabCustomer` cust ON cust.name = pi.customer"
+        conditions.append("cust.customer_group = %(customer_group)s")
+        values["customer_group"] = customer_group
+    elif employee:
+        conditions.append("pi.custom_closing_employee = %(employee)s")
+        values["employee"] = employee
+    else:
+        return 0
+
+    query = f"""
+        SELECT COALESCE(SUM(pi.discount_amount), 0) AS total
+        FROM `tabPOS Invoice` pi
+        {joins}
+        WHERE {' AND '.join(conditions)}
+    """
+    result = frappe.db.sql(query, values, as_dict=True)
+    return flt(result[0]["total"]) if result else 0
+
+
+def apply_staff_discount_policy(doc, method=None):
+    """Resolve and enforce the applicable Staff Discount Policy on submit.
+
+    - Resolves the best-matching enabled Staff Discount Policy for this
+      invoice's customer/employee/branch/item context via
+      get_applicable_policy().
+    - Computes the discount that policy grants and enforces
+      per_transaction_cap (throws if this single invoice's discount would
+      exceed it).
+    - Computes the period-to-date discount already applied under this SAME
+      policy (see _period_to_date_discount) and enforces period_cap (throws
+      if adding this invoice's discount would exceed it).
+    - Records the resolved policy on doc.staff_discount_policy so future
+      period-sum queries can filter cleanly by policy.
+    """
+    employee = doc.get("custom_closing_employee")
+    branch = doc.get("branch")
+
+    item_groups = set()
+    for item in doc.get("items") or []:
+        if item.item_code:
+            item_group = frappe.get_cached_value("Item", item.item_code, "item_group")
+            if item_group:
+                item_groups.add(item_group)
+
+    policy = None
+    for item_group in item_groups or [None]:
+        policy = get_applicable_policy(
+            customer=doc.get("customer"),
+            employee=employee,
+            branch=branch,
+            item_group=item_group,
+        )
+        if policy:
+            break
+
+    if not policy:
+        return
+
+    # Compute the discount this policy grants on this invoice.
+    if policy.get("discount_type") == "Percentage":
+        discount_amount = flt(doc.net_total) * flt(policy.get("discount_percentage")) / 100.0
+    else:
+        discount_amount = flt(policy.get("discount_amount"))
+
+    per_transaction_cap = flt(policy.get("per_transaction_cap"))
+    if per_transaction_cap and discount_amount > per_transaction_cap:
+        frappe.throw(
+            (
+                "Staff Discount Policy {0} caps the per-transaction discount at {1}. "
+                "This invoice's discount ({2}) exceeds that limit."
+            ).format(policy.get("policy_name") or policy.get("name"), per_transaction_cap, discount_amount)
+        )
+
+    period = policy.get("period")
+    period_cap = flt(policy.get("period_cap"))
+    if period and period != "None" and period_cap:
+        customer_group = None
+        matching_employee = None
+        if policy.get("applies_to") == "Customer Group":
+            customer_group = frappe.db.get_value("Customer", doc.get("customer"), "customer_group")
+        else:
+            matching_employee = employee
+
+        period_to_date = _period_to_date_discount(
+            policy.get("name"),
+            doc.name,
+            customer_group=customer_group,
+            employee=matching_employee,
+            period=period,
+        )
+
+        if period_to_date + discount_amount > period_cap:
+            frappe.throw(
+                (
+                    "Staff Discount Policy {0} caps total {1} discounts at {2}. "
+                    "{3} has already been applied this period; this invoice's discount "
+                    "({4}) would exceed the cap."
+                ).format(
+                    policy.get("policy_name") or policy.get("name"),
+                    period,
+                    period_cap,
+                    period_to_date,
+                    discount_amount,
+                )
+            )
+
+    doc.discount_amount = discount_amount
+    doc.staff_discount_policy = policy.get("name")
 
 
 def validate_invoice(doc, method):
