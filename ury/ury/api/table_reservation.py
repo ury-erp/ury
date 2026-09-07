@@ -293,13 +293,13 @@ def check_table_reservation(table):
             return None
 
         # Priority 1: Check if any reservation is currently in its active lock window:
-        # [reserved_at - buffer_time, reserved_at + grace_period]
+        # [reserved_at - buffer_time] through reservation time and until terminal state
         for res in reservations:
             res_time = get_datetime(res.reserved_at)
             lock_start = res_time - timedelta(minutes=buffer_mins)
             grace_end = res_time + timedelta(minutes=grace_mins)
 
-            if lock_start <= now <= grace_end:
+            if now >= lock_start:
                 res["is_lock_window_active"] = True
                 res["buffer_minutes"] = buffer_mins
                 res["grace_minutes"] = grace_mins
@@ -646,6 +646,7 @@ def get_active_reservations(branch=None):
             session_clause = """
                 AND (
                     pos_opening_entry = %s
+                    OR status IN ('Confirmed', 'Active')
                     OR (
                         (pos_opening_entry IS NULL OR pos_opening_entry = '')
                         AND reserved_at >= %s
@@ -685,7 +686,7 @@ def get_active_reservations(branch=None):
             grace_end = res_time + timedelta(minutes=grace)
 
             is_active_status = res.get("status") in ("Confirmed", "Active")
-            res["is_lock_window_active"] = is_active_status and (lock_start <= now <= grace_end)
+            res["is_lock_window_active"] = is_active_status and (now >= lock_start)
             res["buffer_minutes"] = buf
             res["grace_minutes"] = grace
             res["duration_minutes"] = duration
