@@ -485,7 +485,13 @@ fixtures = [
                     "Cost Center-branch",
                     "Journal Entry-branch",
                     "Employee-payment_amount",
-                    "Employee-payment_type"
+                    "Employee-payment_type",
+                    "Item-disposable_items",
+                    "Item-is_disposable",
+                    "POS Invoice Item-is_disposable",
+                    "POS Invoice Item-disposable_items",
+                    "POS Profile-parcel_disposables",
+                    "POS Profile-table_disposables"
                 },
             ]
         ],
