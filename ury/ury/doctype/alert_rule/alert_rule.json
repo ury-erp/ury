@@ -4,18 +4,26 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
+  "alert_type",
   "alert_name",
   "threshold_minutes",
   "column_break_gh7xk",
   "enabled",
-  "notify_roles"
+  "notify_roles",
+  "branch"
  ],
  "fields": [
   {
+   "fieldname": "alert_type",
+   "fieldtype": "Select",
+   "label": "Alert Type",
+   "options": "\nHigh Food Cost\nProduct Block\nPayment Delay\nCancel Delay\nTable Turnaround",
+   "reqd": 1
+  },
+  {
    "fieldname": "alert_name",
    "fieldtype": "Data",
-   "label": "Alert Name",
-   "reqd": 1
+   "label": "Alert Name"
   },
   {
    "description": "Minutes",
@@ -35,8 +43,15 @@
   },
   {
    "fieldname": "notify_roles",
-   "fieldtype": "Small Text",
-   "label": "Notify Roles"
+   "fieldtype": "Table",
+   "label": "Notify Roles",
+   "options": "Alert Rule Role"
+  },
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "label": "Branch",
+   "options": "Branch"
   }
  ],
  "index_web_pages_for_search": 1,
