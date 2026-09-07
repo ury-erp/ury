@@ -32,7 +32,8 @@ app_include_js = [
     # See ury/public/js/return_to_app.js and packages/core/src/frappe/deskLink.ts.
     "/assets/ury/js/return_to_app.js",
     "/assets/ury/js/remove_duplicates.js",
-    "/assets/ury/js/journal_entry.js"
+    "/assets/ury/js/journal_entry.js",
+    "/assets/ury/js/round_off_limit_exceed.js"
 ]
 
 # include js, css files in header of web template
