@@ -6,7 +6,7 @@ import type { Table, TableReservation } from '../lib/table-api';
 import { Badge } from '@ury/ui';
 import { TableShapeIcon } from './TableShapeIcon';
 import TableActionsMenu from './TableActionsMenu';
-import { formatReservationTime } from '../lib/table-utils';
+import { formatReservationTime, isReservationLockWindowActive } from '../lib/table-utils';
 import { t } from '../i18n';
 
 export const TABLE_STATE_STYLES = {
@@ -62,7 +62,11 @@ const TableCard = ({
   isRestricted = false,
 }: TableCardProps) => {
   const isOccupied = table.occupied === 1;
-  const isLockedByReservation = isReserved && !!activeReservation && activeReservation.is_lock_window_active && activeReservation.status === 'Confirmed';
+  const isLockedByReservation =
+    isReserved &&
+    !!activeReservation &&
+    (activeReservation.is_lock_window_active || isReservationLockWindowActive(activeReservation)) &&
+    activeReservation.status === 'Confirmed';
 
   return (
     <div
