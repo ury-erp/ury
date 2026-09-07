@@ -2,6 +2,33 @@ import frappe
 from ury.services.bom_cost_resolver import resolve_item_cost, resolve_product_bundle_cost
 
 
+def _resolve_disposable_cost(item_code, buying_price_list):
+	"""Sum the cost of an item's mapped Disposable Items rows.
+
+	Each `Disposable Items` child-table row (parent = item_code) links a
+	disposable Item plus a qty. We resolve each disposable's own cost via
+	resolve_item_cost and multiply by qty, so packaging/consumable cost
+	that is invisible on the (zero-rated) POS Invoice line still shows up
+	as real cost here.
+
+	Returns 0.0 if the item has no mapped disposables.
+	"""
+	disposable_rows = frappe.get_all(
+		"Disposable Items",
+		filters={"parent": item_code},
+		fields=["item", "qty"],
+	)
+
+	total_cost = 0.0
+	for row in disposable_rows:
+		if not row.item or not row.qty:
+			continue
+		result = resolve_item_cost(row.item, buying_price_list, qty=row.qty)
+		total_cost += result.get("cost", 0) or 0
+
+	return total_cost
+
+
 def execute(filters=None):
 	"""Generate Food Cost and Margin Report.
 
@@ -71,7 +98,9 @@ def execute(filters=None):
 	# Process non-product-bundle items
 	for item in non_pb_items:
 		selling_price = float(item["Selling Price"]) if item["Selling Price"] else 0
-		food_cost = float(item["Food Cost"]) if item["Food Cost"] else 0
+		base_food_cost = float(item["Food Cost"]) if item["Food Cost"] else 0
+		disposable_cost = round(_resolve_disposable_cost(item["item_code"], buying_price_list), 2)
+		food_cost = round(base_food_cost + disposable_cost, 2)
 
 		if selling_price > 0:
 			food_cost_pct = round((food_cost / selling_price) * 100, 2)
@@ -83,6 +112,7 @@ def execute(filters=None):
 				"Item Group": item["Item Group"],
 				"Selling Price": selling_price,
 				"Food Cost": food_cost,
+				"Disposable Cost": disposable_cost,
 				"Food Cost Percentage": food_cost_pct,
 				"Gross Profit": gross_profit,
 				"Gross Profit Percentage": gross_profit_pct
@@ -123,7 +153,8 @@ def execute(filters=None):
 			max_depth=2
 		)
 
-		food_cost = result['cost']
+		disposable_cost = round(_resolve_disposable_cost(item["item_code"], buying_price_list), 2)
+		food_cost = result['cost'] + disposable_cost
 		is_complete = result['complete']
 
 		if is_complete:
@@ -136,6 +167,7 @@ def execute(filters=None):
 				"Item Group": item["Item Group"],
 				"Selling Price": selling_price,
 				"Food Cost": round(food_cost, 2),
+				"Disposable Cost": disposable_cost,
 				"Food Cost Percentage": food_cost_pct,
 				"Gross Profit": gross_profit,
 				"Gross Profit Percentage": gross_profit_pct
@@ -153,6 +185,7 @@ def execute(filters=None):
 		{"label": "Item Name", "fieldname": "Item Name", "fieldtype": "Data", "width": 150},
 		{"label": "Selling Price", "fieldname": "Selling Price", "fieldtype": "Currency", "width": 120},
 		{"label": "Food Cost", "fieldname": "Food Cost", "fieldtype": "Currency", "width": 120},
+		{"label": "Disposable Cost", "fieldname": "Disposable Cost", "fieldtype": "Currency", "width": 120},
 		{"label": "Food Cost Percentage", "fieldname": "Food Cost Percentage", "fieldtype": "Data", "width": 150},
 		{"label": "Gross Profit", "fieldname": "Gross Profit", "fieldtype": "Currency", "width": 120},
 		{"label": "Gross Profit Percentage", "fieldname": "Gross Profit Percentage", "fieldtype": "Data", "width": 150}
@@ -179,7 +212,7 @@ def _apply_heatmap_coloring(sorted_data):
 			if group_items:
 				data.extend(_color_group_items(group_items))
 				# Add visual separator row
-				data.append([None, None, None, None, None, None, None])
+				data.append([None, None, None, None, None, None, None, None])
 			current_item_group = item_group
 			group_items = []
 
@@ -214,6 +247,7 @@ def _color_group_items(group_items):
 			dat["Item Name"],
 			dat["Selling Price"],
 			dat["Food Cost"],
+			dat["Disposable Cost"],
 			food_cost_pct_html,
 			dat["Gross Profit"],
 			dat["Gross Profit Percentage"]
