@@ -193,8 +193,10 @@ doc_events = {
         },
     "POS Closing Entry": {
         "before_save": "ury.ury.hooks.ury_pos_closing_entry.before_save",
-        "validate":"ury.ury.hooks.ury_pos_closing_entry.validate"
-        },
+        "validate": "ury.ury.hooks.ury_pos_closing_entry.validate",
+        "on_submit": "ury.ury.hooks.ury_pos_closing_entry.on_submit",
+        "on_cancel": "ury.ury.hooks.ury_pos_closing_entry.on_cancel",
+    },
     "URY Menu Course": {
 		"validate": "ury.ury.api.ury_menu_course_validation.validate_priority",
 	}    
