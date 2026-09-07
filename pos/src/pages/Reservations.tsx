@@ -92,9 +92,25 @@ export default function Reservations() {
     }
   }, [branch, fetchReservationsData]);
 
+  const RESERVATION_POLL_INTERVAL_MS = 30000;
+
   useEffect(() => {
+    let isMounted = true;
+
     loadInitialData();
-  }, [loadInitialData]);
+
+    if (!branch) return;
+
+    const intervalId = setInterval(async () => {
+      if (!isMounted) return;
+      await fetchReservationsData();
+    }, RESERVATION_POLL_INTERVAL_MS);
+
+    return () => {
+      isMounted = false;
+      clearInterval(intervalId);
+    };
+  }, [loadInitialData, fetchReservationsData, branch]);
 
   const handleOpenEdit = (res: TableReservation) => {
     setEditReservation(res);
