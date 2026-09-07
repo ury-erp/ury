@@ -59,11 +59,11 @@ def get_branch_reservation_settings(branch):
     if not branch:
         return {
             "enable_reservation": 0,
-            "buffer_time": 30,
-            "grace_period": 15,
+            "buffer_time": 0,
+            "grace_period": 0,
             "avg_table_time_last_day": 0.0,
             "avg_table_time_last_week": 0.0,
-            "calculated_duration": 90,
+            "calculated_duration": 60,
         }
 
     try:
@@ -79,18 +79,18 @@ def get_branch_reservation_settings(branch):
         ) or {}
 
         enable_reservation = cint(branch_doc.get("custom_enable_reservation") or 0)
+
         buffer_time_raw = branch_doc.get("custom_buffer_time")
-        buffer_time = cint(buffer_time_raw) if buffer_time_raw is not None and str(buffer_time_raw).strip() != "" else 30
-        if buffer_time <= 0:
-            buffer_time = 30
+        if buffer_time_raw is None or str(buffer_time_raw).strip() == "":
+            buffer_time = 0
+        else:
+            buffer_time = max(0, cint(buffer_time_raw))
 
         grace_period_raw = branch_doc.get("custom_grace_period")
         if grace_period_raw is None or str(grace_period_raw).strip() == "":
-            grace_period = 15
+            grace_period = 0
         else:
-            grace_period = cint(grace_period_raw)
-            if grace_period < 0:
-                grace_period = 0
+            grace_period = max(0, cint(grace_period_raw))
 
         last_day_avg = get_branch_last_day_avg_time(branch)
         last_week_avg = get_branch_last_week_avg_time(branch)
@@ -108,11 +108,11 @@ def get_branch_reservation_settings(branch):
         frappe.log_error(f"Error in get_branch_reservation_settings: {str(e)}", "Reservation Settings Error")
         return {
             "enable_reservation": 0,
-            "buffer_time": 30,
-            "grace_period": 15,
+            "buffer_time": 0,
+            "grace_period": 0,
             "avg_table_time_last_day": 0.0,
             "avg_table_time_last_week": 0.0,
-            "calculated_duration": 90,
+            "calculated_duration": 60,
         }
 
 
@@ -135,8 +135,8 @@ def validate_reservation_conflicts(table, branch, reserved_at, exclude_name=None
         branch = frappe.db.get_value("URY Table", table, "branch")
 
     settings = get_branch_reservation_settings(branch)
-    buffer_mins = cint(settings.get("buffer_time", 30))
-    duration_mins = cint(settings.get("calculated_duration", 90))
+    buffer_mins = cint(settings.get("buffer_time", 0))
+    duration_mins = cint(settings.get("calculated_duration", 60))
 
     new_end = new_start + timedelta(minutes=duration_mins)
     new_protect_start = new_start - timedelta(minutes=buffer_mins)
@@ -258,9 +258,9 @@ def check_table_reservation(table):
     try:
         branch = frappe.db.get_value("URY Table", table, "branch")
         settings = get_branch_reservation_settings(branch)
-        buffer_mins = cint(settings.get("buffer_time", 30))
-        grace_mins = cint(settings.get("grace_period", 15))
-        duration_mins = cint(settings.get("calculated_duration", 90))
+        buffer_mins = cint(settings.get("buffer_time", 0))
+        grace_mins = cint(settings.get("grace_period", 0))
+        duration_mins = cint(settings.get("calculated_duration", 60))
 
         now = now_datetime()
 
@@ -673,9 +673,9 @@ def get_active_reservations(branch=None):
                 branch_settings_cache[b] = get_branch_reservation_settings(b)
 
             b_settings = branch_settings_cache[b]
-            buf = cint(b_settings.get("buffer_time", 30))
-            grace = cint(b_settings.get("grace_period", 15))
-            duration = cint(b_settings.get("calculated_duration", 90))
+            buf = cint(b_settings.get("buffer_time", 0))
+            grace = cint(b_settings.get("grace_period", 0))
+            duration = cint(b_settings.get("calculated_duration", 60))
 
             res_time = get_datetime(res.reserved_at)
             lock_start = res_time - timedelta(minutes=buf)
