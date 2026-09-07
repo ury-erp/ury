@@ -41,7 +41,6 @@ import TableCard, { TABLE_STATE_STYLES } from '../components/TableCard';
 import MergeLinkConnector from '../components/MergeLinkConnector';
 import TableReservationDialog, { type ReservationFormData } from '../components/TableReservationDialog';
 import TableReservationEditDialog, { type EditReservationFormData } from '../components/TableReservationEditDialog';
-import TableReservationWarningDialog from '../components/TableReservationWarningDialog';
 import TableReservationCancelDialog from '../components/TableReservationCancelDialog';
 
 const TableView = () => {
@@ -82,9 +81,6 @@ const TableView = () => {
   // Reservation dialogs state
   const [reservationTable, setReservationTable] = useState<Table | null>(null);
   const [editReservation, setEditReservation] = useState<TableReservation | null>(null);
-  const [reservationWarningOpen, setReservationWarningOpen] = useState(false);
-  const [pendingTable, setPendingTable] = useState<string | null>(null);
-  const [reservationInfo, setReservationInfo] = useState<TableReservation | null>(null);
   const [cancelReservationTable, setCancelReservationTable] = useState<string | null>(null);
   const [cancelReservationInfo, setCancelReservationInfo] = useState<TableReservation | null>(null);
   const [cancelReservationLoading, setCancelReservationLoading] = useState(false);
@@ -342,9 +338,6 @@ const TableView = () => {
     if (isActiveLockRes) {
       const timeStr = formatReservationTime(activeLockRes.reserved_at);
       showToast.error(`Table ${tableName} is reserved for ${timeStr}. Please choose another table.`);
-      setPendingTable(tableName);
-      setReservationInfo(activeLockRes);
-      setReservationWarningOpen(true);
       return;
     }
 
@@ -359,9 +352,6 @@ const TableView = () => {
       if (isResLocked) {
         const timeStr = formatReservationTime(reservation.reserved_at);
         showToast.error(`Table ${tableName} is reserved for ${timeStr}. Please choose another table.`);
-        setPendingTable(tableName);
-        setReservationInfo(reservation);
-        setReservationWarningOpen(true);
         return;
       }
 
@@ -468,15 +458,6 @@ const TableView = () => {
     }
   };
 
-  const handleReservationCancel = () => {
-    if (pendingTable && reservationInfo) {
-      const formattedTime = formatReservationTime(reservationInfo.reserved_at);
-      showToast.error(`Table ${pendingTable} is reserved for ${formattedTime}. Please choose another table.`);
-    }
-    setReservationWarningOpen(false);
-    setPendingTable(null);
-    setReservationInfo(null);
-  };
 
   const handlePreviewTable = (table: Table, event?: MouseEvent<HTMLButtonElement>) => {
     event?.stopPropagation();
@@ -890,13 +871,6 @@ const TableView = () => {
         onConfirm={handleReserveConfirm}
       />
 
-      <TableReservationWarningDialog
-        open={reservationWarningOpen}
-        reservation={reservationInfo}
-        tableName={pendingTable ?? ''}
-        onClose={handleReservationCancel}
-      />
-
       {/* Status Legend */}
       <div className="fixed bottom-[4.5rem] w-full p-4 bg-white border-t border-gray-200">
         <div className="max-w-screen-xl mx-auto">
@@ -908,6 +882,10 @@ const TableView = () => {
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 bg-amber-50 border border-amber-400 rounded"></div>
               <span>{t('tables.occupied')}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 bg-primary-50 border border-primary-400 rounded"></div>
+              <span>Reserved</span>
             </div>
           </div>
         </div>
