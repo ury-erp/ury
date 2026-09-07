@@ -52,6 +52,7 @@ export interface POSInvoiceItem {
   qty: number;
   rate: number;
   amount: number;
+  is_disposable?: number;
 }
 
 export interface POSInvoiceTax {
