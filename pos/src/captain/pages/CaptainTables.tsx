@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Square } from 'lucide-react';
 import { Button, Spinner, showToast } from '@ury/ui';
 import { useCaptainContext } from '../hooks/useCaptainContext';
-import { getRooms, getTables, type Room, type Table } from '../../lib/table-api';
-import { getMergeGroupMembers, sortTablesByMergeGroups } from '../../lib/table-utils';
+import { getRooms, getTables, checkTableReservation, type Room, type Table } from '../../lib/table-api';
+import { getTableOrder } from '../../lib/order-api';
+import { getMergeGroupMembers, sortTablesByMergeGroups, formatReservationTime } from '../../lib/table-utils';
 import {
   getActiveTableOrders,
   getUserFullNames,
@@ -142,10 +143,39 @@ export default function CaptainTables() {
     [currentUser]
   );
 
-  const handleTableTap = (table: Table, order: ActiveTableOrder | undefined) => {
+  const handleTableTap = async (table: Table, order: ActiveTableOrder | undefined) => {
     const ownership = resolveOwnership(table, order);
 
-    if (ownership === 'free' || ownership === 'mine') {
+    if (ownership === 'free') {
+      try {
+        const orderRes = await getTableOrder(table.name);
+        const existingInvoice = orderRes?.message;
+        if (
+          existingInvoice &&
+          existingInvoice.name &&
+          existingInvoice.docstatus === 0 &&
+          existingInvoice.invoice_printed !== 1
+        ) {
+          navigate(`/order/table/${table.name}`);
+          return;
+        }
+      } catch {}
+
+      try {
+        const res = await checkTableReservation(table.name);
+        if (res && res.is_lock_window_active && res.status === 'Confirmed') {
+          const timeStr = formatReservationTime(res.reserved_at);
+          showToast.error(`Table ${table.name} is reserved for ${timeStr}. Please choose another table.`);
+          return;
+        }
+      } catch (err) {
+        console.error(err);
+      }
+      navigate(`/order/table/${table.name}`);
+      return;
+    }
+
+    if (ownership === 'mine') {
       navigate(`/order/table/${table.name}`);
       return;
     }

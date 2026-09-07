@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useMemo, useState, type MouseEvent } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Layout, Square } from 'lucide-react';
 import { usePOSStore } from '../store/pos-store';
@@ -21,7 +21,7 @@ import {
   type TableReservation,
   type BranchReservationSettings,
 } from '../lib/table-api';
-import { getMergeGroupMembers, formatMergedTableLabelFromGroup, getTableRenderGroups, sortTablesByMergeGroups } from '../lib/table-utils';
+import { getMergeGroupMembers, formatMergedTableLabelFromGroup, getTableRenderGroups, sortTablesByMergeGroups, formatReservationTime } from '../lib/table-utils';
 import { Spinner } from '@ury/ui';
 import { Button } from '@ury/ui';
 import { Badge } from '@ury/ui';
@@ -46,7 +46,7 @@ import TableReservationCancelDialog from '../components/TableReservationCancelDi
 
 const TableView = () => {
   const navigate = useNavigate();
-  const { posProfile, setSelectedTable, setSelectedCustomer, setSelectedOrderType } = usePOSStore();
+  const { posProfile, setSelectedTable, setSelectedOrderType } = usePOSStore();
   const user = useRootStore((state) => state.user);
   const showCaptainTransfer = canCaptainTransfer(user, posProfile);
   const isRestricted = isUserRestrictedFromTableOrders(user, posProfile);
@@ -88,7 +88,6 @@ const TableView = () => {
   const [cancelReservationTable, setCancelReservationTable] = useState<string | null>(null);
   const [cancelReservationInfo, setCancelReservationInfo] = useState<TableReservation | null>(null);
   const [cancelReservationLoading, setCancelReservationLoading] = useState(false);
-  const [confirmArrivalLoading, setConfirmArrivalLoading] = useState(false);
 
   const [isLayoutView, setIsLayoutView] = useState(false);
 
@@ -240,7 +239,7 @@ const TableView = () => {
       if (!allMap.has(res.reserved_table)) {
         allMap.set(res.reserved_table, res);
       }
-      if (res.is_lock_window_active) {
+      if (res.is_lock_window_active && res.status === 'Confirmed') {
         lockMap.set(res.reserved_table, res);
       } else {
         if (!upcomingMap.has(res.reserved_table)) {
@@ -256,6 +255,25 @@ const TableView = () => {
     };
   }, [activeReservationsList]);
 
+  // Informational notification when a table enters its reservation buffer window
+  const notifiedLockReservationsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!activeReservationsList || activeReservationsList.length === 0) return;
+
+    for (const res of activeReservationsList) {
+      if (res.is_lock_window_active && res.status === 'Confirmed' && res.reserved_table) {
+        const key = `${res.name || res.reserved_table}_${res.reserved_at}`;
+        if (!notifiedLockReservationsRef.current.has(key)) {
+          notifiedLockReservationsRef.current.add(key);
+          const timeStr = formatReservationTime(res.reserved_at);
+          showToast.warning(
+            `Table ${res.reserved_table} is reserved for ${timeStr}. Please choose another table.`
+          );
+        }
+      }
+    }
+  }, [activeReservationsList]);
+
   const isReservationEnabled = branchSettings ? branchSettings.enable_reservation !== 0 : true;
 
   const handleNavigateToPOS = async (tableName: string) => {
@@ -267,9 +285,31 @@ const TableView = () => {
       return;
     }
 
+    // Check if table has an ongoing active order first
+    try {
+      const orderResponse = await getTableOrder(tableName);
+      const existingInvoice = orderResponse?.message;
+      if (
+        existingInvoice &&
+        existingInvoice.name &&
+        existingInvoice.docstatus === 0 &&
+        existingInvoice.invoice_printed !== 1
+      ) {
+        // Ongoing order exists - allow opening/continuing without reservation lock check
+        setSelectedOrderType(DINE_IN);
+        setSelectedTable(tableName, selectedRoom);
+        navigate('/pos');
+        return;
+      }
+    } catch {
+      // Continue to check reservation if order fetch failed
+    }
+
     // Check if table is under active reservation lock window
     const activeLockRes = lockActiveReservationsByTable.get(tableName);
-    if (activeLockRes) {
+    if (activeLockRes && activeLockRes.is_lock_window_active && activeLockRes.status === 'Confirmed') {
+      const timeStr = formatReservationTime(activeLockRes.reserved_at);
+      showToast.error(`Table ${tableName} is reserved for ${timeStr}. Please choose another table.`);
       setPendingTable(tableName);
       setReservationInfo(activeLockRes);
       setReservationWarningOpen(true);
@@ -279,7 +319,9 @@ const TableView = () => {
     try {
       const reservation = await checkTableReservation(tableName);
 
-      if (reservation && reservation.is_lock_window_active) {
+      if (reservation && reservation.is_lock_window_active && reservation.status === 'Confirmed') {
+        const timeStr = formatReservationTime(reservation.reserved_at);
+        showToast.error(`Table ${tableName} is reserved for ${timeStr}. Please choose another table.`);
         setPendingTable(tableName);
         setReservationInfo(reservation);
         setReservationWarningOpen(true);
@@ -293,40 +335,6 @@ const TableView = () => {
       setSelectedOrderType(DINE_IN);
       setSelectedTable(tableName, selectedRoom);
       navigate('/pos');
-    }
-  };
-
-  const handleReservationContinue = async () => {
-    if (!pendingTable || !selectedRoom) return;
-
-    setConfirmArrivalLoading(true);
-
-    try {
-      if (reservationInfo?.name) {
-        await updateTableReservationStatus(reservationInfo.name, 'Completed');
-      }
-
-      // Pre-populate customer in store
-      if (reservationInfo?.customer) {
-        setSelectedCustomer({
-          id: reservationInfo.customer,
-          name: reservationInfo.customer_name || reservationInfo.customer,
-          phone: reservationInfo.customer_phone || '',
-        });
-      }
-
-      showToast.success('Customer arrival confirmed. Table is now occupied.');
-      setSelectedOrderType(DINE_IN);
-      setSelectedTable(pendingTable, selectedRoom);
-      navigate('/pos');
-    } catch (error) {
-      console.error(error);
-      showToast.error(error instanceof Error ? error.message : 'Failed to confirm arrival');
-    } finally {
-      setConfirmArrivalLoading(false);
-      setReservationWarningOpen(false);
-      setPendingTable(null);
-      setReservationInfo(null);
     }
   };
 
@@ -425,8 +433,8 @@ const TableView = () => {
 
   const handleReservationCancel = () => {
     if (pendingTable && reservationInfo) {
-      const formattedTime = reservationInfo.reserved_at ? reservationInfo.reserved_at.replace('T', ' ') : '';
-      showToast.error(`Table ${pendingTable} is reserved for ${formattedTime}.`);
+      const formattedTime = formatReservationTime(reservationInfo.reserved_at);
+      showToast.error(`Table ${pendingTable} is reserved for ${formattedTime}. Please choose another table.`);
     }
     setReservationWarningOpen(false);
     setPendingTable(null);
@@ -849,9 +857,7 @@ const TableView = () => {
         open={reservationWarningOpen}
         reservation={reservationInfo}
         tableName={pendingTable ?? ''}
-        loading={confirmArrivalLoading}
-        onConfirmArrival={handleReservationContinue}
-        onCancel={handleReservationCancel}
+        onClose={handleReservationCancel}
       />
 
       {/* Status Legend */}

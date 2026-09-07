@@ -1,16 +1,18 @@
 import { type MouseEvent } from 'react';
-import { Eye, Loader2, Printer, Users } from 'lucide-react';
+import { AlertTriangle, Eye, Loader2, Printer, Users } from 'lucide-react';
 import { cn } from '@ury/ui';
 import { formatInvoiceTime } from '@ury/core';
 import type { Table, TableReservation } from '../lib/table-api';
 import { Badge } from '@ury/ui';
 import { TableShapeIcon } from './TableShapeIcon';
 import TableActionsMenu from './TableActionsMenu';
+import { formatReservationTime } from '../lib/table-utils';
 import { t } from '../i18n';
 
 export const TABLE_STATE_STYLES = {
   available: 'border-emerald-300 bg-emerald-50 text-emerald-900 hover:border-emerald-400',
   occupied: 'border-amber-400 bg-amber-50 text-amber-900',
+  reserved: 'border-amber-400 bg-amber-50/50 text-amber-950',
   restricted: 'border-emerald-300 bg-emerald-50 text-emerald-900 opacity-60 cursor-not-allowed',
 } as const;
 
@@ -60,6 +62,7 @@ const TableCard = ({
   isRestricted = false,
 }: TableCardProps) => {
   const isOccupied = table.occupied === 1;
+  const isLockedByReservation = isReserved && !!activeReservation && activeReservation.is_lock_window_active && activeReservation.status === 'Confirmed';
 
   return (
     <div
@@ -74,9 +77,11 @@ const TableCard = ({
         'relative flex min-h-[15.5rem] flex-col rounded-lg border-2 bg-white p-4 transition-all',
         isOccupied
           ? TABLE_STATE_STYLES.occupied
-          : isRestricted
-            ? TABLE_STATE_STYLES.restricted
-            : cn(TABLE_STATE_STYLES.available, 'cursor-pointer hover:shadow-md'),
+          : isLockedByReservation
+            ? cn(TABLE_STATE_STYLES.reserved, 'cursor-pointer hover:shadow-md')
+            : isRestricted
+              ? TABLE_STATE_STYLES.restricted
+              : cn(TABLE_STATE_STYLES.available, 'cursor-pointer hover:shadow-md'),
         menuOpen ? 'z-20' : 'z-0',
         className
       )}
@@ -93,8 +98,19 @@ const TableCard = ({
           </div>
           <div className="flex shrink-0 items-center gap-1">
             {isOccupied ? (
-              <Badge variant="warning" className="whitespace-nowrap">
-                {t('tables.occupied')}
+              <>
+                <Badge variant="warning" className="whitespace-nowrap">
+                  {t('tables.occupied')}
+                </Badge>
+                {isLockedByReservation && (
+                  <Badge variant="outline" className="whitespace-nowrap text-xs border-amber-300 bg-amber-100 text-amber-900 font-medium">
+                    Reserved {formatReservationTime(activeReservation?.reserved_at)}
+                  </Badge>
+                )}
+              </>
+            ) : isLockedByReservation ? (
+              <Badge variant="warning" className="whitespace-nowrap border-amber-300 bg-amber-100 text-amber-900 font-medium">
+                Reserved {formatReservationTime(activeReservation?.reserved_at)}
               </Badge>
             ) : (
               <Badge variant="success" className="whitespace-nowrap">
@@ -154,6 +170,14 @@ const TableCard = ({
             <Badge variant="pending" className="mt-2">
               Take away
             </Badge>
+          )}
+          {isLockedByReservation && (
+            <div className="mt-2 flex items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-950">
+              <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-600" />
+              <span className="truncate">
+                Reserved for {formatReservationTime(activeReservation?.reserved_at)}
+              </span>
+            </div>
           )}
         </div>
       </div>

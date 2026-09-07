@@ -2,9 +2,10 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { X, Square, AlertTriangle } from 'lucide-react';
 import { usePOSStore } from '../store/pos-store';
 import { Dialog, DialogContent, Button, Badge, Spinner, showToast, cn } from '@ury/ui';
-import { getRooms, getTables, getActiveReservations, Room, Table, TableReservation } from '../lib/table-api';
+import { getRooms, getTables, getActiveReservations, checkTableReservation, Room, Table, TableReservation } from '../lib/table-api';
+import { getTableOrder } from '../lib/order-api';
 import { TableShapeIcon } from './TableShapeIcon';
-import { getMergeGroupMembers, formatMergedTableLabelFromGroup } from '../lib/table-utils';
+import { getMergeGroupMembers, formatMergedTableLabelFromGroup, formatReservationTime } from '../lib/table-utils';
 import { t } from '../i18n';
 
 interface Props {
@@ -21,6 +22,7 @@ const TableSelectionDialog: React.FC<Props> = ({ onClose }) => {
   const [loadingRooms, setLoadingRooms] = useState(false);
   const [loadingTables, setLoadingTables] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [tableWarning, setTableWarning] = useState<string | null>(null);
 
   const sortTables = (tables: Table[]): Table[] => {
     return [...tables].sort((a, b) => a.name.localeCompare(b.name));
@@ -46,14 +48,8 @@ const TableSelectionDialog: React.FC<Props> = ({ onClose }) => {
 
   const formatReservedLabel = (reservedAt?: string) => {
     if (!reservedAt) return 'Reserved';
-    try {
-      const d = new Date(reservedAt.replace(' ', 'T'));
-      if (isNaN(d.getTime())) return `Reserved for ${reservedAt}`;
-      const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      return `Reserved for ${timeStr}`;
-    } catch {
-      return `Reserved for ${reservedAt}`;
-    }
+    const formatted = formatReservationTime(reservedAt);
+    return formatted ? `Reserved for ${formatted}` : 'Reserved';
   };
 
   // Fetch rooms on mount with session storage
@@ -133,6 +129,25 @@ const TableSelectionDialog: React.FC<Props> = ({ onClose }) => {
           </Button>
         </div>
         <div className="p-4">
+          {/* Reservation Buffer Warning Banner */}
+          {tableWarning && (
+            <div className="mb-4 flex items-center justify-between rounded-lg border border-amber-300 bg-amber-50 p-3.5 text-amber-950 shadow-sm animate-in fade-in">
+              <div className="flex items-center gap-2.5">
+                <AlertTriangle className="h-5 w-5 shrink-0 text-amber-600" />
+                <span className="text-sm font-semibold">{tableWarning}</span>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => setTableWarning(null)}
+                className="h-7 w-7 text-amber-800 hover:text-amber-950 hover:bg-amber-100"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+
           {/* Room Selection */}
           {loadingRooms ? (
             <div className="mb-6">
@@ -153,7 +168,10 @@ const TableSelectionDialog: React.FC<Props> = ({ onClose }) => {
               {rooms.map(room => (
                 <Button
                   key={room.name}
-                  onClick={() => setSelectedRoom(room.name)}
+                  onClick={() => {
+                    setSelectedRoom(room.name);
+                    setTableWarning(null);
+                  }}
                   variant="tab"
                   data-selected={selectedRoom === room.name}
                   className="h-fit"
@@ -188,22 +206,42 @@ const TableSelectionDialog: React.FC<Props> = ({ onClose }) => {
                 return (
                   <Button
                     key={table.name}
-                    onClick={() => {
-                      if (isReserved) {
-                        let timeStr = '';
-                        if (activeRes?.reserved_at) {
-                          try {
-                            const d = new Date(activeRes.reserved_at.replace(' ', 'T'));
-                            timeStr = !isNaN(d.getTime())
-                              ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                              : activeRes.reserved_at;
-                          } catch {
-                            timeStr = activeRes.reserved_at;
-                          }
+                    onClick={async () => {
+                      // Check if the table has an ongoing order first
+                      try {
+                        const orderRes = await getTableOrder(table.name);
+                        const existingInvoice = orderRes?.message;
+                        if (
+                          existingInvoice &&
+                          existingInvoice.name &&
+                          existingInvoice.docstatus === 0 &&
+                          existingInvoice.invoice_printed !== 1
+                        ) {
+                          setTableWarning(null);
+                          setSelectedTable(table.name, selectedRoom);
+                          onClose();
+                          return;
                         }
-                        showToast.error(`Table ${table.name} is reserved for ${timeStr}.`);
+                      } catch {}
+
+                      let currentActiveRes = activeRes;
+                      if (!currentActiveRes) {
+                        try {
+                          const res = await checkTableReservation(table.name);
+                          if (res && res.is_lock_window_active && res.status === 'Confirmed') {
+                            currentActiveRes = res;
+                          }
+                        } catch {}
+                      }
+
+                      if (currentActiveRes) {
+                        const timeStr = formatReservationTime(currentActiveRes.reserved_at);
+                        const warningMsg = `Table ${table.name} is reserved for ${timeStr}. Please choose another table.`;
+                        setTableWarning(warningMsg);
+                        showToast.error(warningMsg);
                         return;
                       }
+                      setTableWarning(null);
                       setSelectedTable(table.name, selectedRoom);
                       onClose();
                     }}
