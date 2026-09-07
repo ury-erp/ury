@@ -206,6 +206,8 @@ doc_events = {
     "Sales Invoice": {
         "before_insert": "ury.ury.hooks.ury_sales_invoice.before_insert",
         "on_update":"ury.ury.hooks.ury_sales_invoice.on_update",
+        "on_submit": "ury.ury.hooks.ury_sales_invoice.round_off_journal_entry",
+        "on_cancel": "ury.ury.hooks.ury_sales_invoice.journal_entry_cancel",
         },
     "Item": {"validate": "ury.ury.hooks.ury_item.validate"},
     "POS Opening Entry": {
@@ -500,7 +502,9 @@ fixtures = [
                     "POS Invoice Item-disposable_items",
                     "POS Profile-parcel_disposables",
                     "POS Profile-table_disposables",
-                    "Stock Reconciliation-branch"
+                    "Stock Reconciliation-branch",
+                    "POS Profile-cash_discount_account",
+                    "Sales Invoice-cash_discount_journal_entry"
                 },
             ]
         ],
