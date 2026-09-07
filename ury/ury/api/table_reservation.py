@@ -74,6 +74,8 @@ def get_branch_reservation_settings(branch):
                 "custom_enable_reservation",
                 "custom_buffer_time",
                 "custom_grace_period",
+                "custom_avg_table_time_last_day",
+                "custom_avg_table_time_last_week",
             ],
             as_dict=True,
         ) or {}
@@ -135,11 +137,12 @@ def validate_reservation_conflicts(table, branch, reserved_at, exclude_name=None
         branch = frappe.db.get_value("URY Table", table, "branch")
 
     settings = get_branch_reservation_settings(branch)
-    buffer_mins = cint(settings.get("buffer_time", 0))
-    duration_mins = cint(settings.get("calculated_duration", 60))
+    duration_val = settings.get("avg_table_time_last_day")
+    if not duration_val or flt(duration_val) < 15:
+        duration_val = settings.get("calculated_duration", 60)
+    duration_mins = flt(duration_val)
 
     new_end = new_start + timedelta(minutes=duration_mins)
-    new_protect_start = new_start - timedelta(minutes=buffer_mins)
 
     query = """
         SELECT name, reserved_at, branch
@@ -159,14 +162,15 @@ def validate_reservation_conflicts(table, branch, reserved_at, exclude_name=None
         ex_start = parse_to_datetime(ex.reserved_at, current_now)
         ex_branch = ex.branch or branch
         ex_settings = get_branch_reservation_settings(ex_branch)
-        ex_buffer = cint(ex_settings.get("buffer_time", 30))
-        ex_duration = cint(ex_settings.get("calculated_duration", 90))
+        ex_duration_val = ex_settings.get("avg_table_time_last_day")
+        if not ex_duration_val or flt(ex_duration_val) < 15:
+            ex_duration_val = ex_settings.get("calculated_duration", 90)
+        ex_duration = flt(ex_duration_val)
 
         ex_end = ex_start + timedelta(minutes=ex_duration)
-        ex_protect_start = ex_start - timedelta(minutes=ex_buffer)
 
-        # Conflict occurs if the active dining window of one overlaps with the protection window of the other
-        if (ex_end > new_protect_start and ex_start < new_end) or (new_end > ex_protect_start and new_start < ex_end):
+        # Conflict occurs if the two reservation intervals overlap without buffer time
+        if ex_start < new_end and new_start < ex_end:
             frappe.throw(
                 _("Table {0} already has a reservation during the selected time. Please select a different reservation time.").format(table)
             )
