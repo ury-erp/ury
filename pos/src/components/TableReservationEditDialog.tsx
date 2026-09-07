@@ -268,6 +268,7 @@ const TableReservationEditDialog = ({
                 onChange={(_, val) => setSelectedTable(val)}
                 disabled={loading}
                 strict
+                openOnFocus={false}
               />
             </div>
 
@@ -387,7 +388,7 @@ const TableReservationEditDialog = ({
             onClick={handleSubmit}
             disabled={loading || !customer || !customerPhone.trim() || !selectedTable}
           >
-            {loading ? 'Saving Changes...' : 'Save Changes'}
+            Save Changes
           </Button>
         </DialogFooter>
       </DialogContent>
