@@ -27,6 +27,7 @@ interface PaymentDialogProps {
 const PaymentDialog: React.FC<PaymentDialogProps> = ({
   onClose,
   grandTotal,
+  roundedTotal,
   invoice,
   customer,
   posProfile,
@@ -59,16 +60,6 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
     fetchPaymentModes();
   }, [fetchPaymentModes]);
 
-  // Calculate split payment total
-  const payments = paymentModes
-    .map((mode: any) => {
-      const id = typeof mode === 'string' ? mode : mode.id;
-      const amount = parseFloat(paymentInputs[id] || '');
-      return amount > 0 ? { mode_of_payment: id, amount } : null;
-    })
-    .filter(Boolean);
-  const paymentsTotal = payments.reduce((sum, p: any) => sum + p.amount, 0);
-
   // baseTotal represents the amount before any invoice-level discount (like pricing rule or manual discount)
   const baseTotal = grandTotal + (discountAmount || 0);
 
@@ -96,6 +87,19 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   const discountedTotal = Math.max(0, subtotal - totalDiscount);
   // If discount is applied, round up; else, round normally
   const finalTotal = appliedDiscount > 0 ? Math.ceil(discountedTotal) : Math.round(discountedTotal);
+
+  // Calculate split payment total
+  const payments = paymentModes
+    .map((mode: any) => {
+      const id = typeof mode === 'string' ? mode : mode.id;
+      const amount = parseFloat(paymentInputs[id] || '');
+      return amount > 0 ? { mode_of_payment: id, amount } : null;
+    })
+    .filter(Boolean);
+  const paymentsTotal = payments.reduce((sum, p: any) => sum + p.amount, 0);
+  const shortfall = finalTotal - paymentsTotal;
+  const isShort = shortfall > 0.005;
+
   const finalAdjustment = finalTotal - discountedTotal;
   const roundedFinalAdjustment = Math.round(finalAdjustment * 100) / 100;
   const showFinalAdjustment = Math.abs(roundedFinalAdjustment) > 0.001;
@@ -138,7 +142,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
     setError(null);
     try {
       await call.post('ury.ury.doctype.ury_order.ury_order.make_invoice', {
-        additionalDiscount: discountValue ? parseFloat(discountValue) : null,
+        additionalDiscount: appliedDiscount > 0 ? appliedDiscount : null,
         cashier,
         customer,
         invoice,
@@ -147,7 +151,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
         pos_profile: posProfile,
         table,
       });
-      showToast.success(t('success.payment_successful'));
+      showToast.success(t('payment.success', { amount: formatCurrency(paymentsTotal) }));
       onClose();
       clearSelectedOrder();
       await fetchOrders();
@@ -162,7 +166,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent variant="xlarge" className="bg-white w-full max-w-4xl max-h-[90vh] flex flex-col md:flex-row p-0" showCloseButton={false}>
+      <DialogContent variant="xlarge" className="bg-white w-full max-w-4xl max-h-dialog-max-h flex flex-col md:flex-row p-0" showCloseButton={false}>
         {/* Left Column - Discount and Payment Mode */}
         <div className="md:w-1/2 p-6 border-b md:border-b-0 md:border-r border-gray-200 overflow-y-auto">
           <div className="flex justify-between items-center mb-6">
@@ -231,7 +235,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
             </div>
             <div className="flex justify-between mt-2 text-sm">
               <span className="font-medium">{t('payment.total_entered')}</span>
-              <span className={'text-green-600 font-semibold flex items-center gap-1'}>
+              <span className={`${isShort ? 'text-amber-700' : 'text-green-600'} font-semibold flex items-center gap-1`}>
                 {formatCurrency(paymentsTotal)} / {formatCurrency(finalTotal)}
                 {paymentsTotal > finalTotal && (
                   <span className="text-yellow-700 font-semibold">
@@ -241,6 +245,16 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
                 )}
               </span>
             </div>
+            {isShort && (
+              <p role="status" className="text-amber-700 text-sm font-medium">
+                {t('payment.short_by', { amount: formatCurrency(shortfall) })}
+              </p>
+            )}
+            {paymentsTotal > finalTotal && (
+              <p className="text-yellow-700 text-sm font-medium">
+                {t('payment.change_due', { amount: formatCurrency(paymentsTotal - finalTotal) })}
+              </p>
+            )}
           </div>
         </div>
 
@@ -295,8 +309,8 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
           {/* Payment Button */}
           <Button
             onClick={handlePayment}
-            disabled={isProcessing || payments.length === 0}
-            variant={isProcessing || payments.length === 0 ? "secondary" : "default"}
+            disabled={isProcessing || payments.length === 0 || isShort}
+            variant={isProcessing || payments.length === 0 || isShort ? "secondary" : "default"}
             className="w-full"
           >
             {isProcessing ? t('payment.processing') : t('payment.pay_button', { amount: formatCurrency(paymentsTotal > 0 ? paymentsTotal : finalTotal) })}
