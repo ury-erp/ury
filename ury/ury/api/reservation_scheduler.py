@@ -6,8 +6,11 @@ from frappe.utils import (
     now_datetime,
     get_datetime,
     cint,
+    get_system_timezone,
+    convert_utc_to_timezone,
 )
-from datetime import timedelta
+from datetime import datetime, timedelta
+import pytz
 from ury.ury.api.table_reservation import get_branch_reservation_settings
 
 
@@ -15,9 +18,13 @@ def process_reservation_no_shows():
     """
     Scheduled background task and inline API processor that automatically marks
     Confirmed reservations as 'No Show' when current time exceeds reservation_time + grace_period.
-    Supports branch-specific custom_grace_period and exact expiration time (>=).
+    Supports branch-specific custom_grace_period, exact expiration time (>=), and
+    handles timezone discrepancies between client/browser local input and system timezone.
     """
     now = now_datetime()
+    sys_tz = get_system_timezone()
+    utc_now = datetime.now(pytz.UTC)
+    sys_dt = convert_utc_to_timezone(utc_now, sys_tz).replace(tzinfo=None) if sys_tz else now
 
     # Get all Confirmed reservations
     confirmed_reservations = frappe.db.get_all(
@@ -44,8 +51,38 @@ def process_reservation_no_shows():
         res_time = get_datetime(res.reserved_at)
         no_show_threshold = res_time + timedelta(minutes=grace_mins)
 
-        # Mark as No Show when current time reaches or exceeds reservation time + grace period
-        is_overdue = now >= no_show_threshold
+        is_overdue = False
+        # 1. Standard check in system timezone (exact expiration time handled by >=)
+        if now >= no_show_threshold:
+            is_overdue = True
+        elif sys_tz:
+            # 2. Timezone-aware check for client/browser local input (e.g. Asia/Kolkata vs Asia/Dubai)
+            client_tzs = ["Asia/Kolkata"]
+            user_tz = frappe.db.get_value("User", frappe.session.user, "time_zone") if (frappe.session and frappe.session.user) else None
+            if user_tz and user_tz not in client_tzs:
+                client_tzs.append(user_tz)
+
+            for alt_tz in client_tzs:
+                if alt_tz == sys_tz:
+                    continue
+                try:
+                    alt_dt = convert_utc_to_timezone(utc_now, alt_tz).replace(tzinfo=None)
+                    tz_offset = alt_dt - sys_dt
+                    if (now + tz_offset) >= no_show_threshold:
+                        if res.get("creation"):
+                            creation_sys = get_datetime(res.creation)
+                            creation_client = creation_sys + tz_offset
+                            scheduled_delay = (res_time - creation_client).total_seconds()
+                            deadline_seconds = max(0, scheduled_delay) + (grace_mins * 60)
+                            elapsed_seconds = (now - creation_sys).total_seconds()
+                            if elapsed_seconds >= deadline_seconds:
+                                is_overdue = True
+                                break
+                        else:
+                            is_overdue = True
+                            break
+                except Exception:
+                    pass
 
         if is_overdue:
             try:
