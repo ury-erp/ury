@@ -49,7 +49,7 @@ const TableReservationCompleteDialog: React.FC<Props> = ({
         <DialogHeader className="px-8 pt-8 pb-5 shrink-0">
           <DialogTitle className="text-xl flex items-center gap-2">
             <CheckCircle2 className="w-6 h-6 text-blue-600" />
-            Confirm Reservation
+            Complete Reservation
           </DialogTitle>
 
           <DialogDescription className="text-sm text-gray-600 mt-1">
@@ -132,7 +132,7 @@ const TableReservationCompleteDialog: React.FC<Props> = ({
             disabled={loading}
             className="bg-blue-600 hover:bg-blue-700 text-white"
           >
-            {loading ? 'Completing...' : 'Completed'}
+            Complete
           </Button>
         </DialogFooter>
       </DialogContent>

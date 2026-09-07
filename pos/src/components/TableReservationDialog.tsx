@@ -303,7 +303,7 @@ const TableReservationDialog = ({
             onClick={handleSubmit}
             disabled={loading || !customer || !customerPhone.trim()}
           >
-            {loading ? 'Creating Reservation...' : 'Reserve Table'}
+            Reserve Table
           </Button>
         </DialogFooter>
       </DialogContent>

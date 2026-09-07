@@ -153,7 +153,7 @@ const TableReservationCancelDialog = ({
                         onClick={onConfirm}
                         disabled={loading}
                     >
-                        {loading ? "Cancelling..." : "Confirm Cancellation"}
+                        Cancel Reservation
                     </Button>
                 </DialogFooter>
             </DialogContent>
