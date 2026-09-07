@@ -120,3 +120,25 @@ export function getTableRenderGroups(tables: Table[]): Table[][] {
 export function sortTablesByMergeGroups(tables: Table[]): Table[] {
   return getTableRenderGroups(tables).flat();
 }
+
+export function formatReservationTime(reservedAt?: string | null): string {
+  if (!reservedAt) return '';
+  try {
+    const d = new Date(reservedAt.replace(' ', 'T'));
+    if (!isNaN(d.getTime())) {
+      const timeStr = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
+      const today = new Date();
+      const isToday =
+        d.getFullYear() === today.getFullYear() &&
+        d.getMonth() === today.getMonth() &&
+        d.getDate() === today.getDate();
+      if (isToday) {
+        return timeStr;
+      }
+      return `${d.toLocaleDateString([], { month: 'short', day: 'numeric' })} at ${timeStr}`;
+    }
+    return reservedAt;
+  } catch {
+    return reservedAt;
+  }
+}
