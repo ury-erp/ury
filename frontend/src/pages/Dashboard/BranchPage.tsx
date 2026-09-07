@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useBranchContext } from '../../context/BranchContext';
-import { Save, Plus, X, Eye, Edit2, ArrowLeft, Building2, UtensilsCrossed, Map } from 'lucide-react';
+import { Save, Plus, X, Eye, Edit2, ArrowLeft, Building2, UtensilsCrossed, Map, CalendarClock } from 'lucide-react';
 import { Card, Button, Input, Spinner, showToast } from '@ury/ui';
 import { Switch } from '../../components/ui/switch';
 import SideDrawer from '../../components/layout/SideDrawer';
@@ -18,6 +18,11 @@ interface BranchData {
   address?: string;
   custom_no_taxes?: number;
   default_menu?: string;
+  custom_enable_reservation?: number;
+  custom_buffer_time?: number;
+  custom_grace_period?: number;
+  custom_avg_table_time_last_day?: number;
+  custom_avg_table_time_last_week?: number;
 }
 
 interface RestaurantData {
@@ -158,6 +163,11 @@ export const BranchPage: React.FC = () => {
         branch_name: branch.branch_name || branch.name || '',
         address: branch.address || '',
         custom_no_taxes: branch.custom_no_taxes || 0,
+        custom_enable_reservation: branch.custom_enable_reservation ? 1 : 0,
+        custom_buffer_time: branch.custom_buffer_time ?? '',
+        custom_grace_period: branch.custom_grace_period ?? '',
+        custom_avg_table_time_last_day: branch.custom_avg_table_time_last_day ?? '',
+        custom_avg_table_time_last_week: branch.custom_avg_table_time_last_week ?? '',
       });
 
       // Try fetch URY Restaurant linked to this branch
@@ -309,6 +319,11 @@ export const BranchPage: React.FC = () => {
       branch_name: (selectedBranch.branch_name || selectedBranch.name || '').trim(),
       address: (branchData?.address || '').trim(),
       custom_no_taxes: branchData?.custom_no_taxes ? 1 : 0,
+      custom_enable_reservation: branchData?.custom_enable_reservation ? 1 : 0,
+      custom_buffer_time: branchData?.custom_buffer_time != null ? Number(branchData.custom_buffer_time) : 0,
+      custom_grace_period: branchData?.custom_grace_period != null ? Number(branchData.custom_grace_period) : 0,
+      custom_avg_table_time_last_day: branchData?.custom_avg_table_time_last_day != null ? Number(branchData.custom_avg_table_time_last_day) : 0,
+      custom_avg_table_time_last_week: branchData?.custom_avg_table_time_last_week != null ? Number(branchData.custom_avg_table_time_last_week) : 0,
       invoice_series_prefix: (restaurantData?.invoice_series_prefix || '').trim(),
       aggregator_series_prefix: (restaurantData?.aggregator_series_prefix || '').trim(),
       tax_id: (restaurantData?.tax_id || '').trim(),
@@ -334,6 +349,11 @@ export const BranchPage: React.FC = () => {
       branch_name: (branchForm.branch_name || '').trim(),
       address: (branchForm.address || '').trim(),
       custom_no_taxes: branchForm.custom_no_taxes ? 1 : 0,
+      custom_enable_reservation: branchForm.custom_enable_reservation ? 1 : 0,
+      custom_buffer_time: branchForm.custom_buffer_time != null && branchForm.custom_buffer_time !== '' ? Number(branchForm.custom_buffer_time) : 0,
+      custom_grace_period: branchForm.custom_grace_period != null && branchForm.custom_grace_period !== '' ? Number(branchForm.custom_grace_period) : 0,
+      custom_avg_table_time_last_day: branchData?.custom_avg_table_time_last_day != null ? Number(branchData.custom_avg_table_time_last_day) : 0,
+      custom_avg_table_time_last_week: branchData?.custom_avg_table_time_last_week != null ? Number(branchData.custom_avg_table_time_last_week) : 0,
       invoice_series_prefix: (restaurantForm.invoice_series_prefix || '').trim(),
       aggregator_series_prefix: (restaurantForm.aggregator_series_prefix || '').trim(),
       tax_id: (restaurantForm.tax_id || '').trim(),
@@ -373,7 +393,7 @@ export const BranchPage: React.FC = () => {
         currentBranchName = newBranchName;
       }
 
-      // Save Branch fields (address and custom_no_taxes)
+      // Save Branch fields (address and reservation settings)
       await call('frappe.client.set_value', {
         doctype: 'Branch',
         name: currentBranchName,
@@ -381,25 +401,17 @@ export const BranchPage: React.FC = () => {
           branch: branchForm.branch_name,
           address: branchForm.address,
           custom_no_taxes: branchForm.custom_no_taxes ? 1 : 0,
+          custom_enable_reservation: branchForm.custom_enable_reservation ? 1 : 0,
+          custom_buffer_time: branchForm.custom_buffer_time != null && branchForm.custom_buffer_time !== '' ? Number(branchForm.custom_buffer_time) : 0,
+          custom_grace_period: branchForm.custom_grace_period != null && branchForm.custom_grace_period !== '' ? Number(branchForm.custom_grace_period) : 0,
         },
       });
 
       // Save URY Restaurant fields if it exists
       if (restaurantData) {
-        let currentRestaurantName = restaurantData.name;
-        const newRestaurantName = `${branchForm.branch_name.trim()} Restaurant`;
-        if (newRestaurantName !== restaurantData.name) {
-          await call('frappe.client.rename_doc', {
-            doctype: 'URY Restaurant',
-            old_name: restaurantData.name,
-            new_name: newRestaurantName,
-          });
-          currentRestaurantName = newRestaurantName;
-        }
-
         const updatedDoc = {
           ...restaurantData,
-          name: currentRestaurantName,
+          name: restaurantData.name,
           branch: branchForm.branch_name.trim(),
           invoice_series_prefix: restaurantForm.invoice_series_prefix,
           aggregator_series_prefix: restaurantForm.aggregator_series_prefix,
@@ -798,6 +810,95 @@ export const BranchPage: React.FC = () => {
               ) : (
                 <p className="text-sm text-gray-400">No URY Restaurant linked to this branch.</p>
               )}
+            </div>
+
+            {/* RESERVATION SETTINGS SUBSECTION */}
+            <div>
+              <div className="flex items-center gap-2.5 pb-2 border-b border-gray-100 mb-4">
+                <div className="w-7 h-7 rounded-md bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                  <CalendarClock className="w-4 h-4" />
+                </div>
+                <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider">
+                  Reservation Settings
+                </h3>
+              </div>
+
+              <div className="space-y-6">
+                <div className="flex items-center gap-2">
+                  <Switch
+                    id="custom_enable_reservation"
+                    checked={!!branchForm.custom_enable_reservation}
+                    onCheckedChange={(checked) =>
+                      setBranchForm((p) => ({ ...p, custom_enable_reservation: checked ? 1 : 0 }))
+                    }
+                    disabled={!isEditMode}
+                  />
+                  <label
+                    htmlFor="custom_enable_reservation"
+                    className="text-sm font-medium text-gray-700 cursor-pointer"
+                  >
+                    Enable Reservation
+                  </label>
+                </div>
+
+                {!!branchForm.custom_enable_reservation && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700">Buffer Time (Minutes)</label>
+                      <Input
+                        type="number"
+                        value={branchForm.custom_buffer_time ?? ''}
+                        onChange={(e) =>
+                          setBranchForm((p) => ({ ...p, custom_buffer_time: e.target.value }))
+                        }
+                        disabled={!isEditMode}
+                        className="rounded-lg"
+                        placeholder="30"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700">Grace Period (Minutes)</label>
+                      <Input
+                        type="number"
+                        value={branchForm.custom_grace_period ?? ''}
+                        onChange={(e) =>
+                          setBranchForm((p) => ({ ...p, custom_grace_period: e.target.value }))
+                        }
+                        disabled={!isEditMode}
+                        className="rounded-lg"
+                        placeholder="15"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700">
+                        Average Table Time - Last Day (Minutes)
+                      </label>
+                      <Input
+                        value={branchForm.custom_avg_table_time_last_day ?? ''}
+                        readOnly
+                        disabled
+                        className="rounded-lg bg-gray-50 text-gray-700 cursor-not-allowed"
+                        placeholder="0.00"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700">
+                        Average Table Time - Last Week (Minutes)
+                      </label>
+                      <Input
+                        value={branchForm.custom_avg_table_time_last_week ?? ''}
+                        readOnly
+                        disabled
+                        className="rounded-lg bg-gray-50 text-gray-700 cursor-not-allowed"
+                        placeholder="0.00"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </Card>
         )}
