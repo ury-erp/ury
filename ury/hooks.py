@@ -229,6 +229,9 @@ scheduler_events = {
     "cron":{
 		"* * * * *":[
 			"ury.ury.api.ury_kot_validation.kotValidationThread"
+		],
+		"*/5 * * * *":[
+			"ury.ury.services.food_cost_alerts.notify_high_food_cost"
 		]
 	},
 	"daily": [
