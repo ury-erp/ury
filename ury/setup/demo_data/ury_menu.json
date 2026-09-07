@@ -1,0 +1,66 @@
+[
+    {
+        "doctype": "URY Menu",
+        "__newname": "Demo Menu",
+        "branch": "Demo Branch",
+        "items": [
+            {
+                "doctype": "URY Menu Item",
+                "item": "GR",
+                "item_name": "Ghee Rice",
+                "rate": 150.0,
+                "course": "Demo Course",
+                "parentfield": "items"
+            },
+            {
+                "doctype": "URY Menu Item",
+                "item": "WNG",
+                "item_name": "Wings",
+                "special_dish": "1",
+                "rate": 99.0,
+                "course": "Demo Course",
+                "parentfield": "items"
+            },
+            {
+                "doctype": "URY Menu Item",
+                "item": "MR",
+                "item_name": "Mandhi",
+                "rate": 350.0,
+                "course": "Demo Course",
+                "parentfield": "items"
+            },
+            {
+                "doctype": "URY Menu Item",
+                "item": "BR",
+                "item_name": "Biriyani",
+                "rate": 110.0,
+                "course": "Demo Course",
+                "parentfield": "items"
+            },
+            {
+                "doctype": "URY Menu Item",
+                "item": "CG",
+                "item_name": "Chicken Gravy",
+                "rate": 120.0,
+                "course": "Demo Course",
+                "parentfield": "items"
+            },
+            {
+                "doctype": "URY Menu Item",
+                "item": "BG",
+                "item_name": "Beef Gravy",
+                "rate": 200.0,
+                "course": "Demo Course",
+                "parentfield": "items"
+            },
+            {
+                "doctype": "URY Menu Item",
+                "item": "MOM",
+                "item_name": "Momo",
+                "rate": 40.0,
+                "course": "Demo Course",
+                "parentfield": "items"
+            }
+        ]
+    }
+]

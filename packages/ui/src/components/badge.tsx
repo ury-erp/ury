@@ -3,7 +3,15 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "../lib/cn"
 
 const badgeVariants = cva(
-  "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+  [
+    "inline-flex items-center justify-center rounded-full border",
+    // Badges carry status text a server reads at a glance across a counter:
+    // never wrap, hold the semibold weight, and open the tracking slightly so
+    // short labels stay legible at 12px.
+    "whitespace-nowrap font-semibold leading-none tracking-[0.01em]",
+    "transition-colors duration-150 ease-out",
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background",
+  ],
   {
     variants: {
       variant: {
@@ -22,10 +30,12 @@ const badgeVariants = cva(
         completed: "border-transparent bg-green-100 text-green-800",
         cancelled: "border-transparent bg-gray-100 text-gray-800",
       },
+      // With leading-none these resolve to 20 / 24 / 28px pill heights — a
+      // deliberate 4px step that mirrors the control scale below it.
       size: {
-        default: "px-2.5 py-0.5 text-xs",
-        sm: "px-2 py-0.5 text-xs",
-        lg: "px-3 py-1 text-sm",
+        default: "h-6 px-2.5 text-xs",
+        sm: "h-5 px-2 text-xs",
+        lg: "h-7 px-3 text-sm",
       },
     },
     defaultVariants: {

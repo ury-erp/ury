@@ -78,9 +78,48 @@ export default {
         inter: ['Inter', 'sans-serif'],
       },
       borderRadius: {
+        xl: "calc(var(--radius) + 4px)",
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+      },
+      // Elevation scale. Two-layer shadows (a tight contact shadow plus a
+      // wider ambient one) so surfaces read as lifted rather than smudged.
+      // Deliberately low-alpha: elevation should be felt, not seen.
+      boxShadow: {
+        xs: "0 1px 1px 0 hsl(var(--black) / 0.04)",
+        sm: "0 1px 2px 0 hsl(var(--black) / 0.05)",
+        DEFAULT:
+          "0 1px 2px 0 hsl(var(--black) / 0.06), 0 1px 3px 0 hsl(var(--black) / 0.08)",
+        md: "0 2px 4px -1px hsl(var(--black) / 0.06), 0 4px 8px -2px hsl(var(--black) / 0.08)",
+        lg: "0 4px 8px -2px hsl(var(--black) / 0.06), 0 12px 20px -4px hsl(var(--black) / 0.10)",
+        xl: "0 8px 16px -4px hsl(var(--black) / 0.08), 0 24px 40px -8px hsl(var(--black) / 0.14)",
+      },
+      // One shared motion vocabulary: 150ms for control state changes,
+      // 200ms for surfaces entering. Easing is a single decelerating curve.
+      transitionDuration: {
+        DEFAULT: "150ms",
+      },
+      // `out` is redefined to the same curve so `ease-out` — the easing every
+      // component and call site already reaches for — *is* the system easing,
+      // rather than a second, slightly different one.
+      transitionTimingFunction: {
+        DEFAULT: "cubic-bezier(0.2, 0, 0, 1)",
+        out: "cubic-bezier(0.2, 0, 0, 1)",
+      },
+      keyframes: {
+        "overlay-in": {
+          from: { opacity: "0" },
+          to: { opacity: "1" },
+        },
+        "dialog-in": {
+          from: { opacity: "0", transform: "translateY(4px) scale(0.98)" },
+          to: { opacity: "1", transform: "translateY(0) scale(1)" },
+        },
+      },
+      animation: {
+        "overlay-in": "overlay-in 150ms cubic-bezier(0.2, 0, 0, 1)",
+        "dialog-in": "dialog-in 200ms cubic-bezier(0.2, 0, 0, 1)",
       },
       spacing: {
         'order-panel': 'var(--order-panel-width)',

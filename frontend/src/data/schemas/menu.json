@@ -1,0 +1,72 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "URY Menu Schema",
+  "description": "Form and data schema for URY Restaurant Menu management",
+  "type": "object",
+  "properties": {
+    "menu_name": {
+      "type": "string",
+      "title": "Menu Name",
+      "placeholder": "e.g. Main Dining Menu",
+      "minLength": 2
+    },
+    "branch": {
+      "type": "string",
+      "title": "Branch",
+      "enum": ["Main Branch", "Downtown Branch", "Beachfront Outpost", "Express Outlet"],
+      "default": "Main Branch"
+    },
+    "price_list": {
+      "type": "string",
+      "title": "Price List",
+      "enum": ["Standard Rate", "Happy Hour Rate", "VIP Rate", "Delivery Rate"],
+      "default": "Standard Rate"
+    },
+    "is_enabled": {
+      "type": "boolean",
+      "title": "Enable Menu",
+      "default": true
+    },
+    "tax_configuration": {
+      "type": "object",
+      "title": "Tax Configuration",
+      "properties": {
+        "tax_type": {
+          "type": "string",
+          "title": "Tax Type",
+          "enum": ["Inclusive", "Exclusive"],
+          "default": "Exclusive"
+        },
+        "tax_percentage": {
+          "type": "number",
+          "title": "Tax Percentage (%)",
+          "default": 5.0,
+          "minimum": 0,
+          "maximum": 100
+        }
+      },
+      "required": ["tax_type", "tax_percentage"]
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string", "title": "Item Name" },
+          "course": {
+            "type": "string",
+            "title": "Course",
+            "enum": ["Appetizer", "Main Course", "Dessert", "Beverage", "Starter", "Side Dish"]
+          },
+          "price": { "type": "number", "title": "Price", "minimum": 0 },
+          "enabled": { "type": "boolean", "title": "Enabled", "default": true },
+          "special_dish": { "type": "boolean", "title": "Special Dish", "default": false },
+          "image_url": { "type": "string", "title": "Image URL" }
+        },
+        "required": ["name", "course", "price"]
+      }
+    }
+  },
+  "required": ["menu_name", "branch", "price_list"]
+}
