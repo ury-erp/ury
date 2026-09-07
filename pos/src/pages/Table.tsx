@@ -94,10 +94,20 @@ const TableView = () => {
 
   // Load branch reservation settings safely
   useEffect(() => {
+    setBranchSettings(null);
     if (!branch) return;
+    let isMounted = true;
     getBranchReservationSettings(branch)
-      .then((settings) => setBranchSettings(settings))
-      .catch((err) => console.error('Failed to load branch reservation settings', err));
+      .then((settings) => {
+        if (isMounted) setBranchSettings(settings);
+      })
+      .catch((err) => {
+        console.error('Failed to load branch reservation settings', err);
+        if (isMounted) setBranchSettings(null);
+      });
+    return () => {
+      isMounted = false;
+    };
   }, [branch]);
 
   // Fetch rooms
@@ -296,7 +306,7 @@ const TableView = () => {
     }
   }, [activeReservationsList]);
 
-  const isReservationEnabled = branchSettings ? branchSettings.enable_reservation !== 0 : true;
+  const isReservationEnabled = Boolean(branchSettings && Number(branchSettings.enable_reservation) === 1);
 
   const handleNavigateToPOS = async (tableName: string) => {
     if (!selectedRoom) return;
@@ -669,7 +679,7 @@ const TableView = () => {
         onTransferTable={canTransferTable ? () => void handleOpenTransferTable(table) : undefined}
         onTransferCaptain={() => void handleOpenCaptainTransfer(table)}
         showCaptainTransfer={showCaptainTransfer}
-        onReserve={() => setReservationTable(table)}
+        onReserve={isReservationEnabled ? () => setReservationTable(table) : undefined}
         onNavigate={() => handleNavigateToPOS(table.name)}
         onPreview={(event) => handlePreviewTable(table, event)}
         onPrint={(event) => handlePrintTable(table, event)}
@@ -883,10 +893,12 @@ const TableView = () => {
               <div className="w-4 h-4 bg-amber-50 border border-amber-400 rounded"></div>
               <span>{t('tables.occupied')}</span>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-primary-50 border border-primary-400 rounded"></div>
-              <span>Reserved</span>
-            </div>
+            {isReservationEnabled && (
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 bg-primary-50 border border-primary-400 rounded"></div>
+                <span>Reserved</span>
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -19,8 +19,8 @@ const Footer = () => {
   const [reservationEnabled, setReservationEnabled] = useState(false);
 
   useEffect(() => {
+    setReservationEnabled(false);
     if (!branch) {
-      setReservationEnabled(false);
       return;
     }
 
@@ -28,7 +28,7 @@ const Footer = () => {
     getBranchReservationSettings(branch)
       .then((settings) => {
         if (isMounted) {
-          setReservationEnabled(settings.enable_reservation !== 0);
+          setReservationEnabled(Number(settings?.enable_reservation) === 1);
         }
       })
       .catch(() => {

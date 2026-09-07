@@ -16,9 +16,11 @@ import {
   CardContent,
   SearchableSelect,
 } from '@ury/ui';
+import { useNavigate } from 'react-router-dom';
 import { usePOSStore } from '../store/pos-store';
 import {
   getActiveReservations,
+  getBranchReservationSettings,
   getRooms,
   getTables,
   updateTableReservation,
@@ -34,8 +36,20 @@ import TableReservationCancelDialog from '../components/TableReservationCancelDi
 import TableReservationCompleteDialog from '../components/TableReservationCompleteDialog';
 
 export default function Reservations() {
+  const navigate = useNavigate();
   const { posProfile, searchQuery } = usePOSStore();
   const branch = posProfile?.branch ?? '';
+
+  useEffect(() => {
+    if (!branch) return;
+    getBranchReservationSettings(branch).then((settings) => {
+      if (settings && Number(settings.enable_reservation) !== 1) {
+        navigate('/tables', { replace: true });
+      }
+    }).catch(() => {
+      // ignore
+    });
+  }, [branch, navigate]);
 
   const [reservations, setReservations] = useState<TableReservation[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
