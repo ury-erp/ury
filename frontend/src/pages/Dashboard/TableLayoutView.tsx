@@ -1,8 +1,7 @@
 import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import { CreditCard as Edit3, Save, Users, Move, X, Grid3x3 as Grid3X3, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 import { cn } from '@ury/ui';
-import { formatInvoiceTime } from '@ury/core';
-import { call } from '@ury/core';
+import { call, formatInvoiceTime, resolveUryLanguage } from '@ury/core';
 import { Button } from '@ury/ui';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
 
@@ -38,11 +37,35 @@ type POSInvoice = any;
 const getTableOrder = async (_name: string): Promise<any> => null;
 const getCombinedOrderTotals = (_order: any) => ({ roundedTotal: 0 });
 
-const t = (key: string) => {
-  const parts = key.split('.');
-  const last = parts[parts.length - 1];
-  return last.charAt(0).toUpperCase() + last.slice(1).replace(/_/g, ' ');
+const TABLE_COPY: Record<string, { en: string; ru: string }> = {
+  'tables.finish_editing': { en: 'Finish editing', ru: 'Завершить редактирование' },
+  'tables.edit_layout': { en: 'Edit layout', ru: 'Изменить план' },
+  'tables.editing_layout_hint_title': { en: 'Editing table layout', ru: 'Редактирование плана столов' },
+  'tables.drag_tables_hint': { en: 'Drag tables to reposition them', ru: 'Перетаскивайте столы, чтобы изменить их положение' },
+  'tables.autosave_hint': { en: 'Changes are saved automatically', ru: 'Изменения сохраняются автоматически' },
+  'tables.zoom_pan_hint': { en: 'Scroll to zoom, drag to move', ru: 'Прокрутка — масштаб, перетаскивание — перемещение' },
+  'tables.edit_settings': { en: 'Edit table', ru: 'Изменить стол' },
+  'tables.table_info': { en: 'Table information', ru: 'Информация о столе' },
+  'tables.table_name': { en: 'Table name', ru: 'Название стола' },
+  'tables.table_name_title': { en: 'Table name cannot be changed here', ru: 'Здесь нельзя изменить название стола' },
+  'tables.capacity': { en: 'Capacity', ru: 'Вместимость' },
+  'tables.capacity_placeholder': { en: 'Number of seats', ru: 'Число мест' },
+  'tables.capacity_range_hint': { en: 'Enter a value from 0 to 20', ru: 'Введите число от 0 до 20' },
+  'tables.shape': { en: 'Shape', ru: 'Форма' },
+  'tables.circle': { en: 'Circle', ru: 'Круг' },
+  'tables.square': { en: 'Square', ru: 'Квадрат' },
+  'tables.rectangle': { en: 'Rectangle', ru: 'Прямоугольник' },
+  'tables.status': { en: 'Status', ru: 'Статус' },
+  'tables.occupied': { en: 'Occupied', ru: 'Занят' },
+  'tables.available': { en: 'Available', ru: 'Свободен' },
+  'tables.position': { en: 'Position', ru: 'Позиция' },
+  'tables.size': { en: 'Size', ru: 'Размер' },
+  'tables.current_bill': { en: 'Current bill', ru: 'Текущий счёт' },
+  'tables.started_at': { en: 'Started at', ru: 'Начат в' },
+  'tables.total_amount': { en: 'Total amount', ru: 'Общая сумма' },
 };
+
+const t = (key: string) => TABLE_COPY[key]?.[resolveUryLanguage()] ?? key;
 
 
 

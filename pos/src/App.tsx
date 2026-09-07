@@ -15,7 +15,6 @@ import CaptainOrder from './captain/pages/CaptainOrder';
 import { ToastProvider } from '@ury/ui';
 import { usePOSStore } from './store/pos-store';
 import { useEffect } from 'react';
-import { getActiveLanguage } from './i18n';
 import { useRootStore } from './store/root-store';
 
 function App() {
@@ -24,7 +23,7 @@ function App() {
   } = usePOSStore();
   const user = useRootStore((state) => state.user);
   const configuredProfile = useRootStore((state) => state.posProfile);
-  
+
   useEffect(() => {
     // Do not fire protected POS APIs while the browser is still Guest on the
     // optional PIN screen. Waiting for AuthGuard's profile also preserves the
@@ -34,12 +33,6 @@ function App() {
     }
   }, [configuredProfile, initializeApp, user]);
 
-  useEffect(() => {
-    const lang = getActiveLanguage();
-    const isRtl = ['ar', 'he', 'fa', 'ur', 'ku'].includes(lang);
-    document.documentElement.dir = isRtl ? 'rtl' : 'ltr';
-    document.documentElement.lang = lang || 'en';
-  }, []);
   return (
     <>
       <ToastProvider />
