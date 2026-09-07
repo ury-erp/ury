@@ -7,7 +7,9 @@
   "payment_delay_time",
   "cancel_delay_time",
   "column_break_8rpwk",
-  "table_turnaround_warning_time"
+  "table_turnaround_warning_time",
+  "custom_alerts_section",
+  "custom_alerts"
  ],
  "fields": [
   {
@@ -31,6 +33,17 @@
    "fieldname": "table_turnaround_warning_time",
    "fieldtype": "Int",
    "label": "Table Turnaround Warning Time"
+  },
+  {
+   "fieldname": "custom_alerts_section",
+   "fieldtype": "Section Break",
+   "label": "Custom Alerts"
+  },
+  {
+   "fieldname": "custom_alerts",
+   "fieldtype": "Table",
+   "label": "Custom Alerts",
+   "options": "Alert Rule"
   }
  ],
  "index_web_pages_for_search": 1,
