@@ -22,6 +22,7 @@ class StockCorrection(Document):
 		self.validate_reference_stock_reconciliation()
 		self.validate_warehouse_belongs_to_branch()
 		self.validate_items()
+		self.validate_single_direction()
 
 	def validate_reference_stock_reconciliation(self):
 		if not self.reference_stock_reconciliation:
@@ -67,6 +68,22 @@ class StockCorrection(Document):
 				frappe.throw(
 					_("Row {0}: Correction Qty is required and cannot be zero").format(row.idx)
 				)
+
+	def validate_single_direction(self):
+		has_positive = any(flt(row.qty) > 0 for row in self.items)
+		has_negative = any(flt(row.qty) < 0 for row in self.items)
+
+		if has_positive and has_negative:
+			frappe.throw(
+				_(
+					"A Stock Correction cannot mix overage (positive) and shortage"
+					" (negative) rows, because this doctype links to only a single"
+					" Stock Entry and cancelling it would otherwise leave one of the"
+					" two generated Stock Entries permanently un-reversed. Please"
+					" split this into two separate Stock Correction documents: one"
+					" with only positive-qty rows and one with only negative-qty rows."
+				)
+			)
 
 	def on_submit(self):
 		self.create_and_submit_stock_entry()
@@ -114,12 +131,28 @@ class StockCorrection(Document):
 				)
 			)
 
+		company = None
+		if self.reference_stock_reconciliation:
+			company = frappe.db.get_value(
+				"Stock Reconciliation", self.reference_stock_reconciliation, "company"
+			)
+		if not company and self.branch:
+			company = frappe.db.get_value("Branch", self.branch, "company")
+		if not company:
+			frappe.throw(
+				_(
+					"Unable to resolve a Company for this Stock Correction from either"
+					" the referenced Stock Reconciliation or Branch {0}"
+				).format(frappe.bold(self.branch))
+			)
+
 		stock_entry = frappe.get_doc(
 			{
 				"doctype": "Stock Entry",
 				"stock_entry_type": purpose,
 				"purpose": purpose,
 				"branch": self.branch,
+				"company": company,
 				"posting_date": self.posting_date,
 				"posting_time": self.posting_time,
 				"set_posting_time": 1 if self.posting_time else 0,
