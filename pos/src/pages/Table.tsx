@@ -21,7 +21,7 @@ import {
   type TableReservation,
   type BranchReservationSettings,
 } from '../lib/table-api';
-import { getMergeGroupMembers, formatMergedTableLabelFromGroup, getTableRenderGroups, sortTablesByMergeGroups, formatReservationTime } from '../lib/table-utils';
+import { getMergeGroupMembers, formatMergedTableLabelFromGroup, getTableRenderGroups, sortTablesByMergeGroups, formatReservationTime, isReservationLockWindowActive } from '../lib/table-utils';
 import { Spinner } from '@ury/ui';
 import { Button } from '@ury/ui';
 import { Badge } from '@ury/ui';
@@ -239,7 +239,10 @@ const TableView = () => {
       if (!allMap.has(res.reserved_table)) {
         allMap.set(res.reserved_table, res);
       }
-      if (res.is_lock_window_active && res.status === 'Confirmed') {
+      const isLockActive =
+        isReservationLockWindowActive(res, branchSettings?.buffer_time) ||
+        (res.is_lock_window_active && res.status === 'Confirmed');
+      if (isLockActive && res.status === 'Confirmed') {
         lockMap.set(res.reserved_table, res);
       } else {
         if (!upcomingMap.has(res.reserved_table)) {
@@ -253,7 +256,30 @@ const TableView = () => {
       upcomingReservationsByTable: upcomingMap,
       allReservationsByTable: allMap,
     };
-  }, [activeReservationsList]);
+  }, [activeReservationsList, branchSettings?.buffer_time]);
+
+  // Periodic polling for active reservations so buffer time and status transitions reflect in real-time
+  useEffect(() => {
+    if (!branch) return;
+    let isMounted = true;
+
+    const intervalId = setInterval(async () => {
+      if (!isMounted) return;
+      try {
+        const res = await getActiveReservations(branch);
+        if (isMounted && res) {
+          setActiveReservationsList(res);
+        }
+      } catch (_e) {
+        // Polling failure ignored
+      }
+    }, 15000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(intervalId);
+    };
+  }, [branch]);
 
   // Informational notification when a table enters its reservation buffer window
   const notifiedLockReservationsRef = useRef<Set<string>>(new Set());
@@ -307,7 +333,13 @@ const TableView = () => {
 
     // Check if table is under active reservation lock window
     const activeLockRes = lockActiveReservationsByTable.get(tableName);
-    if (activeLockRes && activeLockRes.is_lock_window_active && activeLockRes.status === 'Confirmed') {
+    const isActiveLockRes =
+      activeLockRes &&
+      (activeLockRes.is_lock_window_active ||
+        isReservationLockWindowActive(activeLockRes, branchSettings?.buffer_time)) &&
+      activeLockRes.status === 'Confirmed';
+
+    if (isActiveLockRes) {
       const timeStr = formatReservationTime(activeLockRes.reserved_at);
       showToast.error(`Table ${tableName} is reserved for ${timeStr}. Please choose another table.`);
       setPendingTable(tableName);
@@ -318,8 +350,13 @@ const TableView = () => {
 
     try {
       const reservation = await checkTableReservation(tableName);
+      const isResLocked =
+        reservation &&
+        (reservation.is_lock_window_active ||
+          isReservationLockWindowActive(reservation, branchSettings?.buffer_time)) &&
+        reservation.status === 'Confirmed';
 
-      if (reservation && reservation.is_lock_window_active && reservation.status === 'Confirmed') {
+      if (isResLocked) {
         const timeStr = formatReservationTime(reservation.reserved_at);
         showToast.error(`Table ${tableName} is reserved for ${timeStr}. Please choose another table.`);
         setPendingTable(tableName);
