@@ -31,7 +31,8 @@ app_include_js = [
     # Floating "Back to <App>" chip for users a URY SPA sent into the desk.
     # See ury/public/js/return_to_app.js and packages/core/src/frappe/deskLink.ts.
     "/assets/ury/js/return_to_app.js",
-    "/assets/ury/js/remove_duplicates.js"
+    "/assets/ury/js/remove_duplicates.js",
+    "/assets/ury/js/journal_entry.js"
 ]
 
 # include js, css files in header of web template
