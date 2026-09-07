@@ -866,6 +866,7 @@ def getPosInvoiceItems(invoice):
                 "qty": items.qty,
                 "rate": items.rate,
                 "amount": items.amount,
+                "is_disposable": items.is_disposable,
             }
         )
     taxDetail = orderdItems.taxes

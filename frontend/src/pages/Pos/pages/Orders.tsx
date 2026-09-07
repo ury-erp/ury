@@ -745,7 +745,7 @@ export default function Orders() {
               <div className="mb-6">
                 <h3 className="text-[10.5px] font-medium uppercase tracking-[0.05em] text-text-tertiary mb-2">{t('order.items_title')}</h3>
                 <div>
-                  {selectedOrderItems.map((item, index) => (
+                  {selectedOrderItems.filter((item) => !item.is_disposable).map((item, index) => (
                     <div key={index} className="flex py-1.5 border-b border-hair last:border-0">
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-foreground truncate">{item.item_name}</p>
