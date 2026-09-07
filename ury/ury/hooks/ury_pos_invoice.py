@@ -1,6 +1,6 @@
 import frappe
 from datetime import datetime
-from frappe.utils import now_datetime, get_time,now
+from frappe.utils import now_datetime, get_time, now, flt
 from ury.ury.doctype.ury_order.ury_order import release_merge_cluster_tables
 
 
@@ -22,6 +22,7 @@ def before_submit(doc, method):
     validate_invoice_print(doc, method)
     ro_reload_submit(doc, method)
     set_commission_attribution(doc, method)
+    apply_disposable_items(doc, method)
 
 
 def on_trash(doc, method):
@@ -57,6 +58,111 @@ def set_commission_attribution(doc, method=None):
     for item in doc.get("items") or []:
         if not item.get("custom_entered_by_employee"):
             item.custom_entered_by_employee = _employee_for_user(item.owner or frappe.session.user)
+
+
+def apply_disposable_items(doc, method=None):
+    """Auto-append disposable/packaging items as zero-rated POS Invoice Item rows.
+
+    Mirrors the original grillax `pos_disposables` before_submit hook, adapted to
+    ury's field names and doctypes:
+      - Item.disposable_items (Disposable Items, per source item, split by dine_in)
+      - POS Profile.table_disposables / .parcel_disposables (base disposables)
+      - POS Invoice Item.disposable_items (POS Disposable Item, per-line record)
+      - POS Invoice Item.is_disposable (marks the generated zero-rate line)
+
+    Runs once per submit; skips re-adding if disposable lines already exist
+    (e.g. on a resubmit of a doc that already went through this).
+    """
+    if not doc.get("items"):
+        return
+
+    if any(item.get("is_disposable") for item in doc.items):
+        return
+
+    pos_profile = frappe.get_cached_doc("POS Profile", doc.pos_profile)
+    is_dine_in = doc.order_type == "Dine In"
+
+    disposables_dict = {}
+
+    for item in doc.items:
+        if item.get("is_disposable"):
+            continue
+
+        item_disposables = frappe.get_all(
+            "Disposable Items",
+            filters={"parent": item.item_code, "dine_in": 1 if is_dine_in else 0},
+            fields=["item", "item_name", "qty"],
+        )
+
+        for disposable in item_disposables:
+            qty = flt(disposable.qty) * flt(item.qty)
+            key = disposable.item
+            if key in disposables_dict:
+                disposables_dict[key]["qty"] += qty
+            else:
+                disposables_dict[key] = {
+                    "item": disposable.item,
+                    "item_name": disposable.item_name,
+                    "qty": qty,
+                }
+
+            # Record on the source cart item's own disposable_items child table.
+            item.append(
+                "disposable_items",
+                {
+                    "item": disposable.item,
+                    "item_name": disposable.item_name,
+                    "qty": qty,
+                },
+            )
+
+    if is_dine_in:
+        n_pax = flt(doc.no_of_pax) or 1
+        for table_disposable in pos_profile.get("table_disposables") or []:
+            key = table_disposable.item
+            qty = flt(table_disposable.qty) * n_pax
+            if key in disposables_dict:
+                disposables_dict[key]["qty"] += qty
+            else:
+                disposables_dict[key] = {
+                    "item": table_disposable.item,
+                    "item_name": table_disposable.item_name,
+                    "qty": qty,
+                }
+    else:
+        for parcel_disposable in pos_profile.get("parcel_disposables") or []:
+            key = parcel_disposable.item
+            qty = flt(parcel_disposable.qty)
+            if key in disposables_dict:
+                disposables_dict[key]["qty"] += qty
+            else:
+                disposables_dict[key] = {
+                    "item": parcel_disposable.item,
+                    "item_name": parcel_disposable.item_name,
+                    "qty": qty,
+                }
+
+    for disposable_item in disposables_dict.values():
+        item_doc = frappe.get_cached_doc("Item", disposable_item["item"])
+        doc.append(
+            "items",
+            {
+                "item_code": item_doc.item_code,
+                "item_name": item_doc.item_name,
+                "description": item_doc.description,
+                "is_disposable": 1,
+                "qty": disposable_item["qty"],
+                "rate": 0,
+                "base_rate": 0,
+                "amount": 0,
+                "base_amount": 0,
+                "conversion_factor": 1.0,
+                "uom": item_doc.stock_uom,
+                "income_account": pos_profile.get("income_account"),
+                "expense_account": pos_profile.get("expense_account"),
+                "cost_center": pos_profile.get("cost_center"),
+            },
+        )
 
 
 def validate_invoice(doc, method):
