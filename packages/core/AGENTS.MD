@@ -20,7 +20,7 @@ packages/core/src/
 ├── frappe/
 │   ├── client.ts       ← createFrappeClient() factory + call/db/auth singletons
 │   ├── auth.ts         ← getLoggedUser(), getUserRoles(email), logout()
-│   └── roles.ts        ← isUserRestrictedFromTableOrders(), canCaptainTransfer()
+│   └── roles.ts        ← isUserRestrictedFromTableOrders(), canCaptainTransfer(), derivePOSCapabilities()
 ├── storage.ts          ← storage: localStorage wrapper (+ POS-profile helpers)
 ├── format.ts           ← formatCurrency(), formatInvoiceTime()
 └── print/
@@ -51,8 +51,9 @@ All three swallow errors (log + safe fallback) — callers branch on the return 
 ### Role permissions (`frappe/roles.ts`)
 - `isUserRestrictedFromTableOrders(user, posProfile)` — true if the user holds any role in the profile's `role_restricted_for_table_order` table.
 - `canCaptainTransfer(user, posProfile)` — true if the user holds any role in `transfer_role_permissions`.
+- `derivePOSCapabilities(user, posProfile)` — composes the above into a full `POSCapabilities` object (table orders, remove-sent-items, item images, billing/discount/cancel intent, KOT reprint, captain transfer, POS open/close, print-bill) purely from POS Profile fields + role. It's a client-side UX hint, not the security boundary — per-invoice/per-table ownership and billed-state checks are NOT modeled here (they belong in the Phase-2 backend `get_table_order_context()` endpoint).
 
-Both take the shared `User` and `PosProfileCombined` types from `types.ts` (structural — apps may pass their own compatible shapes).
+All take the shared `User` and `PosProfileCombined` types from `types.ts` (structural — apps may pass their own compatible shapes).
 
 ### Storage (`storage.ts`)
 `storage` object over `localStorage`: generic `setItem`/`getItem`/`removeItem` plus `savePosProfileFull`/`getPosProfileFull` (JSON round-trip under the `pos_profile` key).

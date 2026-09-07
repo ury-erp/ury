@@ -1,0 +1,50 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "User Schema",
+  "type": "object",
+  "properties": {
+    "first_name": {
+      "type": "string",
+      "title": "First Name"
+    },
+    "last_name": {
+      "type": "string",
+      "title": "Last Name"
+    },
+    "email": {
+      "type": "string",
+      "format": "email",
+      "title": "Email Address"
+    },
+    "password": {
+      "type": "string",
+      "title": "Password"
+    },
+    "roles": {
+      "type": "array",
+      "title": "Roles",
+      "items": {
+        "type": "string",
+        "enum": ["URY Cashier", "URY Waiter", "URY Manager"]
+      }
+    },
+    "assigned_room": {
+      "type": "string",
+      "title": "Assigned Room"
+    },
+    "branch": {
+      "type": "string",
+      "title": "Branch"
+    },
+    "enabled": {
+      "type": "boolean",
+      "title": "Enabled",
+      "default": true
+    },
+    "avatar": {
+      "type": "string",
+      "title": "Avatar URL"
+    }
+  },
+  "required": ["first_name", "email", "roles"]
+}

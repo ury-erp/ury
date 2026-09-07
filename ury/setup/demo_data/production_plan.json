@@ -1,0 +1,41 @@
+[
+    {
+        "doctype": "Production Plan",
+        "po_items": [
+            {
+                "doctype": "Production Plan Item",
+                "item_code": "CG",
+                "bom_no": "__BOM_FOR_CG__",
+                "planned_qty": 10,
+                "stock_uom": "Kg",
+                "parentfield": "po_items"
+            }
+        ]
+    },
+    {
+        "doctype": "Production Plan",
+        "po_items": [
+            {
+                "doctype": "Production Plan Item",
+                "item_code": "MOM",
+                "bom_no": "__BOM_FOR_MOM__",
+                "planned_qty": 10,
+                "stock_uom": "Kg",
+                "parentfield": "po_items"
+            }
+        ]
+    },
+    {
+        "doctype": "Production Plan",
+        "po_items": [
+            {
+                "doctype": "Production Plan Item",
+                "item_code": "WNG",
+                "bom_no": "__BOM_FOR_WNG__",
+                "planned_qty": 10,
+                "stock_uom": "Kg",
+                "parentfield": "po_items"
+            }
+        ]
+    }
+]

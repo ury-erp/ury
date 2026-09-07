@@ -25,7 +25,7 @@ ury/                          ← repo root
 │   └── ui/                   ← @ury/ui: shared React components + theme.css + Tailwind preset
 ├── pos/                      ← React 19 POS frontend (v2, current) — consumes @ury/ui + @ury/core
 ├── frontend/                 ← React 19 URY management frontend (served at /ury) — consumes @ury/ui + @ury/core
-├── URYMosaic/                ← Vue 3 KOT kitchen display app
+├── mosaic/                   ← Vue 3 KOT kitchen display app
 ├── urypos/                   ← Vue 3 POS frontend (v1, legacy)
 ├── DEMO/                     ← Demo screenshots / assets
 ├── requirements.txt          ← Python dependencies
@@ -34,7 +34,7 @@ ury/                          ← repo root
 └── FEATURES.md / README.md   ← Human-readable documentation
 ```
 
-Root `package.json` defines yarn classic **workspaces** for `packages/*`, `pos`, and `frontend` (single root `yarn.lock`, hoisted `node_modules`). The Vue apps (`urypos/`, `URYMosaic/`) are **not** workspace members — they keep their own lockfiles and are installed via the root `postinstall` script. The shared packages are source-linked (their `exports` point at TypeScript source; no per-package build step) and are consumed only by the React apps.
+Root `package.json` defines yarn classic **workspaces** for `packages/*`, `pos`, and `frontend` (single root `yarn.lock`, hoisted `node_modules`). The Vue apps (`urypos/`, `mosaic/`) are **not** workspace members — they keep their own lockfiles and are installed via the root `postinstall` script. The shared packages are source-linked (their `exports` point at TypeScript source; no per-package build step) and are consumed only by the React apps.
 
 ---
 
@@ -86,7 +86,7 @@ ury/
 │   │   ├── ury_pos_kot.js            ← KOT related JS
 │   │   └── sign-message.js / jsrsasign-all-min.js  ← QZ Tray signing
 │   ├── pos/              ← Built React POS assets (output of `cd pos && yarn build`)
-│   ├── URYMosaic/        ← Built KOT display assets
+│   ├── mosaic/        ← Built KOT display assets
 │   └── urypos/           ← Built legacy POS assets
 │
 ├── fixtures/             ← Data fixtures exported via `bench export-fixtures`
@@ -170,16 +170,16 @@ ury/
 ### Frontend Apps
 - **`/pos`** — React POS v2 (see `pos/AGENTS.MD`)
 - **`/urypos`** — Vue POS v1 (legacy, `urypos/`)
-- **`/URYMosaic/<production_unit>`** — Vue KOT display (see `URYMosaic/AGENTS.MD`)
+- **`/mosaic/<production_unit>`** — Vue KOT display (see `mosaic/AGENTS.MD`)
 
 All frontends are served as Frappe web pages. Route rules in `hooks.py` (`website_route_rules`) handle SPA routing:
 ```python
 {"from_route": "/pos/<path:app_path>", "to_route": "pos"},
-{"from_route": "/URYMosaic/<path:app_path>", "to_route": "URYMosaic"},
+{"from_route": "/mosaic/<path:app_path>", "to_route": "mosaic"},
 ```
 
 ### Real-time (Socket.io)
-- KOT updates are broadcast via Frappe's Socket.io to the `URYMosaic` kitchen display.
+- KOT updates are broadcast via Frappe's Socket.io to the `mosaic` kitchen display.
 - Channel format: `kot_update_{branch}_{production_unit}`
 
 ### QZ Tray
@@ -195,7 +195,7 @@ All frontends are served as Frappe web pages. Route rules in `hooks.py` (`websit
 |---|---|---|---|
 | POS v2 (React) | `pos/src/` | `ury/public/pos/` | `/pos` |
 | URY management (React) | `frontend/src/` | `ury/public/ury/` | `/ury` |
-| KOT display (Vue) | `URYMosaic/src/` | `ury/public/URYMosaic/` | `/URYMosaic/<unit>` |
+| KOT display (Vue) | `mosaic/src/` | `ury/public/mosaic/` | `/mosaic/<unit>` |
 | POS v1 (Vue, legacy) | `urypos/src/` | `ury/public/urypos/` | `/urypos` |
 
 Shared code for the React apps lives in `packages/`:
@@ -228,7 +228,7 @@ After building, run `bench build --app ury` to copy assets to the Frappe public 
 → Work in `packages/ui/` (same blast radius: `pos/` and `frontend/`).
 
 **To modify KOT display logic:**
-→ Work in `URYMosaic/`. Read `URYMosaic/AGENTS.MD` first.
+→ Work in `mosaic/`. Read `mosaic/AGENTS.MD` first.
 
 **To add or modify a Frappe API endpoint:**
 → Edit `ury/ury_pos/api.py` (main POS API) or `ury/ury/api/<module>.py`.
@@ -251,6 +251,6 @@ After building, run `bench build --app ury` to copy assets to the Frappe public 
 → Hook registration is in `hooks.py` `doc_events`.
 
 **Never:**
-- Modify `ury/public/pos/`, `ury/public/URYMosaic/`, or `ury/public/urypos/` directly — these are build output, not source.
+- Modify `ury/public/pos/`, `ury/public/mosaic/`, or `ury/public/urypos/` directly — these are build output, not source.
 - Edit `fixtures/custom_field.json` directly — export from Frappe desk instead.
 - Add business logic to `www/pos.py` — it should only return boot context data.
