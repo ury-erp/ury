@@ -210,6 +210,7 @@
     "please_print_first": "Veuillez imprimer la facture avant d'effectuer le paiement",
     "enter_cancel_reason": "Veuillez entrer un motif d'annulation.",
     "dine_in_restricted": "La consommation sur place n'est pas disponible pour votre rôle",
+    "payment_failed": "Le paiement n'a pas pu être effectué. Veuillez réessayer.",
     "order_modified": "Cette commande a été modifiée. Veuillez recharger la page pour récupérer les dernières modifications.",
     "order_sync_failed": "Impossible de synchroniser cette commande. Veuillez recharger la page et réessayer.",
     "posOpening": {
