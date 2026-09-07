@@ -17,7 +17,7 @@
    "fieldname": "alert_type",
    "fieldtype": "Select",
    "label": "Alert Type",
-   "options": "\nHigh Food Cost\nProduct Block\nPayment Delay\nCancel Delay\nTable Turnaround\nRound Off Limit",
+   "options": "\nHigh Food Cost\nProduct Block\nPayment Delay\nCancel Delay\nTable Turnaround\nRound Off Limit\nStock Count Gate",
    "reqd": 1
   },
   {
