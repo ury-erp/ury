@@ -223,6 +223,7 @@ doc_events = {
         "on_submit": "ury.ury.api.ury_kot_item_execution_service.seed_kot_item_executions_on_submit",
     },
     "AI Provider": {"on_update": "ury.ury.ai_tools.agent_seeding.on_ai_provider_update"},
+    "Stock Reconciliation": {"validate": "ury.ury.utils.stock_reconciliation_guards.validate"},
 }
 
 # Scheduled Tasks
@@ -494,7 +495,8 @@ fixtures = [
                     "POS Invoice Item-is_disposable",
                     "POS Invoice Item-disposable_items",
                     "POS Profile-parcel_disposables",
-                    "POS Profile-table_disposables"
+                    "POS Profile-table_disposables",
+                    "Stock Reconciliation-branch"
                 },
             ]
         ],
