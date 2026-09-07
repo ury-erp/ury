@@ -260,7 +260,7 @@ const TableSelectionDialog: React.FC<Props> = ({ onClose }) => {
                         : table.occupied === 1
                         ? 'border-amber-500 bg-amber-50 hover:border-amber-600 hover:bg-amber-100'
                         : isReserved
-                        ? 'border-indigo-400 bg-indigo-50 hover:border-indigo-500 hover:bg-indigo-100'
+                        ? 'border-primary-400 bg-primary-50 hover:border-primary-500 hover:bg-primary-100'
                         : 'border-gray-200 hover:border-primary-300 hover:bg-gray-50',
                       'focus-visible:ring-2 focus-visible:ring-primary-600'
                     )}
@@ -272,7 +272,7 @@ const TableSelectionDialog: React.FC<Props> = ({ onClose }) => {
                         table.occupied === 1
                           ? 'text-amber-500'
                           : isReserved
-                          ? 'text-indigo-600'
+                          ? 'text-primary-600'
                           : 'text-gray-500'
                       )}
                     />
@@ -297,7 +297,7 @@ const TableSelectionDialog: React.FC<Props> = ({ onClose }) => {
                         ) : isReserved ? (
                           <Badge
                             variant="outline"
-                            className="text-xs border-indigo-200 bg-indigo-100 text-indigo-800 hover:bg-indigo-100 font-medium"
+                            className="text-xs border-primary-200 bg-primary-100 text-primary-800 hover:bg-primary-100 font-medium"
                           >
                             {formatReservedLabel(activeRes?.reserved_at)}
                           </Badge>

@@ -12,7 +12,7 @@ import { t } from '../i18n';
 export const TABLE_STATE_STYLES = {
   available: 'border-emerald-300 bg-emerald-50 text-emerald-900 hover:border-emerald-400',
   occupied: 'border-amber-400 bg-amber-50 text-amber-900',
-  reserved: 'border-amber-400 bg-amber-50/50 text-amber-950',
+  reserved: 'border-primary-400 bg-primary-50 text-primary-950 hover:border-primary-500',
   restricted: 'border-emerald-300 bg-emerald-50 text-emerald-900 opacity-60 cursor-not-allowed',
 } as const;
 
@@ -94,7 +94,17 @@ const TableCard = ({
         <div className="mb-3 flex items-start justify-between gap-1">
           <div className="flex min-w-0 items-center gap-2">
             <div className="shrink-0">
-              <TableShapeIcon shape={table.table_shape || 'Rectangle'} />
+              <TableShapeIcon
+                shape={table.table_shape || 'Rectangle'}
+                className={cn(
+                  'h-5 w-5',
+                  isOccupied
+                    ? 'text-amber-600'
+                    : isLockedByReservation
+                    ? 'text-primary-600'
+                    : 'text-gray-600'
+                )}
+              />
             </div>
             <span className="shrink-0 text-lg font-semibold text-gray-900" title={mergeGroupLabel ?? table.name}>
               {table.name}
@@ -107,14 +117,20 @@ const TableCard = ({
                   {t('tables.occupied')}
                 </Badge>
                 {isLockedByReservation && (
-                  <Badge variant="outline" className="whitespace-nowrap text-xs border-amber-300 bg-amber-100 text-amber-900 font-medium">
-                    Reserved {formatReservationTime(activeReservation?.reserved_at)}
+                  <Badge
+                    variant="outline"
+                    className="whitespace-nowrap text-xs border-primary-200 bg-primary-100 text-primary-800 font-medium"
+                  >
+                    Reserved
                   </Badge>
                 )}
               </>
             ) : isLockedByReservation ? (
-              <Badge variant="warning" className="whitespace-nowrap border-amber-300 bg-amber-100 text-amber-900 font-medium">
-                Reserved {formatReservationTime(activeReservation?.reserved_at)}
+              <Badge
+                variant="outline"
+                className="whitespace-nowrap text-xs border-primary-200 bg-primary-100 text-primary-800 font-medium"
+              >
+                Reserved
               </Badge>
             ) : (
               <Badge variant="success" className="whitespace-nowrap">
@@ -176,8 +192,8 @@ const TableCard = ({
             </Badge>
           )}
           {isLockedByReservation && (
-            <div className="mt-2 flex items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-950">
-              <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-600" />
+            <div className="mt-2 flex items-center gap-1.5 rounded-md border border-primary-200 bg-primary-50 px-2.5 py-1.5 text-xs font-medium text-primary-950">
+              <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-primary-600" />
               <span className="truncate">
                 Reserved for {formatReservationTime(activeReservation?.reserved_at)}
               </span>
