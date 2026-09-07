@@ -1373,8 +1373,11 @@ def sync_order(
         if not table_branch:
             frappe.throw(_("Table not found."), frappe.PermissionError)
 
-        # Enforce server-side reservation lock check for Dine In table orders
-        if order_type == "Dine In" or (invoice and getattr(invoice, "order_type", None) == "Dine In"):
+        # Enforce server-side reservation lock check ONLY for NEW table orders or table changes
+        is_new_order = not bool(getattr(invoice, "name", None)) or (
+            getattr(invoice, "restaurant_table", None) and invoice.restaurant_table != table
+        )
+        if is_new_order and (order_type == "Dine In" or (invoice and getattr(invoice, "order_type", None) == "Dine In")):
             from ury.ury.api.table_reservation import check_table_reservation, parse_to_datetime
             active_res = check_table_reservation(table)
             if active_res and active_res.get("is_lock_window_active") and active_res.get("status") == "Confirmed":
@@ -1387,7 +1390,7 @@ def sync_order(
                     except Exception:
                         formatted_res_time = str(res_time_raw)
                 frappe.throw(
-                    _("Table {0} is reserved for {1}.").format(table, formatted_res_time)
+                    _("Table {0} is reserved for {1}. Please choose another table.").format(table, formatted_res_time)
                 )
 
         try:
@@ -1781,6 +1784,23 @@ def table_transfer(table, newTable, invoice):
 
     if new_table.occupied == 1:
         frappe.throw(f"Table {new_table.name} is already occupied")
+
+    from ury.ury.api.table_reservation import check_table_reservation, parse_to_datetime
+    active_res = check_table_reservation(new_table.name)
+    if active_res and active_res.get("is_lock_window_active") and active_res.get("status") == "Confirmed":
+        res_time_raw = active_res.get("reserved_at")
+        formatted_res_time = ""
+        if res_time_raw:
+            try:
+                res_dt = parse_to_datetime(res_time_raw)
+                formatted_res_time = res_dt.strftime("%I:%M %p").lstrip("0")
+            except Exception:
+                formatted_res_time = str(res_time_raw)
+        frappe.throw(
+            frappe._("Table {0} is reserved for {1}. Please choose another table.").format(
+                new_table.name, formatted_res_time
+            )
+        )
 
     frappe.db.set_value(
         "URY Table",
