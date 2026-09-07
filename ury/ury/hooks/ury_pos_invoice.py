@@ -16,6 +16,7 @@ def validate(doc, method):
     validate_customer(doc, method)
     validate_price_list(doc, method)
     set_commission_attribution(doc, method)
+    apply_staff_discount_policy(doc, method)
 
 
 def before_submit(doc, method):
@@ -24,7 +25,6 @@ def before_submit(doc, method):
     ro_reload_submit(doc, method)
     set_commission_attribution(doc, method)
     apply_disposable_items(doc, method)
-    apply_staff_discount_policy(doc, method)
 
 
 def on_trash(doc, method):
@@ -163,6 +163,7 @@ def apply_disposable_items(doc, method=None):
                 "income_account": pos_profile.get("income_account"),
                 "expense_account": pos_profile.get("expense_account"),
                 "cost_center": pos_profile.get("cost_center"),
+                "warehouse": pos_profile.get("warehouse"),
             },
         )
 
@@ -229,19 +230,28 @@ def _period_to_date_discount(policy_name, doc_name, customer_group=None, employe
 
 
 def apply_staff_discount_policy(doc, method=None):
-    """Resolve and enforce the applicable Staff Discount Policy on submit.
+    """Resolve and enforce the applicable Staff Discount Policy on validate.
+
+    This is VALIDATION-ONLY: it never assigns doc.discount_amount. By the
+    time this runs, ERPNext's own calculate_taxes_and_totals() has already
+    computed grand_total/rounded_total/outstanding_amount off of whatever
+    discount_amount the cashier/POS UI already put on the doc, so mutating
+    discount_amount here (after the fact, in before_submit) would silently
+    desync the displayed discount from what was actually charged/posted.
+    Instead:
 
     - Resolves the best-matching enabled Staff Discount Policy for this
       invoice's customer/employee/branch/item context via
       get_applicable_policy().
-    - Computes the discount that policy grants and enforces
-      per_transaction_cap (throws if this single invoice's discount would
-      exceed it).
+    - Reads the EXISTING doc.discount_amount (set earlier, before totals
+      were calculated) and enforces per_transaction_cap against it (throws
+      if this single invoice's discount exceeds it).
     - Computes the period-to-date discount already applied under this SAME
       policy (see _period_to_date_discount) and enforces period_cap (throws
-      if adding this invoice's discount would exceed it).
-    - Records the resolved policy on doc.staff_discount_policy so future
-      period-sum queries can filter cleanly by policy.
+      if adding this invoice's existing discount would exceed it).
+    - If within caps, records the resolved policy on
+      doc.staff_discount_policy so future period-sum queries can filter
+      cleanly by policy. Does NOT compute or assign a new discount_amount.
     """
     employee = doc.get("custom_closing_employee")
     branch = doc.get("branch")
@@ -267,11 +277,10 @@ def apply_staff_discount_policy(doc, method=None):
     if not policy:
         return
 
-    # Compute the discount this policy grants on this invoice.
-    if policy.get("discount_type") == "Percentage":
-        discount_amount = flt(doc.net_total) * flt(policy.get("discount_percentage")) / 100.0
-    else:
-        discount_amount = flt(policy.get("discount_amount"))
+    # Validate against whatever discount_amount is ALREADY on the doc
+    # (set by the cashier/POS UI before totals were calculated) — never
+    # compute or assign a new value here.
+    discount_amount = flt(doc.get("discount_amount"))
 
     per_transaction_cap = flt(policy.get("per_transaction_cap"))
     if per_transaction_cap and discount_amount > per_transaction_cap:
@@ -315,7 +324,6 @@ def apply_staff_discount_policy(doc, method=None):
                 )
             )
 
-    doc.discount_amount = discount_amount
     doc.staff_discount_policy = policy.get("name")
 
 
