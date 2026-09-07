@@ -1,11 +1,12 @@
 import { type MouseEvent } from 'react';
-import { Eye, Loader2, Printer, Users } from 'lucide-react';
+import { Eye, Loader2, Printer, ScrollText, Users } from 'lucide-react';
 import { cn } from '@ury/ui';
-import { formatInvoiceTime } from '@ury/core';
+import { formatInvoiceTime, isPrintStatusDisabled } from '@ury/core';
 import type { Table } from '../lib/table-api';
 import { Badge } from '@ury/ui';
 import { TableShapeIcon } from './TableShapeIcon';
 import TableActionsMenu from './TableActionsMenu';
+import { usePOSStore } from '../store/pos-store';
 import { t } from '../i18n';
 
 export const TABLE_STATE_STYLES = {
@@ -28,6 +29,8 @@ interface TableCardProps {
   onNavigate: () => void;
   onPreview: (event: MouseEvent<HTMLButtonElement>) => void;
   onPrint: (event: MouseEvent<HTMLButtonElement>) => void;
+  onViewPrintJobs?: (event: MouseEvent<HTMLButtonElement>) => void;
+  isPrintFailed?: boolean;
   isPrinting: boolean;
   isRestricted?: boolean;
 }
@@ -46,9 +49,12 @@ const TableCard = ({
   onNavigate,
   onPreview,
   onPrint,
+  onViewPrintJobs,
+  isPrintFailed = false,
   isPrinting,
   isRestricted = false,
 }: TableCardProps) => {
+  const { posProfile } = usePOSStore();
   const isOccupied = table.occupied === 1;
 
   return (
@@ -134,6 +140,27 @@ const TableCard = ({
             <Badge variant="pending" className="mt-2">
               Take away
             </Badge>
+          )}
+          {!isPrintStatusDisabled(posProfile) && (
+            <div className="flex justify-end pt-1">
+              <button
+                type="button"
+                className={cn(
+                  'inline-flex items-center justify-center rounded-md p-1 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500',
+                  isPrintFailed
+                    ? 'text-red-600 hover:bg-red-50'
+                    : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'
+                )}
+                aria-label={`View print jobs for ${table.name}`}
+                title={isPrintFailed ? 'Print failed - click to view details' : 'View print jobs'}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onViewPrintJobs?.(e);
+                }}
+              >
+                <ScrollText className="h-5 w-5" />
+              </button>
+            </div>
           )}
         </div>
       </div>

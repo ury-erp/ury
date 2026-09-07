@@ -27,6 +27,7 @@ const TERMINAL_NON_FAILED_STATUSES = new Set(['COMPLETED', 'CANCELED', 'UNKNOWN'
 
 // Payload keys that identify the document an order card represents.
 const ID_KEYS = ['invoice', 'reference_name', 'kot'] as const;
+const TABLE_KEYS = ['table', 'restaurant_table'] as const;
 
 type SocketPayload = Record<string, unknown>;
 
@@ -48,11 +49,30 @@ function removeIdsFromPayload(payload: SocketPayload, target: Set<string>) {
   }
 }
 
+function addTablesFromPayload(payload: SocketPayload, target: Set<string>) {
+  for (const key of TABLE_KEYS) {
+    const value = payload?.[key];
+    if (typeof value === 'string' && value.trim()) {
+      target.add(value.trim());
+    }
+  }
+}
+
+function removeTablesFromPayload(payload: SocketPayload, target: Set<string>) {
+  for (const key of TABLE_KEYS) {
+    const value = payload?.[key];
+    if (typeof value === 'string' && value.trim()) {
+      target.delete(value.trim());
+    }
+  }
+}
+
 export function useOrdersPrintJobs() {
   const { posProfile } = usePOSStore();
   const printStatusDisabled = isPrintStatusDisabled(posProfile);
 
   const [failedInvoiceIds, setFailedInvoiceIds] = useState<Set<string>>(new Set());
+  const [failedTableNames, setFailedTableNames] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const initialLoadRef = useRef(true);
@@ -61,6 +81,7 @@ export function useOrdersPrintJobs() {
   const fetchFailedJobs = useCallback(async () => {
     if (printStatusDisabled) {
       setFailedInvoiceIds(new Set());
+      setFailedTableNames(new Set());
       setLoading(false);
       return;
     }
@@ -78,6 +99,7 @@ export function useOrdersPrintJobs() {
           'status',
           'invoice',
           'reference_name',
+          'table',
           'failure_reason',
           'created_at',
         ]),
@@ -92,6 +114,7 @@ export function useOrdersPrintJobs() {
       const rows: URYPrintJob[] = data?.data || [];
 
       const ids = new Set<string>();
+      const tables = new Set<string>();
 
       if (Array.isArray(rows)) {
         rows.forEach((job) => {
@@ -101,10 +124,14 @@ export function useOrdersPrintJobs() {
           if (job.reference_name) {
             ids.add(String(job.reference_name).trim());
           }
+          if (job.table) {
+            tables.add(String(job.table).trim());
+          }
         });
       }
 
       setFailedInvoiceIds(ids);
+      setFailedTableNames(tables);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to fetch failed print jobs';
       setError(message);
@@ -137,6 +164,15 @@ export function useOrdersPrintJobs() {
         }
         return next;
       });
+      setFailedTableNames((prev) => {
+        const next = new Set(prev);
+        if (payload.status === 'FAILED') {
+          addTablesFromPayload(payload, next);
+        } else if (TERMINAL_NON_FAILED_STATUSES.has(payload.status)) {
+          removeTablesFromPayload(payload, next);
+        }
+        return next;
+      });
     };
 
     const handleFailure = (payload: SocketPayload) => {
@@ -145,12 +181,22 @@ export function useOrdersPrintJobs() {
         addIdsFromPayload(payload, next);
         return next;
       });
+      setFailedTableNames((prev) => {
+        const next = new Set(prev);
+        addTablesFromPayload(payload, next);
+        return next;
+      });
     };
 
     const handleCompleted = (payload: SocketPayload) => {
       setFailedInvoiceIds((prev) => {
         const next = new Set(prev);
         removeIdsFromPayload(payload, next);
+        return next;
+      });
+      setFailedTableNames((prev) => {
+        const next = new Set(prev);
+        removeTablesFromPayload(payload, next);
         return next;
       });
     };
@@ -193,14 +239,24 @@ export function useOrdersPrintJobs() {
     [failedInvoiceIds]
   );
 
+  const hasTableFailed = useCallback(
+    (tableName: string) => {
+      if (!tableName) return false;
+      return failedTableNames.has(String(tableName).trim());
+    },
+    [failedTableNames]
+  );
+
   return useMemo(
     () => ({
       failedInvoiceIds,
+      failedTableNames,
       hasInvoiceFailed,
+      hasTableFailed,
       loading,
       error,
       refreshFailedJobs: fetchFailedJobs,
     }),
-    [failedInvoiceIds, loading, error, fetchFailedJobs, hasInvoiceFailed]
+    [failedInvoiceIds, failedTableNames, loading, error, fetchFailedJobs, hasInvoiceFailed, hasTableFailed]
   );
 }

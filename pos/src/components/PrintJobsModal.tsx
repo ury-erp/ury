@@ -13,7 +13,8 @@ import type { URYPrintJob } from '../hooks/useOrdersPrintJobs';
 interface PrintJobsModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  invoiceId: string | null;
+  invoiceId?: string | null;
+  tableName?: string | null;
 }
 
 function getStatusBadgeVariant(status: string) {
@@ -44,13 +45,14 @@ export function PrintJobsModal({
   open,
   onOpenChange,
   invoiceId,
+  tableName,
 }: PrintJobsModalProps) {
   const [jobs, setJobs] = useState<URYPrintJob[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchInvoiceJobs = useCallback(async () => {
-    if (!invoiceId) {
+  const fetchPrintJobs = useCallback(async () => {
+    if (!invoiceId && !tableName) {
       setJobs([]);
       setError(null);
       return;
@@ -60,6 +62,13 @@ export function PrintJobsModal({
     setError(null);
 
     try {
+      const filters: any[] = [];
+      if (invoiceId) {
+        filters.push(['invoice', '=', invoiceId]);
+      } else if (tableName) {
+        filters.push(['table', '=', tableName]);
+      }
+
       const params = new URLSearchParams({
         fields: JSON.stringify([
           'name',
@@ -77,7 +86,7 @@ export function PrintJobsModal({
           'retry_count',
           'cups_job_id',
         ]),
-        filters: JSON.stringify([['invoice', '=', invoiceId]]),
+        filters: JSON.stringify(filters),
       });
 
       const res = await fetch(`/api/resource/URY%20Print%20Job?${params.toString()}`);
@@ -94,24 +103,29 @@ export function PrintJobsModal({
     } finally {
       setLoading(false);
     }
-  }, [invoiceId]);
+  }, [invoiceId, tableName]);
 
   useEffect(() => {
-    if (open && invoiceId) {
-      fetchInvoiceJobs();
+    if (open && (invoiceId || tableName)) {
+      fetchPrintJobs();
     }
     if (!open) {
       setJobs([]);
       setError(null);
     }
-  }, [open, invoiceId, fetchInvoiceJobs]);
+  }, [open, invoiceId, tableName, fetchPrintJobs]);
 
-  const invoiceJobs = useMemo(() => {
-    if (!invoiceId) return [];
-    return jobs.filter(
-      (job) => job.invoice === invoiceId || job.reference_name === invoiceId
-    );
-  }, [jobs, invoiceId]);
+  const displayedJobs = useMemo(() => {
+    if (invoiceId) {
+      return jobs.filter(
+        (job) => job.invoice === invoiceId || job.reference_name === invoiceId
+      );
+    }
+    if (tableName) {
+      return jobs.filter((job) => job.table === tableName);
+    }
+    return [];
+  }, [jobs, invoiceId, tableName]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -125,12 +139,16 @@ export function PrintJobsModal({
             Print Jobs
           </DialogTitle>
           <DialogDescription className="text-sm text-gray-500">
-            {invoiceId ? `Print queue for invoice ${invoiceId}` : 'View print jobs for the selected invoice'}
+            {invoiceId
+              ? `Print queue for invoice ${invoiceId}`
+              : tableName
+                ? `Print queue for table ${tableName}`
+                : 'View print jobs for the selected item'}
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto p-4">
-          {loading && invoiceJobs.length === 0 && (
+          {loading && displayedJobs.length === 0 && (
             <div className="py-8 text-center">
               <Spinner message="Loading print jobs..." />
             </div>
@@ -142,15 +160,19 @@ export function PrintJobsModal({
             </div>
           )}
 
-          {!loading && invoiceJobs.length === 0 && (
+          {!loading && displayedJobs.length === 0 && (
             <div className="py-8 text-center text-gray-600">
-              No print jobs found for this invoice.
+              {invoiceId
+                ? 'No print jobs found for this invoice.'
+                : tableName
+                  ? 'No print jobs found for this table.'
+                  : 'No print jobs found.'}
             </div>
           )}
 
-          {invoiceJobs.length > 0 && (
+          {displayedJobs.length > 0 && (
             <ul className="space-y-3">
-              {invoiceJobs.map((job) => {
+              {displayedJobs.map((job) => {
                 const jobName = job.print_job_id || job.name;
                 return (
                   <li

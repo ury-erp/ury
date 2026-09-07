@@ -22,6 +22,8 @@ import TableTransferDialog from '../components/TableTransferDialog';
 import CaptainTransferDialog from '../components/CaptainTransferDialog';
 import TableCard from '../components/TableCard';
 import MergeLinkConnector from '../components/MergeLinkConnector';
+import PrintJobsModal from '../components/PrintJobsModal';
+import { useOrdersPrintJobs } from '../hooks/useOrdersPrintJobs';
 
 const TableView = () => {
   const navigate = useNavigate();
@@ -29,6 +31,7 @@ const TableView = () => {
   const user = useRootStore((state) => state.user);
   const showCaptainTransfer = canCaptainTransfer(user, posProfile);
   const isRestricted = isUserRestrictedFromTableOrders(user, posProfile);
+  const { hasTableFailed } = useOrdersPrintJobs();
 
   const branch = posProfile?.branch ?? null;
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -41,6 +44,8 @@ const TableView = () => {
 
   const [error, setError] = useState<string | null>(null);
   const [printingTable, setPrintingTable] = useState<string | null>(null);
+  const [printJobsModalOpen, setPrintJobsModalOpen] = useState(false);
+  const [selectedTableForPrintJobs, setSelectedTableForPrintJobs] = useState<string | null>(null);
   const [menuOpenForTable, setMenuOpenForTable] = useState<string | null>(null);
   const [mergeSourceTable, setMergeSourceTable] = useState<Table | null>(null);
   const [unmergeSourceTable, setUnmergeSourceTable] = useState<Table | null>(null);
@@ -363,24 +368,29 @@ const TableView = () => {
     const canTransferTable = table.occupied === 1 && mergeMembers.length <= 1;
 
     return (
-    <TableCard
-      key={table.name}
-      table={table}
-      mergeGroupLabel={mergeGroupLabel}
-      className={className}
-      menuOpen={menuOpenForTable === table.name}
-      onMenuOpenChange={(open) => setMenuOpenForTable(open ? table.name : null)}
-      onMerge={() => setMergeSourceTable(table)}
-      onUnmerge={() => setUnmergeSourceTable(table)}
-      onTransferTable={canTransferTable ? () => void handleOpenTransferTable(table) : undefined}
-      onTransferCaptain={() => void handleOpenCaptainTransfer(table)}
-      showCaptainTransfer={showCaptainTransfer}
-      onNavigate={() => handleNavigateToPOS(table.name)}
-      onPreview={(event) => handlePreviewTable(table, event)}
-      onPrint={(event) => handlePrintTable(table, event)}
-      isPrinting={printingTable === table.name}
-      isRestricted={isRestricted}
-    />
+      <TableCard
+        key={table.name}
+        table={table}
+        mergeGroupLabel={mergeGroupLabel}
+        className={className}
+        menuOpen={menuOpenForTable === table.name}
+        onMenuOpenChange={(open) => setMenuOpenForTable(open ? table.name : null)}
+        onMerge={() => setMergeSourceTable(table)}
+        onUnmerge={() => setUnmergeSourceTable(table)}
+        onTransferTable={canTransferTable ? () => void handleOpenTransferTable(table) : undefined}
+        onTransferCaptain={() => void handleOpenCaptainTransfer(table)}
+        showCaptainTransfer={showCaptainTransfer}
+        onNavigate={() => handleNavigateToPOS(table.name)}
+        onPreview={(event) => handlePreviewTable(table, event)}
+        onPrint={(event) => handlePrintTable(table, event)}
+        onViewPrintJobs={() => {
+          setSelectedTableForPrintJobs(table.name);
+          setPrintJobsModalOpen(true);
+        }}
+        isPrintFailed={hasTableFailed(table.name)}
+        isPrinting={printingTable === table.name}
+        isRestricted={isRestricted}
+      />
     );
   };
 
@@ -565,6 +575,15 @@ const TableView = () => {
         }}
         currentCaptain={captainTransferContext?.currentCaptain ?? ''}
         onConfirm={handleCaptainTransferConfirm}
+      />
+
+      <PrintJobsModal
+        open={printJobsModalOpen}
+        onOpenChange={(open) => {
+          setPrintJobsModalOpen(open);
+          if (!open) setSelectedTableForPrintJobs(null);
+        }}
+        tableName={selectedTableForPrintJobs}
       />
 
       {/* Status Legend */}
