@@ -1,4 +1,4 @@
-import type { Table } from './table-api';
+import type { Table, TableReservation } from './table-api';
 
 export function parseMergedWith(mergedWith: string | null | undefined): string[] {
   if (!mergedWith) return [];
@@ -142,3 +142,28 @@ export function formatReservationTime(reservedAt?: string | null): string {
     return reservedAt;
   }
 }
+
+export function isReservationLockWindowActive(
+  res: TableReservation | null | undefined,
+  defaultBufferMinutes = 0
+): boolean {
+  if (!res || res.status !== 'Confirmed') return false;
+
+  const buf = res.buffer_minutes ?? defaultBufferMinutes;
+
+  if (res.reserved_at) {
+    try {
+      const resDate = new Date(res.reserved_at.replace(' ', 'T'));
+      if (!isNaN(resDate.getTime())) {
+        const now = new Date();
+        const lockStart = new Date(resDate.getTime() - buf * 60 * 1000);
+        return now >= lockStart;
+      }
+    } catch (_e) {
+      // Ignore date parsing error
+    }
+  }
+
+  return Boolean(res.is_lock_window_active);
+}
+
