@@ -256,6 +256,9 @@ def check_table_reservation(table):
         return None
 
     try:
+        from ury.ury.api.reservation_scheduler import process_reservation_no_shows
+        process_reservation_no_shows()
+
         branch = frappe.db.get_value("URY Table", table, "branch")
         settings = get_branch_reservation_settings(branch)
         buffer_mins = cint(settings.get("buffer_time", 0))
