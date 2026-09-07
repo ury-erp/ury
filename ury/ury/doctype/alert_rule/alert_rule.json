@@ -1,0 +1,54 @@
+{
+ "actions": [],
+ "creation": "2026-09-08 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "alert_name",
+  "threshold_minutes",
+  "column_break_gh7xk",
+  "enabled",
+  "notify_roles"
+ ],
+ "fields": [
+  {
+   "fieldname": "alert_name",
+   "fieldtype": "Data",
+   "label": "Alert Name",
+   "reqd": 1
+  },
+  {
+   "description": "Minutes",
+   "fieldname": "threshold_minutes",
+   "fieldtype": "Int",
+   "label": "Threshold Minutes"
+  },
+  {
+   "fieldname": "column_break_gh7xk",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enabled"
+  },
+  {
+   "fieldname": "notify_roles",
+   "fieldtype": "Small Text",
+   "label": "Notify Roles"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-09-08 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "Alert Rule",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
