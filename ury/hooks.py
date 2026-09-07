@@ -481,6 +481,8 @@ fixtures = [
                     "POS Profile-high_volume",
                     "POS Profile-low_volume",
                     "POS Profile-high_food_cost",
+                    "Cost Center-branch",
+                    "Journal Entry-branch",
                     "Employee-payment_amount",
                     "Employee-payment_type"
                 },
