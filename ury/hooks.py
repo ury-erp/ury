@@ -502,6 +502,7 @@ fixtures = [
                     "POS Profile-parcel_disposables",
                     "POS Profile-table_disposables",
                     "Stock Reconciliation-branch",
+                    "Stock Entry-branch",
                     "POS Profile-cash_discount_account",
                     "Sales Invoice-cash_discount_journal_entry"
                 },
