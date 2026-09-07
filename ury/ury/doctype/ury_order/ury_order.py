@@ -5,8 +5,9 @@ import json
 import frappe
 from frappe import _
 from frappe.model.document import Document
+from frappe.utils import flt
 from erpnext.controllers.queries import item_query
-from ury.ury_pos.api import getBranch, getBranchRoom
+from ury.ury_pos.api import getBranch, getBranchRoom, getRoom, posOpening
 from ury.ury.api.ury_kot_generate import kot_execute
 from ury.ury.api.ury_kot_generate import process_items_for_cancel_kot
 
@@ -72,7 +73,7 @@ def merge_tables_batch(anchor_table, tables):
                 _("Cannot merge tables from different rooms.")
             )
 
-        target_cluster, _ = _get_merge_cluster(
+        target_cluster, _target_table_map = _get_merge_cluster(
             target
         )
 
@@ -278,7 +279,7 @@ def _get_cluster_table_names(table):
     if not table:
         return []
     try:
-        members, _ = _get_merge_cluster(table)
+        members, _table_map = _get_merge_cluster(table)
         return members
     except Exception:
         return [table]
@@ -388,6 +389,9 @@ def release_tables_after_print(invoice):
         "POS Invoice",
         invoice,
     )
+
+    if not frappe.has_permission("POS Invoice", "write", doc=invoice_doc):
+        frappe.throw(_("Not permitted to release tables for this invoice"), frappe.PermissionError)
 
     tables = _get_table_group(
         invoice_doc.restaurant_table,
@@ -545,6 +549,20 @@ def split_bill(source_invoice, items_to_move, customer=None):
 
     source = frappe.get_doc("POS Invoice", source_invoice)
 
+    if not frappe.has_permission("POS Invoice", "write", doc=source):
+        frappe.throw(_("Not permitted to split this invoice."), frappe.PermissionError)
+
+    try:
+        user_branch = getBranch()
+    except frappe.ValidationError:
+        if frappe.session.user == "Administrator" or "System Manager" in frappe.get_roles():
+            user_branch = None
+        else:
+            raise
+
+    if user_branch and source.branch != user_branch:
+        frappe.throw(_("Not permitted to split invoices from another branch."), frappe.PermissionError)
+
     if source.docstatus != 0:
         frappe.throw(_("Only draft invoices can be split."))
 
@@ -669,9 +687,42 @@ def split_bill(source_invoice, items_to_move, customer=None):
 
 
 
-@frappe.whitelist()
-def get_order_invoice(table=None, invoiceNo=None, order_type=None, is_payment=None):
-    """returns the active invoice linked to the given table"""
+def _resolve_or_create_pos_invoice(table, invoiceNo, order_type, is_payment, check_permission=True, override_branch=None):
+    """Find an existing draft POS Invoice or build a new (unsaved) one.
+
+    Contains the same lookup/creation logic that used to live inline in
+    `get_order_invoice`. When `check_permission` is True (the default, used
+    by the staff-facing `get_order_invoice`), the same read-permission and
+    branch-match checks `get_order_invoice` used to perform run at the exact
+    same point they used to — immediately after an existing invoice is
+    loaded, BEFORE any of the unconditional branch/restaurant/price-list
+    resolution below — so an unauthorized caller still gets rejected before
+    any of that extra work happens, not after.
+
+    Pass `check_permission=False` for a customer-safe caller that has
+    already authorized the request through its own mechanism (e.g. a
+    verified ordering-session token) rather than a Frappe user session —
+    `frappe.has_permission`/`getBranch()` assume a real staff session and
+    are not meaningful for an elevated/technical caller.
+
+    `override_branch` lets such a caller supply the branch directly for the
+    no-`table` (pickup) path instead of relying on `getBranch()`, which
+    resolves branch from `frappe.session.user`'s `URY User` assignment —
+    meaningless for an elevated technical user with no such assignment.
+    Ignored for the `table` path, which always derives branch from the table.
+
+    Returns (invoice, invoice_name) where invoice_name is None when a new,
+    unsaved invoice was created.
+    """
+
+    def _enforce_read_permission(invoice):
+        if not check_permission:
+            return
+        if not frappe.has_permission("POS Invoice", "read", doc=invoice):
+            frappe.throw(frappe._("Not permitted to view this order"), frappe.PermissionError)
+        user_branch = getBranch()
+        if invoice.branch and user_branch and invoice.branch != user_branch:
+            frappe.throw(frappe._("Not permitted to view orders outside your active branch"), frappe.PermissionError)
 
     if table:
         filters = {"docstatus": 0}
@@ -679,18 +730,31 @@ def get_order_invoice(table=None, invoiceNo=None, order_type=None, is_payment=No
             filters["name"] = invoiceNo
         elif is_payment != "Payments":
             filters["invoice_printed"] = 0
-            
+
         or_filters = {
             "restaurant_table": table,
             "custom_merged_tables": ["like", f"%{table}%"]
         }
-        
+
         invoices = frappe.get_all("POS Invoice", filters=filters, or_filters=or_filters, limit=1)
         invoice_name = invoices[0].name if invoices else None
         branch, menu_name, restaurant = get_restaurant_and_menu_name(table)
 
         if invoice_name:
             invoice = frappe.get_doc("POS Invoice", invoice_name)
+            _enforce_read_permission(invoice)
+
+            # Captain/waiter ownership + room-access validation (Phase 3): a
+            # Captain without elevated/billing access may only view this
+            # table's order if they're its assigned waiter and it's within
+            # their assigned room. Skipped for a customer-safe/technical
+            # caller (check_permission=False) the same way
+            # _enforce_read_permission is above — getRoom()/frappe.session
+            # assume a real staff session, meaningless for that caller.
+            if check_permission:
+                _enforce_order_access(
+                    invoice, deny_message=frappe._("Not permitted to view this order")
+                )
 
         else:
             invoice = frappe.new_doc("POS Invoice")
@@ -727,29 +791,36 @@ def get_order_invoice(table=None, invoiceNo=None, order_type=None, is_payment=No
             invoice_name = frappe.get_value(
                 "POS Invoice", dict(restaurant_table=table, docstatus=0, name=invoiceNo)
             )
-            
+
         else:
             invoice_name = frappe.get_value(
                 "POS Invoice", dict(docstatus=0, name=invoiceNo)
             )
-            
+
         if invoice_name:
             invoice = frappe.get_doc("POS Invoice", invoice_name)
-            
+            _enforce_read_permission(invoice)
+
+            # Same ownership + room-access validation as the table-lookup
+            # branch above, skipped for a customer-safe/technical caller.
+            if check_permission:
+                _enforce_order_access(
+                    invoice, deny_message=frappe._("Not permitted to view this order")
+                )
 
         else:
             invoice = frappe.new_doc("POS Invoice")
             invoice.is_pos = 1
             invoice.update_stock = 1
-        
-        branch = getBranch()
+
+        branch = override_branch or getBranch()
         restaurant = frappe.db.get_value("URY Restaurant", {"branch": branch}, "name")
-   
+
         menu=get_menu_name(order_type)
- 
+
         if (order_type == "Aggregators" and frappe.db.get_value("Branch", branch, "custom_no_taxes") == 0) or order_type != "Aggregators":
             invoice.taxes_and_charges = frappe.db.get_value("URY Restaurant", restaurant, "default_tax_template")
-        
+
         invoice.selling_price_list = frappe.db.get_value(
             "Price List", dict(restaurant_menu=menu, enabled=1)
         )
@@ -757,7 +828,459 @@ def get_order_invoice(table=None, invoiceNo=None, order_type=None, is_payment=No
         if invoice_name and invoice.restaurant_table:
             _reconcile_invoice_merged_tables(invoice, persist=True)
 
+    return invoice, invoice_name
+
+
+@frappe.whitelist()
+def get_order_invoice(table=None, invoiceNo=None, order_type=None, is_payment=None):
+    """returns the active invoice linked to the given table"""
+
+    # check_permission defaults to True: read-permission and branch-match
+    # checks run inside the helper, immediately after an existing invoice is
+    # loaded — the same point they ran at before this function was split.
+    invoice, invoice_name = _resolve_or_create_pos_invoice(table, invoiceNo, order_type, is_payment)
     return invoice
+
+
+def price_items_for_invoice(items, price_list, pos_profile, branch, menu):
+    """Resolve course and price for each item and build the invoice item dicts.
+
+    Returns a list of dicts in the same shape previously passed directly to
+    `invoice.append("items", ...)` inside `sync_order`. Does not append to
+    the invoice itself.
+    """
+    priced_items = []
+
+    for d in items:
+
+        course = frappe.db.get_value("URY Menu Item", {"item": d.get("item"), "parent": menu}, "course")
+
+        item_prices = frappe.db.get_list(
+            "Item Price",
+            filters={"item_code": d.get("item"), "price_list": price_list},
+            fields=["price_list_rate"],
+        )
+
+        if not item_prices:
+            frappe.throw(_("No item price found for Item: {0} in Price List: {1}. Please check the price list settings.").format(d.get("item"), price_list))
+
+        else:
+            priced_items.append(
+                dict(
+                    item_code=d.get("item"),
+                    item_name=d.get("item_name"),
+                    qty=d.get("qty"),
+                    **({"custom_course": course} if course else {}),
+                    comment=d.get("comment"),
+                    rate = item_prices[0].price_list_rate,
+                    price_list_rate = item_prices[0].price_list_rate,
+                    base_price_list_rate = item_prices[0].price_list_rate,
+                    cost_center = frappe.db.get_value(
+                        "POS Profile", pos_profile, "cost_center"
+                        ),
+                )
+            )
+
+    return priced_items
+
+
+def _has_role(user_roles, role_permitted_rows):
+    """True if any role in `user_roles` appears in a POS Profile Table MultiSelect
+    of "Role Permitted" rows (e.g. transfer_role_permissions, role_allowed_for_billing,
+    role_restricted_for_table_order)."""
+    return any(row.role in user_roles for row in (role_permitted_rows or []))
+
+
+def _order_ownership_flags(invoice, pos_profile_name=None):
+    """Compute the same is_mine / has_elevated_access / is_billing_user /
+    can_view / can_modify booleans that `get_table_order_context()` derives
+    (Phase 2), for reuse by other endpoints (`get_order_invoice`, `sync_order`,
+    `reprint_kot`) without touching that already-reviewed function's body.
+
+    An "order" only has an owner to protect once it actually exists
+    (`invoice.name` truthy) — mirrors the `if order: ... else: can_view = True`
+    branch in `get_table_order_context()`.
+    """
+    order_exists = bool(invoice.name)
+    is_mine = order_exists and frappe.session.user == invoice.waiter
+
+    pos_profile_name = pos_profile_name or invoice.get("pos_profile")
+
+    has_elevated_access = False
+    is_billing_user = False
+    if pos_profile_name:
+        pos_profile = frappe.get_doc("POS Profile", pos_profile_name)
+        user_roles = frappe.get_roles()
+        has_elevated_access = _has_role(user_roles, pos_profile.transfer_role_permissions)
+        is_billing_user = _has_role(user_roles, pos_profile.role_allowed_for_billing)
+
+    # Administrator/System Manager is exempt from the ownership formula
+    # itself, matching this file's own established convention for every
+    # getBranch()/getRoom() call elsewhere (e.g. _enforce_order_access below).
+    # Without this, an admin account not personally listed in the POS
+    # Profile's transfer/billing role tables and not the order's waiter would
+    # be hard-denied by checks that previously didn't exist at all.
+    is_super_user = frappe.session.user == "Administrator" or "System Manager" in frappe.get_roles()
+
+    can_view = is_super_user or ((is_mine or has_elevated_access or is_billing_user) if order_exists else True)
+
+    invoice_billed = order_exists and bool(invoice.get("invoice_printed"))
+    can_modify = is_super_user or (can_view and (not invoice_billed or is_billing_user))
+
+    return {
+        "is_mine": is_mine,
+        "has_elevated_access": has_elevated_access,
+        "is_billing_user": is_billing_user,
+        "can_view": can_view,
+        "can_modify": can_modify,
+    }
+
+
+def _enforce_order_access(invoice, pos_profile_name=None, require_modify=False, deny_message=None):
+    """Fail-closed ownership + room-scoping gate for reading/modifying an
+    existing order. Reuses `_order_ownership_flags()` (Phase 2's ownership
+    formula) for the Captain/waiter check, then additionally requires the
+    acting user's assigned room (via `getRoom()`, the same `URY User`
+    source used elsewhere) to include the order's table room — unless the
+    user already has elevated or billing access.
+    """
+    flags = _order_ownership_flags(invoice, pos_profile_name)
+    allowed = flags["can_modify"] if require_modify else flags["can_view"]
+
+    if not allowed:
+        frappe.throw(
+            deny_message or _("Not permitted to access this order"),
+            frappe.PermissionError,
+        )
+
+    if flags["has_elevated_access"] or flags["is_billing_user"]:
+        return flags
+
+    table = invoice.get("restaurant_table")
+    if not table:
+        return flags
+
+    table_room = frappe.db.get_value("URY Table", table, "restaurant_room")
+    if not table_room:
+        return flags
+
+    try:
+        assigned_rooms = {row.get("name") for row in getRoom()}
+    except frappe.ValidationError:
+        if frappe.session.user == "Administrator" or "System Manager" in frappe.get_roles():
+            return flags
+        raise
+
+    # getRoom() returns room=None for a branch-level (not room-specific)
+    # `URY User` assignment — that's "access to every room in the branch",
+    # not "assigned to a room named None". Found via live E2E test: a real
+    # branch-assigned Captain was wrongly denied here before this check.
+    if None not in assigned_rooms and table_room not in assigned_rooms:
+        frappe.throw(
+            _("Not permitted to access orders outside your assigned room"),
+            frappe.PermissionError,
+        )
+
+    return flags
+
+
+def _has_eligible_captain_transfer_target(branch, room, exclude_user):
+    """Whether at least one other user is assigned to `room` under `branch`,
+    via the same `URY User` child-table (Branch.user) that captain_transfer()
+    itself queries for room-scoped eligibility."""
+    if not branch or not room:
+        return False
+
+    rows = frappe.db.sql(
+        """
+        SELECT user
+        FROM `tabURY User`
+        WHERE parent = %s AND room = %s AND user != %s
+        """,
+        (branch, room, exclude_user),
+    )
+    return bool(rows)
+
+
+@frappe.whitelist()
+def get_table_order_context(table):
+    """Return table + active order + assignment + a computed permission map for `table`.
+
+    This is the server-authoritative replacement for the ownership check V1
+    performed client-side only (`urypos/src/stores/Table.js:379-397`): a
+    Captain without elevated (`transfer_role_permissions`) or billing
+    (`role_allowed_for_billing`) access may only view/modify a table's order
+    if they are its assigned `waiter`. Combines Frappe DocType permission,
+    branch/room scoping, and POS Profile capability fields into one payload
+    so the frontend doesn't have to re-derive this per component.
+    """
+    if not table:
+        frappe.throw(_("Please select a table"))
+
+    table_doc = frappe.get_doc("URY Table", table)
+
+    if not frappe.has_permission("URY Table", "read", doc=table_doc):
+        frappe.throw(_("Not permitted to view this table"), frappe.PermissionError)
+
+    denied_permissions = {
+        "view": False,
+        "modify": False,
+        "reduce_items": False,
+        "remove_items": False,
+        "transfer_table": False,
+        "transfer_captain": False,
+        "print_bill": False,
+        "reprint_kot": False,
+        "settle": False,
+        "cancel": False,
+    }
+
+    try:
+        user_branch = getBranch()
+    except frappe.ValidationError:
+        if frappe.session.user == "Administrator" or "System Manager" in frappe.get_roles():
+            user_branch = None
+        else:
+            raise
+
+    # Branch scoping: deny outright (mirrors get_order_invoice's branch check)
+    # rather than leaking table/order details for a table outside the user's
+    # active branch.
+    if user_branch and table_doc.branch != user_branch:
+        return {
+            "table": table_doc.as_dict(),
+            "order": None,
+            "assignment": None,
+            "permissions": denied_permissions,
+        }
+
+    # Resolve the active order the same way get_order_invoice does: a draft,
+    # not-yet-printed POS Invoice on this table or a table merged into it.
+    invoices = frappe.get_all(
+        "POS Invoice",
+        filters={"docstatus": 0, "invoice_printed": 0},
+        or_filters={
+            "restaurant_table": table,
+            "custom_merged_tables": ["like", f"%{table}%"],
+        },
+        limit=1,
+    )
+    invoice_name = invoices[0].name if invoices else None
+
+    order = None
+    invoice = None
+    is_mine = False
+
+    if invoice_name:
+        invoice = frappe.get_doc("POS Invoice", invoice_name)
+
+        if not frappe.has_permission("POS Invoice", "read", doc=invoice):
+            frappe.throw(_("Not permitted to view this order"), frappe.PermissionError)
+
+        if invoice.branch and user_branch and invoice.branch != user_branch:
+            frappe.throw(
+                _("Not permitted to view orders outside your active branch"),
+                frappe.PermissionError,
+            )
+
+        order = invoice.as_dict()
+        is_mine = frappe.session.user == invoice.waiter
+
+    assignment = (
+        {"waiter": invoice.waiter, "is_mine": is_mine} if invoice else None
+    )
+
+    pos_profile_name = invoice.pos_profile if invoice else None
+    if not pos_profile_name:
+        pos_profile_name = frappe.db.exists("POS Profile", {"branch": table_doc.branch})
+
+    if not pos_profile_name:
+        # No POS Profile resolvable for this table's branch: fail closed.
+        return {
+            "table": table_doc.as_dict(),
+            "order": order,
+            "assignment": assignment,
+            "permissions": denied_permissions,
+        }
+
+    pos_profile = frappe.get_doc("POS Profile", pos_profile_name)
+    user_roles = frappe.get_roles()
+
+    has_elevated_access = _has_role(user_roles, pos_profile.transfer_role_permissions)
+    is_billing_user = _has_role(user_roles, pos_profile.role_allowed_for_billing)
+
+    # Ported V1 ownership check (Table.js:379-397): only applies once a table
+    # is occupied. A free table has no owner to protect.
+    if order:
+        can_view = is_mine or has_elevated_access or is_billing_user
+    else:
+        can_view = True
+
+    # Room scoping: _enforce_order_access() (used by get_order_invoice/
+    # sync_order) additionally requires the acting user's assigned room to
+    # cover this table's room, unless elevated/billing — mirror that here so
+    # this reported permission map can't say "view: true" for a table the
+    # mutation APIs would then hard-deny on the next call.
+    if can_view and order and not (has_elevated_access or is_billing_user):
+        table_room = table_doc.restaurant_room
+        if table_room:
+            try:
+                assigned_rooms = {row.get("name") for row in getRoom()}
+            except frappe.ValidationError:
+                assigned_rooms = set() if not (
+                    frappe.session.user == "Administrator" or "System Manager" in user_roles
+                ) else None
+            # getRoom() returns room=None for a branch-level assignment —
+            # that means access to every room in the branch, not "assigned
+            # to a room named None" (found via live E2E test).
+            if assigned_rooms is not None and None not in assigned_rooms and table_room not in assigned_rooms:
+                can_view = False
+
+    invoice_billed = bool(order) and order.get("invoice_printed") == 1
+    can_modify = can_view and (not order or not invoice_billed or is_billing_user)
+
+    can_reduce_items = can_modify and bool(pos_profile.remove_items)
+    can_remove_items = can_modify and bool(pos_profile.remove_items)
+
+    can_transfer_table = can_modify and has_elevated_access
+
+    # captain_transfer() itself, when custom_enable_multiple_cashier is set,
+    # only allows transferring to a captain assigned to the table's own room
+    # (queried via the Branch.user "URY User" child table). Mirror that here
+    # so the capability reflects whether a transfer is actually possible, not
+    # just whether the role is elevated.
+    can_transfer_captain = bool(order) and has_elevated_access
+    if can_transfer_captain and pos_profile.custom_enable_multiple_cashier:
+        can_transfer_captain = _has_eligible_captain_transfer_target(
+            table_doc.branch, table_doc.restaurant_room, frappe.session.user
+        )
+
+    can_reprint_kot = (
+        bool(order)
+        and bool(pos_profile.custom_enable_kot_reprint)
+        and (is_mine or has_elevated_access)
+    )
+
+    # Gated by can_view (not just the bare DocType-level print permission)
+    # so a Captain without ownership/elevated/billing access can't bypass the
+    # ownership check above by printing another Captain's bill.
+    can_print_bill = (
+        bool(order)
+        and can_view
+        and frappe.has_permission("POS Invoice", "print", doc=invoice)
+    )
+
+    # Captain has no submit/cancel at the DocType level (see
+    # ury/patches/v2_0/default_permissions.py), so these derive from real
+    # permission checks rather than a hardcoded role check, and stay correct
+    # if DocType permissions change later.
+    can_settle = (
+        bool(order)
+        and is_billing_user
+        and frappe.has_permission("POS Invoice", "submit", doc=invoice)
+    )
+    can_cancel = (
+        bool(order)
+        and is_billing_user
+        and frappe.has_permission("POS Invoice", "cancel", doc=invoice)
+    )
+
+    permissions = {
+        "view": can_view,
+        "modify": can_modify,
+        "reduce_items": can_reduce_items,
+        "remove_items": can_remove_items,
+        "transfer_table": can_transfer_table,
+        "transfer_captain": can_transfer_captain,
+        "print_bill": can_print_bill,
+        "reprint_kot": can_reprint_kot,
+        "settle": can_settle,
+        "cancel": can_cancel,
+    }
+
+    return {
+        "table": table_doc.as_dict(),
+        "order": order,
+        "assignment": assignment,
+        "permissions": permissions,
+    }
+
+
+@frappe.whitelist()
+def get_captain_context():
+    """Return the current session's operational POS context: identity,
+    roles, branch, assigned room(s), relevant POS Profile capability fields,
+    and current POS opening state.
+
+    Room assignment is sourced from `getRoom()` (`ury.ury_pos.api`), the same
+    `URY User` child-table (Branch.user) source used elsewhere for
+    branch/room resolution. POS opening state reuses `posOpening()` rather
+    than re-deriving it. Field names mirror what the future
+    `derivePOSCapabilities()` in `@ury/core` reads from POS Profile.
+    """
+    user = frappe.session.user
+    user_roles = frappe.get_roles()
+
+    try:
+        branch = getBranch()
+    except frappe.ValidationError:
+        if user == "Administrator" or "System Manager" in user_roles:
+            branch = None
+        else:
+            raise
+
+    rooms = []
+    if branch:
+        try:
+            rooms = getRoom()
+        except frappe.ValidationError:
+            rooms = []
+
+    pos_profile_name = frappe.db.exists("POS Profile", {"branch": branch}) if branch else None
+
+    pos_profile_context = None
+    role_restricted_for_table_order = False
+
+    if pos_profile_name:
+        pos_profile = frappe.get_doc("POS Profile", pos_profile_name)
+
+        role_restricted_for_table_order = _has_role(
+            user_roles, pos_profile.role_restricted_for_table_order
+        )
+
+        pos_profile_context = {
+            "name": pos_profile.name,
+            "transfer_role_permissions": _has_role(
+                user_roles, pos_profile.transfer_role_permissions
+            ),
+            "role_allowed_for_billing": _has_role(
+                user_roles, pos_profile.role_allowed_for_billing
+            ),
+            "role_restricted_for_table_order": role_restricted_for_table_order,
+            "remove_items": bool(pos_profile.remove_items),
+            "show_image": bool(pos_profile.show_image),
+            "custom_enable_kot_reprint": bool(pos_profile.custom_enable_kot_reprint),
+            "custom_enable_multiple_cashier": bool(pos_profile.custom_enable_multiple_cashier),
+        }
+
+    opening_state = None
+    if branch:
+        try:
+            # posOpening() returns 1 when no open POS Opening Entry exists for
+            # the branch (and msgprints a notice in that case), 0 when open.
+            opening_state = {"pos_open": posOpening() == 0}
+        except Exception:
+            opening_state = None
+
+    return {
+        "user": user,
+        "roles": user_roles,
+        "branch": branch,
+        "rooms": rooms,
+        "pos_profile": pos_profile_context,
+        "role_restricted_for_table_order": role_restricted_for_table_order,
+        "opening_state": opening_state,
+    }
 
 
 @frappe.whitelist()
@@ -802,6 +1325,72 @@ def sync_order(
         return {"status": "Failure"}
 
     invoice = get_order_invoice(table, invoice,order_type)
+
+    if invoice.name and not frappe.has_permission("POS Invoice", "write", doc=invoice):
+        frappe.throw(_("Not permitted to modify this order"), frappe.PermissionError)
+
+    # Reuse Phase 2's ownership formula (_has_role + is_mine/elevated/billing)
+    # directly: block a Captain from modifying another Captain's table order,
+    # and block modification of an already-billed/printed invoice unless the
+    # acting user holds billing access. Only applies once an order actually
+    # exists — a brand-new invoice has no owner or billed state to protect.
+    elevated_user = _has_role(user_role, posprofile.transfer_role_permissions)
+    if invoice.name:
+        is_mine = frappe.session.user == invoice.waiter
+        can_view_order = is_mine or elevated_user or billing_user
+        if not can_view_order:
+            frappe.throw(_("Not permitted to modify this order"), frappe.PermissionError)
+
+        if bool(invoice.invoice_printed) and not billing_user:
+            frappe.throw(
+                _("This order has already been billed and cannot be modified."),
+                frappe.PermissionError,
+            )
+
+    # role_restricted_for_table_order enforcement + requested-table
+    # branch/room validation. Applies to both new and existing orders since
+    # `table` reflects the table currently being requested, not just the
+    # invoice's already-persisted restaurant_table.
+    if table:
+        table_branch, table_room = frappe.db.get_value(
+            "URY Table", table, ["branch", "restaurant_room"]
+        ) or (None, None)
+
+        if not table_branch:
+            frappe.throw(_("Table not found."), frappe.PermissionError)
+
+        try:
+            requesting_user_branch = getBranch()
+        except frappe.ValidationError:
+            if frappe.session.user == "Administrator" or "System Manager" in user_role:
+                requesting_user_branch = None
+            else:
+                raise
+
+        if requesting_user_branch and table_branch != requesting_user_branch:
+            frappe.throw(
+                _("Not permitted to take orders for a table outside your active branch."),
+                frappe.PermissionError,
+            )
+
+        if table_room and not (elevated_user or billing_user):
+            try:
+                assigned_rooms = {row.get("name") for row in getRoom()}
+            except frappe.ValidationError:
+                if frappe.session.user == "Administrator" or "System Manager" in user_role:
+                    assigned_rooms = None
+                else:
+                    raise
+
+            # getRoom() returns room=None for a branch-level assignment —
+            # that means access to every room in the branch, not "assigned
+            # to a room named None" (found via live E2E test: this exact
+            # throw wrongly blocked a real branch-assigned Captain).
+            if assigned_rooms is not None and None not in assigned_rooms and table_room not in assigned_rooms:
+                frappe.throw(
+                    _("Not permitted to take orders for a table outside your assigned room."),
+                    frappe.PermissionError,
+                )
 
     if last_invoice and last_modified_time:
         lastModifiedTime = invoice.modified
@@ -853,14 +1442,54 @@ def sync_order(
     if order_type:
         invoice.order_type = order_type
 
+    # role_restricted_for_table_order blocks the Dine-In/table-order path
+    # entirely for this role, regardless of ownership/elevated access.
+    if invoice.order_type == "Dine In" and _has_role(
+        user_role, posprofile.role_restricted_for_table_order
+    ):
+        frappe.throw(
+            _("You are not permitted to take Dine In table orders."),
+            frappe.PermissionError,
+        )
+
     customerdoc = frappe.get_doc("Customer", customer)
     invoice.mobile_number = customerdoc.mobile_number
     if comments:
         invoice.custom_comments = comments
     invoice.no_of_pax = no_of_pax
     invoice.pos_profile = pos_profile
-    invoice.cashier = cashier
-    invoice.waiter = waiter
+    
+    # Secure server-side attribution of cashier and waiter
+    multiple_cashier = posprofile.custom_enable_multiple_cashier
+    if multiple_cashier:
+        pos_opening_list = frappe.db.sql("""
+            SELECT DISTINCT `tabPOS Opening Entry`.name 
+            FROM `tabPOS Opening Entry`
+            INNER JOIN `tabMultiple Rooms` 
+            ON `tabMultiple Rooms`.parent = `tabPOS Opening Entry`.name
+            WHERE `tabPOS Opening Entry`.branch = %s
+            AND `tabPOS Opening Entry`.status = 'Open'
+            AND `tabPOS Opening Entry`.docstatus = 1
+            AND `tabMultiple Rooms`.room = %s
+        """, (invoice.branch, room), as_dict=True)
+
+        pos_opened_cashier = frappe.db.get_value("POS Opening Entry", pos_opening_list[0].name, "user") if pos_opening_list else None
+
+        main_cashier = None
+        for user_details in posprofile.applicable_for_users:
+            if user_details.custom_main_cashier:
+                main_cashier = user_details.user
+        
+        if frappe.session.user == main_cashier:
+            invoice.cashier = main_cashier
+        else:
+            invoice.cashier = pos_opened_cashier
+    else:
+        invoice.cashier = posprofile.applicable_for_users[0].user if posprofile.applicable_for_users else frappe.session.user
+
+    if not invoice.waiter:
+        invoice.waiter = frappe.session.user
+
     invoice.custom_aggregator_id = aggregator_id
     invoice.custom_restaurant_room =room
     if not invoice.restaurant_table:
@@ -901,40 +1530,42 @@ def sync_order(
     # - 'ury_pos': Already formatted list, hence using else
     if isinstance(items, str):
         items = json.loads(items)
+
+    # Reduction/removal permission: gate any decrease in a previously-sent
+    # item's quantity (including full removal) by POS Profile `remove_items`,
+    # matching Phase 2's can_reduce_items/can_remove_items derivation.
+    if past_item and not bool(posprofile.remove_items):
+        requested_qty_by_item = {}
+        for d in items:
+            requested_qty_by_item[d.get("item")] = requested_qty_by_item.get(
+                d.get("item"), 0
+            ) + flt(d.get("qty"))
+
+        # Aggregate previous qty per item too: a restaurant order can carry
+        # the same item_code across multiple lines (different comments/
+        # courses), so comparing the requested aggregate against each
+        # previous LINE individually would let a real reduction slip through
+        # as long as no single previous line's qty dropped on its own.
+        previous_qty_by_item = {}
+        for prev in past_item:
+            previous_qty_by_item[prev["item_code"]] = previous_qty_by_item.get(
+                prev["item_code"], 0
+            ) + flt(prev["qty"])
+
+        for item_code, prev_qty in previous_qty_by_item.items():
+            if requested_qty_by_item.get(item_code, 0) < prev_qty:
+                frappe.throw(
+                    _("You are not permitted to reduce or remove items from this order."),
+                    frappe.PermissionError,
+                )
+
     invoice.items = []
-    
+
     menu = frappe.db.get_value("URY Menu", {"branch": invoice.branch}, "name")
-   
-    for d in items:
-        
-        course = frappe.db.get_value("URY Menu Item", {"item": d.get("item"),"parent":menu}, "course")
-        
-        item_prices = frappe.db.get_list(
-            "Item Price",
-            filters={"item_code": d.get("item"), "price_list": price_list},
-            fields=["price_list_rate"],
-        )
 
-        if not item_prices:
-            frappe.throw(_("No item price found for Item: {0} in Price List: {1}. Please check the price list settings.").format(d.get("item"), price_list))
-
-        else:
-            invoice.append(
-                "items",
-                dict(
-                    item_code=d.get("item"),
-                    item_name=d.get("item_name"),
-                    qty=d.get("qty"),
-                    **({"custom_course": course} if course else {}),
-                    comment=d.get("comment"),
-                    rate = item_prices[0].price_list_rate,
-                    price_list_rate = item_prices[0].price_list_rate,
-                    base_price_list_rate = item_prices[0].price_list_rate,
-                    cost_center = frappe.db.get_value(
-                        "POS Profile", pos_profile, "cost_center"
-                        ),
-                ),
-            )
+    priced_items = price_items_for_invoice(items, price_list, pos_profile, invoice.branch, menu)
+    for item_dict in priced_items:
+        invoice.append("items", item_dict)
 
     try:
         invoice.save()
@@ -961,7 +1592,6 @@ def sync_order(
                     "URY Table", merged_table.strip(), {"occupied": 1, "latest_invoice_time": invoice.creation}
                 )
 
-    invoice.db_set("owner", cashier)
     return invoice.as_dict()
 
 
@@ -1092,7 +1722,26 @@ def table_transfer(table, newTable, invoice):
     pos_invoice = frappe.get_doc("POS Invoice", invoice)
     new_table = frappe.get_doc("URY Table", newTable)
 
-    merge_members, _ = _get_merge_cluster(table)
+    if not frappe.has_permission("POS Invoice", "write", doc=pos_invoice):
+        frappe.throw(_("Not permitted to transfer this order"), frappe.PermissionError)
+
+    # Explicit server-side transfer-permission check (POS Profile
+    # transfer_role_permissions) — the frontend's canCaptainTransfer() is UX
+    # only and must not be relied on for authorization.
+    if not pos_invoice.pos_profile:
+        frappe.throw(
+            _("Cannot verify transfer permission: order has no POS Profile."),
+            frappe.PermissionError,
+        )
+
+    pos_profile_doc = frappe.get_doc("POS Profile", pos_invoice.pos_profile)
+    if not _has_role(frappe.get_roles(), pos_profile_doc.transfer_role_permissions):
+        frappe.throw(
+            _("You are not permitted to transfer tables."),
+            frappe.PermissionError,
+        )
+
+    merge_members, _table_map = _get_merge_cluster(table)
     if len(merge_members) > 1:
         frappe.throw(_("Table transfer is not allowed for merged tables. Unmerge first."))
 
@@ -1127,43 +1776,94 @@ def table_transfer(table, newTable, invoice):
 
 @frappe.whitelist()
 def captain_transfer(currentCaptain, newCaptain, invoice):
-    pos_profile=frappe.get_value("POS Invoice", invoice,"pos_profile")
-    multiple_cashier = frappe.db.get_value("POS Profile",pos_profile,"custom_enable_multiple_cashier")
-    branch=frappe.get_value("POS Invoice", invoice,"branch")
+    pos_invoice_doc = frappe.get_doc("POS Invoice", invoice)
+
+    # Invoice-write authorization: server-side, not just the frontend gate.
+    if not frappe.has_permission("POS Invoice", "write", doc=pos_invoice_doc):
+        frappe.throw(_("Not permitted to transfer this order"), frappe.PermissionError)
+
+    pos_profile = pos_invoice_doc.pos_profile
+    if not pos_profile:
+        frappe.throw(
+            _("Cannot verify transfer permission: order has no POS Profile."),
+            frappe.PermissionError,
+        )
+
+    pos_profile_doc = frappe.get_doc("POS Profile", pos_profile)
+
+    # Transfer-role authorization (POS Profile transfer_role_permissions),
+    # same field/helper as table_transfer().
+    if not _has_role(frappe.get_roles(), pos_profile_doc.transfer_role_permissions):
+        frappe.throw(
+            _("You are not permitted to transfer captains."),
+            frappe.PermissionError,
+        )
+
+    multiple_cashier = pos_profile_doc.custom_enable_multiple_cashier
+    branch = pos_invoice_doc.branch
+
+    # Branch validation: the target user must actually belong to this
+    # invoice's branch (via the same URY User child-table source used
+    # elsewhere for branch/room resolution).
+    new_captain_branch_rows = frappe.db.sql(
+        """
+            SELECT room
+            FROM `tabURY User`
+            WHERE parent=%s AND user=%s
+        """,
+        (branch, newCaptain),
+        as_dict=True,
+    )
+    if not new_captain_branch_rows:
+        frappe.throw(
+            _("The selected user is not assigned to this branch."),
+            frappe.PermissionError,
+        )
+
+    # Target-user eligibility: there's no dedicated "order-taking role"
+    # config field, so — per PHASE0_PERMISSION_MATRIX.md's capability
+    # derivation table (`canTakeTableOrders` = NOT role_restricted_for_
+    # table_order) — reuse the same POS Profile field that already governs
+    # whether a role may take table orders at all, rather than hard-coding a
+    # role name.
+    new_captain_roles = frappe.get_roles(newCaptain)
+    if _has_role(new_captain_roles, pos_profile_doc.role_restricted_for_table_order):
+        frappe.throw(
+            _("The selected user is not permitted to take table orders."),
+            frappe.PermissionError,
+        )
+
     if multiple_cashier:
-        table=pos_profile=frappe.get_value("POS Invoice", invoice,"restaurant_table")
-        current_room = frappe.get_value("URY Table", table,"restaurant_room")
-        new_captain_room =  frappe.db.sql("""
-                SELECT room
-                FROM `tabURY User`
-                WHERE parent=%s AND user=%s         
-            """,(branch,newCaptain),as_dict=True)
-        room_match = any(room['room'] == current_room for room in new_captain_room)
+        table = pos_invoice_doc.restaurant_table
+        current_room = frappe.get_value("URY Table", table, "restaurant_room")
+        room_match = any(row["room"] == current_room for row in new_captain_branch_rows)
         if not room_match:
             frappe.throw(_("Captain transfer is not allowed between different rooms"))
-        else:
-            current_captain_doc = frappe.get_doc("User", currentCaptain)
-            pos_invoice = frappe.get_doc("POS Invoice", invoice)
-            new_captain_doc = frappe.get_doc("User", newCaptain)
 
-            # Update the waiter field of the POS Invoice
-            pos_invoice.waiter = new_captain_doc.name
-            pos_invoice.save()
+    current_captain_doc = frappe.get_doc("User", currentCaptain)
+    pos_invoice = pos_invoice_doc
+    new_captain_doc = frappe.get_doc("User", newCaptain)
 
-    else:
-        current_captain_doc = frappe.get_doc("User", currentCaptain)
-        pos_invoice = frappe.get_doc("POS Invoice", invoice)
-        new_captain_doc = frappe.get_doc("User", newCaptain)
-
-        # Update the waiter field of the POS Invoice
-        pos_invoice.waiter = new_captain_doc.name
-        pos_invoice.save()
+    # Update the waiter field of the POS Invoice
+    pos_invoice.waiter = new_captain_doc.name
+    pos_invoice.save()
 
 
 @frappe.whitelist()
 def customer_favourite_item(customer_name):
+    if not frappe.has_permission("Customer", "read", customer_name):
+        frappe.throw(_("Not permitted to access this Customer"), frappe.PermissionError)
+
+    filters = {"customer": customer_name}
+    try:
+        branch = getBranch()
+        if branch:
+            filters["branch"] = branch
+    except frappe.exceptions.ValidationError:
+        pass
+
     pos = frappe.db.get_list(
-        "POS Invoice", filters={"customer": customer_name}, fields=["name"]
+        "POS Invoice", filters=filters, fields=["name"]
     )
 
     item_qty = {}
@@ -1188,6 +1888,24 @@ def customer_favourite_item(customer_name):
 def cancel_order(invoice_id, reason):
     pos_invoice = frappe.get_doc("POS Invoice", invoice_id)
 
+    # Authorization gate: the session user must hold cancel rights on this
+    # specific invoice before any mutation happens.
+    if not frappe.has_permission("POS Invoice", "cancel", doc=pos_invoice):
+        frappe.throw(
+            _("You do not have permission to cancel this invoice."),
+            frappe.PermissionError,
+        )
+
+    # Branch scoping: the invoice must belong to the session user's branch
+    # (mirrors the getBranch() pattern used across the URY APIs).
+    if frappe.session.user != "Administrator":
+        user_branch = getBranch()
+        if pos_invoice.branch != user_branch:
+            frappe.throw(
+                _("You are not allowed to cancel an invoice from another branch."),
+                frappe.PermissionError,
+            )
+
     # Release the full merge cluster, not only the primary table and CSV partners.
     if pos_invoice.restaurant_table:
         release_merge_cluster_tables(pos_invoice.restaurant_table)
@@ -1199,20 +1917,86 @@ def cancel_order(invoice_id, reason):
         # If an exception occurs (e.g., "kot" app not found), it will be caught here without effecting execution
         pass
 
-    # Update invoice status
-    frappe.db.sql("""
-        UPDATE `tabPOS Invoice Item`
-        SET docstatus = 2
-        WHERE parent = %s
-    """, (invoice_id,))
+    # Use standard Frappe cancel workflow instead of raw SQL
+    pos_invoice.db_set("cancel_reason", reason)
+    pos_invoice.cancel()
+    if pos_invoice.docstatus == 1:
+        # Submitted invoice: cancel through the standard document workflow so
+        # on_cancel hooks run and GL/payment reversals and audit entries are
+        # produced (docstatus=2 on the invoice and its items).
+        pos_invoice.cancel()
+        pos_invoice.db_set("cancel_reason", reason)
+    else:
+        # Draft invoice: Frappe's standard workflow does not allow cancelling
+        # drafts, so update the status directly as before.
+        frappe.db.sql("""
+            UPDATE `tabPOS Invoice Item`
+            SET docstatus = 2
+            WHERE parent = %s
+        """, (invoice_id,))
 
-    frappe.db.set_value("POS Invoice", invoice_id, "docstatus", 2)
-    frappe.db.set_value("POS Invoice", invoice_id, "status", "Cancelled")
-    frappe.db.set_value("POS Invoice", invoice_id, "cancel_reason", reason)
+        frappe.db.set_value("POS Invoice", invoice_id, "docstatus", 2)
+        frappe.db.set_value("POS Invoice", invoice_id, "status", "Cancelled")
+        frappe.db.set_value("POS Invoice", invoice_id, "cancel_reason", reason)
+
+# Roles permitted to authorize an additional discount when settling an order.
+DISCOUNT_ALLOWED_ROLES = frozenset(
+    {"URY Manager", "URY Cashier", "System Manager", "Administrator"}
+)
+MAX_DISCOUNT_PERCENTAGE = 100
+
+
+def _validate_additional_discount(additional_discount, pos_profile):
+    """Server-side authorization for the discount applied in make_invoice.
+
+    The client-side gate (POS Profile "Enable Discount" checkbox) is only a
+    UI convenience; this check is authoritative. Returns the sanitized
+    discount percentage (0 when no discount is applied). Raises before any
+    invoice state is mutated on failure.
+    """
+    if additional_discount in (None, ""):
+        return 0
+
+    try:
+        discount = flt(additional_discount)
+    except (TypeError, ValueError):
+        frappe.throw(
+            _("Invalid discount value: {0}").format(additional_discount),
+            frappe.ValidationError,
+        )
+
+    if discount <= 0:
+        return 0
+
+    profile = frappe.get_doc("POS Profile", pos_profile)
+
+    if not profile.custom_enable_discount:
+        frappe.throw(
+            _("Discounts are not enabled for POS Profile {0}.").format(pos_profile),
+            frappe.PermissionError,
+        )
+
+    if discount > MAX_DISCOUNT_PERCENTAGE:
+        frappe.throw(
+            _("Discount of {0}% exceeds the maximum allowed discount of {1}%.").format(
+                discount, MAX_DISCOUNT_PERCENTAGE
+            )
+        )
+
+    if not DISCOUNT_ALLOWED_ROLES.intersection(frappe.get_roles()):
+        frappe.throw(
+            _("You do not have permission to apply a discount on this order."),
+            frappe.PermissionError,
+        )
+
+    return discount
+
 
 # Method for URY POS
 @frappe.whitelist()
 def make_invoice(customer, payments, cashier, pos_profile,owner, additionalDiscount=None, table=None, invoice=None):
+    additionalDiscount = _validate_additional_discount(additionalDiscount, pos_profile)
+
     order_type =  invoice_name = frappe.get_value("POS Invoice",invoice , "order_type")
     invoice = get_order_invoice(table, invoice, order_type, "Payments")
 
@@ -1222,7 +2006,25 @@ def make_invoice(customer, payments, cashier, pos_profile,owner, additionalDisco
 
     invoice.customer = customer
     invoice.pos_profile = pos_profile
-    invoice.additional_discount_percentage=additionalDiscount
+    
+    if additionalDiscount:
+        discount_val = frappe.utils.flt(additionalDiscount)
+        if discount_val < 0 or discount_val > 100:
+            frappe.throw(_("Discount percentage must be between 0 and 100"))
+        
+        pos_prof = frappe.get_cached_doc("POS Profile", pos_profile)
+        if not pos_prof.get("allow_discount_change") and not pos_prof.get("custom_enable_discount"):
+            frappe.throw(_("Discount is not allowed for this POS Profile"))
+        
+        allowed_roles = {"Administrator", "System Manager", "URY Admin", "URY Manager", "URY Cashier"}
+        user_roles = set(frappe.get_roles(frappe.session.user))
+        if not allowed_roles.intersection(user_roles):
+            frappe.throw(_("Not permitted to apply discounts"), frappe.PermissionError)
+
+        invoice.additional_discount_percentage = discount_val
+    else:
+        invoice.additional_discount_percentage = 0
+        
     invoice.calculate_taxes_and_totals()
 
     invoice.set("payments", [])

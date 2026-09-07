@@ -1,0 +1,35 @@
+[
+    {
+        "doctype": "User",
+        "email": "cashier@ury.com",
+        "first_name": "URY Cashier",
+        "status": "Active",
+        "roles": [
+            {
+                "role": "URY Cashier"
+            }
+        ]
+    },
+    {
+        "doctype": "User",
+        "email": "captain@ury.com",
+        "first_name": "URY Captain",
+        "status": "Active",
+        "roles": [
+            {
+                "role": "URY Captain"
+            }
+        ]
+    },
+    {
+        "doctype": "User",
+        "email": "manager@ury.com",
+        "first_name": "URY Manager",
+        "status": "Active",
+        "roles": [
+            {
+                "role": "URY Manager"
+            }
+        ]
+    }
+]

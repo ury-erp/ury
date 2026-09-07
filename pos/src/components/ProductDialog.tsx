@@ -313,7 +313,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
       <DialogContent 
         ref={dialogRef}
         variant="xlarge"
-        className="bg-white w-full max-w-[90rem] max-h-[90vh] overflow-y-auto flex flex-col md:flex-row p-0"
+        className="bg-white w-full max-w-[90rem] max-h-dialog-max-h overflow-y-auto flex flex-col md:flex-row p-0"
         showCloseButton={false}
       >
         {/* Left Column - Image  */}

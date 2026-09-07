@@ -1,0 +1,38 @@
+[
+  {
+    "id": "branch",
+    "label": "Branch",
+    "route": "/app/branch/new-branch-1",
+    "description": "Configure your restaurant branches."
+  },
+  {
+    "id": "ury-room",
+    "label": "URY Room",
+    "route": "/app/ury-room/new-ury-room-1",
+    "description": "Set up rooms or areas in your restaurant."
+  },
+  {
+    "id": "ury-table",
+    "label": "URY Table",
+    "route": "/app/ury-table/new-ury-table-1",
+    "description": "Configure tables for dine-in orders."
+  },
+  {
+    "id": "ury-menu",
+    "label": "URY Menu",
+    "route": "/app/ury-menu/new-ury-menu-1",
+    "description": "Add menu items, categories, and prices."
+  },
+  {
+    "id": "mode-of-payment",
+    "label": "Mode of Payment",
+    "route": "/app/mode-of-payment/new-mode-of-payment-1",
+    "description": "Set up payment methods like Cash, Card, UPI."
+  },
+  {
+    "id": "user",
+    "label": "User",
+    "route": "/app/user/new-user-1",
+    "description": "Add staff and assign roles."
+  }
+]

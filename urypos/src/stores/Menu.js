@@ -159,7 +159,7 @@ export const useMenuStore = defineStore("menu", {
       this.db
         .getDocList("URY Menu Course", {
           fields: ["name"],
-          limit: "*",
+          limit: 0,
         })
         .then((docs) => {
           this.course = docs;
