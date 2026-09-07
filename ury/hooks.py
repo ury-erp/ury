@@ -233,6 +233,9 @@ scheduler_events = {
 		"* * * * *":[
 			"ury.ury.api.ury_kot_validation.kotValidationThread",
 			"ury.ury.api.ury_fulfilment_posting_service.recover_pending_posting_intents",
+		],
+		"*/5 * * * *":[
+			"ury.ury.services.food_cost_alerts.notify_high_food_cost"
 		]
 	},
 	"daily": [
