@@ -2017,7 +2017,7 @@ def cancel_order(invoice_id, reason):
                 if notify_roles:
                     for role_row in notify_roles:
                         role_name = role_row.get("role") if isinstance(role_row, dict) else role_row.role
-                        users = get_users_with_role(role_name)
+                        users = get_users_with_role(role_name, branch=pos_invoice.branch)
                         for user in users:
                             message = f"Invoice {invoice_id} has been cancelled after {minutes_open} minutes"
                             subject = f"Invoice {invoice_id} ({pos_invoice.branch}) is cancelled"
