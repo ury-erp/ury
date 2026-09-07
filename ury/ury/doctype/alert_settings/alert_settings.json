@@ -1,0 +1,66 @@
+{
+ "actions": [],
+ "creation": "2026-09-08 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "payment_delay_time",
+  "cancel_delay_time",
+  "column_break_8rpwk",
+  "table_turnaround_warning_time"
+ ],
+ "fields": [
+  {
+   "description": "Minutes",
+   "fieldname": "payment_delay_time",
+   "fieldtype": "Int",
+   "label": "Payment Delay Time"
+  },
+  {
+   "description": "Minutes",
+   "fieldname": "cancel_delay_time",
+   "fieldtype": "Int",
+   "label": "Cancel Delay Time"
+  },
+  {
+   "fieldname": "column_break_8rpwk",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Minutes",
+   "fieldname": "table_turnaround_warning_time",
+   "fieldtype": "Int",
+   "label": "Table Turnaround Warning Time"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-09-08 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "Alert Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "read": 1,
+   "role": "URY Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
