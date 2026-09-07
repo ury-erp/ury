@@ -5,7 +5,7 @@ import { Button, Spinner, showToast } from '@ury/ui';
 import { useCaptainContext } from '../hooks/useCaptainContext';
 import { getRooms, getTables, checkTableReservation, type Room, type Table } from '../../lib/table-api';
 import { getTableOrder } from '../../lib/order-api';
-import { getMergeGroupMembers, sortTablesByMergeGroups, formatReservationTime } from '../../lib/table-utils';
+import { getMergeGroupMembers, sortTablesByMergeGroups, formatReservationTime, isReservationLockWindowActive } from '../../lib/table-utils';
 import {
   getActiveTableOrders,
   getUserFullNames,
@@ -163,7 +163,11 @@ export default function CaptainTables() {
 
       try {
         const res = await checkTableReservation(table.name);
-        if (res && res.is_lock_window_active && res.status === 'Confirmed') {
+        if (
+          res &&
+          (res.is_lock_window_active || isReservationLockWindowActive(res)) &&
+          res.status === 'Confirmed'
+        ) {
           const timeStr = formatReservationTime(res.reserved_at);
           showToast.error(`Table ${table.name} is reserved for ${timeStr}. Please choose another table.`);
           return;

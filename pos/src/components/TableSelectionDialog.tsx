@@ -5,7 +5,7 @@ import { Dialog, DialogContent, Button, Badge, Spinner, showToast, cn } from '@u
 import { getRooms, getTables, getActiveReservations, checkTableReservation, Room, Table, TableReservation } from '../lib/table-api';
 import { getTableOrder } from '../lib/order-api';
 import { TableShapeIcon } from './TableShapeIcon';
-import { getMergeGroupMembers, formatMergedTableLabelFromGroup, formatReservationTime } from '../lib/table-utils';
+import { getMergeGroupMembers, formatMergedTableLabelFromGroup, formatReservationTime, isReservationLockWindowActive } from '../lib/table-utils';
 import { t } from '../i18n';
 
 interface Props {
@@ -39,7 +39,10 @@ const TableSelectionDialog: React.FC<Props> = ({ onClose }) => {
   const lockActiveReservationsByTable = useMemo(() => {
     const map = new Map<string, TableReservation>();
     for (const res of activeReservationsList) {
-      if (res.is_lock_window_active && res.status === 'Confirmed') {
+      const isLockActive =
+        isReservationLockWindowActive(res) ||
+        (res.is_lock_window_active && res.status === 'Confirmed');
+      if (isLockActive && res.status === 'Confirmed') {
         map.set(res.reserved_table, res);
       }
     }
@@ -228,7 +231,11 @@ const TableSelectionDialog: React.FC<Props> = ({ onClose }) => {
                       if (!currentActiveRes) {
                         try {
                           const res = await checkTableReservation(table.name);
-                          if (res && res.is_lock_window_active && res.status === 'Confirmed') {
+                          if (
+                            res &&
+                            (res.is_lock_window_active || isReservationLockWindowActive(res)) &&
+                            res.status === 'Confirmed'
+                          ) {
                             currentActiveRes = res;
                           }
                         } catch {}
