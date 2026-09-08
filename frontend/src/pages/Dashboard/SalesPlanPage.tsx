@@ -161,7 +161,7 @@ const LifecycleStepper: React.FC<LifecycleStepperProps> = ({ status }) => {
 
 export const SalesPlanPage: React.FC = () => {
   const { activeBranchId } = useBranchContext();
-  const { isManager, isLoading: authLoading } = useAuth();
+  const { isManager } = useAuth();
   const [planDate, setPlanDate] = useState(getToday);
   const [items, setItems] = useState<SalesPlanItem[]>([]);
   const [historyScope, setHistoryScope] = useState<Pick<ComparableHistoryResponse, 'branch' | 'company' | 'plan_date'> | null>(null);
@@ -237,9 +237,16 @@ export const SalesPlanPage: React.FC = () => {
               setPlanName(status.name);
               setPlanStatus((status.status as PlanStatus) || null);
             }
-          } catch {
-            // Non-fatal: the plan may not have been saved yet, so there is
-            // no status to show. The stepper simply defaults to Draft.
+          } catch (statusErr) {
+            // A missing/unsaved plan is expected and non-fatal (the stepper
+            // simply defaults to Draft). A permission error is not, and must
+            // not be swallowed silently -- otherwise a user who lacks read
+            // access to URY Sales Plan sees no status and no Approve/Review
+            // action ever renders, with no indication why.
+            const message = statusErr instanceof Error ? statusErr.message : String(statusErr);
+            if (!cancelled && /permission|not permitted|forbidden/i.test(message)) {
+              setTransitionError('You do not have permission to view this plan\'s approval status.');
+            }
           }
         }
       } catch (err) {
@@ -255,7 +262,7 @@ export const SalesPlanPage: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [activeBranchId, planDate, authLoading]);
+  }, [activeBranchId, planDate]);
 
   const filteredItems = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
