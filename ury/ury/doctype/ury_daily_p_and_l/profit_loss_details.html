@@ -81,7 +81,7 @@
                             <tr class="bg-gray">
                                 <td class="text-left font-bold">{{ _('Disposables') }}</td>
                                 <td>{{ frappe.utils.fmt_money(data.disposables_cost or '', currency=currency) }}</td>
-                                <td>{{ data.disposables_percent }}%</td>
+                                <td>{{ data.disposables_percent or 0 }}%</td>
                             </tr>
                             <tr>
                                 <td class="text-left font-bold">{{ _('Direct Expenses') }}</td>
