@@ -85,8 +85,9 @@ def get_plan_stock_on_hand(branch=None, items=None):
 	pos_warehouse = pos_profile_data.get("warehouse") if pos_profile_data else None
 	company = pos_profile_data.get("company") if pos_profile_data else None
 
-	# Fail closed if branch has no POS Profile warehouse configured
-	if not pos_warehouse or not company:
+	# Fail closed only if branch has no company configured.
+	# POS Profile warehouse is optional (items can use department warehouses).
+	if not company:
 		return []
 
 	# Build department -> warehouse mapping from URY Production Department

@@ -15,7 +15,7 @@ interface PosProfileRecord {
   selling_price_list?: string;
   print_format?: string;
   custom_enable_discount?: number;
-  custom_multiple_cashier_configuration?: number;
+  custom_enable_multiple_cashier?: number;
   custom_enable_kot_reprint?: number;
   custom_daily_pos_close?: number;
   custom_edit_order_type?: number;
@@ -172,7 +172,7 @@ export const PosProfilePage: React.FC = () => {
         doctype: 'POS Profile',
         filters: activeBranchId !== 'all' ? [['branch', '=', activeBranchId]] : [],
         fields: ['name', 'branch', 'company', 'warehouse', 'selling_price_list', 'print_format',
-          'custom_enable_discount', 'custom_multiple_cashier_configuration',
+          'custom_enable_discount', 'custom_enable_multiple_cashier',
           'custom_enable_kot_reprint', 'custom_daily_pos_close', 'custom_edit_order_type',
           'paid_limit', 'table_attention_time', 'custom_reset_order_number_daily', 'disabled'],
         limit: 50,
@@ -201,7 +201,7 @@ export const PosProfilePage: React.FC = () => {
         print_format: profile.print_format || '',
         custom_enable_discount: profile.custom_enable_discount || 0,
         custom_enable_kot_reprint: profile.custom_enable_kot_reprint || 0,
-        custom_multiple_cashier_configuration: profile.custom_multiple_cashier_configuration || 0,
+        custom_enable_multiple_cashier: profile.custom_enable_multiple_cashier || 0,
         custom_daily_pos_close: profile.custom_daily_pos_close || 0,
         custom_edit_order_type: profile.custom_edit_order_type || 0,
         paid_limit: profile.paid_limit || '',
@@ -248,7 +248,7 @@ export const PosProfilePage: React.FC = () => {
         print_format: form.print_format || '',
         custom_enable_discount: form.custom_enable_discount ? 1 : 0,
         custom_enable_kot_reprint: form.custom_enable_kot_reprint ? 1 : 0,
-        custom_multiple_cashier_configuration: form.custom_multiple_cashier_configuration ? 1 : 0,
+        custom_enable_multiple_cashier: form.custom_enable_multiple_cashier ? 1 : 0,
         custom_daily_pos_close: form.custom_daily_pos_close ? 1 : 0,
         custom_edit_order_type: form.custom_edit_order_type ? 1 : 0,
         paid_limit: form.paid_limit || '',
@@ -283,7 +283,7 @@ export const PosProfilePage: React.FC = () => {
           print_format: profileForm.print_format,
           custom_enable_discount: profileForm.custom_enable_discount,
           custom_enable_kot_reprint: profileForm.custom_enable_kot_reprint,
-          custom_multiple_cashier_configuration: profileForm.custom_multiple_cashier_configuration,
+          custom_enable_multiple_cashier: profileForm.custom_enable_multiple_cashier,
           custom_daily_pos_close: profileForm.custom_daily_pos_close,
           custom_edit_order_type: profileForm.custom_edit_order_type,
           paid_limit: profileForm.paid_limit,
@@ -469,7 +469,7 @@ export const PosProfilePage: React.FC = () => {
                     {[
                       { key: 'custom_enable_discount', label: 'Enable Item Discounts' },
                       { key: 'custom_enable_kot_reprint', label: 'Enable KOT Reprint' },
-                      { key: 'custom_multiple_cashier_configuration', label: 'Enable Multiple Cashier Configuration' },
+                      { key: 'custom_enable_multiple_cashier', label: 'Enable Multiple Cashier Configuration' },
                       { key: 'custom_daily_pos_close', label: 'Require Daily POS Closing' },
                       { key: 'custom_edit_order_type', label: 'Enable Order Type Edit' },
                       { key: 'custom_reset_order_number_daily', label: 'Reset Order Number Daily' },
