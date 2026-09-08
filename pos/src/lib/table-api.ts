@@ -1,5 +1,5 @@
 import { DOCTYPES } from '../data/doctypes';
-import { db } from '@ury/core';
+import { db, call } from '@ury/core';
 
 export interface Room {
   name: string;
@@ -22,7 +22,6 @@ export interface Table {
 
 
 export async function getRestaurantMenu(posProfile: string, room?: string | null) {
-  const { call } = await import('@ury/core');
   const params: Record<string, string> = { pos_profile: posProfile };
   if (room) {
     params.room = room;
@@ -35,7 +34,7 @@ export async function getRooms(branch: string): Promise<Room[]> {
   const rooms = await db.getDocList(DOCTYPES.URY_ROOM, {
     fields: ['name', 'branch'],
     filters: [['branch', 'like', branch]],
-    limit: "*" as unknown as number,
+    limit: 0,
     asDict: true,
   });
   return rooms as Room[];
@@ -71,7 +70,7 @@ export async function getTables(room: string): Promise<Table[]> {
       'minimum_seating'
     ],
     filters: [['restaurant_room', '=', room]],
-    limit: '*' as unknown as number,
+    limit: 0,
     asDict: true,
   });
 
@@ -105,7 +104,7 @@ export async function getVacantTablesForBranch(
     fields: [...TABLE_LIST_FIELDS],
     filters,
     orderBy: { field: 'restaurant_room', order: 'asc' },
-    limit: '*' as unknown as number,
+    limit: 0,
     asDict: true,
   } as unknown as Parameters<typeof db.getDocList>[1]);
 
@@ -124,7 +123,6 @@ export async function updateTableLayout(name: string, data: Partial<Table>) {
 }
 
 export async function mergeTablesBatch(anchor: string, tables: string[]) {
-  const { call } = await import('@ury/core');
   return call.post('ury.ury.doctype.ury_order.ury_order.merge_tables_batch', {
     anchor_table: anchor,
     tables,
@@ -132,7 +130,6 @@ export async function mergeTablesBatch(anchor: string, tables: string[]) {
 }
 
 export async function unmergeTables(table: string) {
-  const { call } = await import('@ury/core');
   return call.post('ury.ury.doctype.ury_order.ury_order.unmerge_tables', {
     table,
   });

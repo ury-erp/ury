@@ -62,6 +62,7 @@ export interface PaymentMode {
 export interface Category {
   name: string;
   label: string;
+  icon?: string;
 }
 
 export interface Order {
@@ -134,11 +135,19 @@ interface POSState {
   isInitializing: boolean;
   orderComment: string;
   originalCartHash: string;
-  
   tabOrder: { id: string, name: string }[];
   activeTabId: string;
   nextTabNumber: number;
   heldTabs: Record<string, OrderTabState>;
+  noOfPax: number;
+  lastModifiedTime: string | null;
+  /**
+   * Voluntarily-triggered POS Closing dialog (Header menu "Close Shift"),
+   * distinct from POSOpeningProvider's own forced-closure blocking states.
+   * Read by POSOpeningProvider's normal-render branch so the dialog can be
+   * shown as an overlay without unmounting the app underneath it.
+   */
+  showVoluntaryClosing: boolean;
 }
 
 interface POSStore extends POSState {
@@ -190,6 +199,18 @@ interface POSStore extends POSState {
     items: OrderItem[];
   }) => void;
   reorderTabs: (sourceIndex: number, destinationIndex: number) => void;
+  setNoOfPax: (pax: number) => void;
+  /**
+   * Updates only the comment/note on an existing cart line, leaving quantity
+   * and everything else untouched. Additive — used by the Captain order
+   * screen (`pos/src/captain`) to support note-only edits on already-sent
+   * items without going through the full `ProductDialog` edit flow (which
+   * removes+re-adds the line and would also expose variant/addon controls
+   * that don't apply to a sent item). Does not affect existing Cashier
+   * `OrderPanel`/`ProductDialog` behavior, which never calls this.
+   */
+  updateItemComment: (uniqueId: string, comment: string) => void;
+  setShowVoluntaryClosing: (show: boolean) => void;
 }
 
 const generateUniqueId = (item: OrderItem): string => {
@@ -294,6 +315,12 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   currencySymbol: storage.getItem('currencySymbol') || null,
   tableOrder: null,
   isInitializing: true,
+  isUpdatingOrder: false,
+  orderId: null,
+  showVoluntaryClosing: false,
+  orderComment: '',
+  noOfPax: 1,
+  lastModifiedTime: null,
 
   initializeApp: async () => {
     try {
@@ -530,6 +557,13 @@ export const usePOSStore = create<POSStore>((set, get) => ({
     }
   },
 
+  updateItemComment: (uniqueId: string, comment: string) => {
+    const newOrders = get().activeOrders.map(item =>
+      item.uniqueId === uniqueId ? { ...item, comment } : item
+    );
+    set({ activeOrders: newOrders });
+  },
+
   clearOrder: async () => {
     try {
       set({ activeOrders: [] });
@@ -554,12 +588,27 @@ export const usePOSStore = create<POSStore>((set, get) => ({
     }
   },
   setSelectedOrderType: (type) => {
-    const { fetchMenuItems } = get();
+    const { fetchMenuItems, isUpdatingOrder, posProfile, selectedOrderType } = get();
     
     set({ 
           selectedOrderType: type,
           orderId: null
     });
+    const isCurrentTypeToggleable = selectedOrderType === 'Take Away' || selectedOrderType === 'Delivery';
+    const isNewTypeToggleable = type === 'Take Away' || type === 'Delivery';
+
+    if (isUpdatingOrder && posProfile?.edit_order_type && isCurrentTypeToggleable && isNewTypeToggleable) {
+      set({ 
+        selectedOrderType: type,
+      });
+    } else {
+      set({ 
+        activeOrders: [],
+        selectedOrderType: type,
+        isUpdatingOrder: false,
+        orderId: null
+      });
+    }
     
     if (type !== 'Aggregators') {
       fetchMenuItems();
@@ -569,6 +618,8 @@ export const usePOSStore = create<POSStore>((set, get) => ({
   setSelectedItem: (item) => set({ selectedItem: item }),
   setSelectedAggregator: (aggregator) => set({ selectedAggregator: aggregator }),
   setOrderComment: (comment: string) => set({ orderComment: comment }),
+  setNoOfPax: (pax: number) => set({ noOfPax: pax }),
+  setShowVoluntaryClosing: (show: boolean) => set({ showVoluntaryClosing: show }),
 
   processPayment: async (paymentMode: string, amount: number) => {
     try {
@@ -704,7 +755,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
           } as OrderItem;
         });
 
-        set({ 
+        set({
           tableOrder: response,
           activeOrders: orderItems,
           selectedCustomer: order.customer ? {
@@ -715,26 +766,50 @@ export const usePOSStore = create<POSStore>((set, get) => ({
           isUpdatingOrder: true,
           orderId: order.name,
           originalCartHash: generateCartHash({ activeOrders: orderItems, selectedCustomer: order.customer ? { id: order.customer } as any : null, orderComment: '' }),
+          noOfPax: order.no_of_pax || 1,
+          lastModifiedTime: order.modified || null,
+          orderComment: order.custom_comments || '',
         });
       } else {
-        set({ 
+        set({
           tableOrder: null,
-                                        });
+          activeOrders: [],
+          selectedCustomer: null,
+          isUpdatingOrder: false,
+          orderId: null,
+          noOfPax: 1,
+          lastModifiedTime: null,
+          orderComment: '',
+        });
       }
     } catch (error) {
-      set({ 
+      set({
         error: 'Failed to load table order',
         tableOrder: null,
-                              });
+        activeOrders: [],
+        selectedCustomer: null,
+        isUpdatingOrder: false,
+        orderId: null,
+        noOfPax: 1,
+        lastModifiedTime: null,
+        orderComment: '',
+      });
     } finally {
       set({ orderLoading: false });
     }
   },
 
   clearTableOrder: () => {
-    set({ 
+    set({
       tableOrder: null,
-                    });
+      activeOrders: [],
+      selectedCustomer: null,
+      isUpdatingOrder: false,
+      orderId: null,
+      noOfPax: 1,
+      lastModifiedTime: null,
+      orderComment: '',
+    });
   },
 
   setOrderForUpdate: (orderId: string | null) => {
@@ -834,6 +909,8 @@ export const usePOSStore = create<POSStore>((set, get) => ({
       isUpdatingOrder: false,
       orderComment: '',
       originalCartHash: '',
+      noOfPax: 1,
+      lastModifiedTime: null,
     });
   },
 

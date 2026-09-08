@@ -253,7 +253,7 @@ This guide takes you step-by-step through setting up URY on top of ERPNext
     - **Enable order type wise display on mosaic** : Enable this checkbox to filter KOTs displayed on the Kitchen Display System (KDS) based on specific order types.
     - **Order Type** : List the allowed order types (e.g., Dine In, Take Away) in the child table. Only orders matching these types will be displayed in the KDS for this production unit.
 
-> **Note:** To access KDS follow the site url with `/URYMosaic/Production%20Unit%20Name`. eg: [https://ury.xxxx.com/URYMosaic/Kitchen](https://ury.xxx.com/URYMosaic/Kitchen)
+> **Note:** To access KDS follow the site url with `/mosaic/Production%20Unit%20Name`. eg: [https://ury.xxxx.com/mosaic/Kitchen](https://ury.xxx.com/mosaic/Kitchen)
 
 ### Step 11 : User Permissions
 

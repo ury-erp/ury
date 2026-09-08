@@ -1,0 +1,145 @@
+import { call } from '@ury/core';
+
+export interface DashboardSummary {
+  today_sales: number;
+  today_orders: number;
+  occupied_tables: number;
+  total_tables: number;
+  avg_order_value: number;
+  active_cashiers: number;
+  pending_kitchen_orders: number;
+  total_menu_items: number;
+}
+
+export interface ChartSalesTrend {
+  date: string;
+  sales: number;
+}
+
+export interface ChartHourlySales {
+  hour: string;
+  sales: number;
+}
+
+export interface ChartPaymentMethod {
+  method: string;
+  total: number;
+}
+
+export interface ChartOrderType {
+  order_type: string;
+  count: number;
+  total: number;
+}
+
+export interface ChartTopItem {
+  item_name: string;
+  total_qty: number;
+  total_amount: number;
+}
+
+export interface ChartRevenueByBranch {
+  branch: string;
+  total: number;
+}
+
+export interface ChartSalesByCourse {
+  course: string;
+  total: number;
+}
+
+export interface DashboardChartsData {
+  sales_trend: ChartSalesTrend[];
+  hourly_sales: ChartHourlySales[];
+  payment_methods: ChartPaymentMethod[];
+  order_types: ChartOrderType[];
+  top_items: ChartTopItem[];
+  revenue_by_branch: ChartRevenueByBranch[];
+  sales_by_course: ChartSalesByCourse[];
+}
+
+export interface TransactionRecord {
+  name: string;
+  customer?: string;
+  posting_date: string;
+  posting_time: string;
+  grand_total: number;
+  status: string;
+  order_type?: string;
+  restaurant_table?: string;
+  cashier?: string;
+}
+
+export const dashboardService = {
+  async getSummary(branch?: string): Promise<DashboardSummary> {
+    try {
+      let res = await call<DashboardSummary>('ury.ury.api.dashboard.get_dashboard_summary', { branch });
+      res = (res as any)?.message || res;
+      return res || {
+        today_sales: 0,
+        today_orders: 0,
+        occupied_tables: 0,
+        total_tables: 0,
+        avg_order_value: 0,
+        active_cashiers: 0,
+        pending_kitchen_orders: 0,
+        total_menu_items: 0,
+      };
+    } catch {
+      return {
+        today_sales: 0,
+        today_orders: 0,
+        occupied_tables: 0,
+        total_tables: 0,
+        avg_order_value: 0,
+        active_cashiers: 0,
+        pending_kitchen_orders: 0,
+        total_menu_items: 0,
+      };
+    }
+  },
+
+  async getCharts(branch?: string): Promise<DashboardChartsData> {
+    try {
+      let res = await call<DashboardChartsData>('ury.ury.api.dashboard.get_dashboard_charts', { branch });
+      res = (res as any)?.message || res;
+      return res || {
+        sales_trend: [],
+        hourly_sales: [],
+        payment_methods: [],
+        order_types: [],
+        top_items: [],
+        revenue_by_branch: [],
+        sales_by_course: [],
+      };
+    } catch {
+      return {
+        sales_trend: [],
+        hourly_sales: [],
+        payment_methods: [],
+        order_types: [],
+        top_items: [],
+        revenue_by_branch: [],
+        sales_by_course: [],
+      };
+    }
+  },
+
+  async getRecentTransactions(branch?: string, limit: number = 10): Promise<TransactionRecord[]> {
+    try {
+      const res = await call<TransactionRecord[]>('ury.ury.api.dashboard.get_recent_transactions', { branch, limit });
+      return Array.isArray(res) ? res : ((res as any)?.message || []);
+    } catch {
+      return [];
+    }
+  },
+
+  async getModuleRecords<T = any>(doctype: string, branch?: string): Promise<T[]> {
+    try {
+      const res = await call<T[]>('ury.ury.api.dashboard.get_module_records', { doctype, branch });
+      return Array.isArray(res) ? res : ((res as any)?.message || []);
+    } catch {
+      return [];
+    }
+  },
+};

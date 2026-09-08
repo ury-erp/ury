@@ -11,7 +11,10 @@
   "date",
   "time",
   "invoice",
-  "invoice_creation_time"
+  "invoice_creation_time",
+  "branch",
+  "production",
+  "pos_profile"
  ],
  "fields": [
   {
@@ -44,11 +47,28 @@
    "fieldtype": "Data",
    "label": "Invoice Creation Time",
    "read_only": 1
+  },
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "label": "Branch",
+   "options": "Branch"
+  },
+  {
+   "fieldname": "production",
+   "fieldtype": "Data",
+   "label": "Production"
+  },
+  {
+   "fieldname": "pos_profile",
+   "fieldtype": "Link",
+   "label": "POS Profile",
+   "options": "POS Profile"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2023-09-27 12:17:01.570160",
+ "modified": "2026-09-02 19:29:55.046996",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY KOT Error Log",
@@ -93,8 +113,22 @@
    "role": "URY Cashier",
    "select": 1,
    "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "URY Admin",
+   "select": 1,
+   "share": 1,
+   "write": 1
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": []

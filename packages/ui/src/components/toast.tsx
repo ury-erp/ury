@@ -1,5 +1,5 @@
 import { toast, ToastContainer } from 'react-toastify';
-import { CheckCircle, XCircle, Info } from 'lucide-react';
+import { CheckCircle, XCircle, Info, AlertTriangle } from 'lucide-react';
 import 'react-toastify/dist/ReactToastify.css';
 
 // Custom CSS for toast styling
@@ -9,6 +9,7 @@ const toastIcons = {
   success: <CheckCircle className="w-5 h-5" />,
   error: <XCircle className="w-5 h-5" />,
   info: <Info className="w-5 h-5" />,
+  warning: <AlertTriangle className="w-5 h-5" />,
 };
 
 export const showToast = {
@@ -38,6 +39,20 @@ export const showToast = {
       theme: 'colored',
       icon: toastIcons.error,
       className: 'toast-error',
+    });
+  },
+  warning: (message: string) => {
+    toast.warning(message, {
+      position: 'top-right',
+      autoClose: 2000,
+      hideProgressBar: false,
+      closeOnClick: true,
+      pauseOnHover: true,
+      draggable: true,
+      progress: undefined,
+      theme: 'colored',
+      icon: toastIcons.warning,
+      className: 'toast-warning',
     });
   },
   info: (message: string) => {

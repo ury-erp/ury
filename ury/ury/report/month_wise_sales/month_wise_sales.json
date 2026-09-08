@@ -1,8 +1,8 @@
 {
  "add_total_row": 0,
+ "add_translate_data": 0,
  "columns": [],
  "creation": "2023-09-29 14:48:49.987205",
- "disable_prepared_report": 0,
  "disabled": 0,
  "docstatus": 0,
  "doctype": "Report",
@@ -18,7 +18,8 @@
  ],
  "idx": 0,
  "is_standard": "Yes",
- "modified": "2023-12-06 10:44:19.481381",
+ "letter_head": null,
+ "modified": "2026-09-02 19:18:43.995192",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "Month Wise Sales",
@@ -38,6 +39,10 @@
   },
   {
    "role": "URY Manager"
+  },
+  {
+   "role": "URY Admin"
   }
- ]
+ ],
+ "timeout": 0
 }

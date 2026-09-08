@@ -9,7 +9,8 @@
  "document_type": "Setup",
  "engine": "InnoDB",
  "field_order": [
-  "course"
+  "course",
+  "icon"
  ],
  "fields": [
   {
@@ -22,11 +23,17 @@
    "reqd": 1,
    "translatable": 1,
    "unique": 1
+  },
+  {
+   "description": "Enter any Lucide icon name in PascalCase (e.g., Pizza, Coffee, Soup). See https://lucide.dev/icons for all available icons. Common choices: Apple, Banana, Beef, Beer, Blender, BottleWine, Broccoli, Hamburger, Cake, CakeSlice, Candy, CandyCane, Carrot, ChefHat, Cherry, Citrus, Coffee, Cookie, CookingPot, Croissant, CupSoda, Dessert, Donut, Drumstick, Egg, EggFried, Fish, FishSymbol, GlassWater, Grape, Hamburger, HandPlatter, Hop, IceCreamBowl, IceCreamCone, LeafyGreen, Lollipop, Martini, Milk, Microwave, Nut, PaperBag, Pizza, Popcorn, Popsicle, Refrigerator, Salad, Sandwich, Shell, Shrimp, Snail, Soup, Taco, Torus, Utensils, UtensilsCrossed, Vegan, Wheat, Wine.",
+   "fieldname": "icon",
+   "fieldtype": "Data",
+   "label": "Icon"
   }
  ],
  "icon": "fa fa-code-fork",
  "links": [],
- "modified": "2026-03-31 14:16:07.519200",
+ "modified": "2026-09-02 19:26:17.345395",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Menu Course",
@@ -65,6 +72,19 @@
    "role": "URY Cashier",
    "select": 1,
    "share": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "URY Admin",
+   "select": 1,
+   "share": 1,
+   "write": 1
   }
  ],
  "quick_entry": 1,

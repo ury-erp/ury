@@ -8,13 +8,15 @@ def validate(doc, method):
 
 
 def validate_bill_check(doc, method):
-    for row in doc.printer_settings:
-        if not row.bill or not row.printer:
-            msgprint(
-                _(
-                    "Either Bill is not enabled / Printer is not selected in Printer Settings."
-                )
-            )
+    if getattr(doc, "printer_settings", None) and isinstance(doc.printer_settings, (list, tuple)):
+        for row in doc.printer_settings:
+            if hasattr(row, "bill") and hasattr(row, "printer"):
+                if not getattr(row, "bill", None) or not getattr(row, "printer", None):
+                    msgprint(
+                        _(
+                            "Either Bill is not enabled / Printer is not selected in Printer Settings."
+                        )
+                    )
             
 def validate_cost_center(doc, method):
     if not doc.cost_center:

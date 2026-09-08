@@ -1,8 +1,8 @@
 {
  "add_total_row": 0,
+ "add_translate_data": 0,
  "columns": [],
  "creation": "2024-01-05 15:55:03.793993",
- "disable_prepared_report": 0,
  "disabled": 0,
  "docstatus": 0,
  "doctype": "Report",
@@ -32,7 +32,8 @@
  ],
  "idx": 0,
  "is_standard": "Yes",
- "modified": "2024-01-05 15:55:03.793993",
+ "letter_head": null,
+ "modified": "2026-09-02 19:17:35.803741",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "Service Wise Sales",
@@ -51,6 +52,10 @@
   },
   {
    "role": "URY Manager"
+  },
+  {
+   "role": "URY Admin"
   }
- ]
+ ],
+ "timeout": 0
 }

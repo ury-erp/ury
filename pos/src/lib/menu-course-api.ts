@@ -3,6 +3,7 @@ import { call } from '@ury/core';
 export interface MenuCourse {
   name: string;
   label: string;
+  icon?: string;
 }
 
 export interface MenuCourseResponse {
