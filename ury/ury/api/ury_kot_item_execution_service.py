@@ -14,6 +14,7 @@ import json
 
 import frappe
 from frappe import _
+from frappe.exceptions import DuplicateEntryError
 
 from ury.ury.api.ury_kot_execution_service import (
 	IN_PREPARATION,
@@ -56,6 +57,10 @@ def _require_item_execution_doctype():
 def _require_kot_item(kot_item):
 	if not kot_item or not frappe.db.exists(KOT_ITEMS_DOCTYPE, kot_item):
 		raise ItemExecutionError(KOT_ITEM_NOT_FOUND, _("KOT item {0} not found").format(kot_item))
+
+
+def _kot_for_item(kot_item):
+	return frappe.db.get_value(KOT_ITEMS_DOCTYPE, kot_item, "parent")
 
 
 def _audit(doc, actor, event):
@@ -206,6 +211,7 @@ def seed_kot_item_executions(kot, actor=None):
 		_require_kot_item(kot_item)
 		if frappe.db.exists(ITEM_EXECUTION_DOCTYPE, {"kot_item": kot_item}):
 			continue
+		frappe.db.savepoint("ury_seed_kot_item_execution")
 		doc = frappe.get_doc({
 			"doctype": ITEM_EXECUTION_DOCTYPE,
 			"kot": kot,
@@ -217,7 +223,12 @@ def seed_kot_item_executions(kot, actor=None):
 			"idempotency_key": kot_item,
 		})
 		_audit(doc, actor, "seed")
-		doc.insert(ignore_permissions=False)
+		try:
+			doc.insert(ignore_permissions=False)
+		except DuplicateEntryError:
+			# A concurrent submit won the unique kot_item insert.
+			frappe.db.rollback(save_point="ury_seed_kot_item_execution")
+			continue
 		created.append(doc.as_dict())
 	_sync_kot_execution(kot)
 	return created
@@ -243,12 +254,19 @@ def _transition(kot_item, target_state, idempotency_key, actor, actor_field, tim
 	if not idempotency_key:
 		raise ItemExecutionError(INVALID_EXECUTION_TRANSITION, _("idempotency_key is required"))
 	actor = actor or frappe.session.user
+	from ury.ury.api.ury_kot_execution_service import _require_kot_branch_scope
+	kot = _kot_for_item(kot_item)
+	if kot:
+		branch, _company, _production_unit = _kot_scope(kot)
+		_require_kot_branch_scope(branch, actor)
 	prior = _find_prior_result(kot_item, target_state, idempotency_key)
 	if prior:
 		return _result_dict(prior, idempotent=True)
 	locked = _lock_item_execution_row(kot_item)
 	if not locked:
 		raise ItemExecutionError(KOT_ITEM_NOT_FOUND, _("No execution row exists for KOT item {0}").format(kot_item))
+	branch, _company, _production_unit = _kot_scope(locked["kot"])
+	_require_kot_branch_scope(branch, actor)
 	if locked["state"] == target_state:
 		return _result_dict(locked, idempotent=True)
 	if locked["state"] not in (QUEUED, IN_PREPARATION, READY) or (locked["state"] == QUEUED and target_state not in (IN_PREPARATION, READY)):
