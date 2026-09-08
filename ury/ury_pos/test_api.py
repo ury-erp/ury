@@ -284,6 +284,40 @@ class TestURYPosAPI(FrappeTestCase):
         with self.assertRaises(frappe.PermissionError) as context:
             getPosInvoiceItems("POS-INV-001")
         self.assertIn("outside your active branch", str(context.exception))
+
+
+class TestCreateCustomerLinkId(unittest.TestCase):
+    """Regression: success payload must expose Customer link `name`, which
+    can differ from display `customer_name` under series naming."""
+
+    @patch("ury.ury_pos.api.validate_phone_number")
+    @patch("ury.ury_pos.api.frappe.db.commit")
+    @patch("ury.ury_pos.api.frappe.get_doc")
+    @patch("ury.ury_pos.api.frappe.has_permission")
+    def test_returns_inserted_name_distinct_from_display(
+        self, mock_has_permission, mock_get_doc, mock_commit, mock_validate
+    ):
+        mock_has_permission.return_value = True
+        customer_doc = MagicMock()
+        customer_doc.name = None
+
+        def _insert(*_args, **_kwargs):
+            # Simulate naming series assigning a link id ≠ display name.
+            customer_doc.name = "CUST-00042"
+
+        customer_doc.insert.side_effect = _insert
+        mock_get_doc.return_value = customer_doc
+
+        result = create_customer("Alice Restaurant Guest", "+919876543210")
+
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(result["name"], "CUST-00042")
+        self.assertEqual(result["customer_name"], "Alice Restaurant Guest")
+        self.assertNotEqual(result["name"], result["customer_name"])
+        mock_commit.assert_called_once()
+        mock_validate.assert_called_once()
+
+
 import frappe
 import unittest
 from ury.ury_pos.api import create_customer

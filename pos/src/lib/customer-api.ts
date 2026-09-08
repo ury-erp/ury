@@ -79,6 +79,7 @@ export async function addCustomer(
     }
     return {
       data: {
+        name: msg.name,
         customer_name: msg.customer_name,
         mobile_number: msg.mobile_number,
         customer_group: msg.customer_group,
