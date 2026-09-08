@@ -230,6 +230,7 @@ doc_events = {
 	},
     "AI Provider": {"on_update": "ury.ury.ai_tools.agent_seeding.on_ai_provider_update"},
     "Stock Reconciliation": {"validate": "ury.ury.utils.stock_reconciliation_guards.validate"},
+    "Customer": {"validate": "ury.ury.hooks.ury_customer.validate"},
 }
 
 # Scheduled Tasks
