@@ -13,7 +13,12 @@ const {
   getUserFullNames,
   mergeTablesBatch,
   unmergeTables,
+  getVacantTablesForBranch,
+  tableTransfer,
+  captainTransfer,
+  getBranchCaptains,
   showToastError,
+  showToastSuccess,
 } = vi.hoisted(() => ({
   getRooms: vi.fn(),
   getTables: vi.fn(),
@@ -21,7 +26,12 @@ const {
   getUserFullNames: vi.fn(),
   mergeTablesBatch: vi.fn(),
   unmergeTables: vi.fn(),
+  getVacantTablesForBranch: vi.fn(),
+  tableTransfer: vi.fn(),
+  captainTransfer: vi.fn(),
+  getBranchCaptains: vi.fn(),
   showToastError: vi.fn(),
+  showToastSuccess: vi.fn(),
 }))
 
 vi.mock('react-router-dom', () => ({
@@ -33,11 +43,26 @@ vi.mock('@ury/ui', async () => {
   return {
     ...actual,
     showToast: {
-      success: vi.fn(),
+      success: showToastSuccess,
       error: showToastError,
     },
     Spinner: ({ message }: { message?: string }) => <div>{message ?? 'Loading'}</div>,
-    MultiSelectTableDialog: () => null,
+    MultiSelectTableDialog: ({
+      open,
+      onConfirm,
+      sourceName,
+    }: {
+      open: boolean
+      onConfirm: (names: string[]) => Promise<void>
+      sourceName: string
+    }) =>
+      open ? (
+        <div role="dialog" aria-label="merge-tables">
+          <button type="button" onClick={() => void onConfirm(['T2'])}>
+            Confirm merge {sourceName}
+          </button>
+        </div>
+      ) : null,
   }
 })
 
@@ -61,12 +86,19 @@ vi.mock('../lib/table-api', async () => {
     getTables: (...args: unknown[]) => getTables(...args),
     mergeTablesBatch: (...args: unknown[]) => mergeTablesBatch(...args),
     unmergeTables: (...args: unknown[]) => unmergeTables(...args),
+    getVacantTablesForBranch: (...args: unknown[]) => getVacantTablesForBranch(...args),
   }
 })
+
+vi.mock('../lib/order-api', () => ({
+  tableTransfer: (...args: unknown[]) => tableTransfer(...args),
+  captainTransfer: (...args: unknown[]) => captainTransfer(...args),
+}))
 
 vi.mock('../lib/captain-table-api', () => ({
   getActiveTableOrders: (...args: unknown[]) => getActiveTableOrders(...args),
   getUserFullNames: (...args: unknown[]) => getUserFullNames(...args),
+  getBranchCaptains: (...args: unknown[]) => getBranchCaptains(...args),
 }))
 
 vi.mock('../operations', () => ({
@@ -83,6 +115,7 @@ type StubOpts = {
   multipleCashier?: boolean
   canAccessOther?: boolean
   canSettlePayment?: boolean
+  canTransferCaptain?: boolean
   contextError?: string | null
 }
 
@@ -120,7 +153,7 @@ function stubContext(opts: StubOpts = {}) {
       canSettlePayment: opts.canSettlePayment ?? false,
       canApplyDiscount: false,
       canCancelOrder: false,
-      canTransferCaptain: false,
+      canTransferCaptain: opts.canTransferCaptain ?? false,
       canTransferTable: false,
       canPrintBill: true,
       canReprintKot: false,
@@ -513,5 +546,257 @@ describe('TablesPage draft confirmation', () => {
     expect(useServeStore.getState().needsReconcile).toBe(true)
     expect(useServeStore.getState().activeOrders).toHaveLength(1)
     expect(useServeStore.getState().draftTable).toBe(TAKEAWAY_DRAFT_KEY)
+  })
+})
+
+describe('TablesPage actions menu', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    useServeStore.getState().discardDraft()
+    useServeStore.setState({
+      selectedTable: null,
+      selectedRoom: null,
+      draftTable: null,
+      activeOrders: [],
+      needsReconcile: false,
+      selectedOrderType: TAKEAWAY,
+      posProfile: null,
+    })
+    getRooms.mockResolvedValue([{ name: 'Hall A', branch: 'Main' }])
+    getVacantTablesForBranch.mockResolvedValue([
+      {
+        name: 'T2',
+        occupied: 0,
+        latest_invoice_time: null,
+        is_take_away: 0,
+        restaurant_room: 'Hall A',
+        table_shape: 'Square',
+      },
+    ])
+    getBranchCaptains.mockResolvedValue([{ name: 'captain2', label: 'Captain Two' }])
+    mergeTablesBatch.mockResolvedValue(undefined)
+    unmergeTables.mockResolvedValue(undefined)
+    tableTransfer.mockResolvedValue(undefined)
+    captainTransfer.mockResolvedValue(undefined)
+  })
+
+  it('exposes transfer table and transfer captain for an occupied table', async () => {
+    const user = userEvent.setup()
+    stubContext({ canTransferCaptain: true, canAccessOther: true })
+    getTables.mockResolvedValue([
+      {
+        name: 'T9',
+        occupied: 1,
+        latest_invoice_time: '2026-09-08 10:00:00',
+        is_take_away: 0,
+        restaurant_room: 'Hall A',
+        table_shape: 'Square',
+      },
+    ])
+    getActiveTableOrders.mockResolvedValue(
+      new Map([
+        [
+          'T9',
+          {
+            invoiceName: 'INV-9',
+            waiter: 'captain1',
+            grandTotal: 40,
+            invoicePrinted: false,
+          },
+        ],
+      ])
+    )
+    getUserFullNames.mockResolvedValue(new Map([['captain1', 'Captain One']]))
+
+    render(<TablesPage />)
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /T9/i })).toBeInTheDocument()
+    })
+
+    const actions = screen.getAllByRole('button', { name: 'Table actions' })
+    await user.click(actions[0])
+
+    expect(screen.getByRole('button', { name: 'Transfer table' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Transfer captain' })).toBeInTheDocument()
+  })
+
+  it('hides captain transfer without the capability', async () => {
+    const user = userEvent.setup()
+    stubContext({ canTransferCaptain: false, canAccessOther: true })
+    getTables.mockResolvedValue([
+      {
+        name: 'T9',
+        occupied: 1,
+        latest_invoice_time: '2026-09-08 10:00:00',
+        is_take_away: 0,
+        restaurant_room: 'Hall A',
+        table_shape: 'Square',
+      },
+    ])
+    getActiveTableOrders.mockResolvedValue(
+      new Map([
+        [
+          'T9',
+          {
+            invoiceName: 'INV-9',
+            waiter: 'captain1',
+            grandTotal: 40,
+            invoicePrinted: false,
+          },
+        ],
+      ])
+    )
+    getUserFullNames.mockResolvedValue(new Map())
+
+    render(<TablesPage />)
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /T9/i })).toBeInTheDocument()
+    })
+
+    await user.click(screen.getAllByRole('button', { name: 'Table actions' })[0])
+
+    expect(screen.getByRole('button', { name: 'Transfer table' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Transfer captain' })).not.toBeInTheDocument()
+  })
+
+  it('runs merge from the table actions menu', async () => {
+    const user = userEvent.setup()
+    stubContext()
+    getTables.mockResolvedValue([
+      {
+        name: 'T1',
+        occupied: 0,
+        latest_invoice_time: null,
+        is_take_away: 0,
+        restaurant_room: 'Hall A',
+        table_shape: 'Square',
+      },
+      {
+        name: 'T2',
+        occupied: 0,
+        latest_invoice_time: null,
+        is_take_away: 0,
+        restaurant_room: 'Hall A',
+        table_shape: 'Square',
+      },
+    ])
+    getActiveTableOrders.mockResolvedValue(new Map())
+    getUserFullNames.mockResolvedValue(new Map())
+
+    render(<TablesPage />)
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /T1/i })).toBeInTheDocument()
+    })
+
+    const actionButtons = screen.getAllByRole('button', { name: 'Table actions' })
+    await user.click(actionButtons[0])
+    await user.click(screen.getByRole('button', { name: 'Merge tables' }))
+
+    const dialog = await screen.findByRole('dialog', { name: 'merge-tables' })
+    await user.click(within(dialog).getByRole('button', { name: /Confirm merge T1/i }))
+
+    await waitFor(() => {
+      expect(mergeTablesBatch).toHaveBeenCalledWith('T1', ['T2'])
+    })
+    expect(showToastSuccess).toHaveBeenCalled()
+  })
+
+  it('runs unmerge from the table actions menu', async () => {
+    const user = userEvent.setup()
+    stubContext()
+    getTables.mockResolvedValue([
+      {
+        name: 'T1',
+        occupied: 0,
+        latest_invoice_time: null,
+        is_take_away: 0,
+        restaurant_room: 'Hall A',
+        table_shape: 'Square',
+        merged_with: 'T2',
+      },
+      {
+        name: 'T2',
+        occupied: 0,
+        latest_invoice_time: null,
+        is_take_away: 0,
+        restaurant_room: 'Hall A',
+        table_shape: 'Square',
+        merged_with: 'T1',
+      },
+    ])
+    getActiveTableOrders.mockResolvedValue(new Map())
+    getUserFullNames.mockResolvedValue(new Map())
+
+    render(<TablesPage />)
+
+    await waitFor(() => {
+      expect(screen.getByTitle('T1')).toBeInTheDocument()
+    })
+
+    const t1Card = screen.getByTitle('T1').closest('[role="button"]')
+    expect(t1Card).not.toBeNull()
+    await user.click(within(t1Card as HTMLElement).getByRole('button', { name: 'Table actions' }))
+    await user.click(screen.getByRole('button', { name: 'Unmerge tables' }))
+
+    const dialog = await screen.findByRole('dialog')
+    await user.click(within(dialog).getByRole('button', { name: 'Unmerge' }))
+
+    await waitFor(() => {
+      expect(unmergeTables).toHaveBeenCalledWith('T1')
+    })
+    expect(showToastSuccess).toHaveBeenCalled()
+  })
+
+  it('keeps free and occupied cards on the same height class', async () => {
+    stubContext({ canAccessOther: true })
+    getTables.mockResolvedValue([
+      {
+        name: 'T1',
+        occupied: 0,
+        latest_invoice_time: null,
+        is_take_away: 0,
+        restaurant_room: 'Hall A',
+        table_shape: 'Square',
+        no_of_seats: 4,
+      },
+      {
+        name: 'T9',
+        occupied: 1,
+        latest_invoice_time: '2026-09-08 10:00:00',
+        is_take_away: 0,
+        restaurant_room: 'Hall A',
+        table_shape: 'Square',
+        no_of_seats: 4,
+      },
+    ])
+    getActiveTableOrders.mockResolvedValue(
+      new Map([
+        [
+          'T9',
+          {
+            invoiceName: 'INV-9',
+            waiter: 'captain1',
+            grandTotal: 40,
+            invoicePrinted: false,
+          },
+        ],
+      ])
+    )
+    getUserFullNames.mockResolvedValue(new Map())
+
+    render(<TablesPage />)
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /T1/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /T9/i })).toBeInTheDocument()
+    })
+
+    const freeCard = screen.getByRole('button', { name: /T1/i })
+    const occupiedCard = screen.getByRole('button', { name: /T9/i })
+    expect(freeCard.className).toMatch(/min-h-\[11\.5rem\]/)
+    expect(occupiedCard.className).toMatch(/min-h-\[11\.5rem\]/)
   })
 })
