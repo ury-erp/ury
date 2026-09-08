@@ -295,6 +295,16 @@ def _seed_pos_profile(company_name, branch_name, restaurant_name):
             pos_doc.set(fieldname, _role_rows(role))
             dirty = True
 
+    for payment in pos_doc.get("payments", []):
+        mode = payment.get("mode_of_payment")
+        account = payment.get("default_account")
+        account_company = frappe.db.get_value("Account", account, "company") if account else None
+        if account and account_company and account_company != company_name:
+            replacement = _default_mop_account(mode, company_name)
+            if replacement:
+                payment.default_account = replacement
+                dirty = True
+
     if not pos_doc.get("payments"):
         pos_doc.set(
             "payments",
