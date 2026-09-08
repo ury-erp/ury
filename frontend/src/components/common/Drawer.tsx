@@ -53,7 +53,7 @@ export const Drawer: React.FC<DrawerProps> = ({
     <div className="fixed inset-0 z-50 overflow-hidden" onClick={(e) => e.stopPropagation()}>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/40 backdrop-blur-xs transition-opacity duration-300 ease-in-out"
+        className="fixed inset-0 bg-black/40 backdrop-blur-sm transition-opacity duration-300 ease-in-out"
         onClick={(e) => {
           e.stopPropagation();
           e.preventDefault();

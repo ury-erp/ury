@@ -96,7 +96,7 @@ function App() {
                       <Route element={<AppLayout />}>
                         <Route index element={<Navigate to="/dashboard" replace />} />
                         <Route path="/dashboard" element={<Dashboard />} />
-                        <Route path="/pos" element={<POS />} />
+                        <Route path="/register" element={<POS />} />
                         <Route path="/tables" element={<Table />} />
                         <Route path="/orders" element={<Orders />} />
                         <Route path="/settings" element={<Settings />} />

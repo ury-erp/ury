@@ -244,7 +244,7 @@ export default function Orders() {
         await posStore.addToOrder(cartItem);
       }
       // Redirect to POS page
-      navigate('/pos');
+      navigate('/register');
     } catch (err) {
       showToast.error(err instanceof Error ? err.message : t('errors.failed_edit_order'));
     } finally {

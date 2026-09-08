@@ -94,7 +94,7 @@ Usage (from a bench console / ``bench execute``)::
 from datetime import timedelta
 
 import frappe
-from frappe.utils import flt, get_datetime, now_datetime
+from frappe.utils import flt, get_datetime, now_datetime, today
 
 from ury.ury.dev_seed.operations import DEPARTMENTS
 
@@ -528,6 +528,73 @@ def _seed_department_kots(department_name, branch_name, company_name, pos_profil
 	return created
 
 
+def _seed_todays_kot_batch(department_name, branch_name, company_name, pos_profile_name, naming_series, price_list, customer):
+	"""Create a fresh batch of KOTs dated today, with date-scoped labels so
+	the same day is idempotent (label already exists) but a new day naturally
+	gets a fresh batch (label includes today's date, previous days' labels
+	don't match). Reuses the same helpers and table/invoice as
+	_seed_department_kots.
+	"""
+	table = DEPARTMENT_TABLES.get(department_name)
+	if not table or not frappe.db.exists("URY Table", table):
+		return []
+
+	production = _get_production_unit(department_name)
+	if not production:
+		return []
+
+	item_pool = [i for i in DEPARTMENT_ITEMS.get(department_name, []) if frappe.db.exists("Item", i)]
+	if not item_pool:
+		return []
+
+	invoice = _get_or_create_department_invoice(
+		department_name=department_name,
+		table=table,
+		branch_name=branch_name,
+		company_name=company_name,
+		pos_profile_name=pos_profile_name,
+		price_list=price_list,
+		customer=customer,
+		items_needed=item_pool,
+	)
+	if not invoice:
+		return []
+
+	# Small daily batch: 2-3 realistic specs per day per department.
+	# Labels include today's date so idempotency is per-calendar-day:
+	# re-running the same day finds the label already exists (no-op),
+	# running on a new day gets a fresh batch (new label).
+	todays_specs = [
+		("new", ORDER_STATUS_READY, "New Order", 0, 1, 2, False),
+		("verified", ORDER_STATUS_READY, "Order Modified", 0, 3, 2, True),
+	]
+
+	created = []
+	for i, (spec_label, order_status, kot_type, verified, age_minutes, item_count, with_note) in enumerate(todays_specs):
+		label = f"today-{today()}-{department_name}-{i}"
+		item_codes = [item_pool[j % len(item_pool)] for j in range(item_count)]
+		name = _create_kot(
+			invoice=invoice,
+			table=table,
+			customer=customer,
+			pos_profile_name=pos_profile_name,
+			naming_series=naming_series,
+			production=production,
+			label=label,
+			kot_type=kot_type,
+			order_status=order_status,
+			verified=verified,
+			age_minutes=age_minutes,
+			item_codes=item_codes,
+			with_note=with_note,
+		)
+		if name:
+			created.append(name)
+			print(f"Created today's URY KOT {name}: {department_name} / {order_status} / {kot_type}")
+
+	return created
+
+
 # ---------------------------------------------------------------------------
 # Orchestration
 # ---------------------------------------------------------------------------
@@ -567,6 +634,11 @@ def seed():
 			department_name, branch_name, company_name, pos_profile_name, naming_series, price_list, customer
 		)
 		summary[department_name] = len(created)
+
+		created_today = _seed_todays_kot_batch(
+			department_name, branch_name, company_name, pos_profile_name, naming_series, price_list, customer
+		)
+		summary[f"{department_name}_today"] = len(created_today)
 
 	frappe.db.commit()
 	print(f"KOT seed complete: {summary}")
