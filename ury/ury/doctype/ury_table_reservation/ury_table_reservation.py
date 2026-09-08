@@ -92,9 +92,30 @@ class URYTableReservation(Document):
             "No Show": [],
         }
 
+        if new_status in ("Completed", "Cancelled") and old_status != new_status:
+            from ury.ury.api.table_reservation import is_user_authorized_for_reservation_status_change
+            if not is_user_authorized_for_reservation_status_change(branch=self.branch):
+                frappe.throw(
+                    _("Not permitted to change reservation status to {0}.").format(new_status),
+                    frappe.PermissionError,
+                )
+
         if new_status not in allowed_transitions.get(old_status, []):
             frappe.throw(
                 _("Invalid status transition from {0} to {1}.").format(old_status, new_status)
+            )
+
+    def on_update(self):
+        old_doc = self.get_doc_before_save()
+        old_status = old_doc.status if old_doc else None
+        if self.status == "Completed" and old_status != "Completed" and self.reserved_table:
+            frappe.db.set_value(
+                "URY Table",
+                self.reserved_table,
+                {
+                    "occupied": 1,
+                    "latest_invoice_time": now_datetime(),
+                },
             )
 
     def validate_conflicts(self):

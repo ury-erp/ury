@@ -498,6 +498,47 @@ def update_table_reservation(
     return True
 
 
+def is_user_authorized_for_reservation_status_change(branch=None, user=None):
+    """
+    Checks whether the user is authorized to perform privileged reservation status changes
+    (such as transitioning to Completed or Cancelled).
+    Only Cashier (role_allowed_for_billing) or Restaurant Manager (transfer_role_permissions),
+    or Administrator / System Manager are permitted. Order Takers are denied.
+    """
+    user = user or frappe.session.user
+    if not user:
+        return False
+
+    user_roles = set(frappe.get_roles(user))
+    if user == "Administrator" or "System Manager" in user_roles:
+        return True
+
+    # Find matching POS Profile(s) for the branch or user
+    profiles = []
+    if branch:
+        profiles = frappe.db.get_all("POS Profile", filters={"branch": branch, "disabled": 0}, fields=["name"])
+
+    if not profiles:
+        user_profiles = frappe.db.get_all("POS Profile User", filters={"user": user}, fields=["parent as name"])
+        if user_profiles:
+            profiles = user_profiles
+
+    if not profiles:
+        profiles = frappe.db.get_all("POS Profile", filters={"disabled": 0}, fields=["name"], limit=5)
+
+    for p in profiles:
+        try:
+            profile_doc = frappe.get_doc("POS Profile", p.name)
+            billing_roles = {row.role for row in (profile_doc.role_allowed_for_billing or [])}
+            manager_roles = {row.role for row in (profile_doc.transfer_role_permissions or [])}
+            if (user_roles & billing_roles) or (user_roles & manager_roles):
+                return True
+        except Exception:
+            continue
+
+    return False
+
+
 @frappe.whitelist()
 def update_reservation_status(reservation_name, status, pos_invoice=None):
     """
@@ -507,6 +548,14 @@ def update_reservation_status(reservation_name, status, pos_invoice=None):
         frappe.throw(_("Reservation ID is required."))
 
     doc = frappe.get_doc("URY Table Reservation", reservation_name)
+
+    # Validate role permissions for critical status changes
+    if status in ("Completed", "Cancelled"):
+        if not is_user_authorized_for_reservation_status_change(branch=doc.branch):
+            frappe.throw(
+                _("Not permitted to change reservation status to {0}.").format(status),
+                frappe.PermissionError,
+            )
 
     # Validate status transitions
     if status == "Completed":
