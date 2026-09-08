@@ -4,7 +4,8 @@
     "packages/*",
     "pos",
     "frontend",
-    "self-order"
+    "self-order",
+    "serve"
   ],
   "scripts": {
     "ury-pos-install": "cd urypos && yarn install --check-files",
@@ -15,8 +16,9 @@
     "ury-posv2-build": "cd pos && yarn build",
     "ury-frontend-build": "cd frontend && yarn build",
     "ury-self-order-build": "cd self-order && yarn build",
+    "ury-serve-build": "cd serve && yarn build",
     "postinstall": "yarn ury-pos-install && yarn ury-mosaic-install",
-    "build": "yarn ury-pos-build && yarn ury-mosaic-build && yarn ury-posv2-build && yarn ury-frontend-build && yarn ury-self-order-build"
+    "build": "yarn ury-pos-build && yarn ury-mosaic-build && yarn ury-posv2-build && yarn ury-frontend-build && yarn ury-self-order-build && yarn ury-serve-build"
   },
   "resolutions": {
     "vite": "^6.2.0",
