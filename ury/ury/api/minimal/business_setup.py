@@ -42,9 +42,10 @@ def update_business_setup(branch=None, restaurant=None):
         frappe.throw("Not permitted")
 
     # Branch/Restaurant are business-configuration records; require the
-    # caller to actually hold write permission on them (System Manager /
-    # URY Admin per the fixtures, or any other role explicitly granted
-    # write) rather than trusting any authenticated session.
+    # caller to actually hold write permission on them (URY Manager per
+    # this app's DocPerm fixtures -- note System Manager is NOT granted
+    # write on Branch/URY Restaurant here, live-verified against the
+    # actual fixtures) rather than trusting any authenticated session.
     if not frappe.has_permission("Branch", "write") or not frappe.has_permission("URY Restaurant", "write"):
         frappe.throw(_("Not permitted"), frappe.PermissionError)
 
