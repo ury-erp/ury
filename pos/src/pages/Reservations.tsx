@@ -1,8 +1,12 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import {
   BookLock,
   CalendarClock,
+  CalendarRange,
   CheckCircle,
+  ChevronLeft,
+  ChevronRight,
+  List,
   MoreVertical,
   Pencil,
   Phone,
@@ -37,6 +41,47 @@ import TableReservationEditDialog, {
 } from '../components/TableReservationEditDialog';
 import TableReservationCancelDialog from '../components/TableReservationCancelDialog';
 import TableReservationCompleteDialog from '../components/TableReservationCompleteDialog';
+import TableReservationTimeline from '../components/TableReservationTimeline';
+import { DatePicker } from '../components/DatePicker';
+
+function formatDateToYYYYMMDD(d: Date): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function isSameCalendarDay(d1: Date, d2: Date): boolean {
+  return (
+    d1.getFullYear() === d2.getFullYear() &&
+    d1.getMonth() === d2.getMonth() &&
+    d1.getDate() === d2.getDate()
+  );
+}
+
+function formatDisplayDate(d: Date): string {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  if (isSameCalendarDay(d, today)) {
+    return `Today, ${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
+  }
+  if (isSameCalendarDay(d, tomorrow)) {
+    return `Tomorrow, ${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
+  }
+  if (isSameCalendarDay(d, yesterday)) {
+    return `Yesterday, ${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
+  }
+  return d.toLocaleDateString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  });
+}
 
 export default function Reservations() {
   const navigate = useNavigate();
@@ -64,6 +109,13 @@ export default function Reservations() {
     });
   }, [branch, navigate]);
 
+  const [selectedDate, setSelectedDate] = useState<Date>(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  });
+  const [viewMode, setViewMode] = useState<'list' | 'timeline'>('list');
+
   const [reservations, setReservations] = useState<TableReservation[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [availableTables, setAvailableTables] = useState<Table[]>([]);
@@ -84,15 +136,44 @@ export default function Reservations() {
   const [completeLoading, setCompleteLoading] = useState<boolean>(false);
   const [cancelLoading, setCancelLoading] = useState<boolean>(false);
 
-  const fetchReservationsData = useCallback(async () => {
+  const isToday = useMemo(() => {
+    const today = new Date();
+    return isSameCalendarDay(selectedDate, today);
+  }, [selectedDate]);
+
+  const handlePrevDay = () => {
+    setSelectedDate((prev) => {
+      const next = new Date(prev);
+      next.setDate(next.getDate() - 1);
+      return next;
+    });
+  };
+
+  const handleNextDay = () => {
+    setSelectedDate((prev) => {
+      const next = new Date(prev);
+      next.setDate(next.getDate() + 1);
+      return next;
+    });
+  };
+
+  const handleToday = () => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    setSelectedDate(d);
+  };
+
+  const fetchReservationsData = useCallback(async (targetDate?: Date) => {
     if (!branch) return;
     try {
-      const data = await getActiveReservations(branch);
+      const d = targetDate || selectedDate;
+      const dateStr = formatDateToYYYYMMDD(d);
+      const data = await getActiveReservations(branch, dateStr);
       setReservations(data || []);
     } catch (err) {
       console.error('Failed to fetch reservations:', err);
     }
-  }, [branch]);
+  }, [branch, selectedDate]);
 
   const loadInitialData = useCallback(async () => {
     setLoading(true);
@@ -111,33 +192,42 @@ export default function Reservations() {
       }
       setAvailableTables(allTables);
 
-      await fetchReservationsData();
+      await fetchReservationsData(selectedDate);
     } catch (err) {
       console.error('Failed to initialize reservations page:', err);
     } finally {
       setLoading(false);
     }
-  }, [branch, fetchReservationsData]);
+  }, [branch, fetchReservationsData, selectedDate]);
 
   const RESERVATION_POLL_INTERVAL_MS = 30000;
 
+  // Initial load
+  const isInitialLoadedRef = useRef(false);
   useEffect(() => {
-    let isMounted = true;
-
+    if (isInitialLoadedRef.current) return;
+    isInitialLoadedRef.current = true;
     loadInitialData();
+  }, [loadInitialData]);
 
+  // Fetch when selectedDate changes (after initial mount)
+  useEffect(() => {
+    if (!isInitialLoadedRef.current || !branch) return;
+    fetchReservationsData(selectedDate);
+  }, [branch, selectedDate, fetchReservationsData]);
+
+  // Periodic polling
+  useEffect(() => {
     if (!branch) return;
 
-    const intervalId = setInterval(async () => {
-      if (!isMounted) return;
-      await fetchReservationsData();
+    const intervalId = setInterval(() => {
+      fetchReservationsData(selectedDate);
     }, RESERVATION_POLL_INTERVAL_MS);
 
     return () => {
-      isMounted = false;
       clearInterval(intervalId);
     };
-  }, [loadInitialData, fetchReservationsData, branch]);
+  }, [fetchReservationsData, branch, selectedDate]);
 
   const handleOpenEdit = (res: TableReservation) => {
     setEditReservation(res);
@@ -169,7 +259,7 @@ export default function Reservations() {
         reserved_at: data.reservedAt,
         notes: data.notes,
       });
-      await fetchReservationsData();
+      await fetchReservationsData(selectedDate);
     } catch (err) {
       console.error('Failed to update reservation:', err);
       throw err;
@@ -185,7 +275,7 @@ export default function Reservations() {
     setCancelLoading(true);
     try {
       await updateTableReservationStatus(cancelReservation.name, 'Cancelled');
-      await fetchReservationsData();
+      await fetchReservationsData(selectedDate);
       setIsCancelDialogOpen(false);
       setCancelReservation(null);
     } catch (err) {
@@ -205,7 +295,7 @@ export default function Reservations() {
     setCompleteLoading(true);
     try {
       await updateTableReservationStatus(completeReservation.name, 'Completed');
-      await fetchReservationsData();
+      await fetchReservationsData(selectedDate);
       setIsCompleteDialogOpen(false);
       setCompleteReservation(null);
     } catch (err) {
@@ -231,6 +321,18 @@ export default function Reservations() {
     if (selectedRoom === 'all') return availableTables;
     return availableTables.filter((t) => t.restaurant_room === selectedRoom);
   }, [availableTables, selectedRoom]);
+
+  // Tables list for Timeline view (filtered by selected Room and/or Table filter)
+  const filteredTablesForTimeline = useMemo(() => {
+    let list = availableTables;
+    if (selectedRoom !== 'all') {
+      list = list.filter((t) => t.restaurant_room === selectedRoom);
+    }
+    if (selectedTableFilter !== 'all') {
+      list = list.filter((t) => t.name === selectedTableFilter);
+    }
+    return list;
+  }, [availableTables, selectedRoom, selectedTableFilter]);
 
   // Filter reservations based on Room filter, Table filter, and global Search query
   const filteredReservations = useMemo(() => {
@@ -306,7 +408,7 @@ export default function Reservations() {
   return (
     <div className="flex flex-col h-full bg-gray-50 overflow-hidden">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4 flex flex-wrap items-center justify-between gap-4 shrink-0">
+      <div className="bg-white border-b border-gray-200 px-6 py-3.5 flex flex-wrap items-center justify-between gap-4 shrink-0">
         <div className="flex items-center gap-3">
           <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl">
             <BookLock className="w-6 h-6" />
@@ -321,9 +423,9 @@ export default function Reservations() {
           </div>
         </div>
 
-        {/* Separate Room and Table Dropdowns */}
+        {/* Right side: Room Filter -> Table Filter -> Date Selector -> View Mode Switcher */}
         <div className="flex items-center gap-3">
-          <div className="w-44">
+          <div className="w-40">
             <SearchableSelect
               id="room-filter"
               value={selectedRoom}
@@ -337,7 +439,7 @@ export default function Reservations() {
             />
           </div>
 
-          <div className="w-44">
+          <div className="w-40">
             <SearchableSelect
               id="table-filter"
               value={selectedTableFilter}
@@ -350,12 +452,94 @@ export default function Reservations() {
               strict
             />
           </div>
+
+          {/* Calendar Date / Day Selection Control */}
+          <div className="flex items-center gap-0.5 bg-white border border-gray-200 rounded-lg p-0.5 shadow-2xs">
+            <button
+              type="button"
+              onClick={handlePrevDay}
+              className="p-1.5 rounded-md text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors"
+              title="Previous Day"
+              aria-label="Previous Day"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+
+            <DatePicker
+              id="reservation-date-selector"
+              value={formatDateToYYYYMMDD(selectedDate)}
+              formatDisplay={() => formatDisplayDate(selectedDate)}
+              buttonClassName="border-0 shadow-none px-2.5 py-1 text-xs font-bold text-gray-800 hover:bg-gray-50 focus:outline-none"
+              onChange={(_id, val) => {
+                if (!val) return;
+                const parts = val.split('-');
+                if (parts.length === 3) {
+                  setSelectedDate(
+                    new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10))
+                  );
+                }
+              }}
+              className="w-auto"
+            />
+
+            <button
+              type="button"
+              onClick={handleNextDay}
+              className="p-1.5 rounded-md text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors"
+              title="Next Day"
+              aria-label="Next Day"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* View Mode Toggle: List / Timeline (Icons Only) */}
+          <div className="flex items-center bg-gray-100 p-1 rounded-lg border border-gray-200">
+            <button
+              type="button"
+              onClick={() => setViewMode('list')}
+              title="List View"
+              aria-label="List View"
+              className={`p-1.5 rounded-md transition-all ${
+                viewMode === 'list'
+                  ? 'bg-white text-gray-900 shadow-xs'
+                  : 'text-gray-500 hover:text-gray-900'
+              }`}
+            >
+              <List className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('timeline')}
+              title="Timeline View"
+              aria-label="Timeline View"
+              className={`p-1.5 rounded-md transition-all ${
+                viewMode === 'timeline'
+                  ? 'bg-white text-gray-900 shadow-xs'
+                  : 'text-gray-500 hover:text-gray-900'
+              }`}
+            >
+              <CalendarRange className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 overflow-y-auto p-6 min-h-0" onClick={() => setMenuOpenId(null)}>
-        {loading ? (
+      <div
+        className={`flex-1 min-h-0 ${
+          viewMode === 'timeline' ? 'p-6 flex flex-col overflow-hidden' : 'overflow-y-auto p-6'
+        }`}
+        onClick={() => setMenuOpenId(null)}
+      >
+        {viewMode === 'timeline' ? (
+          <TableReservationTimeline
+            reservations={filteredReservations}
+            selectedDate={selectedDate}
+            onSelectReservation={handleOpenEdit}
+            loading={loading}
+          />
+        ) : loading ? (
           <div className="flex items-center justify-center h-64 text-gray-500 text-sm">
             Loading reservations...
           </div>
@@ -366,7 +550,7 @@ export default function Reservations() {
             </div>
             <h3 className="text-base font-semibold text-gray-800">No Reservations Found</h3>
             <p className="text-xs text-gray-500 mt-1 max-w-sm">
-              There are currently no active reservations matching your selected filter.
+              There are currently no reservations for {formatDisplayDate(selectedDate)} matching your selected filter.
             </p>
           </div>
         ) : (
