@@ -17,6 +17,7 @@ interface Props {
   branch?: string | null
   company?: string | null
   onClick?: () => void
+  onConfigure?: () => void
   quantity?: number
   onIncrement?: () => void
   onDecrement?: () => void
@@ -35,6 +36,7 @@ export default function ServeMenuCard({
   branch,
   company,
   onClick,
+  onConfigure,
   quantity,
   onIncrement,
   onDecrement,
@@ -74,6 +76,7 @@ export default function ServeMenuCard({
       imageUrl={imageUrl}
       course={course}
       onClick={onClick}
+      onConfigure={onConfigure}
       disabled={disabled}
       unavailableMessage={unavailableMessage}
       quantity={quantity}

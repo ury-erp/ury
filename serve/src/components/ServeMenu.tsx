@@ -263,42 +263,26 @@ export default function ServeMenu({
         {filteredItems.map((item) => {
           const qty = sumItemQty(activeOrders, item.item)
           return (
-            <div key={item.id} className="relative">
-              <ServeMenuCard
-                name={item.name}
-                price={item.price}
-                imageUrl={showImage ? item.image : null}
-                course={item.course_label || item.course}
-                item={item.item}
-                disabled={disabled}
-                branch={posProfile?.branch}
-                company={posProfile?.company}
-                quantity={qty}
-                onClick={() => handleQuickAdd(item)}
-                onIncrement={() => handleQuickAdd(item)}
-                onDecrement={() => handleDecrement(item)}
-                incrementDisabled={disabled}
-                decrementDisabled={
-                  disabled || !canDecrementItem(activeOrders, item.item, canReduce, canRemove)
-                }
-              />
-              <button
-                type="button"
-                className={cn(
-                  'absolute bottom-2 end-2 z-10 min-h-11 min-w-11 rounded-md bg-white/95 px-2 text-xs font-medium text-blue-700 shadow',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500',
-                  'disabled:pointer-events-none disabled:opacity-40'
-                )}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  openConfigurator(item)
-                }}
-                disabled={disabled}
-                aria-label={`Options for ${item.name}`}
-              >
-                Options
-              </button>
-            </div>
+            <ServeMenuCard
+              key={item.id}
+              name={item.name}
+              price={item.price}
+              imageUrl={showImage ? item.image : null}
+              course={item.course_label || item.course}
+              item={item.item}
+              disabled={disabled}
+              branch={posProfile?.branch}
+              company={posProfile?.company}
+              quantity={qty}
+              onClick={() => handleQuickAdd(item)}
+              onConfigure={() => openConfigurator(item)}
+              onIncrement={() => handleQuickAdd(item)}
+              onDecrement={() => handleDecrement(item)}
+              incrementDisabled={disabled}
+              decrementDisabled={
+                disabled || !canDecrementItem(activeOrders, item.item, canReduce, canRemove)
+              }
+            />
           )
         })}
       </div>
