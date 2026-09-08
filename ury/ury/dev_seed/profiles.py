@@ -102,6 +102,13 @@ def _ensure_mode_of_payment(name, company_name=None):
 
     mop_doc = frappe.get_doc("Mode of Payment", name)
     existing = [row.company for row in mop_doc.get("accounts", [])]
+    for row in mop_doc.get("accounts", []):
+        if row.company == company_name:
+            account = _default_mop_account(name, company_name)
+            if account and row.default_account != account:
+                row.default_account = account
+                mop_doc.save(ignore_permissions=True)
+            return name
     if company_name not in existing:
         account = _default_mop_account(name, company_name)
         if account:
