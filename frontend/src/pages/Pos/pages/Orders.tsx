@@ -19,7 +19,7 @@ import SplitGroupPanel from '../components/SplitGroupPanel';
 import MergedBillPanel from '../components/MergedBillPanel';
 import { printOrder } from '../lib/print';
 import { call } from '@ury/core';
-import { splitBill } from '../lib/order-api';
+import { splitBill, cancelOrder } from '../lib/order-api';
 import {
   getOrdersTabForInvoice,
   getSplitGroup,
@@ -221,10 +221,7 @@ export default function Orders() {
     }
     setCancelLoading(true);
     try {
-      await call.post('ury.ury.doctype.ury_order.ury_order.cancel_order', {
-        invoice_id: selectedOrder.name,
-        reason: cancelReason
-      })
+      await cancelOrder(selectedOrder.name, cancelReason);
       showToast.success(t('success.order_cancelled'));
       setCancelDialogOpen(false);
       setCancelReason('');
