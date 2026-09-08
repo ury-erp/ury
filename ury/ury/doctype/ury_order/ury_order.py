@@ -998,6 +998,23 @@ def _order_ownership_flags(invoice, pos_profile_name=None):
     }
 
 
+def _can_remove_sent_items(pos_profile, invoice=None, pos_profile_name=None):
+    """Whether the acting user may reduce or remove an already-sent line.
+
+    The POS Profile `remove_items` flag grants this to everyone on the
+    profile. Managers - the elevated roles named in
+    `transfer_role_permissions`, the same set that gates table and captain
+    transfer - may also remove sent items without that flag, since they are
+    the people who correct a mis-keyed order on the floor.
+    """
+    if bool(pos_profile.remove_items):
+        return True
+    if invoice is None:
+        return False
+    flags = _order_ownership_flags(invoice, pos_profile_name or pos_profile.name)
+    return bool(flags["has_elevated_access"])
+
+
 def _enforce_order_access(invoice, pos_profile_name=None, require_modify=False, deny_message=None):
     """Fail-closed ownership + room-scoping gate for reading/modifying an
     existing order. Reuses `_order_ownership_flags()` (Phase 2's ownership
@@ -1406,8 +1423,11 @@ def get_table_order_context(table):
     invoice_billed = bool(order) and order.get("invoice_printed") == 1
     can_modify = can_view and (not order or not invoice_billed or is_billing_user)
 
-    can_reduce_items = can_modify and bool(pos_profile.remove_items)
-    can_remove_items = can_modify and bool(pos_profile.remove_items)
+    # Managers (elevated roles) may correct a sent order even when the
+    # profile withholds `remove_items` from ordinary captains.
+    may_remove_sent = bool(pos_profile.remove_items) or has_elevated_access
+    can_reduce_items = can_modify and may_remove_sent
+    can_remove_items = can_modify and may_remove_sent
 
     can_transfer_table = can_modify and has_elevated_access
 
@@ -1829,7 +1849,7 @@ def sync_order(
     # Reduction/removal permission: gate any decrease in a previously-sent
     # item's quantity (including full removal) by POS Profile `remove_items`,
     # matching Phase 2's can_reduce_items/can_remove_items derivation.
-    if past_item and not bool(posprofile.remove_items):
+    if past_item and not _can_remove_sent_items(posprofile, invoice, pos_profile):
         requested_qty_by_item = {}
         for d in items:
             requested_qty_by_item[d.get("item")] = requested_qty_by_item.get(

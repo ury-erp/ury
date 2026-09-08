@@ -14,6 +14,7 @@ import frappe
 from frappe.tests.utils import FrappeTestCase
 
 from ury.ury.doctype.ury_order.ury_order import (
+    _can_remove_sent_items,
     _require_open_cashier_session,
     _resolve_sync_opening_room,
     _validate_dine_in_pax,
@@ -369,3 +370,41 @@ class TestSplitBillOwnershipB5(FrappeTestCase):
         with self.assertRaises(frappe.PermissionError) as ctx:
             split_bill("POS-INV-1", [{"name": "row1", "qty": 1}])
         self.assertIn("Not permitted to split", str(ctx.exception))
+
+
+class TestManagerRemoveSentItems(unittest.TestCase):
+    """Managers may correct a sent order even when the profile withholds
+    `remove_items` from ordinary captains."""
+
+    def _invoice(self):
+        invoice = MagicMock()
+        invoice.name = "POS-INV-1"
+        return invoice
+
+    def test_profile_flag_grants_removal_without_touching_ownership(self):
+        profile = _pos_profile(remove_items=1)
+        with patch(
+            "ury.ury.doctype.ury_order.ury_order._order_ownership_flags"
+        ) as mock_flags:
+            self.assertTrue(_can_remove_sent_items(profile, self._invoice()))
+            mock_flags.assert_not_called()
+
+    def test_manager_may_remove_without_the_profile_flag(self):
+        profile = _pos_profile(remove_items=0)
+        with patch(
+            "ury.ury.doctype.ury_order.ury_order._order_ownership_flags",
+            return_value={"has_elevated_access": True},
+        ):
+            self.assertTrue(_can_remove_sent_items(profile, self._invoice()))
+
+    def test_ordinary_captain_still_denied_without_the_flag(self):
+        profile = _pos_profile(remove_items=0)
+        with patch(
+            "ury.ury.doctype.ury_order.ury_order._order_ownership_flags",
+            return_value={"has_elevated_access": False},
+        ):
+            self.assertFalse(_can_remove_sent_items(profile, self._invoice()))
+
+    def test_no_invoice_falls_back_to_the_profile_flag(self):
+        self.assertFalse(_can_remove_sent_items(_pos_profile(remove_items=0)))
+        self.assertTrue(_can_remove_sent_items(_pos_profile(remove_items=1)))
