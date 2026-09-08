@@ -979,6 +979,9 @@ def create_customer(customer_name, mobile_number=None, customer_group="Individua
         return {
             "status": "success",
             "message": "Customer created successfully",
+            # Additive link id — distinct from display `customer_name` when
+            # naming series ≠ customer_name (e.g. CUST-00042 vs "Alice").
+            "name": customer.name,
             "customer_name": customer_name,
             "mobile_number": mobile_number,
             "customer_group": customer_group,
