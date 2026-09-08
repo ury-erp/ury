@@ -12,6 +12,8 @@ const {
   tableTransfer,
   captainTransfer,
   getCaptainContext,
+  canCancelOrder,
+  cancelOrder,
   showToastError,
   showToastSuccess,
   serveMenuCalls,
@@ -32,6 +34,8 @@ const {
   const tableTransfer = vi.fn()
   const captainTransfer = vi.fn()
   const getCaptainContext = vi.fn()
+  const canCancelOrder = vi.fn().mockResolvedValue(false)
+  const cancelOrder = vi.fn()
   const showToastError = vi.fn()
   const showToastSuccess = vi.fn()
   const serveMenuCalls: ServeMenuProps[] = []
@@ -52,6 +56,7 @@ const {
       item: string
       name: string
       disabled?: 0 | 1 | boolean
+      image?: string | null
     }>,
     addToOrder: vi.fn(),
     removeFromOrder: vi.fn(),
@@ -67,7 +72,9 @@ const {
       print_format: 'Standard',
     },
     orderComment: '',
-    setOrderComment: vi.fn(),
+    setOrderComment: vi.fn((c: string) => {
+      store.orderComment = c
+    }),
     noOfPax: 2,
     setNoOfPax: vi.fn((n: number) => {
       store.noOfPax = n
@@ -165,6 +172,8 @@ const {
     tableTransfer,
     captainTransfer,
     getCaptainContext,
+    canCancelOrder,
+    cancelOrder,
     showToastError,
     showToastSuccess,
     serveMenuCalls,
@@ -207,8 +216,40 @@ vi.mock('@ury/ui', async () => {
           Confirm captain transfer
         </button>
       ) : null,
-    ConfirmDialog: () => null,
-    CommentDialog: () => null,
+    ConfirmDialog: (props: {
+      open: boolean
+      title?: string
+      onConfirm?: () => void | Promise<void>
+    }) =>
+      props.open ? (
+        <div data-testid="confirm-dialog">
+          <p>{props.title}</p>
+          <button type="button" onClick={() => void props.onConfirm?.()}>
+            Confirm cancel
+          </button>
+        </div>
+      ) : null,
+    CommentDialog: (props: {
+      open: boolean
+      title?: string
+      initialComment?: string
+      onSave?: (comment: string) => void
+      onOpenChange?: (open: boolean) => void
+    }) =>
+      props.open ? (
+        <div data-testid="comment-dialog" data-initial={props.initialComment ?? ''}>
+          <p>{props.title}</p>
+          <button
+            type="button"
+            onClick={() => {
+              props.onSave?.('Kitchen note')
+              props.onOpenChange?.(false)
+            }}
+          >
+            Save comment
+          </button>
+        </div>
+      ) : null,
   }
 })
 
@@ -259,10 +300,6 @@ vi.mock('../components/ServeMenu', () => ({
   },
 }))
 
-vi.mock('../components/CaptainOrderLine', () => ({
-  default: () => null,
-}))
-
 vi.mock('../components/CaptainActionsMenu', () => ({
   default: (props: {
     showPrintBill?: boolean
@@ -272,6 +309,12 @@ vi.mock('../components/CaptainActionsMenu', () => ({
     onTransferTable?: () => void | Promise<void>
     showTransferCaptain?: boolean
     onTransferCaptain?: () => void
+    showCancel?: boolean
+    onCancel?: () => void
+    cancelDisabled?: boolean
+    showSplit?: boolean
+    onSplit?: () => void
+    splitDisabled?: boolean
   }) => (
     <>
       {props.showPrintBill ? (
@@ -289,10 +332,29 @@ vi.mock('../components/CaptainActionsMenu', () => ({
           Transfer Captain
         </button>
       ) : null}
+      {props.showSplit ? (
+        <button
+          type="button"
+          onClick={() => props.onSplit?.()}
+          disabled={props.splitDisabled}
+        >
+          Split
+        </button>
+      ) : null}
+      {props.showCancel ? (
+        <button
+          type="button"
+          onClick={() => props.onCancel?.()}
+          disabled={props.cancelDisabled}
+        >
+          Cancel
+        </button>
+      ) : null}
     </>
   ),
 }))
 
+// Real CaptainOrderLine — covers confirmed increment / blocked remove.
 vi.mock('../components/SplitOrderDialog', () => ({
   SplitOrderDialog: (props: { open: boolean; items: unknown[] }) => {
     splitDialogState.open = props.open
@@ -313,8 +375,8 @@ vi.mock('../lib/captain-context-api', () => ({
 }))
 
 vi.mock('../lib/cancel-api', () => ({
-  canCancelOrder: vi.fn().mockResolvedValue(false),
-  cancelOrder: vi.fn(),
+  canCancelOrder: (...args: unknown[]) => canCancelOrder(...args),
+  cancelOrder: (...args: unknown[]) => cancelOrder(...args),
 }))
 
 vi.mock('../lib/serve-extras-api', () => ({
@@ -355,7 +417,24 @@ const cartItem = {
   uniqueId: 'draft|1',
 }
 
-const menuSoup = { id: 'ITEM-1', item: 'ITEM-1', name: 'Soup', disabled: 0 as const }
+const menuSoup = {
+  id: 'ITEM-1',
+  item: 'ITEM-1',
+  name: 'Soup',
+  disabled: 0 as const,
+  image: '/files/soup.jpg',
+}
+
+const confirmedSoupLine = {
+  uniqueId: 'confirmed|1',
+  id: 'ITEM-1',
+  name: 'Soup',
+  price: 120,
+  baseQty: 2,
+  curQty: 2,
+  delta: 0,
+  confirmedQty: 2,
+}
 
 function resetFixtures(opts: {
   table?: string
@@ -368,6 +447,8 @@ function resetFixtures(opts: {
   printBill?: boolean
   transferTable?: boolean
   transferCaptain?: boolean
+  cancelAllowed?: boolean
+  confirmedLines?: boolean
   orderItems?: Array<{
     name: string
     item_name: string
@@ -387,6 +468,9 @@ function resetFixtures(opts: {
   captainTransfer.mockReset()
   getCaptainContext.mockReset()
   getCaptainContext.mockResolvedValue({ opening_state: { pos_open: true } })
+  canCancelOrder.mockReset()
+  canCancelOrder.mockResolvedValue(Boolean(opts.cancelAllowed))
+  cancelOrder.mockReset()
   showToastError.mockReset()
   showToastSuccess.mockReset()
   splitDialogState.open = false
@@ -404,6 +488,11 @@ function resetFixtures(opts: {
   store.orderComment = ''
   store.hasUnsentDraft = vi.fn(() => false)
   store.startTakeaway = vi.fn()
+  store.updateQuantity = vi.fn()
+  store.removeFromOrder = vi.fn()
+  store.setOrderComment = vi.fn((c: string) => {
+    store.orderComment = c
+  })
 
   const reduce = opts.reduceItems ?? true
   const remove = opts.removeItems ?? false
@@ -414,6 +503,9 @@ function resetFixtures(opts: {
   contextState.isContextRefreshing = false
   contextState.contextError = null
   contextState.isOrderReady = true
+  contextState.alreadyOrderedLines = opts.confirmedLines ? [confirmedSoupLine] : []
+  contextState.newOrChangedLines = []
+  contextState.reductionPendingLines = []
   contextState.refetchContext = vi.fn().mockResolvedValue(undefined)
   contextState.refreshContext = vi.fn().mockImplementation(async () => contextState.context)
   contextState.context = {
@@ -814,5 +906,124 @@ describe('Order page flow', () => {
     })
     expect(showToastError).toHaveBeenCalledWith('You can no longer transfer this order.')
     expect(captainTransfer).not.toHaveBeenCalled()
+  })
+
+  it('increments a confirmed line via canModify only (qty+1)', async () => {
+    const user = userEvent.setup()
+    resetFixtures({
+      existingOrder: true,
+      withCart: true,
+      confirmedLines: true,
+      reduceItems: true,
+      removeItems: false,
+    })
+    render(<OrderPage />)
+
+    const increaseBtns = screen.getAllByRole('button', { name: 'Increase' })
+    expect(increaseBtns.length).toBeGreaterThan(0)
+    await user.click(increaseBtns[0])
+
+    expect(store.updateQuantity).toHaveBeenCalledWith('confirmed|1', 3)
+  })
+
+  it('shows remove control disabled without remove_items on confirmed lines', () => {
+    resetFixtures({
+      existingOrder: true,
+      withCart: true,
+      confirmedLines: true,
+      reduceItems: true,
+      removeItems: false,
+    })
+    render(<OrderPage />)
+
+    const removeBtns = screen.getAllByRole('button', { name: 'Remove item (not permitted)' })
+    expect(removeBtns.length).toBeGreaterThan(0)
+    for (const removeBtn of removeBtns) {
+      expect(removeBtn).toBeDisabled()
+      expect(removeBtn).toHaveAttribute(
+        'title',
+        'Removing a sent item is not permitted for this profile'
+      )
+    }
+    expect(store.removeFromOrder).not.toHaveBeenCalled()
+  })
+
+  it('allows remove on confirmed lines when remove_items is granted', async () => {
+    const user = userEvent.setup()
+    resetFixtures({
+      existingOrder: true,
+      withCart: true,
+      confirmedLines: true,
+      reduceItems: true,
+      removeItems: true,
+    })
+    render(<OrderPage />)
+
+    const removeBtns = screen.getAllByRole('button', { name: 'Remove item' })
+    expect(removeBtns[0]).not.toBeDisabled()
+    await user.click(removeBtns[0])
+    expect(store.removeFromOrder).toHaveBeenCalledWith('confirmed|1')
+  })
+
+  it('exposes Split from the actions menu and keeps unsent-draft guard', async () => {
+    const user = userEvent.setup()
+    resetFixtures({ existingOrder: true, withCart: true })
+    store.hasUnsentDraft = vi.fn(() => true)
+    render(<OrderPage />)
+
+    const splitBtn = screen.getByRole('button', { name: 'Split' })
+    expect(splitBtn).not.toBeDisabled()
+    await user.click(splitBtn)
+
+    expect(showToastError).toHaveBeenCalledWith('Update the order before splitting.')
+    expect(splitDialogState.open).toBe(false)
+  })
+
+  it('exposes Cancel from the actions menu behind cancelAllowed', async () => {
+    const user = userEvent.setup()
+    resetFixtures({ existingOrder: true, withCart: true, cancelAllowed: true })
+    render(<OrderPage />)
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
+    })
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.getByTestId('confirm-dialog')).toBeInTheDocument()
+    expect(screen.getByText('Cancel order')).toBeInTheDocument()
+  })
+
+  it('hides Cancel from the actions menu when cancel is not allowed', async () => {
+    resetFixtures({ existingOrder: true, withCart: true, cancelAllowed: false })
+    render(<OrderPage />)
+
+    await waitFor(() => {
+      expect(canCancelOrder).toHaveBeenCalled()
+    })
+    expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument()
+  })
+
+  it('opens the order note dialog from the comment icon and shows has-note state', async () => {
+    const user = userEvent.setup()
+    resetFixtures({ existingOrder: true, withCart: true })
+    store.orderComment = 'Hold the salt'
+    render(<OrderPage />)
+
+    expect(screen.getByTestId('order-note-indicator')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Add order note' })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Edit order note' }))
+    expect(screen.getByTestId('comment-dialog')).toBeInTheDocument()
+    expect(screen.getByTestId('comment-dialog')).toHaveAttribute('data-initial', 'Hold the salt')
+  })
+
+  it('opens an empty order note dialog when no note exists', async () => {
+    const user = userEvent.setup()
+    resetFixtures({ existingOrder: false, withCart: true })
+    render(<OrderPage />)
+
+    expect(screen.queryByTestId('order-note-indicator')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Add order note' }))
+    expect(screen.getByTestId('comment-dialog')).toBeInTheDocument()
+    expect(screen.getByTestId('comment-dialog')).toHaveAttribute('data-initial', '')
   })
 })
