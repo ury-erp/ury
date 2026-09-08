@@ -8,7 +8,13 @@ app_email = "info@tridz.com"
 app_license = "MIT"
 app_logo_url = "/assets/ury/Images/ury-logo.jpg"
 app_icon_title = "URY"
-required_apps = ["erpnext"]
+# "hrms" is required for the Attendance / Employee Attendance Tool
+# doctypes used by the hide-from-attendance filter and branch/company
+# autofill (sa-ui-declutter-autofetch). Declaring the dependency here does
+# not install the app — that still needs `bench get-app hrms` +
+# `bench --site <site> install-app hrms` run against a real bench before
+# these doctypes actually exist.
+required_apps = ["erpnext", "hrms"]
 # Includes in <head>
 # ------------------
 add_to_apps_screen = [
