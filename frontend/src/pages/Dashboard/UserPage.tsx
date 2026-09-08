@@ -36,7 +36,7 @@ export const UserPage: React.FC = () => {
   });
   const [originalUser, setOriginalUser] = useState<any>(null);
 
-  const URY_ROLES = ['URY Manager', 'URY Waiter', 'URY Cashier'];
+  const URY_ROLES = ['URY Manager', 'URY Captain', 'URY Cashier'];
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -59,7 +59,7 @@ export const UserPage: React.FC = () => {
     if (user.roles && Array.isArray(user.roles)) {
       for (const roleObj of user.roles) {
         if (roleObj.role === 'URY Manager') return 'Manager';
-        if (roleObj.role === 'URY Waiter') return 'Waiter';
+        if (roleObj.role === 'URY Captain') return 'Captain';
         if (roleObj.role === 'URY Cashier') return 'Cashier';
       }
     }
@@ -338,7 +338,7 @@ export const UserPage: React.FC = () => {
               onChange={(_, value) => setNewUser({ ...newUser, role: value })}
               options={[
                 { value: 'URY Cashier', label: 'URY Cashier' },
-                { value: 'URY Waiter', label: 'URY Waiter' },
+                { value: 'URY Captain', label: 'URY Captain' },
                 { value: 'URY Manager', label: 'URY Manager' },
               ]}
             />
