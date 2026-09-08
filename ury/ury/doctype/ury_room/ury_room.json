@@ -12,7 +12,9 @@
   "column_break_ahfni",
   "room_type",
   "section_break_hrqbe",
-  "printer_settings"
+  "printer_settings",
+  "kot_printing",
+  "block_takeaway"
  ],
  "fields": [
   {
@@ -42,11 +44,23 @@
   {
    "fieldname": "section_break_hrqbe",
    "fieldtype": "Section Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "kot_printing",
+   "fieldtype": "Check",
+   "label": "Enable KOT Printing"
+  },
+  {
+   "default": "0",
+   "fieldname": "block_takeaway",
+   "fieldtype": "Check",
+   "label": "Block Takeaway Orders"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2024-05-01 19:54:10.412708",
+ "modified": "2024-05-01 20:00:00.000000",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Room",

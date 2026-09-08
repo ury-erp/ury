@@ -16,6 +16,7 @@ interface UryRoomRecord {
   kot_printing?: number;
   print_format?: string;
   block_takeaway?: number;
+  printer_settings?: Array<{ [key: string]: any }>;
 }
 
 export const RoomPage: React.FC = () => {
@@ -36,6 +37,7 @@ export const RoomPage: React.FC = () => {
     kot_printing: false,
     print_format: '',
     block_takeaway: false,
+    printer_settings: [],
   });
 
   const fetchBranches = async () => {
@@ -73,6 +75,7 @@ export const RoomPage: React.FC = () => {
       kot_printing: false,
       print_format: '',
       block_takeaway: false,
+      printer_settings: [],
     });
     setIsDrawerOpen(true);
   };
@@ -91,6 +94,7 @@ export const RoomPage: React.FC = () => {
       kot_printing: room.kot_printing === 1,
       print_format: room.print_format || '',
       block_takeaway: room.block_takeaway === 1,
+      printer_settings: room.printer_settings || [],
     });
     setIsDrawerOpen(true);
   };
@@ -114,6 +118,7 @@ export const RoomPage: React.FC = () => {
           kot_printing: editingRoom.kot_printing === 1 ? 1 : 0,
           print_format: editingRoom.print_format || '',
           block_takeaway: editingRoom.block_takeaway === 1 ? 1 : 0,
+          printer_settings: editingRoom.printer_settings || [],
         };
         const current = {
           room_name: newRoom.room_name || '',
@@ -122,6 +127,7 @@ export const RoomPage: React.FC = () => {
           kot_printing: newRoom.kot_printing ? 1 : 0,
           print_format: newRoom.print_format || '',
           block_takeaway: newRoom.block_takeaway ? 1 : 0,
+          printer_settings: newRoom.printer_settings || [],
         };
         if (JSON.stringify(original) === JSON.stringify(current)) {
           showToast.warning('No changes in document');
@@ -149,6 +155,7 @@ export const RoomPage: React.FC = () => {
             kot_printing: newRoom.kot_printing ? 1 : 0,
             print_format: newRoom.print_format,
             block_takeaway: newRoom.block_takeaway ? 1 : 0,
+            printer_settings: newRoom.printer_settings,
           },
         });
       } else {
@@ -161,6 +168,7 @@ export const RoomPage: React.FC = () => {
             kot_printing: newRoom.kot_printing ? 1 : 0,
             print_format: newRoom.print_format,
             block_takeaway: newRoom.block_takeaway ? 1 : 0,
+            printer_settings: newRoom.printer_settings,
           },
         });
       }
@@ -314,6 +322,17 @@ export const RoomPage: React.FC = () => {
                   onCheckedChange={(checked) => setNewRoom({ ...newRoom, block_takeaway: checked })}
                 />
                 <label htmlFor="block_takeaway" className="text-gray-700 cursor-pointer">Block Takeaway / Delivery Printing</label>
+              </div>
+
+              <div className="pt-3 mt-3 border-t border-gray-100">
+                <label className="block font-medium text-gray-700 mb-2">Printer Settings</label>
+                <div className="bg-gray-50 p-3 rounded border border-gray-200">
+                  <p className="text-sm text-gray-600">
+                    {newRoom.printer_settings && newRoom.printer_settings.length > 0
+                      ? `${newRoom.printer_settings.length} printer setting(s) configured`
+                      : 'No printer settings configured'}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
