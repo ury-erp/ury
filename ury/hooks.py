@@ -248,10 +248,7 @@ scheduler_events = {
 		"*/5 * * * *":[
 			"ury.ury.services.food_cost_alerts.notify_high_food_cost"
 		]
-	},
-	"daily": [
-		"ury.ury.dev_seed.demo_runner.seed_all"
-	]
+	}
 # 	"all": [
 # 		"ury.tasks.all"
 # 	],
@@ -265,6 +262,12 @@ scheduler_events = {
 # 		"ury.tasks.monthly"
 # 	],
 }
+
+# Demo seeding is a deliberate, on-demand action only (bench command below) —
+# it must never run automatically via the scheduler.
+commands = [
+	"ury.commands.seed_demo_data",
+]
 
 # Testing
 # -------

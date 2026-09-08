@@ -548,8 +548,8 @@ def clear_demo_data():
     try:
         global_company = frappe.db.get_single_value("Global Defaults", "demo_company")
         demo_companies = frappe.db.get_all("Company", filters={"name": ["like", "%(Demo)%"]}, pluck="name")
-        
-        if global_company and global_company not in demo_companies:
+
+        if global_company and "(Demo)" in global_company and global_company not in demo_companies:
             demo_companies.append(global_company)
             
         if not demo_companies:
