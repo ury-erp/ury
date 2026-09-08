@@ -131,6 +131,11 @@ class TestGetKOTErrors(FrappeTestCase):
 		profile.applicable_for_users = []
 		profile.disabled = 1
 		profile.branch = BRANCH_A
+		# ERPNext validates linked warehouses against the profile company;
+		# the source profile may use a warehouse from another demo company.
+		profile.warehouse = frappe.db.get_value(
+			"Warehouse", {"company": profile.company, "is_group": 0}, "name"
+		)
 		profile.insert(ignore_permissions=True, set_name=POS_PROFILE)
 
 		# The branch field is a fetched/custom field, so force it after insert.

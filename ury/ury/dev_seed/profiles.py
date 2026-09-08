@@ -263,6 +263,15 @@ def _seed_pos_profile(company_name, branch_name, restaurant_name):
     dirty = False
 
     for fieldname, value in fields.items():
+        # Upstream ERPNext validates that linked warehouses belong to the
+        # profile company. Repair stale demo profiles created before that
+        # validation became strict.
+        if fieldname == "warehouse" and pos_doc.get(fieldname):
+            warehouse_company = frappe.db.get_value("Warehouse", pos_doc.get(fieldname), "company")
+            if warehouse_company and warehouse_company != company_name:
+                pos_doc.set(fieldname, value)
+                dirty = True
+                continue
         if not pos_doc.get(fieldname):
             pos_doc.set(fieldname, value)
             dirty = True
