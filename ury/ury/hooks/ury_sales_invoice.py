@@ -34,8 +34,7 @@ def before_insert(doc, method):
 
 def on_update(doc,method):
     aggregator_unpaid(doc,method)
-    remove_tax(doc,method)
-    
+
 def sales_invoice_naming(doc, method):
     if not doc.is_pos:
         return
@@ -199,11 +198,4 @@ def journal_entry_cancel(doc, method=None):
             "Cash Discount Journal Entry Cancellation Failed",
         )
 
-
-def remove_tax(doc, method=None):
-    """Strip taxes from Aggregator orders on branches configured for
-    tax-inclusive/no-tax aggregator pricing (Branch.custom_no_taxes)."""
-    if doc.order_type == "Aggregators" and frappe.db.get_value("Branch", doc.branch, "custom_no_taxes") == 1:
-        doc.taxes_and_charges = None
-        doc.taxes.clear()
 

@@ -98,7 +98,7 @@ import math
 
 import frappe
 from frappe import _
-from frappe.utils import now_datetime
+from frappe.utils import getdate, now_datetime
 
 from ury.ury.api.ury_bom_compiler import compile_bom_vector
 from ury.ury.api.ury_production_context import resolve_production_context
@@ -204,9 +204,12 @@ def _resolve_plan_remaining(item_code, branch, company, department=None):
 	`URY Sales Plan` stores per-item quantities in its `items` child table
 	(`URY Sales Plan Item`: `item_code`, `qty`, ...), not on the parent --
 	the parent only carries scope/status fields (`branch`, `company`,
-	`docstatus`, ...). This first resolves the submitted parent plan(s) in
-	scope, then sums the matching child rows, following the same
-	`parent`/`parenttype` child-table query convention used elsewhere in this
+	`docstatus`, `status`, `plan_date`, ...). This first resolves the
+	submitted parent plan(s) in scope for today's service date and an
+	active status (`Approved`/`Locked for Production` -- excluding
+	`Draft`/`Proposed`/`Submitted for Approval`/`Superseded/Cancelled`),
+	then sums the matching child rows, following the same `parent`/
+	`parenttype` child-table query convention used elsewhere in this
 	codebase (e.g. `ury_bom_compiler.py`) rather than `frappe.db.get_value`
 	against nonexistent parent columns.
 
@@ -221,7 +224,17 @@ def _resolve_plan_remaining(item_code, branch, company, department=None):
 	if not frappe.db.table_exists(SALES_PLAN_DOCTYPE):
 		return None
 
-	plan_filters = {"branch": branch, "company": company, "docstatus": 1}
+	# Scope to plans that are still in force for today's service date and in
+	# an active status -- an unfiltered query sums every submitted plan in
+	# the branch/company's entire history, including Superseded/Cancelled
+	# ones, so plan_qty/plan_remaining would inflate without bound.
+	plan_filters = {
+		"branch": branch,
+		"company": company,
+		"docstatus": 1,
+		"status": ["in", ["Approved", "Locked for Production"]],
+		"plan_date": getdate(),
+	}
 	plan_names = frappe.get_all(SALES_PLAN_DOCTYPE, filters=plan_filters, pluck="name")
 	if not plan_names:
 		return None
