@@ -28,6 +28,8 @@ const PRECACHE_URLS = [
 	"/assets/ury/serve/icons/icon-512.png",
 	"/assets/ury/serve/icons/icon-192-maskable.png",
 	"/assets/ury/serve/icons/icon-512-maskable.png",
+	"/assets/ury/serve/icons/apple-touch-icon.png",
+	"/assets/ury/serve/ury.ico",
 ];
 
 /** Stale Serve caches only — never touch other apps' Cache Storage keys. */

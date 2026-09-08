@@ -7,8 +7,8 @@
   "scope": "/ury/serve/",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#f7f4ef",
-  "theme_color": "#1c1917",
+  "background_color": "#f9fafb",
+  "theme_color": "#ffffff",
   "lang": "en",
   "icons": [
     {
