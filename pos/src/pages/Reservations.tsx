@@ -15,9 +15,12 @@ import {
   Card,
   CardContent,
   SearchableSelect,
+  showToast,
 } from '@ury/ui';
 import { useNavigate } from 'react-router-dom';
 import { usePOSStore } from '../store/pos-store';
+import { useRootStore } from '../store/root-store';
+import { derivePOSCapabilities } from '@ury/core';
 import {
   getActiveReservations,
   getBranchReservationSettings,
@@ -38,7 +41,17 @@ import TableReservationCompleteDialog from '../components/TableReservationComple
 export default function Reservations() {
   const navigate = useNavigate();
   const { posProfile, searchQuery } = usePOSStore();
+  const user = useRootStore((state) => state.user);
   const branch = posProfile?.branch ?? '';
+
+  const isManagerOrCashier = useMemo(() => {
+    if (!user) return false;
+    if (user.name === 'Administrator' || user.roles?.includes('System Manager')) {
+      return true;
+    }
+    const capabilities = derivePOSCapabilities(user, posProfile);
+    return Boolean(capabilities?.canAccessOtherCaptainsTables);
+  }, [user, posProfile]);
 
   useEffect(() => {
     if (!branch) return;
@@ -165,6 +178,10 @@ export default function Reservations() {
 
   const handleConfirmCancel = async () => {
     if (!cancelReservation) return;
+    if (!isManagerOrCashier) {
+      showToast.error('Not authorized to cancel reservation');
+      return;
+    }
     setCancelLoading(true);
     try {
       await updateTableReservationStatus(cancelReservation.name, 'Cancelled');
@@ -181,6 +198,10 @@ export default function Reservations() {
 
   const handleConfirmComplete = async () => {
     if (!completeReservation) return;
+    if (!isManagerOrCashier) {
+      showToast.error('Not authorized to complete reservation');
+      return;
+    }
     setCompleteLoading(true);
     try {
       await updateTableReservationStatus(completeReservation.name, 'Completed');
@@ -400,7 +421,7 @@ export default function Reservations() {
                                   <span>Edit Reservation</span>
                                 </button>
 
-                                {['Confirmed', 'Active'].includes(res.status) && (
+                                {isManagerOrCashier && ['Confirmed', 'Active'].includes(res.status) && (
                                   <button
                                     type="button"
                                     onClick={() => handleOpenComplete(res)}
@@ -411,14 +432,16 @@ export default function Reservations() {
                                   </button>
                                 )}
 
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenCancel(res)}
-                                  className="w-full text-left px-4 py-2 text-xs font-medium text-red-600 hover:bg-red-50 flex items-center gap-2"
-                                >
-                                  <XCircle className="w-3.5 h-3.5 text-red-600" />
-                                  <span>Cancel Reservation</span>
-                                </button>
+                                {isManagerOrCashier && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenCancel(res)}
+                                    className="w-full text-left px-4 py-2 text-xs font-medium text-red-600 hover:bg-red-50 flex items-center gap-2"
+                                  >
+                                    <XCircle className="w-3.5 h-3.5 text-red-600" />
+                                    <span>Cancel Reservation</span>
+                                  </button>
+                                )}
                               </div>
                             )}
                           </div>
