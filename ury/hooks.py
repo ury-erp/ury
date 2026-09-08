@@ -67,6 +67,13 @@ website_route_rules = [
     {"from_route": "/order/<path:app_path>", "to_route": "order"},
     {"from_route": "/ury/order/<path:app_path>", "to_route": "order"},
     {"from_route": "/mosaic/<path:app_path>", "to_route": "mosaic"},
+    # Staff Serve PWA — must precede the generic /ury/<path> catchall.
+    # Exact + trailing-slash + nested SPA paths; SW is a more-specific rule
+    # so /ury/serve/sw.js is not swallowed by the SPA page.
+    {"from_route": "/ury/serve/sw.js", "to_route": "serve-sw.js"},
+    {"from_route": "/ury/serve", "to_route": "serve"},
+    {"from_route": "/ury/serve/", "to_route": "serve"},
+    {"from_route": "/ury/serve/<path:app_path>", "to_route": "serve"},
     {"from_route": "/ury/<path:app_path>", "to_route": "ury"},
     {"from_route": "/setup-wizard", "to_route": "ury"},
     {"from_route": "/pos/<path:app_path>", "to_route": "pos"},
@@ -284,7 +291,8 @@ on_session_creation = [
 website_path_resolver = [
     "ury.ury.controllers.setup_redirect.website_path_resolver"
 ]
-# after_request = ["ury.utils.after_request"]
+# Sets Service-Worker-Allowed + JS content-type for the Serve PWA worker.
+after_request = ["ury.ury.controllers.serve_pwa.after_request"]
 
 website_redirects = [
     {
