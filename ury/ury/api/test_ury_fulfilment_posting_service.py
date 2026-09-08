@@ -374,7 +374,8 @@ class TestProcessPostingIntent(FrappeTestCase):
 		execution = _execution_doc()
 		execution.state = "QUEUED"
 		with self.assertRaisesRegex(Exception, "requires READY or SERVED"):
-			create_or_get_posting_intent_for_ready(execution, actor="chef@example.com")
+			# Use an authorized service actor so this test reaches the state guard.
+			create_or_get_posting_intent_for_ready(execution, actor="Administrator")
 
 	def test_stock_failure_marks_failed_and_does_not_fulfil_reservation(self):
 		intent = self._intent()
