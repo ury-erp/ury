@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>URY Serve — Connection required</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f7f4ef;
+        --ink: #1c1917;
+        --muted: #57534e;
+        --accent: #b45309;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 2rem;
+        font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+        background:
+          radial-gradient(ellipse at top, #fde68a55, transparent 55%),
+          var(--bg);
+        color: var(--ink);
+      }
+      main {
+        max-width: 26rem;
+        text-align: center;
+      }
+      h1 {
+        font-size: 1.5rem;
+        font-weight: 650;
+        letter-spacing: -0.02em;
+        margin: 0 0 0.75rem;
+      }
+      p {
+        margin: 0 0 0.75rem;
+        line-height: 1.5;
+        color: var(--muted);
+      }
+      .note {
+        font-size: 0.9rem;
+        color: var(--accent);
+        font-weight: 600;
+      }
+      button {
+        margin-top: 1.25rem;
+        appearance: none;
+        border: 0;
+        border-radius: 0.5rem;
+        padding: 0.7rem 1.2rem;
+        font: inherit;
+        font-weight: 600;
+        color: #fff;
+        background: #1c1917;
+        cursor: pointer;
+      }
+      button:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 3px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Connection required</h1>
+      <p>
+        URY Serve needs a live network connection to load tables, menus, and
+        place orders.
+      </p>
+      <p class="note">Orders are not saved or replayed while offline.</p>
+      <button type="button" onclick="location.reload()">Try again</button>
+    </main>
+  </body>
+</html>
