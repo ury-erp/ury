@@ -159,3 +159,13 @@ export async function reprintKot(invoiceNumber: string): Promise<void> {
     invoice_number: invoiceNumber,
   });
 }
+
+export async function cancelOrder(
+  invoice_id: string,
+  reason: string
+): Promise<void> {
+  await call.post('ury.ury.doctype.ury_order.ury_order.cancel_order', {
+    invoice_id,
+    reason,
+  });
+}

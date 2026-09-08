@@ -418,7 +418,7 @@ def get_custom_fields():
 				"label": "Mobile Number",
 				"insert_after": "customer_name",
 				"translatable": 0,
-				"reqd": 1
+				"reqd": 0
 			},
 		],
 

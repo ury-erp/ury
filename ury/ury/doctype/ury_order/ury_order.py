@@ -5,13 +5,15 @@ import json
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import flt
+from frappe.utils import flt, get_datetime
 from erpnext.controllers.queries import item_query
 from ury.ury_pos.api import getBranch, getBranchRoom, getRoom, posOpening
 from ury.ury.api.ury_kot_generate import kot_execute
 from ury.ury.api.ury_kot_generate import process_items_for_cancel_kot
 from ury.ury.api.ury_feature_flags import is_pos_stock_authority_flag_enabled
 from ury.ury.api.ury_order_reservation_service import reconcile_order_reservations
+from ury.ury.doctype.alert_settings.alert_settings import get_alert_rule
+from ury.ury.api.ury_kot_notification import create_system_notification, get_users_with_role
 
 from frappe import cache
 
@@ -1999,9 +2001,35 @@ def cancel_order(invoice_id, reason):
     # state remains out of sync.
     cancel_kot(invoice_id)
 
+    # Best-effort delayed-cancellation fraud alert: notify if order was open longer than threshold
+    try:
+        alert_rule = get_alert_rule("Cancel Delay", branch=pos_invoice.branch)
+        if alert_rule:
+            creation_time = pos_invoice.creation
+            current_time = get_datetime()
+            time_diff = current_time - creation_time
+            minutes_open = int(time_diff.total_seconds() / 60)
+
+            threshold_minutes = alert_rule.get("threshold_minutes", 0)
+            if minutes_open > threshold_minutes:
+                # Resolve notify_roles to users and send notifications
+                notify_roles = alert_rule.get("notify_roles", [])
+                if notify_roles:
+                    for role_row in notify_roles:
+                        role_name = role_row.get("role") if isinstance(role_row, dict) else role_row.role
+                        users = get_users_with_role(role_name, branch=pos_invoice.branch)
+                        for user in users:
+                            message = f"Invoice {invoice_id} has been cancelled after {minutes_open} minutes"
+                            subject = f"Invoice {invoice_id} ({pos_invoice.branch}) is cancelled"
+                            create_system_notification(message, user.get("name"), subject)
+    except Exception as e:
+        # Log error but don't block cancellation
+        frappe.log_error(
+            title="Delayed cancellation alert notification failed",
+            message=f"Failed to send fraud alert for invoice {invoice_id}: {str(e)}"
+        )
+
     # Use standard Frappe cancel workflow instead of raw SQL
-    pos_invoice.db_set("cancel_reason", reason)
-    pos_invoice.cancel()
     if pos_invoice.docstatus == 1:
         # Submitted invoice: cancel through the standard document workflow so
         # on_cancel hooks run and GL/payment reversals and audit entries are
