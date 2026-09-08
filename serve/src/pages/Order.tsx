@@ -412,8 +412,13 @@ export default function OrderPage() {
     }
   }
 
+  const lineImageUrl = (itemCode: string) => {
+    const match = menuItems.find((m) => m.item === itemCode || m.id === itemCode)
+    return match?.image ?? null
+  }
+
   const renderOrderList = () => (
-    <div className="flex-1 space-y-5 overflow-y-auto p-3 pb-32">
+    <div className="space-y-4 p-3">
       {canModify && (
         <CustomerPicker
           value={selectedCustomer}
@@ -507,8 +512,11 @@ export default function OrderPage() {
               line={line}
               variant="confirmed"
               disabled={isInteractionDisabled}
+              imageUrl={lineImageUrl(line.id)}
+              onIncrement={canModify ? () => updateQuantity(line.uniqueId, line.curQty + 1) : undefined}
               onDecrement={canModify && canReduce ? () => updateQuantity(line.uniqueId, Math.max(canRemove ? 0 : 1, line.curQty - 1)) : undefined}
               onRemove={canModify && canRemove ? () => removeFromOrder(line.uniqueId) : undefined}
+              removeBlocked={canModify && !canRemove}
               onEditNote={canModify ? () => setNoteLine(line) : undefined}
             />
           ))}
@@ -518,6 +526,7 @@ export default function OrderPage() {
               line={line}
               variant="delta"
               disabled={isInteractionDisabled}
+              imageUrl={lineImageUrl(line.id)}
               onIncrement={() => updateQuantity(line.uniqueId, line.curQty + 1)}
               onDecrement={() => {
                 if (line.curQty <= 1) removeFromOrder(line.uniqueId)
@@ -532,6 +541,7 @@ export default function OrderPage() {
               line={line}
               variant="reduction"
               disabled={isInteractionDisabled}
+              imageUrl={lineImageUrl(line.id)}
               onRestore={() => updateQuantity(line.uniqueId, Math.min(line.curQty + 1, line.baseQty))}
             />
           ))}

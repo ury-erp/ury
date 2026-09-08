@@ -1,4 +1,4 @@
-import type { FC } from 'react';
+import { useEffect, useState, type FC } from 'react';
 import { Minus, Plus, MessageSquare, RotateCcw, Trash2 } from 'lucide-react';
 import { cn } from '@ury/ui';
 import { formatCurrency } from '@ury/core';
@@ -9,9 +9,16 @@ interface CaptainOrderLineProps {
   /** 'confirmed' = Already Ordered row, 'delta' = New/Changed row, 'reduction' = Reduction pending row. */
   variant: 'confirmed' | 'delta' | 'reduction';
   disabled?: boolean;
+  /** Menu thumbnail URL; missing/failed images fall back to name initials. */
+  imageUrl?: string | null;
   onIncrement?: () => void;
   onDecrement?: () => void;
   onRemove?: () => void;
+  /**
+   * Show the remove control disabled (permission missing). Does not bypass
+   * `remove_items` — the control stays non-interactive.
+   */
+  removeBlocked?: boolean;
   onRestore?: () => void;
   onEditNote?: () => void;
 }
@@ -25,29 +32,61 @@ const CaptainOrderLine: FC<CaptainOrderLineProps> = ({
   line,
   variant,
   disabled,
+  imageUrl,
   onIncrement,
   onDecrement,
   onRemove,
+  removeBlocked,
   onRestore,
   onEditNote,
 }) => {
+  const [imageFailed, setImageFailed] = useState(false);
+  const showImage = Boolean(imageUrl) && !imageFailed;
   const displayQty = variant === 'confirmed' ? line.confirmedQty : variant === 'reduction' ? Math.abs(line.delta) : line.delta;
   const sign = variant === 'delta' ? '+' : variant === 'reduction' ? '−' : '';
+  const showRemove = Boolean(onRemove) || Boolean(removeBlocked);
+  const removeDisabled = Boolean(disabled) || Boolean(removeBlocked) || !onRemove;
+  const removeTitle = removeBlocked
+    ? 'Removing a sent item is not permitted for this profile'
+    : 'Remove item';
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [imageUrl]);
 
   return (
     <div
       className={cn(
-        'flex items-center justify-between gap-3 py-3 px-3 rounded-lg',
+        'flex items-center justify-between gap-2 py-2.5 px-2.5 rounded-lg sm:gap-3 sm:px-3',
         variant === 'delta' && 'bg-blue-50',
         variant === 'reduction' && 'bg-red-50',
         variant === 'confirmed' && 'bg-white'
       )}
     >
+      <div
+        className="relative h-10 w-10 shrink-0 overflow-hidden rounded-md"
+        aria-hidden
+      >
+        {showImage ? (
+          <img
+            src={imageUrl!}
+            alt=""
+            className="h-full w-full object-cover"
+            style={{ filter: 'saturate(0.7) brightness(0.95)' }}
+            onError={() => setImageFailed(true)}
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center bg-gray-200 text-xs font-medium text-gray-400">
+            {line.name.slice(0, 2).toUpperCase()}
+          </div>
+        )}
+      </div>
+
       <button
         type="button"
         onClick={onEditNote}
         disabled={!onEditNote}
-        className={cn('flex-1 text-start', !onEditNote && 'cursor-default')}
+        className={cn('min-w-0 flex-1 text-start', !onEditNote && 'cursor-default')}
       >
         <div className="flex items-center gap-2">
           <span
@@ -64,8 +103,8 @@ const CaptainOrderLine: FC<CaptainOrderLineProps> = ({
         </div>
         {line.comment && (
           <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
-            <MessageSquare className="w-3 h-3" />
-            {line.comment}
+            <MessageSquare className="w-3 h-3 shrink-0" />
+            <span className="truncate">{line.comment}</span>
           </p>
         )}
         <p className="text-xs text-gray-500 mt-0.5">{formatCurrency(line.price * displayQty)}</p>
@@ -108,14 +147,27 @@ const CaptainOrderLine: FC<CaptainOrderLineProps> = ({
           </button>
         )}
 
-        {variant === 'confirmed' && onRemove && (
+        {variant === 'confirmed' && onIncrement && (
+          <button
+            type="button"
+            onClick={onIncrement}
+            disabled={disabled}
+            className="w-9 h-9 rounded-full border border-border flex items-center justify-center disabled:opacity-40"
+            aria-label="Increase"
+            title="Increase quantity"
+          >
+            <Plus className="w-4 h-4" />
+          </button>
+        )}
+
+        {variant === 'confirmed' && showRemove && (
           <button
             type="button"
             onClick={onRemove}
-            disabled={disabled}
+            disabled={removeDisabled}
             className="w-9 h-9 rounded-full border border-red-200 text-red-600 flex items-center justify-center disabled:opacity-40"
-            aria-label="Remove item"
-            title="Remove item"
+            aria-label={removeBlocked ? 'Remove item (not permitted)' : 'Remove item'}
+            title={removeTitle}
           >
             <Trash2 className="w-4 h-4" />
           </button>
