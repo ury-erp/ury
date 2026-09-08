@@ -1188,12 +1188,14 @@ def _get_main_cashier_status(pos_profile_name: str) -> dict:
 
 
 @frappe.whitelist()
-def create_pos_opening_entry(pos_profile: str, company: str, balance_details) -> dict:
+def create_pos_opening_entry(pos_profile: str, company: str = None, balance_details=None) -> dict:
     """Create and submit a POS Opening Entry for the ORI native screen.
 
     Wraps the standard ERPNext flow but fills URY-mandatory fields
-    (branch and restaurant) from the selected POS Profile so ORI users do not
-    need to leave the React app.
+    (branch, restaurant, and company) from the selected POS Profile so ORI
+    users do not need to leave the React app, and so a caller cannot submit
+    an Opening Entry against a company the POS Profile isn't actually
+    configured for.
 
     ``balance_details`` may be a JSON string (legacy Desk shape) or a list of
     ``{"mode_of_payment": ..., "opening_amount": ...}`` dicts.
@@ -1213,9 +1215,16 @@ def create_pos_opening_entry(pos_profile: str, company: str, balance_details) ->
         frappe.throw(_("Selected POS Profile has no Branch."))
     if not pos_profile_doc.restaurant:
         frappe.throw(_("Selected POS Profile has no Restaurant."))
+    if not pos_profile_doc.company:
+        frappe.throw(_("Selected POS Profile has no Company."))
 
     if not frappe.has_permission("POS Profile", "read", doc=pos_profile_doc):
         frappe.throw(_("Not permitted to use this POS Profile."), frappe.PermissionError)
+
+    # U24: derive company from the resolved POS Profile the same way
+    # branch/restaurant already are, rather than trusting a caller-supplied
+    # value that may not match the profile at all.
+    company = pos_profile_doc.company
 
     for entry in balance_details or []:
         opening_amount = entry.get("opening_amount") if isinstance(entry, dict) else None
@@ -1677,6 +1686,12 @@ def ensure_payment_mode_accounts(modes, company):
     ("Please set default Cash or Bank account in Mode of Payments ...").
     """
     from ury.ury.dev_seed.profiles import _ensure_mode_of_payment
+
+    # Mode of Payment / Account records are accounts-configuration data, so
+    # require the same permission ERPNext's own Mode of Payment desk form
+    # requires -- not just any authenticated session.
+    if not frappe.has_permission("Mode of Payment", "create") or not frappe.has_permission("Account", "create"):
+        frappe.throw(_("Not permitted"), frappe.PermissionError)
 
     if isinstance(modes, str):
         modes = frappe.parse_json(modes)

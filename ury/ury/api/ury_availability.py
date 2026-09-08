@@ -124,18 +124,36 @@ POLICY_DIRECT_RETAIL = "DIRECT_RETAIL"
 
 
 def _verify_branch_scope(user, branch, company):
-	"""Fail closed unless `branch`/`company` are present; TODO: real session wiring.
+	"""Fail closed unless `branch`/`company` are present, then verify the
+	caller is actually assigned to `branch` (and that `branch` belongs to
+	`company`) before any availability data for it is returned.
 
-	TODO(server-authoritative scope): wire this to the real session/permission
-	system once one is available in this codebase's request context -- verify
-	`user`'s POS Profile / assigned branch and company against `branch`/
-	`company`, per V3-40 ("derive or verify it server-side against the
-	session user, POS Profile, document permission"). Until then this
-	function only enforces that branch/company are non-empty (never trusts a
-	blank/missing scope), which is the fail-closed half of that requirement.
+	Mirrors the branch-assignment check used elsewhere in this codebase
+	(e.g. `ury/ury_pos/api.py:getBranch()` and
+	`self_ordering.py:assign_device_table()`'s table-branch check): a user
+	is scoped to a branch via the `URY User` child table on `Branch`
+	(`tabURY User.parent == Branch.name`, `tabURY User.user == user`).
+	System Manager / URY Admin are treated as branch-agnostic staff who
+	manage availability across branches, consistent with the manager-role
+	handling in `ury_kot_item_execution_service.py`.
 	"""
 	if not branch or not company:
 		frappe.throw(_("Branch and company are required"), frappe.ValidationError)
+
+	if user == "Administrator":
+		return
+
+	roles = set(frappe.get_roles(user))
+	if roles & {"System Manager", "URY Admin"}:
+		return
+
+	branch_company = frappe.db.get_value("Branch", branch, "company")
+	if branch_company and branch_company != company:
+		frappe.throw(_("Branch does not belong to the given company"), frappe.PermissionError)
+
+	assigned = frappe.db.exists("URY User", {"parenttype": "Branch", "parent": branch, "user": user})
+	if not assigned:
+		frappe.throw(_("You are not permitted to view availability for this branch"), frappe.PermissionError)
 
 
 def _resolve_production_config(item_code, branch, company, department=None):
