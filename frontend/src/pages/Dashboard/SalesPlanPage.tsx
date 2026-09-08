@@ -161,7 +161,7 @@ const LifecycleStepper: React.FC<LifecycleStepperProps> = ({ status }) => {
 
 export const SalesPlanPage: React.FC = () => {
   const { activeBranchId } = useBranchContext();
-  const { isManager } = useAuth();
+  const { isManager, isLoading: authLoading } = useAuth();
   const [planDate, setPlanDate] = useState(getToday);
   const [items, setItems] = useState<SalesPlanItem[]>([]);
   const [historyScope, setHistoryScope] = useState<Pick<ComparableHistoryResponse, 'branch' | 'company' | 'plan_date'> | null>(null);
@@ -255,7 +255,7 @@ export const SalesPlanPage: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [activeBranchId, planDate]);
+  }, [activeBranchId, planDate, authLoading]);
 
   const filteredItems = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
