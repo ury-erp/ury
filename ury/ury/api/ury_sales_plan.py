@@ -77,6 +77,13 @@ def snapshot_item(row):
 
 def append_audit(doc, from_state, to_state, actor):
     audits = doc.get("audit_log") or []
+    # audit_log is a Long Text (JSON) field: once a plan has gone through one
+    # transition and been saved, the stored value is a JSON string, not a
+    # Python list -- doc.get() returns it verbatim. Every transition after
+    # the first must decode it back into a list before appending, or this
+    # throws AttributeError on any plan with existing audit history.
+    if isinstance(audits, str):
+        audits = json.loads(audits) if audits else []
     audits.append({"from_state": from_state, "to_state": to_state, "actor": actor, "branch": doc.get("branch"), "company": doc.get("company")})
     doc.audit_log = audits
 
