@@ -112,6 +112,12 @@ export interface WastageRow {
   component_item: string;
   wasted_qty: number;
   status: string;
+  reason_category?: string;
+  reason_notes?: string;
+  captured_by?: string;
+  captured_on?: string;
+  approved_by?: string;
+  approved_on?: string;
   department: string;
   branch?: string;
   company?: string;
@@ -192,6 +198,16 @@ const normalizeWastage = (row: any): WastageRow => ({
   company: row.company,
   valuation_rate: row.valuation_rate !== undefined ? Number(row.valuation_rate) : undefined,
   valuation_amount: row.valuation_amount !== undefined ? Number(row.valuation_amount) : undefined,
+  // Frappe returns "" (not null) for an unset Data/Datetime field via
+  // frappe.get_all, so `|| undefined` (truthiness) is required here, not
+  // `?? undefined` -- otherwise an unset field survives as "" and passes
+  // downstream `!== undefined` guards as if it had a real value.
+  reason_category: row.reason_category || undefined,
+  reason_notes: row.reason_notes || undefined,
+  captured_by: row.captured_by || undefined,
+  captured_on: row.captured_on || undefined,
+  approved_by: row.approved_by || undefined,
+  approved_on: row.approved_on || undefined,
 });
 
 export const departmentStockService = {

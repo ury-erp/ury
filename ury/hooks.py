@@ -231,12 +231,12 @@ scheduler_events = {
 			"ury.ury.api.ury_kot_validation.kotValidationThread",
 			"ury.ury.api.ury_fulfilment_posting_service.recover_pending_posting_intents",
 		]
-	}
+	},
+	"daily": [
+		"ury.ury.dev_seed.demo_runner.seed_all"
+	]
 # 	"all": [
 # 		"ury.tasks.all"
-# 	],
-# 	"daily": [
-# 		"ury.tasks.daily"
 # 	],
 # 	"hourly": [
 # 		"ury.tasks.hourly"

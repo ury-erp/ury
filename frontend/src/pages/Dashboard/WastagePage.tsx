@@ -18,6 +18,12 @@ import {
   numericCellClass,
 } from '@ury/ui';
 import { getLoggedUser, getUserRoles } from '@ury/core';
+
+// Mirrors the identical helper in StockReservationPage.tsx / PaymentTerminalPage.tsx.
+const formatDateTime = (value?: string) => {
+  if (!value) return '';
+  return new Date(value).toLocaleString();
+};
 import { useBranchContext } from '../../context/BranchContext';
 import { DeskLink } from '../../components/DeskLink';
 import { departmentStockService, DepartmentOption, WastageRow } from '../../services/departmentStock';
@@ -235,17 +241,16 @@ const WastageContent: React.FC = () => {
   /**
    * KPI figures computed strictly from `listWastage()`'s real rows. The
    * `URY Issue Wastage` backend list endpoint
-   * (`ury.ury.api.ury_wastage.list_wastage`) does not currently return a
-   * `creation`/timestamp, `stock_uom`, `reason_category`, `owner`, or
-   * `issue_authorization` field -- only `name`, `component_item`,
-   * `wasted_qty`, `status`, `department`, `branch`, `company`,
-   * `valuation_rate`, and `valuation_amount`. So "largest cause" and
-   * "highest department" below use what's actually returned: department is
-   * present, but reason category is not, so a cause breakdown is omitted
-   * rather than fabricated. A "% of sales" stat was also considered per the
-   * task brief, but no real daily sales figure is available from any
-   * existing service in this frontend (there is no `uryDashboardService`
-   * module), so it is omitted too.
+   * (`ury.ury.api.ury_wastage.list_wastage`) does not return `stock_uom` or
+   * `issue_authorization`, so those can't drive a KPI. It does now return
+   * `reason_category`, `captured_on`/`approved_on` (timestamps), and
+   * `captured_by`/`approved_by` (in place of `owner`), but a cause
+   * breakdown / time-series KPI is not yet computed from them -- they are
+   * shown in the detail drawer only. So "highest department" below uses
+   * what's used today: department is present. A "% of sales" stat was also
+   * considered per the task brief, but no real daily sales figure is
+   * available from any existing service in this frontend (there is no
+   * `uryDashboardService` module), so it is omitted too.
    */
   const kpis = useMemo<KpiItemProps[]>(() => {
     const totalValue = wastageRows.reduce((sum, row) => sum + (row.valuation_amount ?? 0), 0);
@@ -441,6 +446,34 @@ const WastageContent: React.FC = () => {
             )}
             {selectedRow.valuation_amount !== undefined && (
               <KeyValueRow label="Valuation amount" value={`Rs. ${formatCurrency(selectedRow.valuation_amount)}`} />
+            )}
+            {(selectedRow.reason_category || selectedRow.reason_notes) && (
+              <>
+                <DrawerSectionLabel>Reason</DrawerSectionLabel>
+                {selectedRow.reason_category !== undefined && (
+                  <KeyValueRow label="Reason category" value={selectedRow.reason_category} />
+                )}
+                {selectedRow.reason_notes !== undefined && (
+                  <KeyValueRow label="Reason notes" value={selectedRow.reason_notes} />
+                )}
+              </>
+            )}
+            {(selectedRow.captured_by || selectedRow.approved_by) && (
+              <>
+                <DrawerSectionLabel>Audit</DrawerSectionLabel>
+                {selectedRow.captured_by !== undefined && (
+                  <KeyValueRow label="Captured by" value={selectedRow.captured_by} />
+                )}
+                {selectedRow.captured_on !== undefined && (
+                  <KeyValueRow label="Captured on" value={formatDateTime(selectedRow.captured_on)} />
+                )}
+                {selectedRow.approved_by !== undefined && (
+                  <KeyValueRow label="Approved by" value={selectedRow.approved_by} />
+                )}
+                {selectedRow.approved_on !== undefined && (
+                  <KeyValueRow label="Approved on" value={formatDateTime(selectedRow.approved_on)} />
+                )}
+              </>
             )}
             {/* This screen only ever approves/rejects; editing a wastage
                 record's fields still happens in the desk. Rendered only for
