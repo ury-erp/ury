@@ -1,12 +1,21 @@
 import { useEffect, useRef, type MouseEvent as ReactMouseEvent } from 'react';
-import { ArrowRightLeft, Loader2, MoreVertical, Printer, Receipt, UserRound } from 'lucide-react';
+import {
+  ArrowRightLeft,
+  Ban,
+  Loader2,
+  MoreVertical,
+  Printer,
+  Receipt,
+  Split,
+  UserRound,
+} from 'lucide-react';
 import { Button } from '@ury/ui';
 
 /**
  * Captain order screen's secondary-actions overflow menu (PLAN.md §5/§6/§10:
  * "⋯ View order / Reprint KOT / Transfer table / Transfer Captain / Print
  * bill"). "View order" is already the default screen, so this only surfaces
- * the remaining four.
+ * the remaining four, plus Cancel / Split when updating an order.
  *
  * Follows the same overflow-menu convention already established in this app
  * (`TableActionsMenu.tsx` / `OrderActionsMenu.tsx`) — a `Button` + `MoreVertical`
@@ -14,9 +23,9 @@ import { Button } from '@ury/ui';
  * rather than introducing a new `@ury/ui` primitive, since `@ury/ui` doesn't
  * yet ship a `DropdownMenu`/`Sheet` component.
  *
- * Every item is gated by its own `show*` flag, driven by the caller from
- * `useTableOrderContext()`'s real `permissions.*` fields — an item that
- * isn't permitted is not rendered at all, it is never shown disabled.
+ * Most items are gated by their own `show*` flag from real `permissions.*`
+ * fields — an item that isn't permitted is not rendered at all. Split may
+ * render disabled when eligibility fails; Cancel stays behind `cancelAllowed`.
  */
 interface CaptainActionsMenuProps {
   isOpen: boolean;
@@ -31,6 +40,12 @@ interface CaptainActionsMenuProps {
   showPrintBill?: boolean;
   onPrintBill?: () => void;
   isPrintingBill?: boolean;
+  showCancel?: boolean;
+  onCancel?: () => void;
+  cancelDisabled?: boolean;
+  showSplit?: boolean;
+  onSplit?: () => void;
+  splitDisabled?: boolean;
 }
 
 const CaptainActionsMenu = ({
@@ -46,6 +61,12 @@ const CaptainActionsMenu = ({
   showPrintBill = false,
   onPrintBill,
   isPrintingBill = false,
+  showCancel = false,
+  onCancel,
+  cancelDisabled = false,
+  showSplit = false,
+  onSplit,
+  splitDisabled = false,
 }: CaptainActionsMenuProps) => {
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -62,7 +83,14 @@ const CaptainActionsMenu = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isOpen, onOpenChange]);
 
-  if (!showReprintKot && !showTransferTable && !showTransferCaptain && !showPrintBill) {
+  if (
+    !showReprintKot &&
+    !showTransferTable &&
+    !showTransferCaptain &&
+    !showPrintBill &&
+    !showCancel &&
+    !showSplit
+  ) {
     return null;
   }
 
@@ -93,6 +121,18 @@ const CaptainActionsMenu = ({
     event.stopPropagation();
     onOpenChange(false);
     onPrintBill?.();
+  };
+
+  const handleCancel = (event: ReactMouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    onOpenChange(false);
+    onCancel?.();
+  };
+
+  const handleSplit = (event: ReactMouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    onOpenChange(false);
+    onSplit?.();
   };
 
   return (
@@ -158,6 +198,28 @@ const CaptainActionsMenu = ({
                 <Receipt className="h-4 w-4 shrink-0" />
               )}
               Print bill
+            </Button>
+          )}
+          {showSplit && (
+            <Button
+              variant="ghost"
+              className="flex h-auto w-full justify-start gap-2 rounded-none px-4 py-2.5 text-sm font-normal text-gray-700 hover:bg-gray-100"
+              onClick={handleSplit}
+              disabled={splitDisabled}
+            >
+              <Split className="h-4 w-4 shrink-0" />
+              Split
+            </Button>
+          )}
+          {showCancel && (
+            <Button
+              variant="ghost"
+              className="flex h-auto w-full justify-start gap-2 rounded-none px-4 py-2.5 text-sm font-normal text-red-700 hover:bg-red-50"
+              onClick={handleCancel}
+              disabled={cancelDisabled}
+            >
+              <Ban className="h-4 w-4 shrink-0" />
+              Cancel
             </Button>
           )}
         </div>

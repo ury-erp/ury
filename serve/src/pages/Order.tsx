@@ -1,7 +1,7 @@
 import { apiErrorMessage } from '../lib/api-error'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ChevronLeft, ClipboardList, Loader2, UtensilsCrossed } from 'lucide-react'
+import { ChevronLeft, ClipboardList, Loader2, MessageSquare, UtensilsCrossed } from 'lucide-react'
 import {
   Button,
   CommentDialog,
@@ -495,12 +495,6 @@ export default function OrderPage() {
         </div>
       )}
 
-      {canModify && (
-        <Button variant="outline" className="w-full justify-start" disabled={isInteractionDisabled} onClick={() => setOrderNoteOpen(true)}>
-          <span className="truncate">{orderComment ? `Order note: ${orderComment}` : 'Add order note'}</span>
-        </Button>
-      )}
-
       {activeOrders.length === 0 && alreadyOrderedLines.length === 0 ? (
         <div className="flex flex-col items-center py-16 text-center">
           <ClipboardList className="mb-3 h-10 w-10 text-gray-300" />
@@ -603,9 +597,12 @@ export default function OrderPage() {
     )
   }
 
+  const showSplitAction = Boolean(invoiceId) && (isTakeaway ? canModify : Boolean(permissions?.modify))
+  const showCancelAction = Boolean(cancelAllowed && invoiceId)
+
   return (
-    <div className="flex min-h-screen flex-col bg-gray-50">
-      <div className="sticky top-0 z-20 flex items-center justify-between border-b border-border bg-white px-3 py-3">
+    <div className="flex h-screen flex-col overflow-hidden bg-gray-50">
+      <div className="z-20 flex shrink-0 items-center justify-between border-b border-border bg-white px-3 py-3">
         <div className="flex items-center gap-2">
           <Button onClick={() => navigate('/')} variant="ghost" size="icon" aria-label="Back">
             <ChevronLeft className="h-5 w-5" />
@@ -644,95 +641,100 @@ export default function OrderPage() {
               </button>
             </div>
           )}
-          {!isTakeaway && (
-            <CaptainActionsMenu
-              isOpen={isActionsOpen}
-              onOpenChange={setIsActionsOpen}
-              showReprintKot={permissions?.reprint_kot}
-              onReprintKot={async () => {
-                if (!invoiceId || submitting) return
-                setIsReprintingKot(true)
-                try {
-                  await reprintKot(invoiceId)
-                  showToast.success('KOT reprinted')
-                } catch (e) {
-                  showToast.error(e instanceof Error ? e.message : 'KOT reprint failed')
-                } finally {
-                  setIsReprintingKot(false)
-                }
-              }}
-              isReprintingKot={isReprintingKot}
-              showTransferTable={
-                Boolean(permissions?.transfer_table) &&
-                parseMergedWith(context?.order?.custom_merged_tables).length === 0
+          <CaptainActionsMenu
+            isOpen={isActionsOpen}
+            onOpenChange={setIsActionsOpen}
+            showReprintKot={!isTakeaway && Boolean(permissions?.reprint_kot)}
+            onReprintKot={async () => {
+              if (!invoiceId || submitting) return
+              setIsReprintingKot(true)
+              try {
+                await reprintKot(invoiceId)
+                showToast.success('KOT reprinted')
+              } catch (e) {
+                showToast.error(e instanceof Error ? e.message : 'KOT reprint failed')
+              } finally {
+                setIsReprintingKot(false)
               }
-              onTransferTable={async () => {
-                if (submitting || !invoiceId || !table || !posProfile?.branch) return
-                if (parseMergedWith(context?.order?.custom_merged_tables).length > 0) {
-                  showToast.error('Unmerge tables before transferring')
-                  return
+            }}
+            isReprintingKot={isReprintingKot}
+            showTransferTable={
+              !isTakeaway &&
+              Boolean(permissions?.transfer_table) &&
+              parseMergedWith(context?.order?.custom_merged_tables).length === 0
+            }
+            onTransferTable={async () => {
+              if (submitting || !invoiceId || !table || !posProfile?.branch) return
+              if (parseMergedWith(context?.order?.custom_merged_tables).length > 0) {
+                showToast.error('Unmerge tables before transferring')
+                return
+              }
+              setTransferLoading(true)
+              setTransferOpen(true)
+              try {
+                setTransferDestinations(await getVacantTablesForBranch(posProfile.branch, table))
+              } catch (e) {
+                setTransferOpen(false)
+                showToast.error(e instanceof Error ? e.message : 'Failed to load tables')
+              } finally {
+                setTransferLoading(false)
+              }
+            }}
+            showTransferCaptain={!isTakeaway && Boolean(permissions?.transfer_captain)}
+            onTransferCaptain={() => setCaptainOpen(true)}
+            showPrintBill={!isTakeaway && Boolean(permissions?.print_bill)}
+            onPrintBill={async () => {
+              if (!invoiceId || !posProfile || submitting) return
+              setIsPrintingBill(true)
+              try {
+                await printOrder({
+                  orderId: invoiceId,
+                  posProfile,
+                  printFormat: resolvePrintFormat(context?.order ?? {}, posProfile.print_format),
+                })
+                showToast.success('Printed')
+                const refreshed = await refreshContext()
+                if (!refreshed) {
+                  showToast.error(
+                    'Printed, but could not refresh permissions. Reload the table.'
+                  )
                 }
-                setTransferLoading(true)
-                setTransferOpen(true)
-                try {
-                  setTransferDestinations(await getVacantTablesForBranch(posProfile.branch, table))
-                } catch (e) {
-                  setTransferOpen(false)
-                  showToast.error(e instanceof Error ? e.message : 'Failed to load tables')
-                } finally {
-                  setTransferLoading(false)
-                }
-              }}
-              showTransferCaptain={permissions?.transfer_captain}
-              onTransferCaptain={() => setCaptainOpen(true)}
-              showPrintBill={permissions?.print_bill}
-              onPrintBill={async () => {
-                if (!invoiceId || !posProfile || submitting) return
-                setIsPrintingBill(true)
-                try {
-                  await printOrder({
-                    orderId: invoiceId,
-                    posProfile,
-                    printFormat: resolvePrintFormat(context?.order ?? {}, posProfile.print_format),
-                  })
-                  showToast.success('Printed')
-                  const refreshed = await refreshContext()
-                  if (!refreshed) {
-                    showToast.error(
-                      'Printed, but could not refresh permissions. Reload the table.'
-                    )
-                  }
-                } catch (e) {
-                  showToast.error(e instanceof Error ? e.message : 'Print failed')
-                } finally {
-                  setIsPrintingBill(false)
-                }
-              }}
-              isPrintingBill={isPrintingBill}
-            />
-          )}
+              } catch (e) {
+                showToast.error(e instanceof Error ? e.message : 'Print failed')
+              } finally {
+                setIsPrintingBill(false)
+              }
+            }}
+            isPrintingBill={isPrintingBill}
+            showCancel={showCancelAction}
+            onCancel={() => setCancelOpen(true)}
+            cancelDisabled={submitting}
+            showSplit={showSplitAction}
+            onSplit={handleOpenSplit}
+            splitDisabled={submitting || needsReconcile || !splitEligible}
+          />
         </div>
       </div>
 
-      <div className="flex flex-1 flex-col overflow-hidden lg:hidden">
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:hidden">
         {canModify && mode === 'menu' ? <ServeMenu canAddItems={canModify && !isInteractionDisabled} canReduce={canReduce} canRemove={canRemove} /> : renderOrderList()}
       </div>
 
-      <div className="hidden flex-1 overflow-hidden lg:flex lg:flex-col">
-        <div className="flex flex-1 gap-4 overflow-hidden p-3">
+      <div className="hidden min-h-0 flex-1 overflow-hidden lg:flex">
+        <div className="flex min-h-0 flex-1 gap-4 overflow-hidden p-3">
           {canModify && (
-            <div className="min-h-0 flex-1 overflow-hidden rounded-lg border border-border bg-white">
+            <div className="min-h-0 flex-1 overflow-y-auto rounded-lg border border-border bg-white">
               <ServeMenu canAddItems={canModify && !isInteractionDisabled} canReduce={canReduce} canRemove={canRemove} />
             </div>
           )}
-          <div className="min-h-0 flex-1 overflow-hidden rounded-lg border border-border bg-white">
+          <div className="min-h-0 flex-1 overflow-y-auto rounded-lg border border-border bg-white">
             {renderOrderList()}
           </div>
         </div>
       </div>
 
       {canModify && (
-        <div className="sticky bottom-0 space-y-2 border-t border-border bg-white p-3">
+        <div className="z-20 shrink-0 space-y-2 border-t border-border bg-white p-3">
           {needsReconcile && (() => {
             const copy = reconcileBannerCopy({ isTakeaway, reason: reconcileReason })
             return (
@@ -755,20 +757,23 @@ export default function OrderPage() {
             <span className="text-lg font-semibold">{formatCurrency(total)}</span>
           </div>
           <div className="flex gap-2">
-            {cancelAllowed && invoiceId && (
-              <Button variant="outline" onClick={() => setCancelOpen(true)} disabled={submitting}>
-                Cancel
-              </Button>
-            )}
-            {invoiceId && (isTakeaway ? canModify : permissions?.modify) && (
-              <Button
-                variant="outline"
-                onClick={handleOpenSplit}
-                disabled={submitting || needsReconcile || !splitEligible}
-              >
-                Split
-              </Button>
-            )}
+            <Button
+              variant="outline"
+              size="icon"
+              className="relative h-11 w-11 shrink-0"
+              disabled={isInteractionDisabled}
+              onClick={() => setOrderNoteOpen(true)}
+              aria-label={orderComment ? 'Edit order note' : 'Add order note'}
+            >
+              <MessageSquare className="h-5 w-5" />
+              {orderComment ? (
+                <span
+                  className="absolute end-1.5 top-1.5 h-2 w-2 rounded-full bg-blue-600"
+                  data-testid="order-note-indicator"
+                  aria-hidden
+                />
+              ) : null}
+            </Button>
             <Button
               className="flex-1"
               size="lg"
