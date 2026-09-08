@@ -79,6 +79,42 @@ describe('MenuItemCard quantity steppers', () => {
     render(<MenuItemCard name="Raita" priceLabel="Rs. 60" quantity={0} />)
     expect(screen.queryByRole('button', { name: 'Increase Raita' })).not.toBeInTheDocument()
   })
+
+  it('places quantity controls at the bottom-end corner', () => {
+    render(
+      <MenuItemCard
+        name="Soup"
+        priceLabel="Rs. 90"
+        quantity={1}
+        onIncrement={() => undefined}
+        onDecrement={() => undefined}
+      />
+    )
+    const group = screen.getByRole('group', { name: 'Soup quantity 1' })
+    expect(group.className).toMatch(/absolute/)
+    expect(group.className).toMatch(/bottom-2/)
+    expect(group.className).toMatch(/end-2/)
+  })
+})
+
+describe('MenuItemCard configure gestures', () => {
+  it('announces options and opens on Shift+Enter without quick-add', async () => {
+    const user = userEvent.setup()
+    const onClick = vi.fn()
+    const onConfigure = vi.fn()
+    render(
+      <MenuItemCard name="Kebab" priceLabel="Rs. 200" onClick={onClick} onConfigure={onConfigure} />
+    )
+
+    const card = screen.getByRole('button', { name: /Kebab/ })
+    expect(card).toHaveAccessibleName('Kebab. Options available')
+    expect(card).toHaveAttribute('aria-keyshortcuts', 'Shift+Enter')
+
+    card.focus()
+    await user.keyboard('{Shift>}{Enter}{/Shift}')
+    expect(onConfigure).toHaveBeenCalledTimes(1)
+    expect(onClick).not.toHaveBeenCalled()
+  })
 })
 
 describe('ProductConfigurator mobile image sizing', () => {

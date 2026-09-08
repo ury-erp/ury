@@ -1,6 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { Minus, Plus } from 'lucide-react'
 import { cn } from '../lib/cn'
+
+const LONG_PRESS_MS = 500
+const MOVE_SLOP_PX = 10
+const DOUBLE_CLICK_MS = 400
 
 export interface MenuItemCardProps {
   name: string
@@ -8,6 +12,8 @@ export interface MenuItemCardProps {
   imageUrl?: string | null
   course?: string
   onClick?: () => void
+  /** Opens item options (variants/add-ons). Wired to double-click, long-press, and keyboard. */
+  onConfigure?: () => void
   disabled?: boolean
   unavailableMessage?: string | null
   className?: string
@@ -20,7 +26,7 @@ export interface MenuItemCardProps {
 }
 
 function formatQty(quantity: number): string {
-  return Number.isInteger(quantity) ? String(quantity) : String(quantity)
+  return String(quantity)
 }
 
 export function MenuItemCard({
@@ -29,6 +35,7 @@ export function MenuItemCard({
   imageUrl,
   course,
   onClick,
+  onConfigure,
   disabled,
   unavailableMessage,
   className,
@@ -45,26 +52,113 @@ export function MenuItemCard({
   const canIncrement = Boolean(onIncrement) && !isDisabled && !incrementDisabled
   const canDecrement = Boolean(onDecrement) && !isDisabled && !decrementDisabled
 
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pointerOriginRef = useRef<{ x: number; y: number } | null>(null)
+  const suppressClickRef = useRef(false)
+  const lastQuickAddAtRef = useRef(0)
+
   useEffect(() => {
     setImageFailed(false)
   }, [imageUrl])
+
+  useEffect(() => {
+    return () => {
+      if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current)
+    }
+  }, [])
+
+  const clearLongPress = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current)
+      longPressTimerRef.current = null
+    }
+    pointerOriginRef.current = null
+  }
+
+  const handleQuickAdd = () => {
+    if (isDisabled) return
+    if (suppressClickRef.current) {
+      suppressClickRef.current = false
+      return
+    }
+    // Second click of a double-click must not quick-add again.
+    if (onConfigure) {
+      const now = Date.now()
+      if (now - lastQuickAddAtRef.current < DOUBLE_CLICK_MS) {
+        lastQuickAddAtRef.current = 0
+        return
+      }
+      lastQuickAddAtRef.current = now
+    }
+    onClick?.()
+  }
+
+  const handleConfigure = () => {
+    if (isDisabled || !onConfigure) return
+    clearLongPress()
+    onConfigure()
+  }
+
+  const handlePointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    // Ignore non-primary mouse buttons; touch/pen usually report button 0.
+    if (isDisabled || !onConfigure || (e.pointerType === 'mouse' && e.button !== 0)) return
+    clearLongPress()
+    pointerOriginRef.current = { x: e.clientX, y: e.clientY }
+    longPressTimerRef.current = setTimeout(() => {
+      longPressTimerRef.current = null
+      pointerOriginRef.current = null
+      suppressClickRef.current = true
+      onConfigure()
+      // Clear suppression if no click follows (e.g. pointer cancelled).
+      setTimeout(() => {
+        suppressClickRef.current = false
+      }, 50)
+    }, LONG_PRESS_MS)
+  }
+
+  const handlePointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (!pointerOriginRef.current || !longPressTimerRef.current) return
+    const dx = Math.abs(e.clientX - pointerOriginRef.current.x)
+    const dy = Math.abs(e.clientY - pointerOriginRef.current.y)
+    if (dx > MOVE_SLOP_PX || dy > MOVE_SLOP_PX) clearLongPress()
+  }
 
   return (
     <div
       role="button"
       tabIndex={isDisabled ? -1 : 0}
-      aria-label={name}
+      aria-label={onConfigure ? `${name}. Options available` : name}
+      aria-keyshortcuts={onConfigure ? 'Shift+Enter' : undefined}
       className={cn(
-        'flex h-56 cursor-pointer flex-col overflow-hidden rounded-lg bg-white shadow-sm transition-shadow hover:shadow-md',
+        'relative flex h-60 cursor-pointer flex-col overflow-hidden rounded-lg bg-white shadow-sm transition-shadow hover:shadow-md',
         isDisabled && 'pointer-events-none cursor-not-allowed opacity-50',
         className
       )}
-      onClick={isDisabled ? undefined : onClick}
+      onClick={isDisabled ? undefined : handleQuickAdd}
+      onDoubleClick={isDisabled || !onConfigure ? undefined : handleConfigure}
+      onContextMenu={
+        isDisabled || !onConfigure
+          ? undefined
+          : (e) => {
+              e.preventDefault()
+              handleConfigure()
+            }
+      }
+      onPointerDown={onConfigure ? handlePointerDown : undefined}
+      onPointerMove={onConfigure ? handlePointerMove : undefined}
+      onPointerUp={onConfigure ? clearLongPress : undefined}
+      onPointerCancel={onConfigure ? clearLongPress : undefined}
+      onPointerLeave={onConfigure ? clearLongPress : undefined}
       onKeyDown={(e) => {
         if (isDisabled) return
+        if (onConfigure && ((e.key === 'Enter' && e.shiftKey) || e.key === 'ContextMenu')) {
+          e.preventDefault()
+          handleConfigure()
+          return
+        }
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault()
-          onClick?.()
+          handleQuickAdd()
         }
       }}
       aria-disabled={isDisabled || undefined}
