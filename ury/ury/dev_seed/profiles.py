@@ -216,7 +216,7 @@ def _seed_pos_profile(company_name, branch_name, restaurant_name):
         "table_attention_time": 30,
         "custom_kot_naming_series": "KOT-URY-",
         "custom_enable_discount": 1,
-        "custom_multiple_cashier_configuration": 0,
+        "custom_enable_multiple_cashier": 0,
         "custom_enable_kot_reprint": 1,
         "custom_daily_pos_close": 1,
         "custom_edit_order_type": 1,
