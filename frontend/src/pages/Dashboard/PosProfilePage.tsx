@@ -59,6 +59,7 @@ export const PosProfilePage: React.FC = () => {
     applicable_for_users: [{ user: '', default: 0 }], payments: [{ mode_of_payment: '', default: 0 }]
   });
   const [options, setOptions] = useState<any>({ companies: [], warehouses: [], users: [], payments: [] });
+  const [modesWithoutAccounts, setModesWithoutAccounts] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     setAddForm(prev => ({
@@ -99,6 +100,34 @@ export const PosProfilePage: React.FC = () => {
     } catch (e) {
       console.error('Failed to load options', e);
     }
+  };
+
+  const checkPaymentModeAccounts = async (modeNames: string[], company: string) => {
+    if (!company || modeNames.length === 0) {
+      setModesWithoutAccounts(new Set());
+      return;
+    }
+
+    const missing = new Set<string>();
+    for (const modeName of modeNames) {
+      if (!modeName) continue;
+      try {
+        const res = await call<any>('frappe.client.get', {
+          doctype: 'Mode of Payment',
+          name: modeName,
+        });
+        const modeDoc = res.message || res;
+        const accounts = modeDoc.accounts || [];
+        const hasAccountForCompany = accounts.some((row: any) => row.company === company && row.default_account);
+        if (!hasAccountForCompany) {
+          missing.add(modeName);
+        }
+      } catch (e) {
+        console.error(`Failed to check Mode of Payment ${modeName}:`, e);
+        missing.add(modeName);
+      }
+    }
+    setModesWithoutAccounts(missing);
   };
 
   const handleAddProfile = async (e: React.FormEvent) => {
@@ -212,6 +241,12 @@ export const PosProfilePage: React.FC = () => {
       };
       setProfileForm(initialForm);
       setOriginalProfileForm(initialForm);
+
+      // Check which payment modes lack default accounts for this company
+      const modeNames = (profile.payments || [])
+        .map((p: any) => p.mode_of_payment)
+        .filter((m: any) => m);
+      await checkPaymentModeAccounts(modeNames, profile.company);
     } catch {
       setSelectedProfile(null);
     }
@@ -221,6 +256,15 @@ export const PosProfilePage: React.FC = () => {
     fetchProfiles();
     fetchOptions();
   }, [activeBranchId]);
+
+  useEffect(() => {
+    if (selectedProfile && profileForm.company && profileForm.payments) {
+      const modeNames = (profileForm.payments || [])
+        .map((p: any) => p.mode_of_payment)
+        .filter((m: any) => m);
+      checkPaymentModeAccounts(modeNames, profileForm.company);
+    }
+  }, [profileForm.company, profileForm.payments, selectedProfile]);
 
   // View Mode: Open read-only detail view
   const handleProfileView = (profile: PosProfileRecord) => {
@@ -625,47 +669,57 @@ export const PosProfilePage: React.FC = () => {
                     Mode of Payment
                   </h4>
                   <div className="space-y-2 mb-3">
-                    {(profileForm.payments || []).map((row: any, idx: number) => (
-                      <div key={idx} className="flex gap-2 items-center">
-                        <div className="flex-1">
-                          <SearchableSelect
-                            id={`payment_${idx}`}
-                            disabled={!isEditMode}
-                            value={row.mode_of_payment || ''}
-                            onChange={(_, val) => {
-                              const newRows = [...(profileForm.payments || [])];
-                              newRows[idx].mode_of_payment = val;
+                    {(profileForm.payments || []).map((row: any, idx: number) => {
+                      const modeName = row.mode_of_payment;
+                      const isMissingAccount = modeName && modesWithoutAccounts.has(modeName);
+                      return (
+                        <div key={idx} className={`flex gap-2 items-center ${isMissingAccount ? 'relative' : ''}`}>
+                          <div className="flex-1">
+                            <SearchableSelect
+                              id={`payment_${idx}`}
+                              disabled={!isEditMode}
+                              value={row.mode_of_payment || ''}
+                              onChange={(_, val) => {
+                                const newRows = [...(profileForm.payments || [])];
+                                newRows[idx].mode_of_payment = val;
+                                setProfileForm({...profileForm, payments: newRows});
+                              }}
+                              options={[
+                                { value: '', label: 'Select Payment Mode' },
+                                ...options.payments.map((p: any) => ({ value: p.name, label: p.name }))
+                              ]}
+                              placeholder="Select Payment Mode"
+                            />
+                            {isMissingAccount && (
+                              <div className="text-xs text-red-600 dark:text-red-400 mt-1 flex items-center gap-1">
+                                <span className="inline-block w-1.5 h-1.5 bg-red-600 dark:bg-red-400 rounded-full"></span>
+                                <span>No default account configured for this mode in {profileForm.company}</span>
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <Switch
+                              disabled={!isEditMode}
+                              checked={row.default === 1}
+                              onCheckedChange={checked => {
+                                const newRows = [...(profileForm.payments || [])];
+                                newRows[idx].default = checked ? 1 : 0;
+                                setProfileForm({...profileForm, payments: newRows});
+                              }}
+                            />
+                            <span>Default</span>
+                          </div>
+                          {isEditMode && (
+                            <button type="button" className="text-muted-foreground hover:text-red-500 p-1" onClick={() => {
+                              const newRows = (profileForm.payments || []).filter((_: any, i: number) => i !== idx);
                               setProfileForm({...profileForm, payments: newRows});
-                            }}
-                            options={[
-                              { value: '', label: 'Select Payment Mode' },
-                              ...options.payments.map((p: any) => ({ value: p.name, label: p.name }))
-                            ]}
-                            placeholder="Select Payment Mode"
-                          />
+                            }}>
+                              <X className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
-                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                          <Switch
-                            disabled={!isEditMode}
-                            checked={row.default === 1}
-                            onCheckedChange={checked => {
-                              const newRows = [...(profileForm.payments || [])];
-                              newRows[idx].default = checked ? 1 : 0;
-                              setProfileForm({...profileForm, payments: newRows});
-                            }}
-                          />
-                          <span>Default</span>
-                        </div>
-                        {isEditMode && (
-                          <button type="button" className="text-muted-foreground hover:text-red-500 p-1" onClick={() => {
-                            const newRows = (profileForm.payments || []).filter((_: any, i: number) => i !== idx);
-                            setProfileForm({...profileForm, payments: newRows});
-                          }}>
-                            <X className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                   {isEditMode && (
                     <Button
