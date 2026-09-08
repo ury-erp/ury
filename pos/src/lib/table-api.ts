@@ -303,3 +303,21 @@ export async function getActiveReservations(branch?: string): Promise<TableReser
   });
   return response.message ?? [];
 }
+
+export async function getAvailableTablesForReservation(
+  branch: string,
+  reservedAt: string,
+  excludeReservation?: string
+): Promise<Table[]> {
+  const { call } = await import('@ury/core');
+
+  const response = await call.get(
+    'ury.ury.api.table_reservation.get_available_tables_for_reservation',
+    {
+      branch,
+      reserved_at: reservedAt,
+      exclude_reservation: excludeReservation || undefined,
+    }
+  );
+  return response.message ?? [];
+}
