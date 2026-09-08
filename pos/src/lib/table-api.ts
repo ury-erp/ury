@@ -295,11 +295,12 @@ export async function updateTableReservationStatus(reservationName: string, stat
   return response.message;
 }
 
-export async function getActiveReservations(branch?: string): Promise<TableReservation[]> {
+export async function getActiveReservations(branch?: string, date?: string): Promise<TableReservation[]> {
   const { call } = await import('@ury/core');
   
   const response = await call.get('ury.ury.api.table_reservation.get_active_reservations', {
     branch: branch || undefined,
+    date: date || undefined,
   });
   return response.message ?? [];
 }

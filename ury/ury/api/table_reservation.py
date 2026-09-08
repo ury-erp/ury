@@ -672,9 +672,12 @@ def sync_branch_table_occupancy(branch=None):
 
 
 @frappe.whitelist()
-def get_active_reservations(branch=None):
+def get_active_reservations(branch=None, date=None):
     """
-    Returns reservations for the current active POS session for a branch.
+    Returns reservations for a branch based on calendar date.
+    If date is provided (YYYY-MM-DD), returns reservations for that specific calendar day.
+    If date is not provided, returns reservations for current calendar date onwards (today + all future dates).
+    Past calendar dates (< today) are excluded.
     Auto-processes past-due Confirmed reservations to 'No Show' server-side.
     Cleans up stale table occupied flags if no open invoice/reservation exists.
     """
@@ -686,27 +689,32 @@ def get_active_reservations(branch=None):
         if not branch:
             return []
 
-        active_opening = get_current_pos_opening_entry(branch)
-        session_clause = ""
+        now = now_datetime()
+        today_date = now.date()
+        today_start_str = f"{today_date.strftime('%Y-%m-%d')} 00:00:00"
+
         params = [branch]
 
-        if active_opening:
-            session_name = active_opening.name
-            session_start = parse_to_datetime(
-                active_opening.get("period_start_date") or active_opening.get("creation"),
-                now_datetime()
-            )
-            session_clause = """
-                AND (
-                    pos_opening_entry = %s
-                    OR status IN ('Confirmed', 'Active')
-                    OR (
-                        (pos_opening_entry IS NULL OR pos_opening_entry = '')
-                        AND reserved_at >= %s
-                    )
-                )
-            """
-            params.extend([session_name, session_start])
+        if date:
+            # Parse requested date safely
+            try:
+                if isinstance(date, str):
+                    target_date = datetime.strptime(date.strip()[:10], "%Y-%m-%d").date()
+                elif hasattr(date, "date"):
+                    target_date = date.date()
+                else:
+                    target_date = today_date
+            except Exception:
+                target_date = today_date
+
+            day_start_str = f"{target_date.strftime('%Y-%m-%d')} 00:00:00"
+            day_end_str = f"{target_date.strftime('%Y-%m-%d')} 23:59:59"
+            date_clause = "AND reserved_at >= %s AND reserved_at <= %s"
+            params.extend([day_start_str, day_end_str])
+        else:
+            # Current calendar date + all future calendar dates
+            date_clause = "AND reserved_at >= %s"
+            params.append(today_start_str)
 
         query = f"""
             SELECT
@@ -714,7 +722,7 @@ def get_active_reservations(branch=None):
                 customer_phone, no_of_pax, reserved_at, comments, status, pos_opening_entry
             FROM `tabURY Table Reservation`
             WHERE branch = %s
-              {session_clause}
+              {date_clause}
             ORDER BY reserved_at ASC
         """
 
