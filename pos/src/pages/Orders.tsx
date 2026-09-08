@@ -679,19 +679,32 @@ export default function Orders() {
               <div className="mb-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('order.items_title')}</h3>
                 <div className="space-y-3">
-                  {selectedOrderItems.filter((item) => !item.is_disposable).map((item, index) => (
-                    <div key={index} className="flex justify-between items-start py-2 border-b border-gray-100">
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-900">{item.item_name}</p>
-                        <p className="text-xs text-gray-500">Qty: {item.qty}</p>
+                  {selectedOrderItems.filter((item) => !item.is_disposable).map((item, index) => {
+                    const discountPercentage = item.rate < item.price_list_rate
+                      ? Math.round(((item.price_list_rate - item.rate) / item.price_list_rate) * 100)
+                      : null;
+
+                    return (
+                      <div key={index} className="flex justify-between items-start py-2 border-b border-gray-100">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-medium text-gray-900">{item.item_name}</p>
+                            {discountPercentage !== null && (
+                              <Badge className="shrink-0 bg-red-50 text-red-700 border-red-200 hover:bg-red-50 text-xs">
+                                -{discountPercentage}%
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-500">Qty: {item.qty}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-semibold text-gray-900">
+                            {formatCurrency(item.amount)}
+                          </p>
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <p className="text-sm font-semibold text-gray-900">
-                          {formatCurrency(item.amount)}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 
