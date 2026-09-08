@@ -272,6 +272,20 @@ def _seed_pos_profile(company_name, branch_name, restaurant_name):
                 pos_doc.set(fieldname, value)
                 dirty = True
                 continue
+        if fieldname in {
+            "income_account", "expense_account", "write_off_account",
+        } and pos_doc.get(fieldname):
+            account_company = frappe.db.get_value("Account", pos_doc.get(fieldname), "company")
+            if account_company and account_company != company_name:
+                pos_doc.set(fieldname, value)
+                dirty = True
+                continue
+        if fieldname in {"cost_center", "write_off_cost_center"} and pos_doc.get(fieldname):
+            cost_center_company = frappe.db.get_value("Cost Center", pos_doc.get(fieldname), "company")
+            if cost_center_company and cost_center_company != company_name:
+                pos_doc.set(fieldname, value)
+                dirty = True
+                continue
         if not pos_doc.get(fieldname):
             pos_doc.set(fieldname, value)
             dirty = True
