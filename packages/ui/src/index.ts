@@ -33,6 +33,7 @@ export * from './components/product-configurator';
 export * from './components/table-picker-dialog';
 export * from './components/user-picker-dialog';
 export * from './components/multi-select-table-dialog';
+export * from './components/table-actions-menu';
 export * from './components/confirm-dialog';
 export * from './components/customer-picker';
 export * from './components/segmented-control';
