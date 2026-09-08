@@ -144,6 +144,14 @@ class TestGetKOTErrors(FrappeTestCase):
 			"Cost Center", {"company": profile.company, "is_group": 0}, "name"
 		)
 		profile.write_off_cost_center = profile.cost_center
+		for payment in profile.payments:
+			account = frappe.db.get_value(
+				"Account", {"company": profile.company, "account_type": "Cash", "is_group": 0}, "name"
+			)
+			if hasattr(payment, "account"):
+				payment.account = account
+			elif hasattr(payment, "default_account"):
+				payment.default_account = account
 		profile.insert(ignore_permissions=True, set_name=POS_PROFILE)
 
 		# The branch field is a fetched/custom field, so force it after insert.
