@@ -78,6 +78,11 @@
                                 <td>{{ frappe.utils.fmt_money(data.cogs or '', currency=currency) }}</td>
                                 <td>{{ data.cogs_percent }}%</td>
                             </tr>
+                            <tr class="bg-gray">
+                                <td class="text-left font-bold">{{ _('Disposables') }}</td>
+                                <td>{{ frappe.utils.fmt_money(data.disposables_cost or '', currency=currency) }}</td>
+                                <td>{{ data.disposables_percent }}%</td>
+                            </tr>
                             <tr>
                                 <td class="text-left font-bold">{{ _('Direct Expenses') }}</td>
                                 <td>{{ frappe.utils.fmt_money(data.total_direct_expenses or '', currency=currency) }}</td>

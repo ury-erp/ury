@@ -40,6 +40,7 @@ SUMMARY_FIELDS = [
 	("tax", "tax_percent", "Tax"),
 	("net_sales", "net_sales_percent", "Net Sales"),
 	("cogs", "cogs_percent", "Cost of Goods Sold"),
+	("disposables_cost", "disposables_percent", "Disposables"),
 	("total_direct_expenses", "total_direct_expenses_percent", "Total Direct Expenses"),
 	("gross_profit", "gross_profit_percent", "Gross Profit/Loss"),
 	("total_employee_costs", "total_employee_costs_percent", "Employee Costs"),
