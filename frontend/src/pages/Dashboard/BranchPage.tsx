@@ -54,7 +54,8 @@ export const BranchPage: React.FC = () => {
 
   // Linked data
   const [menus, setMenus] = useState<{ name: string; menu_name?: string }[]>([]);
-  const [rooms, setRooms] = useState<{ name: string; room_name?: string }[]>([]);
+  const [rooms, setRooms] = useState<{ name: string; room_name?: string; branch?: string }[]>([]);
+  const [addresses, setAddresses] = useState<{ name: string; address_title?: string }[]>([]);
 
   const [isAddDrawerOpen, setIsAddDrawerOpen] = useState(false);
   const [addForm, setAddForm] = useState({
@@ -129,7 +130,7 @@ export const BranchPage: React.FC = () => {
     try {
       const [menuRes, roomRes] = await Promise.all([
         dashboardService.getModuleRecords<{ name: string; menu_name?: string }>('URY Menu', 'all'),
-        dashboardService.getModuleRecords<{ name: string; room_name?: string }>('URY Room', 'all'),
+        dashboardService.getModuleRecords<{ name: string; room_name?: string; branch?: string }>('URY Room', 'all'),
       ]);
       setMenus(menuRes || []);
       setRooms(roomRes || []);
@@ -138,9 +139,54 @@ export const BranchPage: React.FC = () => {
     }
   };
 
+  const fetchAddresses = async () => {
+    try {
+      const res = await call<any>('frappe.client.get_list', {
+        doctype: 'Address',
+        fields: ['name', 'address_title'],
+        limit_page_length: 200,
+      });
+      const list = Array.isArray(res) ? res : (res?.message || []);
+      setAddresses(list || []);
+    } catch (e) {
+      console.error('Failed to load addresses', e);
+    }
+  };
+
+  // Given free text or an existing Address name, return the linked Address doctype
+  // name to store on Branch/URY Restaurant, creating a new Address record if the
+  // text doesn't match an existing one.
+  const resolveAddressOrCreate = async (raw: string): Promise<string> => {
+    const trimmed = (raw || '').trim();
+    if (!trimmed) return '';
+    const existing = addresses.find(
+      (a) => a.name === trimmed || (a.address_title && a.address_title.toLowerCase() === trimmed.toLowerCase())
+    );
+    if (existing) return existing.name;
+    try {
+      const res = await call<any>('frappe.client.insert', {
+        doc: {
+          doctype: 'Address',
+          address_title: trimmed,
+          address_type: 'Billing',
+          address_line1: trimmed,
+          city: trimmed,
+          country: 'India',
+        },
+      });
+      const created = res.message || res;
+      await fetchAddresses();
+      return created.name;
+    } catch (e) {
+      console.error('Failed to create Address', e);
+      throw e;
+    }
+  };
+
   useEffect(() => {
     fetchCompanies();
     fetchLinkedData();
+    fetchAddresses();
     fetchBranchList();
   }, [activeBranchId]);
 
@@ -218,6 +264,32 @@ export const BranchPage: React.FC = () => {
     fetchDetails(branch.name);
   };
 
+  // Small, safe stand-in for a backend after_insert hook: lets a branch that has
+  // no room yet (typically a Branch created directly in Desk, since room creation
+  // today only happens client-side in handleAddBranch) get a default room without
+  // leaving the page.
+  const handleCreateDefaultRoom = async () => {
+    if (!selectedBranch) return;
+    setSaving(true);
+    try {
+      const roomName = `Main Dining - ${selectedBranch.name}`;
+      await call('frappe.client.insert', {
+        doc: {
+          doctype: 'URY Room',
+          name: roomName,
+          room_name: 'Main Dining',
+          branch: selectedBranch.name,
+        },
+      });
+      showToast.success('Default room created');
+      await fetchLinkedData();
+    } catch (err: any) {
+      showToast.error(err.message || 'Failed to create default room');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleAddBranch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!addForm.branchName || !addForm.branchName.trim()) {
@@ -256,10 +328,15 @@ export const BranchPage: React.FC = () => {
         return;
       }
 
+      // Resolve the Address field to a real Address doctype link, creating one if
+      // the user typed a new value that doesn't match an existing record.
+      const resolvedAddress = await resolveAddressOrCreate(addForm.address);
+
       await call('frappe.client.insert', {
         doc: {
           doctype: 'Branch',
           branch: addForm.branchName,
+          address: resolvedAddress,
           user: [{ user: currentUser }]
         }
       });
@@ -281,7 +358,7 @@ export const BranchPage: React.FC = () => {
           invoice_series_prefix: addForm.invoicePrefix,
           aggregator_series_prefix: addForm.aggregatorPrefix,
           tax_id: addForm.taxId,
-          address: addForm.address,
+          address: resolvedAddress,
           default_room: roomName
         }
       });
@@ -299,8 +376,10 @@ export const BranchPage: React.FC = () => {
   const handleSave = async () => {
     if (!selectedBranch) return;
 
-    // Validate invoice series prefix
-    if (!restaurantForm.invoice_series_prefix || !restaurantForm.invoice_series_prefix.trim()) {
+    // Validate invoice series prefix — only relevant when a URY Restaurant actually
+    // exists to save it to. A plain Branch with no linked URY Restaurant (e.g. one
+    // created directly in Desk) must still be editable/savable for its own fields.
+    if (restaurantData && (!restaurantForm.invoice_series_prefix || !restaurantForm.invoice_series_prefix.trim())) {
       showToast.error('Invoice Series Prefix is required');
       return;
     }
@@ -373,13 +452,17 @@ export const BranchPage: React.FC = () => {
         currentBranchName = newBranchName;
       }
 
+      // Resolve the Address field to a real Address doctype link, creating one if
+      // the user typed a new value that doesn't match an existing record.
+      const resolvedAddress = await resolveAddressOrCreate(branchForm.address);
+
       // Save Branch fields (address and custom_no_taxes)
       await call('frappe.client.set_value', {
         doctype: 'Branch',
         name: currentBranchName,
         fieldname: {
           branch: branchForm.branch_name,
-          address: branchForm.address,
+          address: resolvedAddress,
           custom_no_taxes: branchForm.custom_no_taxes ? 1 : 0,
         },
       });
@@ -447,7 +530,7 @@ export const BranchPage: React.FC = () => {
             <div>
               <h2 className="text-lg font-bold text-foreground">Branch: {selectedBranch.branch_name || selectedBranch.name}</h2>
               <p className="text-xs text-muted-foreground">
-                Address: {branchForm.address || 'Not specified'}
+                Address: {addresses.find((a) => a.name === branchForm.address)?.address_title || branchForm.address || 'Not specified'}
               </p>
             </div>
           </div>
@@ -503,11 +586,16 @@ export const BranchPage: React.FC = () => {
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-foreground">Address</label>
-                  <Input
+                  <SearchableSelect
+                    id="branch_address"
                     value={branchForm.address || ''}
-                    onChange={(e) => setBranchForm(p => ({ ...p, address: e.target.value }))}
+                    onChange={(_, val) => setBranchForm(p => ({ ...p, address: val }))}
+                    options={[
+                      { value: '', label: 'None' },
+                      ...addresses.map((a) => ({ value: a.name, label: a.address_title || a.name }))
+                    ]}
                     disabled={!isEditMode}
-                    className="rounded-lg"
+                    placeholder="Search or type a new address"
                   />
                 </div>
               </div>
@@ -734,7 +822,32 @@ export const BranchPage: React.FC = () => {
                   </div>
                 </div>
               ) : (
-                <p className="text-sm text-muted-foreground">No URY Restaurant linked to this branch.</p>
+                (() => {
+                  const branchRooms = rooms.filter((r) => r.branch === selectedBranch?.name);
+                  return (
+                    <div className="space-y-3">
+                      <p className="text-sm text-muted-foreground">
+                        No URY Restaurant linked to this branch, so room/menu assignment isn't available yet.
+                      </p>
+                      {branchRooms.length > 0 ? (
+                        <ul className="text-sm text-foreground list-disc list-inside">
+                          {branchRooms.map((r) => (
+                            <li key={r.name}>{r.room_name || r.name}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <div className="flex items-center gap-3">
+                          <p className="text-sm text-muted-foreground">This branch has no room yet.</p>
+                          {isEditMode && (
+                            <Button type="button" variant="outline" size="sm" onClick={handleCreateDefaultRoom} disabled={saving}>
+                              Create Default Room
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()
               )}
             </div>
 
@@ -940,7 +1053,16 @@ export const BranchPage: React.FC = () => {
           </div>
           <div>
             <label className="block font-semibold text-foreground mb-1.5">Address (Optional)</label>
-            <Input value={addForm.address} onChange={e => setAddForm({...addForm, address: e.target.value})} />
+            <SearchableSelect
+              id="add_branch_address"
+              value={addForm.address}
+              onChange={(_, val) => setAddForm({...addForm, address: val})}
+              options={[
+                { value: '', label: 'None' },
+                ...addresses.map((a) => ({ value: a.name, label: a.address_title || a.name }))
+              ]}
+              placeholder="Search or type a new address"
+            />
           </div>
           <div className="pt-6 flex justify-end gap-3 border-t border-border">
             <Button type="button" variant="outline" onClick={() => setIsAddDrawerOpen(false)}>Cancel</Button>
