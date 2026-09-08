@@ -702,3 +702,120 @@ def get_active_reservations(branch=None):
     except Exception as e:
         frappe.log_error(f"Error in get_active_reservations: {str(e)}", "Reservation Error")
         return []
+
+
+@frappe.whitelist()
+def get_available_tables_for_reservation(branch=None, reserved_at=None, exclude_reservation=None):
+    """
+    Returns the list of tables in the branch that are available for the requested reservation date/time.
+    Filters out:
+    1. Tables that are currently occupied where expected finish time exceeds the reservation time.
+    2. Tables with another Confirmed/Active/Requested reservation overlapping the reservation window.
+    (Excludes exclude_reservation so editing a reservation does not conflict with itself).
+    """
+    if not branch or not reserved_at:
+        return []
+
+    try:
+        current_now = now_datetime()
+        res_start = parse_to_datetime(reserved_at, current_now)
+
+        # 1. Fetch all tables for the branch (excluding takeaway)
+        tables = frappe.db.sql(
+            """
+            SELECT t.name, t.occupied, t.latest_invoice_time, t.is_take_away,
+                   t.restaurant_room, t.table_shape, t.merged_with, t.no_of_seats,
+                   t.layout_x, t.layout_y, t.minimum_seating, t.branch
+            FROM `tabURY Table` t
+            LEFT JOIN `tabURY Room` r ON t.restaurant_room = r.name
+            WHERE (t.branch = %s OR r.branch = %s)
+              AND (t.is_take_away = 0 OR t.is_take_away IS NULL)
+            ORDER BY t.restaurant_room ASC, t.name ASC
+            """,
+            (branch, branch),
+            as_dict=True,
+        )
+
+        if not tables:
+            return []
+
+        # 2. Get Branch reservation settings for duration calculation
+        settings = get_branch_reservation_settings(branch)
+        duration_val = settings.get("avg_table_time_last_day")
+        if not duration_val or flt(duration_val) < 15:
+            duration_val = settings.get("calculated_duration", 60)
+        duration_mins = flt(duration_val)
+        res_end = res_start + timedelta(minutes=duration_mins)
+
+        expected_duration = get_branch_reservation_duration(branch)
+
+        # 3. Check current occupancy conflicts
+        occupied_tables = {t.name: t for t in tables if cint(t.get("occupied") or 0) == 1}
+        occupied_conflicts = set()
+
+        if occupied_tables:
+            table_names = list(occupied_tables.keys())
+            active_invoices = frappe.db.get_all(
+                "POS Invoice",
+                filters={"restaurant_table": ["in", table_names], "docstatus": 0},
+                fields=["restaurant_table", "creation"],
+            )
+            inv_map = {inv.restaurant_table: inv.creation for inv in active_invoices}
+
+            for t_name, t_data in occupied_tables.items():
+                occupied_start_raw = inv_map.get(t_name) or t_data.get("latest_invoice_time") or current_now
+                occupied_start_dt = parse_to_datetime(occupied_start_raw, current_now)
+                expected_finish = occupied_start_dt + timedelta(minutes=expected_duration)
+
+                if expected_finish > res_start:
+                    occupied_conflicts.add(t_name)
+
+        # 4. Check conflicting reservations
+        table_names = [t.name for t in tables]
+        placeholders = ", ".join(["%s"] * len(table_names))
+        res_query = f"""
+            SELECT name, reserved_table, reserved_at, branch
+            FROM `tabURY Table Reservation`
+            WHERE reserved_table IN ({placeholders})
+              AND status IN ('Confirmed', 'Active', 'Requested')
+        """
+        res_params = list(table_names)
+        if exclude_reservation:
+            res_query += " AND name != %s"
+            res_params.append(exclude_reservation)
+
+        existing_reservations = frappe.db.sql(res_query, tuple(res_params), as_dict=True)
+
+        reservation_conflicts = set()
+        branch_settings_cache = {branch: settings}
+
+        for ex in existing_reservations:
+            ex_table = ex.get("reserved_table")
+            ex_start = parse_to_datetime(ex.reserved_at, current_now)
+            ex_branch = ex.get("branch") or branch
+
+            if ex_branch not in branch_settings_cache:
+                branch_settings_cache[ex_branch] = get_branch_reservation_settings(ex_branch)
+            ex_settings = branch_settings_cache[ex_branch]
+
+            ex_dur_val = ex_settings.get("avg_table_time_last_day")
+            if not ex_dur_val or flt(ex_dur_val) < 15:
+                ex_dur_val = ex_settings.get("calculated_duration", 90)
+            ex_dur = flt(ex_dur_val)
+
+            ex_end = ex_start + timedelta(minutes=ex_dur)
+
+            # Overlap check: [ex_start, ex_end] overlaps [res_start, res_end]
+            if ex_start < res_end and res_start < ex_end:
+                reservation_conflicts.add(ex_table)
+
+        # 5. Filter available tables
+        available_tables = [
+            t for t in tables
+            if t.name not in occupied_conflicts and t.name not in reservation_conflicts
+        ]
+
+        return available_tables
+    except Exception as e:
+        frappe.log_error(f"Error in get_available_tables_for_reservation: {str(e)}", "Reservation Availability Error")
+        return []
