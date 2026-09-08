@@ -184,7 +184,52 @@ export default function CaptainTables() {
       return;
     }
 
-    // Occupied by someone else (or occupancy with no resolvable owner):
+    // Occupied table with NO active order in activeOrders (e.g. Completed reservation table)
+    if (ownership === 'occupied-unknown') {
+      try {
+        const orderRes = await getTableOrder(table.name);
+        const existingInvoice = orderRes?.message;
+        if (
+          existingInvoice &&
+          existingInvoice.name &&
+          existingInvoice.docstatus === 0
+        ) {
+          if (
+            existingInvoice.waiter === currentUser ||
+            canAccessOtherCaptainsTables
+          ) {
+            navigate(`/order/table/${table.name}`);
+            return;
+          }
+          const ownerName = ownerNames.get(existingInvoice.waiter) ?? existingInvoice.waiter;
+          showToast.error(ownerName ? `Assigned to ${ownerName}` : 'This table is occupied');
+          return;
+        }
+      } catch {}
+
+      // Table is occupied but has no active invoice/waiter yet (e.g. Completed reservation).
+      // Verify no active Confirmed reservation lock window before opening table.
+      try {
+        const res = await checkTableReservation(table.name);
+        if (
+          res &&
+          (res.is_lock_window_active || isReservationLockWindowActive(res)) &&
+          res.status === 'Confirmed'
+        ) {
+          const timeStr = formatReservationTime(res.reserved_at);
+          showToast.error(`Table ${table.name} is reserved for ${timeStr}. Please choose another table.`);
+          return;
+        }
+      } catch (err) {
+        console.error(err);
+      }
+
+      // Any permitted Order Taker can access and take the order
+      navigate(`/order/table/${table.name}`);
+      return;
+    }
+
+    // Occupied by someone else:
     // elevated/transfer access overrides the base restriction.
     if (canAccessOtherCaptainsTables) {
       navigate(`/order/table/${table.name}`);
