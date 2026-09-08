@@ -46,7 +46,7 @@ class TestKotItemExecutionAuthorization(FrappeTestCase):
 			seed_kot_item_executions("URY KOT-1")
 			start_item_execution("KOTITEM-1", "start-auth-1")
 		doc = harness.docs[ITEM_EXECUTION_DOCTYPE]["ROW-1"]
-		doc.save.assert_not_called()
+		doc.save.assert_called_once_with(ignore_permissions=True)
 		self.assertEqual(doc.state, IN_PREPARATION)
 		self.assertTrue(doc.insert.called)
 		self.assertTrue(doc.insert.call_args.kwargs.get("ignore_permissions"))
@@ -105,7 +105,7 @@ class _ExecutionHarness:
 		return self._select(doctype, filters=filters, fields=fields, limit=limit)
 
 	def sql(self, query, values=None, as_dict=False, pluck=None, **kwargs):
-		if not values:
+		if not values or "kot_item" not in values:
 			return []
 		rows = self._select(ITEM_EXECUTION_DOCTYPE, filters={"kot_item": values["kot_item"]}, limit=1)
 		if pluck:
