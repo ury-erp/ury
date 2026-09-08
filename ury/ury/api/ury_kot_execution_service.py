@@ -185,6 +185,18 @@ def _kot_scope(kot):
 	return row["branch"], company, row.get("production")
 
 
+def _require_kot_branch_scope(branch, user=None):
+	"""Require the KOT branch to match the user's server-side branch scope."""
+	from ury.ury_pos.api import getBranch
+
+	user = user or frappe.session.user
+	if user == "Administrator" or "System Manager" in frappe.get_roles(user):
+		return
+	active_branch = getBranch()
+	if not active_branch or active_branch in {"all", "All", "ALL"} or active_branch != branch:
+		raise ExecutionError(BRANCH_SCOPE_MISMATCH, _("KOT branch {0} is outside your active branch scope").format(branch))
+
+
 # ---------------------------------------------------------------------------
 # Audit
 # ---------------------------------------------------------------------------

@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import frappe
@@ -19,6 +20,36 @@ from ury.ury.api.ury_kot_item_execution_service import (
 )
 
 MODULE = "ury.ury.api.ury_kot_item_execution_service"
+
+
+class TestKotItemExecutionAuthorization(FrappeTestCase):
+	def test_doctype_denies_direct_create_and_write(self):
+		metadata = json.loads(
+			(Path(__file__).parents[1] / "doctype" / "ury_kot_item_execution" / "ury_kot_item_execution.json").read_text()
+		)
+		for permission in metadata["permissions"]:
+			self.assertFalse(permission.get("create", 0), permission["role"])
+			self.assertFalse(permission.get("write", 0), permission["role"])
+
+	def test_transition_is_service_owned_and_uses_permission_bypass(self):
+		harness = _ExecutionHarness()
+		with patch(f"{MODULE}.frappe.db.exists", side_effect=harness.exists), patch(
+			f"{MODULE}.frappe.get_doc", side_effect=harness.get_doc
+		), patch(f"{MODULE}.frappe.get_all", side_effect=harness.get_all), patch(
+			f"{MODULE}.frappe.db.sql", side_effect=harness.sql
+		), patch(f"{MODULE}.frappe.db.get_value", return_value=frappe._dict({"branch": "BR-1", "production": "PU-1"})), patch(
+			f"{MODULE}.frappe.get_roles", return_value=["Chef"]
+		), patch(f"ury.ury.api.ury_kot_execution_service._require_kot_branch_scope"), patch(
+			f"{MODULE}.frappe.session"
+		) as session:
+			session.user = "chef@example.com"
+			seed_kot_item_executions("URY KOT-1")
+			start_item_execution("KOTITEM-1", "start-auth-1")
+		doc = harness.docs[ITEM_EXECUTION_DOCTYPE]["ROW-1"]
+		doc.save.assert_called_once_with(ignore_permissions=True)
+		self.assertEqual(doc.state, IN_PREPARATION)
+		self.assertTrue(doc.insert.called)
+		self.assertTrue(doc.insert.call_args.kwargs.get("ignore_permissions"))
 
 
 def _exists(doctype, name=None):
@@ -64,6 +95,10 @@ class _ExecutionHarness:
 			return self.docs[arg][name]
 		if arg == "URY KOT":
 			return _kot_doc(*args, **kwargs)
+		if arg == "System Settings":
+			return frappe._dict({"time_zone": "UTC"})
+		if arg == "User":
+			return frappe._dict({"user_type": "System User"})
 		raise AssertionError(f"unexpected get_doc lookup: {arg!r}")
 
 	def get_all(self, doctype, filters=None, fields=None, order_by=None, limit=None):
@@ -71,10 +106,12 @@ class _ExecutionHarness:
 			return []
 		return self._select(doctype, filters=filters, fields=fields, limit=limit)
 
-	def sql(self, query, values=None, as_dict=False):
-		if not values:
+	def sql(self, query, values=None, as_dict=False, pluck=None, **kwargs):
+		if not values or "kot_item" not in values:
 			return []
 		rows = self._select(ITEM_EXECUTION_DOCTYPE, filters={"kot_item": values["kot_item"]}, limit=1)
+		if pluck:
+			return [row.get(pluck) for row in rows]
 		return rows
 
 	def _select(self, doctype, filters=None, fields=None, limit=None):
@@ -147,6 +184,10 @@ class TestKotItemExecution(FrappeTestCase):
 		), patch(f"{MODULE}.frappe.db.get_value", return_value=frappe._dict({"branch": "BR-1", "production": "PU-1"})), patch(
 			f"{MODULE}._attach_ready_posting_intent", side_effect=lambda result, actor: result
 		) as mock_ready_posting, patch(
+			f"{MODULE}.frappe.get_roles", return_value=["Chef"]
+		), patch(
+			"ury.ury.api.ury_kot_execution_service._require_kot_branch_scope"
+		), patch(
 			f"{MODULE}.frappe.session"
 		) as session:
 			session.user = "chef@example.com"
