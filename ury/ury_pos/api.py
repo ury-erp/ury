@@ -416,6 +416,14 @@ def get_split_group(invoice):
 
 @frappe.whitelist()
 def getInvoiceForCashier(status, cashier, limit, limit_start):
+    # U27: `cashier` was previously accepted as-is from the caller, so any
+    # authenticated user in a branch could read another cashier's invoices.
+    # Only an elevated role may look up someone else's invoices; everyone
+    # else is scoped to their own session user regardless of what they pass.
+    if cashier != frappe.session.user:
+        elevated_roles = {"System Manager", "URY Manager", "URY Captain"}
+        if not elevated_roles.intersection(frappe.get_roles()):
+            cashier = frappe.session.user
     branch = getBranch()
     updatedlist = []
     limit = int(limit)+1
@@ -1689,7 +1697,9 @@ def ensure_payment_mode_accounts(modes, company):
 
     # Mode of Payment / Account records are accounts-configuration data, so
     # require the same permission ERPNext's own Mode of Payment desk form
-    # requires -- not just any authenticated session.
+    # requires (Accounts Manager / URY Manager per this app's DocPerm
+    # fixtures -- System Manager is NOT granted create on either doctype
+    # here, live-verified) -- not just any authenticated session.
     if not frappe.has_permission("Mode of Payment", "create") or not frappe.has_permission("Account", "create"):
         frappe.throw(_("Not permitted"), frappe.PermissionError)
 
