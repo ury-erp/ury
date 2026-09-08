@@ -184,6 +184,8 @@ class TestKotItemExecution(FrappeTestCase):
 		), patch(f"{MODULE}.frappe.db.get_value", return_value=frappe._dict({"branch": "BR-1", "production": "PU-1"})), patch(
 			f"{MODULE}._attach_ready_posting_intent", side_effect=lambda result, actor: result
 		) as mock_ready_posting, patch(
+			f"{MODULE}.frappe.get_roles", return_value=["Chef"]
+		), patch(
 			f"{MODULE}.frappe.session"
 		) as session:
 			session.user = "chef@example.com"
