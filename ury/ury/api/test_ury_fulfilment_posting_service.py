@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import frappe
@@ -7,6 +8,7 @@ from frappe.tests.utils import FrappeTestCase
 from ury.ury.api.ury_fulfilment_posting_service import (
 	FAILED,
 	POSTED,
+	_authorize_posting,
 	create_or_get_posting_intent_for_ready,
 	process_posting_intent,
 	recover_pending_posting_intents,
@@ -117,6 +119,25 @@ class TestCreatePostingIntent(FrappeTestCase):
 		patcher = patch(f"{MODULE}.now", return_value="2026-09-04 10:00:00")
 		patcher.start()
 		self.addCleanup(patcher.stop)
+		self.addCleanup(patch.stopall)
+		patch(f"{MODULE}.frappe.get_roles", return_value=["Chef"]).start()
+		patch(f"{MODULE}.frappe.has_permission", return_value=True).start()
+
+	def test_end_users_can_read_and_report_but_cannot_directly_mutate_intents(self):
+		metadata = json.loads(
+			(Path(__file__).parents[1] / "doctype" / "ury_fulfilment_posting_intent" / "ury_fulfilment_posting_intent.json").read_text()
+		)
+		permissions = {row["role"]: row for row in metadata["permissions"]}
+		for role in ("Stock Manager", "Production Manager", "Chef", "URY Captain"):
+			self.assertEqual(permissions[role].get("read"), 1)
+			self.assertEqual(permissions[role].get("report"), 1)
+			self.assertNotIn("create", permissions[role])
+			self.assertNotIn("write", permissions[role])
+
+	def test_posting_service_rejects_actor_without_operational_role(self):
+		with patch(f"{MODULE}.frappe.get_roles", return_value=[]):
+			with self.assertRaises(frappe.PermissionError):
+				_authorize_posting("customer@example.com", _execution_doc())
 
 	def test_ready_creates_one_intent_with_frozen_payload(self):
 		created = []
