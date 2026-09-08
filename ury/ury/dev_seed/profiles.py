@@ -90,6 +90,12 @@ def _get_demo_restaurant(branch_name):
 
 
 def _ensure_mode_of_payment(name, company_name=None):
+    """Ensure a Mode of Payment exists and has a default account for the given company.
+
+    This is idempotent: it creates the mode if missing, and ensures the company
+    row has a default_account set (whether the mode was just created or already exists).
+    Handles modes created by dev_seed.operations (Zomato/Swiggy/Direct) or manually.
+    """
     if not frappe.db.exists("Mode of Payment", name):
         doc = frappe.get_doc({"doctype": "Mode of Payment", "mode_of_payment": name, "type": "General"})
         if company_name:
@@ -103,19 +109,25 @@ def _ensure_mode_of_payment(name, company_name=None):
         return name
 
     mop_doc = frappe.get_doc("Mode of Payment", name)
-    existing = [row.company for row in mop_doc.get("accounts", [])]
+
+    # Look for existing company row and fix/update it
     for row in mop_doc.get("accounts", []):
         if row.company == company_name:
             account = _default_mop_account(name, company_name)
-            if account and row.default_account != account:
+            # Set the account if missing or if it differs from what we computed
+            if account and not row.default_account:
+                row.default_account = account
+                mop_doc.save(ignore_permissions=True)
+            elif account and row.default_account != account:
                 row.default_account = account
                 mop_doc.save(ignore_permissions=True)
             return name
-    if company_name not in existing:
-        account = _default_mop_account(name, company_name)
-        if account:
-            mop_doc.append("accounts", {"company": company_name, "default_account": account})
-            mop_doc.save(ignore_permissions=True)
+
+    # Company row doesn't exist, create it
+    account = _default_mop_account(name, company_name)
+    if account:
+        mop_doc.append("accounts", {"company": company_name, "default_account": account})
+        mop_doc.save(ignore_permissions=True)
     return name
 
 
@@ -339,6 +351,14 @@ def _seed_pos_profile(company_name, branch_name, restaurant_name):
             if replacement:
                 payment.set(account_field, replacement)
                 dirty = True
+
+    # Ensure all payment modes (including user-added ones like Zomato/Swiggy/Direct)
+    # have default accounts set on their Mode of Payment records, so saving the POS
+    # Profile doesn't fail backend validation.
+    for payment in pos_doc.get("payments", []):
+        mode = payment.get("mode_of_payment")
+        if mode:
+            _ensure_mode_of_payment(mode, company_name)
 
     if not pos_doc.get("payments"):
         pos_doc.set(
