@@ -477,7 +477,6 @@ export default function Reservations() {
       <TableReservationEditDialog
         open={isEditDialogOpen}
         reservation={editReservation}
-        availableTables={availableTables}
         onOpenChange={setIsEditDialogOpen}
         onConfirm={handleConfirmEdit}
       />

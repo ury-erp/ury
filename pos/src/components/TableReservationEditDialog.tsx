@@ -17,7 +17,12 @@ import {
 import { TableShapeIcon } from './TableShapeIcon';
 import { CustomerPicker } from './CustomerPicker';
 import { DatePicker } from './DatePicker';
-import { getRooms, getTables, extractErrorMessage, type Table, type TableReservation } from '../lib/table-api';
+import {
+  getAvailableTablesForReservation,
+  extractErrorMessage,
+  type Table,
+  type TableReservation,
+} from '../lib/table-api';
 import type { Customer } from '../store/pos-store';
 import { usePOSStore } from '../store/pos-store';
 
@@ -35,7 +40,7 @@ export interface EditReservationFormData {
 interface TableReservationEditDialogProps {
   open: boolean;
   reservation: TableReservation | null;
-  availableTables: Table[];
+  availableTables?: Table[];
   onOpenChange: (open: boolean) => void;
   onConfirm: (data: EditReservationFormData) => Promise<void>;
 }
@@ -43,7 +48,6 @@ interface TableReservationEditDialogProps {
 const TableReservationEditDialog = ({
   open,
   reservation,
-  availableTables,
   onOpenChange,
   onConfirm,
 }: TableReservationEditDialogProps) => {
@@ -51,7 +55,8 @@ const TableReservationEditDialog = ({
   const branch = posProfile?.branch ?? '';
 
   const [selectedTable, setSelectedTable] = useState('');
-  const [internalTables, setInternalTables] = useState<Table[]>([]);
+  const [availableTablesList, setAvailableTablesList] = useState<Table[]>([]);
+  const [loadingTables, setLoadingTables] = useState(false);
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [customerPhone, setCustomerPhone] = useState('');
   const [noOfPax, setNoOfPax] = useState<number>(1);
@@ -61,52 +66,9 @@ const TableReservationEditDialog = ({
   const [loading, setLoading] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
 
-  // Fetch tables if availableTables prop is empty
-  useEffect(() => {
-    if (!open) return;
-    if (availableTables && availableTables.length > 0) return;
+  const targetBranch = reservation?.branch || branch;
 
-    let isMounted = true;
-    (async () => {
-      try {
-        const roomList = await getRooms(branch);
-        let allTables: Table[] = [];
-        for (const r of roomList) {
-          const roomTables = await getTables(r.name);
-          allTables = [...allTables, ...roomTables];
-        }
-        if (isMounted) {
-          setInternalTables(allTables);
-        }
-      } catch (err) {
-        console.error('Failed to load tables for edit reservation dialog:', err);
-      }
-    })();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [open, availableTables, branch]);
-
-  // Combine tables and guarantee existing reserved_table is included
-  const tablesList = useMemo(() => {
-    const source = availableTables && availableTables.length > 0 ? availableTables : internalTables;
-    const list = [...source];
-    const targetTable = reservation?.reserved_table;
-    if (targetTable && !list.some((t) => t.name === targetTable)) {
-      list.unshift({
-        name: targetTable,
-        restaurant_room: 'Current Table',
-        no_of_seats: reservation?.no_of_pax || 2,
-        table_shape: 'Rectangle',
-        occupied: 0,
-        is_take_away: 0,
-        latest_invoice_time: null,
-      });
-    }
-    return list;
-  }, [availableTables, internalTables, reservation]);
-
+  // Initialize form state when dialog opens or reservation changes
   useEffect(() => {
     if (!open || !reservation) return;
 
@@ -130,6 +92,53 @@ const TableReservationEditDialog = ({
       setReservationTime(parts[1] ? parts[1].slice(0, 5) : '19:00');
     }
   }, [open, reservation]);
+
+  // Fetch available tables from backend when branch, date, time, or reservation changes
+  useEffect(() => {
+    if (!open || !targetBranch || !reservationDate || !reservationTime) {
+      setAvailableTablesList([]);
+      return;
+    }
+
+    let isMounted = true;
+    setLoadingTables(true);
+
+    const formattedReservedAt = `${reservationDate} ${
+      reservationTime.length === 5 ? reservationTime + ':00' : reservationTime
+    }`;
+
+    getAvailableTablesForReservation(
+      targetBranch,
+      formattedReservedAt,
+      reservation?.name
+    )
+      .then((tables) => {
+        if (!isMounted) return;
+        const list = tables || [];
+        setAvailableTablesList(list);
+
+        // If the selected table becomes unavailable after date/time change, clear table selection
+        setSelectedTable((prev) => {
+          if (!prev) return '';
+          const isStillAvailable = list.some((t) => t.name === prev);
+          return isStillAvailable ? prev : '';
+        });
+      })
+      .catch((err) => {
+        console.error('Failed to load available tables for reservation:', err);
+      })
+      .finally(() => {
+        if (isMounted) {
+          setLoadingTables(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [open, targetBranch, reservationDate, reservationTime, reservation?.name]);
+
+  const tablesList = availableTablesList;
 
   const handleCustomerChange = (selected: Customer | null) => {
     setCustomer(selected);
@@ -264,12 +273,23 @@ const TableReservationEditDialog = ({
                   value: t.name,
                   label: `${t.name} (${t.restaurant_room} - ${t.no_of_seats || 0} seats)`,
                 }))}
-                placeholder="Select a table"
+                placeholder={
+                  loadingTables
+                    ? 'Loading available tables...'
+                    : tablesList.length === 0
+                    ? 'No available tables'
+                    : 'Select a table'
+                }
                 onChange={(_, val) => setSelectedTable(val)}
-                disabled={loading}
+                disabled={loading || loadingTables}
                 strict
                 openOnFocus={false}
               />
+              {tablesList.length === 0 && !loadingTables && (
+                <p className="text-xs text-amber-600 font-medium">
+                  No tables are available for the selected date and time.
+                </p>
+              )}
             </div>
 
             {/* Customer */}
