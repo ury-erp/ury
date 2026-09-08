@@ -27,7 +27,12 @@ class TestBranchOperationalState(unittest.TestCase):
 	@patch("ury.ury.api.ury_branch_operational_state.getBranch", return_value="Main")
 	@patch("ury.ury.api.ury_branch_operational_state.frappe")
 	def test_closed_exception_wins(self, frappe_mock, _get_branch):
-		frappe_mock.db.get_value.side_effect = [{"name": "Main", "enabled": 1}, {"is_closed": 1, "reason": "Holiday"}]
+		# Three get_value calls in order: schedule config, today's exception,
+		# yesterday's exception (added by the overnight-carryover fix) -- the
+		# third value is irrelevant to this test's assertion (today's closed
+		# exception already wins) but must be present or the mock's
+		# side_effect iterator is exhausted.
+		frappe_mock.db.get_value.side_effect = [{"name": "Main", "enabled": 1}, {"is_closed": 1, "reason": "Holiday"}, None]
 		result = resolve_branch_operational_state(at=datetime(2026, 9, 7, 12))
 		self.assertEqual(result["state"], "OFF_HOURS")
 		self.assertEqual(result["reason"], "Holiday")
