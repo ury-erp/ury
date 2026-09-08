@@ -263,6 +263,12 @@ def _seed_pos_profile(company_name, branch_name, restaurant_name):
     dirty = False
 
     for fieldname, value in fields.items():
+        if fieldname in {
+            "income_account", "expense_account", "cost_center", "warehouse",
+        } and pos_doc.get(fieldname) != value:
+            pos_doc.set(fieldname, value)
+            dirty = True
+            continue
         # Upstream ERPNext validates that linked warehouses belong to the
         # profile company. Repair stale demo profiles created before that
         # validation became strict.
