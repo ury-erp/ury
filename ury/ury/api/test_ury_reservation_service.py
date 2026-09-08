@@ -26,6 +26,7 @@ from ury.ury.api.ury_reservation_service import (
     create_reservation,
     fulfil_reservation,
     release_reservation,
+    _active_reservation_qty,
 )
 
 
@@ -365,6 +366,12 @@ class TestReleaseFulfilCancel(FrappeTestCase):
         return [
             frappe._dict({"name": "RES-1", "status": status, "reservation_group": "GRP9"}),
         ]
+
+    def test_fulfilled_rows_are_not_counted_as_reserved_capacity(self):
+        with patch(f"{MODULE}.frappe.get_all", return_value=[]) as get_all:
+            result = _active_reservation_qty("ITEM-1", "WH-1", "Company")
+        self.assertEqual(result, 0)
+        self.assertEqual(get_all.call_args.kwargs["filters"]["status"], ["in", [RESERVED]])
 
     def test_release_restores_capacity_for_subsequent_reservation(self):
         """Releasing a Reserved row transitions it to Released.

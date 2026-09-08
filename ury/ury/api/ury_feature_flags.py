@@ -6,8 +6,9 @@
 This module is the SOLE read path used by `ury_order.py` to decide whether a
 POS Invoice's stock authority is handled by ERPNext's native
 `update_stock=1` posting (the current, always-on-by-default behavior) or by
-the new fulfilment services from V3-71/V3-72 (an integration STUB — see the
-loud warning below and in `ury_order.py`).
+the fulfilment services from V3-71/V3-72. The replacement path remains
+feature-flagged and operationally gated until its runtime accounting and
+deployment evidence is accepted.
 
 Governing contract:
 tracks/sa-v3_nxt/outputs/V3-70-fulfilment-accounting-transition-checklist.md
@@ -38,9 +39,11 @@ governing contract above -- not a code change.
 """
 
 import frappe
+from frappe import _
 
 FLAG_DOCTYPE = "URY Feature Flags"
 FLAG_FIELD = "pos_stock_authority_v2"
+RESERVATION_DOCTYPE = "URY Stock Reservation"
 
 
 def is_pos_stock_authority_flag_enabled(company=None, branch=None):
@@ -76,35 +79,28 @@ def maybe_wire_fulfilment_on_submit(doc, method=None):
 	execution has reached READY/SERVED, look up a matching URY Stock
 	Reservation and call the appropriate V3-71/V3-72 fulfilment service.
 
-	This does NOT post anything to ERPNext's real stock ledger -- the
-	fulfilment services themselves only record a URY Fulfilment Record with
-	posted_to_erpnext=False, per V3-71/V3-72's own accepted scope. Real
-	ERPNext posting remains explicit future work.
+	The fulfilment services must complete inside the invoice transaction; any
+	missing or ambiguous reservation binding or posting failure aborts submit.
+	The flag remains operationally gated until real-ledger posting evidence is
+	accepted.
 
 	This also does NOT create reservations -- nothing in the accepted V3
 	graph automatically creates a URY Stock Reservation when an order is
 	placed (V3-43 only provides create_reservation as a callable service, it
 	is not wired to any order-creation trigger). So on a real order today,
-	no matching reservation will exist yet, and this function will log a
-	single informational entry and skip that KOT item rather than error --
+	no matching reservation will exist yet, and this function will reject the
+	submit rather than silently bypass stock authority --
 	wiring automatic reservation creation into order/KOT placement is a
 	separate, not-yet-built follow-up.
 
-	Any failure here is caught and logged, never raised, so a fulfilment
-	bookkeeping problem can never block or roll back a real invoice
-	submission -- update_stock was already resolved (to 0, since this path
-	only runs when the flag is on) before this hook runs.
+	When enabled, fulfilment must complete inside the invoice transaction. Any
+	missing reservation or posting failure is raised so the invoice cannot be
+	marked submitted while replacement stock authority is incomplete.
 	"""
 	if not is_pos_stock_authority_flag_enabled(branch=doc.get("branch")):
 		return
 
-	try:
-		_wire_fulfilment_for_invoice(doc)
-	except Exception:
-		frappe.log_error(
-			title="V3-73 flag-on fulfilment wiring failed",
-			message=frappe.get_traceback(),
-		)
+	_wire_fulfilment_for_invoice(doc)
 
 
 def _wire_fulfilment_for_invoice(doc):
@@ -135,28 +131,15 @@ def _wire_fulfilment_for_invoice(doc):
 				"production_policy",
 			)
 
-			reservation = frappe.get_all(
-				"URY Stock Reservation",
-				filters={
-					"order_ref": doc.name,
-					"top_level_item": item_code,
-					"status": "Reserved",
-				},
-				fields=["name"],
-				limit=1,
-			)
-			if not reservation:
-				frappe.log_error(
-					title="V3-73 flag-on: no reservation found",
-					message=(
-						f"KOT {kot.name} item {item_code} on invoice {doc.name} is "
-						"READY/SERVED but no matching URY Stock Reservation exists "
-						"(automatic reservation-on-order-creation is not yet wired "
-						"into the live order flow -- separate follow-up task). "
-						"Skipped, not an error."
+			reservations = _reservation_rows_for_invoice_item(doc, item_code)
+			reservation_ref = _select_reservation_ref(reservations, production_policy, item_code, kot.name)
+			if not reservation_ref:
+				frappe.throw(
+					_("No stock reservation exists for KOT {0}, item {1}; fulfilment cannot be posted.").format(
+						kot.name, item_code
 					),
+					frappe.ValidationError,
 				)
-				continue
 
 			from ury.ury.api.ury_preproduced_fulfilment_service import fulfil_preproduced_order
 			from ury.ury.api.ury_mto_fulfilment_service import fulfil_mto_order
@@ -166,7 +149,7 @@ def _wire_fulfilment_for_invoice(doc):
 					kot=kot.name,
 					item_code=item_code,
 					qty=qty,
-					reservation_group_ref=reservation[0].name,
+					reservation_group_ref=reservation_ref,
 					actor=frappe.session.user,
 					batch_key=f"{kot.name}:{item_code}",
 				)
@@ -175,6 +158,61 @@ def _wire_fulfilment_for_invoice(doc):
 					kot=kot.name,
 					item_code=item_code,
 					qty=qty,
-					reservation_ref=reservation[0].name,
+					reservation_ref=reservation_ref,
 					actor=frappe.session.user,
 				)
+
+
+def _reservation_rows_for_invoice_item(doc, item_code):
+	filters = {
+		"order_ref": doc.name,
+		"top_level_item": item_code,
+		"status": "Reserved",
+	}
+	branch = doc.get("branch")
+	company = doc.get("company")
+	if branch:
+		filters["branch"] = branch
+	if company:
+		filters["company"] = company
+
+	rows = frappe.get_all(
+		RESERVATION_DOCTYPE,
+		filters=filters,
+		fields=["name", "reservation_group"],
+		order_by="creation asc",
+	)
+	if not rows:
+		return []
+	return rows
+
+
+def _select_reservation_ref(reservations, production_policy, item_code, kot_name):
+	if not reservations:
+		return None
+
+	reservation_groups = []
+	for row in reservations:
+		reservation_group = row.get("reservation_group") or row.get("name")
+		if reservation_group:
+			reservation_groups.append(reservation_group)
+
+	if production_policy == "MADE_TO_ORDER":
+		if len(set(reservation_groups)) != 1:
+			frappe.throw(
+				_("KOT {0}, item {1} maps to multiple reservation groups; fulfilment cannot be posted until the line is resolved.").format(
+					kot_name, item_code
+				),
+				frappe.ValidationError,
+			)
+		return reservation_groups[0]
+
+	if len(reservations) != 1:
+		frappe.throw(
+			_("KOT {0}, item {1} maps to multiple stock reservations; fulfilment cannot be posted until the line is resolved.").format(
+				kot_name, item_code
+			),
+			frappe.ValidationError,
+		)
+
+	return reservation_groups[0]
