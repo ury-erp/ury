@@ -193,7 +193,8 @@
    "print": 1,
    "read": 1,
    "report": 1,
-   "role": "Chef"
+   "role": "Chef",
+   "write": 1
   },
   {
    "create": 1,
@@ -202,7 +203,8 @@
    "print": 1,
    "read": 1,
    "report": 1,
-   "role": "URY Captain"
+   "role": "URY Captain",
+   "write": 1
   },
   {
    "create": 1,
