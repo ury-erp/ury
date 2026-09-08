@@ -167,6 +167,7 @@ def _seed_pos_profile(company_name, branch_name, restaurant_name):
     )
     write_off_account = getattr(company_doc, "write_off_account", None) or expense_account
     write_off_cost_center = cost_center
+    change_amount_account = _default_mop_account("Cash", company_name)
 
     warehouse_name = _ensure_warehouse(company_name)
     selling_price_list = _ensure_price_list()
@@ -206,6 +207,7 @@ def _seed_pos_profile(company_name, branch_name, restaurant_name):
         "cost_center": cost_center,
         "write_off_account": write_off_account,
         "write_off_cost_center": write_off_cost_center,
+        "account_for_change_amount": change_amount_account,
         "selling_price_list": selling_price_list,
         "customer": customer,
         "update_stock": 1,
@@ -280,6 +282,7 @@ def _seed_pos_profile(company_name, branch_name, restaurant_name):
     for fieldname, value in fields.items():
         if fieldname in {
             "income_account", "expense_account", "cost_center", "warehouse",
+            "account_for_change_amount",
         } and pos_doc.get(fieldname) != value:
             pos_doc.set(fieldname, value)
             dirty = True
