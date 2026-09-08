@@ -167,6 +167,18 @@ export const PosProfilePage: React.FC = () => {
         }
       }
 
+      // ERPNext's standard POS Profile validation requires every payment mode
+      // to have a company-scoped default Cash/Bank account. Ensure that before
+      // insert -- otherwise saving with e.g. Cheque/Zomato/Swiggy/Direct throws
+      // "Please set default Cash or Bank account in Mode of Payments ...".
+      const addModeNames = addForm.payments.filter(p => p.mode_of_payment).map(p => p.mode_of_payment);
+      if (addModeNames.length > 0 && addForm.company) {
+        await call('ury.ury_pos.api.ensure_payment_mode_accounts', {
+          modes: addModeNames,
+          company: addForm.company,
+        });
+      }
+
       await call('frappe.client.insert', {
         doc: {
           doctype: 'POS Profile',
@@ -257,14 +269,23 @@ export const PosProfilePage: React.FC = () => {
     fetchOptions();
   }, [activeBranchId]);
 
+  // Key on the serialized mode list rather than the `payments` array
+  // reference -- profileForm.payments gets a new array identity on every
+  // keystroke in the mode-of-payment picker (each onChange does
+  // `[...profileForm.payments]`), so keying on the array itself reran this
+  // effect (and its one-get-per-mode account lookup) on every character
+  // typed instead of only when the actual set of modes changed.
+  const paymentModeNamesKey = (profileForm.payments || [])
+    .map((p: any) => p.mode_of_payment)
+    .filter((m: any) => m)
+    .join('|');
+
   useEffect(() => {
-    if (selectedProfile && profileForm.company && profileForm.payments) {
-      const modeNames = (profileForm.payments || [])
-        .map((p: any) => p.mode_of_payment)
-        .filter((m: any) => m);
+    if (selectedProfile && profileForm.company && paymentModeNamesKey) {
+      const modeNames = paymentModeNamesKey.split('|');
       checkPaymentModeAccounts(modeNames, profileForm.company);
     }
-  }, [profileForm.company, profileForm.payments, selectedProfile]);
+  }, [profileForm.company, paymentModeNamesKey, selectedProfile]);
 
   // View Mode: Open read-only detail view
   const handleProfileView = (profile: PosProfileRecord) => {
@@ -317,6 +338,19 @@ export const PosProfilePage: React.FC = () => {
 
     setSaving(true);
     try {
+      // Same account-mapping guard as create: any payment mode without a
+      // company-scoped default account crashes ERPNext's own POS Profile
+      // validation on save.
+      const editModeNames = (profileForm.payments || [])
+        .filter((p: any) => p.mode_of_payment)
+        .map((p: any) => p.mode_of_payment);
+      if (editModeNames.length > 0 && profileForm.company) {
+        await call('ury.ury_pos.api.ensure_payment_mode_accounts', {
+          modes: editModeNames,
+          company: profileForm.company,
+        });
+      }
+
       await call('frappe.client.set_value', {
         doctype: 'POS Profile',
         name: selectedProfile.name,
