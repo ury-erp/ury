@@ -260,6 +260,21 @@ def _seed_pos_profile(company_name, branch_name, restaurant_name):
     # Existing profile (e.g. created by the setup wizard's "Just show me a demo" flow):
     # patch in anything missing rather than duplicating.
     pos_doc = frappe.get_doc("POS Profile", pos_profile_name)
+    # Repair legacy profiles before any document validation can inspect their
+    # cross-company links. Direct database updates are intentional here: the
+    # profile may be impossible to save until the invalid links are replaced.
+    frappe.db.set_value(
+        "POS Profile",
+        pos_profile_name,
+        {
+            "income_account": income_account,
+            "expense_account": expense_account,
+            "cost_center": cost_center,
+            "warehouse": warehouse_name,
+        },
+        update_modified=False,
+    )
+    pos_doc.reload()
     dirty = False
 
     for fieldname, value in fields.items():
