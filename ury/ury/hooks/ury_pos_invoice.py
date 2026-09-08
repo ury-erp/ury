@@ -1,7 +1,8 @@
 import frappe
 from datetime import datetime
-from frappe.utils import now_datetime, get_time,now
+from frappe.utils import now_datetime, get_time, now, flt, getdate, get_first_day, get_last_day
 from ury.ury.doctype.ury_order.ury_order import release_merge_cluster_tables
+from ury.ury.doctype.staff_discount_policy.staff_discount_policy import get_applicable_policy
 
 
 def before_insert(doc, method):
@@ -15,6 +16,7 @@ def validate(doc, method):
     validate_customer(doc, method)
     validate_price_list(doc, method)
     set_commission_attribution(doc, method)
+    apply_staff_discount_policy(doc, method)
 
 
 def before_submit(doc, method):
@@ -22,6 +24,7 @@ def before_submit(doc, method):
     validate_invoice_print(doc, method)
     ro_reload_submit(doc, method)
     set_commission_attribution(doc, method)
+    apply_disposable_items(doc, method)
 
 
 def on_trash(doc, method):
@@ -57,6 +60,271 @@ def set_commission_attribution(doc, method=None):
     for item in doc.get("items") or []:
         if not item.get("custom_entered_by_employee"):
             item.custom_entered_by_employee = _employee_for_user(item.owner or frappe.session.user)
+
+
+def apply_disposable_items(doc, method=None):
+    """Auto-append disposable/packaging items as zero-rated POS Invoice Item rows.
+
+    Mirrors the original grillax `pos_disposables` before_submit hook, adapted to
+    ury's field names and doctypes:
+      - Item.disposable_items (Disposable Items, per source item, split by dine_in)
+      - POS Profile.table_disposables / .parcel_disposables (base disposables)
+      - POS Invoice Item.disposable_items (POS Disposable Item, per-line record)
+      - POS Invoice Item.is_disposable (marks the generated zero-rate line)
+
+    Runs once per submit; skips re-adding if disposable lines already exist
+    (e.g. on a resubmit of a doc that already went through this).
+    """
+    if not doc.get("items"):
+        return
+
+    if any(item.get("is_disposable") for item in doc.items):
+        return
+
+    pos_profile = frappe.get_cached_doc("POS Profile", doc.pos_profile)
+    is_dine_in = doc.order_type == "Dine In"
+
+    disposables_dict = {}
+
+    for item in doc.items:
+        if item.get("is_disposable"):
+            continue
+
+        item_disposables = frappe.get_all(
+            "Disposable Items",
+            filters={"parent": item.item_code, "dine_in": 1 if is_dine_in else 0},
+            fields=["item", "item_name", "qty"],
+        )
+
+        for disposable in item_disposables:
+            qty = flt(disposable.qty) * flt(item.qty)
+            key = disposable.item
+            if key in disposables_dict:
+                disposables_dict[key]["qty"] += qty
+            else:
+                disposables_dict[key] = {
+                    "item": disposable.item,
+                    "item_name": disposable.item_name,
+                    "qty": qty,
+                }
+
+            # Record on the source cart item's own disposable_items child table.
+            item.append(
+                "disposable_items",
+                {
+                    "item": disposable.item,
+                    "item_name": disposable.item_name,
+                    "qty": qty,
+                },
+            )
+
+    if is_dine_in:
+        n_pax = flt(doc.no_of_pax) or 1
+        for table_disposable in pos_profile.get("table_disposables") or []:
+            key = table_disposable.item
+            qty = flt(table_disposable.qty) * n_pax
+            if key in disposables_dict:
+                disposables_dict[key]["qty"] += qty
+            else:
+                disposables_dict[key] = {
+                    "item": table_disposable.item,
+                    "item_name": table_disposable.item_name,
+                    "qty": qty,
+                }
+    else:
+        for parcel_disposable in pos_profile.get("parcel_disposables") or []:
+            key = parcel_disposable.item
+            qty = flt(parcel_disposable.qty)
+            if key in disposables_dict:
+                disposables_dict[key]["qty"] += qty
+            else:
+                disposables_dict[key] = {
+                    "item": parcel_disposable.item,
+                    "item_name": parcel_disposable.item_name,
+                    "qty": qty,
+                }
+
+    for disposable_item in disposables_dict.values():
+        item_doc = frappe.get_cached_doc("Item", disposable_item["item"])
+        doc.append(
+            "items",
+            {
+                "item_code": item_doc.item_code,
+                "item_name": item_doc.item_name,
+                "description": item_doc.description,
+                "is_disposable": 1,
+                "qty": disposable_item["qty"],
+                "rate": 0,
+                "base_rate": 0,
+                "amount": 0,
+                "base_amount": 0,
+                "conversion_factor": 1.0,
+                "uom": item_doc.stock_uom,
+                "income_account": pos_profile.get("income_account"),
+                "expense_account": pos_profile.get("expense_account"),
+                "cost_center": pos_profile.get("cost_center"),
+                "warehouse": pos_profile.get("warehouse"),
+            },
+        )
+
+
+def _period_window(period):
+    """Return (start_date, end_date) for the given policy period, as of today."""
+    on_date = getdate(frappe.utils.today())
+    if period == "Daily":
+        return on_date, on_date
+    if period == "Weekly":
+        # Week starts Monday.
+        start = frappe.utils.add_days(on_date, -on_date.weekday())
+        end = frappe.utils.add_days(start, 6)
+        return start, end
+    if period == "Monthly":
+        return get_first_day(on_date), get_last_day(on_date)
+    return None, None
+
+
+def _period_to_date_discount(policy_name, doc_name, customer_group=None, employee=None, period=None):
+    """Sum discount_amount already applied under `policy_name` on SUBMITTED
+    (docstatus == 1) POS Invoices within the current period window, for the
+    same customer group (Customer Group policies) or the same cashier
+    employee (Role / Employee Group policies). Excludes the invoice
+    currently being validated. Cancelled (docstatus == 2) and draft
+    (docstatus == 0) invoices are naturally excluded by the docstatus filter.
+    """
+    if not period or period == "None":
+        return 0
+
+    start, end = _period_window(period)
+    if not start:
+        return 0
+
+    conditions = ["pi.docstatus = 1", "pi.staff_discount_policy = %(policy)s", "pi.name != %(doc_name)s"]
+    conditions.append("pi.posting_date BETWEEN %(start)s AND %(end)s")
+
+    values = {
+        "policy": policy_name,
+        "doc_name": doc_name or "",
+        "start": start,
+        "end": end,
+    }
+
+    joins = ""
+    if customer_group:
+        joins = "INNER JOIN `tabCustomer` cust ON cust.name = pi.customer"
+        conditions.append("cust.customer_group = %(customer_group)s")
+        values["customer_group"] = customer_group
+    elif employee:
+        conditions.append("pi.custom_closing_employee = %(employee)s")
+        values["employee"] = employee
+    else:
+        return 0
+
+    query = f"""
+        SELECT COALESCE(SUM(pi.discount_amount), 0) AS total
+        FROM `tabPOS Invoice` pi
+        {joins}
+        WHERE {' AND '.join(conditions)}
+    """
+    result = frappe.db.sql(query, values, as_dict=True)
+    return flt(result[0]["total"]) if result else 0
+
+
+def apply_staff_discount_policy(doc, method=None):
+    """Resolve and enforce the applicable Staff Discount Policy on validate.
+
+    This is VALIDATION-ONLY: it never assigns doc.discount_amount. By the
+    time this runs, ERPNext's own calculate_taxes_and_totals() has already
+    computed grand_total/rounded_total/outstanding_amount off of whatever
+    discount_amount the cashier/POS UI already put on the doc, so mutating
+    discount_amount here (after the fact, in before_submit) would silently
+    desync the displayed discount from what was actually charged/posted.
+    Instead:
+
+    - Resolves the best-matching enabled Staff Discount Policy for this
+      invoice's customer/employee/branch/item context via
+      get_applicable_policy().
+    - Reads the EXISTING doc.discount_amount (set earlier, before totals
+      were calculated) and enforces per_transaction_cap against it (throws
+      if this single invoice's discount exceeds it).
+    - Computes the period-to-date discount already applied under this SAME
+      policy (see _period_to_date_discount) and enforces period_cap (throws
+      if adding this invoice's existing discount would exceed it).
+    - If within caps, records the resolved policy on
+      doc.staff_discount_policy so future period-sum queries can filter
+      cleanly by policy. Does NOT compute or assign a new discount_amount.
+    """
+    employee = doc.get("custom_closing_employee")
+    branch = doc.get("branch")
+
+    item_groups = set()
+    for item in doc.get("items") or []:
+        if item.item_code:
+            item_group = frappe.get_cached_value("Item", item.item_code, "item_group")
+            if item_group:
+                item_groups.add(item_group)
+
+    policy = None
+    for item_group in item_groups or [None]:
+        policy = get_applicable_policy(
+            customer=doc.get("customer"),
+            employee=employee,
+            branch=branch,
+            item_group=item_group,
+        )
+        if policy:
+            break
+
+    if not policy:
+        return
+
+    # Validate against whatever discount_amount is ALREADY on the doc
+    # (set by the cashier/POS UI before totals were calculated) — never
+    # compute or assign a new value here.
+    discount_amount = flt(doc.get("discount_amount"))
+
+    per_transaction_cap = flt(policy.get("per_transaction_cap"))
+    if per_transaction_cap and discount_amount > per_transaction_cap:
+        frappe.throw(
+            (
+                "Staff Discount Policy {0} caps the per-transaction discount at {1}. "
+                "This invoice's discount ({2}) exceeds that limit."
+            ).format(policy.get("policy_name") or policy.get("name"), per_transaction_cap, discount_amount)
+        )
+
+    period = policy.get("period")
+    period_cap = flt(policy.get("period_cap"))
+    if period and period != "None" and period_cap:
+        customer_group = None
+        matching_employee = None
+        if policy.get("applies_to") == "Customer Group":
+            customer_group = frappe.db.get_value("Customer", doc.get("customer"), "customer_group")
+        else:
+            matching_employee = employee
+
+        period_to_date = _period_to_date_discount(
+            policy.get("name"),
+            doc.name,
+            customer_group=customer_group,
+            employee=matching_employee,
+            period=period,
+        )
+
+        if period_to_date + discount_amount > period_cap:
+            frappe.throw(
+                (
+                    "Staff Discount Policy {0} caps total {1} discounts at {2}. "
+                    "{3} has already been applied this period; this invoice's discount "
+                    "({4}) would exceed the cap."
+                ).format(
+                    policy.get("policy_name") or policy.get("name"),
+                    period,
+                    period_cap,
+                    period_to_date,
+                    discount_amount,
+                )
+            )
+
+    doc.staff_discount_policy = policy.get("name")
 
 
 def validate_invoice(doc, method):

@@ -1,0 +1,56 @@
+{
+ "add_total_row": 0,
+ "columns": [],
+ "creation": "2026-09-08 00:00:00.000000",
+ "disable_prepared_report": 0,
+ "disabled": 0,
+ "docstatus": 0,
+ "doctype": "Report",
+ "filters": [
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "label": "Branch",
+   "mandatory": 1,
+   "options": "Branch",
+   "wildcard_filter": 0
+  },
+  {
+   "fieldname": "start_date",
+   "fieldtype": "Date",
+   "label": "From Date",
+   "mandatory": 1,
+   "wildcard_filter": 0
+  },
+  {
+   "fieldname": "end_date",
+   "fieldtype": "Date",
+   "label": "To Date",
+   "mandatory": 1,
+   "wildcard_filter": 0
+  }
+ ],
+ "idx": 0,
+ "is_standard": "Yes",
+ "modified": "2026-09-08 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "APC",
+ "owner": "Administrator",
+ "prepared_report": 0,
+ "query": "WITH date_list AS (\n    SELECT %(start_date)s AS `date`\n    UNION\n    SELECT DATE_ADD(%(start_date)s, INTERVAL n DAY) AS `date`\n    FROM (\n        SELECT a.N + b.N * 10 + c.N * 100 + 1 AS n\n        FROM (\n            SELECT 0 AS N UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5 UNION SELECT 6 UNION SELECT 7 UNION SELECT 8 UNION SELECT 9\n        ) AS a\n        CROSS JOIN (\n            SELECT 0 AS N UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5 UNION SELECT 6 UNION SELECT 7 UNION SELECT 8 UNION SELECT 9\n        ) AS b\n        CROSS JOIN (\n            SELECT 0 AS N UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5 UNION SELECT 6 UNION SELECT 7 UNION SELECT 8 UNION SELECT 9\n        ) AS c\n        ORDER BY n\n    ) AS nums\n    WHERE DATE_ADD(%(start_date)s, INTERVAL n DAY) < %(end_date)s\n    UNION\n    SELECT %(end_date)s AS `date`\n),\npax_data AS (\n    SELECT\n        a.`name` AS `invoice_name`,\n        DATE_ADD(\n            DATE(a.`posting_date`),\n            INTERVAL CASE\n                WHEN TIME(a.`posting_time`) >= CONCAT(LPAD(COALESCE(rs.`hours`, 0), 2, '0'), ':00:00') THEN 0\n                ELSE -1\n            END DAY\n        ) AS `date`,\n        SUM(ABS(a.`no_of_pax`)) AS `no_of_pax`\n    FROM `tabPOS Invoice` a\n    LEFT JOIN `tabURY Report Settings` rs ON rs.`branch` = %(branch)s\n    WHERE\n        a.`branch` = %(branch)s\n        AND a.`restaurant_table` != \"\"\n        AND a.`order_type` != \"Take Away\"\n        AND a.`status` IN (\"Consolidated\", \"Paid\")\n        AND a.`docstatus` = 1\n    GROUP BY a.`name`, DATE_ADD(\n        DATE(a.`posting_date`),\n        INTERVAL CASE\n            WHEN TIME(a.`posting_time`) >= CONCAT(LPAD(COALESCE(rs.`hours`, 0), 2, '0'), ':00:00') THEN 0\n            ELSE -1\n        END DAY\n    )\n),\nitem_data AS (\n    SELECT\n        a.`name` AS `invoice_name`,\n        DATE_ADD(\n            DATE(a.`posting_date`),\n            INTERVAL CASE\n                WHEN TIME(a.`posting_time`) >= CONCAT(LPAD(COALESCE(rs.`hours`, 0), 2, '0'), ':00:00') THEN 0\n                ELSE -1\n            END DAY\n        ) AS `date`,\n        SUM(b.`qty`) AS `total_dish`\n    FROM `tabPOS Invoice` a\n    INNER JOIN `tabPOS Invoice Item` b ON a.`name` = b.`parent`\n    LEFT JOIN `tabURY Report Settings` rs ON rs.`branch` = %(branch)s\n    WHERE\n        a.`branch` = %(branch)s\n        AND a.`restaurant_table` != \"\"\n        AND a.`order_type` != \"Take Away\"\n        AND a.`status` IN (\"Consolidated\", \"Paid\")\n        AND a.`docstatus` = 1\n    GROUP BY a.`name`, DATE_ADD(\n        DATE(a.`posting_date`),\n        INTERVAL CASE\n            WHEN TIME(a.`posting_time`) >= CONCAT(LPAD(COALESCE(rs.`hours`, 0), 2, '0'), ':00:00') THEN 0\n            ELSE -1\n        END DAY\n    )\n),\ncombined_data AS (\n    SELECT\n        d.`date`,\n        COALESCE(p.`invoice_name`, i.`invoice_name`) AS `invoice_name`,\n        COALESCE(p.`no_of_pax`, 0) AS `no_of_pax`,\n        COALESCE(i.`total_dish`, 0) AS `total_dish`\n    FROM date_list d\n    LEFT JOIN pax_data p ON d.`date` = p.`date`\n    LEFT JOIN item_data i ON d.`date` = i.`date` AND p.`invoice_name` = i.`invoice_name`\n)\nSELECT\n    cd.`date` AS \"Date\",\n    cd.`invoice_name` AS \"Invoice Name\",\n    cd.`no_of_pax` AS \"No of Pax\",\n    cd.`total_dish` AS \"Total Dish\",\n    ROUND((cd.`no_of_pax` / cd.`total_dish`), 3) AS \"APC\",\n    CASE\n        WHEN cd.`date` = %(start_date)s THEN\n            (\n                SELECT\n                    ROUND((SUM(ABS(`no_of_pax`)) / SUM(`total_dish`)), 3)\n                FROM combined_data\n            )\n        ELSE NULL\n    END AS \"Total APC\"\nFROM combined_data cd\nORDER BY cd.`date` DESC;",
+ "ref_doctype": "POS Invoice",
+ "report_name": "APC",
+ "report_type": "Query Report",
+ "roles": [
+  {
+   "role": "Accounts Manager"
+  },
+  {
+   "role": "Accounts User"
+  },
+  {
+   "role": "URY Manager"
+  }
+ ]
+}
