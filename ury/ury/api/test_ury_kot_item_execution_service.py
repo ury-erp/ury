@@ -95,6 +95,8 @@ class _ExecutionHarness:
 			return self.docs[arg][name]
 		if arg == "URY KOT":
 			return _kot_doc(*args, **kwargs)
+		if arg == "System Settings":
+			return frappe._dict({"time_zone": "UTC"})
 		raise AssertionError(f"unexpected get_doc lookup: {arg!r}")
 
 	def get_all(self, doctype, filters=None, fields=None, order_by=None, limit=None):
@@ -102,10 +104,12 @@ class _ExecutionHarness:
 			return []
 		return self._select(doctype, filters=filters, fields=fields, limit=limit)
 
-	def sql(self, query, values=None, as_dict=False):
+	def sql(self, query, values=None, as_dict=False, pluck=None, **kwargs):
 		if not values:
 			return []
 		rows = self._select(ITEM_EXECUTION_DOCTYPE, filters={"kot_item": values["kot_item"]}, limit=1)
+		if pluck:
+			return [row.get(pluck) for row in rows]
 		return rows
 
 	def _select(self, doctype, filters=None, fields=None, limit=None):
