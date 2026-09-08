@@ -182,68 +182,74 @@ export function MenuItemCard({
             {unavailableMessage}
           </span>
         )}
-        {showQtyControls && (
-          <div
-            role="group"
-            aria-label={`${name} quantity ${formatQty(quantity)}`}
-            className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-0.5 bg-white/95 px-0.5"
-            onClick={(e) => e.stopPropagation()}
-            onKeyDown={(e) => e.stopPropagation()}
-          >
-            <button
-              type="button"
-              aria-label={`Decrease ${name}`}
-              disabled={!canDecrement}
-              className={cn(
-                'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-gray-800',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500',
-                'disabled:pointer-events-none disabled:opacity-40'
-              )}
-              onClick={(e) => {
-                e.stopPropagation()
-                onDecrement?.()
-              }}
-            >
-              <Minus className="h-4 w-4" aria-hidden />
-            </button>
-            <span
-              className="min-w-8 text-center text-sm font-semibold tabular-nums text-gray-900"
-              aria-live="polite"
-            >
-              {formatQty(quantity)}
-            </span>
-            <button
-              type="button"
-              aria-label={`Increase ${name}`}
-              disabled={!canIncrement}
-              className={cn(
-                'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-gray-800',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500',
-                'disabled:pointer-events-none disabled:opacity-40'
-              )}
-              onClick={(e) => {
-                e.stopPropagation()
-                onIncrement?.()
-              }}
-            >
-              <Plus className="h-4 w-4" aria-hidden />
-            </button>
-          </div>
-        )}
       </div>
       <div className="flex flex-1 flex-col p-3">
         <h3 className="line-clamp-2 text-sm font-medium leading-5 text-gray-900" title={name}>
           {name}
         </h3>
-        <div className="mt-1 h-5">
-          <p className="truncate text-xs text-gray-500" title={course}>
+        {/* Course and price share a row so the stepper below can keep full-size
+            touch targets: on a 2-column phone grid the card is ~166px wide and
+            the stepper alone is ~112px, so a price beside it would collide. */}
+        <div className="mt-1 flex items-baseline justify-between gap-2">
+          <p className="min-w-0 truncate text-xs text-gray-500" title={course}>
             {course || ' '}
           </p>
+          <span className="shrink-0 text-sm font-semibold tabular-nums text-gray-900">
+            {priceLabel}
+          </span>
         </div>
-        <div className="mt-auto pt-2">
-          <span className="text-sm font-semibold tabular-nums text-gray-900">{priceLabel}</span>
-        </div>
+        <div className="mt-auto h-11" aria-hidden />
       </div>
+      {showQtyControls && (
+        <div
+          role="group"
+          aria-label={`${name} quantity ${formatQty(quantity)}`}
+          className="absolute bottom-2 end-2 z-10 flex max-w-[calc(100%-1rem)] items-center rounded-md bg-white/95 shadow"
+          onClick={(e) => e.stopPropagation()}
+          onDoubleClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            aria-label={`Decrease ${name}`}
+            disabled={!canDecrement}
+            className={cn(
+              'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-gray-800',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500',
+              'disabled:pointer-events-none disabled:opacity-40'
+            )}
+            onClick={(e) => {
+              e.stopPropagation()
+              onDecrement?.()
+            }}
+          >
+            <Minus className="h-4 w-4" aria-hidden />
+          </button>
+          <span
+            className="min-w-6 shrink text-center text-sm font-semibold tabular-nums text-gray-900"
+            aria-live="polite"
+          >
+            {formatQty(quantity)}
+          </span>
+          <button
+            type="button"
+            aria-label={`Increase ${name}`}
+            disabled={!canIncrement}
+            className={cn(
+              'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-gray-800',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500',
+              'disabled:pointer-events-none disabled:opacity-40'
+            )}
+            onClick={(e) => {
+              e.stopPropagation()
+              onIncrement?.()
+            }}
+          >
+            <Plus className="h-4 w-4" aria-hidden />
+          </button>
+        </div>
+      )}
     </div>
   )
 }
