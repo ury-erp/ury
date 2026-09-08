@@ -12,6 +12,7 @@ interface ProductionUnitRecord {
   production?: string;
   production_unit_name?: string;
   branch?: string;
+  department?: string;
   item_groups?: any;
 }
 
@@ -34,11 +35,13 @@ export const ProductionUnitPage: React.FC = () => {
   const [saving, setSaving] = useState<boolean>(false);
 
   const [branches, setBranches] = useState<{ name: string }[]>([]);
+  const [departments, setDepartments] = useState<{ name: string }[]>([]);
   const [itemGroupOptions, setItemGroupOptions] = useState<{ name: string; item_group_name?: string }[]>([]);
 
   const [newUnit, setNewUnit] = useState({
     production_unit_name: '',
     branch: '',
+    department: '',
   });
   const [originalUnit, setOriginalUnit] = useState<any>(null);
 
@@ -50,6 +53,15 @@ export const ProductionUnitPage: React.FC = () => {
       setBranches(res || []);
     } catch {
       setBranches([]);
+    }
+  };
+
+  const fetchDepartments = async () => {
+    try {
+      const res = await dashboardService.getModuleRecords<{ name: string }>('URY Production Department', 'all');
+      setDepartments(res || []);
+    } catch {
+      setDepartments([]);
     }
   };
 
@@ -84,6 +96,7 @@ export const ProductionUnitPage: React.FC = () => {
 
   useEffect(() => {
     fetchBranches();
+    fetchDepartments();
     fetchItemGroupOptions();
     fetchUnits();
   }, [activeBranchId]);
@@ -93,6 +106,7 @@ export const ProductionUnitPage: React.FC = () => {
     setNewUnit({
       production_unit_name: '',
       branch: activeBranchId !== 'all' ? activeBranchId : (branches[0]?.name || ''),
+      department: '',
     });
     setItemGroupRows([createEmptyItemGroupRow()]);
     setIsDrawerOpen(true);
@@ -127,11 +141,13 @@ export const ProductionUnitPage: React.FC = () => {
       const initialForm = {
         production_unit_name: data.production || data.production_unit_name || data.name,
         branch: data.branch || '',
+        department: data.department || '',
         item_groups: rows.map(r => r.item_group.trim()).filter(g => g).sort(),
       };
       setNewUnit({
         production_unit_name: initialForm.production_unit_name,
         branch: initialForm.branch,
+        department: initialForm.department,
       });
       setItemGroupRows(rows);
       setOriginalUnit(initialForm);
@@ -139,11 +155,13 @@ export const ProductionUnitPage: React.FC = () => {
       const initialForm = {
         production_unit_name: unit.production || unit.production_unit_name || unit.name,
         branch: unit.branch || '',
+        department: unit.department || '',
         item_groups: [],
       };
       setNewUnit({
         production_unit_name: initialForm.production_unit_name,
         branch: initialForm.branch,
+        department: initialForm.department,
       });
       setItemGroupRows([createEmptyItemGroupRow()]);
       setOriginalUnit(initialForm);
@@ -157,6 +175,11 @@ export const ProductionUnitPage: React.FC = () => {
     const prodName = newUnit.production_unit_name.trim();
     if (!prodName) {
       showToast.error('Production Unit Name is required');
+      return;
+    }
+
+    if (!newUnit.department) {
+      showToast.error('Department is required');
       return;
     }
 
@@ -179,11 +202,13 @@ export const ProductionUnitPage: React.FC = () => {
       const original = {
         production_unit_name: (originalUnit.production_unit_name || '').trim(),
         branch: originalUnit.branch || '',
+        department: originalUnit.department || '',
         item_groups: originalUnit.item_groups || [],
       };
       const current = {
         production_unit_name: prodName,
         branch: newUnit.branch || '',
+        department: newUnit.department || '',
         item_groups: [...selectedGroups].sort(),
       };
       if (JSON.stringify(original) === JSON.stringify(current)) {
@@ -202,6 +227,7 @@ export const ProductionUnitPage: React.FC = () => {
       const payload = {
         production: prodName,
         branch: newUnit.branch,
+        department: newUnit.department,
         item_groups: childTableData
       };
 
@@ -283,6 +309,7 @@ export const ProductionUnitPage: React.FC = () => {
           columns={[
             { key: 'production', header: 'Production Unit', render: (row) => <span className="font-semibold">{row.production || row.production_unit_name || row.name}</span> },
             { key: 'branch', header: 'Branch', render: (row) => row.branch || 'Main' },
+            { key: 'department', header: 'Department', render: (row) => row.department || '-' },
             { key: 'item_groups', header: 'Item Groups', render: (row) => {
               let itemGroupsStr = '';
               if (Array.isArray(row.item_groups)) {
@@ -337,6 +364,19 @@ export const ProductionUnitPage: React.FC = () => {
               onChange={(_, val) => setNewUnit({ ...newUnit, branch: val })}
               options={branches.map(b => ({ value: b.name, label: b.name }))}
               placeholder="Select Branch..."
+            />
+          </div>
+
+          <div>
+            <label className="block font-semibold text-gray-700 mb-1.5">
+              Department <span className="text-red-500">*</span>
+            </label>
+            <SearchableSelect
+              id="department"
+              value={newUnit.department}
+              onChange={(_, val) => setNewUnit({ ...newUnit, department: val })}
+              options={departments.map(d => ({ value: d.name, label: d.name }))}
+              placeholder="Select Department..."
             />
           </div>
 

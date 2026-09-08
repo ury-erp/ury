@@ -31,6 +31,7 @@ export const RoomPage: React.FC = () => {
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
   const [editingRoom, setEditingRoom] = useState<UryRoomRecord | null>(null);
   const [saving, setSaving] = useState<boolean>(false);
+  const [originalRoomDisplayName, setOriginalRoomDisplayName] = useState<string>('');
 
   // Branch options
   const [branches, setBranches] = useState<{ name: string }[]>([]);
@@ -85,6 +86,7 @@ export const RoomPage: React.FC = () => {
 
   const openAddDrawer = () => {
     setEditingRoom(null);
+    setOriginalRoomDisplayName('');
     setNewRoom({
       room_name: '',
       room_type: 'AC',
@@ -104,6 +106,8 @@ export const RoomPage: React.FC = () => {
     if (room.branch && displayName.endsWith(` - ${room.branch}`)) {
       displayName = displayName.substring(0, displayName.length - (` - ${room.branch}`).length);
     }
+    // Store the original display name to use for rename detection later
+    setOriginalRoomDisplayName(displayName);
     setNewRoom({
       room_name: displayName,
       room_type: room.room_type || 'AC',
@@ -135,14 +139,11 @@ export const RoomPage: React.FC = () => {
     setSaving(true);
     try {
       if (editingRoom) {
-        // Derive display name from room.name, stripping branch suffix if present
-        let originalDisplayName = editingRoom.name;
-        if (editingRoom.branch && originalDisplayName.endsWith(` - ${editingRoom.branch}`)) {
-          originalDisplayName = originalDisplayName.substring(0, originalDisplayName.length - (` - ${editingRoom.branch}`).length);
-        }
-
+        // Use the stored original display name (captured when drawer opened) for accurate comparison.
+        // This avoids issues where reconstructing the name from stored values could fail due to
+        // whitespace differences in the branch field or other formatting edge cases.
         const original = {
-          room_name: originalDisplayName || '',
+          room_name: originalRoomDisplayName || '',
           room_type: editingRoom.room_type || 'AC',
           branch: editingRoom.branch || '',
           kot_printing: editingRoom.kot_printing === 1 ? 1 : 0,
@@ -164,14 +165,20 @@ export const RoomPage: React.FC = () => {
         }
 
         let currentName = editingRoom.name;
-        const newDocName = newRoom.branch ? `${newRoom.room_name} - ${newRoom.branch}` : newRoom.room_name;
-        if (newDocName !== editingRoom.name) {
-          await call('frappe.client.rename_doc', {
-            doctype: 'URY Room',
-            old_name: editingRoom.name,
-            new_name: newDocName,
-          });
-          currentName = newDocName;
+        // Only rename if the user actually changed the room name field
+        if (newRoom.room_name !== originalRoomDisplayName) {
+          // Construct new and old document names consistently using the stored display name
+          const oldDocName = editingRoom.branch ? `${originalRoomDisplayName} - ${editingRoom.branch}` : originalRoomDisplayName;
+          const newDocName = newRoom.branch ? `${newRoom.room_name} - ${newRoom.branch}` : newRoom.room_name;
+
+          if (newDocName !== oldDocName) {
+            await call('frappe.client.rename_doc', {
+              doctype: 'URY Room',
+              old_name: editingRoom.name,
+              new_name: newDocName,
+            });
+            currentName = newDocName;
+          }
         }
 
         await call('frappe.client.set_value', {
