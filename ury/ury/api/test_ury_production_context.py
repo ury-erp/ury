@@ -39,11 +39,15 @@ class TestResolveProductionContext(FrappeTestCase):
 		self.assertEqual(result.warehouse, "FG Warehouse - URY")
 		self.assertEqual(result.production_unit_disabled, 0)
 		self.assertEqual(result.department_disabled, 0)
-		mock_get_value.assert_called_once_with("Branch", "Branch A", "company")
+		# get_value is now also called to derive production_unit_disabled/
+		# department_disabled from the linked records' own `enabled` field
+		# (N2 fix) -- assert the company lookup happened, not that it was
+		# the only call.
+		self.assertIn(("Branch", "Branch A", "company"), [c.args for c in mock_get_value.call_args_list])
 
 	@patch(
 		"ury.ury.api.ury_production_context.frappe.db.get_value",
-		side_effect=["MTO Warehouse - URY", None, "Test Company"],
+		side_effect=["MTO Warehouse - URY", 1, 1, "Test Company"],
 	)
 	def test_mto_uses_production_unit_warehouse(self, mock_get_value):
 		row = dict(self.rows[0], production_policy="MADE_TO_ORDER")
@@ -56,16 +60,30 @@ class TestResolveProductionContext(FrappeTestCase):
 			("URY Production Unit", "Main Kitchen", "warehouse"),
 		)
 
-	@patch("ury.ury.api.ury_production_context.frappe.db.get_value", return_value="Test Company")
-	def test_resolver_preserves_legacy_disable_flags(self, mock_get_value):
-		row = dict(
-			self.rows[0], production_unit_disabled=1, department_disabled=1
-		)
-		with self._patch_get_all([row]):
+	def test_resolver_derives_disable_flags_from_linked_records(self):
+		"""production_unit_disabled/department_disabled are not real columns
+		on this doctype (N2 fix) -- they must be derived live from the
+		linked URY Production Unit/URY Production Department's own `enabled`
+		field, not read back off the row (any such value on the row, as
+		might be injected by a stale/legacy caller, must be ignored)."""
+		row = dict(self.rows[0], production_unit_disabled=1, department_disabled=1)
+
+		def _get_value(doctype, name, field):
+			if doctype == "URY Production Unit":
+				return 0  # disabled
+			if doctype == "URY Production Department":
+				return 1  # enabled
+			if doctype == "Branch":
+				return "Test Company"
+			return None
+
+		with self._patch_get_all([row]), patch(
+			"ury.ury.api.ury_production_context.frappe.db.get_value", side_effect=_get_value
+		):
 			result = resolve_production_context("ITEM-CAKE", "Branch A")
 
 		self.assertEqual(result.production_unit_disabled, 1)
-		self.assertEqual(result.department_disabled, 1)
+		self.assertEqual(result.department_disabled, 0)
 
 	@patch("ury.ury.api.ury_production_context.frappe.db.get_value", return_value="Test Company")
 	def test_resolver_respects_department_filter(self, mock_get_value):
@@ -75,7 +93,7 @@ class TestResolveProductionContext(FrappeTestCase):
 		self.assertIsNotNone(result)
 		self.assertEqual(result.department, "Hot Kitchen")
 		self.assertEqual(result.company, "Test Company")
-		mock_get_value.assert_called_once_with("Branch", "Branch A", "company")
+		self.assertIn(("Branch", "Branch A", "company"), [c.args for c in mock_get_value.call_args_list])
 
 	def test_resolver_returns_none_for_missing_or_ambiguous_rows(self):
 		with self._patch_get_all([]):
@@ -93,4 +111,4 @@ class TestResolveProductionContext(FrappeTestCase):
 		with self._patch_get_all():
 			self.assertIsNone(resolve_production_context("ITEM-CAKE", "Branch A", company="Test Company"))
 
-		mock_get_value.assert_called_once_with("Branch", "Branch A", "company")
+		self.assertIn(("Branch", "Branch A", "company"), [c.args for c in mock_get_value.call_args_list])

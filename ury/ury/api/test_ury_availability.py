@@ -345,4 +345,8 @@ class TestAvailabilityProductionContextIntegration(FrappeTestCase):
         self.assertEqual(result["warehouse"], "FG Warehouse - URY")
         self.assertEqual(result["available_qty"], 4)
         mock_get_all.assert_called_once()
-        mock_get_value.assert_called_once_with("Branch", "Branch A", "company")
+        # get_value is now also called to derive production_unit_disabled/
+        # department_disabled from the linked records' own `enabled` field
+        # (N2 fix), not just the company lookup -- assert the company
+        # lookup happened, not that it was the only call.
+        self.assertIn(("Branch", "Branch A", "company"), [c.args for c in mock_get_value.call_args_list])
