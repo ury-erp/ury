@@ -5,7 +5,7 @@ import frappe
 from frappe import _
 from frappe.utils import getdate
 from typing import Dict, List
-from ury.services.bom_cost_resolver import resolve_item_cost, resolve_product_bundle_cost
+from ury.ury.services.bom_cost_resolver import resolve_item_cost, resolve_product_bundle_cost
 
 Columns = List[Dict[str, str]]
 
