@@ -23,6 +23,7 @@ def resolve_production_context(item, branch, company=None, department=None):
 			"name", "item", "branch", "department", "production_unit",
 			"production_policy", "bom", "direct_retail_warehouse",
 			"controlled_by_sales_plan", "allow_over_plan_sale", "availability_mode",
+			"production_unit_disabled", "department_disabled",
 		],
 		filters=filters,
 		limit=2,
@@ -34,7 +35,20 @@ def resolve_production_context(item, branch, company=None, department=None):
 	row.production_policy = normalize_production_policy(row.get("production_policy"))
 	if not row.production_policy:
 		return None
-	row.warehouse = row.get("direct_retail_warehouse")
+	# Finished goods for pre-produced/direct-retail items are held in the
+	# explicitly configured retail warehouse. MTO issues components from the
+	# production unit's warehouse (with the department warehouse as a narrow
+	# fallback for older configurations).
+	if row.production_policy in ("PRE_PRODUCED", "DIRECT_RETAIL"):
+		row.warehouse = row.get("direct_retail_warehouse")
+	else:
+		row.warehouse = frappe.db.get_value(
+			"URY Production Unit", row.get("production_unit"), "warehouse"
+		) or frappe.db.get_value(
+			"URY Production Department", row.get("department"), "department_warehouse"
+		)
+	row.production_unit_disabled = row.get("production_unit_disabled", 0)
+	row.department_disabled = row.get("department_disabled", 0)
 	row.company = frappe.db.get_value("Branch", branch, "company")
 	if company and row.company and company != row.company:
 		return None
