@@ -14,6 +14,8 @@ ury/public/urypos
 ury/public/mosaic
 ury/public/order
 ury/www/order.html
+ury/public/serve
+ury/www/serve.html
 ury/public/node_modules
 urypos/yarn.lock
 mosaic/yarn.lock
