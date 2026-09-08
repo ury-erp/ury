@@ -410,7 +410,8 @@ class TestProcessPostingIntent(FrappeTestCase):
 		rows = [
 			frappe._dict({"name": "PENDING-1", "status": "PENDING", "leased_until": None, "next_retry_at": None}),
 			frappe._dict({"name": "POSTING-FRESH", "status": "POSTING", "leased_until": "2026-09-04 10:09:00", "next_retry_at": None}),
-			frappe._dict({"name": "FAILED-DUE", "status": "FAILED", "leased_until": None, "next_retry_at": "2026-09-04 09:59:00"}),
+			frappe._dict({"name": "FAILED-DUE", "status": "FAILED", "leased_until": None, "next_retry_at": "2026-09-04 09:59:00", "retryable": 1}),
+			frappe._dict({"name": "FAILED-GAVE-UP", "status": "FAILED", "leased_until": None, "next_retry_at": None, "retryable": 0}),
 		]
 
 		with patch(f"{MODULE}.frappe.get_all", return_value=rows), patch(
@@ -420,3 +421,34 @@ class TestProcessPostingIntent(FrappeTestCase):
 
 		self.assertEqual(result, ["PENDING-1", "FAILED-DUE"])
 		self.assertEqual([call.args[0] for call in enqueue.call_args_list], ["PENDING-1", "FAILED-DUE"])
+
+	def test_stock_failure_past_max_attempts_gives_up(self):
+		intent = self._intent()
+		intent.attempts = 5
+		intent.max_attempts = 5
+		stock_entry = _doc({"name": "STE-1"})
+		stock_entry.submit.side_effect = frappe.ValidationError("stock failed")
+		docs_by_name = {"INTENT-1": intent}
+
+		def get_doc(arg, name=None, *args, **kwargs):
+			if arg == "URY Fulfilment Posting Intent":
+				return docs_by_name[name]
+			if isinstance(arg, dict) and arg.get("doctype") == "Stock Entry":
+				return stock_entry
+			raise AssertionError(arg)
+
+		with patch(f"{MODULE}.frappe.db.sql", return_value=[frappe._dict({"name": "INTENT-1", "status": "PENDING", "attempts": 5})]), patch(
+			f"{MODULE}.frappe.get_doc", side_effect=get_doc
+		), patch(f"{MODULE}.frappe.get_all", return_value=[]), patch(
+			f"{MODULE}.fulfil_reservation"
+		) as fulfil, patch(f"{MODULE}.now", return_value="2026-09-04 10:00:00"), patch(
+			f"{MODULE}.now_datetime", return_value=frappe.utils.get_datetime("2026-09-04 10:00:00")
+		), patch(f"{MODULE}.frappe.session") as session:
+			session.user = "chef@example.com"
+			result = process_posting_intent("INTENT-1")
+
+		self.assertEqual(result["status"], FAILED)
+		fulfil.assert_not_called()
+		self.assertEqual(intent.status, FAILED)
+		self.assertFalse(intent.retryable)
+		self.assertIsNone(intent.next_retry_at)
