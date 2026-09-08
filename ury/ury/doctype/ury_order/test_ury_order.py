@@ -40,12 +40,13 @@ class TestURYOrderSEC11(FrappeTestCase):
         self.assertIn("outside your active branch", str(context.exception))
 class TestURYOrder(FrappeTestCase):
     @patch("ury.ury.doctype.ury_order.ury_order.get_order_invoice")
+    @patch("ury.ury.doctype.ury_order.ury_order._require_open_cashier_session")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.has_permission")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.db.get_value")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_doc")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_roles")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.session")
-    def test_sync_order_authorized(self, mock_session, mock_get_roles, mock_get_doc, mock_get_value, mock_has_permission, mock_get_order_invoice):
+    def test_sync_order_authorized(self, mock_session, mock_get_roles, mock_get_doc, mock_get_value, mock_has_permission, _opening, mock_get_order_invoice):
         # Setup mock invoice
         mock_invoice = MagicMock()
         mock_invoice.name = "POS-INV-001"
@@ -140,11 +141,12 @@ class TestURYOrder(FrappeTestCase):
             )
 
     @patch("ury.ury.doctype.ury_order.ury_order.get_order_invoice")
+    @patch("ury.ury.doctype.ury_order.ury_order._require_open_cashier_session")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.has_permission")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.db.get_value")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_doc")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.session")
-    def test_sync_order_fake_cashier_waiter_new_invoice(self, mock_session, mock_get_doc, mock_get_value, mock_has_permission, mock_get_order_invoice):
+    def test_sync_order_fake_cashier_waiter_new_invoice(self, mock_session, mock_get_doc, mock_get_value, mock_has_permission, _opening, mock_get_order_invoice):
         # Setup new invoice
         mock_invoice = MagicMock()
         mock_invoice.name = None # New invoice
@@ -259,6 +261,9 @@ class TestPriceItemsForInvoicePhase1(unittest.TestCase):
 
     @patch("ury.ury.doctype.ury_order.ury_order.get_order_invoice")
     @patch("ury.ury.doctype.ury_order.ury_order.price_items_for_invoice")
+    @patch("ury.ury.doctype.ury_order.ury_order._resolve_menu_for_sync", return_value="Menu A")
+    @patch("ury.ury.doctype.ury_order.ury_order._validate_sync_items_against_menu")
+    @patch("ury.ury.doctype.ury_order.ury_order._require_open_cashier_session")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.has_permission")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.db.get_value")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_doc")
@@ -266,8 +271,10 @@ class TestPriceItemsForInvoicePhase1(unittest.TestCase):
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.session")
     def test_sync_order_delegates_pricing(
         self, mock_session, mock_get_roles, mock_get_doc, mock_get_value, mock_has_permission,
-        mock_price_items, mock_get_order_invoice,
+        _opening, _menu_val, _menu, mock_price_items, mock_get_order_invoice,
     ):
+        # Stub B1 open-session + B2 menu gates so this test keeps asserting
+        # pricing delegation only (same idiom as test_ury_order_sync_validation).
         mock_invoice = MagicMock()
         mock_invoice.name = "POS-INV-002"
         mock_invoice.branch = "Test Branch"
@@ -277,6 +284,7 @@ class TestPriceItemsForInvoicePhase1(unittest.TestCase):
         mock_invoice.items = []
         mock_invoice.waiter = "existing_waiter"
         mock_invoice.selling_price_list = "Standard Selling"
+        mock_invoice.order_type = None
         mock_get_order_invoice.return_value = mock_invoice
 
         # billing_user must resolve True, or sync_order's early "Table
@@ -288,6 +296,8 @@ class TestPriceItemsForInvoicePhase1(unittest.TestCase):
         mock_pos_profile.custom_enable_multiple_cashier = 0
         mock_pos_profile.applicable_for_users = []
         mock_pos_profile.role_allowed_for_billing = [billing_role]
+        mock_pos_profile.transfer_role_permissions = []
+        mock_pos_profile.role_restricted_for_table_order = []
         mock_get_doc.return_value = mock_pos_profile
 
         mock_session.user = "authorized@example.com"
@@ -298,15 +308,16 @@ class TestPriceItemsForInvoicePhase1(unittest.TestCase):
         mock_price_items.return_value = priced
 
         with patch("ury.ury.doctype.ury_order.ury_order.frappe.db.sql"):
-            try:
-                sync_order(
-                    items=[{"item": "Biryani", "qty": 1}],
-                    cashier="fake_cashier", owner="fake_owner", mode_of_payment="Cash",
-                    customer="Test Customer", no_of_pax=2, last_invoice=None,
-                    waiter="fake_waiter", pos_profile="Test Profile",
-                )
-            except Exception:
-                pass
+            with patch("ury.ury.doctype.ury_order.ury_order._reconcile_invoice_merged_tables"):
+                try:
+                    sync_order(
+                        items=[{"item": "Biryani", "qty": 1}],
+                        cashier="fake_cashier", owner="fake_owner", mode_of_payment="Cash",
+                        customer="Test Customer", no_of_pax=2, last_invoice=None,
+                        waiter="fake_waiter", pos_profile="Test Profile",
+                    )
+                except Exception:
+                    pass
 
         mock_price_items.assert_called_once()
         mock_invoice.append.assert_any_call("items", priced[0])
@@ -918,6 +929,7 @@ class TestSyncOrderHardening(FrappeTestCase):
 
     @patch("ury.ury.doctype.ury_order.ury_order._reconcile_invoice_merged_tables")
     @patch("ury.ury.doctype.ury_order.ury_order.get_order_invoice")
+    @patch("ury.ury.doctype.ury_order.ury_order._require_open_cashier_session")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.has_permission")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.db.get_value")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_doc")
@@ -930,6 +942,7 @@ class TestSyncOrderHardening(FrappeTestCase):
         mock_get_doc,
         mock_db_get_value,
         mock_has_permission,
+        _opening,
         mock_get_order_invoice,
         mock_reconcile,
     ):
