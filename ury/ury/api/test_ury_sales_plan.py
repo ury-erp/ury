@@ -64,10 +64,48 @@ class TestURYSalesPlanContract(FrappeTestCase):
 
 
 class TestURYSalesPlanEndpoints(FrappeTestCase):
+    def _ensure_company(self, company_name, abbr):
+        if not frappe.db.exists("Company", company_name):
+            frappe.get_doc(
+                {
+                    "doctype": "Company",
+                    "company_name": company_name,
+                    "default_currency": "INR",
+                    "abbr": abbr,
+                }
+            ).insert()
+
+    def _ensure_branch(self, branch_name, company):
+        if not frappe.db.exists("Branch", branch_name):
+            frappe.get_doc(
+                {
+                    "doctype": "Branch",
+                    "branch": branch_name,
+                    "company": company,
+                    "user": [{"user": "Administrator"}],
+                }
+            ).insert()
+
+    def _ensure_item(self, item_code):
+        if not frappe.db.exists("Item", item_code):
+            frappe.get_doc(
+                {
+                    "doctype": "Item",
+                    "item_code": item_code,
+                    "item_name": item_code,
+                    "item_group": "All Item Groups",
+                    "stock_uom": "Nos",
+                    "is_stock_item": 1,
+                }
+            ).insert()
+
     def setUp(self):
-        self.branch = "URY Branch"
-        self.company = "URY"
+        self.company = "Sales Plan Test Co"
+        self.branch = "Sales Plan Test Branch"
         self.plan_date = "2026-09-20"
+        self._ensure_company(self.company, "SPT")
+        self._ensure_branch(self.branch, self.company)
+        self._ensure_item("MTPL")
         frappe.db.delete(
             "URY Sales Plan",
             {"branch": self.branch, "company": self.company, "plan_date": self.plan_date},

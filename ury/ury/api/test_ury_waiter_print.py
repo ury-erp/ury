@@ -81,7 +81,7 @@ class TestURYWaiterPrint(FrappeTestCase):
 		self.assertEqual(len(combined_doc.kot_items), 2)
 		self.assertEqual(combined_doc.kot_items[0].item, "Pizza")
 		self.assertEqual(combined_doc.kot_items[0].display_mode, "single_qty")
-		self.assertEqual(combined_doc.kot_items[1].quantity, "2")
+		self.assertEqual(combined_doc.kot_items[1].quantity, 2)
 		self.assertEqual(combined_doc.kot_items[1].display_mode, "single_qty")
 
 	@patch("ury.ury.api.ury_waiter_print.frappe.get_all")
@@ -112,7 +112,7 @@ class TestURYWaiterPrint(FrappeTestCase):
 		combined_doc = build_combined_kot_doc(["KOT-1", "KOT-2"])
 
 		self.assertEqual(len(combined_doc.kot_items), 1)
-		self.assertEqual(combined_doc.kot_items[0].quantity, "3")
+		self.assertEqual(combined_doc.kot_items[0].quantity, 3)
 		self.assertEqual(combined_doc.kot_items[0].display_mode, "single_qty")
 
 	@patch("ury.ury.api.ury_waiter_print.frappe.get_all")
@@ -173,7 +173,7 @@ class TestURYWaiterPrint(FrappeTestCase):
 		combined_doc = build_combined_kot_doc(["KOT-1"])
 
 		self.assertEqual(combined_doc.kot_items[0].display_mode, "single_qty")
-		self.assertEqual(combined_doc.kot_items[0].quantity, "3")
+		self.assertEqual(combined_doc.kot_items[0].quantity, 3)
 
 	@patch("ury.ury.api.ury_waiter_print.frappe.get_all")
 	@patch("ury.ury.api.ury_waiter_print.frappe.copy_doc")
