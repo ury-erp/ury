@@ -118,7 +118,27 @@ def create_kot(
             {"item": pr.item_code, "item_name": pr.item_name, "quantity": pr.qty},
         )
 
-    kotdoc.insert()
+    # Guards against the check-then-insert race in process_invoice(): the same
+    # not-yet-submitted invoice can be re-selected across overlapping cron
+    # ticks (get_unprocessed_invoices looks back 5 minutes on a 1-minute
+    # cadence), so the "no KOT exists yet" check above can be stale by the
+    # time we insert. validation_dedup_key is unique on URY KOT and is only
+    # ever set here, so a second fallback KOT for the same invoice+production
+    # is rejected at the DB level instead of silently duplicating.
+    kotdoc.validation_dedup_key = "{0}::{1}".format(posInvoice.name, production_name)
+
+    savepoint = "ury_kot_validation_create_kot"
+    frappe.db.savepoint(savepoint)
+    try:
+        kotdoc.insert()
+    except frappe.DuplicateEntryError:
+        # Someone else (another tick, or the live kot_execute path) already
+        # created the fallback KOT for this invoice+production. That is the
+        # desired outcome, not a failure — treat it as a safe no-op so the
+        # scheduler tick keeps processing the rest of the invoice list.
+        frappe.db.rollback(save_point=savepoint)
+        return
+
     kotdoc.submit()
     kotdoc.db_set("owner", owner)
 

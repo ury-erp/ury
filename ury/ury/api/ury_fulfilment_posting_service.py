@@ -40,6 +40,7 @@ TERMINAL_STATUSES = (POSTED, CANCELLED)
 CLAIMABLE_STATUSES = (PENDING, FAILED, POSTING)
 LEASE_MINUTES = 10
 RETRY_MINUTES = 5
+DEFAULT_MAX_ATTEMPTS = 5
 
 PRE_PRODUCED = "PRE_PRODUCED"
 MADE_TO_ORDER = "MADE_TO_ORDER"
@@ -516,8 +517,17 @@ def _mark_failed(intent_name, error):
 	doc.status = FAILED
 	doc.last_error = str(error)
 	doc.failure_class = getattr(error, "reason_code", error.__class__.__name__)
-	doc.retryable = 1
-	doc.next_retry_at = add_to_date(now_datetime(), minutes=RETRY_MINUTES)
+	max_attempts = int(doc.max_attempts or 0) or DEFAULT_MAX_ATTEMPTS
+	if int(doc.attempts or 0) >= max_attempts:
+		# Give up: this intent has exhausted its retry budget. Leave it FAILED
+		# but not retryable so recover_pending_posting_intents stops
+		# re-enqueuing it forever — it becomes a dead letter, visible for
+		# manual intervention instead of retrying indefinitely.
+		doc.retryable = 0
+		doc.next_retry_at = None
+	else:
+		doc.retryable = 1
+		doc.next_retry_at = add_to_date(now_datetime(), minutes=RETRY_MINUTES)
 	doc.leased_until = None
 	with _service_mutation():
 		doc.save(ignore_permissions=False)
@@ -554,17 +564,24 @@ def process_posting_intent(intent_name):
 
 
 def recover_pending_posting_intents(limit=100):
-	"""Re-enqueue stale PENDING/FAILED/POSTING intents for recovery."""
+	"""Re-enqueue stale PENDING/FAILED/POSTING intents for recovery.
+
+	FAILED intents that _mark_failed gave up on (retryable=0, having exceeded
+	max_attempts) are dead letters: they are deliberately skipped here so they
+	stop retrying forever and stay visible for manual intervention instead.
+	"""
 	candidates = frappe.get_all(
 		INTENT_DOCTYPE,
 		filters={"status": ["in", [PENDING, FAILED, POSTING]]},
-		fields=["name", "status", "leased_until", "next_retry_at"],
+		fields=["name", "status", "leased_until", "next_retry_at", "retryable"],
 		limit=limit,
 	)
 	queued = []
 	now_dt = now_datetime()
 	for row in candidates:
 		if row.get("status") == POSTING and row.get("leased_until") and frappe.utils.get_datetime(row.leased_until) > now_dt:
+			continue
+		if row.get("status") == FAILED and not row.get("retryable"):
 			continue
 		if row.get("status") == FAILED and row.get("next_retry_at") and frappe.utils.get_datetime(row.next_retry_at) > now_dt:
 			continue
