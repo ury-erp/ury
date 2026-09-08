@@ -160,3 +160,15 @@ export async function reprintKot(invoiceNumber: string): Promise<void> {
     invoice_number: invoiceNumber,
   });
 }
+
+/**
+ * Cancels an order/invoice with the provided reason
+ * @param invoice_id The invoice ID to cancel
+ * @param reason The reason for cancellation
+ */
+export async function cancelOrder(invoice_id: string, reason: string): Promise<void> {
+  await call.post('ury.ury.doctype.ury_order.ury_order.cancel_order', {
+    invoice_id,
+    reason,
+  });
+}

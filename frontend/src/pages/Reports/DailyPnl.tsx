@@ -380,6 +380,11 @@ export function DailyPnl() {
                 percent={summaryMap.get('cogs')?.percent}
               />
               <WaterfallRow
+                label="Disposables"
+                amount={summaryMap.get('disposables_cost')?.amount ?? 0}
+                percent={summaryMap.get('disposables_cost')?.percent}
+              />
+              <WaterfallRow
                 label="Direct Expenses"
                 amount={summaryMap.get('total_direct_expenses')?.amount ?? 0}
                 percent={summaryMap.get('total_direct_expenses')?.percent}
