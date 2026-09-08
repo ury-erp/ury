@@ -108,3 +108,35 @@
 .Toastify__close-button:hover {
   opacity: 1 !important;
 }
+
+/* On ≤480px react-toastify forces the container to top:0 / width:100vw and
+   zeroes toast radius. That sits under the status bar on notched phones and
+   installed PWAs (serve at /ury/serve/), and reads edge-to-edge. Re-apply
+   safe-area insets with an env() fallback, add the same 12px rhythm the toast
+   padding uses, and keep the toast a floating card so --radius stays visible. */
+@media only screen and (max-width: 480px) {
+  .Toastify__toast-container,
+  .Toastify__toast-container[data-stacked='true'] {
+    width: auto !important;
+    max-width: calc(
+      100vw - 24px - env(safe-area-inset-left, 0px) -
+        env(safe-area-inset-right, 0px)
+    ) !important;
+    left: max(12px, env(safe-area-inset-left, 0px)) !important;
+    right: max(12px, env(safe-area-inset-right, 0px)) !important;
+    margin: 0 !important;
+  }
+
+  .Toastify__toast-container--top-left,
+  .Toastify__toast-container--top-center,
+  .Toastify__toast-container--top-right {
+    top: calc(env(safe-area-inset-top, 0px) + 12px) !important;
+  }
+
+  .Toastify__toast {
+    width: min(320px, 100%) !important;
+    max-width: 100% !important;
+    margin-bottom: 0.75rem !important;
+    border-radius: var(--radius) !important;
+  }
+}
