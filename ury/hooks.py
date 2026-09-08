@@ -59,7 +59,8 @@ page_js = {"point-of-sale": ["public/js/pos_extend.js"]}
 
 # include js in doctype views
 doctype_js = {
-	"Attendance": "public/js/attendance.js"
+	"Attendance": "public/js/attendance.js",
+	"Employee Attendance Tool": "public/js/employee_attendance_tool.js"
 }
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
