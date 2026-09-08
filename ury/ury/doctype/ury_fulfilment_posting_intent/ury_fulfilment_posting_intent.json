@@ -98,7 +98,9 @@
  "permissions": [
   {"role": "System Manager", "read": 1, "create": 1, "write": 1, "report": 1},
   {"role": "Stock Manager", "read": 1, "create": 1, "write": 1, "report": 1},
-  {"role": "Production Manager", "read": 1, "create": 1, "write": 1, "report": 1}
+  {"role": "Production Manager", "read": 1, "create": 1, "write": 1, "report": 1},
+  {"role": "Chef", "read": 1, "create": 1, "report": 1},
+  {"role": "URY Captain", "read": 1, "create": 1, "report": 1}
  ],
  "sort_field": "modified",
  "sort_order": "DESC",
