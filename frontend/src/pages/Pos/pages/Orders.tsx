@@ -742,17 +742,30 @@ export default function Orders() {
               <div className="mb-6">
                 <h3 className="text-[10.5px] font-medium uppercase tracking-[0.05em] text-text-tertiary mb-2">{t('order.items_title')}</h3>
                 <div>
-                  {selectedOrderItems.filter((item) => !item.is_disposable).map((item, index) => (
-                    <div key={index} className="flex py-1.5 border-b border-hair last:border-0">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-foreground truncate">{item.item_name}</p>
-                        <p className="text-xs text-text-tertiary font-mono tabular-nums">Qty: {item.qty}</p>
+                  {selectedOrderItems.filter((item) => !item.is_disposable).map((item, index) => {
+                    const discountPercentage = item.rate < item.price_list_rate
+                      ? Math.round(((item.price_list_rate - item.rate) / item.price_list_rate) * 100)
+                      : null;
+
+                    return (
+                      <div key={index} className="flex py-1.5 border-b border-hair last:border-0">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <p className="text-sm font-medium text-foreground truncate">{item.item_name}</p>
+                            {discountPercentage !== null && (
+                              <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-destructive-tint text-destructive border border-destructive-tint-border">
+                                -{discountPercentage}%
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-text-tertiary font-mono tabular-nums">Qty: {item.qty}</p>
+                        </div>
+                        <p className="ml-auto font-mono text-xs font-semibold text-foreground tabular-nums self-center">
+                          {formatCurrency(item.amount)}
+                        </p>
                       </div>
-                      <p className="ml-auto font-mono text-xs font-semibold text-foreground tabular-nums self-center">
-                        {formatCurrency(item.amount)}
-                      </p>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 
