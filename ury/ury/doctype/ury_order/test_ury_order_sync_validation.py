@@ -316,3 +316,56 @@ class TestSyncOrderCommentClearB3(FrappeTestCase):
                     pass
 
         self.assertEqual(invoice.custom_comments, "keep me")
+
+
+class TestSplitBillOwnershipB5(FrappeTestCase):
+    @patch("ury.ury.doctype.ury_order.ury_order._enforce_order_access")
+    @patch("ury.ury.doctype.ury_order.ury_order.getBranch", return_value="Branch A")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.has_permission", return_value=True)
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_doc")
+    def test_split_bill_calls_enforce_order_access(
+        self, mock_get_doc, _perm, _branch, mock_enforce
+    ):
+        source = MagicMock()
+        source.branch = "Branch A"
+        source.docstatus = 0
+        source.pos_profile = "Test POS Profile"
+        source.get = lambda key, default=None: getattr(source, key, default)
+        mock_get_doc.return_value = source
+        mock_enforce.side_effect = frappe.PermissionError("Not permitted to split this invoice.")
+
+        with self.assertRaises(frappe.PermissionError):
+            split_bill("POS-INV-1", [{"name": "row1", "qty": 1}])
+
+        mock_enforce.assert_called_once()
+        kwargs = mock_enforce.call_args.kwargs
+        self.assertTrue(kwargs.get("require_modify"))
+        self.assertEqual(kwargs.get("pos_profile_name"), "Test POS Profile")
+
+    @patch("ury.ury.doctype.ury_order.ury_order.getBranch", return_value="Branch A")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.has_permission", return_value=True)
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_doc")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_roles", return_value=["URY Captain"])
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.session")
+    def test_split_bill_denies_other_captain_unbilled(
+        self, mock_session, _roles, mock_get_doc, _perm, _branch
+    ):
+        mock_session.user = "captain_a@example.com"
+        source = MagicMock()
+        source.name = "POS-INV-1"
+        source.branch = "Branch A"
+        source.docstatus = 0
+        source.waiter = "captain_b@example.com"
+        source.invoice_printed = 0
+        source.restaurant_table = None
+        source.pos_profile = "Test POS Profile"
+        source.get = lambda key, default=None: getattr(source, key, default)
+
+        profile = _pos_profile()
+        mock_get_doc.side_effect = lambda *args, **kwargs: (
+            source if args and args[0] == "POS Invoice" else profile
+        )
+
+        with self.assertRaises(frappe.PermissionError) as ctx:
+            split_bill("POS-INV-1", [{"name": "row1", "qty": 1}])
+        self.assertIn("Not permitted to split", str(ctx.exception))
