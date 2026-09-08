@@ -74,14 +74,23 @@ def process_invoice(invoice):
                     production_items.append(i)
 
             if p_flag == 1:
-                create_kot(
-                    invoice,
-                    pos_profile,
-                    kot_naming_series,
-                    production_items,
-                    owner,
-                    p.name,
-                )
+                try:
+                    create_kot(
+                        invoice,
+                        pos_profile,
+                        kot_naming_series,
+                        production_items,
+                        owner,
+                        p.name,
+                    )
+                except Exception:
+                    # Guard each production unit independently so one
+                    # raising invoice/production doesn't abort the rest of
+                    # this scheduler tick's invoice list.
+                    frappe.log_error(
+                        title="KOT Validation Create KOT Failed",
+                        message=frappe.get_traceback(),
+                    )
 
 
 # Function to fetch production units for a branch
@@ -131,11 +140,17 @@ def create_kot(
     frappe.db.savepoint(savepoint)
     try:
         kotdoc.insert()
-    except frappe.DuplicateEntryError:
+    except (frappe.UniqueValidationError, frappe.DuplicateEntryError):
         # Someone else (another tick, or the live kot_execute path) already
         # created the fallback KOT for this invoice+production. That is the
         # desired outcome, not a failure — treat it as a safe no-op so the
         # scheduler tick keeps processing the rest of the invoice list.
+        #
+        # Frappe raises UniqueValidationError (not DuplicateEntryError) for a
+        # violation of a unique=1 index on a non-name column such as
+        # validation_dedup_key -- DuplicateEntryError is reserved for a
+        # primary-key (name) collision. Both are caught here since either
+        # indicates the same "already created" outcome.
         frappe.db.rollback(save_point=savepoint)
         return
 
