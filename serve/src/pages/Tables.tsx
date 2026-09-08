@@ -7,12 +7,15 @@ import {
   ConfirmDialog,
   Spinner,
   showToast,
+  TablePickerDialog,
+  UserPickerDialog,
 } from '@ury/ui'
 import { useCaptainContext } from '../hooks/useCaptainContext'
 import { useServeStore } from '../store/serve-store'
 import {
   getRooms,
   getTables,
+  getVacantTablesForBranch,
   mergeTablesBatch,
   resolveAllowedRooms,
   unmergeTables,
@@ -24,7 +27,14 @@ import {
   getTableMergeActions,
   sortTablesByMergeGroups,
 } from '../lib/table-utils'
-import { getActiveTableOrders, getUserFullNames, type ActiveTableOrder } from '../lib/captain-table-api'
+import {
+  getActiveTableOrders,
+  getBranchCaptains,
+  getUserFullNames,
+  type ActiveTableOrder,
+  type BranchCaptain,
+} from '../lib/captain-table-api'
+import { captainTransfer, tableTransfer } from '../lib/order-api'
 import CaptainTableCard, { type CaptainTableOwnership } from '../components/CaptainTableCard'
 import { OperationalTools } from '../operations'
 
@@ -46,6 +56,7 @@ export default function TablesPage() {
 
   const currentUser = context?.user ?? null
   const canAccessOther = Boolean(capabilities?.canAccessOtherCaptainsTables)
+  const canTransferCaptain = Boolean(capabilities?.canTransferCaptain)
   const multipleCashier = Boolean(context?.pos_profile?.custom_enable_multiple_cashier)
 
   const [selectedRoom, setSelectedRoom] = useState<string | null>(null)
@@ -61,8 +72,23 @@ export default function TablesPage() {
   const [mergeSource, setMergeSource] = useState<Table | null>(null)
   const [unmergeSource, setUnmergeSource] = useState<Table | null>(null)
   const [unmergeSubmitting, setUnmergeSubmitting] = useState(false)
+  const [menuOpenForTable, setMenuOpenForTable] = useState<string | null>(null)
   /** Pending navigation target after draft discard confirm (`takeaway` or table name). */
   const [pendingDestination, setPendingDestination] = useState<string | null>(null)
+
+  const [transferSource, setTransferSource] = useState<Table | null>(null)
+  const [transferInvoiceName, setTransferInvoiceName] = useState<string | null>(null)
+  const [transferDestinations, setTransferDestinations] = useState<Table[]>([])
+  const [transferLoading, setTransferLoading] = useState(false)
+
+  const [captainTransferSource, setCaptainTransferSource] = useState<{
+    table: Table
+    invoiceName: string
+    currentCaptain: string
+  } | null>(null)
+  const [captainOptions, setCaptainOptions] = useState<BranchCaptain[]>([])
+  const [captainLoading, setCaptainLoading] = useState(false)
+  const [captainSearch, setCaptainSearch] = useState('')
 
   const roomsRequestIdRef = useRef(0)
   const tablesRequestIdRef = useRef(0)
@@ -154,6 +180,11 @@ export default function TablesPage() {
     }
   }, [])
 
+  const refreshSelectedRoom = useCallback(() => {
+    if (selectedRoom) void loadTables(selectedRoom)
+    if (branch) void loadActiveOrders(branch)
+  }, [selectedRoom, branch, loadTables, loadActiveOrders])
+
   useEffect(() => {
     if (selectedRoom) void loadTables(selectedRoom)
   }, [selectedRoom, loadTables])
@@ -169,6 +200,29 @@ export default function TablesPage() {
     }, POLL_MS)
     return () => window.clearInterval(id)
   }, [selectedRoom, branch, loadTables, loadActiveOrders])
+
+  useEffect(() => {
+    if (!captainTransferSource || !branch) return
+    let cancelled = false
+    setCaptainLoading(true)
+    getBranchCaptains(branch, {
+      search: captainSearch,
+      exclude: currentUser ?? undefined,
+      limit: 20,
+    })
+      .then((rows) => {
+        if (!cancelled) setCaptainOptions(rows)
+      })
+      .catch(() => {
+        if (!cancelled) setCaptainOptions([])
+      })
+      .finally(() => {
+        if (!cancelled) setCaptainLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [captainTransferSource, captainSearch, currentUser, branch])
 
   const resolveOwnership = useCallback(
     (table: Table, order: ActiveTableOrder | undefined): CaptainTableOwnership => {
@@ -229,6 +283,64 @@ export default function TablesPage() {
     }
     const ownerName = order ? ownerNames.get(order.waiter) ?? order.waiter : null
     showToast.error(ownerName ? `Assigned to ${ownerName}` : 'This table is occupied')
+  }
+
+  const validateActiveOrder = (order: ActiveTableOrder | undefined) => {
+    if (!order?.invoiceName) {
+      throw new Error('No active order on this table')
+    }
+    if (order.invoicePrinted) {
+      throw new Error('Order already billed')
+    }
+    return order
+  }
+
+  const handleOpenTransferTable = async (table: Table) => {
+    setMenuOpenForTable(null)
+    if (getMergeGroupMembers(table, tables).length > 1) {
+      showToast.error('Unmerge tables before transferring')
+      return
+    }
+    if (!branch) {
+      showToast.error('Transfer failed')
+      return
+    }
+
+    const order = activeOrders.get(table.name)
+    setTransferSource(table)
+    setTransferInvoiceName(null)
+    setTransferDestinations([])
+    setTransferLoading(true)
+    try {
+      const active = validateActiveOrder(order)
+      setTransferDestinations(await getVacantTablesForBranch(branch, table.name))
+      setTransferInvoiceName(active.invoiceName)
+    } catch (err) {
+      setTransferSource(null)
+      setTransferInvoiceName(null)
+      setTransferDestinations([])
+      showToast.error(err instanceof Error ? err.message : 'Failed to load tables')
+    } finally {
+      setTransferLoading(false)
+    }
+  }
+
+  const handleOpenCaptainTransfer = (table: Table) => {
+    setMenuOpenForTable(null)
+    try {
+      const order = validateActiveOrder(activeOrders.get(table.name))
+      if (!order.waiter) {
+        throw new Error('No active order on this table')
+      }
+      setCaptainSearch('')
+      setCaptainTransferSource({
+        table,
+        invoiceName: order.invoiceName,
+        currentCaptain: order.waiter,
+      })
+    } catch (err) {
+      showToast.error(err instanceof Error ? err.message : 'Transfer failed')
+    }
   }
 
   const retryFailedLoad = () => {
@@ -363,41 +475,30 @@ export default function TablesPage() {
               const ownership = resolveOwnership(table, order)
               const mergePartners = getMergeGroupMembers(table, tables).filter((n) => n !== table.name)
               const { showMerge, showUnmerge } = getTableMergeActions(table, tables)
+              const canTransferTable =
+                table.occupied === 1 && getMergeGroupMembers(table, tables).length <= 1
               return (
-                <div key={table.name} className="relative flex flex-col gap-2">
-                  <CaptainTableCard
-                    table={table}
-                    order={order}
-                    ownership={ownership}
-                    ownerName={ownership === 'mine' ? undefined : ownerNames.get(order?.waiter ?? '')}
-                    mergePartners={mergePartners}
-                    onTap={() => handleTableTap(table, order)}
-                  />
-                  {(showMerge || showUnmerge) && (
-                    <div className="flex gap-2">
-                      {showMerge && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="min-h-11 flex-1 px-3 text-sm"
-                          onClick={() => setMergeSource(table)}
-                        >
-                          Merge
-                        </Button>
-                      )}
-                      {showUnmerge && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="min-h-11 flex-1 px-3 text-sm"
-                          onClick={() => setUnmergeSource(table)}
-                        >
-                          Unmerge
-                        </Button>
-                      )}
-                    </div>
-                  )}
-                </div>
+                <CaptainTableCard
+                  key={table.name}
+                  table={table}
+                  order={order}
+                  ownership={ownership}
+                  ownerName={ownership === 'mine' ? undefined : ownerNames.get(order?.waiter ?? '')}
+                  mergePartners={mergePartners}
+                  onTap={() => handleTableTap(table, order)}
+                  menuOpen={menuOpenForTable === table.name}
+                  onMenuOpenChange={(open) => setMenuOpenForTable(open ? table.name : null)}
+                  onMerge={showMerge ? () => setMergeSource(table) : undefined}
+                  onUnmerge={showUnmerge ? () => setUnmergeSource(table) : undefined}
+                  canUnmerge={showUnmerge}
+                  onTransferTable={
+                    canTransferTable ? () => void handleOpenTransferTable(table) : undefined
+                  }
+                  onTransferCaptain={
+                    canTransferCaptain ? () => handleOpenCaptainTransfer(table) : undefined
+                  }
+                  showCaptainTransfer={canTransferCaptain}
+                />
               )
             })}
           </div>
@@ -451,6 +552,96 @@ export default function TablesPage() {
           }}
         />
       )}
+
+      <TablePickerDialog
+        open={Boolean(transferSource)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setTransferSource(null)
+            setTransferInvoiceName(null)
+            setTransferDestinations([])
+          }
+        }}
+        sourceName={transferSource?.name || ''}
+        options={transferDestinations.map((t) => ({
+          name: t.name,
+          room: t.restaurant_room,
+        }))}
+        loading={transferLoading}
+        onConfirm={async (newTable) => {
+          if (!transferSource || !transferInvoiceName) return
+          try {
+            await tableTransfer(transferSource.name, newTable, transferInvoiceName)
+            showToast.success('Table transferred')
+            setTransferSource(null)
+            setTransferInvoiceName(null)
+            setTransferDestinations([])
+            refreshSelectedRoom()
+          } catch (e) {
+            showToast.error(e instanceof Error ? e.message : 'Transfer failed')
+            throw e
+          }
+        }}
+        labels={{
+          title: 'Transfer table',
+          description: 'Pick a free destination table',
+          currentLabel: 'Current table',
+          searchPlaceholder: 'Search tables',
+          empty: 'No free tables',
+          cancel: 'Cancel',
+          confirm: 'Transfer',
+          loading: 'Loading…',
+        }}
+      />
+
+      <UserPickerDialog
+        open={Boolean(captainTransferSource)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setCaptainTransferSource(null)
+            setCaptainSearch('')
+            setCaptainOptions([])
+          }
+        }}
+        options={captainOptions}
+        loading={captainLoading}
+        search={captainSearch}
+        onSearchChange={setCaptainSearch}
+        sourceValue={
+          captainTransferSource
+            ? ownerNames.get(captainTransferSource.currentCaptain) ??
+              captainTransferSource.currentCaptain
+            : undefined
+        }
+        onConfirm={async (newCaptain) => {
+          if (!captainTransferSource) return
+          try {
+            await captainTransfer(
+              captainTransferSource.currentCaptain,
+              newCaptain,
+              captainTransferSource.invoiceName
+            )
+            showToast.success('Captain transferred')
+            setCaptainTransferSource(null)
+            setCaptainSearch('')
+            setCaptainOptions([])
+            refreshSelectedRoom()
+          } catch (e) {
+            showToast.error(e instanceof Error ? e.message : 'Captain transfer failed')
+            throw e
+          }
+        }}
+        labels={{
+          title: 'Transfer captain',
+          description: 'Choose the new captain',
+          searchPlaceholder: 'Search users',
+          empty: 'No users found',
+          cancel: 'Cancel',
+          confirm: 'Transfer',
+          loading: 'Loading…',
+          currentLabel: 'Current captain',
+        }}
+      />
 
       <ConfirmDialog
         open={Boolean(pendingDestination)}
