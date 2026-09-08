@@ -23,7 +23,6 @@ def resolve_production_context(item, branch, company=None, department=None):
 			"name", "item", "branch", "department", "production_unit",
 			"production_policy", "bom", "direct_retail_warehouse",
 			"controlled_by_sales_plan", "allow_over_plan_sale", "availability_mode",
-			"production_unit_disabled", "department_disabled",
 		],
 		filters=filters,
 		limit=2,

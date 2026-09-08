@@ -147,26 +147,32 @@ def _resolve_production_config(item_code, branch, company, department=None):
 	exception) when the table is absent or no matching row exists, so callers
 	can fail closed with `CONFIGURATION_ERROR` rather than crash.
 
-	Returns (when resolved) a dict with whichever of these keys the
-	underlying table actually has (missing ones come back `None`):
+	Returns (when resolved) a `frappe._dict` with whichever of these keys the
+	underlying table actually has (missing ones come back `None`), so callers
+	may use either attribute (`config.production_policy`) or dict-style
+	(`config.get("production_policy")`) access -- this matches the shape
+	`resolve_production_context` (the authoritative production resolver this
+	adapter wraps) itself already returns:
 		production_policy, department, production_unit, warehouse,
 		production_unit_disabled, department_disabled
 	"""
 	row = resolve_production_context(item_code, branch, company=company, department=department)
 	if not row:
 		return None
-	return {
-		"production_policy": row.get("production_policy"),
-		"department": row.get("department"),
-		"production_unit": row.get("production_unit"),
-		"warehouse": row.get("warehouse"),
-		"direct_retail_warehouse": row.get("direct_retail_warehouse"),
-		"controlled_by_sales_plan": row.get("controlled_by_sales_plan"),
-		"allow_over_plan_sale": row.get("allow_over_plan_sale"),
-		"availability_mode": row.get("availability_mode"),
-		"production_unit_disabled": row.get("production_unit_disabled", 0),
-		"department_disabled": row.get("department_disabled", 0),
-	}
+	return frappe._dict(
+		{
+			"production_policy": row.get("production_policy"),
+			"department": row.get("department"),
+			"production_unit": row.get("production_unit"),
+			"warehouse": row.get("warehouse"),
+			"direct_retail_warehouse": row.get("direct_retail_warehouse"),
+			"controlled_by_sales_plan": row.get("controlled_by_sales_plan"),
+			"allow_over_plan_sale": row.get("allow_over_plan_sale"),
+			"availability_mode": row.get("availability_mode"),
+			"production_unit_disabled": row.get("production_unit_disabled", 0),
+			"department_disabled": row.get("department_disabled", 0),
+		}
+	)
 
 
 def _resolve_plan_remaining(item_code, branch, company, department=None):
@@ -177,27 +183,51 @@ def _resolve_plan_remaining(item_code, branch, company, department=None):
 	table is absent or no approved/submitted plan row is found -- callers
 	treat that as `NO_ACTIVE_PLAN`.
 
+	`URY Sales Plan` stores per-item quantities in its `items` child table
+	(`URY Sales Plan Item`: `item_code`, `qty`, ...), not on the parent --
+	the parent only carries scope/status fields (`branch`, `company`,
+	`docstatus`, ...). This first resolves the submitted parent plan(s) in
+	scope, then sums the matching child rows, following the same
+	`parent`/`parenttype` child-table query convention used elsewhere in this
+	codebase (e.g. `ury_bom_compiler.py`) rather than `frappe.db.get_value`
+	against nonexistent parent columns.
+
+	`committed_qty`/`fulfilled_qty` have no backing column anywhere in the
+	current schema (parent or child) -- V3-23's frozen-snapshot schema is
+	still pending (see module docstring); until it lands, committed/fulfilled
+	is treated as 0, so `plan_remaining == plan_qty`. TODO(V3-23 merge):
+	replace with the real committed/fulfilled tracking once it exists.
+
 	Returns (when resolved) a dict: {"plan_qty": ..., "plan_remaining": ...}
 	"""
 	if not frappe.db.table_exists(SALES_PLAN_DOCTYPE):
 		return None
 
-	filters = {"item_code": item_code, "branch": branch, "docstatus": 1}
-	if department:
-		filters["department"] = department
-
-	row = frappe.db.get_value(
-		SALES_PLAN_DOCTYPE,
-		filters,
-		["plan_qty", "committed_qty", "fulfilled_qty"],
-		as_dict=True,
-	)
-	if not row or row.plan_qty is None:
+	plan_filters = {"branch": branch, "company": company, "docstatus": 1}
+	plan_names = frappe.get_all(SALES_PLAN_DOCTYPE, filters=plan_filters, pluck="name")
+	if not plan_names:
 		return None
 
-	committed = (row.committed_qty or 0) + (row.fulfilled_qty or 0)
-	plan_remaining = row.plan_qty - committed
-	return {"plan_qty": row.plan_qty, "plan_remaining": plan_remaining}
+	item_filters = {"parent": ["in", plan_names], "item_code": item_code}
+	if department:
+		item_filters["department"] = department
+
+	rows = frappe.get_all(
+		"URY Sales Plan Item",
+		filters=item_filters,
+		fields=["qty"],
+	)
+	if not rows:
+		return None
+
+	plan_qty = sum(row.get("qty") or 0 for row in rows)
+	if not plan_qty:
+		return None
+
+	committed = 0
+	fulfilled = 0
+	plan_remaining = plan_qty - committed - fulfilled
+	return {"plan_qty": plan_qty, "plan_remaining": plan_remaining}
 
 
 def _base_response(item_code, company, branch, department, production_policy):
