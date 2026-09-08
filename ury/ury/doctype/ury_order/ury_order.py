@@ -617,6 +617,14 @@ def split_bill(source_invoice, items_to_move, customer=None):
     if user_branch and source.branch != user_branch:
         frappe.throw(_("Not permitted to split invoices from another branch."), frappe.PermissionError)
 
+    # Same ownership / elevated / billing / billed / room gates as sync_order.
+    _enforce_order_access(
+        source,
+        pos_profile_name=source.get("pos_profile"),
+        require_modify=True,
+        deny_message=_("Not permitted to split this invoice."),
+    )
+
     if source.docstatus != 0:
         frappe.throw(_("Only draft invoices can be split."))
 
