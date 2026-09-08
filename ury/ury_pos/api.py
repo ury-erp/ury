@@ -1664,3 +1664,29 @@ def merge_bills(primary_invoice, secondary_invoice):
             "status": "error",
             "message": str(e),
         }
+
+
+@frappe.whitelist()
+def ensure_payment_mode_accounts(modes, company):
+    """Ensure every Mode of Payment in `modes` has a default account for `company`.
+
+    Called from the frontend POS Profile form right before save, so a payment
+    mode with no company-scoped default account (e.g. Cheque, Credit Card,
+    Zomato, Swiggy, Direct -- anything the dev-seed's Cash/Card/UPI wiring
+    never covers) doesn't crash ERPNext's standard POS Profile validation
+    ("Please set default Cash or Bank account in Mode of Payments ...").
+    """
+    from ury.ury.dev_seed.profiles import _ensure_mode_of_payment
+
+    if isinstance(modes, str):
+        modes = frappe.parse_json(modes)
+    if not modes or not company:
+        return []
+
+    ensured = []
+    for mode in modes:
+        if not mode:
+            continue
+        _ensure_mode_of_payment(mode, company)
+        ensured.append(mode)
+    return ensured
