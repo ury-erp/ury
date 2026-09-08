@@ -14,12 +14,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+from contextlib import contextmanager
 
 import frappe
 from frappe import _
 from frappe.utils import add_to_date, flt, now, now_datetime
 
-from ury.ury.api.ury_reservation_service import RESERVED, fulfil_reservation
+from ury.ury.api.ury_reservation_service import FULFILLED, RESERVED, fulfil_reservation
+from ury.ury.api.ury_kot_execution_service import READY, SERVED
 
 
 INTENT_DOCTYPE = "URY Fulfilment Posting Intent"
@@ -43,6 +45,29 @@ PRE_PRODUCED = "PRE_PRODUCED"
 MADE_TO_ORDER = "MADE_TO_ORDER"
 MTO_LEGACY = "MTO"
 DIRECT_RETAIL = "DIRECT_RETAIL"
+READY_STATES = (READY, SERVED)
+POSTING_ROLES = {"System Manager", "Stock Manager", "Production Manager", "Chef", "URY Captain"}
+
+
+@contextmanager
+def _service_mutation():
+	"""Run only trusted posting mutations as the service principal."""
+	previous_user = frappe.session.user
+	frappe.set_user("Administrator")
+	try:
+		yield
+	finally:
+		frappe.set_user(previous_user)
+
+
+def _authorize_posting(actor, execution_doc):
+	if actor == "Administrator":
+		return
+	roles = set(frappe.get_roles(actor))
+	if not roles.intersection(POSTING_ROLES):
+		raise frappe.PermissionError(_("You are not permitted to post fulfilment stock"))
+	if not frappe.has_permission(KOT_ITEM_DOCTYPE, "read", execution_doc, user=actor):
+		raise frappe.PermissionError(_("You are not permitted to post this fulfilment item"))
 
 
 class FulfilmentPostingError(frappe.ValidationError):
@@ -207,6 +232,14 @@ def _next_fulfilment_sequence(branch, kot, kot_item, accepted_revision, reservat
 
 
 def _freeze_payload(execution_doc, actor):
+	execution_state = execution_doc.get("state") or execution_doc.get("execution_state")
+	if execution_state not in READY_STATES:
+		raise FulfilmentPostingError(
+			"EXECUTION_NOT_READY",
+			_("KOT {0} execution state is {1}; posting requires READY or SERVED").format(
+				execution_doc.kot, execution_state or "UNKNOWN"
+			),
+		)
 	_kot_item, item_code, accepted_qty = _kot_item_doc(execution_doc.kot_item)
 	order_ref = _kot_order_ref(execution_doc.kot)
 	rows = _reservation_rows(order_ref, item_code, execution_doc.branch, execution_doc.company)
@@ -259,6 +292,7 @@ def _freeze_payload(execution_doc, actor):
 		"reservation_group": reservation_group,
 		"components": components,
 		"ready_at": execution_doc.get("ready_at") or now(),
+		"execution_state": execution_state,
 		"actor": actor,
 	}
 	payload["idempotency_key"] = ":".join(
@@ -290,6 +324,7 @@ def create_or_get_posting_intent_for_ready(execution_doc, actor=None):
 		raise FulfilmentPostingError("POSTING_INTENT_DOCTYPE_MISSING", _("{0} is not available").format(INTENT_DOCTYPE))
 
 	actor = actor or frappe.session.user
+	_authorize_posting(actor, execution_doc)
 	payload = _freeze_payload(execution_doc, actor)
 	existing_name = frappe.db.get_value(INTENT_DOCTYPE, {"idempotency_key": payload["idempotency_key"]}, "name")
 	if existing_name:
@@ -310,6 +345,7 @@ def create_or_get_posting_intent_for_ready(execution_doc, actor=None):
 			"accepted_revision": payload["accepted_revision"],
 			"fulfilment_sequence": payload["fulfilment_sequence"],
 			"accepted_qty": payload["accepted_qty"],
+			"execution_state": payload["execution_state"],
 			"reservation_ref": payload["reservation_group"],
 			"frozen_payload_json": _json_dumps(payload),
 			"frozen_payload_hash": _hash_payload(payload),
@@ -317,7 +353,8 @@ def create_or_get_posting_intent_for_ready(execution_doc, actor=None):
 			"actor": actor,
 		}
 	)
-	doc.insert(ignore_permissions=False)
+	with _service_mutation():
+		doc.insert(ignore_permissions=False)
 	return _intent_result(doc.as_dict(), idempotent=False)
 
 
@@ -368,7 +405,8 @@ def _claim_intent(intent_name):
 	doc.lease_owner = frappe.session.user
 	doc.leased_until = add_to_date(now_datetime(), minutes=LEASE_MINUTES)
 	doc.last_attempted_at = now()
-	doc.save(ignore_permissions=False)
+	with _service_mutation():
+		doc.save(ignore_permissions=False)
 	return doc
 
 
@@ -418,9 +456,24 @@ def _submit_stock_entry(intent, payload):
 			"remarks": "URY Fulfilment Posting Intent: {0}".format(intent.name),
 		}
 	)
-	doc.insert(ignore_permissions=False)
-	doc.submit()
+	with _service_mutation():
+		doc.insert(ignore_permissions=False)
+		doc.submit()
 	return doc.name
+
+
+def _reservation_is_fulfilled(reservation_group):
+	rows = frappe.get_all(
+		RESERVATION_DOCTYPE,
+		filters={"reservation_group": reservation_group},
+		fields=["status"],
+	)
+	return bool(rows) and all(row.get("status") == FULFILLED for row in rows)
+
+
+def _fulfil_reservation_once(reservation_group):
+	if not _reservation_is_fulfilled(reservation_group):
+		fulfil_reservation(reservation_group)
 
 
 def _create_or_update_fulfilment(intent, payload, stock_entry):
@@ -450,9 +503,11 @@ def _create_or_update_fulfilment(intent, payload, stock_entry):
 	doc.posted_to_erpnext = 1
 	doc.posting_reference = stock_entry
 	if existing:
-		doc.save(ignore_permissions=False)
+		with _service_mutation():
+			doc.save(ignore_permissions=False)
 	else:
-		doc.insert(ignore_permissions=False)
+		with _service_mutation():
+			doc.insert(ignore_permissions=False)
 	return doc.name
 
 
@@ -464,7 +519,8 @@ def _mark_failed(intent_name, error):
 	doc.retryable = 1
 	doc.next_retry_at = add_to_date(now_datetime(), minutes=RETRY_MINUTES)
 	doc.leased_until = None
-	doc.save(ignore_permissions=False)
+	with _service_mutation():
+		doc.save(ignore_permissions=False)
 	return _intent_result(doc.as_dict(), idempotent=False)
 
 
@@ -476,7 +532,12 @@ def process_posting_intent(intent_name):
 	try:
 		payload = _payload(intent)
 		stock_entry = _submit_stock_entry(intent, payload)
-		fulfil_reservation(payload["reservation_group"])
+		if not intent.get("erpnext_stock_entry"):
+			intent.erpnext_stock_entry = stock_entry
+			with _service_mutation():
+				intent.save(ignore_permissions=False)
+		with _service_mutation():
+			_fulfil_reservation_once(payload["reservation_group"])
 		fulfilment = _create_or_update_fulfilment(intent, payload, stock_entry)
 		intent.fulfilment_record = fulfilment
 		intent.erpnext_stock_entry = stock_entry
@@ -485,7 +546,8 @@ def process_posting_intent(intent_name):
 		intent.posted_by = frappe.session.user
 		intent.leased_until = None
 		intent.last_error = None
-		intent.save(ignore_permissions=False)
+		with _service_mutation():
+			intent.save(ignore_permissions=False)
 		return _intent_result(intent.as_dict(), idempotent=False)
 	except Exception as exc:
 		return _mark_failed(intent.name, exc)

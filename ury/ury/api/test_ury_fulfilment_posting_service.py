@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import frappe
@@ -7,6 +8,7 @@ from frappe.tests.utils import FrappeTestCase
 from ury.ury.api.ury_fulfilment_posting_service import (
 	FAILED,
 	POSTED,
+	_authorize_posting,
 	create_or_get_posting_intent_for_ready,
 	process_posting_intent,
 	recover_pending_posting_intents,
@@ -37,6 +39,7 @@ def _execution_doc():
 			"company": "Company A",
 			"production_unit": "PU-1",
 			"idempotency_key": "ready-1",
+			"state": "READY",
 			"ready_at": "2026-09-04 10:00:00",
 		}
 	)
@@ -116,6 +119,25 @@ class TestCreatePostingIntent(FrappeTestCase):
 		patcher = patch(f"{MODULE}.now", return_value="2026-09-04 10:00:00")
 		patcher.start()
 		self.addCleanup(patcher.stop)
+		self.addCleanup(patch.stopall)
+		patch(f"{MODULE}.frappe.get_roles", return_value=["Chef"]).start()
+		patch(f"{MODULE}.frappe.has_permission", return_value=True).start()
+
+	def test_end_users_can_read_and_report_but_cannot_directly_mutate_intents(self):
+		metadata = json.loads(
+			(Path(__file__).parents[1] / "doctype" / "ury_fulfilment_posting_intent" / "ury_fulfilment_posting_intent.json").read_text()
+		)
+		permissions = {row["role"]: row for row in metadata["permissions"]}
+		for role in ("Stock Manager", "Production Manager", "Chef", "URY Captain"):
+			self.assertEqual(permissions[role].get("read"), 1)
+			self.assertEqual(permissions[role].get("report"), 1)
+			self.assertNotIn("create", permissions[role])
+			self.assertNotIn("write", permissions[role])
+
+	def test_posting_service_rejects_actor_without_operational_role(self):
+		with patch(f"{MODULE}.frappe.get_roles", return_value=[]):
+			with self.assertRaises(frappe.PermissionError):
+				_authorize_posting("customer@example.com", _execution_doc())
 
 	def test_ready_creates_one_intent_with_frozen_payload(self):
 		created = []
@@ -259,6 +281,7 @@ class TestProcessPostingIntent(FrappeTestCase):
 			"order_ref": "POS-INV-1",
 			"item_code": "PLATE-1",
 			"accepted_qty": 1,
+			"execution_state": "READY",
 			"branch": "Branch A",
 			"company": "Company A",
 			"production_policy": "MADE_TO_ORDER",
@@ -298,7 +321,7 @@ class TestProcessPostingIntent(FrappeTestCase):
 
 		with patch(f"{MODULE}.frappe.db.sql", return_value=[frappe._dict({"name": "INTENT-1", "status": "PENDING", "attempts": 0})]), patch(
 			f"{MODULE}.frappe.get_doc", side_effect=get_doc
-		), patch(f"{MODULE}.frappe.get_all", return_value=[]), patch(
+		), patch(f"{MODULE}.frappe.get_all", side_effect=lambda doctype, **kwargs: []), patch(
 			f"{MODULE}.frappe.db.get_value", return_value=None
 		), patch(f"{MODULE}.fulfil_reservation") as fulfil, patch(
 			f"{MODULE}.now", return_value="2026-09-04 10:00:00"
@@ -315,6 +338,44 @@ class TestProcessPostingIntent(FrappeTestCase):
 		self.assertEqual(intent.erpnext_stock_entry, "STE-1")
 		self.assertEqual(intent.fulfilment_record, "FUL-1")
 		self.assertEqual(intent.status, POSTED)
+		self.assertGreaterEqual(intent.save.call_count, 2)
+
+	def test_replay_after_reservation_fulfilled_does_not_fulfil_again(self):
+		intent = self._intent()
+		intent.erpnext_stock_entry = "STE-1"
+		stock_entry = _doc({"name": "STE-1"})
+		fulfilment = _doc({"name": "FUL-1", "posting_reference": "STE-1"})
+
+		def get_doc(arg, name=None, *args, **kwargs):
+			if arg == "URY Fulfilment Posting Intent":
+				return intent
+			if arg == "URY Fulfilment Record":
+				return fulfilment
+			if isinstance(arg, dict) and arg.get("doctype") == "URY Fulfilment Record":
+				return fulfilment
+			raise AssertionError(arg)
+
+		with patch(f"{MODULE}.frappe.db.sql", return_value=[frappe._dict({"name": "INTENT-1", "status": "PENDING", "attempts": 0})]), patch(
+			f"{MODULE}.frappe.get_doc", side_effect=get_doc
+		), patch(f"{MODULE}.frappe.get_all", return_value=[frappe._dict({"status": "Fulfilled"})]), patch(
+			f"{MODULE}.frappe.db.get_value", return_value="FUL-1"
+		), patch(f"{MODULE}.fulfil_reservation") as fulfil, patch(
+			f"{MODULE}.now", return_value="2026-09-04 10:00:00"
+		), patch(f"{MODULE}.now_datetime", return_value=frappe.utils.get_datetime("2026-09-04 10:00:00")), patch(
+			f"{MODULE}.frappe.session"
+		) as session:
+			session.user = "chef@example.com"
+			result = process_posting_intent("INTENT-1")
+
+		self.assertEqual(result["status"], POSTED)
+		fulfil.assert_not_called()
+
+	def test_ready_or_served_is_required(self):
+		execution = _execution_doc()
+		execution.state = "QUEUED"
+		with self.assertRaisesRegex(Exception, "requires READY or SERVED"):
+			# Use an authorized service actor so this test reaches the state guard.
+			create_or_get_posting_intent_for_ready(execution, actor="Administrator")
 
 	def test_stock_failure_marks_failed_and_does_not_fulfil_reservation(self):
 		intent = self._intent()

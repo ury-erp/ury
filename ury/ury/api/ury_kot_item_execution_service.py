@@ -14,6 +14,7 @@ import json
 
 import frappe
 from frappe import _
+from frappe.exceptions import DuplicateEntryError
 
 from ury.ury.api.ury_kot_execution_service import (
 	IN_PREPARATION,
@@ -34,6 +35,7 @@ KOT_ITEMS_DOCTYPE = "URY KOT Items"
 
 ITEM_EXECUTION_STATES = (QUEUED, IN_PREPARATION, READY, SERVED)
 MANAGER_ROLES = {"URY Manager", "URY Admin", "System Manager"}
+EXECUTION_ROLES = MANAGER_ROLES | {"Chef", "URY Chef", "Production Manager"}
 
 NOT_PERMITTED = "NOT_PERMITTED"
 KOT_NOT_FOUND = "KOT_NOT_FOUND"
@@ -48,6 +50,18 @@ class ItemExecutionError(frappe.ValidationError):
 		super().__init__(message or reason_code)
 
 
+def _require_execution_actor(user, branch, company):
+	"""Authorize mutations against server-derived role and scope."""
+	if user == "Administrator":
+		return
+	if not set(frappe.get_roles(user)) & EXECUTION_ROLES:
+		raise ItemExecutionError(NOT_PERMITTED, _("User is not permitted to execute KOT items"))
+	from ury.ury.api.ury_kot_execution_service import _require_kot_branch_scope
+	_require_kot_branch_scope(branch, user)
+	if not company:
+		raise ItemExecutionError(NOT_PERMITTED, _("KOT branch/company scope is invalid"))
+
+
 def _require_item_execution_doctype():
 	if not frappe.db.exists("DocType", ITEM_EXECUTION_DOCTYPE):
 		raise ItemExecutionError(ITEM_EXECUTION_DOCTYPE_NOT_FOUND, _("{0} is not available on this site").format(ITEM_EXECUTION_DOCTYPE))
@@ -56,6 +70,10 @@ def _require_item_execution_doctype():
 def _require_kot_item(kot_item):
 	if not kot_item or not frappe.db.exists(KOT_ITEMS_DOCTYPE, kot_item):
 		raise ItemExecutionError(KOT_ITEM_NOT_FOUND, _("KOT item {0} not found").format(kot_item))
+
+
+def _kot_for_item(kot_item):
+	return frappe.db.get_value(KOT_ITEMS_DOCTYPE, kot_item, "parent")
 
 
 def _audit(doc, actor, event):
@@ -185,9 +203,9 @@ def _sync_kot_execution(kot):
 		doc.set("started_by", started.get("started_by"))
 		doc.set("started_at", started.get("started_at"))
 	if aggregate:
-		doc.save(ignore_permissions=False)
+		doc.save(ignore_permissions=True)
 	else:
-		doc.insert(ignore_permissions=False)
+		doc.insert(ignore_permissions=True)
 	return doc.as_dict()
 
 
@@ -206,6 +224,7 @@ def seed_kot_item_executions(kot, actor=None):
 		_require_kot_item(kot_item)
 		if frappe.db.exists(ITEM_EXECUTION_DOCTYPE, {"kot_item": kot_item}):
 			continue
+		frappe.db.savepoint("ury_seed_kot_item_execution")
 		doc = frappe.get_doc({
 			"doctype": ITEM_EXECUTION_DOCTYPE,
 			"kot": kot,
@@ -217,7 +236,12 @@ def seed_kot_item_executions(kot, actor=None):
 			"idempotency_key": kot_item,
 		})
 		_audit(doc, actor, "seed")
-		doc.insert(ignore_permissions=False)
+		try:
+			doc.insert(ignore_permissions=True)
+		except DuplicateEntryError:
+			# A concurrent submit won the unique kot_item insert.
+			frappe.db.rollback(save_point="ury_seed_kot_item_execution")
+			continue
 		created.append(doc.as_dict())
 	_sync_kot_execution(kot)
 	return created
@@ -243,12 +267,18 @@ def _transition(kot_item, target_state, idempotency_key, actor, actor_field, tim
 	if not idempotency_key:
 		raise ItemExecutionError(INVALID_EXECUTION_TRANSITION, _("idempotency_key is required"))
 	actor = actor or frappe.session.user
+	kot = _kot_for_item(kot_item)
+	if kot:
+		branch, company, _production_unit = _kot_scope(kot)
+		_require_execution_actor(actor, branch, company)
 	prior = _find_prior_result(kot_item, target_state, idempotency_key)
 	if prior:
 		return _result_dict(prior, idempotent=True)
 	locked = _lock_item_execution_row(kot_item)
 	if not locked:
 		raise ItemExecutionError(KOT_ITEM_NOT_FOUND, _("No execution row exists for KOT item {0}").format(kot_item))
+	branch, company, _production_unit = _kot_scope(locked["kot"])
+	_require_execution_actor(actor, branch, company)
 	if locked["state"] == target_state:
 		return _result_dict(locked, idempotent=True)
 	if locked["state"] not in (QUEUED, IN_PREPARATION, READY) or (locked["state"] == QUEUED and target_state not in (IN_PREPARATION, READY)):
@@ -259,7 +289,7 @@ def _transition(kot_item, target_state, idempotency_key, actor, actor_field, tim
 	doc.set(actor_field, actor)
 	doc.set(timestamp_field, frappe.utils.now())
 	_audit(doc, actor, event)
-	doc.save(ignore_permissions=False)
+	doc.save(ignore_permissions=True)
 	_sync_kot_execution(doc.kot)
 	return _result_dict(doc.as_dict(), idempotent=False)
 

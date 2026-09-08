@@ -47,7 +47,8 @@
    "label": "KOT Item",
    "options": "URY KOT Items",
    "read_only": 1,
-   "reqd": 1
+   "reqd": 1,
+   "unique": 1
   },
   {
    "fieldname": "state",
@@ -168,7 +169,6 @@
  "owner": "Administrator",
  "permissions": [
   {
-   "create": 1,
    "email": 1,
    "export": 1,
    "print": 1,
@@ -178,7 +178,6 @@
    "share": 1
   },
   {
-   "create": 1,
    "email": 1,
    "export": 1,
    "print": 1,
@@ -187,12 +186,27 @@
    "role": "Production Manager"
   },
   {
-   "create": 1,
    "email": 1,
    "print": 1,
    "read": 1,
    "report": 1,
    "role": "Chef"
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "URY Captain"
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Stock Manager"
   }
  ],
  "sort_field": "modified",
