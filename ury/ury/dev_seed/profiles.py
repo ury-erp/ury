@@ -283,6 +283,7 @@ def _seed_pos_profile(company_name, branch_name, restaurant_name):
         },
         update_modified=False,
     )
+    frappe.db.commit()
     pos_doc.reload()
     dirty = False
 
