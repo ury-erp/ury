@@ -27,7 +27,7 @@ function parseReservationTime(raw?: string): { hours: number; minutes: number; t
       const timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
       return { hours: h, minutes: m, totalMinutes: h * 60 + m, timeStr };
     }
-  } catch {}
+  } catch { }
   const match = raw.match(/(\d{1,2}):(\d{2})/);
   if (match) {
     const h = parseInt(match[1], 10);
@@ -171,7 +171,8 @@ export default function TableReservationTimeline({
       case 'Completed':
         return 'bg-blue-50/90 border-blue-300 text-blue-950 hover:bg-blue-50';
       case 'Cancelled':
-        return 'bg-rose-50/70 border-rose-200 text-rose-800 opacity-65 hover:opacity-90';
+      case 'Canceled':
+        return 'bg-red-50/90 border-red-600/50 text-red-950 hover:bg-red-50';
       case 'No Show':
         return 'bg-orange-50/90 border-orange-300 text-orange-950 hover:bg-orange-50';
       case 'Requested':
@@ -187,7 +188,8 @@ export default function TableReservationTimeline({
       case 'Completed':
         return 'border-blue-600 ring-2 ring-blue-500/40';
       case 'Cancelled':
-        return 'border-red-600 ring-2 ring-red-500/40';
+      case 'Canceled':
+        return 'border-red-600 ring-2 ring-red-600/40';
       case 'No Show':
         return 'border-orange-600 ring-2 ring-orange-500/40';
       case 'Active':
@@ -209,6 +211,7 @@ export default function TableReservationTimeline({
       case 'Completed':
         return <Badge variant="completed">Completed</Badge>;
       case 'Cancelled':
+      case 'Canceled':
         return <Badge variant="cancelled">Cancelled</Badge>;
       case 'No Show':
         return <Badge variant="noshow">No Show</Badge>;
@@ -287,6 +290,7 @@ export default function TableReservationTimeline({
               const res = item.reservation;
               const isHovered = hoveredId === res.name;
               const resTable = res.reserved_table || (res as any).table || 'Table';
+              const isCancelled = res.status === 'Cancelled' || (res.status as string) === 'Canceled';
 
               return (
                 <div
@@ -301,19 +305,26 @@ export default function TableReservationTimeline({
                     height: `${CARD_HEIGHT}px`,
                     zIndex: isHovered ? 40 : 10,
                   }}
-                  className={`absolute rounded-lg border p-2 flex flex-col justify-between overflow-hidden cursor-pointer transition-all duration-150 select-none ${
-                    isHovered
+                  className={`absolute rounded-lg border p-2 flex flex-col justify-between overflow-hidden cursor-pointer transition-all duration-150 select-none ${isHovered
                       ? `shadow-xl scale-[1.01] ${getStatusHoverRingClass(res.status)}`
                       : 'shadow-2xs hover:shadow-md'
-                  } ${getStatusColorClasses(res.status)}`}
+                    } ${getStatusColorClasses(res.status)}`}
                 >
                   {/* Top Row: Table Name badge + Time + Compact Status */}
                   <div className="flex items-center justify-between gap-1.5 min-w-0">
-                    <span className="text-[11px] font-bold px-1.5 py-0.5 rounded bg-white/90 shadow-2xs text-gray-900 border border-gray-200/60 shrink-0">
+                    <span
+                      className={`text-[11px] font-bold px-1.5 py-0.5 rounded shadow-2xs shrink-0 ${isCancelled
+                          ? 'bg-white/95 text-red-950 border border-red-200'
+                          : 'bg-white/90 text-gray-900 border border-gray-200/60'
+                        }`}
+                    >
                       {resTable}
                     </span>
 
-                    <span className="text-xs font-bold truncate flex items-center gap-1 text-gray-800">
+                    <span
+                      className={`text-xs font-bold truncate flex items-center gap-1 ${isCancelled ? 'text-red-900' : 'text-gray-800'
+                        }`}
+                    >
                       <Clock className="w-3 h-3 shrink-0 opacity-60" />
                       {item.timeStr}
                     </span>
@@ -324,19 +335,25 @@ export default function TableReservationTimeline({
                   </div>
 
                   {/* Middle Row: Customer Name & Guest Count */}
-                  <div className="text-[11px] font-medium text-gray-800 truncate flex items-center gap-1 mt-0.5">
+                  <div
+                    className={`text-[11px] font-medium truncate flex items-center gap-1 mt-0.5 ${isCancelled ? 'text-red-950' : 'text-gray-800'
+                      }`}
+                  >
                     <User className="w-3 h-3 shrink-0 opacity-60" />
                     <span className="truncate font-semibold">{res.customer_name || res.customer}</span>
                     {res.no_of_pax ? (
-                      <span className="text-[10px] text-gray-500 shrink-0">
+                      <span className={`text-[10px] shrink-0 ${isCancelled ? 'text-red-700/80' : 'text-gray-500'}`}>
                         ({res.no_of_pax}p)
                       </span>
                     ) : null}
                   </div>
 
                   {/* Bottom Row: Phone / Time range */}
-                  <div className="flex items-center justify-between text-[10px] text-gray-500 pt-0.5">
-                    <span className="text-[10px] text-gray-600">
+                  <div
+                    className={`flex items-center justify-between text-[10px] pt-0.5 ${isCancelled ? 'text-red-700/80' : 'text-gray-500'
+                      }`}
+                  >
+                    <span className={`text-[10px] ${isCancelled ? 'text-red-800' : 'text-gray-600'}`}>
                       {item.timeStr} - {item.endTimeStr}
                     </span>
                     {res.customer_phone && (
