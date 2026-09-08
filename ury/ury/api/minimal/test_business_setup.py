@@ -20,7 +20,7 @@ class TestSubmitConfigureDataGuard(unittest.TestCase):
     @patch("ury.ury.api.minimal.business_setup.frappe.db.get_single_value")
     def test_guest_user_is_rejected(self, mock_get_single_value):
         # Guest guard must fire before the setup_complete check even runs.
-        with patch.object(frappe.session, "user", "Guest"):
+        with patch("ury.ury.api.minimal.business_setup.frappe.session", frappe._dict({"user": "Guest"})):
             with self.assertRaises(frappe.exceptions.ValidationError) as ctx:
                 submit_configure_data(data="{}")
 
@@ -31,7 +31,7 @@ class TestSubmitConfigureDataGuard(unittest.TestCase):
     def test_setup_already_completed_is_rejected(self, mock_get_single_value):
         mock_get_single_value.return_value = 1
 
-        with patch.object(frappe.session, "user", "test@example.com"):
+        with patch("ury.ury.api.minimal.business_setup.frappe.session", frappe._dict({"user": "test@example.com"})):
             with self.assertRaises(frappe.exceptions.ValidationError) as ctx:
                 submit_configure_data(data="{}")
 
@@ -46,7 +46,7 @@ class TestSubmitConfigureDataGuard(unittest.TestCase):
         # _run_configure_data (mocked here so this stays a guard-only test).
         mock_get_single_value.return_value = 0
 
-        with patch.object(frappe.session, "user", "test@example.com"):
+        with patch("ury.ury.api.minimal.business_setup.frappe.session", frappe._dict({"user": "test@example.com"})):
             with patch(
                 "ury.ury.api.minimal.business_setup._run_configure_data"
             ) as mock_run:
@@ -83,7 +83,7 @@ class TestSubmitConfigureDataRollback(unittest.TestCase):
         mock_get_single_value.return_value = 0
         mock_run.side_effect = Exception("boom while creating URY Table")
 
-        with patch.object(frappe.session, "user", "test@example.com"):
+        with patch("ury.ury.api.minimal.business_setup.frappe.session", frappe._dict({"user": "test@example.com"})):
             with patch(
                 "ury.ury.api.minimal.business_setup.frappe.log_error"
             ) as mock_log_error:
@@ -103,7 +103,7 @@ class TestSubmitConfigureDataRollback(unittest.TestCase):
         mock_get_single_value.return_value = 0
         mock_run.side_effect = frappe.PermissionError("no permission for Branch")
 
-        with patch.object(frappe.session, "user", "test@example.com"):
+        with patch("ury.ury.api.minimal.business_setup.frappe.session", frappe._dict({"user": "test@example.com"})):
             with self.assertRaises(frappe.PermissionError):
                 submit_configure_data(data="{}")
 
@@ -118,7 +118,7 @@ class TestSubmitConfigureDataRollback(unittest.TestCase):
         mock_get_single_value.return_value = 0
         mock_run.return_value = {"status": "success", "results": {"branch": "Main"}}
 
-        with patch.object(frappe.session, "user", "test@example.com"):
+        with patch("ury.ury.api.minimal.business_setup.frappe.session", frappe._dict({"user": "test@example.com"})):
             result = submit_configure_data(data="{}")
 
         self.assertEqual(result, {"status": "success", "results": {"branch": "Main"}})

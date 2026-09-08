@@ -307,3 +307,42 @@ class TestGetItemAvailabilityBranchIsolation(FrappeTestCase):
         fg_calls = [call.args for call in mock_fg.call_args_list]
         self.assertIn(("ITEM-CAKE", "Kitchen Warehouse A - URY", "Company A"), fg_calls)
         self.assertIn(("ITEM-CAKE", "Kitchen Warehouse B - URY", "Company A"), fg_calls)
+
+
+class TestAvailabilityProductionContextIntegration(FrappeTestCase):
+    @patch(f"{MODULE}.project_fg_allocatable")
+    @patch(f"{MODULE}._resolve_plan_remaining")
+    @patch(f"{MODULE}.frappe.db.get_value", return_value="Company A")
+    @patch(f"{MODULE}.frappe.get_all")
+    def test_uses_canonical_production_context_resolver(self, mock_get_all, mock_get_value, mock_plan, mock_fg):
+        mock_get_all.return_value = [
+            {
+                "name": "UIPC-1",
+                "item": "ITEM-CAKE",
+                "branch": "Branch A",
+                "department": "Hot Kitchen",
+                "production_unit": "Main Kitchen",
+                "production_policy": "Make to Stock",
+                "bom": None,
+                "direct_retail_warehouse": "FG Warehouse - URY",
+                "controlled_by_sales_plan": 1,
+                "allow_over_plan_sale": 0,
+                "availability_mode": "Always",
+            }
+        ]
+        mock_plan.return_value = {"plan_qty": 10, "plan_remaining": 10}
+        mock_fg.return_value = {
+            "allocatable_qty": 4,
+            "bin_actual_qty": 12,
+            "bin_projected_qty": 4,
+        }
+
+        result = get_item_availability("ITEM-CAKE", "Branch A", "Company A")
+
+        self.assertEqual(result["reason_code"], "AVAILABLE")
+        self.assertEqual(result["production_policy"], "PRE_PRODUCED")
+        self.assertEqual(result["department"], "Hot Kitchen")
+        self.assertEqual(result["warehouse"], "FG Warehouse - URY")
+        self.assertEqual(result["available_qty"], 4)
+        mock_get_all.assert_called_once()
+        mock_get_value.assert_called_once_with("Branch", "Branch A", "company")

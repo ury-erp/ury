@@ -10,8 +10,9 @@ and the sa-v3_nxt/TODO.md row for V3-73):
 1. Flag OFF (unset/off) -> `invoice.update_stock` ends up 1, exactly as
    before this task existed. This is the single most important behavior in
    this whole task: it is what makes the flag a real rollback mechanism.
-2. Flag ON (mocked only -- never true in real, unmocked code) -> routes to
-   the flag-on branch and sets `invoice.update_stock = 0` instead.
+2. Flag ON (mocked only -- never true in real, unmocked code) -> fails closed
+   until fulfilment posting has enough runtime evidence to make native POS
+   stock updates safe to disable.
 3. Flag flip regression: OFF -> ON -> OFF again must return to identical
    `update_stock = 1` behavior, proving no persisted side effect from a
    prior "on" state leaks into a later "off" state on the same or a new
@@ -54,21 +55,18 @@ class TestPosStockAuthorityFlagOffIsUnchangedBehavior(FrappeTestCase):
         self.assertEqual(invoice.update_stock, 1)
 
 
-class TestPosStockAuthorityFlagOnRoutesToStub(FrappeTestCase):
+class TestPosStockAuthorityFlagOnFailsClosed(FrappeTestCase):
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.log_error")
     @patch("ury.ury.doctype.ury_order.ury_order.is_pos_stock_authority_flag_enabled")
-    def test_flag_on_sets_update_stock_0_and_logs_stub_warning(self, mock_flag, mock_log_error):
+    def test_flag_on_fails_closed_before_disabling_native_stock(self, mock_flag, mock_log_error):
         mock_flag.return_value = True
 
         invoice = SimpleNamespace(update_stock=None)
-        _apply_pos_stock_authority(invoice, branch="Main Branch")
+        with self.assertRaisesRegex(Exception, "not enabled for production yet"):
+            _apply_pos_stock_authority(invoice, branch="Main Branch")
 
-        self.assertEqual(invoice.update_stock, 0)
-        # The flag-on path must be loudly logged as a stub every time it
-        # runs, since it does not yet call the real fulfilment services.
-        mock_log_error.assert_called_once()
-        _, kwargs = mock_log_error.call_args
-        self.assertIn("stub", kwargs.get("message", "").lower())
+        self.assertIsNone(invoice.update_stock)
+        mock_log_error.assert_not_called()
 
 
 class TestPosStockAuthorityFlagFlipRegression(FrappeTestCase):
@@ -81,12 +79,13 @@ class TestPosStockAuthorityFlagFlipRegression(FrappeTestCase):
         _apply_pos_stock_authority(invoice_a, branch="Main Branch")
         self.assertEqual(invoice_a.update_stock, 1)
 
-        # Then on, for a different invoice (simulating a later order while
-        # the flag was toggled on in some environment).
+        # Then on, for a different invoice. Until the V3 fulfilment path is
+        # fully proven, this must fail before changing invoice stock behavior.
         mock_flag.return_value = True
         invoice_b = SimpleNamespace(update_stock=None)
-        _apply_pos_stock_authority(invoice_b, branch="Main Branch")
-        self.assertEqual(invoice_b.update_stock, 0)
+        with self.assertRaisesRegex(Exception, "not enabled for production yet"):
+            _apply_pos_stock_authority(invoice_b, branch="Main Branch")
+        self.assertIsNone(invoice_b.update_stock)
 
         # Flip back off -- a brand new invoice must behave exactly like
         # invoice_a did, with no residue from the flag having been on.

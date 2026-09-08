@@ -101,6 +101,7 @@ from frappe import _
 from frappe.utils import now_datetime
 
 from ury.ury.api.ury_bom_compiler import compile_bom_vector
+from ury.ury.api.ury_production_context import resolve_production_context
 from ury.ury.api.ury_inventory_projection import (
 	get_allocatable_qty,
 	project_component_allocatable,
@@ -151,27 +152,19 @@ def _resolve_production_config(item_code, branch, company, department=None):
 		production_policy, department, production_unit, warehouse,
 		production_unit_disabled, department_disabled
 	"""
-	if not frappe.db.table_exists(PRODUCTION_CONFIG_DOCTYPE):
+	row = resolve_production_context(item_code, branch, company=company, department=department)
+	if not row:
 		return None
-
-	filters = {"item_code": item_code, "branch": branch}
-	if department:
-		filters["department"] = department
-
-	row = frappe.db.get_value(
-		PRODUCTION_CONFIG_DOCTYPE,
-		filters,
-		[
-			"production_policy",
-			"department",
-			"production_unit",
-			"warehouse",
-			"production_unit_disabled",
-			"department_disabled",
-		],
-		as_dict=True,
-	)
-	return row
+	return {
+		"production_policy": row.get("production_policy"),
+		"department": row.get("department"),
+		"production_unit": row.get("production_unit"),
+		"warehouse": row.get("warehouse"),
+		"direct_retail_warehouse": row.get("direct_retail_warehouse"),
+		"controlled_by_sales_plan": row.get("controlled_by_sales_plan"),
+		"allow_over_plan_sale": row.get("allow_over_plan_sale"),
+		"availability_mode": row.get("availability_mode"),
+	}
 
 
 def _resolve_plan_remaining(item_code, branch, company, department=None):
