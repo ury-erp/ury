@@ -638,7 +638,7 @@ export const BranchPage: React.FC = () => {
                                     const newRows = [...restaurantForm.menu_for_room];
                                     newRows[idx].room = val;
                                     newRows[idx].ury_room = val;
-                                    setRestaurantForm({...restaurantForm, menu_for_room: newRows});
+                                    setRestaurantForm({ ...restaurantForm, menu_for_room: newRows });
                                   }}
                                   options={[
                                     { value: '', label: 'Select Room' },
@@ -657,7 +657,7 @@ export const BranchPage: React.FC = () => {
                                       const newRows = [...restaurantForm.menu_for_room];
                                       newRows[idx].menu = val;
                                       newRows[idx].ury_menu = val;
-                                      setRestaurantForm({...restaurantForm, menu_for_room: newRows});
+                                      setRestaurantForm({ ...restaurantForm, menu_for_room: newRows });
                                     }}
                                     options={[
                                       { value: '', label: 'Select Menu' },
@@ -669,8 +669,8 @@ export const BranchPage: React.FC = () => {
                                 </div>
                                 {isEditMode && (
                                   <button type="button" className="text-gray-400 hover:text-red-500 shrink-0" onClick={() => {
-                                    const newRows = restaurantForm.menu_for_room.filter((_:any, i:number) => i !== idx);
-                                    setRestaurantForm({...restaurantForm, menu_for_room: newRows});
+                                    const newRows = restaurantForm.menu_for_room.filter((_: any, i: number) => i !== idx);
+                                    setRestaurantForm({ ...restaurantForm, menu_for_room: newRows });
                                   }}><X className="w-4 h-4" /></button>
                                 )}
                               </td>
@@ -681,7 +681,7 @@ export const BranchPage: React.FC = () => {
                       {isEditMode && (
                         <div className="p-2 border-t border-gray-100 bg-gray-50">
                           <Button type="button" variant="ghost" size="sm" className="text-primary h-7 text-xs" onClick={() => {
-                            setRestaurantForm({...restaurantForm, menu_for_room: [...(restaurantForm.menu_for_room || []), {room: '', menu: ''}]});
+                            setRestaurantForm({ ...restaurantForm, menu_for_room: [...(restaurantForm.menu_for_room || []), { room: '', menu: '' }] });
                           }}>+ Add Row</Button>
                         </div>
                       )}
@@ -764,7 +764,7 @@ export const BranchPage: React.FC = () => {
                                 <Input disabled={!isEditMode} className="w-full text-xs" placeholder="e.g. Dine In" value={row.order_type || ''} onChange={e => {
                                   const newRows = [...restaurantForm.order_type_menu];
                                   newRows[idx].order_type = e.target.value;
-                                  setRestaurantForm({...restaurantForm, order_type_menu: newRows});
+                                  setRestaurantForm({ ...restaurantForm, order_type_menu: newRows });
                                 }} />
                               </td>
                               <td className="px-4 py-2 flex items-center gap-2">
@@ -776,7 +776,7 @@ export const BranchPage: React.FC = () => {
                                       const newRows = [...restaurantForm.order_type_menu];
                                       newRows[idx].menu = val;
                                       newRows[idx].ury_menu = val;
-                                      setRestaurantForm({...restaurantForm, order_type_menu: newRows});
+                                      setRestaurantForm({ ...restaurantForm, order_type_menu: newRows });
                                     }}
                                     options={[
                                       { value: '', label: 'Select Menu' },
@@ -788,8 +788,8 @@ export const BranchPage: React.FC = () => {
                                 </div>
                                 {isEditMode && (
                                   <button type="button" className="text-gray-400 hover:text-red-500 shrink-0" onClick={() => {
-                                    const newRows = restaurantForm.order_type_menu.filter((_:any, i:number) => i !== idx);
-                                    setRestaurantForm({...restaurantForm, order_type_menu: newRows});
+                                    const newRows = restaurantForm.order_type_menu.filter((_: any, i: number) => i !== idx);
+                                    setRestaurantForm({ ...restaurantForm, order_type_menu: newRows });
                                   }}><X className="w-4 h-4" /></button>
                                 )}
                               </td>
@@ -800,7 +800,7 @@ export const BranchPage: React.FC = () => {
                       {isEditMode && (
                         <div className="p-2 border-t border-gray-100 bg-gray-50">
                           <Button type="button" variant="ghost" size="sm" className="text-primary h-7 text-xs" onClick={() => {
-                            setRestaurantForm({...restaurantForm, order_type_menu: [...(restaurantForm.order_type_menu || []), {order_type: '', menu: ''}]});
+                            setRestaurantForm({ ...restaurantForm, order_type_menu: [...(restaurantForm.order_type_menu || []), { order_type: '', menu: '' }] });
                           }}>+ Add Row</Button>
                         </div>
                       )}
@@ -844,7 +844,10 @@ export const BranchPage: React.FC = () => {
                 {!!branchForm.custom_enable_reservation && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700">Buffer Time (Minutes)</label>
+                      <label className="text-sm font-medium text-gray-700">Pre-Reservation Time (mins)</label>
+                      <p className="text-xs text-gray-500">
+                        Keep the table free for the reservation this many minutes before the booking time.
+                      </p>
                       <Input
                         type="number"
                         value={branchForm.custom_buffer_time ?? ''}
@@ -859,6 +862,9 @@ export const BranchPage: React.FC = () => {
 
                     <div className="space-y-2">
                       <label className="text-sm font-medium text-gray-700">Grace Period (Minutes)</label>
+                      <p className="text-xs text-gray-500">
+                        Allow the customer this many extra minutes to arrive after the booking time.
+                      </p>
                       <Input
                         type="number"
                         value={branchForm.custom_grace_period ?? ''}
@@ -998,14 +1004,14 @@ export const BranchPage: React.FC = () => {
         <form onSubmit={handleAddBranch} className="space-y-6 text-sm">
           <div>
             <label className="block font-semibold text-gray-700 mb-1.5">Branch Name <span className="text-red-500">*</span></label>
-            <Input required value={addForm.branchName} onChange={e => setAddForm({...addForm, branchName: e.target.value})} placeholder="e.g. Main Branch" />
+            <Input required value={addForm.branchName} onChange={e => setAddForm({ ...addForm, branchName: e.target.value })} placeholder="e.g. Main Branch" />
           </div>
           <div>
             <label className="block font-semibold text-gray-700 mb-1.5">Company <span className="text-red-500">*</span></label>
             <SearchableSelect
               id="add_branch_company"
               value={addForm.company}
-              onChange={(_, val) => setAddForm({...addForm, company: val})}
+              onChange={(_, val) => setAddForm({ ...addForm, company: val })}
               options={[
                 { value: '', label: 'Select Company' },
                 ...companies.map((c: any) => ({ value: c.name, label: c.name }))
@@ -1016,20 +1022,20 @@ export const BranchPage: React.FC = () => {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block font-semibold text-gray-700 mb-1.5">Invoice Prefix <span className="text-red-500">*</span></label>
-              <Input required value={addForm.invoicePrefix} onChange={e => setAddForm({...addForm, invoicePrefix: e.target.value})} />
+              <Input required value={addForm.invoicePrefix} onChange={e => setAddForm({ ...addForm, invoicePrefix: e.target.value })} />
             </div>
             <div>
               <label className="block font-semibold text-gray-700 mb-1.5">Aggregator Prefix <span className="text-red-500">*</span></label>
-              <Input required value={addForm.aggregatorPrefix} onChange={e => setAddForm({...addForm, aggregatorPrefix: e.target.value})} />
+              <Input required value={addForm.aggregatorPrefix} onChange={e => setAddForm({ ...addForm, aggregatorPrefix: e.target.value })} />
             </div>
           </div>
           <div>
             <label className="block font-semibold text-gray-700 mb-1.5">Tax ID (Optional)</label>
-            <Input value={addForm.taxId} onChange={e => setAddForm({...addForm, taxId: e.target.value})} />
+            <Input value={addForm.taxId} onChange={e => setAddForm({ ...addForm, taxId: e.target.value })} />
           </div>
           <div>
             <label className="block font-semibold text-gray-700 mb-1.5">Address (Optional)</label>
-            <Input value={addForm.address} onChange={e => setAddForm({...addForm, address: e.target.value})} />
+            <Input value={addForm.address} onChange={e => setAddForm({ ...addForm, address: e.target.value })} />
           </div>
           <div className="pt-6 flex justify-end gap-3 border-t border-gray-100">
             <Button type="button" variant="outline" onClick={() => setIsAddDrawerOpen(false)}>Cancel</Button>
