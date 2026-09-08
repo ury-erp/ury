@@ -1,0 +1,30 @@
+<!doctype html>
+{% set user_lang = frappe.lang or 'en' %}
+{% set is_rtl = user_lang in ['ar', 'he', 'fa', 'ur', 'ku'] %}
+<html lang="{{ user_lang }}" dir="{{ 'rtl' if is_rtl else 'ltr' }}">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/assets/ury/serve/ury.ico" sizes="any" />
+    <link rel="apple-touch-icon" href="/assets/ury/serve/icons/apple-touch-icon.png" />
+    <link rel="manifest" href="/assets/ury/serve/manifest.webmanifest" />
+    <!-- Matches the app's white header, so the status bar does not band against it. -->
+    <meta name="theme-color" content="#ffffff" />
+    <!-- iOS ignores the manifest for home-screen installs and reads these. -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="URY Serve" />
+    <title>URY Serve</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script>
+      window.csrf_token = "{{ csrf_token }}";
+      if (!window.frappe) window.frappe = {};
+      window.app_name = "{{ app_name }}";
+      frappe.boot = JSON.parse({{ boot }});
+    </script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

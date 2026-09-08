@@ -284,6 +284,40 @@ class TestURYPosAPI(FrappeTestCase):
         with self.assertRaises(frappe.PermissionError) as context:
             getPosInvoiceItems("POS-INV-001")
         self.assertIn("outside your active branch", str(context.exception))
+
+
+class TestCreateCustomerLinkId(unittest.TestCase):
+    """Regression: success payload must expose Customer link `name`, which
+    can differ from display `customer_name` under series naming."""
+
+    @patch("ury.ury_pos.api.validate_phone_number")
+    @patch("ury.ury_pos.api.frappe.db.commit")
+    @patch("ury.ury_pos.api.frappe.get_doc")
+    @patch("ury.ury_pos.api.frappe.has_permission")
+    def test_returns_inserted_name_distinct_from_display(
+        self, mock_has_permission, mock_get_doc, mock_commit, mock_validate
+    ):
+        mock_has_permission.return_value = True
+        customer_doc = MagicMock()
+        customer_doc.name = None
+
+        def _insert(*_args, **_kwargs):
+            # Simulate naming series assigning a link id ≠ display name.
+            customer_doc.name = "CUST-00042"
+
+        customer_doc.insert.side_effect = _insert
+        mock_get_doc.return_value = customer_doc
+
+        result = create_customer("Alice Restaurant Guest", "+919876543210")
+
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(result["name"], "CUST-00042")
+        self.assertEqual(result["customer_name"], "Alice Restaurant Guest")
+        self.assertNotEqual(result["name"], result["customer_name"])
+        mock_commit.assert_called_once()
+        mock_validate.assert_called_once()
+
+
 import frappe
 import unittest
 from ury.ury_pos.api import create_customer
@@ -526,37 +560,28 @@ class TestSubmitChecklistSEC10(FrappeTestCase):
     """Test cases for submit_checklist function."""
 
     def _create_mock_log_doc(self):
-        """Create a properly-configured MagicMock for log_doc that maintains an items list."""
-        # Create a real list to hold items
-        items_list = []
-
-        # Create the mock document
+        """Emulate Frappe Document child-table set/append on a MagicMock."""
         mock_log_doc = MagicMock()
         mock_log_doc.name = "URY-POS-CHECKLIST-LOG-001"
         mock_log_doc.status = None  # Will be set by submit_checklist
         mock_log_doc.completed_by = None
         mock_log_doc.completed_at = None
+        mock_log_doc.items = []
 
-        # Configure the items property to return the real list
-        mock_log_doc.items = items_list
+        def mock_set(fieldname, value):
+            setattr(mock_log_doc, fieldname, value)
 
-        # Mock the set() method to reset items when called with "items"
-        def mock_set(key, value):
-            if key == "items":
-                items_list.clear()
-                mock_log_doc.items = items_list
+        def mock_append(fieldname, row_dict):
+            row = MagicMock(**row_dict)
+            getattr(mock_log_doc, fieldname).append(row)
+            return row
 
         mock_log_doc.set = mock_set
-
-        # Mock the append() method to actually append to the items list
-        def mock_append(key, value):
-            if key == "items":
-                items_list.append(MagicMock(**value))
-
         mock_log_doc.append = mock_append
 
         return mock_log_doc
 
+    @patch("ury.ury_pos.api.frappe.db.exists", return_value=True)
     @patch("ury.ury_pos.api.frappe.get_all")
     @patch("ury.ury_pos.api.frappe.new_doc")
     @patch("ury.ury_pos.api.frappe.utils.now")
@@ -564,7 +589,14 @@ class TestSubmitChecklistSEC10(FrappeTestCase):
     @patch("ury.ury_pos.api.getBranch")
     @patch("ury.ury_pos.api._validate_checklist_branch")
     def test_submit_checklist_all_mandatory_checked(
-        self, mock_validate_branch, mock_get_branch, mock_session, mock_now, mock_new_doc, mock_get_all
+        self,
+        mock_validate_branch,
+        mock_get_branch,
+        mock_session,
+        mock_now,
+        mock_new_doc,
+        mock_get_all,
+        mock_db_exists,
     ):
         """Test that submit_checklist returns status='Complete' when all mandatory items are checked."""
         # Setup mocks
@@ -612,6 +644,7 @@ class TestSubmitChecklistSEC10(FrappeTestCase):
         self.assertEqual(result["name"], "URY-POS-CHECKLIST-LOG-001")
         mock_log_doc.save.assert_called_once()
 
+    @patch("ury.ury_pos.api.frappe.db.exists", return_value=True)
     @patch("ury.ury_pos.api.frappe.get_all")
     @patch("ury.ury_pos.api.frappe.new_doc")
     @patch("ury.ury_pos.api.frappe.utils.now")
@@ -619,7 +652,14 @@ class TestSubmitChecklistSEC10(FrappeTestCase):
     @patch("ury.ury_pos.api.getBranch")
     @patch("ury.ury_pos.api._validate_checklist_branch")
     def test_submit_checklist_mandatory_unchecked(
-        self, mock_validate_branch, mock_get_branch, mock_session, mock_now, mock_new_doc, mock_get_all
+        self,
+        mock_validate_branch,
+        mock_get_branch,
+        mock_session,
+        mock_now,
+        mock_new_doc,
+        mock_get_all,
+        mock_db_exists,
     ):
         """Test that submit_checklist returns status='In Progress' when at least one mandatory item is unchecked."""
         # Setup mocks

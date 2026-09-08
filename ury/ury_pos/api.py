@@ -979,6 +979,9 @@ def create_customer(customer_name, mobile_number=None, customer_group="Individua
         return {
             "status": "success",
             "message": "Customer created successfully",
+            # Additive link id — distinct from display `customer_name` when
+            # naming series ≠ customer_name (e.g. CUST-00042 vs "Alice").
+            "name": customer.name,
             "customer_name": customer_name,
             "mobile_number": mobile_number,
             "customer_group": customer_group,
@@ -1062,18 +1065,20 @@ def validate_pos_close(pos_profile):
     
     if enable_unclosed_pos_check:
         current_datetime = frappe.utils.now_datetime()
+        # Business day rolls at 05:00. Before that we are still on the prior day.
         start_of_day = current_datetime.replace(hour=5, minute=0, second=0, microsecond=0)
-        
+
         if current_datetime > start_of_day:
-            previous_day = start_of_day - timedelta(days=1)
-            
+            business_date = start_of_day.date()
         else:
-            previous_day = start_of_day
-    
+            business_date = (start_of_day - timedelta(days=1)).date()
+
+        # Any open submitted session older than the current business day is overdue
+        # (not only one whose posting_date equals yesterday).
         unclosed_pos_opening = frappe.db.exists(
             "POS Opening Entry",
             {
-                "posting_date": previous_day.date(),
+                "posting_date": ["<", business_date],
                 "status": "Open",
                 "pos_profile": pos_profile,
                 "docstatus": 1
