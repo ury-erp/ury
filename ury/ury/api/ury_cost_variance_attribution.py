@@ -148,8 +148,16 @@ def compute_posted_cost(kot_or_fulfilment_ref, company):
 
 	record = _resolve_fulfilment_record(kot_or_fulfilment_ref, company)
 
-	valuation_rate = _valuation_rate(record["item_code"], company)
-	posted_cost = (record["qty"] or 0.0) * valuation_rate
+	if not record.get("posted_to_erpnext") or not record.get("posting_reference"):
+		return {
+			"fulfilment_record": record["name"], "kot": record["kot"],
+			"item_code": record["item_code"], "qty": record["qty"], "company": company,
+			"posted_to_erpnext": False, "posted_cost": None,
+			"is_theoretical_equivalent": False,
+			"reason": "FULFILMENT_NOT_POSTED",
+		}
+
+	posted_cost = _read_posted_cost(record["posting_reference"], company)
 
 	return {
 		"fulfilment_record": record["name"],
@@ -157,10 +165,10 @@ def compute_posted_cost(kot_or_fulfilment_ref, company):
 		"item_code": record["item_code"],
 		"qty": record["qty"],
 		"company": company,
-		"valuation_rate": valuation_rate,
+		"posting_reference": record["posting_reference"],
 		"posted_to_erpnext": bool(record["posted_to_erpnext"]),
 		"posted_cost": posted_cost,
-		"is_theoretical_equivalent": True,
+		"is_theoretical_equivalent": False,
 	}
 
 
@@ -195,11 +203,9 @@ def compute_variance(item_code, qty, company, counted_qty=None, persist=False):
 	theoretical = compute_theoretical_cost(item_code, qty, company)
 	theoretical_cost = theoretical["theoretical_cost"]
 
-	# Posted cost, computed the same way as theoretical for now (see
-	# compute_posted_cost's docstring/TODO) -- no fulfilment record lookup
-	# is required here since this entry point is item/qty/company scoped,
-	# not fulfilment-record scoped.
-	posted_cost = theoretical_cost
+	# No fulfilment reference is available at this item/qty grain. Do not
+	# manufacture a posted figure from current valuation rates.
+	posted_cost = None
 
 	result = {
 		"item_code": item_code,
@@ -207,13 +213,9 @@ def compute_variance(item_code, qty, company, counted_qty=None, persist=False):
 		"company": company,
 		"theoretical_cost": theoretical_cost,
 		"posted_cost": posted_cost,
-		"variance_vs_theoretical": posted_cost - theoretical_cost,
-		"reason": (
-			"posted_cost is currently theoretical-equivalent: no real ERPNext "
-			"posting exists for this fulfilment path yet (V3-73's flag defaults "
-			"off). See compute_posted_cost's TODO for the future GL/Stock Ledger "
-			"Entry sourcing."
-		),
+		"variance_vs_theoretical": None,
+		"reason": "FULFILMENT_POSTING_REQUIRED",
+		"provisional": True,
 	}
 
 	if counted_qty is not None:
@@ -273,6 +275,17 @@ def _valuation_rate(item_code, company):
 	return valuation_rate or 0.0
 
 
+def _read_posted_cost(stock_entry, company):
+	"""Read submitted Stock Entry valuation evidence; never infer it."""
+	entry = frappe.db.get_value(
+		"Stock Entry", stock_entry,
+		["name", "company", "docstatus", "total_outgoing_value"], as_dict=True,
+	)
+	if not entry or entry.get("company") != company or entry.get("docstatus") != 1:
+		frappe.throw(_("No submitted stock posting evidence for {0}").format(stock_entry), frappe.ValidationError)
+	return entry.get("total_outgoing_value") or 0.0
+
+
 def _resolve_fulfilment_record(kot_or_fulfilment_ref, company):
 	"""Resolve `kot_or_fulfilment_ref` to one `URY Fulfilment Record` row.
 
@@ -284,7 +297,7 @@ def _resolve_fulfilment_record(kot_or_fulfilment_ref, company):
 	record = frappe.db.get_value(
 		FULFILMENT_RECORD_DOCTYPE,
 		kot_or_fulfilment_ref,
-		["name", "kot", "item_code", "qty", "company", "posted_to_erpnext"],
+		["name", "kot", "item_code", "qty", "company", "posted_to_erpnext", "posting_reference"],
 		as_dict=True,
 	)
 
@@ -292,7 +305,7 @@ def _resolve_fulfilment_record(kot_or_fulfilment_ref, company):
 		candidates = frappe.get_all(
 			FULFILMENT_RECORD_DOCTYPE,
 			filters={"kot": kot_or_fulfilment_ref},
-			fields=["name", "kot", "item_code", "qty", "company", "posted_to_erpnext"],
+			fields=["name", "kot", "item_code", "qty", "company", "posted_to_erpnext", "posting_reference"],
 			order_by="fulfilled_at desc, creation desc",
 			limit_page_length=1,
 		)

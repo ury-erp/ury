@@ -139,12 +139,17 @@ export const saveSalesPlanDraftQuantities = (
   window.localStorage.setItem(key, JSON.stringify(quantities));
 };
 
+export interface SaveSalesPlanDraftItem {
+  item_code: string;
+  qty: number;
+}
+
 export interface SaveSalesPlanDraftParams {
   plan_date: string;
   branch: string;
   company?: string;
   service_period?: string;
-  items: Pick<SalesPlanItem, 'item_code' | 'qty'>[];
+  items: SaveSalesPlanDraftItem[];
 }
 
 export interface SaveSalesPlanDraftResponse {
