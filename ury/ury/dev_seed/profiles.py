@@ -39,6 +39,8 @@ def seed():
 # ---------------------------------------------------------------------------
 
 def _get_demo_company():
+    if frappe.db.exists("Company", "Demo Restaurant"):
+        return "Demo Restaurant"
     if frappe.db.exists("Company", "My Restaurant"):
         return "My Restaurant"
     company = frappe.get_all("Company", limit=1, pluck="name")
