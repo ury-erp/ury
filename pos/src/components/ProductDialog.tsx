@@ -131,6 +131,14 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
     ((!order.comment && !comments) || (order.comment?.trim() === comments?.trim()))
   ) : null;
 
+  // Initialize quantity and comments for new additions
+  useEffect(() => {
+    if (!editMode && selectedItem) {
+      setQuantity('1');
+      setComments('');
+    }
+  }, [selectedItem, editMode]);
+
   const [, setAddonItemCodes] = useState<string[]>([]);
   const [isAddonLoading, setIsAddonLoading] = useState(false);
   const [addonError, setAddonError] = useState<string | null>(null);
@@ -164,14 +172,6 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
       });
   }, [selectedItem]);
 
-  // Initialize quantity and comments from cart if not in edit mode
-  useEffect(() => {
-    if (!editMode && selectedItem) {
-      const cartQuantity = getItemQuantityFromCart(selectedItem);
-      setQuantity(cartQuantity.toString());
-      setComments('');
-    }
-  }, [selectedItem, editMode, getItemQuantityFromCart]);
 
   // Handle click outside to close dialog
   useEffect(() => {
