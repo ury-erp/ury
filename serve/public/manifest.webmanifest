@@ -1,0 +1,39 @@
+{
+  "id": "/ury/serve/",
+  "name": "URY Serve",
+  "short_name": "Serve",
+  "description": "Staff order-taking for URY restaurants",
+  "start_url": "/ury/serve/",
+  "scope": "/ury/serve/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f7f4ef",
+  "theme_color": "#1c1917",
+  "lang": "en",
+  "icons": [
+    {
+      "src": "/assets/ury/serve/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/ury/serve/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/ury/serve/icons/icon-192-maskable.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/assets/ury/serve/icons/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
