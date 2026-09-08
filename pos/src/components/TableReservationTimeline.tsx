@@ -173,10 +173,28 @@ export default function TableReservationTimeline({
       case 'Cancelled':
         return 'bg-rose-50/70 border-rose-200 text-rose-800 opacity-65 hover:opacity-90';
       case 'No Show':
-        return 'bg-gray-50/90 border-gray-300 text-gray-950 hover:bg-gray-50';
+        return 'bg-orange-50/90 border-orange-300 text-orange-950 hover:bg-orange-50';
       case 'Requested':
       default:
         return 'bg-indigo-50/90 border-indigo-300 text-indigo-950 hover:bg-indigo-50';
+    }
+  };
+
+  const getStatusHoverRingClass = (status: string) => {
+    switch (status) {
+      case 'Confirmed':
+        return 'border-emerald-600 ring-2 ring-emerald-600/40';
+      case 'Completed':
+        return 'border-blue-600 ring-2 ring-blue-500/40';
+      case 'Cancelled':
+        return 'border-red-600 ring-2 ring-red-500/40';
+      case 'No Show':
+        return 'border-orange-600 ring-2 ring-orange-500/40';
+      case 'Active':
+        return 'border-amber-600 ring-2 ring-amber-500/40';
+      case 'Requested':
+      default:
+        return 'border-indigo-600 ring-2 ring-indigo-500/40';
     }
   };
 
@@ -285,7 +303,7 @@ export default function TableReservationTimeline({
                   }}
                   className={`absolute rounded-lg border p-2 flex flex-col justify-between overflow-hidden cursor-pointer transition-all duration-150 select-none ${
                     isHovered
-                      ? 'shadow-xl scale-[1.01] border-gray-400'
+                      ? `shadow-xl scale-[1.01] ${getStatusHoverRingClass(res.status)}`
                       : 'shadow-2xs hover:shadow-md'
                   } ${getStatusColorClasses(res.status)}`}
                 >
