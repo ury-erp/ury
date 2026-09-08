@@ -11,6 +11,8 @@ interface DatePickerProps {
   onBlur?: (id: string) => void;
   className?: string;
   disabled?: boolean;
+  buttonClassName?: string;
+  formatDisplay?: (val: string) => string;
 }
 
 const MONTH_NAMES = [
@@ -86,6 +88,8 @@ export function DatePicker({
   onBlur,
   className,
   disabled = false,
+  buttonClassName,
+  formatDisplay,
 }: DatePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -112,15 +116,16 @@ export function DatePicker({
     setViewDate(selectedDate);
   }, [selectedDate]);
 
-  // Display text formatted as DD-MM-YYYY
+  // Display text formatted as DD-MM-YYYY or custom via formatDisplay
   const displayText = useMemo(() => {
     if (!value) return '';
+    if (formatDisplay) return formatDisplay(value);
     const parts = value.split('-');
     if (parts.length === 3) {
       return `${parts[2].padStart(2, '0')}-${parts[1].padStart(2, '0')}-${parts[0]}`;
     }
     return value;
-  }, [value]);
+  }, [value, formatDisplay]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -221,8 +226,10 @@ export function DatePicker({
         type="button"
         disabled={disabled}
         onClick={() => !disabled && setIsOpen((prev) => !prev)}
-        className={`w-full inline-flex items-center justify-between gap-2 rounded-md border bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none shadow-sm cursor-pointer transition-colors ${
-          error ? 'border-red-300' : 'border-gray-200 hover:border-gray-300'
+        className={`w-full inline-flex items-center justify-between gap-2 rounded-md ${
+          buttonClassName ?? 'border border-gray-200 hover:border-gray-300 bg-white px-3 py-2 text-sm font-medium shadow-sm'
+        } text-gray-700 hover:bg-gray-50 focus:outline-none cursor-pointer transition-colors ${
+          error ? 'border-red-300' : ''
         } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
       >
         <span>{displayText || placeholder}</span>
