@@ -78,7 +78,7 @@ export const BranchPage: React.FC = () => {
     try {
       const res = await call<any>('frappe.client.get_list', {
         doctype: 'Branch',
-        fields: ['name', 'branch', 'address', 'custom_no_taxes'],
+        fields: ['name', 'branch', 'custom_no_taxes'],
         limit_page_length: 100
       });
       list = Array.isArray(res) ? res : (res?.message || []);
@@ -202,7 +202,9 @@ export const BranchPage: React.FC = () => {
       setBranchData(branch);
       setBranchForm({
         branch_name: branch.branch_name || branch.name || '',
-        address: branch.address || '',
+        // Branch itself has no address field -- the real Link lives on the
+        // linked URY Restaurant (restaurant.address, populated below).
+        address: '',
         custom_no_taxes: branch.custom_no_taxes || 0,
       });
 
@@ -225,6 +227,10 @@ export const BranchPage: React.FC = () => {
           });
           const restaurant = restaurantRes.message || restaurantRes;
           setRestaurantData(restaurant);
+          // Address is a Link field on URY Restaurant, not Branch -- surface it
+          // through branchForm.address since that's what the Address picker in
+          // the edit form is bound to.
+          setBranchForm((prev) => ({ ...prev, address: restaurant.address || '' }));
           setRestaurantForm({
             invoice_series_prefix: restaurant.invoice_series_prefix || '',
             aggregator_series_prefix: restaurant.aggregator_series_prefix || '',
@@ -336,7 +342,6 @@ export const BranchPage: React.FC = () => {
         doc: {
           doctype: 'Branch',
           branch: addForm.branchName,
-          address: resolvedAddress,
           user: [{ user: currentUser }]
         }
       });
@@ -386,7 +391,8 @@ export const BranchPage: React.FC = () => {
 
     const original = {
       branch_name: (selectedBranch.branch_name || selectedBranch.name || '').trim(),
-      address: (branchData?.address || '').trim(),
+      // address is a URY Restaurant field, not a Branch field -- see fetchDetails.
+      address: (restaurantData?.address || '').trim(),
       custom_no_taxes: branchData?.custom_no_taxes ? 1 : 0,
       invoice_series_prefix: (restaurantData?.invoice_series_prefix || '').trim(),
       aggregator_series_prefix: (restaurantData?.aggregator_series_prefix || '').trim(),
@@ -456,13 +462,14 @@ export const BranchPage: React.FC = () => {
       // the user typed a new value that doesn't match an existing record.
       const resolvedAddress = await resolveAddressOrCreate(branchForm.address);
 
-      // Save Branch fields (address and custom_no_taxes)
+      // Save Branch's own fields. Address is NOT one of them -- Branch has no
+      // address field on this doctype; the real Link lives on URY Restaurant
+      // (saved below) and is applied there instead.
       await call('frappe.client.set_value', {
         doctype: 'Branch',
         name: currentBranchName,
         fieldname: {
           branch: branchForm.branch_name,
-          address: resolvedAddress,
           custom_no_taxes: branchForm.custom_no_taxes ? 1 : 0,
         },
       });
@@ -470,20 +477,30 @@ export const BranchPage: React.FC = () => {
       // Save URY Restaurant fields if it exists
       if (restaurantData) {
         let currentRestaurantName = restaurantData.name;
-        const newRestaurantName = `${branchForm.branch_name.trim()} Restaurant`;
-        if (newRestaurantName !== restaurantData.name) {
-          await call('frappe.client.rename_doc', {
-            doctype: 'URY Restaurant',
-            old_name: restaurantData.name,
-            new_name: newRestaurantName,
-          });
-          currentRestaurantName = newRestaurantName;
+        // Only rename the Restaurant when the Branch name actually changed --
+        // recomputing "<branch> Restaurant" and renaming whenever it differs
+        // from the CURRENT restaurant doc name renames on every unrelated save
+        // for any restaurant not already named exactly that (e.g. one renamed
+        // in Desk, or a seeded "Demo Restaurant"). Same bug class as the Room/
+        // Table name-mutation issues fixed elsewhere in this round.
+        const branchNameChanged = original.branch_name !== current.branch_name;
+        if (branchNameChanged) {
+          const newRestaurantName = `${branchForm.branch_name.trim()} Restaurant`;
+          if (newRestaurantName !== restaurantData.name) {
+            await call('frappe.client.rename_doc', {
+              doctype: 'URY Restaurant',
+              old_name: restaurantData.name,
+              new_name: newRestaurantName,
+            });
+            currentRestaurantName = newRestaurantName;
+          }
         }
 
         const updatedDoc = {
           ...restaurantData,
           name: currentRestaurantName,
           branch: branchForm.branch_name.trim(),
+          address: resolvedAddress,
           invoice_series_prefix: restaurantForm.invoice_series_prefix,
           aggregator_series_prefix: restaurantForm.aggregator_series_prefix,
           tax_id: restaurantForm.tax_id,
