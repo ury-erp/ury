@@ -186,6 +186,8 @@ class TestKotItemExecution(FrappeTestCase):
 		) as mock_ready_posting, patch(
 			f"{MODULE}.frappe.get_roles", return_value=["Chef"]
 		), patch(
+			"ury.ury.api.ury_kot_execution_service._require_kot_branch_scope"
+		), patch(
 			f"{MODULE}.frappe.session"
 		) as session:
 			session.user = "chef@example.com"
