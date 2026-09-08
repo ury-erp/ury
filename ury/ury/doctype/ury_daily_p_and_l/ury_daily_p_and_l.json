@@ -15,6 +15,7 @@
   "tax",
   "net_sales",
   "cogs",
+  "disposables_cost",
   "total_direct_expenses",
   "gross_profit",
   "total_employee_costs",
@@ -28,6 +29,7 @@
   "tax_percent",
   "net_sales_percent",
   "cogs_percent",
+  "disposables_percent",
   "total_direct_expenses_percent",
   "gross_profit_percent",
   "total_employee_costs_percent",
@@ -56,6 +58,7 @@
   "indirect_expenses_breakup",
   "cogs_tab",
   "cost_of_goods",
+  "disposables",
   "amended_from"
  ],
  "fields": [
@@ -194,9 +197,24 @@
   },
   {
    "depends_on": "eval:doc.docstatus==1",
+   "fieldname": "disposables_cost",
+   "fieldtype": "Currency",
+   "label": "Disposables Cost",
+   "precision": "2",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.docstatus==1",
    "fieldname": "cogs_percent",
    "fieldtype": "Percent",
    "label": "Cost of Goods Sold Percent",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.docstatus==1",
+   "fieldname": "disposables_percent",
+   "fieldtype": "Percent",
+   "label": "Disposables Cost Percent",
    "read_only": 1
   },
   {
@@ -338,6 +356,13 @@
    "read_only": 1
   },
   {
+   "fieldname": "disposables",
+   "fieldtype": "Table",
+   "label": "Disposables (Breakup)",
+   "options": "URY Cost Of Goods",
+   "read_only": 1
+  },
+  {
    "fieldname": "amended_from",
    "fieldtype": "Link",
    "label": "Amended From",
@@ -400,7 +425,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2024-01-09 14:15:52.566841",
+ "modified": "2026-09-08 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Daily P and L",

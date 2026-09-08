@@ -61,7 +61,9 @@ class URYDailyPandL(Document):
 	def cogs_sold(self):
 		report_settings = frappe.get_doc("URY Report Settings",self.branch)
 		self.cost_of_goods = []
+		self.disposables = []
 		cogs = 0
+		disposables_cost = 0
 		electricity_reading = self.electricity_closing - self.electricity_opening
 		if electricity_reading <= 0:
 			frappe.throw("Invalid Electricity Reading")
@@ -101,9 +103,10 @@ class URYDailyPandL(Document):
 				)
 				AND d.new_item_code IS NULL
 				AND e.item IS NULL
-			GROUP BY 
+				AND b.is_disposable = 0
+			GROUP BY
 				c.item_name
-			ORDER BY 
+			ORDER BY
 				c.item_group ASC, b.item_name ASC
 		''', {"branch": self.branch, "date": self.date}, as_dict=True)
 
@@ -138,9 +141,10 @@ class URYDailyPandL(Document):
 				)
 				AND d.new_item_code IS NULL
 				AND e.item IS NOT NULL
-			GROUP BY 
+				AND b.is_disposable = 0
+			GROUP BY
 				c.item_name
-			ORDER BY 
+			ORDER BY
 				c.item_group ASC, b.item_name ASC
 		''', {"branch": self.branch, "date": self.date}, as_dict=True)
 
@@ -168,12 +172,44 @@ class URYDailyPandL(Document):
 					OR (rs.`branch` IS NULL AND a.`posting_date` = %(date)s)
 				)
 				AND d.new_item_code IS NOT NULL
-			GROUP BY 
+				AND b.is_disposable = 0
+			GROUP BY
 				c.item_name
-			ORDER BY 
+			ORDER BY
 				c.item_group ASC, b.item_name ASC
 		''', {"branch": self.branch, "date": self.date}, as_dict=True)
-		
+
+		disposable_items = frappe.db.sql('''
+			SELECT
+				c.item_group AS "Item Group",
+				c.item_code AS "Item Code",
+				c.item_name AS "Item Name",
+				SUM(b.qty) AS "Qty"
+			FROM `tabPOS Invoice` a
+			INNER JOIN `tabPOS Invoice Item` b ON a.name = b.parent
+			LEFT JOIN `tabItem` c ON c.item_code = b.item_code
+			LEFT JOIN `tabProduct Bundle` d ON d.new_item_code = b.item_code
+			LEFT JOIN `tabURY Report Settings` rs ON (
+				rs.`branch` = %(branch)s
+			)
+			WHERE
+				a.`branch` = %(branch)s
+				AND a.`status` IN ("Consolidated", "Paid")
+				AND a.`docstatus` = 1
+				AND
+				(
+					((rs.`hours` IS NULL OR rs.`hours` = 0) AND a.`posting_date` = %(date)s)
+					OR (rs.`hours` > 0 AND TIMESTAMP(a.`posting_date`, a.`posting_time`) <= TIMESTAMP(DATE_ADD(%(date)s, INTERVAL 1 DAY), CONCAT(LPAD(rs.`hours`, 2, '0'), ':00:00')) AND TIMESTAMP(a.`posting_date`, a.`posting_time`) >= TIMESTAMP(%(date)s, CONCAT(LPAD(rs.`hours`, 2, '0'), ':00:00')))
+					OR (rs.`branch` IS NULL AND a.`posting_date` = %(date)s)
+				)
+				AND d.new_item_code IS NULL
+				AND b.is_disposable = 1
+			GROUP BY
+				c.item_name
+			ORDER BY
+				c.item_group ASC, b.item_name ASC
+		''', {"branch": self.branch, "date": self.date}, as_dict=True)
+
 		unset_item_prices = []
 		for item in non_pb_item_sales:
 			items_price = frappe.db.get_all("Item Price",fields = ['name','price_list_rate'],filters = {'price_list':report_settings.buying_price_list,'item_code':item['Item Code']})
@@ -257,11 +293,31 @@ class URYDailyPandL(Document):
 				})
 				cogs = cogs + buying_price * qty
 		self.cogs = cogs
-		
+
+		unset_disposable_item_prices = []
+		for item in disposable_items:
+			items_price = frappe.db.get_all("Item Price",fields = ['name','price_list_rate'],filters = {'price_list':report_settings.buying_price_list,'item_code':item['Item Code']})
+			item_name = item['Item Name']
+			if len(items_price) == 0:
+				unset_disposable_item_prices.append(item_name)
+			else:
+				qty = float(item['Qty'])
+				self.append("disposables" ,{
+					"item_code":item['Item Code'],
+					"item_name":item['Item Name'],
+					"item_group":item['Item Group'],
+					"qty":qty,
+					"buying_price":items_price[0].price_list_rate,
+					"amount":items_price[0].price_list_rate * qty
+				})
+				disposables_cost = disposables_cost + items_price[0].price_list_rate * qty
+		self.disposables_cost = disposables_cost
+
 		unset_prices = [
 			("ITEMS", unset_item_prices),
 			("BUNDLE SUB ITEMS", unset_pb_item_prices),
-			("BOM SUB ITEMS", unset_bom_item_prices)
+			("BOM SUB ITEMS", unset_bom_item_prices),
+			("DISPOSABLE ITEMS", unset_disposable_item_prices)
 		]
 		remarks = "BUYING PRICE NOT SET<br><br>" + "<br><br>".join(f"{label}:-<br>{items}" for label, items in unset_prices if items)
 		if any(items for label, items in unset_prices):
@@ -330,13 +386,14 @@ class URYDailyPandL(Document):
 		self.net_sales = self.gross_sales - self.cash_discount_round_off - self.tax
 
 		if self.net_sales == 0.0:
-			self.gross_sales_percent = self.cash_discount_round_off_percent = self.tax_percent = self.cogs_percent = self.total_direct_expenses_percent = self.gross_profit_percent = self.total_employee_costs_percent = self.other_expenses_percent = self.depreciation_percent = self.total_indirect_expenses_percent = self.net_profit_percent = 0.0
+			self.gross_sales_percent = self.cash_discount_round_off_percent = self.tax_percent = self.cogs_percent = self.disposables_percent = self.total_direct_expenses_percent = self.gross_profit_percent = self.total_employee_costs_percent = self.other_expenses_percent = self.depreciation_percent = self.total_indirect_expenses_percent = self.net_profit_percent = 0.0
 		else:
 			self.gross_sales_percent = round(((self.gross_sales / self.net_sales) * 100),2)
 			self.cash_discount_round_off_percent = round(((self.cash_discount_round_off / self.net_sales) * 100),2)
 			self.tax_percent = round(((self.tax / self.net_sales) * 100),2)
 
 			self.cogs_percent = round(((self.cogs / self.net_sales) * 100),2)
+			self.disposables_percent = round(((self.disposables_cost / self.net_sales) * 100),2)
 
 		self.net_sales_percent = 100.0
 
@@ -371,7 +428,7 @@ class URYDailyPandL(Document):
 
 
 		# GROSS PROFIT
-		self.gross_profit = self.net_sales - self.total_direct_expenses - self.cogs
+		self.gross_profit = self.net_sales - self.total_direct_expenses - self.cogs - self.disposables_cost
 		
 		if self.net_sales != 0.0:		
 			self.total_direct_expenses_percent = round(((self.total_direct_expenses / self.net_sales) * 100),2)
