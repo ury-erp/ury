@@ -467,25 +467,27 @@ export default function OrderPage() {
       )}
 
       {canModify && !isTakeaway && (
-        <div className="flex items-center justify-between rounded-lg border border-border bg-white px-3 py-3">
-          <span className="text-sm font-medium text-gray-700">Pax</span>
-          <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between rounded-md border border-border bg-white px-2.5 py-1.5">
+          <span className="text-xs font-medium text-gray-600">Pax</span>
+          <div className="flex items-center gap-2">
             <Button
               onClick={() => setNoOfPax(Math.max(1, noOfPax - 1))}
               variant="outline"
               size="icon"
-              className="h-11 w-11 rounded-full"
+              className="h-9 w-9 rounded-full"
               disabled={isInteractionDisabled}
+              aria-label="Decrease pax"
             >
               -
             </Button>
-            <span className="w-6 text-center">{noOfPax}</span>
+            <span className="min-w-6 text-center text-sm font-medium tabular-nums">{noOfPax}</span>
             <Button
               onClick={() => setNoOfPax(Math.min(50, noOfPax + 1))}
               variant="outline"
               size="icon"
-              className="h-11 w-11 rounded-full"
+              className="h-9 w-9 rounded-full"
               disabled={isInteractionDisabled}
+              aria-label="Increase pax"
             >
               +
             </Button>
