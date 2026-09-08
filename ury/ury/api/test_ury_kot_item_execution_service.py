@@ -97,6 +97,8 @@ class _ExecutionHarness:
 			return _kot_doc(*args, **kwargs)
 		if arg == "System Settings":
 			return frappe._dict({"time_zone": "UTC"})
+		if arg == "User":
+			return frappe._dict({"user_type": "System User"})
 		raise AssertionError(f"unexpected get_doc lookup: {arg!r}")
 
 	def get_all(self, doctype, filters=None, fields=None, order_by=None, limit=None):
