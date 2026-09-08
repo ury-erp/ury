@@ -563,6 +563,150 @@ class TestGetCaptainContext(FrappeTestCase):
         self.assertEqual(result["opening_state"], {"pos_open": True})
         self.assertIn("pos_profile", result)
         self.assertEqual(result["pos_profile"]["name"], "Test POS Profile")
+        mock_posOpening.assert_called_once()
+
+    @patch("ury.ury.doctype.ury_order.ury_order.pos_opening_check")
+    @patch("ury.ury.doctype.ury_order.ury_order.posOpening")
+    @patch("ury.ury.doctype.ury_order.ury_order.getRoom")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.db.exists")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_doc")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_roles")
+    @patch("ury.ury.doctype.ury_order.ury_order.getBranch")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.session")
+    def test_multi_cashier_uses_room_scoped_opening_check(
+        self,
+        mock_session,
+        mock_getBranch,
+        mock_get_roles,
+        mock_get_doc,
+        mock_db_exists,
+        mock_getRoom,
+        mock_posOpening,
+        mock_pos_opening_check,
+    ):
+        """RN parity (D1): multi-cashier open gate is room-scoped, not branch-wide."""
+        mock_session.user = "captain@example.com"
+        mock_getBranch.return_value = "Test Branch"
+        mock_get_roles.return_value = ["URY Captain"]
+        mock_getRoom.return_value = [{"name": "Room B", "branch": "Test Branch"}]
+        mock_db_exists.return_value = "Test POS Profile"
+        mock_pos_opening_check.return_value = {"opening_exists": False}
+        mock_posOpening.return_value = 0  # would admit if incorrectly used
+
+        pos_profile = _make_pos_profile(custom_enable_multiple_cashier=1)
+        mock_get_doc.return_value = pos_profile
+
+        result = get_captain_context()
+
+        self.assertEqual(result["opening_state"], {"pos_open": False})
+        self.assertTrue(result["pos_profile"]["custom_enable_multiple_cashier"])
+        mock_pos_opening_check.assert_called_once()
+        mock_posOpening.assert_not_called()
+
+    @patch("ury.ury.doctype.ury_order.ury_order.pos_opening_check")
+    @patch("ury.ury.doctype.ury_order.ury_order.posOpening")
+    @patch("ury.ury.doctype.ury_order.ury_order.getRoom")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.db.exists")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_doc")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_roles")
+    @patch("ury.ury.doctype.ury_order.ury_order.getBranch")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.session")
+    def test_multi_cashier_open_when_assigned_room_has_opening(
+        self,
+        mock_session,
+        mock_getBranch,
+        mock_get_roles,
+        mock_get_doc,
+        mock_db_exists,
+        mock_getRoom,
+        mock_posOpening,
+        mock_pos_opening_check,
+    ):
+        mock_session.user = "captain@example.com"
+        mock_getBranch.return_value = "Test Branch"
+        mock_get_roles.return_value = ["URY Captain"]
+        mock_getRoom.return_value = [{"name": "Room A", "branch": "Test Branch"}]
+        mock_db_exists.return_value = "Test POS Profile"
+        mock_pos_opening_check.return_value = {
+            "opening_exists": True,
+            "cashier": "cashier@example.com",
+            "pos_profile": "Test POS Profile",
+        }
+
+        pos_profile = _make_pos_profile(custom_enable_multiple_cashier=1)
+        mock_get_doc.return_value = pos_profile
+
+        result = get_captain_context()
+
+        self.assertEqual(result["opening_state"], {"pos_open": True})
+        mock_posOpening.assert_not_called()
+
+    @patch("ury.ury.doctype.ury_order.ury_order.pos_opening_check")
+    @patch("ury.ury.doctype.ury_order.ury_order.posOpening")
+    @patch("ury.ury.doctype.ury_order.ury_order.getRoom")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.db.exists")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_doc")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_roles")
+    @patch("ury.ury.doctype.ury_order.ury_order.getBranch")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.session")
+    def test_opening_check_exception_fails_closed(
+        self,
+        mock_session,
+        mock_getBranch,
+        mock_get_roles,
+        mock_get_doc,
+        mock_db_exists,
+        mock_getRoom,
+        mock_posOpening,
+        mock_pos_opening_check,
+    ):
+        mock_session.user = "captain@example.com"
+        mock_getBranch.return_value = "Test Branch"
+        mock_get_roles.return_value = ["URY Captain"]
+        mock_getRoom.return_value = [{"name": "Room B", "branch": "Test Branch"}]
+        mock_db_exists.return_value = "Test POS Profile"
+        mock_pos_opening_check.side_effect = frappe.ValidationError("No room assigned")
+
+        pos_profile = _make_pos_profile(custom_enable_multiple_cashier=1)
+        mock_get_doc.return_value = pos_profile
+
+        result = get_captain_context()
+
+        self.assertIsNone(result["opening_state"])
+        mock_posOpening.assert_not_called()
+
+    @patch("ury.ury.doctype.ury_order.ury_order.posOpening")
+    @patch("ury.ury.doctype.ury_order.ury_order.getRoom")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.db.exists")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_doc")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_roles")
+    @patch("ury.ury.doctype.ury_order.ury_order.getBranch")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.session")
+    def test_transfer_role_resolved_without_weakening(
+        self,
+        mock_session,
+        mock_getBranch,
+        mock_get_roles,
+        mock_get_doc,
+        mock_db_exists,
+        mock_getRoom,
+        mock_posOpening,
+    ):
+        """Elevated transfer_role_permissions stay true for matching manager roles."""
+        mock_session.user = "manager@example.com"
+        mock_getBranch.return_value = "Test Branch"
+        mock_get_roles.return_value = ["URY Manager"]
+        mock_getRoom.return_value = [{"name": "Main Hall", "branch": "Test Branch"}]
+        mock_db_exists.return_value = "Test POS Profile"
+        mock_posOpening.return_value = 0
+
+        pos_profile = _make_pos_profile(transfer_role_permissions=["URY Manager"])
+        mock_get_doc.return_value = pos_profile
+
+        result = get_captain_context()
+
+        self.assertTrue(result["pos_profile"]["transfer_role_permissions"])
+        self.assertFalse(result["role_restricted_for_table_order"])
 
 
 class TestSyncOrderHardening(FrappeTestCase):

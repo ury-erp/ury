@@ -1268,8 +1268,16 @@ def get_captain_context():
 
     Room assignment is sourced from `getRoom()` (`ury.ury_pos.api`), the same
     `URY User` child-table (Branch.user) source used elsewhere for
-    branch/room resolution. POS opening state reuses `posOpening()` rather
-    than re-deriving it. Field names mirror what the future
+    branch/room resolution.
+
+    POS opening state mirrors RN `MenuContext.getPos`:
+    - single-cashier: branch-wide `posOpening()` (0 = open, 1 = closed)
+    - multi-cashier (`custom_enable_multiple_cashier`): room-scoped
+      `pos_opening_check().opening_exists` for the user's assigned room
+      via `getBranchRoom()` — not any open room on the branch
+
+    Failures while resolving opening state return `opening_state: None`
+    (fail closed). Capability field names mirror what
     `derivePOSCapabilities()` in `@ury/core` reads from POS Profile.
     """
     user = frappe.session.user
@@ -1294,9 +1302,11 @@ def get_captain_context():
 
     pos_profile_context = None
     role_restricted_for_table_order = False
+    multi_cashier = False
 
     if pos_profile_name:
         pos_profile = frappe.get_doc("POS Profile", pos_profile_name)
+        multi_cashier = bool(pos_profile.custom_enable_multiple_cashier)
 
         role_restricted_for_table_order = _has_role(
             user_roles, pos_profile.role_restricted_for_table_order
@@ -1314,15 +1324,23 @@ def get_captain_context():
             "remove_items": bool(pos_profile.remove_items),
             "show_image": bool(pos_profile.show_image),
             "custom_enable_kot_reprint": bool(pos_profile.custom_enable_kot_reprint),
-            "custom_enable_multiple_cashier": bool(pos_profile.custom_enable_multiple_cashier),
+            "custom_enable_multiple_cashier": multi_cashier,
         }
 
     opening_state = None
     if branch:
         try:
-            # posOpening() returns 1 when no open POS Opening Entry exists for
-            # the branch (and msgprints a notice in that case), 0 when open.
-            opening_state = {"pos_open": posOpening() == 0}
+            if multi_cashier:
+                # RN parity: open only when the user's assigned room has an
+                # open POS Opening Entry (tabMultiple Rooms), not when any
+                # room on the branch is open.
+                check = pos_opening_check()
+                opening_state = {"pos_open": bool(check.get("opening_exists"))}
+            else:
+                # posOpening() returns 1 when no open POS Opening Entry exists
+                # for the branch (and msgprints a notice in that case), 0 when
+                # open.
+                opening_state = {"pos_open": posOpening() == 0}
         except Exception:
             opening_state = None
 
