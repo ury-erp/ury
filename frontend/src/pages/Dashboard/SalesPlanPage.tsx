@@ -136,17 +136,18 @@ const LifecycleStepper: React.FC<LifecycleStepperProps> = ({ status }) => {
             {index > 0 && (
               <div className={`h-px w-6 shrink-0 ${isComplete || isActive ? 'bg-primary' : 'bg-muted'}`} />
             )}
-            <div
-              className={`inline-flex h-[19px] items-center gap-[5px] rounded-[5px] px-[7px] text-[11px] font-medium ${
+            <Badge
+              size="tag"
+              variant={
                 isActive
-                  ? 'bg-primary-tint text-primary'
+                  ? 'tagAccent'
                   : isComplete
-                    ? 'bg-success-tint text-success'
-                    : 'bg-muted text-text-tertiary'
-              }`}
+                    ? 'tagSuccess'
+                    : 'default'
+              }
             >
               {step.label}
-            </div>
+            </Badge>
           </React.Fragment>
         );
       })}

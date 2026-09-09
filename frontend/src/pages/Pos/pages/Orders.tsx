@@ -58,39 +58,36 @@ function getStatusTone(status: string): StatusTone {
   return 'neutral';
 }
 
-const statusToneClasses: Record<StatusTone, string> = {
-  neutral: 'border-hair bg-muted text-muted-foreground',
-  success: 'border-success-tint-border bg-success-tint text-success',
-  destructive: 'border-destructive-tint-border bg-destructive-tint text-destructive',
-};
-
 const statusDotClasses: Record<StatusTone, string> = {
   neutral: 'bg-muted-foreground',
   success: 'bg-success',
   destructive: 'bg-destructive',
 };
 
+const getToneVariant = (tone: StatusTone): "default" | "tagDestructive" | "tagSuccess" => {
+  switch (tone) {
+    case 'neutral': return 'default';
+    case 'success': return 'tagSuccess';
+    case 'destructive': return 'tagDestructive';
+  }
+};
+
 function StatusTag({ status, label }: { status: string; label: string }) {
   const tone = getStatusTone(status);
   return (
-    <span
-      className={cn(
-        'inline-flex h-[19px] shrink-0 items-center gap-1.5 rounded-[5px] border px-[7px] text-[11px] font-medium whitespace-nowrap',
-        statusToneClasses[tone]
-      )}
-    >
+    <Badge size="tag" variant={getToneVariant(tone)}>
       <span className={cn('h-[5px] w-[5px] shrink-0 rounded-full', statusDotClasses[tone])} />
       {label}
-    </span>
+    </Badge>
   );
 }
 
 function LinkTag({ icon: Icon, children }: { icon: React.ComponentType<{ className?: string }>; children: React.ReactNode }) {
   return (
-    <span className="inline-flex h-[19px] shrink-0 items-center gap-1 rounded-[5px] border border-primary-tint-border bg-primary-tint px-[7px] text-[11px] font-medium text-primary whitespace-nowrap">
+    <Badge size="tag" variant="tagAccent">
       <Icon className="h-2.5 w-2.5" />
       {children}
-    </span>
+    </Badge>
   );
 }
 
