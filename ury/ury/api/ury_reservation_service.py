@@ -23,11 +23,18 @@ merely mirroring it:
     an item's real active reservation qty is honoured even before the
     wiring task lands.
   - Shared-component decomposition delegates to V3-41's
-    ``compile_bom_vector``: a composite/MTO item (one with an active BOM for
-    the company) is reserved by reserving every one of its exploded leaf
-    components -- including components nested under sub-assemblies -- not
-    the top-level item itself and not any intermediate sub-assembly. A plain
-    stock item (no active BOM) is reserved directly.
+    ``compile_bom_vector``: a MADE_TO_ORDER item (per its resolved
+    `production_policy`, mirroring `ury_availability.py`'s own policy-driven
+    branching -- NOT merely "has an active BOM") is reserved by reserving
+    every one of its exploded leaf components -- including components nested
+    under sub-assemblies -- not the top-level item itself and not any
+    intermediate sub-assembly. A PRE_PRODUCED/DIRECT_RETAIL item is reserved
+    directly against its own finished-goods stock, even when it has an
+    active BOM (the BOM documents the recipe but is not what's checked at
+    sale time). A caller that supplies no `production_policy` at all falls
+    back to the legacy has-active-BOM heuristic (logged) for backward
+    compatibility with genuinely unconfigured items -- see
+    `_resolve_components`.
 
 Atomicity strategy (read this before changing capacity-check code):
 
@@ -97,6 +104,14 @@ RESERVATION_DOCTYPE = "URY Stock Reservation"
 BIN_DOCTYPE = "Bin"
 BOM_DOCTYPE = "BOM"
 BOM_ITEM_DOCTYPE = "BOM Item"
+
+# Mirrors ury_availability.py's policy constants. A PRE_PRODUCED/DIRECT_RETAIL
+# item is sold from its own finished-goods stock, never from raw-component
+# stock, even when it has an active BOM (the BOM merely documents the
+# recipe -- see `_resolve_components` below).
+POLICY_PRE_PRODUCED = "PRE_PRODUCED"
+POLICY_MADE_TO_ORDER = "MADE_TO_ORDER"
+POLICY_DIRECT_RETAIL = "DIRECT_RETAIL"
 
 RESERVED = "Reserved"
 FULFILLED = "Fulfilled"
@@ -174,17 +189,46 @@ def get_available_capacity(item_code, warehouse, company, locked_bin=None):
 # ---------------------------------------------------------------------------
 
 
-def _resolve_components(item_code, qty, company):
+def _resolve_components(item_code, qty, company, production_policy=None):
 	"""Return [{"component_item": ..., "qty": ...}, ...] for `item_code` at `qty`.
 
-	If `item_code` has an active BOM for `company`, it is treated as
-	composite/MTO: the full leaf-level component vector is returned (via
-	V3-41's `compile_bom_vector`, which reads ERPNext's precomputed
-	`BOM Explosion Item` table and recurses through any nested sub-assembly
-	when explosion rows are absent), scaled to `qty`. Otherwise `item_code`
-	is treated as a plain stock item and is returned as its own sole
-	"component".
+	Component resolution is driven by `production_policy` (the same
+	single source of truth `ury_availability.py`'s `_fill_pre_produced`/
+	`_fill_made_to_order` already use), NOT by "does this item happen to
+	have an active BOM":
+
+	  - PRE_PRODUCED / DIRECT_RETAIL: the item is sold from its own
+	    finished-goods stock. It is returned as its own sole "component",
+	    even if it has an active BOM -- a PRE_PRODUCED item's BOM merely
+	    documents the recipe used ahead of time; it is not what gets
+	    checked/reserved at sale time. Exploding it here would (and did,
+	    live) check raw-ingredient stock instead of FG stock, leaking
+	    ingredient names into a validation error on a customer-facing flow.
+	  - MADE_TO_ORDER: composite; the full leaf-level component vector is
+	    returned (via V3-41's `compile_bom_vector`, which reads ERPNext's
+	    precomputed `BOM Explosion Item` table and recurses through any
+	    nested sub-assembly when explosion rows are absent), scaled to `qty`.
+
+	`production_policy=None` (no IPC config resolved -- a legacy/unconfigured
+	item, or a caller that hasn't been updated to pass it) falls back to the
+	pre-existing "has an active default BOM => composite" heuristic, so
+	genuinely unconfigured items keep working exactly as before. This
+	fallback is logged (not silently used) because it is the exact heuristic
+	responsible for the PRE_PRODUCED-with-BOM bug this function now fixes --
+	seeing it fire in logs flags any caller that still isn't threading
+	`production_policy` through.
 	"""
+	if production_policy in (POLICY_PRE_PRODUCED, POLICY_DIRECT_RETAIL):
+		return [{"component_item": item_code, "qty": qty}]
+
+	if production_policy == POLICY_MADE_TO_ORDER:
+		vector = compile_bom_vector(item_code, qty, company)
+		return [
+			{"component_item": component["component_item"], "qty": component["qty"]}
+			for component in sorted(vector["components"], key=lambda c: c["component_item"])
+		]
+
+	# No production_policy supplied -- fall back to the legacy heuristic.
 	bom_name = frappe.db.get_value(
 		BOM_DOCTYPE,
 		{"item": item_code, "company": company, "is_active": 1, "is_default": 1},
@@ -192,6 +236,14 @@ def _resolve_components(item_code, qty, company):
 	)
 	if not bom_name:
 		return [{"component_item": item_code, "qty": qty}]
+
+	frappe.logger("ury_reservation_service").warning(
+		"create_reservation for item {0} (company {1}) received no production_policy; "
+		"falling back to legacy has-active-BOM heuristic (composite reservation). "
+		"If this item is actually PRE_PRODUCED/DIRECT_RETAIL, this will incorrectly "
+		"reserve raw components instead of finished-goods stock -- caller should be "
+		"updated to pass production_policy.".format(item_code, company)
+	)
 
 	vector = compile_bom_vector(item_code, qty, company)
 
@@ -285,7 +337,7 @@ def create_reservation(
 	_require_positive_qty(qty)
 	_require_scope(branch, company, warehouse, item_code, order_ref)
 
-	components = _resolve_components(item_code, qty, company)
+	components = _resolve_components(item_code, qty, company, production_policy=policy)
 	components_sorted = sorted(components, key=lambda c: c["component_item"])
 
 	# Step 1: lock every distinct component's Bin row, in a stable sorted
