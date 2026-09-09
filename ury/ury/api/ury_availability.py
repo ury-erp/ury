@@ -204,13 +204,20 @@ def _resolve_plan_remaining(item_code, branch, company, department=None):
 	`URY Sales Plan` stores per-item quantities in its `items` child table
 	(`URY Sales Plan Item`: `item_code`, `qty`, ...), not on the parent --
 	the parent only carries scope/status fields (`branch`, `company`,
-	`docstatus`, `status`, `plan_date`, ...). This first resolves the
-	submitted parent plan(s) in scope for today's service date and an
-	active status (`Approved`/`Locked for Production` -- excluding
-	`Draft`/`Proposed`/`Submitted for Approval`/`Superseded/Cancelled`),
-	then sums the matching child rows, following the same `parent`/
-	`parenttype` child-table query convention used elsewhere in this
-	codebase (e.g. `ury_bom_compiler.py`) rather than `frappe.db.get_value`
+	`status`, `plan_date`, ...). `URY Sales Plan` is NOT a submittable
+	doctype (`is_submittable` unset in its JSON), so `docstatus` is always
+	0 for every row -- its approval workflow is tracked entirely via the
+	`status` field, not Frappe's submit mechanism. A `docstatus: 1` filter
+	here was a bug: it made this query match zero rows on any site,
+	regardless of how many plans were genuinely `Approved`/`Locked for
+	Production` (found live, tracing why a real seeded-and-approved plan
+	was still invisible to this resolver). This resolves the parent
+	plan(s) in scope for today's service date and an active `status`
+	(`Approved`/`Locked for Production` -- excluding `Draft`/`Proposed`/
+	`Submitted for Approval`/`Superseded/Cancelled`), then sums the
+	matching child rows, following the same `parent`/`parenttype`
+	child-table query convention used elsewhere in this codebase (e.g.
+	`ury_bom_compiler.py`) rather than `frappe.db.get_value`
 	against nonexistent parent columns.
 
 	`committed_qty`/`fulfilled_qty` have no backing column anywhere in the
@@ -231,7 +238,6 @@ def _resolve_plan_remaining(item_code, branch, company, department=None):
 	plan_filters = {
 		"branch": branch,
 		"company": company,
-		"docstatus": 1,
 		"status": ["in", ["Approved", "Locked for Production"]],
 		"plan_date": getdate(),
 	}
