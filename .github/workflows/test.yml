@@ -62,12 +62,23 @@ jobs:
           bench new-site test_site --admin-password=admin --mariadb-root-password=root
           bench --site test_site install-app erpnext
           bench --site test_site install-app ury
-          # A fresh site's install-app doesn't run every patch in order before
-          # test fixtures start inserting records (e.g. erpnext's default
-          # Company setup creates a "Goods In Transit" warehouse referencing a
-          # "Transit" Warehouse Type that a v13 patch creates) -- migrate to
-          # make sure all patches have actually run before tests start.
           bench --site test_site migrate
+          # erpnext's default Company setup (triggered by test fixture
+          # records) creates a "Goods In Transit" warehouse referencing a
+          # "Transit" Warehouse Type -- but that record is normally seeded by
+          # erpnext's setup wizard (install_fixtures.install()), which never
+          # runs on a bare install-app with no company/country selected.
+          # Create just the one record tests actually need rather than
+          # running the full wizard (which has broader side effects and
+          # expects a country/currency/company already chosen).
+          bench --site test_site console <<'PYEOF'
+          import frappe
+          if not frappe.db.exists("Warehouse Type", "Transit"):
+              frappe.get_doc({"doctype": "Warehouse Type", "name": "Transit"}).insert(ignore_permissions=True)
+              frappe.db.commit()
+          exit()
+          y
+          PYEOF
 
       - name: Run backend tests
         run: |
