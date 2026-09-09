@@ -48,9 +48,9 @@ class TestGetAgentName(FrappeTestCase):
 		result = ury_chat._get_agent_name()
 		self.assertEqual(result, ury_chat.DEFAULT_URY_HUF_AGENT_NAME)
 
-	@patch("frappe.conf.get")
-	def test_custom_name_from_config(self, mock_conf_get):
-		mock_conf_get.return_value = "Custom Agent"
+	@patch("frappe.conf", new_callable=MagicMock)
+	def test_custom_name_from_config(self, mock_conf):
+		mock_conf.get.return_value = "Custom Agent"
 		result = ury_chat._get_agent_name()
 		self.assertEqual(result, "Custom Agent")
 
@@ -76,6 +76,14 @@ class TestConversationCacheKey(FrappeTestCase):
 
 class TestGetOrCreateConversation(FrappeTestCase):
 	"""Test conversation creation and retrieval with HUF."""
+
+	def setUp(self):
+		# _huf_unavailable() calls frappe.log_error(), which in this dev site's
+		# hook config throws AppNotInstalledError (erpnext) unrelated to the
+		# behavior under test -- patch it out globally for this class.
+		patcher = patch("frappe.log_error")
+		self.addCleanup(patcher.stop)
+		patcher.start()
 
 	@patch("ury.ury.api.ury_chat.require_manager")
 	@patch("frappe.get_installed_apps")
@@ -126,7 +134,7 @@ class TestGetOrCreateConversation(FrappeTestCase):
 		mock_cache.return_value = mock_cache_instance
 		mock_cache_instance.get_value.return_value = None
 		mock_db_exists.return_value = True
-		mock_db_get_value.return_value = {"disabled": 1, "provider": "OpenAI", "model": "gpt-4"}
+		mock_db_get_value.return_value = frappe._dict({"disabled": 1, "provider": "OpenAI", "model": "gpt-4"})
 
 		result = ury_chat.get_or_create_conversation()
 
@@ -153,7 +161,7 @@ class TestGetOrCreateConversation(FrappeTestCase):
 		mock_cache.return_value = mock_cache_instance
 		mock_cache_instance.get_value.return_value = None
 		mock_db_exists.return_value = True
-		mock_db_get_value.return_value = {"disabled": 0, "provider": None, "model": None}
+		mock_db_get_value.return_value = frappe._dict({"disabled": 0, "provider": None, "model": None})
 
 		result = ury_chat.get_or_create_conversation()
 
@@ -180,7 +188,7 @@ class TestGetOrCreateConversation(FrappeTestCase):
 		mock_cache.return_value = mock_cache_instance
 		mock_cache_instance.get_value.return_value = None
 		mock_db_exists.return_value = True
-		mock_db_get_value.return_value = {"disabled": 0, "provider": "OpenAI", "model": "gpt-4"}
+		mock_db_get_value.return_value = frappe._dict({"disabled": 0, "provider": "OpenAI", "model": "gpt-4"})
 		mock_agent_chat_module = MagicMock()
 		mock_agent_chat.return_value = mock_agent_chat_module
 		mock_agent_chat_module.create_conversation.return_value = {"conversation_id": "CONV-123"}
@@ -212,7 +220,7 @@ class TestGetOrCreateConversation(FrappeTestCase):
 		mock_cache.return_value = mock_cache_instance
 		mock_cache_instance.get_value.return_value = None
 		mock_db_exists.return_value = True
-		mock_db_get_value.return_value = {"disabled": 0, "provider": "OpenAI", "model": "gpt-4"}
+		mock_db_get_value.return_value = frappe._dict({"disabled": 0, "provider": "OpenAI", "model": "gpt-4"})
 		mock_agent_chat_module = MagicMock()
 		mock_agent_chat.return_value = mock_agent_chat_module
 		mock_agent_chat_module.create_conversation.return_value = {"name": "CONV-456"}
@@ -243,7 +251,7 @@ class TestGetOrCreateConversation(FrappeTestCase):
 		mock_cache.return_value = mock_cache_instance
 		mock_cache_instance.get_value.return_value = None
 		mock_db_exists.return_value = True
-		mock_db_get_value.return_value = {"disabled": 0, "provider": "OpenAI", "model": "gpt-4"}
+		mock_db_get_value.return_value = frappe._dict({"disabled": 0, "provider": "OpenAI", "model": "gpt-4"})
 		mock_agent_chat_module = MagicMock()
 		mock_agent_chat.return_value = mock_agent_chat_module
 		mock_agent_chat_module.create_conversation.return_value = "CONV-789"
@@ -274,7 +282,7 @@ class TestGetOrCreateConversation(FrappeTestCase):
 		mock_cache.return_value = mock_cache_instance
 		mock_cache_instance.get_value.return_value = None
 		mock_db_exists.return_value = True
-		mock_db_get_value.return_value = {"disabled": 0, "provider": "OpenAI", "model": "gpt-4"}
+		mock_db_get_value.return_value = frappe._dict({"disabled": 0, "provider": "OpenAI", "model": "gpt-4"})
 		mock_agent_chat_module = MagicMock()
 		mock_agent_chat.return_value = mock_agent_chat_module
 		mock_agent_chat_module.create_conversation.return_value = {}
@@ -294,8 +302,8 @@ class TestGetOrCreateConversation(FrappeTestCase):
 		self,
 		mock_installed_apps,
 		mock_db_exists,
-		mock_cache,
 		mock_db_get_value,
+		mock_cache,
 		mock_agent_chat,
 		mock_require_manager,
 	):
@@ -316,7 +324,6 @@ class TestGetOrCreateConversation(FrappeTestCase):
 		self.assertEqual(result["conversation_id"], "CACHED-CONV-123")
 		mock_agent_chat.assert_not_called()
 
-	@patch("frappe.log_error")
 	@patch("ury.ury.api.ury_chat.require_manager")
 	@patch("ury.ury.api.ury_chat._get_agent_chat_module")
 	@patch("frappe.cache")
@@ -327,11 +334,10 @@ class TestGetOrCreateConversation(FrappeTestCase):
 		self,
 		mock_installed_apps,
 		mock_db_exists,
-		mock_cache,
 		mock_db_get_value,
+		mock_cache,
 		mock_agent_chat,
 		mock_require_manager,
-		mock_log_error,
 	):
 		"""Should catch exceptions and return unavailable."""
 		mock_installed_apps.return_value = ["huf"]
@@ -339,7 +345,7 @@ class TestGetOrCreateConversation(FrappeTestCase):
 		mock_cache.return_value = mock_cache_instance
 		mock_cache_instance.get_value.return_value = None
 		mock_db_exists.return_value = True
-		mock_db_get_value.return_value = {"disabled": 0, "provider": "OpenAI", "model": "gpt-4"}
+		mock_db_get_value.return_value = frappe._dict({"disabled": 0, "provider": "OpenAI", "model": "gpt-4"})
 		mock_agent_chat_module = MagicMock()
 		mock_agent_chat.return_value = mock_agent_chat_module
 		mock_agent_chat_module.create_conversation.side_effect = Exception("HUF API error")
@@ -352,6 +358,11 @@ class TestGetOrCreateConversation(FrappeTestCase):
 
 class TestSendChatMessage(FrappeTestCase):
 	"""Test message sending to HUF conversations."""
+
+	def setUp(self):
+		patcher = patch("frappe.log_error")
+		self.addCleanup(patcher.stop)
+		patcher.start()
 
 	@patch("ury.ury.api.ury_chat.require_manager")
 	@patch("frappe.get_installed_apps")
@@ -417,12 +428,11 @@ class TestSendChatMessage(FrappeTestCase):
 		self.assertIn("[report_context]", sent_message)
 		self.assertIn("branch: Main", sent_message)
 
-	@patch("frappe.log_error")
 	@patch("ury.ury.api.ury_chat.require_manager")
 	@patch("ury.ury.api.ury_chat._get_agent_chat_module")
 	@patch("frappe.get_installed_apps")
 	def test_exception_handling(
-		self, mock_installed_apps, mock_agent_chat, mock_require_manager, mock_log_error
+		self, mock_installed_apps, mock_agent_chat, mock_require_manager
 	):
 		"""Should catch exceptions and return unavailable."""
 		mock_installed_apps.return_value = ["huf"]
@@ -437,6 +447,11 @@ class TestSendChatMessage(FrappeTestCase):
 
 
 class TestGetChatHistory(FrappeTestCase):
+	def setUp(self):
+		patcher = patch("frappe.log_error")
+		self.addCleanup(patcher.stop)
+		patcher.start()
+
 	"""Test chat history retrieval from HUF."""
 
 	@patch("ury.ury.api.ury_chat.require_manager")
@@ -521,12 +536,11 @@ class TestGetChatHistory(FrappeTestCase):
 		self.assertTrue(result["available"])
 		self.assertEqual(result["history"], [])
 
-	@patch("frappe.log_error")
 	@patch("ury.ury.api.ury_chat.require_manager")
 	@patch("ury.ury.api.ury_chat._get_agent_chat_module")
 	@patch("frappe.get_installed_apps")
 	def test_exception_handling(
-		self, mock_installed_apps, mock_agent_chat, mock_require_manager, mock_log_error
+		self, mock_installed_apps, mock_agent_chat, mock_require_manager
 	):
 		"""Should catch exceptions and return unavailable."""
 		mock_installed_apps.return_value = ["huf"]
