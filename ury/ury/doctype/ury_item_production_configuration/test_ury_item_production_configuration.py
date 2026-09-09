@@ -390,3 +390,115 @@ class TestURYItemProductionConfiguration(FrappeTestCase):
 
                 with self.assertRaises(frappe.ValidationError):
                     inserted.save(ignore_permissions=True)
+
+    def test_mto_with_same_department_bom_accepts(self):
+        """Same-department BOM components save fine."""
+        values = {
+            "Branch": "Branch Co",
+            ("BOM", "BOM-MTO-001"): ("MTO Item", "Branch Co"),
+            ("URY Production Department", "Dept-001"): ("Test Branch", "Branch Co"),
+        }
+
+        real_get_value = frappe.db.get_value
+
+        def fake_get_value(doctype, *args, **kwargs):
+            name = kwargs.get("filters", args[0] if args else None)
+            fieldname = kwargs.get("fieldname", args[1] if len(args) > 1 else "name")
+            cache = kwargs.get("cache", args[6] if len(args) > 6 else False)
+
+            if fieldname == "name" and cache and isinstance(name, str):
+                return name
+
+            if isinstance(name, Hashable):
+                key = (doctype, name) if isinstance(name, str) else name
+                if isinstance(key, tuple) and key in values:
+                    return values[key]
+            if doctype in values:
+                return values[doctype]
+            return real_get_value(doctype, *args, **kwargs)
+
+        with self._patch_link_checks():
+            with patch("frappe.db.get_value", side_effect=fake_get_value):
+                with patch("frappe.get_all") as mock_get_all:
+                    # BOM Explosion Item will return components
+                    def get_all_side_effect(doctype, *args, **kwargs):
+                        if doctype == "BOM Explosion Item":
+                            return [
+                                frappe._dict(item_code="Component A"),
+                                frappe._dict(item_code="Component B"),
+                            ]
+                        return []
+
+                    mock_get_all.side_effect = get_all_side_effect
+
+                    doc = self._make_doc(
+                        item="MTO Item",
+                        bom="BOM-MTO-001",
+                        department="Dept-001",
+                        production_policy="MADE_TO_ORDER",
+                    )
+
+                    # Should not raise
+                    doc.insert(ignore_permissions=True)
+
+    def test_mto_with_cross_department_bom_rejects(self):
+        """Cross-department BOM component is rejected."""
+        values = {
+            "Branch": "Branch Co",
+            ("BOM", "BOM-MTO-002"): ("MTO Item Cross", "Branch Co"),
+            ("URY Production Department", "Dept-001"): ("Test Branch", "Branch Co"),
+            ("URY Production Department", "Dept-002"): ("Test Branch", "Branch Co"),
+        }
+
+        real_get_value = frappe.db.get_value
+
+        def fake_get_value(doctype, *args, **kwargs):
+            name = kwargs.get("filters", args[0] if args else None)
+            fieldname = kwargs.get("fieldname", args[1] if len(args) > 1 else "name")
+            cache = kwargs.get("cache", args[6] if len(args) > 6 else False)
+
+            if fieldname == "name" and cache and isinstance(name, str):
+                return name
+
+            # Handle the IPC lookup for component
+            if isinstance(name, dict) and doctype == "URY Item Production Configuration":
+                item = name.get("item")
+                branch = name.get("branch")
+                active = name.get("active")
+                # Component A is in Dept-001, but we're checking from Dept-002
+                if item == "Component A" and branch == "Branch Co" and active == 1:
+                    return ("Dept-001",)
+
+            if isinstance(name, Hashable):
+                key = (doctype, name) if isinstance(name, str) else name
+                if isinstance(key, tuple) and key in values:
+                    return values[key]
+            if doctype in values:
+                return values[doctype]
+            return real_get_value(doctype, *args, **kwargs)
+
+        with self._patch_link_checks():
+            with patch("frappe.db.get_value", side_effect=fake_get_value):
+                with patch("frappe.get_all") as mock_get_all:
+                    # BOM Explosion Item returns Component A
+                    def get_all_side_effect(doctype, *args, **kwargs):
+                        if doctype == "BOM Explosion Item":
+                            return [frappe._dict(item_code="Component A")]
+                        return []
+
+                    mock_get_all.side_effect = get_all_side_effect
+
+                    doc = self._make_doc(
+                        item="MTO Item Cross",
+                        bom="BOM-MTO-002",
+                        department="Dept-002",
+                        production_policy="MADE_TO_ORDER",
+                    )
+
+                    with self.assertRaises(frappe.ValidationError) as context:
+                        doc.insert(ignore_permissions=True)
+
+                    # Verify error message mentions the component and departments
+                    self.assertIn("Component A", str(context.exception))
+                    self.assertIn("Dept-001", str(context.exception))
+                    self.assertIn("Dept-002", str(context.exception))

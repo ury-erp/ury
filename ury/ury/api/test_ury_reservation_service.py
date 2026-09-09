@@ -642,6 +642,187 @@ class TestReleaseFulfilCancel(FrappeTestCase):
         self.assertEqual(loaded_doc.status, FULFILLED)
 
 
+class TestRealtimeEventEmission(FrappeTestCase):
+	"""Tests for realtime event emissions on reservation create/release."""
+
+	def setUp(self):
+		# append_audit() calls frappe.utils.now(), which otherwise
+		# chains into get_system_settings() -> get_cached_doc("System
+		# Settings") -- a real DB/cache path these unit tests do not
+		# stub. Fix the clock instead of routing that lookup through
+		# the get_doc mocks below.
+		now_patcher = patch(f"{MODULE}.frappe.utils.now", return_value="2024-01-01 00:00:00")
+		now_patcher.start()
+		self.addCleanup(now_patcher.stop)
+
+	def test_create_reservation_emits_realtime_event_per_component(self):
+		"""create_reservation() emits one ury_component_stock_changed event per component_item."""
+		get_doc_side_effect, created = _new_doc_recorder()
+
+		def sql_side_effect(query, params, **kwargs):
+			item_code = params["item_code"]
+			bin_qty = {"FLOUR": 10, "SUGAR": 10}[item_code]
+			return [{"name": f"BIN-{item_code}", "actual_qty": bin_qty, "projected_qty": bin_qty}]
+
+		def get_all_side_effect(doctype, filters=None, fields=None, **kwargs):
+			if doctype == "BOM Item":
+				return [
+					frappe._dict(item_code="FLOUR", stock_qty=2, stock_uom="Kg", is_sub_assembly_item=0, bom_no=None),
+					frappe._dict(item_code="SUGAR", stock_qty=1, stock_uom="Kg", is_sub_assembly_item=0, bom_no=None),
+				]
+			return []
+
+		with patch(f"{MODULE}.frappe.has_permission", return_value=True), patch(
+			f"{MODULE}.frappe.db.sql", side_effect=sql_side_effect
+		), patch(
+			f"{MODULE}.frappe.db.get_value", return_value=None
+		), patch(
+			f"{MODULE}.frappe.get_all", side_effect=get_all_side_effect
+		), patch(
+			f"{MODULE}.frappe.get_doc", side_effect=get_doc_side_effect
+		), patch(
+			f"{MODULE}.frappe.generate_hash", return_value="GRP-REALTIME"
+		), patch(
+			f"{MODULE}.frappe.publish_realtime"
+		) as mock_publish:
+			create_reservation(
+				item_code="MENU-A",
+				qty=3,
+				warehouse="WH-1",
+				branch="Branch A",
+				company="Company A",
+				order_ref="ORDER-REALTIME",
+			)
+
+		# Should emit one event per component (FLOUR, SUGAR)
+		self.assertEqual(mock_publish.call_count, 2)
+
+		# Verify the events have the expected channel and payload
+		calls = mock_publish.call_args_list
+		channels = [call[0][0] for call in calls]
+		self.assertEqual(channels, ["ury_component_stock_changed", "ury_component_stock_changed"])
+
+		payloads = [call[0][1] for call in calls]
+		# Components are sorted by item_code, so FLOUR before SUGAR
+		self.assertEqual(payloads[0]["component_item"], "FLOUR")
+		self.assertEqual(payloads[0]["warehouse"], "WH-1")
+		self.assertEqual(payloads[0]["company"], "Company A")
+
+		self.assertEqual(payloads[1]["component_item"], "SUGAR")
+		self.assertEqual(payloads[1]["warehouse"], "WH-1")
+		self.assertEqual(payloads[1]["company"], "Company A")
+
+	def test_create_reservation_emits_single_event_for_simple_item(self):
+		"""create_reservation() emits one event for a simple (non-composite) item."""
+		get_doc_side_effect, created = _new_doc_recorder()
+
+		with patch(f"{MODULE}.frappe.has_permission", return_value=True), patch(
+			f"{MODULE}.frappe.db.sql",
+			return_value=[{"name": "BIN-1", "actual_qty": 10, "projected_qty": 10}],
+		), patch(f"{MODULE}.frappe.db.get_value", return_value=None), patch(
+			f"{MODULE}.frappe.get_all", return_value=[]
+		), patch(
+			f"{MODULE}.frappe.get_doc", side_effect=get_doc_side_effect
+		), patch(
+			f"{MODULE}.frappe.generate_hash", return_value="GRP-SIMPLE"
+		), patch(
+			f"{MODULE}.frappe.publish_realtime"
+		) as mock_publish:
+			create_reservation(
+				item_code="ITEM-SIMPLE",
+				qty=4,
+				warehouse="WH-1",
+				branch="Branch A",
+				company="Company A",
+				order_ref="ORDER-SIMPLE",
+			)
+
+		# Should emit one event for the item itself
+		mock_publish.assert_called_once()
+		call_args = mock_publish.call_args
+		self.assertEqual(call_args[0][0], "ury_component_stock_changed")
+		self.assertEqual(call_args[0][1]["component_item"], "ITEM-SIMPLE")
+		self.assertEqual(call_args[0][1]["warehouse"], "WH-1")
+		self.assertEqual(call_args[0][1]["company"], "Company A")
+
+	def test_release_reservation_emits_realtime_events(self):
+		"""release_reservation() emits one ury_component_stock_changed event per component_item."""
+		loaded_doc = frappe._dict({"name": "RES-1", "status": RESERVED, "audit_log": None})
+		loaded_doc.save = MagicMock()
+
+		def get_doc_dispatch(*args, **kwargs):
+			return loaded_doc
+
+		def get_all_side_effect(doctype, filters=None, fields=None, **kwargs):
+			if doctype == "URY Stock Reservation" and "status" in filters and filters["status"] == RELEASED:
+				# Return rows that were just transitioned to RELEASED
+				return []
+			elif doctype == "URY Stock Reservation" and "name" in filters:
+				# Return the row data for the released reservation
+				return [
+					frappe._dict({
+						"name": "RES-1",
+						"component_item": "COMPONENT-A",
+						"warehouse": "WH-1",
+						"company": "Company A",
+					}),
+				]
+			elif doctype == "URY Stock Reservation" and "reservation_group" in filters:
+				# Initial group lookup
+				return [frappe._dict({"name": "RES-1", "status": RESERVED, "reservation_group": "GRP-RELEASE"})]
+			return []
+
+		with patch(f"{MODULE}.frappe.db.get_value", return_value=None), patch(
+			f"{MODULE}.frappe.get_all", side_effect=get_all_side_effect
+		), patch(
+			f"{MODULE}.frappe.get_doc", side_effect=get_doc_dispatch
+		), patch(
+			f"{MODULE}.frappe.session"
+		) as mock_session, patch(
+			f"{MODULE}.frappe.publish_realtime"
+		) as mock_publish:
+			mock_session.user = "tester@example.com"
+			release_reservation("RES-1", reason="order cancelled")
+
+		# Should emit one event for the released component
+		mock_publish.assert_called_once()
+		call_args = mock_publish.call_args
+		self.assertEqual(call_args[0][0], "ury_component_stock_changed")
+		self.assertEqual(call_args[0][1]["component_item"], "COMPONENT-A")
+		self.assertEqual(call_args[0][1]["warehouse"], "WH-1")
+		self.assertEqual(call_args[0][1]["company"], "Company A")
+
+	def test_publish_realtime_failure_does_not_abort_reservation(self):
+		"""If frappe.publish_realtime raises, the reservation is still created and not rolled back."""
+		get_doc_side_effect, created = _new_doc_recorder()
+
+		with patch(f"{MODULE}.frappe.has_permission", return_value=True), patch(
+			f"{MODULE}.frappe.db.sql",
+			return_value=[{"name": "BIN-1", "actual_qty": 10, "projected_qty": 10}],
+		), patch(f"{MODULE}.frappe.db.get_value", return_value=None), patch(
+			f"{MODULE}.frappe.get_all", return_value=[]
+		), patch(
+			f"{MODULE}.frappe.get_doc", side_effect=get_doc_side_effect
+		), patch(
+			f"{MODULE}.frappe.generate_hash", return_value="GRP-FAIL"
+		), patch(
+			f"{MODULE}.frappe.publish_realtime", side_effect=Exception("socketio down")
+		):
+			# Should not raise, even though publish_realtime failed
+			result = create_reservation(
+				item_code="ITEM-TEST",
+				qty=1,
+				warehouse="WH-1",
+				branch="Branch A",
+				company="Company A",
+				order_ref="ORDER-FAIL",
+			)
+
+		# Reservation should still be created
+		self.assertEqual(result["reservation_group"], "GRP-FAIL")
+		self.assertEqual(len(created), 1)
+
+
 class TestConcurrency(FrappeTestCase):
     def setUp(self):
         # append_audit() calls frappe.utils.now(), which otherwise

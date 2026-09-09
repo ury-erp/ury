@@ -548,6 +548,33 @@ def process_posting_intent(intent_name):
 				intent.save(ignore_permissions=False)
 		with _service_mutation():
 			_fulfil_reservation_once(payload["reservation_group"])
+
+		# Emit realtime event for each distinct component_item in the stock entry.
+		# Wrap in try/except so a socketio failure never breaks the posting transaction.
+		seen = set()
+		for component in payload.get("components") or []:
+			component_item = component.get("item_code")
+			warehouse = component.get("s_warehouse")
+			if not component_item or not warehouse:
+				continue
+			key = (component_item, warehouse)
+			if key not in seen:
+				try:
+					frappe.publish_realtime(
+						"ury_component_stock_changed",
+						{
+							"component_item": component_item,
+							"warehouse": warehouse,
+							"company": payload.get("company"),
+						},
+					)
+				except Exception:
+					# Failure to publish is best-effort, fire-and-forget.
+					frappe.logger("ury_fulfilment_posting_service").exception(
+						"Failed to publish realtime event for component {0}".format(component_item)
+					)
+				seen.add(key)
+
 		fulfilment = _create_or_update_fulfilment(intent, payload, stock_entry)
 		intent.fulfilment_record = fulfilment
 		intent.erpnext_stock_entry = stock_entry

@@ -17,6 +17,7 @@ from ury.ury.api.ury_bom_compiler import (
     build_demand_vector,
     compile_bom_vector,
     compile_shared_component_index,
+    get_items_affected_by_component,
 )
 
 
@@ -294,6 +295,132 @@ class TestBuildDemandVector(unittest.TestCase):
             first = build_demand_vector(snapshot)
             second = build_demand_vector(snapshot)
             self.assertEqual(first, second)
+
+
+class TestGetItemsAffectedByComponent(unittest.TestCase):
+    @patch(f"{MOD}.frappe.get_all")
+    @patch(f"{MOD}.frappe.db.get_value")
+    def test_two_made_to_order_items_sharing_one_component_returns_both(
+        self, mock_get_value, mock_get_all
+    ):
+        def get_all_side_effect(doctype, filters=None, fields=None, pluck=None, **kwargs):
+            # First call: get MADE_TO_ORDER items from URY Item Production Configuration
+            if doctype == "URY Item Production Configuration":
+                return ["Burger", "Cheese Fries"]
+            # Subsequent calls: BOM explosion lookups
+            parent = filters.get("parent") if filters else None
+            if parent == "BOM-BURGER-001":
+                return [_row("Cheese Slice", 2), _row("Bun", 1)]
+            if parent == "BOM-FRIES-001":
+                return [_row("Cheese Slice", 1), _row("Potato", 3)]
+            return []
+
+        def get_value_side_effect(doctype, filters, field=None, **kwargs):
+            if filters.get("item") == "Burger":
+                return "BOM-BURGER-001"
+            if filters.get("item") == "Cheese Fries":
+                return "BOM-FRIES-001"
+            return None
+
+        mock_get_all.side_effect = get_all_side_effect
+        mock_get_value.side_effect = get_value_side_effect
+
+        result = get_items_affected_by_component("Cheese Slice", "Delhi Branch", "URY Co")
+
+        self.assertEqual(len(result), 2)
+        consumers = {row["top_level_item"]: row["qty_per_unit"] for row in result}
+        self.assertEqual(consumers["Burger"], 2)
+        self.assertEqual(consumers["Cheese Fries"], 1)
+
+    @patch(f"{MOD}.frappe.get_all")
+    @patch(f"{MOD}.frappe.db.get_value")
+    def test_component_used_by_single_made_to_order_item_returns_only_that_item(
+        self, mock_get_value, mock_get_all
+    ):
+        def get_all_side_effect(doctype, filters=None, fields=None, pluck=None, **kwargs):
+            if doctype == "URY Item Production Configuration":
+                return ["Burger"]
+            parent = filters.get("parent") if filters else None
+            if parent == "BOM-BURGER-001":
+                return [_row("Bun", 1), _row("Patty", 1)]
+            return []
+
+        def get_value_side_effect(doctype, filters, field=None, **kwargs):
+            if filters.get("item") == "Burger":
+                return "BOM-BURGER-001"
+            return None
+
+        mock_get_all.side_effect = get_all_side_effect
+        mock_get_value.side_effect = get_value_side_effect
+
+        result = get_items_affected_by_component("Bun", "Delhi Branch", "URY Co")
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["top_level_item"], "Burger")
+        self.assertEqual(result[0]["qty_per_unit"], 1)
+
+    @patch(f"{MOD}.frappe.get_all")
+    @patch(f"{MOD}.frappe.db.get_value")
+    def test_unused_component_returns_empty_list(self, mock_get_value, mock_get_all):
+        def get_all_side_effect(doctype, filters=None, fields=None, pluck=None, **kwargs):
+            if doctype == "URY Item Production Configuration":
+                return ["Burger"]
+            parent = filters.get("parent") if filters else None
+            if parent == "BOM-BURGER-001":
+                return [_row("Bun", 1), _row("Patty", 1)]
+            return []
+
+        def get_value_side_effect(doctype, filters, field=None, **kwargs):
+            if filters.get("item") == "Burger":
+                return "BOM-BURGER-001"
+            return None
+
+        mock_get_all.side_effect = get_all_side_effect
+        mock_get_value.side_effect = get_value_side_effect
+
+        result = get_items_affected_by_component("Unused Component", "Delhi Branch", "URY Co")
+
+        self.assertEqual(result, [])
+
+    @patch(f"{MOD}.frappe.get_all")
+    def test_no_made_to_order_items_returns_empty_list(self, mock_get_all):
+        def get_all_side_effect(doctype, filters=None, fields=None, pluck=None, **kwargs):
+            if doctype == "URY Item Production Configuration":
+                return []
+            return []
+
+        mock_get_all.side_effect = get_all_side_effect
+
+        result = get_items_affected_by_component("Cheese Slice", "Delhi Branch", "URY Co")
+
+        self.assertEqual(result, [])
+
+    @patch(f"{MOD}.frappe.throw")
+    def test_missing_component_item_raises_validation_error(self, mock_throw):
+        mock_throw.side_effect = frappe.ValidationError
+
+        with self.assertRaises(frappe.ValidationError):
+            get_items_affected_by_component("", "Delhi Branch", "URY Co")
+
+        mock_throw.assert_called()
+
+    @patch(f"{MOD}.frappe.throw")
+    def test_missing_branch_raises_validation_error(self, mock_throw):
+        mock_throw.side_effect = frappe.ValidationError
+
+        with self.assertRaises(frappe.ValidationError):
+            get_items_affected_by_component("Cheese Slice", "", "URY Co")
+
+        mock_throw.assert_called()
+
+    @patch(f"{MOD}.frappe.throw")
+    def test_missing_company_raises_validation_error(self, mock_throw):
+        mock_throw.side_effect = frappe.ValidationError
+
+        with self.assertRaises(frappe.ValidationError):
+            get_items_affected_by_component("Cheese Slice", "Delhi Branch", "")
+
+        mock_throw.assert_called()
 
 
 if __name__ == "__main__":
