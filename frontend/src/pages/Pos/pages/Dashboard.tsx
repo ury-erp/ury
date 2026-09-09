@@ -621,10 +621,10 @@ export default function Dashboard() {
           title="Service Line"
           meta={
             overCount > 0 ? (
-              <span className="inline-flex h-[19px] items-center gap-[5px] rounded-[5px] bg-destructive-tint px-[7px] text-[11px] font-semibold text-destructive">
+              <Badge size="tag" variant="tagDestructive" className="gap-[5px]">
                 <span className="h-[5px] w-[5px] shrink-0 rounded-full bg-current" />
                 <span className="font-mono tabular-nums">{overCount}</span> over time
-              </span>
+              </Badge>
             ) : serviceLine.length > 0 ? (
               `${serviceLine.length} tables tracked`
             ) : undefined
@@ -644,20 +644,24 @@ export default function Dashboard() {
                 "4 fired, 1 over" without decoding a bar chart.
               */}
               <div className="mb-[14px] flex flex-wrap gap-1.5">
-                {stageCounts.map((stage) => (
-                  <span
-                    key={stage.key}
-                    className={cn(
-                      'inline-flex h-[19px] items-center gap-[5px] rounded-[5px] px-[7px] text-[11px] font-medium',
-                      stage.chip,
-                      stage.count === 0 && 'opacity-45'
-                    )}
-                  >
-                    <span className={cn('h-[5px] w-[5px] shrink-0 rounded-full', stage.dot)} />
-                    {stage.label}
-                    <span className="font-mono tabular-nums font-semibold">{stage.count}</span>
-                  </span>
-                ))}
+                {stageCounts.map((stage) => {
+                  const stageVariant: 'default' | 'tagAccent' | 'tagDestructive' =
+                    stage.key === 'over' ? 'tagDestructive' :
+                    stage.key === 'open' ? 'default' :
+                    'tagAccent';
+                  return (
+                    <Badge
+                      key={stage.key}
+                      size="tag"
+                      variant={stageVariant}
+                      className={stage.count === 0 ? 'opacity-45' : ''}
+                    >
+                      <span className={cn('h-[5px] w-[5px] shrink-0 rounded-full', stage.dot)} />
+                      {stage.label}
+                      <span className="font-mono tabular-nums font-semibold">{stage.count}</span>
+                    </Badge>
+                  );
+                })}
               </div>
 
               {/* Bars */}
@@ -780,16 +784,13 @@ export default function Dashboard() {
                       <div key={idx}>
                         <div className="mb-1.5 flex items-center justify-between gap-2">
                           <span className="truncate text-sm font-medium text-foreground">{item.item_name}</span>
-                          <span
-                            className={cn(
-                              'inline-flex h-[19px] shrink-0 items-center rounded-[5px] px-[7px] font-mono text-[11px] font-semibold tabular-nums',
-                              critical
-                                ? 'bg-destructive-tint text-destructive'
-                                : 'bg-warning-50 text-warning-700'
-                            )}
+                          <Badge
+                            size="tag"
+                            variant={critical ? 'tagDestructive' : 'tagWarning'}
+                            className="shrink-0 font-mono tabular-nums"
                           >
                             {formatETA(item.eta_minutes)}
-                          </span>
+                          </Badge>
                         </div>
                         <div className="h-1 w-full overflow-hidden rounded-[3px] bg-hair">
                           <div

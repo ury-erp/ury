@@ -49,6 +49,15 @@ function isSplitBill(order: Pick<POSInvoice, 'split_total' | 'custom_split_group
   );
 }
 
+function LinkTag({ icon: Icon, children }: { icon: React.ComponentType<{ className?: string }>; children: React.ReactNode }) {
+  return (
+    <Badge size="tag" variant="tagAccent">
+      <Icon className="h-2.5 w-2.5" />
+      {children}
+    </Badge>
+  );
+}
+
 export default function Orders() {
   const { 
     orders,
@@ -406,29 +415,17 @@ export default function Orders() {
                         {order.name}
                       </h3>
                       <div className="flex shrink-0 items-center gap-1">
-                        {mergedBill && (
-                          <Badge
-                            variant="outline"
-                            className="shrink-0 gap-1 border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-50"
-                          >
-                            <GitMerge className="h-3 w-3" />
-                            {t('bill_merge.merged_bill')}
-                          </Badge>
-                        )}
+                        {mergedBill && <LinkTag icon={GitMerge}>{t('bill_merge.merged_bill')}</LinkTag>}
                         {splitBill && (
-                        <Badge
-                          variant="outline"
-                          className="shrink-0 gap-1 border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-50"
-                        >
-                          <GitBranch className="h-3 w-3" />
-                          {(order.split_total ?? 0) >= 2
-                            ? t('bill_split.split_indicator', {
-                                index: order.split_index ?? 0,
-                                total: order.split_total ?? 0,
-                              })
-                            : t('bill_split.split_bill')}
-                        </Badge>
-                      )}
+                          <LinkTag icon={GitBranch}>
+                            {(order.split_total ?? 0) >= 2
+                              ? t('bill_split.split_indicator', {
+                                  index: order.split_index ?? 0,
+                                  total: order.split_total ?? 0,
+                                })
+                              : t('bill_split.split_bill')}
+                          </LinkTag>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center justify-between gap-2">
@@ -581,27 +578,19 @@ export default function Orders() {
                 isMergedBill(selectedOrder)) && (
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   {(selectedOrder.split_total ?? 0) >= 2 || isSplitBill(selectedOrder) ? (
-                    <Badge
-                      variant="outline"
-                      className="gap-1 border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-50"
-                    >
-                      <GitBranch className="h-3 w-3" />
+                    <LinkTag icon={GitBranch}>
                       {(selectedOrder.split_total ?? 0) >= 2
                         ? t('bill_split.split_indicator', {
                             index: selectedOrder.split_index ?? 0,
                             total: selectedOrder.split_total ?? 0,
                           })
                         : t('bill_split.split_bill')}
-                    </Badge>
+                    </LinkTag>
                   ) : null}
                   {isMergedBill(selectedOrder) ? (
-                    <Badge
-                      variant="outline"
-                      className="gap-1 border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-50"
-                    >
-                      <GitMerge className="h-3 w-3" />
+                    <LinkTag icon={GitMerge}>
                       {t('bill_merge.merged_bill')}
-                    </Badge>
+                    </LinkTag>
                   ) : null}
                 </div>
               )}
