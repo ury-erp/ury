@@ -7,7 +7,7 @@ interface TableReservationTimelineProps {
   tables?: Table[];
   reservations: TableReservation[];
   selectedDate: Date;
-  onSelectReservation: (res: TableReservation) => void;
+  onSelectReservation?: (res: TableReservation) => void;
   loading?: boolean;
 }
 
@@ -297,7 +297,7 @@ export default function TableReservationTimeline({
                   key={res.name}
                   onMouseEnter={() => setHoveredId(res.name)}
                   onMouseLeave={() => setHoveredId(null)}
-                  onClick={() => onSelectReservation(res)}
+                  onClick={onSelectReservation ? () => onSelectReservation!(res) : undefined}
                   style={{
                     left: `${item.leftPx}px`,
                     top: `${item.topPx}px`,
@@ -305,7 +305,9 @@ export default function TableReservationTimeline({
                     height: `${CARD_HEIGHT}px`,
                     zIndex: isHovered ? 40 : 10,
                   }}
-                  className={`absolute rounded-lg border p-2 flex flex-col justify-between overflow-hidden cursor-pointer transition-all duration-150 select-none ${isHovered
+                  className={`absolute rounded-lg border p-2 flex flex-col justify-between overflow-hidden transition-all duration-150 select-none ${
+                    onSelectReservation ? 'cursor-pointer' : 'cursor-default'
+                  } ${isHovered
                       ? `shadow-xl scale-[1.01] ${getStatusHoverRingClass(res.status)}`
                       : 'shadow-2xs hover:shadow-md'
                     } ${getStatusColorClasses(res.status)}`}

@@ -2,7 +2,6 @@ import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import {
   BookLock,
   CalendarClock,
-  CalendarRange,
   CheckCircle,
   ChevronLeft,
   ChevronRight,
@@ -519,7 +518,7 @@ export default function Reservations() {
                   : 'text-gray-500 hover:text-gray-900'
               }`}
             >
-              <CalendarRange className="w-4 h-4" />
+              <CalendarClock className="w-4 h-4" />
             </button>
           </div>
         </div>
@@ -536,7 +535,6 @@ export default function Reservations() {
           <TableReservationTimeline
             reservations={filteredReservations}
             selectedDate={selectedDate}
-            onSelectReservation={handleOpenEdit}
             loading={loading}
           />
         ) : loading ? (
