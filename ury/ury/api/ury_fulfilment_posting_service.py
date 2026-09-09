@@ -420,11 +420,29 @@ def _payload(intent):
 
 
 def _find_existing_stock_entry(intent_name):
-	rows = frappe.get_all(
-		"Stock Entry",
-		filters={"docstatus": 1, "remarks": ["like", f"%URY Fulfilment Posting Intent: {intent_name}%"]},
-		fields=["name"],
-		limit=1,
+	"""Locking existence check for a Stock Entry already posted for `intent_name`.
+
+	Called from `_submit_stock_entry`, which runs after `_claim_intent` has
+	taken `FOR UPDATE` on the posting intent row. A plain `get_all` here is a
+	different table, so it is not covered by that lock at all -- under
+	MariaDB REPEATABLE READ it is served from this transaction's consistent
+	read view, which can predate a Stock Entry another worker committed for
+	the same intent moments ago. Missing it here means submitting a second
+	Stock Entry for the same intent, i.e. a duplicate stock issue.
+	`FOR UPDATE` forces this SELECT to read (and lock) the latest committed
+	rows instead, on this request's own connection/transaction.
+	"""
+	rows = frappe.db.sql(
+		"""
+		SELECT name
+		FROM `tabStock Entry`
+		WHERE docstatus = 1 AND remarks LIKE %(remarks)s
+		ORDER BY creation DESC
+		LIMIT 1
+		FOR UPDATE
+		""",
+		{"remarks": f"%URY Fulfilment Posting Intent: {intent_name}%"},
+		as_dict=True,
 	)
 	return rows[0].get("name") if rows else None
 
@@ -465,10 +483,25 @@ def _submit_stock_entry(intent, payload):
 
 
 def _reservation_is_fulfilled(reservation_group):
-	rows = frappe.get_all(
-		RESERVATION_DOCTYPE,
-		filters={"reservation_group": reservation_group},
-		fields=["status"],
+	"""Locking check for whether every row in `reservation_group` is already
+	FULFILLED, used to decide whether `fulfil_reservation` still needs to run.
+
+	Runs after `_claim_intent` locked the posting intent row, but this reads
+	a different table (`URY Stock Reservation`) that lock does not cover. A
+	plain `get_all` can be served from this transaction's pinned consistent
+	read view and miss a concurrent worker's already-committed fulfilment,
+	risking a duplicate `fulfil_reservation` call. `FOR UPDATE` forces a read
+	of (and lock on) the latest committed rows on this same connection.
+	"""
+	rows = frappe.db.sql(
+		f"""
+		SELECT status
+		FROM `tab{RESERVATION_DOCTYPE}`
+		WHERE reservation_group = %(reservation_group)s
+		FOR UPDATE
+		""",
+		{"reservation_group": reservation_group},
+		as_dict=True,
 	)
 	return bool(rows) and all(row.get("status") == FULFILLED for row in rows)
 
@@ -478,12 +511,36 @@ def _fulfil_reservation_once(reservation_group):
 		fulfil_reservation(reservation_group)
 
 
-def _create_or_update_fulfilment(intent, payload, stock_entry):
-	existing = intent.get("fulfilment_record") or frappe.db.get_value(
-		FULFILMENT_DOCTYPE,
-		{"kot": payload["kot"], "item_code": payload["item_code"], "batch_key": payload["idempotency_key"]},
-		"name",
+def _find_existing_fulfilment(payload):
+	"""Locking existence check for an already-created URY Fulfilment Record,
+	for the same reason as `_find_existing_stock_entry`: this table is not
+	covered by `_claim_intent`'s lock on the posting intent row, so a plain
+	`get_value` here can be served from this transaction's pinned consistent
+	read view and miss a concurrent worker's already-committed record,
+	risking a duplicate fulfilment record instead of updating the existing
+	one.
+	"""
+	rows = frappe.db.sql(
+		f"""
+		SELECT name
+		FROM `tab{FULFILMENT_DOCTYPE}`
+		WHERE kot = %(kot)s AND item_code = %(item_code)s AND batch_key = %(batch_key)s
+		ORDER BY creation DESC
+		LIMIT 1
+		FOR UPDATE
+		""",
+		{
+			"kot": payload["kot"],
+			"item_code": payload["item_code"],
+			"batch_key": payload["idempotency_key"],
+		},
+		as_dict=True,
 	)
+	return rows[0]["name"] if rows else None
+
+
+def _create_or_update_fulfilment(intent, payload, stock_entry):
+	existing = intent.get("fulfilment_record") or _find_existing_fulfilment(payload)
 	if existing:
 		doc = frappe.get_doc(FULFILMENT_DOCTYPE, existing)
 	else:
