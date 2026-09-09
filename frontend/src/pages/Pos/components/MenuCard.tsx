@@ -1,4 +1,4 @@
-import { FC, useCallback, useEffect, useState } from 'react';
+import { FC, useCallback, useEffect, useRef, useState } from 'react';
 import { cn, Badge } from '@ury/ui';
 import { formatCurrency } from '@ury/core';
 import {
@@ -34,6 +34,10 @@ const MenuCard: FC<MenuCardProps> = ({
   company,
 }) => {
   const [availability, setAvailability] = useState<ItemAvailability | null>(null);
+  // Timestamp (ms) of the last successful availability refresh, from any
+  // source (mount fetch, I1 realtime event, or an I2 poll tick). The I2
+  // poll below reads this to decide whether a tick is redundant.
+  const lastRefreshedAtRef = useRef<number>(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -43,7 +47,10 @@ const MenuCard: FC<MenuCardProps> = ({
     }
     getItemAvailability({ item_code: item, branch, company })
       .then((result) => {
-        if (!cancelled) setAvailability(result);
+        if (!cancelled) {
+          setAvailability(result);
+          lastRefreshedAtRef.current = Date.now();
+        }
       })
       .catch(() => {
         // Display-only lookup — a failed check must never block the menu
@@ -63,7 +70,10 @@ const MenuCard: FC<MenuCardProps> = ({
   const refetchAvailability = useCallback(() => {
     if (!branch || !company || !item) return;
     getItemAvailability({ item_code: item, branch, company }, { skipCache: true })
-      .then((result) => setAvailability(result))
+      .then((result) => {
+        setAvailability(result);
+        lastRefreshedAtRef.current = Date.now();
+      })
       .catch(() => {
         // Same soft-fail contract as the mount-time fetch above.
       });
@@ -74,6 +84,32 @@ const MenuCard: FC<MenuCardProps> = ({
       refetchAvailability();
     }
   });
+
+  // I2: TTL fallback poll — independent of I1's realtime subscription ever
+  // connecting. Ticks every POLL_INTERVAL_MS; on each tick it only
+  // re-fetches if at least POLL_INTERVAL_MS has elapsed since the last
+  // successful refresh (mount, an I1 event, or a previous poll tick), so a
+  // recent realtime-driven refresh resets the poll clock and this doesn't
+  // fight I1's traffic when realtime is healthy. This effect does not read
+  // or depend on any state from useMenuAvailabilityChannel — it works
+  // unchanged even if that hook/subscription were deleted entirely.
+  useEffect(() => {
+    if (!branch || !company || !item) return;
+    const POLL_INTERVAL_MS = 45_000;
+    const intervalId = setInterval(() => {
+      const elapsed = Date.now() - lastRefreshedAtRef.current;
+      if (elapsed < POLL_INTERVAL_MS) return;
+      getItemAvailability({ item_code: item, branch, company }, { skipCache: true })
+        .then((result) => {
+          setAvailability(result);
+          lastRefreshedAtRef.current = Date.now();
+        })
+        .catch(() => {
+          // Same soft-fail contract as the other fetches above.
+        });
+    }, POLL_INTERVAL_MS);
+    return () => clearInterval(intervalId);
+  }, [item, branch, company]);
 
   const isUnavailable = !!availability && (!availability.sellable || availability.available_qty <= 0);
   const isDisabled = disabled || isUnavailable;
