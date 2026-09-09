@@ -76,6 +76,11 @@ the behavior this documents.
 import frappe
 from frappe.utils import now_datetime
 
+from ury.ury.api.ury_reservation_service import (
+	ACTIVE_STATUSES,
+	RESERVATION_DOCTYPE,
+)
+
 
 BIN_DOCTYPE = "Bin"
 
@@ -83,17 +88,26 @@ BIN_DOCTYPE = "Bin"
 def active_ury_reservation_qty(item_code, warehouse, company):
 	"""Return active URY reservation qty for `item_code`/`warehouse`/`company`.
 
-	STUB: V3-43 has not yet built the reservation doctype/state machine
-	described in V3-40 (Reserved/Fulfilled/Released/Expired/Cancelled). This
-	function always returns 0 until V3-43 lands; see the module docstring's
-	"Reservation stub" section for what V3-43 needs to change here (and
-	nowhere else in this module).
-
-	`company` is accepted (not just item_code/warehouse) because V3-40 scopes
-	reservations by branch/company/warehouse/item/policy/order, so the real
-	implementation will need it even though the stub ignores it.
+	V3-43's reservation doctype/state machine (`URY Stock Reservation`,
+	Reserved/Fulfilled/Released/Expired/Cancelled) is now live, and
+	`ury_order_reservation_service`/`ury_reservation_service` write real rows
+	against it. This sums `qty` for rows in an "active" state
+	(`ACTIVE_STATUSES`, i.e. not yet Released/Expired/Cancelled/Fulfilled),
+	scoped to this item/warehouse/company, matching the field names and scope
+	filters `ury_reservation_service._active_reservation_qty` already uses for
+	the same doctype.
 	"""
-	return 0
+	rows = frappe.get_all(
+		RESERVATION_DOCTYPE,
+		filters={
+			"component_item": item_code,
+			"warehouse": warehouse,
+			"company": company,
+			"status": ["in", list(ACTIVE_STATUSES)],
+		},
+		fields=["qty"],
+	)
+	return sum(row.get("qty") or 0 for row in rows)
 
 
 def get_allocatable_qty(item_code, warehouse, company):

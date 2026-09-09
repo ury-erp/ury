@@ -113,6 +113,14 @@ def generate_qr_token(profile, table=None):
     if not frappe.has_permission("URY Self Ordering Profile", "write", frappe.get_doc("URY Self Ordering Profile", profile)):
         frappe.throw(_("Not permitted"), frappe.PermissionError)
 
+    if table:
+        if not frappe.db.exists("URY Table", table):
+            frappe.throw(_("Invalid table"), frappe.ValidationError)
+        table_branch = frappe.db.get_value("URY Table", table, "branch")
+        profile_branch = frappe.db.get_value("URY Self Ordering Profile", profile, "branch")
+        if table_branch != profile_branch:
+            frappe.throw(_("Table does not belong to this restaurant"), frappe.ValidationError)
+
     secret = _get_profile_secret(profile)
     payload = f"{profile}|{table or 'PICKUP'}"
     signature = _sign(payload, secret)
@@ -145,6 +153,12 @@ def _verify_qr_token(token):
     if not profile_doc.enable_qr_table_ordering:
         frappe.throw(_("Table ordering is not enabled"), frappe.ValidationError)
     if not frappe.db.exists("URY Table", table):
+        frappe.throw(_("Invalid table"), frappe.ValidationError)
+    # Same branch-membership check the device (kiosk/tablet) path enforces
+    # in assign_device_table() -- a QR token must not be honored for a table
+    # that doesn't belong to the token's own ordering profile's branch.
+    table_branch = frappe.db.get_value("URY Table", table, "branch")
+    if table_branch != profile_doc.branch:
         frappe.throw(_("Invalid table"), frappe.ValidationError)
     return profile_doc, table, "QR Table"
 
@@ -394,14 +408,6 @@ def get_customer_product(session, item_code):
     profile = frappe.get_doc("URY Self Ordering Profile", session.ordering_profile)
 
     with _elevated():
-        item = frappe.db.get_value(
-            "Item", item_code,
-            ["item_code", "item_name", "description", "image"],
-            as_dict=True,
-        )
-        if not item:
-            frappe.throw(_("Item not found"), frappe.DoesNotExistError)
-
         # Resolve the same price list add_customer_items()/price_items_for_invoice()
         # would end up using for this session, so variant/add-on rates aren't
         # null: resolve_restaurant_menu() picks the active menu the same way
@@ -413,6 +419,22 @@ def get_customer_product(session, item_code):
         order_type = "Dine In" if session.table else "Take Away"
         branch = frappe.db.get_value("URY Self Ordering Profile", session.ordering_profile, "branch")
         menu = resolve_restaurant_menu(branch=branch, room=None, order_type=order_type, cashier=False)
+
+        # U12: a guest session must only be able to fetch metadata for an
+        # Item that's actually on its active menu -- not any arbitrary Item
+        # in the system.
+        menu_item_codes = {row.get("item") for row in (menu.get("items") or [])}
+        if item_code not in menu_item_codes:
+            frappe.throw(_("Item not found"), frappe.DoesNotExistError)
+
+        item = frappe.db.get_value(
+            "Item", item_code,
+            ["item_code", "item_name", "description", "image"],
+            as_dict=True,
+        )
+        if not item:
+            frappe.throw(_("Item not found"), frappe.DoesNotExistError)
+
         price_list = frappe.db.get_value(
             "Price List", {"restaurant_menu": menu["name"], "enabled": 1}, "name"
         )

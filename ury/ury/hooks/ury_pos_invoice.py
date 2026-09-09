@@ -588,6 +588,31 @@ def sync_merged_invoice(doc):
             frappe.get_traceback(),
             "Merged Invoice Sync Failed"
         )
+        # Don't re-raise: this is an on_update/on_submit hook, and other
+        # linked-record sync hooks in this module (e.g.
+        # release_merged_tables) deliberately swallow failures so a
+        # secondary sync problem can't block the primary POS Invoice's own
+        # save/submit. Still make sure operators are notified, since the
+        # success publish_realtime above never fires on this path.
+        #
+        # linked_invoice is assigned before this try block starts, so it is
+        # always bound here. The publish_realtime call is still wrapped in
+        # its own try/except so a failure in this visibility notification
+        # itself (e.g. the realtime transport being unavailable) can never
+        # raise out of this except handler and mask the original error.
+        try:
+            frappe.publish_realtime(
+                "pos_invoice_sync_failed",
+                {
+                    "name": doc.name,
+                    "linked_invoice": linked_invoice,
+                }
+            )
+        except Exception:
+            frappe.log_error(
+                frappe.get_traceback(),
+                "Merged Invoice Sync Failure Notification Failed"
+            )
 
     finally:
         frappe.flags.in_bill_merge_sync = False

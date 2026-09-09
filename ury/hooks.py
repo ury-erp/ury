@@ -52,7 +52,7 @@ app_include_js = [
 page_js = {"point-of-sale": ["public/js/pos_extend.js"]}
 
 # include js in doctype views
-doctype_js = {"POS Closing Entry": "public/js/pos_closing_entry_clock_integrity.js"}
+doctype_js = {"POS Closing Entry": "ury/public/js/pos_closing_entry_clock_integrity.js"}
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
@@ -248,10 +248,7 @@ scheduler_events = {
 		"*/5 * * * *":[
 			"ury.ury.services.food_cost_alerts.notify_high_food_cost"
 		]
-	},
-	"daily": [
-		"ury.ury.dev_seed.demo_runner.seed_all"
-	]
+	}
 # 	"all": [
 # 		"ury.tasks.all"
 # 	],
@@ -265,6 +262,12 @@ scheduler_events = {
 # 		"ury.tasks.monthly"
 # 	],
 }
+
+# Demo seeding is a deliberate, on-demand action only (bench command below) —
+# it must never run automatically via the scheduler.
+commands = [
+	"ury.commands.seed_demo_data",
+]
 
 # Testing
 # -------

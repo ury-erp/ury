@@ -261,12 +261,15 @@ def seed_kot_item_executions_on_submit(doc, method=None):
 		raise
 
 
-def _transition(kot_item, target_state, idempotency_key, actor, actor_field, timestamp_field, event):
+def _transition(kot_item, target_state, idempotency_key, actor_field, timestamp_field, event):
 	_require_item_execution_doctype()
 	_require_kot_item(kot_item)
 	if not idempotency_key:
 		raise ItemExecutionError(INVALID_EXECUTION_TRANSITION, _("idempotency_key is required"))
-	actor = actor or frappe.session.user
+	# The actor is always the authenticated session user. Callers cannot
+	# supply an actor value, which would otherwise allow false audit
+	# attribution or an authorization bypass via a spoofed identity.
+	actor = frappe.session.user
 	kot = _kot_for_item(kot_item)
 	if kot:
 		branch, company, _production_unit = _kot_scope(kot)
@@ -295,20 +298,20 @@ def _transition(kot_item, target_state, idempotency_key, actor, actor_field, tim
 
 
 @frappe.whitelist()
-def start_item_execution(kot_item, idempotency_key, actor=None):
-	return _transition(kot_item, IN_PREPARATION, idempotency_key, actor, "started_by", "started_at", "start")
+def start_item_execution(kot_item, idempotency_key):
+	return _transition(kot_item, IN_PREPARATION, idempotency_key, "started_by", "started_at", "start")
 
 
 @frappe.whitelist()
-def mark_item_ready(kot_item, idempotency_key, actor=None):
-	actor = actor or frappe.session.user
+def mark_item_ready(kot_item, idempotency_key):
+	actor = frappe.session.user
 	# READY is not a valid durable state without a corresponding posting
 	# intent. Keep both writes inside one savepoint so missing reservations,
 	# migration drift, or enqueue failures cannot leave the item READY alone.
 	savepoint = "ury_ready_posting_intent"
 	frappe.db.savepoint(savepoint)
 	try:
-		result = _transition(kot_item, READY, idempotency_key, actor, "ready_by", "ready_at", "mark_ready")
+		result = _transition(kot_item, READY, idempotency_key, "ready_by", "ready_at", "mark_ready")
 		return _attach_ready_posting_intent(result, actor)
 	except Exception:
 		frappe.db.rollback(save_point=savepoint)
@@ -316,8 +319,8 @@ def mark_item_ready(kot_item, idempotency_key, actor=None):
 
 
 @frappe.whitelist()
-def serve_item_execution(kot_item, idempotency_key, actor=None):
-	return _transition(kot_item, SERVED, idempotency_key, actor, "served_by", "served_at", "serve")
+def serve_item_execution(kot_item, idempotency_key):
+	return _transition(kot_item, SERVED, idempotency_key, "served_by", "served_at", "serve")
 
 
 def get_kot_execution_state(kot):

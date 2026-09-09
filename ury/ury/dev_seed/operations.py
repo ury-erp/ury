@@ -125,7 +125,18 @@ def _get_branch():
 	return branch_name
 
 
-def _get_company():
+def _get_company(branch_name=None):
+	"""Resolve the company for seeding. Prefers the given branch's own
+	`company` field -- picking an arbitrary Company row on the site (the
+	previous behavior) silently mismatches multi-company sites and produces
+	department/production-unit/config rows scoped to the wrong company,
+	which then fail URYItemProductionConfiguration's company-ownership
+	validation.
+	"""
+	if branch_name:
+		branch_company = frappe.db.get_value("Branch", branch_name, "company")
+		if branch_company:
+			return branch_company
 	company_name = frappe.db.get_value("Company", {}, "name")
 	if not company_name:
 		frappe.throw("No Company found on this site — cannot seed operations demo data.")
@@ -562,7 +573,7 @@ def seed():
 	``bench execute ury.ury.dev_seed.operations.seed``.
 	"""
 	branch_name = _get_branch()
-	company_name = _get_company()
+	company_name = _get_company(branch_name)
 	warehouse = _get_default_warehouse(company_name)
 	cost_center = _get_default_cost_center(company_name)
 

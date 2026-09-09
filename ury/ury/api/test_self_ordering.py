@@ -34,10 +34,11 @@ MOD = "ury.ury.api.self_ordering"
 
 
 class TestQRTokenRoundtrip(unittest.TestCase):
+    @patch(f"{MOD}.frappe.db.get_value")
     @patch(f"{MOD}.frappe.db.exists")
     @patch(f"{MOD}.frappe.get_doc")
     @patch(f"{MOD}._get_profile_secret")
-    def test_verify_qr_token_valid_table_token(self, mock_secret, mock_get_doc, mock_exists):
+    def test_verify_qr_token_valid_table_token(self, mock_secret, mock_get_doc, mock_exists, mock_get_value):
         secret = "test-secret"
         mock_secret.return_value = secret
         mock_exists.return_value = True
@@ -45,7 +46,13 @@ class TestQRTokenRoundtrip(unittest.TestCase):
         profile_doc = MagicMock()
         profile_doc.enabled = 1
         profile_doc.enable_qr_table_ordering = 1
+        profile_doc.branch = "Branch A"
         mock_get_doc.return_value = profile_doc
+        # U11 fix: _verify_qr_token() now independently re-checks the
+        # table's own branch against the profile's branch (defense-in-depth
+        # matching the device-table-assignment path) -- same branch here,
+        # so the token is valid.
+        mock_get_value.return_value = "Branch A"
 
         payload = "Profile A|Table 7"
         signature = _sign(payload, secret)
@@ -56,6 +63,35 @@ class TestQRTokenRoundtrip(unittest.TestCase):
         self.assertEqual(profile, profile_doc)
         self.assertEqual(table, "Table 7")
         self.assertEqual(source, "QR Table")
+        mock_get_value.assert_called_once_with("URY Table", "Table 7", "branch")
+
+    @patch(f"{MOD}.frappe.db.get_value")
+    @patch(f"{MOD}.frappe.db.exists")
+    @patch(f"{MOD}.frappe.get_doc")
+    @patch(f"{MOD}._get_profile_secret")
+    def test_verify_qr_token_cross_branch_table_rejected(self, mock_secret, mock_get_doc, mock_exists, mock_get_value):
+        """A correctly-signed token whose table belongs to a DIFFERENT
+        branch than the profile's own branch must still be rejected -- this
+        is the exact live-verified U11 bypass (a leaked/forged token for
+        the wrong branch's table)."""
+        secret = "test-secret"
+        mock_secret.return_value = secret
+        mock_exists.return_value = True
+
+        profile_doc = MagicMock()
+        profile_doc.enabled = 1
+        profile_doc.enable_qr_table_ordering = 1
+        profile_doc.branch = "Branch A"
+        mock_get_doc.return_value = profile_doc
+        mock_get_value.return_value = "Branch B"  # table belongs to a different branch
+
+        payload = "Profile A|Table 7"
+        signature = _sign(payload, secret)
+        raw = f"{payload}|{signature}"
+        token = base64.urlsafe_b64encode(raw.encode()).decode().rstrip("=")
+
+        with self.assertRaises(frappe.ValidationError):
+            _verify_qr_token(token)
 
     @patch(f"{MOD}._get_profile_secret")
     def test_verify_qr_token_bad_signature_rejected(self, mock_secret):

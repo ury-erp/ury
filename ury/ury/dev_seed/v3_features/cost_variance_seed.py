@@ -21,6 +21,11 @@ VARIANCE_REASONS = [
 
 
 def _get_company():
+    branch_name = frappe.db.get_value("Branch", {}, "name")
+    if branch_name:
+        branch_company = frappe.db.get_value("Branch", branch_name, "company")
+        if branch_company:
+            return branch_company
     return frappe.db.get_value("Company", {}, "name")
 
 
