@@ -1,8 +1,12 @@
 """Server-authoritative reservation reconciliation for POS order acceptance.
 
-This module is intentionally not wired into ``sync_order`` in this scoped
-correction. It provides the narrow reservation reconciliation primitive and
-keeps line/context isolation in the reservation layer.
+This module IS wired into ``sync_order`` (see ``ury/ury/doctype/ury_order/
+ury_order.py::sync_order``, which calls ``reconcile_order_reservations``
+directly). It provides the reservation reconciliation primitive, keeps line/
+context isolation in the reservation layer, and (as of D1) re-checks each
+line against ``ury_availability.get_item_availability`` before committing an
+increased reservation, so order acceptance cannot reserve stock for an item
+the display-layer availability engine would refuse to sell.
 """
 
 from collections import defaultdict
@@ -12,7 +16,7 @@ import frappe
 from frappe import _
 from frappe.utils import flt
 
-from ury.ury.api.ury_availability import _resolve_production_config
+from ury.ury.api.ury_availability import _resolve_production_config, get_item_availability
 from ury.ury.api.ury_reservation_service import (
 	RESERVED,
 	create_reservation,
@@ -176,6 +180,31 @@ def _reconcile_line(order_ref, line_key, line, branch, company, actor):
 			_("A reservation warehouse is required for Item {0}").format(item_code),
 			frappe.ValidationError,
 		)
+
+	# Order acceptance is the authoritative transaction boundary for real
+	# stock reservations -- it must not reserve stock for a line the
+	# display-layer availability engine (`get_item_availability`) would
+	# refuse to sell. Only gate an actual increase in reserved qty; a
+	# decrease/removal (requested_qty <= 0, handled below) only releases
+	# existing reservation groups and must never be blocked by
+	# availability, or a user could never remove/reduce a now-unsellable
+	# item from an order. This folds DEPARTMENT_DISABLED and
+	# NO_ACTIVE_PLAN/PLAN_EXHAUSTED gating -- which this reconciliation
+	# path previously skipped entirely -- into order acceptance itself.
+	if requested_qty > 0:
+		availability = get_item_availability(
+			item_code=item_code,
+			branch=branch,
+			company=company,
+			department=context.get("department"),
+		)
+		if not availability.get("sellable"):
+			frappe.throw(
+				_("{0} is not available for order (reason: {1}). Please refresh the menu.").format(
+					item_code, availability.get("reason_code")
+				),
+				frappe.ValidationError,
+			)
 
 	for group in _active_groups(order_ref, item_code, reservation_line_key=line_key):
 		release_reservation(group, reason="Order acceptance line quantity reconciliation")
