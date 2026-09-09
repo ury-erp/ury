@@ -99,7 +99,12 @@ WORK_ORDER_COUNT = 8  # SEED_GAP_MAP.md flags this as lowest-priority/"nice to h
 # volume" guidance -- these are cheap single-doc inserts, not bulk data.
 SALES_PLAN_OFFSETS = [0, 1, 3, 7]  # days back from today
 SALES_PLAN_SERVICE_PERIOD = "Dinner"
-SALES_PLAN_ITEMS_PER_PLAN = 6
+# Every resolvable item (production config + production_unit assigned) is
+# covered, not a fixed subset -- a real order-creation test needs any item
+# on the menu to be plannable, not just a fixed demo sample. Capped only as
+# a sanity ceiling against a runaway catalog, not a deliberate demo-size
+# limit.
+SALES_PLAN_ITEMS_PER_PLAN = 500
 SALES_PLAN_QTY_PER_ITEM = 25
 
 
@@ -489,13 +494,22 @@ def _get_item_department_map():
 	"""item_code -> department, from URY Item Production Configuration rows
 	that ury.ury.dev_seed.operations already created. Returns {} (and lets
 	the caller skip) if that module hasn't run yet.
+
+	Only rows with BOTH department and production_unit assigned are
+	included -- a Sales Plan item row with a null production_unit is not
+	genuinely plannable/producible (nothing can pick it up on the KDS/
+	production side), so it shouldn't be snapshotted into an "Approved"
+	plan as if it were.
 	"""
 	rows = frappe.get_all(
 		"URY Item Production Configuration",
 		fields=["item", "department", "production_unit", "production_policy"],
 		filters={"active": 1},
 	)
-	return {r.item: r for r in rows if r.department}
+	skipped_no_unit = [r.item for r in rows if r.department and not r.production_unit]
+	if skipped_no_unit:
+		print(f"purchasing_seed._get_item_department_map: {len(skipped_no_unit)} item(s) have a department but no production_unit, excluded from Sales Plan coverage: {skipped_no_unit}")
+	return {r.item: r for r in rows if r.department and r.production_unit}
 
 
 def _snapshot_item(item_code, config, qty):
