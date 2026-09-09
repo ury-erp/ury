@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { MenuItem } from '../../lib/api'
 import { getAvailabilityMessage, getItemAvailability, ItemAvailability } from '../../lib/availability'
+import { useMenuAvailabilityChannel } from '../../lib/realtime'
 import ProductCard from './ProductCard'
 
 type Cart = Record<string, { item: MenuItem; qty: number }>
@@ -20,9 +21,8 @@ interface MenuGridProps {
   imageClassName?: string
   /** Branch (restaurant) for the V3-44 availability lookup; omit to skip the check entirely. */
   branch?: string
-  /** Company for the V3-44 availability lookup — currently absent from
-   * OrderingContext (see lib/availability.ts's "Known gap" note); when
-   * unset, availability is not checked and every item renders as normal. */
+  /** Company for the V3-44 availability lookup (from OrderingContext.company);
+   * when unset, availability is not checked and every item renders as normal. */
   company?: string
 }
 
@@ -77,6 +77,10 @@ interface MenuGridCardProps {
 
 function MenuGridCard({ item, cartQty, showImage, onClick, cardClassName, imageClassName, branch, company }: MenuGridCardProps) {
   const [availability, setAvailability] = useState<ItemAvailability | null>(null)
+  // Timestamp (ms) of the last successful availability refresh, from any
+  // source (mount fetch, I1 realtime event, or an I2 poll tick). The I2
+  // poll below reads this to decide whether a tick is redundant.
+  const lastRefreshedAtRef = useRef<number>(0)
 
   useEffect(() => {
     let cancelled = false
@@ -86,7 +90,10 @@ function MenuGridCard({ item, cartQty, showImage, onClick, cardClassName, imageC
     }
     getItemAvailability({ item_code: item.item, branch, company })
       .then((result) => {
-        if (!cancelled) setAvailability(result)
+        if (!cancelled) {
+          setAvailability(result)
+          lastRefreshedAtRef.current = Date.now()
+        }
       })
       .catch(() => {
         // Display-only lookup — a failed check must never block the menu
@@ -96,6 +103,53 @@ function MenuGridCard({ item, cartQty, showImage, onClick, cardClassName, imageC
     return () => {
       cancelled = true
     }
+  }, [item.item, branch, company])
+
+  // I1: on a live "menu_availability_update_<branch>" event that names this
+  // item, re-check just this item's availability (skipCache: true) and
+  // update local state — mirrors the frontend Pos app's MenuCard.tsx.
+  const refetchAvailability = useCallback(() => {
+    if (!branch || !company) return
+    getItemAvailability({ item_code: item.item, branch, company }, { skipCache: true })
+      .then((result) => {
+        setAvailability(result)
+        lastRefreshedAtRef.current = Date.now()
+      })
+      .catch(() => {
+        // Same soft-fail contract as the mount-time fetch above.
+      })
+  }, [item.item, branch, company])
+
+  useMenuAvailabilityChannel(branch, (payload) => {
+    if (payload.affected_items?.includes(item.item)) {
+      refetchAvailability()
+    }
+  })
+
+  // I2: TTL fallback poll — independent of I1's realtime subscription ever
+  // connecting. Ticks every POLL_INTERVAL_MS; on each tick it only
+  // re-fetches if at least POLL_INTERVAL_MS has elapsed since the last
+  // successful refresh (mount, an I1 event, or a previous poll tick), so a
+  // recent realtime-driven refresh resets the poll clock and this doesn't
+  // fight I1's traffic when realtime is healthy. This effect does not read
+  // or depend on any state from useMenuAvailabilityChannel — it works
+  // unchanged even if that hook/subscription were deleted entirely.
+  useEffect(() => {
+    if (!branch || !company) return
+    const POLL_INTERVAL_MS = 45_000
+    const intervalId = setInterval(() => {
+      const elapsed = Date.now() - lastRefreshedAtRef.current
+      if (elapsed < POLL_INTERVAL_MS) return
+      getItemAvailability({ item_code: item.item, branch, company }, { skipCache: true })
+        .then((result) => {
+          setAvailability(result)
+          lastRefreshedAtRef.current = Date.now()
+        })
+        .catch(() => {
+          // Same soft-fail contract as the other fetches above.
+        })
+    }, POLL_INTERVAL_MS)
+    return () => clearInterval(intervalId)
   }, [item.item, branch, company])
 
   const isUnavailable = !!availability && (!availability.sellable || availability.available_qty <= 0)

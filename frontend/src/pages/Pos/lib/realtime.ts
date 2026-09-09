@@ -117,6 +117,67 @@ export function useKotErrorChannel(
   }, [branch, production, onError]);
 }
 
+export interface MenuAvailabilityEventPayload {
+  affected_items: string[];
+  component_item: string;
+  branch: string;
+  department: string | null;
+}
+
+/**
+ * Subscribes to the "menu_availability_update_<branch>" realtime channel
+ * (published by H1's `publish_component_stock_fanout`, see
+ * ury/ury/api/ury_bom_compiler.py) for the lifetime of the mounted component.
+ *
+ * Scoped per-branch: the channel name already filters to the current branch,
+ * so callers only need to check `affected_items` against the item(s) they
+ * render before triggering a `skipCache: true` refetch.
+ *
+ * Mirrors `useKotErrorChannel` above — if the socket never connects, drops,
+ * or the subscribe call rejects, this silently no-ops (logs and returns)
+ * rather than throwing, so menu tiles keep working without live updates.
+ */
+export function useMenuAvailabilityChannel(
+  branch: string | undefined,
+  onEvent: (payload: MenuAvailabilityEventPayload) => void,
+): void {
+  const onEventRef = useRef(onEvent);
+
+  useEffect(() => {
+    onEventRef.current = onEvent;
+  }, [onEvent]);
+
+  useEffect(() => {
+    if (!branch) {
+      return;
+    }
+
+    const channelName = `menu_availability_update_${branch}`;
+    const handler = (payload: MenuAvailabilityEventPayload) => onEventRef.current(payload);
+    let activeSocket: Socket | null = null;
+    let cancelled = false;
+
+    getRealtimeSocket()
+      .then((s) => {
+        if (cancelled) {
+          return;
+        }
+        activeSocket = s;
+        s.on(channelName, handler);
+      })
+      .catch((error) => {
+        // Defensive: never let a failed/absent realtime connection break the
+        // menu — it just keeps rendering whatever availability it last fetched.
+        console.error('Failed to subscribe to menu availability channel:', error);
+      });
+
+    return () => {
+      cancelled = true;
+      activeSocket?.off(channelName, handler);
+    };
+  }, [branch]);
+}
+
 /**
  * Subscribes to multiple KOT error channels (one per production unit).
  * Use this when a terminal needs to monitor errors from multiple production units.

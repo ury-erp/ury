@@ -14,6 +14,7 @@ import {
   type OrderStatus,
   type PaymentRequestResult,
 } from '../lib/api'
+import { getAvailabilityMessage, getItemAvailability } from '../lib/availability'
 
 // Same keys api.ts uses internally for sessionStorage persistence. api.ts
 // doesn't expose a clear function (only get/store), so resetSession clears
@@ -251,6 +252,26 @@ export function useOrderingSession(initialContext?: OrderingContext) {
     setSubmitting(true)
     setError(null)
     try {
+      // Live (skipCache) re-check right before order-confirmation — the
+      // display-only availability cache used while browsing the menu
+      // (MenuGrid, ~30s TTL) is too stale to trust at submit time. Mirrors
+      // ProductDialog.handleAddToOrder()'s pre-submit check in the main POS
+      // app (pos frontend, ProductDialog.tsx) against the same
+      // getItemAvailability(..., { skipCache: true }) contract documented
+      // in lib/availability.ts.
+      if (context.restaurant && context.company) {
+        for (const entry of cartItems) {
+          const availability = await getItemAvailability(
+            { item_code: entry.item.item, branch: context.restaurant, company: context.company },
+            { skipCache: true },
+          )
+          if (!availability.sellable) {
+            setError(`${entry.item.item_name}: ${getAvailabilityMessage(availability.reason_code)}`)
+            return false
+          }
+        }
+      }
+
       const payload = cartItems.map((entry) => ({
         item: entry.item.item,
         qty: entry.qty,

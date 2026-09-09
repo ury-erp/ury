@@ -31,6 +31,7 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
     fetchMenuItems,
     addToOrder,
     isOrderInteractionDisabled,
+    posProfile,
   } = usePOSStore();
 
   useEffect(() => {
@@ -123,6 +124,8 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
                 item={item.item}
                 onClick={() => handleTap(item)}
                 disabled={disabled}
+                branch={posProfile?.branch}
+                company={posProfile?.company}
               />
             ))}
           </div>

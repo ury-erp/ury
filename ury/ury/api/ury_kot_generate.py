@@ -3,6 +3,12 @@ import json
 import frappe
 from ury.ury_pos.api import getBranch
 
+from ury.ury.api.ury_kot_routing import (
+    ROUTING_NOT_CONFIGURED,
+    RoutingError,
+    resolve_production_units,
+)
+
 
 # Load JSON data or return as is if it's already a Python dictionary
 def load_json(data):
@@ -134,82 +140,97 @@ def process_items_for_kot(
 ):
     kot_items = create_order_items(items)
     pos_profile = frappe.get_doc("POS Profile", pos_profile_id)
-    productions = frappe.db.get_all(
-        "URY Production Unit", filters={"branch": pos_profile.branch}, fields=["name"]
-    )
+    pos_invoice = frappe.get_doc("POS Invoice", invoice_id)
 
     created_kot_names = []
 
-    if productions:
-        all_production_item_groups = get_all_production_item_groups(pos_profile.branch)
-        
-        # Iterate through each item and check if item group belongs to a production unit
-        for item in kot_items:
-            item_group = frappe.db.get_value("Item", item["item_code"], "item_group")
-            item_code = item["item_code"]
-            if item_group not in all_production_item_groups:
-                frappe.msgprint(
-                    f"Item group '{item_group}' for item '{item_code}' is not in any production."
-                )
-        for production in productions:
-            productionItemGroupslist = frappe.get_all(
-                "URY Production Item Groups",
-                fields=["item_group"],
-                filters={
-                    "parent": production.name,
-                    "parenttype": "URY Production Unit",
-                },
-                order_by="idx",
-            )
-            productionItemGroups = [
-                item_group.item_group for item_group in productionItemGroupslist
-            ]
-            production_items = [
-                item
-                for item in kot_items
-                if frappe.db.get_value("Item", item["item_code"], "item_group")
-                in productionItemGroups
-            ]
-
-            if production_items:
-                invoice_exist = frappe.db.exists(
-                    "URY KOT",
-                    {
-                        "invoice": invoice_id,
-                        "docstatus": 1,
-                        "production": production.name,
-                    },
-                )
-                # This is the same "no KOT exists yet for this
-                # invoice+production" case the scheduler's create_kot()
-                # fallback guards against with validation_dedup_key -- only
-                # tag the first ("New Order") KOT here, never the
-                # subsequent legitimate ones (Order Modified etc.), so
-                # later KOTs for the same invoice+production are not
-                # rejected by the unique index.
-                validation_dedup_key = None
-                if invoice_exist:
-                    kot_type = "Order Modified"
-                else:
-                    validation_dedup_key = "{0}::{1}".format(invoice_id, production.name)
-
-                kot_name = create_kot_doc(
-                    invoice_id,
-                    customer,
-                    restaurant_table,
-                    production_items,
-                    kot_type,
-                    comments,
-                    pos_profile_id,
-                    kot_naming_series,
-                    production.name,
-                    validation_dedup_key=validation_dedup_key,
-                )
-                created_kot_names.append(kot_name)
-    else:
+    # Verify production units exist for the branch
+    productions = frappe.db.get_all(
+        "URY Production Unit", filters={"branch": pos_profile.branch}, fields=["name"]
+    )
+    if not productions:
         frappe.throw(
             "Create URY Production unit against POS Profile: %s " % pos_profile.name
         )
+
+    # Build a map of production unit -> items for that unit using the unified resolver
+    production_items_map = {}
+    for item in kot_items:
+        item_code = item["item_code"]
+        try:
+            # Resolve production units for this item using the unified routing logic.
+            # Note: production_policy is not passed, so DIRECT_RETAIL items with
+            # item_groups will still be routed via the legacy fallback (backward compatible).
+            resolved_units = resolve_production_units(
+                item_code=item_code,
+                company=pos_invoice.company,
+                branch=pos_profile.branch,
+            )
+            for production_unit in resolved_units:
+                if production_unit not in production_items_map:
+                    production_items_map[production_unit] = []
+                production_items_map[production_unit].append(item)
+        except RoutingError as e:
+            if e.reason_code == ROUTING_NOT_CONFIGURED:
+                # Item has no routing configuration and no fallback match.
+                # Log at debug level and skip, matching legacy behavior.
+                frappe.logger().debug(
+                    f"Item {item_code} has no production routing configured; skipping KOT"
+                )
+            else:
+                # Other routing errors (ambiguous, disabled department/unit) are
+                # configuration issues. Log as warning and skip to avoid breaking the batch.
+                frappe.logger().warning(
+                    f"Routing error for item {item_code}: {e.reason_code} - {str(e)}"
+                )
+
+    # Print warning if any item was not routed (legacy behavior)
+    all_routed_items = set()
+    for items_list in production_items_map.values():
+        for item in items_list:
+            all_routed_items.add(item["item_code"])
+    for item in kot_items:
+        if item["item_code"] not in all_routed_items:
+            item_group = frappe.db.get_value("Item", item["item_code"], "item_group")
+            frappe.msgprint(
+                f"Item group '{item_group}' for item '{item['item_code']}' is not in any production."
+            )
+
+    # Create one KOT per production unit
+    for production_unit, production_items in production_items_map.items():
+        invoice_exist = frappe.db.exists(
+            "URY KOT",
+            {
+                "invoice": invoice_id,
+                "docstatus": 1,
+                "production": production_unit,
+            },
+        )
+        # This is the same "no KOT exists yet for this invoice+production" case
+        # the scheduler's create_kot() fallback guards against with validation_dedup_key --
+        # only tag the first ("New Order") KOT here, never the subsequent legitimate ones
+        # (Order Modified etc.), so later KOTs for the same invoice+production are not
+        # rejected by the unique index.
+        validation_dedup_key = None
+        current_kot_type = kot_type
+        if invoice_exist:
+            current_kot_type = "Order Modified"
+        else:
+            validation_dedup_key = "{0}::{1}".format(invoice_id, production_unit)
+
+        kot_name = create_kot_doc(
+            invoice_id,
+            customer,
+            restaurant_table,
+            production_items,
+            current_kot_type,
+            comments,
+            pos_profile_id,
+            kot_naming_series,
+            production_unit,
+            validation_dedup_key=validation_dedup_key,
+        )
+        created_kot_names.append(kot_name)
 
     return created_kot_names
 
@@ -229,38 +250,56 @@ def process_items_for_cancel_kot(
 
     kot_items = create_order_items(items)
     pos_profile = frappe.get_doc("POS Profile", pos_profile_id)
-    productions = frappe.db.get_all(
-        "URY Production Unit", filters={"branch": pos_profile.branch}, fields=["name"]
-    )
+    pos_invoice = frappe.get_doc("POS Invoice", invoice_id)
 
     created_kot_names = []
 
-    for production in productions:
-        productionDoc = frappe.get_doc("URY Production Unit", production.name)
-        productionItemGroups = [
-            item_group.item_group for item_group in productionDoc.item_groups
-        ]
-        production_items = [
-            item
-            for item in kot_items
-            if frappe.get_doc("Item", item["item_code"]).item_group
-            in productionItemGroups
-        ]
-
-        if production_items:
-            kot_name = create_cancel_kot_doc(
-                invoice_id,
-                restaurant_table,
-                production_items,
-                kot_type,
-                customer,
-                comments,
-                pos_profile_id,
-                cancel_kot_naming_series,
-                invoiceItems,
-                production.name,
+    # Build a map of production unit -> items for that unit using the unified resolver
+    production_items_map = {}
+    for item in kot_items:
+        item_code = item["item_code"]
+        try:
+            # Resolve production units for this item using the unified routing logic.
+            # Note: production_policy is not passed, so DIRECT_RETAIL items with
+            # item_groups will still be routed via the legacy fallback (backward compatible).
+            resolved_units = resolve_production_units(
+                item_code=item_code,
+                company=pos_invoice.company,
+                branch=pos_profile.branch,
             )
-            created_kot_names.append(kot_name)
+            for production_unit in resolved_units:
+                if production_unit not in production_items_map:
+                    production_items_map[production_unit] = []
+                production_items_map[production_unit].append(item)
+        except RoutingError as e:
+            if e.reason_code == ROUTING_NOT_CONFIGURED:
+                # Item has no routing configuration and no fallback match.
+                # Log at debug level and skip, matching legacy behavior.
+                frappe.logger().debug(
+                    f"Item {item_code} has no production routing configured for cancellation; skipping cancel KOT"
+                )
+            else:
+                # Other routing errors (ambiguous, disabled department/unit) are
+                # configuration issues. Log as warning and skip to avoid breaking the batch.
+                frappe.logger().warning(
+                    f"Routing error for cancel item {item_code}: {e.reason_code} - {str(e)}"
+                )
+
+    # Create one cancel KOT per production unit
+    for production_unit, production_items in production_items_map.items():
+        kot_name = create_cancel_kot_doc(
+            invoice_id,
+            restaurant_table,
+            production_items,
+            kot_type,
+            customer,
+            comments,
+            pos_profile_id,
+            cancel_kot_naming_series,
+            invoiceItems,
+            production_unit,
+        )
+        created_kot_names.append(kot_name)
 
     return created_kot_names
 

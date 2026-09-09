@@ -117,7 +117,7 @@ def compile_bom_vector(item_code, qty, company):
 	}
 
 
-def compile_shared_component_index(item_codes, company):
+def compile_shared_component_index(item_codes, company, skip_invalid_items=False):
 	"""Build the reverse dependency index component_item -> consuming top-level items.
 
 	`item_codes` is an iterable of top-level (finished/menu) item codes. Returns:
@@ -134,12 +134,46 @@ def compile_shared_component_index(item_codes, company):
 	shared by two or more top-level items has one entry per consumer, so a
 	caller can answer "which menu items does a shortage of component X
 	block" by reading `index[X]`.
+
+	`skip_invalid_items` selects the failure mode when `compile_bom_vector`
+	raises for one of `item_codes` (most commonly a MADE_TO_ORDER item with no
+	active BOM -- an entirely normal, reachable state for a menu item added
+	before its recipe is finalised):
+
+	  - False (default): the exception propagates and no index is returned.
+	    This is the correct, fail-closed behaviour for any caller that plans
+	    production or authorises stock issue, where silently omitting an item's
+	    demand would understate what must be produced or issued.
+	  - True: that one item is logged and skipped, and the index is still built
+	    from every other item. Use this only for advisory/best-effort consumers
+	    -- see `get_items_affected_by_component`, where one misconfigured item
+	    must not blind the realtime availability channel for the whole branch.
+
+	Returns the index either way; with `skip_invalid_items=True` the skipped
+	items are simply absent from it.
 	"""
 	item_codes = list(dict.fromkeys(item_codes))  # de-dupe, preserve order
 	index = {}
+	skipped = []
 
 	for item_code in item_codes:
-		vector = compile_bom_vector(item_code, 1, company)
+		try:
+			vector = compile_bom_vector(item_code, 1, company)
+		except Exception:
+			if not skip_invalid_items:
+				raise
+			# Per-item isolation: one unbuildable item must not abort the
+			# whole reverse-index build for every other item.
+			skipped.append(item_code)
+			frappe.logger("ury_bom_compiler").exception(
+				"compile_shared_component_index: skipping item {0} (company {1}); "
+				"its BOM vector could not be compiled. The index is still built "
+				"from the remaining items, so this item's availability changes "
+				"will not propagate via the rich realtime channel until its "
+				"configuration is fixed.".format(item_code, company)
+			)
+			continue
+
 		for component in vector["components"]:
 			index.setdefault(component["component_item"], []).append(
 				{
@@ -148,6 +182,14 @@ def compile_shared_component_index(item_codes, company):
 					"stock_uom": component["stock_uom"],
 				}
 			)
+
+	if skipped:
+		frappe.logger("ury_bom_compiler").warning(
+			"compile_shared_component_index (company {0}): built index from {1} of {2} "
+			"items; skipped {3} with uncompilable BOMs: {4}".format(
+				company, len(item_codes) - len(skipped), len(item_codes), len(skipped), ", ".join(skipped)
+			)
+		)
 
 	return index
 
@@ -300,3 +342,169 @@ def _explode_bom_recursive(bom_name, parent_qty, components, visited):
 
 		entry = components.setdefault(line.item_code, {"qty": 0.0, "stock_uom": line.stock_uom})
 		entry["qty"] += line_qty
+
+
+@frappe.whitelist(allow_guest=False)
+def get_items_affected_by_component(component_item, branch, company):
+	"""Return top-level menu/finished items affected by a component shortage.
+
+	Given a single raw material (`component_item`) and a `branch`/`company`,
+	returns a list of MADE_TO_ORDER items that use this component in their BOM.
+	This is the inverse direction of `compile_shared_component_index`: instead
+	of "which components does this finished item use", it answers "which
+	finished items depend on this component".
+
+	Args:
+		component_item (str): The item code of the raw material/component.
+		branch (str): The branch code (scopes the MADE_TO_ORDER item universe).
+		company (str): The company code (verified against branch-derived company).
+
+	Returns:
+		list: A list of dicts, each with:
+			- top_level_item (str): The finished/menu item code.
+			- qty_per_unit (float): Qty of component per unit of finished item.
+			- stock_uom (str): Stock unit of measure for the component.
+
+		Returns an empty list if the component is not used by any MADE_TO_ORDER
+		items, or if no MADE_TO_ORDER items are configured for the branch.
+
+		A configured MADE_TO_ORDER item whose BOM vector cannot be compiled
+		(typically: no active BOM yet) is logged and skipped; it simply never
+		appears in the results. Every other item in the branch still resolves
+		normally. See the `skip_invalid_items=True` rationale at the call site
+		below.
+
+	Raises:
+		frappe.ValidationError: If `component_item`, `branch`, or `company`
+			is missing/empty.
+	"""
+	if not component_item:
+		frappe.throw(_("Component item is required"), frappe.ValidationError)
+	if not branch:
+		frappe.throw(_("Branch is required"), frappe.ValidationError)
+	if not company:
+		frappe.throw(_("Company is required"), frappe.ValidationError)
+
+	# Query all active MADE_TO_ORDER items configured for this branch.
+	made_to_order_items = frappe.get_all(
+		"URY Item Production Configuration",
+		filters={"branch": branch, "production_policy": "MADE_TO_ORDER", "active": 1},
+		pluck="item",
+	)
+
+	if not made_to_order_items:
+		return []
+
+	# Compile the reverse dependency index across all MADE_TO_ORDER items.
+	#
+	# `skip_invalid_items=True` is deliberate. This lookup feeds H1's
+	# best-effort realtime fan-out (`publish_component_stock_fanout`), whose
+	# outer try/except correctly swallows any failure here so a reservation
+	# write is never broken by it. The consequence, before this flag existed,
+	# was that a SINGLE active MADE_TO_ORDER item with no active BOM -- a menu
+	# item added before its recipe is finalised, entirely routine -- made
+	# `compile_bom_vector` raise, aborted the whole reverse-index build, and so
+	# silently stopped the rich `menu_availability_update_*` event from firing
+	# for EVERY item in the branch, for every component change, with no signal
+	# beyond one error-log line. (Live-reproduced on bench sa-prodctrl-unif-live
+	# via the LMNT fixture.) Degrading to "that one item's changes don't
+	# propagate" is both correct and already the accepted behaviour for it;
+	# blinding the entire branch is not.
+	index = compile_shared_component_index(made_to_order_items, company, skip_invalid_items=True)
+
+	# Return affected items for this specific component (or empty list if unused).
+	return index.get(component_item, [])
+
+
+def publish_component_stock_fanout(
+	component_item,
+	warehouse,
+	company,
+	branch,
+	department=None,
+	logger_name="ury_bom_compiler",
+	after_commit=False,
+):
+	"""Publish G1's cheap component-level event, then best-effort fan out a
+	richer, item-resolved event to a branch-scoped channel frontend clients
+	can subscribe to (task H1).
+
+	This is the single seam every write-side mutation site (reservation
+	create/release, fulfilment posting) should call INSTEAD of calling
+	`frappe.publish_realtime("ury_component_stock_changed", ...)` directly,
+	so the dual-publish behaviour and its failure isolation live in exactly
+	one place.
+
+	Two publishes happen here, each independently failure-isolated:
+
+	1. The cheap, unchanged `ury_component_stock_changed` event (component,
+	   warehouse, company only -- no BOM explosion). This is G1's original
+	   event; other consumers may still want just this. Its own publish
+	   failure is logged and swallowed.
+	2. A richer `menu_availability_update_{branch}` event carrying which
+	   MADE_TO_ORDER top-level items are affected by this component's stock
+	   change (resolved via F2's `get_items_affected_by_component`), plus
+	   `component_item`/`branch`/`department`. The channel name mirrors the
+	   `"{event}_{branch}_{scope}"` convention used by
+	   `ury_order.change_table_in_kot`'s `kot_update_{branch}_{production}`
+	   channel (branch-scoped fan-out channel per event family).
+
+	Both steps are independently wrapped: a failure resolving/publishing the
+	rich event is logged and skipped, and never suppresses or is suppressed
+	by the cheap event -- neither publish can become a single point of
+	failure for the caller's stock mutation. Callers should not call this
+	from anywhere but a best-effort, already-committed context, mirroring
+	how G1's original call sites wrapped `publish_realtime` directly.
+
+	A caller that is still INSIDE its transaction must pass
+	`after_commit=True`, which defers both publishes to the transaction's
+	commit hook instead of emitting them immediately. Without it a
+	transaction that later rolls back has already told every connected POS
+	and self-order client that these components changed -- phantom
+	availability events for a mutation that never happened. The default
+	stays False so genuinely post-commit callers keep firing immediately;
+	`after_commit=True` on an already-committed connection would queue a
+	callback that nothing is left to flush.
+	"""
+	logger = frappe.logger(logger_name)
+
+	try:
+		frappe.publish_realtime(
+			"ury_component_stock_changed",
+			{
+				"component_item": component_item,
+				"warehouse": warehouse,
+				"company": company,
+			},
+			after_commit=after_commit,
+		)
+	except Exception:
+		# Failure to publish is best-effort, fire-and-forget.
+		logger.exception(
+			"Failed to publish ury_component_stock_changed for component {0}".format(component_item)
+		)
+
+	try:
+		affected = get_items_affected_by_component(component_item, branch, company) or []
+		affected_items = [row["top_level_item"] for row in affected if row.get("top_level_item")]
+		if not affected_items:
+			return
+		frappe.publish_realtime(
+			"menu_availability_update_{0}".format(branch),
+			{
+				"affected_items": affected_items,
+				"component_item": component_item,
+				"branch": branch,
+				"department": department,
+			},
+			after_commit=after_commit,
+		)
+	except Exception:
+		# The rich fan-out lookup/publish is best-effort: log and move on.
+		# The cheap event above has already fired independently and this
+		# failure must never suppress it or propagate to the caller.
+		logger.exception(
+			"Failed to resolve/publish menu_availability_update fan-out for component {0}".format(
+				component_item
+			)
+		)

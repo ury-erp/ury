@@ -22,6 +22,7 @@ from frappe.utils import add_to_date, flt, now, now_datetime
 
 from ury.ury.api.ury_reservation_service import FULFILLED, RESERVED, fulfil_reservation
 from ury.ury.api.ury_kot_execution_service import READY, SERVED
+from ury.ury.api.ury_bom_compiler import publish_component_stock_fanout
 
 
 INTENT_DOCTYPE = "URY Fulfilment Posting Intent"
@@ -548,6 +549,34 @@ def process_posting_intent(intent_name):
 				intent.save(ignore_permissions=False)
 		with _service_mutation():
 			_fulfil_reservation_once(payload["reservation_group"])
+
+		# Emit realtime events (cheap component-level + rich fan-out) for each
+		# distinct component_item in the stock entry.
+		# Wrap in try/except so a socketio failure never breaks the posting transaction.
+		seen = set()
+		for component in payload.get("components") or []:
+			component_item = component.get("item_code")
+			warehouse = component.get("s_warehouse")
+			if not component_item or not warehouse:
+				continue
+			key = (component_item, warehouse)
+			if key not in seen:
+				try:
+					publish_component_stock_fanout(
+						component_item,
+						warehouse,
+						payload.get("company"),
+						payload.get("branch"),
+						department=payload.get("department"),
+						logger_name="ury_fulfilment_posting_service",
+					)
+				except Exception:
+					# Failure to publish is best-effort, fire-and-forget.
+					frappe.logger("ury_fulfilment_posting_service").exception(
+						"Failed to publish realtime fan-out for component {0}".format(component_item)
+					)
+				seen.add(key)
+
 		fulfilment = _create_or_update_fulfilment(intent, payload, stock_entry)
 		intent.fulfilment_record = fulfilment
 		intent.erpnext_stock_entry = stock_entry
