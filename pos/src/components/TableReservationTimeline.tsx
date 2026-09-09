@@ -137,30 +137,41 @@ export default function TableReservationTimeline({
     return Math.max(420, 32 + (positionedReservations.totalLanes || 1) * (CARD_HEIGHT + LANE_GAP));
   }, [positionedReservations.totalLanes]);
 
-  // Auto scroll to first reservation or current hour on date change
+  // Auto scroll to current time on today (initial mount / date change)
+  const lastScrolledDateKeyRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (!scrollContainerRef.current) return;
 
-    let targetMinutes = 9 * 60; // Default 09:00 AM
+    const dateKey = `${selectedDate.getFullYear()}-${selectedDate.getMonth()}-${selectedDate.getDate()}`;
+    if (lastScrolledDateKeyRef.current === dateKey) {
+      return;
+    }
+    lastScrolledDateKeyRef.current = dateKey;
 
     if (isToday) {
       const now = new Date();
-      targetMinutes = Math.max(0, (now.getHours() - 1) * 60);
-    } else if (reservations.length > 0) {
-      const earliest = Math.min(
-        ...reservations.map((r) => parseReservationTime(r.reserved_at).totalMinutes)
-      );
-      if (earliest < Infinity && earliest > 0) {
-        targetMinutes = Math.max(0, earliest - 60);
-      }
-    }
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+      const currentPx = (currentMinutes / 60) * HOUR_WIDTH;
+      const containerWidth = scrollContainerRef.current.clientWidth || 800;
+      // Position current time comfortably within the viewport (with context before and upcoming ahead)
+      const scrollTarget = Math.max(0, currentPx - Math.max(160, containerWidth / 3));
 
-    const scrollLeft = (targetMinutes / 60) * HOUR_WIDTH;
-    scrollContainerRef.current.scrollTo({
-      left: Math.max(0, scrollLeft),
-      behavior: 'smooth',
-    });
-  }, [selectedDate, isToday, reservations]);
+      requestAnimationFrame(() => {
+        if (scrollContainerRef.current) {
+          scrollContainerRef.current.scrollTo({
+            left: scrollTarget,
+            behavior: 'smooth',
+          });
+        }
+      });
+    } else {
+      scrollContainerRef.current.scrollTo({
+        left: 0,
+        behavior: 'auto',
+      });
+    }
+  }, [selectedDate, isToday]);
 
   const getStatusColorClasses = (status: string) => {
     switch (status) {
