@@ -173,6 +173,8 @@ class TestKotItemExecution(FrappeTestCase):
 		with patch(f"{MODULE}.frappe.db.exists", side_effect=harness.exists), patch(
 			f"{MODULE}.frappe.get_doc", side_effect=harness.get_doc
 		), patch(f"{MODULE}.frappe.get_all", side_effect=harness.get_all), patch(
+			f"{MODULE}.frappe.db.sql", side_effect=harness.sql
+		), patch(
 			f"{MODULE}.frappe.db.get_value", return_value=frappe._dict({"branch": "BR-1", "production": "PU-1"})
 		), patch(f"{MODULE}.frappe.session") as session:
 			session.user = "chef@example.com"
