@@ -33,6 +33,17 @@ def _config(**overrides):
         "warehouse": "Kitchen Warehouse - URY",
         "production_unit_disabled": 0,
         "department_disabled": 0,
+        # These three mirror the doctype's real defaults (B-1/B-2 fix):
+        # controlled_by_sales_plan defaults to 1 (mandatory plan gating,
+        # fail-closed), allow_over_plan_sale defaults to 0, and
+        # availability_mode defaults to "Plan Available" (no override).
+        # Using the real defaults here -- instead of omitting the keys and
+        # relying on the production code's `.get(..., default)` fallback --
+        # is what B-5 requires: a test suite that would have caught the B-1
+        # polarity bug instead of silently masking it.
+        "controlled_by_sales_plan": 1,
+        "allow_over_plan_sale": 0,
+        "availability_mode": "Plan Available",
     }
     base.update(overrides)
     return base
@@ -401,3 +412,132 @@ class TestAvailabilityProductionContextIntegration(FrappeTestCase):
         # (N2 fix), not just the company lookup -- assert the company
         # lookup happened, not that it was the only call.
         self.assertIn(("Branch", "Branch A", "company"), [c.args for c in mock_get_value.call_args_list])
+
+
+class TestControlledBySalesPlanPolarity(FrappeTestCase):
+    """Regression coverage for B-1: `controlled_by_sales_plan` doctype default
+    must be 1 (mandatory plan gating), and the code must keep failing closed
+    for existing/default rows when no plan is active."""
+
+    @patch(f"{MODULE}._resolve_plan_remaining")
+    @patch(f"{MODULE}.project_fg_allocatable")
+    @patch(f"{MODULE}._resolve_production_config")
+    def test_controlled_by_sales_plan_default_still_fails_closed_pre_produced(
+        self, mock_config, mock_fg, mock_plan
+    ):
+        # controlled_by_sales_plan=1 is the doctype default -- this must
+        # still produce NO_ACTIVE_PLAN with no active plan, not silently
+        # fall through to stock-based availability (the B-1 bug).
+        mock_config.return_value = _config(controlled_by_sales_plan=1)
+        mock_fg.return_value = {"allocatable_qty": 20, "bin_actual_qty": 60, "bin_projected_qty": 20}
+        mock_plan.return_value = None
+
+        result = get_item_availability("ITEM-CAKE", "Branch A", "Company A")
+
+        self.assertEqual(result["reason_code"], "NO_ACTIVE_PLAN")
+        self.assertFalse(result["sellable"])
+        self.assertEqual(result["available_qty"], 0)
+
+    @patch(f"{MODULE}._resolve_plan_remaining")
+    @patch(f"{MODULE}.project_fg_allocatable")
+    @patch(f"{MODULE}._resolve_production_config")
+    def test_controlled_by_sales_plan_explicit_opt_out_skips_gate_pre_produced(
+        self, mock_config, mock_fg, mock_plan
+    ):
+        # controlled_by_sales_plan=0 is an explicit operator opt-out -- with
+        # no active plan, the item should fall through to stock-based
+        # availability instead of failing closed.
+        mock_config.return_value = _config(controlled_by_sales_plan=0)
+        mock_fg.return_value = {"allocatable_qty": 20, "bin_actual_qty": 60, "bin_projected_qty": 20}
+        mock_plan.return_value = None
+
+        result = get_item_availability("ITEM-CAKE", "Branch A", "Company A")
+
+        self.assertEqual(result["reason_code"], "AVAILABLE")
+        self.assertTrue(result["sellable"])
+        self.assertEqual(result["available_qty"], 20)
+
+    @patch(f"{MODULE}._resolve_plan_remaining")
+    @patch(f"{MODULE}.project_component_allocatable")
+    @patch(f"{MODULE}.compile_bom_vector")
+    @patch(f"{MODULE}._resolve_production_config")
+    def test_controlled_by_sales_plan_default_still_fails_closed_made_to_order(
+        self, mock_config, mock_compile, mock_alloc, mock_plan
+    ):
+        mock_config.return_value = _config(production_policy="MADE_TO_ORDER", controlled_by_sales_plan=1)
+        mock_compile.return_value = {
+            "item_code": "ITEM-BURGER",
+            "components": [{"component_item": "BUN", "qty": 1, "qty_per_unit": 1, "stock_uom": "Nos"}],
+        }
+        mock_alloc.return_value = {"BUN": {"allocatable_qty": 50}}
+        mock_plan.return_value = None
+
+        result = get_item_availability("ITEM-BURGER", "Branch A", "Company A")
+
+        self.assertEqual(result["reason_code"], "NO_ACTIVE_PLAN")
+        self.assertFalse(result["sellable"])
+
+    @patch(f"{MODULE}._resolve_plan_remaining")
+    @patch(f"{MODULE}.project_component_allocatable")
+    @patch(f"{MODULE}.compile_bom_vector")
+    @patch(f"{MODULE}._resolve_production_config")
+    def test_controlled_by_sales_plan_explicit_opt_out_skips_gate_made_to_order(
+        self, mock_config, mock_compile, mock_alloc, mock_plan
+    ):
+        mock_config.return_value = _config(production_policy="MADE_TO_ORDER", controlled_by_sales_plan=0)
+        mock_compile.return_value = {
+            "item_code": "ITEM-BURGER",
+            "components": [{"component_item": "BUN", "qty": 1, "qty_per_unit": 1, "stock_uom": "Nos"}],
+        }
+        mock_alloc.return_value = {"BUN": {"allocatable_qty": 50}}
+        mock_plan.return_value = None
+
+        result = get_item_availability("ITEM-BURGER", "Branch A", "Company A")
+
+        self.assertEqual(result["reason_code"], "AVAILABLE")
+        self.assertTrue(result["sellable"])
+
+
+class TestAvailabilityModeOverride(FrappeTestCase):
+    """Regression coverage for B-2: the 'Always Available' override must
+    never force sellable over a structural/config error, but must be able to
+    override a purely commercial not-sellable reason (e.g. FG_OUT_OF_STOCK)."""
+
+    @patch(f"{MODULE}.compile_bom_vector")
+    @patch(f"{MODULE}._resolve_production_config")
+    def test_always_available_does_not_override_missing_bom(self, mock_config, mock_compile):
+        import frappe
+
+        mock_config.return_value = _config(
+            production_policy="MADE_TO_ORDER", availability_mode="Always Available"
+        )
+        mock_compile.side_effect = frappe.ValidationError("no active BOM")
+
+        result = get_item_availability("ITEM-BURGER", "Branch A", "Company A")
+
+        self.assertEqual(result["reason_code"], "MISSING_BOM")
+        self.assertFalse(result["sellable"])
+
+    @patch(f"{MODULE}._resolve_plan_remaining")
+    @patch(f"{MODULE}.project_fg_allocatable")
+    @patch(f"{MODULE}._resolve_production_config")
+    def test_always_available_overrides_fg_out_of_stock(self, mock_config, mock_fg, mock_plan):
+        mock_config.return_value = _config(
+            controlled_by_sales_plan=0, availability_mode="Always Available"
+        )
+        mock_fg.return_value = {"allocatable_qty": 0, "bin_actual_qty": 60, "bin_projected_qty": 0}
+        mock_plan.return_value = None
+
+        result = get_item_availability("ITEM-CAKE", "Branch A", "Company A")
+
+        self.assertEqual(result["reason_code"], "AVAILABLE")
+        self.assertTrue(result["sellable"])
+
+    @patch(f"{MODULE}._resolve_production_config")
+    def test_always_available_does_not_override_department_disabled(self, mock_config):
+        mock_config.return_value = _config(department_disabled=1, availability_mode="Always Available")
+
+        result = get_item_availability("ITEM-CAKE", "Branch A", "Company A")
+
+        self.assertEqual(result["reason_code"], "DEPARTMENT_DISABLED")
+        self.assertFalse(result["sellable"])
