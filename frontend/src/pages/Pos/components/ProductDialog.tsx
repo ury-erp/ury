@@ -6,6 +6,7 @@ import { formatCurrency } from '@ury/core';
 import { Button, Dialog, DialogContent, Input } from '@ury/ui';
 import { db } from '@ury/core';
 import { t } from '../i18n';
+import { getItemAvailability, getAvailabilityMessage } from '../lib/availability-api';
 
 interface Variant {
   id: string;
@@ -37,14 +38,15 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
   initialQuantity,
   itemToReplace
 }) => {
-  const { 
-    selectedItem, 
-    addToOrder, 
-    removeFromOrder, 
-    setSelectedItem, 
+  const {
+    selectedItem,
+    addToOrder,
+    removeFromOrder,
+    setSelectedItem,
     getItemQuantityFromCart,
     activeOrders,
-    menuItems
+    menuItems,
+    posProfile
   } = usePOSStore();
   
   // Find existing item in cart
@@ -133,6 +135,9 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
   const [, setAddonItemCodes] = useState<string[]>([]);
   const [isAddonLoading, setIsAddonLoading] = useState(false);
   const [addonError, setAddonError] = useState<string | null>(null);
+
+  const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
+  const [availabilityError, setAvailabilityError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!selectedItem) {
