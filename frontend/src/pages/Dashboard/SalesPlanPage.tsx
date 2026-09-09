@@ -146,6 +146,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({ itemCode, onClose }) 
   const [bomName, setBomName] = useState<string | null>(null);
   const [bomItems, setBomItems] = useState<BomItemRow[]>([]);
   const [bomChecked, setBomChecked] = useState(false);
+  const [bomError, setBomError] = useState(false);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -197,7 +198,7 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({ itemCode, onClose }) 
       try {
         const bomListRes = await call<any>('frappe.client.get_list', {
           doctype: 'BOM',
-          filters: [['item', '=', itemCode]],
+          filters: [['item', '=', itemCode], ['docstatus', '=', 1], ['is_active', '=', 1]],
           fields: ['name', 'is_active', 'is_default'],
           order_by: 'is_default desc, is_active desc, modified desc',
           limit_page_length: 1,
@@ -210,23 +211,30 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({ itemCode, onClose }) 
           return;
         }
 
-        const bomDocRes = await call<any>('frappe.client.get', {
-          doctype: 'BOM',
-          name: bestBom.name,
-        });
-        if (cancelled) return;
-        const bomDoc = bomDocRes?.message || bomDocRes;
-        setBomName(bomDoc?.name || bestBom.name);
-        const rows: BomItemRow[] = Array.isArray(bomDoc?.items)
-          ? bomDoc.items.map((row: any) => ({
-              item_code: row.item_code || '',
-              item_name: row.item_name,
-              qty: row.qty !== undefined ? Number(row.qty) : undefined,
-              uom: row.uom || row.stock_uom,
-            }))
-          : [];
-        setBomItems(rows);
-        setBomChecked(true);
+        try {
+          const bomDocRes = await call<any>('frappe.client.get', {
+            doctype: 'BOM',
+            name: bestBom.name,
+          });
+          if (cancelled) return;
+          const bomDoc = bomDocRes?.message || bomDocRes;
+          setBomName(bomDoc?.name || bestBom.name);
+          const rows: BomItemRow[] = Array.isArray(bomDoc?.items)
+            ? bomDoc.items.map((row: any) => ({
+                item_code: row.item_code || '',
+                item_name: row.item_name,
+                qty: row.qty !== undefined ? Number(row.qty) : undefined,
+                uom: row.uom || row.stock_uom,
+              }))
+            : [];
+          setBomItems(rows);
+          setBomChecked(true);
+        } catch (err) {
+          if (cancelled) return;
+          setBomName(bestBom.name);
+          setBomError(true);
+          setBomChecked(true);
+        }
       } catch (err) {
         if (!cancelled) setBomChecked(true);
       }
@@ -290,9 +298,17 @@ const ItemDetailModal: React.FC<ItemDetailModalProps> = ({ itemCode, onClose }) 
                 <div className="flex items-center justify-center py-6">
                   <Spinner className="h-5 w-5 text-primary" />
                 </div>
-              ) : bomItems.length === 0 ? (
+              ) : !bomName ? (
                 <div className="rounded-md border border-dashed border-border p-8 text-center text-sm text-text-tertiary">
                   No BOM configured for this item.
+                </div>
+              ) : bomError ? (
+                <div className="rounded-md border border-destructive-tint-border bg-destructive-tint px-3 py-2 text-sm text-destructive">
+                  Unable to load the recipe for this item.
+                </div>
+              ) : bomItems.length === 0 ? (
+                <div className="rounded-md border border-dashed border-border p-8 text-center text-sm text-text-tertiary">
+                  This BOM has no ingredient lines.
                 </div>
               ) : (
                 <DataTable columns={bomColumns} rows={bomItems} emptyMessage="No BOM ingredients found." />
@@ -633,7 +649,6 @@ export const SalesPlanPage: React.FC = () => {
               action: {
                 label: 'View item',
                 onClick: () => {
-                  focusItemRow(item.item_code);
                   setSelectedItemDetailCode(item.item_code);
                 },
               },
@@ -752,7 +767,13 @@ export const SalesPlanPage: React.FC = () => {
       )}
 
       <HistoryModal item={selectedHistoryItem} onClose={() => setSelectedHistoryItem(null)} />
-      <ItemDetailModal itemCode={selectedItemDetailCode} onClose={() => setSelectedItemDetailCode(null)} />
+      <ItemDetailModal
+        itemCode={selectedItemDetailCode}
+        onClose={() => {
+          if (selectedItemDetailCode) focusItemRow(selectedItemDetailCode);
+          setSelectedItemDetailCode(null);
+        }}
+      />
     </Page>
   );
 };
