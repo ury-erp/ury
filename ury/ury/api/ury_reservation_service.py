@@ -405,6 +405,27 @@ def create_reservation(
 		doc.insert(ignore_permissions=False)
 		created_names.append(doc.name)
 
+	# Emit realtime event for each distinct component_item affected.
+	# Wrap in try/except so a socketio failure never breaks the reservation transaction.
+	for component in components_sorted:
+		try:
+			frappe.publish_realtime(
+				"ury_component_stock_changed",
+				{
+					"component_item": component["component_item"],
+					"warehouse": warehouse,
+					"company": company,
+				},
+			)
+		except Exception:
+			# Failure to publish is best-effort, fire-and-forget.
+			# Log but do not raise, so the reservation commit is never aborted.
+			frappe.logger("ury_reservation_service").exception(
+				"Failed to publish realtime event for component {0}".format(
+					component["component_item"]
+				)
+			)
+
 	return {"reservation_group": reservation_group, "reservations": created_names}
 
 
@@ -461,7 +482,46 @@ def release_reservation(reservation_name, reason=None):
 	(Reserved/Fulfilled) it simply stops being counted by
 	`_active_reservation_qty`/`get_available_capacity`.
 	"""
-	return _transition_group(reservation_name, RESERVED, RELEASED, reason, event="release")
+	result = _transition_group(reservation_name, RESERVED, RELEASED, reason, event="release")
+
+	# Emit realtime event for each distinct component_item affected.
+	# Fetch the full row data to extract component details.
+	rows = frappe.get_all(
+		RESERVATION_DOCTYPE,
+		filters={"status": RELEASED},
+		fields=["component_item", "warehouse", "company"],
+	)
+	# Extract distinct components from the released reservation group.
+	# Since _transition_group transitions the entire group, get distinct
+	# components from the result row names' parent rows.
+	group_rows = frappe.get_all(
+		RESERVATION_DOCTYPE,
+		filters={"name": ["in", result]},
+		fields=["component_item", "warehouse", "company"],
+	)
+	seen = set()
+	for row in group_rows:
+		key = (row.component_item, row.warehouse, row.company)
+		if key not in seen:
+			try:
+				frappe.publish_realtime(
+					"ury_component_stock_changed",
+					{
+						"component_item": row.component_item,
+						"warehouse": row.warehouse,
+						"company": row.company,
+					},
+				)
+			except Exception:
+				# Failure to publish is best-effort, fire-and-forget.
+				frappe.logger("ury_reservation_service").exception(
+					"Failed to publish realtime event for released component {0}".format(
+						row.component_item
+					)
+				)
+			seen.add(key)
+
+	return result
 
 
 @frappe.whitelist()

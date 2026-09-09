@@ -300,3 +300,55 @@ def _explode_bom_recursive(bom_name, parent_qty, components, visited):
 
 		entry = components.setdefault(line.item_code, {"qty": 0.0, "stock_uom": line.stock_uom})
 		entry["qty"] += line_qty
+
+
+@frappe.whitelist(allow_guest=False)
+def get_items_affected_by_component(component_item, branch, company):
+	"""Return top-level menu/finished items affected by a component shortage.
+
+	Given a single raw material (`component_item`) and a `branch`/`company`,
+	returns a list of MADE_TO_ORDER items that use this component in their BOM.
+	This is the inverse direction of `compile_shared_component_index`: instead
+	of "which components does this finished item use", it answers "which
+	finished items depend on this component".
+
+	Args:
+		component_item (str): The item code of the raw material/component.
+		branch (str): The branch code (scopes the MADE_TO_ORDER item universe).
+		company (str): The company code (verified against branch-derived company).
+
+	Returns:
+		list: A list of dicts, each with:
+			- top_level_item (str): The finished/menu item code.
+			- qty_per_unit (float): Qty of component per unit of finished item.
+			- stock_uom (str): Stock unit of measure for the component.
+
+		Returns an empty list if the component is not used by any MADE_TO_ORDER
+		items, or if no MADE_TO_ORDER items are configured for the branch.
+
+	Raises:
+		frappe.ValidationError: If `component_item`, `branch`, or `company`
+			is missing/empty, or if any MADE_TO_ORDER item has no active BOM.
+	"""
+	if not component_item:
+		frappe.throw(_("Component item is required"), frappe.ValidationError)
+	if not branch:
+		frappe.throw(_("Branch is required"), frappe.ValidationError)
+	if not company:
+		frappe.throw(_("Company is required"), frappe.ValidationError)
+
+	# Query all active MADE_TO_ORDER items configured for this branch.
+	made_to_order_items = frappe.get_all(
+		"URY Item Production Configuration",
+		filters={"branch": branch, "production_policy": "MADE_TO_ORDER", "active": 1},
+		pluck="item",
+	)
+
+	if not made_to_order_items:
+		return []
+
+	# Compile the reverse dependency index across all MADE_TO_ORDER items.
+	index = compile_shared_component_index(made_to_order_items, company)
+
+	# Return affected items for this specific component (or empty list if unused).
+	return index.get(component_item, [])
