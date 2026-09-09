@@ -3,27 +3,35 @@ from unittest.mock import patch
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
-from ury.ury.api.ury_sales_plan import freeze_approval_snapshot, transition_sales_plan
+from ury.ury.api.ury_sales_plan import (
+    _validate_plan_scope,
+    freeze_approval_snapshot,
+    transition_sales_plan,
+    validate_plan_items,
+)
 
 
 class TestURYSalesPlanContract(FrappeTestCase):
+    """transition_sales_plan() only checks transition legality + permission now.
+
+    Scope checking, item validation, snapshot freezing, and audit logging moved
+    to URYSalesPlan.validate() (ury/ury/doctype/ury_sales_plan/ury_sales_plan.py)
+    so they fire on every status-changing save, including a Desk/Workflow-driven
+    transition that never calls transition_sales_plan() at all. Those guardrails
+    are exercised here as direct unit tests of the still-standalone helper
+    functions instead of through transition_sales_plan().
+    """
+
     def _doc(self, **values):
         doc = frappe._dict({"status": "Submitted for Approval", "branch": "Branch A", "company": "Company A", "plan_date": "2026-09-12", "items": [{"item_code": "MTPL", "qty": 2, "production_policy": "PRE_PRODUCED", "bom": "BOM-1"}], "insight_snapshot": {"source": "history"}})
         doc.update(values)
         return doc
 
-    def test_approval_freezes_deterministic_snapshot(self):
+    def test_transition_updates_status_when_permitted(self):
         doc = self._doc()
-        with patch("ury.ury.api.ury_sales_plan.frappe.has_permission", return_value=True), patch(
-            "ury.ury.api.ury_sales_plan.frappe.db.get_value", return_value="Company A"
-        ), patch(
-            "ury.ury.api.ury_sales_plan.validate_item_production_configuration"
-        ) as validate:
+        with patch("ury.ury.api.ury_sales_plan.frappe.has_permission", return_value=True):
             transition_sales_plan(doc, "Approved", actor="approver@example.com")
-        validate.assert_called_once_with("MTPL", "Branch A")
-        self.assertTrue(doc.approval_snapshot_hash)
         self.assertEqual(doc.status, "Approved")
-        self.assertEqual(doc.audit_log[0]["to_state"], "Approved")
 
     def test_invalid_transition_fails_closed(self):
         with self.assertRaises(frappe.ValidationError):
@@ -34,23 +42,27 @@ class TestURYSalesPlanContract(FrappeTestCase):
             with self.assertRaises(frappe.PermissionError):
                 transition_sales_plan(self._doc(), "Approved")
 
-    def test_branch_company_mismatch_fails_closed(self):
-        with patch("ury.ury.api.ury_sales_plan.frappe.has_permission", return_value=True), patch(
-            "ury.ury.api.ury_sales_plan.frappe.db.get_value", return_value="Other Company"
-        ):
+    def test_validate_plan_scope_fails_closed_on_mismatch(self):
+        with patch("ury.ury.api.ury_sales_plan.frappe.db.get_value", return_value="Other Company"):
             with self.assertRaises(frappe.ValidationError):
-                transition_sales_plan(self._doc(), "Approved")
+                _validate_plan_scope(self._doc())
 
-    def test_item_validation_runs_before_approval(self):
+    def test_validate_plan_items_runs_production_configuration_check(self):
         doc = self._doc()
-        with patch("ury.ury.api.ury_sales_plan.frappe.has_permission", return_value=True), patch(
-            "ury.ury.api.ury_sales_plan.frappe.db.get_value", return_value="Company A"
-        ), patch(
+        with patch(
+            "ury.ury.api.ury_sales_plan.validate_item_production_configuration"
+        ) as validate:
+            validate_plan_items(doc)
+        validate.assert_called_once_with("MTPL", "Branch A")
+
+    def test_validate_plan_items_fails_closed_on_bad_mapping(self):
+        doc = self._doc()
+        with patch(
             "ury.ury.api.ury_sales_plan.validate_item_production_configuration",
             side_effect=frappe.ValidationError("invalid mapping"),
         ):
             with self.assertRaises(frappe.ValidationError):
-                transition_sales_plan(doc, "Approved")
+                validate_plan_items(doc)
         self.assertFalse(doc.get("approval_snapshot"))
 
     def test_snapshot_is_immutable_once_created(self):
