@@ -623,8 +623,32 @@ class TestReleaseFulfilCancel(FrappeTestCase):
 
     def _rows(self, status):
         return [
-            frappe._dict({"name": "RES-1", "status": status, "reservation_group": "GRP9"}),
+            frappe._dict({"name": "RES-1", "status": status, "reservation_group": "GRP9", "audit_log": None}),
         ]
+
+    def _sql_side_effect(self, rows):
+        """Mock for `_resolve_group_rows`'s two locking `frappe.db.sql` reads.
+
+        `_resolve_group_rows` now does a `SELECT ... FOR UPDATE` for the
+        single-docname -> reservation_group lookup, then another for the
+        full group's rows, instead of `frappe.db.get_value`/`frappe.get_all`.
+        This mirrors `rows` (as `self._rows(...)` would supply) back through
+        both shapes so the existing get_all-based fixtures still apply.
+        """
+        def _sql(query, values=None, as_dict=False, **kwargs):
+            if values and "name" in values:
+                for row in rows:
+                    if row.get("name") == values["name"]:
+                        return [frappe._dict({"reservation_group": row.get("reservation_group")})]
+                return []
+            if values and "group" in values:
+                return [
+                    frappe._dict(dict(row))
+                    for row in rows
+                    if row.get("reservation_group") == values["group"]
+                ]
+            return []
+        return _sql
 
     def test_fulfilled_rows_are_not_counted_as_reserved_capacity(self):
         with patch(f"{MODULE}.frappe.get_all", return_value=[]) as get_all:
@@ -647,9 +671,12 @@ class TestReleaseFulfilCancel(FrappeTestCase):
         def get_doc_dispatch(*args, **kwargs):
             return loaded_doc
 
+        rows = self._rows(RESERVED)
         with patch(f"{MODULE}.frappe.db.get_value", return_value=None), patch(
-            f"{MODULE}.frappe.get_all", return_value=self._rows(RESERVED)
-        ), patch(f"{MODULE}.frappe.get_doc", side_effect=get_doc_dispatch), patch(
+            f"{MODULE}.frappe.get_all", return_value=rows
+        ), patch(f"{MODULE}.frappe.db.sql", side_effect=self._sql_side_effect(rows)), patch(
+            f"{MODULE}.frappe.get_doc", side_effect=get_doc_dispatch
+        ), patch(
             f"{MODULE}.frappe.session"
         ) as mock_session:
             mock_session.user = "tester@example.com"
@@ -665,9 +692,12 @@ class TestReleaseFulfilCancel(FrappeTestCase):
         def get_doc_dispatch(*args, **kwargs):
             return loaded_doc
 
+        rows = self._rows(RESERVED)
         with patch(f"{MODULE}.frappe.db.get_value", return_value=None), patch(
-            f"{MODULE}.frappe.get_all", return_value=self._rows(RESERVED)
-        ), patch(f"{MODULE}.frappe.get_doc", side_effect=get_doc_dispatch), patch(
+            f"{MODULE}.frappe.get_all", return_value=rows
+        ), patch(f"{MODULE}.frappe.db.sql", side_effect=self._sql_side_effect(rows)), patch(
+            f"{MODULE}.frappe.get_doc", side_effect=get_doc_dispatch
+        ), patch(
             f"{MODULE}.frappe.session"
         ) as mock_session:
             mock_session.user = "tester@example.com"
@@ -676,9 +706,10 @@ class TestReleaseFulfilCancel(FrappeTestCase):
         self.assertEqual(loaded_doc.status, CANCELLED)
 
     def test_cancel_on_fulfilled_is_rejected(self):
+        rows = self._rows(FULFILLED)
         with patch(f"{MODULE}.frappe.db.get_value", return_value=None), patch(
-            f"{MODULE}.frappe.get_all", return_value=self._rows(FULFILLED)
-        ):
+            f"{MODULE}.frappe.get_all", return_value=rows
+        ), patch(f"{MODULE}.frappe.db.sql", side_effect=self._sql_side_effect(rows)):
             with self.assertRaises(frappe.ValidationError):
                 cancel_reservation("RES-1", reason="attempted post-production cancel")
 
@@ -689,9 +720,12 @@ class TestReleaseFulfilCancel(FrappeTestCase):
         def get_doc_dispatch(*args, **kwargs):
             return loaded_doc
 
+        rows = self._rows(RESERVED)
         with patch(f"{MODULE}.frappe.db.get_value", return_value=None), patch(
-            f"{MODULE}.frappe.get_all", return_value=self._rows(RESERVED)
-        ), patch(f"{MODULE}.frappe.get_doc", side_effect=get_doc_dispatch), patch(
+            f"{MODULE}.frappe.get_all", return_value=rows
+        ), patch(f"{MODULE}.frappe.db.sql", side_effect=self._sql_side_effect(rows)), patch(
+            f"{MODULE}.frappe.get_doc", side_effect=get_doc_dispatch
+        ), patch(
             f"{MODULE}.frappe.session"
         ) as mock_session:
             mock_session.user = "tester@example.com"
@@ -831,8 +865,17 @@ class TestRealtimeEventEmission(FrappeTestCase):
 				return [frappe._dict({"name": "RES-1", "status": RESERVED, "reservation_group": "GRP-RELEASE"})]
 			return []
 
+		def sql_side_effect(query, values=None, as_dict=False, **kwargs):
+			if values and "name" in values:
+				return [frappe._dict({"reservation_group": "GRP-RELEASE"})]
+			if values and "group" in values:
+				return [frappe._dict({"name": "RES-1", "status": RESERVED, "reservation_group": "GRP-RELEASE", "audit_log": None})]
+			return []
+
 		with patch(f"{MODULE}.frappe.db.get_value", return_value=None), patch(
 			f"{MODULE}.frappe.get_all", side_effect=get_all_side_effect
+		), patch(
+			f"{MODULE}.frappe.db.sql", side_effect=sql_side_effect
 		), patch(
 			f"{MODULE}.frappe.get_doc", side_effect=get_doc_dispatch
 		), patch(

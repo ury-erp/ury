@@ -29,6 +29,24 @@ def _doc(data):
 	return doc
 
 
+def _intent_lock_sql(intent_row):
+	"""frappe.db.sql side_effect that answers `_claim_intent`'s locking read
+	of the posting intent row with `intent_row`, and every other locking
+	existence check this module now runs post-lock (Stock Entry / reservation
+	/ fulfilment record) with "not found" -- matching what those checks'
+	previously-mocked `frappe.get_all`/`frappe.db.get_value` equivalents
+	returned in these tests before the F6 fix switched them to `FOR UPDATE`
+	SQL. A single blanket `return_value` cannot distinguish these queries
+	from each other, since they all go through the same `frappe.db.sql` mock
+	point now.
+	"""
+	def _sql(query, values=None, as_dict=False, **kwargs):
+		if "tabURY Fulfilment Posting Intent" in query:
+			return [intent_row]
+		return []
+	return _sql
+
+
 def _execution_doc():
 	return _doc(
 		{
@@ -319,7 +337,10 @@ class TestProcessPostingIntent(FrappeTestCase):
 				return fulfilment
 			raise AssertionError(arg)
 
-		with patch(f"{MODULE}.frappe.db.sql", return_value=[frappe._dict({"name": "INTENT-1", "status": "PENDING", "attempts": 0})]), patch(
+		with patch(
+			f"{MODULE}.frappe.db.sql",
+			side_effect=_intent_lock_sql(frappe._dict({"name": "INTENT-1", "status": "PENDING", "attempts": 0})),
+		), patch(
 			f"{MODULE}.frappe.get_doc", side_effect=get_doc
 		), patch(f"{MODULE}.frappe.get_all", side_effect=lambda doctype, **kwargs: []), patch(
 			f"{MODULE}.frappe.db.get_value", return_value=None
@@ -355,7 +376,15 @@ class TestProcessPostingIntent(FrappeTestCase):
 				return fulfilment
 			raise AssertionError(arg)
 
-		with patch(f"{MODULE}.frappe.db.sql", return_value=[frappe._dict({"name": "INTENT-1", "status": "PENDING", "attempts": 0})]), patch(
+		def sql_side_effect(query, values=None, as_dict=False, **kwargs):
+			if "tabURY Fulfilment Posting Intent" in query:
+				return [frappe._dict({"name": "INTENT-1", "status": "PENDING", "attempts": 0})]
+			if "tabURY Stock Reservation" in query:
+				# _reservation_is_fulfilled: every row already Fulfilled.
+				return [frappe._dict({"status": "Fulfilled"})]
+			return []
+
+		with patch(f"{MODULE}.frappe.db.sql", side_effect=sql_side_effect), patch(
 			f"{MODULE}.frappe.get_doc", side_effect=get_doc
 		), patch(f"{MODULE}.frappe.get_all", return_value=[frappe._dict({"status": "Fulfilled"})]), patch(
 			f"{MODULE}.frappe.db.get_value", return_value="FUL-1"
@@ -390,7 +419,10 @@ class TestProcessPostingIntent(FrappeTestCase):
 				return stock_entry
 			raise AssertionError(arg)
 
-		with patch(f"{MODULE}.frappe.db.sql", return_value=[frappe._dict({"name": "INTENT-1", "status": "PENDING", "attempts": 0})]), patch(
+		with patch(
+			f"{MODULE}.frappe.db.sql",
+			side_effect=_intent_lock_sql(frappe._dict({"name": "INTENT-1", "status": "PENDING", "attempts": 0})),
+		), patch(
 			f"{MODULE}.frappe.get_doc", side_effect=get_doc
 		), patch(f"{MODULE}.frappe.get_all", return_value=[]), patch(
 			f"{MODULE}.fulfil_reservation"
@@ -437,7 +469,10 @@ class TestProcessPostingIntent(FrappeTestCase):
 				return stock_entry
 			raise AssertionError(arg)
 
-		with patch(f"{MODULE}.frappe.db.sql", return_value=[frappe._dict({"name": "INTENT-1", "status": "PENDING", "attempts": 5})]), patch(
+		with patch(
+			f"{MODULE}.frappe.db.sql",
+			side_effect=_intent_lock_sql(frappe._dict({"name": "INTENT-1", "status": "PENDING", "attempts": 5})),
+		), patch(
 			f"{MODULE}.frappe.get_doc", side_effect=get_doc
 		), patch(f"{MODULE}.frappe.get_all", return_value=[]), patch(
 			f"{MODULE}.fulfil_reservation"
