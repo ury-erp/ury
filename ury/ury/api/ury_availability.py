@@ -369,15 +369,27 @@ def get_item_availability(item_code, branch, company, department=None):
 		return response
 
 	# TODO(availability_mode semantics): The `availability_mode` field has three
-	# documented options ("Always Available", "Stock Available", "Plan Available")
-	# but its intended semantics are not documented in the codebase. As a
-	# conservative interpretation, if availability_mode is "Always Available",
-	# override the computed reason_code to allow the item to be sold regardless
-	# of plan/stock constraints. For other modes, use the default computed logic.
-	# This TODO should be resolved once availability_mode's intended semantics
-	# are documented in a follow-up task (likely V3-13/V3-15 or a later task).
+	# documented options ("Plan Available" (default/safe), "Stock Available",
+	# "Always Available") but its full intended semantics are not documented in
+	# the codebase. "Always Available" is implemented as an override of
+	# *commercial* not-sellable reasons only (stock/plan-derived: out of stock,
+	# no/exhausted plan, blocking recipe component) — it must NEVER override a
+	# structural/config error (missing BOM, missing/disabled department or
+	# production unit, generic configuration error), since those indicate the
+	# item is not actually safe to sell/produce at all, regardless of plan or
+	# stock. "Stock Available" is not yet implemented. This TODO should be
+	# resolved once availability_mode's intended semantics are fully documented
+	# in a follow-up task (likely V3-13/V3-15 or a later task).
+	_STRUCTURAL_ERROR_CODES = {
+		"MISSING_BOM",
+		"CONFIGURATION_ERROR",
+		"MISSING_DEPARTMENT",
+		"DEPARTMENT_DISABLED",
+		"PRODUCTION_UNIT_DISABLED",
+		"MISSING_PRODUCTION_UNIT",
+	}
 	availability_mode = config.get("availability_mode") if config else None
-	if availability_mode == "Always Available":
+	if availability_mode == "Always Available" and response.get("reason_code") not in _STRUCTURAL_ERROR_CODES:
 		response["reason_code"] = "AVAILABLE"
 		response["sellable"] = True
 

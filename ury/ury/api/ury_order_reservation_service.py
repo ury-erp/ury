@@ -164,9 +164,32 @@ def _active_groups(order_ref, item_code, reservation_line_key=None):
 	return list(dict.fromkeys(groups))
 
 
-def _reconcile_line(order_ref, line_key, line, branch, company, actor):
+def _check_line_availability(item_code, branch, company, context):
+	"""Return an availability-rejection dict for `item_code`, or None if sellable.
+
+	Pure read-only check -- callers use this to pre-flight a whole batch of
+	lines before any reservation side effect (release/create) begins, so a
+	single unavailable line does not leave earlier lines partially reconciled
+	when the overall sync is aborted (B-4).
+	"""
+	availability = get_item_availability(
+		item_code=item_code,
+		branch=branch,
+		company=company,
+		department=context.get("department"),
+	)
+	if availability.get("sellable"):
+		return None
+	return {
+		"item_code": item_code,
+		"reason_code": availability.get("reason_code"),
+	}
+
+
+def _reconcile_line(order_ref, line_key, line, previous_qty, branch, company, actor):
 	item_code = line["item_code"]
 	requested_qty = flt(line["qty"])
+	previous_qty = flt(previous_qty)
 	context = resolve_production_context(item_code, branch, company=company)
 	if not context:
 		frappe.throw(
@@ -184,24 +207,22 @@ def _reconcile_line(order_ref, line_key, line, branch, company, actor):
 	# Order acceptance is the authoritative transaction boundary for real
 	# stock reservations -- it must not reserve stock for a line the
 	# display-layer availability engine (`get_item_availability`) would
-	# refuse to sell. Only gate an actual increase in reserved qty; a
-	# decrease/removal (requested_qty <= 0, handled below) only releases
-	# existing reservation groups and must never be blocked by
-	# availability, or a user could never remove/reduce a now-unsellable
-	# item from an order. This folds DEPARTMENT_DISABLED and
+	# refuse to sell. Only gate a NET INCREASE in reserved qty (requested_qty
+	# > previous_qty), never merely `requested_qty > 0` -- `requested_qty` is
+	# the line's new ABSOLUTE quantity, not a delta, so gating on ">0" would
+	# also block ordinary decreases (e.g. 5 -> 2 because the kitchen ran
+	# out), which must never be blocked by availability or a user could
+	# never remove/reduce a now-unsellable item from an order (B-3). A
+	# same-or-decreasing edit (including all the way to 0) only releases
+	# existing reservation groups. This folds DEPARTMENT_DISABLED and
 	# NO_ACTIVE_PLAN/PLAN_EXHAUSTED gating -- which this reconciliation
 	# path previously skipped entirely -- into order acceptance itself.
-	if requested_qty > 0:
-		availability = get_item_availability(
-			item_code=item_code,
-			branch=branch,
-			company=company,
-			department=context.get("department"),
-		)
-		if not availability.get("sellable"):
+	if requested_qty > previous_qty:
+		rejection = _check_line_availability(item_code, branch, company, context)
+		if rejection:
 			frappe.throw(
 				_("{0} is not available for order (reason: {1}). Please refresh the menu.").format(
-					item_code, availability.get("reason_code")
+					item_code, rejection.get("reason_code")
 				),
 				frappe.ValidationError,
 			)
@@ -243,6 +264,17 @@ def reconcile_order_reservations(order_ref, previous_items, accepted_items, bran
 
 	Reservation groups are released and rebuilt only for the changed POS line
 	context. Same item codes on other POS lines keep their unrelated groups.
+
+	Availability is pre-flighted for ALL changed lines before any reservation
+	side effect (release/create) begins for ANY line (B-4). This codebase's
+	dominant convention for a rejected transaction is a single hard
+	`frappe.throw` that aborts the whole request (see the other validation
+	failures throughout `ury_order.py`), so we keep that hard-abort shape
+	here rather than inventing a partial-acceptance protocol -- but doing the
+	full pre-flight first (instead of throwing mid-loop, as before) means a
+	rejected line can no longer leave earlier lines in this same sync
+	partially released/re-reserved: either the whole batch passes and is
+	applied, or nothing in this call is mutated.
 	"""
 	if not order_ref or not branch or not company:
 		frappe.throw(_("Order reservation scope is incomplete"), frappe.ValidationError)
@@ -250,6 +282,8 @@ def reconcile_order_reservations(order_ref, previous_items, accepted_items, bran
 	actor = actor or frappe.session.user
 	previous = _line_quantities(previous_items)
 	accepted = _line_quantities(accepted_items)
+
+	changed_lines = []
 	for line_key in sorted(set(previous) | set(accepted)):
 		previous_qty = flt(previous.get(line_key, {}).get("qty"))
 		accepted_qty = flt(accepted.get(line_key, {}).get("qty"))
@@ -259,4 +293,37 @@ def reconcile_order_reservations(order_ref, previous_items, accepted_items, bran
 		line = accepted.get(line_key) or previous[line_key]
 		line = dict(line)
 		line["qty"] = accepted_qty
-		_reconcile_line(order_ref, line_key, line, branch, company, actor)
+		changed_lines.append((line_key, line, previous_qty))
+
+	# Pre-flight: only a net INCREASE in a line's qty needs an availability
+	# check (see _reconcile_line for why absolute qty is not the right
+	# gate). Collect every rejection before mutating any reservation state.
+	rejections = []
+	for line_key, line, previous_qty in changed_lines:
+		accepted_qty = flt(line["qty"])
+		if accepted_qty <= previous_qty:
+			continue
+		item_code = line["item_code"]
+		context = resolve_production_context(item_code, branch, company=company)
+		if not context:
+			# Let _reconcile_line raise the proper "context required" error
+			# below, in original line order, rather than duplicating it here.
+			continue
+		rejection = _check_line_availability(item_code, branch, company, context)
+		if rejection:
+			rejections.append(rejection)
+
+	if rejections:
+		if len(rejections) == 1:
+			message = _("{0} is not available for order (reason: {1}). Please refresh the menu.").format(
+				rejections[0]["item_code"], rejections[0]["reason_code"]
+			)
+		else:
+			detail = ", ".join(f"{r['item_code']} ({r['reason_code']})" for r in rejections)
+			message = _("The following items are not available for order: {0}. Please refresh the menu.").format(
+				detail
+			)
+		frappe.throw(message, frappe.ValidationError)
+
+	for line_key, line, previous_qty in changed_lines:
+		_reconcile_line(order_ref, line_key, line, previous_qty, branch, company, actor)

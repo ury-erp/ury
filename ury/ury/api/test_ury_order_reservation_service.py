@@ -27,17 +27,23 @@ class TestOrderReservationLineIsolation(unittest.TestCase):
 			{"item": "ITEM-1", "qty": 1, "comment": "extra spicy"},
 		]
 
-		with patch.object(service, "_reconcile_line") as reconcile_line:
+		context = service.frappe._dict({"name": "UIPC-1", "department": "Hot Line"})
+		with patch.object(service, "_reconcile_line") as reconcile_line, patch.object(
+			service, "resolve_production_context", return_value=context
+		), patch.object(
+			service, "get_item_availability", return_value={"sellable": True, "reason_code": "AVAILABLE"}
+		):
 			service.reconcile_order_reservations(
 				"INV-1", previous, accepted, "BR-1", "COMP-1", "user@example.com"
 			)
 
 		reconcile_line.assert_called_once()
-		order_ref, line_key, line, branch, company, actor = reconcile_line.call_args.args
+		order_ref, line_key, line, previous_qty, branch, company, actor = reconcile_line.call_args.args
 		self.assertEqual(order_ref, "INV-1")
 		self.assertIn("no onion", line_key)
 		self.assertEqual(line["item_code"], "ITEM-1")
 		self.assertEqual(line["qty"], 2.0)
+		self.assertEqual(previous_qty, 1.0)
 		self.assertEqual(branch, "BR-1")
 		self.assertEqual(company, "COMP-1")
 		self.assertEqual(actor, "user@example.com")
@@ -102,7 +108,7 @@ class TestOrderReservationLineIsolation(unittest.TestCase):
 			service, "get_item_availability", return_value={"sellable": True, "reason_code": "AVAILABLE"}
 		) as get_item_availability:
 			result = service._reconcile_line(
-				"INV-1", "ref:ITEM-1:POS-LINE-1", line, "BR-1", "COMP-1", "user@example.com"
+				"INV-1", "ref:ITEM-1:POS-LINE-1", line, 0, "BR-1", "COMP-1", "user@example.com"
 			)
 
 		self.assertEqual(result, {"reservation_group": "GROUP-NEW"})
@@ -152,7 +158,7 @@ class TestOrderReservationLineIsolation(unittest.TestCase):
 		) as get_item_availability:
 			with self.assertRaises(frappe.ValidationError):
 				service._reconcile_line(
-					"INV-1", "ref:ITEM-1:POS-LINE-1", line, "BR-1", "COMP-1", "user@example.com"
+					"INV-1", "ref:ITEM-1:POS-LINE-1", line, 0, "BR-1", "COMP-1", "user@example.com"
 				)
 
 		get_item_availability.assert_called_once_with(
@@ -190,7 +196,7 @@ class TestOrderReservationLineIsolation(unittest.TestCase):
 			service, "get_item_availability"
 		) as get_item_availability:
 			result = service._reconcile_line(
-				"INV-1", "ref:ITEM-1:POS-LINE-1", line, "BR-1", "COMP-1", "user@example.com"
+				"INV-1", "ref:ITEM-1:POS-LINE-1", line, 5, "BR-1", "COMP-1", "user@example.com"
 			)
 
 		self.assertIsNone(result)
@@ -199,3 +205,115 @@ class TestOrderReservationLineIsolation(unittest.TestCase):
 			"GROUP-LINE-1", reason="Order acceptance line quantity reconciliation"
 		)
 		create_reservation.assert_not_called()
+
+	def test_partial_decrease_of_unsellable_item_is_not_gated(self):
+		"""B-3 regression: reducing a line's qty (but not to zero) on an item
+		that has since become unsellable must NOT be blocked -- only a net
+		INCREASE (accepted_qty > previous_qty) may be gated by availability.
+		`requested_qty` is the line's new absolute qty, not a delta, so gating
+		on `requested_qty > 0` alone (the pre-fix bug) would wrongly block
+		this 5 -> 2 edit."""
+		context = service.frappe._dict(
+			{
+				"name": "UIPC-1",
+				"production_policy": "MADE_TO_ORDER",
+				"production_unit": "Kitchen",
+				"department": "Hot Line",
+				"warehouse": "WH-FG",
+			}
+		)
+		line = {
+			"item_code": "ITEM-1",
+			"qty": 2,
+			"source_line_ref": "POS-LINE-1",
+			"source_context": {},
+		}
+
+		with patch.object(service, "resolve_production_context", return_value=context), patch.object(
+			service, "_active_groups", return_value=["GROUP-LINE-1"]
+		), patch.object(service, "release_reservation") as release_reservation, patch.object(
+			service, "create_reservation", return_value={"reservation_group": "GROUP-NEW"}
+		) as create_reservation, patch.object(
+			service,
+			"get_item_availability",
+			return_value={"sellable": False, "reason_code": "FG_OUT_OF_STOCK"},
+		) as get_item_availability:
+			result = service._reconcile_line(
+				"INV-1", "ref:ITEM-1:POS-LINE-1", line, 5, "BR-1", "COMP-1", "user@example.com"
+			)
+
+		self.assertEqual(result, {"reservation_group": "GROUP-NEW"})
+		get_item_availability.assert_not_called()
+		release_reservation.assert_called_once_with(
+			"GROUP-LINE-1", reason="Order acceptance line quantity reconciliation"
+		)
+		create_reservation.assert_called_once()
+
+
+class TestReconcileOrderReservationsPreflight(unittest.TestCase):
+	"""B-4 regression: a rejected line in a multi-line sync must abort before
+	ANY line's reservation state is mutated -- not mid-loop after earlier
+	lines have already been released/recreated."""
+
+	def test_one_unavailable_line_aborts_before_any_reservation_mutation(self):
+		previous = [
+			{"item": "ITEM-OK", "qty": 1, "comment": ""},
+			{"item": "ITEM-BAD", "qty": 1, "comment": ""},
+		]
+		accepted = [
+			{"item": "ITEM-OK", "qty": 2, "comment": ""},
+			{"item": "ITEM-BAD", "qty": 2, "comment": ""},
+		]
+
+		context = service.frappe._dict({"name": "UIPC-1", "department": "Hot Line"})
+
+		def fake_availability(item_code, branch, company, department):
+			if item_code == "ITEM-BAD":
+				return {"sellable": False, "reason_code": "FG_OUT_OF_STOCK"}
+			return {"sellable": True, "reason_code": "AVAILABLE"}
+
+		with patch.object(
+			service, "resolve_production_context", return_value=context
+		), patch.object(
+			service, "get_item_availability", side_effect=fake_availability
+		), patch.object(
+			service, "_reconcile_line"
+		) as reconcile_line:
+			with self.assertRaises(frappe.ValidationError):
+				service.reconcile_order_reservations(
+					"INV-1", previous, accepted, "BR-1", "COMP-1", "user@example.com"
+				)
+
+		# Neither line's reservation state may have been touched -- the
+		# whole batch is pre-flighted before any mutation begins.
+		reconcile_line.assert_not_called()
+
+	def test_mixed_increase_and_decrease_both_apply_when_all_sellable(self):
+		previous = [
+			{"item": "ITEM-A", "qty": 1, "comment": ""},
+			{"item": "ITEM-B", "qty": 5, "comment": ""},
+		]
+		accepted = [
+			{"item": "ITEM-A", "qty": 2, "comment": ""},  # increase -- gated
+			{"item": "ITEM-B", "qty": 2, "comment": ""},  # decrease -- never gated
+		]
+
+		context = service.frappe._dict({"name": "UIPC-1", "department": "Hot Line"})
+
+		with patch.object(
+			service, "resolve_production_context", return_value=context
+		), patch.object(
+			service, "get_item_availability", return_value={"sellable": True, "reason_code": "AVAILABLE"}
+		) as get_item_availability, patch.object(
+			service, "_reconcile_line"
+		) as reconcile_line:
+			service.reconcile_order_reservations(
+				"INV-1", previous, accepted, "BR-1", "COMP-1", "user@example.com"
+			)
+
+		# Pre-flight only checks the net-increase line (ITEM-A), not the
+		# decreasing one (ITEM-B).
+		get_item_availability.assert_called_once_with(
+			item_code="ITEM-A", branch="BR-1", company="COMP-1", department="Hot Line"
+		)
+		self.assertEqual(reconcile_line.call_count, 2)
