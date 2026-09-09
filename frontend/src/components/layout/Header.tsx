@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useBranchContext } from '../../context/BranchContext';
 import { logout, call, getLoggedUser, getUserRoles } from '@ury/core';
 import { Breadcrumbs } from './Breadcrumbs';
+import { useDeskPermission } from '../DeskLink';
 import uryLogo from '../../../Public/URY-bg.png';
 import { buttonVariants } from '@ury/ui';
 import AskBar from '../chat/AskBar';
@@ -47,6 +48,7 @@ function stripHtml(html: string): string {
 export const Header: React.FC = () => {
   const navigate = useNavigate();
   const { activeBranchId, setActiveBranchId, branches, activeBranch, filterContext } = useBranchContext();
+  const deskPermission = useDeskPermission('User');
 
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -274,6 +276,19 @@ export const Header: React.FC = () => {
                     <RefreshCw className="w-4 h-4" />
                     <span>Clear Cache</span>
                   </button>
+
+                  {deskPermission?.read && (
+                    <button
+                      onClick={() => {
+                        setIsUserMenuOpen(false);
+                        window.location.href = '/app';
+                      }}
+                      className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-foreground hover:bg-muted transition-colors"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      <span>Switch to Desk</span>
+                    </button>
+                  )}
 
                   <button
                     onClick={handleLogout}

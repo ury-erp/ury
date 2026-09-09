@@ -5,12 +5,15 @@ import json
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import flt
+from frappe.utils import flt, get_datetime
 from erpnext.controllers.queries import item_query
 from ury.ury_pos.api import getBranch, getBranchRoom, getRoom, posOpening
 from ury.ury.api.ury_kot_generate import kot_execute
 from ury.ury.api.ury_kot_generate import process_items_for_cancel_kot
 from ury.ury.api.ury_feature_flags import is_pos_stock_authority_flag_enabled
+from ury.ury.api.ury_order_reservation_service import reconcile_order_reservations
+from ury.ury.doctype.alert_settings.alert_settings import get_alert_rule
+from ury.ury.api.ury_kot_notification import create_system_notification, get_users_with_role
 
 from frappe import cache
 
@@ -48,20 +51,15 @@ def _apply_pos_stock_authority(invoice, branch=None):
     """
 
     if is_pos_stock_authority_flag_enabled(branch=branch):
-        # FLAG-ON STUB -- see warning above. Only reachable via a deliberate,
-        # out-of-band admin action; never the default in any environment.
-        invoice.update_stock = 0
-        frappe.log_error(
-            title="V3-73 POS stock authority flag is ON",
-            message=(
-                "pos_stock_authority_v2 is enabled but the flag-on "
-                "integration path is a stub (see _apply_pos_stock_authority "
-                "in ury_order.py). update_stock has been set to 0; no "
-                "fulfilment service call has been made. This flag must not "
-                "be enabled in any real environment until dedicated "
-                "integration work wires this path to V3-71/V3-72 at the "
-                "correct invoice-submission trigger point."
+        # Fail closed until the replacement posting path is proven end to end.
+        # Disabling ERPNext's native stock update without a submitted posting
+        # reference would silently create unvalued sales and inventory drift.
+        frappe.throw(
+            _(
+                "POS stock authority is not enabled for production yet. "
+                "Complete and validate fulfilment posting before enabling it."
             ),
+            frappe.ValidationError,
         )
     else:
         # Flag OFF -- identical to this app's behavior before V3-73.
@@ -924,6 +922,7 @@ def price_items_for_invoice(items, price_list, pos_profile, branch, menu):
                     item_code=d.get("item"),
                     item_name=d.get("item_name"),
                     qty=d.get("qty"),
+                    reservation_line_key=d.get("reservation_line_key"),
                     **({"custom_course": course} if course else {}),
                     comment=d.get("comment"),
                     rate = item_prices[0].price_list_rate,
@@ -943,6 +942,20 @@ def _has_role(user_roles, role_permitted_rows):
     of "Role Permitted" rows (e.g. transfer_role_permissions, role_allowed_for_billing,
     role_restricted_for_table_order)."""
     return any(row.role in user_roles for row in (role_permitted_rows or []))
+
+
+def _ensure_invoice_reservation_ref(invoice):
+    if invoice.name:
+        return invoice.name
+
+    set_new_name = getattr(invoice, "set_new_name", None)
+    if callable(set_new_name):
+        set_new_name()
+
+    if not invoice.name:
+        frappe.throw(_("Unable to allocate an order reference for stock reservation."), frappe.ValidationError)
+
+    return invoice.name
 
 
 def _order_ownership_flags(invoice, pos_profile_name=None):
@@ -1571,6 +1584,7 @@ def sync_order(
     past_item = []
     for item in invoice.items:
         previous_item = {
+            "reservation_line_key": item.get("reservation_line_key") or item.name,
             "item_code": item.item_code,
             "item_name": item.item_name,
             "qty": item.qty,
@@ -1584,6 +1598,16 @@ def sync_order(
     # - 'ury_pos': Already formatted list, hence using else
     if isinstance(items, str):
         items = json.loads(items)
+
+    # Preserve the stable line identity supplied by POS clients. This is
+    # required so same-item lines cannot be reconciled into one reservation.
+    for item in items:
+        if item.get("reservation_line_key"):
+            continue
+        if item.get("reservation_line_ref") or item.get("unique_id") or item.get("uniqueId"):
+            continue
+        # Context/occurrence fallback remains in the reconciliation service
+        # when the client has not supplied a stable line identity.
 
     # Reduction/removal permission: gate any decrease in a previously-sent
     # item's quantity (including full removal) by POS Profile `remove_items`,
@@ -1613,11 +1637,20 @@ def sync_order(
                     frappe.PermissionError,
                 )
 
-    invoice.items = []
-
     menu = frappe.db.get_value("URY Menu", {"branch": invoice.branch}, "name")
 
     priced_items = price_items_for_invoice(items, price_list, pos_profile, invoice.branch, menu)
+
+    reconcile_order_reservations(
+        order_ref=_ensure_invoice_reservation_ref(invoice),
+        previous_items=past_item,
+        accepted_items=items,
+        branch=invoice.branch,
+        company=invoice.company or getattr(posprofile, "company", None) or frappe.db.get_value("Branch", invoice.branch, "company"),
+        actor=frappe.session.user,
+    )
+
+    invoice.items = []
     for item_dict in priced_items:
         invoice.append("items", item_dict)
 
@@ -1625,7 +1658,6 @@ def sync_order(
         invoice.save()
     except Exception as e:
         frappe.throw(f"Error while updating order: {e}")   
-
 
     try:
         kot_execute(invoice.name, customer, table, items, past_item, comments)
@@ -1820,12 +1852,12 @@ def table_transfer(table, newTable, invoice):
     pos_invoice.custom_restaurant_room = new_table.restaurant_room
     pos_invoice.save()
 
-    try:
-        change_table_in_kot(
-            pos_invoice.name, new_table.name, pos_invoice.branch
-        )
-    except Exception:
-        pass
+    # Do not swallow KOT-transfer failures: a raise here aborts the request
+    # (and its transaction) so the table/invoice changes above are rolled
+    # back instead of silently leaving order/table/KOT locations
+    # inconsistent. An empty matching-KOT set is a valid no-op and does not
+    # raise.
+    change_table_in_kot(pos_invoice.name, new_table.name, pos_invoice.branch)
 
 
 @frappe.whitelist()
@@ -1964,16 +1996,40 @@ def cancel_order(invoice_id, reason):
     if pos_invoice.restaurant_table:
         release_merge_cluster_tables(pos_invoice.restaurant_table)
 
-    try:
-        cancel_kot(invoice_id)
+    # KOT cancellation is part of the order-cancellation transaction. If it
+    # fails, stop immediately so the invoice is not cancelled while the KOT
+    # state remains out of sync.
+    cancel_kot(invoice_id)
 
+    # Best-effort delayed-cancellation fraud alert: notify if order was open longer than threshold
+    try:
+        alert_rule = get_alert_rule("Cancel Delay", branch=pos_invoice.branch)
+        if alert_rule:
+            creation_time = pos_invoice.creation
+            current_time = get_datetime()
+            time_diff = current_time - creation_time
+            minutes_open = int(time_diff.total_seconds() / 60)
+
+            threshold_minutes = alert_rule.get("threshold_minutes", 0)
+            if minutes_open > threshold_minutes:
+                # Resolve notify_roles to users and send notifications
+                notify_roles = alert_rule.get("notify_roles", [])
+                if notify_roles:
+                    for role_row in notify_roles:
+                        role_name = role_row.get("role") if isinstance(role_row, dict) else role_row.role
+                        users = get_users_with_role(role_name, branch=pos_invoice.branch)
+                        for user in users:
+                            message = f"Invoice {invoice_id} has been cancelled after {minutes_open} minutes"
+                            subject = f"Invoice {invoice_id} ({pos_invoice.branch}) is cancelled"
+                            create_system_notification(message, user.get("name"), subject)
     except Exception as e:
-        # If an exception occurs (e.g., "kot" app not found), it will be caught here without effecting execution
-        pass
+        # Log error but don't block cancellation
+        frappe.log_error(
+            title="Delayed cancellation alert notification failed",
+            message=f"Failed to send fraud alert for invoice {invoice_id}: {str(e)}"
+        )
 
     # Use standard Frappe cancel workflow instead of raw SQL
-    pos_invoice.db_set("cancel_reason", reason)
-    pos_invoice.cancel()
     if pos_invoice.docstatus == 1:
         # Submitted invoice: cancel through the standard document workflow so
         # on_cancel hooks run and GL/payment reversals and audit entries are

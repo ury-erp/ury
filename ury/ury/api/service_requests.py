@@ -35,16 +35,20 @@ def list_open_service_requests(branch):
 @frappe.whitelist()
 def acknowledge_service_request(name):
 	req = frappe.get_doc("URY Service Request", name)
+	if not frappe.has_permission("URY Service Request", "write", doc=req):
+		frappe.throw(frappe._("Not permitted"), frappe.PermissionError)
 	req.status = "Acknowledged"
-	req.save(ignore_permissions=True)
+	req.save()
 	return {"name": req.name, "status": req.status}
 
 
 @frappe.whitelist()
 def resolve_service_request(name):
 	req = frappe.get_doc("URY Service Request", name)
+	if not frappe.has_permission("URY Service Request", "write", doc=req):
+		frappe.throw(frappe._("Not permitted"), frappe.PermissionError)
 	req.status = "Resolved"
 	req.resolved_at = now_datetime()
 	req.resolved_by = frappe.session.user
-	req.save(ignore_permissions=True)
+	req.save()
 	return {"name": req.name, "status": req.status}

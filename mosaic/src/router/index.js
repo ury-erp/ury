@@ -6,7 +6,7 @@ import KOT from "../components/kot.vue";
 const routes = [
   {
     path: "/",
-    name: "Dashboard",
+    name: "Home",
     component: ProductionDashboard,
   },
 

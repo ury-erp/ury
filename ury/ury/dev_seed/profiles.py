@@ -39,6 +39,8 @@ def seed():
 # ---------------------------------------------------------------------------
 
 def _get_demo_company():
+    if frappe.db.exists("Company", "Demo Restaurant"):
+        return "Demo Restaurant"
     if frappe.db.exists("Company", "My Restaurant"):
         return "My Restaurant"
     company = frappe.get_all("Company", limit=1, pluck="name")
@@ -88,6 +90,12 @@ def _get_demo_restaurant(branch_name):
 
 
 def _ensure_mode_of_payment(name, company_name=None):
+    """Ensure a Mode of Payment exists and has a default account for the given company.
+
+    This is idempotent: it creates the mode if missing, and ensures the company
+    row has a default_account set (whether the mode was just created or already exists).
+    Handles modes created by dev_seed.operations (Zomato/Swiggy/Direct) or manually.
+    """
     if not frappe.db.exists("Mode of Payment", name):
         doc = frappe.get_doc({"doctype": "Mode of Payment", "mode_of_payment": name, "type": "General"})
         if company_name:
@@ -101,12 +109,25 @@ def _ensure_mode_of_payment(name, company_name=None):
         return name
 
     mop_doc = frappe.get_doc("Mode of Payment", name)
-    existing = [row.company for row in mop_doc.get("accounts", [])]
-    if company_name not in existing:
-        account = _default_mop_account(name, company_name)
-        if account:
-            mop_doc.append("accounts", {"company": company_name, "default_account": account})
-            mop_doc.save(ignore_permissions=True)
+
+    # Look for existing company row and fix/update it
+    for row in mop_doc.get("accounts", []):
+        if row.company == company_name:
+            account = _default_mop_account(name, company_name)
+            # Set the account if missing or if it differs from what we computed
+            if account and not row.default_account:
+                row.default_account = account
+                mop_doc.save(ignore_permissions=True)
+            elif account and row.default_account != account:
+                row.default_account = account
+                mop_doc.save(ignore_permissions=True)
+            return name
+
+    # Company row doesn't exist, create it
+    account = _default_mop_account(name, company_name)
+    if account:
+        mop_doc.append("accounts", {"company": company_name, "default_account": account})
+        mop_doc.save(ignore_permissions=True)
     return name
 
 
@@ -167,6 +188,7 @@ def _seed_pos_profile(company_name, branch_name, restaurant_name):
     )
     write_off_account = getattr(company_doc, "write_off_account", None) or expense_account
     write_off_cost_center = cost_center
+    change_amount_account = _default_mop_account("Cash", company_name)
 
     warehouse_name = _ensure_warehouse(company_name)
     selling_price_list = _ensure_price_list()
@@ -206,6 +228,7 @@ def _seed_pos_profile(company_name, branch_name, restaurant_name):
         "cost_center": cost_center,
         "write_off_account": write_off_account,
         "write_off_cost_center": write_off_cost_center,
+        "account_for_change_amount": change_amount_account,
         "selling_price_list": selling_price_list,
         "customer": customer,
         "update_stock": 1,
@@ -216,7 +239,7 @@ def _seed_pos_profile(company_name, branch_name, restaurant_name):
         "table_attention_time": 30,
         "custom_kot_naming_series": "KOT-URY-",
         "custom_enable_discount": 1,
-        "custom_multiple_cashier_configuration": 0,
+        "custom_enable_multiple_cashier": 0,
         "custom_enable_kot_reprint": 1,
         "custom_daily_pos_close": 1,
         "custom_edit_order_type": 1,
@@ -260,9 +283,55 @@ def _seed_pos_profile(company_name, branch_name, restaurant_name):
     # Existing profile (e.g. created by the setup wizard's "Just show me a demo" flow):
     # patch in anything missing rather than duplicating.
     pos_doc = frappe.get_doc("POS Profile", pos_profile_name)
+    # Repair legacy profiles before any document validation can inspect their
+    # cross-company links. Direct database updates are intentional here: the
+    # profile may be impossible to save until the invalid links are replaced.
+    frappe.db.set_value(
+        "POS Profile",
+        pos_profile_name,
+        {
+            "income_account": income_account,
+            "expense_account": expense_account,
+            "cost_center": cost_center,
+            "warehouse": warehouse_name,
+        },
+        update_modified=False,
+    )
+    frappe.db.commit()
+    pos_doc.reload()
     dirty = False
 
     for fieldname, value in fields.items():
+        if fieldname in {
+            "income_account", "expense_account", "cost_center", "warehouse",
+            "account_for_change_amount",
+        } and pos_doc.get(fieldname) != value:
+            pos_doc.set(fieldname, value)
+            dirty = True
+            continue
+        # Upstream ERPNext validates that linked warehouses belong to the
+        # profile company. Repair stale demo profiles created before that
+        # validation became strict.
+        if fieldname == "warehouse" and pos_doc.get(fieldname):
+            warehouse_company = frappe.db.get_value("Warehouse", pos_doc.get(fieldname), "company")
+            if warehouse_company and warehouse_company != company_name:
+                pos_doc.set(fieldname, value)
+                dirty = True
+                continue
+        if fieldname in {
+            "income_account", "expense_account", "write_off_account",
+        } and pos_doc.get(fieldname):
+            account_company = frappe.db.get_value("Account", pos_doc.get(fieldname), "company")
+            if account_company and account_company != company_name:
+                pos_doc.set(fieldname, value)
+                dirty = True
+                continue
+        if fieldname in {"cost_center", "write_off_cost_center"} and pos_doc.get(fieldname):
+            cost_center_company = frappe.db.get_value("Cost Center", pos_doc.get(fieldname), "company")
+            if cost_center_company and cost_center_company != company_name:
+                pos_doc.set(fieldname, value)
+                dirty = True
+                continue
         if not pos_doc.get(fieldname):
             pos_doc.set(fieldname, value)
             dirty = True
@@ -271,6 +340,25 @@ def _seed_pos_profile(company_name, branch_name, restaurant_name):
         if meta.has_field(fieldname) and not pos_doc.get(fieldname):
             pos_doc.set(fieldname, _role_rows(role))
             dirty = True
+
+    for payment in pos_doc.get("payments", []):
+        mode = payment.get("mode_of_payment")
+        account_field = "account" if payment.get("account") else "default_account"
+        account = payment.get(account_field)
+        account_company = frappe.db.get_value("Account", account, "company") if account else None
+        if account and account_company and account_company != company_name:
+            replacement = _default_mop_account(mode, company_name)
+            if replacement:
+                payment.set(account_field, replacement)
+                dirty = True
+
+    # Ensure all payment modes (including user-added ones like Zomato/Swiggy/Direct)
+    # have default accounts set on their Mode of Payment records, so saving the POS
+    # Profile doesn't fail backend validation.
+    for payment in pos_doc.get("payments", []):
+        mode = payment.get("mode_of_payment")
+        if mode:
+            _ensure_mode_of_payment(mode, company_name)
 
     if not pos_doc.get("payments"):
         pos_doc.set(

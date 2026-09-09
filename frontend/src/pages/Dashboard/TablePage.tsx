@@ -99,8 +99,17 @@ export const TablePage: React.FC = () => {
 
   const openEditDrawer = (table: UryTableRecord) => {
     setEditingTable(table);
+    // Derive display name from table_name or name, stripping branch suffix if present
+    let displayName = table.table_name || table.name || '';
+    const branchName = table.branch || activeBranchId;
+
+    // Strip all trailing ` - ${branchName}` occurrences to handle already-compounded corruption
+    while (displayName.endsWith(` - ${branchName}`)) {
+      displayName = displayName.substring(0, displayName.length - (` - ${branchName}`).length);
+    }
+
     setNewTable({
-      table_name: table.table_name || table.name || '',
+      table_name: displayName,
       no_of_seats: table.no_of_seats?.toString() || '4',
       minimum_seating: table.minimum_seating?.toString() || '1',
       branch: table.branch || '',
