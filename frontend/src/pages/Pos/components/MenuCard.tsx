@@ -1,4 +1,4 @@
-import { FC, useEffect, useState } from 'react';
+import { FC, useCallback, useEffect, useState } from 'react';
 import { cn, Badge } from '@ury/ui';
 import { formatCurrency } from '@ury/core';
 import {
@@ -6,6 +6,7 @@ import {
   getItemAvailability,
   ItemAvailability,
 } from '../lib/availability-api';
+import { useMenuAvailabilityChannel } from '../lib/realtime';
 
 interface MenuCardProps {
   id: string;
@@ -53,6 +54,26 @@ const MenuCard: FC<MenuCardProps> = ({
       cancelled = true;
     };
   }, [item, branch, company]);
+
+  // I1: on a live "menu_availability_update_<branch>" event that names this
+  // item, re-check just this item's availability (skipCache: true — never
+  // read the 30s display cache after a stock-affecting event) and update
+  // local state. See `subscribeMenuAvailability`'s doc comment in
+  // ../lib/realtime.ts for the fail-soft contract this relies on.
+  const refetchAvailability = useCallback(() => {
+    if (!branch || !company || !item) return;
+    getItemAvailability({ item_code: item, branch, company }, { skipCache: true })
+      .then((result) => setAvailability(result))
+      .catch(() => {
+        // Same soft-fail contract as the mount-time fetch above.
+      });
+  }, [item, branch, company]);
+
+  useMenuAvailabilityChannel(branch, (payload) => {
+    if (payload.affected_items?.includes(item)) {
+      refetchAvailability();
+    }
+  });
 
   const isUnavailable = !!availability && (!availability.sellable || availability.available_qty <= 0);
   const isDisabled = disabled || isUnavailable;

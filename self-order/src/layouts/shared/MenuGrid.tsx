@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { MenuItem } from '../../lib/api'
 import { getAvailabilityMessage, getItemAvailability, ItemAvailability } from '../../lib/availability'
+import { useMenuAvailabilityChannel } from '../../lib/realtime'
 import ProductCard from './ProductCard'
 
 type Cart = Record<string, { item: MenuItem; qty: number }>
@@ -96,6 +97,24 @@ function MenuGridCard({ item, cartQty, showImage, onClick, cardClassName, imageC
       cancelled = true
     }
   }, [item.item, branch, company])
+
+  // I1: on a live "menu_availability_update_<branch>" event that names this
+  // item, re-check just this item's availability (skipCache: true) and
+  // update local state — mirrors the frontend Pos app's MenuCard.tsx.
+  const refetchAvailability = useCallback(() => {
+    if (!branch || !company) return
+    getItemAvailability({ item_code: item.item, branch, company }, { skipCache: true })
+      .then((result) => setAvailability(result))
+      .catch(() => {
+        // Same soft-fail contract as the mount-time fetch above.
+      })
+  }, [item.item, branch, company])
+
+  useMenuAvailabilityChannel(branch, (payload) => {
+    if (payload.affected_items?.includes(item.item)) {
+      refetchAvailability()
+    }
+  })
 
   const isUnavailable = !!availability && (!availability.sellable || availability.available_qty <= 0)
   const unavailableMessage = isUnavailable ? getAvailabilityMessage(availability?.reason_code) : null
