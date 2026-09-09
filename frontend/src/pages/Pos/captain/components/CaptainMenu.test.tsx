@@ -16,12 +16,16 @@ vi.mock("../../components/MenuCard", () => ({
   ),
 }));
 
-vi.mock("@ury/ui", () => ({
-  cn: (...args: any[]) => args.filter(Boolean).join(" "),
-  Spinner: ({ message }: { message: string }) => (
-    <div data-testid="spinner">{message}</div>
-  ),
-}));
+vi.mock("@ury/ui", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@ury/ui")>();
+  return {
+    ...actual,
+    cn: (...args: any[]) => args.filter(Boolean).join(" "),
+    Spinner: ({ message }: { message: string }) => (
+      <div data-testid="spinner">{message}</div>
+    ),
+  };
+});
 
 const mockMenuItems = [
   {

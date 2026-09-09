@@ -8,9 +8,13 @@ vi.mock("@ury/core", () => ({
   formatCurrency: (amount: number) => `Rs. ${amount}`,
 }));
 
-vi.mock("@ury/ui", () => ({
-  cn: (...args: any[]) => args.filter(Boolean).join(" "),
-}));
+vi.mock("@ury/ui", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@ury/ui")>();
+  return {
+    ...actual,
+    cn: (...args: any[]) => args.filter(Boolean).join(" "),
+  };
+});
 
 const mockLine: OrderDeltaLine = {
   uniqueId: "1",
@@ -46,8 +50,10 @@ describe("CaptainOrderLine", () => {
         variant="delta"
       />
     );
-    const text = screen.getByText(/Chicken Biryani/).textContent;
-    expect(text).toContain("2");
+    expect(screen.getByText(/Chicken Biryani/)).toBeInTheDocument();
+    // Quantity is rendered in its own "qty × price = total" line, not
+    // alongside the item name.
+    expect(screen.getByText(/^2 ×/)).toBeInTheDocument();
   });
 
   it("renders a reduction order line with minus sign", () => {
