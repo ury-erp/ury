@@ -2,9 +2,11 @@ import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import {
   BookLock,
   CalendarClock,
+  Check,
   CheckCircle,
   ChevronLeft,
   ChevronRight,
+  Funnel,
   List,
   MoreVertical,
   Pencil,
@@ -18,6 +20,7 @@ import {
   Card,
   CardContent,
   SearchableSelect,
+  RadixSelect,
   showToast,
 } from '@ury/ui';
 import { useNavigate } from 'react-router-dom';
@@ -134,6 +137,9 @@ export default function Reservations() {
   const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState<boolean>(false);
   const [completeLoading, setCompleteLoading] = useState<boolean>(false);
   const [cancelLoading, setCancelLoading] = useState<boolean>(false);
+
+  // Status filter state (Confirmed by default)
+  const [selectedStatus, setSelectedStatus] = useState<string>('Confirmed');
 
   const isToday = useMemo(() => {
     const today = new Date();
@@ -353,7 +359,14 @@ export default function Reservations() {
         }
       }
 
-      // 3. Search Query from global POS header
+      // 3. Status filter ('All' shows all statuses; otherwise match selected status)
+      if (selectedStatus && selectedStatus !== 'All') {
+        if (res.status !== selectedStatus) {
+          return false;
+        }
+      }
+
+      // 4. Search Query from global POS header
       if (searchQuery.trim()) {
         const q = searchQuery.trim().toLowerCase();
         const tableName = resTable.toLowerCase();
@@ -366,7 +379,7 @@ export default function Reservations() {
 
       return true;
     });
-  }, [reservations, availableTables, selectedRoom, selectedTableFilter, searchQuery]);
+  }, [reservations, availableTables, selectedRoom, selectedTableFilter, selectedStatus, searchQuery]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -492,6 +505,49 @@ export default function Reservations() {
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>
+
+          {/* Status Filter Control */}
+          <RadixSelect.Root value={selectedStatus} onValueChange={setSelectedStatus}>
+            <RadixSelect.Trigger
+              className="inline-flex items-center justify-center p-2 rounded-lg border border-gray-200 bg-white text-gray-700 shadow-2xs hover:bg-gray-50 focus:outline-none transition-colors data-[state=open]:border-blue-500 data-[state=open]:ring-2 data-[state=open]:ring-blue-100 cursor-pointer"
+              aria-label="Filter by Status"
+              title={`Status: ${selectedStatus}`}
+            >
+              <Funnel className="w-4 h-4 text-gray-600" />
+            </RadixSelect.Trigger>
+            <RadixSelect.Portal>
+              <RadixSelect.Content
+                className="z-50 w-44 bg-white border border-gray-200 rounded-xl shadow-lg mt-1 p-1 outline-none animate-in fade-in-50 zoom-in-95"
+                position="popper"
+                sideOffset={4}
+                align="end"
+              >
+                <RadixSelect.Viewport className="p-0 space-y-0.5">
+                  {[
+                    { value: 'All', label: 'All', dotClass: 'bg-gray-400' },
+                    { value: 'Confirmed', label: 'Confirmed', dotClass: 'bg-emerald-500' },
+                    { value: 'Completed', label: 'Completed', dotClass: 'bg-blue-600' },
+                    { value: 'Cancelled', label: 'Cancelled', dotClass: 'bg-red-500' },
+                    { value: 'No Show', label: 'No Show', dotClass: 'bg-orange-500' },
+                  ].map((opt) => (
+                    <RadixSelect.Item
+                      key={opt.value}
+                      value={opt.value}
+                      className="relative flex w-full cursor-pointer select-none items-center justify-between rounded-lg px-3 py-2 text-xs text-gray-700 outline-none transition-colors hover:bg-gray-50 focus:bg-gray-50 data-[highlighted]:bg-gray-50 data-[state=checked]:bg-blue-50 data-[state=checked]:text-blue-700 data-[state=checked]:font-semibold"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className={`w-2 h-2 rounded-full shrink-0 ${opt.dotClass}`} />
+                        <RadixSelect.ItemText>{opt.label}</RadixSelect.ItemText>
+                      </div>
+                      <RadixSelect.ItemIndicator>
+                        <Check className="w-3.5 h-3.5 text-blue-600" />
+                      </RadixSelect.ItemIndicator>
+                    </RadixSelect.Item>
+                  ))}
+                </RadixSelect.Viewport>
+              </RadixSelect.Content>
+            </RadixSelect.Portal>
+          </RadixSelect.Root>
 
           {/* View Mode Toggle: List / Timeline (Icons Only) */}
           <div className="flex items-center bg-gray-100 p-1 rounded-lg border border-gray-200">
