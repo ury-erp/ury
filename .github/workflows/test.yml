@@ -78,19 +78,46 @@ jobs:
           # explicit fallback for the one record that comes after it.
           # Same problem exists a layer down for core Frappe fixtures (Gender,
           # Salutation, ...) -- also normally seeded by the setup wizard, via
-          # a *different* install_fixtures module than erpnext's.
+          # a *different* install_fixtures module than erpnext's. And without
+          # a Company (also only created by the wizard), test fixtures for
+          # doctypes with a mandatory `company` field (e.g. Opportunity) fail
+          # too. Rather than keep chasing individual gaps one at a time, run
+          # the actual setup_complete() the wizard calls -- it covers all of
+          # the above in one go (fixtures, company, defaults). Still wrapped
+          # in try/except per call since this is a fresh site with no prior
+          # setup-wizard-specific edge cases to guard against, and each of
+          # these has already been verified independently to leave its own
+          # useful side effects committed even if a later step in the same
+          # call fails.
           bench --site test_site console <<'PYEOF'
           import frappe
-          from erpnext.setup.setup_wizard.operations.install_fixtures import install
+          from erpnext.setup.setup_wizard.setup_wizard import setup_complete
           from frappe.desk.page.setup_wizard.install_fixtures import install as frappe_install_fixtures
+
           try:
               frappe_install_fixtures()
           except Exception as e:
               print("frappe install_fixtures failed (expected, see workflow comment):", e)
+
+          args = frappe._dict({
+              "country": "India",
+              "currency": "INR",
+              "language": "english",
+              "company_name": "Test Company",
+              "company_abbr": "TC",
+              "fy_start_date": "2024-01-01",
+              "fy_end_date": "2024-12-31",
+              "chart_of_accounts": "Standard",
+              "domain": "Retail",
+              "domains": ["Retail"],
+              "timezone": "Asia/Kolkata",
+              "setup_demo": 0,
+          })
           try:
-              install(country="India")
+              setup_complete(args)
           except Exception as e:
-              print("erpnext install_fixtures.install() partially failed (expected, see workflow comment):", e)
+              print("setup_complete partially failed (expected, see workflow comment):", e)
+
           frappe.db.commit()
           if not frappe.db.exists("Warehouse Type", "Transit"):
               frappe.get_doc({"doctype": "Warehouse Type", "name": "Transit"}).insert(ignore_permissions=True)
