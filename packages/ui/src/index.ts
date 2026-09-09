@@ -14,3 +14,5 @@ export * from './components/stat-card';
 export * from './components/data-table';
 export * from './components/toast';
 export * from './components/sidebar';
+export * from './components/searchable-select';
+
