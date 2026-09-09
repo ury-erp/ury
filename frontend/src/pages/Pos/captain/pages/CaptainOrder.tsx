@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ChevronLeft, ClipboardList, Loader2, UtensilsCrossed } from 'lucide-react';
-import { Button, Spinner, cn, showToast } from '@ury/ui';
+import { Badge, Button, Spinner, cn, showToast } from '@ury/ui';
 import { formatCurrency } from '@ury/core';
 import { usePOSStore } from '../../store/pos-store';
 import { useRootStore, RootState } from '../../store/root-store';
@@ -81,6 +81,8 @@ export default function CaptainOrder() {
   const [editingItemUniqueId, setEditingItemUniqueId] = useState<string | null>(null);
   const [noteEditingLine, setNoteEditingLine] = useState<OrderDeltaLine | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [customerError, setCustomerError] = useState<string | null>(null);
+  const [itemsError, setItemsError] = useState<string | null>(null);
 
   // Secondary actions (PLAN.md §5/§6/§10): overflow menu state + the two
   // picker dialogs, reused as-is from the Cashier `Table.tsx` flow.
@@ -100,6 +102,16 @@ export default function CaptainOrder() {
     setMode(alreadyOrderedLines.length > 0 || reductionPendingLines.length > 0 ? 'order' : 'menu');
     setHasSetInitialMode(true);
   }, [hasSetInitialMode, isOrderReady, alreadyOrderedLines.length, reductionPendingLines.length]);
+
+  // Clear inline validation hints as soon as the underlying condition is
+  // satisfied, rather than waiting for the next Send attempt.
+  useEffect(() => {
+    if (selectedCustomer?.name) setCustomerError(null);
+  }, [selectedCustomer]);
+
+  useEffect(() => {
+    if (activeOrders.length > 0) setItemsError(null);
+  }, [activeOrders.length]);
 
   const editingItem = useMemo(
     () => (editingItemUniqueId ? activeOrders.find((i) => i.uniqueId === editingItemUniqueId) ?? null : null),
@@ -184,17 +196,26 @@ export default function CaptainOrder() {
         return;
       }
       if (activeOrders.length === 0) {
-        showToast.error('Add at least one item before sending the order.');
+        setItemsError('Add at least one item before sending the order.');
+        setMode('order');
         return;
       }
+      setItemsError(null);
       // sync_order requires `customer` as a hard backend parameter (found via
       // live E2E test — a 500 "missing 1 required positional argument:
       // 'customer'" — not just a Cashier-UI convention). Match OrderPanel's
       // exact validate-before-submit gate rather than only omitting the field.
       if (!selectedCustomer?.name) {
-        showToast.error('Please select a customer before sending the order.');
+        setCustomerError('Please select a customer');
+        setMode('order');
+        requestAnimationFrame(() => {
+          document
+            .getElementById('captain-customer-select')
+            ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        });
         return;
       }
+      setCustomerError(null);
 
       setIsSubmitting(true);
 
@@ -363,6 +384,9 @@ export default function CaptainOrder() {
   const MIN_PAX = 1;
   const MAX_PAX = 50;
 
+  const newOrChangedCount = newOrChangedLines.length;
+  const sendButtonLabel = newOrChangedCount > 0 ? `Send Order (${newOrChangedCount} items)` : 'Send Order';
+
   // Render order list content — shared between mobile toggle view and tablet side pane
   const OrderListContent = () => (
     <div className="flex-1 overflow-y-auto p-3 space-y-5 pb-32">
@@ -370,7 +394,10 @@ export default function CaptainOrder() {
         // sync_order requires customer server-side (§handleSend) — surfaced
         // here so a Captain can satisfy it before hitting the send-time
         // validation error. Reused as-is from the Cashier OrderPanel.
-        <CustomerSelect disabled={isInteractionDisabled} />
+        <div id="captain-customer-select">
+          <CustomerSelect disabled={isInteractionDisabled} />
+          {customerError && <p className="text-sm text-destructive mt-1 px-1">{customerError}</p>}
+        </div>
       )}
 
       {!canModify && (
@@ -411,6 +438,7 @@ export default function CaptainOrder() {
         <div className="flex flex-col items-center justify-center text-center py-16">
           <ClipboardList className="w-10 h-10 text-text-tertiary mb-3" />
           <p className="text-text-tertiary text-sm">No items yet.</p>
+          {itemsError && <p className="text-sm text-destructive mt-2">{itemsError}</p>}
           {canModify && (
             <Button onClick={() => setMode('menu')} variant="outline" size="sm" className="mt-3 lg:hidden">
               Browse menu
@@ -421,8 +449,8 @@ export default function CaptainOrder() {
         <>
           {alreadyOrderedLines.length > 0 && (
             <section>
-              <h2 className="text-xs font-semibold text-text-tertiary uppercase tracking-wide mb-2 px-1">
-                Already Ordered
+              <h2 className="text-xs font-semibold text-text-tertiary tracking-wide mb-2 px-1">
+                Already ordered
               </h2>
               <div className="space-y-2">
                 {alreadyOrderedLines.map((line) => (
@@ -442,8 +470,8 @@ export default function CaptainOrder() {
 
           {newOrChangedLines.length > 0 && (
             <section>
-              <h2 className="text-xs font-semibold text-primary uppercase tracking-wide mb-2 px-1">
-                New / Changed
+              <h2 className="text-xs font-semibold text-primary tracking-wide mb-2 px-1">
+                New / changed
               </h2>
               <div className="space-y-2">
                 {newOrChangedLines.map((line) => (
@@ -463,8 +491,8 @@ export default function CaptainOrder() {
 
           {reductionPendingLines.length > 0 && (
             <section>
-              <h2 className="text-xs font-semibold text-destructive uppercase tracking-wide mb-2 px-1">
-                Reduction Pending
+              <h2 className="text-xs font-semibold text-destructive tracking-wide mb-2 px-1">
+                Reduction pending
               </h2>
               <div className="space-y-2">
                 {reductionPendingLines.map((line) => (
@@ -525,18 +553,25 @@ export default function CaptainOrder() {
   return (
     <div className="min-h-screen bg-muted flex flex-col">
       {/* Header */}
-      <div className="sticky top-0 z-20 bg-card border-b border-border px-3 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Button onClick={() => navigate('/pos/order')} variant="ghost" size="icon" aria-label="Back to Tables">
-            <ChevronLeft className="w-5 h-5" />
-          </Button>
-          <div>
-            <h1 className="font-semibold text-foreground leading-tight">Table {table}</h1>
-            <p className="text-xs text-text-tertiary">{isUpdatingOrder ? 'Updating order' : 'New order'}</p>
-          </div>
+      <div className="sticky top-0 z-20 bg-card border-b border-border px-3 py-2 flex items-center gap-2">
+        <Button
+          onClick={() => navigate('/pos/order')}
+          variant="ghost"
+          size="icon"
+          aria-label="Back to Tables"
+          className="shrink-0"
+        >
+          <ChevronLeft className="w-5 h-5" />
+        </Button>
+
+        <div className="min-w-0 flex-1 flex items-center gap-2">
+          <h1 className="font-semibold text-foreground leading-tight truncate">Table {table}</h1>
+          <Badge variant="secondary" size="sm" className="shrink-0">
+            {isUpdatingOrder ? 'Updating order' : 'New order'}
+          </Badge>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           {canModify && (
             <div className="flex items-center gap-1 bg-muted rounded-full p-1 lg:hidden">
               <button
@@ -636,7 +671,7 @@ export default function CaptainOrder() {
               ) : isUpdatingOrder ? (
                 'Update Order'
               ) : (
-                'Send Order'
+                sendButtonLabel
               )}
             </Button>
           </div>
@@ -665,7 +700,7 @@ export default function CaptainOrder() {
             ) : isUpdatingOrder ? (
               'Update Order'
             ) : (
-              'Send Order'
+              sendButtonLabel
             )}
           </Button>
         </div>
