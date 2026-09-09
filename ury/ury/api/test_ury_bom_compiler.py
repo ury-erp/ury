@@ -170,6 +170,140 @@ class TestSharedComponentIndex(unittest.TestCase):
         self.assertEqual(len(index["Potato"]), 1)
 
 
+class TestSharedComponentIndexPerItemIsolation(unittest.TestCase):
+    """One item with no active BOM must not abort the whole index build.
+
+    Regression cover for a live-reproduced fragility bug: a single active
+    MADE_TO_ORDER item with no active BOM (a menu item added before its recipe
+    is finalised) made `compile_bom_vector` raise inside
+    `compile_shared_component_index`, which aborted the entire reverse-index
+    build. `publish_component_stock_fanout`'s outer try/except then swallowed
+    it, so the rich `menu_availability_update_*` realtime event silently
+    stopped firing for EVERY item in the branch, with no signal beyond an
+    error-log line.
+    """
+
+    def _mocks(self):
+        """Three valid items plus 'Broken Item', which has no active BOM."""
+
+        def get_value_side_effect(doctype, filters, field=None, **kwargs):
+            return {
+                "Burger": "BOM-BURGER-001",
+                "Cheese Fries": "BOM-FRIES-001",
+                "Milkshake": "BOM-SHAKE-001",
+            }.get(filters.get("item"))
+
+        def get_all_side_effect(doctype, filters=None, fields=None, **kwargs):
+            return {
+                "BOM-BURGER-001": [_row("Bun", 1), _row("Cheese Slice", 2)],
+                "BOM-FRIES-001": [_row("Cheese Slice", 1), _row("Potato", 3)],
+                "BOM-SHAKE-001": [_row("Milk", 4)],
+            }.get(filters["parent"], [])
+
+        return get_value_side_effect, get_all_side_effect
+
+    @patch(f"{MOD}.frappe.get_all")
+    @patch(f"{MOD}.frappe.db.get_value")
+    def test_broken_item_is_skipped_and_valid_items_still_indexed(
+        self, mock_get_value, mock_get_all
+    ):
+        get_value_side_effect, get_all_side_effect = self._mocks()
+        mock_get_value.side_effect = get_value_side_effect
+        mock_get_all.side_effect = get_all_side_effect
+
+        # "Broken Item" is deliberately placed FIRST, so a non-isolated build
+        # would raise before any valid item was ever indexed.
+        index = compile_shared_component_index(
+            ["Broken Item", "Burger", "Cheese Fries", "Milkshake"],
+            "URY Co",
+            skip_invalid_items=True,
+        )
+
+        # Does not raise, and does not return an empty index.
+        self.assertTrue(index)
+
+        # Every valid item is still fully resolved, including the shared
+        # component's per-consumer rates.
+        self.assertEqual(len(index["Cheese Slice"]), 2)
+        consumers = {row["top_level_item"]: row["qty_per_unit"] for row in index["Cheese Slice"]}
+        self.assertEqual(consumers["Burger"], 2)
+        self.assertEqual(consumers["Cheese Fries"], 1)
+        self.assertEqual(len(index["Bun"]), 1)
+        self.assertEqual(len(index["Potato"]), 1)
+        self.assertEqual(len(index["Milk"]), 1)
+
+        # The broken item contributes nothing and appears nowhere.
+        indexed_items = {
+            row["top_level_item"] for rows in index.values() for row in rows
+        }
+        self.assertNotIn("Broken Item", indexed_items)
+
+    @patch(f"{MOD}.frappe.get_all")
+    @patch(f"{MOD}.frappe.db.get_value")
+    def test_strict_mode_remains_fail_closed_by_default(self, mock_get_value, mock_get_all):
+        """Default (skip_invalid_items=False) must still raise.
+
+        Production-planning / stock-issue callers must never silently omit an
+        item's demand, so graceful degradation is opt-in only.
+        """
+        get_value_side_effect, get_all_side_effect = self._mocks()
+        mock_get_value.side_effect = get_value_side_effect
+        mock_get_all.side_effect = get_all_side_effect
+
+        with self.assertRaises(frappe.ValidationError):
+            compile_shared_component_index(["Burger", "Broken Item"], "URY Co")
+
+    @patch(f"{MOD}.frappe.get_all")
+    @patch(f"{MOD}.frappe.db.get_value")
+    def test_all_items_broken_returns_empty_index_without_raising(
+        self, mock_get_value, mock_get_all
+    ):
+        mock_get_value.return_value = None
+        mock_get_all.return_value = []
+
+        index = compile_shared_component_index(
+            ["Broken One", "Broken Two"], "URY Co", skip_invalid_items=True
+        )
+
+        self.assertEqual(index, {})
+
+
+class TestGetItemsAffectedByComponentIsolatesBrokenItems(unittest.TestCase):
+    """The realtime fan-out lookup must survive one misconfigured branch item."""
+
+    @patch(f"{MOD}.frappe.get_all")
+    @patch(f"{MOD}.frappe.db.get_value")
+    def test_one_item_without_bom_does_not_blind_the_whole_branch(
+        self, mock_get_value, mock_get_all
+    ):
+        def get_value_side_effect(doctype, filters, field=None, **kwargs):
+            return {
+                "Burger": "BOM-BURGER-001",
+                "Cheese Fries": "BOM-FRIES-001",
+            }.get(filters.get("item"))
+
+        def get_all_side_effect(doctype, filters=None, fields=None, **kwargs):
+            # The branch's configured MADE_TO_ORDER items, one of which
+            # ("Broken Item") has no active BOM.
+            if doctype == "URY Item Production Configuration":
+                return ["Burger", "Broken Item", "Cheese Fries"]
+            return {
+                "BOM-BURGER-001": [_row("Bun", 1), _row("Cheese Slice", 2)],
+                "BOM-FRIES-001": [_row("Cheese Slice", 1), _row("Potato", 3)],
+            }.get((filters or {}).get("parent"), [])
+
+        mock_get_value.side_effect = get_value_side_effect
+        mock_get_all.side_effect = get_all_side_effect
+
+        affected = get_items_affected_by_component("Cheese Slice", "URY Branch", "URY Co")
+
+        # Before the fix this raised (and the caller's try/except swallowed it,
+        # silently killing the rich event branch-wide). Now both valid
+        # consumers of the shared component resolve normally.
+        consumers = {row["top_level_item"]: row["qty_per_unit"] for row in affected}
+        self.assertEqual(consumers, {"Burger": 2, "Cheese Fries": 1})
+
+
 class TestNoBomFailsClosed(unittest.TestCase):
     @patch(f"{MOD}.frappe.get_all")
     @patch(f"{MOD}.frappe.db.get_value")

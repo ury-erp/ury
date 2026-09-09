@@ -117,7 +117,7 @@ def compile_bom_vector(item_code, qty, company):
 	}
 
 
-def compile_shared_component_index(item_codes, company):
+def compile_shared_component_index(item_codes, company, skip_invalid_items=False):
 	"""Build the reverse dependency index component_item -> consuming top-level items.
 
 	`item_codes` is an iterable of top-level (finished/menu) item codes. Returns:
@@ -134,12 +134,46 @@ def compile_shared_component_index(item_codes, company):
 	shared by two or more top-level items has one entry per consumer, so a
 	caller can answer "which menu items does a shortage of component X
 	block" by reading `index[X]`.
+
+	`skip_invalid_items` selects the failure mode when `compile_bom_vector`
+	raises for one of `item_codes` (most commonly a MADE_TO_ORDER item with no
+	active BOM -- an entirely normal, reachable state for a menu item added
+	before its recipe is finalised):
+
+	  - False (default): the exception propagates and no index is returned.
+	    This is the correct, fail-closed behaviour for any caller that plans
+	    production or authorises stock issue, where silently omitting an item's
+	    demand would understate what must be produced or issued.
+	  - True: that one item is logged and skipped, and the index is still built
+	    from every other item. Use this only for advisory/best-effort consumers
+	    -- see `get_items_affected_by_component`, where one misconfigured item
+	    must not blind the realtime availability channel for the whole branch.
+
+	Returns the index either way; with `skip_invalid_items=True` the skipped
+	items are simply absent from it.
 	"""
 	item_codes = list(dict.fromkeys(item_codes))  # de-dupe, preserve order
 	index = {}
+	skipped = []
 
 	for item_code in item_codes:
-		vector = compile_bom_vector(item_code, 1, company)
+		try:
+			vector = compile_bom_vector(item_code, 1, company)
+		except Exception:
+			if not skip_invalid_items:
+				raise
+			# Per-item isolation: one unbuildable item must not abort the
+			# whole reverse-index build for every other item.
+			skipped.append(item_code)
+			frappe.logger("ury_bom_compiler").exception(
+				"compile_shared_component_index: skipping item {0} (company {1}); "
+				"its BOM vector could not be compiled. The index is still built "
+				"from the remaining items, so this item's availability changes "
+				"will not propagate via the rich realtime channel until its "
+				"configuration is fixed.".format(item_code, company)
+			)
+			continue
+
 		for component in vector["components"]:
 			index.setdefault(component["component_item"], []).append(
 				{
@@ -148,6 +182,14 @@ def compile_shared_component_index(item_codes, company):
 					"stock_uom": component["stock_uom"],
 				}
 			)
+
+	if skipped:
+		frappe.logger("ury_bom_compiler").warning(
+			"compile_shared_component_index (company {0}): built index from {1} of {2} "
+			"items; skipped {3} with uncompilable BOMs: {4}".format(
+				company, len(item_codes) - len(skipped), len(item_codes), len(skipped), ", ".join(skipped)
+			)
+		)
 
 	return index
 
@@ -326,9 +368,15 @@ def get_items_affected_by_component(component_item, branch, company):
 		Returns an empty list if the component is not used by any MADE_TO_ORDER
 		items, or if no MADE_TO_ORDER items are configured for the branch.
 
+		A configured MADE_TO_ORDER item whose BOM vector cannot be compiled
+		(typically: no active BOM yet) is logged and skipped; it simply never
+		appears in the results. Every other item in the branch still resolves
+		normally. See the `skip_invalid_items=True` rationale at the call site
+		below.
+
 	Raises:
 		frappe.ValidationError: If `component_item`, `branch`, or `company`
-			is missing/empty, or if any MADE_TO_ORDER item has no active BOM.
+			is missing/empty.
 	"""
 	if not component_item:
 		frappe.throw(_("Component item is required"), frappe.ValidationError)
@@ -348,7 +396,21 @@ def get_items_affected_by_component(component_item, branch, company):
 		return []
 
 	# Compile the reverse dependency index across all MADE_TO_ORDER items.
-	index = compile_shared_component_index(made_to_order_items, company)
+	#
+	# `skip_invalid_items=True` is deliberate. This lookup feeds H1's
+	# best-effort realtime fan-out (`publish_component_stock_fanout`), whose
+	# outer try/except correctly swallows any failure here so a reservation
+	# write is never broken by it. The consequence, before this flag existed,
+	# was that a SINGLE active MADE_TO_ORDER item with no active BOM -- a menu
+	# item added before its recipe is finalised, entirely routine -- made
+	# `compile_bom_vector` raise, aborted the whole reverse-index build, and so
+	# silently stopped the rich `menu_availability_update_*` event from firing
+	# for EVERY item in the branch, for every component change, with no signal
+	# beyond one error-log line. (Live-reproduced on bench sa-prodctrl-unif-live
+	# via the LMNT fixture.) Degrading to "that one item's changes don't
+	# propagate" is both correct and already the accepted behaviour for it;
+	# blinding the entire branch is not.
+	index = compile_shared_component_index(made_to_order_items, company, skip_invalid_items=True)
 
 	# Return affected items for this specific component (or empty list if unused).
 	return index.get(component_item, [])
