@@ -5,20 +5,34 @@ Ships a standard Frappe `Workflow` record so admins can transition a
 (`/app/ury-sales-plan`), mirroring the state machine defined in
 `ury/ury/api/ury_sales_plan.py::TRANSITIONS`.
 
-The actual fixture data lives at `ury/ury/fixtures/workflow.json` — that is
-the only path `frappe.utils.fixtures.sync_fixtures()` reads on `bench
-migrate` (`frappe.get_app_path(app, "fixtures")`, one level per app, not
-per-doctype). An earlier version of this fix placed the JSON at
-`ury/ury/workflow/ury_sales_plan/ury_sales_plan.json` (mirroring a
-doctype-definition folder's `<name>/<name>.json` shape) — that path is never
-scanned by fixture sync, so the Workflow record silently never imported on
-any real `bench migrate` despite `before_migrate` seeding the `Workflow
-State`/`Workflow Action Master` rows correctly. Confirmed live: after moving
-the JSON here, `bench --site <site> execute frappe.client.get_list
---kwargs '{"doctype": "Workflow"}'` returns the `URY Sales Plan` record after
-migrate; it did not before. `install.py` (this directory) still owns the
-`before_migrate` seeding of `Workflow State`/`Workflow Action Master`, since
-those are separate doctypes fixture sync does not create for you.
+The actual fixture data lives at `ury/fixtures/workflow.json` (sibling of
+`ury/fixtures/role.json` etc) — that is the only path
+`frappe.utils.fixtures.sync_fixtures()` reads on `bench migrate`
+(`frappe.get_app_path("ury", "fixtures")` resolves to the physical directory
+of the top-level `ury` package, i.e. `<repo-root>/ury/`, since that's where
+`hooks.py` itself lives — NOT the nested `ury/ury/` subpackage that
+`ai_tools`, `commands`, etc. live under). Two earlier versions of this fix
+got the fixture path wrong and the Workflow record silently never imported
+on any real `bench migrate`, despite `before_migrate` correctly seeding its
+`Workflow State`/`Workflow Action Master` dependencies each time:
+
+1. First at `ury/ury/workflow/ury_sales_plan/ury_sales_plan.json` (mirroring
+   a doctype-definition folder's `<name>/<name>.json` shape) — fixture sync
+   doesn't scan doctype-shaped folders at all.
+2. Then at `ury/ury/fixtures/workflow.json` (nested under the `ury/ury/`
+   subpackage, since that's where this workflow's own `install.py` genuinely
+   lives per the `ury.ury.workflow.ury_sales_plan.install` dotted hook path)
+   — but `get_app_path` resolves to `ury/fixtures/`, one level up, not
+   `ury/ury/fixtures/`.
+
+Confirmed live both ways: `bench console` → `frappe.get_all("Workflow",
+pluck="name")` returned `[]` after a full `bench migrate` with the fixture
+at either wrong path, and returned `["URY Sales Plan"]` once it was moved to
+the correct `ury/fixtures/workflow.json`. `install.py` (this directory,
+`ury/ury/workflow/ury_sales_plan/`) is unaffected by this — its
+`ury.ury.workflow.ury_sales_plan.install` dotted import path is a normal
+Python package path, not a `get_app_path` fixtures lookup, and was correct
+from the start.
 
 ## FIXED — Desk transitions used to bypass `transition_sales_plan()` guardrails
 
