@@ -351,6 +351,207 @@ class TestCreateReservationCompositeItem(FrappeTestCase):
         self.assertEqual(result["reservation_group"], "GRP3")
 
 
+class TestCreateReservationProductionPolicy(FrappeTestCase):
+    """Regression coverage: `production_policy` (not "has an active BOM")
+    must decide whether create_reservation checks FG stock directly or
+    explodes the BOM into raw components -- see `_resolve_components`.
+    """
+
+    def setUp(self):
+        now_patcher = patch(f"{MODULE}.frappe.utils.now", return_value="2024-01-01 00:00:00")
+        now_patcher.start()
+        self.addCleanup(now_patcher.stop)
+
+    def test_pre_produced_item_with_active_bom_reserves_own_fg_stock_not_components(self):
+        """PRNPM-style item: PRE_PRODUCED, has an active default BOM (documents
+        the recipe), but must reserve/check its OWN finished-goods stock, not
+        explode into raw ingredients. If this regresses to the has-BOM
+        heuristic, the reservation would instead check MZRCHSE/ORGNO-style
+        raw component Bin rows and raise a raw-ingredient shortfall error.
+        """
+        get_doc_side_effect, created = _new_doc_recorder()
+
+        def get_value_side_effect(doctype, filters, field=None, **kwargs):
+            if doctype == "BOM":
+                # A real active default BOM exists for this item -- proving
+                # its mere presence must NOT trigger component explosion
+                # once production_policy is PRE_PRODUCED.
+                if isinstance(filters, dict) and "item" in filters:
+                    return "BOM-PRNPM"
+            return None
+
+        def sql_side_effect(query, params, **kwargs):
+            self.assertEqual(params["item_code"], "PRNPM")
+            return [{"name": "BIN-PRNPM", "actual_qty": 20, "projected_qty": 20}]
+
+        with patch(f"{MODULE}.frappe.has_permission", return_value=True), patch(
+            f"{MODULE}.frappe.db.sql", side_effect=sql_side_effect
+        ), patch(
+            f"{MODULE}.frappe.db.get_value", side_effect=get_value_side_effect
+        ), patch(
+            f"{MODULE}.frappe.get_all", return_value=[]
+        ), patch(
+            f"{MODULE}.frappe.get_doc", side_effect=get_doc_side_effect
+        ), patch(
+            f"{MODULE}.frappe.generate_hash", return_value="GRP-PRNPM"
+        ), patch(
+            f"{MODULE}.compile_bom_vector"
+        ) as mock_compile:
+            result = create_reservation(
+                item_code="PRNPM",
+                qty=5,
+                warehouse="WH-FG",
+                branch="Branch A",
+                company="Company A",
+                order_ref="ORDER-PRNPM",
+                policy="PRE_PRODUCED",
+            )
+
+        mock_compile.assert_not_called()
+        self.assertEqual(len(created), 1)
+        self.assertEqual(created[0]["component_item"], "PRNPM")
+        self.assertEqual(created[0]["qty"], 5)
+        self.assertEqual(result["reservation_group"], "GRP-PRNPM")
+
+    def test_direct_retail_item_with_active_bom_reserves_own_fg_stock(self):
+        """Same guard as PRE_PRODUCED, for DIRECT_RETAIL."""
+        get_doc_side_effect, created = _new_doc_recorder()
+
+        def get_value_side_effect(doctype, filters, field=None, **kwargs):
+            if doctype == "BOM" and isinstance(filters, dict) and "item" in filters:
+                return "BOM-RETAIL-ITEM"
+            return None
+
+        def sql_side_effect(query, params, **kwargs):
+            return [{"name": "BIN-1", "actual_qty": 20, "projected_qty": 20}]
+
+        with patch(f"{MODULE}.frappe.has_permission", return_value=True), patch(
+            f"{MODULE}.frappe.db.sql", side_effect=sql_side_effect
+        ), patch(
+            f"{MODULE}.frappe.db.get_value", side_effect=get_value_side_effect
+        ), patch(
+            f"{MODULE}.frappe.get_all", return_value=[]
+        ), patch(
+            f"{MODULE}.frappe.get_doc", side_effect=get_doc_side_effect
+        ), patch(
+            f"{MODULE}.frappe.generate_hash", return_value="GRP-RETAIL"
+        ), patch(
+            f"{MODULE}.compile_bom_vector"
+        ) as mock_compile:
+            result = create_reservation(
+                item_code="RETAIL-ITEM",
+                qty=2,
+                warehouse="WH-FG",
+                branch="Branch A",
+                company="Company A",
+                order_ref="ORDER-RETAIL",
+                policy="DIRECT_RETAIL",
+            )
+
+        mock_compile.assert_not_called()
+        self.assertEqual(len(created), 1)
+        self.assertEqual(created[0]["component_item"], "RETAIL-ITEM")
+        self.assertEqual(result["reservation_group"], "GRP-RETAIL")
+
+    def test_made_to_order_item_still_reserves_bom_components(self):
+        """Regression guard: MADE_TO_ORDER items keep exploding into BOM
+        components exactly as before, when production_policy is passed
+        explicitly."""
+        get_doc_side_effect, created = _new_doc_recorder()
+
+        def sql_side_effect(query, params, **kwargs):
+            item_code = params["item_code"]
+            bin_qty = {"FLOUR": 10, "SUGAR": 10}[item_code]
+            return [{"name": f"BIN-{item_code}", "actual_qty": bin_qty, "projected_qty": bin_qty}]
+
+        def get_all_side_effect(doctype, filters=None, fields=None, **kwargs):
+            return []
+
+        with patch(f"{MODULE}.frappe.has_permission", return_value=True), patch(
+            f"{MODULE}.frappe.db.sql", side_effect=sql_side_effect
+        ), patch(
+            f"{MODULE}.frappe.get_all", side_effect=get_all_side_effect
+        ), patch(
+            f"{MODULE}.frappe.get_doc", side_effect=get_doc_side_effect
+        ), patch(
+            f"{MODULE}.frappe.generate_hash", return_value="GRP-MTO"
+        ), patch(
+            f"{MODULE}.compile_bom_vector",
+            return_value={
+                "item_code": "MENU-A",
+                "components": [
+                    {"component_item": "FLOUR", "qty": 6, "qty_per_unit": 2},
+                    {"component_item": "SUGAR", "qty": 3, "qty_per_unit": 1},
+                ],
+            },
+        ) as mock_compile:
+            result = create_reservation(
+                item_code="MENU-A",
+                qty=3,
+                warehouse="WH-1",
+                branch="Branch A",
+                company="Company A",
+                order_ref="ORDER-MTO",
+                policy="MADE_TO_ORDER",
+            )
+
+        mock_compile.assert_called_once()
+        self.assertEqual(len(created), 2)
+        by_item = {row["component_item"]: row["qty"] for row in created}
+        self.assertEqual(by_item["FLOUR"], 6)
+        self.assertEqual(by_item["SUGAR"], 3)
+        self.assertEqual(result["reservation_group"], "GRP-MTO")
+
+    def test_no_production_policy_falls_back_to_legacy_has_bom_heuristic(self):
+        """Backward compatibility: a caller that supplies no production_policy
+        (e.g. not yet updated, or item genuinely unconfigured) keeps the
+        pre-existing has-active-BOM => composite-reservation behaviour."""
+        get_doc_side_effect, created = _new_doc_recorder()
+
+        def get_value_side_effect(doctype, filters, field=None, **kwargs):
+            if doctype == "BOM" and isinstance(filters, dict) and "item" in filters:
+                return "BOM-MENU-A"
+            return None
+
+        def sql_side_effect(query, params, **kwargs):
+            item_code = params["item_code"]
+            bin_qty = {"FLOUR": 10, "SUGAR": 10}[item_code]
+            return [{"name": f"BIN-{item_code}", "actual_qty": bin_qty, "projected_qty": bin_qty}]
+
+        with patch(f"{MODULE}.frappe.has_permission", return_value=True), patch(
+            f"{MODULE}.frappe.db.sql", side_effect=sql_side_effect
+        ), patch(
+            f"{MODULE}.frappe.db.get_value", side_effect=get_value_side_effect
+        ), patch(
+            f"{MODULE}.frappe.get_all", return_value=[]
+        ), patch(
+            f"{MODULE}.frappe.get_doc", side_effect=get_doc_side_effect
+        ), patch(
+            f"{MODULE}.frappe.generate_hash", return_value="GRP-LEGACY"
+        ), patch(
+            f"{MODULE}.compile_bom_vector",
+            return_value={
+                "item_code": "MENU-A",
+                "components": [
+                    {"component_item": "FLOUR", "qty": 6, "qty_per_unit": 2},
+                    {"component_item": "SUGAR", "qty": 3, "qty_per_unit": 1},
+                ],
+            },
+        ) as mock_compile:
+            result = create_reservation(
+                item_code="MENU-A",
+                qty=3,
+                warehouse="WH-1",
+                branch="Branch A",
+                company="Company A",
+                order_ref="ORDER-LEGACY",
+            )
+
+        mock_compile.assert_called_once()
+        self.assertEqual(len(created), 2)
+        self.assertEqual(result["reservation_group"], "GRP-LEGACY")
+
+
 class TestReleaseFulfilCancel(FrappeTestCase):
     def setUp(self):
         # append_audit() calls frappe.utils.now(), which otherwise
