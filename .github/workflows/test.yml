@@ -1,0 +1,93 @@
+name: Tests
+
+on:
+  push:
+    branches:
+      - v3-stg
+  pull_request:
+    branches:
+      - v3-stg
+
+permissions: {}
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mariadb-server redis-server
+
+      - name: Start services
+        run: |
+          sudo systemctl start mariadb
+          sudo systemctl start redis-server
+
+      - name: Install Frappe and dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install bench
+
+      - name: Setup Frappe
+        run: |
+          bench init --frappe-branch=version-15 frappe_env
+          cd frappe_env
+          bench new-site test_site --admin-password=admin --mariadb-root-password=root
+          bench --site test_site install-app ury
+
+      - name: Run backend tests
+        run: |
+          cd frappe_env
+          bench --site test_site run-tests --app ury
+
+  frontend-lint-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies and run tests for frontend
+        working-directory: ./frontend
+        run: |
+          yarn install
+          yarn lint
+          if grep -q '"typecheck"' package.json; then
+            yarn typecheck
+          fi
+          yarn test
+
+      - name: Install dependencies and run tests for pos
+        working-directory: ./pos
+        run: |
+          yarn install
+          yarn lint
+          if grep -q '"typecheck"' package.json; then
+            yarn typecheck
+          fi
+          yarn test
+
+      - name: Install dependencies and run tests for self-order
+        working-directory: ./self-order
+        run: |
+          yarn install
+          yarn lint
+          if grep -q '"typecheck"' package.json; then
+            yarn typecheck
+          fi
+          yarn test
