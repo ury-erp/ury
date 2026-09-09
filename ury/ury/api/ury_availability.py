@@ -359,26 +359,53 @@ def get_item_availability(item_code, branch, company, department=None):
 	response["warehouse"] = warehouse
 
 	if production_policy == POLICY_PRE_PRODUCED:
-		_fill_pre_produced(response, item_code, branch, company, resolved_department, warehouse)
+		_fill_pre_produced(response, item_code, branch, company, resolved_department, warehouse, config)
 	elif production_policy == POLICY_MADE_TO_ORDER:
-		_fill_made_to_order(response, item_code, branch, company, resolved_department, warehouse)
+		_fill_made_to_order(response, item_code, branch, company, resolved_department, warehouse, config)
 	elif production_policy == POLICY_DIRECT_RETAIL:
 		_fill_direct_retail(response, item_code, branch, company, warehouse)
 	else:
 		response["reason_code"] = "CONFIGURATION_ERROR"
 		return response
 
+	# TODO(availability_mode semantics): The `availability_mode` field has three
+	# documented options ("Plan Available" (default/safe), "Stock Available",
+	# "Always Available") but its full intended semantics are not documented in
+	# the codebase. "Always Available" is implemented as an override of
+	# *commercial* not-sellable reasons only (stock/plan-derived: out of stock,
+	# no/exhausted plan, blocking recipe component) — it must NEVER override a
+	# structural/config error (missing BOM, missing/disabled department or
+	# production unit, generic configuration error), since those indicate the
+	# item is not actually safe to sell/produce at all, regardless of plan or
+	# stock. "Stock Available" is not yet implemented. This TODO should be
+	# resolved once availability_mode's intended semantics are fully documented
+	# in a follow-up task (likely V3-13/V3-15 or a later task).
+	_STRUCTURAL_ERROR_CODES = {
+		"MISSING_BOM",
+		"CONFIGURATION_ERROR",
+		"MISSING_DEPARTMENT",
+		"DEPARTMENT_DISABLED",
+		"PRODUCTION_UNIT_DISABLED",
+		"MISSING_PRODUCTION_UNIT",
+	}
+	availability_mode = config.get("availability_mode") if config else None
+	if availability_mode == "Always Available" and response.get("reason_code") not in _STRUCTURAL_ERROR_CODES:
+		response["reason_code"] = "AVAILABLE"
+		response["sellable"] = True
+
 	return response
 
 
-def _fill_pre_produced(response, item_code, branch, company, department, warehouse):
+def _fill_pre_produced(response, item_code, branch, company, department, warehouse, config=None):
 	"""Fill `response` in place for a PRE_PRODUCED item, per V3-40's formula.
 
 	`effective_available = min(plan_remaining, fg_allocatable)`. Reason-code
 	priority (per this task's spec): NOT_PRODUCED (fg_available<=0 and never
 	produced, i.e. no Bin.actual_qty ever recorded) takes precedence, then
 	PLAN_EXHAUSTED, then FG_OUT_OF_STOCK, else AVAILABLE. A missing/absent
-	plan is reported as NO_ACTIVE_PLAN before any of those.
+	plan is reported as NO_ACTIVE_PLAN before any of those, unless
+	`controlled_by_sales_plan` is False, in which case the item falls through
+	to stock-based availability.
 	"""
 	fg_projection = project_fg_allocatable(item_code, warehouse, company)
 	fg_available = fg_projection["allocatable_qty"]
@@ -387,8 +414,29 @@ def _fill_pre_produced(response, item_code, branch, company, department, warehou
 	response["fg_available"] = fg_available
 	response["max_producible"] = fg_available
 
+	# controlled_by_sales_plan=0 means the Sales Plan never gates this item,
+	# regardless of whether a plan row exists (V3-40 no-plan case) or exists
+	# but is exhausted (previously only the no-plan case respected this flag,
+	# leaving PLAN_EXHAUSTED able to hard-block a sale even with the flag
+	# explicitly off -- both cases must resolve the same way: stock alone).
+	controlled_by_sales_plan = config.get("controlled_by_sales_plan", 1) if config else 1
+	if not controlled_by_sales_plan:
+		effective_available = fg_available
+		response["available_qty"] = max(effective_available, 0)
+		if fg_available <= 0 and never_produced:
+			response["reason_code"] = "NOT_PRODUCED"
+			response["sellable"] = False
+		elif fg_available <= 0:
+			response["reason_code"] = "FG_OUT_OF_STOCK"
+			response["sellable"] = False
+		else:
+			response["reason_code"] = "AVAILABLE"
+			response["sellable"] = effective_available > 0
+		return
+
 	plan = _resolve_plan_remaining(item_code, branch, company, department)
 	if plan is None:
+		# Plan gate is enabled; fail closed without an active plan
 		response["reason_code"] = "NO_ACTIVE_PLAN"
 		response["sellable"] = False
 		response["available_qty"] = 0
@@ -404,8 +452,16 @@ def _fill_pre_produced(response, item_code, branch, company, department, warehou
 		response["reason_code"] = "NOT_PRODUCED"
 		response["sellable"] = False
 	elif plan["plan_remaining"] <= 0:
-		response["reason_code"] = "PLAN_EXHAUSTED"
-		response["sellable"] = False
+		# If allow_over_plan_sale is True, allow selling past the plan quantity.
+		allow_over_plan_sale = config.get("allow_over_plan_sale", 0) if config else 0
+		if allow_over_plan_sale and fg_available > 0:
+			# Plan exhausted but over-plan sales are allowed; use stock availability
+			response["reason_code"] = "AVAILABLE"
+			response["sellable"] = fg_available > 0
+			response["available_qty"] = max(fg_available, 0)
+		else:
+			response["reason_code"] = "PLAN_EXHAUSTED"
+			response["sellable"] = False
 	elif fg_available <= 0:
 		response["reason_code"] = "FG_OUT_OF_STOCK"
 		response["sellable"] = False
@@ -414,7 +470,7 @@ def _fill_pre_produced(response, item_code, branch, company, department, warehou
 		response["sellable"] = effective_available > 0
 
 
-def _fill_made_to_order(response, item_code, branch, company, department, warehouse):
+def _fill_made_to_order(response, item_code, branch, company, department, warehouse, config=None):
 	"""Fill `response` in place for a MADE_TO_ORDER item, per V3-40's formula.
 
 	`recipe_capacity = floor(min(component_allocatable_i / required_qty_i))`;
@@ -422,7 +478,10 @@ def _fill_made_to_order(response, item_code, branch, company, department, wareho
 	`blocking_component` is set to the limiting component's item_code
 	whenever recipe_capacity is the binding constraint (i.e. whenever
 	recipe_capacity < plan_remaining, or there is no plan and
-	recipe_capacity <= 0), per this task's spec.
+	recipe_capacity <= 0), per this task's spec. If `controlled_by_sales_plan`
+	is False, plan is optional and the item falls through to capacity-based
+	availability. If `allow_over_plan_sale` is True, PLAN_EXHAUSTED can be
+	overridden by available recipe capacity.
 	"""
 	try:
 		bom_vector = compile_bom_vector(item_code, 1, company)
@@ -454,8 +513,26 @@ def _fill_made_to_order(response, item_code, branch, company, department, wareho
 
 	response["max_producible"] = recipe_capacity
 
+	# controlled_by_sales_plan=0 means the Sales Plan never gates this item,
+	# regardless of whether a plan row exists (no-plan case) or exists but is
+	# exhausted (previously only the no-plan case respected this flag,
+	# leaving PLAN_EXHAUSTED able to hard-block a sale even with the flag
+	# explicitly off -- both cases must resolve the same way: capacity alone).
+	controlled_by_sales_plan = config.get("controlled_by_sales_plan", 1) if config else 1
+	if not controlled_by_sales_plan:
+		response["available_qty"] = max(recipe_capacity, 0)
+		if recipe_capacity <= 0:
+			response["reason_code"] = "BLOCKING_COMPONENT"
+			response["sellable"] = False
+			response["blocking_component"] = blocking_component
+		else:
+			response["reason_code"] = "AVAILABLE"
+			response["sellable"] = True
+		return
+
 	plan = _resolve_plan_remaining(item_code, branch, company, department)
 	if plan is None:
+		# Plan gate is enabled; fail closed without an active plan
 		response["reason_code"] = "NO_ACTIVE_PLAN"
 		response["sellable"] = False
 		response["available_qty"] = 0
@@ -474,8 +551,17 @@ def _fill_made_to_order(response, item_code, branch, company, department, wareho
 		response["reason_code"] = "BLOCKING_COMPONENT"
 		response["sellable"] = False
 	elif plan["plan_remaining"] <= 0:
-		response["reason_code"] = "PLAN_EXHAUSTED"
-		response["sellable"] = False
+		# If allow_over_plan_sale is True, allow selling past the plan quantity.
+		allow_over_plan_sale = config.get("allow_over_plan_sale", 0) if config else 0
+		if allow_over_plan_sale and recipe_capacity > 0:
+			# Plan exhausted but over-plan sales are allowed; use capacity.
+			# No blocking component in this case since we have available capacity.
+			response["reason_code"] = "AVAILABLE"
+			response["sellable"] = True
+			response["available_qty"] = max(recipe_capacity, 0)
+		else:
+			response["reason_code"] = "PLAN_EXHAUSTED"
+			response["sellable"] = False
 	else:
 		response["reason_code"] = "AVAILABLE"
 		response["sellable"] = effective_available > 0
