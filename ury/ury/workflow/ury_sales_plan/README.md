@@ -5,6 +5,21 @@ Ships a standard Frappe `Workflow` record so admins can transition a
 (`/app/ury-sales-plan`), mirroring the state machine defined in
 `ury/ury/api/ury_sales_plan.py::TRANSITIONS`.
 
+The actual fixture data lives at `ury/ury/fixtures/workflow.json` — that is
+the only path `frappe.utils.fixtures.sync_fixtures()` reads on `bench
+migrate` (`frappe.get_app_path(app, "fixtures")`, one level per app, not
+per-doctype). An earlier version of this fix placed the JSON at
+`ury/ury/workflow/ury_sales_plan/ury_sales_plan.json` (mirroring a
+doctype-definition folder's `<name>/<name>.json` shape) — that path is never
+scanned by fixture sync, so the Workflow record silently never imported on
+any real `bench migrate` despite `before_migrate` seeding the `Workflow
+State`/`Workflow Action Master` rows correctly. Confirmed live: after moving
+the JSON here, `bench --site <site> execute frappe.client.get_list
+--kwargs '{"doctype": "Workflow"}'` returns the `URY Sales Plan` record after
+migrate; it did not before. `install.py` (this directory) still owns the
+`before_migrate` seeding of `Workflow State`/`Workflow Action Master`, since
+those are separate doctypes fixture sync does not create for you.
+
 ## FIXED — Desk transitions used to bypass `transition_sales_plan()` guardrails
 
 `transition_sales_plan()` in `ury/ury/api/ury_sales_plan.py` used to perform
