@@ -244,11 +244,46 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
     }
   };
 
-  const handleAddToOrder = () => {
+  const handleAddToOrder = async () => {
     const numericQuantity = typeof quantity === 'string' ? parseFloat(quantity) : quantity;
     if (isNaN(numericQuantity) || numericQuantity <= 0) {
       return; // Don't add to order if quantity is 0 or invalid
     }
+
+    // Clear any previous availability errors
+    setAvailabilityError(null);
+
+    // Check availability with live/skipCache call before adding to cart
+    if (!selectedItem || !posProfile) {
+      setAvailabilityError('Unable to verify availability. Please try again.');
+      return;
+    }
+
+    try {
+      setIsCheckingAvailability(true);
+      const availability = await getItemAvailability(
+        {
+          item_code: selectedItem.item,
+          branch: posProfile.branch,
+          company: posProfile.company,
+        },
+        { skipCache: true }
+      );
+
+      if (!availability.sellable) {
+        // Item is not sellable — show user-facing error message
+        const reasonMessage = getAvailabilityMessage(availability.reason_code);
+        setAvailabilityError(reasonMessage);
+        setIsCheckingAvailability(false);
+        return;
+      }
+    } catch (error: any) {
+      setAvailabilityError(error.message || 'Failed to verify item availability');
+      setIsCheckingAvailability(false);
+      return;
+    }
+
+    setIsCheckingAvailability(false);
 
     if (editMode && itemToReplace?.uniqueId) {
       // Remove the old item first
@@ -482,13 +517,22 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
               <span>{t('product_dialog.total')}&nbsp;</span>
               <span>{formatCurrency(total)}</span>
             </div>
+            {availabilityError && (
+              <div className="flex items-center justify-center text-destructive text-sm mt-2">
+                {availabilityError}
+              </div>
+            )}
             <Button
               onClick={handleAddToOrder}
               className="w-full mt-4"
               size="lg"
-              disabled={numericQuantity === 0}
+              disabled={numericQuantity === 0 || isCheckingAvailability}
             >
-              {editMode || existingCartItem ? t('product_dialog.update_order') : t('product_dialog.add_to_order')}
+              {isCheckingAvailability
+                ? t('product_dialog.checking_availability') || 'Checking...'
+                : editMode || existingCartItem
+                ? t('product_dialog.update_order')
+                : t('product_dialog.add_to_order')}
             </Button>
           </div>
         </div>
