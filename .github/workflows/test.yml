@@ -62,6 +62,12 @@ jobs:
           bench new-site test_site --admin-password=admin --mariadb-root-password=root
           bench --site test_site install-app erpnext
           bench --site test_site install-app ury
+          # A fresh site's install-app doesn't run every patch in order before
+          # test fixtures start inserting records (e.g. erpnext's default
+          # Company setup creates a "Goods In Transit" warehouse referencing a
+          # "Transit" Warehouse Type that a v13 patch creates) -- migrate to
+          # make sure all patches have actually run before tests start.
+          bench --site test_site migrate
 
       - name: Run backend tests
         run: |
