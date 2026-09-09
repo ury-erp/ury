@@ -42,7 +42,15 @@ jobs:
         run: |
           bench init --frappe-branch=version-15 frappe_env
           cd frappe_env
+          # ury declares required_apps = ["erpnext"] in hooks.py -- it must be
+          # fetched and installed before ury itself.
+          bench get-app erpnext --branch version-15
+          # This checkout (the repo being tested, at $GITHUB_WORKSPACE) becomes
+          # apps/ury -- get-app with a local path symlinks it in rather than
+          # re-cloning from GitHub, so uncommitted/PR-branch code is what's tested.
+          bench get-app ury "$GITHUB_WORKSPACE"
           bench new-site test_site --admin-password=admin --mariadb-root-password=root
+          bench --site test_site install-app erpnext
           bench --site test_site install-app ury
 
       - name: Run backend tests
