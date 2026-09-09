@@ -50,12 +50,14 @@
    "options": "URY Production Department"
   },
   {
+   "description": "Required for PRE_PRODUCED and MADE_TO_ORDER policies. Optional for DIRECT_RETAIL policy. Scope for production capacity, availability calculations, and work order routing.",
    "fieldname": "production_unit",
    "fieldtype": "Link",
    "label": "Production Unit",
    "options": "URY Production Unit"
   },
   {
+   "description": "Controls how item availability is calculated: PRE_PRODUCED (stock-based availability, requires Production Unit), MADE_TO_ORDER (capacity-based availability from BOM components, requires Production Unit), DIRECT_RETAIL (stock-based availability without Production Unit).",
    "fieldname": "production_policy",
    "fieldtype": "Select",
    "label": "Production Policy",
@@ -69,18 +71,21 @@
   },
   {
    "default": "0",
+   "description": "When checked, item availability requires an active approved/locked sales plan for the branch/department. When unchecked, item availability is based on stock (PRE_PRODUCED) or production capacity (MADE_TO_ORDER) alone, without plan requirement.",
    "fieldname": "controlled_by_sales_plan",
    "fieldtype": "Check",
    "label": "Controlled by Sales Plan"
   },
   {
    "default": "0",
+   "description": "When checked and plan is exhausted, allows selling/producing beyond the approved plan quantity if stock (PRE_PRODUCED) or production capacity (MADE_TO_ORDER) is available. Only applicable when Controlled by Sales Plan is enabled.",
    "fieldname": "allow_over_plan_sale",
    "fieldtype": "Check",
    "label": "Allow Over-Plan Sale",
    "depends_on": "eval:doc.controlled_by_sales_plan==1"
   },
   {
+   "description": "Controls availability override behavior: 'Always Available' makes the item always sellable regardless of plan/stock constraints; 'Stock Available' and 'Plan Available' semantics are reserved for future clarification (currently only 'Always Available' is implemented).",
    "fieldname": "availability_mode",
    "fieldtype": "Select",
    "label": "Availability Mode",
