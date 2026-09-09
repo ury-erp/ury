@@ -152,7 +152,7 @@ const TableReservationDialog = ({
       <DialogContent
         variant="large"
         size="2xl"
-        className="p-0 flex flex-col max-h-[90vh] overflow-hidden"
+        className="p-0 flex flex-col w-full max-w-2xl h-[740px] overflow-hidden"
       >
         {/* Header - Simplified: Table Name & Seat Count */}
         <DialogHeader className="px-8 pt-8 pb-5 shrink-0 border-b border-gray-100">
@@ -174,7 +174,7 @@ const TableReservationDialog = ({
         </DialogHeader>
 
         {/* Body */}
-        <div className="px-8 py-6 space-y-6 overflow-y-auto min-h-0">
+        <div className="px-8 py-6 space-y-6 flex-1">
           {validationError && (
             <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">
               {validationError}
