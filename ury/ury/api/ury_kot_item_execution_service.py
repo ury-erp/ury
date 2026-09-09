@@ -248,9 +248,22 @@ def seed_kot_item_executions(kot, actor=None):
 
 
 def seed_kot_item_executions_on_submit(doc, method=None):
-	"""Seed item execution rows while allowing an older site to migrate."""
+	"""Seed item execution rows while allowing an older site to migrate.
+
+	Every downstream helper (`_kot_items`, `_require_kot`, `_kot_scope`,
+	`_sync_kot_execution`) treats its `kot` argument as a plain docname
+	string, not a Document. Passing the submitted Document straight through
+	silently mis-resolves: `frappe.db.exists("URY KOT", doc)` and
+	`frappe.get_doc("URY KOT", doc)` both accept a dict-like second
+	argument as a filter set, so an empty/Document-shaped filter matches
+	an arbitrary row instead of raising - execution rows then get seeded
+	against the wrong KOT (or none at all) while the real KOT is left with
+	no item-grain execution rows, forever blocking mark_item_ready/serve
+	and the stock posting intent they trigger. Passing the name fixes the
+	resolution for every helper in this module.
+	"""
 	try:
-		return seed_kot_item_executions(doc)
+		return seed_kot_item_executions(doc.name)
 	except ItemExecutionError as exc:
 		if exc.reason_code == ITEM_EXECUTION_DOCTYPE_NOT_FOUND:
 			frappe.logger("ury").warning(
