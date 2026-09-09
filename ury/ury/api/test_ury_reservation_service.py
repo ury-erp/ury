@@ -14,6 +14,8 @@ NOT EXECUTED / unexecutable by design -- see its docstring.
 import json
 from unittest.mock import MagicMock, patch
 
+from contextlib import contextmanager
+
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
@@ -61,7 +63,7 @@ def patch_read_committed_reservation_rows(test_case):
     oversell bug survived a green unit suite.
     """
 
-    def fake_read_committed(item_code, warehouse, company):
+    def fake_reconciled(conn, item_code, warehouse, company):
         return frappe.get_all(
             RESERVATION_DOCTYPE,
             filters={
@@ -70,14 +72,20 @@ def patch_read_committed_reservation_rows(test_case):
                 "company": company,
                 "status": ["in", [RESERVED]],
             },
-            fields=["qty", "reservation_group"],
+            fields=["name", "qty", "reservation_group"],
         )
 
-    patcher = patch(
-        f"{MODULE}._read_committed_reservation_rows", side_effect=fake_read_committed
-    )
-    patcher.start()
-    test_case.addCleanup(patcher.stop)
+    @contextmanager
+    def fake_connection():
+        yield None
+
+    for target, kwargs in (
+        (f"{MODULE}._reconciled_active_rows", {"side_effect": fake_reconciled}),
+        (f"{MODULE}.committed_read_connection", {"side_effect": fake_connection}),
+    ):
+        patcher = patch(target, **kwargs)
+        patcher.start()
+        test_case.addCleanup(patcher.stop)
 
 
 def _new_doc_recorder():
@@ -1039,3 +1047,92 @@ class TestConcurrency(FrappeTestCase):
         # rejected = [r for r in results if r[0] == "rejected"]
         # self.assertEqual(len(succeeded), 1)
         # self.assertEqual(len(rejected), 1)
+
+
+class TestReconciledActiveRows(FrappeTestCase):
+	"""Unit coverage for the two-view reconciliation behind `read_committed=True`.
+
+	These are the cases the four prior review gates had no test for, and are
+	exactly where the F1 (own uncommitted INSERT invisible => oversell) and F2
+	(own uncommitted RELEASE invisible => spurious rejection) regressions lived.
+	A single-process test cannot prove cross-connection isolation -- that is
+	what the live bench run proves -- but it can pin the reconciliation rule
+	itself, which is the part that is easy to "simplify" back into a bug.
+	"""
+
+	def _run(self, own_active, committed_active, exists_committed, exists_own):
+		from ury.ury.api.ury_reservation_service import (
+			_RESERVATION_EXISTS_SQL,
+			_reconciled_active_rows,
+		)
+
+		conn = MagicMock()
+
+		def conn_sql(query, params, **kwargs):
+			if query is _RESERVATION_EXISTS_SQL:
+				return [{"name": n} for n in params["names"] if n in exists_committed]
+			return committed_active
+
+		conn.sql.side_effect = conn_sql
+
+		def get_all_side_effect(doctype, filters=None, fields=None, **kwargs):
+			if fields == ["name"]:
+				names = filters["name"][1]
+				return [{"name": n} for n in names if n in exists_own]
+			return own_active
+
+		with patch(f"{MODULE}.frappe.get_all", side_effect=get_all_side_effect):
+			rows = _reconciled_active_rows(conn, "FLOUR", "WH-1", "Company A")
+		return sorted(row["name"] for row in rows), sum(row["qty"] for row in rows)
+
+	def test_active_in_both_views_is_counted(self):
+		row = {"name": "R1", "qty": 3, "reservation_group": "G1"}
+		names, total = self._run([row], [row], {"R1"}, {"R1"})
+		self.assertEqual((names, total), (["R1"], 3))
+
+	def test_own_uncommitted_insert_is_counted(self):
+		"""F1: the row exists only in our transaction, so the fresh connection
+		cannot see it -- but it is real and must count against capacity."""
+		row = {"name": "R2", "qty": 5, "reservation_group": "G2"}
+		names, total = self._run([row], [], exists_committed=set(), exists_own={"R2"})
+		self.assertEqual((names, total), (["R2"], 5))
+
+	def test_release_committed_by_someone_else_is_not_counted(self):
+		"""Same shape as the case above (active for us, not in the committed
+		active set) but the row DOES exist on the other connection, i.e. it was
+		released and committed after our snapshot was pinned. Must not count."""
+		row = {"name": "R3", "qty": 7, "reservation_group": "G3"}
+		names, total = self._run([row], [], exists_committed={"R3"}, exists_own={"R3"})
+		self.assertEqual((names, total), ([], 0))
+
+	def test_insert_committed_by_someone_else_is_counted(self):
+		"""The concurrent-oversell case c5e73d299 fixed: committed after our
+		snapshot, so absent from our view entirely. Must still count."""
+		row = {"name": "R4", "qty": 2, "reservation_group": "G4"}
+		names, total = self._run([], [row], exists_committed={"R4"}, exists_own=set())
+		self.assertEqual((names, total), (["R4"], 2))
+
+	def test_own_uncommitted_release_is_not_counted(self):
+		"""F2: we released it in this transaction, so it still reads as
+		Reserved on the fresh connection. It must not be counted against its
+		own replacement."""
+		row = {"name": "R5", "qty": 49.8, "reservation_group": "G5"}
+		names, total = self._run([], [row], exists_committed={"R5"}, exists_own={"R5"})
+		self.assertEqual((names, total), ([], 0))
+
+	def test_all_five_cases_together(self):
+		own = [
+			{"name": "R1", "qty": 3, "reservation_group": "G1"},
+			{"name": "R2", "qty": 5, "reservation_group": "G2"},
+			{"name": "R3", "qty": 7, "reservation_group": "G3"},
+		]
+		committed = [
+			{"name": "R1", "qty": 3, "reservation_group": "G1"},
+			{"name": "R4", "qty": 2, "reservation_group": "G4"},
+			{"name": "R5", "qty": 49.8, "reservation_group": "G5"},
+		]
+		names, total = self._run(
+			own, committed, exists_committed={"R1", "R3", "R4", "R5"}, exists_own={"R1", "R2", "R3", "R5"}
+		)
+		self.assertEqual(names, ["R1", "R2", "R4"])
+		self.assertEqual(total, 10)
