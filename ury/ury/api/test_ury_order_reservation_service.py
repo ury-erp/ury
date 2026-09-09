@@ -2,6 +2,8 @@ import json
 import unittest
 from unittest.mock import patch
 
+import frappe
+
 from ury.ury.api import ury_order_reservation_service as service
 
 
@@ -96,12 +98,17 @@ class TestOrderReservationLineIsolation(unittest.TestCase):
 			service, "_active_groups", return_value=["GROUP-LINE-1"]
 		) as active_groups, patch.object(service, "release_reservation") as release_reservation, patch.object(
 			service, "create_reservation", return_value={"reservation_group": "GROUP-NEW"}
-		) as create_reservation:
+		) as create_reservation, patch.object(
+			service, "get_item_availability", return_value={"sellable": True, "reason_code": "AVAILABLE"}
+		) as get_item_availability:
 			result = service._reconcile_line(
 				"INV-1", "ref:ITEM-1:POS-LINE-1", line, "BR-1", "COMP-1", "user@example.com"
 			)
 
 		self.assertEqual(result, {"reservation_group": "GROUP-NEW"})
+		get_item_availability.assert_called_once_with(
+			item_code="ITEM-1", branch="BR-1", company="COMP-1", department="Hot Line"
+		)
 		active_groups.assert_called_once_with(
 			"INV-1", "ITEM-1", reservation_line_key="ref:ITEM-1:POS-LINE-1"
 		)
@@ -113,3 +120,82 @@ class TestOrderReservationLineIsolation(unittest.TestCase):
 			create_reservation.call_args.kwargs["frozen_context"]["reservation_line_key"],
 			"ref:ITEM-1:POS-LINE-1",
 		)
+
+	def test_not_sellable_item_is_rejected_before_reservation(self):
+		"""D1: a line the availability engine marks not-sellable must be
+		rejected at reservation time, and must not release/recreate any
+		reservation group."""
+		context = service.frappe._dict(
+			{
+				"name": "UIPC-1",
+				"production_policy": "MADE_TO_ORDER",
+				"production_unit": "Kitchen",
+				"department": "Hot Line",
+				"warehouse": "WH-FG",
+			}
+		)
+		line = {
+			"item_code": "ITEM-1",
+			"qty": 3,
+			"source_line_ref": "POS-LINE-1",
+			"source_context": {},
+		}
+
+		with patch.object(service, "resolve_production_context", return_value=context), patch.object(
+			service, "_active_groups"
+		) as active_groups, patch.object(service, "release_reservation") as release_reservation, patch.object(
+			service, "create_reservation"
+		) as create_reservation, patch.object(
+			service,
+			"get_item_availability",
+			return_value={"sellable": False, "reason_code": "PLAN_EXHAUSTED"},
+		) as get_item_availability:
+			with self.assertRaises(frappe.ValidationError):
+				service._reconcile_line(
+					"INV-1", "ref:ITEM-1:POS-LINE-1", line, "BR-1", "COMP-1", "user@example.com"
+				)
+
+		get_item_availability.assert_called_once_with(
+			item_code="ITEM-1", branch="BR-1", company="COMP-1", department="Hot Line"
+		)
+		active_groups.assert_not_called()
+		release_reservation.assert_not_called()
+		create_reservation.assert_not_called()
+
+	def test_line_removal_is_not_gated_by_availability(self):
+		"""Reducing/removing a line (requested qty <= 0) must still be able
+		to release an existing reservation even if the item has since become
+		not-sellable -- only a net increase should be availability-gated."""
+		context = service.frappe._dict(
+			{
+				"name": "UIPC-1",
+				"production_policy": "MADE_TO_ORDER",
+				"production_unit": "Kitchen",
+				"department": "Hot Line",
+				"warehouse": "WH-FG",
+			}
+		)
+		line = {
+			"item_code": "ITEM-1",
+			"qty": 0,
+			"source_line_ref": "POS-LINE-1",
+			"source_context": {},
+		}
+
+		with patch.object(service, "resolve_production_context", return_value=context), patch.object(
+			service, "_active_groups", return_value=["GROUP-LINE-1"]
+		), patch.object(service, "release_reservation") as release_reservation, patch.object(
+			service, "create_reservation"
+		) as create_reservation, patch.object(
+			service, "get_item_availability"
+		) as get_item_availability:
+			result = service._reconcile_line(
+				"INV-1", "ref:ITEM-1:POS-LINE-1", line, "BR-1", "COMP-1", "user@example.com"
+			)
+
+		self.assertIsNone(result)
+		get_item_availability.assert_not_called()
+		release_reservation.assert_called_once_with(
+			"GROUP-LINE-1", reason="Order acceptance line quantity reconciliation"
+		)
+		create_reservation.assert_not_called()
