@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build --base=/assets/ury/mosaic/ && yarn copy-html-entry",
     "preview": "vite preview",
-    "copy-html-entry": "cp ../ury/public/mosaic/index.html ../ury/www/mosaic.html"
+    "copy-html-entry": "cp ../ury/public/mosaic/index.html ../ury/www/mosaic.html",
+    "test": "vitest run --config vitest.config.js"
   },
   "dependencies": {
     "socket.io-client": "^4.5.1",
@@ -24,9 +25,12 @@
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^4.2.3",
+    "@vue/test-utils": "^2.4.6",
     "autoprefixer": "^10.4.16",
+    "jsdom": "^24.0.0",
     "postcss": "^8.4.30",
     "tailwindcss": "^3.3.3",
-    "vite": "^4.4.5"
+    "vite": "^4.4.5",
+    "vitest": "^1.6.0"
   }
 }
