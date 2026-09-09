@@ -231,6 +231,141 @@ def _seed_purchase_invoices(branch_name, company_name, items, expense_account):
 
 
 # ---------------------------------------------------------------------------
+# Stock for stray real-data history items (items with real POS Invoice
+# history that predate/aren't part of catalog.py's MENU_ITEMS -- see
+# ury.ury.dev_seed.operations._ensure_item_production_configurations_for_stray_history_items,
+# whose docstring and query this mirrors).
+#
+# On a bench restored from real production data, these stray items are the
+# ONLY sellable items that exist, but this module (see its own docstring) is
+# otherwise entirely scoped to catalog.py's MENU_ITEMS-derived Items --
+# ``_get_menu_items()`` above only reads ``is_sales_item=1`` Items, which
+# real historical items generally aren't tagged as, and even where they are,
+# nothing in this module has ever given them a stock balance. So even after
+# operations.py's stray-item function backfills a resolvable
+# ``URY Item Production Configuration`` for them, ``get_item_availability``
+# (ury/ury/api/ury_availability.py) correctly reports zero stock forever,
+# because no seed script ever created any. This section closes that gap.
+# ---------------------------------------------------------------------------
+
+STRAY_ITEM_OPENING_QTY = 50  # matches a typical demo-catalog opening qty
+
+
+def _get_stray_history_item_codes(branch_name):
+	"""Item codes with real POS Invoice history on this branch that aren't
+	part of catalog.py's MENU_ITEMS. Mirrors
+	``operations._ensure_item_production_configurations_for_stray_history_items``'s
+	own query verbatim, so the two modules agree on what counts as "stray".
+	"""
+	from ury.ury.dev_seed.catalog import MENU_ITEMS
+
+	menu_item_names = {name for name, _group, _rate in MENU_ITEMS}
+
+	item_codes = frappe.db.sql_list(
+		"""
+		SELECT DISTINCT pii.item_code
+		FROM `tabPOS Invoice Item` pii
+		INNER JOIN `tabPOS Invoice` pi ON pi.name = pii.parent
+		WHERE pi.branch = %(branch)s AND pi.docstatus = 1
+		""",
+		{"branch": branch_name},
+	)
+	return [code for code in item_codes if code not in menu_item_names]
+
+
+def _resolve_stray_item_warehouse(item_code, branch_name):
+	"""Resolve the exact warehouse ``get_item_availability`` will read stock
+	from for this item, via the single authoritative resolver
+	(``ury.ury.api.ury_production_context.resolve_production_context``)
+	rather than re-deriving its PRE_PRODUCED/DIRECT_RETAIL ->
+	``direct_retail_warehouse`` vs. MADE_TO_ORDER -> production unit's
+	warehouse (department warehouse fallback) logic here. Returns
+	``(warehouse, production_policy)``, both ``None`` if the item has no
+	resolvable production config yet (e.g. operations.seed() hasn't run, or
+	an unmapped item_group left it without a production_unit/department).
+	"""
+	from ury.ury.api.ury_production_context import resolve_production_context
+
+	context = resolve_production_context(item_code, branch_name)
+	if not context:
+		return None, None
+	return context.get("warehouse"), context.get("production_policy")
+
+
+def _ensure_stock_for_stray_history_items(branch_name, company_name):
+	"""Give every stray real-data history item (``_get_stray_history_item_codes``)
+	that already has a resolvable ``URY Item Production Configuration`` a
+	real opening stock balance in whichever warehouse
+	``get_item_availability`` actually reads from.
+
+	Also flips ``Item.is_stock_item`` to 1 when needed: real production
+	Items restored from a live bench are frequently non-stock
+	(``is_stock_item=0``, since they were historically sold as plain
+	menu/sales items with no stock tracking wired up), and a non-stock Item
+	cannot receive a Stock Entry at all -- confirmed live (``BBQWNG`` came
+	back ``is_stock_item=0`` on the coherence-audit bench).
+
+	Idempotent: skips any item whose resolved warehouse already carries at
+	least ``STRAY_ITEM_OPENING_QTY`` (via ``Bin.actual_qty``), and reuses
+	whatever config/warehouse ``resolve_production_context`` already
+	resolves rather than guessing at one.
+	"""
+	item_codes = _get_stray_history_item_codes(branch_name)
+	if not item_codes:
+		return 0
+
+	created = 0
+	for item_code in item_codes:
+		try:
+			warehouse, production_policy = _resolve_stray_item_warehouse(item_code, branch_name)
+			if not warehouse:
+				# No resolvable production config yet (operations.seed()
+				# hasn't run, or this item is still unmapped) -- nothing to
+				# stock into.
+				continue
+
+			current_qty = frappe.db.get_value(
+				"Bin", {"item_code": item_code, "warehouse": warehouse}, "actual_qty"
+			) or 0
+			if current_qty >= STRAY_ITEM_OPENING_QTY:
+				continue
+
+			if not frappe.db.get_value("Item", item_code, "is_stock_item"):
+				frappe.db.set_value("Item", item_code, "is_stock_item", 1)
+				print(f"Flagged stray history item {item_code} as is_stock_item=1")
+
+			qty_to_add = STRAY_ITEM_OPENING_QTY - current_qty
+			doc = frappe.get_doc(
+				{
+					"doctype": "Stock Entry",
+					"stock_entry_type": "Material Receipt",
+					"purpose": "Material Receipt",
+					"company": company_name,
+					"items": [
+						{
+							"item_code": item_code,
+							"qty": qty_to_add,
+							"t_warehouse": warehouse,
+							"basic_rate": 100,
+						}
+					],
+				}
+			)
+			doc.insert(ignore_permissions=True)
+			doc.submit()
+			created += 1
+			print(
+				f"Created opening Stock Entry for stray history item {item_code}: "
+				f"+{qty_to_add} in {warehouse} (policy={production_policy})"
+			)
+		except Exception as e:
+			print(f"  ! Failed to seed stock for stray history item {item_code}: {e}")
+			frappe.db.rollback()
+
+	return created
+
+
+# ---------------------------------------------------------------------------
 # Completed Work Orders
 # ---------------------------------------------------------------------------
 
@@ -495,6 +630,7 @@ def seed():
 
 	_ensure_suppliers()
 	purchase_invoices_created = _seed_purchase_invoices(branch_name, company_name, items, expense_account)
+	stray_item_stock_created = _ensure_stock_for_stray_history_items(branch_name, company_name)
 	work_orders_created = _seed_work_orders(company_name, fg_warehouse, wip_warehouse)
 	sales_plans_created = _seed_sales_plans(branch_name, company_name)
 
@@ -504,6 +640,7 @@ def seed():
 		"branch": branch_name,
 		"company": company_name,
 		"purchase_invoices_created": purchase_invoices_created,
+		"stray_item_stock_created": stray_item_stock_created,
 		"work_orders_created": work_orders_created,
 		"sales_plans_created_or_fixed": sales_plans_created,
 	}
