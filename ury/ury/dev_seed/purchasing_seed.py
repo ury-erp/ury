@@ -113,8 +113,17 @@ SALES_PLAN_QTY_PER_ITEM = 25
 # ---------------------------------------------------------------------------
 
 def _get_branch_and_company():
+	"""Resolve branch first, then derive company from THAT branch's own
+	`company` field -- picking an arbitrary Company row independently of
+	the chosen branch (the previous behavior) silently mismatches on any
+	multi-company site. This is the same class of bug already fixed in
+	operations.py's _get_company(); this is a separate occurrence in this
+	file, not shared code, so fixed here too.
+	"""
 	branch_name = frappe.db.get_value("Branch", {}, "name")
-	company_name = frappe.db.get_value("Company", {}, "name")
+	company_name = frappe.db.get_value("Branch", branch_name, "company") if branch_name else None
+	if not company_name:
+		company_name = frappe.db.get_value("Company", {}, "name")
 	return branch_name, company_name
 
 
