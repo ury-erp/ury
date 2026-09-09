@@ -13,7 +13,7 @@ permissions: {}
 jobs:
   backend:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
 
     steps:
       - name: Checkout code
@@ -152,6 +152,15 @@ jobs:
           PYEOF
 
       - name: Run backend tests
+        env:
+          # The last run's "Run backend tests" step showed ZERO output for
+          # its entire ~10 minutes before being killed at the job timeout --
+          # that's consistent with Python block-buffering stdout on a non-tty
+          # pipe (GitHub Actions logs) and never getting a chance to flush
+          # before the cancel signal, not necessarily a real hang. Force
+          # unbuffered output so the next run's log actually shows live
+          # progress (or the true stall point) instead of a silent gap.
+          PYTHONUNBUFFERED: "1"
         run: |
           cd frappe_env
           bench --site test_site run-tests --app ury
