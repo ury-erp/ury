@@ -260,6 +260,24 @@ def committed_read_connection():
 	stale) REPEATABLE READ view. The caller's transaction is left completely
 	untouched: nothing is committed, rolled back, or locked on it.
 
+	Open this ONCE per critical section and thread it through, rather than
+	once per component: `create_reservation` performs this read while holding
+	`SELECT ... FOR UPDATE` on every component's Bin row, and each connect is
+	a full TCP connect + MySQL auth handshake. Opening one per component put N
+	handshakes inside the lock critical section for an N-component MTO item,
+	extending lock hold time and cutting reservation throughput under
+	contention for no benefit -- the connection is stateless with respect to
+	the component being read.
+
+	Reusing it across components does pin ITS read view at its first read, so
+	later components are read from that instant rather than from a brand new
+	one. That is sound here and only here: `create_reservation` locks EVERY
+	component's Bin row before performing any of these reads, so from the
+	first read onward no other reservation transaction can commit a row for
+	any component in the set. It must not be hoisted any wider than one
+	`create_reservation` call -- in particular not across the lines of
+	`reconcile_order_reservations`, whose lock sets differ per line.
+
 	See `_active_reservation_qty` for why a second connection is required at
 	all, and why the two more obvious alternatives are not usable here.
 	"""
@@ -394,13 +412,17 @@ def _reconciled_active_rows(conn, item_code, warehouse, company):
 	return list(resolved.values())
 
 
-def _active_reservation_qty(item_code, warehouse, company, exclude_group=None, read_committed=False):
+def _active_reservation_qty(
+	item_code, warehouse, company, exclude_group=None, read_committed=False, committed_conn=None
+):
 	"""Sum active reservation qty for `item_code`/`warehouse`/`company`.
 
 	`read_committed=True` reconciles the request's own view with a read on a
 	short-lived second DB connection (see `_reconciled_active_rows`), so the
 	sum is `latest-committed-by-everyone-else` UNION `this transaction's own
-	uncommitted delta`. This MUST be used by the
+	uncommitted delta`. Pass an already-open `committed_conn` to reuse one
+	connection across the components of a single critical section. This MUST
+	be used by the
 	reservation critical section (`create_reservation`), where it is a
 	correctness requirement, not a performance knob -- it is the fix for a
 	live-reproduced oversell:
@@ -485,8 +507,11 @@ def _active_reservation_qty(item_code, warehouse, company, exclude_group=None, r
 	hint.
 	"""
 	if read_committed:
-		with committed_read_connection() as conn:
-			rows = _reconciled_active_rows(conn, item_code, warehouse, company)
+		if committed_conn is not None:
+			rows = _reconciled_active_rows(committed_conn, item_code, warehouse, company)
+		else:
+			with committed_read_connection() as conn:
+				rows = _reconciled_active_rows(conn, item_code, warehouse, company)
 	else:
 		filters = {
 			"component_item": item_code,
@@ -504,7 +529,9 @@ def _active_reservation_qty(item_code, warehouse, company, exclude_group=None, r
 	return total
 
 
-def get_available_capacity(item_code, warehouse, company, locked_bin=None, read_committed=False):
+def get_available_capacity(
+	item_code, warehouse, company, locked_bin=None, read_committed=False, committed_conn=None
+):
 	"""Return allocatable capacity for `item_code`/`warehouse`, per V3-42's formula.
 
 	``allocatable_qty = Bin.projected_qty - active URY reservation qty``. A
@@ -530,7 +557,7 @@ def get_available_capacity(item_code, warehouse, company, locked_bin=None, read_
 		) or 0
 
 	reservation_qty = _active_reservation_qty(
-		item_code, warehouse, company, read_committed=read_committed
+		item_code, warehouse, company, read_committed=read_committed, committed_conn=committed_conn
 	)
 	return bin_projected_qty - reservation_qty
 
@@ -714,23 +741,29 @@ def create_reservation(
 	# read and the inserts below. See `_active_reservation_qty`'s docstring for
 	# the full rationale and for the two alternatives that were tried live and
 	# rejected. Do not weaken this, and do not weaken the Bin lock.
+	#
+	# The connection is opened ONCE for the whole call rather than once per
+	# component: each connect is a TCP connect + MySQL auth handshake, and
+	# this loop runs while holding `FOR UPDATE` on every component's Bin row.
 	shortfalls = []
-	for component in components_sorted:
-		available = get_available_capacity(
-			component["component_item"],
-			warehouse,
-			company,
-			locked_bin=locked_bins[component["component_item"]],
-			read_committed=True,
-		)
-		if component["qty"] > available:
-			shortfalls.append(
-				{
-					"component_item": component["component_item"],
-					"required": component["qty"],
-					"available": available,
-				}
+	with committed_read_connection() as committed_conn:
+		for component in components_sorted:
+			available = get_available_capacity(
+				component["component_item"],
+				warehouse,
+				company,
+				locked_bin=locked_bins[component["component_item"]],
+				read_committed=True,
+				committed_conn=committed_conn,
 			)
+			if component["qty"] > available:
+				shortfalls.append(
+					{
+						"component_item": component["component_item"],
+						"required": component["qty"],
+						"available": available,
+					}
+				)
 
 	if shortfalls:
 		frappe.throw(
