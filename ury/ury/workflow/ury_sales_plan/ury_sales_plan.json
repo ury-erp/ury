@@ -11,21 +11,21 @@
   {
    "state": "Draft",
    "doc_status": "0",
-   "allow_edit": "System Manager",
+   "allow_edit": "URY Manager",
    "update_field": "status",
    "update_value": "Draft"
   },
   {
    "state": "Proposed",
    "doc_status": "0",
-   "allow_edit": "System Manager",
+   "allow_edit": "URY Manager",
    "update_field": "status",
    "update_value": "Proposed"
   },
   {
    "state": "Submitted for Approval",
    "doc_status": "0",
-   "allow_edit": "System Manager",
+   "allow_edit": "URY Manager",
    "update_field": "status",
    "update_value": "Submitted for Approval"
   },
@@ -56,14 +56,14 @@
    "state": "Draft",
    "action": "Propose",
    "next_state": "Proposed",
-   "allowed": "System Manager",
+   "allowed": "URY Manager",
    "allow_self_approval": 1
   },
   {
    "state": "Proposed",
    "action": "Submit for Approval",
    "next_state": "Submitted for Approval",
-   "allowed": "System Manager",
+   "allowed": "URY Manager",
    "allow_self_approval": 1
   },
   {
