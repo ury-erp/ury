@@ -160,6 +160,13 @@ from frappe import _
 
 from ury.ury.api.ury_bom_compiler import compile_bom_vector, publish_component_stock_fanout
 
+# Slack allowed when comparing a required quantity against available capacity,
+# to absorb binary-float drift in accumulated BOM quantities. One millionth of
+# a stock unit is orders of magnitude below any real sellable quantity, so this
+# cannot admit a meaningful oversell, while it does stop an order that exactly
+# fits the remaining capacity from being rejected.
+QTY_TOLERANCE = 1e-6
+
 
 RESERVATION_DOCTYPE = "URY Stock Reservation"
 BIN_DOCTYPE = "Bin"
@@ -756,7 +763,22 @@ def create_reservation(
 				read_committed=True,
 				committed_conn=committed_conn,
 			)
-			if component["qty"] > available:
+			# Compare with a tolerance rather than a bare `>`. Component
+			# quantities are products of BOM per-unit rates (e.g. 0.1) and
+			# `available` is a Bin quantity minus an accumulated sum of many such
+			# products, so both sides carry binary-float drift. A bare `>`
+			# therefore rejects an order that exactly fits the remaining
+			# capacity -- live-reproduced at volume as "required 0.2, available
+			# 0.1999999999999993"; 7 of the 19 capacity rejections in the Phase 2
+			# load test were this artifact and nothing else, i.e. the last
+			# portion of a component was unsellable.
+			#
+			# QTY_TOLERANCE is applied as plain arithmetic on purpose. `flt(x,
+			# precision)` would be the idiomatic-looking choice but resolves the
+			# rounding method through `frappe.get_system_settings`, i.e. a DB
+			# read -- and this loop runs while holding `FOR UPDATE` on every
+			# component Bin row. No DB access belongs in here.
+			if component["qty"] - available > QTY_TOLERANCE:
 				shortfalls.append(
 					{
 						"component_item": component["component_item"],
