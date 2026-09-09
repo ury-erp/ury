@@ -203,6 +203,12 @@ def _write_cancellation(kot, locked, target_state, actor, event, reason, branch,
 	"""
 	if locked:
 		doc = frappe.get_doc(EXECUTION_DOCTYPE, locked["name"])
+		# See ury_kot_execution_service._transition: `frappe.get_doc` here is
+		# a plain read that can be served from a snapshot pinned before
+		# `_lock_execution_row`'s `FOR UPDATE` ran. Overwrite audit_log with
+		# the value the locking read fetched so the read-modify-write append
+		# below cannot silently drop a concurrently committed entry.
+		doc.audit_log = locked.get("audit_log")
 	else:
 		doc = frappe.get_doc(
 			{
