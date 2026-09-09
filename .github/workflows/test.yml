@@ -63,19 +63,30 @@ jobs:
           bench --site test_site install-app erpnext
           bench --site test_site install-app ury
           bench --site test_site migrate
-          # erpnext's default Company setup (triggered by test fixture
-          # records) creates a "Goods In Transit" warehouse referencing a
-          # "Transit" Warehouse Type -- but that record is normally seeded by
-          # erpnext's setup wizard (install_fixtures.install()), which never
-          # runs on a bare install-app with no company/country selected.
-          # Create just the one record tests actually need rather than
-          # running the full wizard (which has broader side effects and
-          # expects a country/currency/company already chosen).
+          # A bare install-app never runs erpnext's setup wizard, so root
+          # fixture records several doctypes need (Customer Group "All
+          # Customer Groups", Territory "All Territories", Item Group "All
+          # Item Groups", Supplier Group "All Supplier Groups", Warehouse
+          # Type "Transit", ...) don't exist yet -- test fixture creation
+          # then fails on whichever one it hits first with a
+          # LinkValidationError. install_fixtures.install() is exactly the
+          # function the wizard calls to seed these; it errors partway
+          # through on an unrelated Sales Person nested-set issue, but
+          # every root-group record needed here is created earlier in its
+          # list and survives that (verified locally). Wrapped in try/except
+          # so that partial failure doesn't abort the workflow, with an
+          # explicit fallback for the one record that comes after it.
           bench --site test_site console <<'PYEOF'
           import frappe
+          from erpnext.setup.setup_wizard.operations.install_fixtures import install
+          try:
+              install(country="India")
+          except Exception as e:
+              print("install_fixtures.install() partially failed (expected, see workflow comment):", e)
+          frappe.db.commit()
           if not frappe.db.exists("Warehouse Type", "Transit"):
               frappe.get_doc({"doctype": "Warehouse Type", "name": "Transit"}).insert(ignore_permissions=True)
-              frappe.db.commit()
+          frappe.db.commit()
           exit()
           y
           PYEOF
