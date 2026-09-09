@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import ReportSettingsPage from './ReportSettingsPage';
 
@@ -45,6 +45,10 @@ vi.mock('@ury/ui', async (importOriginal) => {
 
 describe('ReportSettingsPage', () => {
   beforeEach(() => {
+    cleanup();
+  });
+
+  afterEach(() => {
     cleanup();
   });
 
