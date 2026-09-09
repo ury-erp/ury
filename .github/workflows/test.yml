@@ -70,7 +70,7 @@ jobs:
           mv /tmp/common_site_config.json.tmp sites/common_site_config.json
           # ury declares required_apps = ["erpnext"] in hooks.py -- it must be
           # fetched and installed before ury itself.
-          bench get-app erpnext --branch version-15
+          bench get-app erpnext --branch version-15 --skip-assets
           # erpnext's own Payment Gateway Account doctype links to the
           # "Payment Gateway" doctype, which erpnext does not ship itself --
           # it lives in the separate frappe/payments app. Without it, any
@@ -78,11 +78,11 @@ jobs:
           # with DocType Payment Gateway not found (this is a pre-existing
           # gap, reproducible identically on a long-lived local dev site,
           # not something introduced by this branch).
-          bench get-app payments --branch version-15
+          bench get-app payments --branch version-15 --skip-assets
           # This checkout (the repo being tested, at $GITHUB_WORKSPACE) becomes
           # apps/ury -- get-app with a local path symlinks it in rather than
           # re-cloning from GitHub, so uncommitted/PR-branch code is what's tested.
-          bench get-app ury "$GITHUB_WORKSPACE"
+          bench get-app ury "$GITHUB_WORKSPACE" --skip-assets
           bench new-site test_site --admin-password=admin --mariadb-root-password=root
           bench --site test_site install-app erpnext
           bench --site test_site install-app payments
