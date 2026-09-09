@@ -94,18 +94,18 @@ class TestValidateSearchInput(FrappeTestCase):
 class TestOverridedPastOrderListValidation(FrappeTestCase):
     """Tests for validate_search_input integration in overrided_past_order_list."""
 
-    @patch(f"{MODULE}.frappe.session.user", "testuser")
     @patch(f"{MODULE}.frappe.db.sql")
     def test_invalid_search_term_throws_before_db_query(self, mock_db_sql):
         """Invalid search term should throw before any database query."""
+        frappe.set_user("testuser")
         with self.assertRaises(frappe.ValidationError):
             overrided_past_order_list("invalid$term", "Draft")
         mock_db_sql.assert_not_called()
 
-    @patch(f"{MODULE}.frappe.session.user", "testuser")
     @patch(f"{MODULE}.frappe.db.sql")
     def test_long_search_term_throws_before_db_query(self, mock_db_sql):
         """Search term exceeding length limit should throw before database query."""
+        frappe.set_user("testuser")
         long_term = "a" * 101
         with self.assertRaises(frappe.ValidationError):
             overrided_past_order_list(long_term, "Draft")
@@ -115,20 +115,20 @@ class TestOverridedPastOrderListValidation(FrappeTestCase):
 class TestOverridedPastOrderListNonAdminUser(FrappeTestCase):
     """Tests for non-Administrator user scenarios."""
 
-    @patch(f"{MODULE}.frappe.session.user", "salesman@example.com")
     @patch(f"{MODULE}.frappe.db.sql")
     def test_non_admin_user_not_associated_with_branch_throws(self, mock_db_sql):
         """Non-admin user without branch association should throw."""
+        frappe.set_user("salesman@example.com")
         mock_db_sql.return_value = []  # No branch found
 
         with self.assertRaises(frappe.ValidationError):
             overrided_past_order_list("", "Draft")
 
-    @patch(f"{MODULE}.frappe.session.user", "salesman@example.com")
     @patch(f"{MODULE}.frappe.db.sql")
     @patch(f"{MODULE}.frappe.db.get_all")
     def test_non_admin_user_with_valid_branch_queries_db(self, mock_get_all, mock_db_sql):
         """Non-admin user with valid branch should proceed with filtered query."""
+        frappe.set_user("salesman@example.com")
         mock_db_sql.return_value = [
             {"branch": "Main Branch", "room": "Room 1"}
         ]
@@ -138,33 +138,33 @@ class TestOverridedPastOrderListNonAdminUser(FrappeTestCase):
         self.assertEqual(result, [])
         mock_get_all.assert_called()
 
-    @patch(f"{MODULE}.frappe.session.user", "salesman@example.com")
     @patch(f"{MODULE}.frappe.db.sql")
     @patch(f"{MODULE}.frappe.db.get_all")
     def test_non_admin_to_bill_status_filters_correct_invoices(self, mock_get_all, mock_db_sql):
         """Non-admin user with 'To Bill' status should filter to Draft invoices with table and no print."""
+        frappe.set_user("salesman@example.com")
         mock_db_sql.return_value = [
             {"branch": "Main Branch", "room": "Room 1"}
         ]
         mock_get_all.return_value = [
-            {
+            frappe._dict({
                 "name": "INV-001",
                 "customer": "Customer 1",
                 "restaurant_table": "Table 1",
                 "invoice_printed": 0,
-            },
-            {
+            }),
+            frappe._dict({
                 "name": "INV-002",
                 "customer": "Customer 2",
                 "restaurant_table": "Table 2",
                 "invoice_printed": 1,  # Printed, should be excluded
-            },
-            {
+            }),
+            frappe._dict({
                 "name": "INV-003",
                 "customer": "Customer 3",
                 "restaurant_table": None,  # No table, should be excluded
                 "invoice_printed": 0,
-            },
+            }),
         ]
 
         result = overrided_past_order_list("", "To Bill")
@@ -172,33 +172,33 @@ class TestOverridedPastOrderListNonAdminUser(FrappeTestCase):
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0]["name"], "INV-001")
 
-    @patch(f"{MODULE}.frappe.session.user", "salesman@example.com")
     @patch(f"{MODULE}.frappe.db.sql")
     @patch(f"{MODULE}.frappe.db.get_all")
     def test_non_admin_other_status_filters_correct_invoices(self, mock_get_all, mock_db_sql):
         """Non-admin user with non-'To Bill' status should filter invoices without table or with print."""
+        frappe.set_user("salesman@example.com")
         mock_db_sql.return_value = [
             {"branch": "Main Branch", "room": "Room 1"}
         ]
         mock_get_all.return_value = [
-            {
+            frappe._dict({
                 "name": "INV-001",
                 "customer": "Customer 1",
                 "restaurant_table": "Table 1",
                 "invoice_printed": 1,  # Has print, should be included
-            },
-            {
+            }),
+            frappe._dict({
                 "name": "INV-002",
                 "customer": "Customer 2",
                 "restaurant_table": None,  # No table, should be included
                 "invoice_printed": 0,
-            },
-            {
+            }),
+            frappe._dict({
                 "name": "INV-003",
                 "customer": "Customer 3",
                 "restaurant_table": "Table 3",
                 "invoice_printed": 0,  # Has table and no print, should be excluded
-            },
+            }),
         ]
 
         result = overrided_past_order_list("", "Submitted")
@@ -213,24 +213,24 @@ class TestOverridedPastOrderListNonAdminUser(FrappeTestCase):
 class TestOverridedPastOrderListAdminUser(FrappeTestCase):
     """Tests for Administrator user scenarios."""
 
-    @patch(f"{MODULE}.frappe.session.user", "Administrator")
     @patch(f"{MODULE}.frappe.db.sql")
     @patch(f"{MODULE}.frappe.db.get_all")
     def test_admin_to_bill_status_no_branch_filter(self, mock_get_all, mock_db_sql):
         """Administrator with 'To Bill' status should see all Draft invoices with table and no print."""
+        frappe.set_user("Administrator")
         mock_get_all.return_value = [
-            {
+            frappe._dict({
                 "name": "INV-001",
                 "customer": "Customer 1",
                 "restaurant_table": "Table 1",
                 "invoice_printed": 0,
-            },
-            {
+            }),
+            frappe._dict({
                 "name": "INV-002",
                 "customer": "Customer 2",
                 "restaurant_table": None,
                 "invoice_printed": 0,
-            },
+            }),
         ]
 
         result = overrided_past_order_list("", "To Bill")
@@ -239,24 +239,24 @@ class TestOverridedPastOrderListAdminUser(FrappeTestCase):
         # Verify SQL query for branch info was not called
         mock_db_sql.assert_not_called()
 
-    @patch(f"{MODULE}.frappe.session.user", "Administrator")
     @patch(f"{MODULE}.frappe.db.sql")
     @patch(f"{MODULE}.frappe.db.get_all")
     def test_admin_other_status_no_branch_filter(self, mock_get_all, mock_db_sql):
         """Administrator with non-'To Bill' status should see all matching invoices without table or with print."""
+        frappe.set_user("Administrator")
         mock_get_all.return_value = [
-            {
+            frappe._dict({
                 "name": "INV-001",
                 "customer": "Customer 1",
                 "restaurant_table": "Table 1",
                 "invoice_printed": 1,
-            },
-            {
+            }),
+            frappe._dict({
                 "name": "INV-002",
                 "customer": "Customer 2",
                 "restaurant_table": None,
                 "invoice_printed": 0,
-            },
+            }),
         ]
 
         result = overrided_past_order_list("", "Submitted")
@@ -267,10 +267,10 @@ class TestOverridedPastOrderListAdminUser(FrappeTestCase):
 class TestOverridedPastOrderListSearchFunctionality(FrappeTestCase):
     """Tests for search term and status combined filtering."""
 
-    @patch(f"{MODULE}.frappe.session.user", "Administrator")
     @patch(f"{MODULE}.frappe.db.get_all")
     def test_search_term_and_status_searches_by_customer_and_name(self, mock_get_all):
         """Search with term and status should search both customer and invoice name."""
+        frappe.set_user("Administrator")
         mock_get_all.side_effect = [
             # First call: search by customer
             [
@@ -288,10 +288,10 @@ class TestOverridedPastOrderListSearchFunctionality(FrappeTestCase):
         self.assertEqual(result[0]["name"], "INV-001")
         self.assertEqual(result[1]["name"], "INV-JOHN-001")
 
-    @patch(f"{MODULE}.frappe.session.user", "Administrator")
     @patch(f"{MODULE}.frappe.db.get_all")
     def test_search_returns_combined_results_from_customer_and_name_queries(self, mock_get_all):
         """Search results from customer and name queries should be combined."""
+        frappe.set_user("Administrator")
         customer_results = [
             {
                 "name": "INV-001",
@@ -324,17 +324,17 @@ class TestOverridedPastOrderListSearchFunctionality(FrappeTestCase):
         self.assertIn("INV-001", [inv["name"] for inv in result])
         self.assertIn("TEST-INV-001", [inv["name"] for inv in result])
 
-    @patch(f"{MODULE}.frappe.session.user", "Administrator")
     @patch(f"{MODULE}.frappe.db.get_all")
     def test_empty_search_with_status_only_no_search_query(self, mock_get_all):
         """Empty search term with status should not call search queries."""
+        frappe.set_user("Administrator")
         mock_get_all.return_value = [
-            {
+            frappe._dict({
                 "name": "INV-001",
                 "customer": "Customer",
                 "restaurant_table": None,
                 "invoice_printed": 1,
-            }
+            })
         ]
 
         result = overrided_past_order_list("", "Submitted")
@@ -346,10 +346,10 @@ class TestOverridedPastOrderListSearchFunctionality(FrappeTestCase):
 class TestOverridedPastOrderListFields(FrappeTestCase):
     """Tests for correct fields being queried."""
 
-    @patch(f"{MODULE}.frappe.session.user", "Administrator")
     @patch(f"{MODULE}.frappe.db.get_all")
     def test_queries_correct_fields(self, mock_get_all):
         """Function should query the correct set of fields."""
+        frappe.set_user("Administrator")
         mock_get_all.return_value = []
 
         overrided_past_order_list("", "Submitted")
@@ -374,39 +374,39 @@ class TestOverridedPastOrderListFields(FrappeTestCase):
 class TestOverridedPastOrderListEdgeCases(FrappeTestCase):
     """Tests for edge cases and error scenarios."""
 
-    @patch(f"{MODULE}.frappe.session.user", "salesman@example.com")
     @patch(f"{MODULE}.frappe.db.sql")
     @patch(f"{MODULE}.frappe.db.get_all")
     def test_multiple_invoices_with_mixed_conditions(self, mock_get_all, mock_db_sql):
         """Test with multiple invoices having mixed table/print conditions."""
+        frappe.set_user("salesman@example.com")
         mock_db_sql.return_value = [
             {"branch": "Main Branch", "room": "Room 1"}
         ]
         mock_get_all.return_value = [
-            {
+            frappe._dict({
                 "name": "INV-001",
                 "customer": "Cust 1",
                 "restaurant_table": "T1",
                 "invoice_printed": 0,
-            },
-            {
+            }),
+            frappe._dict({
                 "name": "INV-002",
                 "customer": "Cust 2",
                 "restaurant_table": "T2",
                 "invoice_printed": 1,
-            },
-            {
+            }),
+            frappe._dict({
                 "name": "INV-003",
                 "customer": "Cust 3",
                 "restaurant_table": None,
                 "invoice_printed": 0,
-            },
-            {
+            }),
+            frappe._dict({
                 "name": "INV-004",
                 "customer": "Cust 4",
                 "restaurant_table": None,
                 "invoice_printed": 1,
-            },
+            }),
         ]
 
         result = overrided_past_order_list("", "To Bill")
@@ -414,11 +414,11 @@ class TestOverridedPastOrderListEdgeCases(FrappeTestCase):
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0]["name"], "INV-001")
 
-    @patch(f"{MODULE}.frappe.session.user", "salesman@example.com")
     @patch(f"{MODULE}.frappe.db.sql")
     @patch(f"{MODULE}.frappe.db.get_all")
     def test_with_limit_parameter(self, mock_get_all, mock_db_sql):
         """Function should accept and pass limit parameter (if implemented)."""
+        frappe.set_user("salesman@example.com")
         mock_db_sql.return_value = [
             {"branch": "Main Branch", "room": "Room 1"}
         ]
@@ -429,19 +429,19 @@ class TestOverridedPastOrderListEdgeCases(FrappeTestCase):
         # Just verify it doesn't throw
         self.assertTrue(True)
 
-    @patch(f"{MODULE}.frappe.session.user", "Administrator")
     @patch(f"{MODULE}.frappe.db.get_all")
     def test_valid_search_special_chars_like_hyphen(self, mock_get_all):
         """Search term with hyphen should work (valid character)."""
+        frappe.set_user("Administrator")
         mock_get_all.return_value = []
         # Should not throw
         result = overrided_past_order_list("Customer-001", "Submitted")
         self.assertEqual(result, [])
 
-    @patch(f"{MODULE}.frappe.session.user", "Administrator")
     @patch(f"{MODULE}.frappe.db.get_all")
     def test_search_with_spaces(self, mock_get_all):
         """Search term with spaces should work."""
+        frappe.set_user("Administrator")
         mock_get_all.return_value = []
         # Should not throw
         result = overrided_past_order_list("Customer Name", "Submitted")
@@ -451,21 +451,21 @@ class TestOverridedPastOrderListEdgeCases(FrappeTestCase):
 class TestOverridedPastOrderListBranchIsolation(FrappeTestCase):
     """Tests to ensure branch isolation for non-admin users."""
 
-    @patch(f"{MODULE}.frappe.session.user", "user1@branch1.com")
     @patch(f"{MODULE}.frappe.db.sql")
     @patch(f"{MODULE}.frappe.db.get_all")
     def test_non_admin_user_only_sees_own_branch_invoices(self, mock_get_all, mock_db_sql):
         """Non-admin user should only see invoices from their assigned branch."""
+        frappe.set_user("user1@branch1.com")
         mock_db_sql.return_value = [
             {"branch": "Branch A", "room": "Room 1"}
         ]
         mock_get_all.return_value = [
-            {
+            frappe._dict({
                 "name": "INV-BRANCH-A-001",
                 "customer": "Customer",
                 "restaurant_table": "T1",
                 "invoice_printed": 0,
-            }
+            })
         ]
 
         result = overrided_past_order_list("", "To Bill")
