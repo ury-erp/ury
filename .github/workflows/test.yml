@@ -32,11 +32,15 @@ jobs:
         run: |
           sudo systemctl start mariadb
           sudo systemctl start redis-server
+          # Ubuntu's mariadb-server ships with no root password (unix_socket
+          # auth) -- bench new-site needs a real password to match
+          # --mariadb-root-password=root below.
+          sudo mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED BY 'root'; FLUSH PRIVILEGES;"
 
       - name: Install Frappe and dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install bench
+          pip install frappe-bench
 
       - name: Setup Frappe
         run: |
@@ -68,7 +72,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
 
       - name: Install dependencies and run tests for frontend
         working-directory: ./frontend
