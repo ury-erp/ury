@@ -195,19 +195,22 @@ export default function CaptainTables() {
         </div>
 
         {branchRooms.length > 0 && (
-          <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
-            {branchRooms.map((room) => (
-              <Button
-                key={room.name}
-                variant="tab"
-                size="sm"
-                data-selected={selectedRoom === room.name}
-                onClick={() => setSelectedRoom(room.name)}
-                className="h-9 shrink-0"
-              >
-                {room.name}
-              </Button>
-            ))}
+          <div className="relative">
+            <div className="mt-2 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+              {branchRooms.map((room) => (
+                <Button
+                  key={room.name}
+                  variant="tab"
+                  size="sm"
+                  data-selected={selectedRoom === room.name}
+                  onClick={() => setSelectedRoom(room.name)}
+                  className="h-9 shrink-0"
+                >
+                  {room.name}
+                </Button>
+              ))}
+            </div>
+            <div className="pointer-events-none absolute inset-y-0 end-0 w-8 bg-gradient-to-l from-card to-transparent" />
           </div>
         )}
       </div>
