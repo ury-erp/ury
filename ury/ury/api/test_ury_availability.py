@@ -225,6 +225,39 @@ class TestGetItemAvailabilityFailClosed(FrappeTestCase):
         self.assertFalse(result["sellable"])
 
     @patch(f"{MODULE}._resolve_production_config")
+    def test_department_disabled(self, mock_config):
+        mock_config.return_value = _config(department_disabled=1)
+
+        result = get_item_availability("ITEM-CAKE", "Branch A", "Company A")
+
+        self.assertEqual(result["reason_code"], "DEPARTMENT_DISABLED")
+        self.assertFalse(result["sellable"])
+
+    @patch(f"{MODULE}._resolve_production_config")
+    def test_production_unit_disabled_pre_produced(self, mock_config):
+        mock_config.return_value = _config(
+            production_policy="PRE_PRODUCED",
+            production_unit_disabled=1
+        )
+
+        result = get_item_availability("ITEM-CAKE", "Branch A", "Company A")
+
+        self.assertEqual(result["reason_code"], "PRODUCTION_UNIT_DISABLED")
+        self.assertFalse(result["sellable"])
+
+    @patch(f"{MODULE}._resolve_production_config")
+    def test_production_unit_disabled_made_to_order(self, mock_config):
+        mock_config.return_value = _config(
+            production_policy="MADE_TO_ORDER",
+            production_unit_disabled=1
+        )
+
+        result = get_item_availability("ITEM-BURGER", "Branch A", "Company A")
+
+        self.assertEqual(result["reason_code"], "PRODUCTION_UNIT_DISABLED")
+        self.assertFalse(result["sellable"])
+
+    @patch(f"{MODULE}._resolve_production_config")
     def test_configuration_error_when_config_unresolvable(self, mock_config):
         mock_config.return_value = None
 
@@ -307,6 +340,24 @@ class TestGetItemAvailabilityBranchIsolation(FrappeTestCase):
         fg_calls = [call.args for call in mock_fg.call_args_list]
         self.assertIn(("ITEM-CAKE", "Kitchen Warehouse A - URY", "Company A"), fg_calls)
         self.assertIn(("ITEM-CAKE", "Kitchen Warehouse B - URY", "Company A"), fg_calls)
+
+
+class TestGetItemAvailabilityDirectRetail(FrappeTestCase):
+
+    @patch(f"{MODULE}.get_allocatable_qty")
+    @patch(f"{MODULE}._resolve_production_config")
+    def test_direct_retail_zero_stock(self, mock_config, mock_alloc):
+        mock_config.return_value = _config(production_policy="DIRECT_RETAIL")
+        mock_alloc.return_value = {
+            "allocatable_qty": 0,
+        }
+
+        result = get_item_availability("ITEM-RETAIL", "Branch A", "Company A")
+
+        self.assertEqual(result["reason_code"], "FG_OUT_OF_STOCK")
+        self.assertFalse(result["sellable"])
+        self.assertEqual(result["available_qty"], 0)
+        self.assertEqual(result["production_policy"], "DIRECT_RETAIL")
 
 
 class TestAvailabilityProductionContextIntegration(FrappeTestCase):
