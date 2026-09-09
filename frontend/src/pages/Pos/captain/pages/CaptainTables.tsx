@@ -146,14 +146,23 @@ export default function CaptainTables() {
     const ownership = resolveOwnership(table, order);
 
     if (ownership === 'free' || ownership === 'mine') {
-      navigate(`/order/table/${table.name}`);
+      // NOTE: must match the registered route `pos/order/table/:table`
+      // (App.tsx) -- the app-consolidation Phase 1 commit (c4f094f) nested
+      // the captain order routes under `pos/`, but this call site was
+      // missed, so it navigated to `/order/table/:table` which matches no
+      // route and silently falls through to the `*` catch-all
+      // (`<Navigate to="/dashboard" replace />`). That sent a Captain
+      // straight into the Manager-only dashboard and an "Access Denied"
+      // screen instead of the order screen -- found live-testing the item-5
+      // Captain stock-reservation permission fix.
+      navigate(`/pos/order/table/${table.name}`);
       return;
     }
 
     // Occupied by someone else (or occupancy with no resolvable owner):
     // elevated/transfer access overrides the base restriction.
     if (canAccessOtherCaptainsTables) {
-      navigate(`/order/table/${table.name}`);
+      navigate(`/pos/order/table/${table.name}`);
       return;
     }
 

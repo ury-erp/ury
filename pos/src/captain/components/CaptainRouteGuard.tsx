@@ -18,14 +18,16 @@ interface Props {
  * every mutation must still be re-validated server-side per PLAN.md §9.
  *
  * NOTE: this guard runs *inside* `AuthGuard`/`POSOpeningProvider`
- * (`pos/src/App.tsx`). `AuthGuard`'s own `hasAccess` check is derived from
- * POS Profile `role_allowed_for_billing` membership only (see
- * `pos/src/store/slices/config-slice.ts`) — a Captain (non-billing role)
- * will fail that check and never reach this guard at all today. That is a
- * known, confirmed, out-of-scope blocker for this phase — see the Phase 6
- * report for detail. This guard still assumes the AuthGuard/session-auth
- * layer above it is intact and only handles the Captain-specific capability
- * check.
+ * (`pos/src/App.tsx`). `AuthGuard`'s `hasAccess` check is derived from
+ * `deriveAllowedRoles()` (see `pos/src/store/slices/config-slice.ts`), which
+ * was fixed to union the fixed `URY_POS_ROLES` vocabulary (including `URY
+ * Captain`) with POS Profile's role-permission child tables, rather than
+ * `role_allowed_for_billing` alone — so a pure Captain role now reaches this
+ * guard the same way Cashier/Manager do. This guard still assumes the
+ * AuthGuard/session-auth layer above it is intact and only handles the
+ * Captain-specific capability check (`canTakeTableOrders`, i.e.
+ * "can place an order", not "can bill/settle payment" — see
+ * `derivePOSCapabilities` in `@ury/core`'s `roles.ts` for that distinction).
  */
 const CaptainRouteGuard: React.FC<Props> = ({ children }) => {
   const { capabilities, branch, isLoading, error } = useCaptainContext();
