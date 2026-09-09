@@ -13,6 +13,7 @@ permissions: {}
 jobs:
   backend:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout code
@@ -142,6 +143,7 @@ jobs:
 
   frontend-lint-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout code
