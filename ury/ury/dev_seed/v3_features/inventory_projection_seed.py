@@ -16,7 +16,12 @@ from ury.ury.api.ury_inventory_projection import get_allocatable_qty
 
 
 def _get_company_and_warehouse():
-    company_name = frappe.db.get_value("Company", {}, "name")
+    branch_name = frappe.db.get_value("Branch", {}, "name")
+    company_name = None
+    if branch_name:
+        company_name = frappe.db.get_value("Branch", branch_name, "company")
+    if not company_name:
+        company_name = frappe.db.get_value("Company", {}, "name")
     warehouse = None
     if company_name:
         warehouse = frappe.db.get_value(

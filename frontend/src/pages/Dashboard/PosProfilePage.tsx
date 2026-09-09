@@ -15,7 +15,7 @@ interface PosProfileRecord {
   selling_price_list?: string;
   print_format?: string;
   custom_enable_discount?: number;
-  custom_multiple_cashier_configuration?: number;
+  custom_enable_multiple_cashier?: number;
   custom_enable_kot_reprint?: number;
   custom_daily_pos_close?: number;
   custom_edit_order_type?: number;
@@ -59,6 +59,7 @@ export const PosProfilePage: React.FC = () => {
     applicable_for_users: [{ user: '', default: 0 }], payments: [{ mode_of_payment: '', default: 0 }]
   });
   const [options, setOptions] = useState<any>({ companies: [], warehouses: [], users: [], payments: [] });
+  const [modesWithoutAccounts, setModesWithoutAccounts] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     setAddForm(prev => ({
@@ -101,6 +102,34 @@ export const PosProfilePage: React.FC = () => {
     }
   };
 
+  const checkPaymentModeAccounts = async (modeNames: string[], company: string) => {
+    if (!company || modeNames.length === 0) {
+      setModesWithoutAccounts(new Set());
+      return;
+    }
+
+    const missing = new Set<string>();
+    for (const modeName of modeNames) {
+      if (!modeName) continue;
+      try {
+        const res = await call<any>('frappe.client.get', {
+          doctype: 'Mode of Payment',
+          name: modeName,
+        });
+        const modeDoc = res.message || res;
+        const accounts = modeDoc.accounts || [];
+        const hasAccountForCompany = accounts.some((row: any) => row.company === company && row.default_account);
+        if (!hasAccountForCompany) {
+          missing.add(modeName);
+        }
+      } catch (e) {
+        console.error(`Failed to check Mode of Payment ${modeName}:`, e);
+        missing.add(modeName);
+      }
+    }
+    setModesWithoutAccounts(missing);
+  };
+
   const handleAddProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
@@ -138,6 +167,18 @@ export const PosProfilePage: React.FC = () => {
         }
       }
 
+      // ERPNext's standard POS Profile validation requires every payment mode
+      // to have a company-scoped default Cash/Bank account. Ensure that before
+      // insert -- otherwise saving with e.g. Cheque/Zomato/Swiggy/Direct throws
+      // "Please set default Cash or Bank account in Mode of Payments ...".
+      const addModeNames = addForm.payments.filter(p => p.mode_of_payment).map(p => p.mode_of_payment);
+      if (addModeNames.length > 0 && addForm.company) {
+        await call('ury.ury_pos.api.ensure_payment_mode_accounts', {
+          modes: addModeNames,
+          company: addForm.company,
+        });
+      }
+
       await call('frappe.client.insert', {
         doc: {
           doctype: 'POS Profile',
@@ -172,7 +213,7 @@ export const PosProfilePage: React.FC = () => {
         doctype: 'POS Profile',
         filters: activeBranchId !== 'all' ? [['branch', '=', activeBranchId]] : [],
         fields: ['name', 'branch', 'company', 'warehouse', 'selling_price_list', 'print_format',
-          'custom_enable_discount', 'custom_multiple_cashier_configuration',
+          'custom_enable_discount', 'custom_enable_multiple_cashier',
           'custom_enable_kot_reprint', 'custom_daily_pos_close', 'custom_edit_order_type',
           'paid_limit', 'table_attention_time', 'custom_reset_order_number_daily', 'disabled'],
         limit: 50,
@@ -201,7 +242,7 @@ export const PosProfilePage: React.FC = () => {
         print_format: profile.print_format || '',
         custom_enable_discount: profile.custom_enable_discount || 0,
         custom_enable_kot_reprint: profile.custom_enable_kot_reprint || 0,
-        custom_multiple_cashier_configuration: profile.custom_multiple_cashier_configuration || 0,
+        custom_enable_multiple_cashier: profile.custom_enable_multiple_cashier || 0,
         custom_daily_pos_close: profile.custom_daily_pos_close || 0,
         custom_edit_order_type: profile.custom_edit_order_type || 0,
         paid_limit: profile.paid_limit || '',
@@ -212,6 +253,12 @@ export const PosProfilePage: React.FC = () => {
       };
       setProfileForm(initialForm);
       setOriginalProfileForm(initialForm);
+
+      // Check which payment modes lack default accounts for this company
+      const modeNames = (profile.payments || [])
+        .map((p: any) => p.mode_of_payment)
+        .filter((m: any) => m);
+      await checkPaymentModeAccounts(modeNames, profile.company);
     } catch {
       setSelectedProfile(null);
     }
@@ -221,6 +268,24 @@ export const PosProfilePage: React.FC = () => {
     fetchProfiles();
     fetchOptions();
   }, [activeBranchId]);
+
+  // Key on the serialized mode list rather than the `payments` array
+  // reference -- profileForm.payments gets a new array identity on every
+  // keystroke in the mode-of-payment picker (each onChange does
+  // `[...profileForm.payments]`), so keying on the array itself reran this
+  // effect (and its one-get-per-mode account lookup) on every character
+  // typed instead of only when the actual set of modes changed.
+  const paymentModeNamesKey = (profileForm.payments || [])
+    .map((p: any) => p.mode_of_payment)
+    .filter((m: any) => m)
+    .join('|');
+
+  useEffect(() => {
+    if (selectedProfile && profileForm.company && paymentModeNamesKey) {
+      const modeNames = paymentModeNamesKey.split('|');
+      checkPaymentModeAccounts(modeNames, profileForm.company);
+    }
+  }, [profileForm.company, paymentModeNamesKey, selectedProfile]);
 
   // View Mode: Open read-only detail view
   const handleProfileView = (profile: PosProfileRecord) => {
@@ -248,7 +313,7 @@ export const PosProfilePage: React.FC = () => {
         print_format: form.print_format || '',
         custom_enable_discount: form.custom_enable_discount ? 1 : 0,
         custom_enable_kot_reprint: form.custom_enable_kot_reprint ? 1 : 0,
-        custom_multiple_cashier_configuration: form.custom_multiple_cashier_configuration ? 1 : 0,
+        custom_enable_multiple_cashier: form.custom_enable_multiple_cashier ? 1 : 0,
         custom_daily_pos_close: form.custom_daily_pos_close ? 1 : 0,
         custom_edit_order_type: form.custom_edit_order_type ? 1 : 0,
         paid_limit: form.paid_limit || '',
@@ -273,6 +338,19 @@ export const PosProfilePage: React.FC = () => {
 
     setSaving(true);
     try {
+      // Same account-mapping guard as create: any payment mode without a
+      // company-scoped default account crashes ERPNext's own POS Profile
+      // validation on save.
+      const editModeNames = (profileForm.payments || [])
+        .filter((p: any) => p.mode_of_payment)
+        .map((p: any) => p.mode_of_payment);
+      if (editModeNames.length > 0 && profileForm.company) {
+        await call('ury.ury_pos.api.ensure_payment_mode_accounts', {
+          modes: editModeNames,
+          company: profileForm.company,
+        });
+      }
+
       await call('frappe.client.set_value', {
         doctype: 'POS Profile',
         name: selectedProfile.name,
@@ -283,7 +361,7 @@ export const PosProfilePage: React.FC = () => {
           print_format: profileForm.print_format,
           custom_enable_discount: profileForm.custom_enable_discount,
           custom_enable_kot_reprint: profileForm.custom_enable_kot_reprint,
-          custom_multiple_cashier_configuration: profileForm.custom_multiple_cashier_configuration,
+          custom_enable_multiple_cashier: profileForm.custom_enable_multiple_cashier,
           custom_daily_pos_close: profileForm.custom_daily_pos_close,
           custom_edit_order_type: profileForm.custom_edit_order_type,
           paid_limit: profileForm.paid_limit,
@@ -469,7 +547,7 @@ export const PosProfilePage: React.FC = () => {
                     {[
                       { key: 'custom_enable_discount', label: 'Enable Item Discounts' },
                       { key: 'custom_enable_kot_reprint', label: 'Enable KOT Reprint' },
-                      { key: 'custom_multiple_cashier_configuration', label: 'Enable Multiple Cashier Configuration' },
+                      { key: 'custom_enable_multiple_cashier', label: 'Enable Multiple Cashier Configuration' },
                       { key: 'custom_daily_pos_close', label: 'Require Daily POS Closing' },
                       { key: 'custom_edit_order_type', label: 'Enable Order Type Edit' },
                       { key: 'custom_reset_order_number_daily', label: 'Reset Order Number Daily' },
@@ -625,47 +703,57 @@ export const PosProfilePage: React.FC = () => {
                     Mode of Payment
                   </h4>
                   <div className="space-y-2 mb-3">
-                    {(profileForm.payments || []).map((row: any, idx: number) => (
-                      <div key={idx} className="flex gap-2 items-center">
-                        <div className="flex-1">
-                          <SearchableSelect
-                            id={`payment_${idx}`}
-                            disabled={!isEditMode}
-                            value={row.mode_of_payment || ''}
-                            onChange={(_, val) => {
-                              const newRows = [...(profileForm.payments || [])];
-                              newRows[idx].mode_of_payment = val;
+                    {(profileForm.payments || []).map((row: any, idx: number) => {
+                      const modeName = row.mode_of_payment;
+                      const isMissingAccount = modeName && modesWithoutAccounts.has(modeName);
+                      return (
+                        <div key={idx} className={`flex gap-2 items-center ${isMissingAccount ? 'relative' : ''}`}>
+                          <div className="flex-1">
+                            <SearchableSelect
+                              id={`payment_${idx}`}
+                              disabled={!isEditMode}
+                              value={row.mode_of_payment || ''}
+                              onChange={(_, val) => {
+                                const newRows = [...(profileForm.payments || [])];
+                                newRows[idx].mode_of_payment = val;
+                                setProfileForm({...profileForm, payments: newRows});
+                              }}
+                              options={[
+                                { value: '', label: 'Select Payment Mode' },
+                                ...options.payments.map((p: any) => ({ value: p.name, label: p.name }))
+                              ]}
+                              placeholder="Select Payment Mode"
+                            />
+                            {isMissingAccount && (
+                              <div className="text-xs text-red-600 dark:text-red-400 mt-1 flex items-center gap-1">
+                                <span className="inline-block w-1.5 h-1.5 bg-red-600 dark:bg-red-400 rounded-full"></span>
+                                <span>No default account configured for this mode in {profileForm.company}</span>
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <Switch
+                              disabled={!isEditMode}
+                              checked={row.default === 1}
+                              onCheckedChange={checked => {
+                                const newRows = [...(profileForm.payments || [])];
+                                newRows[idx].default = checked ? 1 : 0;
+                                setProfileForm({...profileForm, payments: newRows});
+                              }}
+                            />
+                            <span>Default</span>
+                          </div>
+                          {isEditMode && (
+                            <button type="button" className="text-muted-foreground hover:text-red-500 p-1" onClick={() => {
+                              const newRows = (profileForm.payments || []).filter((_: any, i: number) => i !== idx);
                               setProfileForm({...profileForm, payments: newRows});
-                            }}
-                            options={[
-                              { value: '', label: 'Select Payment Mode' },
-                              ...options.payments.map((p: any) => ({ value: p.name, label: p.name }))
-                            ]}
-                            placeholder="Select Payment Mode"
-                          />
+                            }}>
+                              <X className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
-                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                          <Switch
-                            disabled={!isEditMode}
-                            checked={row.default === 1}
-                            onCheckedChange={checked => {
-                              const newRows = [...(profileForm.payments || [])];
-                              newRows[idx].default = checked ? 1 : 0;
-                              setProfileForm({...profileForm, payments: newRows});
-                            }}
-                          />
-                          <span>Default</span>
-                        </div>
-                        {isEditMode && (
-                          <button type="button" className="text-muted-foreground hover:text-red-500 p-1" onClick={() => {
-                            const newRows = (profileForm.payments || []).filter((_: any, i: number) => i !== idx);
-                            setProfileForm({...profileForm, payments: newRows});
-                          }}>
-                            <X className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                   {isEditMode && (
                     <Button

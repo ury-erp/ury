@@ -19,7 +19,7 @@ import SplitGroupPanel from '../components/SplitGroupPanel';
 import MergedBillPanel from '../components/MergedBillPanel';
 import { printOrder } from '../lib/print';
 import { call } from '@ury/core';
-import { splitBill } from '../lib/order-api';
+import { splitBill, cancelOrder } from '../lib/order-api';
 import {
   getOrdersTabForInvoice,
   getSplitGroup,
@@ -58,39 +58,36 @@ function getStatusTone(status: string): StatusTone {
   return 'neutral';
 }
 
-const statusToneClasses: Record<StatusTone, string> = {
-  neutral: 'border-hair bg-muted text-muted-foreground',
-  success: 'border-success-tint-border bg-success-tint text-success',
-  destructive: 'border-destructive-tint-border bg-destructive-tint text-destructive',
-};
-
 const statusDotClasses: Record<StatusTone, string> = {
   neutral: 'bg-muted-foreground',
   success: 'bg-success',
   destructive: 'bg-destructive',
 };
 
+const getToneVariant = (tone: StatusTone): "default" | "tagDestructive" | "tagSuccess" => {
+  switch (tone) {
+    case 'neutral': return 'default';
+    case 'success': return 'tagSuccess';
+    case 'destructive': return 'tagDestructive';
+  }
+};
+
 function StatusTag({ status, label }: { status: string; label: string }) {
   const tone = getStatusTone(status);
   return (
-    <span
-      className={cn(
-        'inline-flex h-[19px] shrink-0 items-center gap-1.5 rounded-[5px] border px-[7px] text-[11px] font-medium whitespace-nowrap',
-        statusToneClasses[tone]
-      )}
-    >
+    <Badge size="tag" variant={getToneVariant(tone)}>
       <span className={cn('h-[5px] w-[5px] shrink-0 rounded-full', statusDotClasses[tone])} />
       {label}
-    </span>
+    </Badge>
   );
 }
 
 function LinkTag({ icon: Icon, children }: { icon: React.ComponentType<{ className?: string }>; children: React.ReactNode }) {
   return (
-    <span className="inline-flex h-[19px] shrink-0 items-center gap-1 rounded-[5px] border border-primary-tint-border bg-primary-tint px-[7px] text-[11px] font-medium text-primary whitespace-nowrap">
+    <Badge size="tag" variant="tagAccent">
       <Icon className="h-2.5 w-2.5" />
       {children}
-    </span>
+    </Badge>
   );
 }
 
@@ -221,10 +218,7 @@ export default function Orders() {
     }
     setCancelLoading(true);
     try {
-      await call.post('ury.ury.doctype.ury_order.ury_order.cancel_order', {
-        invoice_id: selectedOrder.name,
-        reason: cancelReason
-      })
+      await cancelOrder(selectedOrder.name, cancelReason);
       showToast.success(t('success.order_cancelled'));
       setCancelDialogOpen(false);
       setCancelReason('');
@@ -745,17 +739,30 @@ export default function Orders() {
               <div className="mb-6">
                 <h3 className="text-[10.5px] font-medium uppercase tracking-[0.05em] text-text-tertiary mb-2">{t('order.items_title')}</h3>
                 <div>
-                  {selectedOrderItems.map((item, index) => (
-                    <div key={index} className="flex py-1.5 border-b border-hair last:border-0">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-foreground truncate">{item.item_name}</p>
-                        <p className="text-xs text-text-tertiary font-mono tabular-nums">Qty: {item.qty}</p>
+                  {selectedOrderItems.filter((item) => !item.is_disposable).map((item, index) => {
+                    const discountPercentage = item.rate < item.price_list_rate
+                      ? Math.round(((item.price_list_rate - item.rate) / item.price_list_rate) * 100)
+                      : null;
+
+                    return (
+                      <div key={index} className="flex py-1.5 border-b border-hair last:border-0">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <p className="text-sm font-medium text-foreground truncate">{item.item_name}</p>
+                            {discountPercentage !== null && (
+                              <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-destructive-tint text-destructive border border-destructive-tint-border">
+                                -{discountPercentage}%
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-text-tertiary font-mono tabular-nums">Qty: {item.qty}</p>
+                        </div>
+                        <p className="ml-auto font-mono text-xs font-semibold text-foreground tabular-nums self-center">
+                          {formatCurrency(item.amount)}
+                        </p>
                       </div>
-                      <p className="ml-auto font-mono text-xs font-semibold text-foreground tabular-nums self-center">
-                        {formatCurrency(item.amount)}
-                      </p>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 

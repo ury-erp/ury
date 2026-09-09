@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, ChangeEvent } from 'react';
-import { X, Plus, Minus } from 'lucide-react';
+import { X, Plus, Minus, UtensilsCrossed } from 'lucide-react';
 import { OrderItem, usePOSStore } from '../store/pos-store';
 import { cn } from '@ury/ui';
 import { formatCurrency } from '@ury/core';
@@ -127,6 +127,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
   const [selectedAddons, setSelectedAddons] = useState<Array<{ id: string; name: string; price: number }>>([]);
   const [quantity, setQuantity] = useState<string>(editMode ? initialQuantity?.toString() || '0' : '0');
   const [comments, setComments] = useState<string>(itemToReplace?.comment || existingCartItem?.comment || '');
+  const [imageError, setImageError] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
 
   const [, setAddonItemCodes] = useState<string[]>([]);
@@ -318,26 +319,21 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
       >
         {/* Left Column - Image  */}
         <div className="md:w-1/3 relative">
-          {itemDoc?.image ? (
+          {itemDoc?.image && !imageError ? (
             <img
               src={itemDoc.image}
               alt={itemDoc.name}
               className="w-full min-h-96 h-full object-cover rounded-t-lg md:rounded-l-lg md:rounded-tr-none filter saturate-75 brightness-95"
-              onError={(e) => {
-                const target = e.target as HTMLImageElement;
-                target.style.display = 'none';
-                const parent = target.parentElement;
-                if (parent) {
-                  const placeholder = document.createElement('div');
-                  placeholder.className = 'w-full h-96 bg-muted flex items-center justify-center text-[8rem] text-text-tertiary font-medium rounded-t-lg md:rounded-l-lg md:rounded-tr-none';
-                  placeholder.textContent = itemDoc.name.slice(0, 2).toUpperCase();
-                  parent.insertBefore(placeholder, target);
-                }
-              }}
+              onError={() => setImageError(true)}
             />
           ) : (
-            <div className="w-full min-h-96 h-full bg-muted flex items-center justify-center text-[8rem] text-text-tertiary font-medium rounded-t-lg md:rounded-l-lg md:rounded-tr-none">
-              {itemDoc?.name.slice(0, 2).toUpperCase()}
+            <div className="w-full min-h-96 h-full bg-muted flex flex-col items-center justify-center rounded-t-lg md:rounded-l-lg md:rounded-tr-none">
+              <div className="flex flex-col items-center gap-4">
+                <UtensilsCrossed className="w-20 h-20 text-muted-foreground opacity-50" />
+                <div className="text-6xl font-bold text-muted-foreground opacity-75">
+                  {itemDoc?.name.slice(0, 1).toUpperCase()}
+                </div>
+              </div>
             </div>
           )}
           <Button

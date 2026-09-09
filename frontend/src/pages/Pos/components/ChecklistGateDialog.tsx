@@ -216,17 +216,19 @@ const ChecklistGateDialog = ({ posProfile, checklistType, onComplete }: Checklis
                     />
                     <span className="text-sm font-medium text-foreground">
                       {row.item_label}
-                      {row.is_mandatory && <span className="text-destructive ml-1">*</span>}
+                      {!!row.is_mandatory && <span className="text-destructive ml-1">*</span>}
                     </span>
                   </label>
-                  <Input
-                    type="text"
-                    value={row.remarks}
-                    onChange={(e) => handleRemarksChange(index, e.target.value)}
-                    placeholder={t('checklist.remarks_placeholder')}
-                    size="sm"
-                    className="mt-2 ml-7 w-[calc(100%-1.75rem)]"
-                  />
+                  {row.is_checked && (
+                    <Input
+                      type="text"
+                      value={row.remarks}
+                      onChange={(e) => handleRemarksChange(index, e.target.value)}
+                      placeholder={t('checklist.remarks_placeholder')}
+                      size="sm"
+                      className="mt-2 ml-7 w-[calc(100%-1.75rem)]"
+                    />
+                  )}
                 </div>
               ))}
             </div>

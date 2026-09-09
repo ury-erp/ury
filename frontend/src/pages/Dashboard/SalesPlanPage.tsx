@@ -136,17 +136,18 @@ const LifecycleStepper: React.FC<LifecycleStepperProps> = ({ status }) => {
             {index > 0 && (
               <div className={`h-px w-6 shrink-0 ${isComplete || isActive ? 'bg-primary' : 'bg-muted'}`} />
             )}
-            <div
-              className={`inline-flex h-[19px] items-center gap-[5px] rounded-[5px] px-[7px] text-[11px] font-medium ${
+            <Badge
+              size="tag"
+              variant={
                 isActive
-                  ? 'bg-primary-tint text-primary'
+                  ? 'tagAccent'
                   : isComplete
-                    ? 'bg-success-tint text-success'
-                    : 'bg-muted text-text-tertiary'
-              }`}
+                    ? 'tagSuccess'
+                    : 'default'
+              }
             >
               {step.label}
-            </div>
+            </Badge>
           </React.Fragment>
         );
       })}
@@ -237,9 +238,16 @@ export const SalesPlanPage: React.FC = () => {
               setPlanName(status.name);
               setPlanStatus((status.status as PlanStatus) || null);
             }
-          } catch {
-            // Non-fatal: the plan may not have been saved yet, so there is
-            // no status to show. The stepper simply defaults to Draft.
+          } catch (statusErr) {
+            // A missing/unsaved plan is expected and non-fatal (the stepper
+            // simply defaults to Draft). A permission error is not, and must
+            // not be swallowed silently -- otherwise a user who lacks read
+            // access to URY Sales Plan sees no status and no Approve/Review
+            // action ever renders, with no indication why.
+            const message = statusErr instanceof Error ? statusErr.message : String(statusErr);
+            if (!cancelled && /permission|not permitted|forbidden/i.test(message)) {
+              setTransitionError('You do not have permission to view this plan\'s approval status.');
+            }
           }
         }
       } catch (err) {

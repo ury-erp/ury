@@ -18,7 +18,7 @@ import SplitGroupPanel from '../components/SplitGroupPanel';
 import MergedBillPanel from '../components/MergedBillPanel';
 import { printOrder } from '../lib/print';
 import { call } from '@ury/core';
-import { splitBill } from '../lib/order-api';
+import { splitBill, cancelOrder } from '../lib/order-api';
 import {
   getOrdersTabForInvoice,
   getSplitGroup,
@@ -46,6 +46,15 @@ function isSplitBill(order: Pick<POSInvoice, 'split_total' | 'custom_split_group
     (order.split_total ?? 0) >= 2 ||
     !!order.custom_split_group ||
     !!order.custom_split_from
+  );
+}
+
+function LinkTag({ icon: Icon, children }: { icon: React.ComponentType<{ className?: string }>; children: React.ReactNode }) {
+  return (
+    <Badge size="tag" variant="tagAccent">
+      <Icon className="h-2.5 w-2.5" />
+      {children}
+    </Badge>
   );
 }
 
@@ -191,10 +200,7 @@ export default function Orders() {
     }
     setCancelLoading(true);
     try {
-      await call.post('ury.ury.doctype.ury_order.ury_order.cancel_order', {
-        invoice_id: selectedOrder.name,
-        reason: cancelReason
-      })
+      await cancelOrder(selectedOrder.name, cancelReason);
       showToast.success(t('success.order_cancelled'));
       setCancelDialogOpen(false);
       setCancelReason('');
@@ -409,29 +415,17 @@ export default function Orders() {
                         {order.name}
                       </h3>
                       <div className="flex shrink-0 items-center gap-1">
-                        {mergedBill && (
-                          <Badge
-                            variant="outline"
-                            className="shrink-0 gap-1 border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-50"
-                          >
-                            <GitMerge className="h-3 w-3" />
-                            {t('bill_merge.merged_bill')}
-                          </Badge>
-                        )}
+                        {mergedBill && <LinkTag icon={GitMerge}>{t('bill_merge.merged_bill')}</LinkTag>}
                         {splitBill && (
-                        <Badge
-                          variant="outline"
-                          className="shrink-0 gap-1 border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-50"
-                        >
-                          <GitBranch className="h-3 w-3" />
-                          {(order.split_total ?? 0) >= 2
-                            ? t('bill_split.split_indicator', {
-                                index: order.split_index ?? 0,
-                                total: order.split_total ?? 0,
-                              })
-                            : t('bill_split.split_bill')}
-                        </Badge>
-                      )}
+                          <LinkTag icon={GitBranch}>
+                            {(order.split_total ?? 0) >= 2
+                              ? t('bill_split.split_indicator', {
+                                  index: order.split_index ?? 0,
+                                  total: order.split_total ?? 0,
+                                })
+                              : t('bill_split.split_bill')}
+                          </LinkTag>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center justify-between gap-2">
@@ -584,27 +578,19 @@ export default function Orders() {
                 isMergedBill(selectedOrder)) && (
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   {(selectedOrder.split_total ?? 0) >= 2 || isSplitBill(selectedOrder) ? (
-                    <Badge
-                      variant="outline"
-                      className="gap-1 border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-50"
-                    >
-                      <GitBranch className="h-3 w-3" />
+                    <LinkTag icon={GitBranch}>
                       {(selectedOrder.split_total ?? 0) >= 2
                         ? t('bill_split.split_indicator', {
                             index: selectedOrder.split_index ?? 0,
                             total: selectedOrder.split_total ?? 0,
                           })
                         : t('bill_split.split_bill')}
-                    </Badge>
+                    </LinkTag>
                   ) : null}
                   {isMergedBill(selectedOrder) ? (
-                    <Badge
-                      variant="outline"
-                      className="gap-1 border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-50"
-                    >
-                      <GitMerge className="h-3 w-3" />
+                    <LinkTag icon={GitMerge}>
                       {t('bill_merge.merged_bill')}
-                    </Badge>
+                    </LinkTag>
                   ) : null}
                 </div>
               )}
@@ -682,19 +668,32 @@ export default function Orders() {
               <div className="mb-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('order.items_title')}</h3>
                 <div className="space-y-3">
-                  {selectedOrderItems.map((item, index) => (
-                    <div key={index} className="flex justify-between items-start py-2 border-b border-gray-100">
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-900">{item.item_name}</p>
-                        <p className="text-xs text-gray-500">Qty: {item.qty}</p>
+                  {selectedOrderItems.filter((item) => !item.is_disposable).map((item, index) => {
+                    const discountPercentage = item.rate < item.price_list_rate
+                      ? Math.round(((item.price_list_rate - item.rate) / item.price_list_rate) * 100)
+                      : null;
+
+                    return (
+                      <div key={index} className="flex justify-between items-start py-2 border-b border-gray-100">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-medium text-gray-900">{item.item_name}</p>
+                            {discountPercentage !== null && (
+                              <Badge className="shrink-0 bg-red-50 text-red-700 border-red-200 hover:bg-red-50 text-xs">
+                                -{discountPercentage}%
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-500">Qty: {item.qty}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-semibold text-gray-900">
+                            {formatCurrency(item.amount)}
+                          </p>
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <p className="text-sm font-semibold text-gray-900">
-                          {formatCurrency(item.amount)}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 

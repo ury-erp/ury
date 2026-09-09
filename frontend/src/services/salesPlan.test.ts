@@ -65,7 +65,7 @@ describe('salesPlan service helpers', () => {
     ]);
 
     expect(window.localStorage.getItem(key)).toBe(JSON.stringify({ 'ITEM-001': 70, 'ITEM-002': 45.5 }));
-    expect(getSalesPlanDraftQuantities(key)).toEqual({ 'ITEM-001': 70, 'ITEM-002': 45.5 });
+    expect(getSalesPlanDraftQuantities(key!)).toEqual({ 'ITEM-001': 70, 'ITEM-002': 45.5 });
   });
 
   it('requires branch, company, and date before building a draft key', () => {

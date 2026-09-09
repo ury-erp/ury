@@ -98,9 +98,10 @@ import math
 
 import frappe
 from frappe import _
-from frappe.utils import now_datetime
+from frappe.utils import getdate, now_datetime
 
 from ury.ury.api.ury_bom_compiler import compile_bom_vector
+from ury.ury.api.ury_production_context import resolve_production_context
 from ury.ury.api.ury_inventory_projection import (
 	get_allocatable_qty,
 	project_component_allocatable,
@@ -123,18 +124,36 @@ POLICY_DIRECT_RETAIL = "DIRECT_RETAIL"
 
 
 def _verify_branch_scope(user, branch, company):
-	"""Fail closed unless `branch`/`company` are present; TODO: real session wiring.
+	"""Fail closed unless `branch`/`company` are present, then verify the
+	caller is actually assigned to `branch` (and that `branch` belongs to
+	`company`) before any availability data for it is returned.
 
-	TODO(server-authoritative scope): wire this to the real session/permission
-	system once one is available in this codebase's request context -- verify
-	`user`'s POS Profile / assigned branch and company against `branch`/
-	`company`, per V3-40 ("derive or verify it server-side against the
-	session user, POS Profile, document permission"). Until then this
-	function only enforces that branch/company are non-empty (never trusts a
-	blank/missing scope), which is the fail-closed half of that requirement.
+	Mirrors the branch-assignment check used elsewhere in this codebase
+	(e.g. `ury/ury_pos/api.py:getBranch()` and
+	`self_ordering.py:assign_device_table()`'s table-branch check): a user
+	is scoped to a branch via the `URY User` child table on `Branch`
+	(`tabURY User.parent == Branch.name`, `tabURY User.user == user`).
+	System Manager / URY Admin are treated as branch-agnostic staff who
+	manage availability across branches, consistent with the manager-role
+	handling in `ury_kot_item_execution_service.py`.
 	"""
 	if not branch or not company:
 		frappe.throw(_("Branch and company are required"), frappe.ValidationError)
+
+	if user == "Administrator":
+		return
+
+	roles = set(frappe.get_roles(user))
+	if roles & {"System Manager", "URY Admin"}:
+		return
+
+	branch_company = frappe.db.get_value("Branch", branch, "company")
+	if branch_company and branch_company != company:
+		frappe.throw(_("Branch does not belong to the given company"), frappe.PermissionError)
+
+	assigned = frappe.db.exists("URY User", {"parenttype": "Branch", "parent": branch, "user": user})
+	if not assigned:
+		frappe.throw(_("You are not permitted to view availability for this branch"), frappe.PermissionError)
 
 
 def _resolve_production_config(item_code, branch, company, department=None):
@@ -146,32 +165,32 @@ def _resolve_production_config(item_code, branch, company, department=None):
 	exception) when the table is absent or no matching row exists, so callers
 	can fail closed with `CONFIGURATION_ERROR` rather than crash.
 
-	Returns (when resolved) a dict with whichever of these keys the
-	underlying table actually has (missing ones come back `None`):
+	Returns (when resolved) a `frappe._dict` with whichever of these keys the
+	underlying table actually has (missing ones come back `None`), so callers
+	may use either attribute (`config.production_policy`) or dict-style
+	(`config.get("production_policy")`) access -- this matches the shape
+	`resolve_production_context` (the authoritative production resolver this
+	adapter wraps) itself already returns:
 		production_policy, department, production_unit, warehouse,
 		production_unit_disabled, department_disabled
 	"""
-	if not frappe.db.table_exists(PRODUCTION_CONFIG_DOCTYPE):
+	row = resolve_production_context(item_code, branch, company=company, department=department)
+	if not row:
 		return None
-
-	filters = {"item_code": item_code, "branch": branch}
-	if department:
-		filters["department"] = department
-
-	row = frappe.db.get_value(
-		PRODUCTION_CONFIG_DOCTYPE,
-		filters,
-		[
-			"production_policy",
-			"department",
-			"production_unit",
-			"warehouse",
-			"production_unit_disabled",
-			"department_disabled",
-		],
-		as_dict=True,
+	return frappe._dict(
+		{
+			"production_policy": row.get("production_policy"),
+			"department": row.get("department"),
+			"production_unit": row.get("production_unit"),
+			"warehouse": row.get("warehouse"),
+			"direct_retail_warehouse": row.get("direct_retail_warehouse"),
+			"controlled_by_sales_plan": row.get("controlled_by_sales_plan"),
+			"allow_over_plan_sale": row.get("allow_over_plan_sale"),
+			"availability_mode": row.get("availability_mode"),
+			"production_unit_disabled": row.get("production_unit_disabled", 0),
+			"department_disabled": row.get("department_disabled", 0),
+		}
 	)
-	return row
 
 
 def _resolve_plan_remaining(item_code, branch, company, department=None):
@@ -182,27 +201,70 @@ def _resolve_plan_remaining(item_code, branch, company, department=None):
 	table is absent or no approved/submitted plan row is found -- callers
 	treat that as `NO_ACTIVE_PLAN`.
 
+	`URY Sales Plan` stores per-item quantities in its `items` child table
+	(`URY Sales Plan Item`: `item_code`, `qty`, ...), not on the parent --
+	the parent only carries scope/status fields (`branch`, `company`,
+	`status`, `plan_date`, ...). `URY Sales Plan` is NOT a submittable
+	doctype (`is_submittable` unset in its JSON), so `docstatus` is always
+	0 for every row -- its approval workflow is tracked entirely via the
+	`status` field, not Frappe's submit mechanism. A `docstatus: 1` filter
+	here was a bug: it made this query match zero rows on any site,
+	regardless of how many plans were genuinely `Approved`/`Locked for
+	Production` (found live, tracing why a real seeded-and-approved plan
+	was still invisible to this resolver). This resolves the parent
+	plan(s) in scope for today's service date and an active `status`
+	(`Approved`/`Locked for Production` -- excluding `Draft`/`Proposed`/
+	`Submitted for Approval`/`Superseded/Cancelled`), then sums the
+	matching child rows, following the same `parent`/`parenttype`
+	child-table query convention used elsewhere in this codebase (e.g.
+	`ury_bom_compiler.py`) rather than `frappe.db.get_value`
+	against nonexistent parent columns.
+
+	`committed_qty`/`fulfilled_qty` have no backing column anywhere in the
+	current schema (parent or child) -- V3-23's frozen-snapshot schema is
+	still pending (see module docstring); until it lands, committed/fulfilled
+	is treated as 0, so `plan_remaining == plan_qty`. TODO(V3-23 merge):
+	replace with the real committed/fulfilled tracking once it exists.
+
 	Returns (when resolved) a dict: {"plan_qty": ..., "plan_remaining": ...}
 	"""
 	if not frappe.db.table_exists(SALES_PLAN_DOCTYPE):
 		return None
 
-	filters = {"item_code": item_code, "branch": branch, "docstatus": 1}
-	if department:
-		filters["department"] = department
-
-	row = frappe.db.get_value(
-		SALES_PLAN_DOCTYPE,
-		filters,
-		["plan_qty", "committed_qty", "fulfilled_qty"],
-		as_dict=True,
-	)
-	if not row or row.plan_qty is None:
+	# Scope to plans that are still in force for today's service date and in
+	# an active status -- an unfiltered query sums every submitted plan in
+	# the branch/company's entire history, including Superseded/Cancelled
+	# ones, so plan_qty/plan_remaining would inflate without bound.
+	plan_filters = {
+		"branch": branch,
+		"company": company,
+		"status": ["in", ["Approved", "Locked for Production"]],
+		"plan_date": getdate(),
+	}
+	plan_names = frappe.get_all(SALES_PLAN_DOCTYPE, filters=plan_filters, pluck="name")
+	if not plan_names:
 		return None
 
-	committed = (row.committed_qty or 0) + (row.fulfilled_qty or 0)
-	plan_remaining = row.plan_qty - committed
-	return {"plan_qty": row.plan_qty, "plan_remaining": plan_remaining}
+	item_filters = {"parent": ["in", plan_names], "item_code": item_code}
+	if department:
+		item_filters["department"] = department
+
+	rows = frappe.get_all(
+		"URY Sales Plan Item",
+		filters=item_filters,
+		fields=["qty"],
+	)
+	if not rows:
+		return None
+
+	plan_qty = sum(row.get("qty") or 0 for row in rows)
+	if not plan_qty:
+		return None
+
+	committed = 0
+	fulfilled = 0
+	plan_remaining = plan_qty - committed - fulfilled
+	return {"plan_qty": plan_qty, "plan_remaining": plan_remaining}
 
 
 def _base_response(item_code, company, branch, department, production_policy):

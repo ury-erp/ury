@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@ury/ui";
+import { Card, CardContent, CardHeader, CardTitle, CHART_COLORS } from "@ury/ui";
 import { formatCompactCurrency } from "@ury/core";
 import {
   CartesianGrid,
@@ -11,8 +11,6 @@ import {
   YAxis,
 } from "recharts";
 
-const DEFAULT_COLORS = ["#3b82f6", "#6366f1", "#8b5cf6", "#a855f7", "#0ea5e9", "#14b8a6"];
-
 export interface LineChartCardProps {
   title: string;
   data: Record<string, unknown>[];
@@ -23,7 +21,7 @@ export interface LineChartCardProps {
 }
 
 export function LineChartCard({ title, data, xKey, yKeys, colors, labels }: LineChartCardProps) {
-  const palette = colors ?? DEFAULT_COLORS;
+  const palette = colors ?? CHART_COLORS;
   const showDots = data.length > 0 && data.length < 20;
 
   return (

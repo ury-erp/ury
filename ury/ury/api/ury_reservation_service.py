@@ -78,11 +78,9 @@ Atomicity strategy (read this before changing capacity-check code):
   explicitly marked NOT EXECUTED / unexecutable here.
 
 Reservation states (per V3-40): Reserved, Fulfilled, Released, Expired,
-Cancelled. `Reserved` and `Fulfilled` are the only "active" states that
-consume capacity. `Released`, `Expired`, and `Cancelled` are terminal and
-free capacity by simply no longer counting toward the active sum -- this
-module never mutates `Bin`, so "restoring capacity" is nothing more than a
-status transition.
+Cancelled. Only `Reserved` consumes *reserved* capacity. `Fulfilled` means
+the underlying stock movement has already consumed inventory and must not be
+counted again, otherwise availability is deducted twice.
 
 Fulfilment (`fulfil_reservation`) is expected to be called by a later task
 at order/production settlement time. This module intentionally does not
@@ -106,7 +104,7 @@ RELEASED = "Released"
 EXPIRED = "Expired"
 CANCELLED = "Cancelled"
 
-ACTIVE_STATUSES = (RESERVED, FULFILLED)
+ACTIVE_STATUSES = (RESERVED,)
 
 
 # ---------------------------------------------------------------------------
@@ -237,7 +235,7 @@ def _require_create_permission():
 		frappe.throw(_("Not permitted to create reservations"), frappe.PermissionError)
 
 
-def append_audit(doc, actor, event, reason=None):
+def append_audit(doc, actor, event, reason=None, frozen_context=None):
 	import json
 
 	existing = doc.get("audit_log")
@@ -253,6 +251,8 @@ def append_audit(doc, actor, event, reason=None):
 	}
 	if reason:
 		entry["reason"] = reason
+	if frozen_context:
+		entry["frozen_context"] = frozen_context
 	entries.append(entry)
 	doc.audit_log = json.dumps(entries, sort_keys=True, default=str)
 
@@ -268,6 +268,7 @@ def create_reservation(
 	policy=None,
 	actor=None,
 	expires_at=None,
+	frozen_context=None,
 ):
 	"""Atomically reserve capacity for `item_code` (or all of its BOM components).
 
@@ -348,7 +349,7 @@ def create_reservation(
 				"actor": actor,
 			}
 		)
-		append_audit(doc, actor, event="create")
+		append_audit(doc, actor, event="create", frozen_context=frozen_context)
 		doc.insert(ignore_permissions=False)
 		created_names.append(doc.name)
 

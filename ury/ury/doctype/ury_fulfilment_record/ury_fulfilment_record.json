@@ -23,7 +23,8 @@
   "actor",
   "fulfilled_at",
   "section_break_audit",
-  "audit_log"
+  "audit_log",
+  "posting_reference"
  ],
  "fields": [
   {
@@ -68,7 +69,7 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Fulfilment Type",
-   "options": "PRE_PRODUCED\nMTO",
+   "options": "PRE_PRODUCED\nMTO\nDIRECT_RETAIL",
    "read_only": 1,
    "reqd": 1
   },
@@ -92,6 +93,12 @@
    "fieldtype": "Check",
    "in_list_view": 1,
    "label": "Posted To ERPNext",
+   "read_only": 1
+  },
+  {
+   "fieldname": "posting_reference",
+   "fieldtype": "Data",
+   "label": "ERPNext Posting Reference",
    "read_only": 1
   },
   {

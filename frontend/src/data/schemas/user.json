@@ -25,7 +25,7 @@
       "title": "Roles",
       "items": {
         "type": "string",
-        "enum": ["URY Cashier", "URY Waiter", "URY Manager"]
+        "enum": ["URY Cashier", "URY Captain", "URY Manager"]
       }
     },
     "assigned_room": {

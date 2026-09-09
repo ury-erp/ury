@@ -1,5 +1,5 @@
 import { Minus, Plus, MessageSquare, RotateCcw, Trash2 } from 'lucide-react';
-import { cn } from '@ury/ui';
+import { cn, Badge } from '@ury/ui';
 import { formatCurrency } from '@ury/core';
 import type { OrderDeltaLine } from '../hooks/useTableOrderContext';
 
@@ -31,12 +31,11 @@ const CaptainOrderLine: React.FC<CaptainOrderLineProps> = ({
   onEditNote,
 }) => {
   const displayQty = variant === 'confirmed' ? line.confirmedQty : variant === 'reduction' ? Math.abs(line.delta) : line.delta;
-  const sign = variant === 'delta' ? '+' : variant === 'reduction' ? '−' : '';
 
   return (
     <div
       className={cn(
-        'flex items-center justify-between gap-3 py-3 px-3 rounded-lg',
+        'flex items-start justify-between gap-3 py-3 px-3 rounded-lg',
         variant === 'delta' && 'bg-primary-tint',
         variant === 'reduction' && 'bg-destructive-tint',
         variant === 'confirmed' && 'bg-card'
@@ -48,26 +47,46 @@ const CaptainOrderLine: React.FC<CaptainOrderLineProps> = ({
         disabled={!onEditNote}
         className={cn('flex-1 text-start', !onEditNote && 'cursor-default')}
       >
-        <div className="flex items-center gap-2">
-          <span
-            className={cn(
-              'font-medium text-sm',
-              variant === 'delta' && 'text-primary',
-              variant === 'reduction' && 'text-destructive line-through decoration-red-400',
-              variant === 'confirmed' && 'text-foreground'
+        <div className="space-y-2">
+          {/* Item name row with status badge */}
+          <div className="flex items-center gap-2">
+            <span
+              className={cn(
+                'text-sm font-medium',
+                variant === 'reduction' && 'line-through decoration-red-400',
+                variant === 'delta' && 'text-primary',
+                variant === 'reduction' && 'text-destructive',
+                variant === 'confirmed' && 'text-foreground'
+              )}
+            >
+              {line.name}
+            </span>
+
+            {variant === 'delta' && (
+              <Badge variant="tagAccent" size="sm">
+                New
+              </Badge>
             )}
-          >
-            {sign}
-            {displayQty} &times; {line.name}
-          </span>
-        </div>
-        {line.comment && (
-          <p className="text-xs text-text-tertiary mt-0.5 flex items-center gap-1">
-            <MessageSquare className="w-3 h-3" />
-            {line.comment}
+            {variant === 'reduction' && (
+              <Badge variant="tagDestructive" size="sm">
+                Removing
+              </Badge>
+            )}
+          </div>
+
+          {/* Quantity × Price = Total */}
+          <p className="text-xs text-text-tertiary">
+            {displayQty} × {formatCurrency(line.price)} = {formatCurrency(line.price * displayQty)}
           </p>
-        )}
-        <p className="text-xs text-text-tertiary mt-0.5">{formatCurrency(line.price * displayQty)}</p>
+
+          {/* Comment if present */}
+          {line.comment && (
+            <p className="text-xs text-text-tertiary flex items-center gap-1">
+              <MessageSquare className="w-3 h-3" />
+              {line.comment}
+            </p>
+          )}
+        </div>
       </button>
 
       <div className="flex items-center gap-1 shrink-0">
@@ -77,7 +96,7 @@ const CaptainOrderLine: React.FC<CaptainOrderLineProps> = ({
               type="button"
               onClick={onDecrement}
               disabled={disabled}
-              className="w-9 h-9 rounded-full border border-border flex items-center justify-center disabled:opacity-40"
+              className="w-9 h-9 rounded-full border border-border flex items-center justify-center disabled:opacity-40 transition-colors duration-150 ease-out hover:bg-muted"
               aria-label="Decrease"
             >
               <Minus className="w-4 h-4" />
@@ -86,7 +105,7 @@ const CaptainOrderLine: React.FC<CaptainOrderLineProps> = ({
               type="button"
               onClick={onIncrement}
               disabled={disabled}
-              className="w-9 h-9 rounded-full border border-border flex items-center justify-center disabled:opacity-40"
+              className="w-9 h-9 rounded-full border border-border flex items-center justify-center disabled:opacity-40 transition-colors duration-150 ease-out hover:bg-muted"
               aria-label="Increase"
             >
               <Plus className="w-4 h-4" />
@@ -99,7 +118,7 @@ const CaptainOrderLine: React.FC<CaptainOrderLineProps> = ({
             type="button"
             onClick={onDecrement}
             disabled={disabled}
-            className="w-9 h-9 rounded-full border border-border flex items-center justify-center disabled:opacity-40"
+            className="w-9 h-9 rounded-full border border-border flex items-center justify-center disabled:opacity-40 transition-colors duration-150 ease-out hover:bg-muted"
             aria-label="Reduce quantity"
             title="Reduce quantity"
           >
@@ -112,7 +131,7 @@ const CaptainOrderLine: React.FC<CaptainOrderLineProps> = ({
             type="button"
             onClick={onRemove}
             disabled={disabled}
-            className="w-9 h-9 rounded-full border border-destructive text-destructive flex items-center justify-center disabled:opacity-40"
+            className="w-9 h-9 rounded-full border border-destructive text-destructive flex items-center justify-center disabled:opacity-40 transition-colors duration-150 ease-out hover:bg-destructive/10"
             aria-label="Remove item"
             title="Remove item"
           >
@@ -125,7 +144,7 @@ const CaptainOrderLine: React.FC<CaptainOrderLineProps> = ({
             type="button"
             onClick={onRestore}
             disabled={disabled}
-            className="w-9 h-9 rounded-full border border-border flex items-center justify-center disabled:opacity-40"
+            className="w-9 h-9 rounded-full border border-border flex items-center justify-center disabled:opacity-40 transition-colors duration-150 ease-out hover:bg-muted"
             aria-label="Undo reduction"
             title="Undo"
           >

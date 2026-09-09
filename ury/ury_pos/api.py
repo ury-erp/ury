@@ -416,6 +416,14 @@ def get_split_group(invoice):
 
 @frappe.whitelist()
 def getInvoiceForCashier(status, cashier, limit, limit_start):
+    # U27: `cashier` was previously accepted as-is from the caller, so any
+    # authenticated user in a branch could read another cashier's invoices.
+    # Only an elevated role may look up someone else's invoices; everyone
+    # else is scoped to their own session user regardless of what they pass.
+    if cashier != frappe.session.user:
+        elevated_roles = {"System Manager", "URY Manager", "URY Captain"}
+        if not elevated_roles.intersection(frappe.get_roles()):
+            cashier = frappe.session.user
     branch = getBranch()
     updatedlist = []
     limit = int(limit)+1
@@ -866,6 +874,7 @@ def getPosInvoiceItems(invoice):
                 "qty": items.qty,
                 "rate": items.rate,
                 "amount": items.amount,
+                "is_disposable": items.is_disposable,
             }
         )
     taxDetail = orderdItems.taxes
@@ -966,6 +975,13 @@ def create_customer(customer_name, mobile_number=None, customer_group="Individua
 
     """Create a new customer"""
     try:
+        if territory and not frappe.db.exists("Territory", territory):
+            fallback_territory = frappe.db.get_single_value("Selling Settings", "territory")
+            if fallback_territory and frappe.db.exists("Territory", fallback_territory):
+                territory = fallback_territory
+            else:
+                territory = frappe.db.get_value("Territory", {"is_group": 1}, "name") or territory
+
         customer = frappe.get_doc({
             "doctype": "Customer",
             "customer_name": customer_name,
@@ -1180,12 +1196,14 @@ def _get_main_cashier_status(pos_profile_name: str) -> dict:
 
 
 @frappe.whitelist()
-def create_pos_opening_entry(pos_profile: str, company: str, balance_details) -> dict:
+def create_pos_opening_entry(pos_profile: str, company: str = None, balance_details=None) -> dict:
     """Create and submit a POS Opening Entry for the ORI native screen.
 
     Wraps the standard ERPNext flow but fills URY-mandatory fields
-    (branch and restaurant) from the selected POS Profile so ORI users do not
-    need to leave the React app.
+    (branch, restaurant, and company) from the selected POS Profile so ORI
+    users do not need to leave the React app, and so a caller cannot submit
+    an Opening Entry against a company the POS Profile isn't actually
+    configured for.
 
     ``balance_details`` may be a JSON string (legacy Desk shape) or a list of
     ``{"mode_of_payment": ..., "opening_amount": ...}`` dicts.
@@ -1205,9 +1223,16 @@ def create_pos_opening_entry(pos_profile: str, company: str, balance_details) ->
         frappe.throw(_("Selected POS Profile has no Branch."))
     if not pos_profile_doc.restaurant:
         frappe.throw(_("Selected POS Profile has no Restaurant."))
+    if not pos_profile_doc.company:
+        frappe.throw(_("Selected POS Profile has no Company."))
 
     if not frappe.has_permission("POS Profile", "read", doc=pos_profile_doc):
         frappe.throw(_("Not permitted to use this POS Profile."), frappe.PermissionError)
+
+    # U24: derive company from the resolved POS Profile the same way
+    # branch/restaurant already are, rather than trusting a caller-supplied
+    # value that may not match the profile at all.
+    company = pos_profile_doc.company
 
     for entry in balance_details or []:
         opening_amount = entry.get("opening_amount") if isinstance(entry, dict) else None
@@ -1656,3 +1681,37 @@ def merge_bills(primary_invoice, secondary_invoice):
             "status": "error",
             "message": str(e),
         }
+
+
+@frappe.whitelist()
+def ensure_payment_mode_accounts(modes, company):
+    """Ensure every Mode of Payment in `modes` has a default account for `company`.
+
+    Called from the frontend POS Profile form right before save, so a payment
+    mode with no company-scoped default account (e.g. Cheque, Credit Card,
+    Zomato, Swiggy, Direct -- anything the dev-seed's Cash/Card/UPI wiring
+    never covers) doesn't crash ERPNext's standard POS Profile validation
+    ("Please set default Cash or Bank account in Mode of Payments ...").
+    """
+    from ury.ury.dev_seed.profiles import _ensure_mode_of_payment
+
+    # Mode of Payment / Account records are accounts-configuration data, so
+    # require the same permission ERPNext's own Mode of Payment desk form
+    # requires (Accounts Manager / URY Manager per this app's DocPerm
+    # fixtures -- System Manager is NOT granted create on either doctype
+    # here, live-verified) -- not just any authenticated session.
+    if not frappe.has_permission("Mode of Payment", "create") or not frappe.has_permission("Account", "create"):
+        frappe.throw(_("Not permitted"), frappe.PermissionError)
+
+    if isinstance(modes, str):
+        modes = frappe.parse_json(modes)
+    if not modes or not company:
+        return []
+
+    ensured = []
+    for mode in modes:
+        if not mode:
+            continue
+        _ensure_mode_of_payment(mode, company)
+        ensured.append(mode)
+    return ensured

@@ -77,24 +77,33 @@ class TestComputeTheoreticalCost(unittest.TestCase):
 
 
 class TestComputePostedCost(unittest.TestCase):
-    @patch(f"{MOD}._valuation_rate")
     @patch(f"{MOD}._resolve_fulfilment_record")
-    def test_posted_cost_is_theoretical_equivalent_when_not_posted(self, mock_resolve, mock_rate):
+    def test_unposted_fulfilment_has_no_posted_cost(self, mock_resolve):
         mock_resolve.return_value = {
             "name": "FR-001",
             "kot": "KOT-001",
             "item_code": "Burger",
             "qty": 10,
             "company": "URY Co",
-            "posted_to_erpnext": 0,
+            "posted_to_erpnext": 0, "posting_reference": None,
         }
-        mock_rate.return_value = 24.0
 
         result = compute_posted_cost("FR-001", "URY Co")
 
         self.assertFalse(result["posted_to_erpnext"])
-        self.assertTrue(result["is_theoretical_equivalent"])
+        self.assertFalse(result["is_theoretical_equivalent"])
+        self.assertIsNone(result["posted_cost"])
+        self.assertEqual(result["reason"], "FULFILMENT_NOT_POSTED")
+
+    @patch(f"{MOD}._read_posted_cost", return_value=240.0)
+    @patch(f"{MOD}._resolve_fulfilment_record")
+    def test_posted_cost_reads_submitted_posting(self, mock_resolve, mock_read):
+        mock_resolve.return_value = {"name": "FR-001", "kot": "KOT-001", "item_code": "Burger", "qty": 10,
+            "company": "URY Co", "posted_to_erpnext": 1, "posting_reference": "STE-001"}
+        result = compute_posted_cost("FR-001", "URY Co")
         self.assertEqual(result["posted_cost"], 240.0)
+        self.assertEqual(result["posting_reference"], "STE-001")
+        mock_read.assert_called_once_with("STE-001", "URY Co")
 
     def test_missing_company_fails_closed(self):
         with self.assertRaises(frappe.ValidationError):
@@ -111,7 +120,7 @@ class TestComputePostedCost(unittest.TestCase):
                 item_code="Burger",
                 qty=10,
                 company="Other Co",
-                posted_to_erpnext=0,
+			posted_to_erpnext=0, posting_reference=None,
             )
         ]
 
@@ -144,17 +153,18 @@ class TestComputeVariance(unittest.TestCase):
         self.addCleanup(manager_patcher.stop)
 
     @patch(f"{MOD}.compute_theoretical_cost")
-    def test_variance_vs_theoretical_is_zero_when_posted_equals_theoretical(self, mock_theoretical):
+    def test_variance_is_provisional_until_posting_exists(self, mock_theoretical):
         mock_theoretical.return_value = {"theoretical_cost": 240.0}
 
         result = compute_variance("Burger", 10, "URY Co")
 
         self.assertEqual(result["theoretical_cost"], 240.0)
-        self.assertEqual(result["posted_cost"], 240.0)
-        self.assertEqual(result["variance_vs_theoretical"], 0.0)
+        self.assertIsNone(result["posted_cost"])
+        self.assertIsNone(result["variance_vs_theoretical"])
         self.assertIsNone(result["counted_qty"])
         self.assertIsNone(result["variance_vs_counted"])
-        self.assertIn("theoretical-equivalent", result["reason"])
+        self.assertEqual(result["reason"], "FULFILMENT_POSTING_REQUIRED")
+        self.assertTrue(result["provisional"])
 
     @patch(f"{MOD}.compute_theoretical_cost")
     def test_positive_variance_when_counted_qty_exceeds_expected(self, mock_theoretical):
