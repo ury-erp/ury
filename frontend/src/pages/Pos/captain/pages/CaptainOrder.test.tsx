@@ -48,17 +48,21 @@ vi.mock("../../lib/table-api", () => ({
   getVacantTablesForBranch: vi.fn().mockResolvedValue([]),
 }));
 
-vi.mock("@ury/ui", () => ({
-  Button: ({ children, ...props }: any) => <button {...props}>{children}</button>,
-  Spinner: ({ message }: { message: string }) => (
-    <div data-testid="spinner">{message}</div>
-  ),
-  cn: (...args: any[]) => args.filter(Boolean).join(" "),
-  showToast: {
-    error: vi.fn(),
-    success: vi.fn(),
-  },
-}));
+vi.mock("@ury/ui", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@ury/ui")>();
+  return {
+    ...actual,
+    Button: ({ children, ...props }: any) => <button {...props}>{children}</button>,
+    Spinner: ({ message }: { message: string }) => (
+      <div data-testid="spinner">{message}</div>
+    ),
+    cn: (...args: any[]) => args.filter(Boolean).join(" "),
+    showToast: {
+      error: vi.fn(),
+      success: vi.fn(),
+    },
+  };
+});
 
 vi.mock("@ury/core", () => ({
   formatCurrency: (amount: number) => `Rs. ${amount}`,
