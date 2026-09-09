@@ -59,7 +59,7 @@ const CaptainTableCard = ({
     : ownership === 'mine'
       ? 'border-primary bg-primary-tint text-primary'
       : ownership === 'free'
-        ? 'border-dashed border-hair bg-muted text-muted-foreground'
+        ? 'border-gray-300 bg-muted text-muted-foreground'
         : 'border-warning-tint-border bg-warning-tint text-warning';
 
   const statusLabel = isBilled
@@ -85,7 +85,7 @@ const CaptainTableCard = ({
       type="button"
       onClick={onTap}
       className={cn(
-        'flex min-h-[7.5rem] flex-col items-stretch rounded-xl border-2 p-3 text-left transition-all active:scale-[0.98]',
+        'flex min-h-[7.5rem] flex-col items-stretch touch-manipulation select-none rounded-lg border border-s-4 p-3 text-left transition-colors duration-150 ease-out active:scale-[0.98]',
         colorClasses
       )}
     >
@@ -105,7 +105,7 @@ const CaptainTableCard = ({
         </span>
       )}
 
-      <div className="mt-2 flex flex-1 flex-col justify-end gap-1.5">
+      <div className="mt-2 flex flex-1 flex-col justify-end gap-1">
         <Badge variant={statusBadgeVariant} size="sm" className="w-fit truncate max-w-full">
           {statusLabel}
         </Badge>
