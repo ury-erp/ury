@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { showToast } from '@ury/ui';
 import OrderStatusSidebar from '../components/OrderStatusSidebar';
 import { useRootStore } from '../store/root-store';
-import { formatCurrency } from '@ury/core';
+import { formatCurrency, parseFrappeError } from '@ury/core';
 import { Spinner } from '@ury/ui';
 import { Textarea } from '@ury/ui';
 import { usePOSStore } from '../store/pos-store';
@@ -201,7 +201,7 @@ export default function Orders() {
       clearSelectedOrder();
       fetchOrders();
     } catch (err) {
-      showToast.error(err instanceof Error ? err.message : t('errors.failed_cancel_order'));
+      showToast.error(parseFrappeError(err, t('errors.failed_cancel_order')));
     } finally {
       setCancelLoading(false);
     }
@@ -215,15 +215,8 @@ export default function Orders() {
       if (!res.ok) throw new Error('Failed to fetch order details');
       const data = await res.json();
       const order = data.message;
-      // Fill POS store
-      posStore.resetOrderState();
-      posStore.setSelectedOrderType(order.order_type);
-      posStore.setOrderForUpdate(order.name);
-      if (order.restaurant_table) {
-        posStore.setSelectedTable(order.restaurant_table, order.custom_restaurant_room || null,true);
-      }
-      posStore.setSelectedCustomer({ id: order.customer, name: order.customer_name, phone: order.mobile_number });
-      // Fill cart
+
+      // Build the cart items from the draft order
       const items = (order.items || []).map((item: any) => ({
         id: item.item_code,
         name: item.item_name,
@@ -240,17 +233,27 @@ export default function Orders() {
         special_dish: 0,
         tax_rate: 0,
       }));
-      for (const cartItem of items) {
-        await posStore.addToOrder(cartItem);
-      }
+
+      // Open the draft order as a new tab without disturbing existing tabs.
+      // If the same draft is already open, it will just switch to that tab.
+      posStore.openDraftOrderInNewTab({
+        orderId: order.name,
+        orderType: order.order_type,
+        customer: { id: order.customer, name: order.customer_name, phone: order.mobile_number },
+        table: order.restaurant_table || null,
+        room: order.custom_restaurant_room || null,
+        items,
+      });
+
       // Redirect to POS page
       navigate('/pos');
     } catch (err) {
-      showToast.error(err instanceof Error ? err.message : t('errors.failed_edit_order'));
+      showToast.error(parseFrappeError(err, t('errors.failed_edit_order')));
     } finally {
       setEditLoading(false);
     }
   }
+
 
   async function handlePrintOrder() {
     if (!selectedOrder || !posStore.posProfile) return;

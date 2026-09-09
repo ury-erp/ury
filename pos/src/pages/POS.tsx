@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { t } from '../i18n';
 import { Star, TrendingUp } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
@@ -26,6 +26,14 @@ export default function POS() {
   const clickTimerRef = useRef<NodeJS.Timeout | null>(null);
   const clickCountRef = useRef(0);
 
+  useEffect(() => {
+    return () => {
+      if (clickTimerRef.current) {
+        clearTimeout(clickTimerRef.current);
+      }
+    };
+  }, []);
+
   const handleItemClick = (item: any) => {
     if (isMenuInteractionDisabled()) return;
     
@@ -39,7 +47,7 @@ export default function POS() {
       if (clickCountRef.current === 1) {
         // Single click - add to cart
         addToOrder({ ...item, quantity: 1 });
-      } else if (clickCountRef.current === 2) {
+      } else if (clickCountRef.current >= 2) {
         // Double click - open dialog
         setSelectedItem(item);
         setIsDialogOpen(true);
