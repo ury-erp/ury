@@ -479,6 +479,7 @@ export default function Reservations() {
                 }
               }}
               className="w-auto"
+              align="right"
             />
 
             <button
