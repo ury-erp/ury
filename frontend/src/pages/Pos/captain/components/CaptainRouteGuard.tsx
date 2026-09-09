@@ -18,10 +18,12 @@ interface Props {
  * every mutation must still be re-validated server-side per PLAN.md §9.
  *
  * NOTE: Captain routes bypass `AuthGuard` entirely — they're registered as
- * siblings of `/pos` in `App.tsx`, not nested under it. Additionally,
- * `deriveAllowedRoles()` in config-slice.ts includes 'URY Captain' as a
- * defense-in-depth measure. This guard is a UX/client-side gate only;
- * all mutations are re-validated server-side.
+ * siblings of `/pos` in `frontend/src/App.tsx`, not nested under it. (For the
+ * routes that *do* go through `AuthGuard`, `deriveAllowedRoles()` in
+ * config-slice.ts separately includes 'URY Captain' in the allowlist — that's
+ * unrelated defense-in-depth for those routes, not something this guard
+ * relies on.) This guard is a UX/client-side gate only; all mutations are
+ * re-validated server-side.
  */
 const CaptainRouteGuard: React.FC<Props> = ({ children }) => {
   const { capabilities, branch, isLoading, error } = useCaptainContext();
