@@ -85,9 +85,9 @@ export const ProductionUnitPage: React.FC = () => {
     }
   };
 
-  const fetchPosProfiles = async () => {
+  const fetchPosProfiles = async (branch?: string) => {
     try {
-      const res = await dashboardService.getModuleRecords<{ name: string }>('POS Profile', 'all');
+      const res = await dashboardService.getModuleRecords<{ name: string }>('POS Profile', branch || 'all');
       setPosProfiles(res || []);
     } catch {
       setPosProfiles([]);
@@ -109,10 +109,17 @@ export const ProductionUnitPage: React.FC = () => {
   useEffect(() => {
     fetchBranches();
     fetchDepartments();
-    fetchPosProfiles();
     fetchItemGroupOptions();
     fetchUnits();
   }, [activeBranchId]);
+
+  // Keep the POS Profile options scoped to the branch currently selected in the form,
+  // since branch/warehouse on the backend are unconditionally fetched from pos_profile.
+  useEffect(() => {
+    if (isDrawerOpen) {
+      fetchPosProfiles(newUnit.branch);
+    }
+  }, [isDrawerOpen, newUnit.branch]);
 
   const openAddDrawer = () => {
     setEditingUnit(null);
@@ -382,7 +389,7 @@ export const ProductionUnitPage: React.FC = () => {
             <SearchableSelect
               id="branch"
               value={newUnit.branch}
-              onChange={(_, val) => setNewUnit({ ...newUnit, branch: val })}
+              onChange={(_, val) => setNewUnit({ ...newUnit, branch: val, pos_profile: '' })}
               options={branches.map(b => ({ value: b.name, label: b.name }))}
               placeholder="Select Branch..."
             />
@@ -412,6 +419,10 @@ export const ProductionUnitPage: React.FC = () => {
               options={posProfiles.map(p => ({ value: p.name, label: p.name }))}
               placeholder="Select POS Profile..."
             />
+            <p className="text-xs text-gray-500 mt-1">
+              Options are limited to POS Profiles for the selected Branch. Branch and Warehouse
+              on this unit are always taken from the chosen POS Profile when it is saved.
+            </p>
           </div>
 
           {/* Item Groups Section */}
