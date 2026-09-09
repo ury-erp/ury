@@ -97,7 +97,7 @@ touch POS Invoice / invoice settlement code anywhere.
 import frappe
 from frappe import _
 
-from ury.ury.api.ury_bom_compiler import compile_bom_vector
+from ury.ury.api.ury_bom_compiler import compile_bom_vector, publish_component_stock_fanout
 
 
 RESERVATION_DOCTYPE = "URY Stock Reservation"
@@ -120,6 +120,32 @@ EXPIRED = "Expired"
 CANCELLED = "Cancelled"
 
 ACTIVE_STATUSES = (RESERVED,)
+
+
+def _best_effort_department(item_code, branch):
+	"""Best-effort department lookup for the H1 fan-out event payload only.
+
+	Looks up the active `URY Item Production Configuration` mapping for
+	`item_code`/`branch`. This is deliberately a plain, non-raising lookup
+	(unlike `ury_kot_routing.resolve_production_units`, which fails closed
+	on ambiguity/missing config for routing purposes) -- department here is
+	informational context on a best-effort realtime event, not something a
+	stock mutation should ever be blocked or failed by. Returns None on any
+	ambiguity, absence, or lookup error.
+	"""
+	try:
+		rows = frappe.get_all(
+			"URY Item Production Configuration",
+			filters={"item": item_code, "branch": branch, "active": 1},
+			pluck="department",
+			limit=1,
+		)
+		return rows[0] if rows else None
+	except Exception:
+		frappe.logger("ury_reservation_service").exception(
+			"Failed to resolve department for item {0} branch {1}".format(item_code, branch)
+		)
+		return None
 
 
 # ---------------------------------------------------------------------------
@@ -405,23 +431,28 @@ def create_reservation(
 		doc.insert(ignore_permissions=False)
 		created_names.append(doc.name)
 
-	# Emit realtime event for each distinct component_item affected.
-	# Wrap in try/except so a socketio failure never breaks the reservation transaction.
+	# Emit realtime events (cheap component-level + rich fan-out) for each
+	# distinct component_item affected. `publish_component_stock_fanout` is
+	# itself fully failure-isolated (see H1/ury_bom_compiler.py), so no
+	# try/except is needed here -- but this loop must still never raise, so
+	# a defensive except stays in place in case department resolution above
+	# it is ever inlined here in future.
+	department = _best_effort_department(item_code, branch)
 	for component in components_sorted:
 		try:
-			frappe.publish_realtime(
-				"ury_component_stock_changed",
-				{
-					"component_item": component["component_item"],
-					"warehouse": warehouse,
-					"company": company,
-				},
+			publish_component_stock_fanout(
+				component["component_item"],
+				warehouse,
+				company,
+				branch,
+				department=department,
+				logger_name="ury_reservation_service",
 			)
 		except Exception:
 			# Failure to publish is best-effort, fire-and-forget.
 			# Log but do not raise, so the reservation commit is never aborted.
 			frappe.logger("ury_reservation_service").exception(
-				"Failed to publish realtime event for component {0}".format(
+				"Failed to publish realtime fan-out for component {0}".format(
 					component["component_item"]
 				)
 			)
@@ -484,38 +515,34 @@ def release_reservation(reservation_name, reason=None):
 	"""
 	result = _transition_group(reservation_name, RESERVED, RELEASED, reason, event="release")
 
-	# Emit realtime event for each distinct component_item affected.
-	# Fetch the full row data to extract component details.
-	rows = frappe.get_all(
-		RESERVATION_DOCTYPE,
-		filters={"status": RELEASED},
-		fields=["component_item", "warehouse", "company"],
-	)
+	# Emit realtime events (cheap component-level + rich fan-out) for each
+	# distinct component_item affected.
 	# Extract distinct components from the released reservation group.
 	# Since _transition_group transitions the entire group, get distinct
 	# components from the result row names' parent rows.
 	group_rows = frappe.get_all(
 		RESERVATION_DOCTYPE,
 		filters={"name": ["in", result]},
-		fields=["component_item", "warehouse", "company"],
+		fields=["component_item", "warehouse", "company", "branch", "top_level_item"],
 	)
 	seen = set()
 	for row in group_rows:
 		key = (row.component_item, row.warehouse, row.company)
 		if key not in seen:
 			try:
-				frappe.publish_realtime(
-					"ury_component_stock_changed",
-					{
-						"component_item": row.component_item,
-						"warehouse": row.warehouse,
-						"company": row.company,
-					},
+				department = _best_effort_department(row.top_level_item, row.branch)
+				publish_component_stock_fanout(
+					row.component_item,
+					row.warehouse,
+					row.company,
+					row.branch,
+					department=department,
+					logger_name="ury_reservation_service",
 				)
 			except Exception:
 				# Failure to publish is best-effort, fire-and-forget.
 				frappe.logger("ury_reservation_service").exception(
-					"Failed to publish realtime event for released component {0}".format(
+					"Failed to publish realtime fan-out for released component {0}".format(
 						row.component_item
 					)
 				)

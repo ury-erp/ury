@@ -31,6 +31,7 @@ from ury.ury.api.ury_reservation_service import (
 
 
 MODULE = "ury.ury.api.ury_reservation_service"
+BOM_MODULE = "ury.ury.api.ury_bom_compiler"
 
 
 def _new_doc_recorder():
@@ -821,6 +822,113 @@ class TestRealtimeEventEmission(FrappeTestCase):
 		# Reservation should still be created
 		self.assertEqual(result["reservation_group"], "GRP-FAIL")
 		self.assertEqual(len(created), 1)
+
+	def test_create_reservation_emits_rich_fanout_event_with_affected_items(self):
+		"""H1: create_reservation() for a MADE_TO_ORDER item with a shared
+		component also publishes a richer `menu_availability_update_{branch}`
+		event per component, carrying the items resolved by
+		`get_items_affected_by_component` (mocked here to a known list),
+		alongside the unchanged cheap `ury_component_stock_changed` event."""
+		get_doc_side_effect, created = _new_doc_recorder()
+
+		def sql_side_effect(query, params, **kwargs):
+			item_code = params["item_code"]
+			bin_qty = {"FLOUR": 10, "SUGAR": 10}[item_code]
+			return [{"name": f"BIN-{item_code}", "actual_qty": bin_qty, "projected_qty": bin_qty}]
+
+		def get_all_side_effect(doctype, filters=None, fields=None, **kwargs):
+			if doctype == "BOM Item":
+				return [
+					frappe._dict(item_code="FLOUR", stock_qty=2, stock_uom="Kg", is_sub_assembly_item=0, bom_no=None),
+					frappe._dict(item_code="SUGAR", stock_qty=1, stock_uom="Kg", is_sub_assembly_item=0, bom_no=None),
+				]
+			return []
+
+		affected_by_component = {
+			"FLOUR": [{"top_level_item": "MENU-A", "qty_per_unit": 2, "stock_uom": "Kg"}],
+			"SUGAR": [{"top_level_item": "MENU-A", "qty_per_unit": 1, "stock_uom": "Kg"}],
+		}
+
+		def get_items_affected_side_effect(component_item, branch, company):
+			return affected_by_component.get(component_item, [])
+
+		with patch(f"{MODULE}.frappe.has_permission", return_value=True), patch(
+			f"{MODULE}.frappe.db.sql", side_effect=sql_side_effect
+		), patch(
+			f"{MODULE}.frappe.db.get_value", return_value=None
+		), patch(
+			f"{MODULE}.frappe.get_all", side_effect=get_all_side_effect
+		), patch(
+			f"{MODULE}.frappe.get_doc", side_effect=get_doc_side_effect
+		), patch(
+			f"{MODULE}.frappe.generate_hash", return_value="GRP-FANOUT"
+		), patch(
+			f"{BOM_MODULE}.get_items_affected_by_component", side_effect=get_items_affected_side_effect
+		), patch(
+			f"{MODULE}.frappe.publish_realtime"
+		) as mock_publish:
+			create_reservation(
+				item_code="MENU-A",
+				qty=3,
+				warehouse="WH-1",
+				branch="Branch A",
+				company="Company A",
+				order_ref="ORDER-FANOUT",
+			)
+
+		calls = mock_publish.call_args_list
+		# Two components -> two cheap events + two rich fan-out events.
+		self.assertEqual(len(calls), 4)
+
+		cheap_calls = [c for c in calls if c[0][0] == "ury_component_stock_changed"]
+		rich_calls = [c for c in calls if c[0][0] == "menu_availability_update_Branch A"]
+		self.assertEqual(len(cheap_calls), 2)
+		self.assertEqual(len(rich_calls), 2)
+
+		rich_payloads = {c[0][1]["component_item"]: c[0][1] for c in rich_calls}
+		self.assertEqual(rich_payloads["FLOUR"]["affected_items"], ["MENU-A"])
+		self.assertEqual(rich_payloads["FLOUR"]["branch"], "Branch A")
+		self.assertEqual(rich_payloads["SUGAR"]["affected_items"], ["MENU-A"])
+
+	def test_create_reservation_fanout_lookup_failure_does_not_abort_or_raise(self):
+		"""H1 defensive requirement: if `get_items_affected_by_component`
+		raises, create_reservation() still completes normally (the reservation
+		is created, no exception propagates), and the cheap
+		`ury_component_stock_changed` event still fires independently -- a
+		fan-out failure must never be a single point of failure."""
+		get_doc_side_effect, created = _new_doc_recorder()
+
+		with patch(f"{MODULE}.frappe.has_permission", return_value=True), patch(
+			f"{MODULE}.frappe.db.sql",
+			return_value=[{"name": "BIN-1", "actual_qty": 10, "projected_qty": 10}],
+		), patch(f"{MODULE}.frappe.db.get_value", return_value=None), patch(
+			f"{MODULE}.frappe.get_all", return_value=[]
+		), patch(
+			f"{MODULE}.frappe.get_doc", side_effect=get_doc_side_effect
+		), patch(
+			f"{MODULE}.frappe.generate_hash", return_value="GRP-FANOUT-FAIL"
+		), patch(
+			f"{BOM_MODULE}.get_items_affected_by_component", side_effect=Exception("bom index unavailable")
+		), patch(
+			f"{MODULE}.frappe.publish_realtime"
+		) as mock_publish:
+			# Should not raise, even though the fan-out lookup failed.
+			result = create_reservation(
+				item_code="ITEM-TEST",
+				qty=1,
+				warehouse="WH-1",
+				branch="Branch A",
+				company="Company A",
+				order_ref="ORDER-FANOUT-FAIL",
+			)
+
+		# Reservation should still be created despite the fan-out failure.
+		self.assertEqual(result["reservation_group"], "GRP-FANOUT-FAIL")
+		self.assertEqual(len(created), 1)
+
+		# The cheap event still fired independently of the failed fan-out.
+		mock_publish.assert_called_once()
+		self.assertEqual(mock_publish.call_args[0][0], "ury_component_stock_changed")
 
 
 class TestConcurrency(FrappeTestCase):
