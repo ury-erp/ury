@@ -352,3 +352,79 @@ def get_items_affected_by_component(component_item, branch, company):
 
 	# Return affected items for this specific component (or empty list if unused).
 	return index.get(component_item, [])
+
+
+def publish_component_stock_fanout(
+	component_item, warehouse, company, branch, department=None, logger_name="ury_bom_compiler"
+):
+	"""Publish G1's cheap component-level event, then best-effort fan out a
+	richer, item-resolved event to a branch-scoped channel frontend clients
+	can subscribe to (task H1).
+
+	This is the single seam every write-side mutation site (reservation
+	create/release, fulfilment posting) should call INSTEAD of calling
+	`frappe.publish_realtime("ury_component_stock_changed", ...)` directly,
+	so the dual-publish behaviour and its failure isolation live in exactly
+	one place.
+
+	Two publishes happen here, each independently failure-isolated:
+
+	1. The cheap, unchanged `ury_component_stock_changed` event (component,
+	   warehouse, company only -- no BOM explosion). This is G1's original
+	   event; other consumers may still want just this. Its own publish
+	   failure is logged and swallowed.
+	2. A richer `menu_availability_update_{branch}` event carrying which
+	   MADE_TO_ORDER top-level items are affected by this component's stock
+	   change (resolved via F2's `get_items_affected_by_component`), plus
+	   `component_item`/`branch`/`department`. The channel name mirrors the
+	   `"{event}_{branch}_{scope}"` convention used by
+	   `ury_order.change_table_in_kot`'s `kot_update_{branch}_{production}`
+	   channel (branch-scoped fan-out channel per event family).
+
+	Both steps are independently wrapped: a failure resolving/publishing the
+	rich event is logged and skipped, and never suppresses or is suppressed
+	by the cheap event -- neither publish can become a single point of
+	failure for the caller's stock mutation. Callers should not call this
+	from anywhere but a best-effort, already-committed context, mirroring
+	how G1's original call sites wrapped `publish_realtime` directly.
+	"""
+	logger = frappe.logger(logger_name)
+
+	try:
+		frappe.publish_realtime(
+			"ury_component_stock_changed",
+			{
+				"component_item": component_item,
+				"warehouse": warehouse,
+				"company": company,
+			},
+		)
+	except Exception:
+		# Failure to publish is best-effort, fire-and-forget.
+		logger.exception(
+			"Failed to publish ury_component_stock_changed for component {0}".format(component_item)
+		)
+
+	try:
+		affected = get_items_affected_by_component(component_item, branch, company) or []
+		affected_items = [row["top_level_item"] for row in affected if row.get("top_level_item")]
+		if not affected_items:
+			return
+		frappe.publish_realtime(
+			"menu_availability_update_{0}".format(branch),
+			{
+				"affected_items": affected_items,
+				"component_item": component_item,
+				"branch": branch,
+				"department": department,
+			},
+		)
+	except Exception:
+		# The rich fan-out lookup/publish is best-effort: log and move on.
+		# The cheap event above has already fired independently and this
+		# failure must never suppress it or propagate to the caller.
+		logger.exception(
+			"Failed to resolve/publish menu_availability_update fan-out for component {0}".format(
+				component_item
+			)
+		)
