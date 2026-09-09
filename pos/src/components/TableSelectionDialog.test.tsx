@@ -111,8 +111,13 @@ describe("TableSelectionDialog", () => {
   });
 
   it("shows loading spinner while fetching tables", async () => {
-    getTablesMock.mockImplementationOnce(() => new Promise(resolve => setTimeout(() => resolve(mockTables), 100)));
-    
+    // Give this a much longer delay than room-load + auto-select realistically
+    // takes, so the loading state is reliably still visible by the time we
+    // check for it -- a tight, comparable delay to the surrounding steps was
+    // flaky under CI timing jitter (the tables fetch could occasionally
+    // resolve before this assertion ran).
+    getTablesMock.mockImplementationOnce(() => new Promise(resolve => setTimeout(() => resolve(mockTables), 1000)));
+
     render(<TableSelectionDialog onClose={vi.fn()} />);
 
     await waitFor(() => {
