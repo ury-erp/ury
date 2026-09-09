@@ -146,7 +146,7 @@ class TestAcknowledgeServiceRequest(FrappeTestCase):
         # Verify the document was fetched and updated
         mock_get_doc.assert_called_once_with("URY Service Request", "SR-001")
         self.assertEqual(mock_doc.status, "Acknowledged")
-        mock_doc.save.assert_called_once_with(ignore_permissions=True)
+        mock_doc.save.assert_called_once_with()
 
     @patch("ury.ury.api.service_requests.frappe.has_permission")
     @patch("ury.ury.api.service_requests.frappe.get_doc")
@@ -165,17 +165,18 @@ class TestAcknowledgeServiceRequest(FrappeTestCase):
 
     @patch("ury.ury.api.service_requests.frappe.has_permission")
     @patch("ury.ury.api.service_requests.frappe.get_doc")
-    def test_saves_with_ignore_permissions(self, mock_get_doc, mock_has_perm):
+    def test_saves_after_permission_check_passes(self, mock_get_doc, mock_has_perm):
         mock_has_perm.return_value = True
-        """Should save with ignore_permissions=True to bypass permission checks."""
+        """Should call save() once the explicit has_permission check passes."""
         mock_doc = MagicMock()
         mock_doc.name = "SR-003"
         mock_get_doc.return_value = mock_doc
 
         acknowledge_service_request("SR-003")
 
-        # Verify save was called with ignore_permissions=True
-        mock_doc.save.assert_called_once_with(ignore_permissions=True)
+        # Verify save was called (permission gating is done explicitly via
+        # has_permission(), not save()'s own ignore_permissions flag)
+        mock_doc.save.assert_called_once_with()
 
     @patch("ury.ury.api.service_requests.frappe.has_permission")
     @patch("ury.ury.api.service_requests.frappe.get_doc")
@@ -218,7 +219,7 @@ class TestResolveServiceRequest(FrappeTestCase):
         # Verify the document was fetched and updated
         mock_get_doc.assert_called_once_with("URY Service Request", "SR-001")
         self.assertEqual(mock_doc.status, "Resolved")
-        mock_doc.save.assert_called_once_with(ignore_permissions=True)
+        mock_doc.save.assert_called_once_with()
 
     @patch("ury.ury.api.service_requests.frappe.has_permission")
     @patch("ury.ury.api.service_requests.frappe.session")
@@ -283,9 +284,9 @@ class TestResolveServiceRequest(FrappeTestCase):
     @patch("ury.ury.api.service_requests.frappe.session")
     @patch("ury.ury.api.service_requests.frappe.get_doc")
     @patch("ury.ury.api.service_requests.now_datetime")
-    def test_saves_with_ignore_permissions(self, mock_now, mock_get_doc, mock_session, mock_has_perm):
+    def test_saves_after_permission_check_passes(self, mock_now, mock_get_doc, mock_session, mock_has_perm):
         mock_has_perm.return_value = True
-        """Should save with ignore_permissions=True to bypass permission checks."""
+        """Should call save() once the explicit has_permission check passes."""
         mock_now.return_value = "2026-08-19 14:45:30"
         mock_session.user = "Captain"
 
@@ -295,8 +296,9 @@ class TestResolveServiceRequest(FrappeTestCase):
 
         resolve_service_request("SR-005")
 
-        # Verify save was called with ignore_permissions=True
-        mock_doc.save.assert_called_once_with(ignore_permissions=True)
+        # Verify save was called (permission gating is done explicitly via
+        # has_permission(), not save()'s own ignore_permissions flag)
+        mock_doc.save.assert_called_once_with()
 
     @patch("ury.ury.api.service_requests.frappe.has_permission")
     @patch("ury.ury.api.service_requests.frappe.session")
