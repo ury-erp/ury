@@ -1,0 +1,396 @@
+from unittest.mock import MagicMock, patch
+
+import frappe as real_frappe
+from frappe.tests.utils import FrappeTestCase
+
+frappe_dict = real_frappe._dict
+
+from ury.ury.api.ury_kot_generate import (
+    create_order_items,
+    process_items_for_cancel_kot,
+    process_items_for_kot,
+)
+from ury.ury.api.ury_kot_routing import (
+    ROUTING_NOT_CONFIGURED,
+    RoutingError,
+)
+
+MODULE = "ury.ury.api.ury_kot_generate"
+
+
+class TestProcessItemsForKot(FrappeTestCase):
+    """Integration tests for process_items_for_kot() wired to the unified resolver.
+
+    Tests verify that:
+    1. The resolver is called for each item with correct company/branch
+    2. Items are grouped by resolved production units
+    3. One KOT is created per production unit
+    4. RoutingErrors are handled gracefully (not breaking the batch)
+    5. Legacy behavior is preserved for unmapped items (skip silently)
+    """
+
+    def _make_pos_profile(self, branch="Main Branch", company="URY Co"):
+        return frappe_dict({"name": "POS-1", "branch": branch, "company": company})
+
+    def _make_pos_invoice(self, company="URY Co"):
+        return frappe_dict({"name": "INV-001", "company": company})
+
+    def _make_order_items(self, item_codes_and_names):
+        """Create order items from [(item_code, item_name), ...]"""
+        items = []
+        for item_code, item_name in item_codes_and_names:
+            items.append(
+                {
+                    "item": item_code,
+                    "item_name": item_name,
+                    "qty": 1,
+                    "comment": "",
+                }
+            )
+        return items
+
+    @patch(f"{MODULE}.create_kot_doc")
+    @patch(f"{MODULE}.resolve_production_units")
+    @patch(f"{MODULE}.frappe.get_doc")
+    @patch(f"{MODULE}.frappe.db.get_all")
+    def test_items_routed_via_resolver_to_correct_production_units(
+        self, mock_db_get_all, mock_get_doc, mock_resolve, mock_create_kot
+    ):
+        """Verify resolver is called and items grouped correctly by production unit."""
+        # Setup
+        mock_db_get_all.return_value = [
+            {"name": "Unit A"},
+            {"name": "Unit B"},
+        ]
+        mock_get_doc.side_effect = [
+            self._make_pos_profile(),
+            self._make_pos_invoice(),
+        ]
+        # Item 1 routes to Unit A, Item 2 routes to both Unit A and Unit B
+        mock_resolve.side_effect = [
+            ["Unit A"],  # ITEM-1
+            ["Unit A", "Unit B"],  # ITEM-2
+        ]
+        mock_create_kot.side_effect = ["KOT-1", "KOT-2", "KOT-3"]
+
+        # Call
+        order_items = self._make_order_items([("ITEM-1", "Item 1"), ("ITEM-2", "Item 2")])
+        result = process_items_for_kot(
+            invoice_id="INV-001",
+            customer="John Doe",
+            restaurant_table="T-01",
+            items=order_items,
+            comments="",
+            pos_profile_id="POS-1",
+            kot_naming_series="KOT-",
+            kot_type="New Order",
+        )
+
+        # Verify resolver was called for each item
+        self.assertEqual(mock_resolve.call_count, 2)
+        mock_resolve.assert_any_call(
+            item_code="ITEM-1", company="URY Co", branch="Main Branch"
+        )
+        mock_resolve.assert_any_call(
+            item_code="ITEM-2", company="URY Co", branch="Main Branch"
+        )
+
+        # Verify KOTs were created: one for Unit A (with both items), one for Unit B (with Item 2)
+        self.assertEqual(mock_create_kot.call_count, 2)
+        self.assertEqual(result, ["KOT-1", "KOT-2"])
+
+    @patch(f"{MODULE}.create_kot_doc")
+    @patch(f"{MODULE}.resolve_production_units")
+    @patch(f"{MODULE}.frappe.get_doc")
+    @patch(f"{MODULE}.frappe.db.get_all")
+    def test_routing_not_configured_error_skips_item_silently(
+        self, mock_db_get_all, mock_get_doc, mock_resolve, mock_create_kot
+    ):
+        """ROUTING_NOT_CONFIGURED errors are caught and item is skipped (legacy behavior)."""
+        mock_db_get_all.return_value = [{"name": "Unit A"}]
+        mock_get_doc.side_effect = [
+            self._make_pos_profile(),
+            self._make_pos_invoice(),
+        ]
+        # Item 1 routes OK, Item 2 raises ROUTING_NOT_CONFIGURED
+        mock_resolve.side_effect = [
+            ["Unit A"],
+            RoutingError(ROUTING_NOT_CONFIGURED, "No mapping found"),
+        ]
+        mock_create_kot.return_value = "KOT-1"
+
+        order_items = self._make_order_items([("ITEM-1", "Item 1"), ("ITEM-2", "Item 2")])
+        result = process_items_for_kot(
+            invoice_id="INV-001",
+            customer="John Doe",
+            restaurant_table="T-01",
+            items=order_items,
+            comments="",
+            pos_profile_id="POS-1",
+            kot_naming_series="KOT-",
+            kot_type="New Order",
+        )
+
+        # Should create KOT only for Item 1; Item 2 is skipped
+        self.assertEqual(mock_create_kot.call_count, 1)
+        self.assertEqual(result, ["KOT-1"])
+
+    @patch(f"{MODULE}.create_kot_doc")
+    @patch(f"{MODULE}.resolve_production_units")
+    @patch(f"{MODULE}.frappe.get_doc")
+    @patch(f"{MODULE}.frappe.db.get_all")
+    def test_other_routing_errors_are_logged_and_item_skipped(
+        self, mock_db_get_all, mock_get_doc, mock_resolve, mock_create_kot
+    ):
+        """Other RoutingErrors (ambiguous, disabled) are logged as warnings, item skipped."""
+        mock_db_get_all.return_value = [{"name": "Unit A"}]
+        mock_get_doc.side_effect = [
+            self._make_pos_profile(),
+            self._make_pos_invoice(),
+        ]
+        # Item 2 raises ROUTING_AMBIGUOUS
+        from ury.ury.api.ury_kot_routing import ROUTING_AMBIGUOUS
+
+        mock_resolve.side_effect = [
+            ["Unit A"],
+            RoutingError(ROUTING_AMBIGUOUS, "Multiple mappings"),
+        ]
+        mock_create_kot.return_value = "KOT-1"
+
+        order_items = self._make_order_items([("ITEM-1", "Item 1"), ("ITEM-2", "Item 2")])
+        result = process_items_for_kot(
+            invoice_id="INV-001",
+            customer="John Doe",
+            restaurant_table="T-01",
+            items=order_items,
+            comments="",
+            pos_profile_id="POS-1",
+            kot_naming_series="KOT-",
+            kot_type="New Order",
+        )
+
+        # Item 1 routed, Item 2 skipped
+        self.assertEqual(mock_create_kot.call_count, 1)
+        self.assertEqual(result, ["KOT-1"])
+
+    @patch(f"{MODULE}.create_kot_doc")
+    @patch(f"{MODULE}.resolve_production_units")
+    @patch(f"{MODULE}.frappe.get_doc")
+    @patch(f"{MODULE}.frappe.db.get_all")
+    def test_validation_dedup_key_set_for_first_kot_only(
+        self, mock_db_get_all, mock_get_doc, mock_resolve, mock_create_kot
+    ):
+        """validation_dedup_key is only set for the first KOT per invoice+production."""
+        mock_db_get_all.return_value = [{"name": "Unit A"}]
+        mock_get_doc.side_effect = [
+            self._make_pos_profile(),
+            self._make_pos_invoice(),
+        ]
+        mock_resolve.return_value = ["Unit A"]
+
+        # First KOT doesn't exist yet
+        with patch(f"{MODULE}.frappe.db.exists", return_value=False):
+            mock_create_kot.return_value = "KOT-1"
+
+            order_items = self._make_order_items([("ITEM-1", "Item 1")])
+            result = process_items_for_kot(
+                invoice_id="INV-001",
+                customer="John Doe",
+                restaurant_table="T-01",
+                items=order_items,
+                comments="",
+                pos_profile_id="POS-1",
+                kot_naming_series="KOT-",
+                kot_type="New Order",
+            )
+
+            # Verify dedup key was set
+            call_args = mock_create_kot.call_args
+            self.assertEqual(call_args.kwargs.get("validation_dedup_key"), "INV-001::Unit A")
+
+    @patch(f"{MODULE}.create_kot_doc")
+    @patch(f"{MODULE}.resolve_production_units")
+    @patch(f"{MODULE}.frappe.get_doc")
+    @patch(f"{MODULE}.frappe.db.get_all")
+    def test_existing_kot_uses_order_modified_type(
+        self, mock_db_get_all, mock_get_doc, mock_resolve, mock_create_kot
+    ):
+        """When KOT already exists, subsequent KOTs use 'Order Modified' type."""
+        mock_db_get_all.return_value = [{"name": "Unit A"}]
+        mock_get_doc.side_effect = [
+            self._make_pos_profile(),
+            self._make_pos_invoice(),
+        ]
+        mock_resolve.return_value = ["Unit A"]
+
+        # KOT already exists
+        with patch(f"{MODULE}.frappe.db.exists", return_value=True):
+            mock_create_kot.return_value = "KOT-2"
+
+            order_items = self._make_order_items([("ITEM-1", "Item 1")])
+            result = process_items_for_kot(
+                invoice_id="INV-001",
+                customer="John Doe",
+                restaurant_table="T-01",
+                items=order_items,
+                comments="",
+                pos_profile_id="POS-1",
+                kot_naming_series="KOT-",
+                kot_type="New Order",
+            )
+
+            # Verify type was changed to "Order Modified"
+            call_args = mock_create_kot.call_args
+            self.assertEqual(call_args[4], "Order Modified")
+            # Verify dedup key was NOT set
+            self.assertIsNone(call_args.kwargs.get("validation_dedup_key"))
+
+    @patch(f"{MODULE}.create_kot_doc")
+    @patch(f"{MODULE}.resolve_production_units")
+    @patch(f"{MODULE}.frappe.get_doc")
+    @patch(f"{MODULE}.frappe.db.get_all")
+    def test_no_production_units_raises_error(
+        self, mock_db_get_all, mock_get_doc, mock_resolve, mock_create_kot
+    ):
+        """If no production units exist for branch, error is raised."""
+        mock_db_get_all.return_value = []
+        mock_get_doc.return_value = self._make_pos_profile()
+
+        order_items = self._make_order_items([("ITEM-1", "Item 1")])
+
+        with self.assertRaises(frappe.ValidationError):
+            process_items_for_kot(
+                invoice_id="INV-001",
+                customer="John Doe",
+                restaurant_table="T-01",
+                items=order_items,
+                comments="",
+                pos_profile_id="POS-1",
+                kot_naming_series="KOT-",
+                kot_type="New Order",
+            )
+
+
+class TestProcessItemsForCancelKot(FrappeTestCase):
+    """Integration tests for process_items_for_cancel_kot() wired to the unified resolver."""
+
+    def _make_pos_profile(self, branch="Main Branch", company="URY Co"):
+        return frappe_dict({"name": "POS-1", "branch": branch, "company": company})
+
+    def _make_pos_invoice(self, company="URY Co"):
+        return frappe_dict({"name": "INV-001", "company": company})
+
+    def _make_order_items(self, item_codes_and_names):
+        items = []
+        for item_code, item_name in item_codes_and_names:
+            items.append(
+                {
+                    "item": item_code,
+                    "item_name": item_name,
+                    "qty": 1,
+                    "comment": "",
+                }
+            )
+        return items
+
+    @patch(f"{MODULE}.create_cancel_kot_doc")
+    @patch(f"{MODULE}.resolve_production_units")
+    @patch(f"{MODULE}.frappe.get_doc")
+    def test_cancel_items_routed_via_resolver(
+        self, mock_get_doc, mock_resolve, mock_create_cancel_kot
+    ):
+        """Verify resolver is called for cancel items and KOTs are created."""
+        mock_get_doc.side_effect = [
+            self._make_pos_profile(),
+            self._make_pos_invoice(),
+        ]
+        # Item 1 routes to Unit A, Item 2 routes to both
+        mock_resolve.side_effect = [
+            ["Unit A"],
+            ["Unit A", "Unit B"],
+        ]
+        mock_create_cancel_kot.side_effect = ["CNCL-KOT-1", "CNCL-KOT-2"]
+
+        order_items = self._make_order_items([("ITEM-1", "Item 1"), ("ITEM-2", "Item 2")])
+        invoice_items = order_items
+
+        result = process_items_for_cancel_kot(
+            invoice_id="INV-001",
+            customer="John Doe",
+            restaurant_table="T-01",
+            items=order_items,
+            comments="",
+            pos_profile_id="POS-1",
+            cancel_kot_naming_series="CNCL-KOT-",
+            kot_type="Partially cancelled",
+            invoiceItems=invoice_items,
+        )
+
+        # Verify resolver was called for each item
+        self.assertEqual(mock_resolve.call_count, 2)
+        mock_resolve.assert_any_call(
+            item_code="ITEM-1", company="URY Co", branch="Main Branch"
+        )
+        mock_resolve.assert_any_call(
+            item_code="ITEM-2", company="URY Co", branch="Main Branch"
+        )
+
+        # Verify cancel KOTs were created
+        self.assertEqual(mock_create_cancel_kot.call_count, 2)
+        self.assertEqual(result, ["CNCL-KOT-1", "CNCL-KOT-2"])
+
+    @patch(f"{MODULE}.create_cancel_kot_doc")
+    @patch(f"{MODULE}.resolve_production_units")
+    @patch(f"{MODULE}.frappe.get_doc")
+    def test_cancel_routing_not_configured_skips_item(
+        self, mock_get_doc, mock_resolve, mock_create_cancel_kot
+    ):
+        """ROUTING_NOT_CONFIGURED for cancel item is skipped."""
+        mock_get_doc.side_effect = [
+            self._make_pos_profile(),
+            self._make_pos_invoice(),
+        ]
+        mock_resolve.side_effect = [
+            ["Unit A"],
+            RoutingError(ROUTING_NOT_CONFIGURED, "No mapping"),
+        ]
+        mock_create_cancel_kot.return_value = "CNCL-KOT-1"
+
+        order_items = self._make_order_items([("ITEM-1", "Item 1"), ("ITEM-2", "Item 2")])
+        invoice_items = order_items
+
+        result = process_items_for_cancel_kot(
+            invoice_id="INV-001",
+            customer="John Doe",
+            restaurant_table="T-01",
+            items=order_items,
+            comments="",
+            pos_profile_id="POS-1",
+            cancel_kot_naming_series="CNCL-KOT-",
+            kot_type="Partially cancelled",
+            invoiceItems=invoice_items,
+        )
+
+        # Only Item 1 creates a cancel KOT
+        self.assertEqual(mock_create_cancel_kot.call_count, 1)
+        self.assertEqual(result, ["CNCL-KOT-1"])
+
+
+class TestCreateOrderItems(FrappeTestCase):
+    """Tests for create_order_items() helper (preserved functionality)."""
+
+    def test_create_order_items_from_items_list(self):
+        """Verify items are transformed correctly."""
+        items = [
+            {"item": "ITEM-1", "item_name": "Item 1", "qty": 2, "comment": "No onion"},
+            {"item_code": "ITEM-2", "item_name": "Item 2", "qty": 1, "comments": "Extra sauce"},
+        ]
+
+        result = create_order_items(items)
+
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0]["item_code"], "ITEM-1")
+        self.assertEqual(result[0]["qty"], 2)
+        self.assertEqual(result[0]["comments"], "No onion")
+        self.assertEqual(result[1]["item_code"], "ITEM-2")
+        self.assertEqual(result[1]["comments"], "Extra sauce")
