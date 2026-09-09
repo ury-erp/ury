@@ -55,20 +55,27 @@ def validate_pos_closing_entry(doc, method=None):
 	Ported from grillax's pos_closing_entry_hide_fields.js `submit_stock_reconciliation`
 	trigger, which called `pos_closing.get_draft_stock_reconciliation` (the
 	worldtimeapi.org clock-fetch in that same file is intentionally NOT ported).
+
+	Unlike `POS Opening Entry`, `POS Closing Entry` has no `branch` field of its own
+	(confirmed: no core field and no Custom Field named `branch` on this doctype) - only
+	`pos_profile`. Reading `doc.branch` directly raised AttributeError on every single
+	POS Closing Entry save/submit, everywhere, regardless of whether the Stock Count Gate
+	alert rule was even enabled. Resolve the branch from the linked POS Profile instead.
 	"""
-	if not doc.branch:
+	branch = frappe.db.get_value("POS Profile", doc.pos_profile, "branch") if doc.pos_profile else None
+	if not branch:
 		return
 
-	if not get_alert_rule("Stock Count Gate", branch=doc.branch):
+	if not get_alert_rule("Stock Count Gate", branch=branch):
 		return
 
 	stock_reconciliation_exists = frappe.db.exists(
 		"Stock Reconciliation",
-		{"branch": doc.branch, "docstatus": ["in", [0, 1]]},
+		{"branch": branch, "docstatus": ["in", [0, 1]]},
 	)
 
 	if not stock_reconciliation_exists:
 		frappe.throw(
-			f"No Stock Reconciliation found for branch {doc.branch}. "
+			f"No Stock Reconciliation found for branch {branch}. "
 			"Please create and save a Stock Reconciliation before closing this POS session."
 		)

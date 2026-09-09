@@ -67,7 +67,16 @@ def _authorize_posting(actor, execution_doc):
 	roles = set(frappe.get_roles(actor))
 	if not roles.intersection(POSTING_ROLES):
 		raise frappe.PermissionError(_("You are not permitted to post fulfilment stock"))
-	if not frappe.has_permission(KOT_ITEM_DOCTYPE, "read", execution_doc, user=actor):
+	# execution_doc is a "URY KOT Item Execution" row (a standalone doctype,
+	# not a child table), so it has no parenttype/parent fields. KOT_ITEM_DOCTYPE
+	# ("URY KOT Items") *is* a child table (istable=1) - passing execution_doc
+	# to frappe.has_permission for that doctype makes core dispatch into
+	# has_child_permission(), which unconditionally reads child_doc.parenttype
+	# and raises AttributeError, crashing every ready-posting attempt for every
+	# role (not a permission bypass - a hard failure that blocks the whole
+	# stock-posting-on-ready flow). Permission on a KOT Items child row is
+	# governed by its parent KOT, so check read access on the parent instead.
+	if not frappe.has_permission(KOT_DOCTYPE, "read", execution_doc.get("kot"), user=actor):
 		raise frappe.PermissionError(_("You are not permitted to post this fulfilment item"))
 
 
