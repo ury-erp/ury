@@ -33,6 +33,52 @@ from ury.ury.api.ury_reservation_service import (
 MODULE = "ury.ury.api.ury_reservation_service"
 BOM_MODULE = "ury.ury.api.ury_bom_compiler"
 
+RESERVATION_DOCTYPE = "URY Stock Reservation"
+
+
+def patch_read_committed_reservation_rows(test_case):
+    """Keep `create_reservation` tests hermetic after the oversell fix.
+
+    `create_reservation`'s capacity check reads the active-reservation sum on
+    a short-lived SECOND database connection
+    (`_read_committed_reservation_rows`), so that it sees latest-committed
+    data instead of its own transaction's stale REPEATABLE READ view -- see
+    that function's docstring for why this is required and why a locking read
+    or a commit could not be used instead.
+
+    That real connection would bypass these tests' `frappe.get_all` mocks
+    entirely and quietly hit the live database, so every test that calls
+    `create_reservation` would silently stop controlling the
+    reservation-sum input (it would just read an empty real table and appear
+    to pass). This redirects the fresh-connection read back through the
+    module's `frappe.get_all`, which each test already mocks, so the mocked
+    reservation rows keep driving the capacity arithmetic exactly as before.
+
+    Note this makes the unit tests exercise the *arithmetic*, not the
+    isolation behaviour: no single-process test can prove cross-connection
+    read consistency. That is proven only by the live multi-process bench run
+    documented in the module docstring -- which is precisely why the original
+    oversell bug survived a green unit suite.
+    """
+
+    def fake_read_committed(item_code, warehouse, company):
+        return frappe.get_all(
+            RESERVATION_DOCTYPE,
+            filters={
+                "component_item": item_code,
+                "warehouse": warehouse,
+                "company": company,
+                "status": ["in", [RESERVED]],
+            },
+            fields=["qty", "reservation_group"],
+        )
+
+    patcher = patch(
+        f"{MODULE}._read_committed_reservation_rows", side_effect=fake_read_committed
+    )
+    patcher.start()
+    test_case.addCleanup(patcher.stop)
+
 
 def _new_doc_recorder():
     """Return a frappe.get_doc side_effect that records constructed/loaded docs."""
@@ -53,6 +99,7 @@ def _new_doc_recorder():
 
 class TestCreateReservationSimpleItem(FrappeTestCase):
     def setUp(self):
+        patch_read_committed_reservation_rows(self)
         # append_audit() calls frappe.utils.now(), which otherwise
         # chains into get_system_settings() -> get_cached_doc("System
         # Settings") -- a real DB/cache path these unit tests do not
@@ -120,6 +167,7 @@ class TestCreateReservationSimpleItem(FrappeTestCase):
 
 class TestCreateReservationCompositeItem(FrappeTestCase):
     def setUp(self):
+        patch_read_committed_reservation_rows(self)
         # append_audit() calls frappe.utils.now(), which otherwise
         # chains into get_system_settings() -> get_cached_doc("System
         # Settings") -- a real DB/cache path these unit tests do not
@@ -359,6 +407,7 @@ class TestCreateReservationProductionPolicy(FrappeTestCase):
     """
 
     def setUp(self):
+        patch_read_committed_reservation_rows(self)
         now_patcher = patch(f"{MODULE}.frappe.utils.now", return_value="2024-01-01 00:00:00")
         now_patcher.start()
         self.addCleanup(now_patcher.stop)
@@ -647,6 +696,7 @@ class TestRealtimeEventEmission(FrappeTestCase):
 	"""Tests for realtime event emissions on reservation create/release."""
 
 	def setUp(self):
+		patch_read_committed_reservation_rows(self)
 		# append_audit() calls frappe.utils.now(), which otherwise
 		# chains into get_system_settings() -> get_cached_doc("System
 		# Settings") -- a real DB/cache path these unit tests do not

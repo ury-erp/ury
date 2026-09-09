@@ -54,8 +54,10 @@ Atomicity strategy (read this before changing capacity-check code):
        avoid lock-order deadlocks between two concurrent multi-component
        reservations),
     2. compute available capacity for each locked component from the now
-       lock-held Bin snapshot plus a live aggregate of active
-       ``URY Stock Reservation`` rows,
+       lock-held Bin snapshot plus a **read-committed** aggregate of active
+       ``URY Stock Reservation`` rows, taken on a short-lived second DB
+       connection -- see the CRITICAL note below; a plain read on the
+       request's own connection is NOT sufficient and caused a live oversell,
     3. if every component has sufficient capacity, insert all reservation
        rows (still inside the same transaction/lock scope) and return,
     4. if any component is short, raise before inserting anything -- no
@@ -76,13 +78,56 @@ Atomicity strategy (read this before changing capacity-check code):
   by the qty>0 check for any positive-supply resource in practice) and is
   flagged here rather than silently assumed safe.
 
-  EXPLICIT LIMITATION: this module's locking strategy is *reasoned about*
-  from Frappe/MySQL transaction semantics and cannot be executed or proven
-  under real concurrent load in this environment -- there is no live bench
-  or database available. `test_two_terminal_concurrent_reservation` below is
-  written as the test that WOULD prove correctness against a real Frappe
-  test site (using threads + a real DB transaction per thread), but it is
-  explicitly marked NOT EXECUTED / unexecutable here.
+  CRITICAL -- the Bin ``FOR UPDATE`` alone is NOT sufficient, and assuming it
+  was caused a live-reproduced oversell. Under MariaDB/MySQL's default
+  REPEATABLE READ, a transaction's consistent-read snapshot is established at
+  its *first plain (non-locking) read* and is never re-armed -- not by a
+  subsequent ``SELECT ... FOR UPDATE``, not by acquiring any lock.
+  `create_reservation` performs several plain reads before it locks the Bin
+  row (permission check, scope check, and `_resolve_components`' BOM/company
+  lookups), so its snapshot is already pinned by the time the Bin lock is
+  taken. The Bin lock does serialize the transactions correctly -- but a
+  *plain* re-read of the reservation rows afterwards still returns that
+  pre-lock snapshot, so each queued transaction computes capacity as though no
+  sibling reservation exists.
+
+  Live reproduction (bench `sa-prodctrl-unif-live`, 16 concurrent OS
+  processes, two MADE_TO_ORDER items sharing raw component GLMR with 5.0
+  units in stock): all 16 calls succeeded, reserving 16.0 units against 5.0.
+  The same two-call scenario run *sequentially* correctly rejected the
+  over-limit call, isolating the fault to snapshot staleness rather than the
+  capacity formula.
+
+  The fix: step 2's reservation-sum is read on a short-lived second DB
+  connection (`_active_reservation_qty(..., read_committed=True)`), giving that
+  one query its own transaction and its own fresh read view, so it sees every
+  reservation committed up to that instant. The caller's transaction is not
+  committed, rolled back, or otherwise disturbed. This is sound precisely
+  because the Bin ``FOR UPDATE`` (unchanged) already grants mutual exclusion:
+  while this transaction holds it, no competing reservation transaction can be
+  between its own Bin lock and its commit for that component, so there is no
+  phantom window for the fresh read to miss.
+
+  Two alternatives were tried and rejected on evidence -- see
+  `_active_reservation_qty`'s docstring before changing this. In short: making
+  the sum a ``SELECT ... FOR UPDATE`` removed the oversell but made MariaDB
+  fail 15 of 16 concurrent calls with ``QueryDeadlockError (1020, "Record has
+  changed since last read")``, because MariaDB refuses a locking read of rows
+  committed after an existing read view; and committing / changing isolation
+  to force a fresh read view would break the all-or-nothing multi-line
+  guarantee of `ury_order_reservation_service.reconcile_order_reservations`,
+  which calls this function several times inside one transaction.
+
+  `component_item` carries a `search_index` so the reservation-sum query uses
+  an index range rather than a full table scan. Do not weaken the Bin lock.
+
+  `test_two_terminal_concurrent_reservation` below remains marked NOT EXECUTED
+  because a unit test in a single process cannot prove cross-connection
+  transaction behaviour -- and note that this is precisely why the bug above
+  survived: no mocked or sequential test could ever have caught it. Real
+  proof for this module's concurrency claims comes only from the live
+  multi-process bench run documented above and in the track's
+  live-bench-test-results files.
 
 Reservation states (per V3-40): Reserved, Fulfilled, Released, Expired,
 Cancelled. Only `Reserved` consumes *reserved* capacity. `Fulfilled` means
@@ -173,14 +218,138 @@ def _lock_bin_row(item_code, warehouse):
 	return rows[0] if rows else None
 
 
-def _active_reservation_qty(item_code, warehouse, company, exclude_group=None):
-	filters = {
-		"component_item": item_code,
-		"warehouse": warehouse,
-		"company": company,
-		"status": ["in", list(ACTIVE_STATUSES)],
-	}
-	rows = frappe.get_all(RESERVATION_DOCTYPE, filters=filters, fields=["qty", "reservation_group"])
+_RESERVATION_SUM_SQL = """
+	SELECT qty, reservation_group
+	FROM `tabURY Stock Reservation`
+	WHERE component_item = %(item_code)s
+	  AND warehouse = %(warehouse)s
+	  AND company = %(company)s
+	  AND status IN %(statuses)s
+"""
+
+
+def _read_committed_reservation_rows(item_code, warehouse, company):
+	"""Read the active reservation rows on a short-lived second DB connection.
+
+	Returns the same shape as the plain `frappe.get_all` path. Opening a
+	separate connection gives this one query its own transaction and therefore
+	its own fresh read view, so it observes every reservation committed up to
+	this instant -- independent of the calling transaction's (already stale)
+	read view. The caller's transaction is left completely untouched: nothing
+	is committed, rolled back, or locked on it.
+
+	See `_active_reservation_qty` for why this is required, and why the two
+	more obvious alternatives are not usable here.
+	"""
+	from frappe.database import get_db
+
+	conf = frappe.conf
+	conn = get_db(
+		socket=conf.db_socket,
+		host=conf.db_host,
+		port=conf.db_port,
+		user=conf.db_name,
+		password=conf.db_password,
+		cur_db_name=conf.db_name,
+	)
+	try:
+		conn.connect()
+		return conn.sql(
+			_RESERVATION_SUM_SQL,
+			{
+				"item_code": item_code,
+				"warehouse": warehouse,
+				"company": company,
+				"statuses": list(ACTIVE_STATUSES),
+			},
+			as_dict=True,
+		)
+	finally:
+		try:
+			conn.close()
+		except Exception:
+			frappe.logger("ury_reservation_service").exception(
+				"Failed to close read-committed reservation connection"
+			)
+
+
+def _active_reservation_qty(item_code, warehouse, company, exclude_group=None, read_committed=False):
+	"""Sum active reservation qty for `item_code`/`warehouse`/`company`.
+
+	`read_committed=True` performs the sum on a short-lived second DB
+	connection instead of the request's own. This MUST be used by the
+	reservation critical section (`create_reservation`), where it is a
+	correctness requirement, not a performance knob -- it is the fix for a
+	live-reproduced oversell:
+
+	  MariaDB/MySQL default to REPEATABLE READ, where a transaction's
+	  consistent read view is established at its *first plain (non-locking)
+	  read* and is never re-armed afterwards -- not by a later
+	  ``SELECT ... FOR UPDATE``, and not by acquiring any lock.
+	  `create_reservation` runs several plain reads before it locks the Bin
+	  row (`_require_create_permission`, `_require_scope`, and
+	  `_resolve_components`' BOM/company lookups), so the read view is already
+	  pinned by the time `_lock_bin_row` runs. The Bin ``FOR UPDATE`` does
+	  serialize the transactions correctly (confirmed live via reservation
+	  timestamps) -- but a plain re-read of the reservation rows afterwards
+	  still returns that pre-lock read view, so each queued transaction
+	  computed capacity as though no sibling reservation existed. Live result:
+	  16 concurrent calls against 5.0 units of stock and all 16 succeeded.
+
+	Why a second connection, rather than the two more obvious fixes -- both of
+	which were tried and rejected on evidence, so please do not "simplify"
+	this back into either of them:
+
+	  1. Making this a locking read (``SELECT ... FOR UPDATE``) does NOT work
+	     on MariaDB here. Live re-test: the oversell was indeed gone, but 15 of
+	     16 concurrent calls died with
+	     ``QueryDeadlockError (1020, "Record has changed since last read in
+	     table 'tabURY Stock Reservation'")`` instead of the intended
+	     "Insufficient capacity". MariaDB refuses a locking read of a row that
+	     was committed after the transaction's existing read view, rather than
+	     silently reading the latest version. Since the stale read view is the
+	     very condition we are trying to work around, a locking read cannot
+	     escape it -- it just converts a silent oversell into a storm of
+	     spurious transient failures on the money path.
+	  2. Committing (or resetting the isolation level) to force a fresh read
+	     view is not permissible here, because `create_reservation` is called
+	     from inside a larger transaction:
+	     `ury_order_reservation_service.reconcile_order_reservations` releases
+	     and re-creates reservations for several order lines in ONE
+	     transaction and documents an explicit all-or-nothing guarantee
+	     ("either the whole batch passes and is applied, or nothing in this
+	     call is mutated"). A commit here would make earlier lines' mutations
+	     permanent and destroy that guarantee. A mid-transaction
+	     ``SET SESSION TRANSACTION ISOLATION LEVEL`` is also unreliable -- it
+	     applies from the next transaction, so it would not affect the
+	     in-flight one anyway.
+
+	The second connection is safe precisely because the Bin row's
+	``SELECT ... FOR UPDATE`` (taken before this read, and deliberately left
+	untouched) already grants mutual exclusion: while this transaction holds
+	that lock, no other reservation transaction can be between its own Bin
+	lock and its commit for the same component. So "latest committed" read on
+	a fresh connection is exactly the true current state, with no phantom
+	window, and it takes no gap locks -- which is why it does not reintroduce
+	the deadlocks of option 1.
+
+	Read-only availability queries outside the reservation critical section
+	keep the default `read_committed=False` plain read on the request's own
+	connection: they are not serialized by any Bin lock, they must not pay for
+	an extra connection, and a slightly stale read is harmless for a display
+	hint.
+	"""
+	if read_committed:
+		rows = _read_committed_reservation_rows(item_code, warehouse, company)
+	else:
+		filters = {
+			"component_item": item_code,
+			"warehouse": warehouse,
+			"company": company,
+			"status": ["in", list(ACTIVE_STATUSES)],
+		}
+		rows = frappe.get_all(RESERVATION_DOCTYPE, filters=filters, fields=["qty", "reservation_group"])
+
 	total = 0
 	for row in rows:
 		if exclude_group and row.get("reservation_group") == exclude_group:
@@ -189,7 +358,7 @@ def _active_reservation_qty(item_code, warehouse, company, exclude_group=None):
 	return total
 
 
-def get_available_capacity(item_code, warehouse, company, locked_bin=None):
+def get_available_capacity(item_code, warehouse, company, locked_bin=None, read_committed=False):
 	"""Return allocatable capacity for `item_code`/`warehouse`, per V3-42's formula.
 
 	``allocatable_qty = Bin.projected_qty - active URY reservation qty``. A
@@ -198,6 +367,14 @@ def get_available_capacity(item_code, warehouse, company, locked_bin=None):
 	instead of re-reading; if omitted this re-reads (unlocked) via
 	`frappe.db.get_value`, which is fine for read-only availability queries
 	outside the reservation critical section.
+
+	`read_committed` is forwarded to `_active_reservation_qty`: pass True from
+	inside the reservation critical section (after the Bin lock) so the
+	reservation-sum is read on a fresh connection and therefore sees
+	latest-committed data rather than this transaction's already-stale
+	REPEATABLE READ read view. See `_active_reservation_qty`'s docstring for
+	the full rationale and for the two alternatives that were tried and
+	rejected. Read-only availability callers leave it False.
 	"""
 	if locked_bin is not None:
 		bin_projected_qty = locked_bin.get("projected_qty") or 0
@@ -206,7 +383,9 @@ def get_available_capacity(item_code, warehouse, company, locked_bin=None):
 			BIN_DOCTYPE, {"item_code": item_code, "warehouse": warehouse}, "projected_qty"
 		) or 0
 
-	reservation_qty = _active_reservation_qty(item_code, warehouse, company)
+	reservation_qty = _active_reservation_qty(
+		item_code, warehouse, company, read_committed=read_committed
+	)
 	return bin_projected_qty - reservation_qty
 
 
@@ -377,10 +556,26 @@ def create_reservation(
 	# Step 2: check capacity for every component against the now-locked
 	# snapshot. Collect all shortfalls before raising, so the error message
 	# is complete rather than reporting only the first shortfall found.
+	#
+	# `read_committed=True` is REQUIRED here and is not an optimisation: it
+	# reads the active-reservation sum on a fresh connection, so it returns
+	# latest-committed data rather than this transaction's REPEATABLE READ
+	# read view -- which was already pinned by the plain reads above, *before*
+	# the Bin lock was taken. Without it, queued concurrent transactions each
+	# see a pre-lock world with no sibling reservations and all pass the check:
+	# a live-reproduced oversell (16 concurrent calls all reserved against 5.0
+	# units). It is sound only because the Bin lock above is held across this
+	# read and the inserts below. See `_active_reservation_qty`'s docstring for
+	# the full rationale and for the two alternatives that were tried live and
+	# rejected. Do not weaken this, and do not weaken the Bin lock.
 	shortfalls = []
 	for component in components_sorted:
 		available = get_available_capacity(
-			component["component_item"], warehouse, company, locked_bin=locked_bins[component["component_item"]]
+			component["component_item"],
+			warehouse,
+			company,
+			locked_bin=locked_bins[component["component_item"]],
+			read_committed=True,
 		)
 		if component["qty"] > available:
 			shortfalls.append(
