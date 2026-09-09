@@ -131,8 +131,10 @@ class TestListOpenServiceRequests(FrappeTestCase):
 class TestAcknowledgeServiceRequest(FrappeTestCase):
     """Tests for acknowledge_service_request() endpoint."""
 
+    @patch("ury.ury.api.service_requests.frappe.has_permission")
     @patch("ury.ury.api.service_requests.frappe.get_doc")
-    def test_changes_status_to_acknowledged(self, mock_get_doc):
+    def test_changes_status_to_acknowledged(self, mock_get_doc, mock_has_perm):
+        mock_has_perm.return_value = True
         """Should change request status to 'Acknowledged' and save."""
         mock_doc = MagicMock()
         mock_doc.name = "SR-001"
@@ -146,8 +148,10 @@ class TestAcknowledgeServiceRequest(FrappeTestCase):
         self.assertEqual(mock_doc.status, "Acknowledged")
         mock_doc.save.assert_called_once_with(ignore_permissions=True)
 
+    @patch("ury.ury.api.service_requests.frappe.has_permission")
     @patch("ury.ury.api.service_requests.frappe.get_doc")
-    def test_returns_updated_status(self, mock_get_doc):
+    def test_returns_updated_status(self, mock_get_doc, mock_has_perm):
+        mock_has_perm.return_value = True
         """Should return the updated request with new status."""
         mock_doc = MagicMock()
         mock_doc.name = "SR-002"
@@ -159,8 +163,10 @@ class TestAcknowledgeServiceRequest(FrappeTestCase):
         self.assertEqual(result["name"], "SR-002")
         self.assertEqual(result["status"], "Acknowledged")
 
+    @patch("ury.ury.api.service_requests.frappe.has_permission")
     @patch("ury.ury.api.service_requests.frappe.get_doc")
-    def test_saves_with_ignore_permissions(self, mock_get_doc):
+    def test_saves_with_ignore_permissions(self, mock_get_doc, mock_has_perm):
+        mock_has_perm.return_value = True
         """Should save with ignore_permissions=True to bypass permission checks."""
         mock_doc = MagicMock()
         mock_doc.name = "SR-003"
@@ -171,8 +177,10 @@ class TestAcknowledgeServiceRequest(FrappeTestCase):
         # Verify save was called with ignore_permissions=True
         mock_doc.save.assert_called_once_with(ignore_permissions=True)
 
+    @patch("ury.ury.api.service_requests.frappe.has_permission")
     @patch("ury.ury.api.service_requests.frappe.get_doc")
-    def test_handles_already_acknowledged_request(self, mock_get_doc):
+    def test_handles_already_acknowledged_request(self, mock_get_doc, mock_has_perm):
+        mock_has_perm.return_value = True
         """Should handle acknowledging an already-acknowledged request."""
         mock_doc = MagicMock()
         mock_doc.name = "SR-004"
@@ -189,10 +197,12 @@ class TestAcknowledgeServiceRequest(FrappeTestCase):
 class TestResolveServiceRequest(FrappeTestCase):
     """Tests for resolve_service_request() endpoint."""
 
+    @patch("ury.ury.api.service_requests.frappe.has_permission")
     @patch("ury.ury.api.service_requests.frappe.session")
     @patch("ury.ury.api.service_requests.frappe.get_doc")
     @patch("ury.ury.api.service_requests.now_datetime")
-    def test_changes_status_to_resolved(self, mock_now, mock_get_doc, mock_session):
+    def test_changes_status_to_resolved(self, mock_now, mock_get_doc, mock_session, mock_has_perm):
+        mock_has_perm.return_value = True
         """Should change request status to 'Resolved' and save."""
         resolved_time = "2026-08-19 14:45:30"
         mock_now.return_value = resolved_time
@@ -210,10 +220,12 @@ class TestResolveServiceRequest(FrappeTestCase):
         self.assertEqual(mock_doc.status, "Resolved")
         mock_doc.save.assert_called_once_with(ignore_permissions=True)
 
+    @patch("ury.ury.api.service_requests.frappe.has_permission")
     @patch("ury.ury.api.service_requests.frappe.session")
     @patch("ury.ury.api.service_requests.frappe.get_doc")
     @patch("ury.ury.api.service_requests.now_datetime")
-    def test_sets_resolved_at_timestamp(self, mock_now, mock_get_doc, mock_session):
+    def test_sets_resolved_at_timestamp(self, mock_now, mock_get_doc, mock_session, mock_has_perm):
+        mock_has_perm.return_value = True
         """Should set resolved_at to current datetime."""
         resolved_time = "2026-08-19 14:45:30"
         mock_now.return_value = resolved_time
@@ -228,10 +240,12 @@ class TestResolveServiceRequest(FrappeTestCase):
         # Verify resolved_at was set
         self.assertEqual(mock_doc.resolved_at, resolved_time)
 
+    @patch("ury.ury.api.service_requests.frappe.has_permission")
     @patch("ury.ury.api.service_requests.frappe.session")
     @patch("ury.ury.api.service_requests.frappe.get_doc")
     @patch("ury.ury.api.service_requests.now_datetime")
-    def test_sets_resolved_by_current_user(self, mock_now, mock_get_doc, mock_session):
+    def test_sets_resolved_by_current_user(self, mock_now, mock_get_doc, mock_session, mock_has_perm):
+        mock_has_perm.return_value = True
         """Should set resolved_by to the current authenticated user."""
         mock_now.return_value = "2026-08-19 14:45:30"
         mock_session.user = "captain@ury.localhost"
@@ -245,10 +259,12 @@ class TestResolveServiceRequest(FrappeTestCase):
         # Verify resolved_by was set to current user
         self.assertEqual(mock_doc.resolved_by, "captain@ury.localhost")
 
+    @patch("ury.ury.api.service_requests.frappe.has_permission")
     @patch("ury.ury.api.service_requests.frappe.session")
     @patch("ury.ury.api.service_requests.frappe.get_doc")
     @patch("ury.ury.api.service_requests.now_datetime")
-    def test_returns_updated_status(self, mock_now, mock_get_doc, mock_session):
+    def test_returns_updated_status(self, mock_now, mock_get_doc, mock_session, mock_has_perm):
+        mock_has_perm.return_value = True
         """Should return the updated request with Resolved status."""
         mock_now.return_value = "2026-08-19 14:45:30"
         mock_session.user = "Captain Jane"
@@ -263,10 +279,12 @@ class TestResolveServiceRequest(FrappeTestCase):
         self.assertEqual(result["name"], "SR-004")
         self.assertEqual(result["status"], "Resolved")
 
+    @patch("ury.ury.api.service_requests.frappe.has_permission")
     @patch("ury.ury.api.service_requests.frappe.session")
     @patch("ury.ury.api.service_requests.frappe.get_doc")
     @patch("ury.ury.api.service_requests.now_datetime")
-    def test_saves_with_ignore_permissions(self, mock_now, mock_get_doc, mock_session):
+    def test_saves_with_ignore_permissions(self, mock_now, mock_get_doc, mock_session, mock_has_perm):
+        mock_has_perm.return_value = True
         """Should save with ignore_permissions=True to bypass permission checks."""
         mock_now.return_value = "2026-08-19 14:45:30"
         mock_session.user = "Captain"
@@ -280,10 +298,12 @@ class TestResolveServiceRequest(FrappeTestCase):
         # Verify save was called with ignore_permissions=True
         mock_doc.save.assert_called_once_with(ignore_permissions=True)
 
+    @patch("ury.ury.api.service_requests.frappe.has_permission")
     @patch("ury.ury.api.service_requests.frappe.session")
     @patch("ury.ury.api.service_requests.frappe.get_doc")
     @patch("ury.ury.api.service_requests.now_datetime")
-    def test_handles_resolving_acknowledged_request(self, mock_now, mock_get_doc, mock_session):
+    def test_handles_resolving_acknowledged_request(self, mock_now, mock_get_doc, mock_session, mock_has_perm):
+        mock_has_perm.return_value = True
         """Should handle resolving an acknowledged request."""
         mock_now.return_value = "2026-08-19 14:50:00"
         mock_session.user = "Captain"
@@ -300,10 +320,12 @@ class TestResolveServiceRequest(FrappeTestCase):
         self.assertEqual(mock_doc.resolved_by, "Captain")
         mock_doc.save.assert_called_once()
 
+    @patch("ury.ury.api.service_requests.frappe.has_permission")
     @patch("ury.ury.api.service_requests.frappe.session")
     @patch("ury.ury.api.service_requests.frappe.get_doc")
     @patch("ury.ury.api.service_requests.now_datetime")
-    def test_handles_resolving_already_resolved_request(self, mock_now, mock_get_doc, mock_session):
+    def test_handles_resolving_already_resolved_request(self, mock_now, mock_get_doc, mock_session, mock_has_perm):
+        mock_has_perm.return_value = True
         """Should handle re-resolving an already-resolved request (updates timestamp and user)."""
         first_time = "2026-08-19 14:30:00"
         second_time = "2026-08-19 14:45:30"
