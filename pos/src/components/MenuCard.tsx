@@ -1,5 +1,5 @@
 import { FC, useEffect, useState } from 'react';
-import { cn, Badge } from '@ury/ui';
+import { cn } from '@ury/ui';
 import { formatCurrency } from '@ury/core';
 import {
   getAvailabilityMessage,
@@ -24,8 +24,8 @@ interface MenuCardProps {
 const MenuCard: FC<MenuCardProps> = ({
   name,
   price,
-  item_image: _itemImage,
-  course: _course,
+  item_image,
+  course,
   item,
   onClick,
   disabled,
@@ -58,57 +58,71 @@ const MenuCard: FC<MenuCardProps> = ({
   const isDisabled = disabled || isUnavailable;
   const unavailableMessage = isUnavailable ? getAvailabilityMessage(availability?.reason_code) : null;
 
-  // Determine badge variant and text for availability status
-  const getAvailabilityTag = (): { variant: 'tagDestructive' | 'tagWarning' | 'tagSuccess'; text: string; showDot: boolean } | null => {
-    if (!availability) return null;
-
-    if (!availability.sellable || availability.available_qty <= 0) {
-      return { variant: 'tagDestructive', text: unavailableMessage || 'Unavailable', showDot: false };
-    }
-
-    if (availability.available_qty < 5) {
-      return { variant: 'tagWarning', text: `${availability.available_qty} left`, showDot: false };
-    }
-
-    return { variant: 'tagSuccess', text: `${availability.available_qty} left`, showDot: true };
-  };
-
-  const availabilityTag = getAvailabilityTag();
-
   return (
-    <button
-      type="button"
+    <div
       className={cn(
-        "border border-hair rounded-[9px] bg-card p-3 text-left cursor-pointer relative transition-colors duration-150 ease-out",
-        "hover:border-hair2 hover:shadow-sm",
-        isDisabled && "opacity-45 cursor-not-allowed"
+        "bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow cursor-pointer h-56 flex flex-col",
+        isDisabled && "opacity-50 cursor-not-allowed pointer-events-none"
       )}
       onClick={isDisabled ? undefined : onClick}
-      disabled={isDisabled}
       aria-disabled={isDisabled || undefined}
     >
-      {/* Name */}
-      <div className="text-[12.5px] font-[550] leading-[1.3] text-foreground mb-1">
-        {name}
+      {/* Image section - fixed height */}
+      <div className="h-24 relative">
+        {item_image ? (
+          <img
+            src={item_image}
+            alt={name}
+            className="w-full h-full object-cover filter saturate-75 brightness-95"
+            style={{ filter: 'saturate(0.7) brightness(0.95)' }}
+            onError={(e) => {
+              const target = e.target as HTMLImageElement;
+              target.style.display = 'none';
+              const parent = target.parentElement;
+              if (parent) {
+                const placeholder = document.createElement('div');
+                placeholder.className = 'w-full h-full bg-gray-200 flex items-center justify-center text-2xl text-gray-400 font-medium';
+                placeholder.textContent = name.slice(0, 2).toUpperCase();
+                parent.insertBefore(placeholder, target);
+              }
+            }}
+          />
+        ) : (
+          <div className="w-full h-full bg-gray-200 flex items-center justify-center text-2xl text-gray-400 font-medium">
+            {name.slice(0, 2).toUpperCase()}
+          </div>
+        )}
+        {unavailableMessage && (
+          <span className="absolute top-1 right-1 bg-gray-900/80 text-white text-[10px] font-medium px-2 py-0.5 rounded">
+            {unavailableMessage}
+          </span>
+        )}
       </div>
 
-      {/* Price */}
-      <div className="font-mono text-xs text-muted-foreground mt-[5px] tabular-nums">
-        {formatCurrency(price)}
-      </div>
-
-      {/* Status/Availability tag */}
-      {availabilityTag && (
-        <div className="mt-2">
-          <Badge size="tag" variant={availabilityTag.variant}>
-            {availabilityTag.showDot && (
-              <span className="w-[5px] h-[5px] rounded-full bg-current flex-none"></span>
-            )}
-            {availabilityTag.text}
-          </Badge>
+      {/* Content section - flex grow with fixed padding */}
+      <div className="flex-1 p-3 flex flex-col">
+        {/* Name section - fixed height for 2 lines */}
+        <div className="">
+          <h3 className="font-medium text-gray-900 text-sm leading-5 line-clamp-2" title={name}>
+            {name}
+          </h3>
         </div>
-      )}
-    </button>
+
+        {/* Course section - fixed height for 1 line */}
+        <div className="h-5 mt-1">
+          <p className="text-xs text-gray-500 truncate" title={course}>
+            {course || ' '}
+          </p>
+        </div>
+
+        {/* Price section - pushed to bottom */}
+        <div className="mt-auto pt-2">
+          <span className="text-sm font-semibold text-gray-900 tabular-nums">
+            {formatCurrency(price)}
+          </span>
+        </div>
+      </div>
+    </div>
   );
 };
 

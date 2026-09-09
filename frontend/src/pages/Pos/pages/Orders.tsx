@@ -58,12 +58,6 @@ function getStatusTone(status: string): StatusTone {
   return 'neutral';
 }
 
-const statusToneClasses: Record<StatusTone, string> = {
-  neutral: 'border-hair bg-muted text-muted-foreground',
-  success: 'border-success-tint-border bg-success-tint text-success',
-  destructive: 'border-destructive-tint-border bg-destructive-tint text-destructive',
-};
-
 const statusDotClasses: Record<StatusTone, string> = {
   neutral: 'bg-muted-foreground',
   success: 'bg-success',

@@ -3,7 +3,6 @@ import { Clock, User, UserCheck, Receipt, Printer, Pencil, X, GitBranch, GitMerg
 import { Badge, Button, Card, CardContent } from '@ury/ui';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@ury/ui';
 import { showToast } from '@ury/ui';
-import { cn } from '@ury/ui';
 import OrderStatusSidebar from '../components/OrderStatusSidebar';
 import { useRootStore } from '../store/root-store';
 import { formatCurrency } from '@ury/core';
@@ -55,38 +54,6 @@ function LinkTag({ icon: Icon, children }: { icon: React.ComponentType<{ classNa
     <Badge size="tag" variant="tagAccent">
       <Icon className="h-2.5 w-2.5" />
       {children}
-    </Badge>
-  );
-}
-
-type StatusTone = 'neutral' | 'success' | 'destructive';
-
-function getStatusTone(status: string): StatusTone {
-  if (status === 'Recently Paid' || status === 'Paid' || status === 'Consolidated') return 'success';
-  if (status === 'Return') return 'destructive';
-  return 'neutral';
-}
-
-const statusDotClasses: Record<StatusTone, string> = {
-  neutral: 'bg-gray-400',
-  success: 'bg-green-600',
-  destructive: 'bg-red-600',
-};
-
-const getToneVariant = (tone: StatusTone): "default" | "tagDestructive" | "tagSuccess" => {
-  switch (tone) {
-    case 'neutral': return 'default';
-    case 'success': return 'tagSuccess';
-    case 'destructive': return 'tagDestructive';
-  }
-};
-
-function StatusTag({ status, label }: { status: string; label: string }) {
-  const tone = getStatusTone(status);
-  return (
-    <Badge size="tag" variant={getToneVariant(tone)}>
-      <span className={cn('h-[5px] w-[5px] shrink-0 rounded-full', statusDotClasses[tone])} />
-      {label}
     </Badge>
   );
 }
