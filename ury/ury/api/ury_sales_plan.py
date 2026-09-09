@@ -19,18 +19,22 @@ TRANSITIONS = {
 
 
 def transition_sales_plan(doc, target_state, actor=None):
-    """Validate and apply one audited state transition to a plan document."""
+    """Validate the legality of a state transition and apply it.
+
+    The guardrails that used to run here directly (scope check, item
+    validation, approval-snapshot freeze, audit append) now run
+    unconditionally inside ``URYSalesPlan.validate()`` on every ``doc.save()``
+    -- including Desk/Workflow-driven transitions, which never called this
+    function at all. Keeping them here too would double-append audit_log
+    entries, so this function only checks whether the requested edge is a
+    legal one and then saves.
+    """
     current = doc.get("status") or "Draft"
     if target_state not in TRANSITIONS.get(current, set()):
         frappe.throw(_("Invalid Sales Plan transition from {0} to {1}").format(current, target_state), frappe.ValidationError)
     if not frappe.has_permission("URY Sales Plan", "write", doc=doc):
         frappe.throw(_("Not permitted to change this Sales Plan"), frappe.PermissionError)
-    _validate_plan_scope(doc)
-    if target_state == "Approved":
-        validate_plan_items(doc)
-        freeze_approval_snapshot(doc)
     doc.status = target_state
-    append_audit(doc, current, target_state, actor or frappe.session.user)
     return doc
 
 
@@ -114,10 +118,27 @@ def save_draft(plan_date, branch, company=None, service_period=None, items=None)
 
     item_rows = frappe.parse_json(items) if isinstance(items, str) else (items or [])
 
-    existing_name = frappe.db.exists(
+    # Cancellation is terminal: a "Superseded/Cancelled" plan must not block a
+    # fresh Draft from being created for the same (branch, company, plan_date)
+    # scope, so those rows are excluded entirely -- as if no matching doc
+    # existed. Among the remaining rows, deterministically pick the
+    # most-recently-modified one rather than relying on frappe.db.exists()'s
+    # unordered, arbitrary match (this doctype autonames via hash and has no
+    # unique constraint on the scope, so more than one matching row can
+    # already exist) -- mirroring the ordering used by get_plan_status().
+    existing_rows = frappe.get_all(
         "URY Sales Plan",
-        {"branch": branch, "company": company, "plan_date": plan_date},
+        filters={
+            "branch": branch,
+            "company": company,
+            "plan_date": plan_date,
+            "status": ["!=", "Superseded/Cancelled"],
+        },
+        order_by="modified desc",
+        limit_page_length=1,
+        pluck="name",
     )
+    existing_name = existing_rows[0] if existing_rows else None
 
     if existing_name:
         existing_status = frappe.db.get_value("URY Sales Plan", existing_name, "status")
@@ -163,12 +184,11 @@ def transition_plan(name, target_state):
     """Apply an audited state transition to an existing Sales Plan and persist it."""
     doc = frappe.get_doc("URY Sales Plan", name)
     transition_sales_plan(doc, target_state, actor=frappe.session.user)
-    if isinstance(doc.audit_log, list):
-        # audit_log is a Long Text (JSON) field -- transition_sales_plan appends
-        # to it as a Python list, which works for the in-memory dict-shaped docs
-        # used in its own unit tests, but a real Document requires the stored
-        # value to be a string before it can be saved.
-        doc.audit_log = json.dumps(doc.audit_log)
+    # The scope check / item validation / snapshot freeze / audit append that
+    # used to happen inside transition_sales_plan() now run automatically in
+    # URYSalesPlan.validate() on every save (including Desk/Workflow-driven
+    # transitions, which never call transition_sales_plan() at all) -- so
+    # doc.save() alone is sufficient here.
     doc.save()
     return {"name": doc.name, "status": doc.status}
 
