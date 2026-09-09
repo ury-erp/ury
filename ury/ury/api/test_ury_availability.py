@@ -497,6 +497,47 @@ class TestControlledBySalesPlanPolarity(FrappeTestCase):
         self.assertEqual(result["reason_code"], "AVAILABLE")
         self.assertTrue(result["sellable"])
 
+    @patch(f"{MODULE}._resolve_plan_remaining")
+    @patch(f"{MODULE}.project_fg_allocatable")
+    @patch(f"{MODULE}._resolve_production_config")
+    def test_controlled_by_sales_plan_opt_out_ignores_exhausted_plan_pre_produced(
+        self, mock_config, mock_fg, mock_plan
+    ):
+        # Regression for the "plan exists but is exhausted" no-op bug:
+        # controlled_by_sales_plan=0 must ignore the Sales Plan entirely, not
+        # just when no plan row exists -- an exhausted plan (plan_remaining=0)
+        # must NOT hard-block a sale that stock would otherwise allow.
+        mock_config.return_value = _config(controlled_by_sales_plan=0)
+        mock_fg.return_value = {"allocatable_qty": 20, "bin_actual_qty": 60, "bin_projected_qty": 20}
+        mock_plan.return_value = {"plan_qty": 10, "plan_remaining": 0}
+
+        result = get_item_availability("ITEM-CAKE", "Branch A", "Company A")
+
+        self.assertEqual(result["reason_code"], "AVAILABLE")
+        self.assertTrue(result["sellable"])
+        self.assertEqual(result["available_qty"], 20)
+
+    @patch(f"{MODULE}._resolve_plan_remaining")
+    @patch(f"{MODULE}.project_component_allocatable")
+    @patch(f"{MODULE}.compile_bom_vector")
+    @patch(f"{MODULE}._resolve_production_config")
+    def test_controlled_by_sales_plan_opt_out_ignores_exhausted_plan_made_to_order(
+        self, mock_config, mock_compile, mock_alloc, mock_plan
+    ):
+        mock_config.return_value = _config(production_policy="MADE_TO_ORDER", controlled_by_sales_plan=0)
+        mock_compile.return_value = {
+            "item_code": "ITEM-BURGER",
+            "components": [{"component_item": "BUN", "qty": 1, "qty_per_unit": 1, "stock_uom": "Nos"}],
+        }
+        mock_alloc.return_value = {"BUN": {"allocatable_qty": 50}}
+        mock_plan.return_value = {"plan_qty": 10, "plan_remaining": 0}
+
+        result = get_item_availability("ITEM-BURGER", "Branch A", "Company A")
+
+        self.assertEqual(result["reason_code"], "AVAILABLE")
+        self.assertTrue(result["sellable"])
+        self.assertEqual(result["available_qty"], 50)
+
 
 class TestAvailabilityModeOverride(FrappeTestCase):
     """Regression coverage for B-2: the 'Always Available' override must

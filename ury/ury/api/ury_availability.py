@@ -414,29 +414,32 @@ def _fill_pre_produced(response, item_code, branch, company, department, warehou
 	response["fg_available"] = fg_available
 	response["max_producible"] = fg_available
 
+	# controlled_by_sales_plan=0 means the Sales Plan never gates this item,
+	# regardless of whether a plan row exists (V3-40 no-plan case) or exists
+	# but is exhausted (previously only the no-plan case respected this flag,
+	# leaving PLAN_EXHAUSTED able to hard-block a sale even with the flag
+	# explicitly off -- both cases must resolve the same way: stock alone).
+	controlled_by_sales_plan = config.get("controlled_by_sales_plan", 1) if config else 1
+	if not controlled_by_sales_plan:
+		effective_available = fg_available
+		response["available_qty"] = max(effective_available, 0)
+		if fg_available <= 0 and never_produced:
+			response["reason_code"] = "NOT_PRODUCED"
+			response["sellable"] = False
+		elif fg_available <= 0:
+			response["reason_code"] = "FG_OUT_OF_STOCK"
+			response["sellable"] = False
+		else:
+			response["reason_code"] = "AVAILABLE"
+			response["sellable"] = effective_available > 0
+		return
+
 	plan = _resolve_plan_remaining(item_code, branch, company, department)
 	if plan is None:
-		# If controlled_by_sales_plan is False, plan is optional and the item
-		# should be available based on stock alone. If True (default), fail closed.
-		controlled_by_sales_plan = config.get("controlled_by_sales_plan", 1) if config else 1
-		if not controlled_by_sales_plan:
-			# Plan gate is disabled for this item; evaluate stock-based availability
-			effective_available = fg_available
-			response["available_qty"] = max(effective_available, 0)
-			if fg_available <= 0 and never_produced:
-				response["reason_code"] = "NOT_PRODUCED"
-				response["sellable"] = False
-			elif fg_available <= 0:
-				response["reason_code"] = "FG_OUT_OF_STOCK"
-				response["sellable"] = False
-			else:
-				response["reason_code"] = "AVAILABLE"
-				response["sellable"] = effective_available > 0
-		else:
-			# Plan gate is enabled; fail closed without an active plan
-			response["reason_code"] = "NO_ACTIVE_PLAN"
-			response["sellable"] = False
-			response["available_qty"] = 0
+		# Plan gate is enabled; fail closed without an active plan
+		response["reason_code"] = "NO_ACTIVE_PLAN"
+		response["sellable"] = False
+		response["available_qty"] = 0
 		return
 
 	response["plan_qty"] = plan["plan_qty"]
@@ -510,26 +513,29 @@ def _fill_made_to_order(response, item_code, branch, company, department, wareho
 
 	response["max_producible"] = recipe_capacity
 
+	# controlled_by_sales_plan=0 means the Sales Plan never gates this item,
+	# regardless of whether a plan row exists (no-plan case) or exists but is
+	# exhausted (previously only the no-plan case respected this flag,
+	# leaving PLAN_EXHAUSTED able to hard-block a sale even with the flag
+	# explicitly off -- both cases must resolve the same way: capacity alone).
+	controlled_by_sales_plan = config.get("controlled_by_sales_plan", 1) if config else 1
+	if not controlled_by_sales_plan:
+		response["available_qty"] = max(recipe_capacity, 0)
+		if recipe_capacity <= 0:
+			response["reason_code"] = "BLOCKING_COMPONENT"
+			response["sellable"] = False
+			response["blocking_component"] = blocking_component
+		else:
+			response["reason_code"] = "AVAILABLE"
+			response["sellable"] = True
+		return
+
 	plan = _resolve_plan_remaining(item_code, branch, company, department)
 	if plan is None:
-		# If controlled_by_sales_plan is False, plan is optional and the item
-		# should be available based on recipe capacity alone. If True (default), fail closed.
-		controlled_by_sales_plan = config.get("controlled_by_sales_plan", 1) if config else 1
-		if not controlled_by_sales_plan:
-			# Plan gate is disabled for this item; evaluate capacity-based availability
-			response["available_qty"] = max(recipe_capacity, 0)
-			if recipe_capacity <= 0:
-				response["reason_code"] = "BLOCKING_COMPONENT"
-				response["sellable"] = False
-				response["blocking_component"] = blocking_component
-			else:
-				response["reason_code"] = "AVAILABLE"
-				response["sellable"] = True
-		else:
-			# Plan gate is enabled; fail closed without an active plan
-			response["reason_code"] = "NO_ACTIVE_PLAN"
-			response["sellable"] = False
-			response["available_qty"] = 0
+		# Plan gate is enabled; fail closed without an active plan
+		response["reason_code"] = "NO_ACTIVE_PLAN"
+		response["sellable"] = False
+		response["available_qty"] = 0
 		return
 
 	response["plan_qty"] = plan["plan_qty"]
