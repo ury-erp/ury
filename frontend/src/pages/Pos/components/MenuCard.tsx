@@ -79,7 +79,7 @@ const MenuCard: FC<MenuCardProps> = ({
     <button
       type="button"
       className={cn(
-        "border border-hair rounded-[9px] bg-card p-3 text-left cursor-pointer relative transition-all",
+        "border border-hair rounded-[9px] bg-card p-3 text-left cursor-pointer relative transition-colors duration-150 ease-out",
         "hover:border-hair2 hover:shadow-sm",
         isDisabled && "opacity-45 cursor-not-allowed"
       )}
