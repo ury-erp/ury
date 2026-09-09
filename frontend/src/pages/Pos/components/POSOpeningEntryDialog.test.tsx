@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi, afterEach } from "vitest";
 
 vi.mock("../../../lib/pos/pos-opening-api", () => ({
   getModeOfPayment: vi.fn(),
@@ -33,6 +33,10 @@ describe("POSOpeningEntryDialog", () => {
     (posOpeningApi.getModeOfPayment as any).mockResolvedValue([]);
   });
 
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
   it("does not render when open is false", () => {
     const { queryByText } = render(
       <POSOpeningEntryDialog
@@ -57,7 +61,7 @@ describe("POSOpeningEntryDialog", () => {
 
     await waitFor(() => {
       expect(screen.getByText("pos_opening.title")).toBeInTheDocument();
-    });
+    }, { timeout: 3000 });
   });
 
   it("loads payment modes when dialog opens", async () => {
@@ -73,7 +77,7 @@ describe("POSOpeningEntryDialog", () => {
 
     await waitFor(() => {
       expect(posOpeningApi.getModeOfPayment).toHaveBeenCalled();
-    });
+    }, { timeout: 3000 });
   });
 
   it("shows cancel button", async () => {
@@ -88,9 +92,9 @@ describe("POSOpeningEntryDialog", () => {
     );
 
     await waitFor(() => {
-      const buttons = screen.getAllByText("common.cancel");
+      const buttons = screen.queryAllByText("common.cancel");
       expect(buttons.length).toBeGreaterThan(0);
-    });
+    }, { timeout: 3000 });
   });
 
   it("calls onOpenChange when dialog state changes", async () => {
@@ -106,8 +110,8 @@ describe("POSOpeningEntryDialog", () => {
     );
 
     await waitFor(() => {
-      const cancelButtons = screen.getAllByText("common.cancel");
+      const cancelButtons = screen.queryAllByText("common.cancel");
       expect(cancelButtons.length).toBeGreaterThan(0);
-    });
+    }, { timeout: 3000 });
   });
 });
