@@ -47,7 +47,14 @@ describe("TableSelectionDialog", () => {
   ];
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    // resetAllMocks (not clearAllMocks) is required here: clearAllMocks only
+    // wipes call history, not queued mockImplementationOnce overrides -- a
+    // leftover queued override from an earlier test in this file (if the
+    // component ends up calling the mock fewer times than expected) can
+    // silently apply to a later, unrelated test instead of that test's own
+    // override, which is exactly what made "shows loading spinner while
+    // fetching tables" flaky in a test-order-dependent way.
+    vi.resetAllMocks();
     getRoomsMock.mockResolvedValue(mockRooms);
     getTablesMock.mockResolvedValue(mockTables);
     localStorage.clear();
