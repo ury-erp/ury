@@ -1,5 +1,7 @@
 export { cn } from './lib/cn';
 
+export * from './chart-colors';
+
 export * from './components/button';
 export * from './components/dialog';
 export * from './components/drawer';
