@@ -31,6 +31,21 @@ jobs:
 
       - name: Start services
         run: |
+          # Default MariaDB fsyncs the InnoDB log on every commit
+          # (innodb_flush_log_at_trx_commit=1) and every binlog write
+          # (sync_binlog=1) -- each Frappe test does a real commit, so on a
+          # GitHub-hosted runner's disk this made the suite ~140x slower
+          # per-test than the same run against a local warm MySQL instance
+          # (148 tests in 13 minutes vs. 1009 tests in 39 seconds), timing
+          # the job out well before finishing. Neither setting affects
+          # correctness for a throwaway CI database that's deleted at the
+          # end of the job.
+          sudo tee /etc/mysql/mariadb.conf.d/60-ci-speed.cnf > /dev/null <<'EOF'
+          [mysqld]
+          innodb_flush_log_at_trx_commit = 0
+          sync_binlog = 0
+          innodb_doublewrite = 0
+          EOF
           sudo systemctl start mariadb
           sudo systemctl start redis-server
           # Ubuntu's mariadb-server ships with no root password (unix_socket
