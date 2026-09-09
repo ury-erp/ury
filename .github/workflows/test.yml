@@ -76,13 +76,21 @@ jobs:
           # list and survives that (verified locally). Wrapped in try/except
           # so that partial failure doesn't abort the workflow, with an
           # explicit fallback for the one record that comes after it.
+          # Same problem exists a layer down for core Frappe fixtures (Gender,
+          # Salutation, ...) -- also normally seeded by the setup wizard, via
+          # a *different* install_fixtures module than erpnext's.
           bench --site test_site console <<'PYEOF'
           import frappe
           from erpnext.setup.setup_wizard.operations.install_fixtures import install
+          from frappe.desk.page.setup_wizard.install_fixtures import install as frappe_install_fixtures
+          try:
+              frappe_install_fixtures()
+          except Exception as e:
+              print("frappe install_fixtures failed (expected, see workflow comment):", e)
           try:
               install(country="India")
           except Exception as e:
-              print("install_fixtures.install() partially failed (expected, see workflow comment):", e)
+              print("erpnext install_fixtures.install() partially failed (expected, see workflow comment):", e)
           frappe.db.commit()
           if not frappe.db.exists("Warehouse Type", "Transit"):
               frappe.get_doc({"doctype": "Warehouse Type", "name": "Transit"}).insert(ignore_permissions=True)
