@@ -108,6 +108,20 @@ Atomicity strategy (read this before changing capacity-check code):
   between its own Bin lock and its commit for that component, so there is no
   phantom window for the fresh read to miss.
 
+  ...and the fix to the fix: a second connection is a second *transaction*, so
+  it is blind to the CALLING transaction's own uncommitted writes, which the
+  plain read always saw. Taking the fresh connection's answer as the whole
+  truth traded one oversell for another and broke an everyday non-concurrent
+  flow as well (both live-reproduced): a multi-line order's second
+  `create_reservation` could not see the first line's uncommitted insert
+  (oversell), and `_reconcile_line`'s release-then-recreate could not see its
+  own uncommitted release, so a quantity edit was counted against itself and
+  hard-rejected with "Insufficient capacity". The reservation-sum is therefore
+  neither view alone but a reconciliation of the two per row name --
+  `latest-committed-by-everyone-else` UNION `this transaction's own
+  uncommitted delta`. See `_reconciled_active_rows` for the exact case
+  analysis and the two insert-only/qty-immutable invariants it relies on.
+
   Two alternatives were tried and rejected on evidence -- see
   `_active_reservation_qty`'s docstring before changing this. In short: making
   the sum a ``SELECT ... FOR UPDATE`` removed the oversell but made MariaDB
@@ -138,6 +152,8 @@ Fulfilment (`fulfil_reservation`) is expected to be called by a later task
 at order/production settlement time. This module intentionally does not
 touch POS Invoice / invoice settlement code anywhere.
 """
+
+from contextlib import contextmanager
 
 import frappe
 from frappe import _
@@ -219,7 +235,7 @@ def _lock_bin_row(item_code, warehouse):
 
 
 _RESERVATION_SUM_SQL = """
-	SELECT qty, reservation_group
+	SELECT name, qty, reservation_group
 	FROM `tabURY Stock Reservation`
 	WHERE component_item = %(item_code)s
 	  AND warehouse = %(warehouse)s
@@ -227,19 +243,25 @@ _RESERVATION_SUM_SQL = """
 	  AND status IN %(statuses)s
 """
 
+_RESERVATION_EXISTS_SQL = """
+	SELECT name
+	FROM `tabURY Stock Reservation`
+	WHERE name IN %(names)s
+"""
 
-def _read_committed_reservation_rows(item_code, warehouse, company):
-	"""Read the active reservation rows on a short-lived second DB connection.
 
-	Returns the same shape as the plain `frappe.get_all` path. Opening a
-	separate connection gives this one query its own transaction and therefore
-	its own fresh read view, so it observes every reservation committed up to
-	this instant -- independent of the calling transaction's (already stale)
-	read view. The caller's transaction is left completely untouched: nothing
-	is committed, rolled back, or locked on it.
+@contextmanager
+def committed_read_connection():
+	"""Yield a short-lived second DB connection with its own fresh read view.
 
-	See `_active_reservation_qty` for why this is required, and why the two
-	more obvious alternatives are not usable here.
+	Opening a separate connection gives its queries their own transaction and
+	therefore their own read view, so they observe every reservation committed
+	up to that instant -- independent of the calling transaction's (already
+	stale) REPEATABLE READ view. The caller's transaction is left completely
+	untouched: nothing is committed, rolled back, or locked on it.
+
+	See `_active_reservation_qty` for why a second connection is required at
+	all, and why the two more obvious alternatives are not usable here.
 	"""
 	from frappe.database import get_db
 
@@ -254,16 +276,7 @@ def _read_committed_reservation_rows(item_code, warehouse, company):
 	)
 	try:
 		conn.connect()
-		return conn.sql(
-			_RESERVATION_SUM_SQL,
-			{
-				"item_code": item_code,
-				"warehouse": warehouse,
-				"company": company,
-				"statuses": list(ACTIVE_STATUSES),
-			},
-			as_dict=True,
-		)
+		yield conn
 	finally:
 		try:
 			conn.close()
@@ -273,11 +286,121 @@ def _read_committed_reservation_rows(item_code, warehouse, company):
 			)
 
 
+def _committed_active_rows(conn, item_code, warehouse, company):
+	"""Active reservation rows for the component as of latest commit."""
+	return conn.sql(
+		_RESERVATION_SUM_SQL,
+		{
+			"item_code": item_code,
+			"warehouse": warehouse,
+			"company": company,
+			"statuses": list(ACTIVE_STATUSES),
+		},
+		as_dict=True,
+	)
+
+
+def _own_active_rows(item_code, warehouse, company):
+	"""Active reservation rows for the component as this transaction sees them.
+
+	i.e. this transaction's pinned REPEATABLE READ snapshot *plus* its own
+	uncommitted inserts and status changes, which are exactly what the
+	committed view above cannot see.
+	"""
+	return frappe.get_all(
+		RESERVATION_DOCTYPE,
+		filters={
+			"component_item": item_code,
+			"warehouse": warehouse,
+			"company": company,
+			"status": ["in", list(ACTIVE_STATUSES)],
+		},
+		fields=["name", "qty", "reservation_group"],
+	)
+
+
+def _reconciled_active_rows(conn, item_code, warehouse, company):
+	"""Active reservation rows as of *now*, including this transaction's own writes.
+
+	Neither available view is sufficient on its own:
+
+	  - the committed view (fresh connection) sees everyone else's latest
+	    committed state but is blind to the calling transaction's own
+	    uncommitted INSERTs and RELEASEs -- it is a different transaction;
+	  - the own view (`frappe.get_all` on the request's connection) sees this
+	    transaction's own uncommitted writes perfectly, but its committed
+	    baseline is the transaction's stale snapshot.
+
+	The truth is `latest-committed-by-everyone-else` UNION
+	`this-transaction's-own-uncommitted-delta`, and it is recovered here by
+	reconciling the two views per row name. Reservation rows are insert-only
+	(nothing in this app deletes a `URY Stock Reservation` row) and `qty` is
+	never mutated after insert -- only `status` moves -- so every row name
+	falls into exactly one of four cases:
+
+	  1. active in BOTH views -> genuinely active. Count it.
+	  2. active in own view, absent from the committed active set -> either
+	     (a) this transaction's own uncommitted INSERT (the row does not exist
+	     at all on the other connection), which must be counted, or (b) a row
+	     someone else released and committed after our snapshot (the row does
+	     exist, just not active), which must not be. One keyed existence probe
+	     on the committed connection separates them exactly.
+	  3. active in the committed set, not active in own view -> either (a) a
+	     row someone else inserted and committed after our snapshot (absent
+	     from our snapshot entirely), which must be counted, or (b) a row THIS
+	     transaction just released, uncommitted (present in our view, inactive)
+	     which must not be. One keyed probe on our own connection, unfiltered
+	     by status, separates them exactly.
+	  4. active in neither -> not counted.
+
+	Both symmetric-difference sets are tiny (they contain only rows written
+	since the snapshot), so the two probes are keyed primary-key lookups over
+	a handful of names, and are skipped entirely when a difference is empty.
+	"""
+	own = {row["name"]: row for row in _own_active_rows(item_code, warehouse, company)}
+	committed = {row["name"]: row for row in _committed_active_rows(conn, item_code, warehouse, company)}
+
+	resolved = {}
+	for name, row in committed.items():
+		if name in own:
+			resolved[name] = row  # case 1
+
+	# Case 2: active for us, not in the committed active set.
+	own_only = [name for name in own if name not in committed]
+	if own_only:
+		exists_committed = {
+			r["name"]
+			for r in conn.sql(_RESERVATION_EXISTS_SQL, {"names": own_only}, as_dict=True)
+		}
+		for name in own_only:
+			if name not in exists_committed:
+				# Our own uncommitted insert.
+				resolved[name] = own[name]
+
+	# Case 3: active per latest commit, not active for us.
+	committed_only = [name for name in committed if name not in own]
+	if committed_only:
+		exists_own = {
+			r["name"]
+			for r in frappe.get_all(
+				RESERVATION_DOCTYPE, filters={"name": ["in", committed_only]}, fields=["name"]
+			)
+		}
+		for name in committed_only:
+			if name not in exists_own:
+				# Committed by someone else after our snapshot was pinned.
+				resolved[name] = committed[name]
+
+	return list(resolved.values())
+
+
 def _active_reservation_qty(item_code, warehouse, company, exclude_group=None, read_committed=False):
 	"""Sum active reservation qty for `item_code`/`warehouse`/`company`.
 
-	`read_committed=True` performs the sum on a short-lived second DB
-	connection instead of the request's own. This MUST be used by the
+	`read_committed=True` reconciles the request's own view with a read on a
+	short-lived second DB connection (see `_reconciled_active_rows`), so the
+	sum is `latest-committed-by-everyone-else` UNION `this transaction's own
+	uncommitted delta`. This MUST be used by the
 	reservation critical section (`create_reservation`), where it is a
 	correctness requirement, not a performance knob -- it is the fix for a
 	live-reproduced oversell:
@@ -333,6 +456,28 @@ def _active_reservation_qty(item_code, warehouse, company, exclude_group=None, r
 	window, and it takes no gap locks -- which is why it does not reintroduce
 	the deadlocks of option 1.
 
+	But the second connection is a *different transaction*, so on its own it
+	is also blind to the CALLING transaction's own uncommitted writes -- which
+	the plain read always saw. Taking its result as the whole answer was a
+	regression in both directions, and both were live-reproduced:
+
+	  - own uncommitted INSERTs invisible => intra-transaction oversell.
+	    `reconcile_order_reservations` makes N `create_reservation` calls in
+	    ONE transaction; line 2's check could not see line 1's just-inserted
+	    reservation, so every line saw a world with no siblings. Live: two
+	    reservations of 25.9 both accepted against a capacity of 49.8.
+	  - own uncommitted RELEASEs invisible => spurious hard rejection.
+	    `_reconcile_line` releases a line's group and immediately re-creates
+	    it at the new quantity in the same transaction; the released rows
+	    still read as `Reserved` on the fresh connection, so the replacement
+	    was counted against itself. Live: releasing a full-capacity 49.8
+	    reservation and re-requesting 49.8 threw "available 0.0".
+
+	Hence `read_committed=True` does not read *only* on the second connection:
+	it reconciles both views per row name (`_reconciled_active_rows`), which
+	recovers `latest-committed-by-everyone-else UNION own uncommitted delta`
+	exactly. See that function for the four-case argument.
+
 	Read-only availability queries outside the reservation critical section
 	keep the default `read_committed=False` plain read on the request's own
 	connection: they are not serialized by any Bin lock, they must not pay for
@@ -340,7 +485,8 @@ def _active_reservation_qty(item_code, warehouse, company, exclude_group=None, r
 	hint.
 	"""
 	if read_committed:
-		rows = _read_committed_reservation_rows(item_code, warehouse, company)
+		with committed_read_connection() as conn:
+			rows = _reconciled_active_rows(conn, item_code, warehouse, company)
 	else:
 		filters = {
 			"component_item": item_code,
@@ -642,6 +788,9 @@ def create_reservation(
 				branch,
 				department=department,
 				logger_name="ury_reservation_service",
+				# Still inside the transaction: defer to commit so a rollback
+				# does not fan out phantom availability changes to clients.
+				after_commit=True,
 			)
 		except Exception:
 			# Failure to publish is best-effort, fire-and-forget.
@@ -733,6 +882,8 @@ def release_reservation(reservation_name, reason=None):
 					row.branch,
 					department=department,
 					logger_name="ury_reservation_service",
+					# Still inside the transaction -- see create_reservation.
+					after_commit=True,
 				)
 			except Exception:
 				# Failure to publish is best-effort, fire-and-forget.
