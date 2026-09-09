@@ -17,15 +17,13 @@ interface Props {
  * `!role_restricted_for_table_order`. This is NOT the security boundary:
  * every mutation must still be re-validated server-side per PLAN.md §9.
  *
- * NOTE: this guard runs *inside* `AuthGuard`/`POSOpeningProvider`
- * (`pos/src/App.tsx`). `AuthGuard`'s own `hasAccess` check is derived from
- * POS Profile `role_allowed_for_billing` membership only (see
- * `pos/src/store/slices/config-slice.ts`) — a Captain (non-billing role)
- * will fail that check and never reach this guard at all today. That is a
- * known, confirmed, out-of-scope blocker for this phase — see the Phase 6
- * report for detail. This guard still assumes the AuthGuard/session-auth
- * layer above it is intact and only handles the Captain-specific capability
- * check.
+ * NOTE: Captain routes bypass `AuthGuard` entirely — they're registered as
+ * siblings of `/pos` in `frontend/src/App.tsx`, not nested under it. (For the
+ * routes that *do* go through `AuthGuard`, `deriveAllowedRoles()` in
+ * config-slice.ts separately includes 'URY Captain' in the allowlist — that's
+ * unrelated defense-in-depth for those routes, not something this guard
+ * relies on.) This guard is a UX/client-side gate only; all mutations are
+ * re-validated server-side.
  */
 const CaptainRouteGuard: React.FC<Props> = ({ children }) => {
   const { capabilities, branch, isLoading, error } = useCaptainContext();

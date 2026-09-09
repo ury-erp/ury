@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import { Search } from 'lucide-react';
 import { usePOSStore } from '../../store/pos-store';
-import { cn, Spinner } from '@ury/ui';
+import { cn, Spinner, Button, Input } from '@ury/ui';
 import MenuCard from '../../components/MenuCard';
 
 interface CaptainMenuProps {
@@ -61,41 +61,41 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
     <div className="flex flex-col h-full">
       <div className="sticky top-0 z-10 bg-card border-b border-border p-3 space-y-2">
         <div className="relative">
-          <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-tertiary" />
-          <input
+          <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-tertiary pointer-events-none" />
+          <Input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search menu"
-            className="w-full ps-9 pe-3 py-3 rounded-lg border border-border bg-muted text-base focus:outline-none focus:ring-2 focus:ring-primary"
+            className="ps-9 pe-3"
+            variant="search"
           />
         </div>
 
-        <div className="flex gap-2 overflow-x-auto pb-1 -mx-3 px-3">
-          <button
-            onClick={() => setSelectedCategory('')}
-            className={cn(
-              'shrink-0 px-4 py-2 rounded-full text-sm font-medium border',
-              selectedCategory === ''
-                ? 'bg-foreground text-background border-foreground'
-                : 'bg-card text-muted-foreground border-border'
-            )}
-          >
-            All
-          </button>
-          {categories.map((category) => (
-            <button
-              key={category.name}
-              onClick={() => setSelectedCategory(category.name)}
-              className={cn(
-                'shrink-0 px-4 py-2 rounded-full text-sm font-medium border',
-                selectedCategory === category.name
-                  ? 'bg-foreground text-background border-foreground'
-                  : 'bg-card text-muted-foreground border-border'
-              )}
+        <div className="relative">
+          <div className="flex gap-2 overflow-x-auto pb-1 -mx-3 px-3 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+            <Button
+              variant="tab"
+              size="sm"
+              data-selected={selectedCategory === ''}
+              onClick={() => setSelectedCategory('')}
+              className="shrink-0 rounded-full"
             >
-              {category.label}
-            </button>
-          ))}
+              All
+            </Button>
+            {categories.map((category) => (
+              <Button
+                key={category.name}
+                variant="tab"
+                size="sm"
+                data-selected={selectedCategory === category.name}
+                onClick={() => setSelectedCategory(category.name)}
+                className="shrink-0 rounded-full"
+              >
+                {category.label}
+              </Button>
+            ))}
+          </div>
+          <div className="pointer-events-none absolute inset-y-0 end-0 w-8 bg-gradient-to-l from-card to-transparent" />
         </div>
 
         {!canAddItems && (
