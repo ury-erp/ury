@@ -782,7 +782,7 @@ const TableView = () => {
 
       {/* Main Grid View */}
       <div className="flex-1 overflow-auto bg-gray-50 p-6">
-        <div className="max-w-screen-xl mx-auto h-full">
+        <div className="max-w-screen-xl mx-auto">
           {error && !loadingTables ? (
             <div className="h-full flex flex-col items-center justify-center gap-3 text-red-500">
               <AlertTriangle className="w-10 h-10" />

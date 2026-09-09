@@ -78,7 +78,7 @@ const TableCard = ({
         }
       }}
       className={cn(
-        'relative flex min-h-[15.5rem] flex-col rounded-lg border-2 bg-white p-4 transition-all',
+        'relative flex min-h-[15.5rem] flex-col rounded-lg border-2 bg-white p-4 transition-colors',
         isOccupied
           ? TABLE_STATE_STYLES.occupied
           : isLockedByReservation
