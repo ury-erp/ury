@@ -205,6 +205,22 @@
    "read": 1,
    "report": 1,
    "role": "Stock Manager"
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "URY Cashier"
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "URY Captain"
   }
  ],
  "sort_field": "modified",
