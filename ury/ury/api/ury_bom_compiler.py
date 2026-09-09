@@ -417,7 +417,13 @@ def get_items_affected_by_component(component_item, branch, company):
 
 
 def publish_component_stock_fanout(
-	component_item, warehouse, company, branch, department=None, logger_name="ury_bom_compiler"
+	component_item,
+	warehouse,
+	company,
+	branch,
+	department=None,
+	logger_name="ury_bom_compiler",
+	after_commit=False,
 ):
 	"""Publish G1's cheap component-level event, then best-effort fan out a
 	richer, item-resolved event to a branch-scoped channel frontend clients
@@ -449,6 +455,16 @@ def publish_component_stock_fanout(
 	failure for the caller's stock mutation. Callers should not call this
 	from anywhere but a best-effort, already-committed context, mirroring
 	how G1's original call sites wrapped `publish_realtime` directly.
+
+	A caller that is still INSIDE its transaction must pass
+	`after_commit=True`, which defers both publishes to the transaction's
+	commit hook instead of emitting them immediately. Without it a
+	transaction that later rolls back has already told every connected POS
+	and self-order client that these components changed -- phantom
+	availability events for a mutation that never happened. The default
+	stays False so genuinely post-commit callers keep firing immediately;
+	`after_commit=True` on an already-committed connection would queue a
+	callback that nothing is left to flush.
 	"""
 	logger = frappe.logger(logger_name)
 
@@ -460,6 +476,7 @@ def publish_component_stock_fanout(
 				"warehouse": warehouse,
 				"company": company,
 			},
+			after_commit=after_commit,
 		)
 	except Exception:
 		# Failure to publish is best-effort, fire-and-forget.
@@ -480,6 +497,7 @@ def publish_component_stock_fanout(
 				"branch": branch,
 				"department": department,
 			},
+			after_commit=after_commit,
 		)
 	except Exception:
 		# The rich fan-out lookup/publish is best-effort: log and move on.
