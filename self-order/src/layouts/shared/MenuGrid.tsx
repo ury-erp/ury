@@ -20,9 +20,8 @@ interface MenuGridProps {
   imageClassName?: string
   /** Branch (restaurant) for the V3-44 availability lookup; omit to skip the check entirely. */
   branch?: string
-  /** Company for the V3-44 availability lookup — currently absent from
-   * OrderingContext (see lib/availability.ts's "Known gap" note); when
-   * unset, availability is not checked and every item renders as normal. */
+  /** Company for the V3-44 availability lookup (from OrderingContext.company);
+   * when unset, availability is not checked and every item renders as normal. */
   company?: string
 }
 

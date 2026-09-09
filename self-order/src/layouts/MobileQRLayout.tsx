@@ -4,7 +4,7 @@ import { useOrderingSession } from '../hooks/useOrderingSession'
 import type { OrderingContext } from '../lib/api'
 import CategoryTabs from './shared/CategoryTabs'
 import SearchBar from './shared/SearchBar'
-import ProductCard from './shared/ProductCard'
+import MenuGrid from './shared/MenuGrid'
 import ProductDetail from './shared/ProductDetail'
 import CartPage from './shared/CartPage'
 import CheckoutScreen from './shared/CheckoutScreen'
@@ -171,23 +171,20 @@ function MobileQRLayout({ initialContext }: LayoutProps) {
           <SearchBar value={searchQuery} onChange={setSearchQuery} placeholder="Search menu..." />
         </div>
 
-        <section className="mx-4 mt-4 grid grid-cols-2 gap-3">
-          {filteredMenu.map((item) => (
-            <div
-              key={item.item}
-              className="overflow-hidden rounded-lg border transition active:scale-[0.98]"
-            >
-              <ProductCard
-                item={item}
-                cartQty={cart[item.item]?.qty ?? 0}
-                showImage={context?.capabilities.show_item_images ?? false}
-                onClick={() => handleProductClick(item.item)}
-                imageClassName="h-24 w-full object-cover"
-                cardClassName="flex flex-col cursor-pointer"
-              />
-            </div>
-          ))}
-        </section>
+        {/* MenuGrid layers V3-44 availability gating (sold-out badge/disabled
+            state) on top of the shared ProductCard — same pattern as
+            TabletLayout/LandscapeKioskLayout. */}
+        <MenuGrid
+          menu={filteredMenu}
+          cart={cart}
+          showImage={context?.capabilities.show_item_images ?? false}
+          onItemClick={(item) => handleProductClick(item.item)}
+          gridClassName="mx-4 mt-4 grid grid-cols-2 gap-3"
+          cardClassName="flex flex-col cursor-pointer overflow-hidden rounded-lg border transition active:scale-[0.98]"
+          imageClassName="h-24 w-full object-cover"
+          branch={context?.restaurant}
+          company={context?.company}
+        />
 
         {cartCount > 0 && (
           <div className="fixed inset-x-0 bottom-0 border-t bg-background p-4">

@@ -22,14 +22,14 @@ const M = 'ury.ury.api.ury_availability'
  *     `getItemAvailability(..., { skipCache: true })` at that decision
  *     point, or rely on the backend's own transactional rejection.
  *
- * Known gap: `OrderingContext` (see `api.ts`) currently exposes `restaurant`
- * (used here as `branch`) but no `company` field. `get_item_availability`
- * requires `company` and fails closed (throws) without it. Until the
- * self-order bootstrap context carries `company`, callers here should treat
- * a thrown/failed lookup as "unknown availability" (soft-fail, do not block
- * the whole menu) rather than as CONFIGURATION_ERROR — adding `company` to
- * `OrderingContext` is out of this task's scope (frontend-only, no backend
- * changes).
+ * `OrderingContext` (see `api.ts`) exposes both `restaurant` (used here as
+ * `branch`) and `company`, sourced server-side from the ordering profile's
+ * branch -> company lookup (see self_ordering.py's
+ * `_ordering_context_response`). `get_item_availability` requires `company`
+ * and fails closed (throws) without it — callers here should still treat a
+ * thrown/failed lookup as "unknown availability" (soft-fail, do not block
+ * the whole menu) rather than as CONFIGURATION_ERROR, e.g. for sessions
+ * whose branch has no company mapped in `Branch`.
  */
 
 export type AvailabilityReasonCode =

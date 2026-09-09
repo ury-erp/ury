@@ -5,6 +5,7 @@ import { useIdleReset } from '../hooks/useIdleReset'
 import { useOrderingSession } from '../hooks/useOrderingSession'
 import type { MenuItem, OrderingContext } from '../lib/api'
 import SearchBar from './shared/SearchBar'
+import MenuGrid from './shared/MenuGrid'
 import ProductDetail from './shared/ProductDetail'
 import CartPage from './shared/CartPage'
 import CheckoutScreen from './shared/CheckoutScreen'
@@ -364,18 +365,20 @@ function PortraitKioskLayout({ initialContext }: LayoutProps) {
           </nav>
         </div>
 
-        {/* Product grid */}
-        <section className="grid flex-1 grid-cols-2 gap-4 self-start">
-          {visibleMenu.map((item) => (
-            <MenuCard
-              key={item.item}
-              item={item}
-              qtyInCart={cart[item.item]?.qty ?? 0}
-              showImage={context?.capabilities.show_item_images ?? false}
-              onTap={() => handleProductTap(item)}
-            />
-          ))}
-        </section>
+        {/* Product grid — MenuGrid layers V3-44 availability gating (sold-out
+            badge/disabled state) on top of the shared ProductCard, same
+            pattern as Tablet/Landscape Kiosk/Mobile layouts. */}
+        <MenuGrid
+          menu={visibleMenu}
+          cart={cart}
+          showImage={context?.capabilities.show_item_images ?? false}
+          onItemClick={handleProductTap}
+          gridClassName="grid flex-1 grid-cols-2 gap-4 self-start"
+          cardClassName="flex flex-col overflow-hidden rounded-xl border text-left transition active:scale-[0.98]"
+          imageClassName="h-48 w-full object-cover"
+          branch={context?.restaurant}
+          company={context?.company}
+        />
       </div>
 
       {cartCount > 0 && (
@@ -447,36 +450,6 @@ function PortraitKioskLayout({ initialContext }: LayoutProps) {
         </DialogContent>
       </Dialog>
     </div>
-  )
-}
-
-function MenuCard({
-  item,
-  qtyInCart,
-  showImage,
-  onTap,
-}: {
-  item: MenuItem
-  qtyInCart: number
-  showImage: boolean
-  onTap: () => void
-}) {
-  return (
-    <button
-      onClick={onTap}
-      className="flex flex-col overflow-hidden rounded-xl border text-left transition active:scale-[0.98]"
-    >
-      {showImage && item.item_image && (
-        <img src={item.item_image} alt={item.item_name} className="h-48 w-full object-cover" />
-      )}
-      <div className="p-4">
-        <div className="text-lg font-medium">{item.item_name}</div>
-        <div className="mt-1 text-base text-muted-foreground tabular-nums">{formatCurrency(item.rate)}</div>
-        {qtyInCart > 0 && (
-          <div className="mt-2 text-sm font-semibold text-primary">In cart: {qtyInCart}</div>
-        )}
-      </div>
-    </button>
   )
 }
 

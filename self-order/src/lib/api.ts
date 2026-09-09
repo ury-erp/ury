@@ -20,6 +20,10 @@ export interface OrderingContext {
   session: string
   source: string
   restaurant: string
+  /** Company for the V3-44 availability display check (get_item_availability
+   * requires branch+company). Sourced server-side from the ordering profile's
+   * branch -> company lookup — see self_ordering.py's `_ordering_context_response`. */
+  company: string
   table: string | null
   layout: OrderingLayout
   capabilities: OrderingCapabilities
