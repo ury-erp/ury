@@ -1852,12 +1852,12 @@ def table_transfer(table, newTable, invoice):
     pos_invoice.custom_restaurant_room = new_table.restaurant_room
     pos_invoice.save()
 
-    try:
-        change_table_in_kot(
-            pos_invoice.name, new_table.name, pos_invoice.branch
-        )
-    except Exception:
-        pass
+    # Do not swallow KOT-transfer failures: a raise here aborts the request
+    # (and its transaction) so the table/invoice changes above are rolled
+    # back instead of silently leaving order/table/KOT locations
+    # inconsistent. An empty matching-KOT set is a valid no-op and does not
+    # raise.
+    change_table_in_kot(pos_invoice.name, new_table.name, pos_invoice.branch)
 
 
 @frappe.whitelist()

@@ -36,6 +36,7 @@ def create_kot_doc(
     pos_profile_id,
     kot_naming_series,
     production,
+    validation_dedup_key=None,
 ):
     pos_invoice = frappe.get_doc("POS Invoice", invoice_id)
     order_number = pos_invoice.custom_ury_order_number
@@ -59,12 +60,24 @@ def create_kot_doc(
             "order_no":order_number
         }
     )
+    if validation_dedup_key:
+        # Populates the same "<invoice>::<production>" key the scheduler's
+        # create_kot() fallback (ury_kot_validation.py) writes for its own
+        # first-KOT-for-this-invoice+production case. Both writers now
+        # compete on the same unique index, so a real check-then-insert race
+        # between the live path and the scheduler tick is caught at the DB
+        # level instead of silently duplicating. Only the first ("New
+        # Order") KOT for an invoice+production carries this key -- later,
+        # legitimate KOTs for the same invoice+production (Order Modified,
+        # etc.) must not collide with it, so callers only pass this for that
+        # first-KOT case.
+        kot_doc.validation_dedup_key = validation_dedup_key
     branch = getBranch()
     if restaurant_table:
         room = frappe.db.get_value("URY Table", restaurant_table, "restaurant_room")
         restaurant = frappe.db.get_value("URY Table", restaurant_table, "restaurant")
         menu = frappe.db.get_value("Menu for Room", {"room": room,"parent":restaurant}, "menu")
-        
+
     else:
         menu = frappe.db.get_value("URY Restaurant", {"branch": branch}, "active_menu")
 
@@ -167,8 +180,18 @@ def process_items_for_kot(
                         "production": production.name,
                     },
                 )
+                # This is the same "no KOT exists yet for this
+                # invoice+production" case the scheduler's create_kot()
+                # fallback guards against with validation_dedup_key -- only
+                # tag the first ("New Order") KOT here, never the
+                # subsequent legitimate ones (Order Modified etc.), so
+                # later KOTs for the same invoice+production are not
+                # rejected by the unique index.
+                validation_dedup_key = None
                 if invoice_exist:
                     kot_type = "Order Modified"
+                else:
+                    validation_dedup_key = "{0}::{1}".format(invoice_id, production.name)
 
                 kot_name = create_kot_doc(
                     invoice_id,
@@ -180,6 +203,7 @@ def process_items_for_kot(
                     pos_profile_id,
                     kot_naming_series,
                     production.name,
+                    validation_dedup_key=validation_dedup_key,
                 )
                 created_kot_names.append(kot_name)
     else:

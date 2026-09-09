@@ -23,7 +23,6 @@ def resolve_production_context(item, branch, company=None, department=None):
 			"name", "item", "branch", "department", "production_unit",
 			"production_policy", "bom", "direct_retail_warehouse",
 			"controlled_by_sales_plan", "allow_over_plan_sale", "availability_mode",
-			"production_unit_disabled", "department_disabled",
 		],
 		filters=filters,
 		limit=2,
@@ -47,8 +46,28 @@ def resolve_production_context(item, branch, company=None, department=None):
 		) or frappe.db.get_value(
 			"URY Production Department", row.get("department"), "department_warehouse"
 		)
-	row.production_unit_disabled = row.get("production_unit_disabled", 0)
-	row.department_disabled = row.get("department_disabled", 0)
+	# Derived from the linked records' own `enabled` field -- neither
+	# `production_unit_disabled` nor `department_disabled` is a real column
+	# on this doctype, so they cannot come from the `frappe.get_all` row.
+	# Absence of a linked production_unit/department is not itself a
+	# disabled state -- e.g. PRE_PRODUCED/DIRECT_RETAIL rows have no
+	# production_unit at all.
+	if row.get("production_unit"):
+		row.production_unit_disabled = (
+			0
+			if frappe.db.get_value("URY Production Unit", row.get("production_unit"), "enabled")
+			else 1
+		)
+	else:
+		row.production_unit_disabled = 0
+	if row.get("department"):
+		row.department_disabled = (
+			0
+			if frappe.db.get_value("URY Production Department", row.get("department"), "enabled")
+			else 1
+		)
+	else:
+		row.department_disabled = 0
 	row.company = frappe.db.get_value("Branch", branch, "company")
 	if company and row.company and company != row.company:
 		return None

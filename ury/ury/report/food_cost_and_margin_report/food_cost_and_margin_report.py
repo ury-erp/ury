@@ -1,5 +1,5 @@
 import frappe
-from ury.services.bom_cost_resolver import resolve_item_cost, resolve_product_bundle_cost
+from ury.ury.services.bom_cost_resolver import resolve_item_cost, resolve_product_bundle_cost
 
 
 def _resolve_disposable_cost(item_code, buying_price_list):
