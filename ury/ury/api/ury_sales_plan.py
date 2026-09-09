@@ -116,10 +116,18 @@ def save_draft(plan_date, branch, company=None, service_period=None, items=None)
 
     existing_name = frappe.db.exists(
         "URY Sales Plan",
-        {"branch": branch, "company": company, "plan_date": plan_date, "status": "Draft"},
+        {"branch": branch, "company": company, "plan_date": plan_date},
     )
 
     if existing_name:
+        existing_status = frappe.db.get_value("URY Sales Plan", existing_name, "status")
+        if existing_status not in ("Draft", "Proposed"):
+            frappe.throw(
+                _(
+                    "Sales Plan {0} for this branch, company and date is already {1} and can no longer be saved as a draft"
+                ).format(existing_name, existing_status),
+                frappe.ValidationError,
+            )
         doc = frappe.get_doc("URY Sales Plan", existing_name)
     else:
         doc = frappe.get_doc(
