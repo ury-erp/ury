@@ -81,7 +81,11 @@ MATERIALS_CONSUMED = [
 
 def _get_branch_and_company():
 	branch_name = frappe.db.get_value("Branch", {}, "name")
-	company_name = frappe.db.get_value("Company", {}, "name")
+	company_name = None
+	if branch_name:
+		company_name = frappe.db.get_value("Branch", branch_name, "company")
+	if not company_name:
+		company_name = frappe.db.get_value("Company", {}, "name")
 	return branch_name, company_name
 
 
