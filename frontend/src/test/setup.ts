@@ -15,3 +15,10 @@ Object.defineProperty(window, 'localStorage', {
   },
   configurable: true,
 });
+
+// Mock ResizeObserver for recharts and other libraries
+global.ResizeObserver = class ResizeObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+};
