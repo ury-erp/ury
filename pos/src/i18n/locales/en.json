@@ -254,6 +254,7 @@
     "please_print_first": "Please print invoice before making payment",
     "enter_cancel_reason": "Please enter a reason for cancellation.",
     "dine_in_restricted": "Dine In is not available for your role",
+    "payment_failed": "Payment could not be completed. Please try again.",
     "order_modified": "This order has been modified. Please reload the page to retrieve the latest edits.",
     "order_sync_failed": "Could not sync this order. Please reload the page and try again.",
     "posOpening": {
