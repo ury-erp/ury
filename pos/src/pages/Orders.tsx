@@ -3,6 +3,7 @@ import { Clock, User, UserCheck, Receipt, Printer, Pencil, X, GitBranch, GitMerg
 import { Badge, Button, Card, CardContent } from '@ury/ui';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@ury/ui';
 import { showToast } from '@ury/ui';
+import { cn } from '@ury/ui';
 import OrderStatusSidebar from '../components/OrderStatusSidebar';
 import { useRootStore } from '../store/root-store';
 import { formatCurrency } from '@ury/core';
@@ -46,6 +47,47 @@ function isSplitBill(order: Pick<POSInvoice, 'split_total' | 'custom_split_group
     (order.split_total ?? 0) >= 2 ||
     !!order.custom_split_group ||
     !!order.custom_split_from
+  );
+}
+
+function LinkTag({ icon: Icon, children }: { icon: React.ComponentType<{ className?: string }>; children: React.ReactNode }) {
+  return (
+    <Badge size="tag" variant="tagAccent">
+      <Icon className="h-2.5 w-2.5" />
+      {children}
+    </Badge>
+  );
+}
+
+type StatusTone = 'neutral' | 'success' | 'destructive';
+
+function getStatusTone(status: string): StatusTone {
+  if (status === 'Recently Paid' || status === 'Paid' || status === 'Consolidated') return 'success';
+  if (status === 'Return') return 'destructive';
+  return 'neutral';
+}
+
+const statusDotClasses: Record<StatusTone, string> = {
+  neutral: 'bg-gray-400',
+  success: 'bg-green-600',
+  destructive: 'bg-red-600',
+};
+
+const getToneVariant = (tone: StatusTone): "default" | "tagDestructive" | "tagSuccess" => {
+  switch (tone) {
+    case 'neutral': return 'default';
+    case 'success': return 'tagSuccess';
+    case 'destructive': return 'tagDestructive';
+  }
+};
+
+function StatusTag({ status, label }: { status: string; label: string }) {
+  const tone = getStatusTone(status);
+  return (
+    <Badge size="tag" variant={getToneVariant(tone)}>
+      <span className={cn('h-[5px] w-[5px] shrink-0 rounded-full', statusDotClasses[tone])} />
+      {label}
+    </Badge>
   );
 }
 
@@ -406,29 +448,17 @@ export default function Orders() {
                         {order.name}
                       </h3>
                       <div className="flex shrink-0 items-center gap-1">
-                        {mergedBill && (
-                          <Badge
-                            variant="outline"
-                            className="shrink-0 gap-1 border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-50"
-                          >
-                            <GitMerge className="h-3 w-3" />
-                            {t('bill_merge.merged_bill')}
-                          </Badge>
-                        )}
+                        {mergedBill && <LinkTag icon={GitMerge}>{t('bill_merge.merged_bill')}</LinkTag>}
                         {splitBill && (
-                        <Badge
-                          variant="outline"
-                          className="shrink-0 gap-1 border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-50"
-                        >
-                          <GitBranch className="h-3 w-3" />
-                          {(order.split_total ?? 0) >= 2
-                            ? t('bill_split.split_indicator', {
-                                index: order.split_index ?? 0,
-                                total: order.split_total ?? 0,
-                              })
-                            : t('bill_split.split_bill')}
-                        </Badge>
-                      )}
+                          <LinkTag icon={GitBranch}>
+                            {(order.split_total ?? 0) >= 2
+                              ? t('bill_split.split_indicator', {
+                                  index: order.split_index ?? 0,
+                                  total: order.split_total ?? 0,
+                                })
+                              : t('bill_split.split_bill')}
+                          </LinkTag>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center justify-between gap-2">
@@ -581,27 +611,19 @@ export default function Orders() {
                 isMergedBill(selectedOrder)) && (
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   {(selectedOrder.split_total ?? 0) >= 2 || isSplitBill(selectedOrder) ? (
-                    <Badge
-                      variant="outline"
-                      className="gap-1 border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-50"
-                    >
-                      <GitBranch className="h-3 w-3" />
+                    <LinkTag icon={GitBranch}>
                       {(selectedOrder.split_total ?? 0) >= 2
                         ? t('bill_split.split_indicator', {
                             index: selectedOrder.split_index ?? 0,
                             total: selectedOrder.split_total ?? 0,
                           })
                         : t('bill_split.split_bill')}
-                    </Badge>
+                    </LinkTag>
                   ) : null}
                   {isMergedBill(selectedOrder) ? (
-                    <Badge
-                      variant="outline"
-                      className="gap-1 border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-50"
-                    >
-                      <GitMerge className="h-3 w-3" />
+                    <LinkTag icon={GitMerge}>
                       {t('bill_merge.merged_bill')}
-                    </Badge>
+                    </LinkTag>
                   ) : null}
                 </div>
               )}
