@@ -298,6 +298,11 @@ def _ordering_context_response(raw_session_token, source, profile, table, layout
         "session": raw_session_token,
         "source": source,
         "restaurant": profile.restaurant,
+        # Company for the V3-44 availability display check (get_item_availability
+        # requires branch+company; see self-order's lib/availability.ts). Derived
+        # from profile.branch the same way _resolve_or_create_pos_invoice() already
+        # does (see this file's invoice.company fallback), never guessed client-side.
+        "company": frappe.db.get_value("Branch", profile.branch, "company"),
         "table": table,
         # "Mobile" for QR sessions (no device involved); otherwise the
         # provisioned URY Ordering Device's configured layout (Tablet /

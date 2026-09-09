@@ -335,6 +335,7 @@ function LandscapeKioskLayout({ initialContext }: LayoutProps) {
             cardClassName="flex min-w-[180px] flex-col overflow-hidden rounded-2xl border text-left text-lg transition active:scale-[0.97]"
             imageClassName="h-40 w-full object-cover"
             branch={context?.restaurant}
+            company={context?.company}
           />
 
           {visibleMenu.length === 0 && (
