@@ -1,8 +1,10 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Search } from 'lucide-react';
 import { usePOSStore } from '../../store/pos-store';
 import { cn, Spinner, Button, Input } from '@ury/ui';
+import { db } from '@ury/core';
 import MenuCard from '../../components/MenuCard';
+import ProductDialog from '../../components/ProductDialog';
 
 interface CaptainMenuProps {
   /** From the per-table permission map (`get_table_order_context`). When
@@ -32,7 +34,10 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
     addToOrder,
     isOrderInteractionDisabled,
     posProfile,
+    setSelectedItem,
   } = usePOSStore();
+
+  const [isProductDialogOpen, setIsProductDialogOpen] = useState(false);
 
   useEffect(() => {
     fetchMenuItems();
@@ -53,8 +58,32 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
 
   const disabled = !canAddItems || isOrderInteractionDisabled();
 
-  const handleTap = (item: (typeof menuItems)[number]) => {
+  const handleTap = async (item: (typeof menuItems)[number]) => {
     if (disabled) return;
+
+    // Touch UI has no double-click, so (unlike the desktop POS's click-count
+    // gesture) we decide up front whether this item needs configuration:
+    // fetch the full Item doc and reuse the same "has variants/add-ons"
+    // check ProductDialog itself uses to populate its pickers. Items with
+    // neither keep the previous instant single-tap add.
+    try {
+      const itemDoc: any = await db.getDoc('Item', item.item);
+      const hasVariants =
+        Array.isArray(itemDoc?.custom_pos_item_variants) && itemDoc.custom_pos_item_variants.length > 0;
+      const hasAddons =
+        Array.isArray(itemDoc?.custom_pos_add_on_items) && itemDoc.custom_pos_add_on_items.length > 0;
+
+      if (hasVariants || hasAddons) {
+        setSelectedItem(item);
+        setIsProductDialogOpen(true);
+        return;
+      }
+    } catch (err) {
+      // If we can't confirm the item's configuration, fall back to the
+      // instant add rather than blocking order-taking on a lookup failure.
+      console.error('Failed to check item configuration for', item.item, err);
+    }
+
     addToOrder({ ...item, quantity: 1 });
   };
 
@@ -131,6 +160,10 @@ const CaptainMenu: React.FC<CaptainMenuProps> = ({ canAddItems }) => {
           </div>
         )}
       </div>
+
+      {isProductDialogOpen && (
+        <ProductDialog onClose={() => setIsProductDialogOpen(false)} />
+      )}
     </div>
   );
 };

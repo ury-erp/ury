@@ -8,18 +8,20 @@ import { useRootStore, RootState } from '../../store/root-store';
 import {
   captainTransfer,
   reprintKot,
+  splitBill,
   syncOrder,
   SyncOrderRequest,
   tableTransfer,
 } from '../../lib/order-api';
 import { printOrder } from '../../lib/print';
-import { resolvePrintFormat } from '../../lib/invoice-api';
+import { getPOSInvoiceItems, POSInvoiceItem, resolvePrintFormat } from '../../lib/invoice-api';
 import { getVacantTablesForBranch, Table } from '../../lib/table-api';
 import { DINE_IN } from '../../data/order-types';
 import { useTableOrderContext, OrderDeltaLine } from '../hooks/useTableOrderContext';
 import CaptainMenu from '../components/CaptainMenu';
 import CaptainOrderLine from '../components/CaptainOrderLine';
 import CaptainActionsMenu from '../components/CaptainActionsMenu';
+import CaptainSplitOrderDialog from '../components/CaptainSplitOrderDialog';
 import ProductDialog from '../../components/ProductDialog';
 import CommentDialog from '../../components/CommentDialog';
 import TableTransferDialog from '../../components/TableTransferDialog';
@@ -74,7 +76,24 @@ export default function CaptainOrder() {
     selectedCustomer,
     clearTableOrder,
     isOrderInteractionDisabled,
+    selectedOrderType,
+    setSelectedOrderType,
   } = usePOSStore();
+
+  // The shared pos-store's `selectedOrderType` defaults to "Take Away" (see
+  // DEFAULT_ORDER_TYPE in data/order-types.ts) and is otherwise only set by
+  // the Cashier's OrderTypeSelect control, which this screen doesn't render.
+  // Without this, `fetchMenuItems()` resolves whatever order-type menu was
+  // last selected (or the Take Away default) instead of the Dine In menu --
+  // on a branch with no Take Away menu configured, or a different item set,
+  // captains would see an empty or wrong menu for every table. Every captain
+  // table order is Dine In by definition, so force it on mount.
+  useEffect(() => {
+    if (selectedOrderType !== DINE_IN) {
+      setSelectedOrderType(DINE_IN);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [mode, setMode] = useState<Mode>('order');
   const [hasSetInitialMode, setHasSetInitialMode] = useState(false);
@@ -93,6 +112,9 @@ export default function CaptainOrder() {
   const [transferDestinations, setTransferDestinations] = useState<Table[]>([]);
   const [isTransferDestinationsLoading, setIsTransferDestinationsLoading] = useState(false);
   const [isTransferCaptainOpen, setIsTransferCaptainOpen] = useState(false);
+  const [isSplitBillOpen, setIsSplitBillOpen] = useState(false);
+  const [splitBillItems, setSplitBillItems] = useState<POSInvoiceItem[]>([]);
+  const [isLoadingSplitBillItems, setIsLoadingSplitBillItems] = useState(false);
 
   // Default to the Order view for a table that already has a baseline
   // order, Menu for a fresh table — matches PLAN §5 ("free table: menu
@@ -290,6 +312,12 @@ export default function CaptainOrder() {
   const canTransferTable = permissions?.transfer_table ?? false;
   const canTransferCaptain = permissions?.transfer_captain ?? false;
   const canPrintBill = permissions?.print_bill ?? false;
+  // No dedicated `split_bill` field exists on `get_table_order_context`'s
+  // permission map (backend is out of scope for this change) — `print_bill`
+  // is the closest existing capability: like split_bill it requires a real
+  // order plus billing-level access (`frappe.has_permission("POS Invoice",
+  // "print", ...)`), so it's reused here rather than adding a new backend flag.
+  const canSplitBill = canPrintBill;
 
   const handleReprintKot = async () => {
     if (!invoiceId) {
@@ -360,6 +388,35 @@ export default function CaptainOrder() {
     await tableTransfer(table, newTable, invoiceId);
     clearTableOrder();
     showToast.success('Table transferred.');
+    navigate('/pos/order');
+  };
+
+  const handleOpenSplitBill = async () => {
+    if (!invoiceId) {
+      showToast.error('No active order to split.');
+      return;
+    }
+    setIsLoadingSplitBillItems(true);
+    setIsSplitBillOpen(true);
+    try {
+      const { items } = await getPOSInvoiceItems(invoiceId);
+      setSplitBillItems(items);
+    } catch (error) {
+      setIsSplitBillOpen(false);
+      showToast.error(error instanceof Error ? error.message : 'Failed to load bill items.');
+    } finally {
+      setIsLoadingSplitBillItems(false);
+    }
+  };
+
+  const handleSplitBillConfirm = async (payload: {
+    itemsToMove: Array<{ name: string; qty: number }>;
+    customer?: string;
+  }) => {
+    if (!invoiceId) return;
+    const result = await splitBill(invoiceId, payload.itemsToMove, payload.customer);
+    showToast.success(`Bill split. New bill: ${result.new_invoice}`);
+    clearTableOrder();
     navigate('/pos/order');
   };
 
@@ -615,6 +672,8 @@ export default function CaptainOrder() {
             showPrintBill={canPrintBill}
             onPrintBill={handlePrintBill}
             isPrintingBill={isPrintingBill}
+            showSplitBill={canSplitBill}
+            onSplitBill={handleOpenSplitBill}
           />
         </div>
       </div>
@@ -758,6 +817,21 @@ export default function CaptainOrder() {
         currentCaptain={currentCaptain}
         onConfirm={handleCaptainTransferConfirm}
       />
+
+      {invoiceId && !isLoadingSplitBillItems && (
+        <CaptainSplitOrderDialog
+          open={isSplitBillOpen}
+          onOpenChange={setIsSplitBillOpen}
+          invoiceName={invoiceId}
+          items={splitBillItems}
+          sourceCustomer={
+            context?.order?.customer
+              ? { id: context.order.customer, name: context.order.customer, phone: context.order.mobile_number }
+              : null
+          }
+          onConfirm={handleSplitBillConfirm}
+        />
+      )}
     </div>
   );
 }

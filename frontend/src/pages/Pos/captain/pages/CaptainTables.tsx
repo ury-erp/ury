@@ -3,7 +3,15 @@ import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Square } from 'lucide-react';
 import { Button, Spinner, showToast } from '@ury/ui';
 import { useCaptainContext } from '../hooks/useCaptainContext';
-import { getRooms, getTables, type Room, type Table } from '../../lib/table-api';
+import { usePOSStore } from '../../store/pos-store';
+import {
+  getRooms,
+  getTables,
+  mergeTablesBatch,
+  unmergeTables,
+  type Room,
+  type Table,
+} from '../../lib/table-api';
 import { getMergeGroupMembers, sortTablesByMergeGroups } from '../../lib/table-utils';
 import {
   getActiveTableOrders,
@@ -13,6 +21,8 @@ import {
 import CaptainTableCard, {
   type CaptainTableOwnership,
 } from '../components/CaptainTableCard';
+import TableMergeDialog from '../../components/TableMergeDialog';
+import TableUnmergeDialog from '../../components/TableUnmergeDialog';
 
 /**
  * Captain "Tables" home screen (`/order`). See PLAN.md §5/§6 for the
@@ -34,6 +44,18 @@ export default function CaptainTables() {
   const currentUser = context?.user ?? null;
   const canAccessOtherCaptainsTables = Boolean(capabilities?.canAccessOtherCaptainsTables);
 
+  // Attention threshold (sa-v3-captain-app-parity/GAPS.md Gap 4): reuses the
+  // existing POS Profile `table_attention_time` field (already surfaced as
+  // `tableAttention` by getCombinedPosProfile and already consumed by the
+  // "Table Turnaround Delay" report) via the shared pos-store's cached
+  // `posProfile` — no separate API call needed. `posProfile` is populated by
+  // `CaptainRouteGuard`'s `fetchPosProfile()` call, which wraps this screen.
+  const { posProfile } = usePOSStore();
+  const attentionThresholdMinutes =
+    typeof posProfile?.tableAttention === 'number' && posProfile.tableAttention > 0
+      ? posProfile.tableAttention
+      : null;
+
   const [selectedRoom, setSelectedRoom] = useState<string | null>(null);
   const [branchRooms, setBranchRooms] = useState<Room[]>([]);
   const [roomsLoading, setRoomsLoading] = useState(false);
@@ -42,6 +64,12 @@ export default function CaptainTables() {
   const [ownerNames, setOwnerNames] = useState<Map<string, string>>(new Map());
   const [tablesLoading, setTablesLoading] = useState(false);
   const [tablesError, setTablesError] = useState<string | null>(null);
+
+  // Table-level merge/unmerge overflow menu (sa-v3-captain-app-parity/GAPS.md
+  // Gap 3) — same state shape as the main POS's Table.tsx.
+  const [menuOpenForTable, setMenuOpenForTable] = useState<string | null>(null);
+  const [mergeSourceTable, setMergeSourceTable] = useState<Table | null>(null);
+  const [unmergeSourceTable, setUnmergeSourceTable] = useState<Table | null>(null);
 
   // `get_captain_context()`'s `rooms` field (from `getRoom()` in
   // `ury/ury_pos/api.py`) reflects the Captain's own room *assignment*, not
@@ -131,6 +159,46 @@ export default function CaptainTables() {
     if (branch) loadActiveOrders(branch);
   }, [selectedRoom, branch, loadTables, loadActiveOrders]);
 
+  const handleMergeConfirm = async (targetNames: string[]) => {
+    if (!mergeSourceTable || targetNames.length === 0) return;
+    try {
+      await mergeTablesBatch(mergeSourceTable.name, targetNames);
+      if (selectedRoom) await loadTables(selectedRoom);
+      showToast.success('Tables merged');
+    } catch (error) {
+      showToast.error(error instanceof Error ? error.message : 'Failed to merge tables');
+      throw error;
+    }
+  };
+
+  const handleUnmergeConfirm = async () => {
+    if (!unmergeSourceTable) return;
+    try {
+      await unmergeTables(unmergeSourceTable.name);
+      if (selectedRoom) await loadTables(selectedRoom);
+      showToast.success('Tables unmerged');
+    } catch (error) {
+      showToast.error(error instanceof Error ? error.message : 'Failed to unmerge tables');
+      throw error;
+    }
+  };
+
+  const mergeAvailableTables = useMemo(() => {
+    if (!mergeSourceTable) return [];
+    const sourceCluster = new Set(getMergeGroupMembers(mergeSourceTable, tables));
+    return tables.filter((candidate) => {
+      if (candidate.name === mergeSourceTable.name) return false;
+      if (sourceCluster.has(candidate.name)) return false;
+      if (candidate.occupied === 1 && mergeSourceTable.occupied === 1) return false;
+      return true;
+    });
+  }, [mergeSourceTable, tables]);
+
+  const unmergeGroupMembers = useMemo(() => {
+    if (!unmergeSourceTable) return [];
+    return getMergeGroupMembers(unmergeSourceTable, tables);
+  }, [unmergeSourceTable, tables]);
+
   const tableGroups = useMemo(() => sortTablesByMergeGroups(tables), [tables]);
 
   const resolveOwnership = useCallback(
@@ -146,14 +214,14 @@ export default function CaptainTables() {
     const ownership = resolveOwnership(table, order);
 
     if (ownership === 'free' || ownership === 'mine') {
-      navigate(`/order/table/${table.name}`);
+      navigate(`/pos/order/table/${table.name}`);
       return;
     }
 
     // Occupied by someone else (or occupancy with no resolvable owner):
     // elevated/transfer access overrides the base restriction.
     if (canAccessOtherCaptainsTables) {
-      navigate(`/order/table/${table.name}`);
+      navigate(`/pos/order/table/${table.name}`);
       return;
     }
 
@@ -252,12 +320,38 @@ export default function CaptainTables() {
                   ownerName={ownership === 'mine' ? undefined : ownerName}
                   mergePartners={mergePartners}
                   onTap={() => handleTableTap(table, order)}
+                  attentionThresholdMinutes={attentionThresholdMinutes}
+                  showTableActions
+                  menuOpen={menuOpenForTable === table.name}
+                  onMenuOpenChange={(open) => setMenuOpenForTable(open ? table.name : null)}
+                  onMerge={() => setMergeSourceTable(table)}
+                  onUnmerge={() => setUnmergeSourceTable(table)}
                 />
               );
             })}
           </div>
         )}
       </div>
+
+      <TableMergeDialog
+        open={mergeSourceTable !== null}
+        onOpenChange={(open) => {
+          if (!open) setMergeSourceTable(null);
+        }}
+        sourceTable={mergeSourceTable}
+        availableTables={mergeAvailableTables}
+        onConfirm={handleMergeConfirm}
+      />
+
+      <TableUnmergeDialog
+        open={unmergeSourceTable !== null}
+        onOpenChange={(open) => {
+          if (!open) setUnmergeSourceTable(null);
+        }}
+        sourceTable={unmergeSourceTable}
+        groupMembers={unmergeGroupMembers}
+        onConfirm={handleUnmergeConfirm}
+      />
     </div>
   );
 }
