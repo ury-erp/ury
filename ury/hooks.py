@@ -241,6 +241,7 @@ doc_events = {
     "AI Provider": {"on_update": "ury.ury.ai_tools.agent_seeding.on_ai_provider_update"},
     "Stock Reconciliation": {"validate": "ury.ury.utils.stock_reconciliation_guards.validate"},
     "Customer": {"validate": "ury.ury.hooks.ury_customer.validate"},
+    "BOM": {"before_validate": "ury.ury.hooks.ury_bom.apply_yield_back_calculation"},
 }
 
 # Scheduled Tasks
@@ -255,7 +256,10 @@ scheduler_events = {
 		"*/5 * * * *":[
 			"ury.ury.services.food_cost_alerts.notify_high_food_cost"
 		]
-	}
+	},
+	"daily": [
+		"ury.ury.services.yield_check_reminders.notify_overdue_yield_checks"
+	]
 # 	"all": [
 # 		"ury.tasks.all"
 # 	],
@@ -510,6 +514,12 @@ fixtures = [
                     "Journal Entry-branch",
                     "Employee-payment_amount",
                     "Employee-payment_type",
+                    "Item-custom_yield_check_cadence",
+                    "Item-custom_yield_check_interval_days",
+                    "Item-custom_yield_percent",
+                    "Item-custom_yield_tracked",
+                    "BOM Item-custom_yield_qty",
+                    "BOM Item-custom_yield_percent",
                     "Item-disposable_items",
                     "Item-is_disposable",
                     "POS Invoice Item-is_disposable",

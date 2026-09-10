@@ -18,6 +18,10 @@ import { SelfOrderingProfilePage } from './pages/Dashboard/SelfOrderingProfilePa
 import ProductionUnitPage from './pages/Dashboard/ProductionUnitPage';
 import ProductionDepartmentPage from './pages/Dashboard/ProductionDepartmentPage';
 import ItemProductionConfigPage from './pages/Dashboard/ItemProductionConfigPage';
+import YieldStandardsPage from './pages/Dashboard/YieldStandardsPage';
+import YieldVariancePage from './pages/Dashboard/YieldVariancePage';
+import OverdueYieldChecksPage from './pages/Dashboard/OverdueYieldChecksPage';
+import YieldCheckCompliancePage from './pages/Dashboard/YieldCheckCompliancePage';
 import AggregatorPage from './pages/Dashboard/AggregatorPage';
 import SalesPlanPage from './pages/Dashboard/SalesPlanPage';
 import RequirementsPage from './pages/Dashboard/RequirementsPage';
@@ -243,6 +247,10 @@ function AppRoutes() {
           <Route path="production-unit" element={<ProductionUnitPage />} />
           <Route path="production-department" element={<ProductionDepartmentPage />} />
           <Route path="item-production-config" element={<ItemProductionConfigPage />} />
+          <Route path="yield-standards" element={<YieldStandardsPage />} />
+          <Route path="yield-variance" element={<YieldVariancePage />} />
+          <Route path="overdue-yield-checks" element={<OverdueYieldChecksPage />} />
+          <Route path="yield-compliance" element={<YieldCheckCompliancePage />} />
           <Route path="aggregator" element={<AggregatorPage />} />
           <Route path="sales-plan" element={<SalesPlanPage />} />
           <Route path="requirements" element={<RequirementsPage />} />
