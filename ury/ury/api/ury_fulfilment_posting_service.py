@@ -480,6 +480,16 @@ def _stock_entry_items(payload):
 				"item_code": payload["item_code"],
 				"qty": flt(payload["accepted_qty"]),
 				"t_warehouse": target_warehouse,
+				# ERPNext's Stock Entry.mark_finished_and_scrap_items() only
+				# auto-infers is_finished_item from a linked work_order/bom_no
+				# (see get_finished_item()); this is a hand-built ad-hoc entry
+				# with neither, so without setting the flag explicitly ERPNext
+				# rejects the submit with "There must be atleast 1 Finished
+				# Good in this Stock Entry" even though the t_warehouse row is
+				# present. Found live while verifying
+				# tracks/sa-nontable-production-gap (the mocked unit tests
+				# never exercised real Stock Entry validation).
+				"is_finished_item": 1,
 			}
 		)
 	return items
