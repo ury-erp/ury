@@ -9,7 +9,6 @@
  "engine": "InnoDB",
  "field_order": [
   "production",
-  "pos_profile",
   "branch",
   "warehouse",
   "item_groups",
@@ -30,23 +29,23 @@
    "fieldname": "pos_profile",
    "fieldtype": "Link",
    "label": "POS Profile",
-   "options": "POS Profile"
+   "options": "POS Profile",
+   "description": "DEPRECATED: filtering with branch instead"
   },
   {
-   "fetch_from": "pos_profile.branch",
    "fieldname": "branch",
    "fieldtype": "Link",
    "label": "Branch",
    "options": "Branch",
-   "read_only": 1
+   "read_only": 0,
+   "reqd": 1
   },
   {
-   "fetch_from": "pos_profile.warehouse",
    "fieldname": "warehouse",
    "fieldtype": "Link",
    "label": "Warehouse",
    "options": "Warehouse",
-   "read_only": 1
+   "read_only": 0
   },
   {
    "fieldname": "item_groups",

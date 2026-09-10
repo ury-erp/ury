@@ -3,6 +3,7 @@
  "allow_rename": 1,
  "creation": "2025-03-26 03:39:26.809818",
  "default_view": "List",
+ "description": "DEPRECATED: Sub POS Invoices is deprecated.",
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",

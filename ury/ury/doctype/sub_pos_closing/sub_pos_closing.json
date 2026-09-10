@@ -4,6 +4,7 @@
  "autoname": "SUB-CLO-.YYYY.-.#####",
  "creation": "2025-03-26 03:40:02.290820",
  "default_view": "List",
+ "description": "DEPRECATED: Sub POS Closing is deprecated. Replaced by independent shift entries.",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [

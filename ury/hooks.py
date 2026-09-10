@@ -85,7 +85,7 @@ ury_demo_master_doctypes = [
     "URY Menu Course",
     "URY Menu",
     "URY Room",
-    "URY Restaurant",
+
     "URY Table",
     "Product Bundle",
     "URY Production Unit",

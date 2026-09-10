@@ -2,6 +2,9 @@
     {
         "doctype": "Branch",
         "branch": "Demo Branch",
+        "custom_order_counter": 0,
+        "custom_aggregator_order_counter": 0,
+        "custom_reset_order_number_daily": 1,
         "user": [
             {
                 "user": "Administrator"
