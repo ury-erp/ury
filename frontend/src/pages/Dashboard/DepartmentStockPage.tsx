@@ -238,6 +238,96 @@ const CaptureWastageForm: React.FC<CaptureWastageFormProps> = ({ authorization, 
   );
 };
 
+const CHECK_TYPE_OPTIONS = ['Routine', 'Scheduled', 'Spot-Check', 'Manual'];
+
+interface LogYieldCheckFormProps {
+  authorization: IssueAuthorizationRow;
+  onCancel: () => void;
+  onSuccess: () => void;
+  onError: (message: string) => void;
+}
+
+const LogYieldCheckForm: React.FC<LogYieldCheckFormProps> = ({ authorization, onCancel, onSuccess, onError }) => {
+  const [outputQty, setOutputQty] = useState('');
+  const [checkType, setCheckType] = useState<string>(CHECK_TYPE_OPTIONS[0]);
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const qty = Number(outputQty);
+    if (!qty || qty < 0) return;
+    setSubmitting(true);
+    try {
+      await departmentStockService.recordYieldCheck({
+        item: authorization.component_item,
+        branch: authorization.branch || '',
+        company: authorization.company || '',
+        input_qty: authorization.authorized_qty,
+        output_qty: qty,
+        stock_uom: authorization.stock_uom || '',
+        check_type: checkType,
+        issue_authorization: authorization.name,
+        department: authorization.department,
+        production_unit: authorization.production_unit,
+      });
+      onSuccess();
+    } catch {
+      onError('Unable to log usable output for this issue authorization.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="mt-2 flex flex-col gap-2 rounded-md border border-border bg-muted p-3">
+      <label className="flex flex-col text-xs font-medium text-muted-foreground">
+        Input Qty
+        <span className="mt-1 rounded-md border border-border bg-card px-2 py-1.5 text-sm text-foreground">
+          {formatQty(authorization.authorized_qty)} {authorization.stock_uom || ''}
+        </span>
+      </label>
+      <label className="flex flex-col text-xs font-medium text-muted-foreground">
+        Output Qty
+        <Input
+          aria-label="Output quantity"
+          type="number"
+          min="0"
+          step="any"
+          size="sm"
+          value={outputQty}
+          onChange={(event) => setOutputQty(event.target.value)}
+          className="mt-1"
+          required
+        />
+      </label>
+      <label className="flex flex-col text-xs font-medium text-muted-foreground">
+        Check Type
+        <Select
+          aria-label="Check type"
+          size="sm"
+          value={checkType}
+          onChange={(event) => setCheckType(event.target.value)}
+          className="mt-1"
+        >
+          {CHECK_TYPE_OPTIONS.map((type) => (
+            <option key={type} value={type}>
+              {type}
+            </option>
+          ))}
+        </Select>
+      </label>
+      <div className="flex gap-2">
+        <Button type="submit" size="sm" disabled={submitting}>
+          Log Output
+        </Button>
+        <Button type="button" size="sm" variant="outline" onClick={onCancel}>
+          Cancel
+        </Button>
+      </div>
+    </form>
+  );
+};
+
 interface RequestAuthorizationFormProps {
   branch: string;
   department: string;
@@ -442,6 +532,7 @@ const DepartmentStockContent: React.FC = () => {
 
   const [selectedAuthorization, setSelectedAuthorization] = useState<IssueAuthorizationRow | null>(null);
   const [showCaptureForm, setShowCaptureForm] = useState(false);
+  const [showLogYieldForm, setShowLogYieldForm] = useState(false);
   const [selectedWastage, setSelectedWastage] = useState<WastageRow | null>(null);
   const [wastageDrawerAction, setWastageDrawerAction] = useState<'approve' | 'reject' | null>(null);
   const [wastageDrawerBusy, setWastageDrawerBusy] = useState(false);
@@ -544,6 +635,7 @@ const DepartmentStockContent: React.FC = () => {
     setActionError(null);
     setShowRequestForm(false);
     setShowCaptureForm(false);
+    setShowLogYieldForm(false);
     setSelectedAuthorization(null);
     setWastageDrawerAction(null);
     setWastageDrawerBusy(false);
@@ -845,13 +937,19 @@ const DepartmentStockContent: React.FC = () => {
         onClose={() => {
           setSelectedAuthorization(null);
           setShowCaptureForm(false);
+          setShowLogYieldForm(false);
         }}
         title={selectedAuthorization ? selectedAuthorization.component_item_name || selectedAuthorization.component_item : 'Issue authorization'}
         footer={
-          selectedAuthorization && canCapture && selectedAuthorization.status === 'Authorized' && !showCaptureForm ? (
-            <Button type="button" size="sm" onClick={() => setShowCaptureForm(true)}>
-              Capture Wastage
-            </Button>
+          selectedAuthorization && canCapture && selectedAuthorization.status === 'Authorized' && !showCaptureForm && !showLogYieldForm ? (
+            <div className="flex gap-2">
+              <Button type="button" size="sm" onClick={() => setShowCaptureForm(true)}>
+                Capture Wastage
+              </Button>
+              <Button type="button" size="sm" variant="outline" onClick={() => setShowLogYieldForm(true)}>
+                Log Usable Output
+              </Button>
+            </div>
           ) : undefined
         }
       >
@@ -893,6 +991,18 @@ const DepartmentStockContent: React.FC = () => {
                 <CaptureWastageForm
                   authorization={selectedAuthorization}
                   onCancel={() => setShowCaptureForm(false)}
+                  onSuccess={refresh}
+                  onError={setActionError}
+                />
+              </>
+            )}
+
+            {showLogYieldForm && (
+              <>
+                <DrawerSectionLabel>Log Usable Output</DrawerSectionLabel>
+                <LogYieldCheckForm
+                  authorization={selectedAuthorization}
+                  onCancel={() => setShowLogYieldForm(false)}
                   onSuccess={refresh}
                   onError={setActionError}
                 />

@@ -1,0 +1,203 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "hash",
+ "creation": "2026-09-10 00:00:00.000000",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "item",
+  "branch",
+  "company",
+  "section_break_input",
+  "input_qty",
+  "output_qty",
+  "stock_uom",
+  "column_break_yield",
+  "actual_yield_percent",
+  "standard_yield_percent_snapshot",
+  "variance_percent",
+  "section_break_details",
+  "check_type",
+  "department",
+  "production_unit",
+  "section_break_check_info",
+  "checked_by",
+  "checked_on",
+  "section_break_auth",
+  "issue_authorization"
+ ],
+ "fields": [
+  {
+   "fieldname": "item",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Item",
+   "options": "Item",
+   "reqd": 1
+  },
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Branch",
+   "options": "Branch",
+   "reqd": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_input",
+   "fieldtype": "Section Break",
+   "label": "Input/Output"
+  },
+  {
+   "fieldname": "input_qty",
+   "fieldtype": "Float",
+   "label": "Input Qty",
+   "reqd": 1
+  },
+  {
+   "fieldname": "output_qty",
+   "fieldtype": "Float",
+   "label": "Output Qty",
+   "reqd": 1
+  },
+  {
+   "fieldname": "stock_uom",
+   "fieldtype": "Link",
+   "label": "Stock UOM",
+   "options": "UOM",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_yield",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "actual_yield_percent",
+   "fieldtype": "Percent",
+   "label": "Actual Yield %",
+   "read_only": 1
+  },
+  {
+   "fieldname": "standard_yield_percent_snapshot",
+   "fieldtype": "Percent",
+   "label": "Standard Yield % (Snapshot)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "variance_percent",
+   "fieldtype": "Percent",
+   "label": "Variance %",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_details",
+   "fieldtype": "Section Break",
+   "label": "Check Details"
+  },
+  {
+   "fieldname": "check_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Check Type",
+   "options": "Routine\nScheduled\nSpot-Check\nManual",
+   "reqd": 1
+  },
+  {
+   "fieldname": "department",
+   "fieldtype": "Link",
+   "label": "Department",
+   "options": "URY Production Department"
+  },
+  {
+   "fieldname": "production_unit",
+   "fieldtype": "Link",
+   "label": "Production Unit",
+   "options": "URY Production Unit"
+  },
+  {
+   "fieldname": "section_break_check_info",
+   "fieldtype": "Section Break",
+   "label": "Check Info"
+  },
+  {
+   "fieldname": "checked_by",
+   "fieldtype": "Link",
+   "label": "Checked By",
+   "options": "User"
+  },
+  {
+   "fieldname": "checked_on",
+   "fieldtype": "Datetime",
+   "label": "Checked On"
+  },
+  {
+   "fieldname": "section_break_auth",
+   "fieldtype": "Section Break",
+   "label": "Authorization"
+  },
+  {
+   "fieldname": "issue_authorization",
+   "fieldtype": "Link",
+   "label": "Issue Authorization",
+   "options": "URY Issue Authorization"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 0,
+ "links": [],
+ "modified": "2026-09-10 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY Yield Check",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Production Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "role": "Stock Manager",
+   "write": 1
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "role": "Stock User"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "role": "URY Manager"
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
