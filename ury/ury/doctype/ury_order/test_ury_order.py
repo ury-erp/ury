@@ -356,7 +356,19 @@ class TestURYOrder(FrappeTestCase):
         mock_invoice.restaurant_table = None
         mock_new_doc.return_value = mock_invoice
         mock_getBranch.return_value = "Test Branch"
-        mock_get_value.return_value = "Menu A"
+
+        def get_value_side_effect(doctype, *args, **kwargs):
+            # The no-table path's first frappe.get_value call looks up an
+            # existing open invoice by name (invoiceNo=None here, so there
+            # is none); a blanket return_value would make that lookup
+            # truthy and send the code into the "existing invoice" branch,
+            # which calls the real (unmocked) frappe.get_doc and blows up
+            # against whatever data this bench happens to have.
+            if doctype == "POS Invoice":
+                return None
+            return "Menu A"
+
+        mock_get_value.side_effect = get_value_side_effect
 
         with patch("ury.ury.doctype.ury_order.ury_order.frappe.get_all", return_value=[]):
             invoice, invoice_name = _resolve_or_create_pos_invoice(
