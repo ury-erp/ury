@@ -1602,39 +1602,6 @@ def get_captain_context():
 
 
 @frappe.whitelist()
-def get_table_attention_config(branch=None):
-    """"Table needs attention" threshold, for the captain table grid's
-    attention indicator (sa-v3-captain-app-parity/GAPS.md Gap 4).
-
-    The captain table grid already bulk-fetches active POS Invoices directly
-    via `db.getDocList` (see `captain-table-api.ts`'s `getActiveTableOrders`,
-    which reads `creation` too) rather than through this doctype's whitelisted
-    APIs — there's no server-side per-table iteration to hook this into, and
-    doing the "minutes open" math client-side against a wall-clock timestamp
-    the frontend already has is simpler than adding a second per-table
-    round-trip. This endpoint supplies only the one piece the client can't
-    know on its own: what threshold to flag against, and whether the feature
-    is enabled at all.
-
-    NOTE: originally implemented against the generic `Alert Settings` /
-    `get_alert_rule()` mechanism (as the "Cancel Delay" fraud alert uses) with
-    an invented "Table Attention" `alert_type` — that broke on first live test
-    (`Alert Rule.alert_type` is a fixed Select whose options don't include it,
-    and adding a new option would have meant a schema change). `Alert
-    Settings` already ships a purpose-built, un-wired field for exactly this —
-    `table_turnaround_warning_time` (Int, minutes) — so this reads that
-    instead. It's a Single doctype field (global, not branch-scoped), hence
-    `branch` is accepted for API-shape stability but unused; 0/unset means
-    disabled.
-    """
-    threshold = frappe.db.get_single_value("Alert Settings", "table_turnaround_warning_time")
-    if not threshold or threshold <= 0:
-        return {"enabled": False, "threshold_minutes": 0}
-
-    return {"enabled": True, "threshold_minutes": threshold}
-
-
-@frappe.whitelist()
 def sync_order(
     items,
     cashier,

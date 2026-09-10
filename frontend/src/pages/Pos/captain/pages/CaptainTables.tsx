@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Square } from 'lucide-react';
 import { Button, Spinner, showToast } from '@ury/ui';
-import { call } from '@ury/core';
 import { useCaptainContext } from '../hooks/useCaptainContext';
+import { usePOSStore } from '../../store/pos-store';
 import {
   getRooms,
   getTables,
@@ -44,6 +44,18 @@ export default function CaptainTables() {
   const currentUser = context?.user ?? null;
   const canAccessOtherCaptainsTables = Boolean(capabilities?.canAccessOtherCaptainsTables);
 
+  // Attention threshold (sa-v3-captain-app-parity/GAPS.md Gap 4): reuses the
+  // existing POS Profile `table_attention_time` field (already surfaced as
+  // `tableAttention` by getCombinedPosProfile and already consumed by the
+  // "Table Turnaround Delay" report) via the shared pos-store's cached
+  // `posProfile` — no separate API call needed. `posProfile` is populated by
+  // `CaptainRouteGuard`'s `fetchPosProfile()` call, which wraps this screen.
+  const { posProfile } = usePOSStore();
+  const attentionThresholdMinutes =
+    typeof posProfile?.tableAttention === 'number' && posProfile.tableAttention > 0
+      ? posProfile.tableAttention
+      : null;
+
   const [selectedRoom, setSelectedRoom] = useState<string | null>(null);
   const [branchRooms, setBranchRooms] = useState<Room[]>([]);
   const [roomsLoading, setRoomsLoading] = useState(false);
@@ -58,12 +70,6 @@ export default function CaptainTables() {
   const [menuOpenForTable, setMenuOpenForTable] = useState<string | null>(null);
   const [mergeSourceTable, setMergeSourceTable] = useState<Table | null>(null);
   const [unmergeSourceTable, setUnmergeSourceTable] = useState<Table | null>(null);
-
-  // "Needs attention" threshold (sa-v3-captain-app-parity/GAPS.md Gap 4).
-  // `null` while unresolved or when the branch has no "Table Attention"
-  // Alert Settings rule configured — CaptainTableCard renders no indicator
-  // in either case.
-  const [attentionThresholdMinutes, setAttentionThresholdMinutes] = useState<number | null>(null);
 
   // `get_captain_context()`'s `rooms` field (from `getRoom()` in
   // `ury/ury_pos/api.py`) reflects the Captain's own room *assignment*, not
@@ -152,27 +158,6 @@ export default function CaptainTables() {
     if (selectedRoom) loadTables(selectedRoom);
     if (branch) loadActiveOrders(branch);
   }, [selectedRoom, branch, loadTables, loadActiveOrders]);
-
-  useEffect(() => {
-    let cancelled = false;
-    call
-      .get<{ message: { enabled: boolean; threshold_minutes: number } }>(
-        'ury.ury.doctype.ury_order.ury_order.get_table_attention_config',
-        { branch }
-      )
-      .then((response) => {
-        if (cancelled) return;
-        const config = response?.message;
-        setAttentionThresholdMinutes(config?.enabled ? config.threshold_minutes : null);
-      })
-      .catch(() => {
-        // Non-fatal: the attention indicator simply doesn't render.
-        if (!cancelled) setAttentionThresholdMinutes(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [branch]);
 
   const handleMergeConfirm = async (targetNames: string[]) => {
     if (!mergeSourceTable || targetNames.length === 0) return;
