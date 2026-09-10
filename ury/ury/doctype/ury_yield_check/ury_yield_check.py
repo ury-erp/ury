@@ -34,9 +34,20 @@ class URYYieldCheck(Document):
 			)
 
 	def capture_standard_yield_snapshot(self):
-		"""Check 3: Capture Item.custom_yield_percent at save time (only on insert)."""
+		"""Check 3: Capture Item.custom_yield_percent at save time (only on insert).
+
+		Also validates that if custom_yield_tracked is true, custom_yield_percent must be > 0.
+		"""
 		if not self.standard_yield_percent_snapshot:
 			item_yield = frappe.db.get_value("Item", self.item, "custom_yield_percent") or 0.0
+
+			# I6: If item is yield-tracked, require a non-zero standard yield percent
+			if item_yield <= 0:
+				frappe.throw(
+					_("Item {0} is marked yield-tracked but has no standard yield percent set — set a value in Yield Standards first.").format(self.item),
+					frappe.ValidationError
+				)
+
 			self.standard_yield_percent_snapshot = item_yield
 
 	def compute_yield_and_variance(self):
