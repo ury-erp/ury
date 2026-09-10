@@ -1,0 +1,100 @@
+[
+ {
+  "doctype": "Workflow",
+  "name": "URY Sales Plan",
+  "workflow_name": "URY Sales Plan",
+  "document_type": "URY Sales Plan",
+  "is_active": 1,
+  "override_status": 0,
+  "send_email_alert": 0,
+  "workflow_state_field": "status",
+  "states": [
+   {
+    "state": "Draft",
+    "doc_status": "0",
+    "allow_edit": "URY Manager",
+    "update_field": "status",
+    "update_value": "Draft"
+   },
+   {
+    "state": "Proposed",
+    "doc_status": "0",
+    "allow_edit": "URY Manager",
+    "update_field": "status",
+    "update_value": "Proposed"
+   },
+   {
+    "state": "Submitted for Approval",
+    "doc_status": "0",
+    "allow_edit": "URY Manager",
+    "update_field": "status",
+    "update_value": "Submitted for Approval"
+   },
+   {
+    "state": "Approved",
+    "doc_status": "0",
+    "allow_edit": "URY Manager",
+    "update_field": "status",
+    "update_value": "Approved"
+   },
+   {
+    "state": "Locked for Production",
+    "doc_status": "0",
+    "allow_edit": "URY Manager",
+    "update_field": "status",
+    "update_value": "Locked for Production"
+   },
+   {
+    "state": "Superseded/Cancelled",
+    "doc_status": "0",
+    "allow_edit": "URY Manager",
+    "update_field": "status",
+    "update_value": "Superseded/Cancelled"
+   }
+  ],
+  "transitions": [
+   {
+    "state": "Draft",
+    "action": "Propose",
+    "next_state": "Proposed",
+    "allowed": "URY Manager",
+    "allow_self_approval": 1
+   },
+   {
+    "state": "Proposed",
+    "action": "Submit for Approval",
+    "next_state": "Submitted for Approval",
+    "allowed": "URY Manager",
+    "allow_self_approval": 1
+   },
+   {
+    "state": "Submitted for Approval",
+    "action": "Approve",
+    "next_state": "Approved",
+    "allowed": "URY Manager",
+    "allow_self_approval": 1
+   },
+   {
+    "state": "Approved",
+    "action": "Lock for Production",
+    "next_state": "Locked for Production",
+    "allowed": "URY Manager",
+    "allow_self_approval": 1
+   },
+   {
+    "state": "Approved",
+    "action": "Supersede/Cancel",
+    "next_state": "Superseded/Cancelled",
+    "allowed": "URY Manager",
+    "allow_self_approval": 1
+   },
+   {
+    "state": "Locked for Production",
+    "action": "Supersede/Cancel",
+    "next_state": "Superseded/Cancelled",
+    "allowed": "URY Manager",
+    "allow_self_approval": 1
+   }
+  ]
+ }
+]
