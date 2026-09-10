@@ -167,7 +167,7 @@ def _notify_branch(branch, due_items):
 
 	message = (
 		f"The following items at branch {branch} are due for yield checks:\n\n"
-		f"• {chr(10).join('• ' + s for s in item_summaries)}"
+		f"{chr(10).join('• ' + s for s in item_summaries)}"
 	)
 
 	# Notify users with the "Manager" role (or similar; follow food_cost_alerts pattern).
@@ -298,11 +298,15 @@ def _evaluate_interval(item, branch):
 
 	today = getdate()
 
-	# If never checked, due immediately.
+	# If never checked, due immediately. Use days since item creation as days_overdue
+	# to highlight items that have never been checked in the Overdue report.
 	if not last_check:
+		item_creation = frappe.db.get_value("Item", item_code, "creation")
+		item_creation_date = getdate(item_creation)
+		days_since_creation = (today - item_creation_date).days
 		return (
 			f"No yield check recorded (interval: every {interval_days} days)",
-			{},
+			{"days_overdue": days_since_creation},
 		)
 
 	# Compute days overdue.
