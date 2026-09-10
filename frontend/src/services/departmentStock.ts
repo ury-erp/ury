@@ -152,6 +152,31 @@ export interface CreateIssueAuthorizationParams {
   production_unit?: string;
 }
 
+export interface RecordYieldCheckParams {
+  item: string;
+  branch: string;
+  company: string;
+  input_qty: number;
+  output_qty: number;
+  stock_uom: string;
+  check_type: string;
+  issue_authorization?: string;
+  department?: string;
+  production_unit?: string;
+}
+
+export interface YieldCheckResult {
+  name: string;
+  item: string;
+  branch: string;
+  company: string;
+  actual_yield_percent?: number;
+  standard_yield_percent_snapshot?: number;
+  variance_percent?: number;
+  check_type: string;
+  checked_on?: string;
+}
+
 /**
  * One component/department row from a Sales Plan's frozen
  * `approval_snapshot.demand_vector` (see
@@ -371,6 +396,26 @@ export const departmentStockService = {
       production_unit: params.production_unit,
     });
     return normalizeIssueAuthorization((res as any)?.message ?? res);
+  },
+
+  /**
+   * Records a yield check measurement, optionally attached to an Issue Authorization.
+   * Creates a URY Yield Check document with the given fields.
+   */
+  async recordYieldCheck(params: RecordYieldCheckParams): Promise<YieldCheckResult> {
+    const res = await call<any>('ury.ury.api.ury_yield_variance.record_yield_check', {
+      item: params.item,
+      branch: params.branch,
+      company: params.company,
+      input_qty: params.input_qty,
+      output_qty: params.output_qty,
+      stock_uom: params.stock_uom,
+      check_type: params.check_type,
+      issue_authorization: params.issue_authorization,
+      department: params.department,
+      production_unit: params.production_unit,
+    });
+    return (res as any)?.message ?? res;
   },
 
   /**
