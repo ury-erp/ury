@@ -47,15 +47,6 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
     menuItems
   } = usePOSStore();
   
-  // Find existing item in cart
-  const existingCartItem = selectedItem ? activeOrders.find(
-    order => order.id === selectedItem.id &&
-    (!order.selectedVariant || order.selectedVariant.id === initialVariant?.id) &&
-    (!order.selectedAddons || order.selectedAddons.length === initialAddons.length && 
-      order.selectedAddons.every(addon => 
-        initialAddons.some(initAddon => initAddon.id === addon.id)
-      ))
-  ) : null;
 
   // State for the full item doc (used for all dialog content)
   const [itemDoc, setItemDoc] = useState<any | null>(null);
@@ -124,10 +115,29 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
         .filter(Boolean)
     : [];
 
-  const [selectedAddons, setSelectedAddons] = useState<Array<{ id: string; name: string; price: number }>>([]);
+  const [selectedAddons, setSelectedAddons] = useState<Array<{ id: string; name: string; price: number }>>(initialAddons);
   const [quantity, setQuantity] = useState<string>(editMode ? initialQuantity?.toString() || '0' : '0');
-  const [comments, setComments] = useState<string>(itemToReplace?.comment || existingCartItem?.comment || '');
+  const [comments, setComments] = useState<string>(itemToReplace?.comment || '');
   const dialogRef = useRef<HTMLDivElement>(null);
+
+  // Find existing item in cart based on current selections and comments
+  const existingCartItem = selectedItem ? activeOrders.find(
+    order => order.id === selectedItem.id &&
+    (!order.selectedVariant || order.selectedVariant.id === initialVariant?.id) &&
+    (!order.selectedAddons || (order.selectedAddons.length === selectedAddons.length && 
+      order.selectedAddons.every(addon => 
+        selectedAddons.some(selAddon => selAddon.id === addon.id)
+      ))) &&
+    ((!order.comment && !comments) || (order.comment?.trim() === comments?.trim()))
+  ) : null;
+
+  // Initialize quantity and comments for new additions
+  useEffect(() => {
+    if (!editMode && selectedItem) {
+      setQuantity('1');
+      setComments('');
+    }
+  }, [selectedItem, editMode]);
 
   const [, setAddonItemCodes] = useState<string[]>([]);
   const [isAddonLoading, setIsAddonLoading] = useState(false);
@@ -162,18 +172,6 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
       });
   }, [selectedItem]);
 
-  // Initialize quantity and comments from cart if not in edit mode
-  useEffect(() => {
-    if (!editMode && selectedItem) {
-      if (existingCartItem) {
-        setQuantity(existingCartItem.quantity.toString());
-        setComments(existingCartItem.comment || '');
-      } else {
-        const cartQuantity = getItemQuantityFromCart(selectedItem);
-        setQuantity(cartQuantity.toString());
-      }
-    }
-  }, [selectedItem, editMode, getItemQuantityFromCart, existingCartItem]);
 
   // Handle click outside to close dialog
   useEffect(() => {
@@ -207,40 +205,40 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
 
   // Always get price from menuItems for the main item
   const basePrice = selectedItem?.price ? Number(selectedItem.price) : 0;
-  const numericQuantity = quantity === '' ? 0 : parseInt(quantity, 10);
+  const numericQuantity = quantity === '' ? 0 : parseFloat(quantity);
   const addonsTotal = selectedAddons.reduce((sum, addon) => sum + addon.price, 0);
   const total = (basePrice + addonsTotal) * numericQuantity;
 
   const handleQuantityChange = (value: string) => {
-    // Allow empty string or numbers
+    // Only allow valid numbers and one decimal point
+    const isValid = /^\d*\.?\d*$/.test(value);
+    if (!isValid) return;
+
     if (value === '') {
       setQuantity('');
       return;
     }
 
-    const num = parseInt(value, 10);
-    if (!isNaN(num) && num >= 0 && num <= 99) {
-      setQuantity(num.toString());
-    }
+    setQuantity(value);
   };
 
   const handleIncrement = () => {
-    const currentNum = quantity === '' ? 0 : parseInt(quantity, 10);
+    const currentNum = quantity === '' ? 0 : parseFloat(quantity);
     if (currentNum < 99) {
-      setQuantity((currentNum + 1).toString());
+      setQuantity(Math.round((currentNum + 1) * 1000) / 1000 + '');
     }
   };
 
   const handleDecrement = () => {
-    const currentNum = quantity === '' ? 0 : parseInt(quantity, 10);
+    const currentNum = quantity === '' ? 0 : parseFloat(quantity);
     if (currentNum > 0) {
-      setQuantity((currentNum - 1).toString());
+      setQuantity(Math.round((currentNum - 1) * 1000) / 1000 + '');
     }
   };
 
   const handleAddToOrder = () => {
-    const numericQuantity = typeof quantity === 'string' ? parseInt(quantity, 10) : quantity;
-    if (isNaN(numericQuantity) || numericQuantity === 0) {
+    const numericQuantity = typeof quantity === 'string' ? parseFloat(quantity) : quantity;
+    if (isNaN(numericQuantity) || numericQuantity <= 0) {
       return; // Don't add to order if quantity is 0 or invalid
     }
 
@@ -250,11 +248,12 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
     }
 
     // Add main item as a cart line
+    const trimmedComment = comments.trim();
     const orderItem: OrderItem = {
       ...selectedItem,
       quantity: numericQuantity,
       price: basePrice,
-      comment: comments || undefined
+      comment: trimmedComment || undefined
     };
     addToOrder(orderItem);
 
@@ -313,7 +312,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
       <DialogContent 
         ref={dialogRef}
         variant="xlarge"
-        className="bg-white w-full max-w-[90rem] max-h-[90vh] overflow-y-auto flex flex-col md:flex-row p-0"
+        className="bg-white w-full max-w-[90rem] max-h-dialog-max-h overflow-y-auto flex flex-col md:flex-row p-0"
         showCloseButton={false}
       >
         {/* Left Column - Image  */}

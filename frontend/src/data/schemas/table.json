@@ -1,0 +1,56 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "URY Table Schema",
+  "description": "Form and data schema for URY Restaurant Table management",
+  "type": "object",
+  "properties": {
+    "table_name": {
+      "type": "string",
+      "title": "Table Name",
+      "placeholder": "e.g. T-01",
+      "minLength": 1
+    },
+    "seats": {
+      "type": "integer",
+      "title": "Number of Seats",
+      "default": 4,
+      "minimum": 1,
+      "maximum": 30
+    },
+    "room": {
+      "type": "string",
+      "title": "Room Area",
+      "enum": ["Main Hall", "Terrace", "VIP Lounge", "Rooftop Garden", "Bar Counter"],
+      "default": "Main Hall"
+    },
+    "branch": {
+      "type": "string",
+      "title": "Branch",
+      "enum": ["Main Branch", "Downtown Branch", "Beachfront Outpost", "Express Outlet"],
+      "default": "Main Branch"
+    },
+    "status": {
+      "type": "string",
+      "title": "Status",
+      "enum": ["Available", "Occupied", "Reserved", "Cleaning"],
+      "default": "Available"
+    },
+    "shape": {
+      "type": "string",
+      "title": "Table Shape",
+      "enum": ["Rectangle", "Square", "Circle"],
+      "default": "Rectangle"
+    },
+    "layout": {
+      "type": "object",
+      "title": "Advanced Layout Position",
+      "properties": {
+        "x": { "type": "integer", "title": "X Position", "default": 0 },
+        "y": { "type": "integer", "title": "Y Position", "default": 0 },
+        "width": { "type": "integer", "title": "Width (px)", "default": 120 },
+        "height": { "type": "integer", "title": "Height (px)", "default": 80 }
+      }
+    }
+  },
+  "required": ["table_name", "seats", "room", "branch", "status", "shape"]
+}

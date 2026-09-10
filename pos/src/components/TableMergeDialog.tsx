@@ -36,11 +36,13 @@ const TableMergeDialog = ({
 }: TableMergeDialogProps) => {
   const [selectedTargets, setSelectedTargets] = useState<Set<string>>(new Set());
   const [phase, setPhase] = useState<DialogPhase>('select');
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     if (open) {
       setSelectedTargets(new Set());
       setPhase('select');
+      setSearch('');
     }
   }, [open, sourceTable?.name]);
 
@@ -49,13 +51,17 @@ const TableMergeDialog = ({
     [availableTables, selectedTargets]
   );
   const mergeCandidates = useMemo(() => {
-    return availableTables.filter((table) => {
-      return (
-        table.occupied !== 1 &&
-        table.name !== sourceTable?.name
-      );
+    const filtered = availableTables.filter((table) => {
+      return table.name !== sourceTable?.name;
     });
-  }, [availableTables, sourceTable?.name]);
+    const q = search.trim().toLowerCase();
+    if (!q) return filtered;
+    return filtered.filter(
+      (table) =>
+        table.name.toLowerCase().includes(q) ||
+        (table.restaurant_room && table.restaurant_room.toLowerCase().includes(q))
+    );
+  }, [availableTables, sourceTable?.name, search]);
 
   const handleClose = () => {
     if (phase === 'merging') return;
@@ -119,6 +125,17 @@ const TableMergeDialog = ({
               </DialogDescription>
             </DialogHeader>
 
+            <div className="px-6 pt-2">
+              <input
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={t('tables.search_table_placeholder')}
+                className="mb-3 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                disabled={phase === 'merging'}
+              />
+            </div>
+
             <div className="max-h-64 overflow-y-auto px-6 pb-2">
               {mergeCandidates.length === 0 ? (
                 <p className="py-4 text-center text-sm text-gray-500">
@@ -160,7 +177,7 @@ const TableMergeDialog = ({
                           )}
                         </div>
                         <Badge
-                          variant={table.occupied === 1 ? 'secondary' : 'success'}
+                          variant={table.occupied === 1 ? 'warning' : 'success'}
                           className="shrink-0"
                         >
                           {table.occupied === 1 ? t('tables.occupied') : t('tables.available')}

@@ -28,6 +28,8 @@ export interface POSInvoice {
   split_siblings?: string[];
   custom_merged_pos_invoice?: string | null;
   custom_merged_total?: number | null;
+  additional_discount_percentage?: number;
+  discount_amount?: number;
 }
 
 export interface OrdersState {
