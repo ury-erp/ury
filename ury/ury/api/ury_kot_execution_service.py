@@ -233,7 +233,7 @@ def _lock_execution_row(kot):
 	rows = frappe.db.sql(
 		"""
 		SELECT name, state, idempotency_key, started_by, started_at,
-		       ready_by, ready_at, served_by, served_at
+		       ready_by, ready_at, served_by, served_at, audit_log
 		FROM `tab{doctype}`
 		WHERE kot = %(kot)s
 		ORDER BY creation DESC
@@ -368,6 +368,15 @@ def _transition(kot, target_state, idempotency_key, actor_field, timestamp_field
 	# insert the first row, seeding it as having been QUEUED.
 	if locked:
 		doc = frappe.get_doc(EXECUTION_DOCTYPE, locked["name"])
+		# `frappe.get_doc` above is a plain read: under MariaDB REPEATABLE READ
+		# it can be served from this transaction's consistent read view pinned
+		# by an earlier statement (e.g. the idempotency dedup lookup), not from
+		# the latest committed row -- even though it runs after
+		# `_lock_execution_row` took `FOR UPDATE` on this same row. Overwrite
+		# `audit_log` with the value the locking read just fetched so the
+		# read-modify-write append below lands on top of the latest committed
+		# entries instead of silently dropping a concurrently committed one.
+		doc.audit_log = locked.get("audit_log")
 	else:
 		doc = frappe.get_doc(
 			{

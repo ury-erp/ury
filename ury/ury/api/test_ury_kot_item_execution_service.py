@@ -107,12 +107,21 @@ class _ExecutionHarness:
 		return self._select(doctype, filters=filters, fields=fields, limit=limit)
 
 	def sql(self, query, values=None, as_dict=False, pluck=None, **kwargs):
-		if not values or "kot_item" not in values:
+		if not values:
 			return []
-		rows = self._select(ITEM_EXECUTION_DOCTYPE, filters={"kot_item": values["kot_item"]}, limit=1)
-		if pluck:
-			return [row.get(pluck) for row in rows]
-		return rows
+		if "kot_item" in values:
+			rows = self._select(ITEM_EXECUTION_DOCTYPE, filters={"kot_item": values["kot_item"]}, limit=1)
+			if pluck:
+				return [row.get(pluck) for row in rows]
+			return rows
+		if "kot" in values:
+			# _lock_sibling_item_execution_rows: locking read of every sibling
+			# item-execution row for this KOT.
+			rows = self._select(ITEM_EXECUTION_DOCTYPE, filters={"kot": values["kot"]})
+			if pluck:
+				return [row.get(pluck) for row in rows]
+			return rows
+		return []
 
 	def _select(self, doctype, filters=None, fields=None, limit=None):
 		rows = []
@@ -164,6 +173,8 @@ class TestKotItemExecution(FrappeTestCase):
 		with patch(f"{MODULE}.frappe.db.exists", side_effect=harness.exists), patch(
 			f"{MODULE}.frappe.get_doc", side_effect=harness.get_doc
 		), patch(f"{MODULE}.frappe.get_all", side_effect=harness.get_all), patch(
+			f"{MODULE}.frappe.db.sql", side_effect=harness.sql
+		), patch(
 			f"{MODULE}.frappe.db.get_value", return_value=frappe._dict({"branch": "BR-1", "production": "PU-1"})
 		), patch(f"{MODULE}.frappe.session") as session:
 			session.user = "chef@example.com"
