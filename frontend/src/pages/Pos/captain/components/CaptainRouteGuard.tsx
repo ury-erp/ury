@@ -5,6 +5,7 @@ import ServiceRequestPanel from './ServiceRequestPanel';
 import ChecklistGateDialog from '../../components/ChecklistGateDialog';
 import { getChecklist } from '../../../../lib/pos/checklist-api';
 import { initI18n } from '../../i18n';
+import { usePOSStore } from '../../store/pos-store';
 
 interface Props {
   children: React.ReactNode;
@@ -46,10 +47,23 @@ type ChecklistGateState = 'checking' | 'needed' | 'clear';
  * instead of their text, since `t()`'s locale map is empty until
  * `initI18n()` has resolved at least once. Safe to call redundantly if the
  * main POS's `PosLayout` has already initialized it in the same session.
+ *
+ * Also fetches the shared `pos-store`'s `posProfile` (`fetchPosProfile()`),
+ * which is otherwise only triggered by `PosLayout`'s `initializeApp()` —
+ * again, a mount point captain routes never reach. `CaptainMenu.tsx`'s own
+ * `fetchMenuItems()` silently no-ops while `posProfile` is null (its guard:
+ * `if (!posProfile?.restaurant) return`), with no error and no console
+ * output, so a captain landing here without ever having shared a browser
+ * tab with a cashier session (whose cached `posProfile` would otherwise
+ * incidentally leak into this session via `sessionStorage`) sees a
+ * permanently empty "No items found" menu. `children` is held back by the
+ * loading gate below until this resolves, so `CaptainMenu`'s own effect
+ * fires after `posProfile` is already populated.
  */
 const CaptainRouteGuard: React.FC<Props> = ({ children }) => {
   const { context, capabilities, branch, isLoading, error } = useCaptainContext();
   const posProfileName = context?.pos_profile?.name ?? null;
+  const { posProfile, profileLoading, fetchPosProfile } = usePOSStore();
 
   const [checklistGate, setChecklistGate] = useState<ChecklistGateState>('checking');
 
@@ -57,6 +71,15 @@ const CaptainRouteGuard: React.FC<Props> = ({ children }) => {
     initI18n().catch((initError) => {
       console.error('Failed to initialize i18n for captain routes:', initError);
     });
+  }, []);
+
+  useEffect(() => {
+    if (!posProfile && !profileLoading) {
+      fetchPosProfile().catch((profileError) => {
+        console.error('Failed to fetch POS profile for captain routes:', profileError);
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const checkChecklist = useCallback(async () => {
@@ -133,6 +156,14 @@ const CaptainRouteGuard: React.FC<Props> = ({ children }) => {
           checkChecklist();
         }}
       />
+    );
+  }
+
+  if (!posProfile) {
+    return (
+      <div className="min-h-screen">
+        <Spinner message="Loading POS profile..." />
+      </div>
     );
   }
 
