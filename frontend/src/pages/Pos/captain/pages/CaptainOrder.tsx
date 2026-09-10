@@ -76,7 +76,24 @@ export default function CaptainOrder() {
     selectedCustomer,
     clearTableOrder,
     isOrderInteractionDisabled,
+    selectedOrderType,
+    setSelectedOrderType,
   } = usePOSStore();
+
+  // The shared pos-store's `selectedOrderType` defaults to "Take Away" (see
+  // DEFAULT_ORDER_TYPE in data/order-types.ts) and is otherwise only set by
+  // the Cashier's OrderTypeSelect control, which this screen doesn't render.
+  // Without this, `fetchMenuItems()` resolves whatever order-type menu was
+  // last selected (or the Take Away default) instead of the Dine In menu --
+  // on a branch with no Take Away menu configured, or a different item set,
+  // captains would see an empty or wrong menu for every table. Every captain
+  // table order is Dine In by definition, so force it on mount.
+  useEffect(() => {
+    if (selectedOrderType !== DINE_IN) {
+      setSelectedOrderType(DINE_IN);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [mode, setMode] = useState<Mode>('order');
   const [hasSetInitialMode, setHasSetInitialMode] = useState(false);
