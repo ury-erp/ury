@@ -2,8 +2,16 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Square } from 'lucide-react';
 import { Button, Spinner, showToast } from '@ury/ui';
+import { call } from '@ury/core';
 import { useCaptainContext } from '../hooks/useCaptainContext';
-import { getRooms, getTables, type Room, type Table } from '../../lib/table-api';
+import {
+  getRooms,
+  getTables,
+  mergeTablesBatch,
+  unmergeTables,
+  type Room,
+  type Table,
+} from '../../lib/table-api';
 import { getMergeGroupMembers, sortTablesByMergeGroups } from '../../lib/table-utils';
 import {
   getActiveTableOrders,
@@ -13,6 +21,8 @@ import {
 import CaptainTableCard, {
   type CaptainTableOwnership,
 } from '../components/CaptainTableCard';
+import TableMergeDialog from '../../components/TableMergeDialog';
+import TableUnmergeDialog from '../../components/TableUnmergeDialog';
 
 /**
  * Captain "Tables" home screen (`/order`). See PLAN.md §5/§6 for the
@@ -42,6 +52,18 @@ export default function CaptainTables() {
   const [ownerNames, setOwnerNames] = useState<Map<string, string>>(new Map());
   const [tablesLoading, setTablesLoading] = useState(false);
   const [tablesError, setTablesError] = useState<string | null>(null);
+
+  // Table-level merge/unmerge overflow menu (sa-v3-captain-app-parity/GAPS.md
+  // Gap 3) — same state shape as the main POS's Table.tsx.
+  const [menuOpenForTable, setMenuOpenForTable] = useState<string | null>(null);
+  const [mergeSourceTable, setMergeSourceTable] = useState<Table | null>(null);
+  const [unmergeSourceTable, setUnmergeSourceTable] = useState<Table | null>(null);
+
+  // "Needs attention" threshold (sa-v3-captain-app-parity/GAPS.md Gap 4).
+  // `null` while unresolved or when the branch has no "Table Attention"
+  // Alert Settings rule configured — CaptainTableCard renders no indicator
+  // in either case.
+  const [attentionThresholdMinutes, setAttentionThresholdMinutes] = useState<number | null>(null);
 
   // `get_captain_context()`'s `rooms` field (from `getRoom()` in
   // `ury/ury_pos/api.py`) reflects the Captain's own room *assignment*, not
@@ -130,6 +152,67 @@ export default function CaptainTables() {
     if (selectedRoom) loadTables(selectedRoom);
     if (branch) loadActiveOrders(branch);
   }, [selectedRoom, branch, loadTables, loadActiveOrders]);
+
+  useEffect(() => {
+    let cancelled = false;
+    call
+      .get<{ message: { enabled: boolean; threshold_minutes: number } }>(
+        'ury.ury.doctype.ury_order.ury_order.get_table_attention_config',
+        { branch }
+      )
+      .then((response) => {
+        if (cancelled) return;
+        const config = response?.message;
+        setAttentionThresholdMinutes(config?.enabled ? config.threshold_minutes : null);
+      })
+      .catch(() => {
+        // Non-fatal: the attention indicator simply doesn't render.
+        if (!cancelled) setAttentionThresholdMinutes(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [branch]);
+
+  const handleMergeConfirm = async (targetNames: string[]) => {
+    if (!mergeSourceTable || targetNames.length === 0) return;
+    try {
+      await mergeTablesBatch(mergeSourceTable.name, targetNames);
+      if (selectedRoom) await loadTables(selectedRoom);
+      showToast.success('Tables merged');
+    } catch (error) {
+      showToast.error(error instanceof Error ? error.message : 'Failed to merge tables');
+      throw error;
+    }
+  };
+
+  const handleUnmergeConfirm = async () => {
+    if (!unmergeSourceTable) return;
+    try {
+      await unmergeTables(unmergeSourceTable.name);
+      if (selectedRoom) await loadTables(selectedRoom);
+      showToast.success('Tables unmerged');
+    } catch (error) {
+      showToast.error(error instanceof Error ? error.message : 'Failed to unmerge tables');
+      throw error;
+    }
+  };
+
+  const mergeAvailableTables = useMemo(() => {
+    if (!mergeSourceTable) return [];
+    const sourceCluster = new Set(getMergeGroupMembers(mergeSourceTable, tables));
+    return tables.filter((candidate) => {
+      if (candidate.name === mergeSourceTable.name) return false;
+      if (sourceCluster.has(candidate.name)) return false;
+      if (candidate.occupied === 1 && mergeSourceTable.occupied === 1) return false;
+      return true;
+    });
+  }, [mergeSourceTable, tables]);
+
+  const unmergeGroupMembers = useMemo(() => {
+    if (!unmergeSourceTable) return [];
+    return getMergeGroupMembers(unmergeSourceTable, tables);
+  }, [unmergeSourceTable, tables]);
 
   const tableGroups = useMemo(() => sortTablesByMergeGroups(tables), [tables]);
 
@@ -252,12 +335,38 @@ export default function CaptainTables() {
                   ownerName={ownership === 'mine' ? undefined : ownerName}
                   mergePartners={mergePartners}
                   onTap={() => handleTableTap(table, order)}
+                  attentionThresholdMinutes={attentionThresholdMinutes}
+                  showTableActions
+                  menuOpen={menuOpenForTable === table.name}
+                  onMenuOpenChange={(open) => setMenuOpenForTable(open ? table.name : null)}
+                  onMerge={() => setMergeSourceTable(table)}
+                  onUnmerge={() => setUnmergeSourceTable(table)}
                 />
               );
             })}
           </div>
         )}
       </div>
+
+      <TableMergeDialog
+        open={mergeSourceTable !== null}
+        onOpenChange={(open) => {
+          if (!open) setMergeSourceTable(null);
+        }}
+        sourceTable={mergeSourceTable}
+        availableTables={mergeAvailableTables}
+        onConfirm={handleMergeConfirm}
+      />
+
+      <TableUnmergeDialog
+        open={unmergeSourceTable !== null}
+        onOpenChange={(open) => {
+          if (!open) setUnmergeSourceTable(null);
+        }}
+        sourceTable={unmergeSourceTable}
+        groupMembers={unmergeGroupMembers}
+        onConfirm={handleUnmergeConfirm}
+      />
     </div>
   );
 }
