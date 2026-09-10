@@ -93,7 +93,8 @@ def _lock_item_execution_row(kot_item):
 	rows = frappe.db.sql(
 		f"""
 		SELECT name, state, idempotency_key, started_by, started_at,
-		       ready_by, ready_at, served_by, served_at, kot, kot_item
+		       ready_by, ready_at, served_by, served_at, kot, kot_item,
+		       branch, company, production_unit, audit_log
 		FROM `tab{ITEM_EXECUTION_DOCTYPE}`
 		WHERE kot_item = %(kot_item)s
 		ORDER BY creation DESC
@@ -167,13 +168,37 @@ def _aggregate_state(rows):
 	return QUEUED
 
 
-def _sync_kot_execution(kot):
-	rows = frappe.get_all(
-		ITEM_EXECUTION_DOCTYPE,
-		filters={"kot": kot},
-		fields=["name", "state", "idempotency_key", "started_by", "started_at", "ready_by", "ready_at", "served_by", "served_at"],
-		order_by="creation asc",
+def _lock_sibling_item_execution_rows(kot):
+	"""Lock every `URY KOT Item Execution` row for `kot` with `FOR UPDATE`.
+
+	`_transition` only locks the single item row it is mutating (via
+	`_lock_item_execution_row`); by the time this function runs, that row's
+	own transition has already been written. A concurrent transition on a
+	*sibling* item of the same KOT can be mutating another row right now. A
+	plain `get_all` here would be served from whatever consistent-read
+	snapshot this transaction already pinned (e.g. via `_find_prior_result`
+	earlier in the same request), which can be older than that concurrent
+	sibling's commit -- so the KOT-level aggregate would be computed from a
+	stale sibling set. Locking every sibling row up front forces MariaDB to
+	wait for any in-flight sibling transaction and then read its latest
+	committed state, bypassing the pinned snapshot.
+	"""
+	return frappe.db.sql(
+		f"""
+		SELECT name, state, idempotency_key, started_by, started_at,
+		       ready_by, ready_at, served_by, served_at
+		FROM `tab{ITEM_EXECUTION_DOCTYPE}`
+		WHERE kot = %(kot)s
+		ORDER BY creation ASC
+		FOR UPDATE
+		""",
+		{"kot": kot},
+		as_dict=True,
 	)
+
+
+def _sync_kot_execution(kot):
+	rows = _lock_sibling_item_execution_rows(kot)
 	if not rows:
 		return None
 	state = _aggregate_state(rows)
@@ -280,13 +305,25 @@ def _transition(kot_item, target_state, idempotency_key, actor_field, timestamp_
 	locked = _lock_item_execution_row(kot_item)
 	if not locked:
 		raise ItemExecutionError(KOT_ITEM_NOT_FOUND, _("No execution row exists for KOT item {0}").format(kot_item))
-	branch, company, _production_unit = _kot_scope(locked["kot"])
-	_require_execution_actor(actor, branch, company)
+	# Authorize from the just-locked row's own branch/company columns rather
+	# than re-deriving scope from the KOT doc with a fresh plain read: that
+	# plain read would be served from this transaction's pinned consistent-
+	# read snapshot (established earlier by e.g. `_find_prior_result`), which
+	# can be stale relative to the row we just took `FOR UPDATE` on. The
+	# locked row's branch/company/production_unit are stamped once at seed
+	# time and are exactly what `_kot_scope(locked["kot"])` would resolve to.
+	_require_execution_actor(actor, locked["branch"], locked["company"])
 	if locked["state"] == target_state:
 		return _result_dict(locked, idempotent=True)
 	if locked["state"] not in (QUEUED, IN_PREPARATION, READY) or (locked["state"] == QUEUED and target_state not in (IN_PREPARATION, READY)):
 		raise ItemExecutionError(INVALID_EXECUTION_TRANSITION, _("Cannot transition KOT item {0} execution from {1} to {2}").format(kot_item, locked["state"], target_state))
 	doc = frappe.get_doc(ITEM_EXECUTION_DOCTYPE, locked["name"])
+	# `doc.audit_log` above came from the same pinned-snapshot plain read as
+	# the scope lookup would have; overwrite it with the value from the
+	# locked row so the read-modify-write in `_audit` below appends onto the
+	# latest committed audit_log rather than silently dropping a
+	# concurrently committed entry.
+	doc.audit_log = locked["audit_log"]
 	doc.state = target_state
 	doc.idempotency_key = idempotency_key
 	doc.set(actor_field, actor)

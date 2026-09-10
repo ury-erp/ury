@@ -860,19 +860,47 @@ def create_reservation(
 
 
 def _resolve_group_rows(reservation_name):
-	"""Resolve `reservation_name` (a single row's docname or a reservation_group) to rows.
+	"""Resolve `reservation_name` (a single row's docname or a reservation_group)
+	to its full row set, taking a `SELECT ... FOR UPDATE` lock on every row.
 
 	Accepts either a single `URY Stock Reservation` docname or a
 	`reservation_group` value, so callers can operate on the whole atomic
 	group (all components of one composite reservation) with one call, as
 	release/fulfil/cancel must to keep the group's state consistent.
+
+	Unlike every other row this module locks, this path previously took NO
+	lock at all: a plain read -> status-eligibility decision -> write, reached
+	post-lock from `ury_kot_cancellation_service.cancel_before_start` and
+	`ury_fulfilment_posting_service._fulfil_reservation_once` on reservation
+	rows that those callers' own locks (on KOT Execution / posting intent
+	rows, in different tables) do not cover. Without a lock here, two
+	concurrent transitions of the same group (e.g. a release racing a
+	fulfil) could each read the group as eligible and both write, or one
+	could silently clobber the other's status. `FOR UPDATE` serializes
+	concurrent callers on this group, and stays on this request's own
+	connection/transaction.
 	"""
-	single = frappe.db.get_value(RESERVATION_DOCTYPE, reservation_name, "reservation_group")
-	group = single or reservation_name
-	rows = frappe.get_all(
-		RESERVATION_DOCTYPE,
-		filters={"reservation_group": group},
-		fields=["name", "status", "reservation_group"],
+	single_rows = frappe.db.sql(
+		f"""
+		SELECT reservation_group
+		FROM `tab{RESERVATION_DOCTYPE}`
+		WHERE name = %(name)s
+		FOR UPDATE
+		""",
+		{"name": reservation_name},
+		as_dict=True,
+	)
+	group = (single_rows[0]["reservation_group"] if single_rows else None) or reservation_name
+	rows = frappe.db.sql(
+		f"""
+		SELECT name, status, reservation_group, audit_log
+		FROM `tab{RESERVATION_DOCTYPE}`
+		WHERE reservation_group = %(group)s
+		ORDER BY name ASC
+		FOR UPDATE
+		""",
+		{"group": group},
+		as_dict=True,
 	)
 	if not rows:
 		frappe.throw(_("No reservation found for {0}").format(reservation_name), frappe.ValidationError)
@@ -895,6 +923,11 @@ def _transition_group(reservation_name, from_status, to_status, reason, event):
 	actor = frappe.session.user
 	for row in rows:
 		doc = frappe.get_doc(RESERVATION_DOCTYPE, row.name)
+		# `frappe.get_doc` is a plain read; overwrite audit_log with the value
+		# `_resolve_group_rows`'s locking SELECT already fetched so the
+		# read-modify-write append below cannot silently drop a concurrently
+		# committed audit entry.
+		doc.audit_log = row.get("audit_log")
 		doc.status = to_status
 		if reason:
 			doc.reason = reason

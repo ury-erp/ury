@@ -36,6 +36,7 @@
    "in_standard_filter": 1,
    "label": "KOT",
    "options": "URY KOT",
+   "search_index": 1,
    "read_only": 1,
    "reqd": 1
   },
