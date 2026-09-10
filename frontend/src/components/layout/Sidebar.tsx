@@ -134,7 +134,8 @@ export const SETUP_ITEMS: NavItem[] = [
   { label: 'Commission', path: '/commission-settings', icon: Percent },
   { label: 'Production Units', path: '/production-unit', icon: Factory },
   { label: 'Departments', path: '/production-department', icon: Network },
-  { label: 'Item Config', path: '/item-production-config', icon: Package }
+  { label: 'Item Config', path: '/item-production-config', icon: Package },
+  { label: 'Yield Standards', path: '/yield-standards', icon: Percent }
 ];
 
 /**
