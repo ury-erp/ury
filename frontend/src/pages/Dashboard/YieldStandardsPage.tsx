@@ -99,6 +99,11 @@ export const YieldStandardsPage: React.FC = () => {
       showToast.error('Please select an item');
       return;
     }
+    // Validate that if Yield Tracked is enabled, Yield Percent must be set
+    if (form.custom_yield_tracked && (!form.custom_yield_percent || form.custom_yield_percent <= 0)) {
+      showToast.error('Set a Yield Percent before enabling Yield Tracked.');
+      return;
+    }
     setSaving(true);
     try {
       const payload: Record<string, any> = {

@@ -37,6 +37,36 @@ export const YieldVariancePage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedItem, setSelectedItem] = useState('');
   const [itemOptions, setItemOptions] = useState<{ name: string; item_name?: string }[]>([]);
+  const [company, setCompany] = useState<string>('');
+
+  // Fetch company from branch
+  useEffect(() => {
+    let cancelled = false;
+    if (!activeBranchId || activeBranchId === 'all') {
+      setCompany('');
+      return;
+    }
+
+    (async () => {
+      try {
+        const res = await call<any>('frappe.client.get', {
+          doctype: 'Branch',
+          name: activeBranchId,
+        });
+        const branchData = (res as any)?.message || res;
+        if (!cancelled && branchData?.company) {
+          setCompany(branchData.company);
+        } else if (!cancelled) {
+          setCompany('');
+        }
+      } catch {
+        if (!cancelled) setCompany('');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeBranchId]);
 
   // Fetch available items for filtering
   useEffect(() => {
@@ -77,7 +107,7 @@ export const YieldVariancePage: React.FC = () => {
     (async () => {
       try {
         const res = await call<any>('ury.ury.api.ury_yield_variance.get_yield_variance', {
-          company: 'Default Company', // In real scenario, get from context
+          company: company,
           branch: activeBranchId,
           item: selectedItem || undefined,
         });
@@ -98,7 +128,7 @@ export const YieldVariancePage: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [activeBranchId, selectedItem]);
+  }, [activeBranchId, company, selectedItem]);
 
   const columns: DataTableColumn<YieldVarianceRow>[] = [
     {

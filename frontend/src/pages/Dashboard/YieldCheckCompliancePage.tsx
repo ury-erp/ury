@@ -33,6 +33,7 @@ export const YieldCheckCompliancePage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedBranch, setSelectedBranch] = useState('');
   const [branches, setBranches] = useState<{ name: string }[]>([]);
+  const [company, setCompany] = useState<string>('');
 
   // Fetch branches for selector
   useEffect(() => {
@@ -65,6 +66,37 @@ export const YieldCheckCompliancePage: React.FC = () => {
     }
   }, [activeBranchId, selectedBranch]);
 
+  // Fetch company from selected branch
+  useEffect(() => {
+    let cancelled = false;
+    const branch = selectedBranch || activeBranchId;
+
+    if (!branch || branch === 'all') {
+      setCompany('');
+      return;
+    }
+
+    (async () => {
+      try {
+        const res = await call<any>('frappe.client.get', {
+          doctype: 'Branch',
+          name: branch,
+        });
+        const branchData = (res as any)?.message || res;
+        if (!cancelled && branchData?.company) {
+          setCompany(branchData.company);
+        } else if (!cancelled) {
+          setCompany('');
+        }
+      } catch {
+        if (!cancelled) setCompany('');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedBranch, activeBranchId]);
+
   // Fetch compliance data
   useEffect(() => {
     const branch = selectedBranch || activeBranchId;
@@ -76,7 +108,7 @@ export const YieldCheckCompliancePage: React.FC = () => {
     (async () => {
       try {
         const res = await call<any>('ury.ury.api.ury_yield_variance.get_yield_check_compliance', {
-          company: 'Default Company', // In real scenario, get from context
+          company: company,
           branch: branch && branch !== 'all' ? branch : undefined,
         });
         const data = (res as any)?.message || res || [];
@@ -96,7 +128,7 @@ export const YieldCheckCompliancePage: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [activeBranchId, selectedBranch]);
+  }, [activeBranchId, selectedBranch, company]);
 
   const columns: DataTableColumn<ComplianceRow>[] = [
     {
