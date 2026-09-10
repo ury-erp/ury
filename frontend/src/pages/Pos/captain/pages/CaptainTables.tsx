@@ -229,14 +229,14 @@ export default function CaptainTables() {
     const ownership = resolveOwnership(table, order);
 
     if (ownership === 'free' || ownership === 'mine') {
-      navigate(`/order/table/${table.name}`);
+      navigate(`/pos/order/table/${table.name}`);
       return;
     }
 
     // Occupied by someone else (or occupancy with no resolvable owner):
     // elevated/transfer access overrides the base restriction.
     if (canAccessOtherCaptainsTables) {
-      navigate(`/order/table/${table.name}`);
+      navigate(`/pos/order/table/${table.name}`);
       return;
     }
 
