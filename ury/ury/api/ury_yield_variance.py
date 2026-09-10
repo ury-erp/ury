@@ -9,8 +9,12 @@ All endpoints are gated with `require_manager()` + `_require_scope(company)`
 following the established pattern from ury_cost_variance_attribution.py.
 """
 
+import hashlib
+from datetime import datetime, timedelta
+
 import frappe
 from frappe import _
+from frappe.utils import getdate
 
 from ury.ury.report_api.utils import require_manager
 
@@ -137,7 +141,158 @@ def get_yield_variance(company, branch=None, item=None):
 	return records
 
 
+@frappe.whitelist()
+def get_yield_check_compliance(company, branch=None):
+	"""Compute yield check compliance metrics by cadence mode.
+
+	For each yield-tracked item with cadence != 'None', computes required vs
+	completed checks over the last 30 days. Returns compliance percentage and
+	attached vs standalone check count for data-quality signaling.
+
+	Args:
+		company: Company name (required, scoped)
+		branch: Branch name (optional filter; if None, aggregates all branches)
+
+	Returns:
+		list of dicts with compliance data:
+		[
+			{
+				"item": "<item-code>",
+				"cadence": "Every Issue" | "Interval" | "Sampled",
+				"required_count": <int>,
+				"completed_count": <int>,
+				"compliance_percent": <float>,
+				"attached_count": <int>,  # checks with issue_authorization set
+			},
+			...
+		]
+	"""
+	require_manager()
+	_require_scope(company)
+
+	# Fetch all yield-tracked items with cadence != None.
+	tracked_items = frappe.get_all(
+		"Item",
+		filters={
+			"custom_yield_tracked": 1,
+			"custom_yield_check_cadence": ["!=", "None"],
+		},
+		fields=[
+			"name",
+			"custom_yield_check_cadence",
+			"custom_yield_check_interval_days",
+		],
+	)
+
+	compliance_data = []
+	today = getdate()
+	start_date = today - timedelta(days=30)
+
+	for item in tracked_items:
+		item_code = item.name
+		cadence = item.custom_yield_check_cadence
+
+		# Fetch completed checks for this item in the last 30 days.
+		completed_checks = frappe.get_all(
+			YIELD_CHECK_DOCTYPE,
+			filters={
+				"company": company,
+				"item": item_code,
+				"checked_on": [">=", start_date],
+				"checked_on": ["<", today + timedelta(days=1)],
+			} if branch is None else {
+				"company": company,
+				"branch": branch,
+				"item": item_code,
+				"checked_on": [">=", start_date],
+				"checked_on": ["<", today + timedelta(days=1)],
+			},
+			fields=["name", "issue_authorization", "checked_on"],
+		)
+
+		completed_count = len(completed_checks)
+		attached_count = sum(1 for check in completed_checks if check.issue_authorization)
+
+		required_count = 0
+		if cadence == "Every Issue":
+			# Count authorized issues without a corresponding yield check.
+			authorized_issues = frappe.get_all(
+				"URY Issue Authorization",
+				filters={
+					"component_item": item_code,
+					"status": "Authorized",
+				} if branch is None else {
+					"component_item": item_code,
+					"branch": branch,
+					"status": "Authorized",
+				},
+				fields=["name"],
+			)
+			required_count = len(authorized_issues)
+
+		elif cadence == "Interval":
+			# Compute periods elapsed in the last 30 days.
+			interval_days = item.custom_yield_check_interval_days or 1
+			required_count = max(1, 30 // interval_days)
+
+		elif cadence == "Sampled":
+			# Count days in the last 30 where the deterministic hash picked this item.
+			required_count = _count_sampled_days(start_date, today, branch, item_code)
+
+		compliance_percent = (
+			(completed_count / required_count * 100)
+			if required_count > 0
+			else 100.0
+		)
+
+		compliance_data.append({
+			"item": item_code,
+			"cadence": cadence,
+			"required_count": required_count,
+			"completed_count": completed_count,
+			"compliance_percent": round(compliance_percent, 2),
+			"attached_count": attached_count,
+		})
+
+	return compliance_data
+
+
 # --- internal helpers -------------------------------------------------------
+
+
+def _count_sampled_days(start_date, end_date, branch, item_code):
+	"""Count days in [start_date, end_date) where item_code is sampled.
+
+	Uses the same deterministic hash logic as yield_check_reminders.py's
+	_evaluate_sampled (sampling rate 10%).
+
+	Args:
+		start_date: datetime.date
+		end_date: datetime.date
+		branch: Branch name (optional; if None, uses placeholder)
+		item_code: Item code
+
+	Returns:
+		int: number of days where the item was sampled
+	"""
+	SAMPLING_RATE = 0.10
+	count = 0
+	current_date = start_date
+	branch_str = branch or "all"
+
+	while current_date < end_date:
+		today_str = str(current_date)
+		hash_input = f"{today_str}:{branch_str}:{item_code}"
+		hash_value = hashlib.md5(hash_input.encode()).hexdigest()
+		hash_int = int(hash_value[:8], 16)
+		normalized_hash = (hash_int % 1000000) / 1000000.0
+
+		if normalized_hash < SAMPLING_RATE:
+			count += 1
+
+		current_date += timedelta(days=1)
+
+	return count
 
 
 def _require_scope(company):

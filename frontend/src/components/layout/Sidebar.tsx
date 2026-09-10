@@ -36,7 +36,8 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Bot,
-  Percent
+  Percent,
+  Gauge
 } from 'lucide-react';
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = 'ury.sidebar.collapsed';
@@ -108,6 +109,15 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: 'KOT Errors', path: '/kot-error-log', icon: AlertCircle },
       { label: 'Sellability', path: '/menu-routing', icon: Ban }
     ]
+  },
+  {
+    label: 'Yield',
+    items: [
+      { label: 'Standards', path: '/yield-standards', icon: Target },
+      { label: 'Variance', path: '/yield-variance', icon: TrendingUp },
+      { label: 'Overdue Checks', path: '/overdue-yield-checks', icon: AlertCircle },
+      { label: 'Compliance', path: '/yield-compliance', icon: Gauge }
+    ]
   }
 ];
 
@@ -134,8 +144,7 @@ export const SETUP_ITEMS: NavItem[] = [
   { label: 'Commission', path: '/commission-settings', icon: Percent },
   { label: 'Production Units', path: '/production-unit', icon: Factory },
   { label: 'Departments', path: '/production-department', icon: Network },
-  { label: 'Item Config', path: '/item-production-config', icon: Package },
-  { label: 'Yield Standards', path: '/yield-standards', icon: Percent }
+  { label: 'Item Config', path: '/item-production-config', icon: Package }
 ];
 
 /**
@@ -167,13 +176,14 @@ const reportGroupEntries = Object.entries(reportGroups);
 const REPORTS_PATH_PREFIX = '/reports';
 
 /** Every collapse/expand key this rail tracks, persisted together as one JSON blob. */
-type GroupKey = 'Plan' | 'Operate' | 'Observe' | 'Control' | 'Reports' | 'Setup';
+type GroupKey = 'Plan' | 'Operate' | 'Observe' | 'Control' | 'Yield' | 'Reports' | 'Setup';
 
 const DEFAULT_GROUP_STATE: Record<GroupKey, boolean> = {
   Plan: true,
   Operate: true,
   Observe: true,
   Control: true,
+  Yield: true,
   Reports: false,
   Setup: false
 };
