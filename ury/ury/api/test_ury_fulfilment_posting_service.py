@@ -9,6 +9,8 @@ from ury.ury.api.ury_fulfilment_posting_service import (
 	FAILED,
 	POSTED,
 	_authorize_posting,
+	_stock_entry_items,
+	_submit_stock_entry,
 	create_or_get_posting_intent_for_ready,
 	process_posting_intent,
 	recover_pending_posting_intents,
@@ -288,6 +290,96 @@ class TestCreatePostingIntent(FrappeTestCase):
 
 		self.assertTrue(result["idempotent_replay"])
 		self.assertEqual(result["name"], "INTENT-1")
+
+
+class TestStockEntryType(FrappeTestCase):
+	"""Regression for the MTO bug: the posting worker always created a
+	'Material Issue' Stock Entry, which deducts raw-material components but
+	never produces (receives) the finished selling item. MADE_TO_ORDER must
+	post a 'Manufacture' entry with a t_warehouse row for the selling item.
+	See tracks/sa-nontable-production-gap.
+	"""
+
+	def test_mto_stock_rows_include_finished_item_target_warehouse(self):
+		payload = {
+			"production_policy": "MADE_TO_ORDER",
+			"item_code": "PLATE-1",
+			"accepted_qty": 2,
+			"components": [
+				{"item_code": "COMP-1", "qty": 4, "s_warehouse": "Kitchen WH"},
+				{"item_code": "COMP-2", "qty": 2, "s_warehouse": "Kitchen WH"},
+			],
+		}
+		items = _stock_entry_items(payload)
+		finished_rows = [row for row in items if row.get("item_code") == "PLATE-1"]
+		self.assertEqual(len(finished_rows), 1)
+		self.assertEqual(finished_rows[0]["t_warehouse"], "Kitchen WH")
+		self.assertEqual(finished_rows[0]["qty"], 2)
+		component_rows = [row for row in items if row.get("item_code") != "PLATE-1"]
+		self.assertEqual(len(component_rows), 2)
+		for row in component_rows:
+			self.assertEqual(row["s_warehouse"], "Kitchen WH")
+			self.assertNotIn("t_warehouse", row)
+
+	def test_pre_produced_stock_rows_unchanged(self):
+		payload = {
+			"production_policy": "PRE_PRODUCED",
+			"item_code": "PLATE-1",
+			"accepted_qty": 1,
+			"components": [{"item_code": "PLATE-1", "qty": 1, "s_warehouse": "FG WH"}],
+		}
+		items = _stock_entry_items(payload)
+		self.assertEqual(items, [{"item_code": "PLATE-1", "qty": 1.0, "s_warehouse": "FG WH"}])
+
+	def test_submit_stock_entry_uses_manufacture_for_made_to_order(self):
+		payload = {
+			"company": "Company A",
+			"production_policy": "MADE_TO_ORDER",
+			"item_code": "PLATE-1",
+			"accepted_qty": 1,
+			"components": [{"item_code": "COMP-1", "qty": 2, "s_warehouse": "Kitchen WH"}],
+		}
+		intent = _doc({"name": "INTENT-1", "erpnext_stock_entry": None})
+		captured = {}
+
+		def get_doc(arg):
+			captured["doc"] = arg
+			return _doc(arg)
+
+		with patch(f"{MODULE}.frappe.get_doc", side_effect=get_doc), patch(
+			f"{MODULE}._find_existing_stock_entry", return_value=None
+		), patch(f"{MODULE}._service_mutation") as mock_mutation:
+			mock_mutation.return_value.__enter__ = MagicMock()
+			mock_mutation.return_value.__exit__ = MagicMock(return_value=False)
+			_submit_stock_entry(intent, payload)
+
+		self.assertEqual(captured["doc"]["stock_entry_type"], "Manufacture")
+		self.assertEqual(captured["doc"]["purpose"], "Manufacture")
+
+	def test_submit_stock_entry_uses_material_issue_for_pre_produced(self):
+		payload = {
+			"company": "Company A",
+			"production_policy": "PRE_PRODUCED",
+			"item_code": "PLATE-1",
+			"accepted_qty": 1,
+			"components": [{"item_code": "PLATE-1", "qty": 1, "s_warehouse": "FG WH"}],
+		}
+		intent = _doc({"name": "INTENT-1", "erpnext_stock_entry": None})
+		captured = {}
+
+		def get_doc(arg):
+			captured["doc"] = arg
+			return _doc(arg)
+
+		with patch(f"{MODULE}.frappe.get_doc", side_effect=get_doc), patch(
+			f"{MODULE}._find_existing_stock_entry", return_value=None
+		), patch(f"{MODULE}._service_mutation") as mock_mutation:
+			mock_mutation.return_value.__enter__ = MagicMock()
+			mock_mutation.return_value.__exit__ = MagicMock(return_value=False)
+			_submit_stock_entry(intent, payload)
+
+		self.assertEqual(captured["doc"]["stock_entry_type"], "Material Issue")
+		self.assertEqual(captured["doc"]["purpose"], "Material Issue")
 
 
 class TestProcessPostingIntent(FrappeTestCase):
