@@ -184,6 +184,13 @@ before_uninstall = "ury.uninstall.uninstall"
 # function itself no-ops when "huf" isn't in the installed apps list.
 after_migrate = ["ury.ury.ai_tools.agent_seeding.after_migrate"]
 
+# The "URY Sales Plan" Workflow fixture (ury/ury/workflow/ury_sales_plan/ury_sales_plan.json)
+# links to Workflow State / Workflow Action Master records that frappe core does
+# not seed. `bench migrate` syncs fixtures (frappe.modules.utils.sync_fixtures)
+# BEFORE running after_migrate hooks, so seeding these in after_migrate would be
+# too late on a fresh site -- before_migrate runs first, ahead of fixture sync.
+before_migrate = ["ury.ury.workflow.ury_sales_plan.install.before_migrate"]
+
 # Document Events
 # ---------------
 # Hook on document methods and events
@@ -532,4 +539,5 @@ fixtures = [
     {"dt": "Role", "filters": [["role_name", "like", "URY %"]]},
     {"doctype": "Role", "filters": [["role_name", "in", ["Self Ordering Manager"]]]},
     "Client Script",
+    {"doctype": "Workflow", "filters": [["name", "in", ["URY Sales Plan"]]]},
 ]
