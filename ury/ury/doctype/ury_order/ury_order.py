@@ -5,7 +5,7 @@ import json
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import flt, get_datetime
+from frappe.utils import cint, flt, get_datetime
 from erpnext.controllers.queries import item_query
 from ury.ury_pos.api import getBranch, getBranchRoom, getRoom, posOpening
 from ury.ury.api.ury_kot_generate import kot_execute
@@ -615,6 +615,14 @@ def split_bill(source_invoice, items_to_move, customer=None):
     if user_branch and source.branch != user_branch:
         frappe.throw(_("Not permitted to split invoices from another branch."), frappe.PermissionError)
 
+    # Same ownership / elevated / billing / billed / room gates as sync_order.
+    _enforce_order_access(
+        source,
+        pos_profile_name=source.get("pos_profile"),
+        require_modify=True,
+        deny_message=_("Not permitted to split this invoice."),
+    )
+
     if source.docstatus != 0:
         frappe.throw(_("Only draft invoices can be split."))
 
@@ -1003,6 +1011,23 @@ def _order_ownership_flags(invoice, pos_profile_name=None):
     }
 
 
+def _can_remove_sent_items(pos_profile, invoice=None, pos_profile_name=None):
+    """Whether the acting user may reduce or remove an already-sent line.
+
+    The POS Profile `remove_items` flag grants this to everyone on the
+    profile. Managers - the elevated roles named in
+    `transfer_role_permissions`, the same set that gates table and captain
+    transfer - may also remove sent items without that flag, since they are
+    the people who correct a mis-keyed order on the floor.
+    """
+    if bool(pos_profile.remove_items):
+        return True
+    if invoice is None:
+        return False
+    flags = _order_ownership_flags(invoice, pos_profile_name or pos_profile.name)
+    return bool(flags["has_elevated_access"])
+
+
 def _enforce_order_access(invoice, pos_profile_name=None, require_modify=False, deny_message=None):
     """Fail-closed ownership + room-scoping gate for reading/modifying an
     existing order. Reuses `_order_ownership_flags()` (Phase 2's ownership
@@ -1049,6 +1074,211 @@ def _enforce_order_access(invoice, pos_profile_name=None, require_modify=False, 
         )
 
     return flags
+
+
+def _branch_has_open_pos(branch):
+    """True when the branch has at least one submitted Open POS Opening Entry."""
+    return bool(
+        frappe.db.exists(
+            "POS Opening Entry",
+            {"branch": branch, "status": "Open", "docstatus": 1},
+        )
+    )
+
+
+def _room_has_open_pos(branch, room):
+    """True when a multi-cashier opening covers `room` on `branch`."""
+    if not room:
+        return False
+    rows = frappe.db.sql(
+        """
+        SELECT DISTINCT `tabPOS Opening Entry`.name
+        FROM `tabPOS Opening Entry`
+        INNER JOIN `tabMultiple Rooms`
+            ON `tabMultiple Rooms`.parent = `tabPOS Opening Entry`.name
+        WHERE `tabPOS Opening Entry`.branch = %s
+            AND `tabPOS Opening Entry`.status = 'Open'
+            AND `tabPOS Opening Entry`.docstatus = 1
+            AND `tabMultiple Rooms`.room = %s
+        LIMIT 1
+        """,
+        (branch, room),
+    )
+    return bool(rows)
+
+
+def _resolve_sync_opening_room(table=None, room=None, invoice=None):
+    """Prefer the table's restaurant room over a client-supplied room string."""
+    if table:
+        table_room = frappe.db.get_value("URY Table", table, "restaurant_room")
+        if table_room:
+            return table_room
+    if invoice and invoice.get("restaurant_table"):
+        table_room = frappe.db.get_value(
+            "URY Table", invoice.restaurant_table, "restaurant_room"
+        )
+        if table_room:
+            return table_room
+    if room:
+        return room
+    if invoice and invoice.get("custom_restaurant_room"):
+        return invoice.custom_restaurant_room
+    return None
+
+
+def _require_open_cashier_session(
+    pos_profile,
+    branch,
+    room=None,
+    *,
+    billing_user=False,
+    order_type=None,
+):
+    """Fail closed unless a valid open cashier session covers this sync.
+
+    Single-cashier: any open POS Opening Entry on the branch.
+    Multi-cashier: open entry must include the table/order room.
+    Billing takeaway (no room, non-Dine-In) still requires a branch opening so
+    cashier attribution remains valid without inventing a room scope.
+    """
+    if not branch:
+        frappe.throw(_("Cannot sync order without a branch."))
+
+    multi = bool(pos_profile.custom_enable_multiple_cashier)
+    is_takeaway_flow = (order_type or "") != "Dine In" and not room
+
+    if multi and billing_user and is_takeaway_flow:
+        if not _branch_has_open_pos(branch):
+            frappe.throw(
+                _("POS is closed. Please open a POS entry before taking orders.")
+            )
+        return
+
+    if multi:
+        if not room or not _room_has_open_pos(branch, room):
+            frappe.throw(
+                _("POS is closed or no cashier session is open for this room.")
+            )
+        return
+
+    if not _branch_has_open_pos(branch):
+        frappe.throw(_("POS is closed. Please open a POS entry before taking orders."))
+
+
+def _resolve_menu_for_sync(branch, table=None, room=None, order_type=None):
+    """Authoritative menu for sync validation (room-wise / order-type-wise)."""
+    restaurant = frappe.db.get_value("URY Restaurant", {"branch": branch}, "name")
+    if not restaurant:
+        return None
+
+    if table:
+        _branch, menu, _restaurant = get_restaurant_and_menu_name(table)
+        return menu
+
+    if room:
+        room_wise_menu = frappe.db.get_value(
+            "URY Restaurant", restaurant, "room_wise_menu"
+        )
+        if room_wise_menu:
+            menu = frappe.db.get_value(
+                "Menu for Room",
+                {"parent": restaurant, "room": room},
+                "menu",
+            )
+            if menu:
+                return menu
+
+    if order_type:
+        order_type_wise_menu = frappe.db.get_value(
+            "URY Restaurant", restaurant, "order_type_wise_menu"
+        )
+        if order_type_wise_menu:
+            menu = frappe.db.get_value(
+                "Order Type Menu",
+                {"parent": restaurant, "order_type": order_type},
+                "menu",
+            )
+            if menu:
+                return menu
+
+    return frappe.db.get_value("URY Restaurant", restaurant, "active_menu")
+
+
+def _validate_sync_items_against_menu(
+    items,
+    past_item,
+    branch,
+    table=None,
+    room=None,
+    order_type=None,
+):
+    """Reject newly added disabled / off-menu lines; keep historic + aggregators.
+
+    Aggregator flows price from Aggregator Settings (not restaurant menu).
+    Historic item codes already on the invoice may stay even if later disabled
+    or removed from the menu so captains can still update notes/qty of sent lines.
+    """
+    historic_codes = {prev["item_code"] for prev in (past_item or []) if prev.get("item_code")}
+    new_codes = []
+    for row in items or []:
+        code = row.get("item")
+        if code and code not in historic_codes and code not in new_codes:
+            new_codes.append(code)
+
+    if not new_codes:
+        return
+
+    if order_type == "Aggregators":
+        for code in new_codes:
+            if frappe.db.get_value("Item", code, "disabled"):
+                frappe.throw(
+                    _("Item {0} is disabled and cannot be added to the order.").format(code)
+                )
+        return
+
+    menu = _resolve_menu_for_sync(branch, table=table, room=room, order_type=order_type)
+    if not menu:
+        frappe.throw(_("Please set an active menu for this restaurant."))
+
+    menu_rows = frappe.get_all(
+        "URY Menu Item",
+        filters={"parent": menu, "item": ["in", new_codes], "disabled": 0},
+        fields=["item"],
+    )
+    allowed = {row.item for row in menu_rows}
+
+    for code in new_codes:
+        if code not in allowed:
+            frappe.throw(
+                _("Item {0} is not available on the menu.").format(code)
+            )
+        if frappe.db.get_value("Item", code, "disabled"):
+            frappe.throw(
+                _("Item {0} is disabled and cannot be added to the order.").format(code)
+            )
+
+
+def _validate_dine_in_pax(no_of_pax, order_type):
+    """Dine In requires a positive integer guest count."""
+    if order_type != "Dine In":
+        return no_of_pax
+
+    try:
+        pax = cint(no_of_pax)
+    except Exception:
+        pax = 0
+
+    # cint("abc") / None / "" -> 0; reject non-positive and non-integral floats.
+    if no_of_pax is None or no_of_pax == "" or pax < 1:
+        frappe.throw(_("Number of guests must be a positive integer for Dine In orders."))
+
+    if isinstance(no_of_pax, float) and no_of_pax != int(no_of_pax):
+        frappe.throw(_("Number of guests must be a positive integer for Dine In orders."))
+
+    if isinstance(no_of_pax, str) and "." in no_of_pax.strip():
+        frappe.throw(_("Number of guests must be a positive integer for Dine In orders."))
+
+    return pax
 
 
 def _has_eligible_captain_transfer_target(branch, room, exclude_user):
@@ -1206,8 +1436,11 @@ def get_table_order_context(table):
     invoice_billed = bool(order) and order.get("invoice_printed") == 1
     can_modify = can_view and (not order or not invoice_billed or is_billing_user)
 
-    can_reduce_items = can_modify and bool(pos_profile.remove_items)
-    can_remove_items = can_modify and bool(pos_profile.remove_items)
+    # Managers (elevated roles) may correct a sent order even when the
+    # profile withholds `remove_items` from ordinary captains.
+    may_remove_sent = bool(pos_profile.remove_items) or has_elevated_access
+    can_reduce_items = can_modify and may_remove_sent
+    can_remove_items = can_modify and may_remove_sent
 
     can_transfer_table = can_modify and has_elevated_access
 
@@ -1281,8 +1514,16 @@ def get_captain_context():
 
     Room assignment is sourced from `getRoom()` (`ury.ury_pos.api`), the same
     `URY User` child-table (Branch.user) source used elsewhere for
-    branch/room resolution. POS opening state reuses `posOpening()` rather
-    than re-deriving it. Field names mirror what the future
+    branch/room resolution.
+
+    POS opening state mirrors RN `MenuContext.getPos`:
+    - single-cashier: branch-wide `posOpening()` (0 = open, 1 = closed)
+    - multi-cashier (`custom_enable_multiple_cashier`): room-scoped
+      `pos_opening_check().opening_exists` for the user's assigned room
+      via `getBranchRoom()` - not any open room on the branch
+
+    Failures while resolving opening state return `opening_state: None`
+    (fail closed). Capability field names mirror what
     `derivePOSCapabilities()` in `@ury/core` reads from POS Profile.
     """
     user = frappe.session.user
@@ -1307,9 +1548,11 @@ def get_captain_context():
 
     pos_profile_context = None
     role_restricted_for_table_order = False
+    multi_cashier = False
 
     if pos_profile_name:
         pos_profile = frappe.get_doc("POS Profile", pos_profile_name)
+        multi_cashier = bool(pos_profile.custom_enable_multiple_cashier)
 
         role_restricted_for_table_order = _has_role(
             user_roles, pos_profile.role_restricted_for_table_order
@@ -1327,15 +1570,23 @@ def get_captain_context():
             "remove_items": bool(pos_profile.remove_items),
             "show_image": bool(pos_profile.show_image),
             "custom_enable_kot_reprint": bool(pos_profile.custom_enable_kot_reprint),
-            "custom_enable_multiple_cashier": bool(pos_profile.custom_enable_multiple_cashier),
+            "custom_enable_multiple_cashier": multi_cashier,
         }
 
     opening_state = None
     if branch:
         try:
-            # posOpening() returns 1 when no open POS Opening Entry exists for
-            # the branch (and msgprints a notice in that case), 0 when open.
-            opening_state = {"pos_open": posOpening() == 0}
+            if multi_cashier:
+                # RN parity: open only when the user's assigned room has an
+                # open POS Opening Entry (tabMultiple Rooms), not when any
+                # room on the branch is open.
+                check = pos_opening_check()
+                opening_state = {"pos_open": bool(check.get("opening_exists"))}
+            else:
+                # posOpening() returns 1 when no open POS Opening Entry exists
+                # for the branch (and msgprints a notice in that case), 0 when
+                # open.
+                opening_state = {"pos_open": posOpening() == 0}
         except Exception:
             opening_state = None
 
@@ -1348,6 +1599,42 @@ def get_captain_context():
         "role_restricted_for_table_order": role_restricted_for_table_order,
         "opening_state": opening_state,
     }
+
+
+# Fallback when no "Table Attention" Alert Settings row is configured for a
+# branch (see get_table_attention_config below) — matches the informal
+# "flag a table open too long" threshold described in
+# sa-v3-captain-app-parity/GAPS.md Gap 4, until a real per-branch value is set.
+DEFAULT_TABLE_ATTENTION_THRESHOLD_MINUTES = 25
+
+
+@frappe.whitelist()
+def get_table_attention_config(branch=None):
+    """Per-branch "table needs attention" threshold, for the captain table
+    grid's attention indicator (sa-v3-captain-app-parity/GAPS.md Gap 4).
+
+    The captain table grid already bulk-fetches active POS Invoices directly
+    via `db.getDocList` (see `captain-table-api.ts`'s `getActiveTableOrders`,
+    which reads `creation` too) rather than through this doctype's whitelisted
+    APIs — there's no server-side per-table iteration to hook this into, and
+    doing the "minutes open" math client-side against a wall-clock timestamp
+    the frontend already has is simpler than adding a second per-table
+    round-trip. This endpoint supplies only the one piece the client can't
+    know on its own: what threshold to flag against, and whether the feature
+    is enabled at all for this branch.
+
+    Reuses the same `Alert Settings` / `get_alert_rule()` mechanism the
+    "Cancel Delay" fraud alert uses (see `cancel_order` in this file) rather
+    than inventing a second config surface — an "Table Attention" alert_type
+    row (optionally branch-scoped) with a `threshold_minutes` field controls
+    this the same way an admin already configures other alerts.
+    """
+    rule = get_alert_rule("Table Attention", branch=branch)
+    if not rule:
+        return {"enabled": False, "threshold_minutes": DEFAULT_TABLE_ATTENTION_THRESHOLD_MINUTES}
+
+    threshold = rule.get("threshold_minutes") or DEFAULT_TABLE_ATTENTION_THRESHOLD_MINUTES
+    return {"enabled": True, "threshold_minutes": threshold}
 
 
 @frappe.whitelist()
@@ -1521,10 +1808,20 @@ def sync_order(
 
     customerdoc = frappe.get_doc("Customer", customer)
     invoice.mobile_number = customerdoc.mobile_number
-    if comments:
+    if comments is not None:
         invoice.custom_comments = comments
-    invoice.no_of_pax = no_of_pax
+    effective_order_type = order_type or invoice.order_type
+    invoice.no_of_pax = _validate_dine_in_pax(no_of_pax, effective_order_type)
     invoice.pos_profile = pos_profile
+
+    opening_room = _resolve_sync_opening_room(table=table, room=room, invoice=invoice)
+    _require_open_cashier_session(
+        posprofile,
+        invoice.branch,
+        room=opening_room,
+        billing_user=billing_user,
+        order_type=effective_order_type,
+    )
     
     # Secure server-side attribution of cashier and waiter
     multiple_cashier = posprofile.custom_enable_multiple_cashier
@@ -1538,7 +1835,7 @@ def sync_order(
             AND `tabPOS Opening Entry`.status = 'Open'
             AND `tabPOS Opening Entry`.docstatus = 1
             AND `tabMultiple Rooms`.room = %s
-        """, (invoice.branch, room), as_dict=True)
+        """, (invoice.branch, opening_room or room), as_dict=True)
 
         pos_opened_cashier = frappe.db.get_value("POS Opening Entry", pos_opening_list[0].name, "user") if pos_opening_list else None
 
@@ -1558,7 +1855,7 @@ def sync_order(
         invoice.waiter = frappe.session.user
 
     invoice.custom_aggregator_id = aggregator_id
-    invoice.custom_restaurant_room =room
+    invoice.custom_restaurant_room = room
     if not invoice.restaurant_table:
         invoice.restaurant_table = table
 
@@ -1611,8 +1908,10 @@ def sync_order(
 
     # Reduction/removal permission: gate any decrease in a previously-sent
     # item's quantity (including full removal) by POS Profile `remove_items`,
-    # matching Phase 2's can_reduce_items/can_remove_items derivation.
-    if past_item and not bool(posprofile.remove_items):
+    # matching Phase 2's can_reduce_items/can_remove_items derivation. Managers
+    # (elevated roles) may still correct a sent order even when the profile
+    # withholds this from ordinary captains — see _can_remove_sent_items().
+    if past_item and not _can_remove_sent_items(posprofile, invoice=invoice, pos_profile_name=pos_profile):
         requested_qty_by_item = {}
         for d in items:
             requested_qty_by_item[d.get("item")] = requested_qty_by_item.get(
@@ -1637,7 +1936,19 @@ def sync_order(
                     frappe.PermissionError,
                 )
 
-    menu = frappe.db.get_value("URY Menu", {"branch": invoice.branch}, "name")
+    # Reject newly-added lines that are disabled or off the active menu
+    # before pricing runs; historic lines already on the invoice are exempt
+    # (see _validate_sync_items_against_menu docstring).
+    _validate_sync_items_against_menu(
+        items,
+        past_item,
+        invoice.branch,
+        table=table,
+        room=opening_room or room,
+        order_type=effective_order_type,
+    )
+
+    menu = _resolve_menu_for_sync(invoice.branch, table=table or invoice.restaurant_table, room=opening_room or room, order_type=effective_order_type) or frappe.db.get_value("URY Menu", {"branch": invoice.branch}, "name")
 
     priced_items = price_items_for_invoice(items, price_list, pos_profile, invoice.branch, menu)
 
