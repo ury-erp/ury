@@ -4,6 +4,7 @@ import { useCaptainContext } from '../hooks/useCaptainContext';
 import ServiceRequestPanel from './ServiceRequestPanel';
 import ChecklistGateDialog from '../../components/ChecklistGateDialog';
 import { getChecklist } from '../../../../lib/pos/checklist-api';
+import { initI18n } from '../../i18n';
 
 interface Props {
   children: React.ReactNode;
@@ -36,12 +37,27 @@ type ChecklistGateState = 'checking' | 'needed' | 'clear';
  * unrelated defense-in-depth for those routes, not something this guard
  * relies on.) This guard is a UX/client-side gate only; all mutations are
  * re-validated server-side.
+ *
+ * Also initializes the shared `../../i18n` module (`initI18n()`), which is
+ * otherwise only called from `PosLayout.tsx` — a mount point captain routes
+ * never reach. Without this, any captain-tree component that calls the
+ * shared `t()` (e.g. `TableActionsMenu`, reused as-is for table merge/
+ * unmerge) silently renders raw translation keys like `tables.merge_tables`
+ * instead of their text, since `t()`'s locale map is empty until
+ * `initI18n()` has resolved at least once. Safe to call redundantly if the
+ * main POS's `PosLayout` has already initialized it in the same session.
  */
 const CaptainRouteGuard: React.FC<Props> = ({ children }) => {
   const { context, capabilities, branch, isLoading, error } = useCaptainContext();
   const posProfileName = context?.pos_profile?.name ?? null;
 
   const [checklistGate, setChecklistGate] = useState<ChecklistGateState>('checking');
+
+  useEffect(() => {
+    initI18n().catch((initError) => {
+      console.error('Failed to initialize i18n for captain routes:', initError);
+    });
+  }, []);
 
   const checkChecklist = useCallback(async () => {
     if (!posProfileName) {
