@@ -1601,17 +1601,10 @@ def get_captain_context():
     }
 
 
-# Fallback when no "Table Attention" Alert Settings row is configured for a
-# branch (see get_table_attention_config below) — matches the informal
-# "flag a table open too long" threshold described in
-# sa-v3-captain-app-parity/GAPS.md Gap 4, until a real per-branch value is set.
-DEFAULT_TABLE_ATTENTION_THRESHOLD_MINUTES = 25
-
-
 @frappe.whitelist()
 def get_table_attention_config(branch=None):
-    """Per-branch "table needs attention" threshold, for the captain table
-    grid's attention indicator (sa-v3-captain-app-parity/GAPS.md Gap 4).
+    """"Table needs attention" threshold, for the captain table grid's
+    attention indicator (sa-v3-captain-app-parity/GAPS.md Gap 4).
 
     The captain table grid already bulk-fetches active POS Invoices directly
     via `db.getDocList` (see `captain-table-api.ts`'s `getActiveTableOrders`,
@@ -1621,19 +1614,23 @@ def get_table_attention_config(branch=None):
     the frontend already has is simpler than adding a second per-table
     round-trip. This endpoint supplies only the one piece the client can't
     know on its own: what threshold to flag against, and whether the feature
-    is enabled at all for this branch.
+    is enabled at all.
 
-    Reuses the same `Alert Settings` / `get_alert_rule()` mechanism the
-    "Cancel Delay" fraud alert uses (see `cancel_order` in this file) rather
-    than inventing a second config surface — an "Table Attention" alert_type
-    row (optionally branch-scoped) with a `threshold_minutes` field controls
-    this the same way an admin already configures other alerts.
+    NOTE: originally implemented against the generic `Alert Settings` /
+    `get_alert_rule()` mechanism (as the "Cancel Delay" fraud alert uses) with
+    an invented "Table Attention" `alert_type` — that broke on first live test
+    (`Alert Rule.alert_type` is a fixed Select whose options don't include it,
+    and adding a new option would have meant a schema change). `Alert
+    Settings` already ships a purpose-built, un-wired field for exactly this —
+    `table_turnaround_warning_time` (Int, minutes) — so this reads that
+    instead. It's a Single doctype field (global, not branch-scoped), hence
+    `branch` is accepted for API-shape stability but unused; 0/unset means
+    disabled.
     """
-    rule = get_alert_rule("Table Attention", branch=branch)
-    if not rule:
-        return {"enabled": False, "threshold_minutes": DEFAULT_TABLE_ATTENTION_THRESHOLD_MINUTES}
+    threshold = frappe.db.get_single_value("Alert Settings", "table_turnaround_warning_time")
+    if not threshold or threshold <= 0:
+        return {"enabled": False, "threshold_minutes": 0}
 
-    threshold = rule.get("threshold_minutes") or DEFAULT_TABLE_ATTENTION_THRESHOLD_MINUTES
     return {"enabled": True, "threshold_minutes": threshold}
 
 
