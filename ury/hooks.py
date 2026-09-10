@@ -256,7 +256,10 @@ scheduler_events = {
 		"*/5 * * * *":[
 			"ury.ury.services.food_cost_alerts.notify_high_food_cost"
 		]
-	}
+	},
+	"daily": [
+		"ury.ury.services.yield_check_reminders.notify_overdue_yield_checks"
+	]
 # 	"all": [
 # 		"ury.tasks.all"
 # 	],
