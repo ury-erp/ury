@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Square } from 'lucide-react';
 import { Button, Spinner, showToast } from '@ury/ui';
+import { call } from '@ury/core';
 import { useCaptainContext } from '../hooks/useCaptainContext';
 import { usePOSStore } from '../../store/pos-store';
 import {
@@ -55,6 +56,41 @@ export default function CaptainTables() {
     typeof posProfile?.tableAttention === 'number' && posProfile.tableAttention > 0
       ? posProfile.tableAttention
       : null;
+
+  // Elapsed-time / attention math (CaptainTableCard's minutesElapsed) needs
+  // "now" in the same timezone `latest_invoice_time` was stored in (the
+  // site's configured timezone, e.g. Asia/Kolkata) — NOT the viewing
+  // device's own local clock, which can be a different timezone entirely
+  // (a captain's tablet, a manager's laptop abroad, or just a
+  // misconfigured device clock). Reusing the same
+  // `ury.ury.api.ury_server_time.get_server_time` endpoint the POS Closing
+  // Entry clock-integrity check already uses for this exact class of
+  // problem (see `pos_closing_entry_clock_integrity.js`) avoids inventing a
+  // second mechanism. Fetched once per screen load and applied as a fixed
+  // offset against the browser's own `Date.now()` ticking forward, rather
+  // than re-fetched every render.
+  const [serverTimeOffsetMs, setServerTimeOffsetMs] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    call
+      .get<{ message: string }>('ury.ury.api.ury_server_time.get_server_time')
+      .then((response) => {
+        if (cancelled || !response?.message) return;
+        const serverNow = new Date(response.message).getTime();
+        if (!Number.isNaN(serverNow)) {
+          setServerTimeOffsetMs(serverNow - Date.now());
+        }
+      })
+      .catch(() => {
+        // Non-fatal: falls back to the viewing device's own clock, same as
+        // before this fix — worst case is the pre-existing skew, not a new
+        // failure mode.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const [selectedRoom, setSelectedRoom] = useState<string | null>(null);
   const [branchRooms, setBranchRooms] = useState<Room[]>([]);
@@ -321,6 +357,7 @@ export default function CaptainTables() {
                   mergePartners={mergePartners}
                   onTap={() => handleTableTap(table, order)}
                   attentionThresholdMinutes={attentionThresholdMinutes}
+                  serverTimeOffsetMs={serverTimeOffsetMs}
                   showTableActions
                   menuOpen={menuOpenForTable === table.name}
                   onMenuOpenChange={(open) => setMenuOpenForTable(open ? table.name : null)}

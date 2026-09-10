@@ -16,10 +16,16 @@ export interface CaptainTableCardProps {
   /** Names of other tables merged into this one's cluster (excludes `table.name` itself). */
   mergePartners?: string[];
   onTap: () => void;
-  /** Attention threshold from `get_table_attention_config` (backend, per branch). `null`
-   * while unresolved or when the feature is disabled for this branch — the indicator
-   * renders nothing in either case, matching the previous "not implemented" behavior. */
+  /** Per-branch attention threshold, from `posProfile.tableAttention`. `null` while
+   * unresolved or when the profile has no threshold configured — the indicator renders
+   * nothing in either case, matching the previous "not implemented" behavior. */
   attentionThresholdMinutes?: number | null;
+  /** `serverNow - Date.now()` at the time it was fetched (see `CaptainTables.tsx`), so
+   * elapsed-time math lines up with `latest_invoice_time`'s site-timezone value instead
+   * of the viewing device's own (possibly different-timezone, possibly wrong) clock.
+   * Defaults to 0 (trust the device clock) if the server-time fetch hasn't resolved yet
+   * or failed — the same behavior this had before the fix existed. */
+  serverTimeOffsetMs?: number;
   /** Table-level merge/unmerge overflow menu (sa-v3-captain-app-parity/GAPS.md Gap 3).
    * Omit both handlers to hide the menu entirely (e.g. while permissions are loading). */
   showTableActions?: boolean;
@@ -42,20 +48,28 @@ export interface CaptainTableCardProps {
  * for a table that's been open since the previous day — an inherent limit
  * of the field being Time-only, not something a client-side parse fix can
  * fully correct.
+ *
+ * `serverTimeOffsetMs` (see `CaptainTables.tsx`) anchors "today"/"now" to
+ * the SITE's configured timezone rather than the viewing device's own —
+ * `latest_invoice_time` was written server-side in that timezone, and a
+ * captain's tablet, a manager's laptop, or just a misconfigured device
+ * clock can easily be a different timezone (or simply wrong), which would
+ * otherwise silently skew every comparison against it.
  */
-const minutesElapsed = (time: string | null): number | null => {
+const minutesElapsed = (time: string | null, serverTimeOffsetMs: number): number | null => {
   if (!time) return null;
   const match = /^(\d{1,2}):(\d{2}):(\d{2})/.exec(time);
   if (!match) return null;
 
   const [, hours, minutes, seconds] = match;
-  const started = new Date();
+  const nowMs = Date.now() + serverTimeOffsetMs;
+  const started = new Date(nowMs);
   started.setHours(Number(hours), Number(minutes), Number(seconds), 0);
 
   const startedMs = started.getTime();
   if (Number.isNaN(startedMs)) return null;
 
-  return Math.max(0, Math.round((Date.now() - startedMs) / 60000));
+  return Math.max(0, Math.round((nowMs - startedMs) / 60000));
 };
 
 const elapsedLabel = (minutes: number | null): string | null => {
@@ -87,6 +101,7 @@ const CaptainTableCard = ({
   mergePartners,
   onTap,
   attentionThresholdMinutes,
+  serverTimeOffsetMs = 0,
   showTableActions = false,
   menuOpen = false,
   onMenuOpenChange,
@@ -96,7 +111,9 @@ const CaptainTableCard = ({
   const isOccupied = table.occupied === 1;
   const isBilled = Boolean(order?.invoicePrinted);
   const hasMergePartners = Boolean(mergePartners && mergePartners.length > 0);
-  const minutesOpen = isOccupied ? minutesElapsed(table.latest_invoice_time) : null;
+  const minutesOpen = isOccupied
+    ? minutesElapsed(table.latest_invoice_time, serverTimeOffsetMs)
+    : null;
   const elapsed = elapsedLabel(minutesOpen);
   const needsAttention =
     isOccupied &&
