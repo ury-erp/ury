@@ -29,11 +29,33 @@ export interface CaptainTableCardProps {
   onUnmerge?: () => void;
 }
 
-const minutesElapsed = (isoTimestamp: string | null): number | null => {
-  if (!isoTimestamp) return null;
-  const started = new Date(isoTimestamp).getTime();
-  if (Number.isNaN(started)) return null;
-  return Math.max(0, Math.round((Date.now() - started) / 60000));
+/**
+ * `URY Table.latest_invoice_time` is a Frappe `Time` field — a bare
+ * "HH:MM:SS(.ffffff)" string with no date component, not a full timestamp.
+ * `new Date("16:45:26.537906")` is not valid ISO 8601 and parses to
+ * `Invalid Date` in every browser, so this was silently broken (returning
+ * `null`, no elapsed label at all) before this attention-indicator feature
+ * existed too — reusing the field's actual value on today's date is the
+ * only way to get a real elapsed duration out of it. This assumes the table
+ * was last occupied today, which holds for the normal case (a captain
+ * screen showing live floor state) but can undercount right after midnight
+ * for a table that's been open since the previous day — an inherent limit
+ * of the field being Time-only, not something a client-side parse fix can
+ * fully correct.
+ */
+const minutesElapsed = (time: string | null): number | null => {
+  if (!time) return null;
+  const match = /^(\d{1,2}):(\d{2}):(\d{2})/.exec(time);
+  if (!match) return null;
+
+  const [, hours, minutes, seconds] = match;
+  const started = new Date();
+  started.setHours(Number(hours), Number(minutes), Number(seconds), 0);
+
+  const startedMs = started.getTime();
+  if (Number.isNaN(startedMs)) return null;
+
+  return Math.max(0, Math.round((Date.now() - startedMs) / 60000));
 };
 
 const elapsedLabel = (minutes: number | null): string | null => {
