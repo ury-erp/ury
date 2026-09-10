@@ -874,6 +874,7 @@ def _resolve_or_create_pos_invoice(table, invoiceNo, order_type, is_payment, che
             _apply_pos_stock_authority(invoice, branch=getBranch())
 
         branch = override_branch or getBranch()
+        invoice.branch = branch
         restaurant = frappe.db.get_value("URY Restaurant", {"branch": branch}, "name")
 
         menu=get_menu_name(order_type)

@@ -4,7 +4,10 @@ This is the minimal authoritative slice for V3 stock posting:
 
 - READY creates one durable ``URY Fulfilment Posting Intent`` per KOT item.
 - The worker claims intents with a row lock and short lease.
-- ERPNext stock movement is represented as a submitted ``Material Issue``.
+- ERPNext stock movement is a submitted Stock Entry: ``Material Issue`` for
+  PRE_PRODUCED/DIRECT_RETAIL (consumes the already-made selling item), or
+  ``Manufacture`` for MADE_TO_ORDER (consumes raw-material components and
+  receives the selling item into the same production department warehouse).
 - Reservation fulfilment happens only after the Stock Entry has submitted.
 - Replays recover from an already-submitted Stock Entry instead of creating
   another one.
@@ -468,6 +471,27 @@ def _stock_entry_items(payload):
 				"s_warehouse": row["s_warehouse"],
 			}
 		)
+	if payload.get("production_policy") == MADE_TO_ORDER:
+		target_warehouse = (payload.get("components") or [{}])[0].get("s_warehouse")
+		if not target_warehouse or not payload.get("item_code") or flt(payload.get("accepted_qty")) <= 0:
+			raise FulfilmentPostingError("INVALID_STOCK_ROW", _("Frozen stock row is incomplete"))
+		items.append(
+			{
+				"item_code": payload["item_code"],
+				"qty": flt(payload["accepted_qty"]),
+				"t_warehouse": target_warehouse,
+				# ERPNext's Stock Entry.mark_finished_and_scrap_items() only
+				# auto-infers is_finished_item from a linked work_order/bom_no
+				# (see get_finished_item()); this is a hand-built ad-hoc entry
+				# with neither, so without setting the flag explicitly ERPNext
+				# rejects the submit with "There must be atleast 1 Finished
+				# Good in this Stock Entry" even though the t_warehouse row is
+				# present. Found live while verifying
+				# tracks/sa-nontable-production-gap (the mocked unit tests
+				# never exercised real Stock Entry validation).
+				"is_finished_item": 1,
+			}
+		)
 	return items
 
 
@@ -475,12 +499,14 @@ def _submit_stock_entry(intent, payload):
 	existing = intent.get("erpnext_stock_entry") or _find_existing_stock_entry(intent.name)
 	if existing:
 		return existing
+	is_manufacture = payload.get("production_policy") == MADE_TO_ORDER
+	stock_entry_type = "Manufacture" if is_manufacture else "Material Issue"
 	doc = frappe.get_doc(
 		{
 			"doctype": "Stock Entry",
 			"company": payload["company"],
-			"stock_entry_type": "Material Issue",
-			"purpose": "Material Issue",
+			"stock_entry_type": stock_entry_type,
+			"purpose": stock_entry_type,
 			"items": _stock_entry_items(payload),
 			"remarks": "URY Fulfilment Posting Intent: {0}".format(intent.name),
 			"custom_ury_posting_intent": intent.name,

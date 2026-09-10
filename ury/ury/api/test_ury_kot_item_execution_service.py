@@ -15,6 +15,7 @@ from ury.ury.api.ury_kot_item_execution_service import (
 	get_kot_execution_state,
 	mark_item_ready,
 	seed_kot_item_executions,
+	seed_kot_item_executions_on_submit,
 	serve_item_execution,
 	start_item_execution,
 )
@@ -210,3 +211,23 @@ class TestKotItemExecution(FrappeTestCase):
 		mock_ready_posting.assert_called_once()
 		self.assertEqual(harness.docs[KOT_EXECUTION_DOCTYPE]["KOTEXEC-1"]["state"], READY)
 		self.assertEqual(json.loads(harness.created[0]["audit_log"])[0]["event"], "seed")
+
+	def test_seed_on_submit_uses_kot_name_not_document(self):
+		"""Regression: the URY KOT on_submit hook was calling
+		seed_kot_item_executions(doc) with the full Document instead of
+		doc.name. seed_kot_item_executions()/_kot_items() feed that value
+		straight into frappe.get_doc(KOT_DOCTYPE, kot); since a Document is
+		dict-like, frappe.get_doc treats a dict-like second argument as a
+		*filter*, not a name lookup, and silently resolves to whichever row
+		the filter happens to match -- occasionally the same KOT (its own
+		field values are self-consistent), but just as easily an unrelated
+		one (e.g. a cancelled KOT), or nothing at all. This surfaced live
+		while verifying tracks/sa-nontable-production-gap: KOT Item
+		Execution rows sometimes never got created for a KOT that had just
+		submitted, with no error anywhere. See ury_kot_item_execution_service.py,
+		seed_kot_item_executions_on_submit.
+		"""
+		submitted_doc = frappe._dict({"name": "URY KOT-1"})
+		with patch(f"{MODULE}.seed_kot_item_executions") as mock_seed:
+			seed_kot_item_executions_on_submit(submitted_doc)
+		mock_seed.assert_called_once_with("URY KOT-1")

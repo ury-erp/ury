@@ -8,7 +8,7 @@ from types import SimpleNamespace
 from frappe.tests.utils import FrappeTestCase
 from unittest.mock import patch, MagicMock
 
-from ury.ury.doctype.ury_order.ury_order import cancel_order, sync_order, price_items_for_invoice, reconcile_order_reservations
+from ury.ury.doctype.ury_order.ury_order import cancel_order, sync_order, price_items_for_invoice, reconcile_order_reservations, _resolve_or_create_pos_invoice
 
 from unittest.mock import patch, MagicMock
 from ury.ury.doctype.ury_order.ury_order import get_order_invoice
@@ -339,6 +339,44 @@ class TestURYOrder(FrappeTestCase):
         mock_invoice.save.assert_not_called()
         mock_kot_execute.assert_not_called()
         self.assertEqual(mock_invoice.items, [existing_line])
+
+    @patch("ury.ury.doctype.ury_order.ury_order._apply_pos_stock_authority")
+    @patch("ury.ury.doctype.ury_order.ury_order.getBranch")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_value")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.new_doc")
+    def test_resolve_or_create_pos_invoice_sets_branch_for_no_table_new_invoice(
+        self, mock_new_doc, mock_get_value, mock_getBranch, mock_apply_stock_authority
+    ):
+        """Regression for the 'Order reservation scope is incomplete' bug:
+        the no-table (Take Away/Delivery) path built a new invoice but never
+        assigned invoice.branch, so downstream reconcile_order_reservations
+        threw on the missing branch. See tracks/sa-nontable-production-gap.
+        """
+        mock_invoice = MagicMock()
+        mock_invoice.restaurant_table = None
+        mock_new_doc.return_value = mock_invoice
+        mock_getBranch.return_value = "Test Branch"
+
+        def get_value_side_effect(doctype, *args, **kwargs):
+            # The no-table path's first frappe.get_value call looks up an
+            # existing open invoice by name (invoiceNo=None here, so there
+            # is none); a blanket return_value would make that lookup
+            # truthy and send the code into the "existing invoice" branch,
+            # which calls the real (unmocked) frappe.get_doc and blows up
+            # against whatever data this bench happens to have.
+            if doctype == "POS Invoice":
+                return None
+            return "Menu A"
+
+        mock_get_value.side_effect = get_value_side_effect
+
+        with patch("ury.ury.doctype.ury_order.ury_order.frappe.get_all", return_value=[]):
+            invoice, invoice_name = _resolve_or_create_pos_invoice(
+                table=None, invoiceNo=None, order_type="Take Away", is_payment=None
+            )
+
+        self.assertIsNone(invoice_name)
+        self.assertEqual(invoice.branch, "Test Branch")
 
     @patch("ury.ury.doctype.ury_order.ury_order.reconcile_order_reservations")
     @patch("ury.ury.doctype.ury_order.ury_order.kot_execute")
