@@ -1086,10 +1086,12 @@ def validate_pos_close(pos_profile):
         else:
             previous_day = start_of_day
     
+        # A session left open for 2+ days (missed close, not just yesterday's)
+        # must still be caught, not just one opened exactly on `previous_day`.
         unclosed_pos_opening = frappe.db.exists(
             "POS Opening Entry",
             {
-                "posting_date": previous_day.date(),
+                "posting_date": ["<=", previous_day.date()],
                 "status": "Open",
                 "pos_profile": pos_profile,
                 "docstatus": 1
