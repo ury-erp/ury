@@ -441,7 +441,18 @@ def get_custom_fields():
 				"read_only": 1,
 			},
 		],
-     
+		"Stock Entry": [
+			{
+				"fieldname": "custom_ury_posting_intent",
+				"fieldtype": "Data",
+				"label": "URY Posting Intent",
+				"insert_after": "remarks",
+				"read_only": 1,
+				"search_index": 1,
+				"translatable": 0,
+			},
+		],
+
     }
  
 def delete_custom_fields(custom_fields):
