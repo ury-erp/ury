@@ -5,8 +5,9 @@ against standard yield percentages from Item.custom_yield_percent. Yield checks
 are captured at point of production and compared against the standard to
 measure and track efficiency/losses.
 
-All endpoints are gated with `require_manager()` + `_require_scope(company)`
-following the established pattern from ury_cost_variance_attribution.py.
+Permission gating varies by endpoint:
+- record_yield_check: requires frappe.has_permission("create") + _require_scope (staff-facing)
+- get_yield_variance, get_yield_check_compliance: require_manager() + _require_scope (reporting)
 """
 
 import hashlib
@@ -52,7 +53,11 @@ def record_yield_check(item, branch, company, input_qty, output_qty, stock_uom,
 	Raises:
 		frappe.ValidationError if any validation fails in the document's validate()
 	"""
-	require_manager()
+	# I7: Relaxed from manager-only to any authenticated user with doctype create permission
+	# This function is called from prep-staff-facing frontend action (Log Usable Output drawer)
+	# not a manager-only workflow; use lighter permission check consistent with ury_issue_authorization pattern
+	if not frappe.has_permission(YIELD_CHECK_DOCTYPE, "create"):
+		frappe.throw(_("Not permitted to create Yield Check"), frappe.PermissionError)
 	_require_scope(company)
 
 	doc = frappe.get_doc({
@@ -193,19 +198,18 @@ def get_yield_check_compliance(company, branch=None):
 		cadence = item.custom_yield_check_cadence
 
 		# Fetch completed checks for this item in the last 30 days.
+		# I1: Use "between" filter to avoid duplicate dict keys silently dropping the start_date bound
 		completed_checks = frappe.get_all(
 			YIELD_CHECK_DOCTYPE,
 			filters={
 				"company": company,
 				"item": item_code,
-				"checked_on": [">=", start_date],
-				"checked_on": ["<", today + timedelta(days=1)],
+				"checked_on": ["between", [start_date, today + timedelta(days=1)]],
 			} if branch is None else {
 				"company": company,
 				"branch": branch,
 				"item": item_code,
-				"checked_on": [">=", start_date],
-				"checked_on": ["<", today + timedelta(days=1)],
+				"checked_on": ["between", [start_date, today + timedelta(days=1)]],
 			},
 			fields=["name", "issue_authorization", "checked_on"],
 		)
@@ -216,15 +220,18 @@ def get_yield_check_compliance(company, branch=None):
 		required_count = 0
 		if cadence == "Every Issue":
 			# Count authorized issues without a corresponding yield check.
+			# I2: Add 30-day window to authorizations to match the 30-day numerator (completed checks)
 			authorized_issues = frappe.get_all(
 				"URY Issue Authorization",
 				filters={
 					"component_item": item_code,
 					"status": "Authorized",
+					"creation": ["between", [start_date, today + timedelta(days=1)]],
 				} if branch is None else {
 					"component_item": item_code,
 					"branch": branch,
 					"status": "Authorized",
+					"creation": ["between", [start_date, today + timedelta(days=1)]],
 				},
 				fields=["name"],
 			)
@@ -232,8 +239,13 @@ def get_yield_check_compliance(company, branch=None):
 
 		elif cadence == "Interval":
 			# Compute periods elapsed in the last 30 days.
-			interval_days = item.custom_yield_check_interval_days or 1
-			required_count = max(1, 30 // interval_days)
+			# I5: Match cadence engine semantics — when interval_days <= 0, skip this item (not due)
+			interval_days = item.custom_yield_check_interval_days
+			if interval_days and interval_days > 0:
+				required_count = max(1, 30 // interval_days)
+			else:
+				# Skip items with unset or non-positive intervals (not due per engine logic)
+				required_count = 0
 
 		elif cadence == "Sampled":
 			# Count days in the last 30 where the deterministic hash picked this item.
@@ -269,20 +281,31 @@ def _count_sampled_days(start_date, end_date, branch, item_code):
 	Args:
 		start_date: datetime.date
 		end_date: datetime.date
-		branch: Branch name (optional; if None, uses placeholder)
+		branch: Branch name (optional; if None, sums across all real branches)
 		item_code: Item code
 
 	Returns:
 		int: number of days where the item was sampled
 	"""
 	SAMPLING_RATE = 0.10
+
+	# I11: When branch is None (all-branches aggregate), sum per-branch counts
+	# using actual branch names, not a fake "all" placeholder that the cadence engine never uses
+	if branch is None:
+		# Get all branches and sum sampled days for each
+		branches = frappe.get_all("Branch", pluck="name")
+		total_count = 0
+		for branch_name in branches:
+			total_count += _count_sampled_days(start_date, end_date, branch_name, item_code)
+		return total_count
+
+	# Single branch case: count sampled days using actual branch name
 	count = 0
 	current_date = start_date
-	branch_str = branch or "all"
 
 	while current_date < end_date:
 		today_str = str(current_date)
-		hash_input = f"{today_str}:{branch_str}:{item_code}"
+		hash_input = f"{today_str}:{branch}:{item_code}"
 		hash_value = hashlib.md5(hash_input.encode()).hexdigest()
 		hash_int = int(hash_value[:8], 16)
 		normalized_hash = (hash_int % 1000000) / 1000000.0
