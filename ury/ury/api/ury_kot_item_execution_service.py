@@ -275,7 +275,20 @@ def seed_kot_item_executions(kot, actor=None):
 def seed_kot_item_executions_on_submit(doc, method=None):
 	"""Seed item execution rows while allowing an older site to migrate."""
 	try:
-		return seed_kot_item_executions(doc)
+		# Pass doc.name, not doc itself: seed_kot_item_executions()/_kot_items()
+		# feed this straight into frappe.get_doc(KOT_DOCTYPE, kot). A Document
+		# is dict-like, so passing the Document there makes frappe.get_doc
+		# treat it as a *filter dict* instead of a name lookup -- it silently
+		# resolves to whatever row the filter happens to match (occasionally
+		# the same KOT by luck, since its own field values are self-
+		# consistent, but just as easily an unrelated KOT, e.g. a cancelled
+		# one) rather than raising. That produced a live, reproducible bug:
+		# KOT Item Execution rows sometimes seeded against the wrong KOT and
+		# sometimes not created at all for the KOT that just submitted, with
+		# no error surfaced anywhere (found while live-bench verifying
+		# tracks/sa-nontable-production-gap; see test_seed_on_submit_uses_kot_name_not_document
+		# for the regression test).
+		return seed_kot_item_executions(doc.name)
 	except ItemExecutionError as exc:
 		if exc.reason_code == ITEM_EXECUTION_DOCTYPE_NOT_FOUND:
 			frappe.logger("ury").warning(
