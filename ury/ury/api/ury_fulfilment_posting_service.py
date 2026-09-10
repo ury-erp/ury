@@ -431,17 +431,26 @@ def _find_existing_stock_entry(intent_name):
 	Stock Entry for the same intent, i.e. a duplicate stock issue.
 	`FOR UPDATE` forces this SELECT to read (and lock) the latest committed
 	rows instead, on this request's own connection/transaction.
+
+	This queries the indexed `custom_ury_posting_intent` field (an exact
+	match) rather than `remarks LIKE '%...%'`. `remarks` is free text with no
+	fixed format guarantee and a leading-wildcard LIKE can never use a B-tree
+	index, so `FOR UPDATE` on it would lock (scan) every row of `tabStock
+	Entry` -- a table that grows unboundedly -- for the rest of the
+	transaction. `custom_ury_posting_intent` is set alongside `remarks` in
+	`_submit_stock_entry` purely so this lookup can be an indexed equality
+	lookup.
 	"""
 	rows = frappe.db.sql(
 		"""
 		SELECT name
 		FROM `tabStock Entry`
-		WHERE docstatus = 1 AND remarks LIKE %(remarks)s
+		WHERE docstatus = 1 AND custom_ury_posting_intent = %(intent_name)s
 		ORDER BY creation DESC
 		LIMIT 1
 		FOR UPDATE
 		""",
-		{"remarks": f"%URY Fulfilment Posting Intent: {intent_name}%"},
+		{"intent_name": intent_name},
 		as_dict=True,
 	)
 	return rows[0].get("name") if rows else None
@@ -474,6 +483,7 @@ def _submit_stock_entry(intent, payload):
 			"purpose": "Material Issue",
 			"items": _stock_entry_items(payload),
 			"remarks": "URY Fulfilment Posting Intent: {0}".format(intent.name),
+			"custom_ury_posting_intent": intent.name,
 		}
 	)
 	with _service_mutation():
