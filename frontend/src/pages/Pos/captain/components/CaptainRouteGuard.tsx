@@ -1,11 +1,15 @@
-import React from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Spinner } from '@ury/ui';
 import { useCaptainContext } from '../hooks/useCaptainContext';
 import ServiceRequestPanel from './ServiceRequestPanel';
+import ChecklistGateDialog from '../../components/ChecklistGateDialog';
+import { getChecklist } from '../../../../lib/pos/checklist-api';
 
 interface Props {
   children: React.ReactNode;
 }
+
+type ChecklistGateState = 'checking' | 'needed' | 'clear';
 
 /**
  * Capability-gated route wrapper for `/order*`, following the loading /
@@ -17,6 +21,14 @@ interface Props {
  * `!role_restricted_for_table_order`. This is NOT the security boundary:
  * every mutation must still be re-validated server-side per PLAN.md §9.
  *
+ * Also gates on today's Opening checklist for the branch's POS Profile being
+ * `Complete`, same trigger condition and dialog (`ChecklistGateDialog`) the
+ * main POS uses via `POSOpeningProvider`. Captain sessions don't go through
+ * `POSOpeningProvider` (that lives under `/pos`), so this guard re-implements
+ * the same check here using `context.pos_profile.name` (the real backend POS
+ * Profile name resolved by `get_captain_context()` — not the capability shim
+ * built for `derivePOSCapabilities` in `useCaptainContext.ts`).
+ *
  * NOTE: Captain routes bypass `AuthGuard` entirely — they're registered as
  * siblings of `/pos` in `frontend/src/App.tsx`, not nested under it. (For the
  * routes that *do* go through `AuthGuard`, `deriveAllowedRoles()` in
@@ -26,7 +38,33 @@ interface Props {
  * re-validated server-side.
  */
 const CaptainRouteGuard: React.FC<Props> = ({ children }) => {
-  const { capabilities, branch, isLoading, error } = useCaptainContext();
+  const { context, capabilities, branch, isLoading, error } = useCaptainContext();
+  const posProfileName = context?.pos_profile?.name ?? null;
+
+  const [checklistGate, setChecklistGate] = useState<ChecklistGateState>('checking');
+
+  const checkChecklist = useCallback(async () => {
+    if (!posProfileName) {
+      setChecklistGate('clear');
+      return;
+    }
+
+    setChecklistGate('checking');
+    try {
+      const result = await getChecklist(posProfileName, 'Opening');
+      setChecklistGate(result.logStatus !== 'Complete' ? 'needed' : 'clear');
+    } catch (checklistError) {
+      console.error('Failed to check captain opening checklist status:', checklistError);
+      // On error, block on the checklist for safety (mirrors POSOpeningProvider).
+      setChecklistGate('needed');
+    }
+  }, [posProfileName]);
+
+  useEffect(() => {
+    if (!isLoading && !error && capabilities?.canTakeTableOrders && posProfileName) {
+      checkChecklist();
+    }
+  }, [isLoading, error, capabilities?.canTakeTableOrders, posProfileName, checkChecklist]);
 
   if (isLoading) {
     return (
@@ -59,6 +97,26 @@ const CaptainRouteGuard: React.FC<Props> = ({ children }) => {
           </p>
         </div>
       </div>
+    );
+  }
+
+  if (posProfileName && checklistGate !== 'clear') {
+    if (checklistGate === 'checking') {
+      return (
+        <div className="min-h-screen">
+          <Spinner message="Checking opening checklist..." />
+        </div>
+      );
+    }
+
+    return (
+      <ChecklistGateDialog
+        posProfile={posProfileName}
+        checklistType="Opening"
+        onComplete={() => {
+          checkChecklist();
+        }}
+      />
     );
   }
 
