@@ -262,6 +262,20 @@ artifact to the kitchen; it doesn't touch reservations or stock at all.
 Pre-produced items skip step 1's BOM explosion entirely (they reserve their own already-finished
 stock directly) but still go through the same fulfilment-on-ready/served gate for step 2.
 
+> **Historical bug, now fixed:** an earlier version of the reservation engine
+> (`_resolve_components()` in `ury_reservation_service.py`) decided whether to reserve raw
+> components by asking "does this item have an active BOM" rather than by its `production_policy`.
+> Since PRE_PRODUCED items commonly *do* have a BOM attached (for costing/production planning —
+> see §3.3), this incorrectly exploded it and reserved raw-ingredient stock instead of the finished
+> item's own stock, leaking ingredient names into a customer-facing error on a real test item
+> (a pizza that was correctly marked sellable by `get_item_availability()`, then failed at
+> reservation with a raw-material shortfall error). It's now fixed by branching explicitly on
+> `production_policy`: `PRE_PRODUCED`/`DIRECT_RETAIL` always resolve to the item itself as the sole
+> reservation target, matching §3.6 and §3.7 above. A legacy fallback (used only when no
+> `production_policy` is supplied at all) still relies on the old BOM-presence heuristic, but now
+> logs a warning so any caller not yet passing `production_policy` is visible rather than silently
+> reintroducing the bug.
+
 ### 3.8 Kitchen ticket (KOT) routing
 
 When an order is accepted, each line item is routed to a Production Unit so the right kitchen
