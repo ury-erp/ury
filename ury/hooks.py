@@ -241,6 +241,7 @@ doc_events = {
     "AI Provider": {"on_update": "ury.ury.ai_tools.agent_seeding.on_ai_provider_update"},
     "Stock Reconciliation": {"validate": "ury.ury.utils.stock_reconciliation_guards.validate"},
     "Customer": {"validate": "ury.ury.hooks.ury_customer.validate"},
+    "BOM": {"validate": "ury.ury.hooks.ury_bom.apply_yield_back_calculation"},
 }
 
 # Scheduled Tasks
@@ -514,6 +515,8 @@ fixtures = [
                     "Item-custom_yield_check_interval_days",
                     "Item-custom_yield_percent",
                     "Item-custom_yield_tracked",
+                    "BOM Item-custom_yield_qty",
+                    "BOM Item-custom_yield_percent",
                     "Item-disposable_items",
                     "Item-is_disposable",
                     "POS Invoice Item-is_disposable",
