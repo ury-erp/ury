@@ -315,6 +315,13 @@ class TestStockEntryType(FrappeTestCase):
 		self.assertEqual(len(finished_rows), 1)
 		self.assertEqual(finished_rows[0]["t_warehouse"], "Kitchen WH")
 		self.assertEqual(finished_rows[0]["qty"], 2)
+		# Regression: without this flag ERPNext's Stock Entry validation
+		# rejects the submit ("There must be atleast 1 Finished Good in this
+		# Stock Entry") because mark_finished_and_scrap_items() only
+		# auto-infers is_finished_item from a linked work_order/bom_no, which
+		# this hand-built entry has neither of. Found live verifying
+		# tracks/sa-nontable-production-gap.
+		self.assertEqual(finished_rows[0]["is_finished_item"], 1)
 		component_rows = [row for row in items if row.get("item_code") != "PLATE-1"]
 		self.assertEqual(len(component_rows), 2)
 		for row in component_rows:
