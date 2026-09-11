@@ -12,3 +12,4 @@ ury.patches.v3_14.production_unit_department_migration
 ury.patches.v3_15.backfill_production_unit_company
 ury.patches.v3_16.add_stock_entry_posting_intent_field
 ury.patches.v3_17.backfill_bom_yield_qty_and_revision
+ury.patches.v3_18.add_batch_sourcing_mode_fields
