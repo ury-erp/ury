@@ -18,6 +18,7 @@ from ury.ury.api.ury_yield_variance import (
 	record_yield_check,
 	get_yield_variance,
 	get_yield_check_compliance,
+	user_has_branch_access,
 )
 
 
@@ -387,6 +388,148 @@ class TestRequireScope(FrappeTestCase):
 		# Should not raise
 		from ury.ury.api.ury_yield_variance import _require_scope
 		_require_scope("Test Co")
+
+
+class TestUserHasBranchAccess(FrappeTestCase):
+	"""Test B1: user_has_branch_access permission gating."""
+
+	def test_returns_true_for_administrator(self):
+		"""Administrator user has access to any branch."""
+		result = user_has_branch_access("Administrator", "Test Branch")
+		self.assertTrue(result)
+
+	@patch(f"{MOD}.frappe.get_roles")
+	def test_returns_true_for_system_manager_role(self, mock_get_roles):
+		"""User with System Manager role has access to any branch."""
+		mock_get_roles.return_value = ["System Manager", "Sales User"]
+
+		result = user_has_branch_access("test_user", "Test Branch")
+
+		self.assertTrue(result)
+		mock_get_roles.assert_called_once_with("test_user")
+
+	@patch(f"{MOD}.frappe.get_roles")
+	@patch(f"{MOD}.frappe.db.exists")
+	def test_returns_true_when_user_in_branch_table(self, mock_exists, mock_get_roles):
+		"""User listed in Branch's user child table has access."""
+		mock_get_roles.return_value = ["Sales User"]
+		mock_exists.return_value = True
+
+		result = user_has_branch_access("test_user", "Test Branch")
+
+		self.assertTrue(result)
+		mock_exists.assert_called_once_with(
+			"URY User",
+			{
+				"parenttype": "Branch",
+				"parent": "Test Branch",
+				"user": "test_user",
+			},
+		)
+
+	@patch(f"{MOD}.frappe.get_roles")
+	@patch(f"{MOD}.frappe.db.exists")
+	def test_returns_false_when_user_not_in_branch_table(self, mock_exists, mock_get_roles):
+		"""User NOT listed in Branch's user table denied access."""
+		mock_get_roles.return_value = ["Sales User"]
+		mock_exists.return_value = False
+
+		result = user_has_branch_access("test_user", "Test Branch")
+
+		self.assertFalse(result)
+
+	def test_returns_false_when_user_is_none(self):
+		"""None user has no access."""
+		result = user_has_branch_access(None, "Test Branch")
+		self.assertFalse(result)
+
+	def test_returns_false_when_branch_is_none(self):
+		"""None branch check returns False (guard clause)."""
+		result = user_has_branch_access("test_user", None)
+		self.assertFalse(result)
+
+	def test_returns_false_when_both_are_none(self):
+		"""Both None returns False."""
+		result = user_has_branch_access(None, None)
+		self.assertFalse(result)
+
+	def test_returns_false_when_empty_string_user(self):
+		"""Empty string user has no access."""
+		result = user_has_branch_access("", "Test Branch")
+		self.assertFalse(result)
+
+	def test_returns_false_when_empty_string_branch(self):
+		"""Empty string branch check returns False."""
+		result = user_has_branch_access("test_user", "")
+		self.assertFalse(result)
+
+
+class TestRecordYieldCheckBranchAccessGating(FrappeTestCase):
+	"""Test B1: record_yield_check enforces user-branch access."""
+
+	@patch(f"{MOD}.frappe.has_permission")
+	@patch(f"{MOD}._require_scope")
+	@patch(f"{MOD}.user_has_branch_access")
+	def test_calls_user_has_branch_access(self, mock_access, mock_scope, mock_perm):
+		"""record_yield_check checks user's branch access."""
+		mock_perm.return_value = True
+		mock_access.return_value = True
+
+		record_yield_check(
+			item="TEST-ITEM",
+			branch="Test Branch",
+			company="Test Co",
+			input_qty=100,
+			output_qty=85,
+			stock_uom="Nos",
+			check_type="Routine",
+		)
+
+		mock_access.assert_called_once()
+		call_args = mock_access.call_args[0]
+		self.assertIn("Test Branch", call_args)
+
+	@patch(f"{MOD}.frappe.has_permission")
+	@patch(f"{MOD}._require_scope")
+	@patch(f"{MOD}.user_has_branch_access")
+	@patch(f"{MOD}.frappe.session")
+	def test_user_has_branch_access_receives_session_user(self, mock_session, mock_access, mock_scope, mock_perm):
+		"""record_yield_check passes frappe.session.user to branch access check."""
+		mock_session.user = "test_user"
+		mock_perm.return_value = True
+		mock_access.return_value = True
+
+		record_yield_check(
+			item="TEST-ITEM",
+			branch="Test Branch",
+			company="Test Co",
+			input_qty=100,
+			output_qty=85,
+			stock_uom="Nos",
+			check_type="Routine",
+		)
+
+		call_args = mock_access.call_args[0]
+		self.assertEqual(call_args[0], "test_user")
+
+	@patch(f"{MOD}.frappe.has_permission")
+	@patch(f"{MOD}._require_scope")
+	@patch(f"{MOD}.user_has_branch_access")
+	def test_throws_permission_error_when_no_branch_access(self, mock_access, mock_scope, mock_perm):
+		"""record_yield_check raises PermissionError when user lacks branch access."""
+		mock_perm.return_value = True
+		mock_access.return_value = False
+
+		with self.assertRaises(frappe.PermissionError):
+			record_yield_check(
+				item="TEST-ITEM",
+				branch="Test Branch",
+				company="Test Co",
+				input_qty=100,
+				output_qty=85,
+				stock_uom="Nos",
+				check_type="Routine",
+			)
 
 
 if __name__ == "__main__":

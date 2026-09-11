@@ -57,6 +57,36 @@ def validate_plan_items(doc):
         validate_item_production_configuration(item_code, doc.get("branch"))
 
 
+def flag_stale_bom_revisions(doc):
+    """Surface (never block on) plan rows computed from a now-outdated BOM.
+
+    Each row's `bom_revision` was captured (in `save_draft`, from the BOM's
+    `custom_bom_revision` -- see `ury.ury.hooks.ury_bom.set_bom_revision`)
+    at the time the row was added to the plan. If the linked BOM has since
+    been resaved with different yield-adjusted quantities (e.g. because a
+    component Item's `custom_yield_percent` standard changed), the BOM's
+    current `custom_bom_revision` will differ from what this row captured
+    -- meaning the row's `qty` requirement may have been computed from a
+    stale standard.
+
+    This only sets an informational `bom_revision_stale` flag on each row;
+    it never raises. A Draft/Proposed plan must remain free to still
+    reflect a stale calculation while a reviewer looks at it -- only
+    `freeze_approval_snapshot` (which runs on the Approved transition)
+    actually locks values in, and by design this function is only called
+    for plans that haven't reached that point yet (see `validate()` in
+    `ury.ury.doctype.ury_sales_plan.ury_sales_plan`).
+    """
+    for row in doc.get("items") or []:
+        bom = row.get("bom")
+        captured_revision = row.get("bom_revision")
+        if not bom or not captured_revision:
+            row.bom_revision_stale = 0
+            continue
+        current_revision = frappe.db.get_value("BOM", bom, "custom_bom_revision")
+        row.bom_revision_stale = 1 if current_revision and current_revision != captured_revision else 0
+
+
 def freeze_approval_snapshot(doc):
     """Freeze approved demand and mapping inputs into a deterministic snapshot."""
     if doc.get("approval_snapshot"):
@@ -166,10 +196,14 @@ def save_draft(plan_date, branch, company=None, service_period=None, items=None)
     doc.service_period = service_period
     doc.set("items", [])
     for row in item_rows:
-        doc.append(
-            "items",
-            {field: row.get(field) for field in SALES_PLAN_ITEM_FIELDS},
-        )
+        item_dict = {field: row.get(field) for field in SALES_PLAN_ITEM_FIELDS}
+        # Capture the BOM's revision AS OF NOW (server-side, ignoring any
+        # bom_revision the caller may have passed) so a later re-save can
+        # detect whether the BOM has changed since this row was added --
+        # see flag_stale_bom_revisions().
+        if item_dict.get("bom"):
+            item_dict["bom_revision"] = frappe.db.get_value("BOM", item_dict["bom"], "custom_bom_revision")
+        doc.append("items", item_dict)
 
     if existing_name:
         doc.save()

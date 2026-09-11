@@ -280,10 +280,16 @@ const LogYieldCheckForm: React.FC<LogYieldCheckFormProps> = ({ authorization, on
 
   return (
     <form onSubmit={handleSubmit} className="mt-2 flex flex-col gap-2 rounded-md border border-border bg-muted p-3">
+      <p className="mb-1 text-xs text-muted-foreground">
+        <span className="font-medium">Note:</span> This records a measurement for reporting only. It does not create or move stock.
+      </p>
       <label className="flex flex-col text-xs font-medium text-muted-foreground">
-        Input Qty
+        Input Qty (measured — edit if different from authorized amount)
         <span className="mt-1 rounded-md border border-border bg-card px-2 py-1.5 text-sm text-foreground">
           {formatQty(authorization.authorized_qty)} {authorization.stock_uom || ''}
+        </span>
+        <span className="mt-1 text-xs font-normal text-text-tertiary">
+          Pre-filled from the authorized quantity. Enter the actual quantity physically issued if it differs.
         </span>
       </label>
       <label className="flex flex-col text-xs font-medium text-muted-foreground">
