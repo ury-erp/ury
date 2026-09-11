@@ -19,9 +19,14 @@ M2. `set_bom_revision()` only ever runs from the `before_validate` hook, so
     since the field was introduced. That leaves the entire C1
     staleness-detection feature (`ury.api.ury_sales_plan.flag_stale_bom_revisions`)
     silently inert until every BOM happens to get resaved for unrelated
-    reasons. This patch stamps a real revision on every existing BOM using
-    the exact same hashing logic as `set_bom_revision()` (as of this patch),
-    without needing a UI resave.
+    reasons. This patch stamps a real revision on every existing BOM by
+    calling `ury.hooks.ury_bom.set_bom_revision()` directly against each
+    BOM's loaded `items` -- NOT a locally re-implemented copy of that hash.
+    A first draft of this patch inlined the hash formula, and within the
+    same swarm run a separate fix (Track-Item D1) changed that formula
+    (added `uom` to the vector) -- proving inline duplication drifts out of
+    sync immediately, even inside one PR. Importing the real function makes
+    that class of bug structurally impossible.
 
 Both backfills are done via `frappe.db.set_value(..., update_modified=False)`
 in a loop -- not `doc.save()` -- specifically to avoid re-triggering
@@ -30,9 +35,9 @@ is working around the fallout of) and to avoid the overhead of a full
 document save for what is expected to be, at most, a few hundred BOMs.
 """
 
-import hashlib
-
 import frappe
+
+from ury.ury.hooks.ury_bom import set_bom_revision
 
 
 def execute():
@@ -95,26 +100,28 @@ def execute():
             )
             yield_qty_backfilled += 1
 
-        # Recompute custom_bom_revision using the same hashing logic as
-        # ury.hooks.ury_bom.set_bom_revision(): sorted (item_code, rounded
-        # qty) tuples, md5 hex digest truncated to 16 chars. Re-fetch qty
-        # fresh (a row above may have been backfilled, but qty itself is
-        # never changed by this patch, so this is just for a clean read).
+        # Recompute custom_bom_revision via the real set_bom_revision() --
+        # not a re-implemented copy of its hash -- so this patch can never
+        # drift out of sync with whatever vector that function hashes on
+        # (see module docstring: it already changed once, mid-run, when
+        # Track-Item D1 added `uom` to the vector). A lightweight object
+        # carrying just `.items` (re-fetched fresh, so a row backfilled
+        # above is reflected) is enough -- set_bom_revision() only reads
+        # `doc.items`, it doesn't call `.save()` or touch anything else.
         revision_rows = frappe.get_all(
             "BOM Item",
             filters={"parent": bom_name, "parenttype": "BOM"},
-            fields=["item_code", "qty"],
+            fields=["item_code", "qty", "uom"],
         )
-        vector = sorted(
-            (row.item_code, round(row.qty or 0, 6))
-            for row in revision_rows
-            if row.item_code
-        )
-        payload = repr(vector).encode("utf-8")
-        revision = hashlib.md5(payload).hexdigest()[:16]
+        bom_stub = frappe._dict(items=revision_rows)
+        set_bom_revision(bom_stub)
 
         frappe.db.set_value(
-            "BOM", bom_name, "custom_bom_revision", revision, update_modified=False
+            "BOM",
+            bom_name,
+            "custom_bom_revision",
+            bom_stub.custom_bom_revision,
+            update_modified=False,
         )
         revisions_stamped += 1
 
