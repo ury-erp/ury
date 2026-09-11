@@ -32,8 +32,16 @@ def get_due_yield_checks(branch):
 	"""Return list of items due for yield check in the given branch.
 
 	Evaluates yield-tracked items by their cadence mode:
-	- Every Issue: due if an authorized URY Issue Authorization exists with no
-	  corresponding URY Yield Check logged yet.
+	- Every Issue: due if a URY Issue Authorization with status = "Authorized"
+	  exists with no corresponding URY Yield Check logged yet. NOTE
+	  (compliance_basis: "authorization"): this fires on Authorized status
+	  alone — URY Issue Authorization has no field recording whether the
+	  authorization was ever physically issued, was later cancelled, or was
+	  only partially used, so this is authorization-based due-ness, not
+	  confirmed-physical-issuance due-ness. A real fix needs a new field on
+	  URY Issue Authorization (out of scope here); see also
+	  ury_yield_variance.get_yield_check_compliance, which has the same
+	  limitation.
 	- Interval: due if >cadence_interval_days since the last check (or if never
 	  checked).
 	- Sampled: due if a deterministic hash of (today, branch, item) falls under
@@ -233,7 +241,14 @@ def _evaluate_cadence(item, branch):
 
 
 def _evaluate_every_issue(item, branch):
-	"""Every Issue: due if an authorized issue exists with no yield check logged.
+	"""Every Issue: due if a URY Issue Authorization with status = "Authorized"
+	exists with no yield check logged yet.
+
+	compliance_basis: "authorization" — this checks status = "Authorized"
+	only. It cannot tell whether the authorization was ever physically
+	issued, was later cancelled, or was only partially used, so it may flag
+	an item as due even when no corresponding physical issue actually
+	happened. See get_due_yield_checks' docstring for the full caveat.
 
 	Returns:
 		(reason_str, {}) if due, (None, None) if not.

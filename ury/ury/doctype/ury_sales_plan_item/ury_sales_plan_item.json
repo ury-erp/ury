@@ -16,7 +16,8 @@
   "section_break_policy",
   "production_policy",
   "bom",
-  "bom_revision"
+  "bom_revision",
+  "bom_revision_stale"
  ],
  "fields": [
   {
@@ -79,6 +80,13 @@
    "fieldname": "bom_revision",
    "fieldtype": "Data",
    "label": "BOM Revision"
+  },
+  {
+   "fieldname": "bom_revision_stale",
+   "fieldtype": "Check",
+   "label": "BOM Revision Stale",
+   "description": "Set automatically when the plan is re-saved before approval: true if this row's captured bom_revision no longer matches the linked BOM's current bom_revision (i.e. the BOM's yield-adjusted quantities changed since this row was added). Informational only -- does not block save.",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
