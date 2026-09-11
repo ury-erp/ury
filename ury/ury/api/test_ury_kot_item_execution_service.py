@@ -12,6 +12,7 @@ from ury.ury.api.ury_kot_item_execution_service import (
 	QUEUED,
 	READY,
 	SERVED,
+	_attach_ready_posting_intent,
 	get_kot_execution_state,
 	mark_item_ready,
 	seed_kot_item_executions,
@@ -231,3 +232,55 @@ class TestKotItemExecution(FrappeTestCase):
 		with patch(f"{MODULE}.seed_kot_item_executions") as mock_seed:
 			seed_kot_item_executions_on_submit(submitted_doc)
 		mock_seed.assert_called_once_with("URY KOT-1")
+
+
+class TestAttachReadyPostingIntent(FrappeTestCase):
+	"""sa-architecture-closure (Gap A): `mark_item_ready` must never let both
+	native POS deduction and fulfilment posting become authoritative for the
+	same item. `_attach_ready_posting_intent` is the sole call site that
+	creates a fulfilment Stock Entry off a READY transition, so it must skip
+	posting -- quietly, not by failing the READY transition -- whenever
+	`pos_stock_authority_v2` is off (today's universal default, under which
+	native POS `update_stock=1` is already the sole authority).
+	"""
+
+	def test_skips_posting_intent_when_flag_is_off(self):
+		result = {"name": "EXEC-1", "branch": "Branch A", "company": "Company A", "idempotent_replay": False}
+		with patch(
+			"ury.ury.api.ury_feature_flags.is_pos_stock_authority_flag_enabled", return_value=False
+		), patch(f"{MODULE}.frappe.get_doc") as mock_get_doc, patch(
+			f"{MODULE}.create_or_get_posting_intent_for_ready", create=True
+		) as mock_create:
+			returned = _attach_ready_posting_intent(dict(result), actor="chef@example.com")
+
+		mock_get_doc.assert_not_called()
+		mock_create.assert_not_called()
+		self.assertIsNone(returned["posting_intent"])
+		self.assertEqual(returned["posting_intent_status"], "SKIPPED_NATIVE_POS_AUTHORITY")
+
+	def test_creates_posting_intent_when_flag_is_on(self):
+		result = {"name": "EXEC-1", "branch": "Branch A", "company": "Company A", "idempotent_replay": False}
+		fake_doc = frappe._dict({"name": "EXEC-1"})
+		with patch(
+			"ury.ury.api.ury_feature_flags.is_pos_stock_authority_flag_enabled", return_value=True
+		), patch(f"{MODULE}.frappe.get_doc", return_value=fake_doc), patch(
+			"ury.ury.api.ury_fulfilment_posting_service.create_or_get_posting_intent_for_ready",
+			return_value={"name": "INTENT-1", "status": "PENDING"},
+		) as mock_create, patch(
+			"ury.ury.api.ury_fulfilment_posting_service.enqueue_posting_intent"
+		) as mock_enqueue:
+			returned = _attach_ready_posting_intent(dict(result), actor="chef@example.com")
+
+		mock_create.assert_called_once_with(fake_doc, actor="chef@example.com")
+		mock_enqueue.assert_called_once_with("INTENT-1")
+		self.assertEqual(returned["posting_intent"], "INTENT-1")
+		self.assertEqual(returned["posting_intent_status"], "PENDING")
+
+	def test_idempotent_replay_never_touches_posting_intent(self):
+		result = {"name": "EXEC-1", "branch": "Branch A", "company": "Company A", "idempotent_replay": True}
+		with patch(
+			"ury.ury.api.ury_feature_flags.is_pos_stock_authority_flag_enabled"
+		) as mock_flag:
+			returned = _attach_ready_posting_intent(dict(result), actor="chef@example.com")
+		mock_flag.assert_not_called()
+		self.assertEqual(returned, result)
