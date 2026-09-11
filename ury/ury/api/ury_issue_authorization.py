@@ -25,7 +25,7 @@ import json
 import frappe
 from frappe import _
 
-from ury.ury.api.ury_yield_variance import user_has_branch_access
+from ury.ury.report_api.utils import user_has_branch_access
 
 
 ISSUE_AUTH_DOCTYPE = "URY Issue Authorization"

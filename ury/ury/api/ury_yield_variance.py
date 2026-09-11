@@ -17,7 +17,7 @@ import frappe
 from frappe import _
 from frappe.utils import getdate
 
-from ury.ury.report_api.utils import require_manager
+from ury.ury.report_api.utils import require_manager, user_has_branch_access
 
 
 YIELD_CHECK_DOCTYPE = "URY Yield Check"
@@ -342,36 +342,3 @@ def _require_scope(company):
 		frappe.throw(_("Company is required"), frappe.ValidationError)
 
 
-def user_has_branch_access(user, branch):
-	"""True if `user` is assigned to `branch` via Branch's `user` child table
-	(rows of URY User, each linking a User in its own `user` field), or if
-	`user` is Administrator or holds the System Manager role — matching the
-	admin-bypass convention used by report_api.utils.require_manager() so
-	admins are never locked out.
-
-	Shared by the staff-facing WRITE endpoints that accept a caller-supplied
-	branch (record_yield_check here, and
-	ury_issue_authorization.create_issue_authorization) to confirm the
-	calling user is actually assigned to that specific branch, not merely
-	that some branch/company value was supplied. Not used by the
-	manager-gated reporting endpoints (get_yield_variance,
-	get_yield_check_compliance), which intentionally rely on
-	require_manager() instead — managers may report across branches they
-	oversee even without a Branch.user row.
-	"""
-	if not user or not branch:
-		return False
-	if user == "Administrator":
-		return True
-	if "System Manager" in frappe.get_roles(user):
-		return True
-	return bool(
-		frappe.db.exists(
-			"URY User",
-			{
-				"parenttype": "Branch",
-				"parent": branch,
-				"user": user,
-			},
-		)
-	)

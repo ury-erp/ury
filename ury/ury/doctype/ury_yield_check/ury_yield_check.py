@@ -180,7 +180,8 @@ class URYYieldCheck(Document):
 		existing_wastage = frappe.get_all(
 			"URY Issue Wastage",
 			filters={
-				"issue_authorization": self.issue_authorization
+				"issue_authorization": self.issue_authorization,
+				"docstatus": ["!=", 2]
 			},
 			fields=["name"]
 		)
