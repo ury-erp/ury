@@ -259,6 +259,29 @@ def _reconcile_line(order_ref, line_key, line, previous_qty, branch, company, ac
 	return None
 
 
+def release_order_reservations(order_ref, reason=None):
+	"""Release every still-Reserved reservation group belonging to an order.
+
+	Used when an order is cancelled outright (as opposed to reconciled line
+	by line via `reconcile_order_reservations`), so a cancellation does not
+	leak reserved capacity that was never explicitly released. Idempotent:
+	an order with no active reservations (or one already fully released)
+	is a no-op. Returns the list of reservation_group names released.
+	"""
+	if not order_ref:
+		return []
+
+	rows = frappe.get_all(
+		RESERVATION_DOCTYPE,
+		filters={"order_ref": order_ref, "status": RESERVED},
+		fields=["reservation_group"],
+	)
+	groups = list(dict.fromkeys(row.reservation_group for row in rows if row.reservation_group))
+	for group in groups:
+		release_reservation(group, reason=reason or "Order cancelled")
+	return groups
+
+
 def reconcile_order_reservations(order_ref, previous_items, accepted_items, branch, company, actor=None):
 	"""Reconcile reservations to the accepted POS item delta.
 

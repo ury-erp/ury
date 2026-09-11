@@ -317,3 +317,49 @@ class TestReconcileOrderReservationsPreflight(unittest.TestCase):
 			item_code="ITEM-A", branch="BR-1", company="COMP-1", department="Hot Line"
 		)
 		self.assertEqual(reconcile_line.call_count, 2)
+
+
+class TestReleaseOrderReservations(unittest.TestCase):
+	"""release_order_reservations() -- used by cancel_order() so cancellation
+	does not leak reserved capacity (sa-post-373-review-fixes Blocker 3)."""
+
+	def test_releases_every_distinct_active_group_for_the_order(self):
+		rows = [
+			service.frappe._dict({"reservation_group": "GRP-1"}),
+			service.frappe._dict({"reservation_group": "GRP-1"}),
+			service.frappe._dict({"reservation_group": "GRP-2"}),
+		]
+		with patch.object(service.frappe, "get_all", return_value=rows) as get_all, patch.object(
+			service, "release_reservation"
+		) as release_reservation:
+			result = service.release_order_reservations("INV-1", reason="Order cancelled")
+
+		get_all.assert_called_once_with(
+			service.RESERVATION_DOCTYPE,
+			filters={"order_ref": "INV-1", "status": service.RESERVED},
+			fields=["reservation_group"],
+		)
+		self.assertEqual(release_reservation.call_count, 2)
+		release_reservation.assert_any_call("GRP-1", reason="Order cancelled")
+		release_reservation.assert_any_call("GRP-2", reason="Order cancelled")
+		self.assertEqual(result, ["GRP-1", "GRP-2"])
+
+	def test_no_active_reservations_is_a_no_op(self):
+		with patch.object(service.frappe, "get_all", return_value=[]) as get_all, patch.object(
+			service, "release_reservation"
+		) as release_reservation:
+			result = service.release_order_reservations("INV-1")
+
+		get_all.assert_called_once()
+		release_reservation.assert_not_called()
+		self.assertEqual(result, [])
+
+	def test_no_order_ref_is_a_no_op(self):
+		with patch.object(service.frappe, "get_all") as get_all, patch.object(
+			service, "release_reservation"
+		) as release_reservation:
+			result = service.release_order_reservations(None)
+
+		get_all.assert_not_called()
+		release_reservation.assert_not_called()
+		self.assertEqual(result, [])
