@@ -114,6 +114,7 @@ def _find_prior_result(kot_item, target_state, idempotency_key):
 		fields=[
 			"name", "state", "idempotency_key", "started_by", "started_at",
 			"ready_by", "ready_at", "served_by", "served_at", "kot", "kot_item",
+			"branch", "company",
 		],
 		order_by="creation desc",
 		limit=1,
@@ -126,6 +127,8 @@ def _result_dict(row, idempotent=False):
 		"name": row.get("name"),
 		"kot": row.get("kot"),
 		"kot_item": row.get("kot_item"),
+		"branch": row.get("branch"),
+		"company": row.get("company"),
 		"state": row.get("state"),
 		"idempotency_key": row.get("idempotency_key"),
 		"started_by": row.get("started_by"),
@@ -141,6 +144,27 @@ def _result_dict(row, idempotent=False):
 def _attach_ready_posting_intent(result, actor):
 	if result.get("idempotent_replay"):
 		return result
+
+	# sa-architecture-closure: fulfilment posting (this service creating a
+	# Stock Entry) and native POS Invoice deduction (`update_stock=1`, set by
+	# `_apply_pos_stock_authority()` in ury_order.py) must never both be
+	# authoritative for the same item. Today `pos_stock_authority_v2` is OFF
+	# everywhere, which makes native POS the sole stock authority -- so
+	# marking a KOT item READY must NOT also create a fulfilment Stock Entry
+	# for it; native POS will deduct it at invoice time instead. This is a
+	# quiet no-op here (not a thrown error) because READY is a routine
+	# kitchen-workflow transition that must keep working under today's
+	# universal default; the hard stop belongs at the point stock would
+	# actually double-post, not at "the chef marked food ready".
+	from ury.ury.api.ury_feature_flags import is_pos_stock_authority_flag_enabled
+
+	branch = result.get("branch")
+	company = result.get("company")
+	if not is_pos_stock_authority_flag_enabled(company=company, branch=branch):
+		result["posting_intent"] = None
+		result["posting_intent_status"] = "SKIPPED_NATIVE_POS_AUTHORITY"
+		return result
+
 	from ury.ury.api.ury_fulfilment_posting_service import (
 		create_or_get_posting_intent_for_ready,
 		enqueue_posting_intent,

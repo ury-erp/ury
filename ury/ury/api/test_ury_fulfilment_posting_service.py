@@ -8,6 +8,7 @@ from frappe.tests.utils import FrappeTestCase
 from ury.ury.api.ury_fulfilment_posting_service import (
 	FAILED,
 	POSTED,
+	FulfilmentPostingError,
 	_authorize_posting,
 	_stock_entry_items,
 	_submit_stock_entry,
@@ -142,6 +143,11 @@ class TestCreatePostingIntent(FrappeTestCase):
 		self.addCleanup(patch.stopall)
 		patch(f"{MODULE}.frappe.get_roles", return_value=["Chef"]).start()
 		patch(f"{MODULE}.frappe.has_permission", return_value=True).start()
+		# sa-architecture-closure: these tests exercise the posting service's
+		# own internals (payload freezing, sequencing, replay) assuming the
+		# flag-on/fulfilment-authoritative state; the flag-off skip itself is
+		# covered separately below and in test_ury_kot_item_execution_service.py.
+		patch(f"{MODULE}.is_pos_stock_authority_flag_enabled", return_value=True).start()
 
 	def test_end_users_can_read_and_report_but_cannot_directly_mutate_intents(self):
 		metadata = json.loads(
@@ -158,6 +164,18 @@ class TestCreatePostingIntent(FrappeTestCase):
 		with patch(f"{MODULE}.frappe.get_roles", return_value=[]):
 			with self.assertRaises(frappe.PermissionError):
 				_authorize_posting("customer@example.com", _execution_doc())
+
+	def test_create_intent_refuses_when_pos_stock_authority_flag_is_off(self):
+		# sa-architecture-closure (Gap A): with the flag off -- today's
+		# universal default -- native POS `update_stock=1` is already the
+		# sole stock authority. This function must refuse to also create a
+		# Stock Entry for the same item, with a message that explains why,
+		# rather than silently double-posting stock.
+		with patch(f"{MODULE}.is_pos_stock_authority_flag_enabled", return_value=False):
+			with self.assertRaises(FulfilmentPostingError) as ctx:
+				create_or_get_posting_intent_for_ready(_execution_doc(), actor="chef@example.com")
+		self.assertEqual(ctx.exception.reason_code, "POS_STOCK_AUTHORITY_FLAG_OFF")
+		self.assertIn("Native POS", str(ctx.exception))
 
 	def test_ready_creates_one_intent_with_frozen_payload(self):
 		created = []

@@ -26,6 +26,7 @@ from frappe.utils import add_to_date, flt, now, now_datetime
 from ury.ury.api.ury_reservation_service import FULFILLED, RESERVED, fulfil_reservation
 from ury.ury.api.ury_kot_execution_service import READY, SERVED
 from ury.ury.api.ury_bom_compiler import publish_component_stock_fanout
+from ury.ury.api.ury_feature_flags import is_pos_stock_authority_flag_enabled
 
 
 INTENT_DOCTYPE = "URY Fulfilment Posting Intent"
@@ -329,6 +330,31 @@ def create_or_get_posting_intent_for_ready(execution_doc, actor=None):
 		raise FulfilmentPostingError("POSTING_INTENT_DOCTYPE_MISSING", _("{0} is not available").format(INTENT_DOCTYPE))
 
 	actor = actor or frappe.session.user
+
+	# sa-architecture-closure: this service must never post stock for an item
+	# native POS Invoice deduction (`update_stock=1`) is also posting for.
+	# The actual production entry point (`mark_item_ready` ->
+	# `_attach_ready_posting_intent` in ury_kot_item_execution_service.py)
+	# already checks `pos_stock_authority_v2` before ever calling this
+	# function, and skips calling it entirely while the flag is OFF (today's
+	# universal default) so native POS remains the sole authority. This is a
+	# second, defense-in-depth check for any other/future direct caller of
+	# this function: it must never silently create a Stock Entry while the
+	# flag is off, on top of whatever native POS already posts.
+	if not is_pos_stock_authority_flag_enabled(
+		company=execution_doc.get("company"), branch=execution_doc.get("branch")
+	):
+		raise FulfilmentPostingError(
+			"POS_STOCK_AUTHORITY_FLAG_OFF",
+			_(
+				"Stock posting for this item is handled by Native POS in this "
+				"branch's current mode (POS Stock Authority V2 is not enabled), "
+				"so fulfilment posting cannot also post a Stock Entry for it. "
+				"Enable 'POS Stock Authority V2 Enabled' in URY Feature Flags "
+				"for this branch before fulfilment posting can be authoritative."
+			),
+		)
+
 	_authorize_posting(actor, execution_doc)
 	payload = _freeze_payload(execution_doc, actor)
 	existing_name = frappe.db.get_value(INTENT_DOCTYPE, {"idempotency_key": payload["idempotency_key"]}, "name")
