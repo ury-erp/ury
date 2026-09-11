@@ -1,4 +1,5 @@
 import frappe
+from frappe import _
 
 
 def apply_yield_back_calculation(doc, method):
@@ -13,10 +14,6 @@ def apply_yield_back_calculation(doc, method):
     For items without yield tracking, qty is left as manually entered by the user.
     """
     for row in doc.items:
-        # Skip rows without yield_qty configured
-        if not row.custom_yield_qty:
-            continue
-
         # Fetch the item document to check if yield tracking is enabled
         item = frappe.get_doc("Item", row.item_code)
 
@@ -24,9 +21,15 @@ def apply_yield_back_calculation(doc, method):
         if not item.custom_yield_tracked:
             continue
 
-        # Skip if yield percent is not set or is zero (guard against division issues)
+        # At this point, the item is yield-tracked, so it must have required fields set
+        if not row.custom_yield_qty:
+            frappe.throw(_("Yield-tracked item {0} requires custom_yield_qty to be set on BOM row {1}").format(
+                row.item_code, row.idx))
+
+        # Check if yield percent is set and non-zero
         if not row.custom_yield_percent or row.custom_yield_percent == 0:
-            continue
+            frappe.throw(_("Yield percent for item {0} is missing or zero on BOM row {1}. Check the Item's custom_yield_percent setting.").format(
+                row.item_code, row.idx))
 
         # Back-calculate qty from yield_qty and yield_percent
         # Formula: qty = custom_yield_qty / (custom_yield_percent / 100)
