@@ -367,7 +367,14 @@ class TestURYOrder(FrappeTestCase):
         mock_has_permission.return_value = True
         mock_get_branch.return_value = "Test Branch"
 
-        def get_value_side_effect(doctype, filters=None, fieldname=None):
+        def get_value_side_effect(doctype, filters=None, fieldname=None, **kwargs):
+            # `**kwargs` absorbs `ignore=True` (and any other keyword) that
+            # `frappe.db.exists()` now internally passes through to
+            # `get_value()` on this frappe version -- without it, the mock's
+            # positional-only signature raises TypeError before sync_order's
+            # own logic ever runs, masking what this test is actually meant
+            # to prove (see the same drift noted for other tests in this
+            # file, sa-post-373-review-fixes verification).
             if doctype == "URY Table" and fieldname == ["branch", "restaurant_room"]:
                 return ("Test Branch", "Main Hall")
             if doctype == "URY Menu":
