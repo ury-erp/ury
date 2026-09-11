@@ -77,6 +77,21 @@ Either way, the system automatically computes the actual yield % and compares it
 standard yield % *at the time this specific check was logged* — so if you later change the
 standard, past checks don't silently get reinterpreted.
 
+**Operational convention — one authorization per batch:** The system enforces a strict rule:
+each `URY Issue Authorization` can have at most one `URY Yield Check` logged against it. This
+means: if a single authorization covers multiple physical prep batches or multiple deliveries,
+only one aggregate check is possible — which can hide quality issues in an individual batch
+inside an acceptable average. To get batch-level granularity, ensure that **one `Issue
+Authorization` corresponds to one physical prep batch**. If your operation needs finer-grained
+checking (multiple batches under a single authorization), that requires a system enhancement
+not yet built.
+
+**Important — no stock transformation:** Logging a Yield Check is a measurement-only record
+for variance reporting — it does **not** create, move, or transform any stock. It does not
+represent a conversion in your inventory (e.g., whole chicken → boneless chicken becoming a
+separate trackable stock item). If your operation needs to track stock transformations in the
+future, that is a separate, larger feature not yet built.
+
 ### Seeing what's due
 
 **Yield → Overdue Checks** (`/overdue-yield-checks`) lists items that are due for a check right
