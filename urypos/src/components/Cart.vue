@@ -78,7 +78,7 @@
         id="qty_input_cart"
         name="qty_input_cart"
         class="block w-full border-none text-center text-base text-gray-900 dark:text-white"
-        :value="parseInt(cart_item.qty)"
+        :value="parseFloat(cart_item.qty)"
         @input="cart_item.qty = $event.target.value"
         @click="
           this.menu.showModal(cart_item);
