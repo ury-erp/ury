@@ -313,6 +313,8 @@ class TestURYOrder(FrappeTestCase):
         )
         self.assertEqual(events, ["reconcile", "save"])
 
+    @patch("ury.ury.doctype.ury_order.ury_order.get_restaurant_and_menu_name")
+    @patch("ury.ury.doctype.ury_order.ury_order._validate_sync_items_against_menu")
     @patch("ury.ury.doctype.ury_order.ury_order.getBranch")
     @patch("ury.ury.doctype.ury_order.ury_order.reconcile_order_reservations")
     @patch("ury.ury.doctype.ury_order.ury_order.kot_execute")
@@ -335,7 +337,10 @@ class TestURYOrder(FrappeTestCase):
         mock_kot_execute,
         mock_reconcile,
         mock_get_branch,
+        mock_validate_menu,
+        mock_get_restaurant_and_menu_name,
     ):
+        mock_get_restaurant_and_menu_name.return_value = ("Test Branch", "Menu A", "Test Restaurant")
         """A KOT/routing failure must abort sync_order loudly instead of being
         logged and swallowed -- otherwise a customer can be charged (invoice
         saved) while the kitchen never receives the item
