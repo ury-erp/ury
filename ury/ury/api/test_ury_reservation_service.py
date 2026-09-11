@@ -734,6 +734,197 @@ class TestReleaseFulfilCancel(FrappeTestCase):
         self.assertEqual(loaded_doc.status, FULFILLED)
 
 
+class TestSalesPlanCommitWiring(FrappeTestCase):
+    """Sales Plan committed_qty/fulfilled_qty maintenance wired into
+    create_reservation (increment) and _transition_group (decrement on
+    release/cancel/expire, decrement+increment-fulfilled on fulfil)."""
+
+    def setUp(self):
+        patch_read_committed_reservation_rows(self)
+        now_patcher = patch(f"{MODULE}.frappe.utils.now", return_value="2024-01-01 00:00:00")
+        now_patcher.start()
+        self.addCleanup(now_patcher.stop)
+
+    def test_create_reservation_increments_committed_qty_for_matched_plan_item(self):
+        get_doc_side_effect, created = _new_doc_recorder()
+
+        with patch(f"{MODULE}.frappe.has_permission", return_value=True), patch(
+            f"{MODULE}.frappe.db.sql",
+            return_value=[{"name": "BIN-1", "actual_qty": 10, "projected_qty": 10}],
+        ), patch(f"{MODULE}.frappe.db.get_value", return_value=None), patch(
+            f"{MODULE}.frappe.get_all", return_value=[]
+        ), patch(
+            f"{MODULE}.frappe.get_doc", side_effect=get_doc_side_effect
+        ), patch(
+            f"{MODULE}.frappe.generate_hash", return_value="GRP1"
+        ), patch(
+            f"{MODULE}.apply_commit_delta",
+            return_value={"name": "PLI-1", "committed_qty": 4, "fulfilled_qty": 0},
+        ) as mock_apply:
+            create_reservation(
+                item_code="ITEM-SIMPLE",
+                qty=4,
+                warehouse="WH-1",
+                branch="Branch A",
+                company="Company A",
+                order_ref="ORDER-1",
+                frozen_context={"department": "Hot Line"},
+            )
+
+        mock_apply.assert_called_once_with(
+            "ITEM-SIMPLE", "Branch A", "Company A", department="Hot Line", committed_delta=4
+        )
+        # The applied commit is recorded on the created row's audit_log so
+        # release/fulfil can symmetrically reverse it later.
+        audit = json.loads(created[0]["audit_log"])
+        commit_info = audit[0]["frozen_context"]["sales_plan_commit"]
+        self.assertTrue(commit_info["applied"])
+        self.assertEqual(commit_info["qty"], 4)
+        self.assertEqual(commit_info["plan_item"], "PLI-1")
+
+    def test_create_reservation_with_no_plan_match_records_not_applied(self):
+        get_doc_side_effect, created = _new_doc_recorder()
+
+        with patch(f"{MODULE}.frappe.has_permission", return_value=True), patch(
+            f"{MODULE}.frappe.db.sql",
+            return_value=[{"name": "BIN-1", "actual_qty": 10, "projected_qty": 10}],
+        ), patch(f"{MODULE}.frappe.db.get_value", return_value=None), patch(
+            f"{MODULE}.frappe.get_all", return_value=[]
+        ), patch(
+            f"{MODULE}.frappe.get_doc", side_effect=get_doc_side_effect
+        ), patch(
+            f"{MODULE}.frappe.generate_hash", return_value="GRP1"
+        ), patch(
+            f"{MODULE}.apply_commit_delta", return_value=None
+        ):
+            create_reservation(
+                item_code="ITEM-SIMPLE",
+                qty=4,
+                warehouse="WH-1",
+                branch="Branch A",
+                company="Company A",
+                order_ref="ORDER-1",
+            )
+
+        audit = json.loads(created[0]["audit_log"])
+        commit_info = audit[0]["frozen_context"]["sales_plan_commit"]
+        self.assertFalse(commit_info["applied"])
+        self.assertIsNone(commit_info["plan_item"])
+
+    def _rows_with_commit(self, status, qty=4):
+        audit_log = json.dumps(
+            [
+                {
+                    "event": "create",
+                    "frozen_context": {
+                        "sales_plan_commit": {
+                            "applied": True,
+                            "item_code": "ITEM-SIMPLE",
+                            "branch": "Branch A",
+                            "company": "Company A",
+                            "department": "Hot Line",
+                            "qty": qty,
+                            "plan_item": "PLI-1",
+                        }
+                    },
+                }
+            ]
+        )
+        return [
+            frappe._dict(
+                {"name": "RES-1", "status": status, "reservation_group": "GRP9", "audit_log": audit_log}
+            )
+        ]
+
+    def _sql_side_effect(self, rows):
+        def _sql(query, values=None, as_dict=False, **kwargs):
+            if values and "name" in values:
+                for row in rows:
+                    if row.get("name") == values["name"]:
+                        return [frappe._dict({"reservation_group": row.get("reservation_group")})]
+                return []
+            if values and "group" in values:
+                return [frappe._dict(dict(row)) for row in rows if row.get("reservation_group") == values["group"]]
+            return []
+
+        return _sql
+
+    def test_release_decrements_committed_qty_by_recorded_amount(self):
+        loaded_doc = frappe._dict({"name": "RES-1", "status": RESERVED, "audit_log": None})
+        loaded_doc.save = MagicMock()
+        rows = self._rows_with_commit(RESERVED, qty=4)
+
+        with patch(f"{MODULE}.frappe.db.get_value", return_value=None), patch(
+            f"{MODULE}.frappe.get_all", return_value=rows
+        ), patch(f"{MODULE}.frappe.db.sql", side_effect=self._sql_side_effect(rows)), patch(
+            f"{MODULE}.frappe.get_doc", side_effect=lambda *a, **k: loaded_doc
+        ), patch(
+            f"{MODULE}.frappe.session"
+        ) as mock_session, patch(
+            f"{MODULE}.apply_commit_delta"
+        ) as mock_apply:
+            mock_session.user = "tester@example.com"
+            release_reservation("RES-1", reason="order cancelled before production")
+
+        mock_apply.assert_called_once_with(
+            "ITEM-SIMPLE",
+            "Branch A",
+            "Company A",
+            department="Hot Line",
+            committed_delta=-4,
+            fulfilled_delta=0,
+        )
+
+    def test_fulfil_moves_qty_from_committed_to_fulfilled_in_one_call(self):
+        loaded_doc = frappe._dict({"name": "RES-1", "status": RESERVED, "audit_log": None})
+        loaded_doc.save = MagicMock()
+        rows = self._rows_with_commit(RESERVED, qty=6)
+
+        with patch(f"{MODULE}.frappe.db.get_value", return_value=None), patch(
+            f"{MODULE}.frappe.get_all", return_value=rows
+        ), patch(f"{MODULE}.frappe.db.sql", side_effect=self._sql_side_effect(rows)), patch(
+            f"{MODULE}.frappe.get_doc", side_effect=lambda *a, **k: loaded_doc
+        ), patch(
+            f"{MODULE}.frappe.session"
+        ) as mock_session, patch(
+            f"{MODULE}.apply_commit_delta"
+        ) as mock_apply:
+            mock_session.user = "tester@example.com"
+            fulfil_reservation("RES-1")
+
+        mock_apply.assert_called_once_with(
+            "ITEM-SIMPLE",
+            "Branch A",
+            "Company A",
+            department="Hot Line",
+            committed_delta=-6,
+            fulfilled_delta=6,
+        )
+
+    def test_no_commit_recorded_means_no_counter_call(self):
+        """A group whose create predates this feature (no sales_plan_commit in
+        its audit_log) must not touch the counter helper at all."""
+        loaded_doc = frappe._dict({"name": "RES-1", "status": RESERVED, "audit_log": None})
+        loaded_doc.save = MagicMock()
+        rows = [
+            frappe._dict({"name": "RES-1", "status": RESERVED, "reservation_group": "GRP9", "audit_log": None})
+        ]
+
+        with patch(f"{MODULE}.frappe.db.get_value", return_value=None), patch(
+            f"{MODULE}.frappe.get_all", return_value=rows
+        ), patch(f"{MODULE}.frappe.db.sql", side_effect=self._sql_side_effect(rows)), patch(
+            f"{MODULE}.frappe.get_doc", side_effect=lambda *a, **k: loaded_doc
+        ), patch(
+            f"{MODULE}.frappe.session"
+        ) as mock_session, patch(
+            f"{MODULE}.apply_commit_delta"
+        ) as mock_apply:
+            mock_session.user = "tester@example.com"
+            release_reservation("RES-1")
+
+        mock_apply.assert_not_called()
+
+
 class TestRealtimeEventEmission(FrappeTestCase):
 	"""Tests for realtime event emissions on reservation create/release."""
 
