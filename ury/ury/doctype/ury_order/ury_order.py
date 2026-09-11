@@ -1937,11 +1937,16 @@ def sync_order(
 
     try:
         kot_execute(invoice.name, customer, table, items, past_item, comments)
-
     except Exception as e:
-        # If an exception occurs (e.g., "kot" app not found), it will be caught here without affect the code execution.
-        error_msg = f"KOT Creation Failes {str(e)}"            
+        # KOT creation/routing failing is not a side detail to swallow: a
+        # customer must never be charged for an item the kitchen never
+        # receives. Log for diagnostics, then re-raise so the whole request
+        # (including the invoice.save() above) rolls back and the caller
+        # sees a real failure instead of a silently accepted order.
+        # See sa-post-373-review-fixes Blocker 2.
+        error_msg = f"KOT Creation Failed: {str(e)}"
         frappe.log_error(error_msg, "KOT Error")
+        frappe.throw(_("Failed to create kitchen order ticket(s) for this order: {0}").format(str(e)))
 
     # table status
     if invoice.invoice_printed == 0:
