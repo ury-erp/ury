@@ -756,7 +756,14 @@ def add_customer_items(session, items):
             ]
             kot_execute(invoice.name, invoice.customer, invoice.restaurant_table, current_items_for_kot, past_item, None)
         except Exception as e:
+            # Same class of bug as sa-post-373-review-fixes Blocker 2 in
+            # sync_order(): swallowing this exception let a QR self-order be
+            # fully accepted (invoice saved, customer sees confirmation)
+            # while the kitchen silently never received one or more items.
+            # Log for diagnostics, then re-raise so the whole confirm
+            # request -- including the invoice.save() above -- rolls back.
             frappe.log_error(f"Self-order KOT creation failed: {e}", "KOT Error")
+            frappe.throw(_("Failed to create kitchen order ticket(s) for this order: {0}").format(str(e)))
 
     return _sanitize_invoice_for_customer(invoice)
 
