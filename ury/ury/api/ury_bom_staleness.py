@@ -31,7 +31,7 @@ FLOAT_TOLERANCE = 0.001
 
 
 @frappe.whitelist()
-def get_stale_draft_boms(company):
+def get_stale_draft_boms(company, limit=200):
 	"""Return draft BOMs whose stored component yield% has drifted from the
 	component Item's current live yield% standard.
 
@@ -40,6 +40,8 @@ def get_stale_draft_boms(company):
 			`get_yield_variance` / `get_yield_check_compliance` convention
 			of a single required company rather than iterating all
 			companies the caller has scope for).
+		limit: Maximum number of stale rows to return (default 200, matches
+			get_yield_variance convention).
 
 	Returns:
 		One dict per stale ROW (a BOM with multiple stale rows appears
@@ -116,7 +118,7 @@ def get_stale_draft_boms(company):
 			}
 		)
 
-	return stale
+	return stale[:limit]
 
 
 def _require_scope(company):

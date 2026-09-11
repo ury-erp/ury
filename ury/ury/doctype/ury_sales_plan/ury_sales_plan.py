@@ -39,7 +39,7 @@ class URYSalesPlan(Document):
 		# been frozen (see freeze_approval_snapshot, invoked below on the
 		# Approved transition), the plan's numbers are locked historical
 		# record and must not keep shifting on every subsequent save.
-		if not self.get("approval_snapshot"):
+		if self.get("status") in ("Draft", "Proposed", "Submitted for Approval"):
 			flag_stale_bom_revisions(self)
 
 		if prev_status and prev_status != self.status:
