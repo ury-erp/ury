@@ -1,13 +1,9 @@
 import json
 
 import frappe
-from ury.ury_pos.api import getBranch
 
-from ury.ury.api.ury_kot_routing import (
-    ROUTING_NOT_CONFIGURED,
-    RoutingError,
-    resolve_production_units,
-)
+from ury.ury.api.ury_kot_routing import resolve_production_units
+from ury.ury.api.ury_production_context import resolve_production_context
 
 
 # Load JSON data or return as is if it's already a Python dictionary
@@ -78,14 +74,21 @@ def create_kot_doc(
         # etc.) must not collide with it, so callers only pass this for that
         # first-KOT case.
         kot_doc.validation_dedup_key = validation_dedup_key
-    branch = getBranch()
     if restaurant_table:
         room = frappe.db.get_value("URY Table", restaurant_table, "restaurant_room")
         restaurant = frappe.db.get_value("URY Table", restaurant_table, "restaurant")
         menu = frappe.db.get_value("Menu for Room", {"room": room,"parent":restaurant}, "menu")
 
     else:
-        menu = frappe.db.get_value("URY Restaurant", {"branch": branch}, "active_menu")
+        # No-table orders (Takeaway/Delivery/Aggregators/QR-pickup) have no
+        # session-branch-independent context of their own -- the invoice
+        # being ticketed is the only reliable source of branch. Using
+        # getBranch() here derives the menu from the ACTING USER's session
+        # branch instead of the invoice's own branch, which is wrong
+        # whenever those differ (e.g. a billing/back-office user operating
+        # across branches). Same bug class as PR #373 bug #1
+        # (_resolve_or_create_pos_invoice not setting invoice.branch).
+        menu = frappe.db.get_value("URY Restaurant", {"branch": pos_invoice.branch}, "active_menu")
 
     for item in items:
         course = frappe.db.get_value("URY Menu Item", {"item": item["item_code"],"parent":menu}, "course")
@@ -157,32 +160,33 @@ def process_items_for_kot(
     production_items_map = {}
     for item in kot_items:
         item_code = item["item_code"]
-        try:
-            # Resolve production units for this item using the unified routing logic.
-            # Note: production_policy is not passed, so DIRECT_RETAIL items with
-            # item_groups will still be routed via the legacy fallback (backward compatible).
-            resolved_units = resolve_production_units(
-                item_code=item_code,
-                company=pos_invoice.company,
-                branch=pos_profile.branch,
-            )
-            for production_unit in resolved_units:
-                if production_unit not in production_items_map:
-                    production_items_map[production_unit] = []
-                production_items_map[production_unit].append(item)
-        except RoutingError as e:
-            if e.reason_code == ROUTING_NOT_CONFIGURED:
-                # Item has no routing configuration and no fallback match.
-                # Log at debug level and skip, matching legacy behavior.
-                frappe.logger().debug(
-                    f"Item {item_code} has no production routing configured; skipping KOT"
-                )
-            else:
-                # Other routing errors (ambiguous, disabled department/unit) are
-                # configuration issues. Log as warning and skip to avoid breaking the batch.
-                frappe.logger().warning(
-                    f"Routing error for item {item_code}: {e.reason_code} - {str(e)}"
-                )
+        # Resolve this item's configured production_policy (if any) so
+        # DIRECT_RETAIL items -- which have no production routing
+        # requirement -- are correctly exempted from routing instead of
+        # being silently forced through the legacy item-group fallback.
+        production_config = resolve_production_context(
+            item_code, pos_profile.branch, company=pos_invoice.company
+        )
+        production_policy = production_config.production_policy if production_config else None
+
+        # Resolve production units for this item using the unified routing
+        # logic. A RoutingError here means a controlled item's routing is
+        # missing/ambiguous/disabled -- that must fail the whole KOT batch
+        # closed (not be silently skipped) so a customer is never charged
+        # for an item the kitchen never sees. See sa-post-373-review-fixes
+        # Blocker 2. DIRECT_RETAIL items never raise here (see
+        # resolve_production_units); they simply resolve to no production
+        # unit.
+        resolved_units = resolve_production_units(
+            item_code=item_code,
+            company=pos_invoice.company,
+            branch=pos_profile.branch,
+            production_policy=production_policy,
+        )
+        for production_unit in resolved_units:
+            if production_unit not in production_items_map:
+                production_items_map[production_unit] = []
+            production_items_map[production_unit].append(item)
 
     # Print warning if any item was not routed (legacy behavior)
     all_routed_items = set()
@@ -258,32 +262,23 @@ def process_items_for_cancel_kot(
     production_items_map = {}
     for item in kot_items:
         item_code = item["item_code"]
-        try:
-            # Resolve production units for this item using the unified routing logic.
-            # Note: production_policy is not passed, so DIRECT_RETAIL items with
-            # item_groups will still be routed via the legacy fallback (backward compatible).
-            resolved_units = resolve_production_units(
-                item_code=item_code,
-                company=pos_invoice.company,
-                branch=pos_profile.branch,
-            )
-            for production_unit in resolved_units:
-                if production_unit not in production_items_map:
-                    production_items_map[production_unit] = []
-                production_items_map[production_unit].append(item)
-        except RoutingError as e:
-            if e.reason_code == ROUTING_NOT_CONFIGURED:
-                # Item has no routing configuration and no fallback match.
-                # Log at debug level and skip, matching legacy behavior.
-                frappe.logger().debug(
-                    f"Item {item_code} has no production routing configured for cancellation; skipping cancel KOT"
-                )
-            else:
-                # Other routing errors (ambiguous, disabled department/unit) are
-                # configuration issues. Log as warning and skip to avoid breaking the batch.
-                frappe.logger().warning(
-                    f"Routing error for cancel item {item_code}: {e.reason_code} - {str(e)}"
-                )
+        # See process_items_for_kot() above for why production_policy is
+        # resolved and why a RoutingError is left to propagate.
+        production_config = resolve_production_context(
+            item_code, pos_profile.branch, company=pos_invoice.company
+        )
+        production_policy = production_config.production_policy if production_config else None
+
+        resolved_units = resolve_production_units(
+            item_code=item_code,
+            company=pos_invoice.company,
+            branch=pos_profile.branch,
+            production_policy=production_policy,
+        )
+        for production_unit in resolved_units:
+            if production_unit not in production_items_map:
+                production_items_map[production_unit] = []
+            production_items_map[production_unit].append(item)
 
     # Create one cancel KOT per production unit
     for production_unit, production_items in production_items_map.items():
@@ -365,14 +360,20 @@ def create_cancel_kot_doc(
         }
     )
 
-    branch = getBranch()
     if restaurant_table:
         room = frappe.db.get_value("URY Table", restaurant_table, "restaurant_room")
         restaurant = frappe.db.get_value("URY Table", restaurant_table, "restaurant")
         menu = frappe.db.get_value("Menu for Room", {"room": room,"parent":restaurant}, "menu")
-        
+
     else:
-        menu = frappe.db.get_value("URY Restaurant", {"branch": branch}, "active_menu")
+        # No-table cancel KOTs must derive branch from the invoice being
+        # cancelled, not from the acting user's session (getBranch()) --
+        # same bug class as PR #373 bug #1 and the create_kot_doc() fix
+        # above. Using the session branch picks the wrong branch's active
+        # menu (and therefore the wrong course grouping) whenever the
+        # cancelling user's session branch differs from the invoice's own
+        # branch.
+        menu = frappe.db.get_value("URY Restaurant", {"branch": pos_invoice.branch}, "active_menu")
     for cancelItem in cancel_items:
         course = frappe.db.get_value("URY Menu Item", {"item": cancelItem["item_code"],"parent":menu}, "course")
         for item in invoiceItems:
