@@ -1,3 +1,5 @@
+import hashlib
+
 import frappe
 from frappe import _
 
@@ -34,3 +36,36 @@ def apply_yield_back_calculation(doc, method):
         # Back-calculate qty from yield_qty and yield_percent
         # Formula: qty = custom_yield_qty / (custom_yield_percent / 100)
         row.qty = row.custom_yield_qty / (row.custom_yield_percent / 100)
+
+    set_bom_revision(doc)
+
+
+def set_bom_revision(doc):
+    """Compute and set `custom_bom_revision`, a marker that changes whenever
+    this BOM's (yield-adjusted) raw-material quantities change.
+
+    Design choice (see Track-Item C1 brief): a hash of the exploded
+    item/qty vector is used, NOT the doc's `modified` timestamp. A
+    `modified`-based revision is simpler, but it is bumped by ANY save of
+    the BOM -- including edits with no bearing on yield (description
+    tweaks, operations changes, etc.) -- so a Sales Plan row would be
+    flagged "stale" on every unrelated BOM save, drowning out the real
+    signal. Hashing (item_code, qty) for every row is only marginally more
+    expensive than the back-calculation loop already run above (it reuses
+    `doc.items`, no extra DB reads) and only changes when a component or
+    its quantity actually changes -- including the qty changes driven by
+    `apply_yield_back_calculation` above when an Item's
+    `custom_yield_percent` standard changes and this (draft) BOM is
+    resaved. That is exactly the staleness signal
+    `ury_sales_plan.py::flag_stale_bom_revisions` needs to compare against.
+
+    Called from the same `before_validate` hook as the back-calculation
+    above so the revision always reflects the just-recomputed quantities.
+    """
+    vector = sorted(
+        (row.item_code, round(row.qty or 0, 6))
+        for row in (doc.items or [])
+        if row.item_code
+    )
+    payload = repr(vector).encode("utf-8")
+    doc.custom_bom_revision = hashlib.md5(payload).hexdigest()[:16]
