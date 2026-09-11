@@ -17,7 +17,11 @@
   "production_policy",
   "bom",
   "bom_revision",
-  "bom_revision_stale"
+  "bom_revision_stale",
+  "section_break_commit",
+  "committed_qty",
+  "column_break_commit",
+  "fulfilled_qty"
  ],
  "fields": [
   {
@@ -87,12 +91,37 @@
    "label": "BOM Revision Stale",
    "description": "Set automatically when the plan is re-saved before approval: true if this row's captured bom_revision no longer matches the linked BOM's current bom_revision (i.e. the BOM's yield-adjusted quantities changed since this row was added). Informational only -- does not block save.",
    "read_only": 1
+  },
+  {
+   "fieldname": "section_break_commit",
+   "fieldtype": "Section Break",
+   "label": "Commitment"
+  },
+  {
+   "default": "0",
+   "fieldname": "committed_qty",
+   "fieldtype": "Float",
+   "label": "Committed Qty",
+   "description": "Sum of qty from active (Reserved) order lines against this plan line. Maintained transactionally by ury_reservation_service on reservation create/release/fulfil -- never edited directly.",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_commit",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "fulfilled_qty",
+   "fieldtype": "Float",
+   "label": "Fulfilled Qty",
+   "description": "Sum of qty actually posted to stock (fulfilled reservations) against this plan line. Maintained transactionally by ury_reservation_service.fulfil_reservation -- never edited directly.",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-08-28 00:00:00.000000",
+ "modified": "2026-09-11 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Sales Plan Item",

@@ -7,6 +7,7 @@ from ury.ury.api.ury_sales_plan import (
     _validate_plan_scope,
     freeze_approval_snapshot,
     transition_sales_plan,
+    validate_no_overlapping_plan_scope,
     validate_plan_items,
     flag_stale_bom_revisions,
 )
@@ -74,6 +75,74 @@ class TestURYSalesPlanContract(FrappeTestCase):
         # field -- use item access to reach the actual field instead.
         doc["items"][0]["qty"] = 99
         self.assertEqual(freeze_approval_snapshot(doc), first)
+
+
+class TestValidateNoOverlappingPlanScope(FrappeTestCase):
+    """Approving a plan is rejected if another Approved/Locked-for-Production
+    plan already covers the same item+branch+day scope (decided design --
+    see item3-sales-plan-capping-plan.md open question #1)."""
+
+    def _doc(self, **values):
+        doc = frappe._dict(
+            {
+                "name": "SP-NEW",
+                "status": "Submitted for Approval",
+                "branch": "Branch A",
+                "company": "Company A",
+                "plan_date": "2026-09-12",
+                "items": [{"item_code": "MTPL", "qty": 2}],
+            }
+        )
+        doc.update(values)
+        return doc
+
+    def test_no_other_active_plans_is_a_no_op(self):
+        with patch(
+            "ury.ury.api.ury_sales_plan.frappe.get_all", return_value=[]
+        ) as get_all:
+            validate_no_overlapping_plan_scope(self._doc())
+        get_all.assert_called_once()
+
+    def test_overlapping_item_on_another_approved_plan_is_rejected(self):
+        def fake_get_all(doctype, filters=None, fields=None, pluck=None, order_by=None):
+            if doctype == "URY Sales Plan":
+                return ["SP-OLD"]
+            return [{"item_code": "MTPL", "parent": "SP-OLD"}]
+
+        with patch("ury.ury.api.ury_sales_plan.frappe.get_all", side_effect=fake_get_all), patch(
+            "ury.ury.api.ury_sales_plan.frappe.db.get_value", return_value="Approved"
+        ):
+            with self.assertRaises(frappe.ValidationError):
+                validate_no_overlapping_plan_scope(self._doc())
+
+    def test_non_overlapping_item_on_another_approved_plan_approves_fine(self):
+        def fake_get_all(doctype, filters=None, fields=None, pluck=None, order_by=None):
+            if doctype == "URY Sales Plan":
+                return ["SP-OLD"]
+            # The other plan exists but has no row for MTPL.
+            return []
+
+        with patch("ury.ury.api.ury_sales_plan.frappe.get_all", side_effect=fake_get_all):
+            validate_no_overlapping_plan_scope(self._doc())  # must not raise
+
+    def test_excludes_the_plan_being_approved_from_the_other_plan_search(self):
+        captured_filters = {}
+
+        def fake_get_all(doctype, filters=None, fields=None, pluck=None, order_by=None):
+            if doctype == "URY Sales Plan":
+                captured_filters.update(filters)
+                return []
+            return []
+
+        with patch("ury.ury.api.ury_sales_plan.frappe.get_all", side_effect=fake_get_all):
+            validate_no_overlapping_plan_scope(self._doc(name="SP-SELF"))
+
+        self.assertEqual(captured_filters["name"], ["!=", "SP-SELF"])
+
+    def test_no_items_on_the_plan_is_a_no_op(self):
+        with patch("ury.ury.api.ury_sales_plan.frappe.get_all") as get_all:
+            validate_no_overlapping_plan_scope(self._doc(items=[]))
+        get_all.assert_not_called()
 
 
 class TestURYSalesPlanEndpoints(FrappeTestCase):
