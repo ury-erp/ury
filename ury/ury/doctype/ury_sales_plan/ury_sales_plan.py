@@ -9,6 +9,7 @@ from frappe.model.document import Document
 from ury.ury.api.ury_sales_plan import (
 	_validate_plan_scope,
 	append_audit,
+	flag_stale_bom_revisions,
 	freeze_approval_snapshot,
 	validate_plan_items,
 )
@@ -31,6 +32,15 @@ class URYSalesPlan(Document):
 	def validate(self):
 		old = self.get_doc_before_save()
 		prev_status = old.status if old else None
+
+		# Surface (never block on) rows whose requirement was computed from
+		# a BOM yield standard that has since changed -- but only while the
+		# plan can still be freely re-evaluated. Once approval_snapshot has
+		# been frozen (see freeze_approval_snapshot, invoked below on the
+		# Approved transition), the plan's numbers are locked historical
+		# record and must not keep shifting on every subsequent save.
+		if not self.get("approval_snapshot"):
+			flag_stale_bom_revisions(self)
 
 		if prev_status and prev_status != self.status:
 			_validate_plan_scope(self)
