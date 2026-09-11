@@ -250,7 +250,7 @@ class TestProcessItemsForKot(FrappeTestCase):
 
             # Verify type was changed to "Order Modified"
             call_args = mock_create_kot.call_args
-            self.assertEqual(call_args[4], "Order Modified")
+            self.assertEqual(call_args.args[4], "Order Modified")
             # Verify dedup key was NOT set
             self.assertIsNone(call_args.kwargs.get("validation_dedup_key"))
 
@@ -267,7 +267,7 @@ class TestProcessItemsForKot(FrappeTestCase):
 
         order_items = self._make_order_items([("ITEM-1", "Item 1")])
 
-        with self.assertRaises(frappe.ValidationError):
+        with self.assertRaises(real_frappe.ValidationError):
             process_items_for_kot(
                 invoice_id="INV-001",
                 customer="John Doe",
