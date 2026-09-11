@@ -333,7 +333,7 @@ class TestFlagStaleBomRevisions(FrappeTestCase):
 
 		flag_stale_bom_revisions(doc)
 
-		self.assertEqual(doc.items[0].bom_revision_stale, 1)
+		self.assertEqual(doc["items"][0].bom_revision_stale, 1)
 
 	@patch("ury.ury.api.ury_sales_plan.frappe.db.get_value")
 	def test_clears_stale_flag_when_bom_revision_matches(self, mock_get_value):
@@ -351,7 +351,7 @@ class TestFlagStaleBomRevisions(FrappeTestCase):
 
 		flag_stale_bom_revisions(doc)
 
-		self.assertEqual(doc.items[0].bom_revision_stale, 0)
+		self.assertEqual(doc["items"][0].bom_revision_stale, 0)
 
 	@patch("ury.ury.api.ury_sales_plan.frappe.db.get_value")
 	def test_sets_stale_0_when_bom_not_found(self, mock_get_value):
@@ -369,7 +369,7 @@ class TestFlagStaleBomRevisions(FrappeTestCase):
 
 		flag_stale_bom_revisions(doc)
 
-		self.assertEqual(doc.items[0].bom_revision_stale, 0)
+		self.assertEqual(doc["items"][0].bom_revision_stale, 0)
 
 	@patch("ury.ury.api.ury_sales_plan.frappe.db.get_value")
 	def test_handles_missing_bom_field(self, mock_get_value):
@@ -385,7 +385,7 @@ class TestFlagStaleBomRevisions(FrappeTestCase):
 
 		flag_stale_bom_revisions(doc)
 
-		self.assertEqual(doc.items[0].bom_revision_stale, 0)
+		self.assertEqual(doc["items"][0].bom_revision_stale, 0)
 		# Should not call frappe.db.get_value when bom is None
 		mock_get_value.assert_not_called()
 
@@ -403,7 +403,7 @@ class TestFlagStaleBomRevisions(FrappeTestCase):
 
 		flag_stale_bom_revisions(doc)
 
-		self.assertEqual(doc.items[0].bom_revision_stale, 0)
+		self.assertEqual(doc["items"][0].bom_revision_stale, 0)
 		# Should not call frappe.db.get_value when bom_revision is None
 		mock_get_value.assert_not_called()
 
@@ -430,8 +430,8 @@ class TestFlagStaleBomRevisions(FrappeTestCase):
 
 		flag_stale_bom_revisions(doc)
 
-		self.assertEqual(doc.items[0].bom_revision_stale, 0)
-		self.assertEqual(doc.items[1].bom_revision_stale, 1)
+		self.assertEqual(doc["items"][0].bom_revision_stale, 0)
+		self.assertEqual(doc["items"][1].bom_revision_stale, 1)
 
 	@patch("ury.ury.api.ury_sales_plan.frappe.db.get_value")
 	def test_never_raises_exception(self, mock_get_value):
@@ -495,4 +495,4 @@ class TestFlagStaleBomRevisions(FrappeTestCase):
 		flag_stale_bom_revisions(doc)
 
 		# Row is marked stale but no exception
-		self.assertEqual(doc.items[0].bom_revision_stale, 1)
+		self.assertEqual(doc["items"][0].bom_revision_stale, 1)

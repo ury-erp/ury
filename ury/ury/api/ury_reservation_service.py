@@ -820,9 +820,20 @@ def create_reservation(
 	# component rows never equal the top-level item/qty).
 	commit_qty = flt(qty)
 	commit_department = (frozen_context or {}).get("department")
-	commit_result = apply_commit_delta(
-		item_code, branch, company, department=commit_department, committed_delta=commit_qty
-	)
+	try:
+		commit_result = apply_commit_delta(
+			item_code, branch, company, department=commit_department, committed_delta=commit_qty
+		)
+	except Exception:
+		# Sales Plan commit-tracking is best-effort accounting on top of the
+		# reservation, not a precondition for it -- a failure here (no
+		# matching plan, a transient DB/locking issue, etc.) must never abort
+		# an otherwise-valid reservation. Same fail-soft contract already
+		# established for realtime event publishing in this file.
+		frappe.logger("ury_reservation_service").exception(
+			"Failed to apply Sales Plan commit delta for %s/%s/%s", item_code, branch, company
+		)
+		commit_result = None
 	frozen_context = dict(frozen_context or {})
 	frozen_context["sales_plan_commit"] = {
 		"applied": bool(commit_result),
@@ -1011,14 +1022,27 @@ def _transition_group(reservation_name, from_status, to_status, reason, event):
 	if sales_plan_commit:
 		committed_delta = -flt(sales_plan_commit.get("qty"))
 		fulfilled_delta = flt(sales_plan_commit.get("qty")) if to_status == FULFILLED else 0
-		apply_commit_delta(
-			sales_plan_commit.get("item_code"),
-			sales_plan_commit.get("branch"),
-			sales_plan_commit.get("company"),
-			department=sales_plan_commit.get("department"),
-			committed_delta=committed_delta,
-			fulfilled_delta=fulfilled_delta,
-		)
+		try:
+			apply_commit_delta(
+				sales_plan_commit.get("item_code"),
+				sales_plan_commit.get("branch"),
+				sales_plan_commit.get("company"),
+				department=sales_plan_commit.get("department"),
+				committed_delta=committed_delta,
+				fulfilled_delta=fulfilled_delta,
+			)
+		except Exception:
+			# Same fail-soft contract as the create-side apply_commit_delta
+			# call above: this reservation's status transition has already
+			# been saved: a Sales Plan counter-reversal failure must be
+			# logged, not allowed to undo/abort an otherwise-successful
+			# release/cancel/expire/fulfil.
+			frappe.logger("ury_reservation_service").exception(
+				"Failed to reverse Sales Plan commit delta for %s/%s/%s",
+				sales_plan_commit.get("item_code"),
+				sales_plan_commit.get("branch"),
+				sales_plan_commit.get("company"),
+			)
 
 	return [row.name for row in rows]
 
