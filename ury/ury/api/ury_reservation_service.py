@@ -157,8 +157,10 @@ from contextlib import contextmanager
 
 import frappe
 from frappe import _
+from frappe.utils import flt
 
 from ury.ury.api.ury_bom_compiler import compile_bom_vector, publish_component_stock_fanout
+from ury.ury.api.ury_sales_plan_commit import apply_commit_delta
 
 # Slack allowed when comparing a required quantity against available capacity,
 # to absorb binary-float drift in accumulated BOM quantities. One millionth of
@@ -801,6 +803,37 @@ def create_reservation(
 			frappe.ValidationError,
 		)
 
+	# Sales Plan committed_qty tracking: this reservation's `qty` is the
+	# TOP-LEVEL item's requested quantity (not a per-component quantity, which
+	# for a MADE_TO_ORDER item differs per exploded component) -- the same
+	# unit `URY Sales Plan Item.qty` is denominated in. `department` comes
+	# from `frozen_context` (set by `_reconcile_line` in
+	# `ury_order_reservation_service.py`) when the caller supplied one; a
+	# caller with no frozen_context (e.g. a direct/legacy create_reservation
+	# call) simply resolves without a department filter.
+	#
+	# The applied delta is recorded into `frozen_context` (and therefore into
+	# every created row's `audit_log` via `append_audit` below) so that
+	# `_transition_group` can symmetrically reverse it on release/cancel/
+	# expire/fulfil without needing to re-derive the top-level item/qty from
+	# component rows, which is not always possible (a MADE_TO_ORDER item's
+	# component rows never equal the top-level item/qty).
+	commit_qty = flt(qty)
+	commit_department = (frozen_context or {}).get("department")
+	commit_result = apply_commit_delta(
+		item_code, branch, company, department=commit_department, committed_delta=commit_qty
+	)
+	frozen_context = dict(frozen_context or {})
+	frozen_context["sales_plan_commit"] = {
+		"applied": bool(commit_result),
+		"item_code": item_code,
+		"branch": branch,
+		"company": company,
+		"department": commit_department,
+		"qty": commit_qty,
+		"plan_item": commit_result.get("name") if commit_result else None,
+	}
+
 	# Step 3: all components have capacity -- insert every reservation row
 	# inside the same transaction/lock scope, all-or-nothing.
 	reservation_group = frappe.generate_hash(length=10)
@@ -907,6 +940,33 @@ def _resolve_group_rows(reservation_name):
 	return rows
 
 
+def _group_sales_plan_commit(rows):
+	"""Read back the `sales_plan_commit` info `create_reservation` recorded.
+
+	Every row's `audit_log` carries a "create" entry with `frozen_context`
+	(see `create_reservation`), including the `sales_plan_commit` dict this
+	looks for. All rows in a group share the same value (it is set once,
+	before the group's rows are created), so the first row with a usable
+	entry is authoritative for the whole group.
+	"""
+	import json
+
+	for row in rows:
+		audit_log = row.get("audit_log")
+		if not audit_log:
+			continue
+		try:
+			entries = json.loads(audit_log)
+		except (TypeError, ValueError):
+			continue
+		for entry in entries:
+			frozen_context = entry.get("frozen_context") or {}
+			commit_info = frozen_context.get("sales_plan_commit")
+			if commit_info and commit_info.get("applied"):
+				return commit_info
+	return None
+
+
 def _transition_group(reservation_name, from_status, to_status, reason, event):
 	rows = _resolve_group_rows(reservation_name)
 	not_eligible = [row for row in rows if row.status != from_status]
@@ -919,6 +979,20 @@ def _transition_group(reservation_name, from_status, to_status, reason, event):
 			),
 			frappe.ValidationError,
 		)
+
+	# Resolve the group's committed_qty commitment (if any) BEFORE mutating
+	# any row, from the locked snapshot `_resolve_group_rows` already fetched
+	# -- reading it after the row updates below would see each row's
+	# just-rewritten `audit_log` instead of the original "create" entry.
+	# Every transition out of RESERVED (release/cancel/expire/fulfil) ends the
+	# "committed" state for this line, so committed_qty is decremented in all
+	# of them; only a FULFILLED transition additionally moves that same qty
+	# into fulfilled_qty (same locked update, so the two counters never
+	# observe an inconsistent intermediate state -- see
+	# `ury_sales_plan_commit.apply_commit_delta`).
+	sales_plan_commit = None
+	if from_status == RESERVED:
+		sales_plan_commit = _group_sales_plan_commit(rows)
 
 	actor = frappe.session.user
 	for row in rows:
@@ -933,6 +1007,19 @@ def _transition_group(reservation_name, from_status, to_status, reason, event):
 			doc.reason = reason
 		append_audit(doc, actor, event=event, reason=reason)
 		doc.save(ignore_permissions=False)
+
+	if sales_plan_commit:
+		committed_delta = -flt(sales_plan_commit.get("qty"))
+		fulfilled_delta = flt(sales_plan_commit.get("qty")) if to_status == FULFILLED else 0
+		apply_commit_delta(
+			sales_plan_commit.get("item_code"),
+			sales_plan_commit.get("branch"),
+			sales_plan_commit.get("company"),
+			department=sales_plan_commit.get("department"),
+			committed_delta=committed_delta,
+			fulfilled_delta=fulfilled_delta,
+		)
+
 	return [row.name for row in rows]
 
 
