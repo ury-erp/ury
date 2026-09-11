@@ -363,3 +363,98 @@ class TestReleaseOrderReservations(unittest.TestCase):
 		get_all.assert_not_called()
 		release_reservation.assert_not_called()
 		self.assertEqual(result, [])
+
+	def test_calling_again_after_already_released_does_not_double_decrement(self):
+		"""Idempotency: the second call must not re-invoke release_reservation
+		(and therefore must not re-apply its committed_qty decrement) once
+		every reservation for the order is already out of Reserved status --
+		this is the guard `apply_commit_delta`'s FOR UPDATE mutation relies on
+		to never fire twice for the same release event."""
+		rows = [service.frappe._dict({"reservation_group": "GRP-1"})]
+		with patch.object(service.frappe, "get_all", side_effect=[rows, []]), patch.object(
+			service, "release_reservation"
+		) as release_reservation:
+			first = service.release_order_reservations("INV-1")
+			second = service.release_order_reservations("INV-1")
+
+		self.assertEqual(first, ["GRP-1"])
+		self.assertEqual(second, [])
+		# release_order_reservations() defaults an unset reason to "Order
+		# cancelled" internally (see its `reason=reason or "Order cancelled"`
+		# call) -- passing no reason here still resolves to that default.
+		release_reservation.assert_called_once_with("GRP-1", reason="Order cancelled")
+
+
+class TestPlanExhaustedEnforcementMode(unittest.TestCase):
+	"""_check_line_availability()'s Hard/Soft/Alert branching on PLAN_EXHAUSTED."""
+
+	def _availability(self, reason_code):
+		return {"sellable": False, "reason_code": reason_code}
+
+	def test_hard_mode_returns_rejection(self):
+		context = {"department": "Hot Line"}
+		with patch.object(
+			service, "get_item_availability", return_value=self._availability("PLAN_EXHAUSTED")
+		), patch.object(service, "resolve_plan_enforcement_mode", return_value="Hard") as resolve_mode, patch.object(
+			service, "_notify_plan_exceeded"
+		) as notify:
+			result = service._check_line_availability("ITEM-1", "BR-1", "COMP-1", context)
+
+		self.assertEqual(result, {"item_code": "ITEM-1", "reason_code": "PLAN_EXHAUSTED"})
+		resolve_mode.assert_called_once_with("ITEM-1", "BR-1", "COMP-1", department="Hot Line")
+		notify.assert_not_called()
+
+	def test_soft_mode_allows_through_with_no_notification(self):
+		context = {"department": "Hot Line"}
+		with patch.object(
+			service, "get_item_availability", return_value=self._availability("PLAN_EXHAUSTED")
+		), patch.object(service, "resolve_plan_enforcement_mode", return_value="Soft"), patch.object(
+			service, "_notify_plan_exceeded"
+		) as notify:
+			result = service._check_line_availability("ITEM-1", "BR-1", "COMP-1", context)
+
+		self.assertIsNone(result)
+		notify.assert_not_called()
+
+	def test_alert_mode_allows_through_and_fires_notification(self):
+		context = {"department": "Hot Line"}
+		with patch.object(
+			service, "get_item_availability", return_value=self._availability("PLAN_EXHAUSTED")
+		), patch.object(service, "resolve_plan_enforcement_mode", return_value="Alert"), patch.object(
+			service, "_notify_plan_exceeded"
+		) as notify:
+			result = service._check_line_availability("ITEM-1", "BR-1", "COMP-1", context)
+
+		self.assertIsNone(result)
+		notify.assert_called_once_with("ITEM-1", "BR-1", "COMP-1", "Hot Line")
+
+	def test_non_plan_exhausted_reason_is_unaffected_by_enforcement_mode(self):
+		context = {"department": "Hot Line"}
+		with patch.object(
+			service, "get_item_availability", return_value=self._availability("NO_ACTIVE_PLAN")
+		), patch.object(service, "resolve_plan_enforcement_mode") as resolve_mode:
+			result = service._check_line_availability("ITEM-1", "BR-1", "COMP-1", context)
+
+		self.assertEqual(result, {"item_code": "ITEM-1", "reason_code": "NO_ACTIVE_PLAN"})
+		resolve_mode.assert_not_called()
+
+	def test_alert_notification_resolves_branch_scoped_recipients_and_dedupes(self):
+		users_pm = [service.frappe._dict({"name": "pm@example.com"})]
+		users_mgr = [service.frappe._dict({"name": "pm@example.com"}), service.frappe._dict({"name": "mgr@example.com"})]
+
+		def fake_get_users_with_role(role, branch=None):
+			self.assertEqual(branch, "BR-1")
+			if role == "Production Manager":
+				return users_pm
+			return users_mgr
+
+		with patch.object(service, "get_users_with_role", side_effect=fake_get_users_with_role), patch.object(
+			service, "create_system_notification"
+		) as create_notification:
+			service._notify_plan_exceeded("ITEM-1", "BR-1", "COMP-1", "Hot Line")
+
+		# pm@example.com appears in both role lookups but must only be
+		# notified once (dedupe by user across the two role scans).
+		notified_users = {call.args[1] for call in create_notification.call_args_list}
+		self.assertEqual(notified_users, {"pm@example.com", "mgr@example.com"})
+		self.assertEqual(create_notification.call_count, 2)

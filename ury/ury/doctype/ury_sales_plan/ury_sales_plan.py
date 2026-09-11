@@ -11,6 +11,7 @@ from ury.ury.api.ury_sales_plan import (
 	append_audit,
 	flag_stale_bom_revisions,
 	freeze_approval_snapshot,
+	validate_no_overlapping_plan_scope,
 	validate_plan_items,
 )
 
@@ -46,6 +47,7 @@ class URYSalesPlan(Document):
 			_validate_plan_scope(self)
 			if self.status == "Approved":
 				validate_plan_items(self)
+				validate_no_overlapping_plan_scope(self)
 				freeze_approval_snapshot(self)
 			append_audit(self, prev_status, self.status, frappe.session.user)
 			# audit_log is a Long Text (JSON) field -- append_audit leaves it

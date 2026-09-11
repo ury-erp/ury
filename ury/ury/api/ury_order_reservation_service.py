@@ -17,14 +17,26 @@ from frappe import _
 from frappe.utils import flt
 
 from ury.ury.api.ury_availability import _resolve_production_config, get_item_availability
+from ury.ury.api.ury_kot_notification import create_system_notification, get_users_with_role
 from ury.ury.api.ury_reservation_service import (
 	RESERVED,
 	create_reservation,
 	release_reservation,
 )
+from ury.ury.api.ury_sales_plan_commit import resolve_plan_enforcement_mode
 
 
 RESERVATION_DOCTYPE = "URY Stock Reservation"
+
+# Reason code that PLAN_EXHAUSTED enforcement-mode branching applies to.
+# NO_ACTIVE_PLAN and every other rejection reason is unaffected -- enforcement
+# mode only changes behaviour for an item whose plan exists but is exhausted.
+PLAN_EXHAUSTED_REASON = "PLAN_EXHAUSTED"
+
+# Branch-scoped roles notified in Alert enforcement mode, mirroring the
+# manager-role handling used elsewhere for branch alerts (see
+# `ury_kot_item_execution_service.py`, `test_ury_fulfilment_posting_service.py`).
+PLAN_ALERT_ROLES = ("Production Manager", "URY Manager")
 
 LINE_REF_FIELDS = (
 	"reservation_line_key",
@@ -164,6 +176,30 @@ def _active_groups(order_ref, item_code, reservation_line_key=None):
 	return list(dict.fromkeys(groups))
 
 
+def _notify_plan_exceeded(item_code, branch, company, department):
+	"""Fire an Alert-mode desk notification when a plan-exceeded order is allowed through.
+
+	Reuses `ury_kot_notification.create_system_notification`'s existing
+	5-minute per-(user, subject) dedupe, so a burst of orders against an
+	already-exhausted plan does not spam recipients -- a single subject
+	string per item/branch keeps the dedupe key stable across calls.
+	"""
+	subject = _("Sales Plan exceeded: {0} at {1}").format(item_code, branch)
+	message = _(
+		"Item {0} has exceeded its Sales Plan committed quantity at branch {1} "
+		"(department {2}). The order was still accepted because the plan's "
+		"enforcement mode is Alert."
+	).format(item_code, branch, department or "-")
+
+	seen_users = set()
+	for role in PLAN_ALERT_ROLES:
+		for user in get_users_with_role(role, branch=branch):
+			if user.name in seen_users:
+				continue
+			seen_users.add(user.name)
+			create_system_notification(message, user.name, subject)
+
+
 def _check_line_availability(item_code, branch, company, context):
 	"""Return an availability-rejection dict for `item_code`, or None if sellable.
 
@@ -171,6 +207,15 @@ def _check_line_availability(item_code, branch, company, context):
 	lines before any reservation side effect (release/create) begins, so a
 	single unavailable line does not leave earlier lines partially reconciled
 	when the overall sync is aborted (B-4).
+
+	A `PLAN_EXHAUSTED` rejection is branched on the owning Sales Plan's
+	`enforcement_mode` (Hard/Soft/Alert -- see `URY Sales Plan.enforcement_mode`):
+	Hard keeps today's behaviour (rejection, causing the caller to
+	`frappe.throw`); Soft and Alert both let the line through (over-plan
+	status is then simply computable from `committed_qty + fulfilled_qty > qty`
+	on the plan-item row -- no separate flag is written), with Alert
+	additionally firing a branch-scoped notification. Every other rejection
+	reason (NO_ACTIVE_PLAN, CONFIGURATION_ERROR, etc.) is unaffected.
 	"""
 	availability = get_item_availability(
 		item_code=item_code,
@@ -180,9 +225,22 @@ def _check_line_availability(item_code, branch, company, context):
 	)
 	if availability.get("sellable"):
 		return None
+
+	reason_code = availability.get("reason_code")
+	if reason_code == PLAN_EXHAUSTED_REASON:
+		department = context.get("department")
+		mode = resolve_plan_enforcement_mode(item_code, branch, company, department=department)
+		if mode == "Soft":
+			return None
+		if mode == "Alert":
+			_notify_plan_exceeded(item_code, branch, company, department)
+			return None
+		# mode == "Hard" (or unresolved -- defaults to Hard): fall through to
+		# the rejection below, matching today's behaviour exactly.
+
 	return {
 		"item_code": item_code,
-		"reason_code": availability.get("reason_code"),
+		"reason_code": reason_code,
 	}
 
 
