@@ -331,6 +331,9 @@ def create_or_get_posting_intent_for_ready(execution_doc, actor=None):
 
 	actor = actor or frappe.session.user
 
+	_authorize_posting(actor, execution_doc)
+	payload = _freeze_payload(execution_doc, actor)
+
 	# sa-architecture-closure: this service must never post stock for an item
 	# native POS Invoice deduction (`update_stock=1`) is also posting for.
 	# The actual production entry point (`mark_item_ready` ->
@@ -340,7 +343,9 @@ def create_or_get_posting_intent_for_ready(execution_doc, actor=None):
 	# universal default) so native POS remains the sole authority. This is a
 	# second, defense-in-depth check for any other/future direct caller of
 	# this function: it must never silently create a Stock Entry while the
-	# flag is off, on top of whatever native POS already posts.
+	# flag is off, on top of whatever native POS already posts. Checked
+	# after authorization/execution-state validation so those more basic
+	# request-shape errors still surface first.
 	if not is_pos_stock_authority_flag_enabled(
 		company=execution_doc.get("company"), branch=execution_doc.get("branch")
 	):
@@ -354,9 +359,6 @@ def create_or_get_posting_intent_for_ready(execution_doc, actor=None):
 				"for this branch before fulfilment posting can be authoritative."
 			),
 		)
-
-	_authorize_posting(actor, execution_doc)
-	payload = _freeze_payload(execution_doc, actor)
 	existing_name = frappe.db.get_value(INTENT_DOCTYPE, {"idempotency_key": payload["idempotency_key"]}, "name")
 	if existing_name:
 		return _intent_result(frappe.get_doc(INTENT_DOCTYPE, existing_name), idempotent=True)
