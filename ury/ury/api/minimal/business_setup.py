@@ -1,6 +1,8 @@
 import frappe
 from frappe import _
 
+from ury.ury.controllers.setup_redirect import is_ury_setup_complete
+
 @frappe.whitelist()
 def get_business_setup():
     if frappe.session.user == "Guest":
@@ -161,12 +163,12 @@ def create_setup_user(email, name, password=None, role="URY Cashier"):
 
 @frappe.whitelist()
 def submit_configure_data(data):
-    from frappe.utils import cint
-
     if frappe.session.user == "Guest":
         frappe.throw("Not permitted")
 
-    if cint(frappe.db.get_single_value("System Settings", "setup_complete")):
+    # Step 1 (Frappe's setup_complete) already sets System Settings.setup_complete,
+    # so that flag cannot guard Step 2. Use the URY-level check instead.
+    if is_ury_setup_complete():
         frappe.throw("Setup already completed")
 
     if isinstance(data, str):

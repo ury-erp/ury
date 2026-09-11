@@ -8,7 +8,10 @@ from ury.ury.api.minimal.business_setup import submit_configure_data
 
 class TestSubmitConfigureDataGuard(unittest.TestCase):
     """Guard added to submit_configure_data(): reject Guest callers, and
-    reject any call once System Settings.setup_complete is already 1.
+    reject any call once URY setup (Step 1 and Step 2) is already complete.
+
+    System Settings.setup_complete alone is not the guard, because Step 1
+    sets it before Step 2 (this endpoint) runs.
 
     These are mock-based unit tests -- consistent with the existing
     convention in ury/ury_pos/test_api.py (see TestMergeBillsSEC07) -- so
@@ -17,34 +20,54 @@ class TestSubmitConfigureDataGuard(unittest.TestCase):
     test suite.
     """
 
-    @patch("ury.ury.api.minimal.business_setup.frappe.db.get_single_value")
-    def test_guest_user_is_rejected(self, mock_get_single_value):
-        # Guest guard must fire before the setup_complete check even runs.
+    @patch("ury.ury.api.minimal.business_setup.is_ury_setup_complete")
+    def test_guest_user_is_rejected(self, mock_setup_complete):
+        # Guest guard must fire before the setup-complete check even runs.
         with patch("ury.ury.api.minimal.business_setup.frappe.session", frappe._dict({"user": "Guest"})):
             with self.assertRaises(frappe.exceptions.ValidationError) as ctx:
                 submit_configure_data(data="{}")
 
         self.assertIn("Not permitted", str(ctx.exception))
-        mock_get_single_value.assert_not_called()
+        mock_setup_complete.assert_not_called()
 
-    @patch("ury.ury.api.minimal.business_setup.frappe.db.get_single_value")
-    def test_setup_already_completed_is_rejected(self, mock_get_single_value):
-        mock_get_single_value.return_value = 1
+    @patch("ury.ury.api.minimal.business_setup.is_ury_setup_complete")
+    def test_setup_already_completed_is_rejected(self, mock_setup_complete):
+        mock_setup_complete.return_value = True
 
         with patch("ury.ury.api.minimal.business_setup.frappe.session", frappe._dict({"user": "test@example.com"})):
             with self.assertRaises(frappe.exceptions.ValidationError) as ctx:
                 submit_configure_data(data="{}")
 
         self.assertIn("Setup already completed", str(ctx.exception))
-        mock_get_single_value.assert_called_once_with("System Settings", "setup_complete")
+        mock_setup_complete.assert_called_once_with()
 
     @patch("ury.ury.api.minimal.business_setup.frappe.db.get_single_value")
-    def test_setup_not_completed_and_authenticated_user_passes_guard(
-        self, mock_get_single_value
+    @patch("ury.ury.api.minimal.business_setup.is_ury_setup_complete")
+    def test_step1_setup_complete_flag_does_not_block_step2(
+        self, mock_setup_complete, mock_get_single_value
     ):
-        # setup_complete == 0 and a real user must clear the guard and reach
+        # Regression: after Step 1, System Settings.setup_complete is 1 but
+        # no Branch exists yet. Step 2 must still be allowed to run.
+        mock_get_single_value.return_value = 1
+        mock_setup_complete.return_value = False
+
+        with patch("ury.ury.api.minimal.business_setup.frappe.session", frappe._dict({"user": "test@example.com"})):
+            with patch(
+                "ury.ury.api.minimal.business_setup._run_configure_data"
+            ) as mock_run:
+                mock_run.return_value = {"status": "success", "results": {}}
+                result = submit_configure_data(data="{}")
+
+        mock_run.assert_called_once()
+        self.assertEqual(result, {"status": "success", "results": {}})
+
+    @patch("ury.ury.api.minimal.business_setup.is_ury_setup_complete")
+    def test_setup_not_completed_and_authenticated_user_passes_guard(
+        self, mock_setup_complete
+    ):
+        # Setup not complete and a real user must clear the guard and reach
         # _run_configure_data (mocked here so this stays a guard-only test).
-        mock_get_single_value.return_value = 0
+        mock_setup_complete.return_value = False
 
         with patch("ury.ury.api.minimal.business_setup.frappe.session", frappe._dict({"user": "test@example.com"})):
             with patch(
@@ -74,13 +97,12 @@ class TestSubmitConfigureDataRollback(unittest.TestCase):
     re-raising, for both frappe.PermissionError and any other Exception.
     """
 
-    @patch("ury.ury.api.minimal.business_setup.frappe.db.get_single_value")
+    @patch("ury.ury.api.minimal.business_setup.is_ury_setup_complete", return_value=False)
     @patch("ury.ury.api.minimal.business_setup.frappe.db.rollback")
     @patch("ury.ury.api.minimal.business_setup._run_configure_data")
     def test_generic_failure_partway_through_triggers_rollback(
-        self, mock_run, mock_rollback, mock_get_single_value
+        self, mock_run, mock_rollback, _mock_setup_complete
     ):
-        mock_get_single_value.return_value = 0
         mock_run.side_effect = Exception("boom while creating URY Table")
 
         with patch("ury.ury.api.minimal.business_setup.frappe.session", frappe._dict({"user": "test@example.com"})):
@@ -94,13 +116,12 @@ class TestSubmitConfigureDataRollback(unittest.TestCase):
         mock_rollback.assert_called_once()
         mock_log_error.assert_called_once()
 
-    @patch("ury.ury.api.minimal.business_setup.frappe.db.get_single_value")
+    @patch("ury.ury.api.minimal.business_setup.is_ury_setup_complete", return_value=False)
     @patch("ury.ury.api.minimal.business_setup.frappe.db.rollback")
     @patch("ury.ury.api.minimal.business_setup._run_configure_data")
     def test_permission_error_partway_through_triggers_rollback_and_reraises(
-        self, mock_run, mock_rollback, mock_get_single_value
+        self, mock_run, mock_rollback, _mock_setup_complete
     ):
-        mock_get_single_value.return_value = 0
         mock_run.side_effect = frappe.PermissionError("no permission for Branch")
 
         with patch("ury.ury.api.minimal.business_setup.frappe.session", frappe._dict({"user": "test@example.com"})):
@@ -109,13 +130,12 @@ class TestSubmitConfigureDataRollback(unittest.TestCase):
 
         mock_rollback.assert_called_once()
 
-    @patch("ury.ury.api.minimal.business_setup.frappe.db.get_single_value")
+    @patch("ury.ury.api.minimal.business_setup.is_ury_setup_complete", return_value=False)
     @patch("ury.ury.api.minimal.business_setup.frappe.db.rollback")
     @patch("ury.ury.api.minimal.business_setup._run_configure_data")
     def test_success_path_never_rolls_back(
-        self, mock_run, mock_rollback, mock_get_single_value
+        self, mock_run, mock_rollback, _mock_setup_complete
     ):
-        mock_get_single_value.return_value = 0
         mock_run.return_value = {"status": "success", "results": {"branch": "Main"}}
 
         with patch("ury.ury.api.minimal.business_setup.frappe.session", frappe._dict({"user": "test@example.com"})):
