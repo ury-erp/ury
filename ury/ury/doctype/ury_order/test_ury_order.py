@@ -161,6 +161,32 @@ class TestURYOrder(FrappeTestCase):
         mock_invoice.cancel.assert_not_called()
         mock_cancel_kot.assert_called_once_with("POS-INV-001")
 
+    @patch("ury.ury.doctype.ury_order.ury_order.release_order_reservations")
+    @patch("ury.ury.doctype.ury_order.ury_order.cancel_kot")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_doc")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.has_permission")
+    def test_cancel_order_releases_active_reservations(
+        self, mock_has_permission, mock_get_doc, mock_cancel_kot, mock_release
+    ):
+        """cancel_order() must release the order's active stock reservations,
+        not just cancel the KOT/invoice -- otherwise cancellation leaks
+        reserved capacity indefinitely (sa-post-373-review-fixes Blocker 3)."""
+        mock_invoice = MagicMock()
+        mock_invoice.name = "POS-INV-001"
+        mock_invoice.branch = "Test Branch"
+        mock_invoice.restaurant_table = None
+        mock_invoice.docstatus = 1
+        mock_get_doc.return_value = mock_invoice
+        mock_has_permission.return_value = True
+
+        cancel_order("POS-INV-001", "customer changed mind")
+
+        mock_cancel_kot.assert_called_once_with("POS-INV-001")
+        mock_release.assert_called_once_with(
+            "POS-INV-001", reason="Order cancelled: customer changed mind"
+        )
+        mock_invoice.cancel.assert_called_once()
+
     @patch("ury.ury.doctype.ury_order.ury_order.get_order_invoice")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.has_permission")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.db.get_value")
@@ -286,6 +312,103 @@ class TestURYOrder(FrappeTestCase):
             actor="manager@example.com",
         )
         self.assertEqual(events, ["reconcile", "save"])
+
+    @patch("ury.ury.doctype.ury_order.ury_order.get_restaurant_and_menu_name")
+    @patch("ury.ury.doctype.ury_order.ury_order._validate_sync_items_against_menu")
+    @patch("ury.ury.doctype.ury_order.ury_order.getBranch")
+    @patch("ury.ury.doctype.ury_order.ury_order.reconcile_order_reservations")
+    @patch("ury.ury.doctype.ury_order.ury_order.kot_execute")
+    @patch("ury.ury.doctype.ury_order.ury_order.price_items_for_invoice")
+    @patch("ury.ury.doctype.ury_order.ury_order.get_order_invoice")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.has_permission")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.db.get_value")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_doc")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_roles")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.session")
+    def test_sync_order_kot_failure_raises_instead_of_swallowing(
+        self,
+        mock_session,
+        mock_get_roles,
+        mock_get_doc,
+        mock_get_value,
+        mock_has_permission,
+        mock_get_order_invoice,
+        mock_price_items,
+        mock_kot_execute,
+        mock_reconcile,
+        mock_get_branch,
+        mock_validate_menu,
+        mock_get_restaurant_and_menu_name,
+    ):
+        mock_get_restaurant_and_menu_name.return_value = ("Test Branch", "Menu A", "Test Restaurant")
+        """A KOT/routing failure must abort sync_order loudly instead of being
+        logged and swallowed -- otherwise a customer can be charged (invoice
+        saved) while the kitchen never receives the item
+        (sa-post-373-review-fixes Blocker 2)."""
+        mock_invoice = MagicMock()
+        mock_invoice.name = "POS-INV-001"
+        mock_invoice.branch = "Test Branch"
+        mock_invoice.company = "Company A"
+        mock_invoice.restaurant_table = "Table 1"
+        mock_invoice.invoice_printed = 0
+        mock_invoice.invoice_created = 1
+        mock_invoice.items = []
+        mock_invoice.waiter = "existing_waiter"
+        mock_invoice.creation = "2026-09-03 10:00:00"
+        mock_invoice.selling_price_list = "Standard Selling"
+        mock_invoice.save = MagicMock()
+        mock_reconcile.return_value = None
+        mock_kot_execute.side_effect = Exception("Routing error: ITEM-1 has no production unit configured")
+
+        mock_get_order_invoice.return_value = mock_invoice
+        mock_price_items.return_value = [{"item_code": "ITEM-1", "qty": 1}]
+        mock_get_doc.return_value = _make_pos_profile(
+            transfer_role_permissions=("URY Manager",),
+            role_allowed_for_billing=("URY Manager",),
+            remove_items=1,
+        )
+        mock_get_roles.return_value = ["URY Manager"]
+        mock_session.user = "manager@example.com"
+        mock_has_permission.return_value = True
+        mock_get_branch.return_value = "Test Branch"
+
+        def get_value_side_effect(doctype, filters=None, fieldname=None, **kwargs):
+            # `**kwargs` absorbs `ignore=True` (and any other keyword) that
+            # `frappe.db.exists()` now internally passes through to
+            # `get_value()` on this frappe version -- without it, the mock's
+            # positional-only signature raises TypeError before sync_order's
+            # own logic ever runs, masking what this test is actually meant
+            # to prove (see the same drift noted for other tests in this
+            # file, sa-post-373-review-fixes verification).
+            if doctype == "URY Table" and fieldname == ["branch", "restaurant_room"]:
+                return ("Test Branch", "Main Hall")
+            if doctype == "URY Menu":
+                return "Menu A"
+            return "Test Customer"
+
+        mock_get_value.side_effect = get_value_side_effect
+
+        with patch("ury.ury.doctype.ury_order.ury_order.frappe.db.sql"), patch(
+            "ury.ury.doctype.ury_order.ury_order.frappe.log_error"
+        ):
+            with self.assertRaises(Exception):
+                sync_order(
+                    items='[{"item": "ITEM-1", "qty": 1}]',
+                    cashier="fake_cashier",
+                    owner="fake_owner",
+                    mode_of_payment="Cash",
+                    customer="Test Customer",
+                    no_of_pax=2,
+                    last_invoice=None,
+                    waiter="fake_waiter",
+                    pos_profile="Test Profile",
+                    table="Table 1",
+                )
+
+        # The invoice save already happened (it precedes kot_execute); the
+        # failure must still be raised, not swallowed into a log-only path.
+        mock_invoice.save.assert_called_once()
+        mock_kot_execute.assert_called_once()
 
     @patch("ury.ury.doctype.ury_order.ury_order.reconcile_order_reservations")
     @patch("ury.ury.doctype.ury_order.ury_order.kot_execute")

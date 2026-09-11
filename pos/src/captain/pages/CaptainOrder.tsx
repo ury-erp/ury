@@ -15,7 +15,7 @@ import {
 import { printOrder } from '../../lib/print';
 import { resolvePrintFormat } from '../../lib/invoice-api';
 import { getVacantTablesForBranch, Table } from '../../lib/table-api';
-import { DINE_IN } from '../../data/order-types';
+import { DINE_IN, TAKE_AWAY } from '../../data/order-types';
 import { useTableOrderContext, OrderDeltaLine } from '../hooks/useTableOrderContext';
 import CaptainMenu from '../components/CaptainMenu';
 import CaptainOrderLine from '../components/CaptainOrderLine';
@@ -74,7 +74,28 @@ export default function CaptainOrder() {
     selectedCustomer,
     clearTableOrder,
     isOrderInteractionDisabled,
+    selectedOrderType,
+    setSelectedOrderType,
   } = usePOSStore();
+
+  // Every captain table order used to be assumed Dine In, but takeaway
+  // tables (`URY Table.is_take_away`, surfaced via `context.table` from
+  // `get_table_order_context()`) exist and are listed in CaptainTables like
+  // any other table. Forcing Dine In on all of them applied the wrong
+  // menu/pax rules and reported the wrong order_type for those tables. The
+  // shared pos-store's `selectedOrderType` otherwise defaults to "Take Away"
+  // (see DEFAULT_ORDER_TYPE in data/order-types.ts) and is normally only set
+  // by the Cashier's OrderTypeSelect control, which this screen doesn't
+  // render — so still force a value on mount, just the correct one per table.
+  const tableOrderType = context?.table?.is_take_away ? TAKE_AWAY : DINE_IN;
+
+  useEffect(() => {
+    if (!context?.table) return;
+    if (selectedOrderType !== tableOrderType) {
+      setSelectedOrderType(tableOrderType);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [context?.table, tableOrderType]);
 
   const [mode, setMode] = useState<Mode>('order');
   const [hasSetInitialMode, setHasSetInitialMode] = useState(false);
@@ -208,7 +229,7 @@ export default function CaptainOrder() {
         })),
         no_of_pax: noOfPax,
         pos_profile: posProfile.name,
-        order_type: DINE_IN,
+        order_type: tableOrderType,
         table,
         room: selectedRoom || undefined,
         customer: selectedCustomer.name,
