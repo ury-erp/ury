@@ -1,9 +1,20 @@
 import json
+from collections import defaultdict
 
 import frappe
+from frappe.utils import flt
 
 from ury.ury.api.ury_kot_routing import resolve_production_units
 from ury.ury.api.ury_production_context import resolve_production_context
+# Reuse the reservation service's stable per-line key derivation instead of
+# inventing a second concept. `_line_ref` prefers an explicit client-supplied
+# identifier (reservation_line_key/name/etc.); `_line_context` falls back to
+# comment/course/etc.; `_line_key` combines either with an occurrence counter
+# so two lines of the same item_code never collapse into one key. See
+# sa-architecture-closure: cancellation/KOT-delta matching previously used
+# bare item_code, so the same item on two lines (different comments,
+# courses, or a plain duplicate) could have the wrong line cancelled.
+from ury.ury.api.ury_order_reservation_service import _line_context, _line_key, _line_ref
 
 
 # Load JSON data or return as is if it's already a Python dictionary
@@ -22,9 +33,47 @@ def create_order_items(items):
             "qty": item["qty"],
             "item_name": item["item_name"],
             "comments": item.get("comment", item.get("comments", "")),
+            # Preserve the stable per-line key when the caller has already
+            # computed one (see _line_keyed_items below) so it survives the
+            # trip through KOT item creation instead of being dropped.
+            "reservation_line_key": item.get("reservation_line_key"),
         }
         order_items.append(order_item)
     return order_items
+
+
+def _line_keyed_items(items):
+    """Group raw order-item dicts (as sent by the POS client, or the
+    past_item snapshot built by sync_order) by a stable per-line key instead
+    of collapsing same-item lines by item_code.
+
+    Returns an ordered dict: line_key -> {item_code, item_name, qty
+    (aggregated), comments, reservation_line_key}. Ordering follows first
+    appearance so callers can diff two calls (previous vs current) made on
+    lists that are otherwise in the same relative order.
+    """
+    seen = defaultdict(int)
+    result = {}
+    for row in items or []:
+        item_code = row.get("item") or row.get("item_code")
+        if not item_code:
+            continue
+        base_context = _line_ref(row) or json.dumps(
+            _line_context(row), sort_keys=True, default=str
+        )
+        occurrence_base = "{0}:{1}".format(item_code, base_context)
+        seen[occurrence_base] += 1
+        key = _line_key(item_code, row, seen[occurrence_base])
+        if key not in result:
+            result[key] = {
+                "reservation_line_key": key,
+                "item_code": item_code,
+                "item_name": row.get("item_name"),
+                "qty": 0,
+                "comments": row.get("comment", row.get("comments", "")),
+            }
+        result[key]["qty"] = flt(result[key]["qty"]) + flt(row.get("qty"))
+    return result
 
 
 # Create a KOT (Kitchen Order Ticket) document
@@ -99,7 +148,8 @@ def create_kot_doc(
                 "item_name": item["item_name"],
                 "quantity": item["qty"],
                 "comments": item["comments"],
-                "course":course
+                "course":course,
+                "reservation_line_key": item.get("reservation_line_key"),
             },
         )
     kot_doc.insert()
@@ -326,15 +376,24 @@ def create_cancel_kot_doc(
         fields=("name"),
     )
 
-    # Find original KOTs related to the cancel items
+    # Find original KOTs related to the cancel items. When the cancel item
+    # carries a stable reservation_line_key, match ONLY the KOT line that
+    # was tagged with that exact key -- this is what lets two identical
+    # item_code lines (different comments/courses, or a plain duplicate) be
+    # told apart. Fall back to the legacy item_code match only when no line
+    # key is available on either side (older/aggregator payloads).
     original_kots = []
     for cancelItem in cancel_items:
+        cancel_line_key = cancelItem.get("reservation_line_key")
         for kot in kot_list:
             kot_doc = frappe.get_doc("URY KOT", kot.name)
             kot_cancel_items = kot_doc.kot_items
             itemCheckFlag = False
             for kotItem in kot_cancel_items:
-                if cancelItem["item_code"] == kotItem.item:
+                if cancel_line_key and kotItem.get("reservation_line_key"):
+                    if cancel_line_key == kotItem.get("reservation_line_key"):
+                        itemCheckFlag = True
+                elif cancelItem["item_code"] == kotItem.item:
                     itemCheckFlag = True
             if itemCheckFlag:
                 original_kots.append(kot_doc.name)
@@ -376,19 +435,38 @@ def create_cancel_kot_doc(
         menu = frappe.db.get_value("URY Restaurant", {"branch": pos_invoice.branch}, "active_menu")
     for cancelItem in cancel_items:
         course = frappe.db.get_value("URY Menu Item", {"item": cancelItem["item_code"],"parent":menu}, "course")
-        for item in invoiceItems:
-            if cancelItem["item_code"] == item["item_code"]:
-                kot_cancel_doc.append(
-                    "kot_items",
-                    {
-                        "item": cancelItem["item_code"],
-                        "item_name": cancelItem["item_name"],
-                        "cancelled_qty": abs(int(cancelItem["qty"])),
-                        "quantity": item["qty"],
-                        "comments": cancelItem["comments"],
-                        "course":course
-                    },
-                )
+        cancel_line_key = cancelItem.get("reservation_line_key")
+        # Resolve the single invoice line this cancellation belongs to.
+        # Matching by reservation_line_key when available prevents this
+        # from appending a cancel row (and picking up the wrong quantity)
+        # for EVERY invoice line that shares the same item_code -- the
+        # previous behaviour had no `break`, so two lines of the same item
+        # produced duplicate/incorrect cancel entries.
+        matched_item = None
+        if cancel_line_key:
+            for item in invoiceItems:
+                if item.get("reservation_line_key") == cancel_line_key:
+                    matched_item = item
+                    break
+        if matched_item is None:
+            for item in invoiceItems:
+                if cancelItem["item_code"] == item["item_code"]:
+                    matched_item = item
+                    break
+        if matched_item is None:
+            continue
+        kot_cancel_doc.append(
+            "kot_items",
+            {
+                "item": cancelItem["item_code"],
+                "item_name": cancelItem["item_name"],
+                "cancelled_qty": abs(int(cancelItem["qty"])),
+                "quantity": matched_item["qty"],
+                "comments": cancelItem["comments"],
+                "course":course,
+                "reservation_line_key": cancel_line_key,
+            },
+        )
 
     kot_cancel_doc.insert()
     kot_cancel_doc.submit()
@@ -413,11 +491,38 @@ def kot_execute(
 
     current_items = load_json(current_items)
     previous_items = load_json(previous_items)
-    new_invoice_items_array = create_order_items(previous_items)
-    new_Order_items_array = create_order_items(current_items)
 
-    final_array = compare_two_array(new_Order_items_array, new_invoice_items_array)
-    removed_item = get_removed_items(new_invoice_items_array, new_Order_items_array)
+    # Diff current vs previous items PER STABLE LINE (see _line_keyed_items),
+    # not per item_code. Two lines of the same item_code (different
+    # comments/courses, or a plain duplicate) are now tracked as distinct
+    # lines, so a qty change/removal on one line can never be attributed to
+    # the other. See sa-architecture-closure.
+    current_lines = _line_keyed_items(current_items)
+    previous_lines = _line_keyed_items(previous_items)
+
+    positive_qty_items = []
+    negative_qty_items = []
+
+    for key, cur in current_lines.items():
+        prev = previous_lines.get(key)
+        prev_qty = flt(prev["qty"]) if prev else 0
+        delta = flt(cur["qty"]) - prev_qty
+        if delta == 0:
+            continue
+        item = dict(cur)
+        item["qty"] = delta
+        if delta > 0:
+            positive_qty_items.append(item)
+        else:
+            negative_qty_items.append(item)
+
+    removed_item = []
+    for key, prev in previous_lines.items():
+        if key in current_lines:
+            continue
+        item = dict(prev)
+        item["qty"] = -flt(prev["qty"])
+        removed_item.append(item)
 
     pos_profile_id = pos_invoice.pos_profile
     pos_profile = frappe.get_doc("POS Profile", pos_profile_id)
@@ -432,8 +537,6 @@ def kot_execute(
 
     from ury.ury.api.ury_waiter_print import print_combined_waiter_order_slip
 
-    positive_qty_items = [item for item in final_array if int(item["qty"]) > 0]
-    negative_qty_items = [item for item in final_array if int(item["qty"]) <= 0]
     total_cancel_items = negative_qty_items + removed_item
     created_kot_names = []
 
@@ -461,7 +564,7 @@ def kot_execute(
                 pos_profile_id,
                 cancel_kot_naming_series,
                 "Partially cancelled",
-                new_invoice_items_array,
+                list(previous_lines.values()),
             )
         )
 
