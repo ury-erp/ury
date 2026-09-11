@@ -8,7 +8,7 @@ from types import SimpleNamespace
 from frappe.tests.utils import FrappeTestCase
 from unittest.mock import patch, MagicMock
 
-from ury.ury.doctype.ury_order.ury_order import cancel_order, sync_order, price_items_for_invoice, reconcile_order_reservations, _resolve_or_create_pos_invoice
+from ury.ury.doctype.ury_order.ury_order import cancel_order, sync_order, price_items_for_invoice, reconcile_order_reservations, _resolve_or_create_pos_invoice, split_bill
 
 from unittest.mock import patch, MagicMock
 from ury.ury.doctype.ury_order.ury_order import get_order_invoice
@@ -1537,3 +1537,273 @@ class TestCaptainTransfer(FrappeTestCase):
 
         self.assertEqual(pos_invoice.waiter, "captain_b@example.com")
         pos_invoice.save.assert_called_once()
+
+
+class _FakeRow:
+    """Minimal stand-in for a Frappe child-table row: attribute access plus
+    a dict-like .get(), which is all split_bill()/reconcile_order_reservations
+    touch on an invoice item row."""
+
+    def __init__(self, **fields):
+        self.__dict__.update(fields)
+
+    def get(self, key, default=None):
+        return getattr(self, key, default)
+
+
+class _FakeInvoice:
+    """Minimal stand-in for a POS Invoice document. Supports exactly the
+    surface split_bill() exercises: .get()/.set(), .append() onto a real
+    list (so .remove() actually mutates it, unlike a MagicMock attribute),
+    and no-op lifecycle hooks."""
+
+    def __init__(self, **fields):
+        self.items = fields.pop("items", [])
+        self.payments = fields.pop("payments", [])
+        for key, value in fields.items():
+            setattr(self, key, value)
+
+    def get(self, key, default=None):
+        return getattr(self, key, default)
+
+    def set(self, key, value):
+        setattr(self, key, value)
+
+    def append(self, table, row):
+        row = _FakeRow(**row) if isinstance(row, dict) else row
+        getattr(self, table).append(row)
+        return row
+
+    def remove(self, row):
+        self.items.remove(row)
+
+    def set_missing_values(self):
+        pass
+
+    def run_method(self, method_name):
+        pass
+
+    def calculate_taxes_and_totals(self):
+        self.rounded_total = getattr(self, "rounded_total", 0) or sum(
+            flt_local(i.get("qty", 0)) * flt_local(i.get("rate", 0)) for i in self.items
+        )
+
+    def insert(self):
+        if not getattr(self, "name", None):
+            self.name = "POS-INV-NEW"
+
+    def reload(self):
+        pass
+
+    def save(self):
+        pass
+
+
+def flt_local(value):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+class TestSplitBillReservations(FrappeTestCase):
+    """sa-arch-splitbill: split_bill() must move reservation coverage (and,
+    where safely determinable, KOT ownership) along with the invoice item
+    rows it relocates to the new sibling invoice -- not just move item rows
+    while leaving `URY Stock Reservation` pointed at deleted rows on the
+    source invoice and giving the new invoice zero coverage."""
+
+    def _build_source(self):
+        item_a = _FakeRow(
+            name="ITEM-ROW-A",
+            item_code="ITEM-A",
+            item_name="Item A",
+            qty=2,
+            rate=100,
+            price_list_rate=100,
+            base_price_list_rate=100,
+            comment=None,
+            custom_course=None,
+            cost_center="Cost Center",
+            uom="Nos",
+            conversion_factor=1,
+            warehouse="WH-A",
+            reservation_line_key=None,
+        )
+        item_b = _FakeRow(
+            name="ITEM-ROW-B",
+            item_code="ITEM-B",
+            item_name="Item B",
+            qty=1,
+            rate=50,
+            price_list_rate=50,
+            base_price_list_rate=50,
+            comment=None,
+            custom_course=None,
+            cost_center="Cost Center",
+            uom="Nos",
+            conversion_factor=1,
+            warehouse="WH-B",
+            reservation_line_key=None,
+        )
+        return _FakeInvoice(
+            name="POS-INV-SRC",
+            docstatus=0,
+            branch="Test Branch",
+            company="Test Company",
+            restaurant=None,
+            restaurant_table=None,
+            custom_restaurant_room=None,
+            custom_merged_tables=None,
+            waiter=None,
+            cashier=None,
+            pos_profile="Test Profile",
+            order_type=None,
+            no_of_pax=None,
+            customer="Walk In",
+            customer_name="Walk In",
+            selling_price_list="Standard Selling",
+            taxes_and_charges=None,
+            currency="INR",
+            conversion_rate=1,
+            price_list_currency="INR",
+            is_pos=1,
+            update_stock=0,
+            naming_series="POS-INV-.YYYY.-",
+            custom_split_group=None,
+            items=[item_a, item_b],
+            rounded_total=250,
+        )
+
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_all")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.db.set_value")
+    @patch("ury.ury.doctype.ury_order.ury_order.reconcile_order_reservations")
+    @patch("ury.ury.doctype.ury_order.ury_order._enforce_order_access")
+    @patch("ury.ury.doctype.ury_order.ury_order.getBranch")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.new_doc")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_doc")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.has_permission")
+    def test_split_bill_reconciles_reservations_for_moved_and_remaining_items(
+        self,
+        mock_has_permission,
+        mock_get_doc,
+        mock_new_doc,
+        mock_get_branch,
+        mock_enforce_access,
+        mock_reconcile,
+        mock_db_set_value,
+        mock_get_all,
+    ):
+        source = self._build_source()
+        mock_get_doc.return_value = source
+        mock_has_permission.return_value = True
+        mock_get_branch.return_value = "Test Branch"
+
+        new_invoice = _FakeInvoice(name=None, invoice_printed=0, invoice_created=0)
+        mock_new_doc.return_value = new_invoice
+
+        # No KOTs exist yet for this order -- reservation reconciliation is
+        # the only thing under test here.
+        mock_get_all.return_value = []
+
+        result = split_bill(
+            "POS-INV-SRC",
+            json.dumps([{"name": "ITEM-ROW-A", "qty": 2}]),
+        )
+
+        self.assertEqual(result["source_invoice"], "POS-INV-SRC")
+        self.assertEqual(result["new_invoice"], "POS-INV-NEW")
+
+        # Item A fully moved off the source invoice; item B stays.
+        self.assertEqual([i.item_code for i in source.items], ["ITEM-B"])
+        self.assertEqual([i.item_code for i in new_invoice.items], ["ITEM-A"])
+        # The moved row must carry its original stable line identity onto
+        # the new invoice, not a key implicitly derived from its new row
+        # name -- otherwise the reservation lookup below can never find it.
+        self.assertEqual(new_invoice.items[0].get("reservation_line_key"), "ITEM-ROW-A")
+
+        self.assertEqual(mock_reconcile.call_count, 2)
+        source_call, new_call = mock_reconcile.call_args_list
+
+        # Source-side reconciliation: item A drops out of the accepted set
+        # entirely (moved away), item B is unchanged.
+        self.assertEqual(source_call.kwargs["order_ref"], "POS-INV-SRC")
+        previous_keys = {p["reservation_line_key"]: p["qty"] for p in source_call.kwargs["previous_items"]}
+        accepted_keys = {p["reservation_line_key"]: p["qty"] for p in source_call.kwargs["accepted_items"]}
+        self.assertEqual(previous_keys, {"ITEM-ROW-A": 2, "ITEM-ROW-B": 1})
+        self.assertEqual(accepted_keys, {"ITEM-ROW-B": 1})
+
+        # New-invoice-side reconciliation: item A's full quantity is
+        # (re)claimed under the new invoice, under the SAME line key, so
+        # any subsequent posting/lookup keyed on reservation_line_key still
+        # resolves.
+        self.assertEqual(new_call.kwargs["order_ref"], "POS-INV-NEW")
+        self.assertEqual(new_call.kwargs["previous_items"], [])
+        new_accepted = {
+            p["reservation_line_key"]: p["qty"] for p in new_call.kwargs["accepted_items"]
+        }
+        self.assertEqual(new_accepted, {"ITEM-ROW-A": 2})
+
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_all")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.db.set_value")
+    @patch("ury.ury.doctype.ury_order.ury_order.reconcile_order_reservations")
+    @patch("ury.ury.doctype.ury_order.ury_order._enforce_order_access")
+    @patch("ury.ury.doctype.ury_order.ury_order.getBranch")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.new_doc")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_doc")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.has_permission")
+    def test_split_bill_reassigns_kot_only_when_fully_moved(
+        self,
+        mock_has_permission,
+        mock_get_doc,
+        mock_new_doc,
+        mock_get_branch,
+        mock_enforce_access,
+        mock_reconcile,
+        mock_db_set_value,
+        mock_get_all,
+    ):
+        source = self._build_source()
+        mock_get_doc.return_value = source
+        mock_has_permission.return_value = True
+        mock_get_branch.return_value = "Test Branch"
+
+        new_invoice = _FakeInvoice(name=None, invoice_printed=0, invoice_created=0)
+        mock_new_doc.return_value = new_invoice
+
+        # KOT-FULL: every one of its items shares item A's line key -- fully
+        # moved, so its invoice reference must follow to the new invoice.
+        # KOT-MIXED: has one moved and one staying item -- URY KOT has only
+        # a single (whole-document) invoice link, so a mixed KOT cannot be
+        # correctly reassigned and must be left alone.
+        def get_all_side_effect(doctype, filters=None, fields=None, pluck=None, **kwargs):
+            if doctype == "URY KOT":
+                return ["KOT-FULL", "KOT-MIXED"]
+            if doctype == "URY KOT Items":
+                parent = filters.get("parent")
+                if parent == "KOT-FULL":
+                    return [
+                        SimpleNamespace(reservation_line_key="ITEM-ROW-A"),
+                    ]
+                if parent == "KOT-MIXED":
+                    return [
+                        SimpleNamespace(reservation_line_key="ITEM-ROW-A"),
+                        SimpleNamespace(reservation_line_key="ITEM-ROW-B"),
+                    ]
+            return []
+
+        mock_get_all.side_effect = get_all_side_effect
+
+        split_bill(
+            "POS-INV-SRC",
+            json.dumps([{"name": "ITEM-ROW-A", "qty": 2}]),
+        )
+
+        mock_db_set_value.assert_any_call(
+            "URY KOT", "KOT-FULL", "invoice", "POS-INV-NEW", update_modified=False
+        )
+        mixed_reassigned = any(
+            call.args[:3] == ("URY KOT", "KOT-MIXED", "invoice")
+            for call in mock_db_set_value.call_args_list
+        )
+        self.assertFalse(mixed_reassigned, "a KOT with staying items must not be reassigned wholesale")

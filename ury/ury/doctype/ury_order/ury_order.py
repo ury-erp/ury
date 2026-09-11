@@ -595,6 +595,13 @@ def _copy_invoice_item_fields(item_row, qty):
         uom=item_row.uom,
         conversion_factor=item_row.conversion_factor,
         warehouse=item_row.warehouse,
+        # Preserve the stable line identity the reservation/KOT layers key
+        # on (see ury_order_reservation_service.LINE_REF_FIELDS). Without
+        # this, the copied row on the new invoice would get an implicit
+        # reservation_line_key derived from ITS OWN (freshly generated) row
+        # name once inserted, breaking the link back to any reservation
+        # created for the original line (sa-arch-splitbill).
+        reservation_line_key=item_row.get("reservation_line_key") or item_row.name,
     )
 
 
@@ -696,7 +703,25 @@ def split_bill(source_invoice, items_to_move, customer=None):
         new_invoice.customer_name = frappe.db.get_value("Customer", customer, "customer_name")
         new_invoice.mobile_number = frappe.db.get_value("Customer", customer, "mobile_no")
 
+    # Snapshot the pre-split source lines (stable reservation_line_key ->
+    # item_code/qty) before anything is mutated/removed below. This is the
+    # "previous_items" side of a reconcile_order_reservations() call further
+    # down, exactly like sync_order's `past_item` (sa-arch-splitbill: without
+    # this, reservations tied to lines that move to the new invoice are
+    # never released from the source invoice, and the moved lines arrive on
+    # the new invoice with zero reservation coverage).
+    previous_source_items = [
+        {
+            "reservation_line_key": item.get("reservation_line_key") or item.name,
+            "item_code": item.item_code,
+            "item_name": item.item_name,
+            "qty": item.qty,
+        }
+        for item in source.items
+    ]
+
     items_to_remove = []
+    moved_line_keys = set()
     for item in source.items:
         move_qty = move_map.get(item.name, 0)
         if move_qty <= 0:
@@ -704,6 +729,7 @@ def split_bill(source_invoice, items_to_move, customer=None):
         if move_qty >= item.qty:
             new_invoice.append("items", _copy_invoice_item_fields(item, item.qty))
             items_to_remove.append(item)
+            moved_line_keys.add(item.get("reservation_line_key") or item.name)
         else:
             new_invoice.append("items", _copy_invoice_item_fields(item, move_qty))
             item.qty -= move_qty
@@ -742,6 +768,83 @@ def split_bill(source_invoice, items_to_move, customer=None):
             update_modified=False,
         )
         source.save()
+
+        # Reconcile reservations for both sides of the split, reusing the
+        # same reconcile_order_reservations() primitive sync_order already
+        # relies on (sa-arch-splitbill) rather than inventing a new
+        # reservation lifecycle state or mutating existing `URY Stock
+        # Reservation` rows' order_ref in place (that doctype's rows are
+        # meant to be an append-only audit trail of what was reserved when
+        # -- see ury_stock_reservation.py docstring -- so "moving" a
+        # reservation to a different invoice is modelled the same way any
+        # other quantity change is: release/shrink the old side, create the
+        # new side).
+        company = source.company or frappe.db.get_value("Branch", source.branch, "company")
+
+        accepted_source_items = [
+            {
+                "reservation_line_key": item.get("reservation_line_key") or item.name,
+                "item_code": item.item_code,
+                "item_name": item.item_name,
+                "qty": item.qty,
+            }
+            for item in source.items
+        ]
+        reconcile_order_reservations(
+            order_ref=source.name,
+            previous_items=previous_source_items,
+            accepted_items=accepted_source_items,
+            branch=source.branch,
+            company=company,
+            actor=frappe.session.user,
+        )
+
+        new_invoice_items = [
+            {
+                "reservation_line_key": item.get("reservation_line_key") or item.name,
+                "item_code": item.item_code,
+                "item_name": item.item_name,
+                "qty": item.qty,
+            }
+            for item in new_invoice.items
+        ]
+        reconcile_order_reservations(
+            order_ref=new_invoice.name,
+            previous_items=[],
+            accepted_items=new_invoice_items,
+            branch=new_invoice.branch,
+            company=company,
+            actor=frappe.session.user,
+        )
+
+        # Best-effort KOT reassignment: URY KOT has a single `invoice` link
+        # (not a per-line one), so a KOT can only be reassigned wholesale to
+        # the new invoice when EVERY one of its items moved there. A KOT
+        # that mixes moved and staying items has no correct single owner
+        # under the current schema -- that is a genuine data-model gap
+        # (URY KOT Items would need its own invoice/order_ref per row to
+        # resolve it), so such KOTs are deliberately left pointing at the
+        # source invoice rather than guessed at. Downstream fulfilment
+        # posting resolves an order_ref via `_kot_order_ref()` -> KOT.invoice,
+        # so this is what lets `mark_item_ready`/posting find the reservation
+        # that just moved to the new invoice for fully-moved KOTs.
+        if moved_line_keys:
+            kot_names = frappe.get_all(
+                "URY KOT", filters={"invoice": source.name}, pluck="name"
+            )
+            for kot_name in kot_names:
+                kot_item_rows = frappe.get_all(
+                    "URY KOT Items",
+                    filters={"parent": kot_name, "parenttype": "URY KOT"},
+                    fields=["reservation_line_key"],
+                )
+                kot_line_keys = {
+                    row.reservation_line_key for row in kot_item_rows if row.reservation_line_key
+                }
+                if kot_line_keys and kot_line_keys.issubset(moved_line_keys):
+                    frappe.db.set_value(
+                        "URY KOT", kot_name, "invoice", new_invoice.name, update_modified=False
+                    )
     finally:
         frappe.flags.ury_bill_split = False
 
