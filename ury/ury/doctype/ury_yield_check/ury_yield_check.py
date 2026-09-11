@@ -15,6 +15,7 @@ class URYYieldCheck(Document):
 		self.validate_branch_company_consistency()
 		self.validate_stock_uom_match()
 		self.validate_issue_authorization()
+		self.validate_no_duplicate_wastage()
 
 	def validate_item_yield_tracking_enabled(self):
 		"""Check 1: Item must have custom_yield_tracked enabled."""
@@ -164,3 +165,33 @@ class URYYieldCheck(Document):
 		# Optional: Default input_qty from authorized_qty if not set
 		if (not self.input_qty or self.input_qty == 0) and auth_doc.get("authorized_qty"):
 			self.input_qty = auth_doc.get("authorized_qty")
+
+	def validate_no_duplicate_wastage(self):
+		"""Check 8: If issue_authorization is set, ensure no Issue Wastage exists for it.
+
+		Routine/expected trim loss should be logged as Yield Check.
+		Exceptional loss (spoilage, damage, expiry, prep error) should be logged as Issue Wastage.
+		The same authorization should not have both, as it double-counts the same shortfall.
+		"""
+		if not self.issue_authorization:
+			return
+
+		# Check if any URY Issue Wastage record references this authorization
+		existing_wastage = frappe.get_all(
+			"URY Issue Wastage",
+			filters={
+				"issue_authorization": self.issue_authorization
+			},
+			fields=["name"]
+		)
+
+		if existing_wastage:
+			frappe.throw(
+				_("Issue Authorization {0} already has an Issue Wastage record ({1}). "
+				  "Routine/expected trim loss should be logged as a Yield Check, "
+				  "exceptional loss (spoilage, damage, expiry, prep error) as Issue Wastage. "
+				  "The same authorization cannot have both, as it would double-count the same shortfall.").format(
+					self.issue_authorization, existing_wastage[0].name
+				),
+				frappe.ValidationError
+			)
