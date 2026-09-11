@@ -19,7 +19,7 @@ from unittest.mock import patch
 
 from frappe.tests.utils import FrappeTestCase
 
-from ury.ury.api.ury_availability import get_item_availability
+from ury.ury.api.ury_availability import _resolve_plan_remaining, get_item_availability
 
 
 MODULE = "ury.ury.api.ury_availability"
@@ -582,3 +582,61 @@ class TestAvailabilityModeOverride(FrappeTestCase):
 
         self.assertEqual(result["reason_code"], "DEPARTMENT_DISABLED")
         self.assertFalse(result["sellable"])
+
+
+class TestResolvePlanRemainingReflectsCounters(FrappeTestCase):
+    """`_resolve_plan_remaining` must read the real committed_qty/fulfilled_qty
+    counters instead of the old hardcoded committed=fulfilled=0 (which made
+    plan_remaining always equal the full plan_qty, regardless of how many
+    orders had actually been placed against the plan)."""
+
+    @patch(f"{MODULE}.resolve_plan_item_rows")
+    def test_full_plan_qty_when_nothing_committed_yet(self, mock_rows):
+        mock_rows.return_value = [
+            {"name": "PLI-1", "parent": "PLAN-1", "qty": 50, "committed_qty": 0, "fulfilled_qty": 0}
+        ]
+
+        result = _resolve_plan_remaining("ITEM-CAKE", "Branch A", "Company A")
+
+        self.assertEqual(result, {"plan_qty": 50, "plan_remaining": 50})
+
+    @patch(f"{MODULE}.resolve_plan_item_rows")
+    def test_plan_remaining_shrinks_as_committed_and_fulfilled_grow(self, mock_rows):
+        mock_rows.return_value = [
+            {"name": "PLI-1", "parent": "PLAN-1", "qty": 50, "committed_qty": 20, "fulfilled_qty": 15}
+        ]
+
+        result = _resolve_plan_remaining("ITEM-CAKE", "Branch A", "Company A")
+
+        # No longer always equal to plan_qty -- this is exactly the bug fix.
+        self.assertEqual(result, {"plan_qty": 50, "plan_remaining": 15})
+
+    @patch(f"{MODULE}.resolve_plan_item_rows")
+    def test_plan_remaining_can_go_to_zero_when_fully_committed(self, mock_rows):
+        mock_rows.return_value = [
+            {"name": "PLI-1", "parent": "PLAN-1", "qty": 10, "committed_qty": 10, "fulfilled_qty": 0}
+        ]
+
+        result = _resolve_plan_remaining("ITEM-CAKE", "Branch A", "Company A")
+
+        self.assertEqual(result["plan_remaining"], 0)
+
+    @patch(f"{MODULE}.resolve_plan_item_rows")
+    def test_sums_committed_and_fulfilled_across_matching_rows(self, mock_rows):
+        mock_rows.return_value = [
+            {"name": "PLI-1", "parent": "PLAN-1", "qty": 30, "committed_qty": 5, "fulfilled_qty": 0},
+            {"name": "PLI-2", "parent": "PLAN-2", "qty": 20, "committed_qty": 3, "fulfilled_qty": 2},
+        ]
+
+        result = _resolve_plan_remaining("ITEM-CAKE", "Branch A", "Company A")
+
+        self.assertEqual(result["plan_qty"], 50)
+        self.assertEqual(result["plan_remaining"], 40)  # 50 - (5+3) - (0+2)
+
+    @patch(f"{MODULE}.resolve_plan_item_rows")
+    def test_no_matching_rows_is_no_active_plan(self, mock_rows):
+        mock_rows.return_value = []
+
+        result = _resolve_plan_remaining("ITEM-CAKE", "Branch A", "Company A")
+
+        self.assertIsNone(result)

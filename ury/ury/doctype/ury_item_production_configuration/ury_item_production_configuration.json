@@ -13,11 +13,13 @@
   "department",
   "production_unit",
   "production_policy",
+  "sourcing_mode",
   "bom",
   "controlled_by_sales_plan",
   "allow_over_plan_sale",
   "availability_mode",
-  "direct_retail_warehouse"
+  "direct_retail_warehouse",
+  "external_receiving_warehouse"
  ],
  "fields": [
   {
@@ -64,6 +66,15 @@
    "options": "PRE_PRODUCED\nMADE_TO_ORDER\nDIRECT_RETAIL"
   },
   {
+   "default": "IN_HOUSE",
+   "depends_on": "eval:doc.production_policy==\"PRE_PRODUCED\"",
+   "description": "Only meaningful when Production Policy is PRE_PRODUCED (MADE_TO_ORDER is always in-house at order time; DIRECT_RETAIL is already a receipt-only path via Direct Retail Warehouse). IN_HOUSE: batch is manufactured at this branch/unit via a real BOM-based Manufacture Stock Entry. EXTERNAL_RECEIPT: item arrives already finished from a central kitchen/processing location and is received directly as finished stock, no BOM consumption.",
+   "fieldname": "sourcing_mode",
+   "fieldtype": "Select",
+   "label": "Sourcing Mode",
+   "options": "IN_HOUSE\nEXTERNAL_RECEIPT"
+  },
+  {
    "fieldname": "bom",
    "fieldtype": "Link",
    "label": "BOM",
@@ -96,6 +107,14 @@
    "fieldname": "direct_retail_warehouse",
    "fieldtype": "Link",
    "label": "Direct Retail Warehouse",
+   "options": "Warehouse"
+  },
+  {
+   "depends_on": "eval:doc.sourcing_mode==\"EXTERNAL_RECEIPT\"",
+   "description": "Warehouse the finished item is received into when produced off-site (e.g. a central kitchen/processing location). Used by the Receive Batch action instead of the BOM-based Manufacture Stock Entry.",
+   "fieldname": "external_receiving_warehouse",
+   "fieldtype": "Link",
+   "label": "External Receiving Warehouse",
    "options": "Warehouse"
   }
  ],

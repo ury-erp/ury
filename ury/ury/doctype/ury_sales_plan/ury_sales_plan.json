@@ -9,6 +9,7 @@
  "engine": "InnoDB",
  "field_order": [
   "status",
+  "enforcement_mode",
   "branch",
   "company",
   "column_break_scope",
@@ -32,6 +33,16 @@
    "label": "Status",
    "options": "Draft\nProposed\nSubmitted for Approval\nApproved\nLocked for Production\nSuperseded/Cancelled",
    "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "default": "Hard",
+   "description": "Hard: block order placement once plan_remaining hits 0. Soft: allow the order, over-plan status is computable from committed_qty + fulfilled_qty > qty. Alert: allow the order and notify branch-scoped Production Manager/URY Manager recipients when the plan is exceeded.",
+   "fieldname": "enforcement_mode",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Enforcement Mode",
+   "options": "Hard\nSoft\nAlert",
    "reqd": 1
   },
   {
@@ -115,7 +126,7 @@
  "index_web_pages_for_search": 1,
  "istable": 0,
  "links": [],
- "modified": "2026-08-28 00:00:00.000000",
+ "modified": "2026-09-11 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Sales Plan",
