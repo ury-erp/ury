@@ -15,7 +15,8 @@
   "comments",
   "course",
   "serve_priority",
-  "indicate_course"
+  "indicate_course",
+  "reservation_line_key"
  ],
  "fields": [
   {
@@ -71,12 +72,19 @@
    "fieldtype": "Check",
    "label": "Indicate Course",
    "read_only": 1
+  },
+  {
+   "fieldname": "reservation_line_key",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Reservation Line Key",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2024-08-28 16:23:35.778511",
+ "modified": "2026-09-11 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY KOT Items",
