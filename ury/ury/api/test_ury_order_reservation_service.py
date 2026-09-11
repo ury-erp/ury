@@ -379,7 +379,10 @@ class TestReleaseOrderReservations(unittest.TestCase):
 
 		self.assertEqual(first, ["GRP-1"])
 		self.assertEqual(second, [])
-		release_reservation.assert_called_once_with("GRP-1", reason=None)
+		# release_order_reservations() defaults an unset reason to "Order
+		# cancelled" internally (see its `reason=reason or "Order cancelled"`
+		# call) -- passing no reason here still resolves to that default.
+		release_reservation.assert_called_once_with("GRP-1", reason="Order cancelled")
 
 
 class TestPlanExhaustedEnforcementMode(unittest.TestCase):
