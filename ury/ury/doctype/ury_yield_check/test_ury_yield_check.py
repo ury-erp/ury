@@ -439,6 +439,64 @@ class TestYieldCheckValidateIssueAuthorization(FrappeTestCase):
 		self.assertEqual(doc.input_qty, 50)  # Unchanged
 
 
+class TestYieldCheckValidateNoDuplicateWastage(FrappeTestCase):
+	"""Test Check 8: validate_no_duplicate_wastage (A3)."""
+
+	def test_passes_when_issue_authorization_is_not_set(self):
+		"""Validation passes if issue_authorization is None."""
+		doc = URYYieldCheck(_create_yield_check(issue_authorization=None))
+		# Should not raise
+		doc.validate_no_duplicate_wastage()
+
+	@patch(f"{MODULE}.frappe.get_all")
+	def test_passes_when_no_existing_wastage_for_authorization(self, mock_get_all):
+		"""Validation passes when issue_authorization has no Issue Wastage records."""
+		mock_get_all.return_value = []  # No wastage records
+
+		doc = URYYieldCheck(_create_yield_check(issue_authorization="AUTH-001"))
+		# Should not raise
+		doc.validate_no_duplicate_wastage()
+
+	@patch(f"{MODULE}.frappe.get_all")
+	@patch(f"{MODULE}.frappe.throw")
+	def test_throws_when_wastage_already_exists(self, mock_throw, mock_get_all):
+		"""Validation fails when Issue Wastage already references this authorization."""
+		mock_get_all.return_value = [
+			frappe._dict(name="WASTAGE-001")
+		]
+
+		doc = URYYieldCheck(_create_yield_check(issue_authorization="AUTH-001"))
+		doc.validate_no_duplicate_wastage()
+
+		mock_throw.assert_called_once()
+		call_args = mock_throw.call_args[0]
+		self.assertIn("already has an Issue Wastage record", str(call_args[0]))
+		self.assertIn("WASTAGE-001", str(call_args[0]))
+
+	@patch(f"{MODULE}.frappe.get_all")
+	def test_filters_by_issue_authorization(self, mock_get_all):
+		"""Query filters for the specific issue_authorization."""
+		mock_get_all.return_value = []
+
+		doc = URYYieldCheck(_create_yield_check(issue_authorization="AUTH-001"))
+		doc.validate_no_duplicate_wastage()
+
+		mock_get_all.assert_called_once()
+		call_kwargs = mock_get_all.call_args[1]
+		self.assertEqual(call_kwargs["filters"]["issue_authorization"], "AUTH-001")
+
+	@patch(f"{MODULE}.frappe.get_all")
+	def test_searches_ury_issue_wastage_doctype(self, mock_get_all):
+		"""Query targets URY Issue Wastage doctype."""
+		mock_get_all.return_value = []
+
+		doc = URYYieldCheck(_create_yield_check(issue_authorization="AUTH-001"))
+		doc.validate_no_duplicate_wastage()
+
+		call_args = mock_get_all.call_args[0]
+		self.assertEqual(call_args[0], "URY Issue Wastage")
+
+
 class TestYieldCheckIntegrationFullValidate(FrappeTestCase):
 	"""Integration tests for full validate() method."""
 
@@ -446,7 +504,7 @@ class TestYieldCheckIntegrationFullValidate(FrappeTestCase):
 	@patch(f"{MODULE}.frappe.get_all")
 	@patch(f"{MODULE}.frappe.throw")
 	def test_all_checks_are_called_in_sequence(self, mock_throw, mock_get_all, mock_get_value):
-		"""All 7 validation checks are called in the correct order."""
+		"""All 8 validation checks are called in the correct order."""
 		# Setup mocks to make all checks pass
 		mock_get_value.side_effect = [
 			True,  # validate_item_yield_tracking_enabled
@@ -459,12 +517,15 @@ class TestYieldCheckIntegrationFullValidate(FrappeTestCase):
 				"authorized_qty": 100,
 			}),
 		]
-		mock_get_all.return_value = []
+		mock_get_all.side_effect = [
+			[],  # validate_issue_authorization - no existing checks
+			[],  # validate_no_duplicate_wastage - no wastage records
+		]
 
 		doc = URYYieldCheck(_create_yield_check())
 		doc.validate()
 
-		# validate_item_yield_tracking_enabled should be first
+		# All checks should pass
 		mock_throw.assert_not_called()
 
 
