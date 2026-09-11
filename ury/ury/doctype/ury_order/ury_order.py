@@ -11,7 +11,10 @@ from ury.ury_pos.api import getBranch, getBranchRoom, getRoom, posOpening
 from ury.ury.api.ury_kot_generate import kot_execute
 from ury.ury.api.ury_kot_generate import process_items_for_cancel_kot
 from ury.ury.api.ury_feature_flags import is_pos_stock_authority_flag_enabled
-from ury.ury.api.ury_order_reservation_service import reconcile_order_reservations
+from ury.ury.api.ury_order_reservation_service import (
+    reconcile_order_reservations,
+    release_order_reservations,
+)
 from ury.ury.doctype.alert_settings.alert_settings import get_alert_rule
 from ury.ury.api.ury_kot_notification import create_system_notification, get_users_with_role
 
@@ -1937,11 +1940,16 @@ def sync_order(
 
     try:
         kot_execute(invoice.name, customer, table, items, past_item, comments)
-
     except Exception as e:
-        # If an exception occurs (e.g., "kot" app not found), it will be caught here without affect the code execution.
-        error_msg = f"KOT Creation Failes {str(e)}"            
+        # KOT creation/routing failing is not a side detail to swallow: a
+        # customer must never be charged for an item the kitchen never
+        # receives. Log for diagnostics, then re-raise so the whole request
+        # (including the invoice.save() above) rolls back and the caller
+        # sees a real failure instead of a silently accepted order.
+        # See sa-post-373-review-fixes Blocker 2.
+        error_msg = f"KOT Creation Failed: {str(e)}"
         frappe.log_error(error_msg, "KOT Error")
+        frappe.throw(_("Failed to create kitchen order ticket(s) for this order: {0}").format(str(e)))
 
     # table status
     if invoice.invoice_printed == 0:
@@ -2276,6 +2284,14 @@ def cancel_order(invoice_id, reason):
     # fails, stop immediately so the invoice is not cancelled while the KOT
     # state remains out of sync.
     cancel_kot(invoice_id)
+
+    # Release any still-active stock reservations held for this order.
+    # cancel_order() previously cancelled the KOT/invoice but left
+    # `URY Stock Reservation` rows in Reserved status, leaking reserved
+    # capacity indefinitely after cancellation (sa-post-373-review-fixes
+    # Blocker 3). order_ref is the invoice name, matching how sync_order()
+    # reserves via `_ensure_invoice_reservation_ref`.
+    release_order_reservations(invoice_id, reason=f"Order cancelled: {reason}" if reason else "Order cancelled")
 
     # Best-effort delayed-cancellation fraud alert: notify if order was open longer than threshold
     try:
