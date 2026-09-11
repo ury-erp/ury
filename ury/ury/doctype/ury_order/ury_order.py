@@ -14,6 +14,8 @@ from ury.ury.api.ury_feature_flags import is_pos_stock_authority_flag_enabled
 from ury.ury.api.ury_order_reservation_service import (
     reconcile_order_reservations,
     release_order_reservations,
+    resolve_production_context,
+    _warehouse_for_context,
 )
 from ury.ury.doctype.alert_settings.alert_settings import get_alert_rule
 from ury.ury.api.ury_kot_notification import create_system_notification, get_users_with_role
@@ -906,13 +908,47 @@ def get_order_invoice(table=None, invoiceNo=None, order_type=None, is_payment=No
     return invoice
 
 
+def _department_warehouse_for_item(item_code, branch, company):
+    """sa-architecture-closure (Gap B): resolve the same department warehouse
+    the availability/reservation/fulfilment pipeline uses for this item, via
+    `resolve_production_context` + `_warehouse_for_context` -- the exact pair
+    `ury_order_reservation_service._reserve_line` already uses to pick a
+    warehouse for reservation.
+
+    Returns `None` when the item has no resolvable department-controlled
+    production config (e.g. a genuinely direct-retail item, or the
+    production-config table/row is missing) -- callers should fall back to
+    ERPNext's own default (POS Profile warehouse) in that case, which is
+    correct for direct-retail items that aren't tied to a department.
+    """
+    if not item_code or not branch:
+        return None
+    try:
+        context = resolve_production_context(item_code, branch, company)
+    except Exception:
+        return None
+    if not context:
+        return None
+    return _warehouse_for_context(context)
+
+
 def price_items_for_invoice(items, price_list, pos_profile, branch, menu):
     """Resolve course and price for each item and build the invoice item dicts.
 
     Returns a list of dicts in the same shape previously passed directly to
     `invoice.append("items", ...)` inside `sync_order`. Does not append to
     the invoice itself.
+
+    sa-architecture-closure (Gap B): also resolves each item's
+    `department_warehouse` (the same warehouse availability/reservation/
+    fulfilment already agree on) and sets it explicitly on the item dict, so
+    native POS `update_stock` deduction draws from the department's real
+    stock instead of unconditionally defaulting to POS Profile.warehouse
+    (which ERPNext applies automatically when no warehouse is given). Items
+    with no resolvable department (genuinely direct-retail) are left
+    unset, so ERPNext's own POS Profile default still applies for them.
     """
+    company = frappe.db.get_value("Branch", branch, "company")
     priced_items = []
 
     for d in items:
@@ -929,6 +965,7 @@ def price_items_for_invoice(items, price_list, pos_profile, branch, menu):
             frappe.throw(_("No item price found for Item: {0} in Price List: {1}. Please check the price list settings.").format(d.get("item"), price_list))
 
         else:
+            department_warehouse = _department_warehouse_for_item(d.get("item"), branch, company)
             priced_items.append(
                 dict(
                     item_code=d.get("item"),
@@ -936,6 +973,7 @@ def price_items_for_invoice(items, price_list, pos_profile, branch, menu):
                     qty=d.get("qty"),
                     reservation_line_key=d.get("reservation_line_key"),
                     **({"custom_course": course} if course else {}),
+                    **({"warehouse": department_warehouse} if department_warehouse else {}),
                     comment=d.get("comment"),
                     rate = item_prices[0].price_list_rate,
                     price_list_rate = item_prices[0].price_list_rate,
