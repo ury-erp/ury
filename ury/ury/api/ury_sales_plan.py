@@ -57,6 +57,67 @@ def validate_plan_items(doc):
         validate_item_production_configuration(item_code, doc.get("branch"))
 
 
+def validate_no_overlapping_plan_scope(doc):
+    """Reject approval if another Approved/Locked plan already covers the
+    same item+branch+day scope as any row on this plan.
+
+    Decided design (see tracks/sa-architecture-closure/item3-sales-plan-capping-plan.md
+    open question #1): rather than letting `_resolve_plan_remaining` silently
+    sum across multiple matching plans and letting `ury_sales_plan_commit`'s
+    counter-mutation helper pick an ambiguous winner at reservation time, this
+    disallows the overlap outright at the point a plan is approved -- the
+    earliest, clearest place to catch it, and the one place a human is
+    actively making the "this is now governing" decision.
+
+    Scope is per Sales Plan Item row: an overlap on ANY item shared between
+    this plan and an existing Approved/Locked plan for the same branch and
+    `plan_date` blocks the whole approval (company/branch/plan_date are
+    already the parent Sales Plan's own scope, so only `item_code` needs to
+    be compared row-by-row against the other plan's rows).
+    """
+    branch = doc.get("branch")
+    plan_date = doc.get("plan_date")
+    if not branch or not plan_date:
+        return
+
+    item_codes = {row.get("item_code") for row in (doc.get("items") or []) if row.get("item_code")}
+    if not item_codes:
+        return
+
+    other_plan_names = frappe.get_all(
+        "URY Sales Plan",
+        filters={
+            "branch": branch,
+            "plan_date": plan_date,
+            "status": ["in", ["Approved", "Locked for Production"]],
+            "name": ["!=", doc.name or ""],
+        },
+        pluck="name",
+    )
+    if not other_plan_names:
+        return
+
+    conflicts = frappe.get_all(
+        "URY Sales Plan Item",
+        filters={"parent": ["in", other_plan_names], "item_code": ["in", list(item_codes)]},
+        fields=["item_code", "parent"],
+        order_by="parent asc",
+    )
+    if not conflicts:
+        return
+
+    conflict = conflicts[0]
+    conflict_status = frappe.db.get_value("URY Sales Plan", conflict["parent"], "status")
+    frappe.throw(
+        _(
+            "Cannot approve: Item {0} at Branch {1} on {2} is already covered by Sales "
+            "Plan {3} ({4}). Overlapping Approved/Locked-for-Production plans for the "
+            "same item/branch/day are not allowed."
+        ).format(conflict["item_code"], branch, plan_date, conflict["parent"], conflict_status),
+        frappe.ValidationError,
+    )
+
+
 def flag_stale_bom_revisions(doc):
     """Surface (never block on) plan rows computed from a now-outdated BOM.
 
