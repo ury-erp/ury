@@ -26,6 +26,7 @@ export interface TableOrderContextTable {
   name: string;
   branch?: string;
   restaurant_room?: string;
+  is_take_away?: 0 | 1;
   [key: string]: unknown;
 }
 
