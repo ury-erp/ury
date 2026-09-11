@@ -67,19 +67,16 @@ field names and reconcile this function's return shape with whatever
 resolution helper V3-13/V3-15 itself exposes (this function may become a
 thin wrapper over that helper instead of querying the table directly).
 
-## Reconciliation debt: plan_qty/plan_remaining resolution (V3-23 dependency gap)
+## Sales Plan entitlement resolution (`_resolve_plan_remaining`)
 
-Likewise, "approved Sales Plan entitlement" (`URY Sales Plan`, V3-20/V3-23)
-is not in this worktree. `_resolve_plan_remaining` is implemented the same
-defensive way: `frappe.db.table_exists("URY Sales Plan")` guards against a
-missing table, and a best-guess field read (`plan_qty`,
-`committed_qty`/`fulfilled_qty`) returns `None` for plan_qty/plan_remaining
-when no approved/submitted plan row is found, or when the table does not
-exist -- callers treat `plan_qty is None` as `NO_ACTIVE_PLAN` (fail closed).
-
-TODO(V3-23 merge): replace the guessed field list with V3-23's accepted
-frozen-snapshot schema (approved qty, committed/fulfilled qty, revision
-state) once it exists.
+`URY Sales Plan`/`URY Sales Plan Item` now carry real `committed_qty`/
+`fulfilled_qty` columns, transactionally maintained by
+`ury_sales_plan_commit.apply_commit_delta` at reservation create/release/
+fulfil time (see `ury_reservation_service.py`). `_resolve_plan_remaining`
+still guards `frappe.db.table_exists("URY Sales Plan")` (defensive against a
+site where the doctype migration hasn't run) and returns `None` when no
+matching plan/plan-item row is found -- callers treat `plan_qty is None` as
+`NO_ACTIVE_PLAN` (fail closed).
 
 ## Server-authoritative branch/company scope
 
@@ -107,6 +104,7 @@ from ury.ury.api.ury_inventory_projection import (
 	project_component_allocatable,
 	project_fg_allocatable,
 )
+from ury.ury.api.ury_sales_plan_commit import resolve_plan_item_rows
 
 # Imported for its side effect of making `URY Stock Reservation` a real,
 # loaded doctype module in this app (ury_inventory_projection's reservation
@@ -220,11 +218,13 @@ def _resolve_plan_remaining(item_code, branch, company, department=None):
 	`ury_bom_compiler.py`) rather than `frappe.db.get_value`
 	against nonexistent parent columns.
 
-	`committed_qty`/`fulfilled_qty` have no backing column anywhere in the
-	current schema (parent or child) -- V3-23's frozen-snapshot schema is
-	still pending (see module docstring); until it lands, committed/fulfilled
-	is treated as 0, so `plan_remaining == plan_qty`. TODO(V3-23 merge):
-	replace with the real committed/fulfilled tracking once it exists.
+	`committed_qty`/`fulfilled_qty` are real, transactionally-maintained
+	columns on `URY Sales Plan Item` (see `ury_sales_plan_commit.py`'s
+	`apply_commit_delta`, wired into `ury_reservation_service.create_reservation`
+	/ `_transition_group` at reservation create/release/fulfil time) -- this is
+	a plain aggregate `SELECT` over the matched rows, not a locking read, since
+	this function only ever informs a display/pre-flight decision and never
+	itself mutates the counters.
 
 	Returns (when resolved) a dict: {"plan_qty": ..., "plan_remaining": ...}
 	"""
@@ -235,25 +235,7 @@ def _resolve_plan_remaining(item_code, branch, company, department=None):
 	# an active status -- an unfiltered query sums every submitted plan in
 	# the branch/company's entire history, including Superseded/Cancelled
 	# ones, so plan_qty/plan_remaining would inflate without bound.
-	plan_filters = {
-		"branch": branch,
-		"company": company,
-		"status": ["in", ["Approved", "Locked for Production"]],
-		"plan_date": getdate(),
-	}
-	plan_names = frappe.get_all(SALES_PLAN_DOCTYPE, filters=plan_filters, pluck="name")
-	if not plan_names:
-		return None
-
-	item_filters = {"parent": ["in", plan_names], "item_code": item_code}
-	if department:
-		item_filters["department"] = department
-
-	rows = frappe.get_all(
-		"URY Sales Plan Item",
-		filters=item_filters,
-		fields=["qty"],
-	)
+	rows = resolve_plan_item_rows(item_code, branch, company, department=department, plan_date=getdate())
 	if not rows:
 		return None
 
@@ -261,8 +243,8 @@ def _resolve_plan_remaining(item_code, branch, company, department=None):
 	if not plan_qty:
 		return None
 
-	committed = 0
-	fulfilled = 0
+	committed = sum(row.get("committed_qty") or 0 for row in rows)
+	fulfilled = sum(row.get("fulfilled_qty") or 0 for row in rows)
 	plan_remaining = plan_qty - committed - fulfilled
 	return {"plan_qty": plan_qty, "plan_remaining": plan_remaining}
 
