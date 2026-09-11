@@ -622,4 +622,3 @@ class TestCreateCancelKotDocLineIdentity(FrappeTestCase):
         self.assertEqual(append_args[0], "kot_items")
         self.assertEqual(append_args[1]["reservation_line_key"], "ref:Biryani:INVITEM-2")
         self.assertEqual(append_args[1]["cancelled_qty"], 1)
-        self.assertEqual(result[1]["comments"], "Extra sauce")

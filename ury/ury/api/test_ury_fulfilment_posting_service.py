@@ -170,8 +170,30 @@ class TestCreatePostingIntent(FrappeTestCase):
 		# universal default -- native POS `update_stock=1` is already the
 		# sole stock authority. This function must refuse to also create a
 		# Stock Entry for the same item, with a message that explains why,
-		# rather than silently double-posting stock.
-		with patch(f"{MODULE}.is_pos_stock_authority_flag_enabled", return_value=False):
+		# rather than silently double-posting stock. The flag check runs
+		# after authorization/execution-state validation, so this test uses
+		# the same full valid-payload mocking as
+		# test_ready_creates_one_intent_with_frozen_payload to reach it.
+		def get_doc(arg, *args, **kwargs):
+			if arg == "URY KOT Items":
+				return _doc({"item": "PLATE-1", "quantity": 1})
+			raise AssertionError(arg)
+
+		def get_value(doctype, *args, **kwargs):
+			if doctype == "URY KOT":
+				return "POS-INV-1"
+			if doctype == "URY Fulfilment Posting Intent":
+				return None
+			raise AssertionError(doctype)
+
+		with patch(f"{MODULE}.is_pos_stock_authority_flag_enabled", return_value=False), patch(
+			f"{MODULE}.frappe.db.exists", return_value=True
+		), patch(f"{MODULE}.frappe.get_doc", side_effect=get_doc), patch(
+			f"{MODULE}.frappe.db.get_value", side_effect=get_value
+		), patch(f"{MODULE}.frappe.get_all", side_effect=_get_all_for_create()), patch(
+			f"{MODULE}.frappe.session"
+		) as session:
+			session.user = "chef@example.com"
 			with self.assertRaises(FulfilmentPostingError) as ctx:
 				create_or_get_posting_intent_for_ready(_execution_doc(), actor="chef@example.com")
 		self.assertEqual(ctx.exception.reason_code, "POS_STOCK_AUTHORITY_FLAG_OFF")
