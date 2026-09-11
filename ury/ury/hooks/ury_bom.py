@@ -16,11 +16,12 @@ def apply_yield_back_calculation(doc, method):
     For items without yield tracking, qty is left as manually entered by the user.
     """
     for row in doc.items:
-        # Fetch the item document to check if yield tracking is enabled
-        item = frappe.get_doc("Item", row.item_code)
+        # Check if yield tracking is enabled for this item using a cheap single-field lookup.
+        # frappe.get_cached_value is preferred for Item master data (matches codebase pattern).
+        is_yield_tracked = frappe.get_cached_value("Item", row.item_code, "custom_yield_tracked")
 
         # Skip if yield tracking is not enabled for this item
-        if not item.custom_yield_tracked:
+        if not is_yield_tracked:
             continue
 
         # At this point, the item is yield-tracked, so it must have required fields set
@@ -50,11 +51,11 @@ def set_bom_revision(doc):
     the BOM -- including edits with no bearing on yield (description
     tweaks, operations changes, etc.) -- so a Sales Plan row would be
     flagged "stale" on every unrelated BOM save, drowning out the real
-    signal. Hashing (item_code, qty) for every row is only marginally more
+    signal. Hashing (item_code, qty, uom) for every row is only marginally more
     expensive than the back-calculation loop already run above (it reuses
-    `doc.items`, no extra DB reads) and only changes when a component or
-    its quantity actually changes -- including the qty changes driven by
-    `apply_yield_back_calculation` above when an Item's
+    `doc.items`, no extra DB reads) and only changes when a component,
+    its quantity, or its unit of measure actually changes -- including the qty
+    changes driven by `apply_yield_back_calculation` above when an Item's
     `custom_yield_percent` standard changes and this (draft) BOM is
     resaved. That is exactly the staleness signal
     `ury_sales_plan.py::flag_stale_bom_revisions` needs to compare against.
@@ -63,7 +64,7 @@ def set_bom_revision(doc):
     above so the revision always reflects the just-recomputed quantities.
     """
     vector = sorted(
-        (row.item_code, round(row.qty or 0, 6))
+        (row.item_code, round(row.qty or 0, 6), row.uom)
         for row in (doc.items or [])
         if row.item_code
     )
