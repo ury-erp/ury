@@ -18,7 +18,10 @@ merely mirroring it:
 
   - Capacity formula mirrors V3-42's ``get_allocatable_qty``:
     ``allocatable_qty = Bin.projected_qty - active URY reservation qty``,
-    where "active" means status in (Reserved, Fulfilled). This module reads
+    where "active" means status in (Reserved,) only -- see
+    ``ACTIVE_STATUSES``. A Fulfilled reservation has, by definition,
+    already been reflected in `Bin` by the stock posting that fulfilled
+    it, so continuing to subtract it would double-count. This module reads
     `Bin` directly rather than through the stub (which always returns 0), so
     an item's real active reservation qty is honoured even before the
     wiring task lands.
@@ -1053,7 +1056,7 @@ def release_reservation(reservation_name, reason=None):
 
 	"Restoring capacity" is entirely the status transition: this module
 	never mutates Bin, so once a row is no longer in an active status
-	(Reserved/Fulfilled) it simply stops being counted by
+	(`ACTIVE_STATUSES`, i.e. Reserved) it simply stops being counted by
 	`_active_reservation_qty`/`get_available_capacity`.
 	"""
 	result = _transition_group(reservation_name, RESERVED, RELEASED, reason, event="release")
