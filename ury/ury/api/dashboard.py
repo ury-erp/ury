@@ -69,6 +69,10 @@ def get_module_records(doctype, branch=None):
             filters["custom_branch"] = branch
             
     try:
-        return frappe.get_all(doctype, filters=filters, fields=["*"])
+        records = frappe.get_all(doctype, filters=filters, fields=["*"])
+        if doctype == "User":
+            for r in records:
+                r["roles"] = frappe.get_all("Has Role", filters={"parent": r.name}, fields=["role"])
+        return records
     except Exception:
         return []
