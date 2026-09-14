@@ -325,19 +325,21 @@ class TestReleaseOrderReservations(unittest.TestCase):
 
 	def test_releases_every_distinct_active_group_for_the_order(self):
 		rows = [
-			service.frappe._dict({"reservation_group": "GRP-1"}),
-			service.frappe._dict({"reservation_group": "GRP-1"}),
-			service.frappe._dict({"reservation_group": "GRP-2"}),
+			service.frappe._dict({"reservation_group": "GRP-1", "status": service.RESERVED}),
+			service.frappe._dict({"reservation_group": "GRP-1", "status": service.RESERVED}),
+			service.frappe._dict({"reservation_group": "GRP-2", "status": service.RESERVED}),
 		]
 		with patch.object(service.frappe, "get_all", return_value=rows) as get_all, patch.object(
 			service, "release_reservation"
 		) as release_reservation:
 			result = service.release_order_reservations("INV-1", reason="Order cancelled")
 
+		# Every row for the order is fetched, not just the Reserved ones: the
+		# group's FULL status set is what decides whether it may be released.
 		get_all.assert_called_once_with(
 			service.RESERVATION_DOCTYPE,
-			filters={"order_ref": "INV-1", "status": service.RESERVED},
-			fields=["reservation_group"],
+			filters={"order_ref": "INV-1"},
+			fields=["reservation_group", "status"],
 		)
 		self.assertEqual(release_reservation.call_count, 2)
 		release_reservation.assert_any_call("GRP-1", reason="Order cancelled")
@@ -370,7 +372,7 @@ class TestReleaseOrderReservations(unittest.TestCase):
 		every reservation for the order is already out of Reserved status --
 		this is the guard `apply_commit_delta`'s FOR UPDATE mutation relies on
 		to never fire twice for the same release event."""
-		rows = [service.frappe._dict({"reservation_group": "GRP-1"})]
+		rows = [service.frappe._dict({"reservation_group": "GRP-1", "status": service.RESERVED})]
 		with patch.object(service.frappe, "get_all", side_effect=[rows, []]), patch.object(
 			service, "release_reservation"
 		) as release_reservation:
@@ -384,6 +386,39 @@ class TestReleaseOrderReservations(unittest.TestCase):
 		# call) -- passing no reason here still resolves to that default.
 		release_reservation.assert_called_once_with("GRP-1", reason="Order cancelled")
 
+
+	def test_already_fulfilled_group_is_skipped_not_released(self):
+		"""G-09: under POS Stock Authority V2 a made-to-order item's
+		reservation is Fulfilled at production time. Cancelling the order must
+		still complete -- release_reservation would frappe.throw on a group
+		that is no longer Reserved -- and must not hand back capacity for
+		ingredients that were really consumed."""
+		rows = [
+			service.frappe._dict({"reservation_group": "GRP-DONE", "status": service.FULFILLED}),
+			service.frappe._dict({"reservation_group": "GRP-OPEN", "status": service.RESERVED}),
+		]
+		with patch.object(service.frappe, "get_all", return_value=rows), patch.object(
+			service, "release_reservation"
+		) as release_reservation:
+			result = service.release_order_reservations("INV-1")
+
+		self.assertEqual(result, ["GRP-OPEN"])
+		release_reservation.assert_called_once_with("GRP-OPEN", reason="Order cancelled")
+
+	def test_partly_fulfilled_group_is_skipped_rather_than_partially_released(self):
+		"""A group with a mix of statuses is exactly what _transition_group
+		refuses; skip it here so the cancellation as a whole still succeeds."""
+		rows = [
+			service.frappe._dict({"reservation_group": "GRP-MIX", "status": service.RESERVED}),
+			service.frappe._dict({"reservation_group": "GRP-MIX", "status": service.FULFILLED}),
+		]
+		with patch.object(service.frappe, "get_all", return_value=rows), patch.object(
+			service, "release_reservation"
+		) as release_reservation:
+			result = service.release_order_reservations("INV-1")
+
+		self.assertEqual(result, [])
+		release_reservation.assert_not_called()
 
 class TestPlanExhaustedEnforcementMode(unittest.TestCase):
 	"""_check_line_availability()'s Hard/Soft/Alert branching on PLAN_EXHAUSTED."""
