@@ -179,6 +179,12 @@ def _attach_ready_posting_intent(result, actor):
 		enqueue_posting_intent,
 	)
 
+	# Only MADE_TO_ORDER items have a production event to post here; the
+	# service itself decides that, from the policy frozen onto the
+	# reservation at order time, and returns a name-less intent with status
+	# "SKIPPED_NOT_MADE_TO_ORDER" for anything else. Keeping the decision
+	# there rather than duplicating a policy lookup here means it is made
+	# once, from the authoritative frozen value, for every caller.
 	doc = frappe.get_doc(ITEM_EXECUTION_DOCTYPE, result["name"])
 	intent = create_or_get_posting_intent_for_ready(doc, actor=actor)
 	result["posting_intent"] = intent.get("name")
