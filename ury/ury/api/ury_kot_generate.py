@@ -1,7 +1,9 @@
 import json
 
 import frappe
-from ury.ury_pos.api import getBranch
+
+from ury.ury.api.ury_kot_routing import resolve_production_units
+from ury.ury.api.ury_production_context import resolve_production_context
 
 
 # Load JSON data or return as is if it's already a Python dictionary
@@ -72,14 +74,21 @@ def create_kot_doc(
         # etc.) must not collide with it, so callers only pass this for that
         # first-KOT case.
         kot_doc.validation_dedup_key = validation_dedup_key
-    branch = getBranch()
     if restaurant_table:
         room = frappe.db.get_value("URY Table", restaurant_table, "restaurant_room")
         restaurant = frappe.db.get_value("URY Table", restaurant_table, "restaurant")
         menu = frappe.db.get_value("Menu for Room", {"room": room,"parent":restaurant}, "menu")
 
     else:
-        menu = frappe.db.get_value("URY Restaurant", {"branch": branch}, "active_menu")
+        # No-table orders (Takeaway/Delivery/Aggregators/QR-pickup) have no
+        # session-branch-independent context of their own -- the invoice
+        # being ticketed is the only reliable source of branch. Using
+        # getBranch() here derives the menu from the ACTING USER's session
+        # branch instead of the invoice's own branch, which is wrong
+        # whenever those differ (e.g. a billing/back-office user operating
+        # across branches). Same bug class as PR #373 bug #1
+        # (_resolve_or_create_pos_invoice not setting invoice.branch).
+        menu = frappe.db.get_value("URY Restaurant", {"branch": pos_invoice.branch}, "active_menu")
 
     for item in items:
         course = frappe.db.get_value("URY Menu Item", {"item": item["item_code"],"parent":menu}, "course")
@@ -134,82 +143,98 @@ def process_items_for_kot(
 ):
     kot_items = create_order_items(items)
     pos_profile = frappe.get_doc("POS Profile", pos_profile_id)
-    productions = frappe.db.get_all(
-        "URY Production Unit", filters={"branch": pos_profile.branch}, fields=["name"]
-    )
+    pos_invoice = frappe.get_doc("POS Invoice", invoice_id)
 
     created_kot_names = []
 
-    if productions:
-        all_production_item_groups = get_all_production_item_groups(pos_profile.branch)
-        
-        # Iterate through each item and check if item group belongs to a production unit
-        for item in kot_items:
-            item_group = frappe.db.get_value("Item", item["item_code"], "item_group")
-            item_code = item["item_code"]
-            if item_group not in all_production_item_groups:
-                frappe.msgprint(
-                    f"Item group '{item_group}' for item '{item_code}' is not in any production."
-                )
-        for production in productions:
-            productionItemGroupslist = frappe.get_all(
-                "URY Production Item Groups",
-                fields=["item_group"],
-                filters={
-                    "parent": production.name,
-                    "parenttype": "URY Production Unit",
-                },
-                order_by="idx",
-            )
-            productionItemGroups = [
-                item_group.item_group for item_group in productionItemGroupslist
-            ]
-            production_items = [
-                item
-                for item in kot_items
-                if frappe.db.get_value("Item", item["item_code"], "item_group")
-                in productionItemGroups
-            ]
-
-            if production_items:
-                invoice_exist = frappe.db.exists(
-                    "URY KOT",
-                    {
-                        "invoice": invoice_id,
-                        "docstatus": 1,
-                        "production": production.name,
-                    },
-                )
-                # This is the same "no KOT exists yet for this
-                # invoice+production" case the scheduler's create_kot()
-                # fallback guards against with validation_dedup_key -- only
-                # tag the first ("New Order") KOT here, never the
-                # subsequent legitimate ones (Order Modified etc.), so
-                # later KOTs for the same invoice+production are not
-                # rejected by the unique index.
-                validation_dedup_key = None
-                if invoice_exist:
-                    kot_type = "Order Modified"
-                else:
-                    validation_dedup_key = "{0}::{1}".format(invoice_id, production.name)
-
-                kot_name = create_kot_doc(
-                    invoice_id,
-                    customer,
-                    restaurant_table,
-                    production_items,
-                    kot_type,
-                    comments,
-                    pos_profile_id,
-                    kot_naming_series,
-                    production.name,
-                    validation_dedup_key=validation_dedup_key,
-                )
-                created_kot_names.append(kot_name)
-    else:
+    # Verify production units exist for the branch
+    productions = frappe.db.get_all(
+        "URY Production Unit", filters={"branch": pos_profile.branch}, fields=["name"]
+    )
+    if not productions:
         frappe.throw(
             "Create URY Production unit against POS Profile: %s " % pos_profile.name
         )
+
+    # Build a map of production unit -> items for that unit using the unified resolver
+    production_items_map = {}
+    for item in kot_items:
+        item_code = item["item_code"]
+        # Resolve this item's configured production_policy (if any) so
+        # DIRECT_RETAIL items -- which have no production routing
+        # requirement -- are correctly exempted from routing instead of
+        # being silently forced through the legacy item-group fallback.
+        production_config = resolve_production_context(
+            item_code, pos_profile.branch, company=pos_invoice.company
+        )
+        production_policy = production_config.production_policy if production_config else None
+
+        # Resolve production units for this item using the unified routing
+        # logic. A RoutingError here means a controlled item's routing is
+        # missing/ambiguous/disabled -- that must fail the whole KOT batch
+        # closed (not be silently skipped) so a customer is never charged
+        # for an item the kitchen never sees. See sa-post-373-review-fixes
+        # Blocker 2. DIRECT_RETAIL items never raise here (see
+        # resolve_production_units); they simply resolve to no production
+        # unit.
+        resolved_units = resolve_production_units(
+            item_code=item_code,
+            company=pos_invoice.company,
+            branch=pos_profile.branch,
+            production_policy=production_policy,
+        )
+        for production_unit in resolved_units:
+            if production_unit not in production_items_map:
+                production_items_map[production_unit] = []
+            production_items_map[production_unit].append(item)
+
+    # Print warning if any item was not routed (legacy behavior)
+    all_routed_items = set()
+    for items_list in production_items_map.values():
+        for item in items_list:
+            all_routed_items.add(item["item_code"])
+    for item in kot_items:
+        if item["item_code"] not in all_routed_items:
+            item_group = frappe.db.get_value("Item", item["item_code"], "item_group")
+            frappe.msgprint(
+                f"Item group '{item_group}' for item '{item['item_code']}' is not in any production."
+            )
+
+    # Create one KOT per production unit
+    for production_unit, production_items in production_items_map.items():
+        invoice_exist = frappe.db.exists(
+            "URY KOT",
+            {
+                "invoice": invoice_id,
+                "docstatus": 1,
+                "production": production_unit,
+            },
+        )
+        # This is the same "no KOT exists yet for this invoice+production" case
+        # the scheduler's create_kot() fallback guards against with validation_dedup_key --
+        # only tag the first ("New Order") KOT here, never the subsequent legitimate ones
+        # (Order Modified etc.), so later KOTs for the same invoice+production are not
+        # rejected by the unique index.
+        validation_dedup_key = None
+        current_kot_type = kot_type
+        if invoice_exist:
+            current_kot_type = "Order Modified"
+        else:
+            validation_dedup_key = "{0}::{1}".format(invoice_id, production_unit)
+
+        kot_name = create_kot_doc(
+            invoice_id,
+            customer,
+            restaurant_table,
+            production_items,
+            current_kot_type,
+            comments,
+            pos_profile_id,
+            kot_naming_series,
+            production_unit,
+            validation_dedup_key=validation_dedup_key,
+        )
+        created_kot_names.append(kot_name)
 
     return created_kot_names
 
@@ -229,38 +254,47 @@ def process_items_for_cancel_kot(
 
     kot_items = create_order_items(items)
     pos_profile = frappe.get_doc("POS Profile", pos_profile_id)
-    productions = frappe.db.get_all(
-        "URY Production Unit", filters={"branch": pos_profile.branch}, fields=["name"]
-    )
+    pos_invoice = frappe.get_doc("POS Invoice", invoice_id)
 
     created_kot_names = []
 
-    for production in productions:
-        productionDoc = frappe.get_doc("URY Production Unit", production.name)
-        productionItemGroups = [
-            item_group.item_group for item_group in productionDoc.item_groups
-        ]
-        production_items = [
-            item
-            for item in kot_items
-            if frappe.get_doc("Item", item["item_code"]).item_group
-            in productionItemGroups
-        ]
+    # Build a map of production unit -> items for that unit using the unified resolver
+    production_items_map = {}
+    for item in kot_items:
+        item_code = item["item_code"]
+        # See process_items_for_kot() above for why production_policy is
+        # resolved and why a RoutingError is left to propagate.
+        production_config = resolve_production_context(
+            item_code, pos_profile.branch, company=pos_invoice.company
+        )
+        production_policy = production_config.production_policy if production_config else None
 
-        if production_items:
-            kot_name = create_cancel_kot_doc(
-                invoice_id,
-                restaurant_table,
-                production_items,
-                kot_type,
-                customer,
-                comments,
-                pos_profile_id,
-                cancel_kot_naming_series,
-                invoiceItems,
-                production.name,
-            )
-            created_kot_names.append(kot_name)
+        resolved_units = resolve_production_units(
+            item_code=item_code,
+            company=pos_invoice.company,
+            branch=pos_profile.branch,
+            production_policy=production_policy,
+        )
+        for production_unit in resolved_units:
+            if production_unit not in production_items_map:
+                production_items_map[production_unit] = []
+            production_items_map[production_unit].append(item)
+
+    # Create one cancel KOT per production unit
+    for production_unit, production_items in production_items_map.items():
+        kot_name = create_cancel_kot_doc(
+            invoice_id,
+            restaurant_table,
+            production_items,
+            kot_type,
+            customer,
+            comments,
+            pos_profile_id,
+            cancel_kot_naming_series,
+            invoiceItems,
+            production_unit,
+        )
+        created_kot_names.append(kot_name)
 
     return created_kot_names
 
@@ -326,14 +360,20 @@ def create_cancel_kot_doc(
         }
     )
 
-    branch = getBranch()
     if restaurant_table:
         room = frappe.db.get_value("URY Table", restaurant_table, "restaurant_room")
         restaurant = frappe.db.get_value("URY Table", restaurant_table, "restaurant")
         menu = frappe.db.get_value("Menu for Room", {"room": room,"parent":restaurant}, "menu")
-        
+
     else:
-        menu = frappe.db.get_value("URY Restaurant", {"branch": branch}, "active_menu")
+        # No-table cancel KOTs must derive branch from the invoice being
+        # cancelled, not from the acting user's session (getBranch()) --
+        # same bug class as PR #373 bug #1 and the create_kot_doc() fix
+        # above. Using the session branch picks the wrong branch's active
+        # menu (and therefore the wrong course grouping) whenever the
+        # cancelling user's session branch differs from the invoice's own
+        # branch.
+        menu = frappe.db.get_value("URY Restaurant", {"branch": pos_invoice.branch}, "active_menu")
     for cancelItem in cancel_items:
         course = frappe.db.get_value("URY Menu Item", {"item": cancelItem["item_code"],"parent":menu}, "course")
         for item in invoiceItems:

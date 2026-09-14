@@ -4,7 +4,10 @@ This is the minimal authoritative slice for V3 stock posting:
 
 - READY creates one durable ``URY Fulfilment Posting Intent`` per KOT item.
 - The worker claims intents with a row lock and short lease.
-- ERPNext stock movement is represented as a submitted ``Material Issue``.
+- ERPNext stock movement is a submitted Stock Entry: ``Material Issue`` for
+  PRE_PRODUCED/DIRECT_RETAIL (consumes the already-made selling item), or
+  ``Manufacture`` for MADE_TO_ORDER (consumes raw-material components and
+  receives the selling item into the same production department warehouse).
 - Reservation fulfilment happens only after the Stock Entry has submitted.
 - Replays recover from an already-submitted Stock Entry instead of creating
   another one.
@@ -22,6 +25,7 @@ from frappe.utils import add_to_date, flt, now, now_datetime
 
 from ury.ury.api.ury_reservation_service import FULFILLED, RESERVED, fulfil_reservation
 from ury.ury.api.ury_kot_execution_service import READY, SERVED
+from ury.ury.api.ury_bom_compiler import publish_component_stock_fanout
 
 
 INTENT_DOCTYPE = "URY Fulfilment Posting Intent"
@@ -419,11 +423,38 @@ def _payload(intent):
 
 
 def _find_existing_stock_entry(intent_name):
-	rows = frappe.get_all(
-		"Stock Entry",
-		filters={"docstatus": 1, "remarks": ["like", f"%URY Fulfilment Posting Intent: {intent_name}%"]},
-		fields=["name"],
-		limit=1,
+	"""Locking existence check for a Stock Entry already posted for `intent_name`.
+
+	Called from `_submit_stock_entry`, which runs after `_claim_intent` has
+	taken `FOR UPDATE` on the posting intent row. A plain `get_all` here is a
+	different table, so it is not covered by that lock at all -- under
+	MariaDB REPEATABLE READ it is served from this transaction's consistent
+	read view, which can predate a Stock Entry another worker committed for
+	the same intent moments ago. Missing it here means submitting a second
+	Stock Entry for the same intent, i.e. a duplicate stock issue.
+	`FOR UPDATE` forces this SELECT to read (and lock) the latest committed
+	rows instead, on this request's own connection/transaction.
+
+	This queries the indexed `custom_ury_posting_intent` field (an exact
+	match) rather than `remarks LIKE '%...%'`. `remarks` is free text with no
+	fixed format guarantee and a leading-wildcard LIKE can never use a B-tree
+	index, so `FOR UPDATE` on it would lock (scan) every row of `tabStock
+	Entry` -- a table that grows unboundedly -- for the rest of the
+	transaction. `custom_ury_posting_intent` is set alongside `remarks` in
+	`_submit_stock_entry` purely so this lookup can be an indexed equality
+	lookup.
+	"""
+	rows = frappe.db.sql(
+		"""
+		SELECT name
+		FROM `tabStock Entry`
+		WHERE docstatus = 1 AND custom_ury_posting_intent = %(intent_name)s
+		ORDER BY creation DESC
+		LIMIT 1
+		FOR UPDATE
+		""",
+		{"intent_name": intent_name},
+		as_dict=True,
 	)
 	return rows[0].get("name") if rows else None
 
@@ -440,6 +471,27 @@ def _stock_entry_items(payload):
 				"s_warehouse": row["s_warehouse"],
 			}
 		)
+	if payload.get("production_policy") == MADE_TO_ORDER:
+		target_warehouse = (payload.get("components") or [{}])[0].get("s_warehouse")
+		if not target_warehouse or not payload.get("item_code") or flt(payload.get("accepted_qty")) <= 0:
+			raise FulfilmentPostingError("INVALID_STOCK_ROW", _("Frozen stock row is incomplete"))
+		items.append(
+			{
+				"item_code": payload["item_code"],
+				"qty": flt(payload["accepted_qty"]),
+				"t_warehouse": target_warehouse,
+				# ERPNext's Stock Entry.mark_finished_and_scrap_items() only
+				# auto-infers is_finished_item from a linked work_order/bom_no
+				# (see get_finished_item()); this is a hand-built ad-hoc entry
+				# with neither, so without setting the flag explicitly ERPNext
+				# rejects the submit with "There must be atleast 1 Finished
+				# Good in this Stock Entry" even though the t_warehouse row is
+				# present. Found live while verifying
+				# tracks/sa-nontable-production-gap (the mocked unit tests
+				# never exercised real Stock Entry validation).
+				"is_finished_item": 1,
+			}
+		)
 	return items
 
 
@@ -447,14 +499,17 @@ def _submit_stock_entry(intent, payload):
 	existing = intent.get("erpnext_stock_entry") or _find_existing_stock_entry(intent.name)
 	if existing:
 		return existing
+	is_manufacture = payload.get("production_policy") == MADE_TO_ORDER
+	stock_entry_type = "Manufacture" if is_manufacture else "Material Issue"
 	doc = frappe.get_doc(
 		{
 			"doctype": "Stock Entry",
 			"company": payload["company"],
-			"stock_entry_type": "Material Issue",
-			"purpose": "Material Issue",
+			"stock_entry_type": stock_entry_type,
+			"purpose": stock_entry_type,
 			"items": _stock_entry_items(payload),
 			"remarks": "URY Fulfilment Posting Intent: {0}".format(intent.name),
+			"custom_ury_posting_intent": intent.name,
 		}
 	)
 	with _service_mutation():
@@ -464,10 +519,25 @@ def _submit_stock_entry(intent, payload):
 
 
 def _reservation_is_fulfilled(reservation_group):
-	rows = frappe.get_all(
-		RESERVATION_DOCTYPE,
-		filters={"reservation_group": reservation_group},
-		fields=["status"],
+	"""Locking check for whether every row in `reservation_group` is already
+	FULFILLED, used to decide whether `fulfil_reservation` still needs to run.
+
+	Runs after `_claim_intent` locked the posting intent row, but this reads
+	a different table (`URY Stock Reservation`) that lock does not cover. A
+	plain `get_all` can be served from this transaction's pinned consistent
+	read view and miss a concurrent worker's already-committed fulfilment,
+	risking a duplicate `fulfil_reservation` call. `FOR UPDATE` forces a read
+	of (and lock on) the latest committed rows on this same connection.
+	"""
+	rows = frappe.db.sql(
+		f"""
+		SELECT status
+		FROM `tab{RESERVATION_DOCTYPE}`
+		WHERE reservation_group = %(reservation_group)s
+		FOR UPDATE
+		""",
+		{"reservation_group": reservation_group},
+		as_dict=True,
 	)
 	return bool(rows) and all(row.get("status") == FULFILLED for row in rows)
 
@@ -477,12 +547,36 @@ def _fulfil_reservation_once(reservation_group):
 		fulfil_reservation(reservation_group)
 
 
-def _create_or_update_fulfilment(intent, payload, stock_entry):
-	existing = intent.get("fulfilment_record") or frappe.db.get_value(
-		FULFILMENT_DOCTYPE,
-		{"kot": payload["kot"], "item_code": payload["item_code"], "batch_key": payload["idempotency_key"]},
-		"name",
+def _find_existing_fulfilment(payload):
+	"""Locking existence check for an already-created URY Fulfilment Record,
+	for the same reason as `_find_existing_stock_entry`: this table is not
+	covered by `_claim_intent`'s lock on the posting intent row, so a plain
+	`get_value` here can be served from this transaction's pinned consistent
+	read view and miss a concurrent worker's already-committed record,
+	risking a duplicate fulfilment record instead of updating the existing
+	one.
+	"""
+	rows = frappe.db.sql(
+		f"""
+		SELECT name
+		FROM `tab{FULFILMENT_DOCTYPE}`
+		WHERE kot = %(kot)s AND item_code = %(item_code)s AND batch_key = %(batch_key)s
+		ORDER BY creation DESC
+		LIMIT 1
+		FOR UPDATE
+		""",
+		{
+			"kot": payload["kot"],
+			"item_code": payload["item_code"],
+			"batch_key": payload["idempotency_key"],
+		},
+		as_dict=True,
 	)
+	return rows[0]["name"] if rows else None
+
+
+def _create_or_update_fulfilment(intent, payload, stock_entry):
+	existing = intent.get("fulfilment_record") or _find_existing_fulfilment(payload)
 	if existing:
 		doc = frappe.get_doc(FULFILMENT_DOCTYPE, existing)
 	else:
@@ -548,6 +642,34 @@ def process_posting_intent(intent_name):
 				intent.save(ignore_permissions=False)
 		with _service_mutation():
 			_fulfil_reservation_once(payload["reservation_group"])
+
+		# Emit realtime events (cheap component-level + rich fan-out) for each
+		# distinct component_item in the stock entry.
+		# Wrap in try/except so a socketio failure never breaks the posting transaction.
+		seen = set()
+		for component in payload.get("components") or []:
+			component_item = component.get("item_code")
+			warehouse = component.get("s_warehouse")
+			if not component_item or not warehouse:
+				continue
+			key = (component_item, warehouse)
+			if key not in seen:
+				try:
+					publish_component_stock_fanout(
+						component_item,
+						warehouse,
+						payload.get("company"),
+						payload.get("branch"),
+						department=payload.get("department"),
+						logger_name="ury_fulfilment_posting_service",
+					)
+				except Exception:
+					# Failure to publish is best-effort, fire-and-forget.
+					frappe.logger("ury_fulfilment_posting_service").exception(
+						"Failed to publish realtime fan-out for component {0}".format(component_item)
+					)
+				seen.add(key)
+
 		fulfilment = _create_or_update_fulfilment(intent, payload, stock_entry)
 		intent.fulfilment_record = fulfilment
 		intent.erpnext_stock_entry = stock_entry

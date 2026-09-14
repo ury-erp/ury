@@ -34,9 +34,11 @@ from frappe.utils import add_to_date, now_datetime
 from ury.ury_pos.api import resolve_restaurant_menu
 from ury.ury.doctype.ury_order.ury_order import (
     _resolve_or_create_pos_invoice,
+    _ensure_invoice_reservation_ref,
     price_items_for_invoice,
 )
 from ury.ury.api.ury_kot_generate import kot_execute
+from ury.ury.api.ury_order_reservation_service import reconcile_order_reservations
 
 SESSION_TOKEN_BYTES_HASH_LEN = 64  # frappe.generate_hash(length=..)
 MAX_ITEMS_PER_REQUEST = 50
@@ -296,6 +298,11 @@ def _ordering_context_response(raw_session_token, source, profile, table, layout
         "session": raw_session_token,
         "source": source,
         "restaurant": profile.restaurant,
+        # Company for the V3-44 availability display check (get_item_availability
+        # requires branch+company; see self-order's lib/availability.ts). Derived
+        # from profile.branch the same way _resolve_or_create_pos_invoice() already
+        # does (see this file's invoice.company fallback), never guessed client-side.
+        "company": frappe.db.get_value("Branch", profile.branch, "company"),
         "table": table,
         # "Mobile" for QR sessions (no device involved); otherwise the
         # provisioned URY Ordering Device's configured layout (Tablet /
@@ -674,6 +681,29 @@ def add_customer_items(session, items):
             {"item_code": code, "item_name": past_name_by_item[code], "qty": past_qty_by_item[code], "comments": ""}
             for code in past_qty_by_item
         ]
+
+        # Mirror sync_order()'s reservation gate (ury_order.py ~L1644) so a
+        # self-order cannot silently save/KOT an item whose production
+        # config is PLAN_EXHAUSTED / FG_OUT_OF_STOCK / NOT_PRODUCED /
+        # DEPARTMENT_DISABLED. `clean_items` already carries the same
+        # {"item": ..., "qty": ...} shape sync_order() passes as
+        # accepted_items, and `past_item` the same {"item_code": ...}
+        # shape it passes as previous_items, so this call reuses the exact
+        # same reconciliation/pre-flight path staff POS orders go through.
+        # reconcile_order_reservations() raises a clean frappe.throw(...,
+        # frappe.ValidationError) naming the item and reason on rejection
+        # (see _check_line_availability / the rejections block in
+        # ury_order_reservation_service.py) -- no raw traceback reaches the
+        # customer, consistent with this module's other ValidationError
+        # throws.
+        reconcile_order_reservations(
+            order_ref=_ensure_invoice_reservation_ref(invoice),
+            previous_items=past_item,
+            accepted_items=clean_items,
+            branch=invoice.branch,
+            company=invoice.company or frappe.db.get_value("Branch", invoice.branch, "company"),
+            actor=frappe.session.user,
+        )
 
         menu = frappe.db.get_value("URY Menu", {"branch": invoice.branch}, "name")
         priced_items = price_items_for_invoice(

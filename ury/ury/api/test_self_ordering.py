@@ -134,8 +134,9 @@ class TestAddCustomerItemsAppendOnly(unittest.TestCase):
     @patch(f"{MOD}.frappe.db.set_value")
     @patch(f"{MOD}.frappe.db.get_value")
     @patch(f"{MOD}.frappe.set_user")
+    @patch(f"{MOD}.reconcile_order_reservations")
     def test_add_customer_items_appends_without_clearing_existing(
-        self, mock_set_user, mock_db_get_value, mock_db_set_value, mock_db_exists, mock_resolve_session, mock_get_doc,
+        self, mock_reconcile, mock_set_user, mock_db_get_value, mock_db_set_value, mock_db_exists, mock_resolve_session, mock_get_doc,
         mock_resolve_menu, mock_resolve_invoice, mock_price_items, mock_kot,
     ):
         mock_db_exists.return_value = True  # Administrator already mapped to the branch
@@ -228,8 +229,9 @@ class TestAddCustomerItemsAppendOnly(unittest.TestCase):
     @patch(f"{MOD}.frappe.db.set_value")
     @patch(f"{MOD}.frappe.db.get_value")
     @patch(f"{MOD}.frappe.set_user")
+    @patch(f"{MOD}.reconcile_order_reservations")
     def test_add_customer_items_sets_restaurant_table_on_new_invoice(
-        self, mock_set_user, mock_db_get_value, mock_db_set_value, mock_db_exists, mock_resolve_session, mock_get_doc,
+        self, mock_reconcile, mock_set_user, mock_db_get_value, mock_db_set_value, mock_db_exists, mock_resolve_session, mock_get_doc,
         mock_resolve_menu, mock_resolve_invoice, mock_price_items, mock_kot,
     ):
         """_resolve_or_create_pos_invoice() never sets restaurant_table on a
@@ -296,8 +298,9 @@ class TestAddCustomerItemsAppendOnly(unittest.TestCase):
     @patch(f"{MOD}.frappe.db.set_value")
     @patch(f"{MOD}.frappe.db.get_value")
     @patch(f"{MOD}.frappe.set_user")
+    @patch(f"{MOD}.reconcile_order_reservations")
     def test_add_customer_items_aggregates_past_item_for_repeated_item_code(
-        self, mock_set_user, mock_db_get_value, mock_db_set_value, mock_db_exists, mock_resolve_session, mock_get_doc,
+        self, mock_reconcile, mock_set_user, mock_db_get_value, mock_db_set_value, mock_db_exists, mock_resolve_session, mock_get_doc,
         mock_resolve_menu, mock_resolve_invoice, mock_price_items, mock_kot,
     ):
         """Live-testing finding: add_customer_items() always appends a NEW
@@ -377,6 +380,164 @@ class TestAddCustomerItemsAppendOnly(unittest.TestCase):
         self.assertEqual(previous_by_item, {"Biryani": 2})
         # Exactly one entry per item_code on each side -- not two Biryani rows.
         self.assertEqual(len(previous_items_arg), 1)
+
+    @patch(f"{MOD}.kot_execute")
+    @patch(f"{MOD}.price_items_for_invoice")
+    @patch(f"{MOD}._resolve_or_create_pos_invoice")
+    @patch(f"{MOD}.resolve_restaurant_menu")
+    @patch(f"{MOD}.frappe.get_doc")
+    @patch(f"{MOD}._resolve_session")
+    @patch(f"{MOD}.frappe.db.exists")
+    @patch(f"{MOD}.frappe.db.set_value")
+    @patch(f"{MOD}.frappe.db.get_value")
+    @patch(f"{MOD}.frappe.set_user")
+    @patch(f"{MOD}.reconcile_order_reservations")
+    def test_add_customer_items_calls_reservation_gate_for_available_item(
+        self, mock_reconcile, mock_set_user, mock_db_get_value, mock_db_set_value, mock_db_exists, mock_resolve_session, mock_get_doc,
+        mock_resolve_menu, mock_resolve_invoice, mock_price_items, mock_kot,
+    ):
+        """The critical gap this covers: add_customer_items() must route
+        through the SAME reconcile_order_reservations() gate sync_order()
+        uses (ury_order.py ~L1644), so a self-order can never silently
+        bypass the PLAN_EXHAUSTED / FG_OUT_OF_STOCK / NOT_PRODUCED /
+        DEPARTMENT_DISABLED availability checks main POS/Captain POS now
+        enforce. When the item is available (no rejection raised), the add
+        proceeds unchanged: invoice is saved and KOT is generated."""
+        mock_db_exists.return_value = True
+        session = self._session_doc(invoice="POS-INV-100")
+        mock_resolve_session.return_value = session
+
+        profile = MagicMock()
+        profile.enabled = 1
+        profile.allow_add_to_running_table = 1
+        profile.branch = "Branch A"
+        profile.pos_profile = "POS Profile A"
+        profile.default_customer = "Walk-in Customer"
+
+        pos_profile_doc = MagicMock()
+        pos_profile_doc.payments = [MagicMock(mode_of_payment="Cash")]
+
+        def get_doc_side_effect(doctype, name=None):
+            if doctype == "URY Self Ordering Profile":
+                return profile
+            if doctype == "POS Profile":
+                return pos_profile_doc
+            return MagicMock()
+
+        mock_get_doc.side_effect = get_doc_side_effect
+        mock_resolve_menu.return_value = {"items": [{"item": "Biryani"}]}
+
+        invoice = MagicMock()
+        invoice.customer = "Walk-in Customer"
+        invoice.items = []
+        invoice.invoice_created = 1
+        invoice.invoice_printed = 0
+        invoice.restaurant_table = "Table 7"
+        invoice.branch = "Branch A"
+        invoice.company = "Test Company"
+        invoice.selling_price_list = "Standard Selling"
+        invoice.grand_total = 100
+        invoice.name = "POS-INV-100"
+        invoice.append.side_effect = lambda fieldname, row_dict: invoice.items.append(
+            MagicMock(item_code=row_dict.get("item_code"), item_name=row_dict.get("item_name"), qty=row_dict.get("qty"))
+        ) if fieldname == "items" else None
+        mock_resolve_invoice.return_value = (invoice, "POS-INV-100")
+
+        priced_biryani = {"item_code": "Biryani", "item_name": "Biryani", "qty": 1, "comment": "",
+                           "rate": 100, "price_list_rate": 100, "base_price_list_rate": 100, "cost_center": "CC"}
+        mock_price_items.return_value = [priced_biryani]
+        mock_db_get_value.return_value = "Menu A"
+        mock_reconcile.return_value = None  # available -- no rejection
+
+        add_customer_items("session-token", [{"item": "Biryani", "qty": 1}])
+
+        # The gate was invoked before the invoice was mutated/saved, with
+        # the same shapes sync_order() passes: accepted_items in
+        # {"item": ..., "qty": ...} form, previous_items in
+        # {"item_code": ..., "qty": ...} form.
+        mock_reconcile.assert_called_once()
+        _, kwargs = mock_reconcile.call_args
+        self.assertEqual(kwargs["order_ref"], "POS-INV-100")
+        self.assertEqual(kwargs["accepted_items"], [{"item": "Biryani", "item_name": "Biryani", "qty": 1.0, "comment": ""}])
+        self.assertEqual(kwargs["previous_items"], [])
+        self.assertEqual(kwargs["branch"], "Branch A")
+        self.assertEqual(kwargs["company"], "Test Company")
+
+        invoice.save.assert_called_once_with(ignore_permissions=True)
+        mock_kot.assert_called_once()
+
+    @patch(f"{MOD}.kot_execute")
+    @patch(f"{MOD}.price_items_for_invoice")
+    @patch(f"{MOD}._resolve_or_create_pos_invoice")
+    @patch(f"{MOD}.resolve_restaurant_menu")
+    @patch(f"{MOD}.frappe.get_doc")
+    @patch(f"{MOD}._resolve_session")
+    @patch(f"{MOD}.frappe.db.exists")
+    @patch(f"{MOD}.frappe.db.set_value")
+    @patch(f"{MOD}.frappe.db.get_value")
+    @patch(f"{MOD}.frappe.set_user")
+    @patch(f"{MOD}.reconcile_order_reservations")
+    def test_add_customer_items_rejects_unavailable_item_before_save_and_kot(
+        self, mock_reconcile, mock_set_user, mock_db_get_value, mock_db_set_value, mock_db_exists, mock_resolve_session, mock_get_doc,
+        mock_resolve_menu, mock_resolve_invoice, mock_price_items, mock_kot,
+    ):
+        """An item that is on the menu (menu resolution doesn't know about
+        production/stock state) but unavailable per the reservation gate
+        (PLAN_EXHAUSTED/FG_OUT_OF_STOCK/etc.) must be rejected with a clean
+        customer-facing ValidationError, and the invoice must never be
+        saved nor a KOT generated -- mirroring the pre-flight-before-any-
+        mutation guarantee reconcile_order_reservations() already provides
+        for sync_order()."""
+        mock_db_exists.return_value = True
+        session = self._session_doc(invoice="POS-INV-100")
+        mock_resolve_session.return_value = session
+
+        profile = MagicMock()
+        profile.enabled = 1
+        profile.allow_add_to_running_table = 1
+        profile.branch = "Branch A"
+        profile.pos_profile = "POS Profile A"
+        profile.default_customer = "Walk-in Customer"
+
+        pos_profile_doc = MagicMock()
+        pos_profile_doc.payments = [MagicMock(mode_of_payment="Cash")]
+
+        def get_doc_side_effect(doctype, name=None):
+            if doctype == "URY Self Ordering Profile":
+                return profile
+            if doctype == "POS Profile":
+                return pos_profile_doc
+            return MagicMock()
+
+        mock_get_doc.side_effect = get_doc_side_effect
+        mock_resolve_menu.return_value = {"items": [{"item": "Biryani"}]}
+
+        invoice = MagicMock()
+        invoice.customer = "Walk-in Customer"
+        invoice.items = []
+        invoice.invoice_created = 1
+        invoice.invoice_printed = 0
+        invoice.restaurant_table = "Table 7"
+        invoice.branch = "Branch A"
+        invoice.company = "Test Company"
+        invoice.selling_price_list = "Standard Selling"
+        invoice.grand_total = 100
+        invoice.name = "POS-INV-100"
+        mock_resolve_invoice.return_value = (invoice, "POS-INV-100")
+        mock_db_get_value.return_value = "Menu A"
+
+        mock_reconcile.side_effect = frappe.ValidationError(
+            "Biryani is not available for order (reason: PLAN_EXHAUSTED). Please refresh the menu."
+        )
+
+        with self.assertRaises(frappe.ValidationError):
+            add_customer_items("session-token", [{"item": "Biryani", "qty": 1}])
+
+        mock_reconcile.assert_called_once()
+        price_items_for_invoice_called = mock_price_items.called
+        self.assertFalse(price_items_for_invoice_called, "price_items_for_invoice() must not run once the gate rejects the line")
+        invoice.save.assert_not_called()
+        mock_kot.assert_not_called()
 
     @patch(f"{MOD}._resolve_session")
     def test_add_customer_items_rejects_item_not_on_menu(self, mock_resolve_session):
@@ -929,8 +1090,9 @@ class TestQRPickup(unittest.TestCase):
     @patch(f"{MOD}.frappe.db.set_value")
     @patch(f"{MOD}.frappe.db.get_value")
     @patch(f"{MOD}.frappe.set_user")
+    @patch(f"{MOD}.reconcile_order_reservations")
     def test_add_customer_items_works_without_table_for_pickup(
-        self, mock_set_user, mock_db_get_value, mock_db_set_value, mock_db_exists, mock_resolve_session, mock_get_doc,
+        self, mock_reconcile, mock_set_user, mock_db_get_value, mock_db_set_value, mock_db_exists, mock_resolve_session, mock_get_doc,
         mock_resolve_menu, mock_resolve_invoice, mock_price_items, mock_kot,
     ):
         mock_db_exists.return_value = True
