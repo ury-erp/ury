@@ -924,10 +924,10 @@ def getAggregatorMOP(aggregator):
     )
     return modeOfPaymentsList
 @frappe.whitelist()
-def create_customer(customer_name, mobile_number=None, customer_group="Individual", territory="India"):
+def create_customer(customer_name, mobile_number=None, customer_group="Individual", territory=None):
     if not frappe.has_permission("Customer", "create"):
         frappe.throw("Not permitted to create customers", frappe.PermissionError)
-        
+
     if not customer_name:
         frappe.throw("Customer name is required")
     if not mobile_number:
@@ -939,6 +939,8 @@ def create_customer(customer_name, mobile_number=None, customer_group="Individua
 
     """Create a new customer"""
     try:
+        if not territory:
+            territory = frappe.get_single("Selling Settings").territory
         customer = frappe.get_doc({
             "doctype": "Customer",
             "customer_name": customer_name,
