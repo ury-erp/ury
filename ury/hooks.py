@@ -216,7 +216,14 @@ doc_events = {
     "Sales Invoice": {
         "before_insert": "ury.ury.hooks.ury_sales_invoice.before_insert",
         "on_update":"ury.ury.hooks.ury_sales_invoice.on_update",
-        "on_submit": "ury.ury.hooks.ury_sales_invoice.round_off_journal_entry",
+        "on_submit": [
+            "ury.ury.hooks.ury_sales_invoice.round_off_journal_entry",
+            # Close out URY stock reservations at the consolidated Sales
+            # Invoice submit -- the single point at which a POS session's
+            # sale-side stock actually leaves Bin. Guarded internally on
+            # is_consolidated; a no-op for ordinary (non-POS) Sales Invoices.
+            "ury.ury.hooks.ury_sales_invoice.fulfil_reservations_on_consolidation",
+        ],
         "on_cancel": "ury.ury.hooks.ury_sales_invoice.journal_entry_cancel",
         },
     "Item": {"validate": "ury.ury.hooks.ury_item.validate"},
@@ -258,6 +265,13 @@ scheduler_events = {
 		],
 		"*/5 * * * *":[
 			"ury.ury.services.food_cost_alerts.notify_high_food_cost"
+		],
+		# Backstop only. Reservations are normally closed out at the
+		# consolidated Sales Invoice submit (sale) or on cancellation; this
+		# sweeps rows that reached neither, so capacity is not leaked
+		# forever. Hourly is ample for a job whose TTL is measured in a day.
+		"0 * * * *":[
+			"ury.ury.api.ury_reservation_service.expire_stale_reservations_scheduled"
 		]
 	},
 	"daily": [

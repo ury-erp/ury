@@ -23,7 +23,7 @@ import frappe
 from frappe import _
 from frappe.utils import add_to_date, flt, now, now_datetime
 
-from ury.ury.api.ury_reservation_service import FULFILLED, RESERVED, fulfil_reservation
+from ury.ury.api.ury_reservation_service import RESERVED, fulfil_reservation_if_pending
 from ury.ury.api.ury_kot_execution_service import READY, SERVED
 from ury.ury.api.ury_bom_compiler import publish_component_stock_fanout
 from ury.ury.api.ury_feature_flags import is_pos_stock_authority_flag_enabled
@@ -546,33 +546,19 @@ def _submit_stock_entry(intent, payload):
 	return doc.name
 
 
-def _reservation_is_fulfilled(reservation_group):
-	"""Locking check for whether every row in `reservation_group` is already
-	FULFILLED, used to decide whether `fulfil_reservation` still needs to run.
-
-	Runs after `_claim_intent` locked the posting intent row, but this reads
-	a different table (`URY Stock Reservation`) that lock does not cover. A
-	plain `get_all` can be served from this transaction's pinned consistent
-	read view and miss a concurrent worker's already-committed fulfilment,
-	risking a duplicate `fulfil_reservation` call. `FOR UPDATE` forces a read
-	of (and lock on) the latest committed rows on this same connection.
-	"""
-	rows = frappe.db.sql(
-		f"""
-		SELECT status
-		FROM `tab{RESERVATION_DOCTYPE}`
-		WHERE reservation_group = %(reservation_group)s
-		FOR UPDATE
-		""",
-		{"reservation_group": reservation_group},
-		as_dict=True,
-	)
-	return bool(rows) and all(row.get("status") == FULFILLED for row in rows)
-
-
 def _fulfil_reservation_once(reservation_group):
-	if not _reservation_is_fulfilled(reservation_group):
-		fulfil_reservation(reservation_group)
+	"""Fulfil this posting's reservation group, tolerating an already-Fulfilled
+	one.
+
+	Delegates to the shared `fulfil_reservation_if_pending` guard rather than
+	doing its own check-then-call: the consolidated Sales Invoice handler
+	(`ury.ury.hooks.ury_sales_invoice.fulfil_reservations_on_consolidation`)
+	fulfils the same groups at closing for every sale in both tiers, so the
+	two can race on one group and BOTH must be no-ops on an already-Fulfilled
+	group. Keeping one implementation of that rule means they cannot drift
+	apart.
+	"""
+	return fulfil_reservation_if_pending(reservation_group)
 
 
 def _find_existing_fulfilment(payload):

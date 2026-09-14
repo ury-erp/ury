@@ -199,3 +199,102 @@ def journal_entry_cancel(doc, method=None):
         )
 
 
+def fulfil_reservations_on_consolidation(doc, method=None):
+    """Close out URY stock reservations at the consolidated Sales Invoice submit.
+
+    This is the sale-side reservation close-out, and it is deliberately
+    attached to the NATIVE closing-time deduction event rather than to the
+    URY fulfilment posting service, because that is the moment `Bin`
+    actually drops:
+
+        POS Closing Entry.on_submit
+          -> consolidate_pos_invoices()
+            -> POS Invoice Merge Log.on_submit
+              -> consolidated Sales Invoice (is_consolidated=1,
+                 update_stock=1) .submit()
+                -> update_stock_ledger() writes the SLEs      <== here
+
+    A POS Invoice submit writes no stock ledger entry at all (`POS Invoice`
+    has no `update_stock` field); the whole session's sale-side deduction
+    happens once, at closing, on this document. Before this handler existed,
+    nothing ever transitioned a sold order's `URY Stock Reservation` rows out
+    of `Reserved`: `fulfil_reservation` was only reachable from the
+    fulfilment posting service (which only runs when POS Stock Authority V2
+    is enabled) and `release_order_reservations` only from cancellation. So
+    every successful sale left its reservations Reserved forever while `Bin`
+    was separately reduced here, and since
+    `get_available_capacity() = Bin.projected_qty - active reservations`,
+    availability was double-debited and drifted monotonically toward zero.
+
+    Because it hangs off the consolidated Sales Invoice, this runs for every
+    sale in every configuration, with or without the feature flag.
+
+    Not a credit note: a consolidated credit note (`is_return=1`) returns
+    finished goods to the warehouse. Reversing the production side of a
+    return is an explicit, still-undecided disposition question (see the
+    Phase 3 / I-9 follow-up in
+    tracks/sa-testing-issues-14sep/ARCHITECTURE_POS_STOCK_AUTHORITY.md), so
+    this handler deliberately does nothing for returns rather than guessing.
+
+    Never raises: a submitted, ledger-posting Sales Invoice must not be
+    rolled back because a reservation row is in an unexpected state. Failures
+    are logged; `expire_stale_reservations` (registered in `scheduler_events`)
+    is the backstop that keeps a missed close-out from leaking capacity
+    forever.
+    """
+    if not doc.get("is_consolidated"):
+        return
+    if doc.get("is_return"):
+        return
+
+    try:
+        _fulfil_reservations_for_consolidated_invoice(doc)
+    except Exception:
+        frappe.log_error(
+            frappe.get_traceback(),
+            "URY reservation close-out failed for {0}".format(doc.name),
+        )
+
+
+def _fulfil_reservations_for_consolidated_invoice(doc):
+    from ury.ury.api.ury_reservation_service import (
+        RESERVED,
+        fulfil_reservation_if_pending,
+    )
+
+    # `merge_pos_invoice_into` carries the source POS Invoice onto every
+    # consolidated row as `pos_invoice` (with `pos_invoice_item` for the
+    # child row). Reservations are keyed on `order_ref` == the POS Invoice
+    # name (see `ury_order._ensure_invoice_reservation_ref`), so the POS
+    # Invoice is exactly the join key. Deduplicate: one consolidated invoice
+    # merges many POS Invoices, each with many rows, but reservations are
+    # resolved per order, not per row.
+    order_refs = list(
+        dict.fromkeys(
+            row.get("pos_invoice") for row in (doc.get("items") or []) if row.get("pos_invoice")
+        )
+    )
+    if not order_refs:
+        return
+
+    rows = frappe.get_all(
+        "URY Stock Reservation",
+        filters={"order_ref": ["in", order_refs], "status": RESERVED},
+        fields=["reservation_group"],
+    )
+    groups = list(
+        dict.fromkeys(row.reservation_group for row in rows if row.reservation_group)
+    )
+
+    for group in groups:
+        # Idempotent and non-raising per group: under POS Stock Authority V2
+        # the fulfilment posting service already fulfilled MADE_TO_ORDER
+        # groups at production time, so finding a group already Fulfilled
+        # (or mid-transition) is expected, not an error.
+        try:
+            fulfil_reservation_if_pending(group)
+        except Exception:
+            frappe.log_error(
+                frappe.get_traceback(),
+                "URY reservation close-out failed for group {0}".format(group),
+            )
