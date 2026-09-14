@@ -1,4 +1,4 @@
-import type { Table } from './table-api';
+import type { Table, TableReservation } from './table-api';
 
 export function parseMergedWith(mergedWith: string | null | undefined): string[] {
   if (!mergedWith) return [];
@@ -120,3 +120,50 @@ export function getTableRenderGroups(tables: Table[]): Table[][] {
 export function sortTablesByMergeGroups(tables: Table[]): Table[] {
   return getTableRenderGroups(tables).flat();
 }
+
+export function formatReservationTime(reservedAt?: string | null): string {
+  if (!reservedAt) return '';
+  try {
+    const d = new Date(reservedAt.replace(' ', 'T'));
+    if (!isNaN(d.getTime())) {
+      const timeStr = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
+      const today = new Date();
+      const isToday =
+        d.getFullYear() === today.getFullYear() &&
+        d.getMonth() === today.getMonth() &&
+        d.getDate() === today.getDate();
+      if (isToday) {
+        return timeStr;
+      }
+      return `${d.toLocaleDateString([], { month: 'short', day: 'numeric' })} at ${timeStr}`;
+    }
+    return reservedAt;
+  } catch {
+    return reservedAt;
+  }
+}
+
+export function isReservationLockWindowActive(
+  res: TableReservation | null | undefined,
+  defaultBufferMinutes = 0
+): boolean {
+  if (!res || res.status !== 'Confirmed') return false;
+
+  const buf = res.buffer_minutes ?? defaultBufferMinutes;
+
+  if (res.reserved_at) {
+    try {
+      const resDate = new Date(res.reserved_at.replace(' ', 'T'));
+      if (!isNaN(resDate.getTime())) {
+        const now = new Date();
+        const lockStart = new Date(resDate.getTime() - buf * 60 * 1000);
+        return now >= lockStart;
+      }
+    } catch (_e) {
+      // Ignore date parsing error
+    }
+  }
+
+  return Boolean(res.is_lock_window_active);
+}
+

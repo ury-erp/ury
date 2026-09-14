@@ -176,7 +176,7 @@ export function getOrdersTabForInvoice(
     if (options?.viewAllStatus === 1) return 'Paid';
     return 'Recently Paid';
   }
-  if (inv.invoice_printed === 0 && inv.restaurant_table) return 'Unbilled';
+  if (inv.invoice_printed === 1) return 'Unbilled';
   return 'Draft';
 }
 
@@ -294,15 +294,15 @@ export function getCombinedOrderTotals(
   };
 }
 
-export function isMergedBill(order: Pick<POSInvoice, 'custom_merged_pos_invoice'>) {
-  return !!order.custom_merged_pos_invoice;
+export function isMergedBill(order?: Pick<POSInvoice, 'custom_merged_pos_invoice'> | null) {
+  return !!order?.custom_merged_pos_invoice;
 }
 
 export function resolvePrintFormat(
-  order: Pick<POSInvoice, 'custom_merged_pos_invoice'>,
+  order: Pick<POSInvoice, 'custom_merged_pos_invoice'> | null | undefined,
   defaultFormat: string | null | undefined
 ) {
-  if (order.custom_merged_pos_invoice) {
+  if (order?.custom_merged_pos_invoice) {
     return MERGED_POS_INVOICE_PRINT_FORMAT;
   }
   return defaultFormat as string;
