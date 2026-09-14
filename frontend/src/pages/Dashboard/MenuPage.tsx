@@ -69,6 +69,8 @@ export const MenuPage: React.FC = () => {
     new_course_name: '',
     is_adding_new_course: false,
     target_menu: '',
+    special_dish: false,
+    disabled: false,
   });
 
   // Add new menu form state
@@ -198,6 +200,8 @@ export const MenuPage: React.FC = () => {
       new_course_name: '',
       is_adding_new_course: false,
       target_menu: selectedMenu === 'all' ? (menus[0]?.name || '') : selectedMenu,
+      special_dish: false,
+      disabled: false,
     });
     setDrawerMode('add-item');
   };
@@ -224,6 +228,8 @@ export const MenuPage: React.FC = () => {
       new_course_name: '',
       is_adding_new_course: false,
       target_menu: selectedMenu === 'all' ? (menus[0]?.name || '') : selectedMenu,
+      special_dish: !!item.special_dish,
+      disabled: !!item.disabled,
     });
     setDrawerMode('edit-item');
   };
@@ -413,6 +419,8 @@ export const MenuPage: React.FC = () => {
         menuDoc.items[rowIndex].rate = parseFloat(newItem.rate);
         menuDoc.items[rowIndex].course = resolvedCourse;
         menuDoc.items[rowIndex].image = sanitizedImage || undefined;
+        menuDoc.items[rowIndex].special_dish = newItem.special_dish ? 1 : 0;
+        menuDoc.items[rowIndex].disabled = newItem.disabled ? 1 : 0;
         await call('frappe.client.save', { doc: menuDoc });
 
         if (editingItem.item) {
@@ -471,6 +479,8 @@ export const MenuPage: React.FC = () => {
             course: resolvedCourse,
             rate: parseFloat(newItem.rate),
             image: sanitizedImage || undefined,
+            special_dish: newItem.special_dish ? 1 : 0,
+            disabled: newItem.disabled ? 1 : 0,
           });
           await call('frappe.client.save', { doc: menuDoc });
         }
@@ -1024,6 +1034,34 @@ export const MenuPage: React.FC = () => {
             />
           </div>
 
+          <div className="flex items-center gap-6 pt-2">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <div className="relative">
+                <input
+                  type="checkbox"
+                  className="sr-only peer"
+                  checked={newItem.special_dish}
+                  onChange={(e) => setNewItem({ ...newItem, special_dish: e.target.checked })}
+                />
+                <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+              </div>
+              <span className="text-sm font-medium text-gray-700">Special Dish</span>
+            </label>
+            
+            <label className="flex items-center gap-3 cursor-pointer">
+              <div className="relative">
+                <input
+                  type="checkbox"
+                  className="sr-only peer"
+                  checked={newItem.disabled}
+                  onChange={(e) => setNewItem({ ...newItem, disabled: e.target.checked })}
+                />
+                <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+              </div>
+              <span className="text-sm font-medium text-gray-700">Disabled</span>
+            </label>
+          </div>
+
           <div className="pt-6 flex justify-end gap-3 border-t mt-8 border-gray-100">
             <Button type="button" variant="outline" onClick={closeDrawer} className="font-semibold" disabled={savingItem}>Cancel</Button>
             <Button type="submit" disabled={savingItem} className="bg-primary hover:bg-primary/90 text-white font-semibold shadow-xs flex items-center gap-2">
@@ -1106,6 +1144,8 @@ export const MenuPage: React.FC = () => {
                               new_course_name: '',
                               is_adding_new_course: false,
                               target_menu: '',
+                              special_dish: false,
+                              disabled: false,
                             });
                             setDrawerMode('add-item');
                           } else {
