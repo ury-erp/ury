@@ -1044,12 +1044,25 @@ def price_items_for_invoice(items, price_list, pos_profile, branch, menu):
 
     sa-architecture-closure (Gap B): also resolves each item's
     `department_warehouse` (the same warehouse availability/reservation/
-    fulfilment already agree on) and sets it explicitly on the item dict, so
-    native POS `update_stock` deduction draws from the department's real
-    stock instead of unconditionally defaulting to POS Profile.warehouse
-    (which ERPNext applies automatically when no warehouse is given). Items
-    with no resolvable department (genuinely direct-retail) are left
-    unset, so ERPNext's own POS Profile default still applies for them.
+    fulfilment already agree on) and sets it explicitly on the item dict.
+
+    This is load-bearing for stock correctness, not tidiness. The POS
+    Invoice itself never posts a stock ledger entry -- `POS Invoice` has no
+    `update_stock` field at all. The sale-side deduction happens once per
+    session, at POS Closing Entry: consolidation copies each POS Invoice
+    Item onto a consolidated `Sales Invoice` **with its warehouse carried
+    over verbatim** and sets `update_stock = 1` on that document, whose
+    submit writes the SLEs. So the warehouse set here is the warehouse the
+    sale is ultimately deducted from, hours later.
+
+    That is what makes a made-to-order item net out correctly: the
+    fulfilment posting service receives the finished good into this same
+    department warehouse at KOT READY, and closing then issues it from
+    there. Weaken this resolution and the two land in different warehouses.
+
+    Items with no resolvable department (genuinely direct-retail) are left
+    unset, so ERPNext's own POS Profile default still applies for them --
+    they are deducted once, at closing, from that default warehouse.
     """
     company = frappe.db.get_value("Branch", branch, "company")
     priced_items = []

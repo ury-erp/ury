@@ -3,12 +3,32 @@
 
 """V3-73: POS stock authority feature flag.
 
-This module is the SOLE read path used by `ury_order.py` to decide whether a
-POS Invoice's stock authority is handled by ERPNext's native
-`update_stock=1` posting (the current, always-on-by-default behavior) or by
-the fulfilment services from V3-71/V3-72. The replacement path remains
-feature-flagged and operationally gated until its runtime accounting and
-deployment evidence is accepted.
+This module is the SOLE read path for whether the URY real-time production
+posting layer is active for a branch.
+
+Read this before changing anything here: the flag does NOT switch stock
+authority away from native ERPNext, and never did. The sale-side stock
+deduction is owned by native ERPNext in every mode, unconditionally. It is
+anchored to POS Closing Entry, not to invoice submit: `POS Invoice` has no
+`update_stock` field at all, and `POSInvoice.on_submit` writes no stock
+ledger entry. Consolidation at closing copies each POS Invoice Item onto a
+consolidated `Sales Invoice`, sets `update_stock = 1` on it, and that
+document's submit writes the SLEs -- once per session, out of each line's
+warehouse.
+
+What this flag actually gates is a SECOND, orthogonal ledger: the
+production-side raws-to-finished-good movement, posted in real time at KOT
+READY as a `Manufacture` Stock Entry by the fulfilment posting service, for
+made-to-order items only. That movement receives the finished good into the
+same department warehouse the sale later deducts from, so the two net out
+rather than competing. Turning the flag on adds the production ledger; it
+subtracts nothing from the sale ledger.
+
+Concretely, the flag's only effects are (a) whether READY creates a posting
+intent (`ury_kot_item_execution_service._attach_ready_posting_intent`) and
+(b) whether the POS Invoice submit gate below runs. The replacement path
+remains feature-flagged and operationally gated until its runtime accounting
+and deployment evidence is accepted.
 
 Governing contract:
 tracks/sa-v3_nxt/outputs/V3-70-fulfilment-accounting-transition-checklist.md
@@ -72,6 +92,13 @@ def maybe_wire_fulfilment_on_submit(doc, method=None):
 	"""V3-73 flag-on integration point, called from POS Invoice's on_submit
 	doc_event (additive: appended alongside the existing on_submit handler,
 	never replacing it).
+
+	Note what this is NOT: it does not suppress, defer, or replace any native
+	stock posting on this invoice. A POS Invoice submit writes no stock
+	ledger entry in any mode -- the sale is deducted later, at POS Closing
+	Entry, by the consolidated Sales Invoice. This handler only checks that
+	the separate production-side posting has happened for the items on this
+	invoice before the invoice is allowed to submit.
 
 	Flag OFF (default in every real environment): no-op, returns immediately.
 
