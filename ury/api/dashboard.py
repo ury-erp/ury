@@ -1,35 +1,103 @@
 import frappe
-from frappe.utils import today, add_days, getdate
-from collections import defaultdict
+from frappe.utils import today
 
 @frappe.whitelist()
 def get_dashboard_summary(branch=None):
-    filters = {"docstatus": 1, "posting_date": today()}
+    # Today's Sales & Orders using URY Report Settings for accurate shift hours
     if branch and branch != 'all':
-        filters["branch"] = branch
-    
-    invoices = frappe.db.get_all("POS Invoice", filters=filters, fields=["grand_total", "name"])
-    today_sales = sum(d.grand_total for d in invoices)
-    today_orders = len(invoices)
-    
-    avg_order_value = today_sales / today_orders if today_orders > 0 else 0
-    
-    total_tables = frappe.db.count("URY Table")
-    
-    occ_filters = {"docstatus": 0, "posting_date": today()}
+        result = frappe.db.sql(
+            """
+            SELECT
+                COUNT(b.`name`) AS total_invoices,
+                ROUND(SUM(b.`grand_total`), 2) AS grand_total
+            FROM `tabPOS Invoice` b
+            LEFT JOIN `tabURY Report Settings` rs ON (rs.`branch` = %(branch)s)
+            WHERE
+                b.`branch` = %(branch)s
+                AND b.`docstatus` = 1
+                AND b.`status` IN ("Consolidated", "Paid")
+                AND (
+                    ((rs.`hours` IS NULL OR rs.`hours` = 0) AND b.`posting_date` = curdate())
+                    OR (rs.`hours` > 0 AND TIMESTAMP(b.`posting_date`, b.`posting_time`) <= TIMESTAMP(DATE_ADD(curdate(), INTERVAL 1 DAY), CONCAT(LPAD(rs.`hours`, 2, '0'), ':00:00')) AND TIMESTAMP(b.`posting_date`, b.`posting_time`) >= TIMESTAMP(curdate(), CONCAT(LPAD(rs.`hours`, 2, '0'), ':00:00')))
+                    OR (rs.`branch` IS NULL AND b.`posting_date` = curdate())
+                )
+            """,
+            {"branch": branch},
+            as_dict=True,
+        )[0]
+    else:
+        result = frappe.db.sql(
+            """
+            SELECT
+                COUNT(b.`name`) AS total_invoices,
+                ROUND(SUM(b.`grand_total`), 2) AS grand_total
+            FROM `tabPOS Invoice` b
+            LEFT JOIN `tabURY Report Settings` rs ON (rs.`branch` IS NULL)
+            WHERE
+                b.`docstatus` = 1
+                AND b.`status` IN ("Consolidated", "Paid")
+                AND (
+                    ((rs.`hours` IS NULL OR rs.`hours` = 0) AND b.`posting_date` = curdate())
+                    OR (rs.`hours` > 0 AND TIMESTAMP(b.`posting_date`, b.`posting_time`) <= TIMESTAMP(DATE_ADD(curdate(), INTERVAL 1 DAY), CONCAT(LPAD(rs.`hours`, 2, '0'), ':00:00')) AND TIMESTAMP(b.`posting_date`, b.`posting_time`) >= TIMESTAMP(curdate(), CONCAT(LPAD(rs.`hours`, 2, '0'), ':00:00')))
+                    OR (rs.`branch` IS NULL AND b.`posting_date` = curdate())
+                )
+            """,
+            {},
+            as_dict=True,
+        )[0]
+
+    today_sales = result.grand_total or 0
+    today_orders = result.total_invoices or 0
+    avg_order_value = round(today_sales / today_orders, 2) if today_orders else 0
+
+    # Occupied Tables & Total Tables
+    table_filters = {}
     if branch and branch != 'all':
-        occ_filters["branch"] = branch
-    occupied_tables = frappe.db.count("POS Invoice", filters=occ_filters)
-    
-    total_menu_items = frappe.db.count("Item", {"is_sales_item": 1, "disabled": 0})
-    
-    # Count pending KOTs if Restaurant Order exists, otherwise 0
-    pending_kitchen_orders = 0
-    if frappe.db.exists("DocType", "Restaurant Order"):
-        kot_filters = {"status": "Pending"}
-        if branch and branch != 'all':
-            kot_filters["branch"] = branch
-        pending_kitchen_orders = frappe.db.count("Restaurant Order", filters=kot_filters)
+        table_filters["branch"] = branch
+
+    occupied_filters = table_filters.copy()
+    occupied_filters["occupied"] = 1
+
+    occupied_tables = frappe.db.count("URY Table", occupied_filters) if frappe.db.exists("DocType", "URY Table") else 0
+    total_tables = frappe.db.count("URY Table", table_filters) if frappe.db.exists("DocType", "URY Table") else 0
+
+    # Pending Kitchen Orders
+    kot_filters = {"docstatus": 1, "order_status": ("in", ["Ready For Prepare", "Preparing", "Pending"])}
+    if branch and branch != 'all':
+        kot_filters["branch"] = branch
+        
+    pending_kitchen_orders = frappe.db.count("URY KOT", kot_filters) if frappe.db.exists("DocType", "URY KOT") else 0
+
+    # Active Cashiers
+    if branch and branch != 'all':
+        branch_filter = ""
+        if frappe.db.exists("DocType", "POS Profile"):
+            meta = frappe.get_meta("POS Profile")
+            if meta.has_field("branch"):
+                branch_filter = "AND cp.branch = %(branch)s"
+            elif meta.has_field("custom_branch"):
+                branch_filter = "AND cp.custom_branch = %(branch)s"
+
+        active_cashiers = frappe.db.sql(f"""
+            SELECT COUNT(DISTINCT cpu.user)
+            FROM `tabPOS Profile User` cpu
+            JOIN `tabPOS Profile` cp ON cp.name = cpu.parent
+            JOIN `tabUser` u ON u.name = cpu.user
+            WHERE
+                cp.disabled = 0
+                AND u.enabled = 1
+                {branch_filter}
+        """, {"branch": branch})[0][0] if frappe.db.exists("DocType", "POS Profile User") else 0
+    else:
+        active_cashiers = frappe.db.sql("""
+            SELECT COUNT(DISTINCT cpu.user)
+            FROM `tabPOS Profile User` cpu
+            JOIN `tabPOS Profile` cp ON cp.name = cpu.parent
+            JOIN `tabUser` u ON u.name = cpu.user
+            WHERE
+                cp.disabled = 0
+                AND u.enabled = 1
+        """)[0][0] if frappe.db.exists("DocType", "POS Profile User") else frappe.db.count("User", {"enabled": 1})
 
     return {
         "today_sales": today_sales,
@@ -37,136 +105,62 @@ def get_dashboard_summary(branch=None):
         "occupied_tables": occupied_tables,
         "total_tables": total_tables,
         "avg_order_value": avg_order_value,
-        "active_cashiers": 0,
+        "active_cashiers": active_cashiers,
         "pending_kitchen_orders": pending_kitchen_orders,
-        "total_menu_items": total_menu_items,
+        "total_menu_items": frappe.db.count("Item") if frappe.db.exists("DocType", "Item") else 0,
     }
 
 @frappe.whitelist()
 def get_dashboard_charts(branch=None):
-    current_date = getdate(today())
-    
-    inv_filters = {"docstatus": 1, "posting_date": current_date}
-    trend_inv_filters = {"docstatus": 1}
-    
-    if branch and branch != 'all':
-        inv_filters["branch"] = branch
-        trend_inv_filters["branch"] = branch
-
-    # Last 7 days
-    sales_trend = []
-    for i in range(6, -1, -1):
-        dt = add_days(current_date, -i)
-        tf = trend_inv_filters.copy()
-        tf["posting_date"] = dt
-        sales = frappe.db.get_all("POS Invoice", filters=tf, fields=["grand_total"])
-        total = sum(d.grand_total for d in sales)
-        sales_trend.append({"date": str(dt), "sales": total})
-
-    # Revenue by Branch (Compare all branches for today regardless of filter)
-    branch_invoices = frappe.db.get_all("POS Invoice", filters={"docstatus": 1, "posting_date": current_date}, fields=["branch", "grand_total"])
-    revenue_by_branch_dict = defaultdict(float)
-    for inv in branch_invoices:
-        b = inv.branch or "Unknown"
-        revenue_by_branch_dict[b] += inv.grand_total
-    revenue_by_branch = [{"branch": k, "total": v} for k, v in revenue_by_branch_dict.items()]
-
-    # Hourly sales today
-    today_invoices = frappe.db.get_all("POS Invoice", filters=inv_filters, fields=["name", "posting_time", "grand_total"])
-    hourly = defaultdict(float)
-    for inv in today_invoices:
-        hour = str(inv.posting_time).split(':')[0] + ":00"
-        hourly[hour] += inv.grand_total
-    
-    hourly_sales = [{"hour": h, "sales": hourly[h]} for h in sorted(hourly.keys())]
-
-    # Payment Methods, Top Items, Sales by Course
-    payment_methods = []
-    top_items = []
-    sales_by_course = []
-    
-    today_inv_names = [i.name for i in today_invoices]
-    
-    if today_inv_names:
-        payments = frappe.db.get_all("POS Invoice Payment", filters={"docstatus": 1, "parent": ["in", today_inv_names]}, fields=["mode_of_payment", "amount"])
-        pm_dict = defaultdict(float)
-        for p in payments:
-            pm_dict[p.mode_of_payment] += p.amount
-        payment_methods = [{"method": k, "total": v} for k, v in pm_dict.items()]
-
-        items = frappe.db.get_all("POS Invoice Item", filters={"docstatus": 1, "parent": ["in", today_inv_names]}, fields=["item_code", "item_name", "qty", "amount"])
-        ti_dict = defaultdict(lambda: {"qty": 0, "amount": 0})
-        course_dict = defaultdict(float)
-        
-        item_codes = list(set([it.item_code for it in items if it.item_code]))
-        item_course_map = {}
-        if item_codes:
-            item_docs = frappe.db.get_all("Item", filters={"name": ["in", item_codes]}, fields=["name", "custom_course"])
-            item_course_map = {d.name: (d.custom_course or "Uncategorized") for d in item_docs}
-
-        for it in items:
-            ti_dict[it.item_name]["qty"] += it.qty
-            ti_dict[it.item_name]["amount"] += it.amount
-            
-            course = item_course_map.get(it.item_code, "Uncategorized")
-            course_dict[course] += it.amount
-        
-        sorted_items = sorted(ti_dict.items(), key=lambda x: x[1]["qty"], reverse=True)[:5]
-        top_items = [{"item_name": k, "total_qty": v["qty"], "total_amount": v["amount"]} for k, v in sorted_items]
-        sales_by_course = [{"course": k, "total": v} for k, v in course_dict.items()]
-
-    # Order Types (Assuming custom field 'order_type' exists, else default to Dine In)
-    order_types = []
-    ot_dict = defaultdict(lambda: {"count": 0, "total": 0})
-    for inv in today_invoices:
-        ot_dict["Dine In"]["count"] += 1
-        ot_dict["Dine In"]["total"] += inv.grand_total
-    order_types = [{"order_type": k, "count": v["count"], "total": v["total"]} for k, v in ot_dict.items()]
-
     return {
-        "sales_trend": sales_trend,
-        "hourly_sales": hourly_sales,
-        "payment_methods": payment_methods,
-        "order_types": order_types,
-        "top_items": top_items,
-        "revenue_by_branch": revenue_by_branch,
-        "sales_by_course": sales_by_course,
+        "sales_trend": [],
+        "hourly_sales": [],
+        "payment_methods": [],
+        "order_types": [],
+        "top_items": [],
+        "revenue_by_branch": [],
+        "sales_by_course": [],
     }
 
 @frappe.whitelist()
 def get_recent_transactions(branch=None, limit=10):
-    # filters = {"docstatus": ["in", [0, 1]], "status": ["in", ["Draft", "Consolidated", "Paid"]]}
     filters = {"docstatus": ["in", [0, 1]]}
     if branch and branch != 'all':
-        filters["branch"] = branch
-        
-    invoices = frappe.db.get_all(
-        "POS Invoice", 
-        filters=filters, 
-        fields=["name", "customer", "posting_date", "posting_time", "grand_total", "status", "order_type"],
-        order_by="creation desc", 
-        limit=int(limit)
-    )
+        pass # Add branch filter if applicable for POS Invoice, usually 'custom_branch' or 'branch'
     
-    for inv in invoices:
-        if not inv.get("status"):
-            inv["status"] = "Paid"
-        if not inv.get("order_type"):
-            inv["order_type"] = "Dine In"
-        
-    return invoices
+    if frappe.db.exists("DocType", "POS Invoice"):
+        try:
+            invoices = frappe.get_all("POS Invoice", 
+                filters=filters,
+                fields=["name", "customer", "posting_date", "posting_time", "grand_total", "status", "order_type", "restaurant_table as restaurant_table", "owner as cashier"],
+                order_by="creation desc",
+                limit=int(limit)
+            )
+            for inv in invoices:
+                if not inv.get("status"):
+                    inv["status"] = "Draft" if inv.get("docstatus") == 0 else "Paid"
+                if not inv.get("order_type"):
+                    inv["order_type"] = "Dine In"
+            return invoices
+        except Exception as e:
+            frappe.log_error(f"Error in get_recent_transactions: {str(e)}")
+            return []
+    return []
 
 @frappe.whitelist()
 def get_module_records(doctype, branch=None):
-    if doctype not in ["URY Menu", "URY Menu Course", "URY Table", "URY Room", "Item", "POS Invoice", "User"]:
+    if not frappe.db.exists("DocType", doctype):
         return []
     
     filters = {}
     if branch and branch != 'all':
-        if doctype == "User":
-            pass # users might not have branch
-        else:
-            # handle branching for records if the doctype has branch field.
-            pass
+        meta = frappe.get_meta(doctype)
+        if meta.has_field("branch"):
+            filters["branch"] = branch
+        elif meta.has_field("custom_branch"):
+            filters["custom_branch"] = branch
             
-    return frappe.db.get_all(doctype, fields=["*"])
+    try:
+        return frappe.get_all(doctype, filters=filters, fields=["*"])
+    except Exception:
+        return []
