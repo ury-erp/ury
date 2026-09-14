@@ -35,6 +35,18 @@ export const UserPage: React.FC = () => {
     enabled: true,
   });
   const [originalUser, setOriginalUser] = useState<any>(null);
+  const [allRoles, setAllRoles] = useState<{name: string}[]>([]);
+
+  const fetchRoles = async () => {
+    try {
+      const res = await call<any>('frappe.client.get_list', { doctype: 'Role', fields: ['name'], limit: 1000 });
+      const records = res.message || res;
+      setAllRoles(Array.isArray(records) ? records : []);
+    } catch (err) {
+      console.error('Failed to fetch roles', err);
+      setAllRoles([]);
+    }
+  };
 
   const URY_ROLES = ['URY Manager', 'URY Waiter', 'URY Cashier'];
 
@@ -52,16 +64,12 @@ export const UserPage: React.FC = () => {
 
   useEffect(() => {
     fetchUsers();
+    fetchRoles();
   }, [activeBranchId]);
 
   const getDisplayRole = (user: UserRecord): string => {
-    // Try to extract URY role from user's roles
-    if (user.roles && Array.isArray(user.roles)) {
-      for (const roleObj of user.roles) {
-        if (roleObj.role === 'URY Manager') return 'Manager';
-        if (roleObj.role === 'URY Waiter') return 'Waiter';
-        if (roleObj.role === 'URY Cashier') return 'Cashier';
-      }
+    if (user.roles && Array.isArray(user.roles) && user.roles.length > 0) {
+      return user.roles[0].role;
     }
     return 'User';
   };
@@ -74,28 +82,24 @@ export const UserPage: React.FC = () => {
 
   const openEditDrawer = async (user: UserRecord) => {
     setEditingUser(user);
-    let userRole = 'URY Cashier'; // default
+    let userRole = 'URY Cashier';
 
     try {
-      // Fetch the full user record with roles
       const fullUserRes = await call('frappe.client.get', {
         doctype: 'User',
         name: user.name,
       });
       const fullUser = (fullUserRes as any).message || fullUserRes;
 
-      // Extract the actual URY role from the roles array
-      if (fullUser.roles && Array.isArray(fullUser.roles)) {
-        for (const roleObj of fullUser.roles) {
-          if (URY_ROLES.includes(roleObj.role)) {
-            userRole = roleObj.role;
-            break;
-          }
-        }
+      if (fullUser.roles && Array.isArray(fullUser.roles) && fullUser.roles.length > 0) {
+        userRole = fullUser.roles[0].role;
       }
     } catch (err) {
       console.error('Failed to fetch user roles', err);
-      // Default to URY Cashier on error
+    }
+    
+    if (userRole === 'URY Cashier' && user.roles && Array.isArray(user.roles) && user.roles.length > 0) {
+      userRole = user.roles[0].role;
     }
 
     const initialForm = {
@@ -147,23 +151,15 @@ export const UserPage: React.FC = () => {
         });
 
         if (newUser.role) {
-          // Fetch current roles
           const fullUserRes = await call('frappe.client.get', {
             doctype: 'User',
             name: editingUser.name,
           });
           const fullUser = (fullUserRes as any).message || fullUserRes;
 
-          // Start with current roles
           let updatedRoles = fullUser.roles && Array.isArray(fullUser.roles) ? [...fullUser.roles] : [];
+          updatedRoles = [{ role: newUser.role }];
 
-          // Filter out existing URY roles
-          updatedRoles = updatedRoles.filter((roleObj: any) => !URY_ROLES.includes(roleObj.role));
-
-          // Add the new URY role
-          updatedRoles.push({ role: newUser.role });
-
-          // Save the merged roles
           await call('frappe.client.set_value', {
             doctype: 'User',
             name: editingUser.name,
@@ -327,28 +323,21 @@ export const UserPage: React.FC = () => {
           </div>
 
           <div>
-            <label className="block font-semibold text-gray-700 mb-1.5">Role / Access Level</label>
+            <label className="block font-semibold text-gray-700 mb-1.5">Role</label>
             <SearchableSelect
               id="role"
               value={newUser.role}
               onChange={(_, value) => setNewUser({ ...newUser, role: value })}
-              options={[
-                { value: 'URY Cashier', label: 'URY Cashier' },
-                { value: 'URY Waiter', label: 'URY Waiter' },
-                { value: 'URY Manager', label: 'URY Manager' },
-              ]}
+              options={
+                allRoles.length > 0 
+                  ? allRoles.map(r => ({ value: r.name, label: r.name }))
+                  : [
+                      { value: 'URY Cashier', label: 'URY Cashier' },
+                      { value: 'URY Waiter', label: 'URY Waiter' },
+                      { value: 'URY Manager', label: 'URY Manager' },
+                    ]
+              }
             />
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Switch
-              id="user-enabled"
-              checked={newUser.enabled}
-              onCheckedChange={(checked) => setNewUser({ ...newUser, enabled: checked })}
-            />
-            <label htmlFor="user-enabled" className="font-semibold text-gray-700 cursor-pointer">
-              Enabled (Active User)
-            </label>
           </div>
 
           <div className="pt-6 flex justify-end gap-3 border-t mt-4 border-gray-100">
