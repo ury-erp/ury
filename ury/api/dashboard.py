@@ -68,46 +68,13 @@ def get_dashboard_summary(branch=None):
         
     pending_kitchen_orders = frappe.db.count("URY KOT", kot_filters) if frappe.db.exists("DocType", "URY KOT") else 0
 
-    # Active Cashiers
-    if branch and branch != 'all':
-        branch_filter = ""
-        if frappe.db.exists("DocType", "POS Profile"):
-            meta = frappe.get_meta("POS Profile")
-            if meta.has_field("branch"):
-                branch_filter = "AND cp.branch = %(branch)s"
-            elif meta.has_field("custom_branch"):
-                branch_filter = "AND cp.custom_branch = %(branch)s"
-
-        active_cashiers = frappe.db.sql(f"""
-            SELECT COUNT(DISTINCT cpu.user)
-            FROM `tabPOS Profile User` cpu
-            JOIN `tabPOS Profile` cp ON cp.name = cpu.parent
-            JOIN `tabUser` u ON u.name = cpu.user
-            WHERE
-                cp.disabled = 0
-                AND u.enabled = 1
-                {branch_filter}
-        """, {"branch": branch})[0][0] if frappe.db.exists("DocType", "POS Profile User") else 0
-    else:
-        active_cashiers = frappe.db.sql("""
-            SELECT COUNT(DISTINCT cpu.user)
-            FROM `tabPOS Profile User` cpu
-            JOIN `tabPOS Profile` cp ON cp.name = cpu.parent
-            JOIN `tabUser` u ON u.name = cpu.user
-            WHERE
-                cp.disabled = 0
-                AND u.enabled = 1
-        """)[0][0] if frappe.db.exists("DocType", "POS Profile User") else frappe.db.count("User", {"enabled": 1})
-
     return {
         "today_sales": today_sales,
         "today_orders": today_orders,
         "occupied_tables": occupied_tables,
         "total_tables": total_tables,
         "avg_order_value": avg_order_value,
-        "active_cashiers": active_cashiers,
         "pending_kitchen_orders": pending_kitchen_orders,
-        "total_menu_items": frappe.db.count("Item") if frappe.db.exists("DocType", "Item") else 0,
     }
 
 @frappe.whitelist()
