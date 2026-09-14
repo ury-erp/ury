@@ -483,7 +483,7 @@ class TestProcessPostingIntent(FrappeTestCase):
 			f"{MODULE}.frappe.get_doc", side_effect=get_doc
 		), patch(f"{MODULE}.frappe.get_all", side_effect=lambda doctype, **kwargs: []), patch(
 			f"{MODULE}.frappe.db.get_value", return_value=None
-		), patch(f"{MODULE}.fulfil_reservation") as fulfil, patch(
+		), patch(f"{MODULE}.fulfil_reservation_if_pending") as fulfil, patch(
 			f"{MODULE}.now", return_value="2026-09-04 10:00:00"
 		), patch(f"{MODULE}.now_datetime", return_value=frappe.utils.get_datetime("2026-09-04 10:00:00")), patch(
 			f"{MODULE}.frappe.session"
@@ -500,7 +500,19 @@ class TestProcessPostingIntent(FrappeTestCase):
 		self.assertEqual(intent.status, POSTED)
 		self.assertGreaterEqual(intent.save.call_count, 2)
 
-	def test_replay_after_reservation_fulfilled_does_not_fulfil_again(self):
+	def test_replay_after_reservation_fulfilled_delegates_to_idempotent_guard(self):
+		"""A replay whose reservation group is already Fulfilled must still
+		post successfully and must not re-transition the group.
+
+		The "don't re-transition" half of that rule now lives in ONE place --
+		`ury_reservation_service.fulfil_reservation_if_pending`, which the
+		consolidated Sales Invoice close-out shares with this service (either
+		can win the race on the same group). So what this service is
+		responsible for, and what this test asserts, is that it routes its
+		fulfilment through that guard rather than calling `fulfil_reservation`
+		directly. The guard's own already-Fulfilled behaviour is covered by
+		`test_ury_reservation_service`.
+		"""
 		intent = self._intent()
 		intent.erpnext_stock_entry = "STE-1"
 		stock_entry = _doc({"name": "STE-1"})
@@ -519,7 +531,7 @@ class TestProcessPostingIntent(FrappeTestCase):
 			if "tabURY Fulfilment Posting Intent" in query:
 				return [frappe._dict({"name": "INTENT-1", "status": "PENDING", "attempts": 0})]
 			if "tabURY Stock Reservation" in query:
-				# _reservation_is_fulfilled: every row already Fulfilled.
+				# Every row in the group is already Fulfilled.
 				return [frappe._dict({"status": "Fulfilled"})]
 			return []
 
@@ -527,7 +539,7 @@ class TestProcessPostingIntent(FrappeTestCase):
 			f"{MODULE}.frappe.get_doc", side_effect=get_doc
 		), patch(f"{MODULE}.frappe.get_all", return_value=[frappe._dict({"status": "Fulfilled"})]), patch(
 			f"{MODULE}.frappe.db.get_value", return_value="FUL-1"
-		), patch(f"{MODULE}.fulfil_reservation") as fulfil, patch(
+		), patch(f"{MODULE}.fulfil_reservation_if_pending") as fulfil, patch(
 			f"{MODULE}.now", return_value="2026-09-04 10:00:00"
 		), patch(f"{MODULE}.now_datetime", return_value=frappe.utils.get_datetime("2026-09-04 10:00:00")), patch(
 			f"{MODULE}.frappe.session"
@@ -536,7 +548,10 @@ class TestProcessPostingIntent(FrappeTestCase):
 			result = process_posting_intent("INTENT-1")
 
 		self.assertEqual(result["status"], POSTED)
-		fulfil.assert_not_called()
+		# Routed through the shared idempotent guard, never through
+		# `fulfil_reservation` (which would frappe.throw on a group that is
+		# no longer Reserved and fail the replay).
+		fulfil.assert_called_once_with("GROUP-1")
 
 	def test_ready_or_served_is_required(self):
 		execution = _execution_doc()
@@ -564,7 +579,7 @@ class TestProcessPostingIntent(FrappeTestCase):
 		), patch(
 			f"{MODULE}.frappe.get_doc", side_effect=get_doc
 		), patch(f"{MODULE}.frappe.get_all", return_value=[]), patch(
-			f"{MODULE}.fulfil_reservation"
+			f"{MODULE}.fulfil_reservation_if_pending"
 		) as fulfil, patch(f"{MODULE}.now", return_value="2026-09-04 10:00:00"), patch(
 			f"{MODULE}.now_datetime", return_value=frappe.utils.get_datetime("2026-09-04 10:00:00")
 		), patch(f"{MODULE}.frappe.session") as session:
@@ -614,7 +629,7 @@ class TestProcessPostingIntent(FrappeTestCase):
 		), patch(
 			f"{MODULE}.frappe.get_doc", side_effect=get_doc
 		), patch(f"{MODULE}.frappe.get_all", return_value=[]), patch(
-			f"{MODULE}.fulfil_reservation"
+			f"{MODULE}.fulfil_reservation_if_pending"
 		) as fulfil, patch(f"{MODULE}.now", return_value="2026-09-04 10:00:00"), patch(
 			f"{MODULE}.now_datetime", return_value=frappe.utils.get_datetime("2026-09-04 10:00:00")
 		), patch(f"{MODULE}.frappe.session") as session:
