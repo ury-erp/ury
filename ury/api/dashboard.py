@@ -62,7 +62,7 @@ def get_dashboard_summary(branch=None):
     total_tables = frappe.db.count("URY Table", table_filters) if frappe.db.exists("DocType", "URY Table") else 0
 
     # Pending Kitchen Orders
-    kot_filters = {"docstatus": 1, "order_status": ("in", ["Ready For Prepare", "Preparing", "Pending"])}
+    kot_filters = {"docstatus": 1, "order_status": ("in", ["Ready For Prepare"])}
     if branch and branch != 'all':
         kot_filters["branch"] = branch
         
