@@ -237,7 +237,80 @@ class TestCreatePostingIntent(FrappeTestCase):
 		self.assertEqual(payload["components"][0]["s_warehouse"], "Kitchen WH")
 		self.assertEqual(payload["components"][1]["qty"], 1)
 		self.assertEqual(payload["production_configuration"], "CFG-1")
+		# G-06/I-7: the finished good's warehouse is resolved explicitly and
+		# frozen onto the payload, not re-derived from components[0] at
+		# posting time.
+		self.assertEqual(payload["fg_warehouse"], "Kitchen WH")
 		created[0].insert.assert_called_once_with(ignore_permissions=False)
+
+	def test_pre_produced_ready_creates_no_intent_and_posts_nothing(self):
+		"""Production posting is for MADE_TO_ORDER only.
+
+		A pre-produced item's Manufacture entry was already posted, ahead of
+		time, by the batch path, into the same warehouse the sale deducts
+		from at closing. Posting again at READY issued the selling item a
+		second time from that same warehouse -- the double deduction. READY
+		for such an item is a plating milestone with no stock semantics, so
+		no intent is created at all.
+		"""
+		created = []
+
+		def get_doc(arg, *args, **kwargs):
+			if arg == "URY KOT Items":
+				return _doc({"item": "PLATE-1", "quantity": 1})
+			if isinstance(arg, dict):
+				doc = _doc(arg)
+				doc.name = "INTENT-X"
+				created.append(doc)
+				return doc
+			raise AssertionError(arg)
+
+		def get_value(doctype, *args, **kwargs):
+			if doctype == "URY KOT":
+				return "POS-INV-1"
+			if doctype == "URY Fulfilment Posting Intent":
+				return None
+			raise AssertionError(doctype)
+
+		rows = [_reservation_rows(policy="PRE_PRODUCED")[0]]
+		with patch(f"{MODULE}.frappe.db.exists", return_value=True), patch(
+			f"{MODULE}.frappe.get_doc", side_effect=get_doc
+		), patch(f"{MODULE}.frappe.db.get_value", side_effect=get_value), patch(
+			f"{MODULE}.frappe.get_all", side_effect=_get_all_for_create(reservation_rows=rows)
+		), patch(f"{MODULE}.frappe.session") as session:
+			session.user = "chef@example.com"
+			result = create_or_get_posting_intent_for_ready(_execution_doc(), actor="chef@example.com")
+
+		self.assertIsNone(result["name"])
+		self.assertEqual(result["status"], "SKIPPED_NOT_MADE_TO_ORDER")
+		self.assertEqual(created, [])
+
+	def test_direct_retail_ready_creates_no_intent(self):
+		"""Direct-retail items are not produced at all; the sale deducts them
+		once, at closing."""
+		def get_doc(arg, *args, **kwargs):
+			if arg == "URY KOT Items":
+				return _doc({"item": "PLATE-1", "quantity": 1})
+			raise AssertionError(arg)
+
+		def get_value(doctype, *args, **kwargs):
+			if doctype == "URY KOT":
+				return "POS-INV-1"
+			if doctype == "URY Fulfilment Posting Intent":
+				return None
+			raise AssertionError(doctype)
+
+		rows = [_reservation_rows(policy="DIRECT_RETAIL")[0]]
+		with patch(f"{MODULE}.frappe.db.exists", return_value=True), patch(
+			f"{MODULE}.frappe.get_doc", side_effect=get_doc
+		), patch(f"{MODULE}.frappe.db.get_value", side_effect=get_value), patch(
+			f"{MODULE}.frappe.get_all", side_effect=_get_all_for_create(reservation_rows=rows)
+		), patch(f"{MODULE}.frappe.session") as session:
+			session.user = "chef@example.com"
+			result = create_or_get_posting_intent_for_ready(_execution_doc(), actor="chef@example.com")
+
+		self.assertIsNone(result["name"])
+		self.assertEqual(result["status"], "SKIPPED_NOT_MADE_TO_ORDER")
 
 	def test_ready_uses_next_sequence_for_new_reservation_group(self):
 		created = []
@@ -345,6 +418,7 @@ class TestStockEntryType(FrappeTestCase):
 			"production_policy": "MADE_TO_ORDER",
 			"item_code": "PLATE-1",
 			"accepted_qty": 2,
+			"fg_warehouse": "Kitchen WH",
 			"components": [
 				{"item_code": "COMP-1", "qty": 4, "s_warehouse": "Kitchen WH"},
 				{"item_code": "COMP-2", "qty": 2, "s_warehouse": "Kitchen WH"},
@@ -368,15 +442,36 @@ class TestStockEntryType(FrappeTestCase):
 			self.assertEqual(row["s_warehouse"], "Kitchen WH")
 			self.assertNotIn("t_warehouse", row)
 
-	def test_pre_produced_stock_rows_unchanged(self):
+	def test_issuing_the_selling_item_is_structurally_refused(self):
+		"""The no-self-issue invariant: the production event may only consume
+		items strictly below the selling item in the BOM. A row issuing the
+		selling item itself would be deducted twice -- once here and again by
+		the sale at closing, from the same warehouse. This is the exact shape
+		the old PRE_PRODUCED/DIRECT_RETAIL 'Material Issue' posting had."""
 		payload = {
 			"production_policy": "PRE_PRODUCED",
 			"item_code": "PLATE-1",
 			"accepted_qty": 1,
 			"components": [{"item_code": "PLATE-1", "qty": 1, "s_warehouse": "FG WH"}],
 		}
-		items = _stock_entry_items(payload)
-		self.assertEqual(items, [{"item_code": "PLATE-1", "qty": 1.0, "s_warehouse": "FG WH"}])
+		with self.assertRaises(Exception) as ctx:
+			_stock_entry_items(payload)
+		self.assertEqual(getattr(ctx.exception, "reason_code", None), "SELF_ISSUE_NOT_ALLOWED")
+
+	def test_self_issue_is_refused_for_made_to_order_too(self):
+		"""The assertion is structural, not policy-scoped: an MTO payload whose
+		BOM explosion somehow yielded the selling item is refused just the
+		same, so the bug class cannot return through another route."""
+		payload = {
+			"production_policy": "MADE_TO_ORDER",
+			"item_code": "PLATE-1",
+			"accepted_qty": 1,
+			"fg_warehouse": "Kitchen WH",
+			"components": [{"item_code": "PLATE-1", "qty": 1, "s_warehouse": "Kitchen WH"}],
+		}
+		with self.assertRaises(Exception) as ctx:
+			_stock_entry_items(payload)
+		self.assertEqual(getattr(ctx.exception, "reason_code", None), "SELF_ISSUE_NOT_ALLOWED")
 
 	def test_submit_stock_entry_uses_manufacture_for_made_to_order(self):
 		payload = {
@@ -384,6 +479,7 @@ class TestStockEntryType(FrappeTestCase):
 			"production_policy": "MADE_TO_ORDER",
 			"item_code": "PLATE-1",
 			"accepted_qty": 1,
+			"fg_warehouse": "Kitchen WH",
 			"components": [{"item_code": "COMP-1", "qty": 2, "s_warehouse": "Kitchen WH"}],
 		}
 		intent = _doc({"name": "INTENT-1", "erpnext_stock_entry": None})
@@ -403,7 +499,14 @@ class TestStockEntryType(FrappeTestCase):
 		self.assertEqual(captured["doc"]["stock_entry_type"], "Manufacture")
 		self.assertEqual(captured["doc"]["purpose"], "Manufacture")
 
-	def test_submit_stock_entry_uses_material_issue_for_pre_produced(self):
+	def test_submit_stock_entry_refuses_a_non_made_to_order_payload(self):
+		"""The pipeline only ever emits Manufacture entries. The old
+		'Material Issue' branch existed solely for PRE_PRODUCED /
+		DIRECT_RETAIL, which now post nothing at READY at all -- their stock
+		is created ahead of time by the batch path (or not produced at all)
+		and deducted once by the sale at closing. An intent for such a policy
+		reaching the worker means it should never have been created, so fail
+		closed rather than guess a purpose."""
 		payload = {
 			"company": "Company A",
 			"production_policy": "PRE_PRODUCED",
@@ -412,21 +515,12 @@ class TestStockEntryType(FrappeTestCase):
 			"components": [{"item_code": "PLATE-1", "qty": 1, "s_warehouse": "FG WH"}],
 		}
 		intent = _doc({"name": "INTENT-1", "erpnext_stock_entry": None})
-		captured = {}
 
-		def get_doc(arg):
-			captured["doc"] = arg
-			return _doc(arg)
+		with patch(f"{MODULE}._find_existing_stock_entry", return_value=None):
+			with self.assertRaises(Exception) as ctx:
+				_submit_stock_entry(intent, payload)
 
-		with patch(f"{MODULE}.frappe.get_doc", side_effect=get_doc), patch(
-			f"{MODULE}._find_existing_stock_entry", return_value=None
-		), patch(f"{MODULE}._service_mutation") as mock_mutation:
-			mock_mutation.return_value.__enter__ = MagicMock()
-			mock_mutation.return_value.__exit__ = MagicMock(return_value=False)
-			_submit_stock_entry(intent, payload)
-
-		self.assertEqual(captured["doc"]["stock_entry_type"], "Material Issue")
-		self.assertEqual(captured["doc"]["purpose"], "Material Issue")
+		self.assertEqual(getattr(ctx.exception, "reason_code", None), "UNSUPPORTED_PRODUCTION_POLICY")
 
 
 class TestProcessPostingIntent(FrappeTestCase):
