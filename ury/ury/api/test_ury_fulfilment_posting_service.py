@@ -537,6 +537,7 @@ class TestProcessPostingIntent(FrappeTestCase):
 			"company": "Company A",
 			"production_policy": "MADE_TO_ORDER",
 			"reservation_group": "GROUP-1",
+			"fg_warehouse": "Finished Goods WH",
 			"components": [{"item_code": "COMP-1", "qty": 2, "s_warehouse": "Kitchen WH"}],
 			"actor": "chef@example.com",
 		}
