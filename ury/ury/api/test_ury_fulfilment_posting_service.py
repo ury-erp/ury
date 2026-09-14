@@ -9,6 +9,8 @@ from ury.ury.api.ury_fulfilment_posting_service import (
 	FAILED,
 	POSTED,
 	_authorize_posting,
+	_stock_entry_items,
+	_submit_stock_entry,
 	create_or_get_posting_intent_for_ready,
 	process_posting_intent,
 	recover_pending_posting_intents,
@@ -27,6 +29,24 @@ def _doc(data):
 	doc.save = MagicMock()
 	doc.submit = MagicMock()
 	return doc
+
+
+def _intent_lock_sql(intent_row):
+	"""frappe.db.sql side_effect that answers `_claim_intent`'s locking read
+	of the posting intent row with `intent_row`, and every other locking
+	existence check this module now runs post-lock (Stock Entry / reservation
+	/ fulfilment record) with "not found" -- matching what those checks'
+	previously-mocked `frappe.get_all`/`frappe.db.get_value` equivalents
+	returned in these tests before the F6 fix switched them to `FOR UPDATE`
+	SQL. A single blanket `return_value` cannot distinguish these queries
+	from each other, since they all go through the same `frappe.db.sql` mock
+	point now.
+	"""
+	def _sql(query, values=None, as_dict=False, **kwargs):
+		if "tabURY Fulfilment Posting Intent" in query:
+			return [intent_row]
+		return []
+	return _sql
 
 
 def _execution_doc():
@@ -272,6 +292,103 @@ class TestCreatePostingIntent(FrappeTestCase):
 		self.assertEqual(result["name"], "INTENT-1")
 
 
+class TestStockEntryType(FrappeTestCase):
+	"""Regression for the MTO bug: the posting worker always created a
+	'Material Issue' Stock Entry, which deducts raw-material components but
+	never produces (receives) the finished selling item. MADE_TO_ORDER must
+	post a 'Manufacture' entry with a t_warehouse row for the selling item.
+	See tracks/sa-nontable-production-gap.
+	"""
+
+	def test_mto_stock_rows_include_finished_item_target_warehouse(self):
+		payload = {
+			"production_policy": "MADE_TO_ORDER",
+			"item_code": "PLATE-1",
+			"accepted_qty": 2,
+			"components": [
+				{"item_code": "COMP-1", "qty": 4, "s_warehouse": "Kitchen WH"},
+				{"item_code": "COMP-2", "qty": 2, "s_warehouse": "Kitchen WH"},
+			],
+		}
+		items = _stock_entry_items(payload)
+		finished_rows = [row for row in items if row.get("item_code") == "PLATE-1"]
+		self.assertEqual(len(finished_rows), 1)
+		self.assertEqual(finished_rows[0]["t_warehouse"], "Kitchen WH")
+		self.assertEqual(finished_rows[0]["qty"], 2)
+		# Regression: without this flag ERPNext's Stock Entry validation
+		# rejects the submit ("There must be atleast 1 Finished Good in this
+		# Stock Entry") because mark_finished_and_scrap_items() only
+		# auto-infers is_finished_item from a linked work_order/bom_no, which
+		# this hand-built entry has neither of. Found live verifying
+		# tracks/sa-nontable-production-gap.
+		self.assertEqual(finished_rows[0]["is_finished_item"], 1)
+		component_rows = [row for row in items if row.get("item_code") != "PLATE-1"]
+		self.assertEqual(len(component_rows), 2)
+		for row in component_rows:
+			self.assertEqual(row["s_warehouse"], "Kitchen WH")
+			self.assertNotIn("t_warehouse", row)
+
+	def test_pre_produced_stock_rows_unchanged(self):
+		payload = {
+			"production_policy": "PRE_PRODUCED",
+			"item_code": "PLATE-1",
+			"accepted_qty": 1,
+			"components": [{"item_code": "PLATE-1", "qty": 1, "s_warehouse": "FG WH"}],
+		}
+		items = _stock_entry_items(payload)
+		self.assertEqual(items, [{"item_code": "PLATE-1", "qty": 1.0, "s_warehouse": "FG WH"}])
+
+	def test_submit_stock_entry_uses_manufacture_for_made_to_order(self):
+		payload = {
+			"company": "Company A",
+			"production_policy": "MADE_TO_ORDER",
+			"item_code": "PLATE-1",
+			"accepted_qty": 1,
+			"components": [{"item_code": "COMP-1", "qty": 2, "s_warehouse": "Kitchen WH"}],
+		}
+		intent = _doc({"name": "INTENT-1", "erpnext_stock_entry": None})
+		captured = {}
+
+		def get_doc(arg):
+			captured["doc"] = arg
+			return _doc(arg)
+
+		with patch(f"{MODULE}.frappe.get_doc", side_effect=get_doc), patch(
+			f"{MODULE}._find_existing_stock_entry", return_value=None
+		), patch(f"{MODULE}._service_mutation") as mock_mutation:
+			mock_mutation.return_value.__enter__ = MagicMock()
+			mock_mutation.return_value.__exit__ = MagicMock(return_value=False)
+			_submit_stock_entry(intent, payload)
+
+		self.assertEqual(captured["doc"]["stock_entry_type"], "Manufacture")
+		self.assertEqual(captured["doc"]["purpose"], "Manufacture")
+
+	def test_submit_stock_entry_uses_material_issue_for_pre_produced(self):
+		payload = {
+			"company": "Company A",
+			"production_policy": "PRE_PRODUCED",
+			"item_code": "PLATE-1",
+			"accepted_qty": 1,
+			"components": [{"item_code": "PLATE-1", "qty": 1, "s_warehouse": "FG WH"}],
+		}
+		intent = _doc({"name": "INTENT-1", "erpnext_stock_entry": None})
+		captured = {}
+
+		def get_doc(arg):
+			captured["doc"] = arg
+			return _doc(arg)
+
+		with patch(f"{MODULE}.frappe.get_doc", side_effect=get_doc), patch(
+			f"{MODULE}._find_existing_stock_entry", return_value=None
+		), patch(f"{MODULE}._service_mutation") as mock_mutation:
+			mock_mutation.return_value.__enter__ = MagicMock()
+			mock_mutation.return_value.__exit__ = MagicMock(return_value=False)
+			_submit_stock_entry(intent, payload)
+
+		self.assertEqual(captured["doc"]["stock_entry_type"], "Material Issue")
+		self.assertEqual(captured["doc"]["purpose"], "Material Issue")
+
+
 class TestProcessPostingIntent(FrappeTestCase):
 	def _intent(self):
 		payload = {
@@ -319,7 +436,10 @@ class TestProcessPostingIntent(FrappeTestCase):
 				return fulfilment
 			raise AssertionError(arg)
 
-		with patch(f"{MODULE}.frappe.db.sql", return_value=[frappe._dict({"name": "INTENT-1", "status": "PENDING", "attempts": 0})]), patch(
+		with patch(
+			f"{MODULE}.frappe.db.sql",
+			side_effect=_intent_lock_sql(frappe._dict({"name": "INTENT-1", "status": "PENDING", "attempts": 0})),
+		), patch(
 			f"{MODULE}.frappe.get_doc", side_effect=get_doc
 		), patch(f"{MODULE}.frappe.get_all", side_effect=lambda doctype, **kwargs: []), patch(
 			f"{MODULE}.frappe.db.get_value", return_value=None
@@ -355,7 +475,15 @@ class TestProcessPostingIntent(FrappeTestCase):
 				return fulfilment
 			raise AssertionError(arg)
 
-		with patch(f"{MODULE}.frappe.db.sql", return_value=[frappe._dict({"name": "INTENT-1", "status": "PENDING", "attempts": 0})]), patch(
+		def sql_side_effect(query, values=None, as_dict=False, **kwargs):
+			if "tabURY Fulfilment Posting Intent" in query:
+				return [frappe._dict({"name": "INTENT-1", "status": "PENDING", "attempts": 0})]
+			if "tabURY Stock Reservation" in query:
+				# _reservation_is_fulfilled: every row already Fulfilled.
+				return [frappe._dict({"status": "Fulfilled"})]
+			return []
+
+		with patch(f"{MODULE}.frappe.db.sql", side_effect=sql_side_effect), patch(
 			f"{MODULE}.frappe.get_doc", side_effect=get_doc
 		), patch(f"{MODULE}.frappe.get_all", return_value=[frappe._dict({"status": "Fulfilled"})]), patch(
 			f"{MODULE}.frappe.db.get_value", return_value="FUL-1"
@@ -390,7 +518,10 @@ class TestProcessPostingIntent(FrappeTestCase):
 				return stock_entry
 			raise AssertionError(arg)
 
-		with patch(f"{MODULE}.frappe.db.sql", return_value=[frappe._dict({"name": "INTENT-1", "status": "PENDING", "attempts": 0})]), patch(
+		with patch(
+			f"{MODULE}.frappe.db.sql",
+			side_effect=_intent_lock_sql(frappe._dict({"name": "INTENT-1", "status": "PENDING", "attempts": 0})),
+		), patch(
 			f"{MODULE}.frappe.get_doc", side_effect=get_doc
 		), patch(f"{MODULE}.frappe.get_all", return_value=[]), patch(
 			f"{MODULE}.fulfil_reservation"
@@ -437,7 +568,10 @@ class TestProcessPostingIntent(FrappeTestCase):
 				return stock_entry
 			raise AssertionError(arg)
 
-		with patch(f"{MODULE}.frappe.db.sql", return_value=[frappe._dict({"name": "INTENT-1", "status": "PENDING", "attempts": 5})]), patch(
+		with patch(
+			f"{MODULE}.frappe.db.sql",
+			side_effect=_intent_lock_sql(frappe._dict({"name": "INTENT-1", "status": "PENDING", "attempts": 5})),
+		), patch(
 			f"{MODULE}.frappe.get_doc", side_effect=get_doc
 		), patch(f"{MODULE}.frappe.get_all", return_value=[]), patch(
 			f"{MODULE}.fulfil_reservation"

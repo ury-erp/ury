@@ -184,6 +184,13 @@ before_uninstall = "ury.uninstall.uninstall"
 # function itself no-ops when "huf" isn't in the installed apps list.
 after_migrate = ["ury.ury.ai_tools.agent_seeding.after_migrate"]
 
+# The "URY Sales Plan" Workflow fixture (ury/ury/workflow/ury_sales_plan/ury_sales_plan.json)
+# links to Workflow State / Workflow Action Master records that frappe core does
+# not seed. `bench migrate` syncs fixtures (frappe.modules.utils.sync_fixtures)
+# BEFORE running after_migrate hooks, so seeding these in after_migrate would be
+# too late on a fresh site -- before_migrate runs first, ahead of fixture sync.
+before_migrate = ["ury.ury.workflow.ury_sales_plan.install.before_migrate"]
+
 # Document Events
 # ---------------
 # Hook on document methods and events
@@ -234,6 +241,7 @@ doc_events = {
     "AI Provider": {"on_update": "ury.ury.ai_tools.agent_seeding.on_ai_provider_update"},
     "Stock Reconciliation": {"validate": "ury.ury.utils.stock_reconciliation_guards.validate"},
     "Customer": {"validate": "ury.ury.hooks.ury_customer.validate"},
+    "BOM": {"before_validate": "ury.ury.hooks.ury_bom.apply_yield_back_calculation"},
 }
 
 # Scheduled Tasks
@@ -248,7 +256,10 @@ scheduler_events = {
 		"*/5 * * * *":[
 			"ury.ury.services.food_cost_alerts.notify_high_food_cost"
 		]
-	}
+	},
+	"daily": [
+		"ury.ury.services.yield_check_reminders.notify_overdue_yield_checks"
+	]
 # 	"all": [
 # 		"ury.tasks.all"
 # 	],
@@ -503,6 +514,12 @@ fixtures = [
                     "Journal Entry-branch",
                     "Employee-payment_amount",
                     "Employee-payment_type",
+                    "Item-custom_yield_check_cadence",
+                    "Item-custom_yield_check_interval_days",
+                    "Item-custom_yield_percent",
+                    "Item-custom_yield_tracked",
+                    "BOM Item-custom_yield_qty",
+                    "BOM Item-custom_yield_percent",
                     "Item-disposable_items",
                     "Item-is_disposable",
                     "POS Invoice Item-is_disposable",
@@ -511,6 +528,7 @@ fixtures = [
                     "POS Profile-table_disposables",
                     "Stock Reconciliation-branch",
                     "Stock Entry-branch",
+                    "Stock Entry-custom_ury_posting_intent",
                     "POS Profile-cash_discount_account",
                     "Sales Invoice-cash_discount_journal_entry"
                 },
@@ -532,4 +550,5 @@ fixtures = [
     {"dt": "Role", "filters": [["role_name", "like", "URY %"]]},
     {"doctype": "Role", "filters": [["role_name", "in", ["Self Ordering Manager"]]]},
     "Client Script",
+    {"doctype": "Workflow", "filters": [["name", "in", ["URY Sales Plan"]]]},
 ]

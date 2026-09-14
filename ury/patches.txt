@@ -10,3 +10,4 @@ ury.patches.v3_0.backfill_invoice_employee_attribution
 ury.patches.v3_0.backfill_pos_invoice_item_entered_by
 ury.patches.v3_14.production_unit_department_migration
 ury.patches.v3_15.backfill_production_unit_company
+ury.patches.v3_16.add_stock_entry_posting_intent_field

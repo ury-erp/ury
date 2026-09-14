@@ -15,6 +15,7 @@ from ury.ury.api.ury_kot_item_execution_service import (
 	get_kot_execution_state,
 	mark_item_ready,
 	seed_kot_item_executions,
+	seed_kot_item_executions_on_submit,
 	serve_item_execution,
 	start_item_execution,
 )
@@ -107,12 +108,21 @@ class _ExecutionHarness:
 		return self._select(doctype, filters=filters, fields=fields, limit=limit)
 
 	def sql(self, query, values=None, as_dict=False, pluck=None, **kwargs):
-		if not values or "kot_item" not in values:
+		if not values:
 			return []
-		rows = self._select(ITEM_EXECUTION_DOCTYPE, filters={"kot_item": values["kot_item"]}, limit=1)
-		if pluck:
-			return [row.get(pluck) for row in rows]
-		return rows
+		if "kot_item" in values:
+			rows = self._select(ITEM_EXECUTION_DOCTYPE, filters={"kot_item": values["kot_item"]}, limit=1)
+			if pluck:
+				return [row.get(pluck) for row in rows]
+			return rows
+		if "kot" in values:
+			# _lock_sibling_item_execution_rows: locking read of every sibling
+			# item-execution row for this KOT.
+			rows = self._select(ITEM_EXECUTION_DOCTYPE, filters={"kot": values["kot"]})
+			if pluck:
+				return [row.get(pluck) for row in rows]
+			return rows
+		return []
 
 	def _select(self, doctype, filters=None, fields=None, limit=None):
 		rows = []
@@ -164,6 +174,8 @@ class TestKotItemExecution(FrappeTestCase):
 		with patch(f"{MODULE}.frappe.db.exists", side_effect=harness.exists), patch(
 			f"{MODULE}.frappe.get_doc", side_effect=harness.get_doc
 		), patch(f"{MODULE}.frappe.get_all", side_effect=harness.get_all), patch(
+			f"{MODULE}.frappe.db.sql", side_effect=harness.sql
+		), patch(
 			f"{MODULE}.frappe.db.get_value", return_value=frappe._dict({"branch": "BR-1", "production": "PU-1"})
 		), patch(f"{MODULE}.frappe.session") as session:
 			session.user = "chef@example.com"
@@ -199,3 +211,23 @@ class TestKotItemExecution(FrappeTestCase):
 		mock_ready_posting.assert_called_once()
 		self.assertEqual(harness.docs[KOT_EXECUTION_DOCTYPE]["KOTEXEC-1"]["state"], READY)
 		self.assertEqual(json.loads(harness.created[0]["audit_log"])[0]["event"], "seed")
+
+	def test_seed_on_submit_uses_kot_name_not_document(self):
+		"""Regression: the URY KOT on_submit hook was calling
+		seed_kot_item_executions(doc) with the full Document instead of
+		doc.name. seed_kot_item_executions()/_kot_items() feed that value
+		straight into frappe.get_doc(KOT_DOCTYPE, kot); since a Document is
+		dict-like, frappe.get_doc treats a dict-like second argument as a
+		*filter*, not a name lookup, and silently resolves to whichever row
+		the filter happens to match -- occasionally the same KOT (its own
+		field values are self-consistent), but just as easily an unrelated
+		one (e.g. a cancelled KOT), or nothing at all. This surfaced live
+		while verifying tracks/sa-nontable-production-gap: KOT Item
+		Execution rows sometimes never got created for a KOT that had just
+		submitted, with no error anywhere. See ury_kot_item_execution_service.py,
+		seed_kot_item_executions_on_submit.
+		"""
+		submitted_doc = frappe._dict({"name": "URY KOT-1"})
+		with patch(f"{MODULE}.seed_kot_item_executions") as mock_seed:
+			seed_kot_item_executions_on_submit(submitted_doc)
+		mock_seed.assert_called_once_with("URY KOT-1")

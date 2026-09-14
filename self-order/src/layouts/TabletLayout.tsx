@@ -269,6 +269,7 @@ function TabletLayout({ initialContext }: LayoutProps) {
                 cardClassName="flex min-w-[150px] flex-col overflow-hidden rounded-xl border text-left transition active:scale-[0.98]"
                 imageClassName="h-32 w-full object-cover"
                 branch={context?.restaurant}
+                company={context?.company}
               />
             </div>
           )}
