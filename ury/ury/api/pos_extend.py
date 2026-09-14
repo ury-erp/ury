@@ -1,5 +1,6 @@
 import frappe
 from frappe import _
+from ury.ury_pos.api import getBranch, getPosProfile, _resolve_pos_profile
 
 def validate_search_input(search_term):
     """Validate and sanitize search input"""
@@ -10,7 +11,7 @@ def validate_search_input(search_term):
     if len(search_term) > 100:
         frappe.throw(_("Search term too long (max 100 characters)"))
 
-    # Character whitelist (adjust based on requirements)
+    # Character whitelist
     import re
     if not re.match(r'^[a-zA-Z0-9\s\-_@.]+$', search_term):
         frappe.throw(_("Invalid characters in search term"))
@@ -21,20 +22,23 @@ def validate_search_input(search_term):
 def overrided_past_order_list(search_term, status, limit=20):
     user = frappe.session.user
     search_term = validate_search_input(search_term)
+    
     if user != "Administrator":
-        sql_query = """
-            SELECT b.branch,a.room
-            FROM `tabURY User` AS a
-            INNER JOIN `tabBranch` AS b ON a.parent = b.name
-            WHERE a.user = %s
-        """
-        branch_array = frappe.db.sql(sql_query, user, as_dict=True)
-
-        if not branch_array:
-            frappe.throw("User is not Associated with any Branch.Please refresh Page")
-
-        branch_name = branch_array[0].get("branch")
-        room_name = branch_array[0].get("room")
+        branch_name = getBranch()
+        try:
+            pos_profile = _resolve_pos_profile(user, branch_name)
+        except Exception:
+            pos_profile = None
+        if not pos_profile:
+            frappe.throw("No POS Profile found for user. Please refresh page.")
+        
+        pos_profile_doc = frappe.get_doc("POS Profile", pos_profile)
+        room_names = [r.room for r in pos_profile_doc.get("custom_rooms", []) if r.room]
+        if not room_names:
+            frappe.throw("No rooms assigned to POS Profile. Please contact administrator.")
+    else:
+        branch_name = None
+        room_names = []
 
     fields = [
         "name",
@@ -50,20 +54,30 @@ def overrided_past_order_list(search_term, status, limit=20):
     updated_list = []
 
     if search_term and status:
+        filters_customer = {
+            "customer": ["like", "%{}%".format(frappe.db.escape(search_term))],
+            "status": status,
+        }
+        filters_name = {
+            "name": ["like", "%{}%".format(frappe.db.escape(search_term))],
+            "status": status,
+        }
+        if user != "Administrator":
+            filters_customer["branch"] = branch_name
+            filters_customer["custom_restaurant_room"] = ["in", room_names]
+            filters_name["branch"] = branch_name
+            filters_name["custom_restaurant_room"] = ["in", room_names]
+
         invoices_by_customer = frappe.db.get_all(
             "POS Invoice",
-            filters={
-                "customer": ["like", "%{}%".format(frappe.db.escape(search_term))],
-                "status": status,
-            },
+            filters=filters_customer,
             fields=fields,
         )
         invoices_by_name = frappe.db.get_all(
             "POS Invoice",
-            filters={"name": ["like", "%{}%".format(frappe.db.escape(search_term))], "status": status},
+            filters=filters_name,
             fields=fields,
         )
-        print("invoices by customer",invoices_by_customer)
         invoice_list = invoices_by_customer + invoices_by_name
         updated_list = invoice_list
     elif status:
@@ -71,7 +85,7 @@ def overrided_past_order_list(search_term, status, limit=20):
             if status == "To Bill":
                 invoice_list = frappe.db.get_all(
                     "POS Invoice",
-                    filters={"status": "Draft", "branch": branch_name,"custom_restaurant_room": room_name},
+                    filters={"status": "Draft", "branch": branch_name, "custom_restaurant_room": ["in", room_names]},
                     fields=fields,
                 )
                 for invoice in invoice_list:
@@ -81,7 +95,7 @@ def overrided_past_order_list(search_term, status, limit=20):
             else:
                 invoice_list = frappe.db.get_all(
                     "POS Invoice",
-                    filters={"status": status, "branch": branch_name,"custom_restaurant_room":room_name},
+                    filters={"status": status, "branch": branch_name, "custom_restaurant_room": ["in", room_names]},
                     fields=fields,
                 )
                 for invoice in invoice_list:

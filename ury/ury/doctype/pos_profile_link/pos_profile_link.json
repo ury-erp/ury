@@ -1,37 +1,31 @@
 {
  "actions": [],
  "allow_rename": 1,
- "creation": "2023-09-13 23:50:07.542900",
+ "creation": "2026-07-21 09:47:59.000000",
+ "default_view": "List",
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "user",
-  "room"
+  "pos_profile"
  ],
  "fields": [
   {
-   "fieldname": "user",
+   "fieldname": "pos_profile",
    "fieldtype": "Link",
    "in_list_view": 1,
-   "label": "User",
-   "options": "User"
-  },
-  {
-   "description": "DEPRECATED: Will be removed in future. Use POS Profile for room assignment.",
-   "fieldname": "room",
-   "fieldtype": "Link",
-   "label": "Room",
-   "options": "URY Room"
+   "label": "POS Profile",
+   "options": "POS Profile",
+   "reqd": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2024-08-19 18:30:54.832691",
+ "modified": "2026-07-21 09:47:59.000000",
  "modified_by": "Administrator",
  "module": "URY",
- "name": "URY User",
+ "name": "POS Profile Link",
  "owner": "Administrator",
  "permissions": [],
  "sort_field": "modified",

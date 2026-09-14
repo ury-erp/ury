@@ -27,8 +27,7 @@
   "active_info_tab",
   "occupied",
   "column_break_280tb",
-  "latest_invoice_time",
-  "merged_with"
+  "latest_invoice_time"
  ],
  "fields": [
   {
@@ -52,11 +51,11 @@
    "fieldtype": "Column Break"
   },
   {
+   "description": "DEPRECATED: Will be removed in future. Use Branch instead.",
    "fieldname": "restaurant",
    "fieldtype": "Link",
    "label": "Restaurant",
-   "options": "URY Restaurant",
-   "reqd": 1
+   "options": "URY Restaurant"
   },
   {
    "fieldname": "restaurant_room",
@@ -150,7 +149,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-09-02 19:25:38.913387",
+ "modified": "2026-06-17 15:45:13.235634",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Table",
@@ -196,19 +195,6 @@
    "read": 1,
    "role": "URY Cashier",
    "select": 1,
-   "write": 1
-  },
-  {
-   "create": 1,
-   "delete": 1,
-   "email": 1,
-   "export": 1,
-   "print": 1,
-   "read": 1,
-   "report": 1,
-   "role": "URY Admin",
-   "select": 1,
-   "share": 1,
    "write": 1
   }
  ],

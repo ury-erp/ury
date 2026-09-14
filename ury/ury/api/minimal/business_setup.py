@@ -66,29 +66,6 @@ def update_business_setup(branch=None, restaurant=None):
                 doc.update(b_data)
                 doc.insert(ignore_permissions=True)
             
-    if restaurant:
-        if isinstance(restaurant, str):
-            restaurant = frappe.parse_json(restaurant)
-            
-        restaurants_data = restaurant if isinstance(restaurant, list) else [restaurant]
-        
-        company = frappe.get_all("Company", limit=1)
-        company_name = company[0].name if company else None
-        
-        for r_data in restaurants_data:
-            restaurant_name = r_data.get("name") or r_data.get("restaurant_name") or company_name
-            if restaurant_name and frappe.db.exists("URY Restaurant", restaurant_name):
-                rdoc = frappe.get_doc("URY Restaurant", restaurant_name)
-                rdoc.update(r_data)
-                rdoc.save(ignore_permissions=True)
-            elif restaurant_name:
-                rdoc = frappe.new_doc("URY Restaurant")
-                rdoc.name = restaurant_name
-                if not r_data.get("company"):
-                    rdoc.company = company_name
-                rdoc.update(r_data)
-                rdoc.insert(ignore_permissions=True)
-            
     return {"status": "success"}
 
 @frappe.whitelist()
@@ -197,22 +174,9 @@ def submit_configure_data(data):
             room_doc.insert(ignore_permissions=True)
             results["rooms"].append(room_doc.name)
 
-    # 3. URY Restaurant (Required dependency for URY Table!)
+    # 3. URY Restaurant (Skipped - Deprecated)
     restaurant_name = default_company
-    if not frappe.db.exists("URY Restaurant", restaurant_name):
-        rest_doc = frappe.get_doc({
-            "doctype": "URY Restaurant",
-            "name": restaurant_name,
-            "company": default_company,
-            "branch": branch_name,
-            "invoice_series_prefix": data.get("branch", {}).get("invoicePrefix", "INV-"),
-            "aggregator_series_prefix": data.get("branch", {}).get("aggregatorPrefix", "AGG-"),
-            "default_room": first_room_name
-        })
-        rest_doc.insert(ignore_permissions=True)
-        results["restaurant"] = rest_doc.name
-    else:
-        results["restaurant"] = restaurant_name
+    results["restaurant"] = restaurant_name
 
     # 4. URY Tables (linked to Restaurant & Room!)
     results["tables"] = []
@@ -232,7 +196,7 @@ def submit_configure_data(data):
             table_doc = frappe.get_doc({
                 "doctype": "URY Table",
                 "name": t_name,
-                "restaurant": restaurant_name,
+                
                 "restaurant_room": room_link,
                 "branch": branch_name,
                 "no_of_seats": int(t.get("seats", 4)),
@@ -317,8 +281,7 @@ def submit_configure_data(data):
         menu_doc.insert(ignore_permissions=True)
         results["menu"] = menu_doc.name
         
-        # Link menu to restaurant
-        frappe.db.set_value("URY Restaurant", restaurant_name, "active_menu", menu_name)
+        
     elif frappe.db.exists("URY Menu", menu_name):
         results["menu"] = menu_name
 
@@ -458,7 +421,7 @@ def submit_configure_data(data):
                 "table_attention_time": 30,
                 "role_allowed_for_billing": "URY Cashier",
                 "transfer_role_permissions": "URY Manager",
-                "restaurant": restaurant_name,
+                
                 "branch": branch_name,
                 "payments": [{"mode_of_payment": pm, "default": 1 if i == 0 else 0} for i, pm in enumerate(results.get("payment_methods", []))],
                 "applicable_for_users": [{"user": email, "default": 1} for email in cashier_emails]
@@ -490,9 +453,7 @@ def submit_configure_data(data):
 
             pos_doc = frappe.get_doc(pos_dict)
             
-            if tax_template_name:
-                if frappe.db.exists("URY Restaurant", restaurant_name):
-                    frappe.db.set_value("URY Restaurant", restaurant_name, "default_tax_template", tax_template_name)
+            
                 
             pos_doc.insert(ignore_permissions=True)
             results["pos_profile"] = pos_doc.name
@@ -507,7 +468,7 @@ def submit_configure_data(data):
                 "table_attention_time": 30,
                 "role_allowed_for_billing": "URY Cashier",
                 "transfer_role_permissions": "URY Manager",
-                "restaurant": restaurant_name,
+                
                 "branch": branch_name,
             }
             for k, v in update_fields.items():

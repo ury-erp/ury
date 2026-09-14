@@ -122,16 +122,19 @@ def table_status_delete(doc, method):
 def pos_invoice_naming(doc, method):
     pos_profile = frappe.get_doc("POS Profile", doc.pos_profile)
     restaurant = pos_profile.restaurant
+    branch = doc.branch or pos_profile.branch
 
     if not doc.restaurant_table:
-        doc.naming_series = frappe.db.get_value(
-            "URY Restaurant", restaurant, "invoice_series_prefix"
-        )
+        naming_series_prefix = frappe.db.get_value("Branch", branch, "custom_invoice_series_prefix")
+        if not naming_series_prefix:
+            naming_series_prefix = frappe.db.get_value("URY Restaurant", restaurant, "invoice_series_prefix")
+        doc.naming_series = naming_series_prefix
         
         if doc.order_type == "Aggregators":
-            doc.naming_series = frappe.db.get_value(
-                "URY Restaurant", restaurant, "aggregator_series_prefix"
-            )
+            aggregator_prefix = frappe.db.get_value("Branch", branch, "custom_aggregator_series_prefix")
+            if not aggregator_prefix:
+                aggregator_prefix = frappe.db.get_value("URY Restaurant", restaurant, "aggregator_series_prefix")
+            doc.naming_series = aggregator_prefix
     
 
 
@@ -154,20 +157,27 @@ def ro_reload_submit(doc, method):
 
 
 def validate_price_list(doc, method):
+    branch = doc.branch
+    if not branch and doc.pos_profile:
+        branch = frappe.db.get_value("POS Profile", doc.pos_profile, "branch")
         
-    if doc.restaurant:
+    if branch or doc.restaurant:
         
         if doc.restaurant_table:
             room = frappe.db.get_value("URY Table", doc.restaurant_table, "restaurant_room")
-            menu_name = (
-                frappe.db.get_value("URY Restaurant", doc.restaurant, "active_menu")
-                if not frappe.db.get_value(
-                    "URY Restaurant", doc.restaurant, "room_wise_menu"
-                )
-                else frappe.db.get_value(
-                    "Menu for Room", {"parent": doc.restaurant, "room": room}, "menu"
-                )
-            )
+            
+            room_wise_menu = frappe.db.get_value("Branch", branch, "custom_room_wise_menu") if branch else None
+            if room_wise_menu is None and doc.restaurant:
+                room_wise_menu = frappe.db.get_value("URY Restaurant", doc.restaurant, "room_wise_menu")
+                
+            if not room_wise_menu:
+                menu_name = frappe.db.get_value("Branch", branch, "custom_active_menu") if branch else None
+                if not menu_name and doc.restaurant:
+                    menu_name = frappe.db.get_value("URY Restaurant", doc.restaurant, "active_menu")
+            else:
+                menu_name = frappe.db.get_value("Menu for Room", {"parent": branch, "room": room, "parenttype": "Branch"}, "menu") if branch else None
+                if not menu_name and doc.restaurant:
+                    menu_name = frappe.db.get_value("Menu for Room", {"parent": doc.restaurant, "room": room, "parenttype": "URY Restaurant"}, "menu")
 
             doc.selling_price_list = frappe.db.get_value(
                 "Price List", dict(restaurant_menu=menu_name, enabled=1)
@@ -185,7 +195,9 @@ def validate_price_list(doc, method):
             doc.selling_price_list = price_list
             
         else:
-            menu_name = frappe.db.get_value("URY Restaurant", doc.restaurant, "active_menu") 
+            menu_name = frappe.db.get_value("Branch", branch, "custom_active_menu") if branch else None
+            if not menu_name and doc.restaurant:
+                menu_name = frappe.db.get_value("URY Restaurant", doc.restaurant, "active_menu") 
 
             doc.selling_price_list = frappe.db.get_value(
                 "Price List", dict(restaurant_menu=menu_name, enabled=1)
