@@ -410,6 +410,48 @@ export default {
       const now = new Date();
       this.currentTime = now.toLocaleTimeString();
 
+      const genIdempotencyKey = () => {
+        if (window.crypto && window.crypto.randomUUID) {
+          return window.crypto.randomUUID();
+        }
+        // Fallback for non-secure contexts where crypto.randomUUID is
+        // unavailable: still unique enough for a single client action.
+        return `${kot.name}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      };
+
+      try {
+        // Drive every KOT item through the real execution-service lifecycle
+        // (READY, then SERVED) so the recipe snapshot / stock-authority
+        // trigger actually fires. Both transitions are idempotent server-side
+        // (a repeated call with a fresh idempotency_key on an item already at
+        // or past the target state is a no-op), so it's safe to call
+        // mark_item_ready unconditionally even for items a chef already
+        // marked ready via the Captain app.
+        for (const kotitem of kot.kot_items || []) {
+          await this.call.post(
+            "ury.ury.api.ury_kot_item_execution_service.mark_item_ready",
+            {
+              kot_item: kotitem.name,
+              idempotency_key: genIdempotencyKey(),
+            }
+          );
+          await this.call.post(
+            "ury.ury.api.ury_kot_item_execution_service.serve_item_execution",
+            {
+              kot_item: kotitem.name,
+              idempotency_key: genIdempotencyKey(),
+            }
+          );
+        }
+      } catch (error) {
+        console.error("Failed to serve KOT via execution service", error);
+        return;
+      }
+
+      // Legacy KOT-level bookkeeping (order_status/start_time_serv/
+      // production_time) kept as a compatibility shim for consumers that
+      // still read those fields directly, now that the execution service
+      // above is the source of truth for production/stock-deduction.
       this.call
         .post("ury.ury.api.ury_kot_display.serve_kot", {
           name: kot.name,
