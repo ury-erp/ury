@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useBranchContext } from '../../context/BranchContext';
-import { logout, call, getLoggedUser, getUserRoles } from '@ury/core';
+import { logout, call, getLoggedUser, getUserRoles, withReturnContext } from '@ury/core';
 import { Breadcrumbs } from './Breadcrumbs';
 import { useDeskPermission } from '../DeskLink';
 import uryLogo from '../../../Public/URY-bg.png';
@@ -281,7 +281,9 @@ export const Header: React.FC = () => {
                     <button
                       onClick={() => {
                         setIsUserMenuOpen(false);
-                        window.location.href = '/app';
+                        window.location.href = withReturnContext('/app', {
+                          returnTo: { path: '/ury', label: 'URY' },
+                        });
                       }}
                       className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-foreground hover:bg-muted transition-colors"
                     >
