@@ -482,6 +482,12 @@ def _ensure_menu_items(branch_name):
 						"items": [],
 					}
 				)
+				# URY Menu.items is a mandatory Table field, but this menu
+				# is intentionally created empty here -- the loop below
+				# populates it and saves again right after. Without
+				# ignore_mandatory, this insert() itself throws
+				# MandatoryError before that loop ever runs.
+				menu_doc.flags.ignore_mandatory = True
 				menu_doc.insert(ignore_permissions=True)
 				print(f"Created URY Menu: {active_menu}")
 		# Set it as active on the restaurant
