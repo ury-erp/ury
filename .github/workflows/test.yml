@@ -153,6 +153,7 @@ jobs:
               ury.ury.api.test_ury_kot_cancellation_service
               ury.ury.api.test_ury_kot_chef_filter
               ury.ury.api.test_ury_kot_display
+              ury.ury.api.test_ury_kot_display_serve_and_list
               ury.ury.api.test_ury_kot_execution_service
               ury.ury.api.test_ury_kot_generate
               ury.ury.api.test_ury_kot_item_execution_service
@@ -167,6 +168,7 @@ jobs:
             modules: |
               ury.ury.api.test_ury_order_reservation_service
               ury.ury.api.test_ury_reservation_service
+              ury.ury.api.test_ury_reservation_service_expiry
               ury.ury.api.test_ury_preproduced_fulfilment_service
               ury.ury.api.test_ury_print
               ury.ury.api.test_ury_production_context
@@ -184,11 +186,15 @@ jobs:
               ury.ury.controllers.test_setup_redirect
               ury.ury.dev_seed.test_demo_runner
               ury.ury.doctype.alert_settings.test_alert_settings
+              ury.ury.doctype.staff_discount_policy.test_staff_discount_policy
+              ury.ury.doctype.stock_correction.test_stock_correction
               ury.ury.doctype.bulk_production.test_bulk_production
               ury.ury.doctype.menu_for_room.test_menu_for_room
               ury.ury.doctype.sub_pos_closing.test_sub_pos_closing
+              ury.ury.doctype.sub_pos_closing.test_sub_pos_closing_lookups
               ury.ury.doctype.ury_commission_settings.test_ury_commission_settings
               ury.ury.doctype.ury_daily_p_and_l.test_ury_daily_p_and_l
+              ury.ury.doctype.ury_daily_p_and_l.test_ury_daily_p_and_l_get_profit_loss_details
               ury.ury.doctype.ury_insight.test_ury_insight
               ury.ury.doctype.ury_item_production_configuration.test_ury_item_production_configuration
               ury.ury.doctype.ury_kot.test_ury_kot
@@ -227,6 +233,7 @@ jobs:
               ury.ury.report_api.test_items
               ury.ury.report_api.test_operations
               ury.ury.report_api.test_sales
+              ury.ury.report_api.test_sales_data_logic
               ury.ury.services.test_bom_cost_resolver
               ury.ury.services.test_production_unit_department_migration
               ury.ury.services.test_yield_check_reminders
