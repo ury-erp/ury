@@ -3,6 +3,7 @@ from unittest.mock import patch
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
+from ury.ury.tests.factories import make_branch, make_item
 from ury.ury.api.ury_sales_plan import (
     _validate_plan_scope,
     freeze_approval_snapshot,
@@ -158,28 +159,10 @@ class TestURYSalesPlanEndpoints(FrappeTestCase):
             ).insert()
 
     def _ensure_branch(self, branch_name, company):
-        if not frappe.db.exists("Branch", branch_name):
-            frappe.get_doc(
-                {
-                    "doctype": "Branch",
-                    "branch": branch_name,
-                    "company": company,
-                    "user": [{"user": "Administrator"}],
-                }
-            ).insert()
+        make_branch(branch=branch_name, company=company, user=[{"user": "Administrator"}])
 
     def _ensure_item(self, item_code):
-        if not frappe.db.exists("Item", item_code):
-            frappe.get_doc(
-                {
-                    "doctype": "Item",
-                    "item_code": item_code,
-                    "item_name": item_code,
-                    "item_group": "All Item Groups",
-                    "stock_uom": "Nos",
-                    "is_stock_item": 1,
-                }
-            ).insert()
+        make_item(item_code=item_code, item_name=item_code)
 
     def setUp(self):
         self.company = "Sales Plan Test Co"

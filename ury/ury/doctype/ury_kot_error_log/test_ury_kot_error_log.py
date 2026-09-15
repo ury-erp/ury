@@ -5,6 +5,7 @@ import frappe
 from frappe.tests.utils import FrappeTestCase
 
 from ury.ury.api.ury_kot_validation import get_kot_errors
+from ury.ury.tests.factories import make_branch
 
 TEST_CASHIER = "_test_kot_error_cashier@example.com"
 BRANCH_A = "_Test KOT Error Branch A"
@@ -102,13 +103,7 @@ class TestGetKOTErrors(FrappeTestCase):
 			if frappe.db.exists("Branch", branch):
 				frappe.delete_doc("Branch", branch, force=True, ignore_permissions=True)
 
-			frappe.get_doc(
-				{
-					"doctype": "Branch",
-					"branch": branch,
-					"user": [{"user": member}],
-				}
-			).insert(ignore_permissions=True)
+			make_branch(branch=branch, user=[{"user": member}])
 
 	def _create_pos_profile(self):
 		"""Clone an existing POS Profile and re-point it at Branch A.
