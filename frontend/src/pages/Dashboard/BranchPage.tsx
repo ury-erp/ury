@@ -382,10 +382,25 @@ export const BranchPage: React.FC = () => {
   const handleSave = async () => {
     if (!selectedBranch) return;
 
-    // Validate invoice series prefix — only relevant when a URY Restaurant actually
-    // exists to save it to. A plain Branch with no linked URY Restaurant (e.g. one
-    // created directly in Desk) must still be editable/savable for its own fields.
-    if (restaurantData && (!restaurantForm.invoice_series_prefix || !restaurantForm.invoice_series_prefix.trim())) {
+    // When there's no linked URY Restaurant yet but the user has entered
+    // Restaurant-scoped data (address and/or the fiscal fields), we create the
+    // URY Restaurant record on save instead of silently dropping that data --
+    // see ITEM_18_BRANCH_MANAGEMENT.md #4/#18a. This also means those fields
+    // are no longer purely read-only placeholders when restaurantData is null.
+    const addressEntered = !!(branchForm.address || '').trim();
+    const fiscalEntered = !!(
+      (restaurantForm.invoice_series_prefix || '').trim() ||
+      (restaurantForm.aggregator_series_prefix || '').trim() ||
+      (restaurantForm.tax_id || '').trim() ||
+      (restaurantForm.default_tax_template || '').trim()
+    );
+    const shouldCreateRestaurant = !restaurantData && (addressEntered || fiscalEntered);
+
+    // Validate invoice series prefix — required whenever a URY Restaurant either
+    // already exists or is about to be created on this save. A plain Branch with
+    // no Restaurant-scoped data entered must still be editable/savable for its
+    // own fields without this requirement.
+    if ((restaurantData || shouldCreateRestaurant) && (!restaurantForm.invoice_series_prefix || !restaurantForm.invoice_series_prefix.trim())) {
       showToast.error('Invoice Series Prefix is required');
       return;
     }
@@ -516,6 +531,50 @@ export const BranchPage: React.FC = () => {
         await call('frappe.client.save', {
           doc: updatedDoc
         });
+      } else if (shouldCreateRestaurant) {
+        // No URY Restaurant linked yet, but the user entered Restaurant-scoped
+        // data (address and/or fiscal fields) -- create the Restaurant now
+        // instead of silently dropping that data (ITEM_18_BRANCH_MANAGEMENT.md
+        // #4/#18a). Mirrors the URY Restaurant creation in handleAddBranch.
+        const restaurantCompany = companies[0]?.name;
+        if (!restaurantCompany) {
+          showToast.error('Cannot create Restaurant record: no Company found. Create a Company first.');
+          setSaving(false);
+          return;
+        }
+
+        // default_room is mandatory on URY Restaurant -- reuse an existing room
+        // for this branch if one exists, otherwise create the same
+        // "Main Dining - <branch>" default room used elsewhere in this file
+        // (handleAddBranch / handleCreateDefaultRoom).
+        let defaultRoomName = restaurantForm.default_room || rooms.find((r) => r.branch === currentBranchName)?.name;
+        if (!defaultRoomName) {
+          defaultRoomName = `Main Dining - ${currentBranchName}`;
+          await call('frappe.client.insert', {
+            doc: {
+              doctype: 'URY Room',
+              name: defaultRoomName,
+              room_name: 'Main Dining',
+              branch: currentBranchName,
+            },
+          });
+          await fetchLinkedData();
+        }
+
+        await call('frappe.client.insert', {
+          doc: {
+            doctype: 'URY Restaurant',
+            name: `${currentBranchName} Restaurant`,
+            company: restaurantCompany,
+            branch: currentBranchName,
+            invoice_series_prefix: restaurantForm.invoice_series_prefix,
+            aggregator_series_prefix: restaurantForm.aggregator_series_prefix,
+            tax_id: restaurantForm.tax_id,
+            address: resolvedAddress,
+            default_room: defaultRoomName,
+            default_tax_template: restaurantForm.default_tax_template,
+          },
+        });
       }
       showToast.success('Branch saved successfully');
       await fetchDetails(currentBranchName);
@@ -631,7 +690,7 @@ export const BranchPage: React.FC = () => {
                     value={restaurantForm.invoice_series_prefix || ''}
                     onChange={(e) => setRestaurantForm(p => ({ ...p, invoice_series_prefix: e.target.value }))}
                     className="rounded-lg"
-                    disabled={!isEditMode || !restaurantData}
+                    disabled={!isEditMode}
                   />
                 </div>
                 <div className="space-y-2">
@@ -640,7 +699,7 @@ export const BranchPage: React.FC = () => {
                     value={restaurantForm.aggregator_series_prefix || ''}
                     onChange={(e) => setRestaurantForm(p => ({ ...p, aggregator_series_prefix: e.target.value }))}
                     className="rounded-lg"
-                    disabled={!isEditMode || !restaurantData}
+                    disabled={!isEditMode}
                   />
                 </div>
                 <div className="space-y-2">
@@ -649,7 +708,7 @@ export const BranchPage: React.FC = () => {
                     value={restaurantForm.tax_id || ''}
                     onChange={(e) => setRestaurantForm(p => ({ ...p, tax_id: e.target.value }))}
                     className="rounded-lg"
-                    disabled={!isEditMode || !restaurantData}
+                    disabled={!isEditMode}
                   />
                 </div>
                 <div className="space-y-2">
@@ -658,7 +717,7 @@ export const BranchPage: React.FC = () => {
                     value={restaurantForm.default_tax_template || ''}
                     onChange={(e) => setRestaurantForm(p => ({ ...p, default_tax_template: e.target.value }))}
                     className="rounded-lg"
-                    disabled={!isEditMode || !restaurantData}
+                    disabled={!isEditMode}
                     placeholder="e.g. GST 5% - Restaurant"
                   />
                 </div>
