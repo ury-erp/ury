@@ -69,6 +69,38 @@ function formatTime(date: Date): string {
 }
 
 /**
+ * Fetches the Frappe server's current time via the whitelisted
+ * `ury.ury.api.ury_server_time.get_server_time` endpoint, so the closing
+ * period's end boundary is anchored to the same clock as `period_start_date`
+ * (set server-side by POS Opening Entry). Falls back to the browser's local
+ * clock if the call fails, so closing isn't blocked by an unrelated network
+ * hiccup.
+ *
+ * The server returns `now_datetime().isoformat()`, e.g.
+ * "2026-09-08T10:15:23.123456" -- already in the site's system timezone, no
+ * client-side tz conversion needed. Microseconds are dropped before parsing
+ * (mirrors pos_closing_entry_clock_integrity.js) since `Date` parsing of
+ * fractional seconds beyond milliseconds is inconsistent across browsers.
+ */
+async function getServerNow(): Promise<Date> {
+  try {
+    const response = await call.get<{ message: string }>(
+      'ury.ury.api.ury_server_time.get_server_time'
+    );
+    const [datePart, timePartWithMicros] = response.message.split('T');
+    const timePart = (timePartWithMicros || '00:00:00').split('.')[0];
+    const parsed = new Date(`${datePart}T${timePart}`);
+    if (Number.isNaN(parsed.getTime())) {
+      throw new Error(`Unparseable server time: ${response.message}`);
+    }
+    return parsed;
+  } catch (error) {
+    console.error('Failed to fetch server time, falling back to local clock:', error);
+    return new Date();
+  }
+}
+
+/**
  * Extracts a human-readable message from a Frappe API error, unwrapping
  * `_server_messages` when present (e.g. frappe.throw("Submit/Delete Draft
  * Invoices") raised by SubPOSClosing.validate()). Falls back to the error's
@@ -245,7 +277,7 @@ const POSClosingDialog = ({ open, onOpenChange, onClosingSubmitted }: POSClosing
       }
       setIsSubCashier(subCashier);
 
-      const now = new Date();
+      const now = await getServerNow();
       setPeriodEndDate(now);
       const end = formatDateTime(now);
 
