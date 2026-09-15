@@ -48,6 +48,18 @@ def _create_test_user(email, roles):
     return user
 
 
+class _InvoiceStub(frappe._dict):
+	"""frappe._dict with "items" fixed to read the stored key instead of
+	resolving to the inherited dict.items() method (see
+	test_create_kot_inserts_and_submits_document for the same class of bug
+	on .update). Only needed by tests that read posInvoice.items via
+	attribute access, mirroring how process_invoice()/create_kot() read a
+	real frappe Document's child table field of that name."""
+
+	__slots__ = ()
+	items = property(lambda self: self.get("items"))
+
+
 def _invoice_dict(**values):
     """Helper to create a test invoice object."""
     invoice = frappe._dict(
@@ -304,12 +316,15 @@ class TestCreateKot(FrappeTestCase):
 
         pos_profile = frappe._dict({"name": "POS-001", "kot_naming_series": "KOT-.###"})
 
-        kot_doc = frappe._dict()
-        kot_doc.update = MagicMock(return_value=None)
-        kot_doc.append = MagicMock(return_value=None)
-        kot_doc.insert = MagicMock(return_value=None)
-        kot_doc.submit = MagicMock(return_value=None)
-        kot_doc.db_set = MagicMock(return_value=None)
+        # frappe._dict.update/.items are real dict methods -- attribute
+        # assignment on a _dict (__setattr__ = dict.__setitem__) stores under
+        # the dict key, but reading it back as an attribute resolves to the
+        # class's own dict.update/.items method first, never the stored
+        # MagicMock (__getattr__ = dict.get only runs when normal attribute
+        # lookup fails). Use a plain MagicMock for a Document stand-in
+        # instead, so every attribute -- including update -- is a real,
+        # independently call-tracked mock.
+        kot_doc = MagicMock()
 
         mock_new_doc.return_value = kot_doc
 
@@ -351,12 +366,10 @@ class TestCreateKot(FrappeTestCase):
 
         pos_profile = frappe._dict({"name": "POS-001", "kot_naming_series": "KOT-.###"})
 
-        kot_doc = frappe._dict()
-        kot_doc.update = MagicMock()
-        kot_doc.append = MagicMock()
-        kot_doc.insert = MagicMock()
-        kot_doc.submit = MagicMock()
-        kot_doc.db_set = MagicMock()
+        # See test_create_kot_inserts_and_submits_document for why this is
+        # a MagicMock and not a frappe._dict (its .update collides with the
+        # real dict.update method).
+        kot_doc = MagicMock()
 
         mock_new_doc.return_value = kot_doc
 
@@ -442,13 +455,15 @@ class TestProcessInvoice(FrappeTestCase):
         self, mock_get_doc, mock_get_list, mock_get_productions, mock_create_kot
     ):
         """Should create KOT if none exists for invoice."""
-        pos_invoice = _invoice_dict(
-            name="POS-INV-001",
-            waiter="Waiter1",
-            pos_profile="POS-001",
-            customer="Customer1",
-            branch="Branch1",
-            items=[_kot_item_dict(item_code="BURGER")],
+        pos_invoice = _InvoiceStub(
+            _invoice_dict(
+                name="POS-INV-001",
+                waiter="Waiter1",
+                pos_profile="POS-001",
+                customer="Customer1",
+                branch="Branch1",
+                items=[_kot_item_dict(item_code="BURGER")],
+            )
         )
 
         pos_profile = _pos_profile_dict()
