@@ -74,26 +74,31 @@ jobs:
       # setting `doc.get.return_value = doc.items` at each of the 8 direct
       # call sites; 13/13 passing locally, re-verifying against real CI now.
       #
-      # test_ury_order: three real mock-drift bugs from the v3-stg merge
-      # were found and fixed (frappe.db.exists() passing ignore= through to
-      # get_value(), get_restaurant_and_menu_name() fetching 3 URY Table
-      # fields instead of 2, split_bill()'s frappe.db.set_value() using the
-      # multi-field dict form) -- each confirmed against real CI in turn.
-      # But after those 3 fixes landed, a 3rd wave of CI-only failures
-      # appeared (a _FakeRow AttributeError on .name, fixed; then a test
-      # count mismatch -- CI's run-tests reported "Ran 54 tests" for this
-      # module where the file (confirmed via git blob SHA, not stale)
-      # defines exactly 40 test methods across its 10 test classes, with a
-      # genuine assertion failure inside that inflated run). Re-excluded
-      # rather than keep merging shards that are red for reasons not fully
-      # understood one at a time -- the underlying source fixes and all 3
-      # investigation waves are recorded in EXECUTION_LOG.md ("Session 4",
-      # "Session 6") for whoever picks this back up. This file has now
-      # produced more CI-only-environment surprises than any other single
-      # module in this track; worth investigating as its own root-cause
-      # hunt (matching frappe/erpnext CI runner versions locally, e.g. via
-      # a Docker image pinned to the exact commit CI's get-app step
-      # resolves) rather than fixing one symptom at a time.
+      # test_ury_order is RE-ENABLED (Session 6, final): the recurring
+      # "CI-only" mystery for this file is solved. Root cause: GitHub
+      # Actions on a `pull_request` trigger checks out the PR MERGE COMMIT
+      # (HEAD merged with v3-stg), never the raw branch HEAD -- every
+      # earlier investigation here (three separate "fixed, verified 40/40
+      # locally, still red in CI" cycles) was comparing against the wrong
+      # artifact. Confirmed by reproducing CI's exact "Ran 54 tests"
+      # output locally after merging upstream/v3-stg (its own copy of this
+      # file had independently grown to 54 tests; the merge result matches
+      # CI byte-for-byte, including the failing assertion's line number).
+      # The one real failure inside that merged run was a stale test
+      # expectation, not a bug: c84f782a (B02b) deliberately stopped
+      # falling back to a copied row's own .name for reservation_line_key
+      # (autonames are reassigned every save and can't carry identity
+      # across one), confirmed intentional by a same-day upstream
+      # follow-up (291e3a40, itself prompted by an Opus review finding
+      # this same gap) -- our test's assertions were simply never updated
+      # for it. Fixed to expect the new, confirmed-intentional behavior;
+      # 54/54 passing against the merged source.
+      #
+      # Standing lesson for this whole track: local verification MUST
+      # merge upstream/v3-stg before testing, or it is checking something
+      # CI will never actually run. Full investigation (including the
+      # three earlier false starts) in EXECUTION_LOG.md ("Session 4",
+      # "Session 6").
       #
       # The former "9th excluded module", test_ury_order_v3_73_stock_authority_flag,
       # no longer exists: the v3-stg merge in Session 5 deleted the file
@@ -187,6 +192,7 @@ jobs:
             modules: |
               ury.ury.doctype.ury_menu_course.test_ury_menu_course
               ury.ury.doctype.ury_notification_recipient.test_ury_notification_recipient
+              ury.ury.doctype.ury_order.test_ury_order
               ury.ury.doctype.ury_order_item.test_ury_order_item
               ury.ury.doctype.ury_ordering_device.test_ury_ordering_device
               ury.ury.doctype.ury_ordering_session.test_ury_ordering_session
