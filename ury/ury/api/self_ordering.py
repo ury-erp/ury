@@ -39,6 +39,7 @@ from ury.ury.doctype.ury_order.ury_order import (
 )
 from ury.ury.api.ury_kot_generate import kot_execute
 from ury.ury.api.ury_order_reservation_service import reconcile_order_reservations
+from ury.ury.api.ury_stock_policy import get_branch_stock_policy
 
 SESSION_TOKEN_BYTES_HASH_LEN = 64  # frappe.generate_hash(length=..)
 MAX_ITEMS_PER_REQUEST = 50
@@ -696,14 +697,16 @@ def add_customer_items(session, items):
         # ury_order_reservation_service.py) -- no raw traceback reaches the
         # customer, consistent with this module's other ValidationError
         # throws.
-        reconcile_order_reservations(
-            order_ref=_ensure_invoice_reservation_ref(invoice),
-            previous_items=past_item,
-            accepted_items=clean_items,
-            branch=invoice.branch,
-            company=invoice.company or frappe.db.get_value("Branch", invoice.branch, "company"),
-            actor=frappe.session.user,
-        )
+        _self_order_company = invoice.company or frappe.db.get_value("Branch", invoice.branch, "company")
+        if get_branch_stock_policy(branch=invoice.branch, company=_self_order_company).reservation_control_enabled:
+            reconcile_order_reservations(
+                order_ref=_ensure_invoice_reservation_ref(invoice),
+                previous_items=past_item,
+                accepted_items=clean_items,
+                branch=invoice.branch,
+                company=_self_order_company,
+                actor=frappe.session.user,
+            )
 
         menu = frappe.db.get_value("URY Menu", {"branch": invoice.branch}, "name")
         priced_items = price_items_for_invoice(
