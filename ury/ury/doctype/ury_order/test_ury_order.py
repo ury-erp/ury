@@ -668,6 +668,75 @@ class TestURYOrder(FrappeTestCase):
         self.assertIsNone(invoice_name)
         self.assertEqual(invoice.branch, "Test Branch")
 
+    @patch("ury.ury.doctype.ury_order.ury_order.getBranch")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_value")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.db.get_value")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.new_doc")
+    def test_resolve_or_create_pos_invoice_sets_naming_series_for_no_table_new_invoice(
+        self, mock_new_doc, mock_db_get_value, mock_get_value, mock_getBranch
+    ):
+        """Regression for B01: a new non-dine-in (Take Away/Aggregator) POS
+        Invoice must resolve `naming_series` from `URY Restaurant.
+        invoice_series_prefix` the same way the dine-in (table) path already
+        does, instead of silently falling back to the POS Profile default.
+        """
+        mock_invoice = MagicMock()
+        mock_invoice.restaurant_table = None
+        mock_new_doc.return_value = mock_invoice
+        mock_getBranch.return_value = "Test Branch"
+        mock_get_value.return_value = None  # no existing open invoice
+
+        def db_get_value_side_effect(doctype, filters=None, fieldname=None, *args, **kwargs):
+            if doctype == "URY Restaurant" and filters == {"branch": "Test Branch"} and fieldname == "name":
+                return "Test Restaurant"
+            if doctype == "URY Restaurant" and filters == "Test Restaurant" and fieldname == "invoice_series_prefix":
+                return "TR-INV-"
+            return "Menu A"
+
+        mock_db_get_value.side_effect = db_get_value_side_effect
+
+        invoice, invoice_name = _resolve_or_create_pos_invoice(
+            table=None, invoiceNo=None, order_type="Take Away", is_payment=None
+        )
+
+        self.assertIsNone(invoice_name)
+        self.assertEqual(invoice.naming_series, "TR-INV-")
+
+    @patch("ury.ury.doctype.ury_order.ury_order.getBranch")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_value")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.db.get_value")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.new_doc")
+    def test_resolve_or_create_pos_invoice_naming_series_none_when_unconfigured(
+        self, mock_new_doc, mock_db_get_value, mock_get_value, mock_getBranch
+    ):
+        """A restaurant with no `invoice_series_prefix` configured must not
+        crash order creation for the non-dine-in path -- mirrors the
+        dine-in path's existing behavior of leaving naming_series as
+        whatever frappe.db.get_value returns (None), not inventing a
+        different fallback.
+        """
+        mock_invoice = MagicMock()
+        mock_invoice.restaurant_table = None
+        mock_new_doc.return_value = mock_invoice
+        mock_getBranch.return_value = "Test Branch"
+        mock_get_value.return_value = None
+
+        def db_get_value_side_effect(doctype, filters=None, fieldname=None, *args, **kwargs):
+            if doctype == "URY Restaurant" and filters == {"branch": "Test Branch"} and fieldname == "name":
+                return "Test Restaurant"
+            if doctype == "URY Restaurant" and filters == "Test Restaurant" and fieldname == "invoice_series_prefix":
+                return None
+            return "Menu A"
+
+        mock_db_get_value.side_effect = db_get_value_side_effect
+
+        invoice, invoice_name = _resolve_or_create_pos_invoice(
+            table=None, invoiceNo=None, order_type="Take Away", is_payment=None
+        )
+
+        self.assertIsNone(invoice_name)
+        self.assertIsNone(invoice.naming_series)
+
     @patch("ury.ury.doctype.ury_order.ury_order.reconcile_order_reservations")
     @patch("ury.ury.doctype.ury_order.ury_order.kot_execute")
     @patch("ury.ury.doctype.ury_order.ury_order.price_items_for_invoice")
