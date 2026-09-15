@@ -809,6 +809,20 @@ def split_bill(source_invoice, items_to_move, customer=None):
 
 
 
+def _resolve_pos_invoice_naming_series(restaurant):
+    """Resolve the POS Invoice naming series for `restaurant`.
+
+    Single source of truth for both the dine-in (table) and non-dine-in
+    (Take Away/Aggregator) new-invoice paths in `_resolve_or_create_pos_invoice`,
+    so they cannot structurally drift apart on this field again. Mirrors
+    `frappe.db.get_value` behavior of returning None when the restaurant has
+    no `invoice_series_prefix` configured, so a new POS Invoice falls back to
+    ERPNext's default POS Profile series exactly as the dine-in path already
+    does in that case.
+    """
+    return frappe.db.get_value("URY Restaurant", restaurant, "invoice_series_prefix")
+
+
 def _resolve_or_create_pos_invoice(table, invoiceNo, order_type, is_payment, check_permission=True, override_branch=None):
     """Find an existing draft POS Invoice or build a new (unsaved) one.
 
@@ -881,9 +895,7 @@ def _resolve_or_create_pos_invoice(table, invoiceNo, order_type, is_payment, che
         else:
             invoice = frappe.new_doc("POS Invoice")
 
-            invoice.naming_series = frappe.db.get_value(
-                "URY Restaurant", restaurant, "invoice_series_prefix"
-            )
+            invoice.naming_series = _resolve_pos_invoice_naming_series(restaurant)
 
             invoice.is_pos = 1
             invoice.restaurant = restaurant
@@ -936,6 +948,9 @@ def _resolve_or_create_pos_invoice(table, invoiceNo, order_type, is_payment, che
         branch = override_branch or getBranch()
         invoice.branch = branch
         restaurant = frappe.db.get_value("URY Restaurant", {"branch": branch}, "name")
+
+        if not invoice_name:
+            invoice.naming_series = _resolve_pos_invoice_naming_series(restaurant)
 
         menu=get_menu_name(order_type)
 
