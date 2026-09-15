@@ -23,7 +23,19 @@ class TestDemoRunner(FrappeTestCase):
         company = frappe.db.get_value("Company", {}, "name")
         if not company:
             self.skipTest("No Company found on this site -- cannot set up this test's Branch fixture.")
+        # Prefer a Branch already linked to the resolved Company, but fall
+        # back to ANY existing Branch -- exactly what demo_runner's own
+        # _resolve_branch() does. Filtering on {"company": company} alone is
+        # wrong on a site with more than one Company (a CI test site always
+        # has at least frappe/erpnext's "_Test Company" plus whatever
+        # sibling test modules created): the unordered single-row Company
+        # lookup above can return a different Company than the one this
+        # test's own Branch was created under on a previous run, the
+        # filtered lookup then finds nothing, and the insert below dies with
+        # DuplicateEntryError on "Demo Branch" before any assertion runs.
         branch_name = frappe.db.get_value("Branch", {"company": company}, "name")
+        if not branch_name:
+            branch_name = frappe.db.get_value("Branch", {}, "name")
         if not branch_name:
             branch_doc = frappe.get_doc({
                 "doctype": "Branch",
