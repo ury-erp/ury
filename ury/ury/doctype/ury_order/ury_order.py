@@ -2,6 +2,8 @@
 # For license information, please see license.txt
 
 import json
+from collections import defaultdict
+
 import frappe
 from frappe import _
 from frappe.model.document import Document
@@ -11,6 +13,7 @@ from ury.ury_pos.api import getBranch, getBranchRoom, getRoom, posOpening
 from ury.ury.api.ury_kot_generate import kot_execute
 from ury.ury.api.ury_kot_generate import process_items_for_cancel_kot
 from ury.ury.api.ury_order_reservation_service import (
+    _line_ref,
     reconcile_order_reservations,
     release_order_reservations,
     resolve_production_context,
@@ -1726,6 +1729,105 @@ def get_captain_context():
     }
 
 
+def _previous_line_snapshot(invoice_items):
+    """Snapshot the already-saved invoice lines for the previous-vs-current diff.
+
+    The `reservation_line_key` here is the STABLE, client-supplied line
+    identity persisted on `POS Invoice Item-reservation_line_key` (the POS
+    cart's `uniqueId`, round-tripped back to the client on reload).
+
+    It deliberately does NOT fall back to `item.name`. The child row's
+    autoname is regenerated every time `sync_order` rebuilds `invoice.items`,
+    so it cannot carry identity across saves — and worse, using it produced a
+    `ref:<item>:<rowname>` key on the PREVIOUS side that the CURRENT side
+    could never produce, so EVERY edit to an existing line diffed as
+    "remove the old line + add a brand-new one". That is what made a plain
+    1 -> 2 quantity bump cancel the original KOT and re-raise a full KOT for
+    the new quantity instead of raising a clean +1 delta (B02b).
+
+    A row with no persisted key yields `reservation_line_key: None`, which
+    lets `_line_key()` in `ury_order_reservation_service` fall back to its
+    context/occurrence keying — the same fallback the current-items side
+    uses for an unkeyed line, so the two still agree.
+    """
+    snapshot = []
+    for item in invoice_items or []:
+        snapshot.append(
+            {
+                "reservation_line_key": item.get("reservation_line_key") or None,
+                "item_code": item.item_code,
+                "item_name": item.item_name,
+                "qty": item.qty,
+                "comments": "",
+            }
+        )
+    return snapshot
+
+
+def _normalize_current_line_keys(items):
+    """Promote whatever stable line identity the client sent into
+    `reservation_line_key`, so it is (a) used by the diff and (b) persisted
+    by `price_items_for_invoice` for the NEXT sync's previous-side snapshot.
+
+    `_line_ref` is the shared accessor already used by the reservation and
+    KOT-generation sides (`reservation_line_key` / `reservation_line_ref` /
+    `line_ref` / `pos_line_ref` / `pos_line_id` / `unique_id` / `uniqueId`),
+    so no new client contract is invented here — the POS cart's `uniqueId`
+    is accepted as-is.
+    """
+    for item in items or []:
+        if item.get("reservation_line_key"):
+            continue
+        # `name` is last in LINE_REF_FIELDS and is never present on a client
+        # payload; guard anyway so a stray echoed row name cannot become an
+        # identity (same trap as the previous-side `or item.name` bug).
+        probe = {key: value for key, value in item.items() if key != "name"}
+        line_ref = _line_ref(probe)
+        if line_ref:
+            item["reservation_line_key"] = line_ref
+    return items
+
+
+def _backfill_previous_line_keys(previous_items, current_items):
+    """Legacy bridge for orders placed BEFORE line keys were persisted.
+
+    Such an invoice's saved rows have no `reservation_line_key`, while the
+    client now sends one for every cart line. Without this, the first edit of
+    a pre-existing order would still diff as remove+add.
+
+    Adoption is deliberately conservative: a previous unkeyed row inherits a
+    current line's key ONLY when that item_code has exactly one unkeyed
+    previous row and exactly one current line whose key is not already
+    claimed by a keyed previous row. Anything ambiguous (two lines of the
+    same item_code with different comments/courses) is left unkeyed and falls
+    through to context/occurrence matching, so this can never fuse two
+    genuinely distinct lines into one.
+    """
+    claimed = {p.get("reservation_line_key") for p in previous_items if p.get("reservation_line_key")}
+
+    unkeyed_previous = defaultdict(list)
+    for prev in previous_items:
+        if not prev.get("reservation_line_key"):
+            unkeyed_previous[prev.get("item_code")].append(prev)
+
+    if not unkeyed_previous:
+        return previous_items
+
+    available_current = defaultdict(list)
+    for cur in current_items or []:
+        key = cur.get("reservation_line_key")
+        if not key or key in claimed:
+            continue
+        available_current[cur.get("item") or cur.get("item_code")].append(key)
+
+    for item_code, prev_rows in unkeyed_previous.items():
+        candidates = available_current.get(item_code) or []
+        if len(prev_rows) == 1 and len(candidates) == 1:
+            prev_rows[0]["reservation_line_key"] = candidates[0]
+
+    return previous_items
+
+
 @frappe.whitelist()
 def sync_order(
     items,
@@ -1967,17 +2069,7 @@ def sync_order(
         )
         invoice.invoice_created = 1
 
-    past_item = []
-    for item in invoice.items:
-        previous_item = {
-            "reservation_line_key": item.get("reservation_line_key") or item.name,
-            "item_code": item.item_code,
-            "item_name": item.item_name,
-            "qty": item.qty,
-            "comments": "",
-        }
-        past_item.append(previous_item)
-        
+    past_item = _previous_line_snapshot(invoice.items)
 
     # Conditional checking for 'items' type:
     # - 'ury': JSON passed, hence using isinstance
@@ -1986,14 +2078,11 @@ def sync_order(
         items = json.loads(items)
 
     # Preserve the stable line identity supplied by POS clients. This is
-    # required so same-item lines cannot be reconciled into one reservation.
-    for item in items:
-        if item.get("reservation_line_key"):
-            continue
-        if item.get("reservation_line_ref") or item.get("unique_id") or item.get("uniqueId"):
-            continue
-        # Context/occurrence fallback remains in the reconciliation service
-        # when the client has not supplied a stable line identity.
+    # required so same-item lines cannot be reconciled into one reservation,
+    # AND so a quantity change on an existing line matches its own previous
+    # line instead of diffing as remove+add (B02b).
+    items = _normalize_current_line_keys(items)
+    past_item = _backfill_previous_line_keys(past_item, items)
 
     # Reduction/removal permission: gate any decrease in a previously-sent
     # item's quantity (including full removal) by POS Profile `remove_items`,
