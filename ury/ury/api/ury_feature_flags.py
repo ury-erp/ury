@@ -224,6 +224,27 @@ def _verify_item_execution_intent(row, kot_name, doc, process_posting_intent):
 			)
 		intent = _latest_intent(row.get("kot_item"))
 		if not intent or intent.get("status") != POSTED:
+			if _closing_reconciliation_will_catch_this(row, doc):
+				# I-11: T5's closing-time reconciliation (`ury_pos_closing_reconciliation`)
+				# now genuinely catches this same problem, manager-facing, at
+				# end of shift -- so this cashier-facing, per-invoice gate no
+				# longer needs to be the one place that stops it. A stuck
+				# background worker must not stop the till: log for ops
+				# visibility and let the sale proceed. This branch is reached
+				# only when the branch has real enforcement at closing; see
+				# the early return below for the Tier-2-without-T5 case,
+				# which stays strict because it is the only safety net.
+				frappe.log_error(
+					title="URY till-time fulfilment posting advisory",
+					message=(
+						"Production posting for item {0} on KOT {1} has not completed "
+						"(status: {2}) at POS Invoice submit. closing_reconciliation_enabled "
+						"is on for this branch, so this is advisory only: the invoice was "
+						"allowed to submit and POS Closing Entry will enforce this at "
+						"end of shift instead."
+					).format(item_code, kot_name, (intent or {}).get("status") or "missing"),
+				)
+				return
 			frappe.throw(
 				_(
 					"Production posting for item {0} on KOT {1} has not completed "
@@ -304,6 +325,34 @@ def _is_made_to_order(item_code, branch, company):
 	if not context:
 		return False
 	return context.get("production_policy") == MADE_TO_ORDER
+
+
+def _closing_reconciliation_will_catch_this(row, doc):
+	"""True only when T5's `POS Closing Entry.validate` reconciliation
+	(`ury_pos_closing_reconciliation.validate_closing_reconciliation`) is
+	genuinely active for this invoice's branch -- i.e.
+	`closing_reconciliation_enabled` on `get_branch_stock_policy(...)`.
+
+	This is the I-11 gate: the till-time check below may only become
+	advisory where the closing-time check exists to be strict in its
+	place. Fails CLOSED (returns False, i.e. "stay strict at the till")
+	on any resolution failure, exactly like every other policy read in
+	this codebase -- an unreadable policy must not silently remove the
+	only safety net a branch has.
+	"""
+	try:
+		from ury.ury.api.ury_stock_policy import get_branch_stock_policy
+
+		branch = row.get("branch") or doc.get("branch")
+		company = row.get("company") or doc.get("company")
+		policy = get_branch_stock_policy(branch=branch, company=company)
+	except Exception:
+		frappe.logger("ury_feature_flags").exception(
+			"Could not resolve stock policy while deciding till-time "
+			"fulfilment gate severity; staying strict"
+		)
+		return False
+	return bool(policy.closing_reconciliation_enabled)
 
 
 def _latest_intent(kot_item):
