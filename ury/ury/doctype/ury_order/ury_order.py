@@ -16,6 +16,7 @@ from ury.ury.api.ury_order_reservation_service import (
     resolve_production_context,
     _warehouse_for_context,
 )
+from ury.ury.api.ury_stock_policy import get_branch_stock_policy
 from ury.ury.doctype.alert_settings.alert_settings import get_alert_rule
 from ury.ury.api.ury_kot_notification import create_system_notification, get_users_with_role
 
@@ -741,14 +742,15 @@ def split_bill(source_invoice, items_to_move, customer=None):
             }
             for item in source.items
         ]
-        reconcile_order_reservations(
-            order_ref=source.name,
-            previous_items=previous_source_items,
-            accepted_items=accepted_source_items,
-            branch=source.branch,
-            company=company,
-            actor=frappe.session.user,
-        )
+        if get_branch_stock_policy(branch=source.branch, company=company).reservation_control_enabled:
+            reconcile_order_reservations(
+                order_ref=source.name,
+                previous_items=previous_source_items,
+                accepted_items=accepted_source_items,
+                branch=source.branch,
+                company=company,
+                actor=frappe.session.user,
+            )
 
         new_invoice_items = [
             {
@@ -759,14 +761,15 @@ def split_bill(source_invoice, items_to_move, customer=None):
             }
             for item in new_invoice.items
         ]
-        reconcile_order_reservations(
-            order_ref=new_invoice.name,
-            previous_items=[],
-            accepted_items=new_invoice_items,
-            branch=new_invoice.branch,
-            company=company,
-            actor=frappe.session.user,
-        )
+        if get_branch_stock_policy(branch=new_invoice.branch, company=company).reservation_control_enabled:
+            reconcile_order_reservations(
+                order_ref=new_invoice.name,
+                previous_items=[],
+                accepted_items=new_invoice_items,
+                branch=new_invoice.branch,
+                company=company,
+                actor=frappe.session.user,
+            )
 
         # Best-effort KOT reassignment: URY KOT has a single `invoice` link
         # (not a per-line one), so a KOT can only be reassigned wholesale to
@@ -2023,14 +2026,16 @@ def sync_order(
 
     priced_items = price_items_for_invoice(items, price_list, pos_profile, invoice.branch, menu)
 
-    reconcile_order_reservations(
-        order_ref=_ensure_invoice_reservation_ref(invoice),
-        previous_items=past_item,
-        accepted_items=items,
-        branch=invoice.branch,
-        company=invoice.company or getattr(posprofile, "company", None) or frappe.db.get_value("Branch", invoice.branch, "company"),
-        actor=frappe.session.user,
-    )
+    _sync_order_company = invoice.company or getattr(posprofile, "company", None) or frappe.db.get_value("Branch", invoice.branch, "company")
+    if get_branch_stock_policy(branch=invoice.branch, company=_sync_order_company).reservation_control_enabled:
+        reconcile_order_reservations(
+            order_ref=_ensure_invoice_reservation_ref(invoice),
+            previous_items=past_item,
+            accepted_items=items,
+            branch=invoice.branch,
+            company=_sync_order_company,
+            actor=frappe.session.user,
+        )
 
     invoice.items = []
     for item_dict in priced_items:

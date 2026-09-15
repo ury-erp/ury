@@ -9,6 +9,7 @@ from frappe.tests.utils import FrappeTestCase
 from unittest.mock import patch, MagicMock
 
 from ury.ury.doctype.ury_order.ury_order import cancel_order, sync_order, price_items_for_invoice, reconcile_order_reservations, _resolve_or_create_pos_invoice, split_bill
+from ury.ury.api.ury_stock_policy import StockPolicy
 
 from unittest.mock import patch, MagicMock
 from ury.ury.doctype.ury_order.ury_order import get_order_invoice
@@ -39,6 +40,19 @@ class TestURYOrderSEC11(FrappeTestCase):
             get_order_invoice(invoiceNo="POS-INV-001")
         self.assertIn("outside your active branch", str(context.exception))
 class TestURYOrder(FrappeTestCase):
+    def setUp(self):
+        # T3: reconcile_order_reservations() is now gated behind
+        # get_branch_stock_policy(...).reservation_control_enabled. These
+        # pre-existing tests all assert reservation-control-ON behavior, so
+        # default the policy to enabled here; individual tests that need to
+        # exercise the OFF/no-row path patch this again locally.
+        patcher = patch(
+            "ury.ury.doctype.ury_order.ury_order.get_branch_stock_policy",
+            return_value=StockPolicy(True, False, False),
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     @patch("ury.ury.doctype.ury_order.ury_order.get_order_invoice")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.has_permission")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.db.get_value")
@@ -312,6 +326,160 @@ class TestURYOrder(FrappeTestCase):
             actor="manager@example.com",
         )
         self.assertEqual(events, ["reconcile", "save"])
+
+    @patch("ury.ury.doctype.ury_order.ury_order.getBranch")
+    @patch("ury.ury.doctype.ury_order.ury_order.get_branch_stock_policy")
+    @patch("ury.ury.doctype.ury_order.ury_order.reconcile_order_reservations")
+    @patch("ury.ury.doctype.ury_order.ury_order.kot_execute")
+    @patch("ury.ury.doctype.ury_order.ury_order.price_items_for_invoice")
+    @patch("ury.ury.doctype.ury_order.ury_order.get_order_invoice")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.has_permission")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.db.get_value")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_doc")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_roles")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.session")
+    def test_sync_order_skips_reconciliation_when_reservation_control_disabled(
+        self, mock_session, mock_get_roles, mock_get_doc, mock_get_value, mock_has_permission,
+        mock_get_order_invoice, mock_price_items, mock_kot_execute, mock_reconcile,
+        mock_get_branch_stock_policy, mock_get_branch,
+    ):
+        # Tier 1 (or any branch with reservation_control_enabled=False):
+        # reconcile_order_reservations() must not be called at all -- no
+        # reservation row, no side effects.
+        mock_get_branch_stock_policy.return_value = StockPolicy(False, False, False)
+
+        mock_invoice = MagicMock()
+        mock_invoice.name = "POS-INV-001"
+        mock_invoice.branch = "Test Branch"
+        mock_invoice.company = "Company A"
+        mock_invoice.restaurant_table = "Table 1"
+        mock_invoice.invoice_printed = 0
+        mock_invoice.invoice_created = 1
+        previous_item = MagicMock(item_code="ITEM-1", item_name="Item 1", qty=1, name="INVITEM-1")
+        previous_item.get.side_effect = lambda field, default=None: {
+            "reservation_line_key": "INVITEM-1",
+        }.get(field, default)
+        mock_invoice.items = [previous_item]
+        mock_invoice.waiter = "existing_waiter"
+        mock_invoice.creation = "2026-09-03 10:00:00"
+        mock_invoice.selling_price_list = "Standard Selling"
+        mock_invoice.save = MagicMock()
+        mock_invoice.as_dict = MagicMock(return_value={"name": "POS-INV-001"})
+
+        mock_get_order_invoice.return_value = mock_invoice
+        mock_price_items.return_value = [{"item_code": "ITEM-1", "qty": 3}]
+        mock_get_doc.return_value = _make_pos_profile(
+            transfer_role_permissions=("URY Manager",),
+            role_allowed_for_billing=("URY Manager",),
+            remove_items=1,
+        )
+        mock_get_roles.return_value = ["URY Manager"]
+        mock_session.user = "manager@example.com"
+        mock_has_permission.return_value = True
+        mock_get_branch.return_value = "Test Branch"
+
+        def get_value_side_effect(doctype, filters=None, fieldname=None):
+            if doctype == "URY Table" and fieldname == ["branch", "restaurant_room"]:
+                return ("Test Branch", "Main Hall")
+            if doctype == "URY Menu":
+                return "Menu A"
+            return "Test Customer"
+
+        mock_get_value.side_effect = get_value_side_effect
+
+        with patch("ury.ury.doctype.ury_order.ury_order.frappe.db.sql"):
+            sync_order(
+                items='[{"item": "ITEM-1", "qty": 3}]',
+                cashier="fake_cashier",
+                owner="fake_owner",
+                mode_of_payment="Cash",
+                customer="Test Customer",
+                no_of_pax=2,
+                last_invoice=None,
+                waiter="fake_waiter",
+                pos_profile="Test Profile",
+                table="Table 1",
+            )
+
+        mock_reconcile.assert_not_called()
+        mock_invoice.save.assert_called_once()
+
+    @patch("ury.ury.doctype.ury_order.ury_order.getBranch")
+    @patch("ury.ury.doctype.ury_order.ury_order.get_branch_stock_policy")
+    @patch("ury.ury.doctype.ury_order.ury_order.reconcile_order_reservations")
+    @patch("ury.ury.doctype.ury_order.ury_order.kot_execute")
+    @patch("ury.ury.doctype.ury_order.ury_order.price_items_for_invoice")
+    @patch("ury.ury.doctype.ury_order.ury_order.get_order_invoice")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.has_permission")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.db.get_value")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_doc")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_roles")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.session")
+    def test_sync_order_skips_reconciliation_for_branch_with_no_policy_row(
+        self, mock_session, mock_get_roles, mock_get_doc, mock_get_value, mock_has_permission,
+        mock_get_order_invoice, mock_price_items, mock_kot_execute, mock_reconcile,
+        mock_get_branch_stock_policy, mock_get_branch,
+    ):
+        # A branch with no `URY Branch Stock Policy` row at all resolves to
+        # POLICY_ALL_OFF per T1's fail-closed design -- must behave
+        # identically to the explicit-OFF case above.
+        mock_get_branch_stock_policy.return_value = StockPolicy(False, False, False)
+
+        mock_invoice = MagicMock()
+        mock_invoice.name = "POS-INV-002"
+        mock_invoice.branch = "Untouched Branch"
+        mock_invoice.company = "Company A"
+        mock_invoice.restaurant_table = "Table 1"
+        mock_invoice.invoice_printed = 0
+        mock_invoice.invoice_created = 1
+        previous_item = MagicMock(item_code="ITEM-1", item_name="Item 1", qty=1, name="INVITEM-1")
+        previous_item.get.side_effect = lambda field, default=None: {
+            "reservation_line_key": "INVITEM-1",
+        }.get(field, default)
+        mock_invoice.items = [previous_item]
+        mock_invoice.waiter = "existing_waiter"
+        mock_invoice.creation = "2026-09-03 10:00:00"
+        mock_invoice.selling_price_list = "Standard Selling"
+        mock_invoice.save = MagicMock()
+        mock_invoice.as_dict = MagicMock(return_value={"name": "POS-INV-002"})
+
+        mock_get_order_invoice.return_value = mock_invoice
+        mock_price_items.return_value = [{"item_code": "ITEM-1", "qty": 3}]
+        mock_get_doc.return_value = _make_pos_profile(
+            transfer_role_permissions=("URY Manager",),
+            role_allowed_for_billing=("URY Manager",),
+            remove_items=1,
+        )
+        mock_get_roles.return_value = ["URY Manager"]
+        mock_session.user = "manager@example.com"
+        mock_has_permission.return_value = True
+        mock_get_branch.return_value = "Untouched Branch"
+
+        def get_value_side_effect(doctype, filters=None, fieldname=None):
+            if doctype == "URY Table" and fieldname == ["branch", "restaurant_room"]:
+                return ("Untouched Branch", "Main Hall")
+            if doctype == "URY Menu":
+                return "Menu A"
+            return "Test Customer"
+
+        mock_get_value.side_effect = get_value_side_effect
+
+        with patch("ury.ury.doctype.ury_order.ury_order.frappe.db.sql"):
+            sync_order(
+                items='[{"item": "ITEM-1", "qty": 3}]',
+                cashier="fake_cashier",
+                owner="fake_owner",
+                mode_of_payment="Cash",
+                customer="Test Customer",
+                no_of_pax=2,
+                last_invoice=None,
+                waiter="fake_waiter",
+                pos_profile="Test Profile",
+                table="Table 1",
+            )
+
+        mock_reconcile.assert_not_called()
+        mock_invoice.save.assert_called_once()
 
     @patch("ury.ury.doctype.ury_order.ury_order.get_restaurant_and_menu_name")
     @patch("ury.ury.doctype.ury_order.ury_order._validate_sync_items_against_menu")
@@ -1611,6 +1779,15 @@ class TestSplitBillReservations(FrappeTestCase):
     rows it relocates to the new sibling invoice -- not just move item rows
     while leaving `URY Stock Reservation` pointed at deleted rows on the
     source invoice and giving the new invoice zero coverage."""
+
+    def setUp(self):
+        # T3: see TestURYOrder.setUp -- same gating default applies here.
+        patcher = patch(
+            "ury.ury.doctype.ury_order.ury_order.get_branch_stock_policy",
+            return_value=StockPolicy(True, False, False),
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
     def _build_source(self):
         item_a = _FakeRow(
