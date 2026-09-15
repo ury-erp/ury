@@ -36,7 +36,7 @@ from frappe.utils import add_to_date, flt, now, now_datetime
 from ury.ury.api.ury_reservation_service import RESERVED, fulfil_reservation_if_pending
 from ury.ury.api.ury_kot_execution_service import READY, SERVED
 from ury.ury.api.ury_bom_compiler import publish_component_stock_fanout
-from ury.ury.api.ury_feature_flags import is_pos_stock_authority_flag_enabled
+from ury.ury.api.ury_feature_flags import is_pos_stock_authority_flag_enabled, ITEM_EXECUTION_DOCTYPE
 
 
 INTENT_DOCTYPE = "URY Fulfilment Posting Intent"
@@ -82,7 +82,7 @@ def _authorize_posting(actor, execution_doc):
 	roles = set(frappe.get_roles(actor))
 	if not roles.intersection(POSTING_ROLES):
 		raise frappe.PermissionError(_("You are not permitted to post fulfilment stock"))
-	if not frappe.has_permission(KOT_ITEM_DOCTYPE, "read", execution_doc, user=actor):
+	if not frappe.has_permission(ITEM_EXECUTION_DOCTYPE, "read", execution_doc, user=actor):
 		raise frappe.PermissionError(_("You are not permitted to post this fulfilment item"))
 
 
