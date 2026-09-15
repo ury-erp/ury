@@ -9,6 +9,11 @@ from frappe.tests.utils import FrappeTestCase
 from unittest.mock import patch, MagicMock
 
 from ury.ury.doctype.ury_order.ury_order import cancel_order, sync_order, price_items_for_invoice, reconcile_order_reservations, _resolve_or_create_pos_invoice, split_bill
+from ury.ury.doctype.ury_order.ury_order import (
+    _backfill_previous_line_keys,
+    _normalize_current_line_keys,
+    _previous_line_snapshot,
+)
 from ury.ury.api.ury_stock_policy import StockPolicy
 
 from unittest.mock import patch, MagicMock
@@ -2179,3 +2184,212 @@ class TestSplitBillReservations(FrappeTestCase):
         ):
             self.assertEqual(_kot_order_ref("KOT-A"), "POS-INV-NEW")
             self.assertEqual(_kot_order_ref("KOT-B"), "POS-INV-SRC")
+
+
+class _FakeInvoiceItem:
+    """Minimal stand-in for a saved `POS Invoice Item` child row: attribute
+    access for standard fields plus `.get()` for custom ones, matching what
+    `_previous_line_snapshot()` uses."""
+
+    def __init__(self, name, item_code, item_name, qty, reservation_line_key, comment=None):
+        self.name = name
+        self.item_code = item_code
+        self.item_name = item_name
+        self.qty = qty
+        self.reservation_line_key = reservation_line_key
+        self.comment = comment
+
+    def get(self, fieldname, default=None):
+        return getattr(self, fieldname, default)
+
+
+class TestSyncOrderLineIdentity(unittest.TestCase):
+    """B02b: `sync_order()` must diff previous-vs-current order lines on a
+    STABLE line identity, not on the invoice child row's `name`.
+
+    The shipped bug: `past_item` keyed each previous line as
+    `item.get("reservation_line_key") or item.name`. `reservation_line_key`
+    was never persisted (no `POS Invoice Item-reservation_line_key` custom
+    field existed) and the `/pos` React client never sent one, so EVERY
+    previous line was keyed by its child-row autoname while EVERY current
+    line was keyed by context/occurrence. The two sides could therefore
+    never match, and any edit to an existing line -- including a plain
+    1 -> 2 quantity bump -- diffed as "remove the whole old line + add a
+    brand-new one", which cancelled the original KOT and re-fired a full
+    KOT for the new quantity instead of raising a clean +1 delta.
+
+    These tests exercise the real diff primitive
+    (`ury_order_reservation_service._line_quantities`, which is also what
+    `ury_kot_generate._line_keyed_items` mirrors), so they assert the
+    behaviour the KOT and reservation layers actually consume.
+    """
+
+    def _diff(self, previous_items, current_items):
+        """Return (added, removed, changed) line keys for a previous/current pair.
+
+        Mirrors what the reservation and KOT delta layers compute.
+        """
+        from ury.ury.api.ury_order_reservation_service import _line_quantities
+
+        previous = _line_quantities(previous_items)
+        current = _line_quantities(current_items)
+
+        added = {k: v["qty"] for k, v in current.items() if k not in previous}
+        removed = {k: v["qty"] for k, v in previous.items() if k not in current}
+        changed = {
+            k: current[k]["qty"] - previous[k]["qty"]
+            for k in current
+            if k in previous and current[k]["qty"] != previous[k]["qty"]
+        }
+        return added, removed, changed
+
+    def _sync(self, invoice_items, client_items):
+        """Run only sync_order's line-identity stage over a saved invoice's
+        rows and the client's payload, returning (past_item, items)."""
+        past_item = _previous_line_snapshot(invoice_items)
+        items = _normalize_current_line_keys(client_items)
+        past_item = _backfill_previous_line_keys(past_item, items)
+        return past_item, items
+
+    # --- snapshot / normalization units -------------------------------
+
+    def test_previous_snapshot_never_falls_back_to_the_child_row_name(self):
+        """The regression guard for the actual bug: a row with no persisted
+        key must yield None, NOT its autoname."""
+        rows = [_FakeInvoiceItem("ITEM-ROW-9", "Biryani", "Biryani", 2, None)]
+        snapshot = _previous_line_snapshot(rows)
+        self.assertIsNone(snapshot[0]["reservation_line_key"])
+
+    def test_previous_snapshot_uses_the_persisted_key_when_present(self):
+        rows = [_FakeInvoiceItem("ITEM-ROW-9", "Biryani", "Biryani", 2, "Biryani-default-no-addons")]
+        snapshot = _previous_line_snapshot(rows)
+        self.assertEqual(snapshot[0]["reservation_line_key"], "Biryani-default-no-addons")
+
+    def test_current_items_accept_the_cart_uniqueid_as_a_line_key(self):
+        items = _normalize_current_line_keys(
+            [{"item": "Biryani", "qty": 1, "uniqueId": "Biryani-default-no-addons"}]
+        )
+        self.assertEqual(items[0]["reservation_line_key"], "Biryani-default-no-addons")
+
+    def test_current_items_never_adopt_an_echoed_row_name_as_identity(self):
+        """`name` is in LINE_REF_FIELDS for saved-doc use; a client payload
+        echoing a row name must not turn it into a line identity."""
+        items = _normalize_current_line_keys([{"item": "Biryani", "qty": 1, "name": "ITEM-ROW-9"}])
+        self.assertIsNone(items[0].get("reservation_line_key"))
+
+    # --- the four diff scenarios --------------------------------------
+
+    def test_quantity_bump_on_an_existing_line_is_a_delta_not_remove_plus_add(self):
+        previous, current = self._sync(
+            [_FakeInvoiceItem("ITEM-ROW-1", "Biryani", "Biryani", 1, "Biryani-default-no-addons")],
+            [{"item": "Biryani", "item_name": "Biryani", "qty": 2, "reservation_line_key": "Biryani-default-no-addons"}],
+        )
+        added, removed, changed = self._diff(previous, current)
+
+        self.assertEqual(added, {})
+        self.assertEqual(removed, {})
+        self.assertEqual(list(changed.values()), [1])
+
+    def test_a_fresh_item_shows_up_as_an_addition_only(self):
+        previous, current = self._sync(
+            [_FakeInvoiceItem("ITEM-ROW-1", "Biryani", "Biryani", 1, "Biryani-default-no-addons")],
+            [
+                {"item": "Biryani", "qty": 1, "reservation_line_key": "Biryani-default-no-addons"},
+                {"item": "Naan", "qty": 3, "reservation_line_key": "Naan-default-no-addons"},
+            ],
+        )
+        added, removed, changed = self._diff(previous, current)
+
+        self.assertEqual(list(added.values()), [3])
+        self.assertEqual(removed, {})
+        self.assertEqual(changed, {})
+
+    def test_a_dropped_item_shows_up_as_a_removal_only(self):
+        previous, current = self._sync(
+            [
+                _FakeInvoiceItem("ITEM-ROW-1", "Biryani", "Biryani", 1, "Biryani-default-no-addons"),
+                _FakeInvoiceItem("ITEM-ROW-2", "Naan", "Naan", 3, "Naan-default-no-addons"),
+            ],
+            [{"item": "Biryani", "qty": 1, "reservation_line_key": "Biryani-default-no-addons"}],
+        )
+        added, removed, changed = self._diff(previous, current)
+
+        self.assertEqual(added, {})
+        self.assertEqual(list(removed.values()), [3])
+        self.assertEqual(changed, {})
+
+    def test_two_lines_of_the_same_item_with_different_comments_stay_distinct(self):
+        """The correctness class the reservation-side fix was built for:
+        bumping ONE of two same-item lines must not disturb the other, and
+        must not collapse the two into a single aggregated line."""
+        previous, current = self._sync(
+            [
+                _FakeInvoiceItem("ITEM-ROW-1", "Biryani", "Biryani", 1, "LINE-A", comment="less spicy"),
+                _FakeInvoiceItem("ITEM-ROW-2", "Biryani", "Biryani", 1, "LINE-B", comment="extra spicy"),
+            ],
+            [
+                {"item": "Biryani", "qty": 2, "comment": "less spicy", "reservation_line_key": "LINE-A"},
+                {"item": "Biryani", "qty": 1, "comment": "extra spicy", "reservation_line_key": "LINE-B"},
+            ],
+        )
+        added, removed, changed = self._diff(previous, current)
+
+        self.assertEqual(added, {})
+        self.assertEqual(removed, {})
+        self.assertEqual(changed, {"ref:Biryani:LINE-A": 1})
+
+    def test_removing_one_of_two_same_item_lines_leaves_the_other_untouched(self):
+        previous, current = self._sync(
+            [
+                _FakeInvoiceItem("ITEM-ROW-1", "Biryani", "Biryani", 1, "LINE-A", comment="less spicy"),
+                _FakeInvoiceItem("ITEM-ROW-2", "Biryani", "Biryani", 1, "LINE-B", comment="extra spicy"),
+            ],
+            [{"item": "Biryani", "qty": 1, "comment": "less spicy", "reservation_line_key": "LINE-A"}],
+        )
+        added, removed, changed = self._diff(previous, current)
+
+        self.assertEqual(added, {})
+        self.assertEqual(removed, {"ref:Biryani:LINE-B": 1})
+        self.assertEqual(changed, {})
+
+    # --- legacy bridge -------------------------------------------------
+
+    def test_legacy_unkeyed_previous_line_adopts_the_clients_key(self):
+        """An order saved BEFORE keys were persisted must not diff as
+        remove+add on its first edit."""
+        previous, current = self._sync(
+            [_FakeInvoiceItem("ITEM-ROW-1", "Biryani", "Biryani", 1, None)],
+            [{"item": "Biryani", "qty": 2, "reservation_line_key": "Biryani-default-no-addons"}],
+        )
+        self.assertEqual(previous[0]["reservation_line_key"], "Biryani-default-no-addons")
+
+        added, removed, changed = self._diff(previous, current)
+        self.assertEqual(added, {})
+        self.assertEqual(removed, {})
+        self.assertEqual(list(changed.values()), [1])
+
+    def test_legacy_backfill_refuses_ambiguous_same_item_lines(self):
+        """Two unkeyed previous lines of one item_code cannot be attributed
+        to specific client lines, so neither may adopt a key -- guessing
+        would silently fuse two distinct kitchen lines."""
+        previous, _ = self._sync(
+            [
+                _FakeInvoiceItem("ITEM-ROW-1", "Biryani", "Biryani", 1, None, comment="less spicy"),
+                _FakeInvoiceItem("ITEM-ROW-2", "Biryani", "Biryani", 1, None, comment="extra spicy"),
+            ],
+            [
+                {"item": "Biryani", "qty": 1, "comment": "less spicy", "reservation_line_key": "LINE-A"},
+                {"item": "Biryani", "qty": 1, "comment": "extra spicy", "reservation_line_key": "LINE-B"},
+            ],
+        )
+        self.assertEqual([p["reservation_line_key"] for p in previous], [None, None])
+
+    def test_legacy_backfill_never_steals_a_key_already_held_by_another_line(self):
+        previous, _ = self._sync(
+            [
+                _FakeInvoiceItem("ITEM-ROW-1", "Biryani", "Biryani", 1, "LINE-A"),
+                _FakeInvoiceItem("ITEM-ROW-2", "Biryani", "Biryani", 1, None),
+            ],
+            [{"item": "Biryani", "qty": 1, "reservation_line_key": "LINE-A"}],
+        )
+        self.assertEqual([p["reservation_line_key"] for p in previous], ["LINE-A", None])

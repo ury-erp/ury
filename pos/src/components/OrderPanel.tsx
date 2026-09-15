@@ -116,7 +116,12 @@ const OrderPanel = () => {
           item_name: item.name,
           rate: item.selectedVariant?.price || item.price,
           qty: item.quantity,
-          comment: item.comment || undefined
+          comment: item.comment || undefined,
+          // Stable line identity — without it the server cannot tell a
+          // quantity change on an existing line from a remove + re-add, and
+          // a 1 -> 2 bump cancels the original KOT and re-fires a full one
+          // instead of raising a +1 delta (B02b).
+          reservation_line_key: item.reservationLineKey || item.uniqueId,
         })),
         no_of_pax: noOfPax,
         pos_profile: posProfile.name,
