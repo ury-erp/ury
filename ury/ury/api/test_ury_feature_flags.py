@@ -209,6 +209,100 @@ class TestFulfilmentVerificationGate(FrappeTestCase):
         stock one, and must not refuse payment at the till."""
         self._run(None, execution_state="QUEUED")
 
+    def _run_with_unposted_intent(self, closing_reconciliation_enabled, retry_posts=False):
+        """Drive `_verify_item_execution_intent` down the "found an intent,
+        but it is not POSTED, and the synchronous retry didn't fix it" path
+        -- the one I-11 downgrades to advisory when T5's closing-time
+        reconciliation is active for the branch."""
+        from ury.ury.api.ury_feature_flags import _verify_fulfilment_posted_for_invoice
+
+        calls = {"retry": 0}
+
+        unposted = {
+            "name": "INTENT-1",
+            "status": "PENDING",
+            "accepted_revision": "rev-2",
+            "accepted_qty": 3,
+        }
+        posted = dict(unposted, status="POSTED")
+
+        def get_all(doctype, **kwargs):
+            if doctype == "URY KOT":
+                return [frappe._dict({"name": "KOT-001"})]
+            if doctype == "URY KOT Item Execution":
+                return [
+                    frappe._dict(
+                        {
+                            "name": "EXEC-1",
+                            "kot_item": "KOTITEM-1",
+                            "state": "READY",
+                            "idempotency_key": "rev-2",
+                            "branch": "Main Branch",
+                            "company": "Acme Co",
+                        }
+                    )
+                ]
+            if doctype == "URY Fulfilment Posting Intent":
+                current = posted if (retry_posts and calls["retry"]) else unposted
+                return [frappe._dict(current)]
+            raise AssertionError(doctype)
+
+        def fake_process_posting_intent(name):
+            calls["retry"] += 1
+
+        doc = frappe._dict({"name": "POS-INV-001", "branch": "Main Branch", "company": "Acme Co"})
+        with patch(
+            "ury.ury.api.ury_feature_flags.frappe.get_all", side_effect=get_all
+        ), patch(
+            "ury.ury.api.ury_feature_flags.frappe.db.get_value",
+            return_value=frappe._dict({"item": "BURGER", "quantity": 3}),
+        ), patch(
+            "ury.ury.api.ury_feature_flags._is_made_to_order", return_value=True
+        ), patch(
+            "ury.ury.api.ury_fulfilment_posting_service.process_posting_intent",
+            side_effect=fake_process_posting_intent,
+        ), patch(
+            "ury.ury.api.ury_stock_policy.get_branch_stock_policy",
+            return_value=frappe._dict(
+                {"closing_reconciliation_enabled": closing_reconciliation_enabled}
+            ),
+        ), patch("ury.ury.api.ury_feature_flags.frappe.log_error") as mock_log_error:
+            _verify_fulfilment_posted_for_invoice(doc)
+            return mock_log_error, calls
+
+    def test_closing_reconciliation_disabled_still_throws(self):
+        """Safety net preserved: if T5's real enforcement is not active for
+        this branch (closing_reconciliation_enabled is False), the till-time
+        gate remains the sole protection and must still block the submit."""
+        with self.assertRaises(frappe.ValidationError):
+            self._run_with_unposted_intent(closing_reconciliation_enabled=False)
+
+    def test_closing_reconciliation_enabled_is_advisory_not_blocking(self):
+        """I-11: with T5 genuinely active for the branch, a final posting
+        failure after the synchronous retry logs instead of throwing, and
+        the invoice is allowed to submit."""
+        mock_log_error, calls = self._run_with_unposted_intent(
+            closing_reconciliation_enabled=True
+        )
+        mock_log_error.assert_called_once()
+        self.assertEqual(calls["retry"], 1)
+
+    def test_retry_still_fires_before_either_outcome(self):
+        """The synchronous retry must run exactly once regardless of which
+        branch (advisory or strict) decides the final outcome."""
+        with self.assertRaises(frappe.ValidationError):
+            self._run_with_unposted_intent(closing_reconciliation_enabled=False)
+
+    def test_retry_success_is_unaffected_by_policy(self):
+        """When the retry actually posts the intent, behaviour is unchanged
+        from today regardless of closing_reconciliation_enabled: no log, no
+        throw."""
+        mock_log_error, calls = self._run_with_unposted_intent(
+            closing_reconciliation_enabled=True, retry_posts=True
+        )
+        mock_log_error.assert_not_called()
+        self.assertEqual(calls["retry"], 1)
+
     def test_non_made_to_order_item_requires_no_intent(self):
         """Pre-produced and direct-retail items post nothing at READY, so
         demanding an intent for them would block every submit."""
