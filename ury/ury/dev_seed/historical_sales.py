@@ -705,6 +705,33 @@ def seed():
 		print("historical_sales.seed: no POS Profile found (run dev_seed.profiles.seed first) — skipping.")
 		return {"skipped": True, "reason": "no POS Profile"}
 
+	# The POS Profile is the single source of every accounting link ERPNext
+	# copies onto these invoices (cost_center, income/expense account,
+	# warehouse, change-amount account), so the invoice's own `company` MUST
+	# be the profile's company or ERPNext rejects the insert outright with
+	# "Cost Center: <X> does not belong to the Company: <Y>".
+	#
+	# On a site with more than one Company those two can legitimately
+	# disagree: `_get_branch_and_company()` above takes the company off the
+	# Branch record, while `profiles.py` builds the POS Profile around
+	# whatever `_get_demo_company()` picks -- and those are independent
+	# single-row lookups with no pinned ORDER BY, so MariaDB/frappe can
+	# answer them with different Companies (and can answer the *same* query
+	# differently later in the run, since the default ordering is
+	# `modified desc` and seeding touches Company rows). A single-company
+	# bench never sees this; a CI test site, which has both frappe/erpnext's
+	# `_Test Company` and whatever Company sibling test modules created,
+	# hits it every time and silently seeds zero invoices.
+	profile_company = frappe.db.get_value("POS Profile", pos_profile, "company")
+	if profile_company and profile_company != company_name:
+		print(
+			f"historical_sales.seed: Branch '{branch_name}' is linked to Company "
+			f"'{company_name}' but POS Profile '{pos_profile}' belongs to "
+			f"'{profile_company}' — seeding against the POS Profile's company, "
+			"which owns the cost centre/accounts these invoices must use."
+		)
+		company_name = profile_company
+
 	tables = _get_tables(branch_name)
 	if not tables:
 		print("historical_sales.seed: no URY Table records found for this branch (run dev_seed.catalog.seed first) — proceeding with Takeaway-only orders (no tables to assign).")
