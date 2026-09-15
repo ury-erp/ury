@@ -44,6 +44,15 @@ test.describe('POS app', () => {
   //      /pos/order/table/:table (CaptainOrder.tsx) — the "new order" /
   //      KOT / payment golden path lives there and needs real menu items
   //      and a real table row to exercise meaningfully.
+  // FINDING (2026-09-15, live sa-testcov-verify bench, 12 seeded tables /
+  // 4 rooms): logging in as Administrator and hitting /pos/order does NOT
+  // reach CaptainTables -- it reaches an "Open POS Session" screen instead
+  // ("No POS Profile is available for your user in this branch"; Administrator
+  // isn't assigned to the seeded Demo Branch POS Profile). The one seeded
+  // POS Profile User (test@erpnext.com) instead gets "Access Denied" on
+  // /pos/order entirely (missing whatever role CaptainRouteGuard requires).
+  // Making this golden path real needs a properly role-and-POS-Profile-seeded
+  // captain user -- a data-seeding gap, not a code bug. See e2e/README.md.
   test.skip('captain golden path: tables list -> open table -> add items -> KOT -> payment', async ({ page }) => {
     // Intentionally skipped — requires a seeded bench (branch, room,
     // table, menu items) and an authenticated captain session. See TODO

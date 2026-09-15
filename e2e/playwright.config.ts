@@ -1,71 +1,38 @@
-import { defineConfig, devices } from '@playwright/test';
+import { defineConfig, devices } from "@playwright/test";
 
 /**
- * Playwright config for the 4 URY frontend Vite apps
- * (frontend/, pos/, self-order/, mosaic/).
+ * Playwright config for the URY frontend SPAs (frontend/, pos/,
+ * self-order/, mosaic/).
  *
- * Ports: none of the 4 apps set an explicit server.port in their
- * vite.config.ts (checked 2026-09), so each defaults to Vite's 5173 and
- * only auto-increments if that port is already taken on the same machine.
- * Since a dev running all 4 apps concurrently needs 4 distinct ports, this
- * config assumes the convention below and expects each app's dev server to
- * be started explicitly on that port (e.g. `vite --port 5174`). See
- * README.md for exact commands. Override with the env vars below if your
- * setup differs.
+ * These are Frappe website-route-served SPAs, not standalone dev servers:
+ * hooks.py website_route_rules maps /pos, /order, /mosaic, /ury to the
+ * respective app's built index.html (ury/www/{pos,order,mosaic,ury}.html),
+ * served by a real running bench + site. Reflects how these apps actually
+ * ship in production, and sidesteps the fact that pos/ and self-order/
+ * vite.config.ts define no dev-server proxy to a backend at all (only
+ * frontend/ and mosaic/ do), so a `yarn dev` server for pos/self-order
+ * cannot reach a live API in the first place.
  *
- * No webServer block on purpose: these apps are Frappe-embedded SPAs whose
- * index.html reads frappe.boot / csrf_token injected by a running Frappe
- * dev server, and whose vite.config.ts proxies /api, /app, /assets, /files
- * to a real site (see frontend/vite.config.ts, ury.localhost:8002).
- * Exercising a real flow also needs an authenticated session and seeded
- * data (tables, menu items, a device/QR token) that only a running bench +
- * site can provide. Auto-starting bench + MariaDB + a seeded site from
- * here would either be fake (mocking away the real code paths) or require
- * infra this repo alone can't stand up — so this config expects the bench
- * and the 4 `yarn dev` processes to already be running, and just points
- * Playwright at them.
+ * Point URY_BASE_URL at a live bench + site (built via `yarn build` in
+ * each app dir, copied into that site app's public/www dirs, cache
+ * cleared) before running.
  */
+const BASE_URL = process.env.URY_BASE_URL ?? "http://sa-testcov-verify.local:8114";
+
 export default defineConfig({
-  testDir: './tests',
+  testDir: "./tests",
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  reporter: 'list',
+  reporter: "list",
   use: {
-    trace: 'on-first-retry',
+    baseURL: BASE_URL,
+    trace: "on-first-retry",
   },
   projects: [
-    {
-      name: 'frontend',
-      testMatch: 'frontend.spec.ts',
-      use: {
-        ...devices['Desktop Chrome'],
-        baseURL: process.env.URY_FRONTEND_URL ?? 'http://ury.localhost:5173',
-      },
-    },
-    {
-      name: 'pos',
-      testMatch: 'pos.spec.ts',
-      use: {
-        ...devices['Desktop Chrome'],
-        baseURL: process.env.URY_POS_URL ?? 'http://ury.localhost:5174',
-      },
-    },
-    {
-      name: 'self-order',
-      testMatch: 'self-order.spec.ts',
-      use: {
-        ...devices['Desktop Chrome'],
-        baseURL: process.env.URY_SELF_ORDER_URL ?? 'http://ury.localhost:5175',
-      },
-    },
-    {
-      name: 'mosaic',
-      testMatch: 'mosaic.spec.ts',
-      use: {
-        ...devices['Desktop Chrome'],
-        baseURL: process.env.URY_MOSAIC_URL ?? 'http://ury.localhost:5176',
-      },
-    },
+    { name: "frontend", testMatch: "frontend.spec.ts" },
+    { name: "pos", testMatch: "pos.spec.ts" },
+    { name: "self-order", testMatch: "self-order.spec.ts" },
+    { name: "mosaic", testMatch: "mosaic.spec.ts" },
   ],
 });
