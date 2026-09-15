@@ -54,7 +54,8 @@
     "edit_item": "Edit item",
     "add_comment": "Add comment",
     "edit_comment": "Edit comment",
-    "pax": "Pax"
+    "pax": "Pax",
+    "insufficient_capacity": "Insufficient capacity to add more of this item"
   },
   "order": {
     "select_to_view": "Select an order to view details",

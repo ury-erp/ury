@@ -10,7 +10,6 @@ from erpnext.controllers.queries import item_query
 from ury.ury_pos.api import getBranch, getBranchRoom, getRoom, posOpening
 from ury.ury.api.ury_kot_generate import kot_execute
 from ury.ury.api.ury_kot_generate import process_items_for_cancel_kot
-from ury.ury.api.ury_feature_flags import is_pos_stock_authority_flag_enabled
 from ury.ury.api.ury_order_reservation_service import (
     reconcile_order_reservations,
     release_order_reservations,
@@ -21,54 +20,6 @@ from ury.ury.doctype.alert_settings.alert_settings import get_alert_rule
 from ury.ury.api.ury_kot_notification import create_system_notification, get_users_with_role
 
 from frappe import cache
-
-
-def _apply_pos_stock_authority(invoice, branch=None):
-    """V3-73: the SOLE integration point between POS Invoice creation and the
-    new fulfilment services (V3-71/V3-72).
-
-    Flag OFF (the only state that is ever true today, and the default in
-    every environment): behavior is byte-for-byte identical to before this
-    task -- `invoice.update_stock` is set to 1, nothing else happens. This
-    is the safe/current/rollback state. See the governing contract at
-    tracks/sa-v3_nxt/outputs/V3-70-fulfilment-accounting-transition-checklist.md.
-
-    Flag ON (never true today; only reachable if a human explicitly flips
-    the "URY Feature Flags" > "POS Stock Authority V2 Enabled" checkbox,
-    which no code in this app does): sets `invoice.update_stock = 0` and
-    makes a best-effort, minimal call into the V3-71/V3-72 fulfilment
-    services.
-
-    *** WARNING -- FLAG-ON PATH IS AN INTEGRATION STUB, NOT PRODUCTION-READY
-    ***: V3-71/V3-72 are standalone service functions
-    (`fulfil_preproduced_order` / `fulfil_mto_order`) that are not yet
-    robustly wired to a real invoice-submission trigger point (they expect a
-    KOT/reservation/execution-state context that this call site does not
-    have at invoice-creation time -- before items are finalized, taxes are
-    calculated, or the invoice is submitted). This function intentionally
-    does NOT call them here, to avoid guessing at parameter mapping that
-    could misfire against real stock/KOT state. Wiring the flag-on path to
-    the actual fulfilment services, at the correct trigger point in the
-    invoice lifecycle (submission, not creation), with real parameter
-    mapping and error handling, is explicitly out of scope for V3-73 and
-    requires its own dedicated integration-testing task before this flag may
-    ever be enabled in a real environment.
-    """
-
-    if is_pos_stock_authority_flag_enabled(branch=branch):
-        # Fail closed until the replacement posting path is proven end to end.
-        # Disabling ERPNext's native stock update without a submitted posting
-        # reference would silently create unvalued sales and inventory drift.
-        frappe.throw(
-            _(
-                "POS stock authority is not enabled for production yet. "
-                "Complete and validate fulfilment posting before enabling it."
-            ),
-            frappe.ValidationError,
-        )
-    else:
-        # Flag OFF -- identical to this app's behavior before V3-73.
-        invoice.update_stock = 1
 
 
 class URYOrder(Document):
@@ -932,7 +883,6 @@ def _resolve_or_create_pos_invoice(table, invoiceNo, order_type, is_payment, che
             )
 
             invoice.is_pos = 1
-            _apply_pos_stock_authority(invoice, branch=branch)
             invoice.restaurant = restaurant
             invoice.branch = branch
 
@@ -979,7 +929,6 @@ def _resolve_or_create_pos_invoice(table, invoiceNo, order_type, is_payment, che
         else:
             invoice = frappe.new_doc("POS Invoice")
             invoice.is_pos = 1
-            _apply_pos_stock_authority(invoice, branch=getBranch())
 
         branch = override_branch or getBranch()
         invoice.branch = branch
@@ -1044,12 +993,25 @@ def price_items_for_invoice(items, price_list, pos_profile, branch, menu):
 
     sa-architecture-closure (Gap B): also resolves each item's
     `department_warehouse` (the same warehouse availability/reservation/
-    fulfilment already agree on) and sets it explicitly on the item dict, so
-    native POS `update_stock` deduction draws from the department's real
-    stock instead of unconditionally defaulting to POS Profile.warehouse
-    (which ERPNext applies automatically when no warehouse is given). Items
-    with no resolvable department (genuinely direct-retail) are left
-    unset, so ERPNext's own POS Profile default still applies for them.
+    fulfilment already agree on) and sets it explicitly on the item dict.
+
+    This is load-bearing for stock correctness, not tidiness. The POS
+    Invoice itself never posts a stock ledger entry -- `POS Invoice` has no
+    `update_stock` field at all. The sale-side deduction happens once per
+    session, at POS Closing Entry: consolidation copies each POS Invoice
+    Item onto a consolidated `Sales Invoice` **with its warehouse carried
+    over verbatim** and sets `update_stock = 1` on that document, whose
+    submit writes the SLEs. So the warehouse set here is the warehouse the
+    sale is ultimately deducted from, hours later.
+
+    That is what makes a made-to-order item net out correctly: the
+    fulfilment posting service receives the finished good into this same
+    department warehouse at KOT READY, and closing then issues it from
+    there. Weaken this resolution and the two land in different warehouses.
+
+    Items with no resolvable department (genuinely direct-retail) are left
+    unset, so ERPNext's own POS Profile default still applies for them --
+    they are deducted once, at closing, from that default warehouse.
     """
     company = frappe.db.get_value("Branch", branch, "company")
     priced_items = []

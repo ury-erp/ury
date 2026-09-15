@@ -19,6 +19,7 @@ from frappe.utils import flt
 from ury.ury.api.ury_availability import _resolve_production_config, get_item_availability
 from ury.ury.api.ury_kot_notification import create_system_notification, get_users_with_role
 from ury.ury.api.ury_reservation_service import (
+	FULFILLED,
 	RESERVED,
 	create_reservation,
 	release_reservation,
@@ -325,19 +326,55 @@ def release_order_reservations(order_ref, reason=None):
 	leak reserved capacity that was never explicitly released. Idempotent:
 	an order with no active reservations (or one already fully released)
 	is a no-op. Returns the list of reservation_group names released.
+
+	Already-fulfilled groups are skipped, not released and not raised over
+	(G-09). Under POS Stock Authority V2 a made-to-order item's reservation
+	is transitioned to Fulfilled at production time, so cancelling an order
+	whose items already produced reaches groups that are no longer Reserved.
+	`release_reservation` delegates to `_transition_group`, which refuses a
+	partial transition with a `frappe.throw` -- correct for a caller that
+	believes the group is still Reserved, but here it would abort the entire
+	cancellation of a partly-served order over a reservation row's state.
+	A cancellation must always be able to complete.
+
+	Skipping is also the right answer on the merits, not just a way to avoid
+	the throw: a Fulfilled reservation's ingredients have really been
+	consumed, and releasing it would hand that capacity back as if the food
+	had never been made. The raw materials are gone, and cancelling the sale
+	does not bring them back. What that consumption should be charged to --
+	waste, staff meal, or a re-plate -- is an explicit business decision this
+	codebase does not model yet; see `ury_kot_cancellation_service`.
 	"""
 	if not order_ref:
 		return []
 
 	rows = frappe.get_all(
 		RESERVATION_DOCTYPE,
-		filters={"order_ref": order_ref, "status": RESERVED},
-		fields=["reservation_group"],
+		filters={"order_ref": order_ref},
+		fields=["reservation_group", "status"],
 	)
-	groups = list(dict.fromkeys(row.reservation_group for row in rows if row.reservation_group))
-	for group in groups:
+
+	statuses_by_group = {}
+	for row in rows:
+		if row.reservation_group:
+			statuses_by_group.setdefault(row.reservation_group, set()).add(row.status)
+
+	released = []
+	for group, statuses in statuses_by_group.items():
+		if statuses != {RESERVED}:
+			if FULFILLED in statuses:
+				frappe.logger("ury_order_reservation_service").info(
+					"Not releasing reservation group %s for cancelled order %s: "
+					"rows are in %s. Its stock was already consumed by production; "
+					"disposition of the finished good is a separate decision.",
+					group,
+					order_ref,
+					", ".join(sorted(statuses)),
+				)
+			continue
 		release_reservation(group, reason=reason or "Order cancelled")
-	return groups
+		released.append(group)
+	return released
 
 
 def reconcile_order_reservations(order_ref, previous_items, accepted_items, branch, company, actor=None):

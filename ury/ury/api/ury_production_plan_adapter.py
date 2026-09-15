@@ -208,3 +208,51 @@ def _build_department_index(items):
         department = row.get("department")
         index.setdefault(department, []).append(position)
     return index
+
+
+@frappe.whitelist()
+def get_items_from_sales_plan(sales_plan):
+    """Whitelisted entry point for Production Plan's "Get Items From > Sales
+    Plan" button (BUG_LIST.md B05).
+
+    This is the intentionally lower-risk manual alternative called out in
+    PLAN.md Phase 2 item 5, instead of an automatic on-submit hook that would
+    have to guess consolidation rules: a user opens a new Production Plan,
+    clicks the button, and this fills in ``company``, ``posting_date`` and
+    ``items`` (Production Plan Item rows) from an already-Approved /
+    Locked-for-Production URY Sales Plan, leaving the user free to review,
+    add safety stock, pick warehouses, etc. before saving.
+
+    Only reads the Sales Plan (via ``adapt_sales_plan_to_production_plan``,
+    which is itself read-only/side-effect-free) and returns plain data; the
+    caller (client script) is responsible for actually setting the values on
+    the in-memory, unsaved Production Plan form.
+
+    Returns a dict with ``company``, ``posting_date`` and a flat ``items``
+    list of ``{item_code, bom_no, planned_qty, stock_uom}`` -- real
+    ``Production Plan Item`` fieldnames only, department/production-unit/
+    policy context from the sales plan is dropped here since the stock
+    ``Production Plan Item`` doctype has no field to hold it (see
+    ``_ury_department_index`` in the full adapter output for that detail,
+    exposed separately if a caller wants it via
+    ``adapt_sales_plan_to_production_plan`` directly).
+    """
+    sales_plan_doc = frappe.get_doc("URY Sales Plan", sales_plan)
+    adapted = adapt_sales_plan_to_production_plan(sales_plan_doc)
+
+    items = [
+        {
+            "item_code": row.get("item_code"),
+            "bom_no": row.get("bom_no"),
+            "planned_qty": row.get("planned_qty"),
+            "stock_uom": row.get("stock_uom"),
+        }
+        for row in adapted.get("po_items") or []
+        if row.get("item_code")
+    ]
+
+    return {
+        "company": adapted.get("company"),
+        "posting_date": adapted.get("posting_date"),
+        "items": items,
+    }

@@ -27,6 +27,7 @@ from ury.ury.api.ury_reservation_service import (
     cancel_reservation,
     create_reservation,
     fulfil_reservation,
+    fulfil_reservation_if_pending,
     release_reservation,
     _active_reservation_qty,
 )
@@ -732,6 +733,54 @@ class TestReleaseFulfilCancel(FrappeTestCase):
             fulfil_reservation("RES-1")
 
         self.assertEqual(loaded_doc.status, FULFILLED)
+
+    def _fulfil_if_pending(self, rows, loaded_doc=None):
+        loaded_doc = loaded_doc or frappe._dict(
+            {"name": "RES-1", "status": rows[0].status, "audit_log": None}
+        )
+        loaded_doc.save = MagicMock()
+        with patch(f"{MODULE}.frappe.db.get_value", return_value=None), patch(
+            f"{MODULE}.frappe.get_all", return_value=rows
+        ), patch(f"{MODULE}.frappe.db.sql", side_effect=self._sql_side_effect(rows)), patch(
+            f"{MODULE}.frappe.get_doc", side_effect=lambda *a, **k: loaded_doc
+        ), patch(
+            f"{MODULE}.frappe.session"
+        ) as mock_session:
+            mock_session.user = "tester@example.com"
+            outcome = fulfil_reservation_if_pending("RES-1")
+        return outcome, loaded_doc
+
+    def test_fulfil_if_pending_transitions_a_reserved_group(self):
+        outcome, loaded_doc = self._fulfil_if_pending(self._rows(RESERVED))
+
+        self.assertEqual(outcome, "fulfilled")
+        self.assertEqual(loaded_doc.status, FULFILLED)
+
+    def test_fulfil_if_pending_is_a_no_op_on_an_already_fulfilled_group(self):
+        """The consolidated Sales Invoice close-out and the fulfilment posting
+        service both fulfil the same group and can race; whichever loses must
+        do nothing rather than throw (`fulfil_reservation` would)."""
+        outcome, loaded_doc = self._fulfil_if_pending(self._rows(FULFILLED))
+
+        self.assertEqual(outcome, "already")
+        loaded_doc.save.assert_not_called()
+
+    def test_fulfil_if_pending_skips_a_group_in_a_mixed_or_other_state(self):
+        """A partly-released / mid-transition group is skipped and logged, not
+        raised: neither caller may abort a submitted stock posting or a
+        submitted Sales Invoice over a reservation row's state."""
+        rows = [
+            frappe._dict(
+                {"name": "RES-1", "status": RESERVED, "reservation_group": "GRP9", "audit_log": None}
+            ),
+            frappe._dict(
+                {"name": "RES-2", "status": FULFILLED, "reservation_group": "GRP9", "audit_log": None}
+            ),
+        ]
+        outcome, loaded_doc = self._fulfil_if_pending(rows)
+
+        self.assertEqual(outcome, "not_eligible")
+        loaded_doc.save.assert_not_called()
 
 
 class TestSalesPlanCommitWiring(FrappeTestCase):

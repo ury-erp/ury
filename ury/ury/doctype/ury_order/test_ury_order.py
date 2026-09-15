@@ -463,12 +463,11 @@ class TestURYOrder(FrappeTestCase):
         mock_kot_execute.assert_not_called()
         self.assertEqual(mock_invoice.items, [existing_line])
 
-    @patch("ury.ury.doctype.ury_order.ury_order._apply_pos_stock_authority")
     @patch("ury.ury.doctype.ury_order.ury_order.getBranch")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_value")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.new_doc")
     def test_resolve_or_create_pos_invoice_sets_branch_for_no_table_new_invoice(
-        self, mock_new_doc, mock_get_value, mock_getBranch, mock_apply_stock_authority
+        self, mock_new_doc, mock_get_value, mock_getBranch
     ):
         """Regression for the 'Order reservation scope is incomplete' bug:
         the no-table (Take Away/Delivery) path built a new invoice but never
