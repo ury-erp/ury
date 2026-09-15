@@ -12,6 +12,7 @@
   "kot_item",
   "state",
   "idempotency_key",
+  "revision_key",
   "column_break_group",
   "branch",
   "company",
@@ -69,6 +70,14 @@
    "label": "Idempotency Key",
    "read_only": 1,
    "reqd": 1
+  },
+  {
+   "description": "Identity of the current REVISION of this order line -- which version of the line the kitchen is producing, not which RPC call last touched it. Stamped once at seed time and advanced ONLY by a genuine edit/re-fire of the line (see ury_kot_item_execution_service.bump_item_execution_revision). A plain state transition (QUEUED -> IN_PREPARATION -> READY -> SERVED) must never change it. The G-07 stale-posting gate compares this against the posting intent's accepted_revision.",
+   "fieldname": "revision_key",
+   "fieldtype": "Data",
+   "label": "Revision Key",
+   "read_only": 1,
+   "search_index": 1
   },
   {
    "fieldname": "column_break_group",
