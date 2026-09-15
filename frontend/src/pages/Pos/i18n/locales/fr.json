@@ -54,7 +54,8 @@
     "edit_item": "Modifier l'article",
     "add_comment": "Ajouter un commentaire",
     "edit_comment": "Modifier le commentaire",
-    "pax": "Couverts"
+    "pax": "Couverts",
+    "insufficient_capacity": "Capacité insuffisante pour ajouter cet article"
   },
   "order": {
     "select_to_view": "Sélectionnez une commande pour voir les détails",

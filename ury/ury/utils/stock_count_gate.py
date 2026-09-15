@@ -16,15 +16,16 @@ def validate_pos_opening_entry(doc, method=None):
 	must exist with a `modified` timestamp on/after that POS Opening Entry's `modified`
 	timestamp. If not, block with frappe.throw.
 	"""
-	if not doc.branch:
+	branch = doc.get("branch")
+	if not branch:
 		return
 
-	if not get_alert_rule("Stock Count Gate", branch=doc.branch):
+	if not get_alert_rule("Stock Count Gate", branch=branch):
 		return
 
 	last_pos_opening = frappe.db.get_value(
 		"POS Opening Entry",
-		{"branch": doc.branch, "docstatus": 1},
+		{"branch": branch, "docstatus": 1},
 		["name", "status", "modified"],
 		order_by="creation desc",
 		as_dict=True,
@@ -35,7 +36,7 @@ def validate_pos_opening_entry(doc, method=None):
 
 	last_stock_reconciliation_modified = frappe.db.get_value(
 		"Stock Reconciliation",
-		{"branch": doc.branch, "docstatus": 1},
+		{"branch": branch, "docstatus": 1},
 		"modified",
 		order_by="modified desc",
 	)
@@ -43,7 +44,7 @@ def validate_pos_opening_entry(doc, method=None):
 	if not last_stock_reconciliation_modified or last_stock_reconciliation_modified < last_pos_opening.modified:
 		frappe.throw(
 			"Stock Reconciliation Not Completed: please submit the Stock Reconciliation "
-			f"for branch {doc.branch} before opening a new POS session."
+			f"for branch {branch} before opening a new POS session."
 		)
 
 
@@ -56,19 +57,20 @@ def validate_pos_closing_entry(doc, method=None):
 	trigger, which called `pos_closing.get_draft_stock_reconciliation` (the
 	worldtimeapi.org clock-fetch in that same file is intentionally NOT ported).
 	"""
-	if not doc.branch:
+	branch = doc.get("branch")
+	if not branch:
 		return
 
-	if not get_alert_rule("Stock Count Gate", branch=doc.branch):
+	if not get_alert_rule("Stock Count Gate", branch=branch):
 		return
 
 	stock_reconciliation_exists = frappe.db.exists(
 		"Stock Reconciliation",
-		{"branch": doc.branch, "docstatus": ["in", [0, 1]]},
+		{"branch": branch, "docstatus": ["in", [0, 1]]},
 	)
 
 	if not stock_reconciliation_exists:
 		frappe.throw(
-			f"No Stock Reconciliation found for branch {doc.branch}. "
+			f"No Stock Reconciliation found for branch {branch}. "
 			"Please create and save a Stock Reconciliation before closing this POS session."
 		)

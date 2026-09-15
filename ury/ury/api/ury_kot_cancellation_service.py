@@ -351,6 +351,31 @@ def cancel_after_ready(kot, actor=None, reason=None, manager_confirmed_by=None):
 	finished good. Finished-good disposition (return-to-stock via V3-32,
 	wastage via V3-33, or staff-meal) is a LATER, separate action this task
 	does not implement.
+
+	TODO (tracked, deliberate): under POS Stock Authority V2 a made-to-order
+	item that reached READY has already posted a real, submitted `Manufacture`
+	Stock Entry -- its raw materials are genuinely consumed and its finished
+	good genuinely exists in the department warehouse. Cancelling here means
+	that stock is now held against no sale: the sale-side deduction at POS
+	Closing Entry will never happen for it, so the finished good sits in the
+	warehouse indefinitely and the consumed raws are never charged anywhere.
+
+	This function deliberately does NOT try to reverse or write off that
+	entry. Reversing it would be wrong (the food really was cooked), and
+	routing it to waste, staff-meal or re-plate requires a food-waste
+	accounting model -- which account, which cost center, whose approval --
+	that this codebase does not have. Inventing one here would put
+	unreviewed entries into a real financial ledger. The safe default is to
+	leave the stock where it is, correctly recorded, and surface the
+	decision: `disposition_required` below is returned True precisely so a
+	caller/report can find these.
+
+	Recorded as gap G-08 and Phase 3 follow-up in
+	tracks/sa-testing-issues-14sep/ARCHITECTURE_POS_STOCK_AUTHORITY.md.
+	The related reservation-side hazard (G-09) IS handled:
+	`ury_order_reservation_service.release_order_reservations` skips
+	already-Fulfilled groups instead of throwing, so cancelling a partly
+	produced order always completes.
 	"""
 	_require_execution_doctype()
 	_require_kot(kot)
@@ -381,7 +406,10 @@ def cancel_after_ready(kot, actor=None, reason=None, manager_confirmed_by=None):
 	result["disposition_note"] = (
 		"This call only marks CANCELLED_AFTER_READY. Finished-good disposition "
 		"(return-to-stock, wastage, or staff-meal) is a later, separate action "
-		"not implemented here."
+		"not implemented here. If production already posted for this item, its "
+		"raw materials are consumed and its finished good exists in the "
+		"department warehouse against no sale; routing that to waste requires a "
+		"food-waste accounting decision this app does not model yet."
 	)
 	return result
 
