@@ -3,8 +3,16 @@
 
 """V3-73: POS stock authority feature flag.
 
-This module is the SOLE read path for whether the URY real-time production
-posting layer is active for a branch.
+SUPERSEDED (T1 / I-1). This module is no longer the read path for tier
+state. `ury.ury.api.ury_stock_policy.get_branch_stock_policy` is, and it
+reads the per-branch, per-concern `URY Branch Stock Policy` doctype rather
+than the site-wide `URY Feature Flags` Single. `is_pos_stock_authority_flag_enabled`
+below is retained as a deprecated shim over that resolver so the already-merged
+Phase 0/1 call sites stay correct; new code must call the resolver directly.
+Everything the rest of this docstring says about what the gate DOES (and,
+more importantly, does not do) remains accurate -- only its storage and its
+per-concern granularity changed. See ARCHITECTURE_POS_STOCK_AUTHORITY.md
+section 3.4.
 
 Read this before changing anything here: the flag does NOT switch stock
 authority away from native ERPNext, and never did. The sale-side stock
@@ -62,6 +70,9 @@ import frappe
 from frappe import _
 from frappe.utils import flt
 
+# Retired storage location, kept for the T2 migration patch (which reads the
+# old Single to seed `URY Branch Stock Policy` rows) and for reference. No
+# runtime read path in this module uses them any more.
 FLAG_DOCTYPE = "URY Feature Flags"
 FLAG_FIELD = "pos_stock_authority_v2"
 INTENT_DOCTYPE = "URY Fulfilment Posting Intent"
@@ -73,25 +84,44 @@ MADE_TO_ORDER = "MADE_TO_ORDER"
 
 
 def is_pos_stock_authority_flag_enabled(company=None, branch=None):
-	"""Return True only if a human has explicitly enabled the V3-73 flag.
+	"""DEPRECATED. Use `ury.ury.api.ury_stock_policy.get_branch_stock_policy`.
 
-	Fails CLOSED (returns False) on any error, including a missing doctype
-	(e.g. before this app's migration has run), an unset field, or any other
-	unexpected condition. Never raises.
+	The site-wide `URY Feature Flags.pos_stock_authority_v2` Single has been
+	superseded by the per-branch, per-concern `URY Branch Stock Policy`
+	doctype and its resolver (I-1; see ARCHITECTURE_POS_STOCK_AUTHORITY.md
+	section 3.4). This function survives only as a shim for the Phase 0/1 call
+	sites that have not yet been migrated, so they stay correct without every
+	one of them having to change at once. Do not delete it; do not add new
+	callers to it.
 
-	`company` and `branch` are accepted for forward compatibility with a
-	future per-scope override but are not currently used to vary the result
-	-- the single global "URY Feature Flags" value is authoritative today.
+	It now reads
+	`get_branch_stock_policy(branch, company).realtime_production_posting_enabled`
+	-- the closest semantic equivalent, because what the old Single actually
+	gated was whether READY creates a posting intent and whether the POS
+	Invoice submit gate below runs, i.e. "is Tier 2 production posting active".
+	It no longer consults the old Single at all, so a site that has only ever
+	set the old flag reads as off until the migration patch (T2) populates the
+	new doctype.
+
+	ALL NEW CALL SITES MUST CALL `get_branch_stock_policy` DIRECTLY, and must
+	pick the gate matching the concern they are gating: reservation work
+	belongs behind `reservation_control_enabled` and closing-time enforcement
+	behind `closing_reconciliation_enabled`, neither of which this shim can
+	express.
+
+	Fails CLOSED (returns False) on any error. Never raises.
 	"""
+	from ury.ury.api.ury_stock_policy import get_branch_stock_policy
 
 	try:
-		value = frappe.db.get_single_value(FLAG_DOCTYPE, FLAG_FIELD)
+		policy = get_branch_stock_policy(branch=branch, company=company)
 	except Exception:
-		# Fail closed: doctype missing, DB error, not yet migrated, etc.
-		# Never let a read failure be interpreted as "flag on".
+		# Belt and braces. The resolver already fails closed internally and
+		# documents that it never raises, but this shim guards the till and
+		# must not become the thing that breaks it.
 		return False
 
-	return bool(value)
+	return bool(policy.realtime_production_posting_enabled)
 
 
 def maybe_wire_fulfilment_on_submit(doc, method=None):
@@ -129,7 +159,7 @@ def maybe_wire_fulfilment_on_submit(doc, method=None):
 	_verify_fulfilment_posted_for_invoice(doc)
 
 
-def _verify_fulfilment_posted_for_invoice(doc):
+def _verify_fulfilment_posted_for_invoice(doc, strict=False):
 	"""Assert every produced made-to-order line on this invoice has a POSTED
 	intent that matches what is actually being invoiced.
 
@@ -141,6 +171,17 @@ def _verify_fulfilment_posted_for_invoice(doc):
 	threw on every such invoice. It was also redundant -- neither service
 	writes a Stock Entry, so it produced no ledger effect the posting service
 	had not already produced. Verification is the only job left here.
+
+	`strict`: when False (the default, used at POS Invoice submit -- the
+	till), a not-yet-POSTED intent may be downgraded to advisory (log +
+	proceed) when `closing_reconciliation_enabled` is on for the branch,
+	per I-11 -- a stuck background worker must not stop the till when a
+	real enforcement point exists downstream. When True (used by T5's
+	`ury_pos_closing_reconciliation`, which IS that downstream enforcement
+	point), the advisory downgrade must never apply: T5 calling this with
+	`strict=False` would make the till-time advisory and the closing-time
+	enforcement the same permissive check, silently defeating both --
+	exactly the composition bug this parameter exists to prevent.
 	"""
 	from ury.ury.api.ury_fulfilment_posting_service import process_posting_intent
 
@@ -160,10 +201,10 @@ def _verify_fulfilment_posted_for_invoice(doc):
 				# unproduced item is a kitchen-workflow question, not a stock
 				# one, and must not block payment.
 				continue
-			_verify_item_execution_intent(row, kot.name, doc, process_posting_intent)
+			_verify_item_execution_intent(row, kot.name, doc, process_posting_intent, strict=strict)
 
 
-def _verify_item_execution_intent(row, kot_name, doc, process_posting_intent):
+def _verify_item_execution_intent(row, kot_name, doc, process_posting_intent, strict=False):
 	item_code, invoiced_qty = _kot_item_scope(row.get("kot_item"))
 	if not item_code:
 		return
@@ -194,6 +235,27 @@ def _verify_item_execution_intent(row, kot_name, doc, process_posting_intent):
 			)
 		intent = _latest_intent(row.get("kot_item"))
 		if not intent or intent.get("status") != POSTED:
+			if not strict and _closing_reconciliation_will_catch_this(row, doc):
+				# I-11: T5's closing-time reconciliation (`ury_pos_closing_reconciliation`)
+				# now genuinely catches this same problem, manager-facing, at
+				# end of shift -- so this cashier-facing, per-invoice gate no
+				# longer needs to be the one place that stops it. A stuck
+				# background worker must not stop the till: log for ops
+				# visibility and let the sale proceed. This branch is reached
+				# only when the branch has real enforcement at closing; see
+				# the early return below for the Tier-2-without-T5 case,
+				# which stays strict because it is the only safety net.
+				frappe.log_error(
+					title="URY till-time fulfilment posting advisory",
+					message=(
+						"Production posting for item {0} on KOT {1} has not completed "
+						"(status: {2}) at POS Invoice submit. closing_reconciliation_enabled "
+						"is on for this branch, so this is advisory only: the invoice was "
+						"allowed to submit and POS Closing Entry will enforce this at "
+						"end of shift instead."
+					).format(item_code, kot_name, (intent or {}).get("status") or "missing"),
+				)
+				return
 			frappe.throw(
 				_(
 					"Production posting for item {0} on KOT {1} has not completed "
@@ -274,6 +336,34 @@ def _is_made_to_order(item_code, branch, company):
 	if not context:
 		return False
 	return context.get("production_policy") == MADE_TO_ORDER
+
+
+def _closing_reconciliation_will_catch_this(row, doc):
+	"""True only when T5's `POS Closing Entry.validate` reconciliation
+	(`ury_pos_closing_reconciliation.validate_closing_reconciliation`) is
+	genuinely active for this invoice's branch -- i.e.
+	`closing_reconciliation_enabled` on `get_branch_stock_policy(...)`.
+
+	This is the I-11 gate: the till-time check below may only become
+	advisory where the closing-time check exists to be strict in its
+	place. Fails CLOSED (returns False, i.e. "stay strict at the till")
+	on any resolution failure, exactly like every other policy read in
+	this codebase -- an unreadable policy must not silently remove the
+	only safety net a branch has.
+	"""
+	try:
+		from ury.ury.api.ury_stock_policy import get_branch_stock_policy
+
+		branch = row.get("branch") or doc.get("branch")
+		company = row.get("company") or doc.get("company")
+		policy = get_branch_stock_policy(branch=branch, company=company)
+	except Exception:
+		frappe.logger("ury_feature_flags").exception(
+			"Could not resolve stock policy while deciding till-time "
+			"fulfilment gate severity; staying strict"
+		)
+		return False
+	return bool(policy.closing_reconciliation_enabled)
 
 
 def _latest_intent(kot_item):

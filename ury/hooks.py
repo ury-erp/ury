@@ -240,6 +240,12 @@ doc_events = {
         "validate":[
             "ury.ury.hooks.ury_pos_closing_entry.validate",
             "ury.ury.utils.stock_count_gate.validate_pos_closing_entry",
+            # T5 / I-10: session-scoped closing reconciliation. Runs AFTER
+            # `ury_pos_closing_entry.validate`, which is what populates
+            # `pos_transactions` for the custom frontend's path -- this
+            # handler reads that table, so the order matters. No-op unless
+            # the branch has `closing_reconciliation_enabled` (tier gate 3).
+            "ury.ury.hooks.ury_pos_closing_reconciliation.validate_closing_reconciliation",
         ],
         },
     "URY Menu Course": {

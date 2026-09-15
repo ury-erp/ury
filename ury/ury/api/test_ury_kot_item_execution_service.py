@@ -246,8 +246,29 @@ class TestAttachReadyPostingIntent(FrappeTestCase):
 
 	def test_skips_posting_intent_when_flag_is_off(self):
 		result = {"name": "EXEC-1", "branch": "Branch A", "company": "Company A", "idempotent_replay": False}
+		fake_policy = frappe._dict({"realtime_production_posting_enabled": False})
 		with patch(
-			"ury.ury.api.ury_feature_flags.is_pos_stock_authority_flag_enabled", return_value=False
+			"ury.ury.api.ury_stock_policy.get_branch_stock_policy", return_value=fake_policy
+		) as mock_policy, patch(f"{MODULE}.frappe.get_doc") as mock_get_doc, patch(
+			f"{MODULE}.create_or_get_posting_intent_for_ready", create=True
+		) as mock_create:
+			returned = _attach_ready_posting_intent(dict(result), actor="chef@example.com")
+
+		mock_policy.assert_called_once_with(branch="Branch A", company="Company A")
+		mock_get_doc.assert_not_called()
+		mock_create.assert_not_called()
+		self.assertIsNone(returned["posting_intent"])
+		self.assertEqual(returned["posting_intent_status"], "SKIPPED_NATIVE_POS_AUTHORITY")
+
+	def test_skips_posting_intent_when_branch_has_no_policy_row(self):
+		"""A branch with no stock-policy row resolves to all-gates-off (Tier 1
+		default), which must still skip posting quietly -- same behaviour as
+		an explicit False.
+		"""
+		result = {"name": "EXEC-1", "branch": "Branch Unconfigured", "company": "Company A", "idempotent_replay": False}
+		fake_policy = frappe._dict({"realtime_production_posting_enabled": False})
+		with patch(
+			"ury.ury.api.ury_stock_policy.get_branch_stock_policy", return_value=fake_policy
 		), patch(f"{MODULE}.frappe.get_doc") as mock_get_doc, patch(
 			f"{MODULE}.create_or_get_posting_intent_for_ready", create=True
 		) as mock_create:
@@ -258,12 +279,32 @@ class TestAttachReadyPostingIntent(FrappeTestCase):
 		self.assertIsNone(returned["posting_intent"])
 		self.assertEqual(returned["posting_intent_status"], "SKIPPED_NATIVE_POS_AUTHORITY")
 
+	def test_skips_posting_intent_when_reservations_only_tier(self):
+		"""reservation_control_enabled=True but realtime_production_posting_enabled
+		still False (the 'reservations only' tier) must also skip posting.
+		"""
+		result = {"name": "EXEC-1", "branch": "Branch A", "company": "Company A", "idempotent_replay": False}
+		fake_policy = frappe._dict(
+			{"reservation_control_enabled": True, "realtime_production_posting_enabled": False}
+		)
+		with patch(
+			"ury.ury.api.ury_stock_policy.get_branch_stock_policy", return_value=fake_policy
+		), patch(f"{MODULE}.frappe.get_doc") as mock_get_doc, patch(
+			f"{MODULE}.create_or_get_posting_intent_for_ready", create=True
+		) as mock_create:
+			returned = _attach_ready_posting_intent(dict(result), actor="chef@example.com")
+
+		mock_get_doc.assert_not_called()
+		mock_create.assert_not_called()
+		self.assertEqual(returned["posting_intent_status"], "SKIPPED_NATIVE_POS_AUTHORITY")
+
 	def test_creates_posting_intent_when_flag_is_on(self):
 		result = {"name": "EXEC-1", "branch": "Branch A", "company": "Company A", "idempotent_replay": False}
 		fake_doc = frappe._dict({"name": "EXEC-1"})
+		fake_policy = frappe._dict({"realtime_production_posting_enabled": True})
 		with patch(
-			"ury.ury.api.ury_feature_flags.is_pos_stock_authority_flag_enabled", return_value=True
-		), patch(f"{MODULE}.frappe.get_doc", return_value=fake_doc), patch(
+			"ury.ury.api.ury_stock_policy.get_branch_stock_policy", return_value=fake_policy
+		) as mock_policy, patch(f"{MODULE}.frappe.get_doc", return_value=fake_doc), patch(
 			"ury.ury.api.ury_fulfilment_posting_service.create_or_get_posting_intent_for_ready",
 			return_value={"name": "INTENT-1", "status": "PENDING"},
 		) as mock_create, patch(
@@ -271,16 +312,41 @@ class TestAttachReadyPostingIntent(FrappeTestCase):
 		) as mock_enqueue:
 			returned = _attach_ready_posting_intent(dict(result), actor="chef@example.com")
 
+		mock_policy.assert_called_once_with(branch="Branch A", company="Company A")
 		mock_create.assert_called_once_with(fake_doc, actor="chef@example.com")
 		mock_enqueue.assert_called_once_with("INTENT-1")
 		self.assertEqual(returned["posting_intent"], "INTENT-1")
 		self.assertEqual(returned["posting_intent_status"], "PENDING")
 
+	def test_made_to_order_only_restriction_still_holds_with_gate_on(self):
+		"""Even with realtime_production_posting_enabled=True, a PRE_PRODUCED
+		item must not post -- that decision belongs solely to
+		`create_or_get_posting_intent_for_ready` (Phase 0/1 fix), which this
+		repoint must not disturb.
+		"""
+		result = {"name": "EXEC-1", "branch": "Branch A", "company": "Company A", "idempotent_replay": False}
+		fake_doc = frappe._dict({"name": "EXEC-1"})
+		fake_policy = frappe._dict({"realtime_production_posting_enabled": True})
+		with patch(
+			"ury.ury.api.ury_stock_policy.get_branch_stock_policy", return_value=fake_policy
+		), patch(f"{MODULE}.frappe.get_doc", return_value=fake_doc), patch(
+			"ury.ury.api.ury_fulfilment_posting_service.create_or_get_posting_intent_for_ready",
+			return_value={"name": None, "status": "SKIPPED_NOT_MADE_TO_ORDER"},
+		) as mock_create, patch(
+			"ury.ury.api.ury_fulfilment_posting_service.enqueue_posting_intent"
+		) as mock_enqueue:
+			returned = _attach_ready_posting_intent(dict(result), actor="chef@example.com")
+
+		mock_create.assert_called_once_with(fake_doc, actor="chef@example.com")
+		mock_enqueue.assert_not_called()
+		self.assertIsNone(returned["posting_intent"])
+		self.assertEqual(returned["posting_intent_status"], "SKIPPED_NOT_MADE_TO_ORDER")
+
 	def test_idempotent_replay_never_touches_posting_intent(self):
 		result = {"name": "EXEC-1", "branch": "Branch A", "company": "Company A", "idempotent_replay": True}
 		with patch(
-			"ury.ury.api.ury_feature_flags.is_pos_stock_authority_flag_enabled"
-		) as mock_flag:
+			"ury.ury.api.ury_stock_policy.get_branch_stock_policy"
+		) as mock_policy:
 			returned = _attach_ready_posting_intent(dict(result), actor="chef@example.com")
-		mock_flag.assert_not_called()
+		mock_policy.assert_not_called()
 		self.assertEqual(returned, result)
