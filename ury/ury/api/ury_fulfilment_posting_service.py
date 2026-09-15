@@ -142,7 +142,69 @@ def _kot_order_ref(kot):
 	return invoice or kot
 
 
-def _reservation_rows(order_ref, item_code, branch, company):
+def _row_reservation_line_key(row):
+	"""Best-effort read of the order-time `reservation_line_key` off a reservation row.
+
+	`reservation_line_key` is not a column on `URY Stock Reservation`; it is
+	frozen into the row's `audit_log` JSON by
+	`ury_order_reservation_service._reconcile_line` (see its `frozen_context`),
+	which is why this is a Python-side read rather than a SQL filter.
+	Deliberately tolerant -- a row with a missing/unparseable/legacy audit log
+	simply has no line key, and `_scope_rows_to_line` treats that as "not
+	line-bound" rather than an error. Hard validation of the frozen context
+	still happens per selected row in `_reservation_audit_context`.
+	"""
+	try:
+		entries = json.loads(row.get("audit_log") or "[]")
+	except (TypeError, ValueError):
+		return None
+	for entry in reversed(entries or []):
+		context = entry.get("frozen_context")
+		if context:
+			return context.get("reservation_line_key")
+	return None
+
+
+def _scope_rows_to_line(rows, reservation_line_key):
+	"""Narrow `(order_ref, item_code)` reservation rows to one POS line's groups.
+
+	B03: the same item_code can be live on one order more than once -- two
+	separate POS lines of the same dish, or an original line plus a delta KOT
+	raised by a quantity change. Each such line owns its OWN reservation group
+	(`ury_order_reservation_service._reconcile_line` releases and rebuilds per
+	`reservation_line_key`), but this service used to look reservations up by
+	`(order_ref, item_code)` alone. That pooled every line's groups together,
+	so serving one KOT could consume, and Fulfil, the reservation group that
+	rightfully belonged to the other line -- leaving the second KOT to be
+	served with nothing Reserved (`RESERVATION_NOT_FOUND`), or blocking the
+	first outright with `AMBIGUOUS_RESERVATION_BINDING`.
+
+	The narrowing is deliberately one-directional and cannot introduce a false
+	negative:
+
+	- No line key on the KOT item (legacy/pre-migration KOTs, or any creation
+	  path that does not set `URY KOT Items.reservation_line_key`): no
+	  filtering at all, today's exact behaviour.
+	- Line key present and matching rows exist: those rows only. Every row of
+	  one reservation group shares one frozen context -- the group is created
+	  by a single `create_reservation` call -- so a match selects WHOLE groups,
+	  never a partial one.
+	- Line key present but nothing matches (reservations predating the line
+	  key being frozen, or a line whose group was rebuilt under a different
+	  key): fall back to the unfiltered set rather than failing closed.
+
+	So the result is either identical to the old behaviour or a strict subset
+	consisting of whole groups, which means this can only ever turn an
+	ambiguous/cross-consuming lookup into a correct one -- it can never turn a
+	previously-successful lookup into a failure.
+	"""
+	if not reservation_line_key:
+		return rows
+	scoped = [row for row in rows if _row_reservation_line_key(row) == reservation_line_key]
+	return scoped or rows
+
+
+def _reservation_rows(order_ref, item_code, branch, company, reservation_line_key=None):
 	rows = frappe.get_all(
 		RESERVATION_DOCTYPE,
 		filters={
@@ -169,6 +231,7 @@ def _reservation_rows(order_ref, item_code, branch, company):
 			"RESERVATION_NOT_FOUND",
 			_("No Reserved stock reservation found for order {0}, item {1}").format(order_ref, item_code),
 		)
+	rows = _scope_rows_to_line(rows, reservation_line_key)
 	groups = {row.get("reservation_group") or row.get("name") for row in rows}
 	if len(groups) > 1:
 		raise FulfilmentPostingError(
@@ -299,9 +362,23 @@ def _freeze_payload(execution_doc, actor):
 				execution_doc.kot, execution_state or "UNKNOWN"
 			),
 		)
-	_kot_item, item_code, accepted_qty = _kot_item_doc(execution_doc.kot_item)
+	kot_item_doc, item_code, accepted_qty = _kot_item_doc(execution_doc.kot_item)
 	order_ref = _kot_order_ref(execution_doc.kot)
-	rows = _reservation_rows(order_ref, item_code, execution_doc.branch, execution_doc.company)
+	# B03: bind this posting to the reservation group owned by THIS KOT
+	# line, not to every group the order happens to hold for this item_code.
+	# `URY KOT Items.reservation_line_key` is written at KOT creation from the
+	# same `_line_key` derivation the reservation side freezes (see
+	# `ury_kot_generate._line_keyed_items` / `create_kot_doc`), so the two
+	# sides already agree on line identity -- the consumption side simply was
+	# not using it. Absent (legacy KOT item), `_scope_rows_to_line` is a no-op.
+	reservation_line_key = kot_item_doc.get("reservation_line_key")
+	rows = _reservation_rows(
+		order_ref,
+		item_code,
+		execution_doc.branch,
+		execution_doc.company,
+		reservation_line_key=reservation_line_key,
+	)
 	snapshots = [_reservation_snapshot(row, item_code) for row in rows]
 	policies = {snapshot["policy"] for snapshot in snapshots}
 	if len(policies) != 1:
@@ -367,6 +444,11 @@ def _freeze_payload(execution_doc, actor):
 		"production_configuration": snapshots[0].get("production_configuration"),
 		"production_policy": policy,
 		"reservation_group": reservation_group,
+		# The POS line this KOT item belongs to, as agreed between the
+		# reservation and KOT layers. Recorded for traceability/debugging of
+		# which line a posting was bound to; None for legacy KOT items that
+		# carry no line key (see `_scope_rows_to_line`).
+		"reservation_line_key": reservation_line_key,
 		# The warehouse the finished good is received into, resolved
 		# explicitly rather than inferred from a component row. Frozen here,
 		# at the same moment and from the same order-time context as every

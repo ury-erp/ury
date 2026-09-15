@@ -736,3 +736,191 @@ class TestProcessPostingIntent(FrappeTestCase):
 		self.assertEqual(intent.status, FAILED)
 		self.assertFalse(intent.retryable)
 		self.assertIsNone(intent.next_retry_at)
+
+
+def _line_audit_log(component_item, qty, reservation_line_key=None, warehouse="Kitchen WH", policy="MADE_TO_ORDER"):
+	"""`_audit_log`, plus the order-time `reservation_line_key` the reservation
+	service freezes into `frozen_context` (see
+	`ury_order_reservation_service._reconcile_line`). Kept separate from
+	`_audit_log` so the pre-B03 fixtures above keep exercising the legacy,
+	no-line-key shape unchanged.
+	"""
+	context = {
+		"item_code": "PLATE-1",
+		"branch": "Branch A",
+		"company": "Company A",
+		"warehouse": warehouse,
+		"production_policy": policy,
+		"production_unit": "PU-FROZEN",
+		"department": "Kitchen",
+		"production_configuration": "CFG-1",
+	}
+	if reservation_line_key:
+		context["reservation_line_key"] = reservation_line_key
+	return json.dumps(
+		[{"event": "create", "component_item": component_item, "qty": qty, "frozen_context": context}],
+		sort_keys=True,
+	)
+
+
+def _group_rows(group, reservation_line_key=None):
+	"""Two component rows of one reservation group, as `_reservation_rows` reads them."""
+	return [
+		frappe._dict(
+			{
+				"name": "{0}-RES-1".format(group),
+				"reservation_group": group,
+				"policy": "DIRECT_RETAIL",
+				"warehouse": "MUTATED WH",
+				"top_level_item": "PLATE-1",
+				"component_item": "MUTATED-COMP",
+				"qty": 999,
+				"audit_log": _line_audit_log("COMP-1", 2, reservation_line_key),
+			}
+		),
+		frappe._dict(
+			{
+				"name": "{0}-RES-2".format(group),
+				"reservation_group": group,
+				"policy": "DIRECT_RETAIL",
+				"warehouse": "MUTATED WH",
+				"top_level_item": "PLATE-1",
+				"component_item": "MUTATED-COMP",
+				"qty": 999,
+				"audit_log": _line_audit_log("COMP-2", 1, reservation_line_key),
+			}
+		),
+	]
+
+
+class TestReservationLineScoping(FrappeTestCase):
+	"""B03: two live KOTs for the same item_code on one order must each draw
+	from their OWN reservation group, in either serving order.
+
+	Before this fix, `_reservation_rows` filtered only on
+	`(order_ref, item_code, branch, company, status=Reserved)`, so both KOTs
+	drew from one pooled row set: whichever was served first either tripped
+	`AMBIGUOUS_RESERVATION_BINDING` (both groups still Reserved) or consumed
+	and Fulfilled the other line's group, leaving the second KOT served with
+	`RESERVATION_NOT_FOUND`.
+	"""
+
+	LINE_A = "ref:PLATE-1:LINE-A"
+	LINE_B = "ref:PLATE-1:LINE-B"
+
+	def setUp(self):
+		patch(f"{MODULE}.now", return_value="2026-09-04 10:00:00").start()
+		patch(f"{MODULE}.frappe.get_roles", return_value=["Chef"]).start()
+		patch(f"{MODULE}.frappe.has_permission", return_value=True).start()
+		patch(f"{MODULE}.is_pos_stock_authority_flag_enabled", return_value=True).start()
+		self.addCleanup(patch.stopall)
+		# Live reservation store: group -> (line_key, status). Only Reserved
+		# groups are visible to `_reservation_rows`, exactly as the real
+		# `status=Reserved` filter behaves.
+		self.reserved = {
+			"GROUP-A": self.LINE_A,
+			"GROUP-B": self.LINE_B,
+		}
+
+	def _serve(self, kot_item_name, reservation_line_key):
+		"""Freeze one posting intent for one KOT item and return its payload."""
+		created = []
+
+		def get_doc(arg, *args, **kwargs):
+			if arg == "URY KOT Items":
+				item = {"item": "PLATE-1", "quantity": 1}
+				if reservation_line_key:
+					item["reservation_line_key"] = reservation_line_key
+				return _doc(item)
+			if isinstance(arg, dict):
+				doc = _doc(arg)
+				doc.name = "INTENT-{0}".format(kot_item_name)
+				created.append(doc)
+				return doc
+			raise AssertionError(arg)
+
+		def get_value(doctype, *args, **kwargs):
+			if doctype == "URY KOT":
+				return "POS-INV-1"
+			if doctype == "URY Fulfilment Posting Intent":
+				return None
+			raise AssertionError(doctype)
+
+		def get_all(doctype, *args, **kwargs):
+			if doctype == "URY Stock Reservation":
+				rows = []
+				for group, line_key in self.reserved.items():
+					rows.extend(_group_rows(group, line_key))
+				return rows
+			if doctype == "URY Fulfilment Posting Intent":
+				return []
+			raise AssertionError(doctype)
+
+		execution = _execution_doc()
+		execution.kot_item = kot_item_name
+		with patch(f"{MODULE}.frappe.db.exists", return_value=True), patch(
+			f"{MODULE}.frappe.get_doc", side_effect=get_doc
+		), patch(f"{MODULE}.frappe.db.get_value", side_effect=get_value), patch(
+			f"{MODULE}.frappe.get_all", side_effect=get_all
+		), patch(f"{MODULE}.frappe.session") as session:
+			session.user = "chef@example.com"
+			create_or_get_posting_intent_for_ready(execution, actor="chef@example.com")
+
+		payload = json.loads(created[0]["frozen_payload_json"])
+		# The posting fulfils its own group; it leaves every other group alone.
+		self.reserved.pop(payload["reservation_group"], None)
+		return payload
+
+	def test_two_kots_same_item_are_bound_to_their_own_groups_original_first(self):
+		first = self._serve("KOTITEM-A", self.LINE_A)
+		self.assertEqual(first["reservation_group"], "GROUP-A")
+		self.assertEqual(first["reservation_line_key"], self.LINE_A)
+		self.assertEqual({c["reservation_group"] for c in first["components"]}, {"GROUP-A"})
+
+		second = self._serve("KOTITEM-B", self.LINE_B)
+		self.assertEqual(second["reservation_group"], "GROUP-B")
+		self.assertEqual(second["reservation_line_key"], self.LINE_B)
+		self.assertEqual({c["reservation_group"] for c in second["components"]}, {"GROUP-B"})
+
+	def test_two_kots_same_item_are_bound_to_their_own_groups_delta_first(self):
+		first = self._serve("KOTITEM-B", self.LINE_B)
+		self.assertEqual(first["reservation_group"], "GROUP-B")
+
+		second = self._serve("KOTITEM-A", self.LINE_A)
+		self.assertEqual(second["reservation_group"], "GROUP-A")
+
+	def test_single_kot_single_group_is_unaffected_by_line_scoping(self):
+		self.reserved = {"GROUP-A": self.LINE_A}
+		payload = self._serve("KOTITEM-A", self.LINE_A)
+		self.assertEqual(payload["reservation_group"], "GROUP-A")
+		self.assertEqual([c["item_code"] for c in payload["components"]], ["COMP-1", "COMP-2"])
+
+	def test_legacy_reservations_without_a_frozen_line_key_still_resolve(self):
+		"""Reservations created before `reservation_line_key` was frozen carry
+		no line key. A KOT item that does have one must fall back to the old
+		`(order_ref, item_code)` behaviour rather than finding nothing.
+		"""
+		self.reserved = {"GROUP-A": None}
+		payload = self._serve("KOTITEM-A", self.LINE_A)
+		self.assertEqual(payload["reservation_group"], "GROUP-A")
+
+	def test_legacy_kot_item_without_a_line_key_keeps_todays_behaviour(self):
+		self.reserved = {"GROUP-A": self.LINE_A}
+		payload = self._serve("KOTITEM-A", None)
+		self.assertEqual(payload["reservation_group"], "GROUP-A")
+		self.assertIsNone(payload["reservation_line_key"])
+
+	def test_legacy_kot_item_with_two_live_groups_still_fails_closed(self):
+		"""Unchanged pre-B03 behaviour for a KOT item with no line key at all:
+		two candidate groups remain genuinely ambiguous and must still be
+		refused rather than silently picking one.
+		"""
+		with self.assertRaises(FulfilmentPostingError) as ctx:
+			self._serve("KOTITEM-A", None)
+		self.assertEqual(ctx.exception.reason_code, "AMBIGUOUS_RESERVATION_BINDING")
+
+	def test_no_reserved_rows_at_all_still_raises_reservation_not_found(self):
+		self.reserved = {}
+		with self.assertRaises(FulfilmentPostingError) as ctx:
+			self._serve("KOTITEM-A", self.LINE_A)
+		self.assertEqual(ctx.exception.reason_code, "RESERVATION_NOT_FOUND")
