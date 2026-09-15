@@ -3,8 +3,16 @@
 
 """V3-73: POS stock authority feature flag.
 
-This module is the SOLE read path for whether the URY real-time production
-posting layer is active for a branch.
+SUPERSEDED (T1 / I-1). This module is no longer the read path for tier
+state. `ury.ury.api.ury_stock_policy.get_branch_stock_policy` is, and it
+reads the per-branch, per-concern `URY Branch Stock Policy` doctype rather
+than the site-wide `URY Feature Flags` Single. `is_pos_stock_authority_flag_enabled`
+below is retained as a deprecated shim over that resolver so the already-merged
+Phase 0/1 call sites stay correct; new code must call the resolver directly.
+Everything the rest of this docstring says about what the gate DOES (and,
+more importantly, does not do) remains accurate -- only its storage and its
+per-concern granularity changed. See ARCHITECTURE_POS_STOCK_AUTHORITY.md
+section 3.4.
 
 Read this before changing anything here: the flag does NOT switch stock
 authority away from native ERPNext, and never did. The sale-side stock
@@ -62,6 +70,9 @@ import frappe
 from frappe import _
 from frappe.utils import flt
 
+# Retired storage location, kept for the T2 migration patch (which reads the
+# old Single to seed `URY Branch Stock Policy` rows) and for reference. No
+# runtime read path in this module uses them any more.
 FLAG_DOCTYPE = "URY Feature Flags"
 FLAG_FIELD = "pos_stock_authority_v2"
 INTENT_DOCTYPE = "URY Fulfilment Posting Intent"
@@ -73,25 +84,44 @@ MADE_TO_ORDER = "MADE_TO_ORDER"
 
 
 def is_pos_stock_authority_flag_enabled(company=None, branch=None):
-	"""Return True only if a human has explicitly enabled the V3-73 flag.
+	"""DEPRECATED. Use `ury.ury.api.ury_stock_policy.get_branch_stock_policy`.
 
-	Fails CLOSED (returns False) on any error, including a missing doctype
-	(e.g. before this app's migration has run), an unset field, or any other
-	unexpected condition. Never raises.
+	The site-wide `URY Feature Flags.pos_stock_authority_v2` Single has been
+	superseded by the per-branch, per-concern `URY Branch Stock Policy`
+	doctype and its resolver (I-1; see ARCHITECTURE_POS_STOCK_AUTHORITY.md
+	section 3.4). This function survives only as a shim for the Phase 0/1 call
+	sites that have not yet been migrated, so they stay correct without every
+	one of them having to change at once. Do not delete it; do not add new
+	callers to it.
 
-	`company` and `branch` are accepted for forward compatibility with a
-	future per-scope override but are not currently used to vary the result
-	-- the single global "URY Feature Flags" value is authoritative today.
+	It now reads
+	`get_branch_stock_policy(branch, company).realtime_production_posting_enabled`
+	-- the closest semantic equivalent, because what the old Single actually
+	gated was whether READY creates a posting intent and whether the POS
+	Invoice submit gate below runs, i.e. "is Tier 2 production posting active".
+	It no longer consults the old Single at all, so a site that has only ever
+	set the old flag reads as off until the migration patch (T2) populates the
+	new doctype.
+
+	ALL NEW CALL SITES MUST CALL `get_branch_stock_policy` DIRECTLY, and must
+	pick the gate matching the concern they are gating: reservation work
+	belongs behind `reservation_control_enabled` and closing-time enforcement
+	behind `closing_reconciliation_enabled`, neither of which this shim can
+	express.
+
+	Fails CLOSED (returns False) on any error. Never raises.
 	"""
+	from ury.ury.api.ury_stock_policy import get_branch_stock_policy
 
 	try:
-		value = frappe.db.get_single_value(FLAG_DOCTYPE, FLAG_FIELD)
+		policy = get_branch_stock_policy(branch=branch, company=company)
 	except Exception:
-		# Fail closed: doctype missing, DB error, not yet migrated, etc.
-		# Never let a read failure be interpreted as "flag on".
+		# Belt and braces. The resolver already fails closed internally and
+		# documents that it never raises, but this shim guards the till and
+		# must not become the thing that breaks it.
 		return False
 
-	return bool(value)
+	return bool(policy.realtime_production_posting_enabled)
 
 
 def maybe_wire_fulfilment_on_submit(doc, method=None):
