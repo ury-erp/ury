@@ -1,0 +1,135 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "field:branch",
+ "creation": "2026-09-15 00:00:00.000000",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "branch",
+  "section_break_gates",
+  "reservation_control_enabled",
+  "realtime_production_posting_enabled",
+  "closing_reconciliation_enabled",
+  "gate_help",
+  "section_break_audit",
+  "enabled_by",
+  "column_break_audit",
+  "enabled_on"
+ ],
+ "fields": [
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Branch",
+   "options": "Branch",
+   "reqd": 1,
+   "search_index": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "section_break_gates",
+   "fieldtype": "Section Break",
+   "label": "Stock Authority Gates"
+  },
+  {
+   "default": "0",
+   "description": "Tier gate 1. When on, URY reconciles order reservations at sync_order and availability subtracts reservations. No stock-ledger change of any kind. Prerequisite for the other two gates.",
+   "fieldname": "reservation_control_enabled",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Reservation Control Enabled"
+  },
+  {
+   "default": "0",
+   "description": "Tier gate 2. When on, a KOT item reaching READY creates a fulfilment posting intent and a Manufacture Stock Entry for made-to-order items. Requires Reservation Control Enabled.",
+   "fieldname": "realtime_production_posting_enabled",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Realtime Production Posting Enabled"
+  },
+  {
+   "default": "0",
+   "description": "Tier gate 3. When on, POS Closing Entry blocks on unposted production and unclosed reservations. Requires Realtime Production Posting Enabled.",
+   "fieldname": "closing_reconciliation_enabled",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Closing Reconciliation Enabled"
+  },
+  {
+   "fieldname": "gate_help",
+   "fieldtype": "HTML",
+   "label": "Warning",
+   "options": "<div class=\"text-muted\">These gates are strictly ordered: closing reconciliation requires real-time production posting, which requires reservation control. Only four states are legal: all off (Tier 1, pure native), reservations only, + production posting (Tier 2 advisory), + closing reconciliation (Tier 2 enforcing). Enabling any gate is a deliberate, auditable, out-of-band admin action -- no code path in this app sets these values. See ARCHITECTURE_POS_STOCK_AUTHORITY.md &sect;3.4.</div>"
+  },
+  {
+   "fieldname": "section_break_audit",
+   "fieldtype": "Section Break",
+   "label": "Audit"
+  },
+  {
+   "description": "Set automatically the moment any gate transitions from off to on.",
+   "fieldname": "enabled_by",
+   "fieldtype": "Link",
+   "label": "Enabled By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_audit",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Set automatically the moment any gate transitions from off to on.",
+   "fieldname": "enabled_on",
+   "fieldtype": "Datetime",
+   "label": "Enabled On",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 0,
+ "links": [],
+ "modified": "2026-09-15 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "URY Branch Stock Policy",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "URY Manager"
+  },
+  {
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Stock Manager"
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}
