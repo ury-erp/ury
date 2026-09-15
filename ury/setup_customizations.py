@@ -380,13 +380,32 @@ def get_custom_fields():
 				"fieldtype": "Column Break",
 				"insert_after": "restaurant",
 			},
-			{	
+			{
 				"fieldname": "branch",
 				"fieldtype": "Link",
 				"insert_after": "column_break_e3dky",
 				"label": "Branch",
 				"options": "Branch",
 				"reqd": 1
+			}
+		],
+
+		"POS Closing Entry": [
+			{
+				# Mirrors "POS Opening Entry-branch": stock_count_gate.py's
+				# validate_pos_closing_entry() needs doc.branch to resolve the
+				# per-branch "Stock Count Gate" Alert Rule. Standard POS Closing
+				# Entry has no branch field, which used to raise an
+				# AttributeError on any bench where this field was never
+				# created (see v3_19.add_pos_closing_entry_branch_field patch).
+				"fieldname": "branch",
+				"fieldtype": "Link",
+				"insert_after": "pos_opening_entry",
+				"label": "Branch",
+				"options": "Branch",
+				"fetch_from": "pos_profile.branch",
+				"fetch_if_empty": 1,
+				"read_only": 1,
 			}
 		],
 

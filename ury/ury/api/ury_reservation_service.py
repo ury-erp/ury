@@ -18,7 +18,10 @@ merely mirroring it:
 
   - Capacity formula mirrors V3-42's ``get_allocatable_qty``:
     ``allocatable_qty = Bin.projected_qty - active URY reservation qty``,
-    where "active" means status in (Reserved, Fulfilled). This module reads
+    where "active" means status in (Reserved,) only -- see
+    ``ACTIVE_STATUSES``. A Fulfilled reservation has, by definition,
+    already been reflected in `Bin` by the stock posting that fulfilled
+    it, so continuing to subtract it would double-count. This module reads
     `Bin` directly rather than through the stub (which always returns 0), so
     an item's real active reservation qty is honoured even before the
     wiring task lands.
@@ -157,7 +160,7 @@ from contextlib import contextmanager
 
 import frappe
 from frappe import _
-from frappe.utils import flt
+from frappe.utils import cint, flt
 
 from ury.ury.api.ury_bom_compiler import compile_bom_vector, publish_component_stock_fanout
 from ury.ury.api.ury_sales_plan_commit import apply_commit_delta
@@ -1053,7 +1056,7 @@ def release_reservation(reservation_name, reason=None):
 
 	"Restoring capacity" is entirely the status transition: this module
 	never mutates Bin, so once a row is no longer in an active status
-	(Reserved/Fulfilled) it simply stops being counted by
+	(`ACTIVE_STATUSES`, i.e. Reserved) it simply stops being counted by
 	`_active_reservation_qty`/`get_available_capacity`.
 	"""
 	result = _transition_group(reservation_name, RESERVED, RELEASED, reason, event="release")
@@ -1105,6 +1108,62 @@ def fulfil_reservation(reservation_name):
 	code themselves.
 	"""
 	return _transition_group(reservation_name, RESERVED, FULFILLED, reason=None, event="fulfil")
+
+
+def fulfil_reservation_if_pending(reservation_name):
+	"""Idempotent, non-raising variant of `fulfil_reservation`.
+
+	`fulfil_reservation` delegates to `_transition_group`, which deliberately
+	refuses a partial transition (frappe.throw) when any row of the group is
+	not still `Reserved`. That strictness is right for a caller that believes
+	it is the sole fulfiller, but wrong for the two callers that legitimately
+	race each other on the SAME group:
+
+	  - `ury_fulfilment_posting_service` fulfils a MADE_TO_ORDER group at
+	    production time (Tier 2 only), and
+	  - `ury.ury.hooks.ury_sales_invoice.fulfil_reservations_on_consolidation`
+	    fulfils every sold order's groups at the consolidated Sales Invoice
+	    submit -- i.e. at the moment `Bin` actually drops, for every sale in
+	    both tiers.
+
+	Either may run first, so both must tolerate finding the group already
+	`Fulfilled`. Returns one of:
+
+	  "fulfilled"      -- this call performed the transition
+	  "already"        -- every row was already FULFILLED; nothing to do
+	  "not_eligible"   -- the group is in some other/mixed state (e.g. partly
+	                      Released by a cancellation, or mid-transition);
+	                      logged and skipped rather than raised, because
+	                      neither caller may abort a submitted stock posting
+	                      or a submitted Sales Invoice over it
+	  "missing"        -- no such reservation group
+
+	The group rows are read through `_resolve_group_rows`, which takes a
+	`SELECT ... FOR UPDATE` lock, so the status observed here cannot be a
+	stale snapshot of a concurrent worker's already-committed fulfilment.
+	"""
+	try:
+		rows = _resolve_group_rows(reservation_name)
+	except frappe.ValidationError:
+		return "missing"
+
+	if not rows:
+		return "missing"
+
+	statuses = {row.status for row in rows}
+	if statuses == {FULFILLED}:
+		return "already"
+	if statuses != {RESERVED}:
+		frappe.logger("ury_reservation_service").info(
+			"Skipping fulfilment of reservation group %s: rows are in %s, not %s",
+			rows[0].reservation_group,
+			", ".join(sorted(statuses)),
+			RESERVED,
+		)
+		return "not_eligible"
+
+	_transition_group(reservation_name, RESERVED, FULFILLED, reason=None, event="fulfil")
+	return "fulfilled"
 
 
 @frappe.whitelist()
@@ -1159,3 +1218,40 @@ def expire_stale_reservations(ttl_minutes, now=None):
 	for group in groups:
 		_transition_group(group, RESERVED, EXPIRED, reason="TTL expiry", event="expire")
 	return groups
+
+
+# A reservation is created when an order is placed and is closed out when the
+# sale posts, at POS Closing Entry -> consolidated Sales Invoice submit (see
+# `ury.ury.hooks.ury_sales_invoice.fulfil_reservations_on_consolidation`), or
+# when the order is cancelled. The sweeper below is ONLY a backstop for rows
+# that reached neither end -- an abandoned order that was never billed or
+# cancelled, or a close-out that failed -- so its TTL must comfortably exceed
+# the longest legitimate open shift, or it would expire live reservations for
+# orders that are still being served. 24h is deliberately generous for that
+# reason; capacity leaked by a genuinely stuck row is reclaimed a day late,
+# which is far cheaper than silently un-reserving stock mid-service.
+DEFAULT_STALE_RESERVATION_TTL_MINUTES = 24 * 60
+
+
+def expire_stale_reservations_scheduled():
+	"""Zero-argument entry point for `hooks.py`'s `scheduler_events`.
+
+	`expire_stale_reservations` takes a required `ttl_minutes`, which the
+	scheduler cannot supply, so this wrapper resolves the TTL and calls it.
+	Override with `ury_reservation_ttl_minutes` in site config; see
+	`DEFAULT_STALE_RESERVATION_TTL_MINUTES` above for why the default is
+	deliberately long.
+
+	Never raises: a scheduler job that throws is retried forever and buries
+	the real error in the job log.
+	"""
+	try:
+		ttl_minutes = cint(
+			frappe.conf.get("ury_reservation_ttl_minutes")
+		) or DEFAULT_STALE_RESERVATION_TTL_MINUTES
+		return expire_stale_reservations(ttl_minutes)
+	except Exception:
+		frappe.logger("ury_reservation_service").exception(
+			"expire_stale_reservations_scheduled failed"
+		)
+		return []
