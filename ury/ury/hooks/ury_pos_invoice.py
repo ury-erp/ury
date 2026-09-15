@@ -3,6 +3,7 @@ from datetime import datetime
 from frappe.utils import now_datetime, get_time, now, flt, getdate, get_first_day, get_last_day
 from ury.ury.doctype.ury_order.ury_order import release_merge_cluster_tables
 from ury.ury.doctype.staff_discount_policy.staff_discount_policy import get_applicable_policy
+from ury.ury.api.ury_order_reservation_service import release_order_reservations
 
 
 def before_insert(doc, method):
@@ -29,6 +30,36 @@ def before_submit(doc, method):
 
 def on_trash(doc, method):
     table_status_delete(doc, method)
+
+
+def on_cancel(doc, method):
+    """Document-lifecycle counterpart of `on_trash`, plus reservation release (G-13).
+
+    Previously `on_cancel` was aliased straight to `on_trash`, so reservation
+    release for a cancelled order was reachable only through
+    `ury_order.cancel_order()`'s explicit call -- any other cancellation path
+    (Desk cancel, bulk list-view cancel, a server script, a future frontend)
+    left the order's `URY Stock Reservation` rows `Reserved` until the hourly
+    `expire_stale_reservations_scheduled` TTL sweep. This handler moves the
+    release onto the doc_event itself so it fires for every cancellation
+    path, not just the one whitelisted API.
+
+    `release_order_reservations` is documented and tested as idempotent: a
+    group not uniformly `Reserved` (already released, or `Fulfilled` -- see
+    G-09) is skipped rather than raised over, so calling it a second time
+    (e.g. once here and once from `cancel_order()`, which still calls it
+    explicitly for its draft-invoice branch that bypasses `doc.cancel()`
+    entirely) is a no-op. Wrapped in try/except so a failure here never
+    blocks the cancellation itself.
+    """
+    table_status_delete(doc, method)
+    try:
+        release_order_reservations(doc.name, reason="POS Invoice cancelled")
+    except Exception:
+        frappe.log_error(
+            title="release_order_reservations failed on POS Invoice on_cancel",
+            message=frappe.get_traceback(),
+        )
 
 
 def _employee_for_user(user):

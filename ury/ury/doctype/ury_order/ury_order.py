@@ -2399,6 +2399,19 @@ def cancel_order(invoice_id, reason):
     # capacity indefinitely after cancellation (sa-post-373-review-fixes
     # Blocker 3). order_ref is the invoice name, matching how sync_order()
     # reserves via `_ensure_invoice_reservation_ref`.
+    #
+    # G-13 follow-up: `POS Invoice.on_cancel` now also calls
+    # `release_order_reservations` directly (ury_pos_invoice.on_cancel), so
+    # this call is redundant for the submitted-invoice branch below (which
+    # goes through `pos_invoice.cancel()` and therefore fires that hook).
+    # It is kept -- not dropped -- because the *draft*-invoice branch below
+    # never calls `pos_invoice.cancel()`: it flips docstatus via raw SQL,
+    # which does not run any doc_event hooks at all. Dropping this call
+    # would silently stop releasing reservations for draft-invoice
+    # cancellations. `release_order_reservations` is documented/tested as
+    # idempotent (a group not uniformly Reserved is skipped, not raised
+    # over), so the resulting double-call on the submitted-invoice path is a
+    # harmless no-op query, not a correctness risk.
     release_order_reservations(invoice_id, reason=f"Order cancelled: {reason}" if reason else "Order cancelled")
 
     # Best-effort delayed-cancellation fraud alert: notify if order was open longer than threshold

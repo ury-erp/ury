@@ -209,7 +209,7 @@ doc_events = {
             "ury.ury.api.ury_feature_flags.maybe_wire_fulfilment_on_submit",
         ],
         "on_update": "ury.ury.hooks.ury_pos_invoice.on_update",
-        "on_cancel": "ury.ury.hooks.ury_pos_invoice.on_trash",
+        "on_cancel": "ury.ury.hooks.ury_pos_invoice.on_cancel",
         "on_trash": "ury.ury.hooks.ury_pos_invoice.on_trash",
     },
     "POS Profile": {"validate": "ury.ury.hooks.ury_pos_profile.validate"},
