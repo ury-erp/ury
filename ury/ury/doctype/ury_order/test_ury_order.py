@@ -2031,10 +2031,20 @@ class TestSplitBillReservations(FrappeTestCase):
         # Item A fully moved off the source invoice; item B stays.
         self.assertEqual([i.item_code for i in source.items], ["ITEM-B"])
         self.assertEqual([i.item_code for i in new_invoice.items], ["ITEM-A"])
-        # The moved row must carry its original stable line identity onto
-        # the new invoice, not a key implicitly derived from its new row
-        # name -- otherwise the reservation lookup below can never find it.
-        self.assertEqual(new_invoice.items[0].get("reservation_line_key"), "ITEM-ROW-A")
+        # As of c84f782a (B02b) + 291e3a40 (B02b-followup),
+        # _copy_invoice_item_fields() deliberately no longer falls back to
+        # a row's own .name for reservation_line_key -- a legacy/unkeyed
+        # row (like item_a here, built with reservation_line_key=None) is
+        # left None on the new invoice too, rather than being given a
+        # bogus name-derived key that a client can never match and that
+        # would poison _backfill_previous_line_keys' claimed set for any
+        # sibling row of the same item_code. The split invoice's own
+        # backfill logic is expected to rescue it on the next real sync,
+        # the same way an un-split legacy invoice already gets rescued --
+        # that rescue path isn't exercised by split_bill()'s mocked
+        # reconcile_order_reservations() call here, so both this row-level
+        # field and the reconciliation call's own key end up None.
+        self.assertIsNone(new_invoice.items[0].get("reservation_line_key"))
 
         self.assertEqual(mock_reconcile.call_count, 2)
         source_call, new_call = mock_reconcile.call_args_list
@@ -2047,16 +2057,17 @@ class TestSplitBillReservations(FrappeTestCase):
         self.assertEqual(previous_keys, {"ITEM-ROW-A": 2, "ITEM-ROW-B": 1})
         self.assertEqual(accepted_keys, {"ITEM-ROW-B": 1})
 
-        # New-invoice-side reconciliation: item A's full quantity is
-        # (re)claimed under the new invoice, under the SAME line key, so
-        # any subsequent posting/lookup keyed on reservation_line_key still
-        # resolves.
+        # New-invoice-side reconciliation: item A's quantity is (re)claimed
+        # under the new invoice. Since item_a started with no persisted
+        # reservation_line_key, its identity here is also None (see above)
+        # -- the backfill-rescue path, not this call, is what's meant to
+        # re-key it against a real client-supplied identity on next sync.
         self.assertEqual(new_call.kwargs["order_ref"], "POS-INV-NEW")
         self.assertEqual(new_call.kwargs["previous_items"], [])
         new_accepted = {
             p["reservation_line_key"]: p["qty"] for p in new_call.kwargs["accepted_items"]
         }
-        self.assertEqual(new_accepted, {"ITEM-ROW-A": 2})
+        self.assertEqual(new_accepted, {None: 2})
 
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_all")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.db.set_value")
