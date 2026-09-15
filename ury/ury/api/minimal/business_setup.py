@@ -152,7 +152,12 @@ def get_setup_role_options():
     return {
         "status": "success",
         "roles": roles,
-        "is_system_manager": bool(is_system_manager or _is_bootstrap_setup()),
+        # Strictly the real System-Manager check -- deliberately NOT widened
+        # by `_is_bootstrap_setup()`. create_setup_user() restricts a
+        # bootstrap caller to `_SELF_SERVICE_SETUP_ROLES` exactly like any
+        # other non-System-Manager caller, so reporting True during bootstrap
+        # would offer the wizard an elevated role the server then rejects.
+        "is_system_manager": bool(is_system_manager),
         "self_service_roles": sorted(_SELF_SERVICE_SETUP_ROLES),
     }
 

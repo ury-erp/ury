@@ -103,6 +103,64 @@ CANCEL_REASONS = [
     "Other",
 ]
 
+# CANCEL_REASONS and REASON_CATEGORIES are two DIFFERENT vocabularies on two
+# different axes ("why the sale did not happen" vs "what happened to the
+# physical stock"), and only "Other" is spelled the same in both. A caller
+# that captures a write-off for a cancelled order therefore must NOT pass a
+# cancel reason straight through as `reason_category` -- every value except
+# "Other" would fail `capture_kot_cancellation_wastage`'s validation, and in
+# the fail-open POS cancellation path that failure is swallowed, silently
+# capturing no write-off at all. This map is the single, explicit translation
+# between the two; see `wastage_category_for_cancel_reason` below.
+CANCEL_REASON_TO_WASTAGE_CATEGORY = {
+    "Customer Changed Mind": "Other",
+    "Order Placed By Mistake": "Other",
+    "Duplicate Order": "Other",
+    "Kitchen Error": "Preparation Error",
+    "Out Of Stock": "Other",
+    "Excessive Wait": "Other",
+    "Payment Issue": "Other",
+    "Other": "Other",
+}
+
+
+def wastage_category_for_cancel_reason(reason):
+    """Translate a `CANCEL_REASONS` value into a legal `REASON_CATEGORIES` one.
+
+    Falls back to "Other" for an unknown/blank reason rather than raising:
+    the caller is on a cancellation path where a write-off must be captured
+    even if the reason vocabulary drifts.
+    """
+    return CANCEL_REASON_TO_WASTAGE_CATEGORY.get(reason) or DEFAULT_KOT_CANCELLATION_REASON
+
+
+def kot_has_posted_consumption(kot):
+    """True when `kot` has at least one POSTED fulfilment posting intent.
+
+    i.e. production really did post a `Manufacture` Stock Entry for this KOT
+    and its raw materials are genuinely consumed in the ledger. Used by
+    `ury_kot_cancellation_service.cancel_before_start` to tell a truly
+    untouched QUEUED KOT (nothing consumed -- capture nothing) apart from one
+    whose item is configured with `production_posting_trigger_state = QUEUED`
+    and therefore already posted while still QUEUED. Never raises.
+    """
+    if not kot:
+        return False
+    try:
+        if not frappe.db.exists("DocType", POSTING_INTENT_DOCTYPE):
+            return False
+        return bool(
+            frappe.get_all(
+                POSTING_INTENT_DOCTYPE,
+                filters={"kot": kot, "status": "POSTED"},
+                pluck="name",
+                limit=1,
+            )
+        )
+    except Exception:
+        return False
+
+
 # grillax's binary `stock` field (Damaged / Wastage), widened. Only the first
 # three post a `Material Issue`; `Re-plated` posts nothing.
 DISPOSITIONS = ("Wastage", "Damaged", "Staff Meal", "Re-plated")

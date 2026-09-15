@@ -155,6 +155,12 @@ def create_transfer_for_missing(company, branch, department=None):
 	not a per-order requirement), only a worklist of which items need
 	transferring into which warehouse.
 	"""
+	# This endpoint inserts Stock Entries, so it must not be reachable by any
+	# logged-in user. `ignore_permissions=True` below is only there because
+	# the draft is assembled field-by-field rather than through the Desk form;
+	# it is not a grant, so the grant is checked explicitly here first.
+	frappe.has_permission("Stock Entry", "create", throw=True)
+
 	filters = frappe._dict({
 		"company": company,
 		"branch": branch,

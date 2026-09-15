@@ -103,12 +103,11 @@
   {
    "default": "Hard",
    "depends_on": "eval:doc.controlled_by_sales_plan",
-   "description": "Only applies when Controlled by Sales Plan is checked and no active Sales Plan row covers this item for today's branch/department. Hard: block the sale until a plan is created/approved. Soft: allow the sale on stock/capacity alone and flag it for review.",
+   "description": "Only applies when Controlled by Sales Plan is checked and no active Sales Plan row covers this item for today's branch/department. Hard: block the sale until a plan is created/approved. Soft: allow the sale on stock/capacity alone and flag it for review. Left non-mandatory on purpose: rows created before this field existed store NULL, and a reqd flag would make every one of them unsaveable until re-edited. Every reader treats a blank value as Hard.",
    "fieldname": "no_plan_enforcement_mode",
    "fieldtype": "Select",
    "label": "No-Plan Enforcement Mode",
-   "options": "Hard\nSoft",
-   "reqd": 1
+   "options": "Hard\nSoft"
   },
   {
    "default": "0",

@@ -318,7 +318,15 @@ def _capture_disposition_wastage(result, kot, execution_name, disposition, reaso
 
 
 @frappe.whitelist()
-def cancel_before_start(kot, actor=None, reason=None, reservation_name=None):
+def cancel_before_start(
+	kot,
+	actor=None,
+	reason=None,
+	reservation_name=None,
+	disposition=None,
+	reason_category=None,
+	reason_notes=None,
+):
 	"""QUEUED -> CANCELLED_BEFORE_START.
 
 	Only valid if the execution is still QUEUED (never started). Releases
@@ -331,10 +339,23 @@ def cancel_before_start(kot, actor=None, reason=None, reservation_name=None):
 	may be no reservation associated with this KOT), and this function still
 	records the cancellation.
 
-	Captures NO wastage. A QUEUED KOT never started production, so nothing was
-	consumed and there is nothing to write off -- creating a write-off row here
-	would invent a cost that does not exist. See
+	Captures NO wastage in the ordinary case. A QUEUED KOT never started
+	production, so nothing was consumed and there is nothing to write off --
+	creating a write-off row here would invent a cost that does not exist. See
 	`test_cancel_before_start_captures_no_wastage`.
+
+	THE ONE EXCEPTION (item 6 x item 9): `URY Item Production
+	Configuration.production_posting_trigger_state` can be set to QUEUED, in
+	which case production posts a real, submitted `Manufacture` Stock Entry
+	while the KOT is still QUEUED. For such a KOT "QUEUED" no longer implies
+	"consumed nothing", and skipping the capture would leave consumed raw
+	materials and a finished good in the ledger against no sale and with no
+	write-off -- exactly the hole G-08 was resolved to close for the other two
+	states. So the capture runs here too, but ONLY when
+	`ury_wastage.kot_has_posted_consumption(kot)` confirms a POSTED intent
+	exists; it never falls back to the BOM explosion, because for a genuinely
+	untouched QUEUED KOT there is nothing to derive. Captured rows are Draft
+	and inert, so the disposition decision still belongs to the approver.
 	"""
 	_require_execution_doctype()
 	_require_kot(kot)
@@ -368,6 +389,22 @@ def cancel_before_start(kot, actor=None, reason=None, reservation_name=None):
 		branch=branch, company=company, production_unit=production_unit,
 	)
 	result["reservation_release_result"] = released
+	if ury_wastage.kot_has_posted_consumption(kot):
+		# See the docstring's "ONE EXCEPTION": this KOT's item is configured
+		# to post production at QUEUED, so raw materials really were consumed
+		# even though preparation never started.
+		_capture_disposition_wastage(
+			result,
+			kot=kot,
+			execution_name=result.get("name"),
+			disposition=disposition,
+			reason_category=reason_category,
+			reason_notes=reason_notes,
+			actor=actor,
+			branch=branch,
+			company=company,
+		)
+		result["disposition_required"] = True
 	return result
 
 

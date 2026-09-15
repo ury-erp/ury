@@ -75,6 +75,11 @@ def resolve_write_off_defaults(company):
     if not frappe.db.exists("Company", company):
         frappe.throw(frappe._("Company {0} does not exist.").format(company))
 
+    # Whitelisted and read-only, but it still returns real Account / Cost
+    # Center names for a company -- gate it on ordinary Company read access
+    # rather than exposing the chart of accounts to any logged-in user.
+    frappe.has_permission("Company", "read", doc=company, throw=True)
+
     company_doc = frappe.get_doc("Company", company)
 
     expense_account = getattr(company_doc, "default_expense_account", None) or frappe.db.get_value(

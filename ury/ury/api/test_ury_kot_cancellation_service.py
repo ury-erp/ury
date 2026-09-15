@@ -546,3 +546,38 @@ class TestCancellationWastageCaptureWiring(FrappeTestCase):
 		self.assertNotIn("TODO (tracked, deliberate)", source)
 		# It still must never restore or reverse consumed stock.
 		self.assertNotIn("reverse_stock", source)
+
+	def test_cancel_before_start_captures_when_production_posted_at_queued(self):
+		"""Review fix: item 6 lets `production_posting_trigger_state = QUEUED`
+		post a real Manufacture Stock Entry while the KOT is still QUEUED, so
+		"QUEUED" no longer implies "consumed nothing". When a POSTED intent
+		exists, cancel_before_start must capture the write-off too -- otherwise
+		consumed raws and a finished good sit in the ledger against no sale
+		with no write-off, which is exactly the hole G-08 closed for the other
+		two states.
+		"""
+		get_doc_side_effect, _created = _new_doc_recorder()
+		with patch(f"{MODULE}.frappe.db.exists", side_effect=_existence_side_effect()), patch(
+			f"{MODULE}.frappe.get_all", return_value=[]
+		), patch(f"{MODULE}.frappe.db.sql", return_value=[]), patch(
+			f"{MODULE}.frappe.db.get_value", side_effect=_kot_scope_patches()
+		), patch(
+			f"{MODULE}.frappe.get_doc", side_effect=get_doc_side_effect
+		), patch(
+			f"{MODULE}.frappe.session"
+		) as mock_session, patch(
+			f"{MODULE}.ury_wastage.kot_has_posted_consumption", return_value=True
+		), patch(
+			f"{MODULE}.ury_wastage.capture_kot_cancellation_wastage",
+			return_value=_captured(["W-Q1"]),
+		) as mock_capture:
+			mock_session.user = "manager1@example.com"
+			result = cancel_before_start(
+				"KOT-1", actor="manager1@example.com", disposition="Staff Meal"
+			)
+
+		mock_capture.assert_called_once()
+		self.assertEqual(result["state"], CANCELLED_BEFORE_START)
+		self.assertEqual(mock_capture.call_args.kwargs["disposition"], "Staff Meal")
+		self.assertEqual(result["wastage_rows"], ["W-Q1"])
+		self.assertTrue(result["disposition_required"])

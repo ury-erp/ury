@@ -2385,8 +2385,15 @@ def get_order_cancellation_context(invoice_id):
         state = frappe.db.get_value("URY KOT Execution", {"kot": kot}, "state") or cancellation_service.QUEUED
         kot_states.append({"kot": kot, "state": state})
 
+    # Mirrors `_capture_post_production_wastage`'s own selection rule exactly:
+    # preparation begun, OR production already posted (possible while still
+    # QUEUED since item 6's `production_posting_trigger_state = QUEUED`).
     requires_disposition = any(
         row["state"] in (cancellation_service.IN_PREPARATION, cancellation_service.READY)
+        or (
+            row["state"] == cancellation_service.QUEUED
+            and ury_wastage.kot_has_posted_consumption(row["kot"])
+        )
         for row in kot_states
     )
 
@@ -2557,6 +2564,7 @@ def _capture_post_production_wastage(invoice_id, reason, reason_notes, dispositi
     with any error under `wastage_capture_error`.
     """
     from ury.ury.api import ury_kot_cancellation_service as cancellation_service
+    from ury.ury.api import ury_wastage
 
     kots = frappe.get_all(
         "URY KOT",
@@ -2564,22 +2572,59 @@ def _capture_post_production_wastage(invoice_id, reason, reason_notes, dispositi
         pluck="name",
     )
 
-    results = []
+    # A KOT needs a disposition decision when preparation has begun
+    # (IN_PREPARATION/READY) OR when production already posted a real
+    # Manufacture Stock Entry for it -- which, since item 6, can happen while
+    # the KOT is still QUEUED, for an item configured with
+    # `production_posting_trigger_state = QUEUED`. Keying only off the
+    # execution state would silently skip the write-off for exactly those
+    # items even though their raw materials are consumed in the ledger.
+    post_production_kots = []
     for kot in kots:
         state = frappe.db.get_value("URY KOT Execution", {"kot": kot}, "state")
-        if state not in (cancellation_service.IN_PREPARATION, cancellation_service.READY):
-            continue
-        handler = (
-            cancellation_service.cancel_after_start
-            if state == cancellation_service.IN_PREPARATION
-            else cancellation_service.cancel_after_ready
+        if state in (cancellation_service.IN_PREPARATION, cancellation_service.READY) or (
+            state == cancellation_service.QUEUED and ury_wastage.kot_has_posted_consumption(kot)
+        ):
+            post_production_kots.append(kot)
+
+    # The operator's explicit choice must reach `capture_kot_cancellation_wastage`
+    # -- never that function's own "Wastage" default -- whenever this order
+    # actually has something to dispose of. Both cancel dialogs already make
+    # the control mandatory in exactly this case (`requires_disposition` from
+    # `get_order_cancellation_context`); this is the server-side mirror, so a
+    # stale client or a direct API call cannot have a disposition silently
+    # invented for it.
+    if post_production_kots and not disposition:
+        frappe.throw(
+            _(
+                "This order has already been produced. Choose what happened to the "
+                "food (one of: {0}) before cancelling."
+            ).format(", ".join(ury_wastage.DISPOSITIONS)),
+            frappe.ValidationError,
         )
+
+    results = []
+    for kot in post_production_kots:
+        state = frappe.db.get_value("URY KOT Execution", {"kot": kot}, "state")
+        if state == cancellation_service.QUEUED:
+            handler = cancellation_service.cancel_before_start
+        elif state == cancellation_service.IN_PREPARATION:
+            handler = cancellation_service.cancel_after_start
+        else:
+            handler = cancellation_service.cancel_after_ready
         try:
             result = handler(
                 kot=kot,
                 reason=reason,
                 disposition=disposition,
-                reason_category=reason,
+                # `reason` is a CANCEL_REASONS value ("why the sale did not
+                # happen"); `reason_category` is a REASON_CATEGORIES value
+                # ("what happened to the stock"). They are different
+                # vocabularies -- passing the former straight through made
+                # `capture_kot_cancellation_wastage` throw for every reason
+                # except "Other", and because this path is fail-open that
+                # threw-and-swallowed capture silently wrote off nothing.
+                reason_category=ury_wastage.wastage_category_for_cancel_reason(reason),
                 reason_notes=reason_notes,
             )
             result["kot"] = kot
