@@ -40,7 +40,11 @@ export type AvailabilityReasonCode =
 export interface ItemAvailability {
   item_code: string;
   sellable: boolean;
-  available_qty: number;
+  /**
+   * `null` signals "unconstrained" (e.g. an "Always Available" override) --
+   * treat it the same as `undefined`/unknown, never as zero.
+   */
+  available_qty: number | null;
   production_policy: string | null;
   company: string;
   branch: string;

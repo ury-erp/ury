@@ -374,6 +374,14 @@ def get_item_availability(item_code, branch, company, department=None):
 	if availability_mode == "Always Available" and response.get("reason_code") not in _STRUCTURAL_ERROR_CODES:
 		response["reason_code"] = "AVAILABLE"
 		response["sellable"] = True
+		# The override makes the item unconditionally sellable, so its computed
+		# (possibly zero/negative) stock-derived quantities no longer reflect a
+		# real constraint. Signal "unconstrained" with None rather than leaving
+		# the real, possibly-zero value in place, which would otherwise block
+		# cart-capacity/headroom checks downstream despite sellable=True.
+		response["available_qty"] = None
+		if "max_producible" in response:
+			response["max_producible"] = None
 
 	return response
 
