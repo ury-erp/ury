@@ -12,6 +12,21 @@ from ury.ury.doctype.ury_yield_check.ury_yield_check import URYYieldCheck
 
 MODULE = "ury.ury.doctype.ury_yield_check.ury_yield_check"
 
+# Constructing a URYYieldCheck(Document) instance triggers frappe's own
+# internal DocType-meta loading (frappe.get_meta -> Document("DocType", ...))
+# the FIRST time it's needed, which itself calls frappe.db.get_value --
+# the SAME global attribute these tests patch (unittest.mock.patch on a
+# dotted path patches the shared frappe.db object, not a per-module copy).
+# If that first meta load happens while a test has frappe.db.get_value
+# mocked to something meta-loading doesn't expect (a bare float, None,
+# ...), Document construction itself crashes deep inside frappe internals
+# with a confusing AttributeError/DoesNotExistError that has nothing to
+# do with the test's own assertions. Warm the meta cache for real, once,
+# here at import time, before any test patches frappe.db.get_value --
+# every later URYYieldCheck(...) construction then hits frappe's meta
+# cache instead of the DB.
+frappe.get_meta("URY Yield Check")
+
 
 def _create_yield_check(**kwargs):
 	"""Helper to create a Yield Check document with sensible defaults."""
@@ -41,7 +56,9 @@ class TestYieldCheckValidateItemYieldTrackingEnabled(FrappeTestCase):
 		mock_get_value.return_value = False
 
 		doc = URYYieldCheck(_create_yield_check())
-		doc.validate_item_yield_tracking_enabled()
+		mock_throw.side_effect = frappe.ValidationError
+		with self.assertRaises(frappe.ValidationError):
+			doc.validate_item_yield_tracking_enabled()
 
 		mock_throw.assert_called_once()
 		call_args = mock_throw.call_args[0]
@@ -64,7 +81,9 @@ class TestYieldCheckValidateInputQty(FrappeTestCase):
 	def test_throws_when_input_qty_is_zero(self, mock_throw):
 		"""Input quantity of 0 fails validation."""
 		doc = URYYieldCheck(_create_yield_check(input_qty=0))
-		doc.validate_input_qty()
+		mock_throw.side_effect = frappe.ValidationError
+		with self.assertRaises(frappe.ValidationError):
+			doc.validate_input_qty()
 
 		mock_throw.assert_called_once()
 		call_args = mock_throw.call_args[0]
@@ -74,7 +93,9 @@ class TestYieldCheckValidateInputQty(FrappeTestCase):
 	def test_throws_when_input_qty_is_negative(self, mock_throw):
 		"""Negative input quantity fails validation."""
 		doc = URYYieldCheck(_create_yield_check(input_qty=-10))
-		doc.validate_input_qty()
+		mock_throw.side_effect = frappe.ValidationError
+		with self.assertRaises(frappe.ValidationError):
+			doc.validate_input_qty()
 
 		mock_throw.assert_called_once()
 
@@ -82,7 +103,9 @@ class TestYieldCheckValidateInputQty(FrappeTestCase):
 	def test_throws_when_input_qty_is_none(self, mock_throw):
 		"""None input quantity fails validation."""
 		doc = URYYieldCheck(_create_yield_check(input_qty=None))
-		doc.validate_input_qty()
+		mock_throw.side_effect = frappe.ValidationError
+		with self.assertRaises(frappe.ValidationError):
+			doc.validate_input_qty()
 
 		mock_throw.assert_called_once()
 
@@ -120,14 +143,21 @@ class TestYieldCheckCaptureStandardYieldSnapshot(FrappeTestCase):
 		self.assertEqual(doc.standard_yield_percent_snapshot, 85.0)
 
 	@patch(f"{MODULE}.frappe.db.get_value")
-	def test_handles_missing_item_yield_percent(self, mock_get_value):
-		"""Defaults to 0.0 if Item.custom_yield_percent is not set."""
+	@patch(f"{MODULE}.frappe.throw")
+	def test_handles_missing_item_yield_percent(self, mock_throw, mock_get_value):
+		"""I6 hardening: a yield-tracked item with no standard yield percent set
+		now throws rather than silently defaulting to 0.0 (PR #375) -- a 0.0
+		standard would make every future check's variance_percent meaningless."""
 		mock_get_value.return_value = None
+		mock_throw.side_effect = frappe.ValidationError
 
 		doc = URYYieldCheck(_create_yield_check(standard_yield_percent_snapshot=None))
-		doc.capture_standard_yield_snapshot()
+		with self.assertRaises(frappe.ValidationError):
+			doc.capture_standard_yield_snapshot()
 
-		self.assertEqual(doc.standard_yield_percent_snapshot, 0.0)
+		mock_throw.assert_called_once()
+		call_args = mock_throw.call_args[0]
+		self.assertIn("no standard yield percent set", call_args[0])
 
 
 class TestYieldCheckComputeYieldAndVariance(FrappeTestCase):
@@ -201,7 +231,9 @@ class TestYieldCheckValidateBranchCompanyConsistency(FrappeTestCase):
 	def test_throws_when_branch_is_missing(self, mock_throw):
 		"""Validation fails if branch is not set."""
 		doc = URYYieldCheck(_create_yield_check(branch=None))
-		doc.validate_branch_company_consistency()
+		mock_throw.side_effect = frappe.ValidationError
+		with self.assertRaises(frappe.ValidationError):
+			doc.validate_branch_company_consistency()
 
 		mock_throw.assert_called_once()
 		call_args = mock_throw.call_args[0]
@@ -214,7 +246,9 @@ class TestYieldCheckValidateBranchCompanyConsistency(FrappeTestCase):
 		mock_get_value.return_value = None
 
 		doc = URYYieldCheck(_create_yield_check())
-		doc.validate_branch_company_consistency()
+		mock_throw.side_effect = frappe.ValidationError
+		with self.assertRaises(frappe.ValidationError):
+			doc.validate_branch_company_consistency()
 
 		mock_throw.assert_called_once()
 		call_args = mock_throw.call_args[0]
@@ -227,7 +261,9 @@ class TestYieldCheckValidateBranchCompanyConsistency(FrappeTestCase):
 		mock_get_value.return_value = "Other Company"
 
 		doc = URYYieldCheck(_create_yield_check(company="Test Company"))
-		doc.validate_branch_company_consistency()
+		mock_throw.side_effect = frappe.ValidationError
+		with self.assertRaises(frappe.ValidationError):
+			doc.validate_branch_company_consistency()
 
 		mock_throw.assert_called_once()
 		call_args = mock_throw.call_args[0]
@@ -250,7 +286,9 @@ class TestYieldCheckValidateStockUomMatch(FrappeTestCase):
 	def test_throws_when_item_is_missing(self, mock_throw):
 		"""Validation fails if item is not set."""
 		doc = URYYieldCheck(_create_yield_check(item=None))
-		doc.validate_stock_uom_match()
+		mock_throw.side_effect = frappe.ValidationError
+		with self.assertRaises(frappe.ValidationError):
+			doc.validate_stock_uom_match()
 
 		mock_throw.assert_called_once()
 		call_args = mock_throw.call_args[0]
@@ -263,7 +301,9 @@ class TestYieldCheckValidateStockUomMatch(FrappeTestCase):
 		mock_get_value.return_value = None
 
 		doc = URYYieldCheck(_create_yield_check())
-		doc.validate_stock_uom_match()
+		mock_throw.side_effect = frappe.ValidationError
+		with self.assertRaises(frappe.ValidationError):
+			doc.validate_stock_uom_match()
 
 		mock_throw.assert_called_once()
 		call_args = mock_throw.call_args[0]
@@ -276,7 +316,9 @@ class TestYieldCheckValidateStockUomMatch(FrappeTestCase):
 		mock_get_value.return_value = "Kg"
 
 		doc = URYYieldCheck(_create_yield_check(stock_uom="Nos"))
-		doc.validate_stock_uom_match()
+		mock_throw.side_effect = frappe.ValidationError
+		with self.assertRaises(frappe.ValidationError):
+			doc.validate_stock_uom_match()
 
 		mock_throw.assert_called_once()
 		call_args = mock_throw.call_args[0]
@@ -308,7 +350,9 @@ class TestYieldCheckValidateIssueAuthorization(FrappeTestCase):
 		mock_get_value.return_value = None
 
 		doc = URYYieldCheck(_create_yield_check(issue_authorization="AUTH-001"))
-		doc.validate_issue_authorization()
+		mock_throw.side_effect = frappe.ValidationError
+		with self.assertRaises(frappe.ValidationError):
+			doc.validate_issue_authorization()
 
 		mock_throw.assert_called_once()
 		call_args = mock_throw.call_args[0]
@@ -329,7 +373,9 @@ class TestYieldCheckValidateIssueAuthorization(FrappeTestCase):
 			item="TEST-ITEM-001",
 			issue_authorization="AUTH-001"
 		))
-		doc.validate_issue_authorization()
+		mock_throw.side_effect = frappe.ValidationError
+		with self.assertRaises(frappe.ValidationError):
+			doc.validate_issue_authorization()
 
 		mock_throw.assert_called_once()
 		call_args = mock_throw.call_args[0]
@@ -347,7 +393,9 @@ class TestYieldCheckValidateIssueAuthorization(FrappeTestCase):
 		mock_get_value.return_value = auth_doc
 
 		doc = URYYieldCheck(_create_yield_check(issue_authorization="AUTH-001"))
-		doc.validate_issue_authorization()
+		mock_throw.side_effect = frappe.ValidationError
+		with self.assertRaises(frappe.ValidationError):
+			doc.validate_issue_authorization()
 
 		mock_throw.assert_called_once()
 		call_args = mock_throw.call_args[0]
@@ -373,7 +421,9 @@ class TestYieldCheckValidateIssueAuthorization(FrappeTestCase):
 			name="YC-NEW-001",
 			issue_authorization="AUTH-001"
 		))
-		doc.validate_issue_authorization()
+		mock_throw.side_effect = frappe.ValidationError
+		with self.assertRaises(frappe.ValidationError):
+			doc.validate_issue_authorization()
 
 		mock_throw.assert_called_once()
 		call_args = mock_throw.call_args[0]
@@ -466,7 +516,9 @@ class TestYieldCheckValidateNoDuplicateWastage(FrappeTestCase):
 		]
 
 		doc = URYYieldCheck(_create_yield_check(issue_authorization="AUTH-001"))
-		doc.validate_no_duplicate_wastage()
+		mock_throw.side_effect = frappe.ValidationError
+		with self.assertRaises(frappe.ValidationError):
+			doc.validate_no_duplicate_wastage()
 
 		mock_throw.assert_called_once()
 		call_args = mock_throw.call_args[0]
@@ -505,9 +557,15 @@ class TestYieldCheckIntegrationFullValidate(FrappeTestCase):
 	@patch(f"{MODULE}.frappe.throw")
 	def test_all_checks_are_called_in_sequence(self, mock_throw, mock_get_all, mock_get_value):
 		"""All 8 validation checks are called in the correct order."""
-		# Setup mocks to make all checks pass
+		# Setup mocks to make all checks pass. Order must exactly match
+		# validate()'s own call sequence in ury_yield_check.py -- a missing
+		# entry here previously shifted every later value by one position
+		# (e.g. the "Test Company" meant for validate_branch_company_consistency
+		# landing in capture_standard_yield_snapshot's `item_yield <= 0` check
+		# instead, raising TypeError: '<=' not supported between str and int).
 		mock_get_value.side_effect = [
 			True,  # validate_item_yield_tracking_enabled
+			85.0,  # capture_standard_yield_snapshot (Item.custom_yield_percent)
 			"Test Company",  # validate_branch_company_consistency
 			"Nos",  # validate_stock_uom_match
 			frappe._dict({  # validate_issue_authorization
