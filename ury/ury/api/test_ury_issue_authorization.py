@@ -337,3 +337,167 @@ class TestRemainingEntitlementFormula(FrappeTestCase):
 
     def test_formula_floors_at_zero(self):
         self.assertEqual(remaining_entitlement(10, 12, 0, 0), 0)
+
+
+# ---------------------------------------------------------------------------
+# Item 9, acceptance criterion 2 -- THE regression guard.
+#
+# `URY Issue Wastage` became a shared doctype: it now also carries POS
+# KOT-cancellation write-off rows (`source_type = "KOT Cancellation"`), which
+# have no `plan`, no `issue_authorization` and often no `department`. Those
+# rows must be COMPLETELY INVISIBLE to issue entitlement. If even one of them
+# leaked into `prior_quantities()` or `held_quantity()`, every customer
+# cancellation would silently shrink the kitchen's material budget for that
+# item -- a regression that would be invisible until a department ran out of
+# entitlement it should have had.
+#
+# These tests prove the exclusion by running the SAME scope twice, once
+# without KOT-sourced rows and once with them present in the identical
+# branch/company/item scope, and asserting byte-identical results.
+# ---------------------------------------------------------------------------
+
+
+class TestKotSourcedWastageIsInvisibleToEntitlement(FrappeTestCase):
+    SCOPE = {
+        "plan": "PLAN-1",
+        "department": "DEPT-1",
+        "branch": "Branch A",
+        "company": "Company A",
+        "component_item": "COMP-1",
+    }
+
+    def _prior(self, wastage_rows, has_source_type_column=True):
+        """Run prior_quantities() with `wastage_rows` as the live wastage table."""
+        from ury.ury.api.ury_issue_authorization import prior_quantities
+
+        def get_all(doctype, **kwargs):
+            if doctype == "URY Issue Authorization":
+                return [4]  # pluck: one prior authorization of 4
+            if doctype == "URY Issue Wastage":
+                return wastage_rows
+            raise AssertionError("unexpected get_all for {0}".format(doctype))
+
+        def exists(doctype, name=None, *a, **kw):
+            # "URY Issue Return" absent, "URY Issue Wastage" present.
+            return name != "URY Issue Return" if doctype == "DocType" else True
+
+        with patch(f"{MODULE}.frappe.get_all", side_effect=get_all), patch(
+            f"{MODULE}.frappe.db.exists", side_effect=exists
+        ), patch(
+            f"{MODULE}.frappe.db.has_column", return_value=has_source_type_column
+        ):
+            return prior_quantities(**self.SCOPE)
+
+    def test_prior_quantities_byte_identical_with_kot_rows_present(self):
+        issue_rows = [
+            {"name": "W-1", "wasted_qty": 3, "source_type": "Issue Authorization"},
+            {"name": "W-2", "wasted_qty": 1.5, "source_type": "Issue Authorization"},
+        ]
+        kot_rows = [
+            # Same branch/company/component_item scope, deliberately large so
+            # any leak would be unmissable.
+            {"name": "W-KOT-1", "wasted_qty": 100, "source_type": "KOT Cancellation"},
+            {"name": "W-KOT-2", "wasted_qty": 250, "source_type": "KOT Cancellation"},
+        ]
+
+        without_kot = self._prior(list(issue_rows))
+        with_kot = self._prior(issue_rows + kot_rows)
+
+        self.assertEqual(without_kot, with_kot)
+        self.assertEqual(with_kot["wasted_qty"], 4.5)
+        self.assertEqual(with_kot["authorized_qty"], 4)
+
+    def test_only_kot_rows_present_means_zero_wasted(self):
+        result = self._prior(
+            [
+                {"name": "W-KOT-1", "wasted_qty": 100, "source_type": "KOT Cancellation"},
+                {"name": "W-KOT-2", "wasted_qty": 7, "source_type": "KOT Cancellation"},
+            ]
+        )
+        self.assertEqual(result["wasted_qty"], 0)
+
+    def test_legacy_rows_with_null_source_type_still_count(self):
+        """The other direction of the same regression.
+
+        Rows written before `source_type` existed have NULL in that column on
+        a bench where the doctype migrated but the backfill patch has not run.
+        A naive SQL `source_type = 'Issue Authorization'` filter would silently
+        DROP them and inflate entitlement. They must keep counting.
+        """
+        rows = [
+            {"name": "W-LEGACY-1", "wasted_qty": 3, "source_type": None},
+            {"name": "W-LEGACY-2", "wasted_qty": 2, "source_type": ""},
+            {"name": "W-KOT-1", "wasted_qty": 100, "source_type": "KOT Cancellation"},
+        ]
+        self.assertEqual(self._prior(rows)["wasted_qty"], 5)
+
+    def test_unmigrated_schema_without_the_column_counts_every_row(self):
+        """On a bench with no `source_type` column at all, nothing is dropped."""
+        rows = [{"name": "W-LEGACY-1", "wasted_qty": 3}, {"name": "W-LEGACY-2", "wasted_qty": 2}]
+        self.assertEqual(
+            self._prior(rows, has_source_type_column=False)["wasted_qty"], 5
+        )
+
+    def test_held_quantity_byte_identical_with_kot_rows_present(self):
+        from ury.ury.api.ury_wastage import held_quantity
+
+        auth_doc = frappe._dict(
+            {"name": "AUTH-1", "component_item": "COMP-1", "authorized_qty": 10}
+        )
+        issue_rows = [{"name": "W-1", "wasted_qty": 3, "source_type": "Issue Authorization"}]
+        kot_rows = [{"name": "W-KOT-1", "wasted_qty": 500, "source_type": "KOT Cancellation"}]
+
+        def run(rows):
+            def get_all(doctype, **kwargs):
+                if doctype == "URY Issue Wastage":
+                    return rows
+                raise AssertionError("unexpected get_all for {0}".format(doctype))
+
+            # `ury_wastage.frappe` and `ury_issue_authorization.frappe` are the
+            # same module object, so these must be ONE doctype-aware stub --
+            # patching the "two" paths separately would just have the last one
+            # win for both callers. "URY Issue Return" is absent; the wastage
+            # doctype is present.
+            def exists(doctype, name=None, *a, **kw):
+                return doctype == "DocType" and name == "URY Issue Wastage"
+
+            with patch(f"{MODULE}.frappe.get_all", side_effect=get_all), patch(
+                f"{MODULE}.frappe.db.exists", side_effect=exists
+            ), patch(
+                f"{MODULE}.frappe.db.has_column", return_value=True
+            ):
+                return held_quantity(auth_doc)
+
+        without_kot = run(list(issue_rows))
+        with_kot = run(issue_rows + kot_rows)
+
+        self.assertEqual(without_kot, with_kot)
+        self.assertEqual(with_kot, 7)  # 10 authorized - 3 genuinely wasted
+
+    def test_exclude_wastage_still_works_alongside_the_source_guard(self):
+        from ury.ury.api.ury_issue_authorization import sum_issue_sourced_wastage
+
+        rows = [
+            {"name": "W-1", "wasted_qty": 3, "source_type": "Issue Authorization"},
+            {"name": "W-2", "wasted_qty": 4, "source_type": "Issue Authorization"},
+            {"name": "W-KOT-1", "wasted_qty": 99, "source_type": "KOT Cancellation"},
+        ]
+        with patch(f"{MODULE}.frappe.get_all", return_value=rows), patch(
+            f"{MODULE}.frappe.db.exists", return_value=True
+        ), patch(f"{MODULE}.frappe.db.has_column", return_value=True):
+            self.assertEqual(
+                sum_issue_sourced_wastage({}, "wasted_qty", exclude_name="W-2"), 3
+            )
+
+    def test_wastage_query_never_sends_a_null_unsafe_source_type_predicate(self):
+        """The guard must not become a SQL filter: NULL would break both ways."""
+        from ury.ury.api.ury_issue_authorization import sum_issue_sourced_wastage
+
+        with patch(f"{MODULE}.frappe.get_all", return_value=[]) as get_all, patch(
+            f"{MODULE}.frappe.db.exists", return_value=True
+        ), patch(f"{MODULE}.frappe.db.has_column", return_value=True):
+            sum_issue_sourced_wastage(dict(self.SCOPE), "wasted_qty")
+
+        sent_filters = get_all.call_args.kwargs["filters"]
+        self.assertNotIn("source_type", sent_filters)
+        self.assertIn("source_type", get_all.call_args.kwargs["fields"])
