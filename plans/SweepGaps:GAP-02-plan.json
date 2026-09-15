@@ -1,0 +1,19 @@
+{
+  "subtasks": [
+    {
+      "objective": "Add POS v2 table-attention status so occupied tables older than the POS Profile tableAttention threshold are visually marked red instead of only amber/occupied.",
+      "acceptance": "When POS Profile tableAttention is set and an occupied table's latest_invoice_time exceeds that threshold, TableCard renders the attention/red state with a clear attention badge; occupied tables below the threshold keep the existing occupied/warning state, available tables keep the existing available/success state, and missing/invalid thresholds or timestamps do not mark attention. The implementation includes focused coverage or a documented manual verification for threshold edge cases and the POS workspace typecheck passes.",
+      "scope": [
+        "pos/src/components/TableCard.tsx",
+        "pos/src/pages/Table.tsx",
+        "pos/src/lib/pos-profile-api.ts",
+        "pos/src/i18n/locales/*.json"
+      ],
+      "task_type": "impl",
+      "difficulty": 2,
+      "risk": 2,
+      "uncertainty": 2,
+      "priority": 90
+    }
+  ]
+}
