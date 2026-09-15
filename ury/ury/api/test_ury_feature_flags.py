@@ -209,7 +209,7 @@ class TestFulfilmentVerificationGate(FrappeTestCase):
         stock one, and must not refuse payment at the till."""
         self._run(None, execution_state="QUEUED")
 
-    def _run_with_unposted_intent(self, closing_reconciliation_enabled, retry_posts=False):
+    def _run_with_unposted_intent(self, closing_reconciliation_enabled, retry_posts=False, strict=False):
         """Drive `_verify_item_execution_intent` down the "found an intent,
         but it is not POSTED, and the synchronous retry didn't fix it" path
         -- the one I-11 downgrades to advisory when T5's closing-time
@@ -267,7 +267,7 @@ class TestFulfilmentVerificationGate(FrappeTestCase):
                 {"closing_reconciliation_enabled": closing_reconciliation_enabled}
             ),
         ), patch("ury.ury.api.ury_feature_flags.frappe.log_error") as mock_log_error:
-            _verify_fulfilment_posted_for_invoice(doc)
+            _verify_fulfilment_posted_for_invoice(doc, strict=strict)
             return mock_log_error, calls
 
     def test_closing_reconciliation_disabled_still_throws(self):
@@ -286,6 +286,20 @@ class TestFulfilmentVerificationGate(FrappeTestCase):
         )
         mock_log_error.assert_called_once()
         self.assertEqual(calls["retry"], 1)
+
+    def test_strict_ignores_closing_reconciliation_advisory_downgrade(self):
+        """The composition bug this parameter exists to prevent: T5's closing
+        check calls this function with strict=True precisely because
+        closing_reconciliation_enabled is True for the branch it's running
+        against -- the exact condition that makes the till-time (strict=False)
+        caller go advisory. If strict=True didn't override that, T5 would
+        call a verifier that always advisory-passes on the one branch T5 ever
+        runs on, silently defeating both the till-time advisory AND T5's own
+        enforcement for the failure mode both commits' messages describe."""
+        with self.assertRaises(frappe.ValidationError):
+            self._run_with_unposted_intent(
+                closing_reconciliation_enabled=True, strict=True
+            )
 
     def test_retry_still_fires_before_either_outcome(self):
         """The synchronous retry must run exactly once regardless of which

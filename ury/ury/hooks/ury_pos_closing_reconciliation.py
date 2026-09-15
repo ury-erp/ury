@@ -253,7 +253,12 @@ def _verify_invoice_production(invoice_name):
 	# reaches the UI.
 	log_depth = len(getattr(frappe.local, "message_log", []) or [])
 	try:
-		_verify_fulfilment_posted_for_invoice(frappe._dict(row))
+		# strict=True: this IS the downstream enforcement point I-11's
+		# till-time advisory downgrade defers to. Calling with the default
+		# strict=False here would let a not-yet-POSTED intent pass both the
+		# till (advisory, because this gate exists) AND this closing check
+		# (advisory again, for the same reason) -- silently defeating both.
+		_verify_fulfilment_posted_for_invoice(frappe._dict(row), strict=True)
 	except frappe.ValidationError as exc:
 		_truncate_message_log(log_depth)
 		return _("POS Invoice {0}: {1}").format(invoice_name, str(exc))

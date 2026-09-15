@@ -159,7 +159,7 @@ def maybe_wire_fulfilment_on_submit(doc, method=None):
 	_verify_fulfilment_posted_for_invoice(doc)
 
 
-def _verify_fulfilment_posted_for_invoice(doc):
+def _verify_fulfilment_posted_for_invoice(doc, strict=False):
 	"""Assert every produced made-to-order line on this invoice has a POSTED
 	intent that matches what is actually being invoiced.
 
@@ -171,6 +171,17 @@ def _verify_fulfilment_posted_for_invoice(doc):
 	threw on every such invoice. It was also redundant -- neither service
 	writes a Stock Entry, so it produced no ledger effect the posting service
 	had not already produced. Verification is the only job left here.
+
+	`strict`: when False (the default, used at POS Invoice submit -- the
+	till), a not-yet-POSTED intent may be downgraded to advisory (log +
+	proceed) when `closing_reconciliation_enabled` is on for the branch,
+	per I-11 -- a stuck background worker must not stop the till when a
+	real enforcement point exists downstream. When True (used by T5's
+	`ury_pos_closing_reconciliation`, which IS that downstream enforcement
+	point), the advisory downgrade must never apply: T5 calling this with
+	`strict=False` would make the till-time advisory and the closing-time
+	enforcement the same permissive check, silently defeating both --
+	exactly the composition bug this parameter exists to prevent.
 	"""
 	from ury.ury.api.ury_fulfilment_posting_service import process_posting_intent
 
@@ -190,10 +201,10 @@ def _verify_fulfilment_posted_for_invoice(doc):
 				# unproduced item is a kitchen-workflow question, not a stock
 				# one, and must not block payment.
 				continue
-			_verify_item_execution_intent(row, kot.name, doc, process_posting_intent)
+			_verify_item_execution_intent(row, kot.name, doc, process_posting_intent, strict=strict)
 
 
-def _verify_item_execution_intent(row, kot_name, doc, process_posting_intent):
+def _verify_item_execution_intent(row, kot_name, doc, process_posting_intent, strict=False):
 	item_code, invoiced_qty = _kot_item_scope(row.get("kot_item"))
 	if not item_code:
 		return
@@ -224,7 +235,7 @@ def _verify_item_execution_intent(row, kot_name, doc, process_posting_intent):
 			)
 		intent = _latest_intent(row.get("kot_item"))
 		if not intent or intent.get("status") != POSTED:
-			if _closing_reconciliation_will_catch_this(row, doc):
+			if not strict and _closing_reconciliation_will_catch_this(row, doc):
 				# I-11: T5's closing-time reconciliation (`ury_pos_closing_reconciliation`)
 				# now genuinely catches this same problem, manager-facing, at
 				# end of shift -- so this cashier-facing, per-invoice gate no
