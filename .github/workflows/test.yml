@@ -195,6 +195,8 @@ jobs:
               ury.ury.doctype.ury_order.test_ury_order
               ury.ury.doctype.ury_order_item.test_ury_order_item
               ury.ury.doctype.ury_ordering_device.test_ury_ordering_device
+              ury.ury.doctype.ury_payment_terminal.test_ury_payment_terminal
+              ury.ury.doctype.ury_payment_terminal_transaction.test_ury_payment_terminal_transaction
               ury.ury.doctype.ury_ordering_session.test_ury_ordering_session
               ury.ury.doctype.ury_payment_terminal.test_ury_payment_terminal
               ury.ury.doctype.ury_payment_terminal_transaction.test_ury_payment_terminal_transaction
