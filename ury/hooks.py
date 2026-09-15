@@ -435,6 +435,7 @@ fixtures = [
                     "POS Invoice-section_break_hllcp",
                     "POS Invoice-cancel_reason",
                     "POS Invoice Item-comment",
+                    "POS Invoice Item-reservation_line_key",
                     "POS Invoice Item-custom_course",
                     "POS Invoice-custom_merged_total",
                     "POS Invoice-custom_merged_pos_invoice_details",
