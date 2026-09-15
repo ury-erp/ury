@@ -49,6 +49,13 @@ which were never committed to this repo). These are the checked-in, reusable equ
    MariaDB the bench uses — usually `mariadb` host inside the devcontainer network, database
    name matching the site).
 
+   Note: `db_sampler.py`'s `INNODB_TRX`/`SHOW ENGINE INNODB STATUS` queries require the
+   `PROCESS` privilege. A site's normal per-site DB user (the one in `site_config.json`) does
+   NOT have this by default — confirmed against a real bench, where the sampler ran end-to-end
+   but every sample recorded an `Access denied; you need (at least one of) the PROCESS
+   privilege(s)` error. Use the MariaDB root user (or a user explicitly granted `PROCESS`) for
+   `db.user`/`db.password` in `config.json` when you actually need lock/deadlock visibility.
+
 4. **Start the DB sampler** in one terminal, running for at least as long as the harness:
    ```
    python3 tests/live/db_sampler.py --config tests/live/config.json \
