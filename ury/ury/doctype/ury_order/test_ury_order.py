@@ -251,8 +251,13 @@ class TestURYOrder(FrappeTestCase):
         mock_invoice.invoice_printed = 0
         mock_invoice.invoice_created = 1
         previous_item = MagicMock(item_code="ITEM-1", item_name="Item 1", qty=1, name="INVITEM-1")
+        # .get() is a separate mock, not derived from the attributes above --
+        # it must know about item_code too, or sync_order's historic_codes
+        # set (built via prev.get("item_code")) comes back empty and ITEM-1
+        # is wrongly treated as a brand-new code instead of an existing one.
         previous_item.get.side_effect = lambda field, default=None: {
             "reservation_line_key": "INVITEM-1",
+            "item_code": "ITEM-1",
         }.get(field, default)
         mock_invoice.items = [previous_item]
         mock_invoice.waiter = "existing_waiter"
@@ -283,7 +288,16 @@ class TestURYOrder(FrappeTestCase):
 
         mock_get_value.side_effect = get_value_side_effect
 
-        with patch("ury.ury.doctype.ury_order.ury_order.frappe.db.sql"):
+        # _require_open_cashier_session() (a fail-closed POS-open check
+        # sync_order() now runs before reservation) wasn't mocked here, so
+        # it hit the real (empty) test DB and threw before this test's own
+        # assertions ever ran. get_restaurant_and_menu_name() also calls the
+        # top-level frappe.get_value() (distinct from frappe.db.get_value,
+        # already mocked above) to unpack (restaurant, branch, room) for
+        # the table -- also unmocked, also hitting the real empty test DB.
+        with patch("ury.ury.doctype.ury_order.ury_order.frappe.db.sql"), \
+             patch("ury.ury.doctype.ury_order.ury_order.frappe.db.exists", return_value=True), \
+             patch("ury.ury.doctype.ury_order.ury_order.frappe.get_value", return_value=("Restaurant A", "Test Branch", "Main Hall")):
             sync_order(
                 items='[{"item": "ITEM-1", "qty": 3}]',
                 cashier="fake_cashier",
@@ -536,9 +550,22 @@ class TestURYOrder(FrappeTestCase):
         )
         mock_get_roles.return_value = ["URY Manager"]
         mock_session.user = "manager@example.com"
-        mock_get_value.return_value = "Menu A"
+        # A single blanket return_value would also answer the new-items-on-
+        # menu check's Item.disabled lookup truthily (since "Menu A" is a
+        # non-empty string), wrongly throwing "Item ITEM-1 is disabled".
+        mock_get_value.side_effect = lambda doctype, *args, **kwargs: (
+            0 if doctype == "Item" else "Menu A"
+        )
 
-        with patch("ury.ury.doctype.ury_order.ury_order.frappe.db.sql"):
+        # _require_open_cashier_session() (fail-closed POS-open check) and the
+        # new-items-on-menu validation are both real checks sync_order() now
+        # runs before reservation -- neither was mocked here, so they hit the
+        # real (empty) test DB and threw before this test's own assertions
+        # ever ran. Mock both open: a real open POS session, and ITEM-1
+        # available on the menu.
+        with patch("ury.ury.doctype.ury_order.ury_order.frappe.db.sql"), \
+             patch("ury.ury.doctype.ury_order.ury_order.frappe.db.exists", return_value=True), \
+             patch("ury.ury.doctype.ury_order.ury_order.frappe.get_all", return_value=[frappe._dict(item="ITEM-1")]):
             sync_order(
                 items='[{"item": "ITEM-1", "qty": 1}]',
                 cashier="fake_cashier",
@@ -632,6 +659,7 @@ class TestPriceItemsForInvoicePhase1(unittest.TestCase):
             )
 
     @patch("ury.ury.doctype.ury_order.ury_order.reconcile_order_reservations")
+    @patch("ury.ury.doctype.ury_order.ury_order.kot_execute")
     @patch("ury.ury.doctype.ury_order.ury_order.get_order_invoice")
     @patch("ury.ury.doctype.ury_order.ury_order.price_items_for_invoice")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.has_permission")
@@ -641,7 +669,7 @@ class TestPriceItemsForInvoicePhase1(unittest.TestCase):
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.session")
     def test_sync_order_delegates_pricing(
         self, mock_session, mock_get_roles, mock_get_doc, mock_get_value, mock_has_permission,
-        mock_price_items, mock_get_order_invoice, mock_reconcile,
+        mock_price_items, mock_get_order_invoice, mock_kot_execute, mock_reconcile,
     ):
         mock_invoice = MagicMock()
         mock_invoice.name = "POS-INV-002"
@@ -667,13 +695,26 @@ class TestPriceItemsForInvoicePhase1(unittest.TestCase):
 
         mock_session.user = "authorized@example.com"
         mock_has_permission.return_value = True
+        # An unconfigured mock_get_value would return a truthy auto-generated
+        # MagicMock for every frappe.db.get_value call -- including the new-
+        # items-on-menu check's Item.disabled lookup, wrongly throwing "Item
+        # Biryani is disabled". Restaurant/menu-name lookups just need a
+        # truthy value; the disabled check specifically needs a falsy one.
+        mock_get_value.side_effect = lambda doctype, *args, **kwargs: (
+            0 if doctype == "Item" else "Menu A"
+        )
 
         priced = [{"item_code": "Biryani", "item_name": "Biryani", "qty": 1, "comment": None,
                    "rate": 150, "price_list_rate": 150, "base_price_list_rate": 150, "cost_center": "CC-1"}]
         mock_price_items.return_value = priced
         mock_reconcile.return_value = {"status": "ok"}
 
-        with patch("ury.ury.doctype.ury_order.ury_order.frappe.db.sql"):
+        # _require_open_cashier_session() and the new-items-on-menu check
+        # both run before pricing -- neither was mocked here, so they hit
+        # the real (empty) test DB and threw before pricing was ever reached.
+        with patch("ury.ury.doctype.ury_order.ury_order.frappe.db.sql"), \
+             patch("ury.ury.doctype.ury_order.ury_order.frappe.db.exists", return_value=True), \
+             patch("ury.ury.doctype.ury_order.ury_order.frappe.get_all", return_value=[frappe._dict(item="Biryani")]):
             sync_order(
                 items=[{"item": "Biryani", "qty": 1}],
                 cashier="fake_cashier", owner="fake_owner", mode_of_payment="Cash",
@@ -1194,7 +1235,12 @@ class TestSyncOrderHardening(FrappeTestCase):
         mock_has_permission.return_value = True
         mock_db_get_value.return_value = None
 
-        with patch("ury.ury.doctype.ury_order.ury_order.frappe.db.sql", return_value=[]):
+        # _require_open_cashier_session() (a fail-closed POS-open check run
+        # before the item-reduction permission check this test targets)
+        # wasn't mocked here, so it threw "POS is closed" first, masking
+        # the frappe.PermissionError this test actually expects.
+        with patch("ury.ury.doctype.ury_order.ury_order.frappe.db.sql", return_value=[]), \
+             patch("ury.ury.doctype.ury_order.ury_order.frappe.db.exists", return_value=True):
             with self.assertRaises(frappe.PermissionError) as context:
                 sync_order(
                     items=json.dumps([{"item": "ITEM-1", "qty": 1}]),  # 2 -> 1: a reduction
