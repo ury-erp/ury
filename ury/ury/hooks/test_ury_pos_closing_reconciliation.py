@@ -152,7 +152,7 @@ class TestClosingReconciliation(FrappeTestCase):
 			_verify_invoice_production,
 		)
 
-		def _boom(invoice_doc):
+		def _boom(invoice_doc, strict=False):
 			frappe.throw("Production posting is missing for item Biryani on KOT KOT-3.")
 
 		with patch(
@@ -161,12 +161,19 @@ class TestClosingReconciliation(FrappeTestCase):
 		), patch(
 			"ury.ury.api.ury_feature_flags._verify_fulfilment_posted_for_invoice",
 			side_effect=_boom,
-		):
+		) as mock_verify:
 			problem = _verify_invoice_production("POSINV-9")
 
 		self.assertIsNotNone(problem)
 		self.assertIn("POSINV-9", problem)
 		self.assertIn("Production posting is missing", problem)
+		# The composition-bug regression: T5 MUST call with strict=True, since
+		# it is itself the closing-time enforcement point the till-time gate
+		# defers to when closing_reconciliation_enabled is on for the branch
+		# T5 only ever runs against. Calling with the default strict=False
+		# here would let a not-yet-POSTED intent advisory-pass both gates.
+		_, kwargs = mock_verify.call_args
+		self.assertTrue(kwargs.get("strict"))
 
 	def test_unreadable_invoice_is_reported_not_crashed(self):
 		from ury.ury.hooks.ury_pos_closing_reconciliation import (
