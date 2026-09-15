@@ -289,22 +289,30 @@ class TestCreateKotDoc(FrappeTestCase):
 
     @patch(f"{MODULE}.frappe.get_doc")
     @patch(f"{MODULE}.frappe.db.get_value")
-    @patch(f"{MODULE}.getBranch")
-    def test_create_kot_doc_with_table(self, mock_get_branch, mock_db_get_value, mock_get_doc):
-        """Test creating a KOT document with restaurant table."""
-        mock_get_branch.return_value = "Branch-1"
+    def test_create_kot_doc_with_table(self, mock_db_get_value, mock_get_doc):
+        """Test creating a KOT document with a restaurant table: branch/menu
+        is derived from the table's room/restaurant, never from getBranch()
+        (removed -- see the comment in create_kot_doc for why session-branch
+        lookups are wrong for no-table orders; the with-table path never
+        used getBranch in the first place)."""
+        pos_invoice = frappe_dict(
+            {
+                "custom_ury_order_number": "ORD-123",
+                "custom_merged_tables": "T1,T2",
+                "order_type": "Dine In",
+                "custom_aggregator_id": None,
+            }
+        )
+        mock_kot_doc = MagicMock()
+        mock_kot_doc.name = "KOT-001"
+        mock_get_doc.side_effect = [pos_invoice, mock_kot_doc]
+
         mock_db_get_value.side_effect = [
-            MagicMock(custom_ury_order_number="ORD-123", custom_merged_tables="T1,T2",
-                     order_type="Dine In", custom_aggregator_id=None),  # pos_invoice
             "Room-1",  # room from table
             "Restaurant-1",  # restaurant from table
             "MENU-1",  # menu from room
-            "Appetizer",  # course from menu item
+            "Appetizer",  # course for the single item
         ]
-
-        mock_kot_doc = MagicMock()
-        mock_kot_doc.name = "KOT-001"
-        mock_get_doc.return_value = mock_kot_doc
 
         items = [{"item_code": "ITEM-001", "item_name": "Biryani", "qty": 2, "comments": ""}]
 
@@ -327,20 +335,27 @@ class TestCreateKotDoc(FrappeTestCase):
 
     @patch(f"{MODULE}.frappe.get_doc")
     @patch(f"{MODULE}.frappe.db.get_value")
-    @patch(f"{MODULE}.getBranch")
-    def test_create_kot_doc_without_table(self, mock_get_branch, mock_db_get_value, mock_get_doc):
-        """Test creating a KOT document without restaurant table (takeaway)."""
-        mock_get_branch.return_value = "Branch-1"
-        mock_db_get_value.side_effect = [
-            MagicMock(custom_ury_order_number="ORD-124", custom_merged_tables=None,
-                     order_type="Takeaway", custom_aggregator_id=None),  # pos_invoice
-            "MENU-1",  # active menu from branch
-            "Appetizer",  # course
-        ]
-
+    def test_create_kot_doc_without_table(self, mock_db_get_value, mock_get_doc):
+        """Test creating a KOT document without a restaurant table (takeaway):
+        menu is derived from the INVOICE's own branch (pos_invoice.branch),
+        not from the acting user's session branch."""
+        pos_invoice = frappe_dict(
+            {
+                "custom_ury_order_number": "ORD-124",
+                "custom_merged_tables": None,
+                "order_type": "Takeaway",
+                "custom_aggregator_id": None,
+                "branch": "Branch-1",
+            }
+        )
         mock_kot_doc = MagicMock()
         mock_kot_doc.name = "KOT-002"
-        mock_get_doc.return_value = mock_kot_doc
+        mock_get_doc.side_effect = [pos_invoice, mock_kot_doc]
+
+        mock_db_get_value.side_effect = [
+            "MENU-1",  # active menu from the invoice's branch
+            "Appetizer",  # course for the single item
+        ]
 
         items = [{"item_code": "ITEM-002", "item_name": "Pizza", "qty": 1, "comments": ""}]
 
@@ -365,33 +380,37 @@ class TestCreateCancelKotDoc(FrappeTestCase):
     @patch(f"{MODULE}.frappe.get_doc")
     @patch(f"{MODULE}.frappe.db.get_value")
     @patch(f"{MODULE}.frappe.db.get_list")
-    @patch(f"{MODULE}.getBranch")
     def test_create_cancel_kot_doc_success(
-        self, mock_get_branch, mock_db_get_list, mock_db_get_value, mock_get_doc
+        self, mock_db_get_list, mock_db_get_value, mock_get_doc
     ):
-        """Test successfully creating a cancel KOT document."""
-        mock_get_branch.return_value = "Branch-1"
+        """Test successfully creating a cancel KOT document. Branch/menu is
+        derived from the table (with-table path never used getBranch); no
+        getBranch mock needed (removed -- see the comment in
+        create_cancel_kot_doc for why session-branch lookups are wrong)."""
+        pos_invoice = frappe_dict(
+            {"custom_ury_order_number": "ORD-123", "order_type": "Dine In", "custom_aggregator_id": None}
+        )
 
-        # Create a mock KOT doc with items
-        mock_kot_item = MagicMock()
-        mock_kot_item.item = "ITEM-001"
-        mock_kot = MagicMock()
-        mock_kot.name = "KOT-001"
-        mock_kot.kot_items = [mock_kot_item]
-        mock_db_get_list.return_value = [mock_kot]
+        # The one original KOT this cancel item belongs to.
+        original_kot_item = frappe_dict({"item": "ITEM-001", "reservation_line_key": None})
+        original_kot_doc = MagicMock()
+        original_kot_doc.name = "KOT-001"
+        original_kot_doc.kot_items = [original_kot_item]
+
+        mock_kot_ref = MagicMock()
+        mock_kot_ref.name = "KOT-001"
+        mock_db_get_list.return_value = [mock_kot_ref]
+
+        mock_cancel_doc = MagicMock()
+        mock_cancel_doc.name = "CNCL-KOT-001"
+        mock_get_doc.side_effect = [pos_invoice, original_kot_doc, mock_cancel_doc]
 
         mock_db_get_value.side_effect = [
-            MagicMock(custom_ury_order_number="ORD-123", order_type="Dine In",
-                     custom_aggregator_id=None),  # pos_invoice
             "Room-1",  # room
             "Restaurant-1",  # restaurant
             "MENU-1",  # menu
             "Appetizer",  # course
         ]
-
-        mock_cancel_doc = MagicMock()
-        mock_cancel_doc.name = "CNCL-KOT-001"
-        mock_get_doc.return_value = mock_cancel_doc
 
         cancel_items = [
             {"item_code": "ITEM-001", "item_name": "Biryani", "qty": -1, "comments": ""}
