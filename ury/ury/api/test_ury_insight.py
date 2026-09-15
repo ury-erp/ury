@@ -15,6 +15,7 @@ import frappe
 from frappe.tests.utils import FrappeTestCase
 
 from ury.ury.api.ury_insight import get_active_insights, dismiss_insight
+from ury.ury.tests.factories import make_user
 
 
 MODULE = "ury.ury.api.ury_insight"
@@ -103,19 +104,13 @@ class TestGetActiveInsightsHappyPath(FrappeTestCase):
 					pass
 
 	def _create_test_user(self, email, roles):
-		"""Create a test user with specified roles."""
-		if frappe.db.exists("User", email):
-			frappe.delete_doc("User", email, force=True, ignore_permissions=True)
-		user = frappe.get_doc({
-			"doctype": "User",
-			"email": email,
-			"first_name": email.split("@")[0],
-			"send_welcome_email": 0,
-			"enabled": 1,
-		}).insert(ignore_permissions=True)
-		for role in roles:
-			user.add_roles(role)
-		return user
+		"""Create a test user with specified roles.
+
+		Phase 8 proof-of-concept: delegates to the shared
+		ury.ury.tests.factories.make_user factory (same delete-then-recreate
+		semantics this method used to implement inline).
+		"""
+		return make_user(email=email, roles=roles, first_name=email.split("@")[0])
 
 	def test_returns_all_active_insights_when_not_filtered(self):
 		"""get_active_insights() returns all non-dismissed insights."""
@@ -215,19 +210,10 @@ class TestGetActiveInsightsPermissions(FrappeTestCase):
 					pass
 
 	def _create_test_user(self, email, roles):
-		"""Create a test user with specified roles."""
-		if frappe.db.exists("User", email):
-			frappe.delete_doc("User", email, force=True, ignore_permissions=True)
-		user = frappe.get_doc({
-			"doctype": "User",
-			"email": email,
-			"first_name": email.split("@")[0],
-			"send_welcome_email": 0,
-			"enabled": 1,
-		}).insert(ignore_permissions=True)
-		for role in roles:
-			user.add_roles(role)
-		return user
+		"""Create a test user with specified roles (delegates to the shared
+		ury.ury.tests.factories.make_user factory -- Phase 8 proof of
+		concept)."""
+		return make_user(email=email, roles=roles, first_name=email.split("@")[0])
 
 	def test_non_manager_cannot_call_get_active_insights(self):
 		"""Non-manager users get PermissionError when calling get_active_insights()."""
@@ -304,19 +290,10 @@ class TestDismissInsightHappyPath(FrappeTestCase):
 				pass
 
 	def _create_test_user(self, email, roles):
-		"""Create a test user with specified roles."""
-		if frappe.db.exists("User", email):
-			frappe.delete_doc("User", email, force=True, ignore_permissions=True)
-		user = frappe.get_doc({
-			"doctype": "User",
-			"email": email,
-			"first_name": email.split("@")[0],
-			"send_welcome_email": 0,
-			"enabled": 1,
-		}).insert(ignore_permissions=True)
-		for role in roles:
-			user.add_roles(role)
-		return user
+		"""Create a test user with specified roles (delegates to the shared
+		ury.ury.tests.factories.make_user factory -- Phase 8 proof of
+		concept)."""
+		return make_user(email=email, roles=roles, first_name=email.split("@")[0])
 
 	def test_marks_insight_as_dismissed(self):
 		"""dismiss_insight() sets dismissed flag to 1."""
@@ -402,19 +379,10 @@ class TestDismissInsightPermissions(FrappeTestCase):
 					pass
 
 	def _create_test_user(self, email, roles):
-		"""Create a test user with specified roles."""
-		if frappe.db.exists("User", email):
-			frappe.delete_doc("User", email, force=True, ignore_permissions=True)
-		user = frappe.get_doc({
-			"doctype": "User",
-			"email": email,
-			"first_name": email.split("@")[0],
-			"send_welcome_email": 0,
-			"enabled": 1,
-		}).insert(ignore_permissions=True)
-		for role in roles:
-			user.add_roles(role)
-		return user
+		"""Create a test user with specified roles (delegates to the shared
+		ury.ury.tests.factories.make_user factory -- Phase 8 proof of
+		concept)."""
+		return make_user(email=email, roles=roles, first_name=email.split("@")[0])
 
 	def test_non_manager_cannot_dismiss_insight(self):
 		"""Non-manager users get PermissionError when calling dismiss_insight()."""
@@ -459,19 +427,10 @@ class TestGetActiveInsightsEdgeCases(FrappeTestCase):
 				pass
 
 	def _create_test_user(self, email, roles):
-		"""Create a test user with specified roles."""
-		if frappe.db.exists("User", email):
-			frappe.delete_doc("User", email, force=True, ignore_permissions=True)
-		user = frappe.get_doc({
-			"doctype": "User",
-			"email": email,
-			"first_name": email.split("@")[0],
-			"send_welcome_email": 0,
-			"enabled": 1,
-		}).insert(ignore_permissions=True)
-		for role in roles:
-			user.add_roles(role)
-		return user
+		"""Create a test user with specified roles (delegates to the shared
+		ury.ury.tests.factories.make_user factory -- Phase 8 proof of
+		concept)."""
+		return make_user(email=email, roles=roles, first_name=email.split("@")[0])
 
 	def test_empty_result_when_no_active_insights_exist(self):
 		"""get_active_insights() returns empty list when no insights exist."""
@@ -523,19 +482,10 @@ class TestDismissInsightEdgeCases(FrappeTestCase):
 				pass
 
 	def _create_test_user(self, email, roles):
-		"""Create a test user with specified roles."""
-		if frappe.db.exists("User", email):
-			frappe.delete_doc("User", email, force=True, ignore_permissions=True)
-		user = frappe.get_doc({
-			"doctype": "User",
-			"email": email,
-			"first_name": email.split("@")[0],
-			"send_welcome_email": 0,
-			"enabled": 1,
-		}).insert(ignore_permissions=True)
-		for role in roles:
-			user.add_roles(role)
-		return user
+		"""Create a test user with specified roles (delegates to the shared
+		ury.ury.tests.factories.make_user factory -- Phase 8 proof of
+		concept)."""
+		return make_user(email=email, roles=roles, first_name=email.split("@")[0])
 
 	def test_dismiss_nonexistent_insight_raises_error(self):
 		"""dismiss_insight() with invalid insight name raises error."""
