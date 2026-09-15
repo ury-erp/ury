@@ -1662,3 +1662,80 @@ class TestSharedGroupPartialFulfilment(FrappeTestCase):
 
         self.assertEqual(self._statuses(store), {CANCELLED})
         self.assertTrue(logger.return_value.warning.called)
+
+
+class TestCreateReservationRealPermissionBoundary(FrappeTestCase):
+	"""Real (non-mocked, `frappe.set_user()`-based) negative-permission coverage for
+	`create_reservation()`'s `_require_create_permission()` gate.
+
+	Every other test in this file mocks `frappe` entirely (per the module
+	docstring's own admission that these were "not executed... only a
+	detached checkout"), so the actual doctype-role permission check on
+	`URY Stock Reservation` has never been exercised against a real
+	site/role-permission table. This uses a real user + real role
+	assignment and asserts the actual raised exception, per this track's
+	Phase 4 acceptance criteria.
+	"""
+
+	@classmethod
+	def setUpClass(cls):
+		super().setUpClass()
+		from ury.ury.tests.factories import make_user
+
+		# "Stock Manager" has read/report on URY Stock Reservation per the
+		# doctype's fixture permissions, but explicitly NOT "create" -- the
+		# permission set most likely to be mistaken for sufficient by a
+		# future reviewer, which makes it the sharpest negative case.
+		cls.read_only_user = make_user(
+			email="p4r3-reservation-readonly@ury.test", roles=["Stock Manager"]
+		).name
+		# A user with zero URY-specific roles at all -- the baseline case.
+		cls.no_role_user = make_user(
+			email="p4r3-reservation-norole@ury.test", roles=[]
+		).name
+
+	def tearDown(self):
+		frappe.set_user("Administrator")
+
+	def test_read_only_role_cannot_create_reservation(self):
+		frappe.set_user(self.read_only_user)
+		with self.assertRaises(frappe.PermissionError):
+			create_reservation(
+				item_code="P4R3-NONEXISTENT-ITEM",
+				qty=1,
+				warehouse="P4R3-NONEXISTENT-WAREHOUSE",
+				branch="P4R3-NONEXISTENT-BRANCH",
+				company="P4R3-NONEXISTENT-COMPANY",
+				order_ref="P4R3-ORDER-1",
+			)
+
+	def test_no_role_user_cannot_create_reservation(self):
+		frappe.set_user(self.no_role_user)
+		with self.assertRaises(frappe.PermissionError):
+			create_reservation(
+				item_code="P4R3-NONEXISTENT-ITEM",
+				qty=1,
+				warehouse="P4R3-NONEXISTENT-WAREHOUSE",
+				branch="P4R3-NONEXISTENT-BRANCH",
+				company="P4R3-NONEXISTENT-COMPANY",
+				order_ref="P4R3-ORDER-1",
+			)
+
+	def test_permission_check_runs_before_scope_validation(self):
+		"""The permission gate must fail closed even when every other
+		argument is also invalid/missing -- i.e. it is genuinely the first
+		check, not incidentally passing because of a later validation
+		error with the same exception type. Confirmed here by omitting
+		required scope fields entirely; if `_require_create_permission()`
+		were ever reordered after `_require_scope()`, this would start
+		raising `frappe.ValidationError` instead and the test would fail."""
+		frappe.set_user(self.no_role_user)
+		with self.assertRaises(frappe.PermissionError):
+			create_reservation(
+				item_code=None,
+				qty=None,
+				warehouse=None,
+				branch=None,
+				company=None,
+				order_ref=None,
+			)
