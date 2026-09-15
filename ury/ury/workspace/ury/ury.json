@@ -132,6 +132,39 @@
   }
  ],
  "sequence_id": 31.0,
- "shortcuts": [],
+ "shortcuts": [
+  {
+   "color": "Green",
+   "doc_view": "",
+   "icon": "point-of-sale",
+   "label": "POS",
+   "type": "URL",
+   "url": "/pos"
+  },
+  {
+   "color": "Blue",
+   "doc_view": "List",
+   "icon": "setting-gear",
+   "label": "POS Profile",
+   "link_to": "POS Profile",
+   "type": "DocType"
+  },
+  {
+   "color": "Blue",
+   "doc_view": "List",
+   "icon": "point-of-sale",
+   "label": "Branch",
+   "link_to": "Branch",
+   "type": "DocType"
+  },
+  {
+   "color": "Orange",
+   "doc_view": "List",
+   "icon": "point-of-sale",
+   "label": "POS Closing Entry",
+   "link_to": "POS Closing Entry",
+   "type": "DocType"
+  }
+ ],
  "title": "URY"
 }
