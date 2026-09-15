@@ -16,7 +16,7 @@ import {
 import { printOrder } from '../../lib/print';
 import { getPOSInvoiceItems, POSInvoiceItem, resolvePrintFormat } from '../../lib/invoice-api';
 import { getVacantTablesForBranch, Table } from '../../lib/table-api';
-import { DINE_IN } from '../../data/order-types';
+import { DINE_IN, TAKE_AWAY } from '../../data/order-types';
 import { useTableOrderContext, OrderDeltaLine } from '../hooks/useTableOrderContext';
 import CaptainMenu from '../components/CaptainMenu';
 import CaptainOrderLine from '../components/CaptainOrderLine';
@@ -83,17 +83,20 @@ export default function CaptainOrder() {
   // The shared pos-store's `selectedOrderType` defaults to "Take Away" (see
   // DEFAULT_ORDER_TYPE in data/order-types.ts) and is otherwise only set by
   // the Cashier's OrderTypeSelect control, which this screen doesn't render.
-  // Without this, `fetchMenuItems()` resolves whatever order-type menu was
-  // last selected (or the Take Away default) instead of the Dine In menu --
-  // on a branch with no Take Away menu configured, or a different item set,
-  // captains would see an empty or wrong menu for every table. Every captain
-  // table order is Dine In by definition, so force it on mount.
+  // Without syncing it here, `fetchMenuItems()` resolves whatever order-type
+  // menu was last selected instead of the menu matching this table -- on a
+  // branch with distinct Dine In / Take Away menus, captains would see the
+  // wrong menu. A captain table order is Take Away when the table itself is
+  // flagged `is_take_away` (see `pos/src/captain/pages/CaptainOrder.tsx`'s
+  // equivalent fix, sa-post-373-review-fixes); otherwise it's Dine In, same
+  // as every other captain table order.
+  const tableOrderType = context?.table?.is_take_away ? TAKE_AWAY : DINE_IN;
   useEffect(() => {
-    if (selectedOrderType !== DINE_IN) {
-      setSelectedOrderType(DINE_IN);
+    if (selectedOrderType !== tableOrderType) {
+      setSelectedOrderType(tableOrderType);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [tableOrderType]);
 
   const [mode, setMode] = useState<Mode>('order');
   const [hasSetInitialMode, setHasSetInitialMode] = useState(false);
@@ -251,7 +254,7 @@ export default function CaptainOrder() {
         })),
         no_of_pax: noOfPax,
         pos_profile: posProfile.name,
-        order_type: DINE_IN,
+        order_type: tableOrderType,
         table,
         room: selectedRoom || undefined,
         customer: selectedCustomer.name,
