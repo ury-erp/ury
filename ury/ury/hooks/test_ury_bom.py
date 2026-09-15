@@ -52,6 +52,7 @@ class TestApplyYieldBackCalculation(FrappeTestCase):
 		# Create BOM doc
 		doc = MagicMock()
 		doc.items = [row]
+		doc.get.return_value = doc.items
 
 		apply_yield_back_calculation(doc, "before_validate")
 
@@ -77,6 +78,7 @@ class TestApplyYieldBackCalculation(FrappeTestCase):
 		# Create BOM doc
 		doc = MagicMock()
 		doc.items = [row]
+		doc.get.return_value = doc.items
 
 		with self.assertRaises(frappe.ValidationError):
 			apply_yield_back_calculation(doc, "before_validate")
@@ -103,6 +105,7 @@ class TestApplyYieldBackCalculation(FrappeTestCase):
 		# Create BOM doc
 		doc = MagicMock()
 		doc.items = [row]
+		doc.get.return_value = doc.items
 
 		with self.assertRaises(frappe.ValidationError):
 			apply_yield_back_calculation(doc, "before_validate")
@@ -128,6 +131,7 @@ class TestApplyYieldBackCalculation(FrappeTestCase):
 		# Create BOM doc
 		doc = MagicMock()
 		doc.items = [row]
+		doc.get.return_value = doc.items
 
 		apply_yield_back_calculation(doc, "before_validate")
 
@@ -152,6 +156,7 @@ class TestApplyYieldBackCalculation(FrappeTestCase):
 		# Create BOM doc
 		doc = MagicMock()
 		doc.items = [row]
+		doc.get.return_value = doc.items
 
 		apply_yield_back_calculation(doc, "before_validate")
 
@@ -183,6 +188,7 @@ class TestApplyYieldBackCalculation(FrappeTestCase):
 		# Create BOM doc
 		doc = MagicMock()
 		doc.items = [row1, row2]
+		doc.get.return_value = doc.items
 
 		apply_yield_back_calculation(doc, "before_validate")
 
@@ -222,6 +228,7 @@ class TestSetBomRevision(FrappeTestCase):
 		# Create BOM doc
 		doc = MagicMock()
 		doc.items = [row1, row2]
+		doc.get.return_value = doc.items
 
 		set_bom_revision(doc)
 
@@ -242,6 +249,7 @@ class TestSetBomRevision(FrappeTestCase):
 
 		doc_a = MagicMock()
 		doc_a.items = [row1a]
+		doc_a.get.return_value = doc_a.items
 
 		set_bom_revision(doc_a)
 		rev_a = doc_a.custom_bom_revision
@@ -254,6 +262,7 @@ class TestSetBomRevision(FrappeTestCase):
 
 		doc_b = MagicMock()
 		doc_b.items = [row1b]
+		doc_b.get.return_value = doc_b.items
 
 		set_bom_revision(doc_b)
 		rev_b = doc_b.custom_bom_revision
@@ -275,6 +284,7 @@ class TestSetBomRevision(FrappeTestCase):
 
 		doc_a = MagicMock()
 		doc_a.items = [row1a, row2a]
+		doc_a.get.return_value = doc_a.items
 
 		set_bom_revision(doc_a)
 		rev_a = doc_a.custom_bom_revision
@@ -292,6 +302,7 @@ class TestSetBomRevision(FrappeTestCase):
 
 		doc_b = MagicMock()
 		doc_b.items = [row1b, row2b]
+		doc_b.get.return_value = doc_b.items
 
 		set_bom_revision(doc_b)
 		rev_b = doc_b.custom_bom_revision
@@ -308,6 +319,7 @@ class TestSetBomRevision(FrappeTestCase):
 
 		doc = MagicMock()
 		doc.items = [row]
+		doc.get.return_value = doc.items
 
 		set_bom_revision(doc)
 
@@ -319,6 +331,7 @@ class TestSetBomRevision(FrappeTestCase):
 		"""Empty BOM produces a valid (but predictable) revision."""
 		doc = MagicMock()
 		doc.items = []
+		doc.get.return_value = doc.items
 
 		set_bom_revision(doc)
 
@@ -340,6 +353,7 @@ class TestSetBomRevision(FrappeTestCase):
 
 		doc = MagicMock()
 		doc.items = [row1, row2]
+		doc.get.return_value = doc.items
 
 		set_bom_revision(doc)
 
@@ -364,9 +378,11 @@ class TestSetBomRevision(FrappeTestCase):
 
 		doc1 = MagicMock()
 		doc1.items = [row1]
+		doc1.get.return_value = doc1.items
 
 		doc2 = MagicMock()
 		doc2.items = [row2_exact]
+		doc2.get.return_value = doc2.items
 
 		set_bom_revision(doc1)
 		set_bom_revision(doc2)
