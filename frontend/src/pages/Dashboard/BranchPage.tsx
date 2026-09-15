@@ -7,6 +7,7 @@ import SideDrawer from '../../components/layout/SideDrawer';
 import { call, getLoggedUser } from '@ury/core';
 import { dashboardService } from '../../services/dashboard';
 import { SearchableSelect } from '../../components/common/SearchableSelect';
+import { StockAuthorityTierSection } from './StockAuthorityTierSection';
 
 interface BranchData {
   name: string;
@@ -941,6 +942,12 @@ export const BranchPage: React.FC = () => {
                 <p className="text-sm text-muted-foreground">No URY Restaurant linked to this branch.</p>
               )}
             </div>
+
+            {/* STOCK AUTHORITY SUBSECTION */}
+            <StockAuthorityTierSection
+              branch={selectedBranch.name}
+              branchLabel={selectedBranch.branch_name || selectedBranch.name}
+            />
           </Card>
         )}
       </div>
