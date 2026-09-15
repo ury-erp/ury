@@ -1,43 +1,64 @@
 {
-  "_comment": "Copy to config.json (gitignored) and fill in real values for a specific bench.",
-  "bench_url": "http://sa-testcov-verify.localhost:8000",
+  "_comment": "Copy to config.json (gitignored) and fill in real values for a specific bench. This example now reflects the REAL ury_pos flow, reverse-engineered against a live bench in Phase 6 round 2 (see EXECUTION_LOG.md) -- there is no generic create/add_item/submit/pay/close split in this app; see 'flow'/'endpoints' below.",
+  "bench_url": "http://localhost:8114",
+  "host_header": "REPLACE_ME (e.g. sa-testcov-verify.local) -- required when bench_url is a raw dev-server port rather than a proper vhost-routed hostname; Frappe resolves the site purely off the Host header.",
   "api_key": "REPLACE_ME",
   "api_secret": "REPLACE_ME",
   "cookies": null,
-  "branch": "Main Branch",
+  "flow": "ury_pos",
+  "branch": "REPLACE_ME (e.g. Demo Branch)",
   "endpoints": {
-    "create": "ury.pos.api.order.create_order",
-    "add_item": "ury.pos.api.order.add_item",
-    "submit": "ury.pos.api.order.submit_order",
-    "pay": "ury.pos.api.order.pay_order",
-    "close": "ury.pos.api.order.close_order"
+    "_comment": "Real, whitelisted dotted paths in ury/ury/doctype/ury_order/ury_order.py. sync_order handles BOTH create (invoice=None) and add-item/re-sync (invoice=<name>) -- there is no separate add_item endpoint. make_invoice applies payment AND submits the POS Invoice in one call -- there is no separate submit endpoint, and no per-order close endpoint (closing is a separate batch-level POS Closing Entry, out of scope for this harness).",
+    "create": "ury.ury.doctype.ury_order.ury_order.sync_order",
+    "add_item": "ury.ury.doctype.ury_order.ury_order.sync_order",
+    "pay": "ury.ury.doctype.ury_order.ury_order.make_invoice"
   },
-  "item_pool": [
-    { "item_code": "TEST-ITEM-001", "qty": 1 },
-    { "item_code": "TEST-ITEM-002", "qty": 2 },
-    { "item_code": "TEST-ITEM-003", "qty": 1 }
+  "pos_profile": "REPLACE_ME -- an existing POS Profile name",
+  "customer": "REPLACE_ME -- an existing Customer name",
+  "waiter": "REPLACE_ME -- a user with URY Cashier/Captain role and, ideally, System Manager (to bypass the branch/room assignment checks in sync_order for a scripted actor)",
+  "cashier": "REPLACE_ME -- same user as waiter is fine for this harness",
+  "owner": "REPLACE_ME -- same user as waiter is fine for this harness",
+  "tables": [
+    "REPLACE_ME with real URY Table names, e.g. T1, T2, T3 -- picked randomly per actor run so concurrent actors can collide on the same table by design"
   ],
+  "item_pool": [
+    {
+      "item": "REPLACE_ME with a real Item Code that has an Item Price under the POS Profile's selling_price_list",
+      "item_name": "same as item",
+      "rate": 100,
+      "qty": 1
+    }
+  ],
+  "mode_of_payment": "Cash",
   "db": {
     "driver": "pymysql",
     "host": "mariadb",
     "port": 3306,
-    "user": "root",
+    "user": "REPLACE_ME (site DB user from site_config.json, or root -- see PROCESS-privilege caveat below for db_sampler.py)",
     "password": "REPLACE_ME",
     "database": "REPLACE_ME_site_db_name"
   },
   "no_oversell": {
+    "_comment": "Confirmed NOT APPLICABLE to this app's POS menu items in Phase 6 round 2: URY menu items are is_stock_item=0 (never touch tabBin at all). Real sell-through-capacity risk in this app lives in URY Stock Reservation vs URY Sales Plan (production-capacity enforcement), which this generic no_oversell/tabBin check cannot see. Left here only for an app that DOES sell stock-tracked items directly.",
     "bin_table": "tabBin",
     "allow_negative_stock_items": []
   },
   "reservation_atomicity": {
-    "reservation_table": "tabStock Reservation Entry",
-    "order_field": "voucher_no",
-    "order_table": "tabSales Order"
+    "_comment": "Real doctype for this app is URY Stock Reservation, not ERPNext's Stock Reservation Entry. Its active/holding-stock status is 'Reserved' (see ury/ury/api/ury_reservation_service.py), not an exclusion of terminal states -- pass active_statuses explicitly or the check silently misclassifies Fulfilled/Released rows too (see invariant_checker.py).",
+    "reservation_table": "tabURY Stock Reservation",
+    "order_field": "order_ref",
+    "order_table": "tabPOS Invoice",
+    "active_statuses": [
+      "Reserved"
+    ]
   },
   "audit_log_completeness": {
-    "order_table": "tabSales Order",
+    "order_table": "tabPOS Invoice",
     "version_table": "tabVersion",
-    "tracked_docstatuses": [1, 2],
+    "tracked_docstatuses": [
+      1,
+      2
+    ],
     "since_clause": "1=1"
   }
 }
