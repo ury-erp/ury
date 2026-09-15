@@ -22,12 +22,29 @@ TEST_MANAGER = "_test_ury_insight_api_manager@example.com"
 TEST_NON_MANAGER = "_test_ury_insight_api_non_manager@example.com"
 
 
+def _ensure_test_branch(branch_name="Test Branch"):
+	"""URY Insight.branch links to the core Branch doctype, which a fresh
+	test site has no records for (only created via the setup wizard, which
+	CI's fixture bootstrap does not run for every doctype -- see
+	ury/install.py's before_tests for the general version of this gap).
+	Seed the record(s) these tests need directly."""
+	if not frappe.db.exists("Branch", branch_name):
+		branch_doc = frappe.get_doc({"doctype": "Branch", "branch": branch_name})
+		# ury's custom "user" child table on Branch is marked mandatory, but
+		# these tests only need the Branch record to exist for URY Insight's
+		# link validation -- no branch-user assignment is relevant here.
+		branch_doc.flags.ignore_mandatory = True
+		branch_doc.insert(ignore_permissions=True)
+
+
 class TestGetActiveInsightsHappyPath(FrappeTestCase):
 	"""Test get_active_insights() in nominal conditions."""
 
 	def setUp(self):
 		"""Create test users and insights."""
 		frappe.set_user("Administrator")
+		_ensure_test_branch()
+		_ensure_test_branch("Other Branch")
 		self._create_test_user(TEST_MANAGER, roles=["URY Manager"])
 		self._create_test_user(TEST_NON_MANAGER, roles=[])
 		
@@ -256,6 +273,8 @@ class TestDismissInsightHappyPath(FrappeTestCase):
 
 	def setUp(self):
 		frappe.set_user("Administrator")
+		_ensure_test_branch()
+		_ensure_test_branch("Other Branch")
 		self._create_test_user(TEST_MANAGER, roles=["URY Manager"])
 		
 		self.active_insight = frappe.get_doc({
