@@ -45,7 +45,12 @@ import frappe
 from frappe import _
 from frappe.utils import add_to_date, flt, now, now_datetime
 
-from ury.ury.api.ury_reservation_service import RESERVED, fulfil_reservation_if_pending
+from ury.ury.api.ury_reservation_service import (
+	QTY_TOLERANCE,
+	RESERVED,
+	fulfil_reservation_if_pending,
+	group_reserved_top_level_qty,
+)
 from ury.ury.api.ury_kot_execution_service import READY, SERVED
 from ury.ury.api.ury_bom_compiler import publish_component_stock_fanout
 from ury.ury.api.ury_feature_flags import is_pos_stock_authority_flag_enabled, ITEM_EXECUTION_DOCTYPE
@@ -388,12 +393,53 @@ def _freeze_payload(execution_doc, actor):
 		)
 	policy = snapshots[0]["policy"]
 	reservation_group = rows[0].get("reservation_group") or rows[0].get("name")
+
+	# B03b: this KOT item's SHARE of the reservation group, not the whole group.
+	#
+	# One group can legitimately cover several KOT items. A straight quantity
+	# bump on one POS line (Coffee 1 -> 2) does not create a second group --
+	# `ury_order_reservation_service._reconcile_line` releases the line's group
+	# and creates ONE replacement sized for the new TOTAL, under the same
+	# `reservation_line_key` -- and the delta KOT raised for the +1 inherits
+	# that same line key. So B03's line scoping correctly binds BOTH the
+	# original KOT item and the delta KOT item to that one group, whose
+	# component rows are sized for qty 2.
+	#
+	# Freezing those rows verbatim, as this did, made each of the two postings
+	# consume raw materials for the full 2 while receiving a finished good for
+	# its own 1: components deducted twice over. Scale each component to
+	# `accepted_qty / reserved_total` so the two postings together consume
+	# exactly what the group reserved. `fulfil_reservation_if_pending` performs
+	# the matching cumulative accounting on the group's status.
+	#
+	# Whole-group behaviour is preserved bit-for-bit wherever the share is 1.0
+	# -- the single-KOT case, and B03's two-separate-lines case (two groups of
+	# one KOT each) -- because `x * 1.0 == x` exactly for floats, and likewise
+	# for a legacy group whose reserved total is unknown.
+	reserved_group_qty = group_reserved_top_level_qty(rows)
+	line_share = 1.0
+	if reserved_group_qty:
+		if accepted_qty - reserved_group_qty > QTY_TOLERANCE:
+			# The KOT item claims more than the line ever reserved. Posting it
+			# would consume beyond the reservation, and silently scaling it
+			# down would under-produce against the ticket. Neither is a
+			# defensible guess, so fail closed and observably: the intent lands
+			# FAILED with this reason code rather than corrupting the ledger.
+			raise FulfilmentPostingError(
+				"KOT_QTY_EXCEEDS_RESERVATION",
+				_(
+					"KOT item {0} is for {1} of {2}, but its reservation group {3} "
+					"reserves only {4}; posting is blocked until the line is resolved"
+				).format(execution_doc.kot_item, accepted_qty, item_code, reservation_group, reserved_group_qty),
+			)
+		line_share = accepted_qty / reserved_group_qty
+
 	components = [
 		{
 			"reservation_ref": snapshot["reservation_ref"],
 			"reservation_group": snapshot["reservation_group"],
 			"item_code": snapshot["component_item"],
-			"qty": snapshot["qty"],
+			"qty": flt(snapshot["qty"]) * line_share,
 			"s_warehouse": snapshot["warehouse"],
 		}
 		for snapshot in snapshots
@@ -431,6 +477,14 @@ def _freeze_payload(execution_doc, actor):
 		# which line a posting was bound to; None for legacy KOT items that
 		# carry no line key (see `_scope_rows_to_line`).
 		"reservation_line_key": reservation_line_key,
+		# B03b traceability: the group's total reserved top-level quantity, and
+		# the fraction of it this KOT item's components were scaled to. None/1.0
+		# means this posting consumes the whole group, which is the single-KOT
+		# case and every legacy group. Recorded so a Stock Entry's component
+		# quantities can be reconciled back to the reservation that authorised
+		# them without re-deriving the ratio.
+		"reservation_group_qty": reserved_group_qty,
+		"reservation_line_share": line_share,
 		# The warehouse the finished good is received into, resolved
 		# explicitly rather than inferred from a component row. Frozen here,
 		# at the same moment and from the same order-time context as every
@@ -774,9 +828,8 @@ def _submit_stock_entry(intent, payload):
 	return doc.name
 
 
-def _fulfil_reservation_once(reservation_group):
-	"""Fulfil this posting's reservation group, tolerating an already-Fulfilled
-	one.
+def _fulfil_reservation_once(payload):
+	"""Fulfil THIS POSTING'S SHARE of its reservation group, exactly once.
 
 	Delegates to the shared `fulfil_reservation_if_pending` guard rather than
 	doing its own check-then-call: the consolidated Sales Invoice handler
@@ -785,8 +838,27 @@ def _fulfil_reservation_once(reservation_group):
 	two can race on one group and BOTH must be no-ops on an already-Fulfilled
 	group. Keeping one implementation of that rule means they cannot drift
 	apart.
+
+	B03b: the share, not the whole group. One group can cover several KOT items
+	(an original line plus the delta KOT of a quantity bump -- see
+	`_freeze_payload`), and each posts its own Stock Entry for its own
+	quantity. Passing this posting's identity and quantity lets the guard
+	accumulate them and flip the group to `Fulfilled` only once the last
+	sharing KOT item has posted, instead of the first one closing the group and
+	stranding its siblings with `RESERVATION_NOT_FOUND`.
+
+	The contributor identity is the posting intent's `idempotency_key`, which
+	is unique per (branch, kot, kot_item, accepted_revision,
+	fulfilment_sequence) and stable across retries -- so a replayed worker
+	contributes once, and two distinct KOT items never collide. The quantity is
+	`accepted_qty`, in the same top-level item units as the group's reserved
+	total.
 	"""
-	return fulfil_reservation_if_pending(reservation_group)
+	return fulfil_reservation_if_pending(
+		payload["reservation_group"],
+		contributor=payload.get("idempotency_key"),
+		contributed_qty=payload.get("accepted_qty"),
+	)
 
 
 def _find_existing_fulfilment(payload):
@@ -883,7 +955,7 @@ def process_posting_intent(intent_name):
 			with _service_mutation():
 				intent.save(ignore_permissions=False)
 		with _service_mutation():
-			_fulfil_reservation_once(payload["reservation_group"])
+			_fulfil_reservation_once(payload)
 
 		# Emit realtime events (cheap component-level + rich fan-out) for each
 		# distinct component_item in the stock entry.
