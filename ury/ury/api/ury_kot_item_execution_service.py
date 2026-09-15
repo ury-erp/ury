@@ -165,11 +165,12 @@ def _attach_ready_posting_intent(result, actor):
 	# deducted once, by native, at closing. A quiet no-op (not a thrown
 	# error) because READY is a routine kitchen-workflow transition that must
 	# keep working in the default configuration.
-	from ury.ury.api.ury_feature_flags import is_pos_stock_authority_flag_enabled
+	from ury.ury.api.ury_stock_policy import get_branch_stock_policy
 
 	branch = result.get("branch")
 	company = result.get("company")
-	if not is_pos_stock_authority_flag_enabled(company=company, branch=branch):
+	policy = get_branch_stock_policy(branch=branch, company=company)
+	if not policy.realtime_production_posting_enabled:
 		result["posting_intent"] = None
 		result["posting_intent_status"] = "SKIPPED_NATIVE_POS_AUTHORITY"
 		return result
