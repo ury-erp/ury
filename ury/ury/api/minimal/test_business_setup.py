@@ -162,7 +162,7 @@ class TestCreateSetupUserRoles(unittest.TestCase):
         return patch("ury.ury.api.minimal.business_setup.frappe.session", frappe._dict({"user": user}))
 
     @patch("ury.ury.api.minimal.business_setup.frappe.get_roles", return_value=[])
-    @patch("ury.ury.api.minimal.business_setup._is_bootstrap_setup", return_value=False)
+    @patch("ury.ury.api.minimal.business_setup._is_bootstrap_setup", return_value=True)
     @patch("ury.ury.api.minimal.business_setup.frappe.db.exists", return_value=False)
     @patch("ury.ury.api.minimal.business_setup.frappe.get_doc")
     def test_backward_compat_single_role_string_still_works(
@@ -233,7 +233,7 @@ class TestCreateSetupUserRoles(unittest.TestCase):
                 create_setup_user(email="a@example.com", name="A", roles=["System Manager"])
 
     @patch("ury.ury.api.minimal.business_setup.frappe.get_roles", return_value=[])
-    @patch("ury.ury.api.minimal.business_setup._is_bootstrap_setup", return_value=False)
+    @patch("ury.ury.api.minimal.business_setup._is_bootstrap_setup", return_value=True)
     @patch("ury.ury.api.minimal.business_setup.frappe.db.exists", return_value=False)
     @patch("ury.ury.api.minimal.business_setup.frappe.get_doc")
     def test_non_system_manager_can_grant_allowed_roles_combination(
