@@ -371,7 +371,7 @@ def cancel_after_ready(kot, actor=None, reason=None, manager_confirmed_by=None):
 	caller/report can find these.
 
 	Recorded as gap G-08 and Phase 3 follow-up in
-	tracks/sa-testing-issues-14sep/ARCHITECTURE_POS_STOCK_AUTHORITY.md.
+	tracks/sa-pos-stock-phase2/ARCHITECTURE_POS_STOCK_AUTHORITY.md.
 	The related reservation-side hazard (G-09) IS handled:
 	`ury_order_reservation_service.release_order_reservations` skips
 	already-Fulfilled groups instead of throwing, so cancelling a partly
