@@ -65,30 +65,29 @@ jobs:
       # test_ury_yield_variance, test_ury_item_production_configuration,
       # test_yield_check_reminders) are included in the 96 modules below.
       #
-      # test_ury_bom and test_ury_order both have their underlying source
-      # bugs fixed and verified passing against fresh local sites (13/13
-      # and 37/37 respectively), but NEITHER is re-enabled here: each
-      # produced further failures unique to this workflow's actual Python
-      # 3.11 CI runner that a local re-check (including, for test_ury_bom,
-      # a standalone Python 3.11 repro of the exact failing logic) could
-      # not reproduce. For test_ury_order specifically, the leading theory
-      # for the mismatch (CI fetching a newer frappe/erpnext version-15
-      # commit than the local bench) was directly ruled out -- `git
-      # ls-remote` against both upstream branches returned the exact same
-      # commit hashes the local bench has. Left excluded rather than merge
-      # a shard that's red for a reason not yet understood; both source
-      # fixes and this investigation are recorded in EXECUTION_LOG.md
-      # ("Session 4") for whoever picks this back up -- likely one shared
-      # root cause across both, not two coincidences.
+      # test_ury_bom is now RE-ENABLED (Session 6): the Python-3.11-only CI
+      # failure above turned out to share a root cause with an upstream bug
+      # independently fixed in commit 10ed35c (set_bom_revision() changed
+      # from `doc.items` to `doc.get("items")`) -- the test file's
+      # MagicMock doc objects never configured `.get`, so `doc.get("items")`
+      # returned an unconfigured MagicMock instead of the row list. Fixed by
+      # setting `doc.get.return_value = doc.items` at each of the 8 direct
+      # call sites; 13/13 passing locally, re-verifying against real CI now.
       #
-      # A 9th module, test_ury_order_v3_73_stock_authority_flag, is also
-      # excluded: it imports and passes locally against a real bench
-      # (verified) but fails with ModuleNotFoundError specifically inside
-      # this workflow's fresh bench get-app/install-app environment, for
-      # a reason not yet root-caused (not a missing/misspelled file --
-      # confirmed present and correctly tracked in git). Left out rather
-      # than block the other 91 on an unresolved CI-environment-specific
-      # mystery; a real follow-up, not silently dropped.
+      # test_ury_order remains excluded: its underlying source bug is fixed
+      # and verified passing locally (37/37), but it produced 3 different,
+      # never-touched-by-this-fix test failures unique to this workflow's
+      # real CI runner that a local re-check could not reproduce (the
+      # leading "newer frappe/erpnext version" theory was directly ruled
+      # out via matching `git ls-remote` commit hashes). Left excluded
+      # rather than merge a shard that's red for a reason not yet
+      # understood; the source fix and full investigation are recorded in
+      # EXECUTION_LOG.md ("Session 4") for whoever picks this back up.
+      #
+      # The former "9th excluded module", test_ury_order_v3_73_stock_authority_flag,
+      # no longer exists: the v3-stg merge in Session 5 deleted the file
+      # upstream, resolving that ModuleNotFoundError mystery by removing its
+      # cause entirely.
       matrix:
         include:
           - shard: 0
@@ -187,6 +186,7 @@ jobs:
               ury.ury.doctype.ury_service_request.test_ury_service_request
               ury.ury.doctype.ury_table.test_ury_table
               ury.ury.doctype.ury_yield_check.test_ury_yield_check
+              ury.ury.hooks.test_ury_bom
               ury.ury.hooks.test_ury_item
               ury.ury.report_api.test_commission
               ury.ury.report_api.test_day_close
