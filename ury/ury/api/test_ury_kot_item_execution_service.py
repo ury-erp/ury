@@ -367,10 +367,18 @@ class TestResolveProductionPostingTriggerState(FrappeTestCase):
 		self.assertEqual(_resolve_production_posting_trigger_state("KOTITEM-1", None), READY)
 
 	def test_falls_back_to_ready_when_item_code_cannot_be_resolved(self):
+		# The lookup deliberately tries field "item" first, falling back to
+		# the legacy "item_code" field name if that resolves to nothing --
+		# see `_resolve_production_posting_trigger_state`'s two chained
+		# `frappe.db.get_value` calls. With both mocked to return None here,
+		# neither field name resolves an item_code, so the function must
+		# fall back to READY, having tried both field names in order.
 		with patch(f"{MODULE}.frappe.db.get_value", return_value=None) as mock_get_value:
 			state = _resolve_production_posting_trigger_state("KOTITEM-1", "Branch A")
 		self.assertEqual(state, READY)
-		mock_get_value.assert_called_once()
+		mock_get_value.assert_any_call("URY KOT Items", "KOTITEM-1", "item")
+		mock_get_value.assert_any_call("URY KOT Items", "KOTITEM-1", "item_code")
+		self.assertEqual(mock_get_value.call_count, 2)
 
 	def test_falls_back_to_ready_when_no_configuration_row_or_field_unset(self):
 		def _get_value(doctype, filters_or_field, field=None):

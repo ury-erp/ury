@@ -370,25 +370,51 @@ class TestClosingReconciliation(FrappeTestCase):
 
 	def test_caller_supplied_pos_transactions_not_overwritten(self):
 		doc = _closing(["POSINV-1"])
+
+		# `ury_pos_closing_entry` and `ury_pos_closing_reconciliation` both
+		# do a plain `import frappe`, so `MODULE.frappe` and
+		# `ury_pos_closing_entry.frappe` are the *same* module object --
+		# patching `frappe.get_all` via either module-qualified path patches
+		# the one shared attribute. Patching it twice under a single `with`
+		# (as an earlier version of this test did, one patch per module)
+		# silently makes the later patch win for *all* callers, which let a
+		# real `frappe.get_all` call from `_verify_reservations_resolvable`
+		# (its "URY Stock Reservation" lookup, unrelated to
+		# `populate_pos_transactions`) get attributed to the wrong mock and
+		# fail an over-broad `assert_not_called()`. Use a single patch with
+		# a side effect that only objects to the specific query
+		# `populate_pos_transactions` would issue (a "POS Invoice" lookup),
+		# so the assertion is scoped to what this test actually claims:
+		# populate_pos_transactions's own `:44` guard returns before ever
+		# issuing its query, because pos_transactions is non-empty -- the
+		# caller-supplied row is never overwritten. Other, unrelated
+		# `frappe.get_all` calls in the same code path (like the stock
+		# reservation lookup) are expected and allowed.
+		def _get_all_side_effect(doctype, *args, **kwargs):
+			if doctype == "POS Invoice":
+				raise AssertionError(
+					"populate_pos_transactions must not query POS Invoice "
+					"when pos_transactions is already caller-supplied"
+				)
+			return []
+
 		with patch(
 			"ury.ury.api.ury_stock_policy.get_branch_stock_policy",
 			return_value=POLICY_ON,
 		), patch(
 			f"{MODULE}._verify_invoice_production", return_value=None
 		) as verify, patch(
-			f"{MODULE}.frappe.get_all", return_value=[]
-		), patch(
-			"ury.ury.hooks.ury_pos_closing_entry.frappe.get_all"
-		) as entry_get_all:
+			f"{MODULE}.frappe.get_all", side_effect=_get_all_side_effect
+		) as get_all:
 			validate_closing_reconciliation(doc)  # must not raise
 
-		# populate_pos_transactions's own `:44` guard means it returns before
-		# ever issuing its query, because pos_transactions is non-empty --
-		# the caller-supplied row is never overwritten.
-		entry_get_all.assert_not_called()
 		self.assertEqual(len(doc.pos_transactions), 1)
 		self.assertEqual(doc.pos_transactions[0].pos_invoice, "POSINV-1")
 		self.assertEqual(verify.call_count, 1)
+		# Sanity check that the side effect actually ran (i.e. this test
+		# would fail loudly if populate_pos_transactions ever did query
+		# "POS Invoice" again).
+		self.assertTrue(get_all.called)
 
 	def test_hook_order_entry_populate_precedes_reconciliation(self):
 		"""Documents the current order as defence-in-depth (not a
