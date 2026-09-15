@@ -42,6 +42,13 @@ export const usetoggleRecentOrder = defineStore("recentOrders", {
     recentWaiter: null,
     draftInvoice: null,
     cancelReason: null,
+    cancelReasonNotes: null,
+    cancelReasons: [],
+    cancelDisposition: null,
+    cancelDispositions: [],
+    cancelDispositionRequired: false,
+    cancelEstimate: null,
+    cancelPostProductionKot: null,
     pastOrderType: null,
     selectedTable: null,
     invoiceNumber: null,
@@ -573,6 +580,10 @@ export const usetoggleRecentOrder = defineStore("recentOrders", {
           if (result.message === true) {
             this.cancelInvoiceFlag = true;
             this.cancelReason = "";
+            this.cancelReasonNotes = "";
+            this.cancelDisposition = "";
+            this.cancelEstimate = null;
+            this.fetchCancellationContext();
           } else {
             this.alert.createAlert(
               "Message",
@@ -587,11 +598,50 @@ export const usetoggleRecentOrder = defineStore("recentOrders", {
           // console.error(error)
         });
     },
+    // Mirrors `invoiceData.js`'s fetchCancellationContext -- see that store
+    // for the full rationale (item 10, AC-5).
+    fetchCancellationContext() {
+      if (!this.invoiceNumber) return;
+      this.call
+        .get("ury.ury.doctype.ury_order.ury_order.get_order_cancellation_context", {
+          invoice_id: this.invoiceNumber,
+        })
+        .then((result) => {
+          const ctx = result.message || {};
+          this.cancelReasons = ctx.cancel_reasons || [];
+          this.cancelDispositions = ctx.dispositions || [];
+          this.cancelDispositionRequired = !!ctx.requires_disposition;
+          const kots = ctx.kots || [];
+          const postProduction = kots.find(
+            (row) => row.state === "IN_PREPARATION" || row.state === "READY"
+          );
+          this.cancelPostProductionKot = postProduction ? postProduction.kot : null;
+        })
+        .catch((error) => console.error(error));
+    },
+    fetchCancellationEstimate() {
+      const kot = this.cancelPostProductionKot;
+      if (!kot || !this.cancelDisposition) {
+        this.cancelEstimate = null;
+        return;
+      }
+      this.call
+        .get("ury.ury.api.ury_wastage.estimate_kot_cancellation_wastage_value", {
+          kot,
+          disposition: this.cancelDisposition,
+        })
+        .then((result) => {
+          this.cancelEstimate = result.message || null;
+        })
+        .catch((error) => console.error(error));
+    },
 
     cancelInvoice: async function () {
       const updatedFields = {
         invoice_id: this.invoiceNumber,
         reason: this.cancelReason,
+        reason_notes: this.cancelReasonNotes,
+        disposition: this.cancelDisposition || undefined,
       };
       this.call
         .post("ury.ury.doctype.ury_order.ury_order.cancel_order", updatedFields)

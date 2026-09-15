@@ -244,6 +244,9 @@ def _write_cancellation(kot, locked, target_state, actor, event, reason, branch,
 		)
 
 	doc.state = target_state
+	# First-class field per AC-8: queryable without parsing audit_log JSON,
+	# in addition to (not instead of) the existing audit_log entry below.
+	doc.cancellation_reason = reason
 	append_audit(doc, actor, event=event, reason=reason)
 
 	if locked:

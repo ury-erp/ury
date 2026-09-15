@@ -27,6 +27,7 @@
   "column_break_serve",
   "cancelled_by",
   "cancelled_at",
+  "cancellation_reason",
   "section_break_audit",
   "audit_log"
  ],
@@ -153,6 +154,13 @@
    "fieldname": "cancelled_at",
    "fieldtype": "Datetime",
    "label": "Cancelled At",
+   "read_only": 1
+  },
+  {
+   "description": "First-class cancellation reason (mirrors the POS Invoice cancel_reason vocabulary) so it is queryable without parsing audit_log JSON.",
+   "fieldname": "cancellation_reason",
+   "fieldtype": "Data",
+   "label": "Cancellation Reason",
    "read_only": 1
   },
   {

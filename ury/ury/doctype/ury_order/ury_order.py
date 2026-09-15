@@ -2363,7 +2363,67 @@ def customer_favourite_item(customer_name):
 
 
 @frappe.whitelist()
-def cancel_order(invoice_id, reason):
+def get_order_cancellation_context(invoice_id):
+    """Read-only context for the cancel dialog (item 10).
+
+    Returns the shared reason/disposition vocabulary plus, for each KOT
+    linked to this invoice, its `URY KOT Execution` state -- so the frontend
+    can decide whether to show the disposition control at all (AC-5: required
+    when IN_PREPARATION/READY, absent when QUEUED) without hardcoding the
+    state machine's values.
+    """
+    from ury.ury.api import ury_wastage
+    from ury.ury.api import ury_kot_cancellation_service as cancellation_service
+
+    kots = frappe.get_all(
+        "URY KOT",
+        filters={"invoice": invoice_id, "type": ("in", ("New Order", "Order Modified")), "docstatus": 1},
+        pluck="name",
+    )
+    kot_states = []
+    for kot in kots:
+        state = frappe.db.get_value("URY KOT Execution", {"kot": kot}, "state") or cancellation_service.QUEUED
+        kot_states.append({"kot": kot, "state": state})
+
+    requires_disposition = any(
+        row["state"] in (cancellation_service.IN_PREPARATION, cancellation_service.READY)
+        for row in kot_states
+    )
+
+    return {
+        "kots": kot_states,
+        "requires_disposition": requires_disposition,
+        "cancel_reasons": list(ury_wastage.CANCEL_REASONS),
+        "dispositions": list(ury_wastage.DISPOSITIONS),
+    }
+
+
+@frappe.whitelist()
+def cancel_order(invoice_id, reason, reason_notes=None, disposition=None):
+    """Cancel a POS order.
+
+    `reason` is the required Select value from the shared cancellation-reason
+    vocabulary (`ury.ury.api.ury_wastage.CANCEL_REASONS`) -- validated here so
+    a stale/direct API caller cannot bypass the frontend's Select. `reason_notes`
+    is the separate free-text detail field (kept apart from `reason` so
+    existing free-text expressiveness, especially for "Other", is not lost --
+    see `POS Invoice-cancel_reason_notes`).
+
+    `disposition` (`ury_wastage.DISPOSITIONS`) is only meaningful when this
+    order's KOT(s) already posted production (`IN_PREPARATION` / `READY`
+    execution state) -- see `_capture_post_production_wastage` below, which
+    threads it into `ury_kot_cancellation_service.cancel_after_start` /
+    `cancel_after_ready` so the operator's actual choice reaches
+    `capture_kot_cancellation_wastage()` instead of that function's own
+    default.
+    """
+    from ury.ury.api import ury_wastage
+
+    if reason not in ury_wastage.CANCEL_REASONS:
+        frappe.throw(_("Unknown cancellation reason: {0}").format(reason), frappe.ValidationError)
+    if disposition and disposition not in ury_wastage.DISPOSITIONS:
+        frappe.throw(_("Unknown disposition: {0}").format(disposition), frappe.ValidationError)
+
     pos_invoice = frappe.get_doc("POS Invoice", invoice_id)
 
     # Authorization gate: the session user must hold cancel rights on this
@@ -2387,6 +2447,17 @@ def cancel_order(invoice_id, reason):
     # Release the full merge cluster, not only the primary table and CSV partners.
     if pos_invoice.restaurant_table:
         release_merge_cluster_tables(pos_invoice.restaurant_table)
+
+    # Post-production write-off (item 10): when this order's KOT already
+    # posted production (IN_PREPARATION/READY execution state), route the
+    # operator's chosen disposition into the item-9 wastage-capture flow
+    # before the legacy KOT cancellation below tears the KOT down. Best-effort
+    # / fail-open, same rationale as `_capture_disposition_wastage` in
+    # `ury_kot_cancellation_service`: a write-off capture failure must never
+    # block the order cancellation itself.
+    wastage_capture_result = _capture_post_production_wastage(
+        invoice_id, reason=reason, reason_notes=reason_notes, disposition=disposition
+    )
 
     # KOT cancellation is part of the order-cancellation transaction. If it
     # fails, stop immediately so the invoice is not cancelled while the KOT
@@ -2449,6 +2520,7 @@ def cancel_order(invoice_id, reason):
         # produced (docstatus=2 on the invoice and its items).
         pos_invoice.cancel()
         pos_invoice.db_set("cancel_reason", reason)
+        pos_invoice.db_set("cancel_reason_notes", reason_notes)
     else:
         # Draft invoice: Frappe's standard workflow does not allow cancelling
         # drafts, so update the status directly as before.
@@ -2461,6 +2533,66 @@ def cancel_order(invoice_id, reason):
         frappe.db.set_value("POS Invoice", invoice_id, "docstatus", 2)
         frappe.db.set_value("POS Invoice", invoice_id, "status", "Cancelled")
         frappe.db.set_value("POS Invoice", invoice_id, "cancel_reason", reason)
+        frappe.db.set_value("POS Invoice", invoice_id, "cancel_reason_notes", reason_notes)
+
+    return wastage_capture_result
+
+
+def _capture_post_production_wastage(invoice_id, reason, reason_notes, disposition):
+    """Route the operator's disposition into item 9's wastage capture, for a
+    KOT whose execution already progressed past QUEUED.
+
+    Looks up the `URY KOT Execution` state for each KOT linked to this
+    invoice; if it is IN_PREPARATION or READY, calls the matching
+    `ury_kot_cancellation_service.cancel_after_start` / `cancel_after_ready`
+    with the chosen `disposition` and `reason`, so `wasted_qty` write-off rows
+    carry the operator's real choice instead of that function's own default.
+    A QUEUED (or missing) execution row means nothing was produced -- no
+    disposition applies, matching AC-4/AC-5 (hide the control, capture
+    nothing).
+
+    Fail-open: mirrors `_capture_disposition_wastage`'s own rationale -- an
+    order cancellation must never be blocked by a write-off capture failure.
+    Returns a list of per-KOT results (empty if nothing applied), each tagged
+    with any error under `wastage_capture_error`.
+    """
+    from ury.ury.api import ury_kot_cancellation_service as cancellation_service
+
+    kots = frappe.get_all(
+        "URY KOT",
+        filters={"invoice": invoice_id, "type": ("in", ("New Order", "Order Modified")), "docstatus": 1},
+        pluck="name",
+    )
+
+    results = []
+    for kot in kots:
+        state = frappe.db.get_value("URY KOT Execution", {"kot": kot}, "state")
+        if state not in (cancellation_service.IN_PREPARATION, cancellation_service.READY):
+            continue
+        handler = (
+            cancellation_service.cancel_after_start
+            if state == cancellation_service.IN_PREPARATION
+            else cancellation_service.cancel_after_ready
+        )
+        try:
+            result = handler(
+                kot=kot,
+                reason=reason,
+                disposition=disposition,
+                reason_category=reason,
+                reason_notes=reason_notes,
+            )
+            result["kot"] = kot
+            results.append(result)
+        except Exception as exc:  # noqa: BLE001 -- fail-open, see docstring
+            frappe.log_error(
+                frappe.get_traceback(),
+                "Post-production wastage capture failed for KOT {0} (invoice {1})".format(
+                    kot, invoice_id
+                ),
+            )
+            results.append({"kot": kot, "wastage_capture_error": str(exc)})
+    return results
 
 # Roles permitted to authorize an additional discount when settling an order.
 DISCOUNT_ALLOWED_ROLES = frozenset(

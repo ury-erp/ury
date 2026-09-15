@@ -107,6 +107,60 @@ export const WASTAGE_REASON_CATEGORIES: WastageReasonCategory[] = [
   'Other',
 ];
 
+export type CancelReason =
+  | 'Customer Changed Mind'
+  | 'Order Placed By Mistake'
+  | 'Duplicate Order'
+  | 'Kitchen Error'
+  | 'Out Of Stock'
+  | 'Excessive Wait'
+  | 'Payment Issue'
+  | 'Other';
+
+/**
+ * Mirrors `ury.ury.api.ury_wastage.CANCEL_REASONS` exactly -- the single
+ * server-side source of truth for "why the sale did not happen". Do not
+ * hand-maintain a second copy; if the server list changes, update this one
+ * to match (or fetch `get_cancellation_vocabulary` at runtime).
+ */
+export const CANCEL_REASONS: CancelReason[] = [
+  'Customer Changed Mind',
+  'Order Placed By Mistake',
+  'Duplicate Order',
+  'Kitchen Error',
+  'Out Of Stock',
+  'Excessive Wait',
+  'Payment Issue',
+  'Other',
+];
+
+export type CancelDisposition = 'Wastage' | 'Damaged' | 'Staff Meal' | 'Re-plated';
+
+/**
+ * Mirrors `ury.ury.api.ury_wastage.DISPOSITIONS` exactly -- "what happened to
+ * the physical stock" for a post-production cancellation (KOT execution
+ * state IN_PREPARATION / READY). Not shown at all when the KOT is QUEUED.
+ */
+export const CANCEL_DISPOSITIONS: CancelDisposition[] = ['Wastage', 'Damaged', 'Staff Meal', 'Re-plated'];
+
+export interface CancellationWastageEstimateLine {
+  component_item: string;
+  qty: number;
+  warehouse?: string;
+  valuation_rate: number;
+  valuation_source: string;
+  estimated_amount: number;
+}
+
+export interface CancellationWastageEstimate {
+  kot: string;
+  disposition: CancelDisposition;
+  derivation: string | null;
+  will_post: boolean;
+  lines: CancellationWastageEstimateLine[];
+  estimated_total: number;
+}
+
 export interface WastageRow {
   name: string;
   component_item: string;
@@ -330,6 +384,22 @@ export const departmentStockService = {
   async rejectWastage(wastageName: string): Promise<WastageRow> {
     const res = await call<any>('ury.ury.api.ury_wastage.reject_wastage', { wastage: wastageName });
     return normalizeWastage((res as any)?.message ?? res);
+  },
+
+  /**
+   * Read-only estimate of the write-off value a post-production cancellation
+   * would create, for the "estimated write-off value" step of the cancel
+   * dialog (item 10, AC-6). Never captures or persists anything.
+   */
+  async estimateCancellationWastageValue(
+    kot: string,
+    disposition: CancelDisposition,
+  ): Promise<CancellationWastageEstimate> {
+    const res = await call<any>('ury.ury.api.ury_wastage.estimate_kot_cancellation_wastage_value', {
+      kot,
+      disposition,
+    });
+    return ((res as any)?.message ?? res) as CancellationWastageEstimate;
   },
 
   /**

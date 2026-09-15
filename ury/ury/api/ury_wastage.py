@@ -84,6 +84,25 @@ APPROVE_ROLES = {"System Manager", "Stock Manager"}
 
 REASON_CATEGORIES = {"Spoilage", "Preparation Error", "Dropped/Damaged", "Expired", "Other"}
 
+# Single server-side vocabulary for "why the sale did not happen" (item 10).
+# Distinct axis from REASON_CATEGORIES above (which is "what happened to the
+# physical stock" wastage-reason-category): this is the customer/service-facing
+# cancellation reason shown on POS Invoice / URY KOT Execution. Order matters
+# (it is the Select field's option order); "Other" stays last so it reads as
+# the catch-all. Mirrored on the frontend by
+# `frontend/src/services/departmentStock.ts`'s `CANCEL_REASONS` constant --
+# keep the two lists identical; this list is the single source of truth.
+CANCEL_REASONS = [
+    "Customer Changed Mind",
+    "Order Placed By Mistake",
+    "Duplicate Order",
+    "Kitchen Error",
+    "Out Of Stock",
+    "Excessive Wait",
+    "Payment Issue",
+    "Other",
+]
+
 # grillax's binary `stock` field (Damaged / Wastage), widened. Only the first
 # three post a `Material Issue`; `Re-plated` posts nothing.
 DISPOSITIONS = ("Wastage", "Damaged", "Staff Meal", "Re-plated")
@@ -924,6 +943,78 @@ def append_audit(doc, event, actor, details):
     entry.update(details or {})
     entries.append(entry)
     doc.audit_log = json.dumps(entries, sort_keys=True, default=str)
+
+
+@frappe.whitelist()
+def get_cancellation_vocabulary():
+    """Read-only vocabulary for the POS/urypos cancel dialog (item 10).
+
+    Single server-side source of truth for both the cancel-reason Select and
+    the post-production disposition Select, so neither surface hand-maintains
+    its own copy. `frontend/src/services/departmentStock.ts` mirrors this
+    call's shape into a typed `CANCEL_REASONS` constant, the same pattern it
+    already uses for `WASTAGE_REASON_CATEGORIES`.
+    """
+    return {
+        "cancel_reasons": list(CANCEL_REASONS),
+        "dispositions": list(DISPOSITIONS),
+    }
+
+
+@frappe.whitelist()
+def estimate_kot_cancellation_wastage_value(kot, disposition=None, branch=None, company=None):
+    """Read-only estimate of the write-off value a cancellation would create.
+
+    Mirrors `capture_kot_cancellation_wastage()`'s own consumption resolution
+    (`_kot_consumption`) and `compute_wastage_valuation()`'s rate cascade, but
+    inserts nothing. Used by the cancel dialog to show the estimated write-off
+    amount before the operator confirms (item 10, AC-6). Never raises for a
+    KOT that consumed nothing -- returns a zero estimate instead, matching
+    `capture_kot_cancellation_wastage()`'s own fail-open shape.
+    """
+    if not frappe.has_permission(WASTAGE_DOCTYPE, "read"):
+        frappe.throw(_("Not permitted to read Issue Wastage"), frappe.PermissionError)
+
+    disposition = disposition or DEFAULT_KOT_CANCELLATION_DISPOSITION
+    if disposition not in DISPOSITIONS:
+        frappe.throw(
+            _("Unknown disposition {0}; expected one of {1}").format(
+                disposition, ", ".join(DISPOSITIONS)
+            ),
+            frappe.ValidationError,
+        )
+
+    branch, company = _resolve_kot_scope(kot, branch, company)
+    consumption, derivation = _kot_consumption(kot, branch, company)
+
+    lines = []
+    total = 0.0
+    for row in consumption:
+        qty = flt(row.get("qty"))
+        rate, source = _resolve_valuation_rate(
+            row.get("component_item"), row.get("warehouse"), company, qty
+        )
+        amount = qty * rate
+        total += amount
+        lines.append(
+            {
+                "component_item": row.get("component_item"),
+                "qty": qty,
+                "warehouse": row.get("warehouse"),
+                "valuation_rate": rate,
+                "valuation_source": source,
+                "estimated_amount": amount,
+            }
+        )
+
+    return {
+        "kot": kot,
+        "disposition": disposition,
+        "derivation": derivation,
+        "will_post": disposition in POSTING_DISPOSITIONS,
+        "lines": lines,
+        "estimated_total": total,
+    }
 
 
 @frappe.whitelist()
