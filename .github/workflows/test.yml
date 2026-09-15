@@ -436,3 +436,12 @@ jobs:
             yarn typecheck || true
           fi
           yarn test
+
+      - name: Install dependencies and run tests for mosaic
+        working-directory: ./mosaic
+        run: |
+          yarn install --check-files
+          # mosaic was on Vitest 1.6 (out of step with the 4.1.11 the other
+          # three apps use) until this track's Phase 3 bumped it; its own
+          # `test` script pins the vitest config explicitly.
+          yarn test
