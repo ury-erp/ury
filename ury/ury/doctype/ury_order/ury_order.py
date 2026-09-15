@@ -551,12 +551,17 @@ def _copy_invoice_item_fields(item_row, qty):
         conversion_factor=item_row.conversion_factor,
         warehouse=item_row.warehouse,
         # Preserve the stable line identity the reservation/KOT layers key
-        # on (see ury_order_reservation_service.LINE_REF_FIELDS). Without
-        # this, the copied row on the new invoice would get an implicit
-        # reservation_line_key derived from ITS OWN (freshly generated) row
-        # name once inserted, breaking the link back to any reservation
-        # created for the original line (sa-arch-splitbill).
-        reservation_line_key=item_row.get("reservation_line_key") or item_row.name,
+        # on (see ury_order_reservation_service.LINE_REF_FIELDS). A row with
+        # a real persisted key carries it forward as-is (sa-arch-splitbill).
+        # A LEGACY row with no key (saved before this field existed) must
+        # NOT fall back to its own row name: `_previous_line_snapshot` no
+        # longer falls back to `name` either (see B02b), so a name-derived
+        # key here would be a bogus, client-unmatchable value that also
+        # poisons `_backfill_previous_line_keys`'s `claimed` set for any
+        # sibling row of the same item_code -- leaving `None` lets the
+        # split invoice's own backfill logic rescue it on the next sync,
+        # the same way an un-split legacy invoice already gets rescued.
+        reservation_line_key=item_row.get("reservation_line_key") or None,
     )
 
 
