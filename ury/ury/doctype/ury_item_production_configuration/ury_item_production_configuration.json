@@ -49,7 +49,8 @@
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "Department",
-   "options": "URY Production Department"
+   "options": "URY Production Department",
+   "description": "The department that produces this item. All of this item's BOM ingredients are issued from this department's own warehouse (specifically, the warehouse on its Production Unit, falling back to the department warehouse). URY never sources ingredients across departments: if two departments use the same raw material, each must hold its own stock of it, transferred in from a central store by an ordinary Stock Entry."
   },
   {
    "description": "Required for PRE_PRODUCED and MADE_TO_ORDER policies. Optional for DIRECT_RETAIL policy. Scope for production capacity, availability calculations, and work order routing.",
@@ -78,7 +79,8 @@
    "fieldname": "bom",
    "fieldtype": "Link",
    "label": "BOM",
-   "options": "BOM"
+   "options": "BOM",
+   "description": "The recipe used when this item is produced. Every component in this BOM must be stocked in this item's own department warehouse -- see the Department field."
   },
   {
    "default": "1",

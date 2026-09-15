@@ -112,6 +112,13 @@ from ury.ury.api.ury_sales_plan_commit import resolve_plan_item_rows
 # not because this module calls any of its mutating entry points.
 import ury.ury.api.ury_reservation_service  # noqa: F401
 
+# Item 4 (G-13, sa-pos-followups-and-ux): reuse the exact NEVER_STOCKED vs
+# DEPLETED classification `ury_reservation_service` uses at order-acceptance
+# time, so a misconfigured item's availability badge (never-stocked) agrees
+# with what the order-time error will say -- see `_raise_shortfall_error`
+# there for the definition.
+from ury.ury.api.ury_reservation_service import _component_never_stocked
+
 
 PRODUCTION_CONFIG_DOCTYPE = "URY Item Production Configuration"
 SALES_PLAN_DOCTYPE = "URY Sales Plan"
@@ -265,6 +272,7 @@ def _base_response(item_code, company, branch, department, production_policy):
 		"fg_available": None,
 		"max_producible": None,
 		"blocking_component": None,
+		"blocking_component_never_stocked": None,
 		"reason_code": "CONFIGURATION_ERROR",
 		"as_of": now_datetime(),
 	}
@@ -507,6 +515,9 @@ def _fill_made_to_order(response, item_code, branch, company, department, wareho
 			response["reason_code"] = "BLOCKING_COMPONENT"
 			response["sellable"] = False
 			response["blocking_component"] = blocking_component
+			response["blocking_component_never_stocked"] = _component_never_stocked(
+				blocking_component, warehouse
+			)
 		else:
 			response["reason_code"] = "AVAILABLE"
 			response["sellable"] = True
@@ -528,6 +539,9 @@ def _fill_made_to_order(response, item_code, branch, company, department, wareho
 
 	if recipe_capacity < plan["plan_remaining"]:
 		response["blocking_component"] = blocking_component
+		response["blocking_component_never_stocked"] = _component_never_stocked(
+			blocking_component, warehouse
+		)
 
 	if recipe_capacity <= 0:
 		response["reason_code"] = "BLOCKING_COMPONENT"

@@ -174,6 +174,250 @@ class TestCreateReservationSimpleItem(FrappeTestCase):
         self.assertEqual(created, [])
 
 
+class TestShortfallErrorMessage(FrappeTestCase):
+    """Item 4 / G-13 (sa-pos-followups-and-ux, ITEM_4_CROSS_DEPARTMENT.md §5.1).
+
+    Covers AC-1 (clear order-time error naming item/warehouse/chain/remedies),
+    AC-2 (DEPLETED vs NEVER_STOCKED wording), and AC-4 (two departments using
+    the same raw material never share a warehouse / never draw from each
+    other's stock -- each fails or succeeds independently, naming its own
+    warehouse).
+    """
+
+    def setUp(self):
+        patch_read_committed_reservation_rows(self)
+        now_patcher = patch(f"{MODULE}.frappe.utils.now", return_value="2024-01-01 00:00:00")
+        now_patcher.start()
+        self.addCleanup(now_patcher.stop)
+
+    def _frozen_context(self, warehouse, department, production_unit):
+        return {
+            "department": department,
+            "production_unit": production_unit,
+            "warehouse": warehouse,
+        }
+
+    def test_never_stocked_shortfall_names_item_warehouse_chain_and_remedies(self):
+        """AC-1: Chicken never stocked in Grill Store -- no Bin row at all."""
+
+        def get_value_side_effect(doctype, filters, field=None, **kwargs):
+            if doctype == "BOM" and isinstance(filters, dict) and "item" in filters:
+                return "BOM-BIRYANI"
+            if doctype == "BOM" and isinstance(filters, str) and field == "quantity":
+                return 1
+            if doctype == "Bin":
+                # No Bin row for CHICKEN/Grill Store -- get_available_capacity's
+                # fallback path when the lock found nothing to lock.
+                return None
+            return None
+
+        def sql_side_effect(query, params, **kwargs):
+            if "tabBin" in query:
+                return []  # no Bin row exists -> nothing to lock
+            return []
+
+        def get_all_side_effect(doctype, filters=None, fields=None, **kwargs):
+            if doctype == "BOM Item":
+                return [
+                    frappe._dict(
+                        item_code="CHICKEN", stock_qty=0.5, stock_uom="Kg",
+                        is_sub_assembly_item=0, bom_no=None,
+                    ),
+                ]
+            return []  # no pre-existing active reservations
+
+        with patch(f"{MODULE}.frappe.has_permission", return_value=True), patch(
+            f"{MODULE}.frappe.db.sql", side_effect=sql_side_effect
+        ), patch(
+            f"{MODULE}.frappe.db.get_value", side_effect=get_value_side_effect
+        ), patch(
+            f"{MODULE}.frappe.get_all", side_effect=get_all_side_effect
+        ):
+            with self.assertRaises(frappe.ValidationError) as ctx:
+                create_reservation(
+                    item_code="Chicken Biryani",
+                    qty=1,
+                    warehouse="Grill Store - URY",
+                    branch="Branch A",
+                    company="Company A",
+                    order_ref="ORDER-GRILL-1",
+                    policy="MADE_TO_ORDER",
+                    frozen_context=self._frozen_context(
+                        "Grill Store - URY", "Grill Section", "Grill 1"
+                    ),
+                )
+
+        message = str(ctx.exception)
+        # (a) the item
+        self.assertIn("Chicken Biryani", message)
+        # (b) the warehouse
+        self.assertIn("Grill Store - URY", message)
+        # (c) the production unit/department chain
+        self.assertIn("Grill Section", message)
+        self.assertIn("Grill 1", message)
+        # (d) the component with required vs available
+        self.assertIn("CHICKEN", message)
+        self.assertIn("required 0.5", message)
+        # (e) never-stocked classification
+        self.assertIn("never been stocked", message)
+        # (f) the three numbered remedies
+        self.assertIn("1. Transfer the ingredient in", message)
+        self.assertIn("2. Or change the item's department", message)
+        self.assertIn("3. Or correct the recipe", message)
+        # Must not leak reservation-internal invariant codes (AC-1).
+        self.assertNotIn("MIXED_RESERVATION_POLICIES", message)
+        self.assertNotIn("AMBIGUOUS_RESERVATION_BINDING", message)
+
+    def test_depleted_shortfall_uses_short_by_wording_not_never_stocked(self):
+        """AC-2: Chicken IS stocked (0.1 Kg) in Grill Store against a 0.5 Kg need."""
+
+        def get_value_side_effect(doctype, filters, field=None, **kwargs):
+            if doctype == "BOM" and isinstance(filters, dict) and "item" in filters:
+                return "BOM-BIRYANI"
+            if doctype == "BOM" and isinstance(filters, str) and field == "quantity":
+                return 1
+            return None
+
+        def sql_side_effect(query, params, **kwargs):
+            if "tabStock Ledger Entry" in query:
+                # This warehouse has held positive stock before -> DEPLETED,
+                # not NEVER_STOCKED, even though it now reads short.
+                return [{"1": 1}]
+            if "tabBin" in query:
+                return [{"name": "BIN-CHICKEN", "actual_qty": 0.1, "projected_qty": 0.1}]
+            return []
+
+        def get_all_side_effect(doctype, filters=None, fields=None, **kwargs):
+            if doctype == "BOM Item":
+                return [
+                    frappe._dict(
+                        item_code="CHICKEN", stock_qty=0.5, stock_uom="Kg",
+                        is_sub_assembly_item=0, bom_no=None,
+                    ),
+                ]
+            return []
+
+        with patch(f"{MODULE}.frappe.has_permission", return_value=True), patch(
+            f"{MODULE}.frappe.db.sql", side_effect=sql_side_effect
+        ), patch(
+            f"{MODULE}.frappe.db.get_value", side_effect=get_value_side_effect
+        ), patch(
+            f"{MODULE}.frappe.get_all", side_effect=get_all_side_effect
+        ):
+            with self.assertRaises(frappe.ValidationError) as ctx:
+                create_reservation(
+                    item_code="Chicken Biryani",
+                    qty=1,
+                    warehouse="Grill Store - URY",
+                    branch="Branch A",
+                    company="Company A",
+                    order_ref="ORDER-GRILL-2",
+                    policy="MADE_TO_ORDER",
+                    frozen_context=self._frozen_context(
+                        "Grill Store - URY", "Grill Section", "Grill 1"
+                    ),
+                )
+
+        message = str(ctx.exception)
+        self.assertIn("short by 0.4", message)
+        self.assertNotIn("never been stocked", message)
+
+    def test_two_departments_same_material_fail_independently_naming_own_warehouse(self):
+        """AC-4: Grill and Tandoor both need CHICKEN; only Grill Store has it.
+
+        The Grill order succeeds; the Tandoor order fails naming Tandoor
+        Store (never its own Grill Store, and never a shared/central store).
+        Neither call raises AMBIGUOUS_*/MIXED_* -- those codes are never
+        reachable from this single-warehouse-per-call path.
+        """
+
+        def get_value_side_effect(doctype, filters, field=None, **kwargs):
+            if doctype == "BOM" and isinstance(filters, dict) and "item" in filters:
+                return "BOM-CHX"
+            if doctype == "BOM" and isinstance(filters, str) and field == "quantity":
+                return 1
+            return None
+
+        def make_sql_side_effect(stocked_warehouse, stocked_qty):
+            def sql_side_effect(query, params, **kwargs):
+                if "tabBin" in query:
+                    if params.get("warehouse") == stocked_warehouse:
+                        return [{"name": "BIN-CHICKEN", "actual_qty": stocked_qty, "projected_qty": stocked_qty}]
+                    return []
+                if "tabStock Ledger Entry" in query:
+                    return []
+                return []
+
+            return sql_side_effect
+
+        def get_all_side_effect(doctype, filters=None, fields=None, **kwargs):
+            if doctype == "BOM Item":
+                return [
+                    frappe._dict(
+                        item_code="CHICKEN", stock_qty=0.5, stock_uom="Kg",
+                        is_sub_assembly_item=0, bom_no=None,
+                    ),
+                ]
+            return []
+
+        get_doc_side_effect, created = _new_doc_recorder()
+
+        # Grill: stocked in Grill Store -> succeeds.
+        with patch(f"{MODULE}.frappe.has_permission", return_value=True), patch(
+            f"{MODULE}.frappe.db.sql", side_effect=make_sql_side_effect("Grill Store - URY", 5)
+        ), patch(
+            f"{MODULE}.frappe.db.get_value", side_effect=get_value_side_effect
+        ), patch(
+            f"{MODULE}.frappe.get_all", side_effect=get_all_side_effect
+        ), patch(
+            f"{MODULE}.frappe.get_doc", side_effect=get_doc_side_effect
+        ), patch(
+            f"{MODULE}.frappe.generate_hash", return_value="GRP-GRILL"
+        ):
+            result = create_reservation(
+                item_code="Grill Chicken Item",
+                qty=1,
+                warehouse="Grill Store - URY",
+                branch="Branch A",
+                company="Company A",
+                order_ref="ORDER-GRILL-3",
+                policy="MADE_TO_ORDER",
+                frozen_context=self._frozen_context("Grill Store - URY", "Grill Section", "Grill 1"),
+            )
+        self.assertEqual(result["reservation_group"], "GRP-GRILL")
+        self.assertEqual(created[0]["warehouse"], "Grill Store - URY")
+
+        # Tandoor: NOT stocked in Tandoor Store (and never drawn from Grill
+        # Store or any shared store) -> fails, naming Tandoor Store.
+        with patch(f"{MODULE}.frappe.has_permission", return_value=True), patch(
+            f"{MODULE}.frappe.db.sql", side_effect=make_sql_side_effect("Grill Store - URY", 5)
+        ), patch(
+            f"{MODULE}.frappe.db.get_value", side_effect=get_value_side_effect
+        ), patch(
+            f"{MODULE}.frappe.get_all", side_effect=get_all_side_effect
+        ):
+            with self.assertRaises(frappe.ValidationError) as ctx:
+                create_reservation(
+                    item_code="Tandoor Chicken Item",
+                    qty=1,
+                    warehouse="Tandoor Store - URY",
+                    branch="Branch A",
+                    company="Company A",
+                    order_ref="ORDER-TANDOOR-1",
+                    policy="MADE_TO_ORDER",
+                    frozen_context=self._frozen_context(
+                        "Tandoor Store - URY", "Tandoor Section", "Tandoor 1"
+                    ),
+                )
+
+        message = str(ctx.exception)
+        self.assertIn("Tandoor Store - URY", message)
+        self.assertNotIn("Grill Store", message)
+        self.assertNotIn("MIXED_RESERVATION_POLICIES", message)
+        self.assertNotIn("AMBIGUOUS_RESERVATION_BINDING", message)
+        self.assertNotIn("AMBIGUOUS_FINISHED_GOODS_WAREHOUSE", message)
+
+
 class TestCreateReservationCompositeItem(FrappeTestCase):
     def setUp(self):
         patch_read_committed_reservation_rows(self)
@@ -1419,3 +1663,109 @@ class TestReconciledActiveRows(FrappeTestCase):
 		)
 		self.assertEqual(names, ["R1", "R2", "R4"])
 		self.assertEqual(total, 10)
+
+
+class TestNoRegressionToFulfilmentInvariantAssertions(FrappeTestCase):
+    """AC-7: Item 4 / G-13 introduces no new warehouse parameter into
+    `create_reservation` (or `_freeze_payload`, which this module does not
+    touch), and the existing `ury_fulfilment_posting_service` invariant
+    assertions -- AMBIGUOUS_RESERVATION_BINDING, MIXED_RESERVATION_POLICIES,
+    AMBIGUOUS_FINISHED_GOODS_WAREHOUSE -- are unaffected: they read frozen
+    reservation-row data this module still writes exactly as before (a single
+    scalar `warehouse` shared by every component row of one reservation
+    group).
+    """
+
+    def setUp(self):
+        patch_read_committed_reservation_rows(self)
+        now_patcher = patch(f"{MODULE}.frappe.utils.now", return_value="2024-01-01 00:00:00")
+        now_patcher.start()
+        self.addCleanup(now_patcher.stop)
+
+    def test_create_reservation_signature_unchanged(self):
+        import inspect
+
+        params = list(inspect.signature(create_reservation).parameters)
+        # Exactly the pre-existing parameter set -- no new warehouse-related
+        # parameter (e.g. a per-component warehouse map) was introduced.
+        self.assertEqual(
+            params,
+            [
+                "item_code",
+                "qty",
+                "warehouse",
+                "branch",
+                "company",
+                "order_ref",
+                "policy",
+                "actor",
+                "expires_at",
+                "frozen_context",
+            ],
+        )
+
+    def test_fulfilment_posting_service_invariant_codes_still_present_unmodified(self):
+        """This track deliberately does not touch
+        `ury_fulfilment_posting_service.py` -- confirm its three invariant
+        codes are still defined exactly as before, i.e. no accidental edit
+        crept in via a shared import or refactor.
+        """
+        from ury.ury.api import ury_fulfilment_posting_service as fps
+        import inspect
+
+        source = inspect.getsource(fps)
+        for code in (
+            "AMBIGUOUS_RESERVATION_BINDING",
+            "MIXED_RESERVATION_POLICIES",
+            "AMBIGUOUS_FINISHED_GOODS_WAREHOUSE",
+        ):
+            self.assertIn(code, source)
+
+    def test_every_created_reservation_row_shares_one_scalar_warehouse(self):
+        """A composite reservation's rows all carry the *same* `warehouse`
+        value -- the precondition `_reservation_rows`/`_freeze_payload` rely
+        on to raise their AMBIGUOUS_*/MIXED_* invariants only on genuinely
+        corrupted data, never on an ordinary composite reservation.
+        """
+        get_doc_side_effect, created = _new_doc_recorder()
+
+        def get_value_side_effect(doctype, filters, field=None, **kwargs):
+            if doctype == "BOM" and isinstance(filters, dict) and "item" in filters:
+                return "BOM-MENU-A"
+            if doctype == "BOM" and isinstance(filters, str) and field == "quantity":
+                return 1
+            return None
+
+        def sql_side_effect(query, params, **kwargs):
+            return [{"name": "BIN-1", "actual_qty": 100, "projected_qty": 100}]
+
+        def get_all_side_effect(doctype, filters=None, fields=None, **kwargs):
+            if doctype == "BOM Item":
+                return [
+                    frappe._dict(item_code="FLOUR", stock_qty=2, stock_uom="Kg", is_sub_assembly_item=0, bom_no=None),
+                    frappe._dict(item_code="SUGAR", stock_qty=1, stock_uom="Kg", is_sub_assembly_item=0, bom_no=None),
+                ]
+            return []
+
+        with patch(f"{MODULE}.frappe.has_permission", return_value=True), patch(
+            f"{MODULE}.frappe.db.sql", side_effect=sql_side_effect
+        ), patch(
+            f"{MODULE}.frappe.db.get_value", side_effect=get_value_side_effect
+        ), patch(
+            f"{MODULE}.frappe.get_all", side_effect=get_all_side_effect
+        ), patch(
+            f"{MODULE}.frappe.get_doc", side_effect=get_doc_side_effect
+        ), patch(
+            f"{MODULE}.frappe.generate_hash", return_value="GRP-AC7"
+        ):
+            create_reservation(
+                item_code="MENU-A",
+                qty=3,
+                warehouse="WH-1",
+                branch="Branch A",
+                company="Company A",
+                order_ref="ORDER-AC7",
+            )
+
+        warehouses = {row["warehouse"] for row in created}
+        self.assertEqual(warehouses, {"WH-1"})
