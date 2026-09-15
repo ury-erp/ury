@@ -63,6 +63,7 @@ import frappe
 from frappe.utils import flt
 
 from ury.ury.api.ury_production_context import resolve_production_context
+from ury.ury.report_api.utils import require_manager
 
 MADE_TO_ORDER = "MADE_TO_ORDER"
 PRE_PRODUCED = "PRE_PRODUCED"
@@ -321,6 +322,8 @@ def get_shadow_comparison_report(branch, from_date, to_date):
 				},
 			}
 	"""
+	require_manager()
+
 	if not branch:
 		frappe.throw(frappe._("Branch is required"))
 	if not from_date or not to_date:

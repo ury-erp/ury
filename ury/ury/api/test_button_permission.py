@@ -146,3 +146,47 @@ class TestCancelCheckEdgeCases(FrappeTestCase):
         cancel_check()
         # Only the permission check should be called
         self.assertEqual(mock_has_permission.call_count, 1)
+
+
+class TestCancelCheckRealPermissionBoundary(FrappeTestCase):
+    """Real (non-mocked) coverage of cancel_check()'s has_permission() call.
+
+    Every test above patches frappe.permissions.has_permission itself, so the
+    actual POS Invoice 'cancel' permission-role lookup has never run for real
+    against a real session/role-permission table -- same class of gap as the
+    branch-operational-state and service-line findings in round 3. Unlike
+    those, cancel_check() itself never raises: has_permission(...,
+    raise_exception=False) means the function returns a plain bool either
+    way. So the 'negative-permission' assertion here is that a roleless user
+    really gets back False (not that an exception is raised), confirmed
+    against real role-permission evaluation rather than a mock.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        email = "p4r4-roleless-cancelcheck@ury.test"
+        if frappe.db.exists("User", email):
+            frappe.delete_doc("User", email, force=True, ignore_permissions=True)
+        cls.roleless_user = frappe.get_doc({
+            "doctype": "User",
+            "email": email,
+            "first_name": "P4R4Roleless",
+            "send_welcome_email": 0,
+            "enabled": 1,
+        }).insert(ignore_permissions=True)
+        # Frappe auto-adds the 'All' role to every new user; explicitly strip
+        # any doctype-level POS Invoice cancel permission by construction --
+        # 'All' carries no such permission by default, so this user is a real
+        # roleless negative case, not a mock stand-in for one.
+
+    def tearDown(self):
+        frappe.set_user("Administrator")
+
+    def test_roleless_user_denied_cancel_permission_for_real(self):
+        frappe.set_user(self.roleless_user.name)
+        self.assertFalse(cancel_check())
+
+    def test_administrator_has_cancel_permission_for_real(self):
+        frappe.set_user("Administrator")
+        self.assertTrue(cancel_check())
