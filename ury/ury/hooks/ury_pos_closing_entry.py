@@ -12,7 +12,7 @@ def validate(doc, method):
 
 def populate_pos_transactions(doc, method):
     """Rebuild `pos_transactions` server-side from unconsolidated POS
-    Invoices for this cashier/profile/period, exactly like
+    Invoices for this closing user/profile/period, exactly like
     ``SubPOSClosing.validate()`` does for the sub-cashier close.
 
     The custom POS frontend's ``createPosClosingEntry`` call (unlike native
@@ -30,16 +30,15 @@ def populate_pos_transactions(doc, method):
     is never overwritten.
 
     ERPNext core's own ``POSClosingEntry.validate_pos_invoices()`` (invoked
-    again on submit) separately requires ``pos_invoice.owner == self.user``
-    for every row in this table -- a check against the *creator* of the
-    invoice, not this app's custom ``cashier`` field, which can differ in
-    multi-cashier POS Profiles (see ``ury_order.py``'s ``main_cashier`` /
-    ``pos_opened_cashier`` assignment). Selecting purely by ``cashier`` here
-    would populate rows core then hard-rejects at submit, turning today's
-    silent no-consolidation bug into a worse shift-close failure. So rows
-    whose ``owner`` doesn't match ``doc.user`` are looked up but dropped
-    (not appended) rather than included -- same policy as skipping an
-    already-consolidated invoice.
+    again on submit) requires ``pos_invoice.owner == self.user`` for every
+    row in this table -- a check against the *creator* of the invoice, not
+    this app's custom ``cashier`` field, which can differ from the creator
+    in multi-cashier POS Profiles (see ``ury_order.py``'s ``main_cashier`` /
+    ``pos_opened_cashier`` assignment). This function populates exactly the
+    child table core's submit-time check validates against ``owner``, so it
+    selects candidates by ``owner`` up front -- the query itself guarantees
+    every row satisfies core's invariant, rather than selecting by
+    ``cashier`` and then dropping rows that fail it after the fact.
     """
     if doc.get("pos_transactions"):
         return
@@ -51,7 +50,7 @@ def populate_pos_transactions(doc, method):
         filters={
             "docstatus": 1,
             "pos_profile": doc.pos_profile,
-            "cashier": doc.user,
+            "owner": doc.user,
             "posting_date": ["between", [doc.period_start_date, doc.period_end_date]],
         },
         fields=["name", "owner", "posting_date", "posting_time", "customer", "grand_total", "net_total", "total_qty", "consolidated_invoice"],
@@ -62,21 +61,6 @@ def populate_pos_transactions(doc, method):
 
     for invoice in invoices:
         if invoice.consolidated_invoice:
-            continue
-        if invoice.owner != doc.user:
-            frappe.log_error(
-                title="POS Closing Entry: skipped invoice with owner != cashier",
-                message=(
-                    f"POS Invoice {invoice.name} matched cashier={doc.user} on "
-                    f"POS Closing Entry {doc.name or '(new)'} but has owner="
-                    f"{invoice.owner}. Core's validate_pos_invoices() requires "
-                    "owner == user, so this row was excluded from "
-                    "pos_transactions to avoid a hard submit failure. Likely a "
-                    "multi-cashier POS Profile -- verify this invoice gets "
-                    "consolidated by whichever closing entry the actual owner "
-                    "closes."
-                ),
-            )
             continue
         invoice_ts = get_datetime(f"{invoice.posting_date} {invoice.posting_time or '00:00:00'}")
         if not (period_start <= invoice_ts <= period_end):
