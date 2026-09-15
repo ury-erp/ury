@@ -1806,3 +1806,130 @@ class TestSplitBillReservations(FrappeTestCase):
             for call in mock_db_set_value.call_args_list
         )
         self.assertFalse(mixed_reassigned, "a KOT with staying items must not be reassigned wholesale")
+
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_all")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.db.set_value")
+    @patch("ury.ury.doctype.ury_order.ury_order.reconcile_order_reservations")
+    @patch("ury.ury.doctype.ury_order.ury_order._enforce_order_access")
+    @patch("ury.ury.doctype.ury_order.ury_order.getBranch")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.new_doc")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.get_doc")
+    @patch("ury.ury.doctype.ury_order.ury_order.frappe.has_permission")
+    def test_split_bill_fulfilment_lookup_no_cross_contamination(
+        self,
+        mock_has_permission,
+        mock_get_doc,
+        mock_new_doc,
+        mock_get_branch,
+        mock_enforce_access,
+        mock_reconcile,
+        mock_db_set_value,
+        mock_get_all,
+    ):
+        """G-14 regression (T9): once split_bill() has re-keyed reservations
+        and reassigned the *fully-moved* KOT's invoice link, simulate both
+        resulting invoices reaching consolidated-submit and confirm each
+        fulfilment lookup -- modelled the same way
+        ury_fulfilment_posting_service._kot_order_ref()/_reservation_rows()
+        actually resolve it (order_ref = KOT.invoice, filtered by
+        top_level_item) -- finds exactly its own item's reservation, with no
+        cross-contamination and no orphan.
+
+        This only covers the case the current fix actually handles: a KOT
+        entirely on one side of the split. The genuinely unfixed case (a
+        single KOT mixing moved and staying items) has no correct single
+        `URY KOT.invoice` value under the current one-link-per-document
+        schema and is covered separately by
+        test_split_bill_reassigns_kot_only_when_fully_moved, which asserts
+        it is deliberately left alone rather than guessed at.
+        """
+        from ury.ury.api.ury_fulfilment_posting_service import _kot_order_ref
+
+        source = self._build_source()
+        mock_get_doc.return_value = source
+        mock_has_permission.return_value = True
+        mock_get_branch.return_value = "Test Branch"
+
+        new_invoice = _FakeInvoice(name=None, invoice_printed=0, invoice_created=0)
+        mock_new_doc.return_value = new_invoice
+
+        # KOT-A is entirely item A (fully moved to the new invoice).
+        # KOT-B is entirely item B (stays on the source invoice).
+        kot_invoice = {"KOT-A": "POS-INV-SRC", "KOT-B": "POS-INV-SRC"}
+
+        def get_all_side_effect(doctype, filters=None, fields=None, pluck=None, **kwargs):
+            if doctype == "URY KOT":
+                return ["KOT-A", "KOT-B"]
+            if doctype == "URY KOT Items":
+                parent = filters.get("parent")
+                if parent == "KOT-A":
+                    return [SimpleNamespace(reservation_line_key="ITEM-ROW-A")]
+                if parent == "KOT-B":
+                    return [SimpleNamespace(reservation_line_key="ITEM-ROW-B")]
+            return []
+
+        mock_get_all.side_effect = get_all_side_effect
+
+        def db_set_value_side_effect(doctype, name, field, value, update_modified=None):
+            if doctype == "URY KOT" and field == "invoice":
+                kot_invoice[name] = value
+
+        mock_db_set_value.side_effect = db_set_value_side_effect
+
+        split_bill(
+            "POS-INV-SRC",
+            json.dumps([{"name": "ITEM-ROW-A", "qty": 2}]),
+        )
+
+        # KOT-A followed item A to the new invoice; KOT-B was untouched.
+        self.assertEqual(kot_invoice["KOT-A"], "POS-INV-NEW")
+        self.assertEqual(kot_invoice["KOT-B"], "POS-INV-SRC")
+
+        # Build the reservation "table" a real Reserved reservation lookup
+        # would see, from exactly what reconcile_order_reservations() was
+        # actually asked to accept on each side of the split.
+        source_call, new_call = mock_reconcile.call_args_list
+        reservations = {}
+        for call, item_code in ((source_call, "ITEM-B"), (new_call, "ITEM-A")):
+            order_ref = call.kwargs["order_ref"]
+            for accepted in call.kwargs["accepted_items"]:
+                reservations.setdefault((order_ref, accepted["item_code"]), 0)
+                reservations[(order_ref, accepted["item_code"])] += accepted["qty"]
+
+        def reservation_for_kot(kot_name, item_code):
+            order_ref = _kot_order_ref_fake(kot_invoice, kot_name)
+            return reservations.get((order_ref, item_code))
+
+        # A stand-in for the real _kot_order_ref(), which does
+        # frappe.db.get_value("URY KOT", kot, "invoice") -- here read from
+        # our simulated table instead of a real DB row.
+        def _kot_order_ref_fake(table, kot):
+            return table.get(kot) or kot
+
+        # KOT-A (moved) must resolve its item A reservation under the NEW
+        # invoice's order_ref, and must find nothing under the source's.
+        self.assertEqual(reservation_for_kot("KOT-A", "ITEM-A"), 2)
+        self.assertIsNone(reservations.get(("POS-INV-SRC", "ITEM-A")))
+
+        # KOT-B (stayed) must resolve its item B reservation under the
+        # SOURCE invoice's order_ref, and must find nothing under the new
+        # invoice's.
+        self.assertEqual(reservation_for_kot("KOT-B", "ITEM-B"), 1)
+        self.assertIsNone(reservations.get(("POS-INV-NEW", "ITEM-B")))
+
+        # No orphan/duplicate coverage: exactly two (order_ref, item) cells
+        # are populated, one per moved/staying item, each with its own qty.
+        self.assertEqual(
+            reservations,
+            {("POS-INV-SRC", "ITEM-B"): 1, ("POS-INV-NEW", "ITEM-A"): 2},
+        )
+
+        # Sanity: the real _kot_order_ref() has the exact same
+        # invoice-or-kot-name fallback our fake models (confirms the fake
+        # above isn't testing a strawman).
+        with patch(
+            "ury.ury.api.ury_fulfilment_posting_service.frappe.db.get_value",
+            side_effect=lambda doctype, name, field: kot_invoice.get(name),
+        ):
+            self.assertEqual(_kot_order_ref("KOT-A"), "POS-INV-NEW")
+            self.assertEqual(_kot_order_ref("KOT-B"), "POS-INV-SRC")
