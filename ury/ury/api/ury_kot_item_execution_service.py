@@ -92,7 +92,7 @@ def _execution_filter(kot_item):
 def _lock_item_execution_row(kot_item):
 	rows = frappe.db.sql(
 		f"""
-		SELECT name, state, idempotency_key, started_by, started_at,
+		SELECT name, state, idempotency_key, revision_key, started_by, started_at,
 		       ready_by, ready_at, served_by, served_at, kot, kot_item,
 		       branch, company, production_unit, audit_log
 		FROM `tab{ITEM_EXECUTION_DOCTYPE}`
@@ -112,7 +112,7 @@ def _find_prior_result(kot_item, target_state, idempotency_key):
 		ITEM_EXECUTION_DOCTYPE,
 		filters={"kot_item": kot_item, "state": target_state, "idempotency_key": idempotency_key},
 		fields=[
-			"name", "state", "idempotency_key", "started_by", "started_at",
+			"name", "state", "idempotency_key", "revision_key", "started_by", "started_at",
 			"ready_by", "ready_at", "served_by", "served_at", "kot", "kot_item",
 			"branch", "company",
 		],
@@ -131,6 +131,7 @@ def _result_dict(row, idempotent=False):
 		"company": row.get("company"),
 		"state": row.get("state"),
 		"idempotency_key": row.get("idempotency_key"),
+		"revision_key": row.get("revision_key"),
 		"started_by": row.get("started_by"),
 		"started_at": row.get("started_at"),
 		"ready_by": row.get("ready_by"),
@@ -139,6 +140,59 @@ def _result_dict(row, idempotent=False):
 		"served_at": row.get("served_at"),
 		"idempotent_replay": idempotent,
 	}
+
+
+def _new_revision_key():
+	"""Mint a fresh line-revision identity.
+
+	See `bump_item_execution_revision` for what "revision" means here and
+	why it must not be `idempotency_key`.
+	"""
+	return frappe.generate_hash(length=32)
+
+
+def bump_item_execution_revision(kot_item, actor=None, reason=None):
+	"""Advance a KOT item's `revision_key` because the LINE ITSELF changed.
+
+	Call this -- and only this -- from code paths that represent a genuine
+	edit or re-fire of an order line: a quantity change after the kitchen
+	already produced it, or a re-fire after a failed production run. It is
+	the single writer of `revision_key`.
+
+	Why a separate field at all: `idempotency_key` is a per-RPC replay
+	token. The Mosaic client mints a fresh UUID for *each* call
+	(`mark_item_ready`, then `serve_item_execution`), and `_transition`
+	rewrites the row's copy on every state change so `_find_prior_result`
+	can dedupe replays of that specific call. It therefore answers "which
+	RPC was this?", never "which version of the line is this?". The G-07
+	stale-posting gate needs the latter: it compares the revision frozen
+	onto the READY-time posting intent against the row's current revision.
+	Pointing that gate at `idempotency_key` made it compare the READY call's
+	UUID against the SERVED call's UUID, which can never match -- a false
+	"stale production posting" block on every normally served made-to-order
+	item.
+
+	The real protection G-07 exists for is preserved: the quantity half of
+	the gate independently catches "order edited upward after READY", and a
+	genuine re-fire routed through this function still trips the revision
+	half.
+	"""
+	_require_item_execution_doctype()
+	_require_kot_item(kot_item)
+	actor = actor or frappe.session.user
+	locked = _lock_item_execution_row(kot_item)
+	if not locked:
+		raise ItemExecutionError(
+			KOT_ITEM_NOT_FOUND,
+			_("No execution row exists for KOT item {0}").format(kot_item),
+		)
+	_require_execution_actor(actor, locked["branch"], locked["company"])
+	doc = frappe.get_doc(ITEM_EXECUTION_DOCTYPE, locked["name"])
+	doc.audit_log = locked["audit_log"]
+	doc.revision_key = _new_revision_key()
+	_audit(doc, actor, reason or "revise")
+	doc.save(ignore_permissions=True)
+	return _result_dict(doc.as_dict(), idempotent=False)
 
 
 def _attach_ready_posting_intent(result, actor):
@@ -299,6 +353,10 @@ def seed_kot_item_executions(kot, actor=None):
 			"company": company,
 			"production_unit": production_unit,
 			"idempotency_key": kot_item,
+			# First revision of this line. Distinct from `idempotency_key`
+			# (a per-RPC replay token) and advanced only by
+			# `bump_item_execution_revision`, never by a state transition.
+			"revision_key": _new_revision_key(),
 		})
 		_audit(doc, actor, "seed")
 		try:
@@ -378,6 +436,13 @@ def _transition(kot_item, target_state, idempotency_key, actor_field, timestamp_
 	# concurrently committed entry.
 	doc.audit_log = locked["audit_log"]
 	doc.state = target_state
+	# Per-RPC replay token only: this is what `_find_prior_result` matches on,
+	# so it must track the call that is being applied right now. It is
+	# deliberately NOT the line's revision -- `revision_key` is that, and
+	# nothing in this generic transition path may touch it (only
+	# `bump_item_execution_revision` may). Writing a revision here is what
+	# made every normal READY -> SERVED progression look "stale" to the G-07
+	# gate at POS Invoice submit.
 	doc.idempotency_key = idempotency_key
 	doc.set(actor_field, actor)
 	doc.set(timestamp_field, frappe.utils.now())

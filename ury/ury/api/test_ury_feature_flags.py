@@ -144,7 +144,14 @@ class TestFulfilmentVerificationGate(FrappeTestCase):
     """G-07: a POSTED intent for the right kot_item is not on its own proof
     that what was posted is what is being invoiced."""
 
-    def _run(self, intent, execution_state="READY", idempotency_key="rev-2", invoiced_qty=3):
+    def _run(
+        self,
+        intent,
+        execution_state="READY",
+        idempotency_key="rev-2",
+        revision_key="rev-2",
+        invoiced_qty=3,
+    ):
         from ury.ury.api.ury_feature_flags import _verify_fulfilment_posted_for_invoice
 
         def get_all(doctype, **kwargs):
@@ -158,6 +165,7 @@ class TestFulfilmentVerificationGate(FrappeTestCase):
                             "kot_item": "KOTITEM-1",
                             "state": execution_state,
                             "idempotency_key": idempotency_key,
+                            "revision_key": revision_key,
                             "branch": "Main Branch",
                             "company": "Acme Co",
                         }
@@ -195,9 +203,54 @@ class TestFulfilmentVerificationGate(FrappeTestCase):
 
     def test_stale_revision_blocks_submit(self):
         """A re-fired item whose new READY transition never created an intent
-        would otherwise pass on the previous fire's POSTED intent."""
+        would otherwise pass on the previous fire's POSTED intent.
+
+        `bump_item_execution_revision` moved the line from rev-1 to rev-2, so
+        the intent frozen against rev-1 no longer describes what is being
+        invoiced.
+        """
         with self.assertRaises(frappe.ValidationError):
-            self._run(self._posted(accepted_revision="rev-1"))
+            self._run(self._posted(accepted_revision="rev-1"), revision_key="rev-2")
+
+    def test_served_unedited_item_is_not_reported_stale(self):
+        """Regression for the false "stale production posting" block.
+
+        `idempotency_key` is a per-RPC replay token: Mosaic mints a fresh
+        UUID for `mark_item_ready` and another for `serve_item_execution`,
+        and `_transition` writes whichever call is running onto the row. The
+        intent is frozen at READY. So for EVERY normally served
+        made-to-order item, the row's `idempotency_key` at invoice-submit
+        time is the SERVE call's key while the intent holds the READY call's
+        key -- a guaranteed mismatch, with no user edit anywhere.
+
+        This case is exactly that: nothing about the line changed, only its
+        state advanced READY -> SERVED. Before the fix (gate reading
+        `idempotency_key`) this raised and the bill could not be settled;
+        with the gate reading `revision_key`, which a state transition never
+        touches, it must pass.
+        """
+        self._run(
+            self._posted(accepted_revision="rev-2"),
+            execution_state="SERVED",
+            idempotency_key="serve-call-uuid",
+            revision_key="rev-2",
+        )
+
+    def test_missing_revision_key_skips_revision_check_only(self):
+        """A row seeded before `revision_key` existed and not yet backfilled
+        carries no revision claim, so there is nothing for the revision half
+        to compare. It is skipped rather than guessed at -- such a row cannot
+        have been re-fired, because re-firing is what writes the field. The
+        quantity half still runs, which is the check that independently
+        catches an order edited upward after READY."""
+        self._run(self._posted(accepted_revision="anything"), revision_key=None)
+
+        with self.assertRaises(frappe.ValidationError):
+            self._run(
+                self._posted(accepted_revision="anything", accepted_qty=1),
+                revision_key=None,
+                invoiced_qty=3,
+            )
 
     def test_quantity_increased_after_ready_blocks_submit(self):
         """Order edited 1 -> 3 after READY: one was produced, three are sold."""
@@ -237,6 +290,7 @@ class TestFulfilmentVerificationGate(FrappeTestCase):
                             "kot_item": "KOTITEM-1",
                             "state": "READY",
                             "idempotency_key": "rev-2",
+                            "revision_key": "rev-2",
                             "branch": "Main Branch",
                             "company": "Acme Co",
                         }
