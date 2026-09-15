@@ -293,7 +293,9 @@ class TestURYOrder(FrappeTestCase):
         mock_has_permission.return_value = True
         mock_get_branch.return_value = "Test Branch"
 
-        def get_value_side_effect(doctype, filters=None, fieldname=None):
+        def get_value_side_effect(doctype, filters=None, fieldname=None, **kwargs):
+            if doctype == "URY Table" and fieldname == ["restaurant", "branch", "restaurant_room"]:
+                return ("Test Restaurant", "Test Branch", "Main Hall")
             if doctype == "URY Table" and fieldname == ["branch", "restaurant_room"]:
                 return ("Test Branch", "Main Hall")
             if doctype == "URY Menu":
@@ -392,7 +394,9 @@ class TestURYOrder(FrappeTestCase):
         mock_has_permission.return_value = True
         mock_get_branch.return_value = "Test Branch"
 
-        def get_value_side_effect(doctype, filters=None, fieldname=None):
+        def get_value_side_effect(doctype, filters=None, fieldname=None, **kwargs):
+            if doctype == "URY Table" and fieldname == ["restaurant", "branch", "restaurant_room"]:
+                return ("Test Restaurant", "Test Branch", "Main Hall")
             if doctype == "URY Table" and fieldname == ["branch", "restaurant_room"]:
                 return ("Test Branch", "Main Hall")
             if doctype == "URY Menu":
@@ -469,7 +473,9 @@ class TestURYOrder(FrappeTestCase):
         mock_has_permission.return_value = True
         mock_get_branch.return_value = "Untouched Branch"
 
-        def get_value_side_effect(doctype, filters=None, fieldname=None):
+        def get_value_side_effect(doctype, filters=None, fieldname=None, **kwargs):
+            if doctype == "URY Table" and fieldname == ["restaurant", "branch", "restaurant_room"]:
+                return ("Test Restaurant", "Untouched Branch", "Main Hall")
             if doctype == "URY Table" and fieldname == ["branch", "restaurant_room"]:
                 return ("Untouched Branch", "Main Hall")
             if doctype == "URY Menu":
@@ -562,6 +568,8 @@ class TestURYOrder(FrappeTestCase):
             # own logic ever runs, masking what this test is actually meant
             # to prove (see the same drift noted for other tests in this
             # file, sa-post-373-review-fixes verification).
+            if doctype == "URY Table" and fieldname == ["restaurant", "branch", "restaurant_room"]:
+                return ("Test Restaurant", "Test Branch", "Main Hall")
             if doctype == "URY Table" and fieldname == ["branch", "restaurant_room"]:
                 return ("Test Branch", "Main Hall")
             if doctype == "URY Menu":
@@ -786,7 +794,7 @@ class TestPriceItemsForInvoicePhase1(unittest.TestCase):
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.db.get_list")
     @patch("ury.ury.doctype.ury_order.ury_order.frappe.db.get_value")
     def test_price_items_for_invoice_shape(self, mock_get_value, mock_get_list):
-        def get_value_side_effect(doctype, filters, fieldname=None):
+        def get_value_side_effect(doctype, filters, fieldname=None, **kwargs):
             if doctype == "URY Menu Item":
                 return "Starters"
             if doctype == "POS Profile":
@@ -2093,7 +2101,7 @@ class TestSplitBillReservations(FrappeTestCase):
 
         mock_get_all.side_effect = get_all_side_effect
 
-        def db_set_value_side_effect(doctype, name, field, value, update_modified=None):
+        def db_set_value_side_effect(doctype, name, field, value=None, update_modified=None):
             if doctype == "URY KOT" and field == "invoice":
                 kot_invoice[name] = value
 
