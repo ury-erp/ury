@@ -193,7 +193,7 @@ def _verify_fulfilment_posted_for_invoice(doc, strict=False):
 		rows = frappe.get_all(
 			ITEM_EXECUTION_DOCTYPE,
 			filters={"kot": kot.name},
-			fields=["name", "kot_item", "state", "idempotency_key", "branch", "company"],
+			fields=["name", "kot_item", "state", "idempotency_key", "revision_key", "branch", "company"],
 		)
 		for row in rows:
 			if row.get("state") not in PRODUCED_STATES:
@@ -274,11 +274,28 @@ def _verify_item_execution_intent(row, kot_name, doc, process_posting_intent, st
 	#     intent passes on the previous fire's intent.
 	#
 	# Both are silent stock loss, and both are invisible to a kot_item-only
-	# match. Pin the intent to the execution row's CURRENT idempotency key and
+	# match. Pin the intent to the execution row's CURRENT line revision and
 	# to the quantity actually being invoiced; a mismatch means the posting
 	# describes a different revision of this line, so fail rather than accept.
-	current_revision = row.get("idempotency_key") or "current"
-	if intent.get("accepted_revision") != current_revision:
+	#
+	# This compares `revision_key`, NOT `idempotency_key`. `idempotency_key`
+	# is a per-RPC replay token -- the client mints a fresh UUID per call and
+	# `_transition` rewrites the row's copy on every state change -- so
+	# comparing it against a value frozen at READY time guaranteed a mismatch
+	# for every item that was subsequently SERVED, falsely blocking payment on
+	# ordinary made-to-order sales. `revision_key` changes only when the line
+	# itself is edited or re-fired
+	# (`ury_kot_item_execution_service.bump_item_execution_revision`), which is
+	# the property this check always meant to assert.
+	#
+	# A row with no `revision_key` predates the field and has not yet been
+	# backfilled (patch `v3_21.backfill_kot_item_execution_revision_key`). Such
+	# a row cannot have been re-fired -- re-firing is what writes the field --
+	# so there is no revision claim to test and this half is skipped. It is not
+	# a fail-open: the quantity check below still runs, and it is the half that
+	# independently catches "order edited upward after READY".
+	current_revision = row.get("revision_key")
+	if current_revision and intent.get("accepted_revision") != current_revision:
 		frappe.throw(
 			_(
 				"Production posting for item {0} on KOT {1} is stale: it was posted "
