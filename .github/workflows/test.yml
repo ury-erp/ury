@@ -45,36 +45,44 @@ jobs:
       # took for its original 17 modules, while now gating the entire
       # suite instead of a hand-picked subset.
       #
-      # 5 of the 100 real (non-empty-stub) test files are deliberately
-      # excluded from the 93 modules below, not silently -- each is a
+      # 4 of the 100 real (non-empty-stub) test files are deliberately
+      # excluded from the 94 modules below, not silently -- each is a
       # confirmed, real, pre-existing failure clustered in the yield-
-      # tracking feature area -- test_ury_yield_variance,
-      # test_yield_check_reminders, test_ury_item_production_configuration,
-      # test_demo_runner (four of the five). See EXECUTION_LOG.md
-      # (sa-comprehensive-test-strategy track, "Session 2" / CI-sharding
-      # section) for full tracebacks. These are real bugs to fix, not
-      # sharding artifacts -- tracked as a Phase 2 follow-up, not swept
-      # under this change.
+      # tracking feature area -- test_yield_check_reminders,
+      # test_ury_item_production_configuration, test_demo_runner. See
+      # EXECUTION_LOG.md (sa-comprehensive-test-strategy track, "Session
+      # 2" / CI-sharding section) for full tracebacks. These are real
+      # bugs to fix, not sharding artifacts -- tracked as a Phase 2
+      # follow-up, not swept under this change.
       #
-      # test_ury_yield_check and test_ury_reservation_service (also
-      # originally in that cluster) are fixed and included below.
-      # test_ury_yield_check's 9 failures were: (a) mocking
-      # frappe.db.get_value patches it globally, so constructing a real
-      # URYYieldCheck(Document) while it's mocked can crash frappe's own
-      # internal DocType-meta loading, which also calls the same mocked
-      # function -- fixed by warming the meta cache once at import time;
-      # (b) frappe.throw mocks with no side_effect, same class of bug as
-      # test_ury_bom below; (c) one test asserting pre-hardening behavior
-      # (defaulting to 0.0 instead of throwing) that PR #375 deliberately
-      # changed; (d) one mock_get_value.side_effect list missing an entry,
-      # shifting every later value out of sync. 36/36 passing locally,
-      # verified in real CI too. test_ury_reservation_service's 2 failures
-      # were 2 tests trying to drive component resolution via a "BOM Item"
+      # test_ury_yield_check, test_ury_reservation_service, and
+      # test_ury_yield_variance (also originally in that cluster) are
+      # fixed and included below. test_ury_yield_check's 9 failures were:
+      # (a) mocking frappe.db.get_value patches it globally, so
+      # constructing a real URYYieldCheck(Document) while it's mocked can
+      # crash frappe's own internal DocType-meta loading, which also
+      # calls the same mocked function -- fixed by warming the meta cache
+      # once at import time; (b) frappe.throw mocks with no side_effect,
+      # same class of bug as test_ury_bom below; (c) one test asserting
+      # pre-hardening behavior (defaulting to 0.0 instead of throwing)
+      # that PR #375 deliberately changed; (d) one
+      # mock_get_value.side_effect list missing an entry, shifting every
+      # later value out of sync. 36/36 passing locally, verified in real
+      # CI too. test_ury_reservation_service's 2 failures were 2 tests
+      # trying to drive component resolution via a "BOM Item"
       # frappe.get_all query the code no longer makes at all (it moved to
       # a separate compile_bom_vector() module in an earlier refactor) --
       # fixed by using the same policy="MADE_TO_ORDER" +
       # patch(compile_bom_vector) pattern 3 other tests in the same file
-      # already established. 32/32 passing locally.
+      # already established. 32/32 passing locally, verified in real CI
+      # too. test_ury_yield_variance's 6 failures were the I7 hardening
+      # change (require_manager() -> frappe.has_permission() +
+      # user_has_branch_access() for record_yield_check specifically,
+      # per that function's own comment) not reflected in 4 tests, plus 2
+      # unrelated test-mock gaps (a missing frappe.get_doc mock letting a
+      # real document insert run against nonexistent records; a
+      # frappe.db.exists() assertion missing a filter key the real query
+      # added). 30/30 passing locally.
       #
       # test_ury_bom and test_ury_order both have their underlying source
       # bugs fixed and verified passing against fresh local sites (13/13
@@ -168,6 +176,7 @@ jobs:
               ury.ury.api.test_ury_stock_service
               ury.ury.api.test_ury_waiter_print
               ury.ury.api.test_ury_wastage
+              ury.ury.api.test_ury_yield_variance
               ury.ury.api.test_ury_workstation_mapping
               ury.ury.controllers.test_setup_redirect
               ury.ury.doctype.menu_for_room.test_menu_for_room
