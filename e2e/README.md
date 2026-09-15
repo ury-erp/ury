@@ -35,27 +35,59 @@ or one `--project` at a time):
 3 passed, 3 skipped (golden-path specs, see below)
 ```
 
-## Golden-path specs: still (honestly) skipped
+## Golden-path specs: round 2 update (2026-09-15) -- root cause found and fixed
 
-Attempted to un-skip the POS captain golden path against the live,
-seeded `sa-testcov-verify` bench (12 `URY Table` / 4 `URY Room` rows
-already present):
+Round 1 (above) reported the golden-path spec blocked on a "data-seeding
+gap: no user is both role-authorized and POS-Profile-assigned." Round 2
+re-investigated that with a real Playwright network-response listener
+(rather than curl guesses at API endpoint names) and found the actual
+root cause was different from round 1's theory:
 
-- Logging in as `Administrator` and hitting `/pos/order` does **not**
-  reach the `CaptainTables` "Tables" screen the spec's TODO describes --
-  it reaches an "Open POS Session" screen instead (`AuthGuard` passes,
-  but the app's POS-session flow gates further), and fails with "No POS
-  Profile is available for your user in this branch" (Administrator
-  isn't assigned to the seeded `Demo Branch` POS Profile).
-- The one seeded `POS Profile User" (`test@erpnext.com`) hits a harder
-  wall: `/pos/order` renders "Access Denied" for that user entirely --
-  it lacks whatever role `CaptainRouteGuard` requires.
+- `test@erpnext.com` (the seeded `POS Profile User` for `Demo Branch`)
+  already had the `URY Captain` role **and** was already a `POS Profile
+  User` -- both things round 1 assumed were missing.
+- Logging in as that user and hitting `/pos/order` still rendered
+  "Access Denied." Capturing the failing XHR showed why:
+  `ury.ury_pos.api.getPosProfile` throws `ValidationError: User is not
+  Associated with any Branch.Please refresh Page`.
+- Root cause, traced into `ury/ury_pos/api.py`'s `getBranch()`: it joins
+  `` `tabURY User` `` (a child table declared **on the `Branch`
+  doctype**, distinct from Frappe's `User`/role system) against
+  `frappe.session.user`. Only `Administrator` had a `URY User` row on
+  `Demo Branch` -- `test@erpnext.com` had none, despite having the right
+  role and POS Profile membership.
+- Fix (real, applied against the live `sa-testcov-verify` bench via
+  `bench --site sa-testcov-verify.local console`):
+  ```python
+  branch = frappe.get_doc('Branch', 'Demo Branch')
+  branch.append('user', {'user': 'test@erpnext.com'})
+  branch.save(ignore_permissions=True)
+  frappe.db.commit()
+  ```
+- After that single fix, `getPosProfile`/`getModeOfPayment` both return
+  200, and the golden-path spec (`tests/pos.spec.ts`, no longer skipped)
+  passes for real: log in via the actual `/login` form, land on
+  `CaptainTables`'s "Tables" heading, tap a real "Free" table tile
+  (`button[type="button"]` with a `Free` status badge -- confirmed from
+  the live rendered DOM), and land on `/pos/order/table/:table`.
 
-Making the golden path real needs a properly role-and-POS-Profile-seeded
-captain user, not just any bench with rooms/tables -- that's a data-seeding
-fix beyond this pass's budget, so the `test.skip` stays, with this
-concrete finding recorded here (and in `tests/pos.spec.ts`'s TODO) instead
-of silently re-skipping without evidence.
+```
+$ URY_BASE_URL=http://sa-testcov-verify.local:8114 npx playwright test --project=pos --workers=1
+✓  [pos] loads and renders a recognizable app shell (1.1s)
+✓  [pos] captain golden path: login -> tables list -> open a table (4.5s)
+-  [pos] captain golden path: add items -> KOT -> serve -> POS close (skipped)
+2 passed, 1 skipped
+```
+
+**Still (honestly) skipped**: the deeper "add items -> KOT -> serve ->
+POS close" leg. Reaching `CaptainOrder` (the per-table screen) is real
+and passing; driving `CaptainMenu` to add priced items, sending a KOT via
+`syncOrder`/`reprintKot` (`pos/src/lib/order-api.ts`), and then completing
+payment/POS Closing Entry on the cashier side of the app were not
+attempted in this pass -- that's real additional UI-automation work
+(menu item selection, quantity/comment dialogs, payment modal, POS
+Closing Entry form), not a data gap, and is left as an explicit TODO in
+`tests/pos.spec.ts` rather than faked.
 
 ## QUnit: real client-script logic exists, still correctly out of scope
 
@@ -74,7 +106,11 @@ doctypes remains untested by anything, QUnit or Playwright.
 
 - `playwright.config.ts` -- one shared `baseURL` (env-overridable), 4
   project entries (one per app, `frontend` unused for now).
-- `tests/pos.spec.ts` / `tests/self-order.spec.ts` / `tests/mosaic.spec.ts`
-  -- one real, passing "app shell mounts" assertion per app, plus a
-  `test.skip`'d golden-path test with a TODO describing exactly what's
-  missing to make it real (see above).
+- `tests/pos.spec.ts` -- app-shell assertion, a now-real (not skipped)
+  login -> Tables -> open-a-table golden-path assertion, and one
+  remaining `test.skip`'d leg (add items -> KOT -> serve -> POS close)
+  with a TODO.
+- `tests/self-order.spec.ts` / `tests/mosaic.spec.ts` -- one real,
+  passing "app shell mounts" assertion per app, plus a `test.skip`'d
+  golden-path test with a TODO describing exactly what's missing to make
+  it real (not attempted in round 2 -- scope was the POS captain flow).
