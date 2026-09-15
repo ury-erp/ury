@@ -13,6 +13,7 @@ from ury.ury.api.ury_kot_item_execution_service import (
 	READY,
 	SERVED,
 	_attach_ready_posting_intent,
+	bump_item_execution_revision,
 	get_kot_execution_state,
 	mark_item_ready,
 	seed_kot_item_executions,
@@ -212,6 +213,95 @@ class TestKotItemExecution(FrappeTestCase):
 		mock_ready_posting.assert_called_once()
 		self.assertEqual(harness.docs[KOT_EXECUTION_DOCTYPE]["KOTEXEC-1"]["state"], READY)
 		self.assertEqual(json.loads(harness.created[0]["audit_log"])[0]["event"], "seed")
+
+	def _drive_lifecycle(self, harness, calls):
+		"""Seed one KOT and run `calls` (fn, idempotency_key) against item 1."""
+		with patch(f"{MODULE}.frappe.db.exists", side_effect=harness.exists), patch(
+			f"{MODULE}.frappe.get_doc", side_effect=harness.get_doc
+		), patch(f"{MODULE}.frappe.get_all", side_effect=harness.get_all), patch(
+			f"{MODULE}.frappe.db.sql", side_effect=harness.sql
+		), patch(
+			f"{MODULE}.frappe.db.get_value",
+			return_value=frappe._dict({"branch": "BR-1", "production": "PU-1"}),
+		), patch(
+			f"{MODULE}._attach_ready_posting_intent", side_effect=lambda result, actor: result
+		), patch(f"{MODULE}.frappe.get_roles", return_value=["Chef"]), patch(
+			"ury.ury.api.ury_kot_execution_service._require_kot_branch_scope"
+		), patch(f"{MODULE}.frappe.session") as session:
+			session.user = "chef@example.com"
+			seed_kot_item_executions("URY KOT-1")
+			for fn, key in calls:
+				fn("KOTITEM-1", idempotency_key=key) if key else fn("KOTITEM-1")
+
+	def _row(self, harness):
+		return next(
+			doc
+			for doc in harness.docs[ITEM_EXECUTION_DOCTYPE].values()
+			if doc["kot_item"] == "KOTITEM-1"
+		)
+
+	def test_revision_key_is_stamped_at_seed_and_differs_from_idempotency_key(self):
+		harness = _ExecutionHarness()
+		self._drive_lifecycle(harness, [])
+		row = self._row(harness)
+		self.assertTrue(row.get("revision_key"))
+		# The two fields answer different questions and must not be aliases:
+		# `idempotency_key` is seeded to the kot_item name as a replay token,
+		# `revision_key` is a minted line-revision identity.
+		self.assertNotEqual(row["revision_key"], row["idempotency_key"])
+
+	def test_state_transitions_never_advance_revision_key(self):
+		"""The bug: `_transition` rewrites `idempotency_key` on EVERY state
+		change, including READY -> SERVED, and the G-07 gate was reading that
+		field as the line's revision. The client sends a different key per
+		RPC, so the row's key after a serve can never equal the value frozen
+		onto the READY-time posting intent -- every normally served item
+		looked "stale" at POS Invoice submit.
+
+		`revision_key` must be inert across the whole normal lifecycle.
+		"""
+		harness = _ExecutionHarness()
+		self._drive_lifecycle(
+			harness,
+			[
+				(start_item_execution, "start-uuid"),
+				(mark_item_ready, "ready-uuid"),
+				(serve_item_execution, "serve-uuid"),
+			],
+		)
+		row = self._row(harness)
+		self.assertEqual(row["state"], SERVED)
+		# The replay token tracked the last RPC, as it always has.
+		self.assertEqual(row["idempotency_key"], "serve-uuid")
+		# The revision did not move: nothing about the LINE changed.
+		self.assertEqual(row["revision_key"], harness.created[0]["revision_key"])
+
+	def test_bump_advances_revision_key_for_a_genuine_re_fire(self):
+		"""The only writer of `revision_key`: a real edit / re-fire of the
+		line. This is what keeps G-07's revision half meaningful after the
+		fix -- a posting frozen against the previous revision is still
+		correctly detected as stale."""
+		harness = _ExecutionHarness()
+		self._drive_lifecycle(
+			harness,
+			[(start_item_execution, "start-uuid"), (mark_item_ready, "ready-uuid")],
+		)
+		before = self._row(harness)["revision_key"]
+		with patch(f"{MODULE}.frappe.db.exists", side_effect=harness.exists), patch(
+			f"{MODULE}.frappe.get_doc", side_effect=harness.get_doc
+		), patch(f"{MODULE}.frappe.get_all", side_effect=harness.get_all), patch(
+			f"{MODULE}.frappe.db.sql", side_effect=harness.sql
+		), patch(f"{MODULE}.frappe.get_roles", return_value=["Chef"]), patch(
+			"ury.ury.api.ury_kot_execution_service._require_kot_branch_scope"
+		), patch(f"{MODULE}.frappe.session") as session:
+			session.user = "chef@example.com"
+			result = bump_item_execution_revision("KOTITEM-1", reason="re_fire")
+		row = self._row(harness)
+		self.assertNotEqual(row["revision_key"], before)
+		self.assertEqual(result["revision_key"], row["revision_key"])
+		# A re-fire is not a state change; the replay token is untouched.
+		self.assertEqual(row["idempotency_key"], "ready-uuid")
+		self.assertEqual(json.loads(row["audit_log"])[-1]["event"], "re_fire")
 
 	def test_seed_on_submit_uses_kot_name_not_document(self):
 		"""Regression: the URY KOT on_submit hook was calling

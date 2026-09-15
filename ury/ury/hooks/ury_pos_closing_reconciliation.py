@@ -209,7 +209,7 @@ def _verify_invoice_production(invoice_name):
 	function is the G-07 fix: it already walks KOTs -> execution rows, skips
 	unproduced and non-MADE_TO_ORDER lines, performs one synchronous retry of
 	a pending intent, and pins the intent to the execution row's current
-	`idempotency_key` AND the invoiced quantity. Every one of those rules is
+	`revision_key` AND the invoiced quantity. Every one of those rules is
 	subtle and safety-critical; two copies would drift, and a "shared helper"
 	extraction would mean editing that module's already-merged, live-verified
 	code to gain nothing this call does not already give us.

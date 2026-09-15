@@ -326,7 +326,25 @@ def _freeze_payload(execution_doc, actor):
 			"UNEXPECTED_FINISHED_GOODS_RESERVATION",
 			_("{0} fulfilment for KOT item {1} must resolve to one stock row").format(policy, execution_doc.kot_item),
 		)
-	accepted_revision = execution_doc.get("idempotency_key") or "current"
+	# Which VERSION OF THE LINE this posting is accepted against.
+	#
+	# This used to read `idempotency_key`, but that field is a per-RPC replay
+	# token: the client mints a fresh UUID for every call and `_transition`
+	# rewrites the row's copy on every state change. Freezing it here meant
+	# the intent carried the READY call's UUID while the row went on to carry
+	# the SERVED call's UUID, so the G-07 gate in `ury_feature_flags` found a
+	# mismatch on every normally served item and falsely blocked the invoice.
+	# `revision_key` is stamped once at seed time and advanced only by
+	# `ury_kot_item_execution_service.bump_item_execution_revision` (a genuine
+	# edit / re-fire of the line), which is exactly the identity this needs.
+	#
+	# The `idempotency_key` fallback covers rows seeded before `revision_key`
+	# existed and not yet touched by the v3_21 backfill patch; the gate skips
+	# the revision comparison for such rows rather than acting on a value it
+	# knows is not a revision.
+	accepted_revision = (
+		execution_doc.get("revision_key") or execution_doc.get("idempotency_key") or "current"
+	)
 	fulfilment_sequence = _next_fulfilment_sequence(
 		execution_doc.branch,
 		execution_doc.kot,
