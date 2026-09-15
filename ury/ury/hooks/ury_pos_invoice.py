@@ -1,6 +1,6 @@
 import frappe
 from datetime import datetime
-from frappe.utils import now_datetime, get_time, now, flt, getdate, get_first_day, get_last_day
+from frappe.utils import now_datetime, get_time, now, flt, getdate, get_first_day, get_last_day, get_datetime
 from ury.ury.doctype.ury_order.ury_order import release_merge_cluster_tables
 from ury.ury.doctype.staff_discount_policy.staff_discount_policy import get_applicable_policy
 
@@ -391,11 +391,12 @@ def calculate_and_set_times(doc, method):
     doc.arrived_time = doc.creation
 
     current_time_str = now()
-    
+
     current_time = datetime.strptime(current_time_str, "%Y-%m-%d %H:%M:%S.%f")
-    
-    time_difference = current_time - doc.creation
-    
+
+    creation_time = get_datetime(doc.creation)
+    time_difference = current_time - creation_time
+
     total_seconds = int(time_difference.total_seconds())
     hours, remainder = divmod(total_seconds, 3600)
     minutes, seconds = divmod(remainder, 60)
