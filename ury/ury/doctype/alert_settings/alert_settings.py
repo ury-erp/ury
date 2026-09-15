@@ -29,13 +29,11 @@ def get_alert_rule(alert_type, branch=None):
 	if not settings.custom_alerts:
 		return None
 
-	# First priority: exact match on alert_type and branch. If a branch-specific
-	# row exists, its `enabled` value is authoritative — do not fall through to
-	# the global default even if this row is disabled.
+	# First priority: exact match on alert_type and branch
 	if branch:
 		for rule in settings.custom_alerts:
-			if rule.alert_type == alert_type and rule.branch == branch:
-				return rule.as_dict() if rule.enabled else None
+			if rule.alert_type == alert_type and rule.branch == branch and rule.enabled:
+				return rule.as_dict()
 
 	# Fall back to global default (alert_type match, no branch)
 	for rule in settings.custom_alerts:

@@ -145,22 +145,32 @@ def _attach_ready_posting_intent(result, actor):
 	if result.get("idempotent_replay"):
 		return result
 
-	# sa-architecture-closure: fulfilment posting (this service creating a
-	# Stock Entry) and native POS Invoice deduction (`update_stock=1`, set by
-	# `_apply_pos_stock_authority()` in ury_order.py) must never both be
-	# authoritative for the same item. Today `pos_stock_authority_v2` is OFF
-	# everywhere, which makes native POS the sole stock authority -- so
-	# marking a KOT item READY must NOT also create a fulfilment Stock Entry
-	# for it; native POS will deduct it at invoice time instead. This is a
-	# quiet no-op here (not a thrown error) because READY is a routine
-	# kitchen-workflow transition that must keep working under today's
-	# universal default; the hard stop belongs at the point stock would
-	# actually double-post, not at "the chef marked food ready".
-	from ury.ury.api.ury_feature_flags import is_pos_stock_authority_flag_enabled
+	# There are two distinct stock ledgers here, with one owner each, and
+	# they are NOT competitors for the same quantity:
+	#
+	#   Sale       -- owned by native ERPNext, always, in every mode. Posted
+	#                 once per session at POS Closing Entry, via the
+	#                 consolidated Sales Invoice's `update_stock = 1`. The
+	#                 POS Invoice itself posts nothing (it has no
+	#                 `update_stock` field), so nothing here suppresses
+	#                 anything: native's deduction is never opted out of.
+	#   Production -- owned by the fulfilment posting service, and only when
+	#                 POS Stock Authority V2 is enabled. Posted in real time
+	#                 at READY, as a `Manufacture` Stock Entry that consumes
+	#                 raw components and receives the finished good into the
+	#                 same department warehouse the sale later deducts from,
+	#                 so the two net out.
+	#
+	# With the flag off there is simply no production ledger: the item is
+	# deducted once, by native, at closing. A quiet no-op (not a thrown
+	# error) because READY is a routine kitchen-workflow transition that must
+	# keep working in the default configuration.
+	from ury.ury.api.ury_stock_policy import get_branch_stock_policy
 
 	branch = result.get("branch")
 	company = result.get("company")
-	if not is_pos_stock_authority_flag_enabled(company=company, branch=branch):
+	policy = get_branch_stock_policy(branch=branch, company=company)
+	if not policy.realtime_production_posting_enabled:
 		result["posting_intent"] = None
 		result["posting_intent_status"] = "SKIPPED_NATIVE_POS_AUTHORITY"
 		return result
@@ -170,6 +180,12 @@ def _attach_ready_posting_intent(result, actor):
 		enqueue_posting_intent,
 	)
 
+	# Only MADE_TO_ORDER items have a production event to post here; the
+	# service itself decides that, from the policy frozen onto the
+	# reservation at order time, and returns a name-less intent with status
+	# "SKIPPED_NOT_MADE_TO_ORDER" for anything else. Keeping the decision
+	# there rather than duplicating a policy lookup here means it is made
+	# once, from the authoritative frozen value, for every caller.
 	doc = frappe.get_doc(ITEM_EXECUTION_DOCTYPE, result["name"])
 	intent = create_or_get_posting_intent_for_ready(doc, actor=actor)
 	result["posting_intent"] = intent.get("name")

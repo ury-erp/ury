@@ -65,7 +65,7 @@ def set_bom_revision(doc):
     """
     vector = sorted(
         (row.item_code, round(row.qty or 0, 6), row.uom)
-        for row in (doc.items or [])
+        for row in (doc.get("items") or [])
         if row.item_code
     )
     payload = repr(vector).encode("utf-8")
