@@ -57,12 +57,21 @@ class URYBranchStockPolicy(Document):
 		write and re-read a policy row within the same unit of work, and
 		every test in a bench test run shares one `frappe.local`. Clearing
 		the memo on write keeps `get_branch_stock_policy` honest in both
-		cases. `clear_branch_stock_policy_cache` already swallows all
-		exceptions, so this can never break a save.
+		cases. `clear_branch_stock_policy_cache` already swallows all of its
+		own exceptions, but this method wraps the call in its own
+		try/except as defense-in-depth: even if that invariant is ever
+		broken (or violated by a test double), a save or delete of this
+		document must never fail because the cache could not be cleared.
 		"""
 		from ury.ury.api.ury_stock_policy import clear_branch_stock_policy_cache
 
-		clear_branch_stock_policy_cache(self.branch)
+		try:
+			clear_branch_stock_policy_cache(self.branch)
+		except Exception:
+			frappe.log_error(
+				title="URY Branch Stock Policy: cache invalidation failed",
+				message=frappe.get_traceback(),
+			)
 
 	def _validate_gate_dependencies(self):
 		if self.realtime_production_posting_enabled and not self.reservation_control_enabled:
