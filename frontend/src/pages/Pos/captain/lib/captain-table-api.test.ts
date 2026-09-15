@@ -15,19 +15,10 @@ describe('getActiveTableOrders', () => {
     getDocListMock.mockReset();
   });
 
-  it('fetches active (docstatus=0) invoices for the branch and maps by restaurant_table', async () => {
-    getDocListMock.mockResolvedValueOnce([
-      {
-        name: 'INV-1',
-        restaurant_table: 'T-1',
-        custom_merged_tables: null,
-        waiter: 'waiter@example.com',
-        grand_total: 500,
-        invoice_printed: 0,
-      },
-    ]);
+  it('queries active (docstatus=0) POS Invoices for the given branch with the expected fields', async () => {
+    getDocListMock.mockResolvedValueOnce([]);
 
-    const result = await getActiveTableOrders('Kozhikode');
+    await getActiveTableOrders('Kozhikode');
 
     expect(getDocListMock).toHaveBeenCalledWith(
       'POS Invoice',
@@ -44,24 +35,41 @@ describe('getActiveTableOrders', () => {
           ['branch', '=', 'Kozhikode'],
           ['docstatus', '=', 0],
         ],
-      })
+      }),
     );
+  });
+
+  it('maps each row to its restaurant_table', async () => {
+    getDocListMock.mockResolvedValueOnce([
+      {
+        name: 'INV-1',
+        restaurant_table: 'T-1',
+        custom_merged_tables: null,
+        waiter: 'waiter@example.com',
+        grand_total: 500,
+        invoice_printed: 0,
+      },
+    ]);
+
+    const result = await getActiveTableOrders('Kozhikode');
+
     expect(result.get('T-1')).toEqual({
       invoiceName: 'INV-1',
       waiter: 'waiter@example.com',
       grandTotal: 500,
       invoicePrinted: false,
     });
+    expect(result.size).toBe(1);
   });
 
-  it('maps the same invoice info onto every merged partner table, not just the primary table', async () => {
+  it('also indexes merged-table partners under the same invoice info', async () => {
     getDocListMock.mockResolvedValueOnce([
       {
         name: 'INV-2',
-        restaurant_table: 'T-1',
-        custom_merged_tables: 'T-2, T-3',
-        waiter: 'waiter@example.com',
-        grand_total: 900,
+        restaurant_table: 'T-2',
+        custom_merged_tables: 'T-3, T-4',
+        waiter: 'waiter2@example.com',
+        grand_total: 1200,
         invoice_printed: 1,
       },
     ]);
@@ -69,20 +77,25 @@ describe('getActiveTableOrders', () => {
     const result = await getActiveTableOrders('Kozhikode');
 
     expect(result.size).toBe(3);
-    expect(result.get('T-1')?.invoiceName).toBe('INV-2');
-    expect(result.get('T-2')?.invoiceName).toBe('INV-2');
-    expect(result.get('T-3')?.invoiceName).toBe('INV-2');
-    expect(result.get('T-2')?.invoicePrinted).toBe(true);
+    const expected = {
+      invoiceName: 'INV-2',
+      waiter: 'waiter2@example.com',
+      grandTotal: 1200,
+      invoicePrinted: true,
+    };
+    expect(result.get('T-2')).toEqual(expected);
+    expect(result.get('T-3')).toEqual(expected);
+    expect(result.get('T-4')).toEqual(expected);
   });
 
-  it('skips setting a primary-table entry when restaurant_table is null (e.g. a take-away invoice)', async () => {
+  it('skips indexing under restaurant_table when it is null (take-away/pickup invoices)', async () => {
     getDocListMock.mockResolvedValueOnce([
       {
         name: 'INV-3',
         restaurant_table: null,
         custom_merged_tables: null,
-        waiter: 'waiter@example.com',
-        grand_total: 200,
+        waiter: 'waiter3@example.com',
+        grand_total: 300,
         invoice_printed: 0,
       },
     ]);
@@ -94,7 +107,9 @@ describe('getActiveTableOrders', () => {
 
   it('returns an empty map when no active invoices exist', async () => {
     getDocListMock.mockResolvedValueOnce([]);
+
     const result = await getActiveTableOrders('Kozhikode');
+
     expect(result.size).toBe(0);
   });
 });
@@ -104,27 +119,28 @@ describe('getUserFullNames', () => {
     getDocListMock.mockReset();
   });
 
-  it('returns an empty map without calling the backend when given no user names', async () => {
+  it('returns an empty map without calling the API when given no user names', async () => {
     const result = await getUserFullNames([]);
+
     expect(result.size).toBe(0);
     expect(getDocListMock).not.toHaveBeenCalled();
   });
 
-  it('dedupes and filters falsy user names before querying, using an `in` filter', async () => {
-    getDocListMock.mockResolvedValueOnce([{ name: 'a@example.com', full_name: 'Alice A' }]);
+  it('filters out falsy entries and de-duplicates before querying', async () => {
+    getDocListMock.mockResolvedValueOnce([]);
 
-    await getUserFullNames(['a@example.com', 'a@example.com', '', 'a@example.com']);
+    await getUserFullNames(['a@example.com', '', 'a@example.com', 'b@example.com']);
 
     expect(getDocListMock).toHaveBeenCalledWith(
       'User',
       expect.objectContaining({
-        filters: [['name', 'in', ['a@example.com']]],
-        limit: 1,
-      })
+        filters: [['name', 'in', ['a@example.com', 'b@example.com']]],
+        limit: 2,
+      }),
     );
   });
 
-  it('falls back to the raw user id when full_name is missing', async () => {
+  it('maps user name -> full_name, falling back to the user id when full_name is missing', async () => {
     getDocListMock.mockResolvedValueOnce([
       { name: 'a@example.com', full_name: 'Alice A' },
       { name: 'b@example.com', full_name: '' },
